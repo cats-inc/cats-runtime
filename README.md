@@ -1,80 +1,57 @@
 # cats-runtime
 
-> Thin facade over agent execution backends. Phase 1 wraps `agent-fleet` over HTTP.
+> Unified runtime for subscription CLIs today, API backends later.
 
 ## Overview
 
-`cats-runtime` is the stable runtime boundary intended for future products such as
-`cats-inc`. It hides backend-specific details behind a small HTTP surface so upper
-layers do not depend on `agent-fleet` internals directly.
+`cats-runtime` is the stable execution boundary for upper-layer products such as
+`cats-inc` and `crew-chat-poc`. It now embeds the CLI runtime directly instead
+of proxying to a second local `agent-fleet` service.
 
-The first implementation is intentionally narrow:
+Current capabilities:
 
-- health inspection
-- session creation
-- session lookup
-- message streaming
-- session close
-- Kiro model catalog passthrough
+- session lifecycle management for CLI-backed runtimes
+- streamed turns over SSE or NDJSON
+- external session discovery for supported local tools
+- provider-specific helpers such as Kiro model inspection
 
 ## Current Status
 
 - [x] Bootstrap the subproject
-- [x] Implement the first `agent-fleet` adapter
-- [x] Add streaming passthrough tests
+- [x] Embed the CLI runtime into `cats-runtime`
+- [x] Remove the external `agent-fleet` HTTP hop
+- [x] Add direct runtime route tests
 - [ ] Migrate `crew-chat-poc` to call `cats-runtime`
-- [ ] Add a second backend (`api-runtime`)
+- [ ] Add `backends/api` for pay-as-you-go API keys and Ollama
 
 ## Design Rules
 
-- `cats-runtime` MUST treat `agent-fleet` as an external backend boundary
-- `cats-runtime` MUST NOT source-import `agent-fleet/src/...`
-- Public callers should depend on `cats-runtime`, not on backend-specific routes
+- Public callers should depend on `cats-runtime`, not provider-specific CLIs
+- `src/core` holds runtime-wide contracts and config
+- `src/backends/cli` holds embedded CLI runtime logic ported from `agent-fleet`
+- `src/http` exposes the inbound HTTP contract
+- Future API-native providers should land under `src/backends/api`
 
 ## Quick Start
 
 ```powershell
 cd cats-runtime
-npm install
 copy .env.example .env
+npm install
 npm run build
 node dist/index.js
 ```
 
 Default URL: `http://127.0.0.1:3110`
 
-Upstream dependency: `agent-fleet` at `http://localhost:3100`
-
 ## Key Files
 
-- `src/index.ts` - process entrypoint
-- `src/server.ts` - HTTP server and route handling
-- `src/adapters/agentFleetBackend.ts` - upstream adapter
-- `docs/api.md` - supported public API
-- `docs/architecture.md` - boundary and layering notes
-- [ ] Task 2 - description
-- [x] Task 3 - completed
-
-## Quick Start
-
-```bash
-# Clone the repository
-git clone https://github.com/username/project-name.git
-cd project-name
-
-# Setup environment (example)
-cp .env.example .env
-# Edit .env with your values
-
-# Install dependencies (choose based on your stack)
-# Python:
-python -m venv .venv
-.venv\Scripts\activate  # Windows
-pip install -r requirements.txt
-
-# Node.js:
-npm install
-```
+- `src/index.ts` - process entrypoint and shutdown wiring
+- `src/server.ts` - single-service runtime bootstrap
+- `src/http/app.ts` - route registration and auth middleware
+- `src/backends/cli/` - embedded CLI runtime modules
+- `docs/api.md` - public HTTP surface
+- `docs/architecture.md` - internal layout and data flow
 
 ## Documentation
 
@@ -82,38 +59,9 @@ See [docs/](./docs/) for detailed documentation:
 
 - [Setup Guide](./docs/setup-guide.md)
 - [Architecture](./docs/architecture.md)
+- [API](./docs/api.md)
 - [Contributing](./CONTRIBUTING.md)
-- [Script Standards](./docs/SCRIPT-STANDARDS.md)
-- [Research Log](./docs/research/)
-
-## Project Structure
-
-```
-project-root/
-├── src/           # Source code
-├── tests/         # Test files
-├── docs/          # Documentation
-├── scripts/       # Build/deployment scripts
-├── config/        # Configuration files
-└── assets/        # Static assets
-```
-
-## Maintenance
-
-### Updating Agent Rules & Templates
-
-This project follows AAIF standards. You can update the core infrastructure files (Agent rules, documentation templates) using the built-in update scripts:
-
-**Windows**
-```powershell
-.\scripts\windows\Update-Project.ps1
-```
-
-**Linux / macOS**
-```bash
-./scripts/linux/update-project.sh
-```
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+This project is licensed under the MIT License. See [LICENSE](./LICENSE).

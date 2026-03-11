@@ -11,10 +11,9 @@
 ## Project-Specific Context
 
 - `cats-runtime` is the future stable runtime boundary for upper-layer products
-- Phase 1 wraps `agent-fleet` as an external HTTP backend
-- Do not import `../agent-fleet/src/...`
+- The CLI runtime is now embedded under `src/backends/cli`
+- Use `agent-fleet` only as a migration/reference source, not a runtime dependency
 - Default listener: `http://127.0.0.1:3110`
-- Default upstream backend: `http://localhost:3100`
 
 ## Current API Surface
 
@@ -24,12 +23,20 @@
 - `POST /sessions`
 - `POST /sessions/:id/messages`
 - `POST /sessions/:id/close`
+- `POST /sessions/:id/resume`
+- `POST /sessions/:id/fork`
+- `DELETE /sessions/:id`
+- `GET /sessions/:id/history`
+- `GET /sessions/:id/stream`
+- `GET /pool/status`
+- `GET /browse`
 - `GET /kiro/models`
 
 ## Working Rules
 
 - Favor the smallest public contract that keeps upper layers decoupled
-- Keep transport details in adapters, not in future consumers
+- Keep inbound transport details in `src/http`, not in backend modules
+- Keep CLI-specific logic in `src/backends/cli`
 - Update `docs/api.md` and `docs/architecture.md` when changing the public surface
 - Add or update tests for every route change
 
@@ -105,4 +112,4 @@ Before completing a task or handing off:
 
 ---
 
-*Last updated: YYYY-MM-DD*
+*Last updated: 2026-03-11*

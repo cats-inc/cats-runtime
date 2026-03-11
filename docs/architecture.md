@@ -1,14 +1,18 @@
 # System Architecture
 
-> Phase 1 architecture for the `cats-runtime` thin facade.
+> Current architecture for the embedded `cats-runtime` service.
 
 ## Overview
 
-`cats-runtime` sits between product-facing applications and execution backends.
-It provides a stable contract while keeping backend-specific transport logic inside
-small adapters.
+`cats-runtime` now runs as a single service. The CLI runtime that previously
+lived behind the `agent-fleet` HTTP boundary has been ported into this repo and
+organized under `src/backends/cli`.
 
-In phase 1, the only backend is `agent-fleet`.
+The architectural split is:
+
+- `core`: shared runtime config and stable types
+- `backends`: execution implementations (`cli` now, `api` later)
+- `http`: inbound transport and route wiring
 
 ## Architecture Diagram
 
@@ -18,71 +22,85 @@ In phase 1, the only backend is `agent-fleet`.
 └──────────┬───────────┘
            │ stable HTTP contract
            ▼
-┌──────────────────────┐
-│     cats-runtime     │
-│  route + auth layer  │
-│  backend adapters    │
-└──────────┬───────────┘
-           │ backend adapter
+┌───────────────────────────────────────────┐
+│               cats-runtime                │
+│  http routes + auth + streaming          │
+│  core contracts + config                 │
+│  backends/cli session pool + discovery   │
+└──────────┬────────────────────────────────┘
+           │ subprocess / local files / local APIs
            ▼
-┌──────────────────────┐
-│     agent-fleet      │
-│ CLI provider runtime │
-└──────────────────────┘
+┌───────────────────────────────────────────┐
+│ Claude / Codex / Gemini / Kiro / Cursor  │
+│ Auggie / OpenCode local runtimes         │
+└───────────────────────────────────────────┘
 ```
 
-## Components
-
-### HTTP Server
-
-- **Purpose**: expose the public `cats-runtime` contract
-- **Technology**: Node.js built-in `http`
-- **Responsibilities**:
-  - route matching
-  - optional inbound auth
-  - upstream response relay
-  - local health reporting
-
-### `agent-fleet` Adapter
-
-- **Purpose**: encapsulate upstream transport to `agent-fleet`
-- **Technology**: Node.js built-in `fetch`
-- **Responsibilities**:
-  - upstream auth injection
-  - timeout handling
-  - health probing
-  - raw response passthrough for JSON and NDJSON streams
-
-## Data Flow
-
-1. A caller sends a request to `cats-runtime`
-2. `cats-runtime` validates the inbound request and auth
-3. The `agent-fleet` adapter forwards the request to the configured upstream backend
-4. `cats-runtime` relays the upstream response back to the caller
-
-## Design Rules
-
-- `cats-runtime` MUST NOT source-import `agent-fleet` internals
-- Adapters own backend-specific headers, URLs, and timeout policy
-- Upper layers should depend on the `cats-runtime` contract, not on `agent-fleet`
-
-## Future Shape
-
-The intended internal structure is:
+## Internal Layout
 
 ```text
 src/
   core/
-  adapters/
-    agentFleetBackend.ts
-    apiRuntimeBackend.ts   # future
+    config.ts
+    dotenv.ts
+    types.ts
+  backends/
+    cli/
+      auggie/
+      cursor/
+      discovery/
+      kiro/
+      opencode/
+      pool/
+      providers/
+      runtime/
+  http/
+    app.ts
+    auth.ts
+    routes/
+    streaming.ts
 ```
 
-When the second backend lands, upper layers should still keep the same contract.
+## Components
+
+### `src/http`
+
+- Exposes the public `cats-runtime` HTTP API
+- Applies optional bearer auth
+- Streams turn output as SSE or NDJSON
+
+### `src/backends/cli`
+
+- Manages subprocess-backed sessions
+- Tracks session registry and workspace modes
+- Discovers external native sessions from supported tools
+- Encapsulates provider-specific spawn, resume, fork, and permission logic
+
+### `src/core`
+
+- Loads runtime-wide configuration
+- Defines stable exported runtime types
+- Keeps shared utilities out of provider modules
+
+## Data Flow
+
+1. A caller sends a request to `cats-runtime`
+2. `src/http` authenticates and routes the request
+3. Session routes use `WorkerPool` and `SessionRegistry` inside `src/backends/cli`
+4. Provider adapters spawn or resume the target CLI/runtime
+5. Stream events are returned directly to the caller
+
+## Design Rules
+
+- Upper layers should depend on `cats-runtime`, not on provider-specific CLIs
+- `agent-fleet` remains a migration source/reference, not a runtime dependency
+- New API-key or Ollama integrations should land under `src/backends/api`
+- Inbound transport code should stay in `src/http`, not in backend modules
 
 ## Key Decisions
 
 - [001: Use an HTTP adapter around agent-fleet first](./decisions/001-agent-fleet-http-adapter.md)
+- [002: Embed the CLI runtime into cats-runtime](./decisions/002-embed-cli-runtime.md)
 
 ---
 

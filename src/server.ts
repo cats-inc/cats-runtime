@@ -1,172 +1,245 @@
 import { once } from 'node:events';
-import {
-  createServer,
-  type IncomingMessage,
-  type Server,
-  type ServerResponse,
-} from 'node:http';
-
-import { AgentFleetBackend } from './adapters/agentFleetBackend.js';
+import type { Server } from 'node:http';
+import { fileURLToPath } from 'node:url';
+import { createAdaptorServer } from '@hono/node-server';
+import { AuggieSessionService } from './backends/cli/auggie/AuggieSessionService.js';
 import { loadConfig } from './core/config.js';
-import {
-  readRequestBody,
-  relayUpstreamResponse,
-  sendJson,
-  sendMethodNotAllowed,
-  sendNotFound,
-  sendProxyError,
-} from './core/http.js';
 import type { RuntimeConfig } from './core/types.js';
+import { AuggieSessionScanner } from './backends/cli/discovery/AuggieSessionScanner.js';
+import { FileWatcher } from './backends/cli/discovery/FileWatcher.js';
+import { SessionScanner } from './backends/cli/discovery/SessionScanner.js';
+import { CodexSessionScanner } from './backends/cli/discovery/CodexSessionScanner.js';
+import { CopilotSessionScanner } from './backends/cli/discovery/CopilotSessionScanner.js';
+import { GeminiSessionScanner } from './backends/cli/discovery/GeminiSessionScanner.js';
+import { syncNativeSessions } from './backends/cli/discovery/nativeDiscovery.js';
+import { CursorNativeSessionService } from './backends/cli/cursor/CursorNativeSessionService.js';
+import { KiroNativeSessionService } from './backends/cli/kiro/KiroNativeSessionService.js';
+import { OpencodeNativeSessionService } from './backends/cli/opencode/OpencodeNativeSessionService.js';
+import { createRuntimeAdapter } from './backends/cli/runtime/runtime.js';
+import { SessionRegistry } from './backends/cli/pool/SessionRegistry.js';
+import { WorkerPool } from './backends/cli/pool/WorkerPool.js';
+import { createRuntimeApp, type AppContext } from './http/app.js';
+
+interface DiscoveryController {
+  start(): void;
+  stop(): void;
+}
 
 export interface RuntimeServer {
   server: Server;
+  app: ReturnType<typeof createRuntimeApp>;
+  context: AppContext;
   start(): Promise<{ host: string; port: number }>;
   close(): Promise<void>;
 }
 
-const ROUTE_METHODS = new Map<string, string[]>([
-  ['/health', ['GET']],
-  ['/sessions', ['GET', 'POST']],
-  ['/kiro/models', ['GET']],
-]);
-
-function matchesSessionRoute(pathname: string): boolean {
-  return /^\/sessions\/[^/]+$/u.test(pathname);
+function startWatcher(name: string, watcher: FileWatcher): void {
+  watcher.on('discovered', ({ count }) => {
+    console.log(`[discovery:${name}] Found ${count} new external session(s)`);
+  });
+  watcher.on('error', (error) => {
+    console.warn(`[discovery:${name}] Watcher error:`, error.message);
+  });
+  watcher.start().catch((error) => {
+    console.warn(`[discovery:${name}] Initial scan failed:`, error.message);
+  });
 }
 
-function matchesMessageRoute(pathname: string): boolean {
-  return /^\/sessions\/[^/]+\/messages$/u.test(pathname);
-}
+function createDiscoveryController(ctx: AppContext): DiscoveryController {
+  const auggieWatcher = new FileWatcher(
+    ctx.config.auggieSessionsDir,
+    new AuggieSessionScanner(ctx.auggieSessions),
+    'auggie',
+    ctx.registry,
+  );
+  const claudeWatcher = new FileWatcher(
+    ctx.config.claudeProjectsDir,
+    new SessionScanner(ctx.config.claudeProjectsDir),
+    'claude',
+    ctx.registry,
+  );
+  const codexWatcher = new FileWatcher(
+    ctx.config.codexSessionsDir,
+    new CodexSessionScanner(ctx.config.codexSessionsDir),
+    'codex',
+    ctx.registry,
+  );
+  const copilotWatcher = new FileWatcher(
+    ctx.config.copilotSessionsDir,
+    new CopilotSessionScanner(ctx.config.copilotSessionsDir),
+    'copilot',
+    ctx.registry,
+  );
+  const geminiWatcher = new FileWatcher(
+    ctx.config.geminiSessionsDir,
+    new GeminiSessionScanner(ctx.config.geminiSessionsDir),
+    'gemini',
+    ctx.registry,
+  );
 
-function matchesCloseRoute(pathname: string): boolean {
-  return /^\/sessions\/[^/]+\/close$/u.test(pathname);
-}
+  let cursorTimer: ReturnType<typeof setInterval> | null = null;
+  let kiroTimer: ReturnType<typeof setInterval> | null = null;
+  let opencodeTimer: ReturnType<typeof setInterval> | null = null;
+  let started = false;
 
-function isAuthorized(request: IncomingMessage, config: RuntimeConfig): boolean {
-  if (!config.apiKey) {
-    return true;
-  }
-  return request.headers.authorization === `Bearer ${config.apiKey}`;
-}
+  const startNativeDiscovery = (
+    name: 'cursor' | 'kiro' | 'opencode',
+    listAllSessions: () => Promise<Array<{
+      providerSessionId: string;
+      cwd: string;
+      summary?: string;
+      messageCount: number;
+      lastActivity?: string;
+      model?: string;
+    }>>,
+  ): ReturnType<typeof setInterval> | null => {
+    let running = false;
+    const label = name === 'cursor'
+      ? 'Cursor'
+      : name === 'kiro'
+        ? 'Kiro'
+        : 'OpenCode';
 
-function allowedMethodsFor(pathname: string): string[] | null {
-  const direct = ROUTE_METHODS.get(pathname);
-  if (direct) {
-    return direct;
-  }
-  if (matchesSessionRoute(pathname)) {
-    return ['GET'];
-  }
-  if (matchesMessageRoute(pathname)) {
-    return ['POST'];
-  }
-  if (matchesCloseRoute(pathname)) {
-    return ['POST'];
-  }
-  return null;
-}
+    const scan = async (): Promise<void> => {
+      if (running) return;
+      running = true;
 
-function upstreamHeaders(request: IncomingMessage): Record<string, string> {
-  const headers: Record<string, string> = {};
-  if (typeof request.headers.accept === 'string' && request.headers.accept) {
-    headers.accept = request.headers.accept;
-  }
-  if (
-    typeof request.headers['content-type'] === 'string'
-    && request.headers['content-type']
-  ) {
-    headers['content-type'] = request.headers['content-type'];
-  }
-  return headers;
-}
+      try {
+        const sessions = await listAllSessions();
+        const { newCount } = syncNativeSessions(ctx.registry, name, sessions);
+        if (newCount > 0) {
+          console.log(`[discovery:${name}] Imported ${newCount} native ${label} session(s)`);
+        }
+      } catch (error) {
+        console.warn(`[discovery:${name}] Native scan failed:`, (error as Error).message);
+      } finally {
+        running = false;
+      }
+    };
 
-async function proxyRequest(
-  request: IncomingMessage,
-  response: ServerResponse,
-  backend: AgentFleetBackend,
-  path: string,
-): Promise<void> {
-  const abortController = new AbortController();
-  request.on('close', () => abortController.abort());
+    if (ctx.config.nativeDiscoveryIntervalMs <= 0) {
+      return null;
+    }
 
-  try {
-    const body = request.method === 'GET' ? undefined : await readRequestBody(request);
-    const upstream = await backend.request(path, {
-      method: request.method,
-      body,
-      headers: upstreamHeaders(request),
-      signal: abortController.signal,
-    });
-    await relayUpstreamResponse(response, upstream);
-  } catch (error) {
-    sendProxyError(response, error);
-  }
-}
+    void scan();
 
-async function handleRequest(
-  request: IncomingMessage,
-  response: ServerResponse,
-  config: RuntimeConfig,
-  backend: AgentFleetBackend,
-): Promise<void> {
-  const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
+    return setInterval(() => {
+      void scan();
+    }, ctx.config.nativeDiscoveryIntervalMs);
+  };
 
-  if (!isAuthorized(request, config)) {
-    sendJson(response, 401, { error: 'Unauthorized' });
-    return;
-  }
+  return {
+    start() {
+      if (started) return;
+      started = true;
 
-  if (request.method === 'GET' && url.pathname === '/health') {
-    const health = await backend.getHealth();
-    sendJson(response, health.status === 'ok' ? 200 : 503, health);
-    return;
-  }
+      startWatcher('auggie', auggieWatcher);
+      startWatcher('claude', claudeWatcher);
+      startWatcher('codex', codexWatcher);
+      startWatcher('copilot', copilotWatcher);
+      startWatcher('gemini', geminiWatcher);
 
-  const allowedMethods = allowedMethodsFor(url.pathname);
-  if (!allowedMethods) {
-    sendNotFound(response);
-    return;
-  }
-
-  if (!allowedMethods.includes(request.method ?? 'GET')) {
-    sendMethodNotAllowed(response, allowedMethods);
-    return;
-  }
-
-  await proxyRequest(request, response, backend, `${url.pathname}${url.search}`);
+      cursorTimer = startNativeDiscovery('cursor', () => ctx.cursorNative.listAllSessions());
+      kiroTimer = startNativeDiscovery('kiro', () => ctx.kiroNative.listAllSessions());
+      opencodeTimer = startNativeDiscovery(
+        'opencode',
+        () => ctx.opencodeNative.listAllSessions({ startIfNeeded: false }),
+      );
+    },
+    stop() {
+      if (!started) return;
+      started = false;
+      auggieWatcher.stop();
+      claudeWatcher.stop();
+      codexWatcher.stop();
+      copilotWatcher.stop();
+      geminiWatcher.stop();
+      if (cursorTimer) clearInterval(cursorTimer);
+      if (kiroTimer) clearInterval(kiroTimer);
+      if (opencodeTimer) clearInterval(opencodeTimer);
+      cursorTimer = null;
+      kiroTimer = null;
+      opencodeTimer = null;
+    },
+  };
 }
 
 export function createRuntimeServer(
   config: RuntimeConfig = loadConfig(),
-  backend: AgentFleetBackend = new AgentFleetBackend(config),
 ): RuntimeServer {
-  const server = createServer((request, response) => {
-    void handleRequest(request, response, config, backend).catch((error) => {
-      sendProxyError(response, error);
-    });
+  const dataDir = fileURLToPath(new URL('../data', import.meta.url));
+  const registry = new SessionRegistry(dataDir, config.sessionBaseDir);
+  const auggieSessions = new AuggieSessionService(config.auggieSessionsDir);
+  const cursorNative = new CursorNativeSessionService({
+    command: config.cursorPath,
+    chatsDir: config.cursorChatsDir,
+    runtime: createRuntimeAdapter(config.cursorRuntime),
   });
+  const kiroNative = new KiroNativeSessionService({
+    command: config.kiroPath,
+    dbPath: config.kiroDbPath,
+    runtime: createRuntimeAdapter(config.kiroRuntime),
+  });
+  const opencodeNative = new OpencodeNativeSessionService({
+    command: config.opencodePath,
+    hostname: config.opencodeServerHost,
+    port: config.opencodeServerPort,
+    startupTimeoutMs: config.opencodeServerStartupTimeoutMs,
+  });
+  const pool = new WorkerPool(config, registry, kiroNative, auggieSessions, opencodeNative);
+  const context: AppContext = {
+    config,
+    registry,
+    pool,
+    cursorNative,
+    kiroNative,
+    auggieSessions,
+    opencodeNative,
+  };
+  const app = createRuntimeApp(context);
+  const server = createAdaptorServer({ fetch: app.fetch }) as Server;
+  const discovery = createDiscoveryController(context);
 
   return {
     server,
+    app,
+    context,
     async start() {
-      server.listen(config.port, config.host);
-      await once(server, 'listening');
+      discovery.start();
+
+      if (!server.listening) {
+        if (config.host) {
+          server.listen(config.port, config.host);
+        } else {
+          server.listen(config.port);
+        }
+        await once(server, 'listening');
+      }
+
       const address = server.address();
       if (!address || typeof address === 'string') {
-        return { host: config.host, port: config.port };
+        return { host: config.host || '0.0.0.0', port: config.port };
       }
+
       return { host: address.address, port: address.port };
     },
     async close() {
+      discovery.stop();
+      pool.killAll();
+      registry.flush();
+      await opencodeNative.close();
+
       if (!server.listening) {
         return;
       }
+
       if (typeof server.closeIdleConnections === 'function') {
         server.closeIdleConnections();
       }
       if (typeof server.closeAllConnections === 'function') {
         server.closeAllConnections();
       }
+
       server.close();
       await once(server, 'close');
     },

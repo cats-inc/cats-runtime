@@ -1,7 +1,7 @@
 {
   "name": "cats-runtime",
   "version": "0.1.0",
-  "description": "Thin facade over agent execution backends, starting with agent-fleet.",
+  "description": "Unified runtime for subscription CLIs and future API backends.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -15,11 +15,14 @@
   "keywords": [
     "cats",
     "runtime",
-    "agent-fleet",
-    "adapter"
+    "gateway",
+    "cli"
   ],
   "license": "MIT",
-  "dependencies": {},
+  "dependencies": {
+    "@hono/node-server": "^1.14.0",
+    "hono": "^4.7.0"
+  },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0"

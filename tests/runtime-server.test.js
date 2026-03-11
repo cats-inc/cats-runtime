@@ -1,224 +1,120 @@
 import assert from 'node:assert/strict';
-import { once } from 'node:events';
-import { createServer as createHttpServer } from 'node:http';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 
+import { loadConfig } from '../dist/core/config.js';
 import { createRuntimeServer } from '../dist/server.js';
 
-function createMockBackend(routeHandler) {
-  return createHttpServer((request, response) => {
-    void routeHandler(request, response);
-  });
-}
+function createTestConfig(overrides = {}) {
+  const root = mkdtempSync(join(tmpdir(), 'cats-runtime-test-'));
+  const env = {
+    HOME: root,
+    USERPROFILE: root,
+    CATS_RUNTIME_HOST: '127.0.0.1',
+    CATS_RUNTIME_PORT: '3110',
+    CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
+    CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
+    CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
+    AUGGIE_SESSIONS_DIR: join(root, '.augment', 'sessions'),
+    CLAUDE_PROJECTS_DIR: join(root, '.claude', 'projects'),
+    CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
+    COPILOT_SESSIONS_DIR: join(root, '.copilot', 'session-state'),
+    CURSOR_CHATS_DIR: join(root, '.cursor', 'chats'),
+    GEMINI_SESSIONS_DIR: join(root, '.gemini', 'tmp'),
+    KIRO_DB_PATH: join(root, '.kiro', 'data.sqlite3'),
+  };
 
-async function listen(server) {
-  server.listen(0, '127.0.0.1');
-  await once(server, 'listening');
-  const address = server.address();
-  if (!address || typeof address === 'string') {
-    throw new Error('Failed to read server address');
+  for (const dir of [
+    env.CATS_RUNTIME_SESSION_BASE_DIR,
+    env.AUGGIE_SESSIONS_DIR,
+    env.CLAUDE_PROJECTS_DIR,
+    env.CODEX_SESSIONS_DIR,
+    env.COPILOT_SESSIONS_DIR,
+    env.CURSOR_CHATS_DIR,
+    env.GEMINI_SESSIONS_DIR,
+    join(root, 'data'),
+  ]) {
+    mkdirSync(dir, { recursive: true });
   }
-  return `http://127.0.0.1:${address.port}`;
-}
 
-async function close(server) {
-  if (!server.listening) {
-    return;
-  }
-  if (typeof server.closeIdleConnections === 'function') {
-    server.closeIdleConnections();
-  }
-  if (typeof server.closeAllConnections === 'function') {
-    server.closeAllConnections();
-  }
-  server.close();
-  await once(server, 'close');
-}
-
-test('POST /sessions proxies JSON payloads and upstream auth', async () => {
-  const seen = { auth: '', body: '' };
-  const backend = createMockBackend(async (request, response) => {
-    if (request.url !== '/sessions' || request.method !== 'POST') {
-      response.writeHead(404).end();
-      return;
-    }
-
-    seen.auth = request.headers.authorization ?? '';
-    const chunks = [];
-    for await (const chunk of request) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-    seen.body = Buffer.concat(chunks).toString('utf8');
-
-    response.writeHead(201, { 'content-type': 'application/json' });
-    response.end(JSON.stringify({ id: 'session-1', status: 'ready' }));
-  });
-
-  const backendUrl = await listen(backend);
-  const runtime = createRuntimeServer({
+  const config = {
+    ...loadConfig(env),
     host: '127.0.0.1',
     port: 0,
-    apiKey: '',
-    backendBaseUrl: backendUrl,
-    backendApiKey: 'fleet-secret',
-    backendTimeoutMs: 5000,
-  });
+    ...overrides,
+  };
 
-  const runtimeAddress = await runtime.start();
-  const response = await fetch(
-    `http://${runtimeAddress.host}:${runtimeAddress.port}/sessions`,
-    {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ provider: 'claude', permissionMode: 'skip' }),
-    },
-  );
+  return { config, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+}
 
-  assert.equal(response.status, 201);
-  assert.deepEqual(await response.json(), { id: 'session-1', status: 'ready' });
-  assert.equal(seen.auth, 'Bearer fleet-secret');
-  assert.equal(
-    seen.body,
-    JSON.stringify({ provider: 'claude', permissionMode: 'skip' }),
-  );
-
-  await runtime.close();
-  await close(backend);
-});
-
-test('POST /sessions/:id/messages relays NDJSON streams unchanged', async () => {
-  const backend = createMockBackend(async (request, response) => {
-    if (request.url !== '/sessions/session-1/messages' || request.method !== 'POST') {
-      response.writeHead(404).end();
-      return;
-    }
-
-    response.writeHead(200, {
-      'content-type': 'application/x-ndjson',
-      'cache-control': 'no-cache',
-    });
-    response.write('{"type":"text","text":"hello"}\n');
-    response.write('{"type":"result","usage":{"inputTokens":1,"outputTokens":2}}\n');
-    response.end();
-  });
-
-  const backendUrl = await listen(backend);
-  const runtime = createRuntimeServer({
-    host: '127.0.0.1',
-    port: 0,
-    apiKey: '',
-    backendBaseUrl: backendUrl,
-    backendApiKey: '',
-    backendTimeoutMs: 5000,
-  });
-
-  const runtimeAddress = await runtime.start();
-  const response = await fetch(
-    `http://${runtimeAddress.host}:${runtimeAddress.port}/sessions/session-1/messages`,
-    {
-      method: 'POST',
-      headers: {
-        accept: 'application/x-ndjson',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ message: 'hi' }),
-    },
-  );
-
-  assert.equal(response.status, 200);
-  assert.equal(response.headers.get('content-type'), 'application/x-ndjson');
-  assert.equal(
-    await response.text(),
-    '{"type":"text","text":"hello"}\n'
-      + '{"type":"result","usage":{"inputTokens":1,"outputTokens":2}}\n',
-  );
-
-  await runtime.close();
-  await close(backend);
-});
-
-test('GET /kiro/models proxies the current model catalog', async () => {
-  const backend = createMockBackend(async (request, response) => {
-    if (request.url !== '/kiro/models' || request.method !== 'GET') {
-      response.writeHead(404).end();
-      return;
-    }
-
-    response.writeHead(200, { 'content-type': 'application/json' });
-    response.end(
-      JSON.stringify({
-        runtime: { mode: 'wsl' },
-        source: 'static',
-        models: ['claude-sonnet-4.5', 'deepseek-3.2'],
-      }),
-    );
-  });
-
-  const backendUrl = await listen(backend);
-  const runtime = createRuntimeServer({
-    host: '127.0.0.1',
-    port: 0,
-    apiKey: '',
-    backendBaseUrl: backendUrl,
-    backendApiKey: '',
-    backendTimeoutMs: 5000,
-  });
-
-  const runtimeAddress = await runtime.start();
-  const response = await fetch(
-    `http://${runtimeAddress.host}:${runtimeAddress.port}/kiro/models`,
-  );
-
-  assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), {
-    runtime: { mode: 'wsl' },
-    source: 'static',
-    models: ['claude-sonnet-4.5', 'deepseek-3.2'],
-  });
-
-  await runtime.close();
-  await close(backend);
-});
+async function withRuntime(overrides, run) {
+  const { config, cleanup } = createTestConfig(overrides);
+  const runtime = createRuntimeServer(config);
+  try {
+    const address = await runtime.start();
+    await run(address, runtime);
+  } finally {
+    await runtime.close();
+    cleanup();
+  }
+}
 
 test('GET /health enforces optional inbound auth', async () => {
-  const backend = createMockBackend(async (_request, response) => {
-    response.writeHead(200, { 'content-type': 'application/json' });
-    response.end(JSON.stringify({ status: 'ok', version: '0.1.0' }));
+  await withRuntime({ apiKey: 'runtime-secret' }, async (address) => {
+    const unauthenticated = await fetch(`http://${address.host}:${address.port}/health`);
+    assert.equal(unauthenticated.status, 401);
+
+    const authenticated = await fetch(
+      `http://${address.host}:${address.port}/health`,
+      {
+        headers: { authorization: 'Bearer runtime-secret' },
+      },
+    );
+
+    assert.equal(authenticated.status, 200);
+    const payload = await authenticated.json();
+    assert.equal(payload.service, 'cats-runtime');
+    assert.equal(payload.status, 'ok');
+    assert.equal(payload.version, '0.1.0');
+    assert.equal(typeof payload.timestamp, 'string');
   });
+});
 
-  const backendUrl = await listen(backend);
-  const runtime = createRuntimeServer({
-    host: '127.0.0.1',
-    port: 0,
-    apiKey: 'runtime-secret',
-    backendBaseUrl: backendUrl,
-    backendApiKey: '',
-    backendTimeoutMs: 5000,
+test('GET /sessions returns the embedded registry state', async () => {
+  await withRuntime({}, async (address) => {
+    const response = await fetch(`http://${address.host}:${address.port}/sessions`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      sessions: [],
+      count: 0,
+    });
   });
+});
 
-  const runtimeAddress = await runtime.start();
-  const unauthenticated = await fetch(
-    `http://${runtimeAddress.host}:${runtimeAddress.port}/health`,
-  );
-  assert.equal(unauthenticated.status, 401);
+test('POST /sessions rejects unknown providers before spawning', async () => {
+  await withRuntime({}, async (address) => {
+    const response = await fetch(`http://${address.host}:${address.port}/sessions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ provider: 'unknown-cli', cwd: 'C:/repo' }),
+    });
 
-  const authenticated = await fetch(
-    `http://${runtimeAddress.host}:${runtimeAddress.port}/health`,
-    {
-      headers: { authorization: 'Bearer runtime-secret' },
-    },
-  );
+    assert.equal(response.status, 400);
+    const payload = await response.json();
+    assert.match(payload.error, /Unknown provider 'unknown-cli'/);
+  });
+});
 
-  assert.equal(authenticated.status, 200);
-  const payload = await authenticated.json();
-  assert.equal(payload.service, 'cats-runtime');
-  assert.equal(payload.status, 'ok');
-  assert.equal(payload.backend.kind, 'agent-fleet');
-  assert.equal(payload.backend.reachable, true);
-  assert.equal(payload.backend.status, 'ok');
-  assert.equal(payload.backend.version, '0.1.0');
-  assert.equal(typeof payload.timestamp, 'string');
-
-  await runtime.close();
-  await close(backend);
+test('GET /kiro/models returns the local catalog without an upstream proxy', async () => {
+  await withRuntime({ kiroRuntime: { mode: 'wsl' } }, async (address) => {
+    const response = await fetch(`http://${address.host}:${address.port}/kiro/models`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      runtime: { mode: 'wsl' },
+      source: 'static',
+      models: ['claude-sonnet-4.5', 'deepseek-3.2', 'minimax-m2.1'],
+    });
+  });
 });

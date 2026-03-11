@@ -7,41 +7,17 @@
 
 | Service | Port | Env Var | Purpose | Notes |
 |---------|------|---------|---------|-------|
-| `cats-runtime` | 3110 | `CATS_RUNTIME_PORT` | Thin runtime facade for upper-layer apps | Default host `127.0.0.1` |
-
-## External Dependencies
-
-| Service | Default URL | Ownership | Purpose |
-|---------|-------------|-----------|---------|
-| `agent-fleet` | `http://localhost:3100` | External backend to this subproject | Phase 1 CLI runtime backend |
-
-<!-- TODO: Add your project's services here. One row per service. -->
-
-| Service Name | Port | Protocol | Description | Start Command |
-|--------------|------|----------|-------------|---------------|
-| | | | | |
-
-<!-- Example entries (remove when you have real entries):
-| Frontend Dev Server | 3000 | TCP | Vite dev server for React app | npm run dev |
-| Backend API | 8000 | TCP | FastAPI application server | uvicorn main:app |
-| PostgreSQL | 5432 | TCP | Primary database | docker compose up db |
--->
+| `cats-runtime` | 3110 | `CATS_RUNTIME_PORT` | Unified runtime service for upper-layer apps | Default host `127.0.0.1` |
+| `opencode` embedded server | 4097 | `OPENCODE_SERVER_PORT` | Local OpenCode HTTP bridge used by the OpenCode backend | Started on demand by `cats-runtime` |
 
 ## Environment Variables
 
 Port numbers should be configurable via environment variables so developers can override defaults when needed.
 
-<!-- TODO: List the .env variables that control port settings -->
-
 | Variable | Default | Service | Notes |
 |----------|---------|---------|-------|
-| | | | |
-
-<!-- Example entries:
-| VITE_PORT | 3000 | Frontend Dev Server | Set in .env or vite.config |
-| API_PORT | 8000 | Backend API | Set in .env |
-| DB_PORT | 5432 | PostgreSQL | Set in docker-compose.yml |
--->
+| `CATS_RUNTIME_PORT` | `3110` | `cats-runtime` | Main inbound HTTP listener |
+| `OPENCODE_SERVER_PORT` | `4097` | `opencode` embedded server | Only used when the OpenCode backend is active |
 
 ## Cross-Project Port Coordination
 
@@ -60,4 +36,4 @@ This project was created from **project-bootstrap**, which maintains a central p
 
 ---
 
-*Last updated: <!-- Update this when making changes -->*
+*Last updated: 2026-03-11*

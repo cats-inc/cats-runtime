@@ -1,22 +1,7 @@
-export interface RuntimeConfig {
-  host: string;
-  port: number;
-  apiKey: string;
-  backendBaseUrl: string;
-  backendApiKey: string;
-  backendTimeoutMs: number;
-}
-
-export interface RuntimeHealth {
-  service: 'cats-runtime';
-  status: 'ok' | 'degraded';
-  timestamp: string;
-  backend: {
-    kind: 'agent-fleet';
-    baseUrl: string;
-    reachable: boolean;
-    status?: string;
-    version?: string;
-    error?: string;
-  };
-}
+export type { FleetConfig as RuntimeConfig } from '../backends/cli/config.js';
+export type {
+  SessionInfo,
+  SessionStatus,
+  SessionView,
+  WorkspaceMode,
+} from '../backends/cli/pool/types.js';

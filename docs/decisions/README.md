@@ -38,6 +38,8 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
+| [002-embed-cli-runtime](./002-embed-cli-runtime.md) | Embed the CLI runtime into `cats-runtime` | Accepted | 2026-03-11 |
+| [001-agent-fleet-http-adapter](./001-agent-fleet-http-adapter.md) | Use an HTTP adapter around `agent-fleet` first | Superseded | 2026-03-11 |
 | [000-template](./000-template.md) | Template | - | - |
 <!-- Add new ADRs above this line -->
 

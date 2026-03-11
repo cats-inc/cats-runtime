@@ -1,11 +1,11 @@
 # API Specification
 
-> Public HTTP surface for the first `cats-runtime` facade.
+> Public HTTP surface for the embedded `cats-runtime` service.
 
 ## Overview
 
-`cats-runtime` is a thin HTTP facade. In phase 1 it forwards supported requests to
-`agent-fleet` while presenting a stable endpoint set to upstream consumers.
+`cats-runtime` serves the runtime contract directly. Requests no longer hop
+through a second local `agent-fleet` HTTP service.
 
 ## Base URL
 
@@ -21,17 +21,16 @@ Inbound auth is optional. When `CATS_RUNTIME_API_KEY` is set, clients must send:
 Authorization: Bearer <cats-runtime-api-key>
 ```
 
-Upstream auth to `agent-fleet` is configured separately with `AGENT_FLEET_API_KEY`.
+`GET /sessions/{id}/stream` also accepts `?token=<api-key>` for EventSource use
+cases where custom headers are awkward.
 
-## Endpoints
+## Core Endpoints
 
 ### Health
 
 ```text
 GET /health
 ```
-
-Returns the local runtime status plus backend reachability.
 
 Example response:
 
@@ -40,41 +39,26 @@ Example response:
   "service": "cats-runtime",
   "status": "ok",
   "timestamp": "2026-03-11T12:34:56.000Z",
-  "backend": {
-    "kind": "agent-fleet",
-    "baseUrl": "http://localhost:3100",
-    "reachable": true,
-    "status": "ok",
-    "version": "0.1.0"
-  }
+  "version": "0.1.0"
 }
 ```
 
-### List Sessions
+### Sessions
 
 ```text
-GET /sessions
+GET    /sessions
+POST   /sessions
+GET    /sessions/{id}
+POST   /sessions/{id}/messages
+POST   /sessions/{id}/close
+POST   /sessions/{id}/resume
+POST   /sessions/{id}/fork
+DELETE /sessions/{id}
+GET    /sessions/{id}/history
+GET    /sessions/{id}/stream
 ```
 
-Passes through the query string and returns the upstream JSON payload.
-
-### Get Session
-
-```text
-GET /sessions/{id}
-```
-
-Returns the upstream session view unchanged.
-
-### Create Session
-
-```text
-POST /sessions
-```
-
-The request body is forwarded to `agent-fleet` unchanged.
-
-Minimal example:
+Minimal create example:
 
 ```json
 {
@@ -85,16 +69,7 @@ Minimal example:
 }
 ```
 
-### Send Message
-
-```text
-POST /sessions/{id}/messages
-Accept: application/x-ndjson
-```
-
-The request body is forwarded unchanged. The upstream response stream is relayed as-is.
-
-Example request body:
+Message example:
 
 ```json
 {
@@ -102,25 +77,37 @@ Example request body:
 }
 ```
 
-### Close Session
+`POST /sessions/{id}/messages` supports:
+
+- `Accept: text/event-stream`
+- `Accept: application/x-ndjson`
+
+### Runtime Inspection
 
 ```text
-POST /sessions/{id}/close
-```
-
-Returns the upstream close response unchanged.
-
-### Kiro Models
-
-```text
+GET /pool/status
+GET /browse?path=...
 GET /kiro/models
 ```
 
-Returns the current Kiro model catalog from the configured backend.
+### Native Session Discovery
+
+```text
+GET  /auggie/sessions
+POST /auggie/sessions/discover
+GET  /codex/sessions
+POST /codex/sessions/discover
+GET  /cursor/sessions
+POST /cursor/sessions/discover
+GET  /kiro/sessions
+POST /kiro/sessions/discover
+GET  /opencode/sessions
+POST /opencode/sessions/discover
+```
 
 ## Error Responses
 
-Local facade errors use this format:
+Errors use this format:
 
 ```json
 {
@@ -128,13 +115,13 @@ Local facade errors use this format:
 }
 ```
 
-Proxy errors preserve upstream status codes when an upstream response exists.
-Connectivity failures return `502`.
-
 ## Notes
 
-- `cats-runtime` currently supports only the routes listed above
-- This contract is intentionally small so upper layers do not absorb extra backend detail
+- The public contract is served directly by `cats-runtime`
+- Provider-specific capabilities still differ; not every provider supports
+  resume, fork, or permission enforcement in the same way
+- Future API-key and Ollama support will be added under `backends/api` without
+  requiring a new inbound service
 
 ---
 

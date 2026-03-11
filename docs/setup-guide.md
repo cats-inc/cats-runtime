@@ -5,7 +5,8 @@
 ## Prerequisites
 
 - Node.js 22+
-- `agent-fleet` running on `http://localhost:3100` for phase 1
+- Installed local CLIs for the providers you want to use (`claude`, `codex`,
+  `gemini`, `cursor-agent`, `kiro-cli`, `opencode`, etc.)
 
 ## Installation
 
@@ -23,8 +24,10 @@ Key variables in `.env`:
 - `CATS_RUNTIME_HOST=127.0.0.1`
 - `CATS_RUNTIME_PORT=3110`
 - `CATS_RUNTIME_API_KEY=`
-- `AGENT_FLEET_BASE_URL=http://localhost:3100`
-- `AGENT_FLEET_API_KEY=`
+- `CATS_RUNTIME_SESSION_BASE_DIR=...`
+- `CATS_RUNTIME_MAX_SESSIONS=10`
+- `CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS=5000`
+- `OPENCODE_SERVER_PORT=4097`
 
 ## Running the Project
 
@@ -69,7 +72,7 @@ Remove setup:
 ## Verify Installation
 
 ```powershell
-node ..\agent-fleet\node_modules\typescript\bin\tsc -p tsconfig.json --typeRoots ..\agent-fleet\node_modules\@types
+npm run build
 node --test --test-isolation=none tests\runtime-server.test.js
 Invoke-WebRequest http://127.0.0.1:3110/health -UseBasicParsing
 ```
@@ -86,10 +89,15 @@ Use:
 
 Then restart, or change `CATS_RUNTIME_PORT` in `.env`.
 
-### Health is `degraded`
+### Native provider discovery logs errors
 
-`cats-runtime` is up, but phase 1 still depends on `agent-fleet`. Check
-`AGENT_FLEET_BASE_URL` and confirm `agent-fleet` is running.
+`cats-runtime` can discover native sessions from local CLIs. If a provider is not
+installed or not executable in the current environment, that provider's discovery
+scan may log an error. Fix the provider path or disable discovery with:
+
+```powershell
+CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS=0
+```
 
 ---
 
