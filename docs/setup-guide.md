@@ -1,102 +1,96 @@
 # Setup Guide
 
-> Environment setup and installation instructions.
+> Environment setup and run instructions for `cats-runtime`.
 
 ## Prerequisites
 
-- [ ] Prerequisite 1 (e.g., Python 3.10+)
-- [ ] Prerequisite 2 (e.g., Node.js 18+)
-- [ ] Prerequisite 3 (e.g., Docker)
+- Node.js 22+
+- `agent-fleet` running on `http://localhost:3100` for phase 1
 
 ## Installation
 
-### 1. Clone Repository
-
-```bash
-git clone https://github.com/username/project-name.git
-cd project-name
-```
-
-### 2. Environment Setup
-
-```bash
-# Copy environment template
-cp .env.example .env
-
-# Edit .env with your values
-# (Add specific variables that need to be configured)
-```
-
-### 3. Dependencies
-
-#### Python Project
-
-```bash
-# Create virtual environment
-python -m venv .venv
-
-# Activate (Windows)
-.venv\Scripts\activate
-
-# Activate (Linux/macOS)
-source .venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-# or
-pip install -e ".[dev]"
-```
-
-#### Node.js Project
-
-```bash
+```powershell
+cd cats-runtime
+copy .env.example .env
 npm install
-# or
-yarn install
+npm run build
 ```
 
-### 4. Database Setup (if applicable)
+## Environment Variables
 
-```bash
-# (Add database setup commands)
-```
+Key variables in `.env`:
 
-### 5. Verify Installation
-
-```bash
-# Run tests to verify setup
-pytest  # Python
-npm test  # Node.js
-```
+- `CATS_RUNTIME_HOST=127.0.0.1`
+- `CATS_RUNTIME_PORT=3110`
+- `CATS_RUNTIME_API_KEY=`
+- `AGENT_FLEET_BASE_URL=http://localhost:3100`
+- `AGENT_FLEET_API_KEY=`
 
 ## Running the Project
 
-### Development Mode
+### Manual start
 
-```bash
-# Python
-python main.py
-
-# Node.js
-npm run dev
+```powershell
+node dist/index.js
 ```
 
-### Production Mode
+### Restart helper
 
-```bash
-# (Add production run commands)
+```powershell
+.\scripts\windows\Restart-Server.ps1
+```
+
+### Stop only
+
+```powershell
+.\scripts\windows\Restart-Server.ps1 -Stop
+```
+
+## Windows auto-start
+
+Install startup shortcut:
+
+```powershell
+.\scripts\windows\Setup-AutoStart.ps1 -Install
+```
+
+Verify setup:
+
+```powershell
+.\scripts\windows\Setup-AutoStart.ps1 -Verify
+```
+
+Remove setup:
+
+```powershell
+.\scripts\windows\Setup-AutoStart.ps1 -Remove
+```
+
+## Verify Installation
+
+```powershell
+node ..\agent-fleet\node_modules\typescript\bin\tsc -p tsconfig.json --typeRoots ..\agent-fleet\node_modules\@types
+node --test --test-isolation=none tests\runtime-server.test.js
+Invoke-WebRequest http://127.0.0.1:3110/health -UseBasicParsing
 ```
 
 ## Common Issues
 
-### Issue 1: [Problem Description]
+### Port 3110 already in use
 
-**Solution**: (How to fix)
+Use:
 
-### Issue 2: [Problem Description]
+```powershell
+.\scripts\windows\Restart-Server.ps1 -Stop
+```
 
-**Solution**: (How to fix)
+Then restart, or change `CATS_RUNTIME_PORT` in `.env`.
+
+### Health is `degraded`
+
+`cats-runtime` is up, but phase 1 still depends on `agent-fleet`. Check
+`AGENT_FLEET_BASE_URL` and confirm `agent-fleet` is running.
 
 ---
 
-*Last updated: YYYY-MM-DD*
+*Last updated: 2026-03-11*
