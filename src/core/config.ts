@@ -1,6 +1,7 @@
 export { loadConfig } from '../backends/cli/config.js';
 export type {
-  FleetConfig as RuntimeConfig,
+  CliRuntimeConfig as RuntimeConfig,
+  ProviderRuntimeConfig,
   ProviderCommandConfig,
   RunnerMode,
   RuntimeMode,

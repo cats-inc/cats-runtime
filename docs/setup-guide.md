@@ -15,6 +15,7 @@ cd cats-runtime
 copy .env.example .env
 npm install
 npm run build
+npm test
 ```
 
 ## Environment Variables
@@ -36,6 +37,9 @@ Key variables in `.env`:
 ```powershell
 node dist/index.js
 ```
+
+Then open `http://127.0.0.1:3110/` for the embedded dashboard, or call the HTTP
+API directly.
 
 ### Restart helper
 
@@ -73,7 +77,7 @@ Remove setup:
 
 ```powershell
 npm run build
-node --test --test-isolation=none tests\runtime-server.test.js
+npm test
 Invoke-WebRequest http://127.0.0.1:3110/health -UseBasicParsing
 ```
 

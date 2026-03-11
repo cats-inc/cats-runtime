@@ -5,7 +5,7 @@ export type SessionStatus =
   | 'closing'
   | 'closed';
 
-export type SessionOrigin = 'fleet' | 'discovered';
+export type SessionOrigin = 'runtime' | 'discovered';
 export type SessionActivity = 'interactive' | 'tearing_down' | 'inactive';
 export type SessionOwnership = 'persistent_process' | 'logical_session' | 'workspace_latest';
 export type SessionResumeStrategy = 'none' | 'provider_session' | 'latest_in_workspace';

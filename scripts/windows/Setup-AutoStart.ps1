@@ -118,7 +118,6 @@ if ($Verify) {
                     Write-Host "   Backend reachable: $backendBaseUrl" -ForegroundColor Green
                 } else {
                     Write-Host "   Backend unreachable: $backendBaseUrl" -ForegroundColor Yellow
-                    Write-Host "   cats-runtime is up, but phase 1 still depends on agent-fleet." -ForegroundColor Yellow
                 }
             }
         } else {
@@ -288,7 +287,7 @@ Add-Content -Path `$logFile -Value "=== Startup complete ==="
     $Shortcut.Arguments = "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$runnerScript`""
     $Shortcut.WorkingDirectory = $repoRoot
     $Shortcut.WindowStyle = 7
-    $Shortcut.Description = "Cats Runtime - thin runtime facade"
+    $Shortcut.Description = "Cats Runtime - embedded runtime service"
     $Shortcut.Save()
 
     Write-Host "   Created: $startupShortcut" -ForegroundColor Green
@@ -303,6 +302,5 @@ Add-Content -Path `$logFile -Value "=== Startup complete ==="
     Write-Host "Start now (without reboot):" -ForegroundColor Cyan
     Write-Host "  powershell -File `"$runnerScript`"" -ForegroundColor White
     Write-Host ""
-    Write-Host "Phase 1 note: cats-runtime still depends on agent-fleet being available." -ForegroundColor Yellow
     exit 0
 }

@@ -6,7 +6,7 @@
 
 `cats-runtime` is the stable execution boundary for upper-layer products such as
 `cats-inc` and `crew-chat-poc`. It now embeds the CLI runtime directly instead
-of proxying to a second local `agent-fleet` service.
+of proxying to a second local sidecar service.
 
 Current capabilities:
 
@@ -19,16 +19,17 @@ Current capabilities:
 
 - [x] Bootstrap the subproject
 - [x] Embed the CLI runtime into `cats-runtime`
-- [x] Remove the external `agent-fleet` HTTP hop
-- [x] Add direct runtime route tests
-- [ ] Migrate `crew-chat-poc` to call `cats-runtime`
+- [x] Remove the external HTTP hop
+- [x] Port the runtime dashboard into `cats-runtime`
+- [x] Port the CLI runtime test surface into `cats-runtime`
+- [x] Migrate `crew-chat-poc` to call `cats-runtime`
 - [ ] Add `backends/api` for pay-as-you-go API keys and Ollama
 
 ## Design Rules
 
 - Public callers should depend on `cats-runtime`, not provider-specific CLIs
 - `src/core` holds runtime-wide contracts and config
-- `src/backends/cli` holds embedded CLI runtime logic ported from `agent-fleet`
+- `src/backends/cli` holds the embedded CLI runtime implementation
 - `src/http` exposes the inbound HTTP contract
 - Future API-native providers should land under `src/backends/api`
 

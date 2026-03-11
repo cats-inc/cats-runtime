@@ -6,7 +6,7 @@ import type { AppContext } from '../app.js';
 import { formatSSE } from '../streaming.js';
 import type { SessionInfo } from '../../backends/cli/pool/types.js';
 import type { SessionRegistry } from '../../backends/cli/pool/SessionRegistry.js';
-import type { FleetConfig } from '../../backends/cli/config.js';
+import type { CliRuntimeConfig } from '../../backends/cli/config.js';
 
 function appendHistory(sourcePath: string, entry: Record<string, unknown>): void {
   mkdirSync(dirname(sourcePath), { recursive: true });
@@ -16,9 +16,9 @@ function appendHistory(sourcePath: string, entry: Record<string, unknown>): void
 function getOrCreateSourcePath(
   session: SessionInfo,
   registry: SessionRegistry,
-  config: FleetConfig,
+  config: CliRuntimeConfig,
 ): string {
-  // Only reuse sourcePath if it's fleet-owned; never write into provider-native transcripts
+  // Only reuse sourcePath if it's runtime-managed; never write into provider-native transcripts
   if (session.sourcePath && session.sourcePath.startsWith(config.sessionBaseDir)) {
     return session.sourcePath;
   }
@@ -86,7 +86,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     c.header('Transfer-Encoding', 'chunked');
     c.header('Cache-Control', 'no-cache');
 
-    // Skip fleet synthetic history for sessions with a provider-native transcript
+    // Skip runtime-managed synthetic history for sessions with a provider-native transcript
     // (e.g. discovered Claude sessions resumed with --resume write their own)
     const sourcePath = session.providerSourcePath
       ? null

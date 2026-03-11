@@ -1,4 +1,4 @@
-export type { FleetConfig as RuntimeConfig } from '../backends/cli/config.js';
+export type { CliRuntimeConfig as RuntimeConfig } from '../backends/cli/config.js';
 export type {
   SessionInfo,
   SessionStatus,

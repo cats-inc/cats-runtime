@@ -90,7 +90,7 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
     }
   }
 
-  // Collect paths: provider transcript first, then fleet-managed (if different)
+  // Collect paths: provider transcript first, then runtime-managed (if different)
   const paths: string[] = [];
   if (session.providerSourcePath) paths.push(session.providerSourcePath);
   if (session.sourcePath && session.sourcePath !== session.providerSourcePath) {

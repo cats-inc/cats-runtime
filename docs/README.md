@@ -16,15 +16,15 @@ These important documents live in the project root:
 | Document | Status | Description |
 |----------|--------|-------------|
 | [requirements.md](./requirements.md) | ?? Template | Requirements specification |
-| [architecture.md](./architecture.md) | ? Active | Phase 1 runtime boundary and layering |
+| [architecture.md](./architecture.md) | ? Active | Embedded runtime architecture and layering |
 | [api.md](./api.md) | ? Active | Supported public HTTP contract |
 
 ## Development Guides
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| [setup-guide.md](./setup-guide.md) | ?? Template | Environment setup |
-| [testing.md](./testing.md) | ?? Template | Testing strategy |
+| [setup-guide.md](./setup-guide.md) | ? Active | Environment setup |
+| [testing.md](./testing.md) | ? Active | Testing strategy |
 | [deployment.md](./deployment.md) | ?? Template | Deployment instructions |
 | [security-guidelines.md](./security-guidelines.md) | ?? Template | Security policies |
 | [mcp-config.md](./mcp-config.md) | ?? Template | MCP server configuration |

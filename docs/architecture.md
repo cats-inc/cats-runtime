@@ -66,6 +66,7 @@ src/
 ### `src/http`
 
 - Exposes the public `cats-runtime` HTTP API
+- Serves the embedded dashboard UI from `/`
 - Applies optional bearer auth
 - Streams turn output as SSE or NDJSON
 
@@ -93,7 +94,7 @@ src/
 ## Design Rules
 
 - Upper layers should depend on `cats-runtime`, not on provider-specific CLIs
-- `agent-fleet` remains a migration source/reference, not a runtime dependency
+- Historical `agent-fleet` references should stay confined to ADRs and migration notes
 - New API-key or Ollama integrations should land under `src/backends/api`
 - Inbound transport code should stay in `src/http`, not in backend modules
 

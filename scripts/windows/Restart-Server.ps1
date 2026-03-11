@@ -126,7 +126,6 @@ try {
                 Write-Host "  Backend:  reachable ($backendBaseUrl)" -ForegroundColor Green
             } else {
                 Write-Host "  Backend:  unreachable ($backendBaseUrl)" -ForegroundColor Yellow
-                Write-Host "  cats-runtime is up, but phase 1 still needs agent-fleet." -ForegroundColor Yellow
             }
         }
     }

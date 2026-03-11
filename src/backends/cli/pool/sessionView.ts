@@ -18,19 +18,22 @@ interface SessionViewOptions {
 
 export function normalizeSessionOrigin(
   session: {
-    origin?: SessionOrigin;
+    origin?: SessionOrigin | 'fleet';
     managed?: boolean;
     sourcePath?: string;
     providerSourcePath?: string;
   },
   sessionBaseDir?: string,
 ): SessionOrigin {
-  if (session.origin === 'fleet' || session.origin === 'discovered') {
+  if (session.origin === 'runtime' || session.origin === 'discovered') {
     return session.origin;
+  }
+  if (session.origin === 'fleet') {
+    return 'runtime';
   }
 
   if (session.managed === true) {
-    return 'fleet';
+    return 'runtime';
   }
 
   const paths = [session.providerSourcePath, session.sourcePath].filter(
@@ -41,7 +44,7 @@ export function normalizeSessionOrigin(
     return !value.startsWith(sessionBaseDir);
   });
 
-  return hasExternalProviderPath ? 'discovered' : 'fleet';
+  return hasExternalProviderPath ? 'discovered' : 'runtime';
 }
 
 function resolveNow(now?: number): number {

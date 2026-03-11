@@ -17,7 +17,7 @@ const RUNTIME_MODES = [
 export type RunnerMode = typeof RUNNER_MODES[number];
 export type RuntimeMode = typeof RUNTIME_MODES[number];
 
-export interface RuntimeConfig {
+export interface ProviderRuntimeConfig {
   mode: RuntimeMode;
   distro?: string;
 }
@@ -26,10 +26,10 @@ export interface ProviderCommandConfig {
   path: string;
   runner: RunnerMode;
   runnerPath?: string;
-  runtime: RuntimeConfig;
+  runtime: ProviderRuntimeConfig;
 }
 
-export interface FleetConfig {
+export interface CliRuntimeConfig {
   host: string;
   port: number;
   apiKey: string;
@@ -50,10 +50,10 @@ export interface FleetConfig {
   codexSessionsDir: string;
   copilotSessionsDir: string;
   cursorChatsDir: string;
-  cursorRuntime: RuntimeConfig;
+  cursorRuntime: ProviderRuntimeConfig;
   geminiSessionsDir: string;
   kiroDbPath: string;
-  kiroRuntime: RuntimeConfig;
+  kiroRuntime: ProviderRuntimeConfig;
   nativeDiscoveryIntervalMs: number;
   externalSessionLiveWindowMs: number;
   maxSessions: number;
@@ -120,7 +120,7 @@ export function defaultExternalSessionLiveWindowMs(): number {
   return 15000;
 }
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): FleetConfig {
+export function loadConfig(env: NodeJS.ProcessEnv = process.env): CliRuntimeConfig {
   const home = env.HOME || env.USERPROFILE || '';
 
   const auggiePath = env.AUGGIE_PATH || 'auggie';
@@ -132,17 +132,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): FleetConfig {
   const kiroPath = env.KIRO_PATH || 'kiro-cli';
   const opencodePath = env.OPENCODE_PATH || 'opencode';
 
-  const apiKey = env.CATS_RUNTIME_API_KEY || env.FLEET_API_KEY || '';
-  const host = env.CATS_RUNTIME_HOST
-    || env.FLEET_HOST
-    || (apiKey ? '' : '127.0.0.1');
+  const apiKey = env.CATS_RUNTIME_API_KEY || '';
+  const host = env.CATS_RUNTIME_HOST || (apiKey ? '' : '127.0.0.1');
   const port = parsePositiveInt(
-    env.CATS_RUNTIME_PORT || env.PORT || env.FLEET_PORT || '3110',
+    env.CATS_RUNTIME_PORT || env.PORT || '3110',
     3110,
     'CATS_RUNTIME_PORT',
   );
   const sessionBaseDir = env.CATS_RUNTIME_SESSION_BASE_DIR
-    || env.FLEET_SESSION_BASE_DIR
     || join(home, '.cats-runtime', 'sessions');
 
   return {
@@ -210,7 +207,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): FleetConfig {
       'CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS',
     ),
     maxSessions: parsePositiveInt(
-      env.CATS_RUNTIME_MAX_SESSIONS || env.FLEET_MAX_SESSIONS,
+      env.CATS_RUNTIME_MAX_SESSIONS,
       10,
       'CATS_RUNTIME_MAX_SESSIONS',
     ),
@@ -300,7 +297,7 @@ function readRuntimeConfig(
   prefix: string,
   defaultMode: RuntimeMode,
   env: NodeJS.ProcessEnv = process.env,
-): RuntimeConfig {
+): ProviderRuntimeConfig {
   const value = (env[`${prefix}_RUNTIME`] || defaultMode).trim().toLowerCase();
   if (!(RUNTIME_MODES as readonly string[]).includes(value)) {
     throw new Error(

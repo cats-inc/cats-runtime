@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { delimiter, extname, isAbsolute, join } from 'node:path';
-import type { ProviderCommandConfig, RuntimeConfig } from '../config.js';
+import type { ProviderCommandConfig, ProviderRuntimeConfig } from '../config.js';
 
 export interface ShellInvocation {
   command: string;
@@ -16,13 +16,13 @@ export interface ProcessSpawnConfig extends ShellInvocation {
 const POWERSHELL_EXEC_PAYLOAD_ENV = 'CATS_RUNTIME_PWSH_EXEC_B64';
 
 export interface RuntimeAdapter {
-  readonly mode: RuntimeConfig['mode'];
+  readonly mode: ProviderRuntimeConfig['mode'];
   toRuntimePath(path: string): string;
   toHostPath(path: string): string;
   buildShellInvocation(script: string): ShellInvocation;
 }
 
-export function createRuntimeAdapter(config: RuntimeConfig): RuntimeAdapter {
+export function createRuntimeAdapter(config: ProviderRuntimeConfig): RuntimeAdapter {
   if (config.mode === 'wsl') {
     return new WslRuntimeAdapter(config.distro || 'Ubuntu');
   }
@@ -117,9 +117,9 @@ export function buildPowerShellCommandScript(): string {
   return [
     `$payloadJson = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($env:${POWERSHELL_EXEC_PAYLOAD_ENV}))`,
     '$payload = $payloadJson | ConvertFrom-Json',
-    '$agentFleetArgs = @()',
-    'foreach ($item in $payload.args) { $agentFleetArgs += [string]$item }',
-    '& ([string]$payload.command) @agentFleetArgs',
+    '$runtimeArgs = @()',
+    'foreach ($item in $payload.args) { $runtimeArgs += [string]$item }',
+    '& ([string]$payload.command) @runtimeArgs',
     'exit $LASTEXITCODE',
   ].join('; ');
 }

@@ -75,18 +75,20 @@ If an agent realizes it has violated a MUST/MUST NOT directive:
 
 ## Project Overview
 
-**Purpose**: Thin runtime facade for upper-layer products, starting with an
-HTTP adapter over `agent-fleet`.
+**Purpose**: Unified runtime service for upper-layer products, with embedded CLI
+execution today and API backends later.
 
-**Background**: This project exists to separate product-facing applications from
-backend-specific CLI runtime details. Phase 1 treats `agent-fleet` as an
-external backend boundary. Future phases will add more backends behind the same
+**Background**: This project separates product-facing applications from
+provider-specific execution details while keeping the runtime itself in one
+service. The CLI runtime now lives directly in this repo under `src/backends/cli`.
+Future phases will add API-native and local-model backends behind the same
 contract.
 
 **Key Features**:
 - Stable health and session endpoints for upstream apps
-- Stream passthrough for agent turn output
-- Backend-specific transport isolated inside adapters
+- Streamed turn output over SSE and NDJSON
+- Embedded dashboard at `/`
+- Backend-specific execution isolated behind `core + backends/* + http`
 
 ---
 
@@ -97,11 +99,11 @@ contract.
 | Language | TypeScript | 5.x |
 | Runtime | Node.js | 22+ |
 | HTTP | Built-in `http` + `fetch` | Node native |
-| Testing | `node:test` | Node native |
+| Testing | Vitest | 3.x |
 | Build | TypeScript compiler | 5.x |
 
 **Additional Tools**:
-- `agent-fleet`: phase 1 upstream backend
+- Local provider CLIs such as `claude`, `codex`, `gemini`, `cursor-agent`, `kiro-cli`, `opencode`
 
 ---
 

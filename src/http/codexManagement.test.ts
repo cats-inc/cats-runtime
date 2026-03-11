@@ -1,0 +1,289 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { createRuntimeApp as createApp } from './app.js';
+import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
+import type { CliRuntimeConfig } from '../backends/cli/config.js';
+import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
+import type { CursorNativeSessionService } from '../backends/cli/cursor/CursorNativeSessionService.js';
+import type { KiroNativeSessionService } from '../backends/cli/kiro/KiroNativeSessionService.js';
+import type { AuggieSessionService } from '../backends/cli/auggie/AuggieSessionService.js';
+import type { OpencodeNativeSessionService } from '../backends/cli/opencode/OpencodeNativeSessionService.js';
+
+describe('codex management', () => {
+  const makeConfig = (): CliRuntimeConfig => ({
+    host: '127.0.0.1',
+    port: 3100,
+    apiKey: '',
+    auggieMaxTurns: 10,
+    auggiePath: 'auggie',
+    claudePath: 'claude',
+    codexPath: 'codex',
+    copilotPath: 'copilot',
+    cursorPath: 'cursor-agent',
+    geminiPath: 'gemini',
+    kiroPath: 'kiro-cli',
+    opencodePath: 'opencode',
+    opencodeServerHost: '127.0.0.1',
+    opencodeServerPort: 4097,
+    opencodeServerStartupTimeoutMs: 10000,
+    auggieSessionsDir: '~/.augment/sessions',
+    claudeProjectsDir: '',
+    codexSessionsDir: codexSessionsDir,
+    copilotSessionsDir: '',
+    cursorChatsDir: '~/.cursor/chats',
+    cursorRuntime: {
+      mode: 'wsl',
+      distro: 'Ubuntu',
+    },
+    geminiSessionsDir: '',
+    kiroDbPath: '~/.local/share/kiro-cli/data.sqlite3',
+    kiroRuntime: {
+      mode: 'wsl',
+      distro: 'Ubuntu',
+    },
+    nativeDiscoveryIntervalMs: 5000,
+    externalSessionLiveWindowMs: 15000,
+    maxSessions: 10,
+    sessionBaseDir: 'C:/tmp/cats-runtime/sessions',
+    providerCommands: {
+      auggie: { path: 'auggie', runner: 'auto', runtime: { mode: 'native' } },
+      claude: { path: 'claude', runner: 'auto', runtime: { mode: 'native' } },
+      codex: { path: 'codex', runner: 'auto', runtime: { mode: 'native' } },
+      copilot: { path: 'copilot', runner: 'auto', runtime: { mode: 'native' } },
+      cursor: { path: 'cursor-agent', runner: 'auto', runtime: { mode: 'wsl', distro: 'Ubuntu' } },
+      gemini: { path: 'gemini', runner: 'auto', runtime: { mode: 'native' } },
+      kiro: { path: 'kiro-cli', runner: 'auto', runtime: { mode: 'wsl', distro: 'Ubuntu' } },
+      opencode: { path: 'opencode', runner: 'auto', runtime: { mode: 'native' } },
+    },
+  });
+
+  let registry: SessionRegistry;
+  let pool: WorkerPool;
+  let cursorNative: CursorNativeSessionService;
+  let kiroNative: KiroNativeSessionService;
+  let auggieSessions: AuggieSessionService;
+  let opencodeNative: OpencodeNativeSessionService;
+  let app: ReturnType<typeof createApp>;
+  let codexSessionsDir: string;
+
+  beforeEach(() => {
+    codexSessionsDir = join(tmpdir(), `codex-management-test-${Date.now()}`);
+    mkdirSync(codexSessionsDir, { recursive: true });
+
+    registry = new SessionRegistry();
+    pool = {
+      getCapabilities: vi.fn(() => ({ resume: true, fork: true, permissions: true })),
+      get: vi.fn(() => undefined),
+      spawn: vi.fn(),
+      kill: vi.fn(),
+      status: vi.fn(() => ({ active: 0 })),
+    } as unknown as WorkerPool;
+    cursorNative = {
+      createSession: vi.fn(),
+      listSessions: vi.fn(),
+      listAllSessions: vi.fn(),
+      loadHistory: vi.fn(),
+      deleteSession: vi.fn(),
+    } as unknown as CursorNativeSessionService;
+    kiroNative = {
+      listSessions: vi.fn(),
+      listAllSessions: vi.fn(),
+      loadHistory: vi.fn(),
+      deleteSession: vi.fn(),
+      canResumeSession: vi.fn(),
+      getLatestSession: vi.fn(),
+      getLatestSessionId: vi.fn(),
+    } as unknown as KiroNativeSessionService;
+    auggieSessions = {
+      listSessions: vi.fn(),
+      listAllSessions: vi.fn(),
+      loadHistory: vi.fn(),
+      getLatestSession: vi.fn(),
+      getSession: vi.fn(),
+    } as unknown as AuggieSessionService;
+    opencodeNative = {
+      createSession: vi.fn(),
+      listSessions: vi.fn(),
+      listAllSessions: vi.fn(),
+      getSession: vi.fn(),
+      loadHistory: vi.fn(),
+      prompt: vi.fn(),
+      abortSession: vi.fn(),
+      deleteSession: vi.fn(),
+      listPendingPermissions: vi.fn(),
+      replyPermission: vi.fn(),
+      listPendingQuestions: vi.fn(),
+      rejectQuestion: vi.fn(),
+      close: vi.fn(),
+    } as unknown as OpencodeNativeSessionService;
+
+    app = createApp({
+      config: makeConfig(),
+      registry,
+      pool,
+      cursorNative,
+      kiroNative,
+      auggieSessions,
+      opencodeNative,
+    });
+  });
+
+  afterEach(() => {
+    rmSync(codexSessionsDir, { recursive: true, force: true });
+  });
+
+  function writeCodexSessionFile(input: {
+    sessionId: string;
+    cwd: string;
+    summary: string;
+    timestamp: string;
+  }): void {
+    const dayDir = join(codexSessionsDir, '2026', '03', '11');
+    mkdirSync(dayDir, { recursive: true });
+    writeFileSync(
+      join(dayDir, `rollout-${input.sessionId}.jsonl`),
+      [
+        JSON.stringify({
+          timestamp: '2026-03-11T08:00:00.000Z',
+          type: 'session_meta',
+          payload: {
+            id: input.sessionId,
+            cwd: input.cwd,
+          },
+        }),
+        JSON.stringify({
+          timestamp: input.timestamp,
+          type: 'event_msg',
+          payload: { type: 'user_message', message: input.summary },
+        }),
+      ].join('\n') + '\n',
+    );
+  }
+
+  it('inspects Codex sessions from rollout files without mutating the registry', async () => {
+    writeCodexSessionFile({
+      sessionId: 'thread-inspect',
+      cwd: 'C:/repo',
+      summary: 'Inspect me',
+      timestamp: '2026-03-11T08:01:00.000Z',
+    });
+
+    const res = await app.request('/codex/sessions?cwd=C:/repo');
+    const body = await res.json() as {
+      sessions: Array<{ providerSessionId: string; cwd: string }>;
+      count: number;
+    };
+
+    expect(res.status).toBe(200);
+    expect(body.count).toBe(1);
+    expect(body.sessions[0]).toMatchObject({
+      providerSessionId: 'thread-inspect',
+      cwd: 'C:/repo',
+    });
+    expect(registry.list()).toHaveLength(0);
+  });
+
+  it('discovers Codex sessions into the registry on demand', async () => {
+    writeCodexSessionFile({
+      sessionId: 'thread-discover',
+      cwd: 'C:/repo',
+      summary: 'Discover me',
+      timestamp: '2026-03-11T08:02:00.000Z',
+    });
+
+    const res = await app.request('/codex/sessions/discover', {
+      method: 'POST',
+      body: JSON.stringify({ cwd: 'C:/repo', group: 'backend' }),
+      headers: { 'content-type': 'application/json' },
+    });
+    const body = await res.json() as {
+      sessions: Array<{ providerName: string; controlMode: string; group?: string }>;
+      count: number;
+    };
+
+    expect(res.status).toBe(200);
+    expect(body.count).toBe(1);
+    expect(body.sessions[0].providerName).toBe('codex');
+    expect(body.sessions[0].controlMode).toBe('resume_only');
+    expect(body.sessions[0].group).toBe('backend');
+    expect(registry.list({ provider: 'codex' })).toHaveLength(1);
+  });
+
+  it('serializes discovered Codex sessions as resume_only', async () => {
+    registry.upsertDiscovered('thread-123', {
+      cwd: 'C:/repo',
+      providerName: 'codex',
+      summary: 'Investigate build issue',
+      messageCount: 4,
+      sourcePath: 'C:/Users/test/.codex/sessions/2026/03/11/thread-123.jsonl',
+    });
+
+    const res = await app.request('/sessions');
+    const body = await res.json() as {
+      sessions: Array<{ providerName: string; controlMode: string; resumeStrategy: string }>;
+    };
+
+    expect(res.status).toBe(200);
+    expect(body.sessions[0].providerName).toBe('codex');
+    expect(body.sessions[0].controlMode).toBe('resume_only');
+    expect(body.sessions[0].resumeStrategy).toBe('provider_session');
+  });
+
+  it('resumes a discovered Codex session through the generic resume route', async () => {
+    const session = registry.upsertDiscovered('thread-456', {
+      cwd: 'C:/repo',
+      providerName: 'codex',
+      sourcePath: 'C:/Users/test/.codex/sessions/2026/03/11/thread-456.jsonl',
+    });
+
+    const res = await app.request(`/sessions/${session!.id}/resume`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+      headers: { 'content-type': 'application/json' },
+    });
+
+    expect(res.status).toBe(200);
+    expect(vi.mocked(pool.spawn)).toHaveBeenCalledWith(session!.id, 'codex', {
+      cwd: 'C:/repo',
+      workspaceMode: 'shared',
+      model: undefined,
+      resumeSessionId: 'thread-456',
+      permissionMode: 'skip',
+    });
+  });
+
+  it('forks a runtime-owned Codex session through the generic fork route', async () => {
+    const session = registry.create({
+      id: 'codex-runtime-1',
+      providerName: 'codex',
+      cwd: 'C:/repo',
+      workspaceMode: 'shared',
+      model: 'gpt-5.4',
+    });
+    registry.setProviderSessionId(session.id, 'thread-parent');
+    registry.updateStatus(session.id, 'closed');
+
+    const res = await app.request(`/sessions/${session.id}/fork`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+      headers: { 'content-type': 'application/json' },
+    });
+
+    expect(res.status).toBe(201);
+    expect(vi.mocked(pool.spawn)).toHaveBeenCalledWith(
+      expect.any(String),
+      'codex',
+      {
+        cwd: 'C:/repo',
+        workspaceMode: 'shared',
+        model: 'gpt-5.4',
+        resumeSessionId: 'thread-parent',
+        forkSession: true,
+        permissionMode: 'skip',
+      },
+    );
+  });
+});
+

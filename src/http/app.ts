@@ -1,6 +1,9 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Hono } from 'hono';
 import { logger } from 'hono/logger';
-import type { FleetConfig } from '../backends/cli/config.js';
+import type { CliRuntimeConfig } from '../backends/cli/config.js';
 import type { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
 import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
 import type { CursorNativeSessionService } from '../backends/cli/cursor/CursorNativeSessionService.js';
@@ -22,7 +25,7 @@ import { auggieRoutes } from './routes/auggie.js';
 import { opencodeRoutes } from './routes/opencode.js';
 
 export interface AppContext {
-  config: FleetConfig;
+  config: CliRuntimeConfig;
   registry: SessionRegistry;
   pool: WorkerPool;
   cursorNative: CursorNativeSessionService;
@@ -33,10 +36,18 @@ export interface AppContext {
 
 export function createRuntimeApp(ctx: AppContext) {
   const app = new Hono();
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+
+  // Serve the embedded dashboard UI without auth.
+  app.get('/', (c) => {
+    const htmlPath = resolve(__dirname, '../../public/index.html');
+    const html = readFileSync(htmlPath, 'utf-8');
+    return c.html(html);
+  });
 
   app.use('*', async (c, next) => {
     const path = c.req.path;
-    if (path === '/sessions' || path === '/health' || path === '/pool/status') {
+    if (path === '/' || path === '/sessions' || path === '/health' || path === '/pool/status') {
       return await next();
     }
     return logger()(c, next);

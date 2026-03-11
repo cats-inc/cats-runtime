@@ -1,0 +1,228 @@
+import { describe, expect, it } from 'vitest';
+import {
+  defaultAuggieMaxTurns,
+  defaultAuggieSessionsDir,
+  defaultCursorAndKiroRuntimeMode,
+  defaultCursorChatsDir,
+  defaultExternalSessionLiveWindowMs,
+  defaultNativeDiscoveryIntervalMs,
+  defaultKiroDbPath,
+  defaultOpencodeServerHost,
+  defaultOpencodeServerPort,
+  defaultOpencodeServerStartupTimeoutMs,
+  defaultProviderRuntimeMode,
+  loadConfig,
+} from './config.js';
+
+describe('config platform defaults', () => {
+  it('defaults Cursor and Kiro to WSL only on Windows', () => {
+    expect(defaultCursorAndKiroRuntimeMode('win32')).toBe('wsl');
+    expect(defaultCursorAndKiroRuntimeMode('darwin')).toBe('native');
+    expect(defaultCursorAndKiroRuntimeMode('linux')).toBe('native');
+  });
+
+  it('defaults provider runtimes explicitly for all CLIs', () => {
+    expect(defaultProviderRuntimeMode('claude', 'win32')).toBe('native');
+    expect(defaultProviderRuntimeMode('codex', 'win32')).toBe('native');
+    expect(defaultProviderRuntimeMode('gemini', 'win32')).toBe('native');
+    expect(defaultProviderRuntimeMode('copilot', 'win32')).toBe('native');
+    expect(defaultProviderRuntimeMode('opencode', 'win32')).toBe('native');
+    expect(defaultProviderRuntimeMode('auggie', 'win32')).toBe('native');
+    expect(defaultProviderRuntimeMode('cursor', 'win32')).toBe('wsl');
+    expect(defaultProviderRuntimeMode('kiro', 'win32')).toBe('wsl');
+    expect(defaultProviderRuntimeMode('cursor', 'darwin')).toBe('native');
+    expect(defaultProviderRuntimeMode('kiro', 'linux')).toBe('native');
+  });
+
+  it('uses the shared Cursor chats path on every platform', () => {
+    expect(defaultCursorChatsDir()).toBe('~/.cursor/chats');
+  });
+
+  it('uses the shared Auggie session path on every platform', () => {
+    expect(defaultAuggieSessionsDir()).toBe('~/.augment/sessions');
+  });
+
+  it('uses 10 Auggie max turns by default', () => {
+    expect(defaultAuggieMaxTurns()).toBe(10);
+  });
+
+  it('uses the macOS Kiro database path on Darwin', () => {
+    expect(defaultKiroDbPath('darwin'))
+      .toBe('~/Library/Application Support/kiro-cli/data.sqlite3');
+  });
+
+  it('uses the Linux/WSL Kiro database path elsewhere', () => {
+    expect(defaultKiroDbPath('linux')).toBe('~/.local/share/kiro-cli/data.sqlite3');
+    expect(defaultKiroDbPath('win32')).toBe('~/.local/share/kiro-cli/data.sqlite3');
+  });
+
+  it('defaults OpenCode server settings for a sidecar local server', () => {
+    expect(defaultOpencodeServerHost()).toBe('127.0.0.1');
+    expect(defaultOpencodeServerPort()).toBe(4097);
+    expect(defaultOpencodeServerStartupTimeoutMs()).toBe(10000);
+  });
+
+  it('polls native provider storage every 5 seconds by default', () => {
+    expect(defaultNativeDiscoveryIntervalMs()).toBe(5000);
+  });
+
+  it('treats discovered sessions as externally live for 15 seconds after activity', () => {
+    expect(defaultExternalSessionLiveWindowMs()).toBe(15000);
+  });
+
+  it('loads Auggie max turns from the environment', () => {
+    const previous = process.env.AUGGIE_MAX_TURNS;
+    process.env.AUGGIE_MAX_TURNS = '7';
+
+    try {
+      expect(loadConfig().auggieMaxTurns).toBe(7);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.AUGGIE_MAX_TURNS;
+      } else {
+        process.env.AUGGIE_MAX_TURNS = previous;
+      }
+    }
+  });
+
+  it('loads Auggie and OpenCode command overrides from the environment', () => {
+    const previous = {
+      AUGGIE_PATH: process.env.AUGGIE_PATH,
+      AUGGIE_RUNNER: process.env.AUGGIE_RUNNER,
+      AUGGIE_RUNNER_PATH: process.env.AUGGIE_RUNNER_PATH,
+      AUGGIE_SESSIONS_DIR: process.env.AUGGIE_SESSIONS_DIR,
+      OPENCODE_PATH: process.env.OPENCODE_PATH,
+      OPENCODE_RUNNER: process.env.OPENCODE_RUNNER,
+      OPENCODE_RUNNER_PATH: process.env.OPENCODE_RUNNER_PATH,
+      OPENCODE_SERVER_HOST: process.env.OPENCODE_SERVER_HOST,
+      OPENCODE_SERVER_PORT: process.env.OPENCODE_SERVER_PORT,
+      OPENCODE_SERVER_STARTUP_TIMEOUT_MS: process.env.OPENCODE_SERVER_STARTUP_TIMEOUT_MS,
+    };
+
+    process.env.AUGGIE_PATH = '/custom/auggie';
+    process.env.AUGGIE_RUNNER = 'pwsh';
+    process.env.AUGGIE_RUNNER_PATH = '/custom/pwsh';
+    process.env.AUGGIE_SESSIONS_DIR = '/custom/augment/sessions';
+    process.env.OPENCODE_PATH = '/custom/opencode';
+    process.env.OPENCODE_RUNNER = 'direct';
+    process.env.OPENCODE_RUNNER_PATH = '/custom/direct-runner';
+    process.env.OPENCODE_SERVER_HOST = '0.0.0.0';
+    process.env.OPENCODE_SERVER_PORT = '5001';
+    process.env.OPENCODE_SERVER_STARTUP_TIMEOUT_MS = '2500';
+
+    try {
+      const config = loadConfig();
+
+      expect(config.auggiePath).toBe('/custom/auggie');
+      expect(config.auggieSessionsDir).toBe('/custom/augment/sessions');
+      expect(config.providerCommands.auggie).toEqual({
+        path: '/custom/auggie',
+        runner: 'pwsh',
+        runnerPath: '/custom/pwsh',
+        runtime: { mode: 'native', distro: undefined },
+      });
+
+      expect(config.opencodePath).toBe('/custom/opencode');
+      expect(config.opencodeServerHost).toBe('0.0.0.0');
+      expect(config.opencodeServerPort).toBe(5001);
+      expect(config.opencodeServerStartupTimeoutMs).toBe(2500);
+      expect(config.providerCommands.opencode).toEqual({
+        path: '/custom/opencode',
+        runner: 'direct',
+        runnerPath: '/custom/direct-runner',
+        runtime: { mode: 'native', distro: undefined },
+      });
+    } finally {
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+    }
+  });
+
+  it('loads runtime overrides for every CLI provider family', () => {
+    const previous = {
+      CLAUDE_RUNTIME: process.env.CLAUDE_RUNTIME,
+      CLAUDE_RUNTIME_DISTRO: process.env.CLAUDE_RUNTIME_DISTRO,
+      CODEX_RUNTIME: process.env.CODEX_RUNTIME,
+      CODEX_RUNTIME_DISTRO: process.env.CODEX_RUNTIME_DISTRO,
+      GEMINI_RUNTIME: process.env.GEMINI_RUNTIME,
+      GEMINI_RUNTIME_DISTRO: process.env.GEMINI_RUNTIME_DISTRO,
+      COPILOT_RUNTIME: process.env.COPILOT_RUNTIME,
+      COPILOT_RUNTIME_DISTRO: process.env.COPILOT_RUNTIME_DISTRO,
+      OPENCODE_RUNTIME: process.env.OPENCODE_RUNTIME,
+      OPENCODE_RUNTIME_DISTRO: process.env.OPENCODE_RUNTIME_DISTRO,
+      AUGGIE_RUNTIME: process.env.AUGGIE_RUNTIME,
+      AUGGIE_RUNTIME_DISTRO: process.env.AUGGIE_RUNTIME_DISTRO,
+      CURSOR_RUNTIME: process.env.CURSOR_RUNTIME,
+      CURSOR_RUNTIME_DISTRO: process.env.CURSOR_RUNTIME_DISTRO,
+      KIRO_RUNTIME: process.env.KIRO_RUNTIME,
+      KIRO_RUNTIME_DISTRO: process.env.KIRO_RUNTIME_DISTRO,
+    };
+
+    process.env.CLAUDE_RUNTIME = 'wsl';
+    process.env.CLAUDE_RUNTIME_DISTRO = 'Ubuntu';
+    process.env.CODEX_RUNTIME = 'wsl';
+    process.env.CODEX_RUNTIME_DISTRO = 'Ubuntu';
+    process.env.GEMINI_RUNTIME = 'wsl';
+    process.env.GEMINI_RUNTIME_DISTRO = 'Ubuntu';
+    process.env.COPILOT_RUNTIME = 'wsl';
+    process.env.COPILOT_RUNTIME_DISTRO = 'Ubuntu';
+    process.env.OPENCODE_RUNTIME = 'wsl';
+    process.env.OPENCODE_RUNTIME_DISTRO = 'Ubuntu';
+    process.env.AUGGIE_RUNTIME = 'wsl';
+    process.env.AUGGIE_RUNTIME_DISTRO = 'Ubuntu';
+    process.env.CURSOR_RUNTIME = 'wsl';
+    process.env.CURSOR_RUNTIME_DISTRO = 'Ubuntu';
+    process.env.KIRO_RUNTIME = 'wsl';
+    process.env.KIRO_RUNTIME_DISTRO = 'Ubuntu';
+
+    try {
+      const config = loadConfig();
+
+      expect(config.providerCommands.claude.runtime).toEqual({
+        mode: 'wsl',
+        distro: 'Ubuntu',
+      });
+      expect(config.providerCommands.codex.runtime).toEqual({
+        mode: 'wsl',
+        distro: 'Ubuntu',
+      });
+      expect(config.providerCommands.gemini.runtime).toEqual({
+        mode: 'wsl',
+        distro: 'Ubuntu',
+      });
+      expect(config.providerCommands.copilot.runtime).toEqual({
+        mode: 'wsl',
+        distro: 'Ubuntu',
+      });
+      expect(config.providerCommands.opencode.runtime).toEqual({
+        mode: 'wsl',
+        distro: 'Ubuntu',
+      });
+      expect(config.providerCommands.auggie.runtime).toEqual({
+        mode: 'wsl',
+        distro: 'Ubuntu',
+      });
+      expect(config.providerCommands.cursor.runtime).toEqual({
+        mode: 'wsl',
+        distro: 'Ubuntu',
+      });
+      expect(config.providerCommands.kiro.runtime).toEqual({
+        mode: 'wsl',
+        distro: 'Ubuntu',
+      });
+    } finally {
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+    }
+  });
+});

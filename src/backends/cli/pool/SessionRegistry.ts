@@ -84,7 +84,7 @@ export class SessionRegistry {
       id,
       providerName: input.providerName,
       status: 'initializing',
-      origin: 'fleet',
+      origin: 'runtime',
       cwd: input.cwd,
       workspaceMode: input.workspaceMode,
       model: input.model,
@@ -216,18 +216,18 @@ export class SessionRegistry {
     // Check if we already track this provider session
     for (const session of this.sessions.values()) {
       if (session.providerSessionId === providerSessionId) {
-        // Only update metadata, never overwrite status or fleet-owned cwd
-        if (!session.cwd || session.origin !== 'fleet') {
+        // Only update metadata, never overwrite status or runtime-owned cwd
+        if (!session.cwd || session.origin !== 'runtime') {
           session.cwd = data.cwd;
         }
         if (data.summary) session.summary = data.summary;
         if (data.group && !session.group) session.group = data.group;
         if (data.workspaceMode) session.workspaceMode = data.workspaceMode;
-        // Only attach providerSourcePath if session doesn't already have fleet-managed history
+        // Only attach providerSourcePath if session doesn't already have runtime-managed history
         // (prevents /history from duplicating turns from both sources)
-        const hasFleetHistory = session.sourcePath && this.sessionBaseDir
+        const hasRuntimeHistory = session.sourcePath && this.sessionBaseDir
           && session.sourcePath.startsWith(this.sessionBaseDir);
-        if (data.sourcePath && !hasFleetHistory) {
+        if (data.sourcePath && !hasRuntimeHistory) {
           session.providerSourcePath = data.sourcePath;
         }
         if (data.sourcePath && !session.sourcePath) session.sourcePath = data.sourcePath;

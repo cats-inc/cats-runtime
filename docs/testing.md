@@ -1,79 +1,53 @@
 # Testing Strategy
 
-> Testing approach, standards, and procedures.
+> Testing approach, standards, and procedures for `cats-runtime`.
 
 ## Overview
 
-(Describe the overall testing philosophy for this project)
+`cats-runtime` uses Vitest for both unit-level modules and HTTP-level route
+tests. The goal is to keep provider adapters, session orchestration, discovery,
+and public routes covered inside this repo so runtime changes are verified
+locally in the same service that ships them.
 
 ## Test Types
 
 ### Unit Tests
 
-- **Location**: `tests/unit/`
-- **Framework**: (pytest / Jest / etc.)
-- **Coverage Target**: (e.g., 80%)
+- **Location**: `src/backends/cli/**/*.test.ts`
+- **Framework**: Vitest
+- **Scope**: provider parsers, runtime adapters, worker helpers, discovery, session registry, native services
 
 ### Integration Tests
 
-- **Location**: `tests/integration/`
-- **Framework**:
-- **Scope**:
+- **Location**: `src/http/*.test.ts`, `tests/runtime-server.test.ts`
+- **Framework**: Vitest
+- **Scope**: route behavior, auth, session lifecycle, native session management, server bootstrap
 
 ### End-to-End Tests
 
-- **Location**: `tests/e2e/`
-- **Framework**: (Playwright / Cypress / etc.)
-- **Scope**:
+- **Location**: manual for now
+- **Framework**: N/A
+- **Scope**: local verification against installed provider CLIs and the embedded dashboard
 
 ## Running Tests
 
 ### All Tests
 
 ```bash
-# Python
-pytest
-
-# Node.js
 npm test
 ```
 
 ### Specific Test Suite
 
 ```bash
-# Python
-pytest tests/unit/
-pytest tests/integration/
-
-# Node.js
-npm run test:unit
-npm run test:e2e
-```
-
-### With Coverage
-
-```bash
-# Python
-pytest --cov=src --cov-report=html
-
-# Node.js
-npm run test:coverage
+npx vitest run src/backends/cli/runtime/runtime.test.ts
+npx vitest run src/http/cursorManagement.test.ts
+npx vitest run tests/runtime-server.test.ts
 ```
 
 ## Test Naming Conventions
 
-```python
-# Python
-def test_function_name_should_expected_behavior_when_condition():
-    pass
-
-# Example
-def test_calculate_total_should_return_sum_when_valid_items():
-    pass
-```
-
 ```javascript
-// JavaScript/TypeScript
 describe('ComponentName', () => {
   it('should expected behavior when condition', () => {
     // ...
@@ -83,16 +57,18 @@ describe('ComponentName', () => {
 
 ## Mocking Guidelines
 
-- (Describe when and how to use mocks)
-- (List common mocking patterns)
+- Mock provider-native services in HTTP route tests instead of shelling out to real CLIs
+- Keep provider parser tests deterministic with inline sample payloads
+- Prefer temp directories for discovery/history tests so file layout stays realistic
 
 ## CI/CD Integration
 
 - Tests run automatically on:
+  - [x] Local pre-commit verification
   - [ ] Pull requests
   - [ ] Main branch commits
   - [ ] Scheduled (nightly)
 
 ---
 
-*Last updated: YYYY-MM-DD*
+*Last updated: 2026-03-11*

@@ -1,4 +1,4 @@
-import type { FleetConfig } from '../config.js';
+import type { CliRuntimeConfig } from '../config.js';
 import { AuggieSessionService } from '../auggie/AuggieSessionService.js';
 import { KiroNativeSessionService } from '../kiro/KiroNativeSessionService.js';
 import { OpencodeNativeSessionService } from '../opencode/OpencodeNativeSessionService.js';
@@ -16,14 +16,14 @@ import type { SessionRegistry } from './SessionRegistry.js';
 
 export class WorkerPool {
   private workers = new Map<string, WorkerProcess>();
-  private config: FleetConfig;
+  private config: CliRuntimeConfig;
   private registry: SessionRegistry;
   private kiroNative: KiroNativeSessionService;
   private auggieSessions: AuggieSessionService;
   private opencodeNative: OpencodeNativeSessionService;
 
   constructor(
-    config: FleetConfig,
+    config: CliRuntimeConfig,
     registry: SessionRegistry,
     kiroNative: KiroNativeSessionService,
     auggieSessions: AuggieSessionService,
@@ -46,7 +46,7 @@ export class WorkerPool {
 
   private resolveProvider(
     name: ProviderName,
-  ): { provider: Provider; commandConfig: FleetConfig['providerCommands'][ProviderName] } {
+  ): { provider: Provider; commandConfig: CliRuntimeConfig['providerCommands'][ProviderName] } {
     switch (name) {
       case 'auggie':
         return {

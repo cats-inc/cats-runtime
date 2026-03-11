@@ -61,6 +61,6 @@ it is no longer a runtime dependency of `cats-runtime`.
 
 ## Follow-up
 
-- Migrate `crew-chat-poc` to the embedded `cats-runtime`
+- Keep `crew-chat-poc` pointed at the embedded `cats-runtime`
 - Add `src/backends/api`
-- Normalize remaining legacy `fleet` naming where it no longer adds value
+- Revisit any remaining public-contract migration shims only when breaking changes are acceptable

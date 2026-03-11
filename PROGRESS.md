@@ -1,23 +1,24 @@
 # Progress
 
-> Implementation status for the `cats-runtime` migration track.
+> Implementation status for the embedded `cats-runtime` delivery track.
 
 ## Current Status
 
 | Component | Status | Description |
 |-----------|--------|-------------|
-| Core | In Progress | Thin facade boundary and adapter shape defined |
-| API | In Progress | Session and message passthrough endpoints implemented |
-| Tests | In Progress | Adapter and streaming coverage added with mock upstream |
-| Docs | In Progress | README, API, architecture, and service registry updated |
+| Core | Completed | Embedded CLI runtime, session registry, discovery, and worker pool are in-repo |
+| HTTP API | Completed | Health, sessions, messages, history, observe, and provider management routes are served directly from `cats-runtime` |
+| Dashboard | Completed | The embedded dashboard UI is served from `GET /` |
+| Tests | Completed | Vitest covers provider, discovery, pool, HTTP, and server bootstrap behavior |
+| Docs | Completed | README, API, architecture, testing, and agent guidance match the single-service model |
 
 **Legend**: Not Started | In Progress | Completed | Blocked
 
 ## Work Packages
 
-### WP-1: agent-fleet Adapter
+### WP-1: Embed CLI Runtime
 
-**Status**: In Progress  
+**Status**: Completed  
 **Assigned**: Codex  
 **Priority**: P0
 
@@ -26,34 +27,33 @@
 | Task | Status | Notes |
 |------|--------|-------|
 | Bootstrap `cats-runtime` subproject | [x] | Generated from `../project-bootstrap` |
-| Define runtime boundary | [x] | HTTP facade, no source imports from `agent-fleet` |
-| Implement agent-fleet adapter | [x] | Health, sessions, messages, close, Kiro models |
-| Add adapter tests | [x] | Mock backend + streaming passthrough coverage |
-| Prepare first consumer migration | [ ] | `crew-chat-poc` switch happens in phase 2 |
+| Define runtime boundary | [x] | Stable `core + backends/* + http` layering in place |
+| Port CLI runtime into `cats-runtime` | [x] | Providers, discovery, pool, native services, and dashboard moved in-repo |
+| Port and expand tests | [x] | Vitest runs the copied runtime/provider/HTTP suites plus server coverage |
+| Migrate first consumer | [x] | `crew-chat-poc` now targets `cats-runtime` only |
 
 #### Acceptance Criteria
 
-- [x] `cats-runtime` can run without importing `agent-fleet` internals
-- [x] `cats-runtime` can proxy streamed turn output from `agent-fleet`
-- [x] Kiro model discovery is available through `cats-runtime`
-- [ ] `crew-chat-poc` consumes `cats-runtime`
+- [x] `cats-runtime` runs as a single service without a second `agent-fleet` process
+- [x] `cats-runtime` owns streamed turn output end to end
+- [x] Native provider management and Kiro model discovery are available directly from `cats-runtime`
+- [x] `crew-chat-poc` consumes `cats-runtime`
 
 ## Completion Notes
 
-### WP-1: agent-fleet Adapter
+### WP-1: Embed CLI Runtime
 
 **Updated**: 2026-03-11
 
 #### Key Decisions
 
-- Use a thin HTTP adapter first, not a source-level integration
-- Keep the public surface intentionally small for the first consumer migration
-- Use Node built-ins only for the first cut to avoid framework lock-in
+- Keep the long-term layout as `core + backends/* + http`
+- Port `agent-fleet` runtime logic into `src/backends/cli` without modifying the source project
+- Treat historical adapter docs as superseded ADRs, not active implementation guidance
 
 #### Remaining Items
 
-- [ ] Repoint `crew-chat-poc` to `cats-runtime`
-- [ ] Add the future `api-runtime` backend
+- [ ] Add `src/backends/api` for API-key and Ollama-backed execution paths
 
 ---
 

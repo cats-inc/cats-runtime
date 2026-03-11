@@ -12,11 +12,13 @@
 
 - `cats-runtime` is the future stable runtime boundary for upper-layer products
 - The CLI runtime is now embedded under `src/backends/cli`
-- Use `agent-fleet` only as a migration/reference source, not a runtime dependency
+- Keep `agent-fleet` references limited to historical ADRs and migration notes
 - Default listener: `http://127.0.0.1:3110`
+- The dashboard UI is served directly from `GET /`
 
 ## Current API Surface
 
+- `GET /`
 - `GET /health`
 - `GET /sessions`
 - `GET /sessions/:id`

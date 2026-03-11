@@ -1,7 +1,7 @@
 import { createMiddleware } from 'hono/factory';
-import type { FleetConfig } from '../backends/cli/config.js';
+import type { CliRuntimeConfig } from '../backends/cli/config.js';
 
-export function bearerAuth(config: FleetConfig) {
+export function bearerAuth(config: CliRuntimeConfig) {
   return createMiddleware(async (c, next) => {
     if (!config.apiKey) {
       return await next();

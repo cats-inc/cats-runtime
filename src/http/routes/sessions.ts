@@ -37,7 +37,7 @@ function serializeSessions(
   });
 }
 
-/** POST /sessions — create a new fleet-owned session */
+/** POST /sessions — create a new runtime-owned session */
 sessionRoutes.post('/sessions', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const body = await c.req.json<{
@@ -456,7 +456,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
   return c.json(serializeSession(ctx, ctx.registry.get(id) ?? session));
 });
 
-/** POST /sessions/:id/fork — fork a fleet-owned session */
+/** POST /sessions/:id/fork — fork a runtime-owned session */
 sessionRoutes.post('/sessions/:id/fork', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const id = c.req.param('id');

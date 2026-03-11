@@ -342,7 +342,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
 }
 
 function shouldLogProviderStderr(providerName: string): boolean {
-  if (process.env.CATS_RUNTIME_LOG_STDERR === '1' || process.env.FLEET_LOG_STDERR === '1') {
+  if (process.env.CATS_RUNTIME_LOG_STDERR === '1') {
     return true;
   }
   return providerName !== 'kiro';

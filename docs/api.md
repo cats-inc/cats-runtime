@@ -5,7 +5,7 @@
 ## Overview
 
 `cats-runtime` serves the runtime contract directly. Requests no longer hop
-through a second local `agent-fleet` HTTP service.
+through a second local runtime service.
 
 ## Base URL
 
@@ -25,6 +25,14 @@ Authorization: Bearer <cats-runtime-api-key>
 cases where custom headers are awkward.
 
 ## Core Endpoints
+
+### Dashboard
+
+```text
+GET /
+```
+
+Returns the embedded `cats-runtime` dashboard HTML.
 
 ### Health
 
@@ -118,6 +126,7 @@ Errors use this format:
 ## Notes
 
 - The public contract is served directly by `cats-runtime`
+- The dashboard at `/` is intentionally unauthenticated for local use
 - Provider-specific capabilities still differ; not every provider supports
   resume, fork, or permission enforcement in the same way
 - Future API-key and Ollama support will be added under `backends/api` without
