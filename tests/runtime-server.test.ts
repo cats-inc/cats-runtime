@@ -15,6 +15,7 @@ function createTestConfig(overrides = {}) {
     CATS_RUNTIME_PORT: '3110',
     CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
     CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
+    CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
     CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
     AUGGIE_SESSIONS_DIR: join(root, '.augment', 'sessions'),
     CLAUDE_PROJECTS_DIR: join(root, '.claude', 'projects'),
@@ -27,6 +28,7 @@ function createTestConfig(overrides = {}) {
 
   for (const dir of [
     env.CATS_RUNTIME_SESSION_BASE_DIR,
+    env.CATS_RUNTIME_DATA_DIR,
     env.AUGGIE_SESSIONS_DIR,
     env.CLAUDE_PROJECTS_DIR,
     env.CODEX_SESSIONS_DIR,

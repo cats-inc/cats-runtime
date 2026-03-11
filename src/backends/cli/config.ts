@@ -33,6 +33,7 @@ export interface CliRuntimeConfig {
   host: string;
   port: number;
   apiKey: string;
+  dataDir?: string;
   auggieMaxTurns: number;
   auggiePath: string;
   claudePath: string;
@@ -139,6 +140,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CliRuntimeConf
     3110,
     'CATS_RUNTIME_PORT',
   );
+  const dataDir = env.CATS_RUNTIME_DATA_DIR
+    || join(home, '.cats-runtime', 'data');
   const sessionBaseDir = env.CATS_RUNTIME_SESSION_BASE_DIR
     || join(home, '.cats-runtime', 'sessions');
 
@@ -146,6 +149,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CliRuntimeConf
     host,
     port,
     apiKey,
+    dataDir,
     auggieMaxTurns: parsePositiveInt(
       env.AUGGIE_MAX_TURNS,
       defaultAuggieMaxTurns(),

@@ -17,11 +17,16 @@ interface JsonRpcResponse {
   jsonrpc: '2.0';
   id?: number;
   result?: Record<string, unknown>;
+  error?: {
+    code?: number;
+    message?: string;
+    data?: unknown;
+  };
   method?: string;
   params?: Record<string, unknown>;
 }
 
-type CodexState = 'uninitialized' | 'initializing' | 'ready';
+type CodexState = 'uninitialized' | 'initializing' | 'ready' | 'failed';
 
 type CodexApprovalDecision = 'accept' | 'decline' | 'approved' | 'denied';
 
@@ -81,6 +86,10 @@ export class CodexProvider implements Provider {
   }
 
   buildStdinMessage(content: string): string {
+    if (this.state === 'failed') {
+      throw new Error('Codex session bootstrap failed earlier. Close and recreate the session.');
+    }
+
     if (this.state === 'uninitialized') {
       if (!this._spawnOpts) {
         throw new Error('Codex provider spawn options were not initialized');
@@ -235,6 +244,19 @@ export class CodexProvider implements Provider {
   }
 
   private handleResponse(msg: JsonRpcResponse): StreamEvent | null {
+    if (msg.error) {
+      if (this.state === 'initializing') {
+        this.state = 'failed';
+        this._pendingMessage = null;
+        this.threadId = null;
+      }
+
+      return {
+        type: 'error',
+        text: formatJsonRpcError(msg.error),
+      };
+    }
+
     const result = msg.result ?? {};
 
     // thread/start|resume|fork response — extract threadId (may be at result.threadId or result.thread.id)
@@ -377,7 +399,6 @@ export class CodexProvider implements Provider {
       cwd: opts.cwd,
       approvalPolicy: policy.approvalPolicy,
       sandbox: policy.sandbox,
-      persistExtendedHistory: true,
     };
 
     if (!opts.resumeSessionId) {
@@ -511,4 +532,16 @@ function firstCommandToken(command: string): string {
 
 function normalizeAllowedToken(value: string | null | undefined): string {
   return (value || '').trim().toLowerCase().replace(/[^a-z0-9*]+/g, '');
+}
+
+function formatJsonRpcError(error: NonNullable<JsonRpcResponse['error']>): string {
+  const message = typeof error.message === 'string' && error.message.trim()
+    ? error.message.trim()
+    : 'Unknown JSON-RPC error';
+
+  if (typeof error.code === 'number') {
+    return `Codex JSON-RPC error ${error.code}: ${message}`;
+  }
+
+  return `Codex JSON-RPC error: ${message}`;
 }

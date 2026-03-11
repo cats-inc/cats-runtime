@@ -43,8 +43,8 @@ describe('CodexProvider', () => {
       expect(threadStart.id).toBe(1);
       expect(threadStart.params.sandbox).toBe('workspace-write');
       expect(threadStart.params.approvalPolicy).toBe('never');
-      expect(threadStart.params.persistExtendedHistory).toBe(true);
       expect(threadStart.params.experimentalRawEvents).toBe(false);
+      expect(threadStart.params.persistExtendedHistory).toBeUndefined();
     });
 
     it('resumes an existing thread when resumeSessionId is provided', () => {
@@ -55,7 +55,7 @@ describe('CodexProvider', () => {
 
       expect(threadResume.method).toBe('thread/resume');
       expect(threadResume.params.threadId).toBe('thread-123');
-      expect(threadResume.params.persistExtendedHistory).toBe(true);
+      expect(threadResume.params.persistExtendedHistory).toBeUndefined();
     });
 
     it('forks an existing thread when forkSession is requested', () => {
@@ -70,7 +70,7 @@ describe('CodexProvider', () => {
 
       expect(threadFork.method).toBe('thread/fork');
       expect(threadFork.params.threadId).toBe('thread-parent');
-      expect(threadFork.params.persistExtendedHistory).toBe(true);
+      expect(threadFork.params.persistExtendedHistory).toBeUndefined();
     });
 
     it('maps read_only workspace to a rejecting read-only policy', () => {
@@ -99,6 +99,23 @@ describe('CodexProvider', () => {
       provider.buildStdinMessage('First');
       const msg = provider.buildStdinMessage('Second');
       expect(msg).toBe('');
+    });
+
+    it('throws clearly after bootstrap failed earlier', () => {
+      provider.buildSpawnArgs(baseOpts);
+      provider.buildStdinMessage('First');
+      provider.parseStreamLine(JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        error: {
+          code: -32600,
+          message: 'thread/start.persistFullHistory requires experimentalApi capability',
+        },
+      }));
+
+      expect(() => provider.buildStdinMessage('Retry')).toThrow(
+        'Codex session bootstrap failed earlier. Close and recreate the session.',
+      );
     });
 
     it('sends turn/start directly when ready', () => {
@@ -209,6 +226,25 @@ describe('CodexProvider', () => {
       }));
       expect(event?.type).toBe('init');
       expect(event?.sessionId).toBe('thread-nested');
+    });
+
+    it('surfaces bootstrap JSON-RPC errors instead of swallowing them', () => {
+      provider.buildSpawnArgs(baseOpts);
+      provider.buildStdinMessage('Hello');
+
+      const event = provider.parseStreamLine(JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        error: {
+          code: -32600,
+          message: 'thread/start.persistFullHistory requires experimentalApi capability',
+        },
+      }));
+
+      expect(event).toEqual({
+        type: 'error',
+        text: 'Codex JSON-RPC error -32600: thread/start.persistFullHistory requires experimentalApi capability',
+      });
     });
 
     it('parses item/agentMessage/delta as text event', () => {

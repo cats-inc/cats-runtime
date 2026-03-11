@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { join } from 'node:path';
 import {
   defaultAuggieMaxTurns,
   defaultAuggieSessionsDir,
@@ -71,76 +72,54 @@ describe('config platform defaults', () => {
   });
 
   it('loads Auggie max turns from the environment', () => {
-    const previous = process.env.AUGGIE_MAX_TURNS;
-    process.env.AUGGIE_MAX_TURNS = '7';
+    expect(loadConfig({ AUGGIE_MAX_TURNS: '7' }).auggieMaxTurns).toBe(7);
+  });
 
-    try {
-      expect(loadConfig().auggieMaxTurns).toBe(7);
-    } finally {
-      if (previous === undefined) {
-        delete process.env.AUGGIE_MAX_TURNS;
-      } else {
-        process.env.AUGGIE_MAX_TURNS = previous;
-      }
-    }
+  it('defaults runtime data and session directories under ~/.cats-runtime', () => {
+    const config = loadConfig({
+      HOME: '/home/tester',
+      USERPROFILE: '',
+    });
+
+    expect(config.dataDir).toBe(join('/home/tester', '.cats-runtime', 'data'));
+    expect(config.sessionBaseDir).toBe(join('/home/tester', '.cats-runtime', 'sessions'));
   });
 
   it('loads Auggie and OpenCode command overrides from the environment', () => {
-    const previous = {
-      AUGGIE_PATH: process.env.AUGGIE_PATH,
-      AUGGIE_RUNNER: process.env.AUGGIE_RUNNER,
-      AUGGIE_RUNNER_PATH: process.env.AUGGIE_RUNNER_PATH,
-      AUGGIE_SESSIONS_DIR: process.env.AUGGIE_SESSIONS_DIR,
-      OPENCODE_PATH: process.env.OPENCODE_PATH,
-      OPENCODE_RUNNER: process.env.OPENCODE_RUNNER,
-      OPENCODE_RUNNER_PATH: process.env.OPENCODE_RUNNER_PATH,
-      OPENCODE_SERVER_HOST: process.env.OPENCODE_SERVER_HOST,
-      OPENCODE_SERVER_PORT: process.env.OPENCODE_SERVER_PORT,
-      OPENCODE_SERVER_STARTUP_TIMEOUT_MS: process.env.OPENCODE_SERVER_STARTUP_TIMEOUT_MS,
-    };
+    const config = loadConfig({
+      AUGGIE_PATH: '/custom/auggie',
+      AUGGIE_RUNNER: 'pwsh',
+      AUGGIE_RUNNER_PATH: '/custom/pwsh',
+      AUGGIE_RUNTIME: 'native',
+      AUGGIE_SESSIONS_DIR: '/custom/augment/sessions',
+      OPENCODE_PATH: '/custom/opencode',
+      OPENCODE_RUNNER: 'direct',
+      OPENCODE_RUNNER_PATH: '/custom/direct-runner',
+      OPENCODE_RUNTIME: 'native',
+      OPENCODE_SERVER_HOST: '0.0.0.0',
+      OPENCODE_SERVER_PORT: '5001',
+      OPENCODE_SERVER_STARTUP_TIMEOUT_MS: '2500',
+    });
 
-    process.env.AUGGIE_PATH = '/custom/auggie';
-    process.env.AUGGIE_RUNNER = 'pwsh';
-    process.env.AUGGIE_RUNNER_PATH = '/custom/pwsh';
-    process.env.AUGGIE_SESSIONS_DIR = '/custom/augment/sessions';
-    process.env.OPENCODE_PATH = '/custom/opencode';
-    process.env.OPENCODE_RUNNER = 'direct';
-    process.env.OPENCODE_RUNNER_PATH = '/custom/direct-runner';
-    process.env.OPENCODE_SERVER_HOST = '0.0.0.0';
-    process.env.OPENCODE_SERVER_PORT = '5001';
-    process.env.OPENCODE_SERVER_STARTUP_TIMEOUT_MS = '2500';
+    expect(config.auggiePath).toBe('/custom/auggie');
+    expect(config.auggieSessionsDir).toBe('/custom/augment/sessions');
+    expect(config.providerCommands.auggie).toEqual({
+      path: '/custom/auggie',
+      runner: 'pwsh',
+      runnerPath: '/custom/pwsh',
+      runtime: { mode: 'native', distro: undefined },
+    });
 
-    try {
-      const config = loadConfig();
-
-      expect(config.auggiePath).toBe('/custom/auggie');
-      expect(config.auggieSessionsDir).toBe('/custom/augment/sessions');
-      expect(config.providerCommands.auggie).toEqual({
-        path: '/custom/auggie',
-        runner: 'pwsh',
-        runnerPath: '/custom/pwsh',
-        runtime: { mode: 'native', distro: undefined },
-      });
-
-      expect(config.opencodePath).toBe('/custom/opencode');
-      expect(config.opencodeServerHost).toBe('0.0.0.0');
-      expect(config.opencodeServerPort).toBe(5001);
-      expect(config.opencodeServerStartupTimeoutMs).toBe(2500);
-      expect(config.providerCommands.opencode).toEqual({
-        path: '/custom/opencode',
-        runner: 'direct',
-        runnerPath: '/custom/direct-runner',
-        runtime: { mode: 'native', distro: undefined },
-      });
-    } finally {
-      for (const [key, value] of Object.entries(previous)) {
-        if (value === undefined) {
-          delete process.env[key];
-        } else {
-          process.env[key] = value;
-        }
-      }
-    }
+    expect(config.opencodePath).toBe('/custom/opencode');
+    expect(config.opencodeServerHost).toBe('0.0.0.0');
+    expect(config.opencodeServerPort).toBe(5001);
+    expect(config.opencodeServerStartupTimeoutMs).toBe(2500);
+    expect(config.providerCommands.opencode).toEqual({
+      path: '/custom/opencode',
+      runner: 'direct',
+      runnerPath: '/custom/direct-runner',
+      runtime: { mode: 'native', distro: undefined },
+    });
   });
 
   it('loads runtime overrides for every CLI provider family', () => {

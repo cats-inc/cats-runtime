@@ -24,6 +24,7 @@ Key variables in `.env`:
 - `CATS_RUNTIME_HOST=127.0.0.1`
 - `CATS_RUNTIME_PORT=3110`
 - `CATS_RUNTIME_API_KEY=`
+- `CATS_RUNTIME_DATA_DIR=...`
 - `CATS_RUNTIME_SESSION_BASE_DIR=...`
 - `CATS_RUNTIME_MAX_SESSIONS=10`
 - `CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS=5000`
@@ -46,6 +47,11 @@ npm run dev
 
 Then open `http://127.0.0.1:3110/` for the embedded dashboard, or call the HTTP
 API directly.
+
+By default, runtime metadata persists under `~/.cats-runtime/data` and runtime
+session workspaces/transcripts persist under `~/.cats-runtime/sessions`. Override
+either path with `CATS_RUNTIME_DATA_DIR` or `CATS_RUNTIME_SESSION_BASE_DIR` if
+you need to relocate local state.
 
 ### Restart helper
 

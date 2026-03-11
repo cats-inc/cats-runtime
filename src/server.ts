@@ -1,6 +1,6 @@
 import { once } from 'node:events';
 import type { Server } from 'node:http';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import { createAdaptorServer } from '@hono/node-server';
 import { AuggieSessionService } from './backends/cli/auggie/AuggieSessionService.js';
 import { loadConfig } from './core/config.js';
@@ -167,7 +167,7 @@ function createDiscoveryController(ctx: AppContext): DiscoveryController {
 export function createRuntimeServer(
   config: RuntimeConfig = loadConfig(),
 ): RuntimeServer {
-  const dataDir = fileURLToPath(new URL('../data', import.meta.url));
+  const dataDir = config.dataDir || join(config.sessionBaseDir, '..', 'data');
   const registry = new SessionRegistry(dataDir, config.sessionBaseDir);
   const auggieSessions = new AuggieSessionService(config.auggieSessionsDir);
   const cursorNative = new CursorNativeSessionService({

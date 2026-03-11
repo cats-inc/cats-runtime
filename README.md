@@ -44,6 +44,11 @@ npm run dev
 
 Default URL: `http://127.0.0.1:3110`
 
+Runtime state defaults under the user's home directory:
+
+- registry metadata: `~/.cats-runtime/data`
+- session workspaces and transcripts: `~/.cats-runtime/sessions`
+
 ## Key Files
 
 - `src/index.ts` - process entrypoint and shutdown wiring
