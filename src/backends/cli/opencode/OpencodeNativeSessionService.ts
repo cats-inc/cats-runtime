@@ -1,4 +1,6 @@
 import { spawn } from 'node:child_process';
+import type { ProviderCommandConfig } from '../config.js';
+import { buildProcessSpawnConfig } from '../runtime/runtime.js';
 
 export interface OpencodeNativeSessionSummary {
   providerSessionId: string;
@@ -57,6 +59,7 @@ export type OpencodeServerLauncher = (input: {
 
 export interface OpencodeNativeSessionServiceOptions {
   command: string;
+  commandConfig?: ProviderCommandConfig;
   hostname?: string;
   port?: number;
   startupTimeoutMs?: number;
@@ -136,9 +139,12 @@ interface ResolvedServer extends OpencodeServerHandle {
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = 4097;
 const DEFAULT_STARTUP_TIMEOUT_MS = 10000;
+const PROMPT_HISTORY_POLL_ATTEMPTS = 4;
+const PROMPT_HISTORY_POLL_INTERVAL_MS = 250;
 
 export class OpencodeNativeSessionService {
   private readonly command: string;
+  private readonly commandConfig: ProviderCommandConfig;
   private readonly hostname: string;
   private readonly port: number;
   private readonly startupTimeoutMs: number;
@@ -148,12 +154,16 @@ export class OpencodeNativeSessionService {
   private serverPromise: Promise<ResolvedServer | null> | null = null;
 
   constructor(options: OpencodeNativeSessionServiceOptions) {
-    this.command = options.command;
+    this.commandConfig = options.commandConfig || defaultOpencodeCommandConfig(options.command);
+    this.command = this.commandConfig.path;
     this.hostname = options.hostname || DEFAULT_HOST;
     this.port = options.port || DEFAULT_PORT;
     this.startupTimeoutMs = options.startupTimeoutMs || DEFAULT_STARTUP_TIMEOUT_MS;
     this.fetchFn = options.fetchFn || fetch;
-    this.launcher = options.launcher || defaultOpencodeServerLauncher;
+    this.launcher = options.launcher || ((input) => defaultOpencodeServerLauncher({
+      ...input,
+      commandConfig: this.commandConfig,
+    }));
   }
 
   async listSessions(
@@ -250,7 +260,7 @@ export class OpencodeNativeSessionService {
   }
 
   async loadHistory(cwd: string, providerSessionId: string): Promise<OpencodeHistoryMessage[]> {
-    const messages = await this.request<OpencodeApiMessageEnvelope[]>(
+    const rawMessages = await this.request<unknown>(
       `/session/${encodeURIComponent(providerSessionId)}/message`,
       {
         method: 'GET',
@@ -260,6 +270,7 @@ export class OpencodeNativeSessionService {
       },
     );
 
+    const messages = normalizeMessageList(rawMessages);
     return messages.flatMap((message) => {
       const text = extractTextFromParts(message.parts);
       if (!text) return [];
@@ -280,7 +291,7 @@ export class OpencodeNativeSessionService {
     signal?: AbortSignal;
   }): Promise<OpencodePromptResult> {
     const model = parseOpencodeModel(input.model);
-    const response = await this.request<OpencodeApiMessageEnvelope>(
+    const response = await this.request<unknown>(
       `/session/${encodeURIComponent(input.sessionId)}/message`,
       {
         method: 'POST',
@@ -300,24 +311,25 @@ export class OpencodeNativeSessionService {
       },
     );
 
-    if (response.info.role !== 'assistant') {
+    const directResponse = normalizeMessageEnvelope(response);
+    if (directResponse?.info.role === 'assistant') {
+      return toPromptResult(directResponse);
+    }
+
+    const historyResponse = await this.findPromptResultInHistory(
+      input.cwd,
+      input.sessionId,
+      input.content,
+    );
+    if (historyResponse) {
+      return historyResponse;
+    }
+
+    if (directResponse) {
       throw new Error('OpenCode returned a non-assistant response for prompt');
     }
 
-    if (response.info.error) {
-      throw new Error(extractApiError(response.info.error));
-    }
-
-    return {
-      sessionId: response.info.sessionID,
-      messageId: response.info.id,
-      text: extractTextFromParts(response.parts),
-      usage: response.info.tokens ? {
-        inputTokens: response.info.tokens.input ?? 0,
-        outputTokens: response.info.tokens.output ?? 0,
-      } : undefined,
-      toolUses: extractToolUses(response.parts),
-    };
+    throw new Error(buildEmptyPromptResponseError(input.model));
   }
 
   async abortSession(cwd: string, providerSessionId: string): Promise<boolean> {
@@ -514,6 +526,37 @@ export class OpencodeNativeSessionService {
       clearTimeout(timeout);
     }
   }
+
+  private async findPromptResultInHistory(
+    cwd: string,
+    sessionId: string,
+    prompt: string,
+  ): Promise<OpencodePromptResult | null> {
+    for (let attempt = 0; attempt < PROMPT_HISTORY_POLL_ATTEMPTS; attempt += 1) {
+      const rawMessages = await this.request<unknown>(
+        `/session/${encodeURIComponent(sessionId)}/message`,
+        {
+          method: 'GET',
+        },
+        { cwd },
+      ).catch(() => null);
+
+      const messages = normalizeMessageList(rawMessages);
+      const matchedAssistant = findAssistantAfterPrompt(messages, prompt);
+      if (matchedAssistant) {
+        return toPromptResult(matchedAssistant);
+      }
+
+      if (findLastPromptMessageIndex(messages, prompt) >= 0 && attempt < PROMPT_HISTORY_POLL_ATTEMPTS - 1) {
+        await sleep(PROMPT_HISTORY_POLL_INTERVAL_MS);
+        continue;
+      }
+
+      return null;
+    }
+
+    return null;
+  }
 }
 
 export function parseOpencodeModel(
@@ -542,7 +585,7 @@ export function parseOpencodeModel(
 
 const OPENCODE_MODEL_ALIASES: Record<string, { providerID: string; modelID: string }> = {
   'minimax m2.5': {
-    providerID: 'opencode',
+    providerID: 'opencode-go',
     modelID: 'minimax-m2.5',
   },
   'minimax m2.5 free': {
@@ -550,11 +593,11 @@ const OPENCODE_MODEL_ALIASES: Record<string, { providerID: string; modelID: stri
     modelID: 'minimax-m2.5-free',
   },
   'kimi k2.5': {
-    providerID: 'opencode',
+    providerID: 'opencode-go',
     modelID: 'kimi-k2.5',
   },
   'glm-5': {
-    providerID: 'opencode',
+    providerID: 'opencode-go',
     modelID: 'glm-5',
   },
   'mimo v2 flash free': {
@@ -573,6 +616,72 @@ function extractTextFromParts(parts: OpencodeApiPart[]): string {
     .filter((part) => !part.ignored)
     .map((part) => part.text)
     .join('');
+}
+
+function normalizeMessageList(value: unknown): OpencodeApiMessageEnvelope[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map(normalizeMessageEnvelope)
+    .filter((message): message is OpencodeApiMessageEnvelope => Boolean(message));
+}
+
+function normalizeMessageEnvelope(value: unknown): OpencodeApiMessageEnvelope | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const info = (value as { info?: unknown }).info;
+  const parts = (value as { parts?: unknown }).parts;
+  if (!info || typeof info !== 'object' || !Array.isArray(parts)) {
+    return null;
+  }
+
+  const role = (info as { role?: unknown }).role;
+  if (role !== 'user' && role !== 'assistant') {
+    return null;
+  }
+
+  return {
+    info: info as OpencodeApiAssistantMessage | OpencodeApiUserMessage,
+    parts: parts as OpencodeApiPart[],
+  };
+}
+
+function findAssistantAfterPrompt(
+  messages: OpencodeApiMessageEnvelope[],
+  prompt: string,
+): OpencodeApiMessageEnvelope | null {
+  const userIndex = findLastPromptMessageIndex(messages, prompt);
+  if (userIndex < 0) {
+    return null;
+  }
+
+  for (let index = userIndex + 1; index < messages.length; index += 1) {
+    const message = messages[index];
+    if (message?.info.role === 'assistant') {
+      return message;
+    }
+  }
+
+  return null;
+}
+
+function findLastPromptMessageIndex(
+  messages: OpencodeApiMessageEnvelope[],
+  prompt: string,
+): number {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message?.info.role !== 'user') continue;
+    if (extractTextFromParts(message.parts) === prompt) {
+      return index;
+    }
+  }
+
+  return -1;
 }
 
 function extractToolUses(parts: OpencodeApiPart[]): OpencodePromptToolUse[] {
@@ -598,6 +707,33 @@ function extractToolUses(parts: OpencodeApiPart[]): OpencodePromptToolUse[] {
 
 function extractApiError(error: { name?: string; data?: { message?: string } }): string {
   return error.data?.message || error.name || 'OpenCode request failed';
+}
+
+function toPromptResult(message: OpencodeApiMessageEnvelope): OpencodePromptResult {
+  if (message.info.role !== 'assistant') {
+    throw new Error('OpenCode returned a non-assistant response for prompt');
+  }
+
+  if (message.info.error) {
+    throw new Error(extractApiError(message.info.error));
+  }
+
+  return {
+    sessionId: message.info.sessionID,
+    messageId: message.info.id,
+    text: extractTextFromParts(message.parts),
+    usage: message.info.tokens ? {
+      inputTokens: message.info.tokens.input ?? 0,
+      outputTokens: message.info.tokens.output ?? 0,
+    } : undefined,
+    toolUses: extractToolUses(message.parts),
+  };
+}
+
+function buildEmptyPromptResponseError(model?: string): string {
+  const modelText = model ? ` for model '${model}'` : '';
+  return `OpenCode returned no assistant response${modelText}. `
+    + 'The requested model/provider may be unavailable or OpenCode may have rejected the turn.';
 }
 
 function toIso(value?: number): string | undefined {
@@ -634,17 +770,44 @@ async function safeReadBody(response: Response): Promise<string> {
   }
 }
 
+export function buildOpencodeServerSpawnConfig(
+  commandConfig: ProviderCommandConfig,
+  hostname: string,
+  port: number,
+  cwd: string = process.cwd(),
+): ReturnType<typeof buildProcessSpawnConfig> {
+  return buildProcessSpawnConfig(
+    commandConfig,
+    'opencode',
+    [
+      'serve',
+      `--hostname=${hostname}`,
+      `--port=${port}`,
+    ],
+    cwd,
+  );
+}
+
 async function defaultOpencodeServerLauncher(input: {
   command: string;
+  commandConfig?: ProviderCommandConfig;
   hostname: string;
   port: number;
   timeoutMs: number;
 }): Promise<OpencodeServerHandle> {
-  const proc = spawn(input.command, [
-    'serve',
-    `--hostname=${input.hostname}`,
-    `--port=${input.port}`,
-  ], {
+  const spawnConfig = buildOpencodeServerSpawnConfig(
+    input.commandConfig || defaultOpencodeCommandConfig(input.command),
+    input.hostname,
+    input.port,
+  );
+  const env = {
+    ...process.env,
+    ...spawnConfig.env,
+  };
+  const proc = spawn(spawnConfig.command, spawnConfig.args, {
+    cwd: spawnConfig.cwd,
+    env,
+    shell: spawnConfig.shell,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
@@ -687,4 +850,20 @@ async function defaultOpencodeServerLauncher(input: {
       proc.kill();
     },
   };
+}
+
+function defaultOpencodeCommandConfig(command: string): ProviderCommandConfig {
+  return {
+    path: command,
+    runner: 'auto',
+    runtime: {
+      mode: 'native',
+    },
+  };
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }

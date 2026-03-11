@@ -1,3 +1,7 @@
+import { randomUUID } from 'node:crypto';
+import { unlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type {
   Provider,
   ProviderCapabilities,
@@ -7,6 +11,7 @@ import type {
 
 /** Regex to strip ANSI escape sequences from Copilot CLI output */
 const ANSI_RE = /\x1b\[[0-9;]*[A-Za-z]/g;
+const COPILOT_INLINE_PROMPT_LIMIT = 2000;
 
 export class CopilotProvider implements Provider {
   name = 'copilot';
@@ -14,11 +19,13 @@ export class CopilotProvider implements Provider {
   capabilities: ProviderCapabilities = { resume: true, fork: false, permissions: false };
 
   private _pendingPrompt: string | null = null;
+  private _pendingPromptFilePath: string | null = null;
   private _sessionId: string | undefined;
   private _lastOutputTokens = 0;
   private _sawMessageDelta = false;
 
   prepareEphemeralTurn(content: string): void {
+    this.cleanupPendingPromptFile();
     this._pendingPrompt = content;
     this._lastOutputTokens = 0;
     this._sawMessageDelta = false;
@@ -46,7 +53,13 @@ export class CopilotProvider implements Provider {
     }
 
     if (this._pendingPrompt) {
-      args.push('-p', this._pendingPrompt);
+      const prompt = this._pendingPrompt;
+      args.push(
+        '-p',
+        shouldExternalizePrompt(prompt)
+          ? buildPromptFileInstruction(this.writePendingPromptFile(prompt))
+          : prompt,
+      );
       this._pendingPrompt = null;
     }
 
@@ -55,6 +68,11 @@ export class CopilotProvider implements Provider {
 
   buildStdinMessage(_content: string): string {
     return ''; // prompt already in args via prepareEphemeralTurn
+  }
+
+  async afterTurn(_opts: ProviderSpawnOptions): Promise<StreamEvent | null> {
+    this.cleanupPendingPromptFile();
+    return null;
   }
 
   parseStreamLine(line: string): StreamEvent | null {
@@ -144,6 +162,45 @@ export class CopilotProvider implements Provider {
         return null;
     }
   }
+
+  private writePendingPromptFile(prompt: string): string {
+    if (this._pendingPromptFilePath) {
+      return normalizePromptPath(this._pendingPromptFilePath);
+    }
+
+    const filePath = join(tmpdir(), `cats-runtime-copilot-${randomUUID()}.txt`);
+    writeFileSync(filePath, prompt, 'utf8');
+    this._pendingPromptFilePath = filePath;
+    return normalizePromptPath(filePath);
+  }
+
+  private cleanupPendingPromptFile(): void {
+    if (!this._pendingPromptFilePath) {
+      return;
+    }
+
+    try {
+      unlinkSync(this._pendingPromptFilePath);
+    } catch {
+      // Best-effort cleanup only.
+    }
+
+    this._pendingPromptFilePath = null;
+  }
+}
+
+function shouldExternalizePrompt(prompt: string): boolean {
+  return prompt.length > COPILOT_INLINE_PROMPT_LIMIT;
+}
+
+function buildPromptFileInstruction(filePath: string): string {
+  return `Read the full user request from the temp file "${filePath}". `
+    + 'Treat the file contents as the complete prompt, follow it exactly, '
+    + 'and do not mention this indirection unless it matters to the task.';
+}
+
+function normalizePromptPath(filePath: string): string {
+  return filePath.replace(/\\/g, '/');
 }
 
 function extractContent(content: unknown): string {

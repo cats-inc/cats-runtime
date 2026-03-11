@@ -1,5 +1,9 @@
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  buildOpencodeServerSpawnConfig,
   OpencodeNativeSessionService,
   parseOpencodeModel,
 } from './OpencodeNativeSessionService.js';
@@ -50,6 +54,66 @@ describe('OpencodeNativeSessionService', () => {
     });
 
     await expect(service.listAllSessions({ startIfNeeded: false })).resolves.toEqual([]);
+  });
+
+  it('resolves the Windows npm shim when launching the embedded OpenCode server', () => {
+    const previous = {
+      APPDATA: process.env.APPDATA,
+      npm_config_prefix: process.env.npm_config_prefix,
+      PATH: process.env.PATH,
+      PATHEXT: process.env.PATHEXT,
+    };
+    const platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform');
+    const tempRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-opencode-'));
+    const npmPrefix = join(tempRoot, 'npm-global');
+    const shimPath = join(npmPrefix, 'opencode.cmd');
+
+    mkdirSync(npmPrefix, { recursive: true });
+    writeFileSync(shimPath, '@echo off\r\n');
+
+    try {
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      process.env.APPDATA = '';
+      process.env.npm_config_prefix = npmPrefix;
+      process.env.PATH = '';
+      process.env.PATHEXT = '.COM;.EXE;.BAT;.CMD';
+
+      const spawnConfig = buildOpencodeServerSpawnConfig(
+        {
+          path: 'opencode',
+          runner: 'auto',
+          runtime: {
+            mode: 'native',
+          },
+        },
+        '127.0.0.1',
+        4097,
+        'C:\\Users\\kenne\\repo',
+      );
+
+      expect(spawnConfig).toEqual({
+        command: shimPath,
+        args: [
+          'serve',
+          '--hostname=127.0.0.1',
+          '--port=4097',
+        ],
+        shell: true,
+        cwd: 'C:\\Users\\kenne\\repo',
+      });
+    } finally {
+      if (platformDescriptor) {
+        Object.defineProperty(process, 'platform', platformDescriptor);
+      }
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 
   it('creates sessions, loads history, and deletes them through the HTTP API', async () => {
@@ -194,6 +258,46 @@ describe('OpencodeNativeSessionService', () => {
     });
   });
 
+  it('surfaces a clear error when OpenCode accepts a prompt but returns no assistant payload', async () => {
+    const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(typeof input === 'string' ? input : input.toString());
+      if (url.pathname === '/global/health') {
+        return jsonResponse({ ok: true });
+      }
+      if (url.pathname === '/session/oc-1/message' && init?.method === 'POST') {
+        return new Response('', { status: 200 });
+      }
+      if (url.pathname === '/session/oc-1/message' && init?.method === 'GET') {
+        return jsonResponse([
+          {
+            info: {
+              id: 'user-1',
+              sessionID: 'oc-1',
+              role: 'user',
+              time: { created: 1710000000000 },
+            },
+            parts: [{ id: 'part-1', type: 'text', text: 'Ship it' }],
+          },
+        ]);
+      }
+      throw new Error(`Unexpected request: ${url} ${init?.method}`);
+    });
+    const service = new OpencodeNativeSessionService({
+      command: 'opencode',
+      fetchFn: fetchFn as typeof fetch,
+      launcher: vi.fn(),
+    });
+
+    await expect(service.prompt({
+      cwd: '/tmp/repo',
+      sessionId: 'oc-1',
+      content: 'Ship it',
+      model: 'opencode/glm-5',
+    })).rejects.toThrow(
+      "OpenCode returned no assistant response for model 'opencode/glm-5'",
+    );
+  });
+
   it('parses provider/model strings for OpenCode prompt requests', () => {
     expect(parseOpencodeModel('anthropic/claude-sonnet-4.5')).toEqual({
       providerID: 'anthropic',
@@ -204,15 +308,15 @@ describe('OpencodeNativeSessionService', () => {
       modelID: 'gpt-5',
     });
     expect(parseOpencodeModel('minimax m2.5')).toEqual({
-      providerID: 'opencode',
+      providerID: 'opencode-go',
       modelID: 'minimax-m2.5',
     });
     expect(parseOpencodeModel('kimi k2.5')).toEqual({
-      providerID: 'opencode',
+      providerID: 'opencode-go',
       modelID: 'kimi-k2.5',
     });
     expect(parseOpencodeModel('glm-5')).toEqual({
-      providerID: 'opencode',
+      providerID: 'opencode-go',
       modelID: 'glm-5',
     });
     expect(parseOpencodeModel('minimax m2.5 free')).toEqual({

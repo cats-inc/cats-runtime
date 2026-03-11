@@ -43,8 +43,8 @@ describe('config platform defaults', () => {
     expect(defaultAuggieSessionsDir()).toBe('~/.augment/sessions');
   });
 
-  it('uses 10 Auggie max turns by default', () => {
-    expect(defaultAuggieMaxTurns()).toBe(10);
+  it('uses 50 Auggie max turns by default', () => {
+    expect(defaultAuggieMaxTurns()).toBe(50);
   });
 
   it('uses the macOS Kiro database path on Darwin', () => {

@@ -182,6 +182,7 @@ export function createRuntimeServer(
   });
   const opencodeNative = new OpencodeNativeSessionService({
     command: config.opencodePath,
+    commandConfig: config.providerCommands.opencode,
     hostname: config.opencodeServerHost,
     port: config.opencodeServerPort,
     startupTimeoutMs: config.opencodeServerStartupTimeoutMs,

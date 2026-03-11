@@ -88,7 +88,7 @@ export function defaultAuggieSessionsDir(): string {
 }
 
 export function defaultAuggieMaxTurns(): number {
-  return 10;
+  return 50;
 }
 
 export function defaultKiroDbPath(

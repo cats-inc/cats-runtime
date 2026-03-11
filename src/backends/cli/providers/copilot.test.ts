@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CopilotProvider } from './copilot.js';
 
@@ -71,6 +72,25 @@ describe('CopilotProvider', () => {
       const args = provider.buildSpawnArgs({ cwd: '/tmp' });
       expect(args).not.toContain('-p');
       expect(args).not.toContain('First message');
+    });
+
+    it('uses a temp prompt file when the inline prompt would be too long', async () => {
+      const longPrompt = 'x'.repeat(5000);
+      provider.prepareEphemeralTurn(longPrompt);
+
+      const args = provider.buildSpawnArgs({ cwd: '/tmp' });
+      const promptArg = args[args.indexOf('-p') + 1]!;
+      const match = promptArg.match(/temp file "([^"]+)"/);
+
+      expect(promptArg).not.toContain(longPrompt);
+      expect(match).not.toBeNull();
+
+      const promptFilePath = match![1]!;
+      expect(existsSync(promptFilePath)).toBe(true);
+      expect(readFileSync(promptFilePath, 'utf8')).toBe(longPrompt);
+
+      await provider.afterTurn?.({ cwd: '/tmp' });
+      expect(existsSync(promptFilePath)).toBe(false);
     });
   });
 
