@@ -14,7 +14,6 @@
 cd cats-runtime
 copy .env.example .env
 npm install
-npm run build
 npm test
 ```
 
@@ -28,6 +27,13 @@ Key variables in `.env`:
 - `CATS_RUNTIME_SESSION_BASE_DIR=...`
 - `CATS_RUNTIME_MAX_SESSIONS=10`
 - `CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS=5000`
+- `AUGGIE_PATH=auggie`
+- `COPILOT_PATH=copilot`
+- `CURSOR_RUNTIME=wsl`
+- `KIRO_RUNTIME_DISTRO=Ubuntu`
+- `CLAUDE_RUNNER=auto`
+- `CLAUDE_PROJECTS_DIR=...`
+- `CODEX_SESSIONS_DIR=...`
 - `OPENCODE_SERVER_PORT=4097`
 
 ## Running the Project
@@ -35,7 +41,7 @@ Key variables in `.env`:
 ### Manual start
 
 ```powershell
-node dist/index.js
+npm run dev
 ```
 
 Then open `http://127.0.0.1:3110/` for the embedded dashboard, or call the HTTP
@@ -51,6 +57,18 @@ API directly.
 
 ```powershell
 .\scripts\windows\Restart-Server.ps1 -Stop
+```
+
+### Linux restart helper
+
+```bash
+./scripts/linux/restart-server.sh
+```
+
+### macOS restart helper
+
+```bash
+./scripts/macos/restart-server.sh
 ```
 
 ## Windows auto-start
@@ -71,6 +89,46 @@ Remove setup:
 
 ```powershell
 .\scripts\windows\Setup-AutoStart.ps1 -Remove
+```
+
+## Linux auto-start
+
+Install systemd user service:
+
+```bash
+./scripts/linux/setup-autostart.sh --install
+```
+
+Verify setup:
+
+```bash
+./scripts/linux/setup-autostart.sh --verify
+```
+
+Remove setup:
+
+```bash
+./scripts/linux/setup-autostart.sh --remove
+```
+
+## macOS auto-start
+
+Install launchd agent:
+
+```bash
+./scripts/macos/setup-autostart.sh --install
+```
+
+Verify setup:
+
+```bash
+./scripts/macos/setup-autostart.sh --verify
+```
+
+Remove setup:
+
+```bash
+./scripts/macos/setup-autostart.sh --remove
 ```
 
 ## Verify Installation

@@ -39,8 +39,7 @@ Current capabilities:
 cd cats-runtime
 copy .env.example .env
 npm install
-npm run build
-node dist/index.js
+npm run dev
 ```
 
 Default URL: `http://127.0.0.1:3110`
