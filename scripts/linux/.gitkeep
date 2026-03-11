@@ -1,0 +1,3 @@
+# Linux scripts directory
+# Use Bash (.sh) scripts
+# Naming convention: kebab-case (e.g., setup-environment.sh)
