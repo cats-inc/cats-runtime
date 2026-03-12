@@ -4,10 +4,10 @@
 
 ## Optimizations
 
-### OPT-1: WSL Session Scanning - Avoid Spawning WSL VM
+### OPT-1: WSL Discovery Policy and Visibility
 
 **Priority**: P1
-**Status**: Not Started
+**Status**: Planned
 
 #### Problem
 
@@ -20,24 +20,54 @@
 3. Python script reads SQLite databases inside WSL to extract session data
 4. WSL Ubuntu starts up, systemd boots all enabled services, RAM usage spikes
 
-#### Proposed Solution
+#### Phase 1 Direction
 
-Read WSL files directly from Windows via `\\wsl$\Ubuntu\...` (or `\\wsl.localhost\Ubuntu\...`) instead of spawning a Python process inside WSL.
+Introduce an explicit WSL discovery policy for Windows/WSL-backed providers, and
+surface its current behavior in the dashboard.
 
-- Use Node.js `better-sqlite3` (or similar) to read Cursor/Kiro SQLite databases directly from `\\wsl$\Ubuntu\home\<user>\.config\...`
-- Eliminate the embedded Python scripts in `CursorNativeSessionService.ts` and `KiroNativeSessionService.ts`
-- Fall back to the current WSL spawn approach only if `\\wsl$\` is not accessible
+- Add `CATS_RUNTIME_WSL_DISCOVERY_POLICY` to control whether background
+  Cursor/Kiro discovery may start WSL
+- Start with three policies:
+  - `always`: preserve the current behavior
+  - `if_running`: scan only when the configured distro is already running
+  - `manual_only`: never start WSL from background discovery
+- Record discovery state so the UI can show whether scans are active, skipped,
+  disabled, or failing
+- Expose discovery status through a dedicated runtime endpoint for dashboard use
+- Add a global dashboard indicator that shows both the configured policy and the
+  current WSL discovery state
 
-#### Caveats
+#### Deferred Optimization
 
-- `\\wsl$\` is only accessible when WSL is already Running; if WSL is Stopped, accessing this path will also trigger WSL to start
-- Consider a "skip if WSL is stopped" option to avoid unintended WSL activation during scans
+Direct Windows-side SQLite reads via `\\wsl$\Ubuntu\...` (or
+`\\wsl.localhost\Ubuntu\...`) remain an optional follow-up optimization, not the
+first response.
+
+This path should only be revisited if policy-based skipping is insufficient and
+there is still a measurable need to reduce scan latency or remove the embedded
+Python readers.
+
+#### Rationale
+
+- The primary pain is unintended WSL activation during background polling, not
+  Python itself
+- `\\wsl$\` is not a complete fix because it can still activate WSL when the
+  distro is stopped
+- A policy-first design is lower-risk than introducing new native SQLite
+  dependencies and cross-platform filesystem edge cases
 
 #### Affected Files
 
+- `src/backends/cli/config.ts`
+- `src/server.ts`
+- `src/http/app.ts`
+- `src/http/routes/health.ts` or a new discovery status route
+- `public/index.html`
 - `src/backends/cli/runtime/runtime.ts`
 - `src/backends/cli/cursor/CursorNativeSessionService.ts`
 - `src/backends/cli/kiro/KiroNativeSessionService.ts`
+- `docs/specs/SPEC-001-wsl-discovery-policy.md`
+- `docs/plans/PLAN-001-wsl-discovery-policy.md`
 
 ---
 

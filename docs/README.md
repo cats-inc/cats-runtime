@@ -9,7 +9,7 @@ These important documents live in the project root:
 | Document | Status | Description |
 |----------|--------|-------------|
 | [PROGRESS.md](../PROGRESS.md) | ? Active | Implementation status and work packages |
-| [ROADMAP.md](../ROADMAP.md) | ?? Template | Project roadmap and milestones |
+| [ROADMAP.md](../ROADMAP.md) | ? Active | Roadmap and planned optimization tracks |
 
 ## Core Documents
 
@@ -50,8 +50,8 @@ Add your project-specific automation scripts here.
 | [AGENT-GUIDE.md](./AGENT-GUIDE.md) | ? Active | Project-specific agent notes |
 | [terminology.md](./terminology.md) | ?? Template | AAIF/A2A/MCP terminology |
 | [a2a/](./a2a/) | ?? | A2A agent card and task templates |
-| [specs/](./specs/) | ?? | Feature specifications |
-| [plans/](./plans/) | ?? | Implementation plans |
+| [specs/](./specs/) | ? Active | Feature specifications, including WSL discovery planning |
+| [plans/](./plans/) | ? Active | Implementation plans, including WSL discovery rollout |
 | [decisions/](./decisions/) | ? Active | Architecture Decision Records |
 
 **Legend**: ? Complete | ?? Template (needs content) | ?? Directory
@@ -87,3 +87,7 @@ When working on this project:
 - Include a clear title and purpose at the top
 - Keep documents focused and concise
 - Update the "Last updated" date when modifying
+
+---
+
+*Last updated: 2026-03-13*
