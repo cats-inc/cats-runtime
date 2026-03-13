@@ -24,6 +24,22 @@ describe('WslDiscoveryStatusStore', () => {
     expect(payload.wsl.providers.kiro.state).toBe('not_applicable');
   });
 
+  it('starts WSL-backed providers in idle state when policy allows background scans', () => {
+    const store = new WslDiscoveryStatusStore({
+      cursorRuntime: { mode: 'wsl', distro: 'Ubuntu' },
+      kiroRuntime: { mode: 'wsl', distro: 'Ubuntu' },
+      nativeDiscoveryIntervalMs: 5000,
+      wslDiscoveryPolicy: 'always',
+    });
+
+    expect(store.snapshot().summary).toEqual({
+      state: 'idle',
+      message: 'Background WSL discovery is waiting for the first scan',
+    });
+    expect(store.snapshot().providers.cursor.state).toBe('idle');
+    expect(store.snapshot().providers.kiro.state).toBe('idle');
+  });
+
   it('starts WSL-backed providers in disabled state when policy is manual_only', () => {
     const store = new WslDiscoveryStatusStore({
       cursorRuntime: { mode: 'wsl', distro: 'Ubuntu' },
@@ -40,6 +56,67 @@ describe('WslDiscoveryStatusStore', () => {
 });
 
 describe('runWslAwareNativeDiscovery', () => {
+  it('returns disabled without scanning when policy is manual_only', async () => {
+    const registry = new SessionRegistry();
+    const store = new WslDiscoveryStatusStore({
+      cursorRuntime: { mode: 'wsl', distro: 'Ubuntu' },
+      kiroRuntime: { mode: 'native' },
+      nativeDiscoveryIntervalMs: 5000,
+      wslDiscoveryPolicy: 'manual_only',
+    });
+    const listAllSessions = vi.fn();
+
+    const result = await runWslAwareNativeDiscovery({
+      provider: 'cursor',
+      listAllSessions,
+      registry,
+      runtime: { mode: 'wsl', distro: 'Ubuntu' },
+      policy: 'manual_only',
+      statusStore: store,
+    });
+
+    expect(result).toEqual({
+      outcome: 'disabled',
+      newCount: 0,
+      syncedCount: 0,
+    });
+    expect(listAllSessions).not.toHaveBeenCalled();
+    expect(store.snapshot().providers.cursor.state).toBe('disabled');
+  });
+
+  it('passes through directly for non-WSL runtimes', async () => {
+    const registry = new SessionRegistry();
+    const store = new WslDiscoveryStatusStore({
+      cursorRuntime: { mode: 'native' },
+      kiroRuntime: { mode: 'native' },
+      nativeDiscoveryIntervalMs: 5000,
+      wslDiscoveryPolicy: 'always',
+    });
+
+    const result = await runWslAwareNativeDiscovery({
+      provider: 'cursor',
+      listAllSessions: vi.fn(async () => [
+        {
+          providerSessionId: 'cursor-native-1',
+          cwd: '/tmp/repo',
+          summary: 'Native session',
+          messageCount: 1,
+        },
+      ]),
+      registry,
+      runtime: { mode: 'native' },
+      policy: 'always',
+      statusStore: store,
+    });
+
+    expect(result).toEqual({
+      outcome: 'scanned',
+      newCount: 1,
+      syncedCount: 1,
+    });
+    expect(registry.list({ provider: 'cursor' })).toHaveLength(1);
+  });
+
   it('skips WSL scans when policy requires a running distro and none is running', async () => {
     const registry = new SessionRegistry();
     const store = new WslDiscoveryStatusStore({
@@ -100,6 +177,32 @@ describe('runWslAwareNativeDiscovery', () => {
     expect(store.snapshot().providers.cursor.state).toBe('active');
     expect(registry.list({ provider: 'cursor' })).toHaveLength(1);
   });
+
+  it('marks provider state as failed when scanning throws', async () => {
+    const registry = new SessionRegistry();
+    const store = new WslDiscoveryStatusStore({
+      cursorRuntime: { mode: 'wsl', distro: 'Ubuntu' },
+      kiroRuntime: { mode: 'native' },
+      nativeDiscoveryIntervalMs: 5000,
+      wslDiscoveryPolicy: 'always',
+    });
+
+    await expect(runWslAwareNativeDiscovery({
+      provider: 'cursor',
+      listAllSessions: vi.fn(async () => {
+        throw new Error('scan exploded');
+      }),
+      registry,
+      runtime: { mode: 'wsl', distro: 'Ubuntu' },
+      policy: 'always',
+      statusStore: store,
+    })).rejects.toThrow('scan exploded');
+
+    expect(store.snapshot().providers.cursor).toEqual(expect.objectContaining({
+      state: 'failed',
+      message: 'scan exploded',
+    }));
+  });
 });
 
 describe('isWslDistroRunning', () => {
@@ -112,5 +215,27 @@ describe('isWslDistroRunning', () => {
         stderr: '',
       })),
     )).resolves.toBe(true);
+  });
+
+  it('returns false when the distro is not in the running list', async () => {
+    await expect(isWslDistroRunning(
+      'Ubuntu',
+      vi.fn(async () => ({
+        code: 0,
+        stdout: 'Debian\nArch\n',
+        stderr: '',
+      })),
+    )).resolves.toBe(false);
+  });
+
+  it('throws when the wsl command fails', async () => {
+    await expect(isWslDistroRunning(
+      'Ubuntu',
+      vi.fn(async () => ({
+        code: 1,
+        stdout: '',
+        stderr: 'WSL not available',
+      })),
+    )).rejects.toThrow('WSL not available');
   });
 });

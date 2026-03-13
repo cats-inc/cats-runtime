@@ -95,6 +95,20 @@ function createDiscoveryController(
   let opencodeTimer: ReturnType<typeof setInterval> | null = null;
   let started = false;
   const wslDistroInspector = options.wslDistroInspector || isWslDistroRunning;
+  const wslDiscoveryPolicy = ctx.config.wslDiscoveryPolicy ?? 'always';
+
+  const shouldSkipBackgroundWslDiscovery = (
+    provider: 'cursor' | 'kiro' | 'opencode',
+  ): boolean => {
+    if (provider === 'opencode' || wslDiscoveryPolicy !== 'manual_only') {
+      return false;
+    }
+
+    const runtime = provider === 'cursor'
+      ? ctx.config.cursorRuntime
+      : ctx.config.kiroRuntime;
+    return runtime.mode === 'wsl';
+  };
 
   const startNativeDiscovery = (
     name: 'cursor' | 'kiro' | 'opencode',
@@ -127,7 +141,7 @@ function createDiscoveryController(
               listAllSessions,
               registry: ctx.registry,
               runtime,
-              policy: ctx.config.wslDiscoveryPolicy ?? 'always',
+              policy: wslDiscoveryPolicy,
               statusStore: ctx.wslDiscoveryStatus!,
               inspector: wslDistroInspector,
             });
@@ -154,19 +168,7 @@ function createDiscoveryController(
       return null;
     }
 
-    if (
-      name === 'cursor'
-      && ctx.config.cursorRuntime.mode === 'wsl'
-      && (ctx.config.wslDiscoveryPolicy ?? 'always') === 'manual_only'
-    ) {
-      return null;
-    }
-
-    if (
-      name === 'kiro'
-      && ctx.config.kiroRuntime.mode === 'wsl'
-      && (ctx.config.wslDiscoveryPolicy ?? 'always') === 'manual_only'
-    ) {
+    if (shouldSkipBackgroundWslDiscovery(name)) {
       return null;
     }
 

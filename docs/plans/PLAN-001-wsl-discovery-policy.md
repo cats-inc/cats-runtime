@@ -7,7 +7,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress |
+| **Status** | Completed |
 | **Owner** | Codex |
 | **Assigned To** | TBD |
 | **Reviewer** | TBD |
@@ -52,19 +52,19 @@ without relying on hidden behavior.
 **Deliverables**: Users can see why WSL discovery is active, skipped, disabled,
 or degraded.
 
-### Phase 3: Manual Discovery Semantics, Tests, and Docs
+### Phase 3: Follow-Up Items
 
-- [ ] Decide whether `POST /cursor/sessions/discover` and
+- [ ] Decide in a future slice whether `POST /cursor/sessions/discover` and
       `POST /kiro/sessions/discover` should accept `startIfNeeded`
 - [x] Add tests for policy parsing, skipped scans, state transitions, and the
       new status endpoint
 - [x] Update `docs/api.md`, `docs/setup-guide.md`, and `docs/architecture.md`
       after the implementation lands
-- [ ] Re-evaluate whether `\\wsl$` or a Node-native SQLite reader is still
-      justified after observing the policy-based design
+- [ ] Re-evaluate in a future slice whether `\\wsl$` or a Node-native SQLite
+      reader is still justified after observing the policy-based design
 
-**Deliverables**: The new behavior is tested, documented, and positioned for a
-possible second-round optimization only if needed.
+**Deliverables**: The delivered slice is tested and documented, with follow-up
+items clearly deferred instead of left ambiguous.
 
 ## Files to Create/Modify
 
@@ -123,6 +123,7 @@ possible second-round optimization only if needed.
 |------|--------|
 | 2026-03-13 | Plan created |
 | 2026-03-13 | Implemented policy parsing, background discovery state, status route, dashboard indicator, tests, and docs |
+| 2026-03-13 | Closed the delivered slice; left manual discovery overrides and direct WSL file access as explicit future follow-ups |
 
 ---
 

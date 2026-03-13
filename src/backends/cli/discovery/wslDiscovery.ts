@@ -258,7 +258,7 @@ export async function runWslAwareNativeDiscovery(
   const distro = input.runtime.distro || 'Ubuntu';
 
   try {
-    let wslRunning: boolean | undefined;
+    let wslRunning: boolean | undefined = input.policy === 'always' ? true : undefined;
 
     if (input.policy === 'if_running') {
       wslRunning = await (input.inspector || isWslDistroRunning)(distro);
@@ -288,7 +288,7 @@ export async function runWslAwareNativeDiscovery(
 
     input.statusStore.markScanSuccess(input.provider, {
       importedCount: result.newCount,
-      wslRunning: wslRunning ?? true,
+      wslRunning,
       message: result.newCount > 0
         ? `Imported ${result.newCount} native ${providerLabel(input.provider)} session(s)`
         : `Scanned native ${providerLabel(input.provider)} sessions`,
