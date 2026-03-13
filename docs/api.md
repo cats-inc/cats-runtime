@@ -94,6 +94,7 @@ Message example:
 
 ```text
 GET /pool/status
+GET /discovery/status
 GET /browse?path=...
 GET /kiro/models
 ```
@@ -129,9 +130,11 @@ Errors use this format:
 - The dashboard at `/` is intentionally unauthenticated for local use
 - Provider-specific capabilities still differ; not every provider supports
   resume, fork, or permission enforcement in the same way
+- `GET /discovery/status` reports the configured WSL discovery policy plus the
+  current background scan state for WSL-backed Cursor/Kiro discovery
 - Future API-key and Ollama support will be added under `backends/api` without
   requiring a new inbound service
 
 ---
 
-*Last updated: 2026-03-11*
+*Last updated: 2026-03-13*

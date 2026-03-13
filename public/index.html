@@ -59,6 +59,60 @@
     white-space: nowrap;
   }
   header h1 span { color: var(--accent); }
+  .runtime-status-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+    min-width: 240px;
+  }
+  .runtime-status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--text2);
+  }
+  .runtime-status-dot[data-state="active"] {
+    background: var(--green);
+    box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.12);
+  }
+  .runtime-status-dot[data-state="skipped"] {
+    background: var(--yellow);
+    box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.12);
+  }
+  .runtime-status-dot[data-state="disabled"],
+  .runtime-status-dot[data-state="not_applicable"] {
+    background: var(--text2);
+  }
+  .runtime-status-dot[data-state="failed"] {
+    background: var(--red);
+    box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.12);
+  }
+  .runtime-status-dot[data-state="idle"],
+  .runtime-status-dot[data-state="running"] {
+    background: var(--orange);
+    box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.12);
+  }
+  .runtime-status-copy {
+    min-width: 0;
+  }
+  .runtime-status-title {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+  .runtime-status-meta {
+    font-size: 11px;
+    color: var(--text2);
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .api-key-group {
     margin-left: auto;
     display: flex;
@@ -580,6 +634,13 @@
 
 <header>
   <h1><span>cats</span>-runtime</h1>
+  <div class="runtime-status-group" id="wslDiscoveryStatus" title="Loading WSL discovery status">
+    <span class="runtime-status-dot" id="wslDiscoveryDot" data-state="idle"></span>
+    <div class="runtime-status-copy">
+      <div class="runtime-status-title" id="wslDiscoveryPolicy">WSL discovery</div>
+      <div class="runtime-status-meta" id="wslDiscoveryLabel">Loading status...</div>
+    </div>
+  </div>
   <div class="api-key-group">
     <label>API Key</label>
     <input type="password" id="apiKeyInput" placeholder="Bearer token" />
@@ -779,6 +840,108 @@ function headers(extra = {}) {
   const key = apiKey();
   if (key) h['Authorization'] = `Bearer ${key}`;
   return h;
+}
+
+function formatDiscoveryState(state) {
+  switch (state) {
+    case 'not_applicable':
+      return 'native only';
+    case 'idle':
+      return 'idle';
+    case 'running':
+      return 'scanning';
+    case 'active':
+      return 'active';
+    case 'skipped':
+      return 'skipped';
+    case 'disabled':
+      return 'disabled';
+    case 'failed':
+      return 'error';
+    default:
+      return state || 'unknown';
+  }
+}
+
+function renderDiscoveryStatus(payload) {
+  const group = document.getElementById('wslDiscoveryStatus');
+  const dot = document.getElementById('wslDiscoveryDot');
+  const policyEl = document.getElementById('wslDiscoveryPolicy');
+  const labelEl = document.getElementById('wslDiscoveryLabel');
+  const wsl = payload?.wsl || {};
+  const summary = wsl.summary || {};
+  const policy = wsl.policy || 'always';
+  const state = summary.state || 'idle';
+  const providers = wsl.providers || {};
+
+  dot.dataset.state = state;
+  policyEl.textContent = `WSL ${policy}`;
+  labelEl.textContent = summary.message || formatDiscoveryState(state);
+
+  const tooltipLines = [
+    `Policy: ${policy}`,
+    `State: ${formatDiscoveryState(state)}`,
+  ];
+
+  for (const providerName of ['cursor', 'kiro']) {
+    const provider = providers[providerName];
+    if (!provider) continue;
+    const bits = [
+      `${providerName}: ${formatDiscoveryState(provider.state)}`,
+      provider.runtimeMode ? `[${provider.runtimeMode}]` : '',
+      provider.distro ? `(${provider.distro})` : '',
+    ].filter(Boolean);
+    const suffix = provider.message ? ` - ${provider.message}` : '';
+    tooltipLines.push(`${bits.join(' ')}${suffix}`);
+  }
+
+  group.title = tooltipLines.join('\n');
+}
+
+async function refreshDiscoveryStatus() {
+  try {
+    const res = await fetch(`${API_BASE}/discovery/status`, { headers: headers() });
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        renderDiscoveryStatus({
+          wsl: {
+            policy: 'locked',
+            summary: {
+              state: 'disabled',
+              message: 'API key required for discovery status',
+            },
+            providers: {},
+          },
+        });
+        return;
+      }
+
+      renderDiscoveryStatus({
+        wsl: {
+          policy: 'error',
+          summary: {
+            state: 'failed',
+            message: `Discovery status request failed (${res.status})`,
+          },
+          providers: {},
+        },
+      });
+      return;
+    }
+
+    renderDiscoveryStatus(await res.json());
+  } catch (e) {
+    renderDiscoveryStatus({
+      wsl: {
+        policy: 'error',
+        summary: {
+          state: 'failed',
+          message: `Discovery status unavailable: ${e.message}`,
+        },
+        providers: {},
+      },
+    });
+  }
 }
 
 // --- Sessions ---
@@ -1618,10 +1781,12 @@ document.addEventListener('keydown', (e) => {
 });
 
 // Initial load
+refreshDiscoveryStatus();
 refreshSessions();
 
 // Auto-refresh every 5s
 setInterval(() => {
+  refreshDiscoveryStatus();
   refreshSessions();
   if (currentSessionId && !isStreaming) refreshSession();
 }, 5000);

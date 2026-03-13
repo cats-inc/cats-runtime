@@ -28,6 +28,7 @@ Key variables in `.env`:
 - `CATS_RUNTIME_SESSION_BASE_DIR=...`
 - `CATS_RUNTIME_MAX_SESSIONS=10`
 - `CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS=5000`
+- `CATS_RUNTIME_WSL_DISCOVERY_POLICY=always`
 - `AUGGIE_PATH=auggie`
 - `COPILOT_PATH=copilot`
 - `CURSOR_RUNTIME=wsl`
@@ -167,6 +168,18 @@ scan may log an error. Fix the provider path or disable discovery with:
 CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS=0
 ```
 
+On Windows, WSL-backed Cursor/Kiro discovery can also be made more conservative:
+
+```powershell
+CATS_RUNTIME_WSL_DISCOVERY_POLICY=if_running
+```
+
+Available values:
+
+- `always`: background discovery may start WSL if needed
+- `if_running`: scan only when the configured WSL distro is already running
+- `manual_only`: do not run background WSL discovery for Cursor/Kiro
+
 ---
 
-*Last updated: 2026-03-11*
+*Last updated: 2026-03-13*

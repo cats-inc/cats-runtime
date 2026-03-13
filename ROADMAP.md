@@ -7,7 +7,7 @@
 ### OPT-1: WSL Discovery Policy and Visibility
 
 **Priority**: P1
-**Status**: Planned
+**Status**: In Progress
 
 #### Problem
 
@@ -36,6 +36,13 @@ surface its current behavior in the dashboard.
 - Expose discovery status through a dedicated runtime endpoint for dashboard use
 - Add a global dashboard indicator that shows both the configured policy and the
   current WSL discovery state
+
+Current implementation status:
+
+- Implemented `CATS_RUNTIME_WSL_DISCOVERY_POLICY`
+- Implemented `GET /discovery/status`
+- Implemented dashboard header visibility for WSL discovery state
+- Deferred manual discovery overrides such as `startIfNeeded`
 
 #### Deferred Optimization
 

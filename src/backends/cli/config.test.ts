@@ -12,6 +12,7 @@ import {
   defaultOpencodeServerPort,
   defaultOpencodeServerStartupTimeoutMs,
   defaultProviderRuntimeMode,
+  defaultWslDiscoveryPolicy,
   loadConfig,
 } from './config.js';
 
@@ -67,12 +68,30 @@ describe('config platform defaults', () => {
     expect(defaultNativeDiscoveryIntervalMs()).toBe(5000);
   });
 
+  it('defaults WSL discovery policy to always', () => {
+    expect(defaultWslDiscoveryPolicy()).toBe('always');
+  });
+
   it('treats discovered sessions as externally live for 15 seconds after activity', () => {
     expect(defaultExternalSessionLiveWindowMs()).toBe(15000);
   });
 
   it('loads Auggie max turns from the environment', () => {
     expect(loadConfig({ AUGGIE_MAX_TURNS: '7' }).auggieMaxTurns).toBe(7);
+  });
+
+  it('loads WSL discovery policy from the environment', () => {
+    expect(
+      loadConfig({
+        CATS_RUNTIME_WSL_DISCOVERY_POLICY: 'if_running',
+      }).wslDiscoveryPolicy,
+    ).toBe('if_running');
+  });
+
+  it('rejects invalid WSL discovery policy values', () => {
+    expect(() => loadConfig({
+      CATS_RUNTIME_WSL_DISCOVERY_POLICY: 'sometimes',
+    })).toThrow(/Invalid CATS_RUNTIME_WSL_DISCOVERY_POLICY/);
   });
 
   it('defaults runtime data and session directories under ~/.cats-runtime', () => {

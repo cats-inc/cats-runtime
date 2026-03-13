@@ -52,13 +52,12 @@ function createTestConfig(overrides = {}) {
 
 async function withRuntime(
   overrides: Record<string, unknown>,
-  run: (address: { host: string; port: number }) => Promise<void>,
+  run: (runtime: ReturnType<typeof createRuntimeServer>) => Promise<void>,
 ) {
   const { config, cleanup } = createTestConfig(overrides);
   const runtime = createRuntimeServer(config);
   try {
-    const address = await runtime.start();
-    await run(address);
+    await run(runtime);
   } finally {
     await runtime.close();
     cleanup();
@@ -67,8 +66,8 @@ async function withRuntime(
 
 describe('runtime server', () => {
   it('GET / serves the embedded dashboard', async () => {
-    await withRuntime({}, async (address) => {
-      const response = await fetch(`http://${address.host}:${address.port}/`);
+    await withRuntime({}, async (runtime) => {
+      const response = await runtime.app.request('/');
       expect(response.status).toBe(200);
       const html = await response.text();
       expect(html).toContain('cats-runtime Dashboard');
@@ -77,12 +76,12 @@ describe('runtime server', () => {
   });
 
   it('GET /health enforces optional inbound auth', async () => {
-    await withRuntime({ apiKey: 'runtime-secret' }, async (address) => {
-      const unauthenticated = await fetch(`http://${address.host}:${address.port}/health`);
+    await withRuntime({ apiKey: 'runtime-secret' }, async (runtime) => {
+      const unauthenticated = await runtime.app.request('/health');
       expect(unauthenticated.status).toBe(401);
 
-      const authenticated = await fetch(
-        `http://${address.host}:${address.port}/health`,
+      const authenticated = await runtime.app.request(
+        '/health',
         {
           headers: { authorization: 'Bearer runtime-secret' },
         },
@@ -99,8 +98,8 @@ describe('runtime server', () => {
   });
 
   it('GET /sessions returns the embedded registry state', async () => {
-    await withRuntime({}, async (address) => {
-      const response = await fetch(`http://${address.host}:${address.port}/sessions`);
+    await withRuntime({}, async (runtime) => {
+      const response = await runtime.app.request('/sessions');
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({
         sessions: [],
@@ -110,8 +109,8 @@ describe('runtime server', () => {
   });
 
   it('POST /sessions rejects unknown providers before spawning', async () => {
-    await withRuntime({}, async (address) => {
-      const response = await fetch(`http://${address.host}:${address.port}/sessions`, {
+    await withRuntime({}, async (runtime) => {
+      const response = await runtime.app.request('/sessions', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ provider: 'unknown-cli', cwd: 'C:/repo' }),
@@ -124,14 +123,55 @@ describe('runtime server', () => {
   });
 
   it('GET /kiro/models returns the local catalog without an upstream proxy', async () => {
-    await withRuntime({ kiroRuntime: { mode: 'wsl' } }, async (address) => {
-      const response = await fetch(`http://${address.host}:${address.port}/kiro/models`);
+    await withRuntime({ kiroRuntime: { mode: 'wsl' } }, async (runtime) => {
+      const response = await runtime.app.request('/kiro/models');
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({
         runtime: { mode: 'wsl' },
         source: 'static',
         models: ['claude-sonnet-4.5', 'deepseek-3.2', 'minimax-m2.1'],
       });
+    });
+  });
+
+  it('GET /discovery/status reports WSL discovery policy state for dashboard polling', async () => {
+    await withRuntime({
+      cursorRuntime: { mode: 'wsl', distro: 'Ubuntu' },
+      kiroRuntime: { mode: 'wsl', distro: 'Ubuntu' },
+      wslDiscoveryPolicy: 'manual_only',
+      nativeDiscoveryIntervalMs: 5000,
+    }, async (runtime) => {
+      const response = await runtime.app.request('/discovery/status');
+      expect(response.status).toBe(200);
+
+      const payload = await response.json() as {
+        wsl: {
+          policy: string;
+          summary: { state: string; message: string };
+          providers: Record<string, {
+            state: string;
+            runtimeMode: string;
+            distro?: string;
+            message: string;
+          }>;
+        };
+      };
+
+      expect(payload.wsl.policy).toBe('manual_only');
+      expect(payload.wsl.summary).toEqual({
+        state: 'disabled',
+        message: 'Background WSL discovery is disabled by policy',
+      });
+      expect(payload.wsl.providers.cursor).toEqual(expect.objectContaining({
+        state: 'disabled',
+        runtimeMode: 'wsl',
+        distro: 'Ubuntu',
+      }));
+      expect(payload.wsl.providers.kiro).toEqual(expect.objectContaining({
+        state: 'disabled',
+        runtimeMode: 'wsl',
+        distro: 'Ubuntu',
+      }));
     });
   });
 });

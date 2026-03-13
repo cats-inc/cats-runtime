@@ -10,7 +10,9 @@ import type { CursorNativeSessionService } from '../backends/cli/cursor/CursorNa
 import type { KiroNativeSessionService } from '../backends/cli/kiro/KiroNativeSessionService.js';
 import type { AuggieSessionService } from '../backends/cli/auggie/AuggieSessionService.js';
 import type { OpencodeNativeSessionService } from '../backends/cli/opencode/OpencodeNativeSessionService.js';
+import type { WslDiscoveryStatusStore } from '../backends/cli/discovery/wslDiscovery.js';
 import { bearerAuth } from './auth.js';
+import { discoveryRoutes } from './routes/discovery.js';
 import { healthRoutes } from './routes/health.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { messageRoutes } from './routes/messages.js';
@@ -32,6 +34,7 @@ export interface AppContext {
   kiroNative: KiroNativeSessionService;
   auggieSessions: AuggieSessionService;
   opencodeNative: OpencodeNativeSessionService;
+  wslDiscoveryStatus?: WslDiscoveryStatusStore;
 }
 
 export function createRuntimeApp(ctx: AppContext) {
@@ -47,7 +50,13 @@ export function createRuntimeApp(ctx: AppContext) {
 
   app.use('*', async (c, next) => {
     const path = c.req.path;
-    if (path === '/' || path === '/sessions' || path === '/health' || path === '/pool/status') {
+    if (
+      path === '/'
+      || path === '/sessions'
+      || path === '/health'
+      || path === '/pool/status'
+      || path === '/discovery/status'
+    ) {
       return await next();
     }
     return logger()(c, next);
@@ -60,6 +69,7 @@ export function createRuntimeApp(ctx: AppContext) {
   });
 
   app.route('/', healthRoutes);
+  app.route('/', discoveryRoutes);
   app.route('/', sessionRoutes);
   app.route('/', messageRoutes);
   app.route('/', historyRoutes);

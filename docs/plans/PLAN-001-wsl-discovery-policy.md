@@ -7,7 +7,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | In Progress |
 | **Owner** | Codex |
 | **Assigned To** | TBD |
 | **Reviewer** | TBD |
@@ -28,26 +28,26 @@ explicitly deferred.
 
 ### Phase 1: Policy Model and Discovery State
 
-- [ ] Add `WslDiscoveryPolicy` config parsing in `src/backends/cli/config.ts`
-- [ ] Decide and document compatibility behavior when the env var is absent
-- [ ] Add a WSL runtime probe that can tell whether the configured distro is
+- [x] Add `WslDiscoveryPolicy` config parsing in `src/backends/cli/config.ts`
+- [x] Decide and document compatibility behavior when the env var is absent
+- [x] Add a WSL runtime probe that can tell whether the configured distro is
       already running without launching a provider process
-- [ ] Refactor background Cursor/Kiro discovery in `src/server.ts` to respect
+- [x] Refactor background Cursor/Kiro discovery in `src/server.ts` to respect
       the configured policy
-- [ ] Record per-provider discovery state for `cursor` and `kiro`
+- [x] Record per-provider discovery state for `cursor` and `kiro`
 
 **Deliverables**: Background WSL discovery can run, skip, or stay manual-only
 without relying on hidden behavior.
 
 ### Phase 2: HTTP Status Surface and Dashboard Indicator
 
-- [ ] Add a dedicated discovery status endpoint, preferably
+- [x] Add a dedicated discovery status endpoint, preferably
       `GET /discovery/status`
-- [ ] Expose configured policy, runtime mode, distro, last scan timestamp, and
+- [x] Expose configured policy, runtime mode, distro, last scan timestamp, and
       last outcome per WSL-backed provider
-- [ ] Update `public/index.html` to show a compact global WSL indicator in the
+- [x] Update `public/index.html` to show a compact global WSL indicator in the
       header
-- [ ] Show both the configured policy and the current state label in the UI
+- [x] Show both the configured policy and the current state label in the UI
 
 **Deliverables**: Users can see why WSL discovery is active, skipped, disabled,
 or degraded.
@@ -56,9 +56,9 @@ or degraded.
 
 - [ ] Decide whether `POST /cursor/sessions/discover` and
       `POST /kiro/sessions/discover` should accept `startIfNeeded`
-- [ ] Add tests for policy parsing, skipped scans, state transitions, and the
+- [x] Add tests for policy parsing, skipped scans, state transitions, and the
       new status endpoint
-- [ ] Update `docs/api.md`, `docs/setup-guide.md`, and `docs/architecture.md`
+- [x] Update `docs/api.md`, `docs/setup-guide.md`, and `docs/architecture.md`
       after the implementation lands
 - [ ] Re-evaluate whether `\\wsl$` or a Node-native SQLite reader is still
       justified after observing the policy-based design
@@ -122,6 +122,7 @@ possible second-round optimization only if needed.
 | Date | Update |
 |------|--------|
 | 2026-03-13 | Plan created |
+| 2026-03-13 | Implemented policy parsing, background discovery state, status route, dashboard indicator, tests, and docs |
 
 ---
 

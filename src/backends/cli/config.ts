@@ -13,9 +13,15 @@ const RUNTIME_MODES = [
   'native',
   'wsl',
 ] as const;
+const WSL_DISCOVERY_POLICIES = [
+  'always',
+  'if_running',
+  'manual_only',
+] as const;
 
 export type RunnerMode = typeof RUNNER_MODES[number];
 export type RuntimeMode = typeof RUNTIME_MODES[number];
+export type WslDiscoveryPolicy = typeof WSL_DISCOVERY_POLICIES[number];
 
 export interface ProviderRuntimeConfig {
   mode: RuntimeMode;
@@ -55,6 +61,7 @@ export interface CliRuntimeConfig {
   geminiSessionsDir: string;
   kiroDbPath: string;
   kiroRuntime: ProviderRuntimeConfig;
+  wslDiscoveryPolicy?: WslDiscoveryPolicy;
   nativeDiscoveryIntervalMs: number;
   externalSessionLiveWindowMs: number;
   maxSessions: number;
@@ -115,6 +122,10 @@ export function defaultOpencodeServerStartupTimeoutMs(): number {
 
 export function defaultNativeDiscoveryIntervalMs(): number {
   return 5000;
+}
+
+export function defaultWslDiscoveryPolicy(): WslDiscoveryPolicy {
+  return 'always';
 }
 
 export function defaultExternalSessionLiveWindowMs(): number {
@@ -197,6 +208,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CliRuntimeConf
       'KIRO',
       defaultProviderRuntimeMode('kiro'),
       env,
+    ),
+    wslDiscoveryPolicy: parseWslDiscoveryPolicy(
+      env.CATS_RUNTIME_WSL_DISCOVERY_POLICY,
+      defaultWslDiscoveryPolicy(),
     ),
     nativeDiscoveryIntervalMs: parseNonNegativeInt(
       env.CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS
@@ -315,6 +330,25 @@ function readRuntimeConfig(
       || env[`${prefix}_WSL_DISTRO`]
       || undefined,
   };
+}
+
+function parseWslDiscoveryPolicy(
+  value: string | undefined,
+  fallback: WslDiscoveryPolicy,
+): WslDiscoveryPolicy {
+  const raw = value?.trim().toLowerCase();
+  if (!raw) {
+    return fallback;
+  }
+
+  if ((WSL_DISCOVERY_POLICIES as readonly string[]).includes(raw)) {
+    return raw as WslDiscoveryPolicy;
+  }
+
+  throw new Error(
+    `Invalid CATS_RUNTIME_WSL_DISCOVERY_POLICY='${raw}'. `
+      + `Valid values: ${WSL_DISCOVERY_POLICIES.join(', ')}`,
+  );
 }
 
 function readRunnerPath(

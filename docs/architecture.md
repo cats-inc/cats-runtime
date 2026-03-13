@@ -76,6 +76,8 @@ src/
 - Tracks session registry and workspace modes
 - Discovers external native sessions from supported tools
 - Encapsulates provider-specific spawn, resume, fork, and permission logic
+- Applies policy-aware WSL discovery for Cursor/Kiro and exposes discovery
+  status for the dashboard
 
 ### `src/core`
 
@@ -91,6 +93,14 @@ src/
 4. Provider adapters spawn or resume the target CLI/runtime
 5. Stream events are returned directly to the caller
 
+For WSL-backed Cursor/Kiro discovery:
+
+1. Background discovery checks the configured WSL discovery policy
+2. `always` scans directly, `if_running` only scans already-running distros, and
+   `manual_only` disables background WSL scans
+3. The runtime records the latest WSL discovery state for dashboard polling via
+   `GET /discovery/status`
+
 ## Design Rules
 
 - Upper layers should depend on `cats-runtime`, not on provider-specific CLIs
@@ -105,4 +115,4 @@ src/
 
 ---
 
-*Last updated: 2026-03-11*
+*Last updated: 2026-03-13*

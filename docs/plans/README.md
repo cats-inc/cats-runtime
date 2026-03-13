@@ -46,7 +46,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 
 | Plan | Title | Status | Related Spec |
 |------|-------|--------|--------------|
-| [PLAN-001](./PLAN-001-wsl-discovery-policy.md) | WSL Discovery Policy and Dashboard Visibility | Draft | [SPEC-001](../specs/SPEC-001-wsl-discovery-policy.md) |
+| [PLAN-001](./PLAN-001-wsl-discovery-policy.md) | WSL Discovery Policy and Dashboard Visibility | In Progress | [SPEC-001](../specs/SPEC-001-wsl-discovery-policy.md) |
 | [000-template](./000-template.md) | Template | - | - |
 <!-- Add new plans above this line -->
 

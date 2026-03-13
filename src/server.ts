@@ -12,6 +12,12 @@ import { CodexSessionScanner } from './backends/cli/discovery/CodexSessionScanne
 import { CopilotSessionScanner } from './backends/cli/discovery/CopilotSessionScanner.js';
 import { GeminiSessionScanner } from './backends/cli/discovery/GeminiSessionScanner.js';
 import { syncNativeSessions } from './backends/cli/discovery/nativeDiscovery.js';
+import {
+  WslDiscoveryStatusStore,
+  isWslDistroRunning,
+  runWslAwareNativeDiscovery,
+  type WslDistroInspector,
+} from './backends/cli/discovery/wslDiscovery.js';
 import { CursorNativeSessionService } from './backends/cli/cursor/CursorNativeSessionService.js';
 import { KiroNativeSessionService } from './backends/cli/kiro/KiroNativeSessionService.js';
 import { OpencodeNativeSessionService } from './backends/cli/opencode/OpencodeNativeSessionService.js';
@@ -23,6 +29,10 @@ import { createRuntimeApp, type AppContext } from './http/app.js';
 interface DiscoveryController {
   start(): void;
   stop(): void;
+}
+
+interface RuntimeServerOptions {
+  wslDistroInspector?: WslDistroInspector;
 }
 
 export interface RuntimeServer {
@@ -45,7 +55,10 @@ function startWatcher(name: string, watcher: FileWatcher): void {
   });
 }
 
-function createDiscoveryController(ctx: AppContext): DiscoveryController {
+function createDiscoveryController(
+  ctx: AppContext,
+  options: RuntimeServerOptions = {},
+): DiscoveryController {
   const auggieWatcher = new FileWatcher(
     ctx.config.auggieSessionsDir,
     new AuggieSessionScanner(ctx.auggieSessions),
@@ -81,6 +94,7 @@ function createDiscoveryController(ctx: AppContext): DiscoveryController {
   let kiroTimer: ReturnType<typeof setInterval> | null = null;
   let opencodeTimer: ReturnType<typeof setInterval> | null = null;
   let started = false;
+  const wslDistroInspector = options.wslDistroInspector || isWslDistroRunning;
 
   const startNativeDiscovery = (
     name: 'cursor' | 'kiro' | 'opencode',
@@ -105,6 +119,25 @@ function createDiscoveryController(ctx: AppContext): DiscoveryController {
       running = true;
 
       try {
+        if (name === 'cursor' || name === 'kiro') {
+          const runtime = name === 'cursor' ? ctx.config.cursorRuntime : ctx.config.kiroRuntime;
+          if (runtime.mode === 'wsl') {
+            const result = await runWslAwareNativeDiscovery({
+              provider: name,
+              listAllSessions,
+              registry: ctx.registry,
+              runtime,
+              policy: ctx.config.wslDiscoveryPolicy ?? 'always',
+              statusStore: ctx.wslDiscoveryStatus!,
+              inspector: wslDistroInspector,
+            });
+            if (result.outcome === 'scanned' && result.newCount > 0) {
+              console.log(`[discovery:${name}] Imported ${result.newCount} native ${label} session(s)`);
+            }
+            return;
+          }
+        }
+
         const sessions = await listAllSessions();
         const { newCount } = syncNativeSessions(ctx.registry, name, sessions);
         if (newCount > 0) {
@@ -118,6 +151,22 @@ function createDiscoveryController(ctx: AppContext): DiscoveryController {
     };
 
     if (ctx.config.nativeDiscoveryIntervalMs <= 0) {
+      return null;
+    }
+
+    if (
+      name === 'cursor'
+      && ctx.config.cursorRuntime.mode === 'wsl'
+      && (ctx.config.wslDiscoveryPolicy ?? 'always') === 'manual_only'
+    ) {
+      return null;
+    }
+
+    if (
+      name === 'kiro'
+      && ctx.config.kiroRuntime.mode === 'wsl'
+      && (ctx.config.wslDiscoveryPolicy ?? 'always') === 'manual_only'
+    ) {
       return null;
     }
 
@@ -166,10 +215,12 @@ function createDiscoveryController(ctx: AppContext): DiscoveryController {
 
 export function createRuntimeServer(
   config: RuntimeConfig = loadConfig(),
+  options: RuntimeServerOptions = {},
 ): RuntimeServer {
   const dataDir = config.dataDir || join(config.sessionBaseDir, '..', 'data');
   const registry = new SessionRegistry(dataDir, config.sessionBaseDir);
   const auggieSessions = new AuggieSessionService(config.auggieSessionsDir);
+  const wslDiscoveryStatus = new WslDiscoveryStatusStore(config);
   const cursorNative = new CursorNativeSessionService({
     command: config.cursorPath,
     chatsDir: config.cursorChatsDir,
@@ -196,10 +247,11 @@ export function createRuntimeServer(
     kiroNative,
     auggieSessions,
     opencodeNative,
+    wslDiscoveryStatus,
   };
   const app = createRuntimeApp(context);
   const server = createAdaptorServer({ fetch: app.fetch }) as Server;
-  const discovery = createDiscoveryController(context);
+  const discovery = createDiscoveryController(context, options);
 
   return {
     server,
