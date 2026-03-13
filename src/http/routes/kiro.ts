@@ -48,15 +48,20 @@ kiroRoutes.get('/kiro/sessions', async (c) => {
 /** POST /kiro/sessions/discover — import native Kiro sessions into the registry */
 kiroRoutes.post('/kiro/sessions/discover', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
-  const body = await c.req.json<{ cwd?: string; group?: string }>().catch(() => ({})) as {
+  const body = await c.req.json<{
     cwd?: string;
     group?: string;
+    startIfNeeded?: boolean;
+  }>().catch(() => ({})) as {
+    cwd?: string;
+    group?: string;
+    startIfNeeded?: boolean;
   };
 
   try {
     const nativeSessions = body.cwd
-      ? await ctx.kiroNative.listSessions(body.cwd)
-      : await ctx.kiroNative.listAllSessions();
+      ? await ctx.kiroNative.listSessions(body.cwd, { startIfNeeded: body.startIfNeeded })
+      : await ctx.kiroNative.listAllSessions({ startIfNeeded: body.startIfNeeded });
     const sessions = nativeSessions
       .map((session) => ctx.registry.upsertDiscovered(session.providerSessionId, {
         providerName: 'kiro',

@@ -146,4 +146,32 @@ describe('CursorNativeSessionService', () => {
 
     expect(decodeEmbeddedPython(shellScript)).toContain('mode=ro&immutable=1');
   });
+
+  it('skips WSL discovery when startIfNeeded is false and the distro is stopped', async () => {
+    const runner = vi.fn(async () => ({
+      code: 0,
+      stdout: JSON.stringify([
+        {
+          sessionId: 'cursor-1',
+          workspacePath: '/mnt/c/Users/kenne/Source/SK2/ai-content-storyteller',
+          summary: 'Storyteller Session',
+          messageCount: 2,
+        },
+      ]),
+      stderr: '',
+    }));
+    const service = new CursorNativeSessionService({
+      command: 'cursor-agent',
+      chatsDir: '~/.cursor/chats',
+      runtime: createRuntimeAdapter({
+        mode: 'wsl',
+        distro: 'Ubuntu',
+      }),
+      runner,
+      wslInspector: vi.fn(async () => false),
+    });
+
+    await expect(service.listAllSessions({ startIfNeeded: false })).resolves.toEqual([]);
+    expect(runner).not.toHaveBeenCalled();
+  });
 });

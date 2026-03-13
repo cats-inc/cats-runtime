@@ -233,6 +233,22 @@ describe('Kiro native session management', () => {
     expect(registry.list({ provider: 'kiro' })).toHaveLength(1);
   });
 
+  it('passes startIfNeeded=false to Kiro manual discovery', async () => {
+    vi.mocked(kiroNative.listSessions).mockResolvedValue([]);
+
+    const res = await app.request('/kiro/sessions/discover', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cwd: 'C:/repo', startIfNeeded: false }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(vi.mocked(kiroNative.listSessions)).toHaveBeenCalledWith(
+      'C:/repo',
+      { startIfNeeded: false },
+    );
+  });
+
   it('inspects Kiro model options for the configured runtime', async () => {
     const res = await app.request('/kiro/models');
 
@@ -304,4 +320,3 @@ describe('Kiro native session management', () => {
     expect(body.error).toContain('latest session');
   });
 });
-

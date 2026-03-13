@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { isWslDistroRunning, type WslDistroInspector } from '../discovery/wslDiscovery.js';
 import type { RuntimeAdapter } from '../runtime/runtime.js';
 import {
   createRuntimeAdapter,
@@ -27,12 +28,16 @@ interface CommandResult {
 }
 
 export type CursorCommandRunner = (command: string, args: string[]) => Promise<CommandResult>;
+export interface CursorSessionListOptions {
+  startIfNeeded?: boolean;
+}
 
 export interface CursorNativeSessionServiceOptions {
   command: string;
   chatsDir: string;
   runtime: RuntimeAdapter;
   runner?: CursorCommandRunner;
+  wslInspector?: WslDistroInspector;
 }
 
 interface RawCursorSession {
@@ -55,12 +60,14 @@ export class CursorNativeSessionService {
   private readonly chatsDir: string;
   private readonly runtime: RuntimeAdapter;
   private readonly runner: CursorCommandRunner;
+  private readonly wslInspector: WslDistroInspector;
 
   constructor(options: CursorNativeSessionServiceOptions) {
     this.command = options.command;
     this.chatsDir = options.chatsDir;
     this.runtime = options.runtime;
     this.runner = options.runner || defaultCommandRunner;
+    this.wslInspector = options.wslInspector || isWslDistroRunning;
   }
 
   normalizeWorkspace(cwd: string): string {
@@ -70,14 +77,23 @@ export class CursorNativeSessionService {
     return this.runtime.toRuntimePath(cwd);
   }
 
-  async listSessions(cwd: string): Promise<CursorNativeSessionSummary[]> {
+  async listSessions(
+    cwd: string,
+    options: CursorSessionListOptions = {},
+  ): Promise<CursorNativeSessionSummary[]> {
     const workspace = this.normalizeWorkspace(cwd);
-    return (await this.listAllSessions()).filter(
+    return (await this.listAllSessions(options)).filter(
       (session) => this.normalizeWorkspace(session.cwd) === workspace,
     );
   }
 
-  async listAllSessions(): Promise<CursorNativeSessionSummary[]> {
+  async listAllSessions(
+    options: CursorSessionListOptions = {},
+  ): Promise<CursorNativeSessionSummary[]> {
+    if (!(await this.shouldStartDiscovery(options))) {
+      return [];
+    }
+
     const result = await this.runJsonScript<RawCursorSession[]>(LIST_ALL_CURSOR_SESSIONS_PY, [
       this.chatsDir,
     ]);
@@ -153,6 +169,16 @@ export class CursorNativeSessionService {
       this.chatsDir,
     ]);
     return Boolean(result.deleted);
+  }
+
+  private async shouldStartDiscovery(
+    options: CursorSessionListOptions,
+  ): Promise<boolean> {
+    if (options.startIfNeeded !== false || this.runtime.mode !== 'wsl') {
+      return true;
+    }
+
+    return this.wslInspector(this.runtime.distro || 'Ubuntu');
   }
 
   private async runJsonScript<T>(script: string, args: string[]): Promise<T> {

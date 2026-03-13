@@ -17,6 +17,7 @@ const POWERSHELL_EXEC_PAYLOAD_ENV = 'CATS_RUNTIME_PWSH_EXEC_B64';
 
 export interface RuntimeAdapter {
   readonly mode: ProviderRuntimeConfig['mode'];
+  readonly distro?: string;
   toRuntimePath(path: string): string;
   toHostPath(path: string): string;
   buildShellInvocation(script: string): ShellInvocation;
@@ -31,6 +32,7 @@ export function createRuntimeAdapter(config: ProviderRuntimeConfig): RuntimeAdap
 
 class NativeRuntimeAdapter implements RuntimeAdapter {
   readonly mode = 'native' as const;
+  readonly distro = undefined;
 
   toRuntimePath(path: string): string {
     return path.replace(/\\/g, '/');
@@ -57,7 +59,7 @@ class NativeRuntimeAdapter implements RuntimeAdapter {
 
 class WslRuntimeAdapter implements RuntimeAdapter {
   readonly mode = 'wsl' as const;
-  private readonly distro: string;
+  readonly distro: string;
 
   constructor(distro: string) {
     this.distro = distro;

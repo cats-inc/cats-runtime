@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { isWslDistroRunning, type WslDistroInspector } from '../discovery/wslDiscovery.js';
 import type { RuntimeAdapter } from '../runtime/runtime.js';
 import {
   createRuntimeAdapter,
@@ -27,12 +28,16 @@ interface CommandResult {
 }
 
 export type KiroCommandRunner = (command: string, args: string[]) => Promise<CommandResult>;
+export interface KiroSessionListOptions {
+  startIfNeeded?: boolean;
+}
 
 export interface KiroNativeSessionServiceOptions {
   command: string;
   dbPath: string;
   runtime: RuntimeAdapter;
   runner?: KiroCommandRunner;
+  wslInspector?: WslDistroInspector;
 }
 
 interface RawKiroSession {
@@ -55,12 +60,14 @@ export class KiroNativeSessionService {
   private readonly dbPath: string;
   private readonly runtime: RuntimeAdapter;
   private readonly runner: KiroCommandRunner;
+  private readonly wslInspector: WslDistroInspector;
 
   constructor(options: KiroNativeSessionServiceOptions) {
     this.command = options.command;
     this.dbPath = options.dbPath;
     this.runtime = options.runtime;
     this.runner = options.runner || defaultCommandRunner;
+    this.wslInspector = options.wslInspector || isWslDistroRunning;
   }
 
   normalizeWorkspace(cwd: string): string {
@@ -70,14 +77,23 @@ export class KiroNativeSessionService {
     return this.runtime.toRuntimePath(cwd);
   }
 
-  async listSessions(cwd: string): Promise<KiroNativeSessionSummary[]> {
+  async listSessions(
+    cwd: string,
+    options: KiroSessionListOptions = {},
+  ): Promise<KiroNativeSessionSummary[]> {
     const workspace = this.normalizeWorkspace(cwd);
-    return (await this.listAllSessions()).filter(
+    return (await this.listAllSessions(options)).filter(
       (session) => this.normalizeWorkspace(session.cwd) === workspace,
     );
   }
 
-  async listAllSessions(): Promise<KiroNativeSessionSummary[]> {
+  async listAllSessions(
+    options: KiroSessionListOptions = {},
+  ): Promise<KiroNativeSessionSummary[]> {
+    if (!(await this.shouldStartDiscovery(options))) {
+      return [];
+    }
+
     const result = await this.runJsonScript<RawKiroSession[]>(LIST_ALL_KIRO_SESSIONS_PY, [
       this.dbPath,
     ]);
@@ -140,6 +156,16 @@ export class KiroNativeSessionService {
   async getLatestSessionId(cwd: string): Promise<string | null> {
     const latest = await this.getLatestSession(cwd);
     return latest?.providerSessionId ?? null;
+  }
+
+  private async shouldStartDiscovery(
+    options: KiroSessionListOptions,
+  ): Promise<boolean> {
+    if (options.startIfNeeded !== false || this.runtime.mode !== 'wsl') {
+      return true;
+    }
+
+    return this.wslInspector(this.runtime.distro || 'Ubuntu');
   }
 
   private async runJsonScript<T>(script: string, args: string[]): Promise<T> {

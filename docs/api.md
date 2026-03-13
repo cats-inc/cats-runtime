@@ -114,6 +114,20 @@ GET  /opencode/sessions
 POST /opencode/sessions/discover
 ```
 
+For manual WSL-backed discovery, `POST /cursor/sessions/discover` and
+`POST /kiro/sessions/discover` also accept:
+
+```json
+{
+  "cwd": "C:/repo",
+  "startIfNeeded": false
+}
+```
+
+When `startIfNeeded` is `false`, the runtime will skip waking a stopped WSL
+distro and return any sessions it can inspect without starting WSL. The default
+remains `true`.
+
 ## Error Responses
 
 Errors use this format:

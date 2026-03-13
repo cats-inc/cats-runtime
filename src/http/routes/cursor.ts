@@ -22,15 +22,20 @@ cursorRoutes.get('/cursor/sessions', async (c) => {
 /** POST /cursor/sessions/discover — import native Cursor sessions into the registry */
 cursorRoutes.post('/cursor/sessions/discover', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
-  const body = await c.req.json<{ cwd?: string; group?: string }>().catch(() => ({})) as {
+  const body = await c.req.json<{
     cwd?: string;
     group?: string;
+    startIfNeeded?: boolean;
+  }>().catch(() => ({})) as {
+    cwd?: string;
+    group?: string;
+    startIfNeeded?: boolean;
   };
 
   try {
     const nativeSessions = body.cwd
-      ? await ctx.cursorNative.listSessions(body.cwd)
-      : await ctx.cursorNative.listAllSessions();
+      ? await ctx.cursorNative.listSessions(body.cwd, { startIfNeeded: body.startIfNeeded })
+      : await ctx.cursorNative.listAllSessions({ startIfNeeded: body.startIfNeeded });
     const sessions = nativeSessions
       .map((session) => ctx.registry.upsertDiscovered(session.providerSessionId, {
         providerName: 'cursor',

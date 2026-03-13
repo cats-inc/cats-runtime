@@ -235,6 +235,22 @@ describe('Cursor native session management', () => {
     expect(registry.list({ provider: 'cursor' })).toHaveLength(1);
   });
 
+  it('passes startIfNeeded=false to Cursor manual discovery', async () => {
+    vi.mocked(cursorNative.listSessions).mockResolvedValue([]);
+
+    const res = await app.request('/cursor/sessions/discover', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cwd: 'C:/repo', startIfNeeded: false }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(vi.mocked(cursorNative.listSessions)).toHaveBeenCalledWith(
+      'C:/repo',
+      { startIfNeeded: false },
+    );
+  });
+
   it('inspects native Cursor sessions without mutating the registry', async () => {
     vi.mocked(cursorNative.listSessions).mockResolvedValue([
       {
@@ -456,4 +472,3 @@ describe('Cursor native session management', () => {
     expect(vi.mocked(pool.kill)).toHaveBeenCalledWith(session.id);
   });
 });
-

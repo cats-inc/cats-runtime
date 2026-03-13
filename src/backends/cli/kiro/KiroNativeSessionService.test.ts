@@ -110,4 +110,32 @@ describe('KiroNativeSessionService', () => {
       'kiro-latest',
     )).resolves.toBe(true);
   });
+
+  it('skips WSL discovery when startIfNeeded is false and the distro is stopped', async () => {
+    const runner = vi.fn(async () => ({
+      code: 0,
+      stdout: JSON.stringify([
+        {
+          sessionId: 'kiro-latest',
+          workspacePath: '/mnt/c/Users/kenne/Source/SK2/one-man-digital-company',
+          summary: 'Latest session',
+          messageCount: 3,
+        },
+      ]),
+      stderr: '',
+    }));
+    const service = new KiroNativeSessionService({
+      command: 'kiro-cli',
+      dbPath: '~/.local/share/kiro-cli/data.sqlite3',
+      runtime: createRuntimeAdapter({
+        mode: 'wsl',
+        distro: 'Ubuntu',
+      }),
+      runner,
+      wslInspector: vi.fn(async () => false),
+    });
+
+    await expect(service.listAllSessions({ startIfNeeded: false })).resolves.toEqual([]);
+    expect(runner).not.toHaveBeenCalled();
+  });
 });
