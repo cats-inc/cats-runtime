@@ -1,3 +1,6 @@
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { createRuntimeApp as createApp } from './app.js';
 import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
@@ -200,6 +203,7 @@ describe('Cursor native session management', () => {
       messageCount: 1,
     });
     vi.mocked(cursorNative.deleteSession).mockResolvedValue(true);
+    vi.mocked(cursorNative.listSessions).mockResolvedValue([]);
 
     const res = await app.request(`/sessions/${session!.id}`, {
       method: 'DELETE',
@@ -231,6 +235,112 @@ describe('Cursor native session management', () => {
     expect(body.nativeDeleted).toBe(false);
     // Session kept in registry — not removed
     expect(registry.get(session!.id)).toBeDefined();
+  });
+
+  it('retains session when Cursor deletion claims success but the session is still discoverable', async () => {
+    const session = registry.upsertDiscovered('cursor-half-deleted', {
+      providerName: 'cursor',
+      cwd: 'C:/repo',
+      summary: 'Untitled Session',
+      messageCount: 1,
+    });
+    vi.mocked(cursorNative.deleteSession).mockResolvedValue(true);
+    vi.mocked(cursorNative.listSessions).mockResolvedValue([
+      {
+        providerSessionId: 'cursor-half-deleted',
+        cwd: 'C:/repo',
+        summary: 'Still here',
+        messageCount: 1,
+      },
+    ]);
+
+    const res = await app.request(`/sessions/${session!.id}`, {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.status).toBe('retained');
+    expect(body.nativeDeleted).toBe(false);
+    expect(registry.get(session!.id)).toBeDefined();
+  });
+
+  it('does not kill an attached worker when delete is retained', async () => {
+    const session = registry.create({
+      providerName: 'cursor',
+      cwd: 'C:/repo',
+      workspaceMode: 'shared',
+    });
+    registry.setProviderSessionId(session.id, 'cursor-attached');
+    registry.updateStatus(session.id, 'ready');
+    attachedWorkers.set(session.id, { alive: true });
+
+    vi.mocked(cursorNative.deleteSession).mockResolvedValue(true);
+    vi.mocked(cursorNative.listSessions).mockResolvedValue([
+      {
+        providerSessionId: 'cursor-attached',
+        cwd: 'C:/repo',
+        summary: 'Still here',
+        messageCount: 2,
+      },
+    ]);
+
+    const res = await app.request(`/sessions/${session.id}`, {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.status).toBe('retained');
+    expect(registry.get(session.id)).toBeDefined();
+    expect(attachedWorkers.get(session.id)?.alive).toBe(true);
+    expect(vi.mocked(pool.kill)).not.toHaveBeenCalledWith(session.id);
+  });
+
+  it('deletes transcript-only discovered Cursor sessions without staging away native-owned files first', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cursor-native-delete-'));
+    const transcriptPath = join(tempDir, 'cursor-native-only.jsonl');
+    writeFileSync(transcriptPath, '{"type":"user"}\n');
+
+    const session = registry.upsertDiscovered('cursor-native-only', {
+      providerName: 'cursor',
+      cwd: 'C:/repo',
+      summary: 'Transcript only',
+      messageCount: 1,
+      sourcePath: transcriptPath,
+    });
+
+    vi.mocked(cursorNative.deleteSession).mockImplementation(async () => {
+      if (!existsSync(transcriptPath)) {
+        return false;
+      }
+      rmSync(transcriptPath, { force: true });
+      return true;
+    });
+    vi.mocked(cursorNative.listSessions).mockImplementation(async () => (
+      existsSync(transcriptPath)
+        ? [{
+          providerSessionId: 'cursor-native-only',
+          cwd: 'C:/repo',
+          summary: 'Transcript only',
+          messageCount: 1,
+        }]
+        : []
+    ));
+
+    try {
+      const res = await app.request(`/sessions/${session!.id}`, {
+        method: 'DELETE',
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json() as Record<string, unknown>;
+      expect(body.status).toBe('deleted');
+      expect(registry.get(session!.id)).toBeUndefined();
+      expect(existsSync(transcriptPath)).toBe(false);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   it('discovers existing Cursor sessions for a workspace', async () => {

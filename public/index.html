@@ -1279,15 +1279,20 @@ async function deleteSession(id) {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const body = await res.json();
+    if (body.status === 'retained') {
+      alert(body.reason || 'Session data could not be removed safely. Session retained.');
+      await refreshSessions();
+      if (id === currentSessionId) {
+        await selectSession(id);
+      }
+      return;
+    }
     if (id === currentSessionId) {
       currentSessionId = null;
       document.getElementById('chatContainer').style.display = 'none';
       document.getElementById('chatPlaceholder').style.display = '';
     }
-    if (body.status === 'retained') {
-      alert('Transcript files could not be deleted. Session kept intact — you can retry later.');
-    }
-    refreshSessions();
+    await refreshSessions();
   } catch (e) {
     alert('Failed: ' + e.message);
   }
@@ -1324,7 +1329,7 @@ async function deleteGroup(cwd) {
   const blockedCount = sessions.length - deletableSessions.length;
   let msg = `Delete all ${sessions.length} session(s) under "${cwd.split('/').pop()}"?`;
   if (closableCount > 0) {
-    msg += `\n\n${closableCount} live runtime-controlled session(s) will be stopped first.`;
+    msg += `\n\n${closableCount} live runtime-controlled session(s) may be stopped if deletion succeeds.`;
   }
   if (blockedCount > 0) {
     msg += `\n\n${blockedCount} external active/closing session(s) will be skipped.`;
@@ -1338,6 +1343,8 @@ async function deleteGroup(cwd) {
   let deleted = 0;
   let retained = 0;
   let failed = 0;
+  let currentSessionDeleted = false;
+  let currentSessionRetained = false;
 
   for (const s of deletableSessions) {
     const controls = sessionControls(s);
@@ -1355,8 +1362,10 @@ async function deleteGroup(cwd) {
         const body = await res.json();
         if (body.status === 'retained') {
           retained++;
+          if (s.id === currentSessionId) currentSessionRetained = true;
         } else {
           deleted++;
+          if (s.id === currentSessionId) currentSessionDeleted = true;
         }
       } else {
         failed++;
@@ -1368,7 +1377,7 @@ async function deleteGroup(cwd) {
 
   groupDeleteState.delete(cwd);
 
-  if (deletableSessions.some(s => s.id === currentSessionId)) {
+  if (currentSessionDeleted) {
     currentSessionId = null;
     document.getElementById('chatContainer').style.display = 'none';
     document.getElementById('chatPlaceholder').style.display = '';
@@ -1376,12 +1385,15 @@ async function deleteGroup(cwd) {
 
   const warnings = [];
   if (failed > 0) warnings.push(`${failed} failed`);
-  if (retained > 0) warnings.push(`${retained} retained (transcript files locked)`);
+  if (retained > 0) warnings.push(`${retained} retained (cleanup incomplete)`);
   if (warnings.length > 0) {
     alert(`Deleted ${deleted} session(s). ${warnings.join('; ')}.`);
   }
 
-  refreshSessions();
+  await refreshSessions();
+  if (currentSessionRetained && currentSessionId) {
+    await selectSession(currentSessionId);
+  }
 }
 
 async function deleteAllSessions() {
@@ -1411,7 +1423,7 @@ async function deleteAllSessions() {
   const blockedCount = sessions.length - deletableSessions.length;
   let msg = `Delete ALL ${sessions.length} session(s) across all projects?`;
   if (closableCount > 0) {
-    msg += `\n\n${closableCount} live runtime-controlled session(s) will be stopped first.`;
+    msg += `\n\n${closableCount} live runtime-controlled session(s) may be stopped if deletion succeeds.`;
   }
   if (blockedCount > 0) {
     msg += `\n\n${blockedCount} external active/closing session(s) will be skipped.`;
@@ -1422,6 +1434,8 @@ async function deleteAllSessions() {
   let deleted = 0;
   let retained = 0;
   let failed = 0;
+  let currentSessionDeleted = false;
+  let currentSessionRetained = false;
 
   for (const s of deletableSessions) {
     const controls = sessionControls(s);
@@ -1438,8 +1452,10 @@ async function deleteAllSessions() {
         const body = await res.json();
         if (body.status === 'retained') {
           retained++;
+          if (s.id === currentSessionId) currentSessionRetained = true;
         } else {
           deleted++;
+          if (s.id === currentSessionId) currentSessionDeleted = true;
         }
       } else {
         failed++;
@@ -1449,7 +1465,7 @@ async function deleteAllSessions() {
     }
   }
 
-  if (deletableSessions.some(s => s.id === currentSessionId)) {
+  if (currentSessionDeleted) {
     currentSessionId = null;
     document.getElementById('chatContainer').style.display = 'none';
     document.getElementById('chatPlaceholder').style.display = '';
@@ -1457,12 +1473,15 @@ async function deleteAllSessions() {
 
   const warnings = [];
   if (failed > 0) warnings.push(`${failed} failed`);
-  if (retained > 0) warnings.push(`${retained} retained (transcript files locked)`);
+  if (retained > 0) warnings.push(`${retained} retained (cleanup incomplete)`);
   if (warnings.length > 0) {
     alert(`Deleted ${deleted} session(s). ${warnings.join('; ')}.`);
   }
 
-  refreshSessions();
+  await refreshSessions();
+  if (currentSessionRetained && currentSessionId) {
+    await selectSession(currentSessionId);
+  }
 }
 
 // --- Messages ---

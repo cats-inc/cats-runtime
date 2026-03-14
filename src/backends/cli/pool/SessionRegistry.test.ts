@@ -1,11 +1,20 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { SessionRegistry } from './SessionRegistry.js';
 
 describe('SessionRegistry', () => {
   let registry: SessionRegistry;
+  let tempDir: string;
 
   beforeEach(() => {
     registry = new SessionRegistry();
+    tempDir = mkdtempSync(join(tmpdir(), 'session-registry-test-'));
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
   });
 
   it('creates a session with correct defaults', () => {
@@ -89,6 +98,35 @@ describe('SessionRegistry', () => {
     const result = registry.remove(s.id);
     expect(result.deleted).toBe(true);
     expect(registry.get(s.id)).toBeUndefined();
+  });
+
+  it('does not partially delete runtime transcripts when one path cannot be removed', () => {
+    registry = new SessionRegistry(undefined, tempDir);
+    const session = registry.create({ providerName: 'claude', cwd: '/repo' });
+    const writableDir = join(tempDir, 'writable');
+    const blockedDir = join(tempDir, 'blocked');
+    mkdirSync(writableDir, { recursive: true });
+    mkdirSync(blockedDir, { recursive: true });
+
+    const goodTranscript = join(writableDir, `${session.id}.jsonl`);
+    const badTranscript = join(blockedDir, `${session.id}-blocked.jsonl`);
+    writeFileSync(goodTranscript, '{"ok":true}\n');
+    writeFileSync(badTranscript, '{"blocked":true}\n');
+    chmodSync(blockedDir, 0o555);
+
+    registry.setSourcePath(session.id, goodTranscript);
+    registry.get(session.id)!.providerSourcePath = badTranscript;
+
+    try {
+      const result = registry.deleteTranscripts(session.id);
+
+      expect(result.fileDeleted).toBe(false);
+      expect(existsSync(goodTranscript)).toBe(true);
+      expect(existsSync(badTranscript)).toBe(true);
+      expect(registry.get(session.id)).toBeDefined();
+    } finally {
+      chmodSync(blockedDir, 0o755);
+    }
   });
 
   describe('upsertDiscovered', () => {

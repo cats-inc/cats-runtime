@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import type { SessionInfo, SessionStatus, WorkspaceMode } from './types.js';
 import { normalizeSessionOrigin } from './sessionView.js';
 
@@ -23,6 +23,19 @@ interface DiscoveredSessionData {
   sourcePath?: string;
   group?: string;
   workspaceMode?: WorkspaceMode;
+}
+
+interface PreparedTranscriptDeletion {
+  hadFiles: boolean;
+  ready: boolean;
+  finalize(): { fileDeleted: boolean };
+  rollback(): void;
+}
+
+interface StagedTranscriptArtifact {
+  originalPath: string;
+  stagedPath: string;
+  cleanupDir: string;
 }
 
 export class SessionRegistry {
@@ -183,31 +196,103 @@ export class SessionRegistry {
    * Does NOT remove the session from the registry.
    */
   deleteTranscripts(id: string): { fileDeleted: boolean } {
-    const session = this.sessions.get(id);
-    if (!session) return { fileDeleted: false };
-
-    const pathsToDelete = new Set<string>();
-    if (session.sourcePath) pathsToDelete.add(session.sourcePath);
-    if (session.providerSourcePath) pathsToDelete.add(session.providerSourcePath);
-
-    let fileDeleted = false;
-    for (const filePath of pathsToDelete) {
-      try {
-        rmSync(filePath, { force: true });
-        const snapshotDir = filePath.replace(/\.jsonl?$/, '');
-        rmSync(snapshotDir, { recursive: true, force: true });
-        const projectDir = dirname(filePath);
-        try {
-          const remaining = readdirSync(projectDir);
-          if (remaining.length === 0) rmSync(projectDir);
-        } catch { /* ignore */ }
-        fileDeleted = true;
-      } catch {
-        // Non-fatal — file may already be gone
-      }
+    const prepared = this.prepareTranscriptDeletion(id);
+    if (!prepared.ready) {
+      prepared.rollback();
+      return { fileDeleted: false };
     }
 
-    return { fileDeleted };
+    try {
+      return prepared.finalize();
+    } catch {
+      prepared.rollback();
+      return { fileDeleted: false };
+    }
+  }
+
+  prepareTranscriptDeletion(id: string): PreparedTranscriptDeletion {
+    const session = this.sessions.get(id);
+    if (!session) {
+      return {
+        hadFiles: false,
+        ready: false,
+        finalize: () => ({ fileDeleted: false }),
+        rollback: () => {},
+      };
+    }
+
+    return this.prepareTranscriptDeletionForPaths(
+      this.collectTranscriptArtifactPaths(session),
+    );
+  }
+
+  prepareManagedTranscriptDeletion(id: string): PreparedTranscriptDeletion {
+    const session = this.sessions.get(id);
+    if (!session) {
+      return {
+        hadFiles: false,
+        ready: false,
+        finalize: () => ({ fileDeleted: false }),
+        rollback: () => {},
+      };
+    }
+
+    return this.prepareTranscriptDeletionForPaths(
+      this.collectManagedTranscriptArtifactPaths(session),
+    );
+  }
+
+  private prepareTranscriptDeletionForPaths(
+    artifactPaths: string[],
+  ): PreparedTranscriptDeletion {
+    const stagedArtifacts: StagedTranscriptArtifact[] = [];
+    let hadFiles = false;
+
+    try {
+      for (const artifactPath of artifactPaths) {
+        if (!existsSync(artifactPath)) continue;
+        hadFiles = true;
+        stagedArtifacts.push(this.stageTranscriptArtifact(artifactPath));
+      }
+    } catch {
+      this.restoreStagedArtifacts(stagedArtifacts);
+      return {
+        hadFiles,
+        ready: false,
+        finalize: () => ({ fileDeleted: false }),
+        rollback: () => {},
+      };
+    }
+
+    let completed = false;
+
+    return {
+      hadFiles,
+      ready: true,
+      finalize: () => {
+        if (completed) {
+          return { fileDeleted: hadFiles };
+        }
+
+        completed = true;
+        const cleanupDirs = new Set(stagedArtifacts.map((artifact) => artifact.cleanupDir));
+        for (const artifact of stagedArtifacts) {
+          try {
+            rmSync(artifact.stagedPath, { recursive: true, force: true });
+          } catch {
+            // Best effort only. The staged artifact is already detached from
+            // the tracked session path, so it will not be rediscovered.
+          }
+        }
+        this.cleanupEmptyDirs(cleanupDirs);
+        return { fileDeleted: hadFiles };
+      },
+      rollback: () => {
+        if (completed) return;
+        completed = true;
+        this.restoreStagedArtifacts(stagedArtifacts);
+      },
+    };
   }
 
   /** Remove a session from the registry (does not touch files). */
@@ -362,5 +447,59 @@ export class SessionRegistry {
       group: incoming.group ?? existing.group,
       workspaceMode: incoming.workspaceMode ?? existing.workspaceMode,
     };
+  }
+
+  private collectTranscriptArtifactPaths(session: SessionInfo): string[] {
+    const artifactPaths = new Set<string>();
+    for (const transcriptPath of [session.sourcePath, session.providerSourcePath]) {
+      if (!transcriptPath) continue;
+      artifactPaths.add(transcriptPath);
+
+      const snapshotDir = transcriptPath.replace(/\.jsonl?$/, '');
+      if (snapshotDir !== transcriptPath) {
+        artifactPaths.add(snapshotDir);
+      }
+    }
+    return Array.from(artifactPaths);
+  }
+
+  private collectManagedTranscriptArtifactPaths(session: SessionInfo): string[] {
+    if (!this.sessionBaseDir) return [];
+
+    return this.collectTranscriptArtifactPaths(session).filter((artifactPath) =>
+      artifactPath.startsWith(this.sessionBaseDir!),
+    );
+  }
+
+  private stageTranscriptArtifact(originalPath: string): StagedTranscriptArtifact {
+    const stagedPath = join(
+      dirname(originalPath),
+      `.cats-runtime-delete-${randomUUID()}-${basename(originalPath)}.pending-delete`,
+    );
+    renameSync(originalPath, stagedPath);
+    return {
+      originalPath,
+      stagedPath,
+      cleanupDir: dirname(originalPath),
+    };
+  }
+
+  private restoreStagedArtifacts(stagedArtifacts: StagedTranscriptArtifact[]): void {
+    for (const artifact of [...stagedArtifacts].reverse()) {
+      if (!existsSync(artifact.stagedPath) || existsSync(artifact.originalPath)) continue;
+      renameSync(artifact.stagedPath, artifact.originalPath);
+    }
+  }
+
+  private cleanupEmptyDirs(dirs: Iterable<string>): void {
+    for (const dir of dirs) {
+      try {
+        const remaining = readdirSync(dir);
+        if (remaining.length === 0) rmSync(dir);
+      } catch {
+        // Ignore cleanup failures after the session artifacts have already
+        // been detached from their original paths.
+      }
+    }
   }
 }

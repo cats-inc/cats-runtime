@@ -37,6 +37,51 @@ function serializeSessions(
   });
 }
 
+function tracksNativeSessionState(session: SessionInfo): boolean {
+  return Boolean(
+    session.providerSessionId
+    && (session.providerName === 'cursor'
+      || session.providerName === 'kiro'
+      || session.providerName === 'opencode'),
+  );
+}
+
+async function deleteNativeSessionState(
+  ctx: AppContext,
+  session: SessionInfo,
+): Promise<boolean> {
+  if (!session.providerSessionId) return true;
+
+  if (session.providerName === 'cursor') {
+    const deleted = await ctx.cursorNative.deleteSession(session.cwd, session.providerSessionId);
+    if (!deleted) return false;
+    const remaining = await ctx.cursorNative.listSessions(
+      session.cwd,
+      { startIfNeeded: false },
+    );
+    return !remaining.some((item) => item.providerSessionId === session.providerSessionId);
+  }
+
+  if (session.providerName === 'kiro') {
+    const deleted = await ctx.kiroNative.deleteSession(session.cwd, session.providerSessionId);
+    if (!deleted) return false;
+    const remaining = await ctx.kiroNative.listSessions(
+      session.cwd,
+      { startIfNeeded: false },
+    );
+    return !remaining.some((item) => item.providerSessionId === session.providerSessionId);
+  }
+
+  if (session.providerName === 'opencode') {
+    const deleted = await ctx.opencodeNative.deleteSession(session.cwd, session.providerSessionId);
+    if (!deleted) return false;
+    const remaining = await ctx.opencodeNative.getSession(session.cwd, session.providerSessionId);
+    return remaining == null;
+  }
+
+  return true;
+}
+
 /** POST /sessions — create a new runtime-owned session */
 sessionRoutes.post('/sessions', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
@@ -299,70 +344,59 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
     }, 409);
   }
 
+  const preparedTranscripts = ctx.registry.prepareManagedTranscriptDeletion(id);
+  const hasNativeSessionState = tracksNativeSessionState(session);
+  const hadTranscript = preparedTranscripts.hadFiles || hasNativeSessionState;
+
+  if (!preparedTranscripts.ready) {
+    return c.json({
+      status: 'retained',
+      hadTranscript,
+      fileDeleted: false,
+      nativeDeleted: false,
+      reason: 'Session files are locked or in use. Nothing was removed.',
+    });
+  }
+
+  let nativeDeleted = false;
+  try {
+    if (hasNativeSessionState) {
+      nativeDeleted = await deleteNativeSessionState(ctx, session);
+    }
+  } catch (err) {
+    preparedTranscripts.rollback();
+    return c.json({ error: `Failed to delete native ${session.providerName} session: ${err}` }, 500);
+  }
+
+  const nativeCleanupSucceeded = !hasNativeSessionState || nativeDeleted;
+  if (!nativeCleanupSucceeded) {
+    preparedTranscripts.rollback();
+    return c.json({
+      status: 'retained',
+      hadTranscript,
+      fileDeleted: false,
+      nativeDeleted: false,
+      reason: 'Session cleanup could not be verified. Nothing was removed.',
+    });
+  }
+
   const worker = ctx.pool.get(id);
   if (worker) {
     ctx.pool.kill(id);
   }
 
-  const hasRegistryTranscript = Boolean(session.sourcePath || session.providerSourcePath);
-  const hasNativeSessionState = Boolean(
-    session.providerSessionId
-    && (session.providerName === 'cursor'
-      || session.providerName === 'kiro'
-      || session.providerName === 'opencode'),
-  );
-
-  let nativeDeleted = false;
-  if (session.providerName === 'cursor' && session.providerSessionId) {
-    try {
-      nativeDeleted = await ctx.cursorNative.deleteSession(session.cwd, session.providerSessionId);
-    } catch (err) {
-      return c.json({ error: `Failed to delete native Cursor session: ${err}` }, 500);
-    }
+  const { fileDeleted } = preparedTranscripts.finalize();
+  let workspaceCleaned = false;
+  if (session.workspaceMode === 'isolated') {
+    workspaceCleaned = cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, id);
   }
-  if (session.providerName === 'kiro' && session.providerSessionId) {
-    try {
-      nativeDeleted = await ctx.kiroNative.deleteSession(session.cwd, session.providerSessionId);
-    } catch (err) {
-      return c.json({ error: `Failed to delete native Kiro session: ${err}` }, 500);
-    }
-  }
-  if (session.providerName === 'opencode' && session.providerSessionId) {
-    try {
-      nativeDeleted = await ctx.opencodeNative.deleteSession(session.cwd, session.providerSessionId);
-    } catch (err) {
-      return c.json({ error: `Failed to delete native OpenCode session: ${err}` }, 500);
-    }
-  }
-
-  const { fileDeleted } = ctx.registry.deleteTranscripts(id);
-  const hadTranscript = hasRegistryTranscript || hasNativeSessionState;
-  const transcriptDeleted = fileDeleted || nativeDeleted;
-
-  // Only remove from registry when all associated data has been cleaned up.
-  // If files couldn't be deleted, keep the session visible so the user can
-  // retry later — avoids half-deleted state and ghost rediscovery.
-  if (!hadTranscript || transcriptDeleted) {
-    let workspaceCleaned = false;
-    if (session.workspaceMode === 'isolated') {
-      workspaceCleaned = cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, id);
-    }
-    ctx.registry.unregister(id);
-    return c.json({
-      status: 'deleted',
-      hadTranscript,
-      fileDeleted: transcriptDeleted,
-      nativeDeleted,
-      workspaceCleaned,
-    });
-  }
-
+  ctx.registry.unregister(id);
   return c.json({
-    status: 'retained',
+    status: 'deleted',
     hadTranscript,
-    fileDeleted: false,
-    nativeDeleted,
-    reason: 'Transcript files could not be deleted. Session kept in registry to avoid data loss.',
+    fileDeleted,
+    nativeDeleted: hasNativeSessionState ? nativeDeleted : false,
+    workspaceCleaned,
   });
 });
 

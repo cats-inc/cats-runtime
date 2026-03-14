@@ -192,6 +192,7 @@ describe('Kiro native session management', () => {
       messageCount: 1,
     });
     vi.mocked(kiroNative.deleteSession).mockResolvedValue(true);
+    vi.mocked(kiroNative.listSessions).mockResolvedValue([]);
 
     const res = await app.request(`/sessions/${session!.id}`, {
       method: 'DELETE',

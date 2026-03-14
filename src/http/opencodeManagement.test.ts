@@ -198,6 +198,7 @@ describe('OpenCode native session management', () => {
       messageCount: 1,
     });
     vi.mocked(opencodeNative.deleteSession).mockResolvedValue(true);
+    vi.mocked(opencodeNative.getSession).mockResolvedValue(null);
 
     const res = await app.request(`/sessions/${session!.id}`, {
       method: 'DELETE',
@@ -237,4 +238,3 @@ describe('OpenCode native session management', () => {
     expect(registry.list({ provider: 'opencode' })).toHaveLength(1);
   });
 });
-
