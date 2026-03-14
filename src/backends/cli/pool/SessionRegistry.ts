@@ -214,29 +214,55 @@ export class SessionRegistry {
     },
   ): SessionInfo | null {
     // Check if we already track this provider session
+    let matched: SessionInfo | undefined;
     for (const session of this.sessions.values()) {
       if (session.providerSessionId === providerSessionId) {
-        // Only update metadata, never overwrite status or runtime-owned cwd
-        if (!session.cwd || session.origin !== 'runtime') {
-          session.cwd = data.cwd;
-        }
-        if (data.summary) session.summary = data.summary;
-        if (data.group && !session.group) session.group = data.group;
-        if (data.workspaceMode) session.workspaceMode = data.workspaceMode;
-        // Only attach providerSourcePath if session doesn't already have runtime-managed history
-        // (prevents /history from duplicating turns from both sources)
-        const hasRuntimeHistory = session.sourcePath && this.sessionBaseDir
-          && session.sourcePath.startsWith(this.sessionBaseDir);
-        if (data.sourcePath && !hasRuntimeHistory) {
-          session.providerSourcePath = data.sourcePath;
-        }
-        if (data.sourcePath && !session.sourcePath) session.sourcePath = data.sourcePath;
-        if (data.messageCount != null) session.messageCount = data.messageCount;
-        if (data.lastActivity) session.lastActivity = data.lastActivity;
-        session.updatedAt = new Date().toISOString();
-        this.scheduleSave();
-        return session;
+        matched = session;
+        break;
       }
+    }
+
+    // Fallback: match a runtime session that hasn't received its
+    // providerSessionId yet (same provider + same workspace).
+    // This prevents duplicate entries when discovery fires before the
+    // first message completes and sets providerSessionId on the runtime session.
+    if (!matched) {
+      for (const session of this.sessions.values()) {
+        if (
+          session.origin === 'runtime'
+          && !session.providerSessionId
+          && session.providerName === data.providerName
+          && session.cwd === data.cwd
+          && session.status !== 'closed'
+        ) {
+          matched = session;
+          matched.providerSessionId = providerSessionId;
+          break;
+        }
+      }
+    }
+
+    if (matched) {
+      // Only update metadata, never overwrite status or runtime-owned cwd
+      if (!matched.cwd || matched.origin !== 'runtime') {
+        matched.cwd = data.cwd;
+      }
+      if (data.summary) matched.summary = data.summary;
+      if (data.group && !matched.group) matched.group = data.group;
+      if (data.workspaceMode) matched.workspaceMode = data.workspaceMode;
+      // Only attach providerSourcePath if session doesn't already have runtime-managed history
+      // (prevents /history from duplicating turns from both sources)
+      const hasRuntimeHistory = matched.sourcePath && this.sessionBaseDir
+        && matched.sourcePath.startsWith(this.sessionBaseDir);
+      if (data.sourcePath && !hasRuntimeHistory) {
+        matched.providerSourcePath = data.sourcePath;
+      }
+      if (data.sourcePath && !matched.sourcePath) matched.sourcePath = data.sourcePath;
+      if (data.messageCount != null) matched.messageCount = data.messageCount;
+      if (data.lastActivity) matched.lastActivity = data.lastActivity;
+      matched.updatedAt = new Date().toISOString();
+      this.scheduleSave();
+      return matched;
     }
 
     // New discovered session — no worker, so status is closed

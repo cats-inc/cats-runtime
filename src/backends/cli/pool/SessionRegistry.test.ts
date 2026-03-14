@@ -122,6 +122,81 @@ describe('SessionRegistry', () => {
       expect(registry.list()).toHaveLength(1);
     });
 
+    it('merges into runtime session whose providerSessionId is not yet set', () => {
+      // Simulate: runtime session created (providerSessionId still null),
+      // then discovery finds the same provider session before the first
+      // message completes.
+      const runtime = registry.create({
+        providerName: 'kiro',
+        cwd: '/workspace',
+      });
+      registry.updateStatus(runtime.id, 'ready');
+
+      const result = registry.upsertDiscovered('kiro-native-abc', {
+        providerName: 'kiro',
+        cwd: '/workspace',
+        messageCount: 1,
+        summary: 'discovered summary',
+      });
+
+      // Should merge into the existing runtime session, not create a new one
+      expect(result).not.toBeNull();
+      expect(result!.id).toBe(runtime.id);
+      expect(result!.origin).toBe('runtime');
+      expect(result!.providerSessionId).toBe('kiro-native-abc');
+      expect(result!.messageCount).toBe(1);
+      expect(registry.list()).toHaveLength(1);
+    });
+
+    it('does not merge into a closed runtime session', () => {
+      const runtime = registry.create({
+        providerName: 'copilot',
+        cwd: '/workspace',
+      });
+      registry.updateStatus(runtime.id, 'closed');
+
+      const result = registry.upsertDiscovered('copilot-xyz', {
+        providerName: 'copilot',
+        cwd: '/workspace',
+      });
+
+      // Closed runtime session should not be matched — new discovered session created
+      expect(result).not.toBeNull();
+      expect(result!.id).not.toBe(runtime.id);
+      expect(result!.origin).toBe('discovered');
+      expect(registry.list()).toHaveLength(2);
+    });
+
+    it('does not merge when provider name differs', () => {
+      registry.create({
+        providerName: 'kiro',
+        cwd: '/workspace',
+      });
+
+      const result = registry.upsertDiscovered('copilot-xyz', {
+        providerName: 'copilot',
+        cwd: '/workspace',
+      });
+
+      expect(result!.origin).toBe('discovered');
+      expect(registry.list()).toHaveLength(2);
+    });
+
+    it('does not merge when cwd differs', () => {
+      registry.create({
+        providerName: 'kiro',
+        cwd: '/workspace-a',
+      });
+
+      const result = registry.upsertDiscovered('kiro-abc', {
+        providerName: 'kiro',
+        cwd: '/workspace-b',
+      });
+
+      expect(result!.origin).toBe('discovered');
+      expect(registry.list()).toHaveLength(2);
+    });
+
     it('allows rediscovery after remove (best-effort delete)', () => {
       const session = registry.upsertDiscovered('ext-rediscover', {
         providerName: 'claude',
