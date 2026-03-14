@@ -25,7 +25,7 @@ interface DiscoveredSessionData {
   workspaceMode?: WorkspaceMode;
 }
 
-interface PreparedTranscriptDeletion {
+export interface PreparedFileDeletion {
   hadFiles: boolean;
   ready: boolean;
   finalize(): { fileDeleted: boolean };
@@ -210,7 +210,7 @@ export class SessionRegistry {
     }
   }
 
-  prepareTranscriptDeletion(id: string): PreparedTranscriptDeletion {
+  prepareTranscriptDeletion(id: string): PreparedFileDeletion {
     const session = this.sessions.get(id);
     if (!session) {
       return {
@@ -221,12 +221,12 @@ export class SessionRegistry {
       };
     }
 
-    return this.prepareTranscriptDeletionForPaths(
+    return this.preparePathDeletion(
       this.collectTranscriptArtifactPaths(session),
     );
   }
 
-  prepareManagedTranscriptDeletion(id: string): PreparedTranscriptDeletion {
+  prepareManagedTranscriptDeletion(id: string): PreparedFileDeletion {
     const session = this.sessions.get(id);
     if (!session) {
       return {
@@ -237,14 +237,14 @@ export class SessionRegistry {
       };
     }
 
-    return this.prepareTranscriptDeletionForPaths(
+    return this.preparePathDeletion(
       this.collectManagedTranscriptArtifactPaths(session),
     );
   }
 
-  private prepareTranscriptDeletionForPaths(
-    artifactPaths: string[],
-  ): PreparedTranscriptDeletion {
+  preparePathDeletion(
+    artifactPaths: Iterable<string>,
+  ): PreparedFileDeletion {
     const stagedArtifacts: StagedTranscriptArtifact[] = [];
     let hadFiles = false;
 

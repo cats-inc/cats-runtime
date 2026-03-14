@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createRuntimeApp as createApp } from './app.js';
@@ -247,6 +247,34 @@ describe('codex management', () => {
     expect(body.hadTranscript).toBe(false);
     expect(body.fileDeleted).toBe(false);
     expect(registry.get(session.id)).toBeUndefined();
+  });
+
+  it('deletes discovered Codex rollout files so they cannot be rediscovered', async () => {
+    writeCodexSessionFile({
+      sessionId: 'thread-delete',
+      cwd: 'C:/repo',
+      summary: 'Delete me',
+      timestamp: '2026-03-11T08:03:00.000Z',
+    });
+
+    const sourcePath = join(codexSessionsDir, '2026', '03', '11', 'rollout-thread-delete.jsonl');
+    const session = registry.upsertDiscovered('thread-delete', {
+      cwd: 'C:/repo',
+      providerName: 'codex',
+      summary: 'Delete me',
+      messageCount: 1,
+      sourcePath,
+    });
+
+    const res = await app.request(`/sessions/${session!.id}`, {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.status).toBe('deleted');
+    expect(registry.get(session!.id)).toBeUndefined();
+    expect(existsSync(sourcePath)).toBe(false);
   });
 
   it('resumes a discovered Codex session through the generic resume route', async () => {

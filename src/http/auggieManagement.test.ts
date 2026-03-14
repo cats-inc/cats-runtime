@@ -1,3 +1,6 @@
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRuntimeApp as createApp } from './app.js';
 import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
@@ -160,6 +163,47 @@ describe('Auggie native session management', () => {
     });
   });
 
+  it('deletes discovered Auggie session files so they cannot be rediscovered', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'auggie-delete-'));
+    const sourcePath = join(tempDir, 'auggie-123.json');
+    writeFileSync(sourcePath, JSON.stringify({ sessionId: 'auggie-123', chatHistory: [{}] }));
+
+    const session = registry.upsertDiscovered('auggie-123', {
+      providerName: 'auggie',
+      cwd: 'C:/repo',
+      summary: 'Existing Auggie Session',
+      sourcePath,
+      messageCount: 1,
+    });
+
+    vi.mocked(auggieSessions.getSession).mockImplementation(async (providerSessionId: string) => (
+      providerSessionId === 'auggie-123' && existsSync(sourcePath)
+        ? {
+          providerSessionId: 'auggie-123',
+          cwd: 'C:/repo',
+          sourcePath,
+          summary: 'Existing Auggie Session',
+          messageCount: 1,
+          exchangeCount: 1,
+        }
+        : null
+    ));
+
+    try {
+      const res = await app.request(`/sessions/${session!.id}`, {
+        method: 'DELETE',
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json() as Record<string, unknown>;
+      expect(body.status).toBe('deleted');
+      expect(registry.get(session!.id)).toBeUndefined();
+      expect(existsSync(sourcePath)).toBe(false);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('discovers existing Auggie sessions for a workspace', async () => {
     vi.mocked(auggieSessions.listSessions).mockResolvedValue([
       {
@@ -243,4 +287,3 @@ describe('Auggie native session management', () => {
     expect(registry.get(session!.id)?.status).toBe('initializing');
   });
 });
-

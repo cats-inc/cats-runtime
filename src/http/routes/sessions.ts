@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { basename, dirname, join } from 'node:path';
 import { Hono } from 'hono';
 import type { AppContext } from '../app.js';
 import type {
@@ -6,6 +7,10 @@ import type {
   SessionStatus,
   WorkspaceMode,
 } from '../../backends/cli/pool/types.js';
+import { SessionScanner } from '../../backends/cli/discovery/SessionScanner.js';
+import { CodexSessionScanner } from '../../backends/cli/discovery/CodexSessionScanner.js';
+import { CopilotSessionScanner } from '../../backends/cli/discovery/CopilotSessionScanner.js';
+import { GeminiSessionScanner } from '../../backends/cli/discovery/GeminiSessionScanner.js';
 import { KNOWN_PROVIDERS } from '../../backends/cli/providers/types.js';
 import {
   resolveWorkspace,
@@ -77,6 +82,75 @@ async function deleteNativeSessionState(
     if (!deleted) return false;
     const remaining = await ctx.opencodeNative.getSession(session.cwd, session.providerSessionId);
     return remaining == null;
+  }
+
+  return true;
+}
+
+function tracksProviderDiscoveryState(session: SessionInfo): boolean {
+  return Boolean(
+    session.providerSessionId
+    && (session.providerName === 'auggie'
+      || session.providerName === 'claude'
+      || session.providerName === 'codex'
+      || session.providerName === 'copilot'
+      || session.providerName === 'gemini'),
+  );
+}
+
+function collectProviderDiscoveryArtifactPaths(ctx: AppContext, session: SessionInfo): string[] {
+  if (!tracksProviderDiscoveryState(session)) {
+    return [];
+  }
+
+  const artifactPaths = new Set<string>();
+  for (const sourcePath of [session.providerSourcePath, session.sourcePath]) {
+    if (!sourcePath) continue;
+    if (sourcePath.startsWith(ctx.config.sessionBaseDir)) continue;
+
+    if (session.providerName === 'copilot' && basename(sourcePath) === 'workspace.yaml') {
+      artifactPaths.add(sourcePath);
+      artifactPaths.add(join(dirname(sourcePath), 'events.jsonl'));
+      continue;
+    }
+
+    artifactPaths.add(sourcePath);
+  }
+
+  return Array.from(artifactPaths);
+}
+
+async function verifyProviderDiscoveryStateDeleted(
+  ctx: AppContext,
+  session: SessionInfo,
+): Promise<boolean> {
+  if (!tracksProviderDiscoveryState(session) || !session.providerSessionId) {
+    return true;
+  }
+
+  if (session.providerName === 'auggie') {
+    const remaining = await ctx.auggieSessions.getSession(session.providerSessionId);
+    return remaining == null;
+  }
+
+  if (session.providerName === 'claude') {
+    const remaining = await new SessionScanner(ctx.config.claudeProjectsDir).scan();
+    return !remaining.some((item) => item.providerSessionId === session.providerSessionId);
+  }
+
+  if (session.providerName === 'codex') {
+    const remaining = await new CodexSessionScanner(ctx.config.codexSessionsDir).scan();
+    return !remaining.some((item) => item.providerSessionId === session.providerSessionId);
+  }
+
+  if (session.providerName === 'copilot') {
+    const remaining = await new CopilotSessionScanner(ctx.config.copilotSessionsDir).scan();
+    return !remaining.some((item) => item.providerSessionId === session.providerSessionId);
+  }
+
+  if (session.providerName === 'gemini') {
+    const remaining = await new GeminiSessionScanner(ctx.config.geminiSessionsDir).scan();
+    return !remaining.some((item) => item.providerSessionId === session.providerSessionId);
   }
 
   return true;
@@ -344,11 +418,20 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
     }, 409);
   }
 
-  const preparedTranscripts = ctx.registry.prepareManagedTranscriptDeletion(id);
+  const preparedManagedTranscripts = ctx.registry.prepareManagedTranscriptDeletion(id);
+  const preparedProviderDiscovery = ctx.registry.preparePathDeletion(
+    collectProviderDiscoveryArtifactPaths(ctx, session),
+  );
   const hasNativeSessionState = tracksNativeSessionState(session);
-  const hadTranscript = preparedTranscripts.hadFiles || hasNativeSessionState;
+  const hasProviderDiscoveryState = tracksProviderDiscoveryState(session);
+  const hadTranscript = preparedManagedTranscripts.hadFiles
+    || preparedProviderDiscovery.hadFiles
+    || hasNativeSessionState
+    || hasProviderDiscoveryState;
 
-  if (!preparedTranscripts.ready) {
+  if (!preparedManagedTranscripts.ready || !preparedProviderDiscovery.ready) {
+    preparedManagedTranscripts.rollback();
+    preparedProviderDiscovery.rollback();
     return c.json({
       status: 'retained',
       hadTranscript,
@@ -364,13 +447,29 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
       nativeDeleted = await deleteNativeSessionState(ctx, session);
     }
   } catch (err) {
-    preparedTranscripts.rollback();
+    preparedManagedTranscripts.rollback();
+    preparedProviderDiscovery.rollback();
     return c.json({ error: `Failed to delete native ${session.providerName} session: ${err}` }, 500);
   }
 
+  let providerDiscoveryDeleted = false;
+  try {
+    if (hasProviderDiscoveryState) {
+      providerDiscoveryDeleted = await verifyProviderDiscoveryStateDeleted(ctx, session);
+    }
+  } catch (err) {
+    preparedManagedTranscripts.rollback();
+    preparedProviderDiscovery.rollback();
+    return c.json({
+      error: `Failed to verify ${session.providerName} discovery cleanup: ${err}`,
+    }, 500);
+  }
+
   const nativeCleanupSucceeded = !hasNativeSessionState || nativeDeleted;
-  if (!nativeCleanupSucceeded) {
-    preparedTranscripts.rollback();
+  const providerDiscoveryCleanupSucceeded = !hasProviderDiscoveryState || providerDiscoveryDeleted;
+  if (!nativeCleanupSucceeded || !providerDiscoveryCleanupSucceeded) {
+    preparedManagedTranscripts.rollback();
+    preparedProviderDiscovery.rollback();
     return c.json({
       status: 'retained',
       hadTranscript,
@@ -385,7 +484,8 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
     ctx.pool.kill(id);
   }
 
-  const { fileDeleted } = preparedTranscripts.finalize();
+  const managedDeletion = preparedManagedTranscripts.finalize();
+  const providerDeletion = preparedProviderDiscovery.finalize();
   let workspaceCleaned = false;
   if (session.workspaceMode === 'isolated') {
     workspaceCleaned = cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, id);
@@ -394,7 +494,7 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
   return c.json({
     status: 'deleted',
     hadTranscript,
-    fileDeleted,
+    fileDeleted: managedDeletion.fileDeleted || providerDeletion.fileDeleted,
     nativeDeleted: hasNativeSessionState ? nativeDeleted : false,
     workspaceCleaned,
   });
