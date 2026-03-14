@@ -178,12 +178,14 @@ export class SessionRegistry {
     return true;
   }
 
-  /** Remove session from registry and delete source .jsonl file if present */
-  remove(id: string): { deleted: boolean; fileDeleted: boolean } {
+  /**
+   * Try to delete transcript files associated with a session.
+   * Does NOT remove the session from the registry.
+   */
+  deleteTranscripts(id: string): { fileDeleted: boolean } {
     const session = this.sessions.get(id);
-    if (!session) return { deleted: false, fileDeleted: false };
+    if (!session) return { fileDeleted: false };
 
-    // Collect all unique transcript paths to delete
     const pathsToDelete = new Set<string>();
     if (session.sourcePath) pathsToDelete.add(session.sourcePath);
     if (session.providerSourcePath) pathsToDelete.add(session.providerSourcePath);
@@ -192,10 +194,8 @@ export class SessionRegistry {
     for (const filePath of pathsToDelete) {
       try {
         rmSync(filePath, { force: true });
-        // Delete sibling directory (session snapshots) if it exists
         const snapshotDir = filePath.replace(/\.jsonl?$/, '');
         rmSync(snapshotDir, { recursive: true, force: true });
-        // Remove parent project dir if now empty
         const projectDir = dirname(filePath);
         try {
           const remaining = readdirSync(projectDir);
@@ -207,6 +207,22 @@ export class SessionRegistry {
       }
     }
 
+    return { fileDeleted };
+  }
+
+  /** Remove a session from the registry (does not touch files). */
+  unregister(id: string): boolean {
+    if (!this.sessions.delete(id)) return false;
+    this.scheduleSave();
+    return true;
+  }
+
+  /** Remove session from registry and delete source .jsonl file if present */
+  remove(id: string): { deleted: boolean; fileDeleted: boolean } {
+    const session = this.sessions.get(id);
+    if (!session) return { deleted: false, fileDeleted: false };
+
+    const { fileDeleted } = this.deleteTranscripts(id);
     this.sessions.delete(id);
     this.scheduleSave();
     return { deleted: true, fileDeleted };

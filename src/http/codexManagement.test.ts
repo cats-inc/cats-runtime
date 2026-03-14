@@ -231,6 +231,24 @@ describe('codex management', () => {
     expect(body.sessions[0].resumeStrategy).toBe('provider_session');
   });
 
+  it('fully deletes a session with no transcript or native state', async () => {
+    const session = registry.create({
+      providerName: 'codex',
+      cwd: 'C:/repo',
+    });
+
+    const res = await app.request(`/sessions/${session.id}`, {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.status).toBe('deleted');
+    expect(body.hadTranscript).toBe(false);
+    expect(body.fileDeleted).toBe(false);
+    expect(registry.get(session.id)).toBeUndefined();
+  });
+
   it('resumes a discovered Codex session through the generic resume route', async () => {
     const session = registry.upsertDiscovered('thread-456', {
       cwd: 'C:/repo',
@@ -286,4 +304,3 @@ describe('codex management', () => {
     );
   });
 });
-

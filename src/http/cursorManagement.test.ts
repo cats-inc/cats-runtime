@@ -211,6 +211,28 @@ describe('Cursor native session management', () => {
     expect(registry.get(session!.id)).toBeUndefined();
   });
 
+  it('retains session when native Cursor session state cannot be deleted', async () => {
+    const session = registry.upsertDiscovered('cursor-stuck', {
+      providerName: 'cursor',
+      cwd: 'C:/repo',
+      summary: 'Untitled Session',
+      messageCount: 1,
+    });
+    vi.mocked(cursorNative.deleteSession).mockResolvedValue(false);
+
+    const res = await app.request(`/sessions/${session!.id}`, {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.status).toBe('retained');
+    expect(body.hadTranscript).toBe(true);
+    expect(body.nativeDeleted).toBe(false);
+    // Session kept in registry — not removed
+    expect(registry.get(session!.id)).toBeDefined();
+  });
+
   it('discovers existing Cursor sessions for a workspace', async () => {
     vi.mocked(cursorNative.listSessions).mockResolvedValue([
       {

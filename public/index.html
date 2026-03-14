@@ -1284,8 +1284,8 @@ async function deleteSession(id) {
       document.getElementById('chatContainer').style.display = 'none';
       document.getElementById('chatPlaceholder').style.display = '';
     }
-    if (body.fileDeleted === false) {
-      alert('Session removed from registry, but the source transcript could not be deleted. It may be rediscovered on the next scan.');
+    if (body.status === 'retained') {
+      alert('Transcript files could not be deleted. Session kept intact — you can retry later.');
     }
     refreshSessions();
   } catch (e) {
@@ -1336,8 +1336,8 @@ async function deleteGroup(cwd) {
   refreshSessions(); // show spinner
 
   let deleted = 0;
+  let retained = 0;
   let failed = 0;
-  let fileNotDeleted = 0;
 
   for (const s of deletableSessions) {
     const controls = sessionControls(s);
@@ -1352,9 +1352,12 @@ async function deleteGroup(cwd) {
     try {
       const res = await fetch(`${API_BASE}/sessions/${s.id}`, { method: 'DELETE', headers: headers() });
       if (res.ok) {
-        deleted++;
         const body = await res.json();
-        if (body.fileDeleted === false) fileNotDeleted++;
+        if (body.status === 'retained') {
+          retained++;
+        } else {
+          deleted++;
+        }
       } else {
         failed++;
       }
@@ -1373,7 +1376,7 @@ async function deleteGroup(cwd) {
 
   const warnings = [];
   if (failed > 0) warnings.push(`${failed} failed`);
-  if (fileNotDeleted > 0) warnings.push(`${fileNotDeleted} transcript(s) could not be deleted and may be rediscovered`);
+  if (retained > 0) warnings.push(`${retained} retained (transcript files locked)`);
   if (warnings.length > 0) {
     alert(`Deleted ${deleted} session(s). ${warnings.join('; ')}.`);
   }
@@ -1417,8 +1420,8 @@ async function deleteAllSessions() {
   if (!confirm(msg)) return;
 
   let deleted = 0;
+  let retained = 0;
   let failed = 0;
-  let fileNotDeleted = 0;
 
   for (const s of deletableSessions) {
     const controls = sessionControls(s);
@@ -1432,9 +1435,12 @@ async function deleteAllSessions() {
     try {
       const res = await fetch(`${API_BASE}/sessions/${s.id}`, { method: 'DELETE', headers: headers() });
       if (res.ok) {
-        deleted++;
         const body = await res.json();
-        if (body.fileDeleted === false) fileNotDeleted++;
+        if (body.status === 'retained') {
+          retained++;
+        } else {
+          deleted++;
+        }
       } else {
         failed++;
       }
@@ -1451,7 +1457,7 @@ async function deleteAllSessions() {
 
   const warnings = [];
   if (failed > 0) warnings.push(`${failed} failed`);
-  if (fileNotDeleted > 0) warnings.push(`${fileNotDeleted} transcript(s) could not be deleted and may be rediscovered`);
+  if (retained > 0) warnings.push(`${retained} retained (transcript files locked)`);
   if (warnings.length > 0) {
     alert(`Deleted ${deleted} session(s). ${warnings.join('; ')}.`);
   }

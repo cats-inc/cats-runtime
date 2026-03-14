@@ -304,6 +304,14 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
     ctx.pool.kill(id);
   }
 
+  const hasRegistryTranscript = Boolean(session.sourcePath || session.providerSourcePath);
+  const hasNativeSessionState = Boolean(
+    session.providerSessionId
+    && (session.providerName === 'cursor'
+      || session.providerName === 'kiro'
+      || session.providerName === 'opencode'),
+  );
+
   let nativeDeleted = false;
   if (session.providerName === 'cursor' && session.providerSessionId) {
     try {
@@ -327,17 +335,34 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
     }
   }
 
-  let workspaceCleaned = false;
-  if (session.workspaceMode === 'isolated') {
-    workspaceCleaned = cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, id);
+  const { fileDeleted } = ctx.registry.deleteTranscripts(id);
+  const hadTranscript = hasRegistryTranscript || hasNativeSessionState;
+  const transcriptDeleted = fileDeleted || nativeDeleted;
+
+  // Only remove from registry when all associated data has been cleaned up.
+  // If files couldn't be deleted, keep the session visible so the user can
+  // retry later — avoids half-deleted state and ghost rediscovery.
+  if (!hadTranscript || transcriptDeleted) {
+    let workspaceCleaned = false;
+    if (session.workspaceMode === 'isolated') {
+      workspaceCleaned = cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, id);
+    }
+    ctx.registry.unregister(id);
+    return c.json({
+      status: 'deleted',
+      hadTranscript,
+      fileDeleted: transcriptDeleted,
+      nativeDeleted,
+      workspaceCleaned,
+    });
   }
 
-  const { fileDeleted } = ctx.registry.remove(id);
   return c.json({
-    status: 'deleted',
-    fileDeleted: fileDeleted || nativeDeleted,
+    status: 'retained',
+    hadTranscript,
+    fileDeleted: false,
     nativeDeleted,
-    workspaceCleaned,
+    reason: 'Transcript files could not be deleted. Session kept in registry to avoid data loss.',
   });
 });
 
