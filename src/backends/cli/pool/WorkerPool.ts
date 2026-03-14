@@ -11,7 +11,7 @@ import { CursorProvider } from '../providers/cursor.js';
 import { GeminiProvider } from '../providers/gemini.js';
 import { KiroProvider } from '../providers/kiro.js';
 import { OpencodeProvider } from '../providers/opencode.js';
-import { WorkerProcess } from './WorkerProcess.js';
+import { WorkerProcess, type SpawnResilienceConfig } from './WorkerProcess.js';
 import type { SessionRegistry } from './SessionRegistry.js';
 
 export class WorkerPool {
@@ -88,7 +88,11 @@ export class WorkerPool {
     }
 
     const { provider, commandConfig } = this.resolveProvider(providerName as ProviderName);
-    const worker = new WorkerProcess(provider, opts, commandConfig);
+    const resilience: SpawnResilienceConfig = {
+      retries: this.config.spawnRetries,
+      timeoutMs: this.config.spawnTimeoutMs,
+    };
+    const worker = new WorkerProcess(provider, opts, commandConfig, resilience);
 
     worker.on('event', (event) => {
       if ((event.type === 'init' || event.type === 'result') && event.sessionId) {

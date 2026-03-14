@@ -65,6 +65,8 @@ export interface CliRuntimeConfig {
   nativeDiscoveryIntervalMs: number;
   externalSessionLiveWindowMs: number;
   maxSessions: number;
+  spawnRetries: number;
+  spawnTimeoutMs: number;
   sessionBaseDir: string;
   providerCommands: Record<ProviderName, ProviderCommandConfig>;
 }
@@ -130,6 +132,14 @@ export function defaultWslDiscoveryPolicy(): WslDiscoveryPolicy {
 
 export function defaultExternalSessionLiveWindowMs(): number {
   return 15000;
+}
+
+export function defaultSpawnRetries(): number {
+  return 1;
+}
+
+export function defaultSpawnTimeoutMs(): number {
+  return 30000;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): CliRuntimeConfig {
@@ -229,6 +239,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CliRuntimeConf
       env.CATS_RUNTIME_MAX_SESSIONS,
       10,
       'CATS_RUNTIME_MAX_SESSIONS',
+    ),
+    spawnRetries: parsePositiveInt(
+      env.CATS_RUNTIME_SPAWN_RETRIES,
+      defaultSpawnRetries(),
+      'CATS_RUNTIME_SPAWN_RETRIES',
+    ),
+    spawnTimeoutMs: parseNonNegativeInt(
+      env.CATS_RUNTIME_SPAWN_TIMEOUT_MS,
+      defaultSpawnTimeoutMs(),
+      'CATS_RUNTIME_SPAWN_TIMEOUT_MS',
     ),
     sessionBaseDir,
     providerCommands: {

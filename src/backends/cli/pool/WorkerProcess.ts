@@ -12,6 +12,11 @@ export interface WorkerProcessEvents {
   ready: [];
 }
 
+export interface SpawnResilienceConfig {
+  retries: number;
+  timeoutMs: number;
+}
+
 export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   private process: ChildProcess | null = null;
   private provider: Provider;
@@ -23,16 +28,19 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   private activeTurnController: AbortController | null = null;
   private stderrLines: string[] = [];
   private lastLaunchSummary = '';
+  private spawnResilience: SpawnResilienceConfig;
 
   constructor(
     provider: Provider,
     spawnOpts: ProviderSpawnOptions,
     commandConfig: ProviderCommandConfig,
+    spawnResilience: SpawnResilienceConfig = { retries: 1, timeoutMs: 30_000 },
   ) {
     super();
     this.provider = provider;
     this.spawnOpts = spawnOpts;
     this.commandConfig = commandConfig;
+    this.spawnResilience = spawnResilience;
   }
 
   get alive(): boolean {
@@ -230,15 +238,64 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
 
     try {
       if (this.provider.ephemeral) {
-        if (this._providerSessionId) {
-          this.spawnOpts = { ...this.spawnOpts, resumeSessionId: this._providerSessionId };
+        const { retries, timeoutMs } = this.spawnResilience;
+
+        for (let attempt = 1; attempt <= retries; attempt++) {
+          // Reset per-attempt state
+          sawEvent = false;
+          error = null;
+          queue.length = 0;
+
+          if (this._providerSessionId) {
+            this.spawnOpts = { ...this.spawnOpts, resumeSessionId: this._providerSessionId };
+          }
+          await this.runProviderBeforeTurn();
+          this.provider.prepareEphemeralTurn?.(content);
+          this.spawnProcess();
+          const msg = this.provider.buildStdinMessage(content);
+          if (msg) this.process!.stdin!.write(msg);
+          this.process!.stdin!.end();
+
+          // Per-attempt spawn timeout
+          let timeoutId: ReturnType<typeof setTimeout> | undefined;
+          if (timeoutMs > 0) {
+            timeoutId = setTimeout(() => {
+              if (!sawEvent && this.process && this.process.exitCode === null) {
+                error = new Error(
+                  `Provider did not respond within ${timeoutMs}ms`
+                  + (this.lastLaunchSummary ? `. launch: ${this.lastLaunchSummary}` : ''),
+                );
+                this.process.kill('SIGTERM');
+              }
+            }, timeoutMs);
+          }
+
+          // Wait for first event or process exit/error
+          if (!sawEvent && !queue.includes(null)) {
+            await new Promise<void>((r) => { resolve = r; });
+          }
+
+          if (timeoutId) clearTimeout(timeoutId);
+
+          if (sawEvent) break; // spawn succeeded
+
+          // Drain the termination sentinel so next attempt starts clean
+          const nullIdx = queue.indexOf(null);
+          if (nullIdx !== -1) queue.splice(nullIdx, 1);
+
+          if (attempt < retries) {
+            console.error(
+              `[${this.provider.name}] Spawn attempt ${attempt}/${retries} failed`
+              + (error ? `: ${error.message}` : '')
+              + '. Retrying...',
+            );
+            error = null;
+            continue;
+          }
+
+          // All attempts exhausted
+          throw error || this.buildProcessExitError(null);
         }
-        await this.runProviderBeforeTurn();
-        this.provider.prepareEphemeralTurn?.(content);
-        this.spawnProcess();
-        const msg = this.provider.buildStdinMessage(content);
-        if (msg) this.process!.stdin!.write(msg);
-        this.process!.stdin!.end();
       } else {
         await this.runProviderBeforeTurn();
         const msg = this.provider.buildStdinMessage(content);

@@ -12,6 +12,8 @@ import {
   defaultOpencodeServerPort,
   defaultOpencodeServerStartupTimeoutMs,
   defaultProviderRuntimeMode,
+  defaultSpawnRetries,
+  defaultSpawnTimeoutMs,
   defaultWslDiscoveryPolicy,
   loadConfig,
 } from './config.js';
@@ -74,6 +76,36 @@ describe('config platform defaults', () => {
 
   it('treats discovered sessions as externally live for 15 seconds after activity', () => {
     expect(defaultExternalSessionLiveWindowMs()).toBe(15000);
+  });
+
+  it('defaults spawn retries to 1 (no retry)', () => {
+    expect(defaultSpawnRetries()).toBe(1);
+  });
+
+  it('defaults spawn timeout to 30 seconds', () => {
+    expect(defaultSpawnTimeoutMs()).toBe(30000);
+  });
+
+  it('loads spawn resilience settings from the environment', () => {
+    const config = loadConfig({
+      CATS_RUNTIME_SPAWN_RETRIES: '3',
+      CATS_RUNTIME_SPAWN_TIMEOUT_MS: '15000',
+    });
+    expect(config.spawnRetries).toBe(3);
+    expect(config.spawnTimeoutMs).toBe(15000);
+  });
+
+  it('rejects non-positive spawn retries', () => {
+    expect(() => loadConfig({
+      CATS_RUNTIME_SPAWN_RETRIES: '0',
+    })).toThrow(/CATS_RUNTIME_SPAWN_RETRIES/);
+  });
+
+  it('allows spawn timeout of zero to disable it', () => {
+    const config = loadConfig({
+      CATS_RUNTIME_SPAWN_TIMEOUT_MS: '0',
+    });
+    expect(config.spawnTimeoutMs).toBe(0);
   });
 
   it('loads Auggie max turns from the environment', () => {
