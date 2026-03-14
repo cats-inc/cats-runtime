@@ -197,6 +197,40 @@ describe('SessionRegistry', () => {
       expect(registry.list()).toHaveLength(2);
     });
 
+    it('defers ambiguous discovery until a runtime session reports its provider session ID', () => {
+      const first = registry.create({
+        providerName: 'copilot',
+        cwd: '/workspace',
+      });
+      const second = registry.create({
+        providerName: 'copilot',
+        cwd: '/workspace',
+      });
+
+      const result = registry.upsertDiscovered('copilot-ambiguous', {
+        providerName: 'copilot',
+        cwd: '/workspace',
+        messageCount: 1,
+        summary: 'pending discovery',
+      });
+
+      // Ambiguous runtime candidates should not create a duplicate or
+      // merge into an arbitrary session.
+      expect(result).toBeNull();
+      expect(registry.list()).toHaveLength(2);
+      expect(registry.get(first.id)?.providerSessionId).toBeUndefined();
+      expect(registry.get(second.id)?.providerSessionId).toBeUndefined();
+
+      // Once the correct runtime session reports its provider session ID,
+      // the pending discovery metadata is merged exactly.
+      registry.setProviderSessionId(second.id, 'copilot-ambiguous');
+      const merged = registry.get(second.id)!;
+      expect(merged.providerSessionId).toBe('copilot-ambiguous');
+      expect(merged.messageCount).toBe(1);
+      expect(merged.summary).toBe('pending discovery');
+      expect(registry.list()).toHaveLength(2);
+    });
+
     it('allows rediscovery after remove (best-effort delete)', () => {
       const session = registry.upsertDiscovered('ext-rediscover', {
         providerName: 'claude',

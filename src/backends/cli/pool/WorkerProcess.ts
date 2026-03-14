@@ -286,7 +286,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
           if (attempt < retries) {
             console.error(
               `[${this.provider.name}] Spawn attempt ${attempt}/${retries} failed`
-              + (error ? `: ${error.message}` : '')
+              + formatRetryReason(error)
               + '. Retrying...',
             );
             error = null;
@@ -415,4 +415,14 @@ function formatLaunchSummary(
     return `${runtime}/${runner}:${outerCommand}`;
   }
   return `${runtime}/${runner}:${outerCommand} -> ${innerCommand}`;
+}
+
+function formatRetryReason(error: unknown): string {
+  if (error instanceof Error) {
+    return `: ${error.message}`;
+  }
+  if (typeof error === 'string' && error) {
+    return `: ${error}`;
+  }
+  return '';
 }

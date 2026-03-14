@@ -13,8 +13,21 @@ export interface CreateSessionInput {
   group?: string;
 }
 
+interface DiscoveredSessionData {
+  cwd: string;
+  providerName: string;
+  summary?: string;
+  messageCount?: number;
+  lastActivity?: string;
+  model?: string;
+  sourcePath?: string;
+  group?: string;
+  workspaceMode?: WorkspaceMode;
+}
+
 export class SessionRegistry {
   private sessions = new Map<string, SessionInfo>();
+  private pendingDiscovered = new Map<string, DiscoveredSessionData>();
   private persistPath: string | null = null;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -147,6 +160,7 @@ export class SessionRegistry {
     const session = this.sessions.get(id);
     if (!session) return false;
     session.providerSessionId = providerSessionId;
+    this.applyPendingDiscovered(session, providerSessionId);
     session.updatedAt = new Date().toISOString();
     this.scheduleSave();
     return true;
@@ -201,18 +215,13 @@ export class SessionRegistry {
   /** Upsert a discovered session by provider session ID */
   upsertDiscovered(
     providerSessionId: string,
-    data: {
-      cwd: string;
-      providerName: string;
-      summary?: string;
-      messageCount?: number;
-      lastActivity?: string;
-      model?: string;
-      sourcePath?: string;
-      group?: string;
-      workspaceMode?: WorkspaceMode;
-    },
+    data: DiscoveredSessionData,
   ): SessionInfo | null {
+    const mergedData = this.mergeDiscoveredData(
+      this.pendingDiscovered.get(providerSessionId),
+      data,
+    );
+
     // Check if we already track this provider session
     let matched: SessionInfo | undefined;
     for (const session of this.sessions.values()) {
@@ -222,48 +231,23 @@ export class SessionRegistry {
       }
     }
 
-    // Fallback: match a runtime session that hasn't received its
-    // providerSessionId yet (same provider + same workspace).
-    // This prevents duplicate entries when discovery fires before the
-    // first message completes and sets providerSessionId on the runtime session.
-    if (!matched) {
-      for (const session of this.sessions.values()) {
-        if (
-          session.origin === 'runtime'
-          && !session.providerSessionId
-          && session.providerName === data.providerName
-          && session.cwd === data.cwd
-          && session.status !== 'closed'
-        ) {
-          matched = session;
-          matched.providerSessionId = providerSessionId;
-          break;
-        }
-      }
+    if (matched) {
+      return this.mergeDiscoveredIntoSession(matched, providerSessionId, mergedData);
     }
 
-    if (matched) {
-      // Only update metadata, never overwrite status or runtime-owned cwd
-      if (!matched.cwd || matched.origin !== 'runtime') {
-        matched.cwd = data.cwd;
-      }
-      if (data.summary) matched.summary = data.summary;
-      if (data.group && !matched.group) matched.group = data.group;
-      if (data.workspaceMode) matched.workspaceMode = data.workspaceMode;
-      // Only attach providerSourcePath if session doesn't already have runtime-managed history
-      // (prevents /history from duplicating turns from both sources)
-      const hasRuntimeHistory = matched.sourcePath && this.sessionBaseDir
-        && matched.sourcePath.startsWith(this.sessionBaseDir);
-      if (data.sourcePath && !hasRuntimeHistory) {
-        matched.providerSourcePath = data.sourcePath;
-      }
-      if (data.sourcePath && !matched.sourcePath) matched.sourcePath = data.sourcePath;
-      if (data.messageCount != null) matched.messageCount = data.messageCount;
-      if (data.lastActivity) matched.lastActivity = data.lastActivity;
-      matched.updatedAt = new Date().toISOString();
-      this.scheduleSave();
-      return matched;
+    const candidates = this.findPendingRuntimeCandidates(mergedData);
+    if (candidates.length === 1) {
+      return this.mergeDiscoveredIntoSession(candidates[0], providerSessionId, mergedData);
     }
+
+    if (candidates.length > 1) {
+      // Multiple live runtime sessions are still waiting for their provider session ID.
+      // Keep the discovered metadata in memory until one of them reports an exact ID.
+      this.pendingDiscovered.set(providerSessionId, mergedData);
+      return null;
+    }
+
+    this.pendingDiscovered.delete(providerSessionId);
 
     // New discovered session — no worker, so status is closed
     const id = randomUUID();
@@ -271,26 +255,96 @@ export class SessionRegistry {
     const session: SessionInfo = {
       id,
       providerSessionId,
-      providerName: data.providerName,
+      providerName: mergedData.providerName,
       status: 'closed',
       origin: 'discovered',
-      cwd: data.cwd,
-      workspaceMode: data.workspaceMode || 'shared',
-      model: data.model,
-      group: data.group,
-      summary: data.summary,
-      sourcePath: data.sourcePath,
-      providerSourcePath: data.sourcePath,
-      messageCount: data.messageCount ?? 0,
+      cwd: mergedData.cwd,
+      workspaceMode: mergedData.workspaceMode || 'shared',
+      model: mergedData.model,
+      group: mergedData.group,
+      summary: mergedData.summary,
+      sourcePath: mergedData.sourcePath,
+      providerSourcePath: mergedData.sourcePath,
+      messageCount: mergedData.messageCount ?? 0,
       totalInputTokens: 0,
       totalOutputTokens: 0,
       createdAt: now,
       updatedAt: now,
-      lastActivity: data.lastActivity,
+      lastActivity: mergedData.lastActivity,
     };
 
     this.sessions.set(id, session);
     this.scheduleSave();
     return session;
+  }
+
+  private applyPendingDiscovered(session: SessionInfo, providerSessionId: string): void {
+    const pending = this.pendingDiscovered.get(providerSessionId);
+    if (!pending) return;
+    this.mergeDiscoveredIntoSession(session, providerSessionId, pending, false);
+  }
+
+  private findPendingRuntimeCandidates(data: DiscoveredSessionData): SessionInfo[] {
+    return Array.from(this.sessions.values()).filter((session) =>
+      session.origin === 'runtime'
+      && !session.providerSessionId
+      && session.providerName === data.providerName
+      && session.cwd === data.cwd
+      && session.status !== 'closed'
+      && session.status !== 'closing'
+    );
+  }
+
+  private mergeDiscoveredIntoSession(
+    session: SessionInfo,
+    providerSessionId: string,
+    data: DiscoveredSessionData,
+    scheduleSave = true,
+  ): SessionInfo {
+    session.providerSessionId = providerSessionId;
+
+    // Only update metadata, never overwrite status or runtime-owned cwd
+    if (!session.cwd || session.origin !== 'runtime') {
+      session.cwd = data.cwd;
+    }
+    if (data.summary) session.summary = data.summary;
+    if (data.group && !session.group) session.group = data.group;
+    if (data.workspaceMode) session.workspaceMode = data.workspaceMode;
+    if (data.model && !session.model) session.model = data.model;
+
+    // Only attach providerSourcePath if session doesn't already have runtime-managed history
+    // (prevents /history from duplicating turns from both sources)
+    const hasRuntimeHistory = session.sourcePath && this.sessionBaseDir
+      && session.sourcePath.startsWith(this.sessionBaseDir);
+    if (data.sourcePath && !hasRuntimeHistory) {
+      session.providerSourcePath = data.sourcePath;
+    }
+    if (data.sourcePath && !session.sourcePath) session.sourcePath = data.sourcePath;
+    if (data.messageCount != null) session.messageCount = data.messageCount;
+    if (data.lastActivity) session.lastActivity = data.lastActivity;
+    session.updatedAt = new Date().toISOString();
+    this.pendingDiscovered.delete(providerSessionId);
+    if (scheduleSave) {
+      this.scheduleSave();
+    }
+    return session;
+  }
+
+  private mergeDiscoveredData(
+    existing: DiscoveredSessionData | undefined,
+    incoming: DiscoveredSessionData,
+  ): DiscoveredSessionData {
+    if (!existing) return { ...incoming };
+    return {
+      cwd: incoming.cwd || existing.cwd,
+      providerName: incoming.providerName || existing.providerName,
+      summary: incoming.summary ?? existing.summary,
+      messageCount: incoming.messageCount ?? existing.messageCount,
+      lastActivity: incoming.lastActivity ?? existing.lastActivity,
+      model: incoming.model ?? existing.model,
+      sourcePath: incoming.sourcePath ?? existing.sourcePath,
+      group: incoming.group ?? existing.group,
+      workspaceMode: incoming.workspaceMode ?? existing.workspaceMode,
+    };
   }
 }
