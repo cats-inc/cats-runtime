@@ -2,6 +2,23 @@ version: 1
 
 # Environments describe isolated execution/login contexts.
 # Today cats-runtime supports native and WSL. Docker can fit this shape later.
+#
+# Supported kinds:
+#   native  — run on the host directly (macOS / Linux / Windows)
+#   wsl     — run inside a WSL distro (Windows only)
+#   (docker — planned; specify container name, image is not needed)
+#
+# On macOS / Linux all providers run natively, so you only need:
+#   environments:
+#     native:
+#       kind: native
+# or simply omit the environments block entirely (defaults to native).
+#
+# WSL: distro names must be unique (as shown by `wsl -l`).
+# To run two Ubuntu environments, import the same image under different names:
+#   wsl --import Ubuntu-Dev D:\wsl\Ubuntu-Dev D:\exports\ubuntu.tar
+# Then reference each by its distinct distro name below.
+#
 # File-backed provider paths are resolved on the host. On Windows, if you add a
 # WSL-backed file provider (Claude/Codex/Copilot/Gemini/Auggie), use a
 # host-accessible path such as \\wsl$\Ubuntu\home\user\... instead of ~/.xxx.
@@ -11,10 +28,11 @@ environments:
   ubuntu:
     kind: wsl
     distro: Ubuntu
-  debian:
-    kind: wsl
-    distro: Debian
 
+# Positive-list: only providers listed below are enabled.
+# Any known provider omitted from this block is automatically disabled
+# (attempting to create a session for it will return an error).
+# To enable only a subset, simply remove the providers you don't need.
 providers:
   claude:
     default_instance: native
@@ -34,6 +52,15 @@ providers:
         runner: auto
         sessions_dir: ~/.codex/sessions
 
+  gemini:
+    default_instance: native
+    instances:
+      native:
+        environment: native
+        command: gemini
+        runner: auto
+        sessions_dir: ~/.gemini/tmp
+
   copilot:
     default_instance: native
     instances:
@@ -43,14 +70,17 @@ providers:
         runner: auto
         sessions_dir: ~/.copilot/session-state
 
-  gemini:
+  opencode:
     default_instance: native
     instances:
       native:
         environment: native
-        command: gemini
+        command: opencode
         runner: auto
-        sessions_dir: ~/.gemini/tmp
+        server:
+          host: 127.0.0.1
+          port: 4097
+          startup_timeout_ms: 10000
 
   auggie:
     default_instance: native
@@ -69,11 +99,6 @@ providers:
         command: cursor-agent
         runner: auto
         chats_dir: ~/.cursor/chats
-      debian:
-        environment: debian
-        command: cursor-agent
-        runner: auto
-        chats_dir: ~/.cursor/chats
 
   kiro:
     default_instance: ubuntu
@@ -82,21 +107,7 @@ providers:
         environment: ubuntu
         command: kiro-cli
         runner: auto
+        # db_path defaults:
+        #   macOS:       ~/Library/Application Support/kiro-cli/data.sqlite3
+        #   Linux / WSL: ~/.local/share/kiro-cli/data.sqlite3
         db_path: ~/.local/share/kiro-cli/data.sqlite3
-      debian:
-        environment: debian
-        command: kiro-cli
-        runner: auto
-        db_path: ~/.local/share/kiro-cli/data.sqlite3
-
-  opencode:
-    default_instance: native
-    instances:
-      native:
-        environment: native
-        command: opencode
-        runner: auto
-        server:
-          host: 127.0.0.1
-          port: 4097
-          startup_timeout_ms: 10000
