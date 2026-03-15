@@ -18,6 +18,7 @@ export class FileWatcher extends EventEmitter<FileWatcherEvents> {
   private scanner: SessionScannerLike;
   private providerName: string;
   private registry: SessionRegistry;
+  private providerInstanceId?: string;
   private watcher: FSWatcher | null = null;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private debounceMs = 2000;
@@ -27,12 +28,14 @@ export class FileWatcher extends EventEmitter<FileWatcherEvents> {
     scanner: SessionScannerLike,
     providerName: string,
     registry: SessionRegistry,
+    providerInstanceId?: string,
   ) {
     super();
     this.watchDir = watchDir;
     this.scanner = scanner;
     this.providerName = providerName;
     this.registry = registry;
+    this.providerInstanceId = providerInstanceId;
   }
 
   /** Run initial scan and start watching */
@@ -80,12 +83,17 @@ export class FileWatcher extends EventEmitter<FileWatcherEvents> {
     for (const d of discovered) {
       // Skip sessions that have an active worker
       const hasWorker = allSessions.some(
-        (s) => s.providerSessionId === d.providerSessionId && liveStatuses.has(s.status),
+        (s) =>
+          s.providerName === this.providerName
+          && (s.providerInstanceId || 'default') === (this.providerInstanceId || 'default')
+          && s.providerSessionId === d.providerSessionId
+          && liveStatuses.has(s.status),
       );
       if (hasWorker) continue;
 
       const session = this.registry.upsertDiscovered(d.providerSessionId, {
         providerName: this.providerName,
+        providerInstanceId: this.providerInstanceId,
         cwd: d.cwd,
         summary: d.summary,
         sourcePath: d.sourcePath,

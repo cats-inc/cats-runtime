@@ -27,7 +27,11 @@ import {
 } from '../../backends/cli/pool/sessionView.js';
 import {
   getAuggieSessions,
+  getClaudeProjectsDir,
+  getCodexSessionsDir,
+  getCopilotSessionsDir,
   getCursorNative,
+  getGeminiSessionsDir,
   getKiroNative,
   getOpencodeNative,
 } from '../providerServices.js';
@@ -162,22 +166,30 @@ async function verifyProviderDiscoveryStateDeleted(
   }
 
   if (session.providerName === 'claude') {
-    const remaining = await new SessionScanner(ctx.config.claudeProjectsDir).scan();
+    const remaining = await new SessionScanner(
+      getClaudeProjectsDir(ctx, session.providerInstanceId),
+    ).scan();
     return !remaining.some((item) => item.providerSessionId === session.providerSessionId);
   }
 
   if (session.providerName === 'codex') {
-    const remaining = await new CodexSessionScanner(ctx.config.codexSessionsDir).scan();
+    const remaining = await new CodexSessionScanner(
+      getCodexSessionsDir(ctx, session.providerInstanceId),
+    ).scan();
     return !remaining.some((item) => item.providerSessionId === session.providerSessionId);
   }
 
   if (session.providerName === 'copilot') {
-    const remaining = await new CopilotSessionScanner(ctx.config.copilotSessionsDir).scan();
+    const remaining = await new CopilotSessionScanner(
+      getCopilotSessionsDir(ctx, session.providerInstanceId),
+    ).scan();
     return !remaining.some((item) => item.providerSessionId === session.providerSessionId);
   }
 
   if (session.providerName === 'gemini') {
-    const remaining = await new GeminiSessionScanner(ctx.config.geminiSessionsDir).scan();
+    const remaining = await new GeminiSessionScanner(
+      getGeminiSessionsDir(ctx, session.providerInstanceId),
+    ).scan();
     return !remaining.some((item) => item.providerSessionId === session.providerSessionId);
   }
 

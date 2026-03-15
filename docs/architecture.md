@@ -79,7 +79,7 @@ src/
 - Manages subprocess-backed sessions
 - Tracks session registry and workspace modes
 - Resolves `(provider, instance)` into concrete command/runtime settings
-- Discovers external native sessions from supported tools
+- Discovers external native/file-backed sessions from supported tools per provider instance
 - Encapsulates provider-specific spawn, resume, fork, and permission logic
 - Applies policy-aware WSL discovery for Cursor/Kiro and exposes discovery
   status for the dashboard

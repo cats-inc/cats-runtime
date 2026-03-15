@@ -106,12 +106,16 @@ case-folded in `workspaceKey` while `cwd` remains the original display path.
 ```text
 GET /pool/status
 GET /discovery/status
+GET /providers/config
 GET /browse?path=...
 GET /kiro/models
 ```
 
 `GET /kiro/models` also accepts `?instance=<instance-id>` and returns the
 resolved `instance` alongside the runtime metadata.
+
+`GET /providers/config` returns the configured provider topology for dashboards
+or other clients that need to offer provider-instance selection.
 
 ### Native Session Discovery
 
@@ -128,7 +132,7 @@ GET  /opencode/sessions
 POST /opencode/sessions/discover
 ```
 
-The provider-native endpoints for Auggie, Cursor, Kiro, and OpenCode accept an
+The provider-native endpoints for Auggie, Cursor, Kiro, OpenCode, and Codex accept an
 optional `instance` query/body field so callers can target a specific configured
 provider instance.
 
@@ -166,6 +170,8 @@ Errors use this format:
 - `GET /discovery/status` reports the configured WSL discovery policy plus the
   current background scan state for WSL-backed Cursor/Kiro discovery; when a
   provider has multiple WSL instances, the payload keys are `provider@instance`
+- File-scanned providers (`claude`, `codex`, `copilot`, `gemini`, `auggie`) now
+  discover external sessions per configured provider instance as well
 - Future API-key and Ollama support will be added under `backends/api` without
   requiring a new inbound service
 

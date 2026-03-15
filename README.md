@@ -14,6 +14,7 @@ Current capabilities:
 - streamed turns over SSE or NDJSON
 - external session discovery for supported local tools
 - file-based provider instance config for native and multi-WSL execution
+- dashboard-side provider instance selection for session creation
 - provider-specific helpers such as Kiro model inspection
 
 ## Current Status

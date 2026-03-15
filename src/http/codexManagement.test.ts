@@ -67,10 +67,13 @@ describe('codex management', () => {
   let opencodeNative: OpencodeNativeSessionService;
   let app: ReturnType<typeof createApp>;
   let codexSessionsDir: string;
+  let codexUbuntuSessionsDir: string;
 
   beforeEach(() => {
     codexSessionsDir = join(tmpdir(), `codex-management-test-${Date.now()}`);
+    codexUbuntuSessionsDir = join(tmpdir(), `codex-management-test-ubuntu-${Date.now()}`);
     mkdirSync(codexSessionsDir, { recursive: true });
+    mkdirSync(codexUbuntuSessionsDir, { recursive: true });
 
     registry = new SessionRegistry();
     pool = {
@@ -132,6 +135,7 @@ describe('codex management', () => {
 
   afterEach(() => {
     rmSync(codexSessionsDir, { recursive: true, force: true });
+    rmSync(codexUbuntuSessionsDir, { recursive: true, force: true });
   });
 
   function writeCodexSessionFile(input: {
@@ -139,8 +143,8 @@ describe('codex management', () => {
     cwd: string;
     summary: string;
     timestamp: string;
-  }): void {
-    const dayDir = join(codexSessionsDir, '2026', '03', '11');
+  }, baseDir = codexSessionsDir): void {
+    const dayDir = join(baseDir, '2026', '03', '11');
     mkdirSync(dayDir, { recursive: true });
     writeFileSync(
       join(dayDir, `rollout-${input.sessionId}.jsonl`),
@@ -209,6 +213,72 @@ describe('codex management', () => {
     expect(body.sessions[0].controlMode).toBe('resume_only');
     expect(body.sessions[0].group).toBe('backend');
     expect(registry.list({ provider: 'codex' })).toHaveLength(1);
+  });
+
+  it('uses the requested Codex instance for inspect and manual discovery', async () => {
+    writeCodexSessionFile({
+      sessionId: 'thread-ubuntu',
+      cwd: 'C:/repo',
+      summary: 'Ubuntu only',
+      timestamp: '2026-03-11T08:02:00.000Z',
+    }, codexUbuntuSessionsDir);
+
+    const config = makeConfig();
+    config.providerDefaultInstances = {
+      codex: 'native',
+    };
+    config.providerInstances = {
+      codex: {
+        native: {
+          id: 'native',
+          providerName: 'codex',
+          commandConfig: config.providerCommands.codex,
+          codexSessionsDir,
+        },
+        ubuntu: {
+          id: 'ubuntu',
+          providerName: 'codex',
+          commandConfig: {
+            ...config.providerCommands.codex,
+            runtime: { mode: 'wsl', distro: 'Ubuntu' },
+          },
+          codexSessionsDir: codexUbuntuSessionsDir,
+        },
+      },
+    };
+    app = createApp({
+      config,
+      registry,
+      pool,
+      cursorNative,
+      kiroNative,
+      auggieSessions,
+      opencodeNative,
+    });
+
+    const inspectRes = await app.request('/codex/sessions?instance=ubuntu');
+    const inspectBody = await inspectRes.json() as {
+      sessions: Array<{ providerSessionId: string }>;
+      count: number;
+    };
+    expect(inspectRes.status).toBe(200);
+    expect(inspectBody.count).toBe(1);
+    expect(inspectBody.sessions[0].providerSessionId).toBe('thread-ubuntu');
+
+    const discoverRes = await app.request('/codex/sessions/discover', {
+      method: 'POST',
+      body: JSON.stringify({ instance: 'ubuntu' }),
+      headers: { 'content-type': 'application/json' },
+    });
+    const discoverBody = await discoverRes.json() as {
+      sessions: Array<{ providerInstanceId?: string; providerSessionId: string }>;
+      count: number;
+    };
+    expect(discoverRes.status).toBe(200);
+    expect(discoverBody.count).toBe(1);
+    expect(discoverBody.sessions[0].providerSessionId).toBe('thread-ubuntu');
+    expect(discoverBody.sessions[0].providerInstanceId).toBe('ubuntu');
+    expect(registry.list({ provider: 'codex' })[0]?.providerInstanceId).toBe('ubuntu');
   });
 
   it('serializes discovered Codex sessions as resume_only', async () => {

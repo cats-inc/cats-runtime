@@ -14,40 +14,40 @@ environments:
 
 providers:
   claude:
-    projects_dir: ~/.claude/projects
     default_instance: native
     instances:
       native:
         environment: native
         command: claude
         runner: auto
+        projects_dir: ~/.claude/projects
 
   codex:
-    sessions_dir: ~/.codex/sessions
     default_instance: native
     instances:
       native:
         environment: native
         command: codex
         runner: auto
+        sessions_dir: ~/.codex/sessions
 
   copilot:
-    sessions_dir: ~/.copilot/session-state
     default_instance: native
     instances:
       native:
         environment: native
         command: copilot
         runner: auto
+        sessions_dir: ~/.copilot/session-state
 
   gemini:
-    sessions_dir: ~/.gemini/tmp
     default_instance: native
     instances:
       native:
         environment: native
         command: gemini
         runner: auto
+        sessions_dir: ~/.gemini/tmp
 
   auggie:
     default_instance: native

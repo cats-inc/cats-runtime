@@ -272,6 +272,19 @@ environments:
     kind: wsl
     distro: Ubuntu
 providers:
+  codex:
+    default_instance: native
+    instances:
+      native:
+        environment: native
+        command: codex
+        runner: auto
+        sessions_dir: /native/codex/sessions
+      ubuntu:
+        environment: ubuntu
+        command: codex
+        runner: auto
+        sessions_dir: /wsl/codex/sessions
   cursor:
     default_instance: native
     instances:
@@ -313,8 +326,24 @@ providers:
       });
 
       expect(config.configPath).toBe(configPath);
+      expect(config.providerDefaultInstances?.codex).toBe('native');
       expect(config.providerDefaultInstances?.cursor).toBe('native');
       expect(config.providerDefaultInstances?.kiro).toBe('ubuntu');
+
+      expect(config.codexSessionsDir).toBe('/native/codex/sessions');
+      expect(resolveProviderInstance(config, 'codex', 'ubuntu')).toMatchObject({
+        id: 'ubuntu',
+        codexSessionsDir: '/wsl/codex/sessions',
+        commandConfig: {
+          path: 'codex',
+          runner: 'auto',
+          runtime: {
+            mode: 'wsl',
+            distro: 'Ubuntu',
+            environmentId: 'ubuntu',
+          },
+        },
+      });
 
       expect(config.providerCommands.cursor).toEqual({
         path: 'cursor-agent',

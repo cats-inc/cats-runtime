@@ -25,6 +25,7 @@ import { cursorRoutes } from './routes/cursor.js';
 import { kiroRoutes } from './routes/kiro.js';
 import { auggieRoutes } from './routes/auggie.js';
 import { opencodeRoutes } from './routes/opencode.js';
+import { providerRoutes } from './routes/providers.js';
 
 export interface AppContext {
   config: CliRuntimeConfig;
@@ -60,6 +61,7 @@ export function createRuntimeApp(ctx: AppContext) {
       || path === '/health'
       || path === '/pool/status'
       || path === '/discovery/status'
+      || path === '/providers/config'
     ) {
       return await next();
     }
@@ -85,6 +87,7 @@ export function createRuntimeApp(ctx: AppContext) {
   app.route('/', kiroRoutes);
   app.route('/', auggieRoutes);
   app.route('/', opencodeRoutes);
+  app.route('/', providerRoutes);
 
   return app;
 }

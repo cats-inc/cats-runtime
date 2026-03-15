@@ -2,11 +2,12 @@ import { Hono } from 'hono';
 import type { AppContext } from '../app.js';
 import { CodexSessionScanner } from '../../backends/cli/discovery/CodexSessionScanner.js';
 import { toSessionViews } from '../../backends/cli/pool/sessionView.js';
+import { getCodexSessionsDir } from '../providerServices.js';
 
 export const codexRoutes = new Hono();
 
-async function scanCodexSessions(ctx: AppContext, cwd?: string) {
-  const scanner = new CodexSessionScanner(ctx.config.codexSessionsDir);
+async function scanCodexSessions(ctx: AppContext, cwd?: string, instanceId?: string) {
+  const scanner = new CodexSessionScanner(getCodexSessionsDir(ctx, instanceId));
   const sessions = await scanner.scan();
 
   if (!cwd) {
@@ -20,9 +21,10 @@ async function scanCodexSessions(ctx: AppContext, cwd?: string) {
 codexRoutes.get('/codex/sessions', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const cwd = c.req.query('cwd');
+  const instance = c.req.query('instance') || undefined;
 
   try {
-    const sessions = await scanCodexSessions(ctx, cwd);
+    const sessions = await scanCodexSessions(ctx, cwd, instance);
     return c.json({ sessions, count: sessions.length });
   } catch (err) {
     return c.json({ error: `Failed to inspect Codex sessions: ${err}` }, 500);
@@ -32,16 +34,18 @@ codexRoutes.get('/codex/sessions', async (c) => {
 /** POST /codex/sessions/discover — import discovered Codex sessions into the registry */
 codexRoutes.post('/codex/sessions/discover', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
-  const body = await c.req.json<{ cwd?: string; group?: string }>().catch(() => ({})) as {
+  const body = await c.req.json<{ cwd?: string; group?: string; instance?: string }>().catch(() => ({})) as {
     cwd?: string;
     group?: string;
+    instance?: string;
   };
 
   try {
-    const nativeSessions = await scanCodexSessions(ctx, body.cwd);
+    const nativeSessions = await scanCodexSessions(ctx, body.cwd, body.instance);
     const sessions = nativeSessions
       .map((session) => ctx.registry.upsertDiscovered(session.providerSessionId, {
         providerName: 'codex',
+        providerInstanceId: body.instance,
         cwd: session.cwd,
         group: body.group,
         summary: session.summary,

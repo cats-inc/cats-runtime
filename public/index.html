@@ -272,6 +272,16 @@
   .provider-badge[data-p="kiro"] { background: rgba(20,184,166,0.2); color: var(--kiro); }
   .provider-badge[data-p="auggie"] { background: rgba(6,182,212,0.2); color: var(--auggie); }
   .provider-badge[data-p="opencode"] { background: rgba(244,114,182,0.2); color: var(--opencode); }
+  .instance-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    color: var(--text2);
+    font-size: 10px;
+    letter-spacing: 0.02em;
+  }
   .project-header .chevron {
     font-size: 10px;
     color: var(--text2);
@@ -713,15 +723,20 @@
     </div>
     <div class="form-group">
       <label>Provider</label>
-        <select id="inputProvider">
+        <select id="inputProvider" onchange="onProviderChange()">
           <option value="auggie">auggie</option>
           <option value="claude">claude</option>
           <option value="codex">codex</option>
-          <option value="gemini">gemini</option>
           <option value="copilot">copilot</option>
           <option value="cursor">cursor</option>
+          <option value="gemini">gemini</option>
           <option value="kiro">kiro</option>
+          <option value="opencode">opencode</option>
         </select>
+    </div>
+    <div class="form-group" id="instanceGroup">
+      <label>Provider Instance</label>
+      <select id="inputInstance"></select>
     </div>
     <div class="form-group">
       <label>Model (optional)</label>
@@ -789,11 +804,13 @@ function renderMd(text) {
 }
 
 const API_BASE = window.location.origin;
+const PROVIDER_ORDER = ['claude', 'codex', 'gemini', 'copilot', 'cursor', 'kiro', 'auggie', 'opencode'];
 let currentSessionId = null;
 let isStreaming = false;
 let observeSource = null;
 let observeFullText = '';
 let observeAssistantEl = null;
+let providerCatalog = null;
 
 function apiKey() {
   return document.getElementById('apiKeyInput').value;
@@ -840,6 +857,100 @@ function headers(extra = {}) {
   const key = apiKey();
   if (key) h['Authorization'] = `Bearer ${key}`;
   return h;
+}
+
+function providerMeta(providerName) {
+  return providerCatalog?.providers?.[providerName] || null;
+}
+
+function instanceMeta(providerName, instanceId) {
+  const provider = providerMeta(providerName);
+  if (!provider) return null;
+  return (provider.instances || []).find((instance) => instance.id === (instanceId || provider.defaultInstance || 'default')) || null;
+}
+
+function formatInstanceOptionLabel(providerName, instance) {
+  if (!instance) return 'default';
+  const parts = [instance.id];
+  if (instance.runtime?.mode === 'wsl') {
+    parts.push(instance.runtime.distro ? `wsl:${instance.runtime.distro}` : 'wsl');
+  } else if (instance.runtime?.mode) {
+    parts.push(instance.runtime.mode);
+  }
+  const provider = providerMeta(providerName);
+  if (provider?.defaultInstance === instance.id) {
+    parts.push('default');
+  }
+  return parts.join(' | ');
+}
+
+function shouldShowInstance(session) {
+  const provider = providerMeta(session.providerName);
+  if (provider?.instances?.length > 1) return true;
+  return !!session.providerInstanceId && session.providerInstanceId !== 'default';
+}
+
+function formatSessionInstance(session) {
+  const instanceId = session.providerInstanceId || 'default';
+  const instance = instanceMeta(session.providerName, instanceId);
+  if (instance) {
+    return formatInstanceOptionLabel(session.providerName, instance);
+  }
+  return instanceId;
+}
+
+function syncProviderSelect() {
+  if (!providerCatalog?.providers) return;
+
+  const providerSelect = document.getElementById('inputProvider');
+  const current = providerSelect.value || 'claude';
+  const providers = PROVIDER_ORDER.filter((providerName) => providerCatalog.providers[providerName]);
+  providerSelect.innerHTML = providers
+    .map((providerName) => `<option value="${providerName}">${providerName}</option>`)
+    .join('');
+  providerSelect.value = providers.includes(current)
+    ? current
+    : (providers[0] || 'claude');
+}
+
+function onProviderChange() {
+  const providerName = document.getElementById('inputProvider').value || 'claude';
+  const provider = providerMeta(providerName);
+  const instanceSelect = document.getElementById('inputInstance');
+  const instanceGroup = document.getElementById('instanceGroup');
+  const instances = provider?.instances?.length
+    ? provider.instances
+    : [{ id: 'default', runtime: { mode: 'native' } }];
+  const selected = instanceSelect.value;
+
+  instanceSelect.innerHTML = instances
+    .map((instance) => `<option value="${instance.id}">${formatInstanceOptionLabel(providerName, instance)}</option>`)
+    .join('');
+  instanceSelect.value = instances.some((instance) => instance.id === selected)
+    ? selected
+    : (provider?.defaultInstance || instances[0]?.id || 'default');
+  instanceSelect.disabled = instances.length <= 1;
+  instanceGroup.style.display = '';
+}
+
+async function refreshProviderCatalog() {
+  try {
+    const res = await fetch(`${API_BASE}/providers/config`, { headers: headers() });
+    if (!res.ok) {
+      return;
+    }
+
+    const data = await res.json();
+    providerCatalog = data;
+    syncProviderSelect();
+    onProviderChange();
+    refreshSessions();
+    if (currentSessionId) {
+      refreshSession();
+    }
+  } catch {
+    // Leave the dashboard on its static fallback options.
+  }
 }
 
 function formatDiscoveryState(state) {
@@ -1041,6 +1152,9 @@ function renderSessionList(sessions) {
       const activity = sessionActivity(s);
       const controls = sessionControls(s);
       const prov = s.providerName || 'claude';
+      const instanceLabel = shouldShowInstance(s)
+        ? `<span class="instance-badge">${formatSessionInstance(s)}</span>`
+        : '';
       return `
         <div class="session-card ${isActive ? 'active' : ''}" onclick="selectSession('${s.id}')">
           <div class="sc-top">
@@ -1052,6 +1166,7 @@ function renderSessionList(sessions) {
           </div>
           <div class="sc-meta">
             <span class="provider-badge" data-p="${prov}">${prov}</span>
+            ${instanceLabel}
             <span>${s.messageCount || 0} msgs</span>
             ${s.lastActivity ? `<span>${new Date(s.lastActivity).toLocaleString()}</span>` : ''}
           </div>
@@ -1221,6 +1336,7 @@ async function refreshSession() {
     if (s.ownership) meta.push(humanizeToken(s.ownership));
     if (s.resumeStrategy && s.resumeStrategy !== 'none') meta.push(`resume: ${humanizeToken(s.resumeStrategy)}`);
     if (!s.attached && activity === 'interactive') meta.push('external active');
+    if (shouldShowInstance(s)) meta.push(`instance: ${formatSessionInstance(s)}`);
     if (s.workspaceMode) meta.push(s.workspaceMode);
     if (s.cwd) meta.push(s.cwd.replace(/\\/g, '/'));
     if (s.model) meta.push(s.model);
@@ -1723,8 +1839,10 @@ function closeBrowseModal() {
 
 // --- Create Modal ---
 function openCreateModal() {
+  refreshProviderCatalog();
   document.getElementById('createModal').classList.add('open');
   onWorkspaceModeChange();
+  onProviderChange();
   document.getElementById('inputWorkspaceMode').focus();
 }
 
@@ -1752,6 +1870,8 @@ async function createSession() {
     workspaceMode,
     provider: document.getElementById('inputProvider').value || 'claude',
   };
+  const instance = document.getElementById('inputInstance').value;
+  if (instance) body.instance = instance;
   if (cwd) body.cwd = cwd;
   if (workspaceMode === 'shared') {
     body.permissionMode = document.getElementById('inputPermission').value;
@@ -1811,12 +1931,18 @@ function saveApiKey(value) {
 }
 
 document.getElementById('apiKeyInput').addEventListener('change', (e) => {
-  if (saveApiKey(e.target.value)) refreshSessions();
+  if (saveApiKey(e.target.value)) {
+    refreshProviderCatalog();
+    refreshSessions();
+  }
 });
 // Also refresh on Enter key for immediate feedback
 document.getElementById('apiKeyInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
-    if (saveApiKey(e.target.value)) refreshSessions();
+    if (saveApiKey(e.target.value)) {
+      refreshProviderCatalog();
+      refreshSessions();
+    }
   }
 });
 
@@ -1837,6 +1963,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 // Initial load
+refreshProviderCatalog();
 refreshDiscoveryStatus();
 refreshSessions();
 

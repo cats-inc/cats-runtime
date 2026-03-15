@@ -47,6 +47,8 @@ Legacy provider-specific env vars still work, but new installs should prefer
 - `environments`: named execution environments such as `native` or a WSL distro
 - `providers.<name>.default_instance`: instance used when the caller omits `instance`
 - `providers.<name>.instances.<id>`: command, runner, runtime, and provider-local storage
+- file-scanned providers keep their discovery path on the instance itself
+  (`projects_dir` for Claude, `sessions_dir` for Codex/Copilot/Gemini)
 
 Minimal example:
 
@@ -59,6 +61,14 @@ environments:
     kind: wsl
     distro: Ubuntu
 providers:
+  codex:
+    default_instance: native
+    instances:
+      native:
+        environment: native
+        command: codex
+        runner: auto
+        sessions_dir: ~/.codex/sessions
   cursor:
     default_instance: ubuntu
     instances:
@@ -77,6 +87,9 @@ providers:
 This lets one provider expose multiple independently logged-in environments,
 such as several WSL distros on one Windows host. Docker is not wired yet, but
 the environment/instance model is intended to extend in that direction.
+
+The embedded dashboard reads `GET /providers/config` and uses it to populate the
+provider-instance selector in the create-session modal.
 
 ## Running the Project
 

@@ -44,7 +44,11 @@ export interface ProviderInstanceConfig {
   providerName: ProviderName;
   commandConfig: ProviderCommandConfig;
   auggieSessionsDir?: string;
+  claudeProjectsDir?: string;
+  codexSessionsDir?: string;
+  copilotSessionsDir?: string;
   cursorChatsDir?: string;
+  geminiSessionsDir?: string;
   kiroDbPath?: string;
   opencodeServerHost?: string;
   opencodeServerPort?: number;
@@ -287,7 +291,11 @@ export function listProviderInstances(
     | 'providerDefaultInstances'
     | 'providerInstances'
     | 'auggieSessionsDir'
+    | 'claudeProjectsDir'
+    | 'codexSessionsDir'
+    | 'copilotSessionsDir'
     | 'cursorChatsDir'
+    | 'geminiSessionsDir'
     | 'kiroDbPath'
     | 'opencodeServerHost'
     | 'opencodeServerPort'
@@ -317,7 +325,11 @@ export function resolveProviderInstance(
     | 'providerDefaultInstances'
     | 'providerInstances'
     | 'auggieSessionsDir'
+    | 'claudeProjectsDir'
+    | 'codexSessionsDir'
+    | 'copilotSessionsDir'
     | 'cursorChatsDir'
+    | 'geminiSessionsDir'
     | 'kiroDbPath'
     | 'opencodeServerHost'
     | 'opencodeServerPort'
@@ -409,6 +421,7 @@ function buildLegacyRuntimeShape(
         id: 'default',
         providerName: 'claude',
         commandConfig: providerCommands.claude,
+        claudeProjectsDir: env.CLAUDE_PROJECTS_DIR || `${home}/.claude/projects`,
       },
     },
     codex: {
@@ -416,6 +429,7 @@ function buildLegacyRuntimeShape(
         id: 'default',
         providerName: 'codex',
         commandConfig: providerCommands.codex,
+        codexSessionsDir: env.CODEX_SESSIONS_DIR || `${home}/.codex/sessions`,
       },
     },
     copilot: {
@@ -423,6 +437,7 @@ function buildLegacyRuntimeShape(
         id: 'default',
         providerName: 'copilot',
         commandConfig: providerCommands.copilot,
+        copilotSessionsDir: env.COPILOT_SESSIONS_DIR || `${home}/.copilot/session-state`,
       },
     },
     cursor: {
@@ -438,6 +453,7 @@ function buildLegacyRuntimeShape(
         id: 'default',
         providerName: 'gemini',
         commandConfig: providerCommands.gemini,
+        geminiSessionsDir: env.GEMINI_SESSIONS_DIR || `${home}/.gemini/tmp`,
       },
     },
     kiro: {
@@ -550,7 +566,11 @@ function buildLegacyProviderInstance(
   config: Pick<
     CliRuntimeConfig,
     | 'auggieSessionsDir'
+    | 'claudeProjectsDir'
+    | 'codexSessionsDir'
+    | 'copilotSessionsDir'
     | 'cursorChatsDir'
+    | 'geminiSessionsDir'
     | 'kiroDbPath'
     | 'opencodeServerHost'
     | 'opencodeServerPort'
@@ -562,7 +582,11 @@ function buildLegacyProviderInstance(
     providerName: provider,
     commandConfig,
     auggieSessionsDir: provider === 'auggie' ? config.auggieSessionsDir : undefined,
+    claudeProjectsDir: provider === 'claude' ? config.claudeProjectsDir : undefined,
+    codexSessionsDir: provider === 'codex' ? config.codexSessionsDir : undefined,
+    copilotSessionsDir: provider === 'copilot' ? config.copilotSessionsDir : undefined,
     cursorChatsDir: provider === 'cursor' ? config.cursorChatsDir : undefined,
+    geminiSessionsDir: provider === 'gemini' ? config.geminiSessionsDir : undefined,
     kiroDbPath: provider === 'kiro' ? config.kiroDbPath : undefined,
     opencodeServerHost: provider === 'opencode' ? config.opencodeServerHost : undefined,
     opencodeServerPort: provider === 'opencode' ? config.opencodeServerPort : undefined,
@@ -680,10 +704,30 @@ function applyFileBasedProviderConfig(
               || fallback.auggieSessionsDir
               || auggieSessionsDir
             : undefined,
+          claudeProjectsDir: provider === 'claude'
+            ? readString(instanceDoc.projects_dir)
+              || fallback.claudeProjectsDir
+              || claudeProjectsDir
+            : undefined,
+          codexSessionsDir: provider === 'codex'
+            ? readString(instanceDoc.sessions_dir)
+              || fallback.codexSessionsDir
+              || codexSessionsDir
+            : undefined,
+          copilotSessionsDir: provider === 'copilot'
+            ? readString(instanceDoc.sessions_dir)
+              || fallback.copilotSessionsDir
+              || copilotSessionsDir
+            : undefined,
           cursorChatsDir: provider === 'cursor'
             ? readString(instanceDoc.chats_dir)
               || fallback.cursorChatsDir
               || cursorChatsDir
+            : undefined,
+          geminiSessionsDir: provider === 'gemini'
+            ? readString(instanceDoc.sessions_dir)
+              || fallback.geminiSessionsDir
+              || geminiSessionsDir
             : undefined,
           kiroDbPath: provider === 'kiro'
             ? readString(instanceDoc.db_path)
@@ -736,6 +780,18 @@ function applyFileBasedProviderConfig(
       if (provider === 'cursor') {
         cursorChatsDir = nextInstances[defaultInstance].cursorChatsDir || cursorChatsDir;
         cursorRuntime = nextInstances[defaultInstance].commandConfig.runtime;
+      }
+      if (provider === 'claude') {
+        claudeProjectsDir = nextInstances[defaultInstance].claudeProjectsDir || claudeProjectsDir;
+      }
+      if (provider === 'codex') {
+        codexSessionsDir = nextInstances[defaultInstance].codexSessionsDir || codexSessionsDir;
+      }
+      if (provider === 'copilot') {
+        copilotSessionsDir = nextInstances[defaultInstance].copilotSessionsDir || copilotSessionsDir;
+      }
+      if (provider === 'gemini') {
+        geminiSessionsDir = nextInstances[defaultInstance].geminiSessionsDir || geminiSessionsDir;
       }
       if (provider === 'kiro') {
         kiroDbPath = nextInstances[defaultInstance].kiroDbPath || kiroDbPath;

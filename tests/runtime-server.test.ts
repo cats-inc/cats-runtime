@@ -135,6 +135,62 @@ describe('runtime server', () => {
     });
   });
 
+  it('GET /providers/config returns configured provider instances for the dashboard', async () => {
+    await withRuntime({
+      providerDefaultInstances: {
+        cursor: 'ubuntu',
+      },
+      providerInstances: {
+        cursor: {
+          ubuntu: {
+            id: 'ubuntu',
+            providerName: 'cursor',
+            commandConfig: {
+              path: 'cursor-agent',
+              runner: 'auto',
+              runtime: { mode: 'wsl', distro: 'Ubuntu', environmentId: 'ubuntu' },
+            },
+            cursorChatsDir: '/wsl/ubuntu/.cursor/chats',
+          },
+          debian: {
+            id: 'debian',
+            providerName: 'cursor',
+            commandConfig: {
+              path: 'cursor-agent',
+              runner: 'auto',
+              runtime: { mode: 'wsl', distro: 'Debian', environmentId: 'debian' },
+            },
+            cursorChatsDir: '/wsl/debian/.cursor/chats',
+          },
+        },
+      },
+    }, async (runtime) => {
+      const response = await runtime.app.request('/providers/config');
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        providers: expect.objectContaining({
+          cursor: {
+            defaultInstance: 'ubuntu',
+            instances: [
+              {
+                id: 'ubuntu',
+                command: 'cursor-agent',
+                runner: 'auto',
+                runtime: { mode: 'wsl', distro: 'Ubuntu', environmentId: 'ubuntu' },
+              },
+              {
+                id: 'debian',
+                command: 'cursor-agent',
+                runner: 'auto',
+                runtime: { mode: 'wsl', distro: 'Debian', environmentId: 'debian' },
+              },
+            ],
+          },
+        }),
+      });
+    });
+  });
+
   it('GET /discovery/status reports WSL discovery policy state for dashboard polling', async () => {
     await withRuntime({
       cursorRuntime: { mode: 'wsl', distro: 'Ubuntu' },

@@ -71,36 +71,68 @@ function createDiscoveryController(
   ctx: AppContext,
   options: RuntimeServerOptions = {},
 ): DiscoveryController {
-  const auggieWatcher = new FileWatcher(
-    ctx.config.auggieSessionsDir,
-    new AuggieSessionScanner(ctx.auggieSessions),
-    'auggie',
-    ctx.registry,
-  );
-  const claudeWatcher = new FileWatcher(
-    ctx.config.claudeProjectsDir,
-    new SessionScanner(ctx.config.claudeProjectsDir),
-    'claude',
-    ctx.registry,
-  );
-  const codexWatcher = new FileWatcher(
-    ctx.config.codexSessionsDir,
-    new CodexSessionScanner(ctx.config.codexSessionsDir),
-    'codex',
-    ctx.registry,
-  );
-  const copilotWatcher = new FileWatcher(
-    ctx.config.copilotSessionsDir,
-    new CopilotSessionScanner(ctx.config.copilotSessionsDir),
-    'copilot',
-    ctx.registry,
-  );
-  const geminiWatcher = new FileWatcher(
-    ctx.config.geminiSessionsDir,
-    new GeminiSessionScanner(ctx.config.geminiSessionsDir),
-    'gemini',
-    ctx.registry,
-  );
+  const watcherEntries = [
+    ...listProviderInstances(ctx.config, 'auggie').map((instance) => ({
+      name: instance.id === getDefaultInstanceId(ctx.config, 'auggie')
+        ? 'auggie'
+        : `auggie@${instance.id}`,
+      watcher: new FileWatcher(
+        instance.auggieSessionsDir || ctx.config.auggieSessionsDir,
+        new AuggieSessionScanner(ctx.resolveAuggieSessions!(instance.id)),
+        'auggie',
+        ctx.registry,
+        instance.id,
+      ),
+    })),
+    ...listProviderInstances(ctx.config, 'claude').map((instance) => ({
+      name: instance.id === getDefaultInstanceId(ctx.config, 'claude')
+        ? 'claude'
+        : `claude@${instance.id}`,
+      watcher: new FileWatcher(
+        instance.claudeProjectsDir || ctx.config.claudeProjectsDir,
+        new SessionScanner(instance.claudeProjectsDir || ctx.config.claudeProjectsDir),
+        'claude',
+        ctx.registry,
+        instance.id,
+      ),
+    })),
+    ...listProviderInstances(ctx.config, 'codex').map((instance) => ({
+      name: instance.id === getDefaultInstanceId(ctx.config, 'codex')
+        ? 'codex'
+        : `codex@${instance.id}`,
+      watcher: new FileWatcher(
+        instance.codexSessionsDir || ctx.config.codexSessionsDir,
+        new CodexSessionScanner(instance.codexSessionsDir || ctx.config.codexSessionsDir),
+        'codex',
+        ctx.registry,
+        instance.id,
+      ),
+    })),
+    ...listProviderInstances(ctx.config, 'copilot').map((instance) => ({
+      name: instance.id === getDefaultInstanceId(ctx.config, 'copilot')
+        ? 'copilot'
+        : `copilot@${instance.id}`,
+      watcher: new FileWatcher(
+        instance.copilotSessionsDir || ctx.config.copilotSessionsDir,
+        new CopilotSessionScanner(instance.copilotSessionsDir || ctx.config.copilotSessionsDir),
+        'copilot',
+        ctx.registry,
+        instance.id,
+      ),
+    })),
+    ...listProviderInstances(ctx.config, 'gemini').map((instance) => ({
+      name: instance.id === getDefaultInstanceId(ctx.config, 'gemini')
+        ? 'gemini'
+        : `gemini@${instance.id}`,
+      watcher: new FileWatcher(
+        instance.geminiSessionsDir || ctx.config.geminiSessionsDir,
+        new GeminiSessionScanner(instance.geminiSessionsDir || ctx.config.geminiSessionsDir),
+        'gemini',
+        ctx.registry,
+        instance.id,
+      ),
+    })),
+  ];
 
   const timers: Array<ReturnType<typeof setInterval>> = [];
   let started = false;
@@ -218,11 +250,9 @@ function createDiscoveryController(
       if (started) return;
       started = true;
 
-      startWatcher('auggie', auggieWatcher);
-      startWatcher('claude', claudeWatcher);
-      startWatcher('codex', codexWatcher);
-      startWatcher('copilot', copilotWatcher);
-      startWatcher('gemini', geminiWatcher);
+      for (const entry of watcherEntries) {
+        startWatcher(entry.name, entry.watcher);
+      }
 
       for (const instance of listProviderInstances(ctx.config, 'cursor')) {
         const timer = startNativeDiscovery(
@@ -254,11 +284,9 @@ function createDiscoveryController(
     stop() {
       if (!started) return;
       started = false;
-      auggieWatcher.stop();
-      claudeWatcher.stop();
-      codexWatcher.stop();
-      copilotWatcher.stop();
-      geminiWatcher.stop();
+      for (const entry of watcherEntries) {
+        entry.watcher.stop();
+      }
       while (timers.length > 0) {
         clearInterval(timers.pop()!);
       }
