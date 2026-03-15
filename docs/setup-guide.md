@@ -103,7 +103,8 @@ Path semantics matter:
   Cursor/Kiro instances.
 
 The embedded dashboard reads `GET /providers/config` and uses it to populate the
-provider-instance selector in the create-session modal.
+provider-instance selector in the create-session modal. In YAML mode, only
+providers explicitly listed under `providers:` appear in the dashboard.
 
 ## Running the Project
 

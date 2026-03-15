@@ -22,6 +22,19 @@ import {
   resolveProviderInstance,
 } from './config.js';
 
+const MISSING_CONFIG_PATH = join(
+  tmpdir(),
+  `cats-runtime-config-missing-${process.pid}-providers.yaml`,
+);
+
+function loadConfigWithoutProviderFile(env: NodeJS.ProcessEnv = {}) {
+  return loadConfig({
+    ...process.env,
+    ...env,
+    CATS_RUNTIME_CONFIG_PATH: env.CATS_RUNTIME_CONFIG_PATH || MISSING_CONFIG_PATH,
+  });
+}
+
 describe('config platform defaults', () => {
   it('defaults Cursor and Kiro to WSL only on Windows', () => {
     expect(defaultCursorAndKiroRuntimeMode('win32')).toBe('wsl');
@@ -91,7 +104,7 @@ describe('config platform defaults', () => {
   });
 
   it('loads spawn resilience settings from the environment', () => {
-    const config = loadConfig({
+    const config = loadConfigWithoutProviderFile({
       CATS_RUNTIME_SPAWN_RETRIES: '3',
       CATS_RUNTIME_SPAWN_TIMEOUT_MS: '15000',
     });
@@ -100,38 +113,38 @@ describe('config platform defaults', () => {
   });
 
   it('rejects non-positive spawn retries', () => {
-    expect(() => loadConfig({
+    expect(() => loadConfigWithoutProviderFile({
       CATS_RUNTIME_SPAWN_RETRIES: '0',
     })).toThrow(/CATS_RUNTIME_SPAWN_RETRIES/);
   });
 
   it('allows spawn timeout of zero to disable it', () => {
-    const config = loadConfig({
+    const config = loadConfigWithoutProviderFile({
       CATS_RUNTIME_SPAWN_TIMEOUT_MS: '0',
     });
     expect(config.spawnTimeoutMs).toBe(0);
   });
 
   it('loads Auggie max turns from the environment', () => {
-    expect(loadConfig({ AUGGIE_MAX_TURNS: '7' }).auggieMaxTurns).toBe(7);
+    expect(loadConfigWithoutProviderFile({ AUGGIE_MAX_TURNS: '7' }).auggieMaxTurns).toBe(7);
   });
 
   it('loads WSL discovery policy from the environment', () => {
     expect(
-      loadConfig({
+      loadConfigWithoutProviderFile({
         CATS_RUNTIME_WSL_DISCOVERY_POLICY: 'if_running',
       }).wslDiscoveryPolicy,
     ).toBe('if_running');
   });
 
   it('rejects invalid WSL discovery policy values', () => {
-    expect(() => loadConfig({
+    expect(() => loadConfigWithoutProviderFile({
       CATS_RUNTIME_WSL_DISCOVERY_POLICY: 'sometimes',
     })).toThrow(/Invalid CATS_RUNTIME_WSL_DISCOVERY_POLICY/);
   });
 
   it('defaults runtime data and session directories under ~/.cats-runtime', () => {
-    const config = loadConfig({
+    const config = loadConfigWithoutProviderFile({
       HOME: '/home/tester',
       USERPROFILE: '',
     });
@@ -141,7 +154,7 @@ describe('config platform defaults', () => {
   });
 
   it('loads Auggie and OpenCode command overrides from the environment', () => {
-    const config = loadConfig({
+    const config = loadConfigWithoutProviderFile({
       AUGGIE_PATH: '/custom/auggie',
       AUGGIE_RUNNER: 'pwsh',
       AUGGIE_RUNNER_PATH: '/custom/pwsh',
@@ -215,7 +228,7 @@ describe('config platform defaults', () => {
     process.env.KIRO_RUNTIME_DISTRO = 'Ubuntu';
 
     try {
-      const config = loadConfig();
+      const config = loadConfigWithoutProviderFile();
 
       expect(config.providerCommands.claude.runtime).toEqual({
         mode: 'wsl',

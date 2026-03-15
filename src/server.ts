@@ -160,6 +160,16 @@ function resolveServiceForInstance<T>(
   return service;
 }
 
+function getDefaultService<T>(
+  config: CliRuntimeConfig,
+  provider: ProviderName,
+  servicesByInstance: Map<string, T>,
+  buildFallback: () => T,
+): T {
+  const defaultInstanceId = getProviderDefaultInstanceId(config, provider);
+  return servicesByInstance.get(defaultInstanceId) || buildFallback();
+}
+
 export function createDiscoveryController(
   ctx: AppContext,
   options: RuntimeServerOptions = {},
@@ -501,10 +511,44 @@ export function createRuntimeServer(
   const resolveOpencodeNative = (instanceId?: string): OpencodeNativeSessionService =>
     resolveServiceForInstance(config, 'opencode', instanceId, opencodeNativeByInstance);
 
-  const auggieSessions = resolveAuggieSessions(getProviderDefaultInstanceId(config, 'auggie'));
-  const cursorNative = resolveCursorNative(getProviderDefaultInstanceId(config, 'cursor'));
-  const kiroNative = resolveKiroNative(getProviderDefaultInstanceId(config, 'kiro'));
-  const opencodeNative = resolveOpencodeNative(getProviderDefaultInstanceId(config, 'opencode'));
+  const auggieSessions = getDefaultService(
+    config,
+    'auggie',
+    auggieSessionsByInstance,
+    () => new AuggieSessionService(config.auggieSessionsDir),
+  );
+  const cursorNative = getDefaultService(
+    config,
+    'cursor',
+    cursorNativeByInstance,
+    () => new CursorNativeSessionService({
+      command: config.cursorPath,
+      chatsDir: config.cursorChatsDir,
+      runtime: createRuntimeAdapter(config.cursorRuntime),
+    }),
+  );
+  const kiroNative = getDefaultService(
+    config,
+    'kiro',
+    kiroNativeByInstance,
+    () => new KiroNativeSessionService({
+      command: config.kiroPath,
+      dbPath: config.kiroDbPath,
+      runtime: createRuntimeAdapter(config.kiroRuntime),
+    }),
+  );
+  const opencodeNative = getDefaultService(
+    config,
+    'opencode',
+    opencodeNativeByInstance,
+    () => new OpencodeNativeSessionService({
+      command: config.opencodePath,
+      commandConfig: config.providerCommands.opencode,
+      hostname: config.opencodeServerHost,
+      port: config.opencodeServerPort,
+      startupTimeoutMs: config.opencodeServerStartupTimeoutMs,
+    }),
+  );
   const pool = new WorkerPool(
     config,
     registry,

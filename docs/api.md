@@ -117,7 +117,8 @@ GET /kiro/models
 resolved `instance` alongside the runtime metadata.
 
 `GET /providers/config` returns the configured provider topology for dashboards
-or other clients that need to offer provider-instance selection.
+or other clients that need to offer provider-instance selection. In positive-list
+YAML mode, providers omitted from `providers:` are not returned at all.
 
 ### Native Session Discovery
 

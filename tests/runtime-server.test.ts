@@ -11,6 +11,7 @@ function createTestConfig(overrides = {}) {
   const env = {
     HOME: root,
     USERPROFILE: root,
+    CATS_RUNTIME_CONFIG_PATH: join(root, 'providers.missing.yaml'),
     CATS_RUNTIME_HOST: '127.0.0.1',
     CATS_RUNTIME_PORT: '3110',
     CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
@@ -86,6 +87,8 @@ describe('runtime server', () => {
       const openCreateModalBody = openCreateModalMatch![1];
       expect(openCreateModalBody.indexOf("classList.add('open')"))
         .toBeLessThan(openCreateModalBody.indexOf('await refreshProviderCatalog()'));
+      expect(html).toContain('id="createSessionBtn"');
+      expect(html).not.toContain("{ id: 'default', runtime: { mode: 'native' } }");
     });
   });
 
@@ -155,6 +158,10 @@ describe('runtime server', () => {
         cursor: 'ubuntu',
       },
       providerInstances: {
+        auggie: {},
+        claude: {},
+        codex: {},
+        copilot: {},
         cursor: {
           ubuntu: {
             id: 'ubuntu',
@@ -177,12 +184,15 @@ describe('runtime server', () => {
             cursorChatsDir: '/wsl/debian/.cursor/chats',
           },
         },
+        gemini: {},
+        kiro: {},
+        opencode: {},
       },
     }, async (runtime) => {
       const response = await runtime.app.request('/providers/config');
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({
-        providers: expect.objectContaining({
+        providers: {
           cursor: {
             defaultInstance: 'ubuntu',
             instances: [
@@ -200,9 +210,81 @@ describe('runtime server', () => {
               },
             ],
           },
-        }),
+        },
       });
     });
+  });
+
+  it('POST /sessions rejects providers omitted by positive-list YAML config', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-positive-list-test-'));
+    const configPath = join(root, 'providers.yaml');
+    writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+providers:
+  claude:
+    instances:
+      default:
+        environment: native
+        command: claude
+        runner: auto
+        projects_dir: ~/.claude/projects
+`.trimStart());
+
+    const env = {
+      HOME: root,
+      USERPROFILE: root,
+      CATS_RUNTIME_CONFIG_PATH: configPath,
+      CATS_RUNTIME_HOST: '127.0.0.1',
+      CATS_RUNTIME_PORT: '3110',
+      CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
+      CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
+      CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
+      CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
+    };
+
+    for (const dir of [
+      env.CATS_RUNTIME_DATA_DIR,
+      env.CATS_RUNTIME_SESSION_BASE_DIR,
+    ]) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    const runtime = createRuntimeServer(loadConfig(env));
+    try {
+      const catalogResponse = await runtime.app.request('/providers/config');
+      expect(catalogResponse.status).toBe(200);
+      expect(await catalogResponse.json()).toEqual({
+        providers: {
+          claude: {
+            defaultInstance: 'default',
+            instances: [
+              {
+                id: 'default',
+                command: 'claude',
+                runner: 'auto',
+                runtime: { mode: 'native', environmentId: 'native' },
+              },
+            ],
+          },
+        },
+      });
+
+      const response = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ provider: 'codex' }),
+      });
+
+      expect(response.status).toBe(400);
+      const payload = await response.json();
+      expect(payload.error).toMatch(/Provider 'codex' is not configured/);
+    } finally {
+      await runtime.close();
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('GET /sessions treats instance=default as the provider default alias in YAML mode', async () => {

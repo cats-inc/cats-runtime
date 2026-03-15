@@ -756,7 +756,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeCreateModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="createSession()">Create</button>
+      <button class="btn btn-primary" id="createSessionBtn" onclick="createSession()">Create</button>
     </div>
   </div>
 </div>
@@ -899,38 +899,73 @@ function formatSessionInstance(session) {
   return instanceId;
 }
 
-function syncProviderSelect() {
-  if (!providerCatalog?.providers) return;
+function configuredProviderNames() {
+  if (!providerCatalog?.providers) return [];
 
+  return PROVIDER_ORDER.filter(
+    (providerName) => (providerCatalog.providers[providerName]?.instances?.length || 0) > 0,
+  );
+}
+
+function setCreateModalEnabled(enabled) {
+  document.getElementById('createSessionBtn').disabled = !enabled;
+}
+
+function syncProviderSelect() {
   const providerSelect = document.getElementById('inputProvider');
+  if (!providerCatalog?.providers) {
+    providerSelect.disabled = true;
+    setCreateModalEnabled(false);
+    return;
+  }
+
   const current = providerSelect.value || 'claude';
-  const providers = PROVIDER_ORDER.filter((providerName) => providerCatalog.providers[providerName]);
+  const providers = configuredProviderNames();
+
+  if (providers.length === 0) {
+    providerSelect.innerHTML = '<option value="">No configured providers</option>';
+    providerSelect.value = '';
+    providerSelect.disabled = true;
+    setCreateModalEnabled(false);
+    return;
+  }
+
   providerSelect.innerHTML = providers
     .map((providerName) => `<option value="${providerName}">${providerName}</option>`)
     .join('');
+  providerSelect.disabled = false;
   providerSelect.value = providers.includes(current)
     ? current
-    : (providers[0] || 'claude');
+    : providers[0];
+  setCreateModalEnabled(true);
 }
 
 function onProviderChange() {
-  const providerName = document.getElementById('inputProvider').value || 'claude';
-  const provider = providerMeta(providerName);
+  const providerName = document.getElementById('inputProvider').value;
+  const provider = providerName ? providerMeta(providerName) : null;
   const instanceSelect = document.getElementById('inputInstance');
   const instanceGroup = document.getElementById('instanceGroup');
-  const instances = provider?.instances?.length
-    ? provider.instances
-    : [{ id: 'default', runtime: { mode: 'native' } }];
+  const instances = provider?.instances || [];
   const selected = instanceSelect.value;
+
+  if (instances.length === 0) {
+    instanceSelect.innerHTML = '';
+    instanceSelect.value = '';
+    instanceSelect.disabled = true;
+    instanceGroup.style.display = 'none';
+    setCreateModalEnabled(false);
+    return;
+  }
 
   instanceSelect.innerHTML = instances
     .map((instance) => `<option value="${instance.id}">${formatInstanceOptionLabel(providerName, instance)}</option>`)
     .join('');
   instanceSelect.value = instances.some((instance) => instance.id === selected)
     ? selected
-    : (provider?.defaultInstance || instances[0]?.id || 'default');
+    : (provider?.defaultInstance || instances[0]?.id || '');
   instanceSelect.disabled = instances.length <= 1;
   instanceGroup.style.display = '';
+  setCreateModalEnabled(true);
 }
 
 async function refreshProviderCatalog() {
@@ -1863,15 +1898,21 @@ function onWorkspaceModeChange() {
 async function createSession() {
   const workspaceMode = document.getElementById('inputWorkspaceMode').value;
   const cwd = document.getElementById('inputCwd').value.trim();
+  const provider = document.getElementById('inputProvider').value;
 
   if ((workspaceMode === 'shared' || workspaceMode === 'read_only') && !cwd) {
     alert('Working directory is required for ' + workspaceMode + ' mode');
     return;
   }
 
+  if (!provider) {
+    alert('No providers are configured. Add one to providers.yaml first.');
+    return;
+  }
+
   const body = {
     workspaceMode,
-    provider: document.getElementById('inputProvider').value || 'claude',
+    provider,
   };
   const instance = document.getElementById('inputInstance').value;
   if (instance) body.instance = instance;

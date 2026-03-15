@@ -27,6 +27,7 @@ dist/
 .env
 .env.local
 .env.*.local
+config/providers.yaml
 
 # === IDE ===
 .idea/
