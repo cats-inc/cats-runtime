@@ -52,6 +52,26 @@ coverage expected for each change.
 These debt items are recorded here but are not bundled into the immediate bugfix
 pass unless a targeted fix naturally reduces complexity without expanding scope.
 
+## Final Review Notes (Reference Only)
+
+After the hardening work landed, final Gemini and Claude review passes did not
+identify any remaining correctness bug that blocks the current provider-instance
+model. They did leave a short list of follow-on cleanup ideas worth preserving:
+
+1. `server.ts` and `providerServices.ts` still duplicate near-identical native
+   service resolution helpers and can eventually share one implementation.
+2. File watcher specs currently resolve the same file-backed path more than once
+   during bootstrap; this is deterministic but can be reduced as a small local
+   cleanup.
+3. Route-level error mapping only special-cases unknown provider instances; if
+   request-time config/path validation errors become more common, the runtime
+   may want a richer 4xx/5xx classification policy.
+4. The broader provider metadata shape still has room to become more
+   table-driven as additional providers or environment kinds are added.
+
+These notes are intentionally tracked as reference refactors, not as new bugs
+against the delivered provider-instance flow.
+
 ## Implementation Phases
 
 ### Phase 1: Correctness and Guardrails
@@ -133,6 +153,7 @@ the immediate bugfix commit.
 |------|--------|
 | 2026-03-16 | Plan created to track accepted findings from post-commit review of `97d9c4d` |
 | 2026-03-16 | Phase 1 and Phase 2 fixes implemented; deferred cleanup items explicitly kept out of this patch set |
+| 2026-03-16 | Final Gemini/Claude review suggestions recorded as reference-only cleanup items; no new blocking bug accepted |
 
 ---
 
