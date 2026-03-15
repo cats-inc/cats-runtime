@@ -457,4 +457,45 @@ providers:
       rmSync(tempDir, { recursive: true, force: true });
     }
   });
+
+  it('allows explicit WSL runtime to inherit distro from the referenced environment', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const configPath = join(tempDir, 'providers.yaml');
+    writeFileSync(configPath, `
+version: 1
+environments:
+  ubuntu:
+    kind: wsl
+    distro: Ubuntu
+providers:
+  cursor:
+    instances:
+      default:
+        environment: ubuntu
+        runtime: wsl
+        command: cursor-agent
+        runner: auto
+`.trimStart());
+
+    try {
+      const config = loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_CONFIG_PATH: configPath,
+      });
+
+      expect(resolveProviderInstance(config, 'cursor')).toMatchObject({
+        id: 'default',
+        commandConfig: {
+          runtime: {
+            mode: 'wsl',
+            distro: 'Ubuntu',
+            environmentId: 'ubuntu',
+          },
+        },
+      });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
 });

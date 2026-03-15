@@ -47,7 +47,7 @@ function createTestConfig(overrides = {}) {
     ...overrides,
   };
 
-  return { config, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+  return { root, config, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
 
 async function withRuntime(
@@ -78,6 +78,14 @@ describe('runtime server', () => {
         .toBeLessThan(html.indexOf('<option value="gemini">gemini</option>'));
       expect(html.indexOf('<option value="kiro">kiro</option>'))
         .toBeLessThan(html.indexOf('<option value="auggie">auggie</option>'));
+
+      const openCreateModalMatch = html.match(
+        /async function openCreateModal\(\) \{([\s\S]*?)\n\}/,
+      );
+      expect(openCreateModalMatch?.[1]).toBeTruthy();
+      const openCreateModalBody = openCreateModalMatch![1];
+      expect(openCreateModalBody.indexOf("classList.add('open')"))
+        .toBeLessThan(openCreateModalBody.indexOf('await refreshProviderCatalog()'));
     });
   });
 
@@ -238,8 +246,9 @@ describe('runtime server', () => {
     });
   });
 
-  it('deduplicates overlapping file discovery watchers for the same provider', async () => {
-    const sharedDir = mkdtempSync(join(tmpdir(), 'cats-runtime-auggie-shared-'));
+  it('deduplicates overlapping file discovery watchers even when one path uses ~', async () => {
+    const { root, config, cleanup } = createTestConfig();
+    const sharedDir = join(root, '.augment', 'sessions');
     writeFileSync(
       join(sharedDir, 'session-1.json'),
       JSON.stringify({
@@ -273,7 +282,6 @@ describe('runtime server', () => {
     );
 
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { config, cleanup } = createTestConfig();
     config.auggieSessionsDir = sharedDir;
     config.providerDefaultInstances = {
       ...config.providerDefaultInstances,
@@ -295,10 +303,15 @@ describe('runtime server', () => {
             ...config.providerCommands.auggie,
             runtime: { ...config.providerCommands.auggie.runtime },
           },
-          auggieSessionsDir: sharedDir,
+          auggieSessionsDir: '~/.augment/sessions',
         },
       },
     };
+
+    const previousHome = process.env.HOME;
+    const previousUserProfile = process.env.USERPROFILE;
+    process.env.HOME = root;
+    process.env.USERPROFILE = root;
 
     const runtime = createRuntimeServer(config);
     try {
@@ -321,10 +334,19 @@ describe('runtime server', () => {
           && String(message).includes("'auggie@mirror'")),
       ).toBe(true);
     } finally {
+      if (previousHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = previousHome;
+      }
+      if (previousUserProfile === undefined) {
+        delete process.env.USERPROFILE;
+      } else {
+        process.env.USERPROFILE = previousUserProfile;
+      }
       warnSpy.mockRestore();
       await runtime.close();
       cleanup();
-      rmSync(sharedDir, { recursive: true, force: true });
     }
   });
 

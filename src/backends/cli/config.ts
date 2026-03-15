@@ -936,9 +936,10 @@ function resolveRuntimeFromFile(
     fallback.mode,
     `${label}.runtime`,
   );
+  const effectiveDistro = inlineDistro || fallback.distro;
   assertExplicitWslHasDistro(
     mode,
-    inlineDistro,
+    effectiveDistro,
     label,
     filePath,
     Boolean(inlineRuntime),
@@ -946,7 +947,7 @@ function resolveRuntimeFromFile(
 
   return {
     mode,
-    distro: inlineDistro || fallback.distro,
+    distro: effectiveDistro,
     environmentId: fallback.environmentId,
   };
 }

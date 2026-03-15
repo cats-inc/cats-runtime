@@ -70,14 +70,31 @@ function startWatcher(name: string, watcher: FileWatcher): void {
 }
 
 function normalizeDiscoveryDir(watchDir: string): string {
-  const trimmed = watchDir.trim();
-  const normalized = trimmed.startsWith('~')
-    ? normalizePath(trimmed)
-    : normalizePath(resolvePath(trimmed));
+  const normalized = normalizePath(resolveHomeDir(watchDir.trim()));
   const withoutTrailingSeparators = normalized.replace(/[\\/]+$/, '');
   return process.platform === 'win32'
     ? withoutTrailingSeparators.toLowerCase()
     : withoutTrailingSeparators;
+}
+
+function resolveHomeDir(pathValue: string): string {
+  const homeDir = process.env.HOME || process.env.USERPROFILE;
+  if (!homeDir) {
+    return pathValue.startsWith('~')
+      ? pathValue
+      : resolvePath(pathValue);
+  }
+
+  if (pathValue === '~') {
+    return homeDir;
+  }
+  if (pathValue.startsWith('~/') || pathValue.startsWith('~\\')) {
+    return resolvePath(homeDir, pathValue.slice(2));
+  }
+
+  return pathValue.startsWith('~')
+    ? pathValue
+    : resolvePath(pathValue);
 }
 
 function pickPreferredWatcherSpec(

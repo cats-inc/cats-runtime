@@ -1841,14 +1841,12 @@ function closeBrowseModal() {
 
 // --- Create Modal ---
 async function openCreateModal() {
-  const refreshed = await refreshProviderCatalog();
-  if (!refreshed) {
-    syncProviderSelect();
-    onProviderChange();
-  }
+  syncProviderSelect();
+  onProviderChange();
   document.getElementById('createModal').classList.add('open');
   onWorkspaceModeChange();
   document.getElementById('inputWorkspaceMode').focus();
+  await refreshProviderCatalog();
 }
 
 function closeCreateModal() {
