@@ -26,6 +26,7 @@ Current capabilities:
 - [x] Port the CLI runtime test surface into `cats-runtime`
 - [x] Migrate `crew-chat-poc` to call `cats-runtime`
 - [x] Add file-based provider instances for multi-environment CLI accounts
+- [ ] Resolve accepted review follow-ups for provider-instance hardening
 - [ ] Add `backends/api` for pay-as-you-go API keys and Ollama
 
 ## Design Rules

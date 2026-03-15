@@ -11,6 +11,7 @@
 | Dashboard | Completed | The embedded dashboard UI is served from `GET /` |
 | Tests | Completed | Vitest covers provider, discovery, pool, HTTP, and server bootstrap behavior |
 | Docs | Completed | README, API, architecture, testing, and agent guidance match the single-service model |
+| Follow-ups | In Progress | Accepted post-review findings for provider-instance rollout are tracked in `docs/plans/PLAN-002-provider-instance-review-followups.md` |
 
 **Legend**: Not Started | In Progress | Completed | Blocked
 
@@ -55,6 +56,35 @@
 
 - [ ] Add `src/backends/api` for API-key and Ollama-backed execution paths
 
+### WP-2: Provider Instance Review Follow-ups
+
+**Status**: In Progress  
+**Assigned**: Codex  
+**Priority**: P1
+
+#### Goal
+
+Capture and resolve the accepted findings from post-commit review of the
+provider-instance rollout so the current architecture is hardened before new
+environment types or providers are added.
+
+#### Accepted Findings
+
+| Finding | Status | Notes |
+|---------|--------|-------|
+| Duplicate discovered sessions when same-provider instances share a watch dir | [ ] | Track as a correctness bug; fix in discovery bootstrap |
+| Discovery bootstrap uses fragile non-null assertions for optional resolvers | [ ] | Tighten bootstrap code so tests and helper reuse are safer |
+| YAML `wsl` definitions do not require `distro` | [ ] | Fail during config load instead of at runtime |
+| Dashboard create modal briefly renders stale provider-instance data | [ ] | Treat as UI polish with low technical risk |
+| Static provider ordering mismatches runtime ordering | [ ] | Remove reorder flash in the modal |
+| `config.ts` remains switch-heavy and repetitive | [ ] Deferred | Record as technical debt, not required for immediate bugfix |
+| Legacy top-level runtime fields remain slightly misleading | [ ] Deferred | Keep for compatibility in the short term |
+| `ProviderInstanceConfig` is growing into a bag of optionals | [ ] Deferred | Revisit with a scoped type-shape cleanup |
+
+#### Tracking
+
+- Active plan: `docs/plans/PLAN-002-provider-instance-review-followups.md`
+
 ---
 
-*Last updated: 2026-03-11*
+*Last updated: 2026-03-16*
