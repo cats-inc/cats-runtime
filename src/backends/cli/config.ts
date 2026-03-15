@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { parse } from 'yaml';
-import type { ProviderName } from './providers/types.js';
+import { KNOWN_PROVIDERS, type ProviderName } from './providers/types.js';
 
 const RUNNER_MODES = [
   'auto',
@@ -51,6 +51,22 @@ export class UnknownProviderInstanceError extends Error {
     this.instanceId = instanceId;
     this.validInstances = validInstances;
   }
+}
+
+export class ProviderNotConfiguredError extends Error {
+  readonly provider: ProviderName;
+
+  constructor(provider: ProviderName) {
+    super(`Provider '${provider}' is not configured`);
+    this.name = 'ProviderNotConfiguredError';
+    this.provider = provider;
+  }
+}
+
+export function isProviderNotConfiguredError(
+  error: unknown,
+): error is ProviderNotConfiguredError {
+  return error instanceof ProviderNotConfiguredError;
 }
 
 export interface ProviderInstanceConfig {
@@ -318,7 +334,7 @@ export function listProviderInstances(
   provider: ProviderName,
 ): ProviderInstanceConfig[] {
   const configured = config.providerInstances?.[provider];
-  if (configured && Object.keys(configured).length > 0) {
+  if (configured !== undefined) {
     return Object.values(configured);
   }
 
@@ -359,7 +375,11 @@ export function resolveProviderInstance(
   instanceId?: string,
 ): ProviderInstanceConfig {
   const configured = config.providerInstances?.[provider];
-  if (configured && Object.keys(configured).length > 0) {
+  if (configured !== undefined) {
+    if (Object.keys(configured).length === 0) {
+      throw new ProviderNotConfiguredError(provider);
+    }
+
     const selected = !instanceId || instanceId === 'default'
       ? getProviderDefaultInstanceId(config, provider)
       : instanceId;
@@ -823,6 +843,16 @@ function applyFileBasedProviderConfig(
       }
       if (provider === 'auggie') {
         auggieSessionsDir = nextInstances[defaultInstance].auggieSessionsDir || auggieSessionsDir;
+      }
+    }
+
+    // Positive-list: providers not listed in the YAML are disabled.
+    const configuredProviders = new Set(
+      Object.keys(providers) as ProviderName[],
+    );
+    for (const known of KNOWN_PROVIDERS) {
+      if (!configuredProviders.has(known)) {
+        providerInstances[known] = {};
       }
     }
   }

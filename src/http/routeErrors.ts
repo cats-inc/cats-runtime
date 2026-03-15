@@ -1,8 +1,12 @@
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { isUnknownProviderInstanceError } from '../backends/cli/config.js';
+import {
+  isProviderNotConfiguredError,
+  isUnknownProviderInstanceError,
+} from '../backends/cli/config.js';
 
 export function getRouteErrorStatus(error: unknown): ContentfulStatusCode {
-  return isUnknownProviderInstanceError(error)
-    ? 400
-    : 500;
+  if (isUnknownProviderInstanceError(error) || isProviderNotConfiguredError(error)) {
+    return 400;
+  }
+  return 500;
 }

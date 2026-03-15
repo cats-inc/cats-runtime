@@ -508,4 +508,56 @@ providers:
       rmSync(tempDir, { recursive: true, force: true });
     }
   });
+
+  it('only enables providers listed in providers.yaml (positive list)', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const configPath = join(tempDir, 'providers.yaml');
+    writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+providers:
+  claude:
+    instances:
+      default:
+        environment: native
+        command: claude
+        runner: auto
+        projects_dir: ~/.claude/projects
+  codex:
+    instances:
+      default:
+        environment: native
+        command: codex
+        runner: auto
+        sessions_dir: ~/.codex/sessions
+`.trimStart());
+
+    try {
+      const config = loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_CONFIG_PATH: configPath,
+      });
+
+      // Listed providers have instances
+      expect(listProviderInstances(config, 'claude')).toHaveLength(1);
+      expect(listProviderInstances(config, 'codex')).toHaveLength(1);
+
+      // Unlisted providers return empty
+      expect(listProviderInstances(config, 'gemini')).toHaveLength(0);
+      expect(listProviderInstances(config, 'kiro')).toHaveLength(0);
+      expect(listProviderInstances(config, 'cursor')).toHaveLength(0);
+      expect(listProviderInstances(config, 'copilot')).toHaveLength(0);
+      expect(listProviderInstances(config, 'auggie')).toHaveLength(0);
+      expect(listProviderInstances(config, 'opencode')).toHaveLength(0);
+
+      // Resolving an unlisted provider throws ProviderNotConfiguredError
+      expect(() => resolveProviderInstance(config, 'gemini'))
+        .toThrow(/Provider 'gemini' is not configured/);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
 });
