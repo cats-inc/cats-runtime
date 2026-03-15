@@ -170,6 +170,7 @@ describe('Cursor native session management', () => {
         cwd: 'C:/repo',
         resumeSessionId: 'cursor-123',
       }),
+      'default',
     );
   });
 
@@ -494,6 +495,7 @@ describe('Cursor native session management', () => {
         cwd: 'C:/repo',
         resumeSessionId: 'cursor-123',
       }),
+      undefined,
     );
     expect(registry.get(session!.id)?.status).toBe('ready');
   });

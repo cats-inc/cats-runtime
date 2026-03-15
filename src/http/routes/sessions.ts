@@ -2,6 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { basename, dirname, join } from 'node:path';
 import { Hono } from 'hono';
 import type { AppContext } from '../app.js';
+import {
+  resolveProviderInstance,
+  type ProviderInstanceConfig,
+} from '../../backends/cli/config.js';
 import type {
   SessionInfo,
   SessionStatus,
@@ -21,6 +25,12 @@ import {
   toSessionView,
   toSessionViews,
 } from '../../backends/cli/pool/sessionView.js';
+import {
+  getAuggieSessions,
+  getCursorNative,
+  getKiroNative,
+  getOpencodeNative,
+} from '../providerServices.js';
 
 export const sessionRoutes = new Hono();
 const SESSION_PROVIDERS = KNOWN_PROVIDERS;
@@ -42,6 +52,18 @@ function serializeSessions(
   });
 }
 
+function resolveRequestedProviderInstance(
+  ctx: AppContext,
+  providerName: string,
+  instanceId?: string,
+): ProviderInstanceConfig {
+  return resolveProviderInstance(
+    ctx.config,
+    providerName as typeof SESSION_PROVIDERS[number],
+    instanceId,
+  );
+}
+
 function tracksNativeSessionState(session: SessionInfo): boolean {
   return Boolean(
     session.providerSessionId
@@ -58,9 +80,10 @@ async function deleteNativeSessionState(
   if (!session.providerSessionId) return true;
 
   if (session.providerName === 'cursor') {
-    const deleted = await ctx.cursorNative.deleteSession(session.cwd, session.providerSessionId);
+    const cursorNative = getCursorNative(ctx, session.providerInstanceId);
+    const deleted = await cursorNative.deleteSession(session.cwd, session.providerSessionId);
     if (!deleted) return false;
-    const remaining = await ctx.cursorNative.listSessions(
+    const remaining = await cursorNative.listSessions(
       session.cwd,
       { startIfNeeded: false },
     );
@@ -68,9 +91,10 @@ async function deleteNativeSessionState(
   }
 
   if (session.providerName === 'kiro') {
-    const deleted = await ctx.kiroNative.deleteSession(session.cwd, session.providerSessionId);
+    const kiroNative = getKiroNative(ctx, session.providerInstanceId);
+    const deleted = await kiroNative.deleteSession(session.cwd, session.providerSessionId);
     if (!deleted) return false;
-    const remaining = await ctx.kiroNative.listSessions(
+    const remaining = await kiroNative.listSessions(
       session.cwd,
       { startIfNeeded: false },
     );
@@ -78,9 +102,10 @@ async function deleteNativeSessionState(
   }
 
   if (session.providerName === 'opencode') {
-    const deleted = await ctx.opencodeNative.deleteSession(session.cwd, session.providerSessionId);
+    const opencodeNative = getOpencodeNative(ctx, session.providerInstanceId);
+    const deleted = await opencodeNative.deleteSession(session.cwd, session.providerSessionId);
     if (!deleted) return false;
-    const remaining = await ctx.opencodeNative.getSession(session.cwd, session.providerSessionId);
+    const remaining = await opencodeNative.getSession(session.cwd, session.providerSessionId);
     return remaining == null;
   }
 
@@ -129,7 +154,10 @@ async function verifyProviderDiscoveryStateDeleted(
   }
 
   if (session.providerName === 'auggie') {
-    const remaining = await ctx.auggieSessions.getSession(session.providerSessionId);
+    const remaining = await getAuggieSessions(
+      ctx,
+      session.providerInstanceId,
+    ).getSession(session.providerSessionId);
     return remaining == null;
   }
 
@@ -161,6 +189,7 @@ sessionRoutes.post('/sessions', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const body = await c.req.json<{
     provider?: string;
+    instance?: string;
     cwd?: string;
     model?: string;
     group?: string;
@@ -176,6 +205,13 @@ sessionRoutes.post('/sessions', async (c) => {
     return c.json({
       error: `Unknown provider '${providerName}'. Valid: ${SESSION_PROVIDERS.join(', ')}`,
     }, 400);
+  }
+
+  let providerInstance: ProviderInstanceConfig;
+  try {
+    providerInstance = resolveRequestedProviderInstance(ctx, providerName, body.instance);
+  } catch (err) {
+    return c.json({ error: `${err}` }, 400);
   }
 
   const sessionId = randomUUID();
@@ -194,7 +230,7 @@ sessionRoutes.post('/sessions', async (c) => {
   }
 
   if (providerName === 'cursor') {
-    const caps = ctx.pool.getCapabilities('cursor');
+    const caps = ctx.pool.getCapabilities('cursor', providerInstance.id);
     if (!caps.permissions && resolved.workspaceMode === 'read_only') {
       return c.json({
         error: `Provider '${providerName}' does not support permission enforcement required by read_only workspace`,
@@ -203,11 +239,12 @@ sessionRoutes.post('/sessions', async (c) => {
 
     let nativeProviderSessionId: string | null = null;
     try {
-      const native = await ctx.cursorNative.createSession(resolved.cwd);
+      const native = await getCursorNative(ctx, providerInstance.id).createSession(resolved.cwd);
       nativeProviderSessionId = native.providerSessionId;
       const session = ctx.registry.create({
         id: sessionId,
         providerName: 'cursor',
+        providerInstanceId: providerInstance.id,
         cwd: resolved.cwd,
         workspaceMode: resolved.workspaceMode,
         model: body.model || native.model,
@@ -225,7 +262,7 @@ sessionRoutes.post('/sessions', async (c) => {
         resumeSessionId: native.providerSessionId,
         permissionMode: resolved.permissionMode,
         allowedTools: body.allowedTools,
-      });
+      }, providerInstance.id);
       ctx.registry.updateStatus(session.id, 'ready');
 
       return c.json(serializeSession(ctx, session), 201);
@@ -233,7 +270,10 @@ sessionRoutes.post('/sessions', async (c) => {
       ctx.registry.remove(sessionId);
       if (nativeProviderSessionId) {
         try {
-          await ctx.cursorNative.deleteSession(resolved.cwd, nativeProviderSessionId);
+          await getCursorNative(ctx, providerInstance.id).deleteSession(
+            resolved.cwd,
+            nativeProviderSessionId,
+          );
         } catch {
           // Best effort rollback only.
         }
@@ -246,7 +286,7 @@ sessionRoutes.post('/sessions', async (c) => {
   }
 
   if (providerName === 'opencode') {
-    const caps = ctx.pool.getCapabilities('opencode');
+    const caps = ctx.pool.getCapabilities('opencode', providerInstance.id);
     if (!caps.permissions && resolved.workspaceMode === 'read_only') {
       return c.json({
         error: `Provider '${providerName}' does not support permission enforcement required by read_only workspace`,
@@ -255,11 +295,12 @@ sessionRoutes.post('/sessions', async (c) => {
 
     let nativeProviderSessionId: string | null = null;
     try {
-      const native = await ctx.opencodeNative.createSession(resolved.cwd);
+      const native = await getOpencodeNative(ctx, providerInstance.id).createSession(resolved.cwd);
       nativeProviderSessionId = native.providerSessionId;
       const session = ctx.registry.create({
         id: sessionId,
         providerName: 'opencode',
+        providerInstanceId: providerInstance.id,
         cwd: resolved.cwd,
         workspaceMode: resolved.workspaceMode,
         model: body.model,
@@ -277,7 +318,7 @@ sessionRoutes.post('/sessions', async (c) => {
         resumeSessionId: native.providerSessionId,
         permissionMode: resolved.permissionMode,
         allowedTools: body.allowedTools,
-      });
+      }, providerInstance.id);
       ctx.registry.updateStatus(session.id, 'ready');
 
       return c.json(serializeSession(ctx, session), 201);
@@ -285,7 +326,10 @@ sessionRoutes.post('/sessions', async (c) => {
       ctx.registry.remove(sessionId);
       if (nativeProviderSessionId) {
         try {
-          await ctx.opencodeNative.deleteSession(resolved.cwd, nativeProviderSessionId);
+          await getOpencodeNative(ctx, providerInstance.id).deleteSession(
+            resolved.cwd,
+            nativeProviderSessionId,
+          );
         } catch {
           // Best effort rollback only.
         }
@@ -297,7 +341,7 @@ sessionRoutes.post('/sessions', async (c) => {
     }
   }
 
-  const caps = ctx.pool.getCapabilities(providerName);
+  const caps = ctx.pool.getCapabilities(providerName, providerInstance.id);
 
   if (!caps.permissions && resolved.workspaceMode === 'read_only') {
     return c.json({
@@ -313,6 +357,7 @@ sessionRoutes.post('/sessions', async (c) => {
   const session = ctx.registry.create({
     id: sessionId,
     providerName,
+    providerInstanceId: providerInstance.id,
     cwd: resolved.cwd,
     workspaceMode: resolved.workspaceMode,
     model: body.model,
@@ -326,7 +371,7 @@ sessionRoutes.post('/sessions', async (c) => {
       model: body.model,
       permissionMode: resolved.permissionMode,
       allowedTools: body.allowedTools,
-    });
+    }, providerInstance.id);
   } catch (err) {
     if (resolved.workspaceMode === 'isolated') {
       cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, sessionId);
@@ -344,9 +389,15 @@ sessionRoutes.get('/sessions', (c) => {
 
   const status = c.req.query('status') as SessionStatus | undefined;
   const provider = c.req.query('provider');
+  const instance = c.req.query('instance');
   const group = c.req.query('group');
 
-  const sessions = ctx.registry.list({ status, provider, group });
+  let sessions = ctx.registry.list({ status, provider, group });
+  if (instance) {
+    sessions = sessions.filter(
+      (session) => (session.providerInstanceId || 'default') === instance,
+    );
+  }
   return c.json({ sessions: serializeSessions(ctx, sessions), count: sessions.length });
 });
 
@@ -535,7 +586,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         model: session.model,
         resumeSessionId: session.providerSessionId,
         permissionMode: 'skip',
-      });
+      }, session.providerInstanceId);
       ctx.registry.updateStatus(id, 'ready');
     } catch (err) {
       return c.json({ error: `Failed to resume: ${err}` }, 500);
@@ -556,7 +607,10 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
     }
 
     try {
-      const canResume = await ctx.kiroNative.canResumeSession(session.cwd, session.providerSessionId);
+      const canResume = await getKiroNative(
+        ctx,
+        session.providerInstanceId,
+      ).canResumeSession(session.cwd, session.providerSessionId);
       if (!canResume) {
         return c.json({
           error: 'Kiro can only resume the latest session in a workspace. '
@@ -570,7 +624,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         model: session.model,
         resumeSessionId: session.providerSessionId,
         permissionMode: 'skip',
-      });
+      }, session.providerInstanceId);
       ctx.registry.updateStatus(id, 'ready');
     } catch (err) {
       return c.json({ error: `Failed to resume: ${err}` }, 500);
@@ -583,7 +637,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
     return c.json({ error: 'No provider session ID to resume' }, 400);
   }
 
-  const caps = ctx.pool.getCapabilities(session.providerName);
+  const caps = ctx.pool.getCapabilities(session.providerName, session.providerInstanceId);
   if (!caps.resume) {
     return c.json({ error: `Provider '${session.providerName}' does not support resume` }, 501);
   }
@@ -606,7 +660,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
       model: session.model,
       resumeSessionId: session.providerSessionId,
       permissionMode,
-    });
+    }, session.providerInstanceId);
     ctx.registry.updateStatus(id, 'initializing');
   } catch (err) {
     return c.json({ error: `Failed to resume: ${err}` }, 500);
@@ -635,7 +689,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     return c.json({ error: 'No provider session ID to fork from' }, 400);
   }
 
-  const caps = ctx.pool.getCapabilities(session.providerName);
+  const caps = ctx.pool.getCapabilities(session.providerName, session.providerInstanceId);
   if (!caps.fork) {
     return c.json({ error: `Provider '${session.providerName}' does not support fork` }, 501);
   }
@@ -669,6 +723,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
   const forked = ctx.registry.create({
     id: forkId,
     providerName: session.providerName,
+    providerInstanceId: session.providerInstanceId,
     cwd: forkCwd,
     workspaceMode: forkWorkspaceMode,
     model: session.model,
@@ -683,7 +738,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
       resumeSessionId: session.providerSessionId,
       forkSession: true,
       permissionMode: forkPermissionMode,
-    });
+    }, session.providerInstanceId);
   } catch (err) {
     if (forkWorkspaceMode === 'isolated') {
       cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, forkId);

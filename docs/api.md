@@ -71,6 +71,7 @@ Minimal create example:
 ```json
 {
   "provider": "claude",
+  "instance": "native",
   "cwd": "C:/repo",
   "model": "claude-opus-4-6",
   "permissionMode": "skip"
@@ -91,8 +92,14 @@ Message example:
 - `Accept: application/x-ndjson`
 
 Session responses also include `workspaceKey`, a normalized grouping key for
-workspace-aware UIs. Windows-style paths are case-folded in this field while
-`cwd` remains the original display path.
+workspace-aware UIs. When a provider exposes multiple configured instances,
+session payloads also include `providerInstanceId`. Windows-style paths are
+case-folded in `workspaceKey` while `cwd` remains the original display path.
+
+`POST /sessions` accepts an optional `instance` field. When omitted,
+`cats-runtime` uses the provider's configured `default_instance`.
+
+`GET /sessions` accepts `?instance=<instance-id>` to filter registry results.
 
 ### Runtime Inspection
 
@@ -102,6 +109,9 @@ GET /discovery/status
 GET /browse?path=...
 GET /kiro/models
 ```
+
+`GET /kiro/models` also accepts `?instance=<instance-id>` and returns the
+resolved `instance` alongside the runtime metadata.
 
 ### Native Session Discovery
 
@@ -118,12 +128,17 @@ GET  /opencode/sessions
 POST /opencode/sessions/discover
 ```
 
+The provider-native endpoints for Auggie, Cursor, Kiro, and OpenCode accept an
+optional `instance` query/body field so callers can target a specific configured
+provider instance.
+
 For manual WSL-backed discovery, `POST /cursor/sessions/discover` and
 `POST /kiro/sessions/discover` also accept:
 
 ```json
 {
   "cwd": "C:/repo",
+  "instance": "ubuntu",
   "startIfNeeded": false
 }
 ```
@@ -149,10 +164,11 @@ Errors use this format:
 - Provider-specific capabilities still differ; not every provider supports
   resume, fork, or permission enforcement in the same way
 - `GET /discovery/status` reports the configured WSL discovery policy plus the
-  current background scan state for WSL-backed Cursor/Kiro discovery
+  current background scan state for WSL-backed Cursor/Kiro discovery; when a
+  provider has multiple WSL instances, the payload keys are `provider@instance`
 - Future API-key and Ollama support will be added under `backends/api` without
   requiring a new inbound service
 
 ---
 
-*Last updated: 2026-03-13*
+*Last updated: 2026-03-15*

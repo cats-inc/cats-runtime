@@ -13,9 +13,11 @@ export function syncNativeSessions(
   registry: SessionRegistry,
   providerName: 'cursor' | 'kiro' | 'opencode',
   sessions: NativeSessionSummary[],
+  providerInstanceId?: string,
 ): { newCount: number; syncedCount: number } {
   const known = new Set(
     registry.list({ provider: providerName })
+      .filter((session) => (session.providerInstanceId || 'default') === (providerInstanceId || 'default'))
       .map((session) => session.providerSessionId)
       .filter((sessionId): sessionId is string => Boolean(sessionId)),
   );
@@ -30,6 +32,7 @@ export function syncNativeSessions(
 
     const tracked = registry.upsertDiscovered(session.providerSessionId, {
       providerName,
+      providerInstanceId,
       cwd: session.cwd,
       summary: session.summary,
       messageCount: session.messageCount,

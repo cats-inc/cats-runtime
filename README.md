@@ -13,6 +13,7 @@ Current capabilities:
 - session lifecycle management for CLI-backed runtimes
 - streamed turns over SSE or NDJSON
 - external session discovery for supported local tools
+- file-based provider instance config for native and multi-WSL execution
 - provider-specific helpers such as Kiro model inspection
 
 ## Current Status
@@ -23,6 +24,7 @@ Current capabilities:
 - [x] Port the runtime dashboard into `cats-runtime`
 - [x] Port the CLI runtime test surface into `cats-runtime`
 - [x] Migrate `crew-chat-poc` to call `cats-runtime`
+- [x] Add file-based provider instances for multi-environment CLI accounts
 - [ ] Add `backends/api` for pay-as-you-go API keys and Ollama
 
 ## Design Rules
@@ -38,6 +40,7 @@ Current capabilities:
 ```powershell
 cd cats-runtime
 copy .env.example .env
+copy config\providers.yaml.example config\providers.yaml
 npm install
 npm run dev
 ```
@@ -55,6 +58,7 @@ Runtime state defaults under the user's home directory:
 - `src/server.ts` - single-service runtime bootstrap
 - `src/http/app.ts` - route registration and auth middleware
 - `src/backends/cli/` - embedded CLI runtime modules
+- `config/providers.yaml.example` - file-based provider instance topology
 - `docs/api.md` - public HTTP surface
 - `docs/architecture.md` - internal layout and data flow
 

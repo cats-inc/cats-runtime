@@ -1,4 +1,7 @@
-import type { CliRuntimeConfig } from '../config.js';
+import {
+  resolveProviderInstance,
+  type CliRuntimeConfig,
+} from '../config.js';
 import { AuggieSessionService } from '../auggie/AuggieSessionService.js';
 import { KiroNativeSessionService } from '../kiro/KiroNativeSessionService.js';
 import { OpencodeNativeSessionService } from '../opencode/OpencodeNativeSessionService.js';
@@ -14,6 +17,12 @@ import { OpencodeProvider } from '../providers/opencode.js';
 import { WorkerProcess, type SpawnResilienceConfig } from './WorkerProcess.js';
 import type { SessionRegistry } from './SessionRegistry.js';
 
+interface ProviderServiceResolvers {
+  getAuggieSessions?: (instanceId?: string) => AuggieSessionService;
+  getKiroNative?: (instanceId?: string) => KiroNativeSessionService;
+  getOpencodeNative?: (instanceId?: string) => OpencodeNativeSessionService;
+}
+
 export class WorkerPool {
   private workers = new Map<string, WorkerProcess>();
   private config: CliRuntimeConfig;
@@ -21,6 +30,7 @@ export class WorkerPool {
   private kiroNative: KiroNativeSessionService;
   private auggieSessions: AuggieSessionService;
   private opencodeNative: OpencodeNativeSessionService;
+  private resolvers: ProviderServiceResolvers;
 
   constructor(
     config: CliRuntimeConfig,
@@ -28,12 +38,14 @@ export class WorkerPool {
     kiroNative: KiroNativeSessionService,
     auggieSessions: AuggieSessionService,
     opencodeNative: OpencodeNativeSessionService,
+    resolvers: ProviderServiceResolvers = {},
   ) {
     this.config = config;
     this.registry = registry;
     this.kiroNative = kiroNative;
     this.auggieSessions = auggieSessions;
     this.opencodeNative = opencodeNative;
+    this.resolvers = resolvers;
   }
 
   get activeCount(): number {
@@ -46,48 +58,68 @@ export class WorkerPool {
 
   private resolveProvider(
     name: ProviderName,
+    instanceId?: string,
   ): { provider: Provider; commandConfig: CliRuntimeConfig['providerCommands'][ProviderName] } {
+    const instance = resolveProviderInstance(this.config, name, instanceId);
     switch (name) {
       case 'auggie':
         return {
-          provider: new AuggieProvider(this.auggieSessions, this.config.auggieMaxTurns),
-          commandConfig: this.config.providerCommands.auggie,
+          provider: new AuggieProvider(
+            this.resolvers.getAuggieSessions?.(instance.id) || this.auggieSessions,
+            this.config.auggieMaxTurns,
+          ),
+          commandConfig: instance.commandConfig,
         };
       case 'codex':
-        return { provider: new CodexProvider(), commandConfig: this.config.providerCommands.codex };
+        return { provider: new CodexProvider(), commandConfig: instance.commandConfig };
       case 'claude':
-        return { provider: new ClaudeProvider(), commandConfig: this.config.providerCommands.claude };
+        return { provider: new ClaudeProvider(), commandConfig: instance.commandConfig };
       case 'gemini':
-        return { provider: new GeminiProvider(), commandConfig: this.config.providerCommands.gemini };
+        return { provider: new GeminiProvider(), commandConfig: instance.commandConfig };
       case 'copilot':
-        return { provider: new CopilotProvider(), commandConfig: this.config.providerCommands.copilot };
+        return { provider: new CopilotProvider(), commandConfig: instance.commandConfig };
       case 'cursor':
-        return { provider: new CursorProvider(), commandConfig: this.config.providerCommands.cursor };
+        return { provider: new CursorProvider(), commandConfig: instance.commandConfig };
       case 'kiro':
         return {
-          provider: new KiroProvider(this.kiroNative),
-          commandConfig: this.config.providerCommands.kiro,
+          provider: new KiroProvider(
+            this.resolvers.getKiroNative?.(instance.id) || this.kiroNative,
+          ),
+          commandConfig: instance.commandConfig,
         };
       case 'opencode':
         return {
-          provider: new OpencodeProvider(this.opencodeNative),
-          commandConfig: this.config.providerCommands.opencode,
+          provider: new OpencodeProvider(
+            this.resolvers.getOpencodeNative?.(instance.id) || this.opencodeNative,
+          ),
+          commandConfig: instance.commandConfig,
         };
       default:
         throw new Error(`Unknown provider: '${name}'. Valid: claude, codex, gemini, copilot, cursor, kiro, auggie, opencode`);
     }
   }
 
-  getCapabilities(providerName: string): ProviderCapabilities {
-    return this.resolveProvider(providerName as ProviderName).provider.capabilities;
+  getCapabilities(providerName: string, providerInstanceId?: string): ProviderCapabilities {
+    return this.resolveProvider(
+      providerName as ProviderName,
+      providerInstanceId,
+    ).provider.capabilities;
   }
 
-  spawn(sessionId: string, providerName: string, opts: ProviderSpawnOptions): WorkerProcess {
+  spawn(
+    sessionId: string,
+    providerName: string,
+    opts: ProviderSpawnOptions,
+    providerInstanceId?: string,
+  ): WorkerProcess {
     if (this.activeCount >= this.config.maxSessions) {
       throw new Error(`Max sessions (${this.config.maxSessions}) reached`);
     }
 
-    const { provider, commandConfig } = this.resolveProvider(providerName as ProviderName);
+    const { provider, commandConfig } = this.resolveProvider(
+      providerName as ProviderName,
+      providerInstanceId,
+    );
     const resilience: SpawnResilienceConfig = {
       retries: this.config.spawnRetries,
       timeoutMs: this.config.spawnTimeoutMs,

@@ -1,7 +1,7 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SessionRegistry } from './SessionRegistry.js';
 
 describe('SessionRegistry', () => {
@@ -103,19 +103,29 @@ describe('SessionRegistry', () => {
   it('does not partially delete runtime transcripts when one path cannot be removed', () => {
     registry = new SessionRegistry(undefined, tempDir);
     const session = registry.create({ providerName: 'claude', cwd: '/repo' });
-    const writableDir = join(tempDir, 'writable');
-    const blockedDir = join(tempDir, 'blocked');
-    mkdirSync(writableDir, { recursive: true });
-    mkdirSync(blockedDir, { recursive: true });
+    const artifactDir = join(tempDir, 'artifacts');
+    mkdirSync(artifactDir, { recursive: true });
 
-    const goodTranscript = join(writableDir, `${session.id}.jsonl`);
-    const badTranscript = join(blockedDir, `${session.id}-blocked.jsonl`);
+    const goodTranscript = join(artifactDir, `${session.id}.jsonl`);
+    const badTranscript = join(artifactDir, `${session.id}-blocked.jsonl`);
     writeFileSync(goodTranscript, '{"ok":true}\n');
     writeFileSync(badTranscript, '{"blocked":true}\n');
-    chmodSync(blockedDir, 0o555);
 
     registry.setSourcePath(session.id, goodTranscript);
     registry.get(session.id)!.providerSourcePath = badTranscript;
+
+    const registryWithPrivateAccess = registry as SessionRegistry & {
+      stageTranscriptArtifact: (path: string) => unknown;
+    };
+    const originalStage = registryWithPrivateAccess.stageTranscriptArtifact.bind(registryWithPrivateAccess);
+    const stageSpy = vi.spyOn(registryWithPrivateAccess, 'stageTranscriptArtifact');
+    stageSpy.mockImplementation((path: string) => {
+      if (path === badTranscript) {
+        throw new Error('blocked');
+      }
+
+      return originalStage(path);
+    });
 
     try {
       const result = registry.deleteTranscripts(session.id);
@@ -125,7 +135,7 @@ describe('SessionRegistry', () => {
       expect(existsSync(badTranscript)).toBe(true);
       expect(registry.get(session.id)).toBeDefined();
     } finally {
-      chmodSync(blockedDir, 0o755);
+      stageSpy.mockRestore();
     }
   });
 

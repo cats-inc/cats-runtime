@@ -1,0 +1,99 @@
+version: 1
+
+# Environments describe isolated execution/login contexts.
+# Today cats-runtime supports native and WSL. Docker can fit this shape later.
+environments:
+  native:
+    kind: native
+  ubuntu:
+    kind: wsl
+    distro: Ubuntu
+  debian:
+    kind: wsl
+    distro: Debian
+
+providers:
+  claude:
+    projects_dir: ~/.claude/projects
+    default_instance: native
+    instances:
+      native:
+        environment: native
+        command: claude
+        runner: auto
+
+  codex:
+    sessions_dir: ~/.codex/sessions
+    default_instance: native
+    instances:
+      native:
+        environment: native
+        command: codex
+        runner: auto
+
+  copilot:
+    sessions_dir: ~/.copilot/session-state
+    default_instance: native
+    instances:
+      native:
+        environment: native
+        command: copilot
+        runner: auto
+
+  gemini:
+    sessions_dir: ~/.gemini/tmp
+    default_instance: native
+    instances:
+      native:
+        environment: native
+        command: gemini
+        runner: auto
+
+  auggie:
+    default_instance: native
+    instances:
+      native:
+        environment: native
+        command: auggie
+        runner: auto
+        sessions_dir: ~/.augment/sessions
+
+  cursor:
+    default_instance: ubuntu
+    instances:
+      ubuntu:
+        environment: ubuntu
+        command: cursor-agent
+        runner: auto
+        chats_dir: ~/.cursor/chats
+      debian:
+        environment: debian
+        command: cursor-agent
+        runner: auto
+        chats_dir: ~/.cursor/chats
+
+  kiro:
+    default_instance: ubuntu
+    instances:
+      ubuntu:
+        environment: ubuntu
+        command: kiro-cli
+        runner: auto
+        db_path: ~/.local/share/kiro-cli/data.sqlite3
+      debian:
+        environment: debian
+        command: kiro-cli
+        runner: auto
+        db_path: ~/.local/share/kiro-cli/data.sqlite3
+
+  opencode:
+    default_instance: native
+    instances:
+      native:
+        environment: native
+        command: opencode
+        runner: auto
+        server:
+          host: 127.0.0.1
+          port: 4097
+          startup_timeout_ms: 10000

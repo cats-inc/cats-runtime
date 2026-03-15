@@ -7,6 +7,7 @@ import { normalizeSessionOrigin } from './sessionView.js';
 export interface CreateSessionInput {
   id?: string;
   providerName: string;
+  providerInstanceId?: string;
   cwd: string;
   workspaceMode?: WorkspaceMode;
   model?: string;
@@ -16,6 +17,7 @@ export interface CreateSessionInput {
 interface DiscoveredSessionData {
   cwd: string;
   providerName: string;
+  providerInstanceId?: string;
   summary?: string;
   messageCount?: number;
   lastActivity?: string;
@@ -109,6 +111,7 @@ export class SessionRegistry {
     const session: SessionInfo = {
       id,
       providerName: input.providerName,
+      providerInstanceId: input.providerInstanceId,
       status: 'initializing',
       origin: 'runtime',
       cwd: input.cwd,
@@ -318,15 +321,19 @@ export class SessionRegistry {
     providerSessionId: string,
     data: DiscoveredSessionData,
   ): SessionInfo | null {
+    const pendingKey = discoveredKey(providerSessionId, data.providerInstanceId);
     const mergedData = this.mergeDiscoveredData(
-      this.pendingDiscovered.get(providerSessionId),
+      this.pendingDiscovered.get(pendingKey),
       data,
     );
 
     // Check if we already track this provider session
     let matched: SessionInfo | undefined;
     for (const session of this.sessions.values()) {
-      if (session.providerSessionId === providerSessionId) {
+      if (
+        session.providerSessionId === providerSessionId
+        && sameProviderInstance(session.providerInstanceId, mergedData.providerInstanceId)
+      ) {
         matched = session;
         break;
       }
@@ -344,11 +351,11 @@ export class SessionRegistry {
     if (candidates.length > 1) {
       // Multiple live runtime sessions are still waiting for their provider session ID.
       // Keep the discovered metadata in memory until one of them reports an exact ID.
-      this.pendingDiscovered.set(providerSessionId, mergedData);
+      this.pendingDiscovered.set(pendingKey, mergedData);
       return null;
     }
 
-    this.pendingDiscovered.delete(providerSessionId);
+    this.pendingDiscovered.delete(pendingKey);
 
     // New discovered session — no worker, so status is closed
     const id = randomUUID();
@@ -357,6 +364,7 @@ export class SessionRegistry {
       id,
       providerSessionId,
       providerName: mergedData.providerName,
+      providerInstanceId: mergedData.providerInstanceId,
       status: 'closed',
       origin: 'discovered',
       cwd: mergedData.cwd,
@@ -380,7 +388,9 @@ export class SessionRegistry {
   }
 
   private applyPendingDiscovered(session: SessionInfo, providerSessionId: string): void {
-    const pending = this.pendingDiscovered.get(providerSessionId);
+    const pending = this.pendingDiscovered.get(
+      discoveredKey(providerSessionId, session.providerInstanceId),
+    );
     if (!pending) return;
     this.mergeDiscoveredIntoSession(session, providerSessionId, pending, false);
   }
@@ -390,6 +400,7 @@ export class SessionRegistry {
       session.origin === 'runtime'
       && !session.providerSessionId
       && session.providerName === data.providerName
+      && sameProviderInstance(session.providerInstanceId, data.providerInstanceId)
       && session.cwd === data.cwd
       && session.status !== 'closed'
       && session.status !== 'closing'
@@ -403,6 +414,9 @@ export class SessionRegistry {
     scheduleSave = true,
   ): SessionInfo {
     session.providerSessionId = providerSessionId;
+    if (data.providerInstanceId) {
+      session.providerInstanceId = data.providerInstanceId;
+    }
 
     // Only update metadata, never overwrite status or runtime-owned cwd
     if (!session.cwd || session.origin !== 'runtime') {
@@ -424,7 +438,9 @@ export class SessionRegistry {
     if (data.messageCount != null) session.messageCount = data.messageCount;
     if (data.lastActivity) session.lastActivity = data.lastActivity;
     session.updatedAt = new Date().toISOString();
-    this.pendingDiscovered.delete(providerSessionId);
+    this.pendingDiscovered.delete(
+      discoveredKey(providerSessionId, data.providerInstanceId ?? session.providerInstanceId),
+    );
     if (scheduleSave) {
       this.scheduleSave();
     }
@@ -439,6 +455,7 @@ export class SessionRegistry {
     return {
       cwd: incoming.cwd || existing.cwd,
       providerName: incoming.providerName || existing.providerName,
+      providerInstanceId: incoming.providerInstanceId ?? existing.providerInstanceId,
       summary: incoming.summary ?? existing.summary,
       messageCount: incoming.messageCount ?? existing.messageCount,
       lastActivity: incoming.lastActivity ?? existing.lastActivity,
@@ -502,4 +519,12 @@ export class SessionRegistry {
       }
     }
   }
+}
+
+function sameProviderInstance(left?: string, right?: string): boolean {
+  return (left || 'default') === (right || 'default');
+}
+
+function discoveredKey(providerSessionId: string, providerInstanceId?: string): string {
+  return `${providerInstanceId || 'default'}:${providerSessionId}`;
 }

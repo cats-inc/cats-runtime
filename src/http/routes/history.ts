@@ -2,6 +2,12 @@ import { createReadStream, readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { Hono } from 'hono';
 import type { AppContext } from '../app.js';
+import {
+  getAuggieSessions,
+  getCursorNative,
+  getKiroNative,
+  getOpencodeNative,
+} from '../providerServices.js';
 
 export const historyRoutes = new Hono();
 
@@ -45,7 +51,10 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
     }
 
     try {
-      const messages = await ctx.cursorNative.loadHistory(session.cwd, session.providerSessionId);
+      const messages = await getCursorNative(
+        ctx,
+        session.providerInstanceId,
+      ).loadHistory(session.cwd, session.providerSessionId);
       return c.json({ messages });
     } catch (err) {
       return c.json({ error: `Failed to load Cursor history: ${err}` }, 500);
@@ -58,7 +67,10 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
     }
 
     try {
-      const messages = await ctx.kiroNative.loadHistory(session.cwd, session.providerSessionId);
+      const messages = await getKiroNative(
+        ctx,
+        session.providerInstanceId,
+      ).loadHistory(session.cwd, session.providerSessionId);
       return c.json({ messages });
     } catch (err) {
       return c.json({ error: `Failed to load Kiro history: ${err}` }, 500);
@@ -67,7 +79,7 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
 
   if (session.providerName === 'auggie') {
     try {
-      const messages = await ctx.auggieSessions.loadHistory({
+      const messages = await getAuggieSessions(ctx, session.providerInstanceId).loadHistory({
         providerSessionId: session.providerSessionId,
         sourcePath: session.providerSourcePath || session.sourcePath,
       });
@@ -83,7 +95,10 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
     }
 
     try {
-      const messages = await ctx.opencodeNative.loadHistory(session.cwd, session.providerSessionId);
+      const messages = await getOpencodeNative(
+        ctx,
+        session.providerInstanceId,
+      ).loadHistory(session.cwd, session.providerSessionId);
       return c.json({ messages });
     } catch (err) {
       return c.json({ error: `Failed to load OpenCode history: ${err}` }, 500);

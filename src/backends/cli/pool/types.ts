@@ -24,6 +24,7 @@ export interface SessionControls {
 export interface SessionInfo {
   id: string;
   providerName: string;
+  providerInstanceId?: string;
   providerSessionId?: string;
   status: SessionStatus;
   origin: SessionOrigin;

@@ -35,6 +35,10 @@ export interface AppContext {
   auggieSessions: AuggieSessionService;
   opencodeNative: OpencodeNativeSessionService;
   wslDiscoveryStatus?: WslDiscoveryStatusStore;
+  resolveCursorNative?: (instanceId?: string) => CursorNativeSessionService;
+  resolveKiroNative?: (instanceId?: string) => KiroNativeSessionService;
+  resolveAuggieSessions?: (instanceId?: string) => AuggieSessionService;
+  resolveOpencodeNative?: (instanceId?: string) => OpencodeNativeSessionService;
 }
 
 export function createRuntimeApp(ctx: AppContext) {

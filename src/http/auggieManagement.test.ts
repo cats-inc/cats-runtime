@@ -283,6 +283,7 @@ describe('Auggie native session management', () => {
         cwd: 'C:/repo',
         resumeSessionId: 'auggie-123',
       }),
+      undefined,
     );
     expect(registry.get(session!.id)?.status).toBe('initializing');
   });

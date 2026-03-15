@@ -1,7 +1,6 @@
 import { spawn } from 'node:child_process';
 import type {
   CliRuntimeConfig,
-  ProviderRuntimeConfig,
   RuntimeMode,
   WslDiscoveryPolicy,
 } from '../config.js';
@@ -43,6 +42,7 @@ export type WslDistroInspector = (distro: string) => Promise<boolean>;
 
 export interface WslDiscoveryProviderStatus {
   provider: WslDiscoveryProviderName;
+  instanceId: string;
   runtimeMode: RuntimeMode;
   distro?: string;
   state: WslDiscoveryProviderState;
@@ -61,7 +61,7 @@ export interface WslDiscoveryStatusSnapshot {
     state: WslDiscoverySummaryState;
     message: string;
   };
-  providers: Record<WslDiscoveryProviderName, WslDiscoveryProviderStatus>;
+  providers: Record<string, WslDiscoveryProviderStatus>;
 }
 
 export interface DiscoveryStatusPayload {
@@ -70,9 +70,10 @@ export interface DiscoveryStatusPayload {
 
 export interface RunWslAwareNativeDiscoveryInput {
   provider: WslDiscoveryProviderName;
+  providerInstanceId?: string;
   listAllSessions: () => Promise<NativeSessionSummary[]>;
   registry: SessionRegistry;
-  runtime: ProviderRuntimeConfig;
+  runtime: CliRuntimeConfig['cursorRuntime'];
   policy: WslDiscoveryPolicy;
   statusStore: WslDiscoveryStatusStore;
   inspector?: WslDistroInspector;
@@ -87,25 +88,47 @@ export interface WslAwareNativeDiscoveryResult {
 export class WslDiscoveryStatusStore {
   private readonly policy: WslDiscoveryPolicy;
   private readonly nativeDiscoveryIntervalMs: number;
-  private readonly providers: Record<WslDiscoveryProviderName, WslDiscoveryProviderStatus>;
+  private readonly providers: Record<string, WslDiscoveryProviderStatus>;
+  private readonly defaultInstances: Record<WslDiscoveryProviderName, string>;
 
   constructor(config: Pick<
     CliRuntimeConfig,
-    'cursorRuntime' | 'kiroRuntime' | 'nativeDiscoveryIntervalMs' | 'wslDiscoveryPolicy'
+    | 'cursorRuntime'
+    | 'kiroRuntime'
+    | 'nativeDiscoveryIntervalMs'
+    | 'wslDiscoveryPolicy'
+    | 'providerDefaultInstances'
+    | 'providerInstances'
   >) {
     this.policy = config.wslDiscoveryPolicy ?? 'always';
     this.nativeDiscoveryIntervalMs = config.nativeDiscoveryIntervalMs;
-    this.providers = {
-      cursor: this.createInitialProviderStatus('cursor', config.cursorRuntime),
-      kiro: this.createInitialProviderStatus('kiro', config.kiroRuntime),
+    this.defaultInstances = {
+      cursor: config.providerDefaultInstances?.cursor || 'default',
+      kiro: config.providerDefaultInstances?.kiro || 'default',
     };
+    this.providers = {};
+
+    for (const instance of getConfiguredProviderRuntimes(config, 'cursor')) {
+      this.providers[this.providerKey('cursor', instance.instanceId)] = this.createInitialProviderStatus(
+        'cursor',
+        instance.instanceId,
+        instance.runtime,
+      );
+    }
+
+    for (const instance of getConfiguredProviderRuntimes(config, 'kiro')) {
+      this.providers[this.providerKey('kiro', instance.instanceId)] = this.createInitialProviderStatus(
+        'kiro',
+        instance.instanceId,
+        instance.runtime,
+      );
+    }
   }
 
   snapshot(): WslDiscoveryStatusSnapshot {
-    const providers = {
-      cursor: { ...this.providers.cursor },
-      kiro: { ...this.providers.kiro },
-    };
+    const providers = Object.fromEntries(
+      Object.entries(this.providers).map(([key, value]) => [key, { ...value }]),
+    );
 
     return {
       backgroundEnabled: this.nativeDiscoveryIntervalMs > 0,
@@ -118,9 +141,10 @@ export class WslDiscoveryStatusStore {
 
   markScanStart(
     provider: WslDiscoveryProviderName,
+    providerInstanceId: string | undefined,
     input: { message: string; wslRunning?: boolean },
   ): void {
-    this.updateProvider(provider, {
+    this.updateProvider(provider, providerInstanceId, {
       state: 'running',
       message: input.message,
       wslRunning: input.wslRunning,
@@ -130,10 +154,11 @@ export class WslDiscoveryStatusStore {
 
   markScanSuccess(
     provider: WslDiscoveryProviderName,
+    providerInstanceId: string | undefined,
     input: { importedCount: number; message: string; wslRunning?: boolean },
   ): void {
     const timestamp = nowIso();
-    this.updateProvider(provider, {
+    this.updateProvider(provider, providerInstanceId, {
       state: 'active',
       message: input.message,
       importedCount: input.importedCount,
@@ -145,9 +170,10 @@ export class WslDiscoveryStatusStore {
 
   markSkipped(
     provider: WslDiscoveryProviderName,
+    providerInstanceId: string | undefined,
     input: { message: string; wslRunning?: boolean },
   ): void {
-    this.updateProvider(provider, {
+    this.updateProvider(provider, providerInstanceId, {
       state: 'skipped',
       message: input.message,
       importedCount: 0,
@@ -156,8 +182,12 @@ export class WslDiscoveryStatusStore {
     });
   }
 
-  markDisabled(provider: WslDiscoveryProviderName, message: string): void {
-    this.updateProvider(provider, {
+  markDisabled(
+    provider: WslDiscoveryProviderName,
+    providerInstanceId: string | undefined,
+    message: string,
+  ): void {
+    this.updateProvider(provider, providerInstanceId, {
       state: 'disabled',
       message,
       importedCount: 0,
@@ -165,8 +195,12 @@ export class WslDiscoveryStatusStore {
     });
   }
 
-  markFailure(provider: WslDiscoveryProviderName, error: unknown): void {
-    this.updateProvider(provider, {
+  markFailure(
+    provider: WslDiscoveryProviderName,
+    providerInstanceId: string | undefined,
+    error: unknown,
+  ): void {
+    this.updateProvider(provider, providerInstanceId, {
       state: 'failed',
       message: errorMessage(error),
       importedCount: 0,
@@ -176,11 +210,13 @@ export class WslDiscoveryStatusStore {
 
   private createInitialProviderStatus(
     provider: WslDiscoveryProviderName,
-    runtime: ProviderRuntimeConfig,
+    instanceId: string,
+    runtime: CliRuntimeConfig['cursorRuntime'],
   ): WslDiscoveryProviderStatus {
     if (runtime.mode !== 'wsl') {
       return {
         provider,
+        instanceId,
         runtimeMode: runtime.mode,
         state: 'not_applicable',
         message: `${providerLabel(provider)} uses ${runtime.mode} runtime`,
@@ -190,6 +226,7 @@ export class WslDiscoveryStatusStore {
     if (this.nativeDiscoveryIntervalMs <= 0) {
       return {
         provider,
+        instanceId,
         runtimeMode: runtime.mode,
         distro: runtime.distro || 'Ubuntu',
         state: 'disabled',
@@ -201,6 +238,7 @@ export class WslDiscoveryStatusStore {
     if (this.policy === 'manual_only') {
       return {
         provider,
+        instanceId,
         runtimeMode: runtime.mode,
         distro: runtime.distro || 'Ubuntu',
         state: 'disabled',
@@ -211,6 +249,7 @@ export class WslDiscoveryStatusStore {
 
     return {
       provider,
+      instanceId,
       runtimeMode: runtime.mode,
       distro: runtime.distro || 'Ubuntu',
       state: 'idle',
@@ -222,12 +261,24 @@ export class WslDiscoveryStatusStore {
 
   private updateProvider(
     provider: WslDiscoveryProviderName,
+    providerInstanceId: string | undefined,
     next: Partial<WslDiscoveryProviderStatus>,
   ): void {
-    this.providers[provider] = {
-      ...this.providers[provider],
+    const key = this.providerKey(provider, providerInstanceId);
+    this.providers[key] = {
+      ...this.providers[key],
       ...next,
     };
+  }
+
+  private providerKey(
+    provider: WslDiscoveryProviderName,
+    providerInstanceId?: string,
+  ): string {
+    const instanceId = providerInstanceId || this.defaultInstances[provider];
+    return instanceId === this.defaultInstances[provider]
+      ? provider
+      : `${provider}@${instanceId}`;
   }
 }
 
@@ -235,7 +286,12 @@ export async function runWslAwareNativeDiscovery(
   input: RunWslAwareNativeDiscoveryInput,
 ): Promise<WslAwareNativeDiscoveryResult> {
   if (input.runtime.mode !== 'wsl') {
-    const result = syncNativeSessions(input.registry, input.provider, await input.listAllSessions());
+    const result = syncNativeSessions(
+      input.registry,
+      input.provider,
+      await input.listAllSessions(),
+      input.providerInstanceId,
+    );
     return {
       outcome: 'scanned',
       newCount: result.newCount,
@@ -246,6 +302,7 @@ export async function runWslAwareNativeDiscovery(
   if (input.policy === 'manual_only') {
     input.statusStore.markDisabled(
       input.provider,
+      input.providerInstanceId,
       'Background WSL discovery is disabled by policy',
     );
     return {
@@ -263,7 +320,7 @@ export async function runWslAwareNativeDiscovery(
     if (input.policy === 'if_running') {
       wslRunning = await (input.inspector || isWslDistroRunning)(distro);
       if (!wslRunning) {
-        input.statusStore.markSkipped(input.provider, {
+        input.statusStore.markSkipped(input.provider, input.providerInstanceId, {
           wslRunning,
           message: `Skipped background scan because WSL distro '${distro}' is not running`,
         });
@@ -275,7 +332,7 @@ export async function runWslAwareNativeDiscovery(
       }
     }
 
-    input.statusStore.markScanStart(input.provider, {
+    input.statusStore.markScanStart(input.provider, input.providerInstanceId, {
       wslRunning,
       message: `Scanning ${providerLabel(input.provider)} sessions in WSL distro '${distro}'`,
     });
@@ -284,9 +341,10 @@ export async function runWslAwareNativeDiscovery(
       input.registry,
       input.provider,
       await input.listAllSessions(),
+      input.providerInstanceId,
     );
 
-    input.statusStore.markScanSuccess(input.provider, {
+    input.statusStore.markScanSuccess(input.provider, input.providerInstanceId, {
       importedCount: result.newCount,
       wslRunning,
       message: result.newCount > 0
@@ -300,7 +358,7 @@ export async function runWslAwareNativeDiscovery(
       syncedCount: result.syncedCount,
     };
   } catch (error) {
-    input.statusStore.markFailure(input.provider, error);
+    input.statusStore.markFailure(input.provider, input.providerInstanceId, error);
     throw error;
   }
 }
@@ -329,12 +387,41 @@ export async function isWslDistroRunning(
 export function createDiscoveryStatusPayload(
   config: Pick<
     CliRuntimeConfig,
-    'cursorRuntime' | 'kiroRuntime' | 'nativeDiscoveryIntervalMs' | 'wslDiscoveryPolicy'
+    | 'cursorRuntime'
+    | 'kiroRuntime'
+    | 'nativeDiscoveryIntervalMs'
+    | 'wslDiscoveryPolicy'
+    | 'providerDefaultInstances'
+    | 'providerInstances'
   >,
 ): DiscoveryStatusPayload {
   return {
     wsl: new WslDiscoveryStatusStore(config).snapshot(),
   };
+}
+
+function getConfiguredProviderRuntimes(
+  config: Pick<
+    CliRuntimeConfig,
+    | 'cursorRuntime'
+    | 'kiroRuntime'
+    | 'providerDefaultInstances'
+    | 'providerInstances'
+  >,
+  provider: WslDiscoveryProviderName,
+): Array<{ instanceId: string; runtime: CliRuntimeConfig['cursorRuntime'] }> {
+  const configured = config.providerInstances?.[provider];
+  if (configured && Object.keys(configured).length > 0) {
+    return Object.values(configured).map((instance) => ({
+      instanceId: instance.id,
+      runtime: instance.commandConfig.runtime,
+    }));
+  }
+
+  return [{
+    instanceId: config.providerDefaultInstances?.[provider] || 'default',
+    runtime: provider === 'cursor' ? config.cursorRuntime : config.kiroRuntime,
+  }];
 }
 
 async function defaultCommandRunner(
@@ -369,7 +456,7 @@ async function defaultCommandRunner(
 function summarizeProviders(
   policy: WslDiscoveryPolicy,
   nativeDiscoveryIntervalMs: number,
-  providers: Record<WslDiscoveryProviderName, WslDiscoveryProviderStatus>,
+  providers: Record<string, WslDiscoveryProviderStatus>,
 ): { state: WslDiscoverySummaryState; message: string } {
   const relevant = Object.values(providers).filter((provider) => provider.runtimeMode === 'wsl');
 

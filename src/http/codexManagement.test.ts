@@ -297,7 +297,7 @@ describe('codex management', () => {
       model: undefined,
       resumeSessionId: 'thread-456',
       permissionMode: 'skip',
-    });
+    }, undefined);
   });
 
   it('forks a runtime-owned Codex session through the generic fork route', async () => {
@@ -329,6 +329,7 @@ describe('codex management', () => {
         forkSession: true,
         permissionMode: 'skip',
       },
+      undefined,
     );
   });
 });

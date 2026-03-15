@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../app.js';
 import { toSessionViews } from '../../backends/cli/pool/sessionView.js';
+import { getCursorNative } from '../providerServices.js';
 
 export const cursorRoutes = new Hono();
 
@@ -8,11 +9,12 @@ export const cursorRoutes = new Hono();
 cursorRoutes.get('/cursor/sessions', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const cwd = c.req.query('cwd');
+  const instance = c.req.query('instance') || undefined;
 
   try {
     const sessions = cwd
-      ? await ctx.cursorNative.listSessions(cwd)
-      : await ctx.cursorNative.listAllSessions();
+      ? await getCursorNative(ctx, instance).listSessions(cwd)
+      : await getCursorNative(ctx, instance).listAllSessions();
     return c.json({ sessions, count: sessions.length });
   } catch (err) {
     return c.json({ error: `Failed to inspect Cursor sessions: ${err}` }, 500);
@@ -24,21 +26,25 @@ cursorRoutes.post('/cursor/sessions/discover', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const body = await c.req.json<{
     cwd?: string;
+    instance?: string;
     group?: string;
     startIfNeeded?: boolean;
   }>().catch(() => ({})) as {
     cwd?: string;
+    instance?: string;
     group?: string;
     startIfNeeded?: boolean;
   };
 
   try {
+    const native = getCursorNative(ctx, body.instance);
     const nativeSessions = body.cwd
-      ? await ctx.cursorNative.listSessions(body.cwd, { startIfNeeded: body.startIfNeeded })
-      : await ctx.cursorNative.listAllSessions({ startIfNeeded: body.startIfNeeded });
+      ? await native.listSessions(body.cwd, { startIfNeeded: body.startIfNeeded })
+      : await native.listAllSessions({ startIfNeeded: body.startIfNeeded });
     const sessions = nativeSessions
       .map((session) => ctx.registry.upsertDiscovered(session.providerSessionId, {
         providerName: 'cursor',
+        providerInstanceId: body.instance,
         cwd: session.cwd,
         group: body.group,
         summary: session.summary,

@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../app.js';
+import { resolveProviderInstance } from '../../backends/cli/config.js';
 import { toSessionViews } from '../../backends/cli/pool/sessionView.js';
+import { getKiroNative } from '../providerServices.js';
 
 export const kiroRoutes = new Hono();
 
@@ -23,10 +25,13 @@ function getKiroModelsForRuntime(mode: 'native' | 'wsl'): string[] {
 /** GET /kiro/models — return the Kiro model options for the configured runtime */
 kiroRoutes.get('/kiro/models', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
+  const instance = c.req.query('instance') || undefined;
+  const providerInstance = resolveProviderInstance(ctx.config, 'kiro', instance);
   return c.json({
-    runtime: ctx.config.kiroRuntime,
+    runtime: providerInstance.commandConfig.runtime,
+    instance: providerInstance.id,
     source: 'static',
-    models: getKiroModelsForRuntime(ctx.config.kiroRuntime.mode),
+    models: getKiroModelsForRuntime(providerInstance.commandConfig.runtime.mode),
   });
 });
 
@@ -34,11 +39,12 @@ kiroRoutes.get('/kiro/models', async (c) => {
 kiroRoutes.get('/kiro/sessions', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const cwd = c.req.query('cwd');
+  const instance = c.req.query('instance') || undefined;
 
   try {
     const sessions = cwd
-      ? await ctx.kiroNative.listSessions(cwd)
-      : await ctx.kiroNative.listAllSessions();
+      ? await getKiroNative(ctx, instance).listSessions(cwd)
+      : await getKiroNative(ctx, instance).listAllSessions();
     return c.json({ sessions, count: sessions.length });
   } catch (err) {
     return c.json({ error: `Failed to inspect Kiro sessions: ${err}` }, 500);
@@ -50,21 +56,25 @@ kiroRoutes.post('/kiro/sessions/discover', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const body = await c.req.json<{
     cwd?: string;
+    instance?: string;
     group?: string;
     startIfNeeded?: boolean;
   }>().catch(() => ({})) as {
     cwd?: string;
+    instance?: string;
     group?: string;
     startIfNeeded?: boolean;
   };
 
   try {
+    const native = getKiroNative(ctx, body.instance);
     const nativeSessions = body.cwd
-      ? await ctx.kiroNative.listSessions(body.cwd, { startIfNeeded: body.startIfNeeded })
-      : await ctx.kiroNative.listAllSessions({ startIfNeeded: body.startIfNeeded });
+      ? await native.listSessions(body.cwd, { startIfNeeded: body.startIfNeeded })
+      : await native.listAllSessions({ startIfNeeded: body.startIfNeeded });
     const sessions = nativeSessions
       .map((session) => ctx.registry.upsertDiscovered(session.providerSessionId, {
         providerName: 'kiro',
+        providerInstanceId: body.instance,
         cwd: session.cwd,
         group: body.group,
         summary: session.summary,

@@ -159,6 +159,7 @@ describe('Kiro native session management', () => {
         cwd: 'C:/repo',
         model: 'claude-sonnet-4.5',
       }),
+      'default',
     );
   });
 
@@ -255,10 +256,12 @@ describe('Kiro native session management', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json() as {
+      instance: string;
       runtime: { mode: string; distro?: string };
       source: string;
       models: string[];
     };
+    expect(body.instance).toBe('default');
     expect(body.runtime).toEqual({
       mode: 'wsl',
       distro: 'Ubuntu',
@@ -297,6 +300,7 @@ describe('Kiro native session management', () => {
         cwd: 'C:/repo',
         resumeSessionId: 'kiro-123',
       }),
+      undefined,
     );
     expect(registry.get(session!.id)?.status).toBe('ready');
   });

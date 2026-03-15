@@ -127,6 +127,7 @@ describe('runtime server', () => {
       const response = await runtime.app.request('/kiro/models');
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({
+        instance: 'default',
         runtime: { mode: 'wsl' },
         source: 'static',
         models: ['claude-sonnet-4.5', 'deepseek-3.2', 'minimax-m2.1'],

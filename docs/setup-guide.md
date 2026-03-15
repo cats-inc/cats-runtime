@@ -13,30 +13,70 @@
 ```powershell
 cd cats-runtime
 copy .env.example .env
+copy config\providers.yaml.example config\providers.yaml
 npm install
 npm test
 ```
 
 ## Environment Variables
 
-Key variables in `.env`:
+Keep `.env` for runtime-wide values and secrets:
 
 - `CATS_RUNTIME_HOST=127.0.0.1`
 - `CATS_RUNTIME_PORT=3110`
 - `CATS_RUNTIME_API_KEY=`
 - `CATS_RUNTIME_DATA_DIR=...`
 - `CATS_RUNTIME_SESSION_BASE_DIR=...`
+- `CATS_RUNTIME_CONFIG_PATH=config/providers.yaml`
 - `CATS_RUNTIME_MAX_SESSIONS=10`
 - `CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS=5000`
 - `CATS_RUNTIME_WSL_DISCOVERY_POLICY=always`
-- `AUGGIE_PATH=auggie`
-- `COPILOT_PATH=copilot`
-- `CURSOR_RUNTIME=wsl`
-- `KIRO_RUNTIME_DISTRO=Ubuntu`
-- `CLAUDE_RUNNER=auto`
-- `CLAUDE_PROJECTS_DIR=...`
-- `CODEX_SESSIONS_DIR=...`
-- `OPENCODE_SERVER_PORT=4097`
+- `CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS=15000`
+- `CATS_RUNTIME_SPAWN_RETRIES=1`
+- `CATS_RUNTIME_SPAWN_TIMEOUT_MS=30000`
+- `AUGGIE_MAX_TURNS=50`
+- `PWSH_PATH=...`
+
+Legacy provider-specific env vars still work, but new installs should prefer
+`config/providers.yaml`.
+
+## Provider Instances (`config/providers.yaml`)
+
+`config/providers.yaml` defines provider topology:
+
+- `environments`: named execution environments such as `native` or a WSL distro
+- `providers.<name>.default_instance`: instance used when the caller omits `instance`
+- `providers.<name>.instances.<id>`: command, runner, runtime, and provider-local storage
+
+Minimal example:
+
+```yaml
+version: 1
+environments:
+  native:
+    kind: native
+  ubuntu:
+    kind: wsl
+    distro: Ubuntu
+providers:
+  cursor:
+    default_instance: ubuntu
+    instances:
+      ubuntu:
+        environment: ubuntu
+        command: cursor-agent
+        runner: auto
+        chats_dir: ~/.cursor/chats
+      native:
+        environment: native
+        command: cursor-agent
+        runner: auto
+        chats_dir: ~/.cursor/chats
+```
+
+This lets one provider expose multiple independently logged-in environments,
+such as several WSL distros on one Windows host. Docker is not wired yet, but
+the environment/instance model is intended to extend in that direction.
 
 ## Running the Project
 
@@ -180,6 +220,10 @@ Available values:
 - `if_running`: scan only when the configured WSL distro is already running
 - `manual_only`: do not run background WSL discovery for Cursor/Kiro
 
+If you define multiple WSL-backed provider instances, `GET /discovery/status`
+will report them separately as `cursor@ubuntu`, `cursor@debian`, `kiro@ubuntu`,
+and so on.
+
 ---
 
-*Last updated: 2026-03-13*
+*Last updated: 2026-03-15*

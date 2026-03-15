@@ -3,6 +3,11 @@ import type { Server } from 'node:http';
 import { join } from 'node:path';
 import { createAdaptorServer } from '@hono/node-server';
 import { AuggieSessionService } from './backends/cli/auggie/AuggieSessionService.js';
+import {
+  getProviderDefaultInstanceId,
+  listProviderInstances,
+  resolveProviderInstance,
+} from './backends/cli/config.js';
 import { loadConfig } from './core/config.js';
 import type { RuntimeConfig } from './core/types.js';
 import { AuggieSessionScanner } from './backends/cli/discovery/AuggieSessionScanner.js';
@@ -55,6 +60,13 @@ function startWatcher(name: string, watcher: FileWatcher): void {
   });
 }
 
+function getDefaultInstanceId(
+  config: RuntimeConfig,
+  provider: Parameters<typeof getProviderDefaultInstanceId>[1],
+): string {
+  return getProviderDefaultInstanceId(config, provider);
+}
+
 function createDiscoveryController(
   ctx: AppContext,
   options: RuntimeServerOptions = {},
@@ -90,28 +102,30 @@ function createDiscoveryController(
     ctx.registry,
   );
 
-  let cursorTimer: ReturnType<typeof setInterval> | null = null;
-  let kiroTimer: ReturnType<typeof setInterval> | null = null;
-  let opencodeTimer: ReturnType<typeof setInterval> | null = null;
+  const timers: Array<ReturnType<typeof setInterval>> = [];
   let started = false;
   const wslDistroInspector = options.wslDistroInspector || isWslDistroRunning;
   const wslDiscoveryPolicy = ctx.config.wslDiscoveryPolicy ?? 'always';
 
   const shouldSkipBackgroundWslDiscovery = (
     provider: 'cursor' | 'kiro' | 'opencode',
+    instanceId: string,
   ): boolean => {
     if (provider === 'opencode' || wslDiscoveryPolicy !== 'manual_only') {
       return false;
     }
 
-    const runtime = provider === 'cursor'
-      ? ctx.config.cursorRuntime
-      : ctx.config.kiroRuntime;
+    const runtime = resolveProviderInstance(
+      ctx.config,
+      provider,
+      instanceId,
+    ).commandConfig.runtime;
     return runtime.mode === 'wsl';
   };
 
   const startNativeDiscovery = (
     name: 'cursor' | 'kiro' | 'opencode',
+    instanceId: string,
     listAllSessions: () => Promise<Array<{
       providerSessionId: string;
       cwd: string;
@@ -127,6 +141,9 @@ function createDiscoveryController(
       : name === 'kiro'
         ? 'Kiro'
         : 'OpenCode';
+    const discoveryLabel = instanceId === getDefaultInstanceId(ctx.config, name)
+      ? name
+      : `${name}@${instanceId}`;
 
     const scan = async (): Promise<void> => {
       if (running) return;
@@ -134,10 +151,15 @@ function createDiscoveryController(
 
       try {
         if (name === 'cursor' || name === 'kiro') {
-          const runtime = name === 'cursor' ? ctx.config.cursorRuntime : ctx.config.kiroRuntime;
+          const runtime = resolveProviderInstance(
+            ctx.config,
+            name,
+            instanceId,
+          ).commandConfig.runtime;
           if (runtime.mode === 'wsl') {
             const result = await runWslAwareNativeDiscovery({
               provider: name,
+              providerInstanceId: instanceId,
               listAllSessions,
               registry: ctx.registry,
               runtime,
@@ -146,19 +168,31 @@ function createDiscoveryController(
               inspector: wslDistroInspector,
             });
             if (result.outcome === 'scanned' && result.newCount > 0) {
-              console.log(`[discovery:${name}] Imported ${result.newCount} native ${label} session(s)`);
+              console.log(
+                `[discovery:${discoveryLabel}] Imported ${result.newCount} native ${label} session(s)`,
+              );
             }
             return;
           }
         }
 
         const sessions = await listAllSessions();
-        const { newCount } = syncNativeSessions(ctx.registry, name, sessions);
+        const { newCount } = syncNativeSessions(
+          ctx.registry,
+          name,
+          sessions,
+          instanceId,
+        );
         if (newCount > 0) {
-          console.log(`[discovery:${name}] Imported ${newCount} native ${label} session(s)`);
+          console.log(
+            `[discovery:${discoveryLabel}] Imported ${newCount} native ${label} session(s)`,
+          );
         }
       } catch (error) {
-        console.warn(`[discovery:${name}] Native scan failed:`, (error as Error).message);
+        console.warn(
+          `[discovery:${discoveryLabel}] Native scan failed:`,
+          (error as Error).message,
+        );
       } finally {
         running = false;
       }
@@ -168,7 +202,7 @@ function createDiscoveryController(
       return null;
     }
 
-    if (shouldSkipBackgroundWslDiscovery(name)) {
+    if (shouldSkipBackgroundWslDiscovery(name, instanceId)) {
       return null;
     }
 
@@ -190,12 +224,32 @@ function createDiscoveryController(
       startWatcher('copilot', copilotWatcher);
       startWatcher('gemini', geminiWatcher);
 
-      cursorTimer = startNativeDiscovery('cursor', () => ctx.cursorNative.listAllSessions());
-      kiroTimer = startNativeDiscovery('kiro', () => ctx.kiroNative.listAllSessions());
-      opencodeTimer = startNativeDiscovery(
-        'opencode',
-        () => ctx.opencodeNative.listAllSessions({ startIfNeeded: false }),
-      );
+      for (const instance of listProviderInstances(ctx.config, 'cursor')) {
+        const timer = startNativeDiscovery(
+          'cursor',
+          instance.id,
+          () => ctx.resolveCursorNative!(instance.id).listAllSessions(),
+        );
+        if (timer) timers.push(timer);
+      }
+
+      for (const instance of listProviderInstances(ctx.config, 'kiro')) {
+        const timer = startNativeDiscovery(
+          'kiro',
+          instance.id,
+          () => ctx.resolveKiroNative!(instance.id).listAllSessions(),
+        );
+        if (timer) timers.push(timer);
+      }
+
+      for (const instance of listProviderInstances(ctx.config, 'opencode')) {
+        const timer = startNativeDiscovery(
+          'opencode',
+          instance.id,
+          () => ctx.resolveOpencodeNative!(instance.id).listAllSessions({ startIfNeeded: false }),
+        );
+        if (timer) timers.push(timer);
+      }
     },
     stop() {
       if (!started) return;
@@ -205,12 +259,9 @@ function createDiscoveryController(
       codexWatcher.stop();
       copilotWatcher.stop();
       geminiWatcher.stop();
-      if (cursorTimer) clearInterval(cursorTimer);
-      if (kiroTimer) clearInterval(kiroTimer);
-      if (opencodeTimer) clearInterval(opencodeTimer);
-      cursorTimer = null;
-      kiroTimer = null;
-      opencodeTimer = null;
+      while (timers.length > 0) {
+        clearInterval(timers.pop()!);
+      }
     },
   };
 }
@@ -221,26 +272,94 @@ export function createRuntimeServer(
 ): RuntimeServer {
   const dataDir = config.dataDir || join(config.sessionBaseDir, '..', 'data');
   const registry = new SessionRegistry(dataDir, config.sessionBaseDir);
-  const auggieSessions = new AuggieSessionService(config.auggieSessionsDir);
   const wslDiscoveryStatus = new WslDiscoveryStatusStore(config);
-  const cursorNative = new CursorNativeSessionService({
-    command: config.cursorPath,
-    chatsDir: config.cursorChatsDir,
-    runtime: createRuntimeAdapter(config.cursorRuntime),
-  });
-  const kiroNative = new KiroNativeSessionService({
-    command: config.kiroPath,
-    dbPath: config.kiroDbPath,
-    runtime: createRuntimeAdapter(config.kiroRuntime),
-  });
-  const opencodeNative = new OpencodeNativeSessionService({
-    command: config.opencodePath,
-    commandConfig: config.providerCommands.opencode,
-    hostname: config.opencodeServerHost,
-    port: config.opencodeServerPort,
-    startupTimeoutMs: config.opencodeServerStartupTimeoutMs,
-  });
-  const pool = new WorkerPool(config, registry, kiroNative, auggieSessions, opencodeNative);
+  const auggieSessionsByInstance = new Map(
+    listProviderInstances(config, 'auggie').map((instance) => [
+      instance.id,
+      new AuggieSessionService(instance.auggieSessionsDir || config.auggieSessionsDir),
+    ]),
+  );
+  const cursorNativeByInstance = new Map(
+    listProviderInstances(config, 'cursor').map((instance) => [
+      instance.id,
+      new CursorNativeSessionService({
+        command: instance.commandConfig.path,
+        chatsDir: instance.cursorChatsDir || config.cursorChatsDir,
+        runtime: createRuntimeAdapter(instance.commandConfig.runtime),
+      }),
+    ]),
+  );
+  const kiroNativeByInstance = new Map(
+    listProviderInstances(config, 'kiro').map((instance) => [
+      instance.id,
+      new KiroNativeSessionService({
+        command: instance.commandConfig.path,
+        dbPath: instance.kiroDbPath || config.kiroDbPath,
+        runtime: createRuntimeAdapter(instance.commandConfig.runtime),
+      }),
+    ]),
+  );
+  const opencodeNativeByInstance = new Map(
+    listProviderInstances(config, 'opencode').map((instance) => [
+      instance.id,
+      new OpencodeNativeSessionService({
+        command: instance.commandConfig.path,
+        commandConfig: instance.commandConfig,
+        hostname: instance.opencodeServerHost || config.opencodeServerHost,
+        port: instance.opencodeServerPort || config.opencodeServerPort,
+        startupTimeoutMs: instance.opencodeServerStartupTimeoutMs
+          || config.opencodeServerStartupTimeoutMs,
+      }),
+    ]),
+  );
+
+  const resolveAuggieSessions = (instanceId?: string): AuggieSessionService =>
+    auggieSessionsByInstance.get(resolveProviderInstance(config, 'auggie', instanceId).id)
+    || auggieSessionsByInstance.values().next().value
+    || new AuggieSessionService(config.auggieSessionsDir);
+  const resolveCursorNative = (instanceId?: string): CursorNativeSessionService =>
+    cursorNativeByInstance.get(resolveProviderInstance(config, 'cursor', instanceId).id)
+    || cursorNativeByInstance.values().next().value
+    || new CursorNativeSessionService({
+      command: config.cursorPath,
+      chatsDir: config.cursorChatsDir,
+      runtime: createRuntimeAdapter(config.cursorRuntime),
+    });
+  const resolveKiroNative = (instanceId?: string): KiroNativeSessionService =>
+    kiroNativeByInstance.get(resolveProviderInstance(config, 'kiro', instanceId).id)
+    || kiroNativeByInstance.values().next().value
+    || new KiroNativeSessionService({
+      command: config.kiroPath,
+      dbPath: config.kiroDbPath,
+      runtime: createRuntimeAdapter(config.kiroRuntime),
+    });
+  const resolveOpencodeNative = (instanceId?: string): OpencodeNativeSessionService =>
+    opencodeNativeByInstance.get(resolveProviderInstance(config, 'opencode', instanceId).id)
+    || opencodeNativeByInstance.values().next().value
+    || new OpencodeNativeSessionService({
+      command: config.opencodePath,
+      commandConfig: config.providerCommands.opencode,
+      hostname: config.opencodeServerHost,
+      port: config.opencodeServerPort,
+      startupTimeoutMs: config.opencodeServerStartupTimeoutMs,
+    });
+
+  const auggieSessions = resolveAuggieSessions(getDefaultInstanceId(config, 'auggie'));
+  const cursorNative = resolveCursorNative(getDefaultInstanceId(config, 'cursor'));
+  const kiroNative = resolveKiroNative(getDefaultInstanceId(config, 'kiro'));
+  const opencodeNative = resolveOpencodeNative(getDefaultInstanceId(config, 'opencode'));
+  const pool = new WorkerPool(
+    config,
+    registry,
+    kiroNative,
+    auggieSessions,
+    opencodeNative,
+    {
+      getAuggieSessions: resolveAuggieSessions,
+      getKiroNative: resolveKiroNative,
+      getOpencodeNative: resolveOpencodeNative,
+    },
+  );
   const context: AppContext = {
     config,
     registry,
@@ -250,6 +369,10 @@ export function createRuntimeServer(
     auggieSessions,
     opencodeNative,
     wslDiscoveryStatus,
+    resolveCursorNative,
+    resolveKiroNative,
+    resolveAuggieSessions,
+    resolveOpencodeNative,
   };
   const app = createRuntimeApp(context);
   const server = createAdaptorServer({ fetch: app.fetch }) as Server;
@@ -282,7 +405,9 @@ export function createRuntimeServer(
       discovery.stop();
       pool.killAll();
       registry.flush();
-      await opencodeNative.close();
+      for (const service of new Set(opencodeNativeByInstance.values())) {
+        await service.close();
+      }
 
       if (!server.listening) {
         return;

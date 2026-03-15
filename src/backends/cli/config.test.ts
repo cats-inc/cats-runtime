@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import {
   defaultAuggieMaxTurns,
   defaultAuggieSessionsDir,
@@ -15,7 +17,9 @@ import {
   defaultSpawnRetries,
   defaultSpawnTimeoutMs,
   defaultWslDiscoveryPolicy,
+  listProviderInstances,
   loadConfig,
+  resolveProviderInstance,
 } from './config.js';
 
 describe('config platform defaults', () => {
@@ -253,6 +257,122 @@ describe('config platform defaults', () => {
           process.env[key] = value;
         }
       }
+    }
+  });
+
+  it('loads provider instances from providers.yaml and resolves per-instance runtimes', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const configPath = join(tempDir, 'providers.yaml');
+    writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+  ubuntu:
+    kind: wsl
+    distro: Ubuntu
+providers:
+  cursor:
+    default_instance: native
+    instances:
+      native:
+        environment: native
+        command: cursor-agent
+        runner: auto
+        chats_dir: /native/cursor/chats
+      ubuntu:
+        environment: ubuntu
+        command: cursor-agent
+        runner: auto
+        chats_dir: /wsl/cursor/chats
+  kiro:
+    default_instance: ubuntu
+    instances:
+      ubuntu:
+        environment: ubuntu
+        command: kiro-cli
+        runner: auto
+        db_path: /wsl/kiro/data.sqlite3
+  opencode:
+    instances:
+      default:
+        environment: native
+        command: opencode
+        runner: direct
+        server:
+          host: 0.0.0.0
+          port: 5001
+          startup_timeout_ms: 2500
+`.trimStart());
+
+    try {
+      const config = loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_CONFIG_PATH: configPath,
+      });
+
+      expect(config.configPath).toBe(configPath);
+      expect(config.providerDefaultInstances?.cursor).toBe('native');
+      expect(config.providerDefaultInstances?.kiro).toBe('ubuntu');
+
+      expect(config.providerCommands.cursor).toEqual({
+        path: 'cursor-agent',
+        runner: 'auto',
+        runnerPath: undefined,
+        runtime: {
+          mode: 'native',
+          distro: undefined,
+          environmentId: 'native',
+        },
+      });
+      expect(config.cursorChatsDir).toBe('/native/cursor/chats');
+      expect(config.cursorRuntime).toEqual({
+        mode: 'native',
+        distro: undefined,
+        environmentId: 'native',
+      });
+
+      expect(resolveProviderInstance(config, 'cursor', 'ubuntu')).toMatchObject({
+        id: 'ubuntu',
+        cursorChatsDir: '/wsl/cursor/chats',
+        commandConfig: {
+          path: 'cursor-agent',
+          runner: 'auto',
+          runtime: {
+            mode: 'wsl',
+            distro: 'Ubuntu',
+            environmentId: 'ubuntu',
+          },
+        },
+      });
+      expect(listProviderInstances(config, 'cursor').map((instance) => instance.id)).toEqual([
+        'native',
+        'ubuntu',
+      ]);
+
+      expect(config.kiroDbPath).toBe('/wsl/kiro/data.sqlite3');
+      expect(config.kiroRuntime).toEqual({
+        mode: 'wsl',
+        distro: 'Ubuntu',
+        environmentId: 'ubuntu',
+      });
+
+      expect(config.opencodeServerHost).toBe('0.0.0.0');
+      expect(config.opencodeServerPort).toBe(5001);
+      expect(config.opencodeServerStartupTimeoutMs).toBe(2500);
+      expect(config.providerCommands.opencode).toEqual({
+        path: 'opencode',
+        runner: 'direct',
+        runnerPath: undefined,
+        runtime: {
+          mode: 'native',
+          distro: undefined,
+          environmentId: 'native',
+        },
+      });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
     }
   });
 });

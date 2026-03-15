@@ -883,9 +883,7 @@ function renderDiscoveryStatus(payload) {
     `State: ${formatDiscoveryState(state)}`,
   ];
 
-  for (const providerName of ['cursor', 'kiro']) {
-    const provider = providers[providerName];
-    if (!provider) continue;
+  for (const [providerName, provider] of Object.entries(providers).sort(([left], [right]) => left.localeCompare(right))) {
     const bits = [
       `${providerName}: ${formatDiscoveryState(provider.state)}`,
       provider.runtimeMode ? `[${provider.runtimeMode}]` : '',
