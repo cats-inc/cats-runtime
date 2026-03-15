@@ -46,7 +46,11 @@ export class SessionRegistry {
   private persistPath: string | null = null;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(dataDir?: string, private sessionBaseDir?: string) {
+  constructor(
+    dataDir?: string,
+    private sessionBaseDir?: string,
+    private providerDefaultInstances: Record<string, string> = {},
+  ) {
     if (dataDir) {
       mkdirSync(dataDir, { recursive: true });
       this.persistPath = join(dataDir, 'sessions.json');
@@ -59,16 +63,48 @@ export class SessionRegistry {
     try {
       const raw = readFileSync(this.persistPath, 'utf-8');
       const arr: SessionInfo[] = JSON.parse(raw);
+      const loadedByProviderSession = new Map<string, SessionInfo>();
+      let migrated = false;
+
       for (const loaded of arr) {
         // All sessions come back as closed (no live worker)
         const s: SessionInfo = {
           ...loaded,
           status: 'closed',
           origin: normalizeSessionOrigin(loaded, this.sessionBaseDir),
+          providerInstanceId: this.normalizeProviderInstanceId(
+            loaded.providerName,
+            loaded.providerInstanceId,
+          ),
         };
         // Default missing workspaceMode for backward compat
         if (!s.workspaceMode) s.workspaceMode = 'shared';
+        if (s.providerInstanceId !== loaded.providerInstanceId || s.origin !== loaded.origin) {
+          migrated = true;
+        }
+        if (loaded.workspaceMode !== s.workspaceMode) {
+          migrated = true;
+        }
+
+        if (s.providerSessionId) {
+          const key = this.discoveredKey(
+            s.providerName,
+            s.providerSessionId,
+            s.providerInstanceId,
+          );
+          const existing = loadedByProviderSession.get(key);
+          if (existing) {
+            this.mergeLoadedDuplicate(existing, s);
+            migrated = true;
+            continue;
+          }
+          loadedByProviderSession.set(key, s);
+        }
+
         this.sessions.set(s.id, s);
+      }
+      if (migrated) {
+        this.saveToDisk();
       }
       console.log(`[registry] Loaded ${arr.length} session(s) from disk`);
     } catch {
@@ -111,7 +147,10 @@ export class SessionRegistry {
     const session: SessionInfo = {
       id,
       providerName: input.providerName,
-      providerInstanceId: input.providerInstanceId,
+      providerInstanceId: this.normalizeProviderInstanceId(
+        input.providerName,
+        input.providerInstanceId,
+      ),
       status: 'initializing',
       origin: 'runtime',
       cwd: input.cwd,
@@ -321,7 +360,11 @@ export class SessionRegistry {
     providerSessionId: string,
     data: DiscoveredSessionData,
   ): SessionInfo | null {
-    const pendingKey = discoveredKey(providerSessionId, data.providerInstanceId);
+    const pendingKey = this.discoveredKey(
+      data.providerName,
+      providerSessionId,
+      data.providerInstanceId,
+    );
     const mergedData = this.mergeDiscoveredData(
       this.pendingDiscovered.get(pendingKey),
       data,
@@ -332,7 +375,11 @@ export class SessionRegistry {
     for (const session of this.sessions.values()) {
       if (
         session.providerSessionId === providerSessionId
-        && sameProviderInstance(session.providerInstanceId, mergedData.providerInstanceId)
+        && this.sameProviderInstance(
+          session.providerName,
+          session.providerInstanceId,
+          mergedData.providerInstanceId,
+        )
       ) {
         matched = session;
         break;
@@ -389,7 +436,11 @@ export class SessionRegistry {
 
   private applyPendingDiscovered(session: SessionInfo, providerSessionId: string): void {
     const pending = this.pendingDiscovered.get(
-      discoveredKey(providerSessionId, session.providerInstanceId),
+      this.discoveredKey(
+        session.providerName,
+        providerSessionId,
+        session.providerInstanceId,
+      ),
     );
     if (!pending) return;
     this.mergeDiscoveredIntoSession(session, providerSessionId, pending, false);
@@ -400,7 +451,11 @@ export class SessionRegistry {
       session.origin === 'runtime'
       && !session.providerSessionId
       && session.providerName === data.providerName
-      && sameProviderInstance(session.providerInstanceId, data.providerInstanceId)
+      && this.sameProviderInstance(
+        session.providerName,
+        session.providerInstanceId,
+        data.providerInstanceId,
+      )
       && session.cwd === data.cwd
       && session.status !== 'closed'
       && session.status !== 'closing'
@@ -414,9 +469,10 @@ export class SessionRegistry {
     scheduleSave = true,
   ): SessionInfo {
     session.providerSessionId = providerSessionId;
-    if (data.providerInstanceId) {
-      session.providerInstanceId = data.providerInstanceId;
-    }
+    session.providerInstanceId = this.normalizeProviderInstanceId(
+      session.providerName,
+      data.providerInstanceId ?? session.providerInstanceId,
+    );
 
     // Only update metadata, never overwrite status or runtime-owned cwd
     if (!session.cwd || session.origin !== 'runtime') {
@@ -439,7 +495,11 @@ export class SessionRegistry {
     if (data.lastActivity) session.lastActivity = data.lastActivity;
     session.updatedAt = new Date().toISOString();
     this.pendingDiscovered.delete(
-      discoveredKey(providerSessionId, data.providerInstanceId ?? session.providerInstanceId),
+      this.discoveredKey(
+        session.providerName,
+        providerSessionId,
+        data.providerInstanceId ?? session.providerInstanceId,
+      ),
     );
     if (scheduleSave) {
       this.scheduleSave();
@@ -519,12 +579,67 @@ export class SessionRegistry {
       }
     }
   }
+
+  private normalizeProviderInstanceId(providerName: string, providerInstanceId?: string): string | undefined {
+    const defaultInstanceId = this.providerDefaultInstances[providerName];
+    if (providerInstanceId === 'default') {
+      return defaultInstanceId || 'default';
+    }
+    if (!providerInstanceId) {
+      return defaultInstanceId || undefined;
+    }
+    return providerInstanceId;
+  }
+
+  private sameProviderInstance(providerName: string, left?: string, right?: string): boolean {
+    return (this.normalizeProviderInstanceId(providerName, left) || 'default')
+      === (this.normalizeProviderInstanceId(providerName, right) || 'default');
+  }
+
+  private discoveredKey(
+    providerName: string,
+    providerSessionId: string,
+    providerInstanceId?: string,
+  ): string {
+    return `${this.normalizeProviderInstanceId(providerName, providerInstanceId) || 'default'}:${providerSessionId}`;
+  }
+
+  private mergeLoadedDuplicate(target: SessionInfo, incoming: SessionInfo): void {
+    target.providerInstanceId = this.normalizeProviderInstanceId(
+      target.providerName,
+      target.providerInstanceId ?? incoming.providerInstanceId,
+    );
+    if (!target.providerSessionId && incoming.providerSessionId) {
+      target.providerSessionId = incoming.providerSessionId;
+    }
+    if (!target.cwd && incoming.cwd) target.cwd = incoming.cwd;
+    if (!target.workspaceMode && incoming.workspaceMode) target.workspaceMode = incoming.workspaceMode;
+    if (!target.model && incoming.model) target.model = incoming.model;
+    if (!target.group && incoming.group) target.group = incoming.group;
+    if (!target.summary && incoming.summary) target.summary = incoming.summary;
+    if (!target.sourcePath && incoming.sourcePath) target.sourcePath = incoming.sourcePath;
+    if (!target.providerSourcePath && incoming.providerSourcePath) {
+      target.providerSourcePath = incoming.providerSourcePath;
+    }
+    target.messageCount = Math.max(target.messageCount, incoming.messageCount);
+    target.totalInputTokens = Math.max(target.totalInputTokens, incoming.totalInputTokens);
+    target.totalOutputTokens = Math.max(target.totalOutputTokens, incoming.totalOutputTokens);
+    target.createdAt = earlierTimestamp(target.createdAt, incoming.createdAt);
+    target.updatedAt = laterTimestamp(target.updatedAt, incoming.updatedAt);
+    target.lastActivity = laterOptionalTimestamp(target.lastActivity, incoming.lastActivity);
+  }
 }
 
-function sameProviderInstance(left?: string, right?: string): boolean {
-  return (left || 'default') === (right || 'default');
+function earlierTimestamp(left: string, right: string): string {
+  return left <= right ? left : right;
 }
 
-function discoveredKey(providerSessionId: string, providerInstanceId?: string): string {
-  return `${providerInstanceId || 'default'}:${providerSessionId}`;
+function laterTimestamp(left: string, right: string): string {
+  return left >= right ? left : right;
+}
+
+function laterOptionalTimestamp(left?: string, right?: string): string | undefined {
+  if (!left) return right;
+  if (!right) return left;
+  return left >= right ? left : right;
 }

@@ -460,7 +460,11 @@ export function createRuntimeServer(
   options: RuntimeServerOptions = {},
 ): RuntimeServer {
   const dataDir = config.dataDir || join(config.sessionBaseDir, '..', 'data');
-  const registry = new SessionRegistry(dataDir, config.sessionBaseDir);
+  const registry = new SessionRegistry(
+    dataDir,
+    config.sessionBaseDir,
+    config.providerDefaultInstances,
+  );
   const wslDiscoveryStatus = new WslDiscoveryStatusStore(config);
   const auggieSessionsByInstance = new Map(
     listProviderInstances(config, 'auggie').map((instance) => [

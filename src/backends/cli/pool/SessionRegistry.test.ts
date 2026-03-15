@@ -139,6 +139,67 @@ describe('SessionRegistry', () => {
     }
   });
 
+  it('normalizes legacy default instance ids to the configured default instance on load', () => {
+    const persistDir = mkdtempSync(join(tmpdir(), 'session-registry-load-test-'));
+    const persistPath = join(persistDir, 'sessions.json');
+    writeFileSync(persistPath, JSON.stringify([
+      {
+        id: 'legacy-default',
+        providerSessionId: 'claude-session-1',
+        providerName: 'claude',
+        providerInstanceId: 'default',
+        status: 'closed',
+        origin: 'discovered',
+        cwd: '/repo',
+        workspaceMode: 'shared',
+        summary: 'push',
+        messageCount: 111,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        createdAt: '2026-03-15T21:09:25.906Z',
+        updatedAt: '2026-03-15T21:34:35.096Z',
+        lastActivity: '2026-03-15T21:34:32.934Z',
+      },
+      {
+        id: 'native-default',
+        providerSessionId: 'claude-session-1',
+        providerName: 'claude',
+        providerInstanceId: 'native',
+        status: 'closed',
+        origin: 'discovered',
+        cwd: '/repo',
+        workspaceMode: 'shared',
+        summary: 'push',
+        messageCount: 111,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        createdAt: '2026-03-15T21:34:54.407Z',
+        updatedAt: '2026-03-15T21:35:30.586Z',
+        lastActivity: '2026-03-15T21:34:32.934Z',
+      },
+    ], null, 2));
+
+    try {
+      registry = new SessionRegistry(
+        persistDir,
+        undefined,
+        { claude: 'native' },
+      );
+
+      const sessions = registry.list();
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0]).toMatchObject({
+        providerName: 'claude',
+        providerInstanceId: 'native',
+        providerSessionId: 'claude-session-1',
+        createdAt: '2026-03-15T21:09:25.906Z',
+        updatedAt: '2026-03-15T21:35:30.586Z',
+      });
+    } finally {
+      rmSync(persistDir, { recursive: true, force: true });
+    }
+  });
+
   describe('upsertDiscovered', () => {
     it('creates a new discovered session', () => {
       const session = registry.upsertDiscovered('ext-abc', {
@@ -168,6 +229,56 @@ describe('SessionRegistry', () => {
       expect(updated!.messageCount).toBe(10);
       // Should not create duplicates
       expect(registry.list()).toHaveLength(1);
+    });
+
+    it('treats legacy default and configured default instance ids as the same discovered session', () => {
+      const persistDir = mkdtempSync(join(tmpdir(), 'session-registry-alias-test-'));
+      const persistPath = join(persistDir, 'sessions.json');
+      writeFileSync(persistPath, JSON.stringify([
+        {
+          id: 'legacy-default',
+          providerSessionId: 'claude-session-1',
+          providerName: 'claude',
+          providerInstanceId: 'default',
+          status: 'closed',
+          origin: 'discovered',
+          cwd: '/repo',
+          workspaceMode: 'shared',
+          summary: 'push',
+          messageCount: 111,
+          totalInputTokens: 0,
+          totalOutputTokens: 0,
+          createdAt: '2026-03-15T21:09:25.906Z',
+          updatedAt: '2026-03-15T21:34:35.096Z',
+          lastActivity: '2026-03-15T21:34:32.934Z',
+        },
+      ], null, 2));
+
+      try {
+        registry = new SessionRegistry(
+          persistDir,
+          undefined,
+          { claude: 'native' },
+        );
+
+        const updated = registry.upsertDiscovered('claude-session-1', {
+          providerName: 'claude',
+          providerInstanceId: 'native',
+          cwd: '/repo',
+          messageCount: 112,
+        });
+
+        expect(updated).not.toBeNull();
+        expect(registry.list()).toHaveLength(1);
+        expect(updated).toMatchObject({
+          id: 'legacy-default',
+          providerInstanceId: 'native',
+          providerSessionId: 'claude-session-1',
+          messageCount: 112,
+        });
+      } finally {
+        rmSync(persistDir, { recursive: true, force: true });
+      }
     });
 
     it('merges into runtime session whose providerSessionId is not yet set', () => {
