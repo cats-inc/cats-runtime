@@ -11,7 +11,7 @@
 | Dashboard | Completed | The embedded dashboard UI is served from `GET /` |
 | Tests | Completed | Vitest covers provider, discovery, pool, HTTP, and server bootstrap behavior |
 | Docs | Completed | README, API, architecture, testing, and agent guidance match the single-service model |
-| Follow-ups | In Progress | Accepted post-review findings for provider-instance rollout are tracked in `docs/plans/PLAN-002-provider-instance-review-followups.md` |
+| Follow-ups | Completed | Accepted post-review findings for provider-instance rollout were implemented and recorded in `docs/plans/PLAN-002-provider-instance-review-followups.md` |
 
 **Legend**: Not Started | In Progress | Completed | Blocked
 
@@ -58,7 +58,7 @@
 
 ### WP-2: Provider Instance Review Follow-ups
 
-**Status**: In Progress  
+**Status**: Completed  
 **Assigned**: Codex  
 **Priority**: P1
 
@@ -72,18 +72,19 @@ environment types or providers are added.
 
 | Finding | Status | Notes |
 |---------|--------|-------|
-| Duplicate discovered sessions when same-provider instances share a watch dir | [ ] | Track as a correctness bug; fix in discovery bootstrap |
-| Discovery bootstrap uses fragile non-null assertions for optional resolvers | [ ] | Tighten bootstrap code so tests and helper reuse are safer |
-| YAML `wsl` definitions do not require `distro` | [ ] | Fail during config load instead of at runtime |
-| Dashboard create modal briefly renders stale provider-instance data | [ ] | Treat as UI polish with low technical risk |
-| Static provider ordering mismatches runtime ordering | [ ] | Remove reorder flash in the modal |
-| `config.ts` remains switch-heavy and repetitive | [ ] Deferred | Record as technical debt, not required for immediate bugfix |
-| Legacy top-level runtime fields remain slightly misleading | [ ] Deferred | Keep for compatibility in the short term |
-| `ProviderInstanceConfig` is growing into a bag of optionals | [ ] Deferred | Revisit with a scoped type-shape cleanup |
+| Duplicate discovered sessions when same-provider instances share a watch dir | [x] | Discovery bootstrap now deduplicates overlapping file watchers and warns |
+| Discovery bootstrap uses fragile non-null assertions for optional resolvers | [x] | Bootstrap now falls back to default services when per-instance resolvers are absent |
+| YAML `wsl` definitions do not require `distro` | [x] | Explicit WSL definitions now fail during config load when `distro` is missing |
+| Dashboard create modal briefly renders stale provider-instance data | [x] | Modal now waits for provider catalog refresh before opening |
+| Static provider ordering mismatches runtime ordering | [x] | Static select order now matches `PROVIDER_ORDER` |
+| `config.ts` remains switch-heavy and repetitive | Deferred | Tracked as follow-on refactor work, not part of the hardening pass |
+| Legacy top-level runtime fields remain slightly misleading | Deferred | Compatibility shim retained intentionally for now |
+| `ProviderInstanceConfig` is growing into a bag of optionals | Deferred | Tracked for a later type-shape cleanup |
 
 #### Tracking
 
 - Active plan: `docs/plans/PLAN-002-provider-instance-review-followups.md`
+- Verification: `npm test` (`316` tests passed)
 
 ---
 

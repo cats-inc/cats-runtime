@@ -724,13 +724,13 @@
     <div class="form-group">
       <label>Provider</label>
         <select id="inputProvider" onchange="onProviderChange()">
-          <option value="auggie">auggie</option>
           <option value="claude">claude</option>
           <option value="codex">codex</option>
+          <option value="gemini">gemini</option>
           <option value="copilot">copilot</option>
           <option value="cursor">cursor</option>
-          <option value="gemini">gemini</option>
           <option value="kiro">kiro</option>
+          <option value="auggie">auggie</option>
           <option value="opencode">opencode</option>
         </select>
     </div>
@@ -937,7 +937,7 @@ async function refreshProviderCatalog() {
   try {
     const res = await fetch(`${API_BASE}/providers/config`, { headers: headers() });
     if (!res.ok) {
-      return;
+      return false;
     }
 
     const data = await res.json();
@@ -948,8 +948,10 @@ async function refreshProviderCatalog() {
     if (currentSessionId) {
       refreshSession();
     }
+    return true;
   } catch {
     // Leave the dashboard on its static fallback options.
+    return false;
   }
 }
 
@@ -1838,11 +1840,14 @@ function closeBrowseModal() {
 }
 
 // --- Create Modal ---
-function openCreateModal() {
-  refreshProviderCatalog();
+async function openCreateModal() {
+  const refreshed = await refreshProviderCatalog();
+  if (!refreshed) {
+    syncProviderSelect();
+    onProviderChange();
+  }
   document.getElementById('createModal').classList.add('open');
   onWorkspaceModeChange();
-  onProviderChange();
   document.getElementById('inputWorkspaceMode').focus();
 }
 

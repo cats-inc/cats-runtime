@@ -1,10 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { loadConfig } from '../src/core/config.js';
-import { createRuntimeServer } from '../src/server.js';
+import { createDiscoveryController, createRuntimeServer } from '../src/server.js';
 
 function createTestConfig(overrides = {}) {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-test-'));
@@ -72,6 +72,12 @@ describe('runtime server', () => {
       const html = await response.text();
       expect(html).toContain('cats-runtime Dashboard');
       expect(html).toContain('cats-runtime');
+      expect(html.indexOf('<option value="claude">claude</option>'))
+        .toBeLessThan(html.indexOf('<option value="codex">codex</option>'));
+      expect(html.indexOf('<option value="codex">codex</option>'))
+        .toBeLessThan(html.indexOf('<option value="gemini">gemini</option>'));
+      expect(html.indexOf('<option value="kiro">kiro</option>'))
+        .toBeLessThan(html.indexOf('<option value="auggie">auggie</option>'));
     });
   });
 
@@ -230,5 +236,114 @@ describe('runtime server', () => {
         distro: 'Ubuntu',
       }));
     });
+  });
+
+  it('deduplicates overlapping file discovery watchers for the same provider', async () => {
+    const sharedDir = mkdtempSync(join(tmpdir(), 'cats-runtime-auggie-shared-'));
+    writeFileSync(
+      join(sharedDir, 'session-1.json'),
+      JSON.stringify({
+        sessionId: 'auggie-1',
+        created: '2026-03-10T00:00:00.000Z',
+        modified: '2026-03-10T00:01:00.000Z',
+        name: 'Repo review',
+        agentState: {
+          modelId: 'gpt-5-4',
+        },
+        chatHistory: [
+          {
+            exchange: {
+              request_message: 'Review this repo',
+              request_nodes: [
+                {
+                  ide_state_node: {
+                    workspace_folders: [
+                      {
+                        folder_root: 'C:/Users/kenne/Source/SK2/one-man-digital-company',
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      }, null, 2),
+      'utf-8',
+    );
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { config, cleanup } = createTestConfig();
+    config.auggieSessionsDir = sharedDir;
+    config.providerDefaultInstances = {
+      ...config.providerDefaultInstances,
+      auggie: 'native',
+    };
+    config.providerInstances = {
+      ...config.providerInstances,
+      auggie: {
+        native: {
+          id: 'native',
+          providerName: 'auggie',
+          commandConfig: config.providerCommands.auggie,
+          auggieSessionsDir: sharedDir,
+        },
+        mirror: {
+          id: 'mirror',
+          providerName: 'auggie',
+          commandConfig: {
+            ...config.providerCommands.auggie,
+            runtime: { ...config.providerCommands.auggie.runtime },
+          },
+          auggieSessionsDir: sharedDir,
+        },
+      },
+    };
+
+    const runtime = createRuntimeServer(config);
+    try {
+      await runtime.start();
+
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        if (runtime.context.registry.list({ provider: 'auggie' }).length > 0) {
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+
+      const sessions = runtime.context.registry.list({ provider: 'auggie' });
+      expect(sessions).toHaveLength(1);
+      expect(sessions[0].providerInstanceId).toBe('native');
+      expect(
+        warnSpy.mock.calls.some(([message]) =>
+          String(message).includes("share watch dir")
+          && String(message).includes("'auggie'")
+          && String(message).includes("'auggie@mirror'")),
+      ).toBe(true);
+    } finally {
+      warnSpy.mockRestore();
+      await runtime.close();
+      cleanup();
+      rmSync(sharedDir, { recursive: true, force: true });
+    }
+  });
+
+  it('createDiscoveryController falls back to default services when instance resolvers are absent', async () => {
+    const { config, cleanup } = createTestConfig();
+    const runtime = createRuntimeServer(config);
+
+    try {
+      expect(() => createDiscoveryController({
+        ...runtime.context,
+        resolveCursorNative: undefined,
+        resolveKiroNative: undefined,
+        resolveAuggieSessions: undefined,
+        resolveOpencodeNative: undefined,
+        wslDiscoveryStatus: undefined,
+      })).not.toThrow();
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
   });
 });

@@ -1,6 +1,6 @@
 import { once } from 'node:events';
 import type { Server } from 'node:http';
-import { join } from 'node:path';
+import { join, normalize as normalizePath, resolve as resolvePath } from 'node:path';
 import { createAdaptorServer } from '@hono/node-server';
 import { AuggieSessionService } from './backends/cli/auggie/AuggieSessionService.js';
 import {
@@ -30,6 +30,7 @@ import { createRuntimeAdapter } from './backends/cli/runtime/runtime.js';
 import { SessionRegistry } from './backends/cli/pool/SessionRegistry.js';
 import { WorkerPool } from './backends/cli/pool/WorkerPool.js';
 import { createRuntimeApp, type AppContext } from './http/app.js';
+import type { ProviderName } from './backends/cli/providers/types.js';
 
 interface DiscoveryController {
   start(): void;
@@ -38,6 +39,14 @@ interface DiscoveryController {
 
 interface RuntimeServerOptions {
   wslDistroInspector?: WslDistroInspector;
+}
+
+interface WatcherSpec {
+  provider: ProviderName;
+  instanceId: string;
+  name: string;
+  watchDir: string;
+  createWatcher(): FileWatcher;
 }
 
 export interface RuntimeServer {
@@ -60,35 +69,101 @@ function startWatcher(name: string, watcher: FileWatcher): void {
   });
 }
 
-function getDefaultInstanceId(
-  config: RuntimeConfig,
-  provider: Parameters<typeof getProviderDefaultInstanceId>[1],
-): string {
-  return getProviderDefaultInstanceId(config, provider);
+function normalizeDiscoveryDir(watchDir: string): string {
+  const trimmed = watchDir.trim();
+  const normalized = trimmed.startsWith('~')
+    ? normalizePath(trimmed)
+    : normalizePath(resolvePath(trimmed));
+  const withoutTrailingSeparators = normalized.replace(/[\\/]+$/, '');
+  return process.platform === 'win32'
+    ? withoutTrailingSeparators.toLowerCase()
+    : withoutTrailingSeparators;
 }
 
-function createDiscoveryController(
+function pickPreferredWatcherSpec(
+  config: RuntimeConfig,
+  left: WatcherSpec,
+  right: WatcherSpec,
+): WatcherSpec {
+  const defaultInstanceId = getProviderDefaultInstanceId(config, left.provider);
+  if (left.instanceId === defaultInstanceId && right.instanceId !== defaultInstanceId) {
+    return left;
+  }
+  if (right.instanceId === defaultInstanceId && left.instanceId !== defaultInstanceId) {
+    return right;
+  }
+  return left;
+}
+
+function dedupeWatcherSpecs(
+  config: RuntimeConfig,
+  watcherSpecs: WatcherSpec[],
+): Array<{ name: string; watcher: FileWatcher }> {
+  const keptByKey = new Map<string, WatcherSpec>();
+
+  for (const spec of watcherSpecs) {
+    const key = `${spec.provider}:${normalizeDiscoveryDir(spec.watchDir)}`;
+    const existing = keptByKey.get(key);
+    if (!existing) {
+      keptByKey.set(key, spec);
+      continue;
+    }
+
+    const kept = pickPreferredWatcherSpec(config, existing, spec);
+    const skipped = kept === existing ? spec : existing;
+    keptByKey.set(key, kept);
+
+    console.warn(
+      `[discovery:${spec.provider}] Instances '${existing.name}' and '${spec.name}' `
+      + `share watch dir '${spec.watchDir}'. Keeping '${kept.name}' and skipping `
+      + `'${skipped.name}'.`,
+    );
+  }
+
+  return Array.from(keptByKey.values()).map((spec) => ({
+    name: spec.name,
+    watcher: spec.createWatcher(),
+  }));
+}
+
+export function createDiscoveryController(
   ctx: AppContext,
   options: RuntimeServerOptions = {},
 ): DiscoveryController {
-  const watcherEntries = [
+  const resolveAuggieSessions = (instanceId?: string): AuggieSessionService =>
+    ctx.resolveAuggieSessions?.(instanceId) || ctx.auggieSessions;
+  const resolveCursorNative = (instanceId?: string): CursorNativeSessionService =>
+    ctx.resolveCursorNative?.(instanceId) || ctx.cursorNative;
+  const resolveKiroNative = (instanceId?: string): KiroNativeSessionService =>
+    ctx.resolveKiroNative?.(instanceId) || ctx.kiroNative;
+  const resolveOpencodeNative = (instanceId?: string): OpencodeNativeSessionService =>
+    ctx.resolveOpencodeNative?.(instanceId) || ctx.opencodeNative;
+  const wslDiscoveryStatus = ctx.wslDiscoveryStatus || new WslDiscoveryStatusStore(ctx.config);
+
+  const watcherEntries = dedupeWatcherSpecs(ctx.config, [
     ...listProviderInstances(ctx.config, 'auggie').map((instance) => ({
-      name: instance.id === getDefaultInstanceId(ctx.config, 'auggie')
+      provider: 'auggie' as const,
+      instanceId: instance.id,
+      name: instance.id === getProviderDefaultInstanceId(ctx.config, 'auggie')
         ? 'auggie'
         : `auggie@${instance.id}`,
-      watcher: new FileWatcher(
+      watchDir: instance.auggieSessionsDir || ctx.config.auggieSessionsDir,
+      createWatcher: () => new FileWatcher(
         instance.auggieSessionsDir || ctx.config.auggieSessionsDir,
-        new AuggieSessionScanner(ctx.resolveAuggieSessions!(instance.id)),
+        new AuggieSessionScanner(resolveAuggieSessions(instance.id)),
         'auggie',
         ctx.registry,
         instance.id,
       ),
     })),
     ...listProviderInstances(ctx.config, 'claude').map((instance) => ({
-      name: instance.id === getDefaultInstanceId(ctx.config, 'claude')
+      provider: 'claude' as const,
+      instanceId: instance.id,
+      name: instance.id === getProviderDefaultInstanceId(ctx.config, 'claude')
         ? 'claude'
         : `claude@${instance.id}`,
-      watcher: new FileWatcher(
+      watchDir: instance.claudeProjectsDir || ctx.config.claudeProjectsDir,
+      createWatcher: () => new FileWatcher(
         instance.claudeProjectsDir || ctx.config.claudeProjectsDir,
         new SessionScanner(instance.claudeProjectsDir || ctx.config.claudeProjectsDir),
         'claude',
@@ -97,10 +172,13 @@ function createDiscoveryController(
       ),
     })),
     ...listProviderInstances(ctx.config, 'codex').map((instance) => ({
-      name: instance.id === getDefaultInstanceId(ctx.config, 'codex')
+      provider: 'codex' as const,
+      instanceId: instance.id,
+      name: instance.id === getProviderDefaultInstanceId(ctx.config, 'codex')
         ? 'codex'
         : `codex@${instance.id}`,
-      watcher: new FileWatcher(
+      watchDir: instance.codexSessionsDir || ctx.config.codexSessionsDir,
+      createWatcher: () => new FileWatcher(
         instance.codexSessionsDir || ctx.config.codexSessionsDir,
         new CodexSessionScanner(instance.codexSessionsDir || ctx.config.codexSessionsDir),
         'codex',
@@ -109,10 +187,13 @@ function createDiscoveryController(
       ),
     })),
     ...listProviderInstances(ctx.config, 'copilot').map((instance) => ({
-      name: instance.id === getDefaultInstanceId(ctx.config, 'copilot')
+      provider: 'copilot' as const,
+      instanceId: instance.id,
+      name: instance.id === getProviderDefaultInstanceId(ctx.config, 'copilot')
         ? 'copilot'
         : `copilot@${instance.id}`,
-      watcher: new FileWatcher(
+      watchDir: instance.copilotSessionsDir || ctx.config.copilotSessionsDir,
+      createWatcher: () => new FileWatcher(
         instance.copilotSessionsDir || ctx.config.copilotSessionsDir,
         new CopilotSessionScanner(instance.copilotSessionsDir || ctx.config.copilotSessionsDir),
         'copilot',
@@ -121,10 +202,13 @@ function createDiscoveryController(
       ),
     })),
     ...listProviderInstances(ctx.config, 'gemini').map((instance) => ({
-      name: instance.id === getDefaultInstanceId(ctx.config, 'gemini')
+      provider: 'gemini' as const,
+      instanceId: instance.id,
+      name: instance.id === getProviderDefaultInstanceId(ctx.config, 'gemini')
         ? 'gemini'
         : `gemini@${instance.id}`,
-      watcher: new FileWatcher(
+      watchDir: instance.geminiSessionsDir || ctx.config.geminiSessionsDir,
+      createWatcher: () => new FileWatcher(
         instance.geminiSessionsDir || ctx.config.geminiSessionsDir,
         new GeminiSessionScanner(instance.geminiSessionsDir || ctx.config.geminiSessionsDir),
         'gemini',
@@ -132,7 +216,7 @@ function createDiscoveryController(
         instance.id,
       ),
     })),
-  ];
+  ]);
 
   const timers: Array<ReturnType<typeof setInterval>> = [];
   let started = false;
@@ -173,7 +257,7 @@ function createDiscoveryController(
       : name === 'kiro'
         ? 'Kiro'
         : 'OpenCode';
-    const discoveryLabel = instanceId === getDefaultInstanceId(ctx.config, name)
+    const discoveryLabel = instanceId === getProviderDefaultInstanceId(ctx.config, name)
       ? name
       : `${name}@${instanceId}`;
 
@@ -196,7 +280,7 @@ function createDiscoveryController(
               registry: ctx.registry,
               runtime,
               policy: wslDiscoveryPolicy,
-              statusStore: ctx.wslDiscoveryStatus!,
+              statusStore: wslDiscoveryStatus,
               inspector: wslDistroInspector,
             });
             if (result.outcome === 'scanned' && result.newCount > 0) {
@@ -258,7 +342,7 @@ function createDiscoveryController(
         const timer = startNativeDiscovery(
           'cursor',
           instance.id,
-          () => ctx.resolveCursorNative!(instance.id).listAllSessions(),
+          () => resolveCursorNative(instance.id).listAllSessions(),
         );
         if (timer) timers.push(timer);
       }
@@ -267,7 +351,7 @@ function createDiscoveryController(
         const timer = startNativeDiscovery(
           'kiro',
           instance.id,
-          () => ctx.resolveKiroNative!(instance.id).listAllSessions(),
+          () => resolveKiroNative(instance.id).listAllSessions(),
         );
         if (timer) timers.push(timer);
       }
@@ -276,7 +360,7 @@ function createDiscoveryController(
         const timer = startNativeDiscovery(
           'opencode',
           instance.id,
-          () => ctx.resolveOpencodeNative!(instance.id).listAllSessions({ startIfNeeded: false }),
+          () => resolveOpencodeNative(instance.id).listAllSessions({ startIfNeeded: false }),
         );
         if (timer) timers.push(timer);
       }
@@ -372,10 +456,10 @@ export function createRuntimeServer(
       startupTimeoutMs: config.opencodeServerStartupTimeoutMs,
     });
 
-  const auggieSessions = resolveAuggieSessions(getDefaultInstanceId(config, 'auggie'));
-  const cursorNative = resolveCursorNative(getDefaultInstanceId(config, 'cursor'));
-  const kiroNative = resolveKiroNative(getDefaultInstanceId(config, 'kiro'));
-  const opencodeNative = resolveOpencodeNative(getDefaultInstanceId(config, 'opencode'));
+  const auggieSessions = resolveAuggieSessions(getProviderDefaultInstanceId(config, 'auggie'));
+  const cursorNative = resolveCursorNative(getProviderDefaultInstanceId(config, 'cursor'));
+  const kiroNative = resolveKiroNative(getProviderDefaultInstanceId(config, 'kiro'));
+  const opencodeNative = resolveOpencodeNative(getProviderDefaultInstanceId(config, 'opencode'));
   const pool = new WorkerPool(
     config,
     registry,

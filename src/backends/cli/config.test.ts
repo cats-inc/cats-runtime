@@ -404,4 +404,57 @@ providers:
       rmSync(tempDir, { recursive: true, force: true });
     }
   });
+
+  it('rejects WSL environments without a distro in providers.yaml', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const configPath = join(tempDir, 'providers.yaml');
+    writeFileSync(configPath, `
+version: 1
+environments:
+  ubuntu:
+    kind: wsl
+providers:
+  cursor:
+    instances:
+      default:
+        environment: ubuntu
+        command: cursor-agent
+        runner: auto
+`.trimStart());
+
+    try {
+      expect(() => loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_CONFIG_PATH: configPath,
+      })).toThrow(/environments\.ubuntu.*distro/);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects inline WSL instances without a distro in providers.yaml', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const configPath = join(tempDir, 'providers.yaml');
+    writeFileSync(configPath, `
+version: 1
+providers:
+  cursor:
+    instances:
+      default:
+        runtime: wsl
+        command: cursor-agent
+        runner: auto
+`.trimStart());
+
+    try {
+      expect(() => loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_CONFIG_PATH: configPath,
+      })).toThrow(/cursor\.instances\.default.*distro/);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
 });

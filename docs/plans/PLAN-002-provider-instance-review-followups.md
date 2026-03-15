@@ -6,7 +6,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress |
+| **Status** | Completed |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | External agent review |
@@ -56,13 +56,13 @@ pass unless a targeted fix naturally reduces complexity without expanding scope.
 
 ### Phase 1: Correctness and Guardrails
 
-- [ ] Deduplicate file-based watchers per provider when multiple instances
+- [x] Deduplicate file-based watchers per provider when multiple instances
       resolve to the same discovery directory.
-- [ ] Emit a warning when overlapping provider-instance discovery directories
+- [x] Emit a warning when overlapping provider-instance discovery directories
       are detected.
-- [ ] Remove discovery-controller non-null assertions by using explicit
+- [x] Remove discovery-controller non-null assertions by using explicit
       resolver fallbacks.
-- [ ] Validate YAML `wsl` environments and inline `wsl` instance runtimes so a
+- [x] Validate YAML `wsl` environments and inline `wsl` instance runtimes so a
       missing `distro` fails during config load.
 
 **Deliverables**: No duplicate discovered sessions from overlapping watch roots,
@@ -70,21 +70,21 @@ safer discovery bootstrap, and earlier config validation failures.
 
 ### Phase 2: Dashboard Polish
 
-- [ ] Make create-modal provider-instance initialization wait for catalog
+- [x] Make create-modal provider-instance initialization wait for catalog
       refresh completion or otherwise suppress the stale intermediate render.
-- [ ] Align static provider select ordering with runtime-driven ordering to
+- [x] Align static provider select ordering with runtime-driven ordering to
       avoid reorder flicker.
 
 **Deliverables**: Stable provider/instance controls in the dashboard modal.
 
 ### Phase 3: Deferred Cleanup
 
-- [ ] Evaluate a table-driven provider config parser to reduce repeated
-      switch-case logic in `config.ts`.
-- [ ] Evaluate whether legacy top-level runtime/session path fields can be
-      reduced or more clearly marked as compatibility shims.
-- [ ] Evaluate a cleaner per-provider instance settings shape instead of one
-      wide interface with many optionals.
+- [x] Evaluate a table-driven provider config parser and keep it deferred to a
+      focused follow-on refactor.
+- [x] Evaluate whether legacy top-level runtime/session path fields can be
+      reduced and retain them as compatibility shims for now.
+- [x] Evaluate a cleaner per-provider instance settings shape and defer it to a
+      later type-shape cleanup.
 
 **Deliverables**: A scoped refactor proposal, not an implicit requirement for
 the immediate bugfix commit.
@@ -132,6 +132,7 @@ the immediate bugfix commit.
 | Date | Update |
 |------|--------|
 | 2026-03-16 | Plan created to track accepted findings from post-commit review of `97d9c4d` |
+| 2026-03-16 | Phase 1 and Phase 2 fixes implemented; deferred cleanup items explicitly kept out of this patch set |
 
 ---
 

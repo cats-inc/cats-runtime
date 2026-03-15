@@ -607,7 +607,7 @@ function applyFileBasedProviderConfig(
     throw new Error(`Unsupported provider config version '${String(version)}'. Expected 1.`);
   }
 
-  const environments = parseEnvironmentMap(doc.environments);
+  const environments = parseEnvironmentMap(doc.environments, filePath);
   const providerCommands = cloneProviderCommands(legacy.providerCommands);
   const providerDefaultInstances = { ...legacy.providerDefaultInstances };
   const providerInstances = cloneProviderInstances(legacy.providerInstances);
@@ -863,7 +863,10 @@ function buildCommandConfigFromFile(
   };
 }
 
-function parseEnvironmentMap(raw: unknown): Record<string, ParsedEnvironmentConfig> {
+function parseEnvironmentMap(
+  raw: unknown,
+  filePath: string,
+): Record<string, ParsedEnvironmentConfig> {
   if (raw === undefined) {
     return {};
   }
@@ -882,10 +885,17 @@ function parseEnvironmentMap(raw: unknown): Record<string, ParsedEnvironmentConf
       'native',
       `environments.${environmentId}.kind`,
     );
+    const distro = readString(environment.distro);
+    assertExplicitWslHasDistro(
+      mode,
+      distro,
+      `environments.${environmentId}`,
+      filePath,
+    );
 
     result[environmentId] = {
       mode,
-      distro: readString(environment.distro),
+      distro,
     };
   }
 
@@ -920,17 +930,47 @@ function resolveRuntimeFromFile(
   const inlineRuntime = readString(raw.runtime)
     || readString(raw.kind)
     || readString(raw.mode);
+  const inlineDistro = readString(raw.distro);
   const mode = parseRuntimeModeValue(
     inlineRuntime,
     fallback.mode,
     `${label}.runtime`,
   );
+  assertExplicitWslHasDistro(
+    mode,
+    inlineDistro,
+    label,
+    filePath,
+    Boolean(inlineRuntime),
+  );
 
   return {
     mode,
-    distro: readString(raw.distro) || fallback.distro,
+    distro: inlineDistro || fallback.distro,
     environmentId: fallback.environmentId,
   };
+}
+
+function assertExplicitWslHasDistro(
+  mode: RuntimeMode,
+  distro: string | undefined,
+  label: string,
+  filePath: string,
+  isExplicitWsl = true,
+): void {
+  if (mode !== 'wsl') {
+    return;
+  }
+
+  if (!isExplicitWsl) {
+    return;
+  }
+
+  if (!distro) {
+    throw new Error(
+      `'${label}' in '${filePath}' sets runtime to 'wsl' but does not define 'distro'`,
+    );
+  }
 }
 
 function cloneProviderCommands(
