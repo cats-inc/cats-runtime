@@ -45,6 +45,7 @@ export interface SessionInfo {
 }
 
 export interface SessionView extends SessionInfo {
+  workspaceKey: string;
   activity: SessionActivity;
   ownership: SessionOwnership;
   resumeStrategy: SessionResumeStrategy;

@@ -51,6 +51,14 @@ function resolveNow(now?: number): number {
   return typeof now === 'number' ? now : Date.now();
 }
 
+export function sessionWorkspaceKey(cwd?: string): string {
+  const normalized = (cwd || 'unknown').replace(/\\/g, '/');
+  if (/^[A-Za-z]:\//.test(normalized) || normalized.startsWith('//')) {
+    return normalized.toLowerCase();
+  }
+  return normalized;
+}
+
 function hasRecentExternalActivity(
   session: SessionInfo,
   options: SessionViewOptions,
@@ -162,6 +170,7 @@ export function toSessionView(
   const attached = options.attached === true;
   return {
     ...session,
+    workspaceKey: sessionWorkspaceKey(session.cwd),
     activity: sessionActivity(session, options),
     ownership: sessionOwnership(session.providerName),
     resumeStrategy: sessionResumeStrategy(session.providerName),

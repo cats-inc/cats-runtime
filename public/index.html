@@ -965,6 +965,33 @@ async function refreshSessions() {
   }
 }
 
+function normalizeCwdPath(cwd) {
+  return cwd ? cwd.replace(/\\/g, '/') : 'unknown';
+}
+
+function workspaceKeyFromCwd(cwd) {
+  const normalized = normalizeCwdPath(cwd);
+  if (/^[A-Za-z]:\//.test(normalized) || normalized.startsWith('//')) {
+    return normalized.toLowerCase();
+  }
+  return normalized;
+}
+
+function workspaceKeyForSession(session) {
+  return session.workspaceKey || workspaceKeyFromCwd(session.cwd);
+}
+
+function pickWorkspaceLabel(current, candidate) {
+  if (!current || current === 'unknown') return candidate;
+  if (!candidate || candidate === 'unknown') return current;
+  if (current.toLowerCase() === candidate.toLowerCase()) {
+    if (!/[A-Z]/.test(current) && /[A-Z]/.test(candidate)) {
+      return candidate;
+    }
+  }
+  return current;
+}
+
 function renderSessionList(sessions) {
   const el = document.getElementById('sessionList');
   if (!sessions || sessions.length === 0) {
@@ -983,14 +1010,20 @@ function renderSessionList(sessions) {
   // Group by project (cwd)
   const groups = new Map();
   for (const s of sessions) {
-    const cwd = s.cwd ? s.cwd.replace(/\\/g, '/') : 'unknown';
-    if (!groups.has(cwd)) groups.set(cwd, []);
-    groups.get(cwd).push(s);
+    const workspaceKey = workspaceKeyForSession(s);
+    const displayCwd = normalizeCwdPath(s.cwd);
+    if (!groups.has(workspaceKey)) {
+      groups.set(workspaceKey, { cwd: displayCwd, items: [] });
+    }
+    const group = groups.get(workspaceKey);
+    group.cwd = pickWorkspaceLabel(group.cwd, displayCwd);
+    group.items.push(s);
   }
 
-  el.innerHTML = Array.from(groups.entries()).map(([cwd, items]) => {
+  el.innerHTML = Array.from(groups.entries()).map(([workspaceKey, group]) => {
+    const { cwd, items } = group;
     const projectName = cwd.split('/').pop() || cwd;
-    const isCollapsed = collapsedGroups.has(cwd);
+    const isCollapsed = collapsedGroups.has(workspaceKey);
     const dots = items
       .filter(s => isInteractive(s))
       .map(s => `<span class="sc-dot ${s.status === 'busy' ? 'sc-dot-busy' : 'sc-dot-ready'}"></span>`)
@@ -1000,8 +1033,9 @@ function renderSessionList(sessions) {
     const providers = [...new Set(items.map(s => s.providerName || 'claude'))];
     const providerAttr = providers.length === 1 ? providers[0] : 'mixed';
 
-    const groupKey = cwd.replace(/'/g, "\\'");
-    const isDeleting = groupDeleteState.has(cwd);
+    const groupKey = workspaceKey.replace(/'/g, "\\'");
+    const groupLabel = cwd.replace(/'/g, "\\'");
+    const isDeleting = groupDeleteState.has(workspaceKey);
 
     const cards = items.map(s => {
       const summaryText = s.summary || '';
@@ -1036,7 +1070,7 @@ function renderSessionList(sessions) {
           <span class="project-count">(${items.length})</span>
           <span class="project-dots">${dots}</span>
           <button class="project-delete" ${(isDeleting || deletableCount === 0) ? 'disabled' : ''}
-            onclick="event.stopPropagation();deleteGroup('${groupKey}')"
+            onclick="event.stopPropagation();deleteGroup('${groupKey}', '${groupLabel}')"
             title="${deletableCount === 0 ? 'No deletable sessions in this project right now' : 'Delete all sessions in this project'}">
             ${isDeleting ? '<span class="spinner"></span>' : '&#128465;'}
           </button>
@@ -1301,7 +1335,7 @@ async function deleteSession(id) {
 // --- Batch Group Delete ---
 const groupDeleteState = new Set();
 
-async function deleteGroup(cwd) {
+async function deleteGroup(workspaceKey, displayCwd) {
   // Find all sessions in this group
   let sessions;
   try {
@@ -1309,8 +1343,7 @@ async function deleteGroup(cwd) {
     if (!res.ok) return;
     const data = await res.json();
     sessions = (data.sessions || []).filter(s => {
-      const sCwd = s.cwd ? s.cwd.replace(/\\/g, '/') : 'unknown';
-      return sCwd === cwd;
+      return workspaceKeyForSession(s) === workspaceKey;
     });
   } catch (e) {
     alert('Failed to load sessions: ' + e.message);
@@ -1327,7 +1360,7 @@ async function deleteGroup(cwd) {
 
   const closableCount = deletableSessions.filter(s => sessionControls(s).canClose).length;
   const blockedCount = sessions.length - deletableSessions.length;
-  let msg = `Delete all ${sessions.length} session(s) under "${cwd.split('/').pop()}"?`;
+  let msg = `Delete all ${sessions.length} session(s) under "${displayCwd.split('/').pop()}"?`;
   if (closableCount > 0) {
     msg += `\n\n${closableCount} live runtime-controlled session(s) may be stopped if deletion succeeds.`;
   }
@@ -1337,7 +1370,7 @@ async function deleteGroup(cwd) {
   msg += '\n\nThis action is irreversible.';
   if (!confirm(msg)) return;
 
-  groupDeleteState.add(cwd);
+  groupDeleteState.add(workspaceKey);
   refreshSessions(); // show spinner
 
   let deleted = 0;
@@ -1375,7 +1408,7 @@ async function deleteGroup(cwd) {
     }
   }
 
-  groupDeleteState.delete(cwd);
+  groupDeleteState.delete(workspaceKey);
 
   if (currentSessionDeleted) {
     currentSessionId = null;

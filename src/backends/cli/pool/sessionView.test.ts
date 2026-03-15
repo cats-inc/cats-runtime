@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   normalizeSessionOrigin,
+  sessionWorkspaceKey,
   sessionActivity,
   sessionControlMode,
   sessionControls,
@@ -50,6 +51,15 @@ describe('sessionView helpers', () => {
     expect(sessionActivity('ready')).toBe('interactive');
     expect(sessionActivity('closing')).toBe('tearing_down');
     expect(sessionActivity('closed')).toBe('inactive');
+  });
+
+  it('builds a case-insensitive workspace key for Windows paths', () => {
+    expect(sessionWorkspaceKey('C:\\Users\\sammy\\Source\\Repo')).toBe(
+      'c:/users/sammy/source/repo',
+    );
+    expect(sessionWorkspaceKey('/Users/sammy/Source/Repo')).toBe(
+      '/Users/sammy/Source/Repo',
+    );
   });
 
   it('describes provider ownership and resume semantics separately', () => {
@@ -108,6 +118,7 @@ describe('sessionView helpers', () => {
     expect(view.controlMode).toBe('full');
     expect(view.attached).toBe(true);
     expect(view.ownership).toBe('logical_session');
+    expect(view.workspaceKey).toBe('/tmp/project');
     expect(view.controls).toEqual({
       canSend: true,
       canResume: false,

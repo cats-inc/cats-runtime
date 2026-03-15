@@ -90,6 +90,10 @@ Message example:
 - `Accept: text/event-stream`
 - `Accept: application/x-ndjson`
 
+Session responses also include `workspaceKey`, a normalized grouping key for
+workspace-aware UIs. Windows-style paths are case-folded in this field while
+`cwd` remains the original display path.
+
 ### Runtime Inspection
 
 ```text
