@@ -3,6 +3,7 @@ import { basename, dirname, join } from 'node:path';
 import { Hono } from 'hono';
 import type { AppContext } from '../app.js';
 import {
+  getProviderDefaultInstanceId,
   resolveProviderInstance,
   type ProviderInstanceConfig,
 } from '../../backends/cli/config.js';
@@ -16,6 +17,7 @@ import { CodexSessionScanner } from '../../backends/cli/discovery/CodexSessionSc
 import { CopilotSessionScanner } from '../../backends/cli/discovery/CopilotSessionScanner.js';
 import { GeminiSessionScanner } from '../../backends/cli/discovery/GeminiSessionScanner.js';
 import { KNOWN_PROVIDERS } from '../../backends/cli/providers/types.js';
+import type { ProviderName } from '../../backends/cli/providers/types.js';
 import {
   resolveWorkspace,
   cleanupIsolatedWorkspace,
@@ -66,6 +68,23 @@ function resolveRequestedProviderInstance(
     providerName as typeof SESSION_PROVIDERS[number],
     instanceId,
   );
+}
+
+function sessionMatchesInstanceFilter(
+  ctx: AppContext,
+  session: SessionInfo,
+  requestedInstance: string,
+): boolean {
+  const providerName = session.providerName as ProviderName;
+  const actualInstanceId = session.providerInstanceId
+    || getProviderDefaultInstanceId(ctx.config, providerName);
+
+  if (requestedInstance === 'default') {
+    const defaultInstanceId = getProviderDefaultInstanceId(ctx.config, providerName);
+    return actualInstanceId === defaultInstanceId || actualInstanceId === 'default';
+  }
+
+  return actualInstanceId === requestedInstance;
 }
 
 function tracksNativeSessionState(session: SessionInfo): boolean {
@@ -407,7 +426,7 @@ sessionRoutes.get('/sessions', (c) => {
   let sessions = ctx.registry.list({ status, provider, group });
   if (instance) {
     sessions = sessions.filter(
-      (session) => (session.providerInstanceId || 'default') === instance,
+      (session) => sessionMatchesInstanceFilter(ctx, session, instance),
     );
   }
   return c.json({ sessions: serializeSessions(ctx, sessions), count: sessions.length });

@@ -205,6 +205,62 @@ describe('runtime server', () => {
     });
   });
 
+  it('GET /sessions treats instance=default as the provider default alias in YAML mode', async () => {
+    await withRuntime({
+      providerDefaultInstances: {
+        cursor: 'ubuntu',
+      },
+      providerInstances: {
+        cursor: {
+          ubuntu: {
+            id: 'ubuntu',
+            providerName: 'cursor',
+            commandConfig: {
+              path: 'cursor-agent',
+              runner: 'auto',
+              runtime: { mode: 'wsl', distro: 'Ubuntu', environmentId: 'ubuntu' },
+            },
+            cursorChatsDir: '/wsl/ubuntu/.cursor/chats',
+          },
+          native: {
+            id: 'native',
+            providerName: 'cursor',
+            commandConfig: {
+              path: 'cursor-agent',
+              runner: 'auto',
+              runtime: { mode: 'native', environmentId: 'native' },
+            },
+            cursorChatsDir: 'C:/Users/test/.cursor/chats',
+          },
+        },
+      },
+    }, async (runtime) => {
+      runtime.context.registry.create({
+        providerName: 'cursor',
+        providerInstanceId: 'ubuntu',
+        cwd: 'C:/repo',
+      });
+      runtime.context.registry.create({
+        providerName: 'cursor',
+        providerInstanceId: 'native',
+        cwd: 'C:/repo-native',
+      });
+
+      const response = await runtime.app.request('/sessions?provider=cursor&instance=default');
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        sessions: [
+          expect.objectContaining({
+            providerName: 'cursor',
+            providerInstanceId: 'ubuntu',
+            cwd: 'C:/repo',
+          }),
+        ],
+        count: 1,
+      });
+    });
+  });
+
   it('GET /discovery/status reports WSL discovery policy state for dashboard polling', async () => {
     await withRuntime({
       cursorRuntime: { mode: 'wsl', distro: 'Ubuntu' },

@@ -274,6 +274,66 @@ describe('Kiro native session management', () => {
     ]);
   });
 
+  it('treats instance=default as an alias for the configured default Kiro instance', async () => {
+    const config = makeConfig();
+    config.providerDefaultInstances = {
+      kiro: 'ubuntu',
+    };
+    config.providerInstances = {
+      kiro: {
+        native: {
+          id: 'native',
+          providerName: 'kiro',
+          commandConfig: {
+            ...config.providerCommands.kiro,
+            runtime: { mode: 'native' },
+          },
+          kiroDbPath: 'C:/kiro/native.sqlite3',
+        },
+        ubuntu: {
+          id: 'ubuntu',
+          providerName: 'kiro',
+          commandConfig: {
+            ...config.providerCommands.kiro,
+            runtime: { mode: 'wsl', distro: 'Ubuntu', environmentId: 'ubuntu' },
+          },
+          kiroDbPath: '/home/tester/.local/share/kiro-cli/data.sqlite3',
+        },
+      },
+    };
+    app = createApp({
+      config,
+      registry,
+      pool,
+      cursorNative,
+      kiroNative,
+      auggieSessions,
+      opencodeNative,
+    });
+
+    const res = await app.request('/kiro/models?instance=default');
+    const body = await res.json() as {
+      instance: string;
+      runtime: { mode: string; distro?: string; environmentId?: string };
+    };
+
+    expect(res.status).toBe(200);
+    expect(body.instance).toBe('ubuntu');
+    expect(body.runtime).toEqual({
+      mode: 'wsl',
+      distro: 'Ubuntu',
+      environmentId: 'ubuntu',
+    });
+  });
+
+  it('returns 400 when a requested Kiro instance does not exist', async () => {
+    const res = await app.request('/kiro/models?instance=missing');
+    const body = await res.json() as { error: string };
+
+    expect(res.status).toBe(400);
+    expect(body.error).toContain("Unknown kiro instance 'missing'");
+  });
+
   it('resumes a discovered Kiro session when it is still the latest in the workspace', async () => {
     const session = registry.upsertDiscovered('kiro-123', {
       providerName: 'kiro',

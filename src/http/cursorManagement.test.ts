@@ -422,6 +422,14 @@ describe('Cursor native session management', () => {
     expect(body.sessions[0].cwd).toBe('/mnt/c/Users/kenne/Source/SK2/ai-content-storyteller');
   });
 
+  it('returns 400 when a requested Cursor instance does not exist', async () => {
+    const res = await app.request('/cursor/sessions?instance=missing');
+    const body = await res.json() as { error: string };
+
+    expect(res.status).toBe(400);
+    expect(body.error).toContain("Unknown cursor instance 'missing'");
+  });
+
   it('discovers all native Cursor sessions when cwd is omitted', async () => {
     vi.mocked(cursorNative.listAllSessions).mockResolvedValue([
       {

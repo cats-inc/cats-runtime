@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { AppContext } from '../app.js';
 import { toSessionViews } from '../../backends/cli/pool/sessionView.js';
 import { getOpencodeNative } from '../providerServices.js';
+import { getRouteErrorStatus } from '../routeErrors.js';
 
 export const opencodeRoutes = new Hono();
 
@@ -17,7 +18,10 @@ opencodeRoutes.get('/opencode/sessions', async (c) => {
       : await getOpencodeNative(ctx, instance).listAllSessions();
     return c.json({ sessions, count: sessions.length });
   } catch (err) {
-    return c.json({ error: `Failed to inspect OpenCode sessions: ${err}` }, 500);
+    return c.json(
+      { error: `Failed to inspect OpenCode sessions: ${err}` },
+      getRouteErrorStatus(err),
+    );
   }
 });
 
@@ -56,6 +60,9 @@ opencodeRoutes.post('/opencode/sessions/discover', async (c) => {
       count: sessions.length,
     });
   } catch (err) {
-    return c.json({ error: `Failed to discover OpenCode sessions: ${err}` }, 500);
+    return c.json(
+      { error: `Failed to discover OpenCode sessions: ${err}` },
+      getRouteErrorStatus(err),
+    );
   }
 });

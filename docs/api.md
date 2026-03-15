@@ -96,10 +96,12 @@ workspace-aware UIs. When a provider exposes multiple configured instances,
 session payloads also include `providerInstanceId`. Windows-style paths are
 case-folded in `workspaceKey` while `cwd` remains the original display path.
 
-`POST /sessions` accepts an optional `instance` field. When omitted,
-`cats-runtime` uses the provider's configured `default_instance`.
+`POST /sessions` accepts an optional `instance` field. When omitted, or when the
+caller explicitly sends `"default"`, `cats-runtime` uses the provider's
+configured `default_instance`.
 
 `GET /sessions` accepts `?instance=<instance-id>` to filter registry results.
+`?instance=default` matches each provider's configured default instance.
 
 ### Runtime Inspection
 
@@ -134,7 +136,8 @@ POST /opencode/sessions/discover
 
 The provider-native endpoints for Auggie, Cursor, Kiro, OpenCode, and Codex accept an
 optional `instance` query/body field so callers can target a specific configured
-provider instance.
+provider instance. `"default"` is accepted as an alias for each provider's
+configured default instance. Unknown instance IDs return `400`.
 
 For manual WSL-backed discovery, `POST /cursor/sessions/discover` and
 `POST /kiro/sessions/discover` also accept:
@@ -172,9 +175,11 @@ Errors use this format:
   provider has multiple WSL instances, the payload keys are `provider@instance`
 - File-scanned providers (`claude`, `codex`, `copilot`, `gemini`, `auggie`) now
   discover external sessions per configured provider instance as well
+- File-backed provider paths are resolved on the host. On Windows, WSL-backed
+  file providers must use host-accessible paths such as `\\wsl$\Distro\...`
 - Future API-key and Ollama support will be added under `backends/api` without
   requiring a new inbound service
 
 ---
 
-*Last updated: 2026-03-15*
+*Last updated: 2026-03-16*

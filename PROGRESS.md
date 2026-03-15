@@ -77,6 +77,7 @@ environment types or providers are added.
 | YAML `wsl` definitions do not require `distro` | [x] | Explicit WSL definitions now fail during config load when `distro` is missing |
 | Dashboard create modal briefly renders stale provider-instance data | [x] | Modal now waits for provider catalog refresh before opening |
 | Static provider ordering mismatches runtime ordering | [x] | Static select order now matches `PROVIDER_ORDER` |
+| File-backed provider paths were not explicitly modeled as host paths | [x] | Host-side path resolution is now shared across discovery, routes, and bootstrap; Windows WSL guest-relative paths fail fast |
 | `config.ts` remains switch-heavy and repetitive | Deferred | Tracked as follow-on refactor work, not part of the hardening pass |
 | Legacy top-level runtime fields remain slightly misleading | Deferred | Compatibility shim retained intentionally for now |
 | `ProviderInstanceConfig` is growing into a bag of optionals | Deferred | Tracked for a later type-shape cleanup |

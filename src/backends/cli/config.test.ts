@@ -386,6 +386,16 @@ providers:
         distro: 'Ubuntu',
         environmentId: 'ubuntu',
       });
+      expect(resolveProviderInstance(config, 'kiro', 'default')).toMatchObject({
+        id: 'ubuntu',
+        commandConfig: {
+          runtime: {
+            mode: 'wsl',
+            distro: 'Ubuntu',
+            environmentId: 'ubuntu',
+          },
+        },
+      });
 
       expect(config.opencodeServerHost).toBe('0.0.0.0');
       expect(config.opencodeServerPort).toBe(5001);

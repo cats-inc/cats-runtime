@@ -39,6 +39,20 @@ export interface ProviderCommandConfig {
   runtime: ProviderRuntimeConfig;
 }
 
+export class UnknownProviderInstanceError extends Error {
+  readonly provider: ProviderName;
+  readonly instanceId: string;
+  readonly validInstances: string[];
+
+  constructor(provider: ProviderName, instanceId: string, validInstances: string[]) {
+    super(`Unknown ${provider} instance '${instanceId}'. Valid: ${validInstances.join(', ')}`);
+    this.name = 'UnknownProviderInstanceError';
+    this.provider = provider;
+    this.instanceId = instanceId;
+    this.validInstances = validInstances;
+  }
+}
+
 export interface ProviderInstanceConfig {
   id: string;
   providerName: ProviderName;
@@ -318,6 +332,12 @@ export function listProviderInstances(
   ];
 }
 
+export function isUnknownProviderInstanceError(
+  error: unknown,
+): error is UnknownProviderInstanceError {
+  return error instanceof UnknownProviderInstanceError;
+}
+
 export function resolveProviderInstance(
   config: Pick<
     CliRuntimeConfig,
@@ -340,22 +360,20 @@ export function resolveProviderInstance(
 ): ProviderInstanceConfig {
   const configured = config.providerInstances?.[provider];
   if (configured && Object.keys(configured).length > 0) {
-    const selected = instanceId || getProviderDefaultInstanceId(config, provider);
+    const selected = !instanceId || instanceId === 'default'
+      ? getProviderDefaultInstanceId(config, provider)
+      : instanceId;
     const instance = configured[selected];
     if (instance) {
       return instance;
     }
 
-    throw new Error(
-      `Unknown ${provider} instance '${selected}'. Valid: ${Object.keys(configured).join(', ')}`,
-    );
+    throw new UnknownProviderInstanceError(provider, selected, Object.keys(configured));
   }
 
   const defaultInstanceId = getProviderDefaultInstanceId(config, provider);
   if (instanceId && instanceId !== defaultInstanceId && instanceId !== 'default') {
-    throw new Error(
-      `Unknown ${provider} instance '${instanceId}'. Valid: ${defaultInstanceId}`,
-    );
+    throw new UnknownProviderInstanceError(provider, instanceId, [defaultInstanceId]);
   }
 
   return buildLegacyProviderInstance(

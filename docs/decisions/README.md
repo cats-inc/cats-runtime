@@ -38,6 +38,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
+| [004-file-backed-paths-are-host-resolved](./004-file-backed-paths-are-host-resolved.md) | Resolve file-backed provider paths on the host | Accepted | 2026-03-16 |
 | [003-provider-instance-config](./003-provider-instance-config.md) | Move provider execution topology into file-based provider instances | Accepted | 2026-03-15 |
 | [002-embed-cli-runtime](./002-embed-cli-runtime.md) | Embed the CLI runtime into `cats-runtime` | Accepted | 2026-03-11 |
 | [001-agent-fleet-http-adapter](./001-agent-fleet-http-adapter.md) | Use an HTTP adapter around `agent-fleet` first | Superseded | 2026-03-11 |

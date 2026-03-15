@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { AppContext } from '../app.js';
 import { toSessionViews } from '../../backends/cli/pool/sessionView.js';
 import { getAuggieSessions } from '../providerServices.js';
+import { getRouteErrorStatus } from '../routeErrors.js';
 
 export const auggieRoutes = new Hono();
 
@@ -17,7 +18,10 @@ auggieRoutes.get('/auggie/sessions', async (c) => {
       : await getAuggieSessions(ctx, instance).listAllSessions();
     return c.json({ sessions, count: sessions.length });
   } catch (err) {
-    return c.json({ error: `Failed to inspect Auggie sessions: ${err}` }, 500);
+    return c.json(
+      { error: `Failed to inspect Auggie sessions: ${err}` },
+      getRouteErrorStatus(err),
+    );
   }
 });
 
@@ -57,6 +61,9 @@ auggieRoutes.post('/auggie/sessions/discover', async (c) => {
       count: sessions.length,
     });
   } catch (err) {
-    return c.json({ error: `Failed to discover Auggie sessions: ${err}` }, 500);
+    return c.json(
+      { error: `Failed to discover Auggie sessions: ${err}` },
+      getRouteErrorStatus(err),
+    );
   }
 });

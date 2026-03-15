@@ -11,6 +11,9 @@ organized under `src/backends/cli`.
 Provider execution topology now comes from `config/providers.yaml` when present.
 That file maps each provider to one or more named instances, and each instance
 maps to an execution environment such as `native` or a specific WSL distro.
+File-backed providers still discover sessions from the host process, so their
+discovery paths are resolved as host filesystem paths rather than
+environment-relative guest paths.
 
 The architectural split is:
 
@@ -83,6 +86,8 @@ src/
 - Encapsulates provider-specific spawn, resume, fork, and permission logic
 - Applies policy-aware WSL discovery for Cursor/Kiro and exposes discovery
   status for the dashboard
+- Validates and resolves file-backed provider paths on the host before starting
+  scanners or file watchers
 
 ### `src/core`
 
@@ -108,6 +113,14 @@ For WSL-backed Cursor/Kiro discovery:
 4. The runtime records discovery state per `provider@instance` for dashboard
    polling via `GET /discovery/status`
 
+For file-backed providers:
+
+1. The runtime resolves instance-specific discovery paths on the host
+2. On Windows, WSL-backed file providers must use host-accessible paths such as
+   `\\wsl$\Distro\...`
+3. Ambiguous guest-relative paths are rejected during bootstrap instead of
+   falling through to watcher/scanner failures later
+
 ## Design Rules
 
 - Upper layers should depend on `cats-runtime`, not on provider-specific CLIs
@@ -122,7 +135,8 @@ For WSL-backed Cursor/Kiro discovery:
 - [001: Use an HTTP adapter around agent-fleet first](./decisions/001-agent-fleet-http-adapter.md)
 - [002: Embed the CLI runtime into cats-runtime](./decisions/002-embed-cli-runtime.md)
 - [003: Move provider execution topology into file-based provider instances](./decisions/003-provider-instance-config.md)
+- [004: Resolve file-backed provider paths on the host](./decisions/004-file-backed-paths-are-host-resolved.md)
 
 ---
 
-*Last updated: 2026-03-15*
+*Last updated: 2026-03-16*

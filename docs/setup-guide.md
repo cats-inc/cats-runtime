@@ -88,6 +88,20 @@ This lets one provider expose multiple independently logged-in environments,
 such as several WSL distros on one Windows host. Docker is not wired yet, but
 the environment/instance model is intended to extend in that direction.
 
+Path semantics matter:
+
+- File-backed providers (`claude`, `codex`, `copilot`, `gemini`, `auggie`) use
+  host-side discovery paths. `projects_dir` / `sessions_dir` must point to a
+  path that the `cats-runtime` host process can read directly.
+- On Windows, if one of those file-backed providers is configured as
+  `runtime: wsl`, do not use guest-relative Linux paths such as
+  `~/.codex/sessions` or `/home/user/.codex/sessions`. Use a host-accessible
+  path such as `\\wsl$\Ubuntu\home\user\.codex\sessions` instead.
+- Cursor `chats_dir` and Kiro `db_path` are different: they are consumed by
+  runtime-aware native services inside the selected runtime, so `~/.cursor/chats`
+  and `~/.local/share/kiro-cli/data.sqlite3` remain valid for WSL-backed
+  Cursor/Kiro instances.
+
 The embedded dashboard reads `GET /providers/config` and uses it to populate the
 provider-instance selector in the create-session modal.
 
@@ -239,4 +253,4 @@ and so on.
 
 ---
 
-*Last updated: 2026-03-15*
+*Last updated: 2026-03-16*

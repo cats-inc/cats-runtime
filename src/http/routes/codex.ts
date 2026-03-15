@@ -3,6 +3,7 @@ import type { AppContext } from '../app.js';
 import { CodexSessionScanner } from '../../backends/cli/discovery/CodexSessionScanner.js';
 import { toSessionViews } from '../../backends/cli/pool/sessionView.js';
 import { getCodexSessionsDir } from '../providerServices.js';
+import { getRouteErrorStatus } from '../routeErrors.js';
 
 export const codexRoutes = new Hono();
 
@@ -27,7 +28,10 @@ codexRoutes.get('/codex/sessions', async (c) => {
     const sessions = await scanCodexSessions(ctx, cwd, instance);
     return c.json({ sessions, count: sessions.length });
   } catch (err) {
-    return c.json({ error: `Failed to inspect Codex sessions: ${err}` }, 500);
+    return c.json(
+      { error: `Failed to inspect Codex sessions: ${err}` },
+      getRouteErrorStatus(err),
+    );
   }
 });
 
@@ -64,6 +68,9 @@ codexRoutes.post('/codex/sessions/discover', async (c) => {
       count: sessions.length,
     });
   } catch (err) {
-    return c.json({ error: `Failed to discover Codex sessions: ${err}` }, 500);
+    return c.json(
+      { error: `Failed to discover Codex sessions: ${err}` },
+      getRouteErrorStatus(err),
+    );
   }
 });

@@ -2,6 +2,9 @@ version: 1
 
 # Environments describe isolated execution/login contexts.
 # Today cats-runtime supports native and WSL. Docker can fit this shape later.
+# File-backed provider paths are resolved on the host. On Windows, if you add a
+# WSL-backed file provider (Claude/Codex/Copilot/Gemini/Auggie), use a
+# host-accessible path such as \\wsl$\Ubuntu\home\user\... instead of ~/.xxx.
 environments:
   native:
     kind: native

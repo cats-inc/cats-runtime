@@ -281,6 +281,14 @@ describe('codex management', () => {
     expect(registry.list({ provider: 'codex' })[0]?.providerInstanceId).toBe('ubuntu');
   });
 
+  it('returns 400 when a requested Codex instance does not exist', async () => {
+    const res = await app.request('/codex/sessions?instance=missing');
+    const body = await res.json() as { error: string };
+
+    expect(res.status).toBe(400);
+    expect(body.error).toContain("Unknown codex instance 'missing'");
+  });
+
   it('serializes discovered Codex sessions as resume_only', async () => {
     registry.upsertDiscovered('thread-123', {
       cwd: 'C:/repo',

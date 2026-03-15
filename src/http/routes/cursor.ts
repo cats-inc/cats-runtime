@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { AppContext } from '../app.js';
 import { toSessionViews } from '../../backends/cli/pool/sessionView.js';
 import { getCursorNative } from '../providerServices.js';
+import { getRouteErrorStatus } from '../routeErrors.js';
 
 export const cursorRoutes = new Hono();
 
@@ -17,7 +18,10 @@ cursorRoutes.get('/cursor/sessions', async (c) => {
       : await getCursorNative(ctx, instance).listAllSessions();
     return c.json({ sessions, count: sessions.length });
   } catch (err) {
-    return c.json({ error: `Failed to inspect Cursor sessions: ${err}` }, 500);
+    return c.json(
+      { error: `Failed to inspect Cursor sessions: ${err}` },
+      getRouteErrorStatus(err),
+    );
   }
 });
 
@@ -62,6 +66,9 @@ cursorRoutes.post('/cursor/sessions/discover', async (c) => {
       count: sessions.length,
     });
   } catch (err) {
-    return c.json({ error: `Failed to discover Cursor sessions: ${err}` }, 500);
+    return c.json(
+      { error: `Failed to discover Cursor sessions: ${err}` },
+      getRouteErrorStatus(err),
+    );
   }
 });

@@ -3,6 +3,7 @@ import type { AppContext } from '../app.js';
 import { resolveProviderInstance } from '../../backends/cli/config.js';
 import { toSessionViews } from '../../backends/cli/pool/sessionView.js';
 import { getKiroNative } from '../providerServices.js';
+import { getRouteErrorStatus } from '../routeErrors.js';
 
 export const kiroRoutes = new Hono();
 
@@ -26,13 +27,20 @@ function getKiroModelsForRuntime(mode: 'native' | 'wsl'): string[] {
 kiroRoutes.get('/kiro/models', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const instance = c.req.query('instance') || undefined;
-  const providerInstance = resolveProviderInstance(ctx.config, 'kiro', instance);
-  return c.json({
-    runtime: providerInstance.commandConfig.runtime,
-    instance: providerInstance.id,
-    source: 'static',
-    models: getKiroModelsForRuntime(providerInstance.commandConfig.runtime.mode),
-  });
+  try {
+    const providerInstance = resolveProviderInstance(ctx.config, 'kiro', instance);
+    return c.json({
+      runtime: providerInstance.commandConfig.runtime,
+      instance: providerInstance.id,
+      source: 'static',
+      models: getKiroModelsForRuntime(providerInstance.commandConfig.runtime.mode),
+    });
+  } catch (err) {
+    return c.json(
+      { error: `Failed to inspect Kiro models: ${err}` },
+      getRouteErrorStatus(err),
+    );
+  }
 });
 
 /** GET /kiro/sessions?cwd=... — inspect native Kiro sessions */
@@ -47,7 +55,10 @@ kiroRoutes.get('/kiro/sessions', async (c) => {
       : await getKiroNative(ctx, instance).listAllSessions();
     return c.json({ sessions, count: sessions.length });
   } catch (err) {
-    return c.json({ error: `Failed to inspect Kiro sessions: ${err}` }, 500);
+    return c.json(
+      { error: `Failed to inspect Kiro sessions: ${err}` },
+      getRouteErrorStatus(err),
+    );
   }
 });
 
@@ -92,6 +103,9 @@ kiroRoutes.post('/kiro/sessions/discover', async (c) => {
       count: sessions.length,
     });
   } catch (err) {
-    return c.json({ error: `Failed to discover Kiro sessions: ${err}` }, 500);
+    return c.json(
+      { error: `Failed to discover Kiro sessions: ${err}` },
+      getRouteErrorStatus(err),
+    );
   }
 });
