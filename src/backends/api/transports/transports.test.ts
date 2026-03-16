@@ -79,25 +79,67 @@ describe('API transports', () => {
     expect(result.usage).toEqual({ inputTokens: 11, outputTokens: 7 });
   });
 
-  it('parses OpenAI chat completions tool calls', async () => {
+  it('adds an Anthropic prompt cache breakpoint to the reusable prefix', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       jsonResponse({
-        id: 'chatcmpl-1',
-        choices: [{
-          message: {
+        id: 'msg_1',
+        content: [{ type: 'text', text: 'Done.' }],
+        usage: { input_tokens: 2, output_tokens: 1 },
+      }),
+    );
+
+    const transport = new AnthropicTransport(fetchMock, {
+      ANTHROPIC_API_KEY: 'test-key',
+    });
+    const instance: RemoteProviderInstanceConfig = {
+      id: 'sonnet',
+      providerName: 'claude',
+      backend: 'api',
+      transport: 'anthropic',
+      apiKeyEnv: 'ANTHROPIC_API_KEY',
+      model: 'claude-sonnet-4-6',
+    };
+
+    await transport.completeTurn({
+      ...makeInput(instance),
+      messages: [
+        { role: 'system', parts: [{ type: 'text', text: 'You are helpful.' }] },
+        { role: 'user', parts: [{ type: 'text', text: 'Remember src/app.ts.' }] },
+        { role: 'user', parts: [{ type: 'text', text: 'Now inspect it.' }] },
+      ],
+    });
+
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+    const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
+    const messages = Array.isArray(body.messages) ? body.messages : [];
+    expect(messages[0]).toEqual({
+      role: 'user',
+      content: [{
+        type: 'text',
+        text: 'Remember src/app.ts.',
+        cache_control: { type: 'ephemeral' },
+      }],
+    });
+  });
+
+  it('parses OpenAI Responses API tool calls', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        id: 'resp_1',
+        output: [
+          {
+            type: 'message',
             role: 'assistant',
-            content: 'Checking the file.',
-            tool_calls: [{
-              id: 'call_1',
-              type: 'function',
-              function: {
-                name: 'read_file',
-                arguments: '{"path":"src/app.ts"}',
-              },
-            }],
+            content: [{ type: 'output_text', text: 'Checking the file.' }],
           },
-        }],
-        usage: { prompt_tokens: 5, completion_tokens: 9 },
+          {
+            type: 'function_call',
+            call_id: 'call_1',
+            name: 'read_file',
+            arguments: '{"path":"src/app.ts"}',
+          },
+        ],
+        usage: { input_tokens: 5, output_tokens: 9 },
       }),
     );
 
@@ -114,7 +156,9 @@ describe('API transports', () => {
     };
 
     const result = await transport.completeTurn(makeInput(instance));
-    expect(result.responseId).toBe('chatcmpl-1');
+    const [requestUrl] = fetchMock.mock.calls[0] ?? [];
+    expect(String(requestUrl)).toContain('/v1/responses');
+    expect(result.responseId).toBe('resp_1');
     expect(result.assistant.parts).toEqual([
       { type: 'text', text: 'Checking the file.' },
       expect.objectContaining({
@@ -125,6 +169,49 @@ describe('API transports', () => {
       }),
     ]);
     expect(result.usage).toEqual({ inputTokens: 5, outputTokens: 9 });
+  });
+
+  it('uses OpenAI previous_response_id for continuation when available', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        id: 'resp_2',
+        output: [{
+          type: 'message',
+          role: 'assistant',
+          content: [{ type: 'output_text', text: 'Continued.' }],
+        }],
+        usage: { input_tokens: 4, output_tokens: 2 },
+      }),
+    );
+
+    const transport = new OpenAiTransport(fetchMock, {
+      OPENAI_API_KEY: 'test-key',
+    });
+    const instance: RemoteProviderInstanceConfig = {
+      id: 'main',
+      providerName: 'codex',
+      backend: 'api',
+      transport: 'openai',
+      apiKeyEnv: 'OPENAI_API_KEY',
+      model: 'gpt-5',
+    };
+
+    await transport.completeTurn({
+      ...makeInput(instance),
+      previousResponseId: 'resp_prev',
+      messages: [
+        { role: 'system', parts: [{ type: 'text', text: 'Stay terse.' }] },
+        { role: 'user', parts: [{ type: 'text', text: 'What changed?' }] },
+      ],
+    });
+
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+    const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
+    expect(body.previous_response_id).toBe('resp_prev');
+    expect(body.instructions).toBe('Stay terse.');
+    expect(body.input).toEqual([
+      { role: 'user', content: 'What changed?' },
+    ]);
   });
 
   it('parses Gemini function calls', async () => {
@@ -209,6 +296,74 @@ describe('API transports', () => {
         parts: [{ text: 'Hi' }],
       },
     ]);
+  });
+
+  it('creates and uses Gemini cached content for large reusable prefixes', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/v1beta/cachedContents')) {
+        return jsonResponse({
+          name: 'cachedContents/test-cache',
+          expireTime: '2026-03-16T03:00:00Z',
+        });
+      }
+
+      if (url.includes(':generateContent')) {
+        return jsonResponse({
+          candidates: [{
+            content: {
+              parts: [{ text: 'Used cached context.' }],
+            },
+          }],
+          usageMetadata: { promptTokenCount: 8, candidatesTokenCount: 3 },
+        });
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    const transport = new GeminiTransport(fetchMock, {
+      GEMINI_API_KEY: 'test-key',
+    });
+    const instance: RemoteProviderInstanceConfig = {
+      id: 'flash',
+      providerName: 'gemini',
+      backend: 'api',
+      transport: 'google',
+      apiKeyEnv: 'GEMINI_API_KEY',
+      model: 'gemini-3-flash-preview',
+    };
+
+    const result = await transport.completeTurn({
+      ...makeInput(instance),
+      turnStep: 0,
+      messages: [
+        { role: 'user', parts: [{ type: 'text', text: 'A'.repeat(5000) }] },
+        { role: 'assistant', parts: [{ type: 'text', text: 'Stored context.' }] },
+        { role: 'user', parts: [{ type: 'text', text: 'What next?' }] },
+      ],
+    });
+
+    expect(result.sessionState?.geminiCachedContent).toEqual(expect.objectContaining({
+      name: 'cachedContents/test-cache',
+      model: 'gemini-3-flash-preview',
+    }));
+
+    const [, cacheInit] = fetchMock.mock.calls[0] ?? [];
+    const cacheBody = JSON.parse(String(cacheInit?.body || '{}')) as Record<string, unknown>;
+    expect(cacheBody.model).toBe('models/gemini-3-flash-preview');
+
+    const [, generateInit] = fetchMock.mock.calls[1] ?? [];
+    const generateBody = JSON.parse(String(generateInit?.body || '{}')) as Record<string, unknown>;
+    expect(generateBody.cachedContent).toBe('cachedContents/test-cache');
+    expect(generateBody.contents).toEqual([
+      {
+        role: 'user',
+        parts: [{ text: 'What next?' }],
+      },
+    ]);
+    expect(generateBody.tools).toBeUndefined();
+    expect(generateBody.systemInstruction).toBeUndefined();
   });
 
   it('parses Ollama chat responses with local tool calls', async () => {

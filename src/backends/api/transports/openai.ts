@@ -30,105 +30,135 @@ function resolveBaseUrl(instance: RemoteProviderInstanceConfig, env: NodeJS.Proc
   return fromEnv || instance.baseUrl || 'https://api.openai.com';
 }
 
-function toOpenAiMessages(messages: ApiConversationMessage[]): Array<Record<string, unknown>> {
+function extractSystemPrompt(messages: ApiConversationMessage[]): string | undefined {
+  const text = messages
+    .filter((message) => message.role === 'system')
+    .flatMap((message) => message.parts)
+    .filter((part): part is Extract<ApiConversationPart, { type: 'text' }> => part.type === 'text')
+    .map((part) => part.text)
+    .filter(Boolean)
+    .join('\n');
+
+  return text || undefined;
+}
+
+function messageText(message: ApiConversationMessage): string {
+  return message.parts
+    .filter((part): part is Extract<ApiConversationPart, { type: 'text' }> => part.type === 'text')
+    .map((part) => part.text)
+    .join('\n');
+}
+
+function toOpenAiInputItems(messages: ApiConversationMessage[]): Array<Record<string, unknown>> {
   const mapped: Array<Record<string, unknown>> = [];
 
   for (const message of messages) {
     if (message.role === 'system') {
-      const text = message.parts
-        .filter((part): part is Extract<ApiConversationPart, { type: 'text' }> => part.type === 'text')
-        .map((part) => part.text)
-        .join('\n');
-      mapped.push({ role: 'system', content: text });
       continue;
     }
 
     if (message.role === 'user') {
       const toolResults = message.parts.filter((part): part is Extract<ApiConversationPart, { type: 'tool_result' }> => part.type === 'tool_result');
+      const text = messageText(message);
+      if (text) {
+        mapped.push({ role: 'user', content: text });
+      }
       if (toolResults.length > 0) {
         for (const part of toolResults) {
           mapped.push({
-            role: 'tool',
-            tool_call_id: part.toolCallId,
-            content: part.output,
+            type: 'function_call_output',
+            call_id: part.toolCallId,
+            output: part.output,
           });
         }
-        continue;
       }
-
-      const text = message.parts
-        .filter((part): part is Extract<ApiConversationPart, { type: 'text' }> => part.type === 'text')
-        .map((part) => part.text)
-        .join('\n');
-      mapped.push({ role: 'user', content: text });
       continue;
     }
 
-    const text = message.parts
-      .filter((part): part is Extract<ApiConversationPart, { type: 'text' }> => part.type === 'text')
-      .map((part) => part.text)
-      .join('\n');
-    const toolCalls = message.parts
-      .filter((part): part is Extract<ApiConversationPart, { type: 'tool_call' }> => part.type === 'tool_call')
-      .map((part) => ({
-        id: part.id,
-        type: 'function',
-        function: {
-          name: part.name,
-          arguments: JSON.stringify(part.arguments),
-        },
-      }));
+    const text = messageText(message);
+    if (text) {
+      mapped.push({
+        role: 'assistant',
+        content: text,
+      });
+    }
 
-    mapped.push({
-      role: 'assistant',
-      content: text || null,
-      ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
-    });
+    const toolCalls = message.parts
+      .filter((part): part is Extract<ApiConversationPart, { type: 'tool_call' }> => part.type === 'tool_call');
+    for (const part of toolCalls) {
+      mapped.push({
+        type: 'function_call',
+        call_id: part.id,
+        name: part.name,
+        arguments: JSON.stringify(part.arguments),
+      });
+    }
   }
 
   return mapped;
 }
 
-function extractAssistantParts(message: unknown): ApiConversationPart[] {
-  if (!message || typeof message !== 'object') {
-    return [];
+function toIncrementalInput(messages: ApiConversationMessage[]): Array<Record<string, unknown>> | null {
+  const lastMessage = [...messages].reverse().find((message) => message.role !== 'system');
+  if (!lastMessage) {
+    return null;
   }
 
-  const payload = message as Record<string, unknown>;
+  const input = toOpenAiInputItems([lastMessage]);
+  return input.length > 0 ? input : null;
+}
+
+function extractAssistantParts(payload: Record<string, unknown>): ApiConversationPart[] {
+  const output = Array.isArray(payload.output) ? payload.output : [];
   const parts: ApiConversationPart[] = [];
-  if (typeof payload.content === 'string' && payload.content) {
-    parts.push({ type: 'text', text: payload.content });
-  }
-
-  const toolCalls = Array.isArray(payload.tool_calls) ? payload.tool_calls : [];
-  for (const item of toolCalls) {
+  for (const item of output) {
     if (!item || typeof item !== 'object') {
       continue;
     }
-    const toolCall = item as Record<string, unknown>;
-    const fn = toolCall.function && typeof toolCall.function === 'object'
-      ? toolCall.function as Record<string, unknown>
-      : {};
-    let args: Record<string, unknown> = {};
-    if (typeof fn.arguments === 'string' && fn.arguments) {
-      try {
-        const parsed = JSON.parse(fn.arguments);
-        if (parsed && typeof parsed === 'object') {
-          args = parsed as Record<string, unknown>;
+
+    const entry = item as Record<string, unknown>;
+    if (entry.type === 'message') {
+      const content = Array.isArray(entry.content) ? entry.content : [];
+      for (const contentItem of content) {
+        if (!contentItem || typeof contentItem !== 'object') {
+          continue;
         }
-      } catch {
-        args = {};
+        const block = contentItem as Record<string, unknown>;
+        if (block.type === 'output_text' && typeof block.text === 'string' && block.text) {
+          parts.push({ type: 'text', text: block.text });
+        }
       }
+      continue;
     }
-    if (typeof toolCall.id === 'string' && typeof fn.name === 'string') {
+
+    if (
+      entry.type === 'function_call'
+      && typeof entry.call_id === 'string'
+      && typeof entry.name === 'string'
+    ) {
+      let args: Record<string, unknown> = {};
+      if (typeof entry.arguments === 'string' && entry.arguments) {
+        try {
+          const parsed = JSON.parse(entry.arguments);
+          if (parsed && typeof parsed === 'object') {
+            args = parsed as Record<string, unknown>;
+          }
+        } catch {
+          args = {};
+        }
+      }
       parts.push({
         type: 'tool_call',
-        id: toolCall.id,
-        name: fn.name,
+        id: entry.call_id,
+        name: entry.name,
         arguments: args,
-        raw: toolCall,
+        raw: entry,
       } satisfies ApiToolCallPart);
     }
+  }
+
+  if (parts.length === 0 && typeof payload.output_text === 'string' && payload.output_text) {
+    parts.push({ type: 'text', text: payload.output_text });
   }
 
   return parts;
@@ -137,12 +167,18 @@ function extractAssistantParts(message: unknown): ApiConversationPart[] {
 function toOpenAiTools(input: ApiCompletionInput): Array<Record<string, unknown>> {
   return input.tools.map((tool) => ({
     type: 'function',
-    function: {
-      name: tool.name,
-      description: tool.description,
-      parameters: tool.inputSchema,
-    },
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.inputSchema,
   }));
+}
+
+function shouldRetryWithoutPreviousResponseId(errorBody: string): boolean {
+  const normalized = errorBody.toLowerCase();
+  return normalized.includes('previous_response_id')
+    || normalized.includes('response not found')
+    || normalized.includes('not found')
+    || normalized.includes('expired');
 }
 
 export class OpenAiTransport implements ApiTransportClient {
@@ -166,44 +202,57 @@ export class OpenAiTransport implements ApiTransportClient {
       headers['OpenAI-Project'] = this.env[input.instance.projectEnv]!;
     }
 
-    const response = await this.fetchImpl(`${baseUrl.replace(/\/$/, '')}/v1/chat/completions`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        model: input.model,
-        messages: toOpenAiMessages(input.messages),
-        tools: input.tools.length > 0 ? toOpenAiTools(input) : undefined,
-        tool_choice: input.tools.length > 0 ? 'auto' : undefined,
-        max_completion_tokens: input.instance.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
-      }),
-      signal: input.signal,
-    });
+    const endpoint = `${baseUrl.replace(/\/$/, '')}/v1/responses`;
+    const instructions = extractSystemPrompt(input.messages);
+    const incrementalInput = input.previousResponseId
+      ? toIncrementalInput(input.messages)
+      : null;
 
-    if (!response.ok) {
-      throw new Error(`OpenAI request failed: ${await readErrorBody(response)}`);
-    }
+    const sendRequest = async (usePreviousResponseId: boolean): Promise<ApiCompletionResponse> => {
+      const response = await this.fetchImpl(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model: input.model,
+          instructions,
+          input: usePreviousResponseId && incrementalInput
+            ? incrementalInput
+            : toOpenAiInputItems(input.messages),
+          previous_response_id: usePreviousResponseId ? input.previousResponseId : undefined,
+          tools: input.tools.length > 0 ? toOpenAiTools(input) : undefined,
+          tool_choice: input.tools.length > 0 ? 'auto' : undefined,
+          max_output_tokens: input.instance.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+        }),
+        signal: input.signal,
+      });
 
-    const payload = await response.json() as Record<string, unknown>;
-    const choices = Array.isArray(payload.choices) ? payload.choices : [];
-    const choice = choices[0] && typeof choices[0] === 'object'
-      ? choices[0] as Record<string, unknown>
-      : {};
-    const message = choice.message;
-    const usage = payload.usage && typeof payload.usage === 'object'
-      ? payload.usage as Record<string, unknown>
-      : {};
+      if (!response.ok) {
+        const errorBody = await readErrorBody(response);
+        if (usePreviousResponseId && shouldRetryWithoutPreviousResponseId(errorBody)) {
+          return sendRequest(false);
+        }
+        throw new Error(`OpenAI request failed: ${errorBody}`);
+      }
 
-    return {
-      responseId: typeof payload.id === 'string' ? payload.id : undefined,
-      assistant: {
-        role: 'assistant',
-        parts: extractAssistantParts(message),
-      },
-      usage: {
-        inputTokens: typeof usage.prompt_tokens === 'number' ? usage.prompt_tokens : 0,
-        outputTokens: typeof usage.completion_tokens === 'number' ? usage.completion_tokens : 0,
-      },
-      raw: payload,
+      const payload = await response.json() as Record<string, unknown>;
+      const usage = payload.usage && typeof payload.usage === 'object'
+        ? payload.usage as Record<string, unknown>
+        : {};
+
+      return {
+        responseId: typeof payload.id === 'string' ? payload.id : undefined,
+        assistant: {
+          role: 'assistant',
+          parts: extractAssistantParts(payload),
+        },
+        usage: {
+          inputTokens: typeof usage.input_tokens === 'number' ? usage.input_tokens : 0,
+          outputTokens: typeof usage.output_tokens === 'number' ? usage.output_tokens : 0,
+        },
+        raw: payload,
+      };
     };
+
+    return sendRequest(Boolean(input.previousResponseId && incrementalInput));
   }
 }

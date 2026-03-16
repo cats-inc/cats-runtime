@@ -10,6 +10,31 @@ import type {
 import { readErrorBody } from './streaming.js';
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
+const PROMPT_CACHE_CONTROL = { type: 'ephemeral' } as const;
+
+interface AnthropicContentBlock {
+  type: string;
+  text?: string;
+  id?: string;
+  name?: string;
+  input?: Record<string, unknown>;
+  tool_use_id?: string;
+  content?: string;
+  is_error?: boolean;
+  cache_control?: typeof PROMPT_CACHE_CONTROL;
+}
+
+interface AnthropicMessagePayload {
+  role: 'user' | 'assistant';
+  content: AnthropicContentBlock[];
+}
+
+interface AnthropicToolPayload {
+  name: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+  cache_control?: typeof PROMPT_CACHE_CONTROL;
+}
 
 function requireApiKey(instance: RemoteProviderInstanceConfig, env: NodeJS.ProcessEnv): string {
   const apiKeyEnv = instance.apiKeyEnv;
@@ -30,22 +55,22 @@ function resolveBaseUrl(instance: RemoteProviderInstanceConfig, env: NodeJS.Proc
   return fromEnv || instance.baseUrl || 'https://api.anthropic.com';
 }
 
-function extractSystemPrompt(messages: ApiConversationMessage[]): string | undefined {
+function extractSystemBlocks(messages: ApiConversationMessage[]): AnthropicContentBlock[] {
   return messages
     .filter((message) => message.role === 'system')
     .flatMap((message) => message.parts)
     .filter((part): part is Extract<ApiConversationPart, { type: 'text' }> => part.type === 'text')
     .map((part) => part.text)
     .filter(Boolean)
-    .join('\n') || undefined;
+    .map((text) => ({ type: 'text', text }));
 }
 
-function toAnthropicMessage(message: ApiConversationMessage): Record<string, unknown> | null {
+function toAnthropicMessage(message: ApiConversationMessage): AnthropicMessagePayload | null {
   if (message.role === 'system') {
     return null;
   }
 
-  const content = message.parts.flatMap<Record<string, unknown>>((part) => {
+  const content = message.parts.flatMap<AnthropicContentBlock>((part) => {
     if (part.type === 'text') {
       return [{ type: 'text', text: part.text }];
     }
@@ -74,12 +99,44 @@ function toAnthropicMessage(message: ApiConversationMessage): Record<string, unk
   };
 }
 
-function toAnthropicTools(input: ApiCompletionInput): Array<Record<string, unknown>> {
+function toAnthropicTools(input: ApiCompletionInput): AnthropicToolPayload[] {
   return input.tools.map((tool) => ({
     name: tool.name,
     description: tool.description,
     input_schema: tool.inputSchema,
   }));
+}
+
+function applyPromptCacheBreakpoint(
+  system: AnthropicContentBlock[],
+  messages: AnthropicMessagePayload[],
+  tools: AnthropicToolPayload[],
+): void {
+  for (let index = messages.length - 2; index >= 0; index -= 1) {
+    const blocks = messages[index]?.content;
+    if (blocks && blocks.length > 0) {
+      blocks[blocks.length - 1] = {
+        ...blocks[blocks.length - 1],
+        cache_control: PROMPT_CACHE_CONTROL,
+      };
+      return;
+    }
+  }
+
+  if (system.length > 0) {
+    system[system.length - 1] = {
+      ...system[system.length - 1],
+      cache_control: PROMPT_CACHE_CONTROL,
+    };
+    return;
+  }
+
+  if (tools.length > 0) {
+    tools[tools.length - 1] = {
+      ...tools[tools.length - 1],
+      cache_control: PROMPT_CACHE_CONTROL,
+    };
+  }
 }
 
 function extractAssistantParts(content: unknown): ApiConversationPart[] {
@@ -125,6 +182,13 @@ export class AnthropicTransport implements ApiTransportClient {
   async completeTurn(input: ApiCompletionInput): Promise<ApiCompletionResponse> {
     const apiKey = requireApiKey(input.instance, this.env);
     const baseUrl = resolveBaseUrl(input.instance, this.env);
+    const system = extractSystemBlocks(input.messages);
+    const messages = input.messages
+      .map(toAnthropicMessage)
+      .filter((message): message is AnthropicMessagePayload => Boolean(message));
+    const tools = input.tools.length > 0 ? toAnthropicTools(input) : [];
+    applyPromptCacheBreakpoint(system, messages, tools);
+
     const response = await this.fetchImpl(`${baseUrl.replace(/\/$/, '')}/v1/messages`, {
       method: 'POST',
       headers: {
@@ -136,11 +200,9 @@ export class AnthropicTransport implements ApiTransportClient {
       body: JSON.stringify({
         model: input.model,
         max_tokens: input.instance.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
-        system: extractSystemPrompt(input.messages),
-        messages: input.messages
-          .map(toAnthropicMessage)
-          .filter((message): message is Record<string, unknown> => Boolean(message)),
-        tools: input.tools.length > 0 ? toAnthropicTools(input) : undefined,
+        system: system.length > 0 ? system : undefined,
+        messages,
+        tools: tools.length > 0 ? tools : undefined,
       }),
       signal: input.signal,
     });

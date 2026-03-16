@@ -853,6 +853,12 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     model: session.model,
     group: (body as { group?: string }).group ?? session.group,
   });
+  if (session.providerSessionId) {
+    ctx.registry.setProviderSessionId(forked.id, session.providerSessionId);
+  }
+  if (session.providerState) {
+    ctx.registry.setProviderState(forked.id, session.providerState);
+  }
   cloneManagedHistoryIfPresent(ctx, session, forked);
 
   try {

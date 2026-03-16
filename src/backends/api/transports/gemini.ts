@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { RemoteProviderInstanceConfig } from '../../cli/config.js';
 import type {
   ApiCompletionInput,
@@ -10,6 +11,7 @@ import type {
 import { readErrorBody } from './streaming.js';
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
+const DEFAULT_CACHE_TTL = '3600s';
 
 function requireApiKey(instance: RemoteProviderInstanceConfig, env: NodeJS.ProcessEnv): string {
   const apiKeyEnv = instance.apiKeyEnv;
@@ -28,6 +30,10 @@ function requireApiKey(instance: RemoteProviderInstanceConfig, env: NodeJS.Proce
 function resolveBaseUrl(instance: RemoteProviderInstanceConfig, env: NodeJS.ProcessEnv): string {
   const fromEnv = instance.baseUrlEnv ? env[instance.baseUrlEnv] : undefined;
   return fromEnv || instance.baseUrl || 'https://generativelanguage.googleapis.com';
+}
+
+function modelResourceName(model: string): string {
+  return model.startsWith('models/') ? model : `models/${model}`;
 }
 
 function extractSystemInstruction(
@@ -100,6 +106,51 @@ function toGeminiTools(input: ApiCompletionInput): Array<Record<string, unknown>
   }];
 }
 
+function approximateTokenCount(value: unknown): number {
+  return Math.ceil(JSON.stringify(value).length / 4);
+}
+
+function minimumCacheTokensForModel(model: string): number {
+  const normalized = model.toLowerCase();
+  if (normalized.includes('pro')) {
+    return 4096;
+  }
+  return 1024;
+}
+
+function cacheKeyForPrefix(
+  model: string,
+  systemInstruction: Record<string, unknown> | undefined,
+  tools: Array<Record<string, unknown>>,
+  prefixContents: Array<Record<string, unknown>>,
+): string {
+  return createHash('sha256')
+    .update(JSON.stringify({
+      model,
+      systemInstruction,
+      tools,
+      prefixContents,
+    }))
+    .digest('hex');
+}
+
+function isExpired(expiresAt?: string): boolean {
+  if (!expiresAt) {
+    return false;
+  }
+
+  const expiry = Date.parse(expiresAt);
+  return Number.isFinite(expiry) && expiry <= Date.now();
+}
+
+function shouldInvalidateCachedContent(errorBody: string): boolean {
+  const normalized = errorBody.toLowerCase();
+  return normalized.includes('cachedcontent')
+    || normalized.includes('cached content')
+    || normalized.includes('not found')
+    || normalized.includes('expired');
+}
+
 function extractAssistantParts(payload: Record<string, unknown>): ApiConversationPart[] {
   const candidates = Array.isArray(payload.candidates) ? payload.candidates : [];
   const candidate = candidates[0] && typeof candidates[0] === 'object'
@@ -151,47 +202,136 @@ export class GeminiTransport implements ApiTransportClient {
   async completeTurn(input: ApiCompletionInput): Promise<ApiCompletionResponse> {
     const apiKey = requireApiKey(input.instance, this.env);
     const baseUrl = resolveBaseUrl(input.instance, this.env);
-    const endpoint = `${baseUrl.replace(/\/$/, '')}/v1beta/models/${
+    const trimmedBaseUrl = baseUrl.replace(/\/$/, '');
+    const endpoint = `${trimmedBaseUrl}/v1beta/models/${
       encodeURIComponent(input.model)
     }:generateContent`;
+    const systemInstruction = extractSystemInstruction(input.messages);
+    const contents = toGeminiContents(input.messages);
+    const tools = toGeminiTools(input);
+    let nextSessionState = input.sessionState;
 
-    const response = await this.fetchImpl(endpoint, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-goog-api-key': apiKey,
-        ...input.instance.headers,
-      },
-      body: JSON.stringify({
-        systemInstruction: extractSystemInstruction(input.messages),
-        contents: toGeminiContents(input.messages),
-        tools: toGeminiTools(input),
-        generationConfig: {
-          maxOutputTokens: input.instance.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+    const generationConfig = {
+      maxOutputTokens: input.instance.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+    };
+
+    const sendGenerate = async (body: Record<string, unknown>): Promise<ApiCompletionResponse> => {
+      const response = await this.fetchImpl(endpoint, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-goog-api-key': apiKey,
+          ...input.instance.headers,
         },
-      }),
-      signal: input.signal,
-    });
+        body: JSON.stringify(body),
+        signal: input.signal,
+      });
 
-    if (!response.ok) {
-      throw new Error(`Gemini request failed: ${await readErrorBody(response)}`);
+      if (!response.ok) {
+        throw new Error(`Gemini request failed: ${await readErrorBody(response)}`);
+      }
+
+      const payload = await response.json() as Record<string, unknown>;
+      const usage = payload.usageMetadata && typeof payload.usageMetadata === 'object'
+        ? payload.usageMetadata as Record<string, unknown>
+        : {};
+
+      return {
+        assistant: {
+          role: 'assistant',
+          parts: extractAssistantParts(payload),
+        },
+        usage: {
+          inputTokens: typeof usage.promptTokenCount === 'number' ? usage.promptTokenCount : 0,
+          outputTokens: typeof usage.candidatesTokenCount === 'number' ? usage.candidatesTokenCount : 0,
+        },
+        sessionState: nextSessionState,
+        raw: payload,
+      };
+    };
+
+    const canUseExplicitCache = (input.turnStep ?? 0) === 0 && contents.length > 1;
+    if (canUseExplicitCache) {
+      const prefixContents = contents.slice(0, -1);
+      const suffixContents = contents.slice(-1);
+      const estimatedTokens = approximateTokenCount({
+        systemInstruction,
+        tools,
+        prefixContents,
+      });
+
+      if (estimatedTokens >= minimumCacheTokensForModel(input.model)) {
+        const prefixKey = cacheKeyForPrefix(input.model, systemInstruction, tools, prefixContents);
+        let cachedContentName: string | undefined;
+        const existingCache = input.sessionState?.geminiCachedContent;
+
+        if (
+          existingCache
+          && existingCache.key === prefixKey
+          && existingCache.model === input.model
+          && !isExpired(existingCache.expiresAt)
+        ) {
+          cachedContentName = existingCache.name;
+        } else {
+          const cacheResponse = await this.fetchImpl(`${trimmedBaseUrl}/v1beta/cachedContents`, {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              'x-goog-api-key': apiKey,
+              ...input.instance.headers,
+            },
+            body: JSON.stringify({
+              model: modelResourceName(input.model),
+              systemInstruction,
+              contents: prefixContents,
+              tools: tools.length > 0 ? tools : undefined,
+              ttl: DEFAULT_CACHE_TTL,
+            }),
+            signal: input.signal,
+          });
+
+          if (cacheResponse.ok) {
+            const payload = await cacheResponse.json() as Record<string, unknown>;
+            if (typeof payload.name === 'string') {
+              cachedContentName = payload.name;
+              nextSessionState = {
+                geminiCachedContent: {
+                  name: payload.name,
+                  key: prefixKey,
+                  model: input.model,
+                  prefixMessageCount: prefixContents.length,
+                  expiresAt: typeof payload.expireTime === 'string' ? payload.expireTime : undefined,
+                },
+              };
+            }
+          } else {
+            nextSessionState = {};
+          }
+        }
+
+        if (cachedContentName) {
+          try {
+            return await sendGenerate({
+              cachedContent: cachedContentName,
+              contents: suffixContents,
+              generationConfig,
+            });
+          } catch (error) {
+            if (shouldInvalidateCachedContent(String(error))) {
+              nextSessionState = {};
+            } else {
+              throw error;
+            }
+          }
+        }
+      }
     }
 
-    const payload = await response.json() as Record<string, unknown>;
-    const usage = payload.usageMetadata && typeof payload.usageMetadata === 'object'
-      ? payload.usageMetadata as Record<string, unknown>
-      : {};
-
-    return {
-      assistant: {
-        role: 'assistant',
-        parts: extractAssistantParts(payload),
-      },
-      usage: {
-        inputTokens: typeof usage.promptTokenCount === 'number' ? usage.promptTokenCount : 0,
-        outputTokens: typeof usage.candidatesTokenCount === 'number' ? usage.candidatesTokenCount : 0,
-      },
-      raw: payload,
-    };
+    return sendGenerate({
+      systemInstruction,
+      contents,
+      tools: tools.length > 0 ? tools : undefined,
+      generationConfig,
+    });
   }
 }

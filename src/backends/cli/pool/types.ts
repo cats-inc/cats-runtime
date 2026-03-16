@@ -1,4 +1,5 @@
 export type {
+  GeminiCachedContentState,
   PermissionMode,
   SessionActivity,
   SessionControlMode,
@@ -6,6 +7,7 @@ export type {
   SessionInfo,
   SessionOrigin,
   SessionOwnership,
+  SessionProviderState,
   SessionResumeStrategy,
   SessionStatus,
   SessionView,

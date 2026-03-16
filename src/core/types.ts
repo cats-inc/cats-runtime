@@ -16,6 +16,18 @@ export type ProviderBackend = 'cli' | 'api' | 'local';
 
 export type WorkspaceMode = 'isolated' | 'shared' | 'read_only';
 
+export interface GeminiCachedContentState {
+  name: string;
+  key: string;
+  model: string;
+  prefixMessageCount: number;
+  expiresAt?: string;
+}
+
+export interface SessionProviderState {
+  geminiCachedContent?: GeminiCachedContentState;
+}
+
 export interface SessionControls {
   canSend: boolean;
   canResume: boolean;
@@ -30,6 +42,7 @@ export interface SessionInfo {
   providerBackend?: ProviderBackend;
   providerInstanceId?: string;
   providerSessionId?: string;
+  providerState?: SessionProviderState;
   status: SessionStatus;
   origin: SessionOrigin;
   cwd: string;

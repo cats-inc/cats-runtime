@@ -1,7 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import type { PermissionMode, SessionInfo, SessionStatus, WorkspaceMode } from './types.js';
+import type {
+  PermissionMode,
+  SessionInfo,
+  SessionProviderState,
+  SessionStatus,
+  WorkspaceMode,
+} from './types.js';
 import type { ProviderDefaultTarget } from '../config.js';
 import { normalizeSessionOrigin } from './sessionView.js';
 
@@ -239,6 +245,15 @@ export class SessionRegistry {
     if (!session) return false;
     session.providerSessionId = providerSessionId;
     this.applyPendingDiscovered(session, providerSessionId);
+    session.updatedAt = new Date().toISOString();
+    this.scheduleSave();
+    return true;
+  }
+
+  setProviderState(id: string, providerState?: SessionProviderState): boolean {
+    const session = this.sessions.get(id);
+    if (!session) return false;
+    session.providerState = cloneProviderState(providerState);
     session.updatedAt = new Date().toISOString();
     this.scheduleSave();
     return true;
@@ -697,6 +712,9 @@ export class SessionRegistry {
     if (!target.providerSourcePath && incoming.providerSourcePath) {
       target.providerSourcePath = incoming.providerSourcePath;
     }
+    if (!target.providerState && incoming.providerState) {
+      target.providerState = cloneProviderState(incoming.providerState);
+    }
     target.messageCount = Math.max(target.messageCount, incoming.messageCount);
     target.totalInputTokens = Math.max(target.totalInputTokens, incoming.totalInputTokens);
     target.totalOutputTokens = Math.max(target.totalOutputTokens, incoming.totalOutputTokens);
@@ -718,4 +736,19 @@ function laterOptionalTimestamp(left?: string, right?: string): string | undefin
   if (!left) return right;
   if (!right) return left;
   return left >= right ? left : right;
+}
+
+function cloneProviderState(
+  providerState?: SessionProviderState,
+): SessionProviderState | undefined {
+  if (!providerState) {
+    return undefined;
+  }
+
+  const normalized: SessionProviderState = {};
+  if (providerState.geminiCachedContent) {
+    normalized.geminiCachedContent = { ...providerState.geminiCachedContent };
+  }
+
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
 }

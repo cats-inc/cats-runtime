@@ -93,6 +93,38 @@ describe('SessionRegistry', () => {
     expect(registry.get(s.id)?.providerSessionId).toBe('claude-xyz');
   });
 
+  it('persists provider state metadata across reloads', () => {
+    const persistDir = mkdtempSync(join(tmpdir(), 'session-registry-state-test-'));
+
+    try {
+      registry = new SessionRegistry(persistDir);
+      const session = registry.create({ providerName: 'gemini', cwd: '/repo' });
+      registry.setProviderState(session.id, {
+        geminiCachedContent: {
+          name: 'cachedContents/test-cache',
+          key: 'cache-key',
+          model: 'gemini-3-flash-preview',
+          prefixMessageCount: 2,
+          expiresAt: '2026-03-16T03:00:00Z',
+        },
+      });
+      registry.flush();
+
+      const reloaded = new SessionRegistry(persistDir);
+      expect(reloaded.get(session.id)?.providerState).toEqual({
+        geminiCachedContent: {
+          name: 'cachedContents/test-cache',
+          key: 'cache-key',
+          model: 'gemini-3-flash-preview',
+          prefixMessageCount: 2,
+          expiresAt: '2026-03-16T03:00:00Z',
+        },
+      });
+    } finally {
+      rmSync(persistDir, { recursive: true, force: true });
+    }
+  });
+
   it('removes a session', () => {
     const s = registry.create({ providerName: 'claude', cwd: '/a' });
     const result = registry.remove(s.id);

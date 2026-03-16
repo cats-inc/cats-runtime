@@ -201,13 +201,13 @@ export class ApiBackendManager {
     message: string,
     signal: AbortSignal,
   ): AsyncGenerator<StreamEvent> {
-    const session = this.registry.get(sessionId);
-    if (!session) {
+    const initialSession = this.registry.get(sessionId);
+    if (!initialSession) {
       throw new Error(`Session '${sessionId}' not found`);
     }
 
     const remoteInstance = ensureRemoteTarget(target);
-    const model = session.model || remoteInstance.model;
+    const model = initialSession.model || remoteInstance.model;
     if (!model) {
       throw new Error(
         `Provider '${target.providerName}' target '${target.backend}/${target.instanceId}' `
@@ -215,7 +215,7 @@ export class ApiBackendManager {
       );
     }
 
-    const transcriptPath = session.sourcePath || session.providerSourcePath;
+    const transcriptPath = initialSession.sourcePath || initialSession.providerSourcePath;
     const conversation = prependSystemPrompt(
       await loadTranscriptMessages(transcriptPath),
       remoteInstance.systemPrompt,
@@ -229,9 +229,11 @@ export class ApiBackendManager {
 
     const transport = buildTransport(remoteInstance, this.options);
     const toolDefinitions = this.tools.listTools(remoteInstance.toolProfile);
-    const permissionMode = session.permissionMode || (session.workspaceMode === 'read_only' ? 'default' : 'skip');
+    const permissionMode = initialSession.permissionMode
+      || (initialSession.workspaceMode === 'read_only' ? 'default' : 'skip');
 
-    let responseId: string | undefined;
+    let responseId = initialSession.providerSessionId;
+    let sessionState = initialSession.providerState;
     let initialized = false;
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
@@ -241,24 +243,32 @@ export class ApiBackendManager {
     for (let step = 0; step < maxToolSteps; step += 1) {
       const completion = await transport.completeTurn({
         sessionId,
-        providerName: session.providerName,
+        providerName: initialSession.providerName,
         instance: remoteInstance,
         model,
         messages: conversation,
         tools: toolDefinitions,
+        previousResponseId: responseId,
+        sessionState,
+        turnStep: step,
         signal,
       });
 
+      if (completion.responseId) {
+        responseId = completion.responseId;
+      }
+      if (completion.sessionState !== undefined) {
+        sessionState = completion.sessionState;
+        this.registry.setProviderState(sessionId, sessionState);
+      }
+
       if (!initialized) {
         initialized = true;
-        responseId = completion.responseId || responseId;
         yield {
           type: 'init',
           sessionId: responseId,
           raw: completion.raw,
         };
-      } else if (!responseId && completion.responseId) {
-        responseId = completion.responseId;
       }
 
       totalInputTokens += completion.usage?.inputTokens ?? 0;
@@ -306,10 +316,10 @@ export class ApiBackendManager {
       for (const toolCall of toolCalls) {
         const toolResult = await this.tools.execute({
           sessionId,
-          cwd: session.cwd,
-          workspaceMode: session.workspaceMode,
+          cwd: initialSession.cwd,
+          workspaceMode: initialSession.workspaceMode,
           permissionMode,
-          allowedTools: session.allowedTools,
+          allowedTools: initialSession.allowedTools,
           toolProfile: remoteInstance.toolProfile,
         }, {
           id: toolCall.id,

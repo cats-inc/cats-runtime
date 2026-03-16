@@ -1,4 +1,8 @@
-import type { HealthStatus, ProviderCapabilities } from '../../core/types.js';
+import type {
+  HealthStatus,
+  ProviderCapabilities,
+  SessionProviderState,
+} from '../../core/types.js';
 import type { ToolDefinition, ToolExecutionContext, ToolResult } from '../../core/tools/LocalToolRuntime.js';
 import type { RemoteProviderInstanceConfig } from '../cli/config.js';
 
@@ -40,6 +44,9 @@ export interface ApiCompletionInput {
   model: string;
   messages: ApiConversationMessage[];
   tools: ToolDefinition[];
+  previousResponseId?: string;
+  sessionState?: SessionProviderState;
+  turnStep?: number;
   signal?: AbortSignal;
 }
 
@@ -50,6 +57,7 @@ export interface ApiCompletionResponse {
     inputTokens: number;
     outputTokens: number;
   };
+  sessionState?: SessionProviderState;
   raw?: unknown;
 }
 

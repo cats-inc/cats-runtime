@@ -203,81 +203,71 @@ describe('API backend integration', () => {
     let openAiCalls = 0;
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       const url = typeof input === 'string' ? input : input.url;
-      if (!url.includes('/v1/chat/completions')) {
+      if (!url.includes('/v1/responses')) {
         throw new Error(`Unexpected fetch URL: ${url}`);
       }
 
       openAiCalls += 1;
       if (openAiCalls === 1) {
         return jsonResponse({
-          id: 'chatcmpl-1',
-          choices: [{
-            message: {
-              role: 'assistant',
-              tool_calls: [{
-                id: 'call_1',
-                type: 'function',
-                function: {
-                  name: 'read_file',
-                  arguments: '{"path":"src/app.ts"}',
-                },
-              }],
-            },
+          id: 'resp_1',
+          output: [{
+            type: 'function_call',
+            call_id: 'call_1',
+            name: 'read_file',
+            arguments: '{"path":"src/app.ts"}',
           }],
-          usage: { prompt_tokens: 5, completion_tokens: 4 },
+          usage: { input_tokens: 5, output_tokens: 4 },
+        });
+      }
+
+      if (openAiCalls === 2) {
+        const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
+        const inputItems = Array.isArray(body.input) ? body.input : [];
+        expect(body.previous_response_id).toBe('resp_1');
+        expect(inputItems.some((message) => {
+          if (!message || typeof message !== 'object') return false;
+          const payload = message as Record<string, unknown>;
+          return payload.type === 'function_call_output'
+            && payload.call_id === 'call_1'
+            && typeof payload.output === 'string'
+            && payload.output.includes('export const value = 7;');
+        })).toBe(true);
+
+        return jsonResponse({
+          id: 'resp_2',
+          output: [{
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: 'The file exports value 7.' }],
+          }],
+          usage: { input_tokens: 6, output_tokens: 7 },
         });
       }
 
       const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
-      const messages = Array.isArray(body.messages) ? body.messages : [];
+      const inputItems = Array.isArray(body.input) ? body.input : [];
+      expect(body.previous_response_id).toBe('resp_2');
+      expect(inputItems).toEqual([
+        { role: 'user', content: 'Which file was that?' },
+      ]);
+      expect(body.instructions).toBeUndefined();
 
-      if (openAiCalls === 2) {
-        expect(messages.some((message) => {
-          if (!message || typeof message !== 'object') return false;
-          const payload = message as Record<string, unknown>;
-          return payload.role === 'tool'
-            && typeof payload.content === 'string'
-            && payload.content.includes('export const value = 7;');
-        })).toBe(true);
-
-        return jsonResponse({
-          id: 'chatcmpl-2',
-          choices: [{
-            message: {
-              role: 'assistant',
-              content: 'The file exports value 7.',
-            },
-          }],
-          usage: { prompt_tokens: 6, completion_tokens: 7 },
-        });
-      }
-
-      expect(messages.some((message) => {
+      expect(inputItems.some((message) => {
         if (!message || typeof message !== 'object') return false;
         const payload = message as Record<string, unknown>;
-        return payload.role === 'assistant'
-          && Array.isArray(payload.tool_calls)
-          && (payload.tool_calls as Array<Record<string, unknown>>).some((toolCall) =>
-            toolCall.function && typeof toolCall.function === 'object'
-            && (toolCall.function as Record<string, unknown>).name === 'read_file');
-      })).toBe(true);
-      expect(messages.some((message) => {
-        if (!message || typeof message !== 'object') return false;
-        const payload = message as Record<string, unknown>;
-        return payload.role === 'tool'
-          && typeof payload.content === 'string'
-          && payload.content.includes('export const value = 7;');
+        return payload.role === 'user'
+          && payload.content === 'Which file was that?';
       })).toBe(true);
 
       return jsonResponse({
-        id: 'chatcmpl-3',
-        choices: [{
-          message: {
-            role: 'assistant',
-            content: 'It was src/app.ts.',
-          },
+        id: 'resp_3',
+        output: [{
+          type: 'message',
+          role: 'assistant',
+          content: [{ type: 'output_text', text: 'It was src/app.ts.' }],
         }],
-        usage: { prompt_tokens: 4, completion_tokens: 5 },
+        usage: { input_tokens: 4, output_tokens: 5 },
       });
     });
 
@@ -319,7 +309,7 @@ describe('API backend integration', () => {
       expect(messageResponse.status).toBe(200);
       const streamEvents = parseNdjson(await messageResponse.text());
       expect(streamEvents).toEqual([
-        expect.objectContaining({ type: 'init', sessionId: 'chatcmpl-1' }),
+        expect.objectContaining({ type: 'init', sessionId: 'resp_1' }),
         expect.objectContaining({
           type: 'tool_use',
           toolName: 'read_file',
@@ -334,7 +324,7 @@ describe('API backend integration', () => {
         expect.objectContaining({ type: 'text', text: 'The file exports value 7.' }),
         expect.objectContaining({
           type: 'result',
-          sessionId: 'chatcmpl-1',
+          sessionId: 'resp_2',
           usage: { inputTokens: 11, outputTokens: 11 },
         }),
       ]);
@@ -368,11 +358,11 @@ describe('API backend integration', () => {
       });
       expect(secondMessageResponse.status).toBe(200);
       expect(parseNdjson(await secondMessageResponse.text())).toEqual([
-        expect.objectContaining({ type: 'init', sessionId: 'chatcmpl-3' }),
+        expect.objectContaining({ type: 'init', sessionId: 'resp_3' }),
         expect.objectContaining({ type: 'text', text: 'It was src/app.ts.' }),
         expect.objectContaining({
           type: 'result',
-          sessionId: 'chatcmpl-3',
+          sessionId: 'resp_3',
           usage: { inputTokens: 4, outputTokens: 5 },
         }),
       ]);
@@ -477,7 +467,7 @@ describe('API backend integration', () => {
         expect.objectContaining({ type: 'text', text: 'Claude saw value 7.' }),
         expect.objectContaining({
           type: 'result',
-          sessionId: 'msg_1',
+          sessionId: 'msg_2',
           usage: { inputTokens: 7, outputTokens: 7 },
         }),
       ]);
@@ -514,6 +504,146 @@ describe('API backend integration', () => {
           usage: { inputTokens: 5, outputTokens: 5 },
         }),
       ]);
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
+  it('persists Gemini cached content metadata and reuses it after resume', async () => {
+    const { config, env, cleanup } = createApiConfigRoot();
+    const largePrompt = 'A'.repeat(18000);
+    let cacheCreateCalls = 0;
+    let generateCalls = 0;
+
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/v1beta/cachedContents')) {
+        cacheCreateCalls += 1;
+        const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
+        const contents = Array.isArray(body.contents) ? body.contents : [];
+        expect(contents).toHaveLength(2);
+        return jsonResponse({
+          name: 'cachedContents/gemini-session',
+          expireTime: '2026-03-16T03:00:00Z',
+        });
+      }
+
+      if (url.includes(':generateContent')) {
+        generateCalls += 1;
+        const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
+
+        if (generateCalls === 1) {
+          expect(body.cachedContent).toBeUndefined();
+          return jsonResponse({
+            candidates: [{
+              content: {
+                parts: [{ text: 'Stored your long context.' }],
+              },
+            }],
+            usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 4 },
+          });
+        }
+
+        expect(body.cachedContent).toBe('cachedContents/gemini-session');
+        expect(body.contents).toEqual([
+          {
+            role: 'user',
+            parts: [{ text: 'What do you remember?' }],
+          },
+        ]);
+        return jsonResponse({
+          candidates: [{
+            content: {
+              parts: [{ text: 'I reused the cached history.' }],
+            },
+          }],
+          usageMetadata: { promptTokenCount: 6, candidatesTokenCount: 5 },
+        });
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    const runtime = createRuntimeServer(config, {
+      apiBackend: {
+        fetch: fetchMock,
+        env: {
+          ...env,
+          OPENAI_API_KEY: 'openai-test-key',
+          ANTHROPIC_API_KEY: 'anthropic-test-key',
+          GEMINI_API_KEY: 'gemini-test-key',
+        },
+      },
+    });
+
+    try {
+      const createResponse = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'gemini',
+          cwd: join(env.HOME, 'repo'),
+          workspaceMode: 'shared',
+        }),
+      });
+      expect(createResponse.status).toBe(201);
+      const session = await createResponse.json() as Record<string, unknown>;
+
+      const firstMessage = await runtime.app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({ message: largePrompt }),
+      });
+      expect(firstMessage.status).toBe(200);
+      expect(parseNdjson(await firstMessage.text())).toEqual([
+        expect.objectContaining({ type: 'init' }),
+        expect.objectContaining({ type: 'text', text: 'Stored your long context.' }),
+        expect.objectContaining({
+          type: 'result',
+          usage: { inputTokens: 10, outputTokens: 4 },
+        }),
+      ]);
+
+      const closeResponse = await runtime.app.request(`/sessions/${session.id}/close`, {
+        method: 'POST',
+      });
+      expect(closeResponse.status).toBe(200);
+
+      const resumeResponse = await runtime.app.request(`/sessions/${session.id}/resume`, {
+        method: 'POST',
+      });
+      expect(resumeResponse.status).toBe(200);
+
+      const secondMessage = await runtime.app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({ message: 'What do you remember?' }),
+      });
+      expect(secondMessage.status).toBe(200);
+      expect(parseNdjson(await secondMessage.text())).toEqual([
+        expect.objectContaining({ type: 'init' }),
+        expect.objectContaining({ type: 'text', text: 'I reused the cached history.' }),
+        expect.objectContaining({
+          type: 'result',
+          usage: { inputTokens: 6, outputTokens: 5 },
+        }),
+      ]);
+
+      expect(cacheCreateCalls).toBe(1);
+      expect(generateCalls).toBe(2);
+      expect(runtime.context.registry.get(String(session.id))?.providerState).toEqual({
+        geminiCachedContent: expect.objectContaining({
+          name: 'cachedContents/gemini-session',
+          model: 'gemini-2.5-pro',
+        }),
+      });
     } finally {
       await runtime.close();
       cleanup();
@@ -635,7 +765,7 @@ describe('API backend integration', () => {
         expect.objectContaining({ type: 'text', text: 'Both files were inspected.' }),
         expect.objectContaining({
           type: 'result',
-          sessionId: 'msg_1',
+          sessionId: 'msg_2',
           usage: { inputTokens: 7, outputTokens: 7 },
         }),
       ]);
