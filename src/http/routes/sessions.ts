@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { Hono } from 'hono';
 import { getRuntimeSessionManager, type AppContext } from '../app.js';
 import {
   type ProviderInstanceConfig,
 } from '../../backends/cli/config.js';
+import type { SessionsIndex } from '../../backends/cli/discovery/types.js';
+import type { PreparedFileDeletion } from '../../backends/cli/pool/SessionRegistry.js';
 import type {
   SessionInfo,
   SessionInvocationContext,
@@ -239,6 +241,217 @@ function collectProviderDiscoveryArtifactPaths(ctx: AppContext, session: Session
   return Array.from(artifactPaths);
 }
 
+function createNoopPreparedDeletion(): PreparedFileDeletion {
+  return {
+    hadFiles: false,
+    ready: true,
+    finalize: () => ({ fileDeleted: false }),
+    rollback: () => {},
+  };
+}
+
+function createFailedPreparedDeletion(hadFiles: boolean): PreparedFileDeletion {
+  return {
+    hadFiles,
+    ready: false,
+    finalize: () => ({ fileDeleted: false }),
+    rollback: () => {},
+  };
+}
+
+function combinePreparedDeletions(
+  ...preparedDeletions: PreparedFileDeletion[]
+): PreparedFileDeletion {
+  return {
+    hadFiles: preparedDeletions.some((prepared) => prepared.hadFiles),
+    ready: preparedDeletions.every((prepared) => prepared.ready),
+    finalize: () => {
+      let fileDeleted = false;
+      for (const prepared of preparedDeletions) {
+        fileDeleted = prepared.finalize().fileDeleted || fileDeleted;
+      }
+      return { fileDeleted };
+    },
+    rollback: () => {
+      for (const prepared of [...preparedDeletions].reverse()) {
+        prepared.rollback();
+      }
+    },
+  };
+}
+
+function prepareReplacementFileDeletion(
+  filePath: string,
+  nextContent: string,
+): PreparedFileDeletion {
+  if (!existsSync(filePath)) {
+    return createNoopPreparedDeletion();
+  }
+
+  const stagedPath = join(
+    dirname(filePath),
+    `.cats-runtime-delete-${randomUUID()}-${basename(filePath)}.pending-delete`,
+  );
+
+  try {
+    renameSync(filePath, stagedPath);
+    writeFileSync(filePath, nextContent);
+  } catch {
+    try {
+      if (existsSync(filePath)) {
+        rmSync(filePath, { force: true });
+      }
+    } catch {
+      // Best effort restore below.
+    }
+
+    try {
+      if (existsSync(stagedPath) && !existsSync(filePath)) {
+        renameSync(stagedPath, filePath);
+      }
+    } catch {
+      // If restore also fails we surface ready=false and let the delete abort.
+    }
+
+    return createFailedPreparedDeletion(true);
+  }
+
+  let completed = false;
+
+  return {
+    hadFiles: true,
+    ready: true,
+    finalize: () => {
+      if (completed) {
+        return { fileDeleted: true };
+      }
+
+      completed = true;
+      try {
+        rmSync(stagedPath, { force: true });
+      } catch {
+        // Best effort only. The replacement file is already live at filePath.
+      }
+      return { fileDeleted: true };
+    },
+    rollback: () => {
+      if (completed) return;
+
+      completed = true;
+      try {
+        if (existsSync(filePath)) {
+          rmSync(filePath, { force: true });
+        }
+      } catch {
+        // Continue attempting to restore the original file.
+      }
+
+      try {
+        if (existsSync(stagedPath) && !existsSync(filePath)) {
+          renameSync(stagedPath, filePath);
+        }
+      } catch {
+        // Delete will still abort because the prepared deletion is not finalized.
+      }
+    },
+  };
+}
+
+function prepareClaudeSessionIndexDeletion(session: SessionInfo): PreparedFileDeletion {
+  if (session.providerName !== 'claude' || !session.providerSessionId) {
+    return createNoopPreparedDeletion();
+  }
+
+  const sourcePath = session.providerSourcePath || session.sourcePath;
+  if (!sourcePath) {
+    return createNoopPreparedDeletion();
+  }
+
+  const indexPath = join(dirname(sourcePath), 'sessions-index.json');
+  if (!existsSync(indexPath)) {
+    return createNoopPreparedDeletion();
+  }
+
+  let index: SessionsIndex;
+  try {
+    index = JSON.parse(readFileSync(indexPath, 'utf-8')) as SessionsIndex;
+  } catch {
+    // If Claude falls back to raw .jsonl scanning, deleting the transcript path is enough.
+    return createNoopPreparedDeletion();
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(index, session.providerSessionId)) {
+    return createNoopPreparedDeletion();
+  }
+
+  const nextIndex = { ...index };
+  delete nextIndex[session.providerSessionId];
+  return prepareReplacementFileDeletion(indexPath, `${JSON.stringify(nextIndex, null, 2)}\n`);
+}
+
+function prepareJunieSessionIndexDeletion(session: SessionInfo): PreparedFileDeletion {
+  if (session.providerName !== 'junie' || !session.providerSessionId) {
+    return createNoopPreparedDeletion();
+  }
+
+  const sourcePath = session.providerSourcePath || session.sourcePath;
+  if (!sourcePath) {
+    return createNoopPreparedDeletion();
+  }
+
+  const indexPath = join(dirname(dirname(sourcePath)), 'index.jsonl');
+  if (!existsSync(indexPath)) {
+    return createNoopPreparedDeletion();
+  }
+
+  let removedEntry = false;
+  let raw: string;
+  try {
+    raw = readFileSync(indexPath, 'utf-8');
+  } catch {
+    return createNoopPreparedDeletion();
+  }
+
+  const remainingLines: string[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    if (!line.trim()) {
+      continue;
+    }
+
+    try {
+      const entry = JSON.parse(line) as { sessionId?: string };
+      if (entry.sessionId === session.providerSessionId) {
+        removedEntry = true;
+        continue;
+      }
+    } catch {
+      // Preserve unknown lines verbatim rather than corrupting the index.
+    }
+
+    remainingLines.push(line);
+  }
+
+  if (!removedEntry) {
+    return createNoopPreparedDeletion();
+  }
+
+  const nextContent = remainingLines.length > 0
+    ? `${remainingLines.join('\n')}\n`
+    : '';
+  return prepareReplacementFileDeletion(indexPath, nextContent);
+}
+
+function prepareProviderDiscoveryDeletion(
+  ctx: AppContext,
+  session: SessionInfo,
+): PreparedFileDeletion {
+  return combinePreparedDeletions(
+    ctx.registry.preparePathDeletion(collectProviderDiscoveryArtifactPaths(ctx, session)),
+    prepareClaudeSessionIndexDeletion(session),
+    prepareJunieSessionIndexDeletion(session),
+  );
+}
+
 async function verifyProviderDiscoveryStateDeleted(
   _ctx: AppContext,
   session: SessionInfo,
@@ -247,11 +460,10 @@ async function verifyProviderDiscoveryStateDeleted(
     return true;
   }
 
-  // File-backed providers (auggie, claude, codex, copilot, gemini, pi, junie)
-  // are cleaned up by preparedProviderDiscovery.finalize() which deletes the
-  // source files. Verifying by re-scanning the disk here would always find the
-  // files still present because finalize() runs AFTER this check, causing the
-  // delete to be incorrectly rolled back. Trust the prepared deletion instead.
+  // File-backed providers are cleaned up by the prepared provider-discovery
+  // deletion step, which stages transcript files away and rewrites provider
+  // indexes for providers that need one. Re-scanning here would observe the
+  // pre-finalize filesystem state and incorrectly roll back the delete.
   return true;
 }
 
@@ -650,9 +862,7 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
   }
 
   const preparedManagedTranscripts = ctx.registry.prepareManagedTranscriptDeletion(id);
-  const preparedProviderDiscovery = ctx.registry.preparePathDeletion(
-    collectProviderDiscoveryArtifactPaths(ctx, session),
-  );
+  const preparedProviderDiscovery = prepareProviderDiscoveryDeletion(ctx, session);
   const hasNativeSessionState = tracksNativeSessionState(session);
   const hasProviderDiscoveryState = tracksProviderDiscoveryState(session);
   const hadTranscript = preparedManagedTranscripts.hadFiles

@@ -3,6 +3,8 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createRuntimeApp as createApp } from './app.js';
+import { SessionScanner } from '../backends/cli/discovery/SessionScanner.js';
+import { JunieSessionScanner } from '../backends/cli/junie/JunieSessionScanner.js';
 import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig } from '../backends/cli/config.js';
 import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
@@ -19,9 +21,11 @@ describe('file-discovered session deletion', () => {
   let auggieSessions: AuggieSessionService;
   let opencodeNative: OpencodeNativeSessionService;
   let app: ReturnType<typeof createApp>;
+  let claudeProjectsDir: string;
   let copilotSessionsDir: string;
   let geminiRootDir: string;
   let geminiSessionsDir: string;
+  let junieSessionsDir: string;
 
   const makeConfig = (): CliRuntimeConfig => ({
     host: '127.0.0.1',
@@ -71,11 +75,15 @@ describe('file-discovered session deletion', () => {
   });
 
   beforeEach(() => {
+    claudeProjectsDir = join(tmpdir(), `claude-delete-test-${Date.now()}`);
     copilotSessionsDir = join(tmpdir(), `copilot-delete-test-${Date.now()}`);
     geminiRootDir = join(tmpdir(), `gemini-delete-test-${Date.now()}`);
     geminiSessionsDir = join(geminiRootDir, 'tmp');
+    junieSessionsDir = join(tmpdir(), `junie-delete-test-${Date.now()}`);
+    mkdirSync(claudeProjectsDir, { recursive: true });
     mkdirSync(copilotSessionsDir, { recursive: true });
     mkdirSync(geminiSessionsDir, { recursive: true });
+    mkdirSync(junieSessionsDir, { recursive: true });
 
     registry = new SessionRegistry();
     pool = {
@@ -136,8 +144,66 @@ describe('file-discovered session deletion', () => {
   });
 
   afterEach(() => {
+    rmSync(claudeProjectsDir, { recursive: true, force: true });
     rmSync(copilotSessionsDir, { recursive: true, force: true });
     rmSync(geminiRootDir, { recursive: true, force: true });
+    rmSync(junieSessionsDir, { recursive: true, force: true });
+  });
+
+  it('deletes discovered Claude sessions without leaving sessions-index entries behind', async () => {
+    const projectDir = join(claudeProjectsDir, '-repo');
+    mkdirSync(projectDir, { recursive: true });
+
+    const sourcePath = join(projectDir, 'claude-delete.jsonl');
+    const keepPath = join(projectDir, 'claude-keep.jsonl');
+    writeFileSync(
+      sourcePath,
+      JSON.stringify({ type: 'user', message: { content: 'Delete me' }, cwd: 'C:/repo' }) + '\n',
+    );
+    writeFileSync(
+      keepPath,
+      JSON.stringify({ type: 'user', message: { content: 'Keep me' }, cwd: 'C:/repo' }) + '\n',
+    );
+    writeFileSync(
+      join(projectDir, 'sessions-index.json'),
+      JSON.stringify({
+        'claude-delete': {
+          cwd: 'C:/repo',
+          summary: 'Delete me',
+          message_count: 1,
+          last_message_at: '2026-03-11T08:00:00Z',
+        },
+        'claude-keep': {
+          cwd: 'C:/repo',
+          summary: 'Keep me',
+          message_count: 1,
+          last_message_at: '2026-03-11T08:01:00Z',
+        },
+      }, null, 2),
+    );
+
+    const session = registry.upsertDiscovered('claude-delete', {
+      providerName: 'claude',
+      cwd: 'C:/repo',
+      summary: 'Delete me',
+      sourcePath,
+      messageCount: 1,
+    });
+
+    const res = await app.request(`/sessions/${session!.id}`, {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.status).toBe('deleted');
+    expect(registry.get(session!.id)).toBeUndefined();
+    expect(existsSync(sourcePath)).toBe(false);
+    expect(existsSync(keepPath)).toBe(true);
+
+    const discovered = await new SessionScanner(claudeProjectsDir).scan();
+    expect(discovered.some((item) => item.providerSessionId === 'claude-delete')).toBe(false);
+    expect(discovered.some((item) => item.providerSessionId === 'claude-keep')).toBe(true);
   });
 
   it('deletes discovered Copilot directory sessions so they cannot be rediscovered', async () => {
@@ -218,5 +284,59 @@ describe('file-discovered session deletion', () => {
     expect(body.status).toBe('deleted');
     expect(registry.get(session!.id)).toBeUndefined();
     expect(existsSync(sourcePath)).toBe(false);
+  });
+
+  it('deletes discovered Junie sessions without leaving index entries behind', async () => {
+    const sessionDir = join(junieSessionsDir, 'junie-delete');
+    const keepDir = join(junieSessionsDir, 'junie-keep');
+    mkdirSync(sessionDir, { recursive: true });
+    mkdirSync(keepDir, { recursive: true });
+
+    const sourcePath = join(sessionDir, 'events.jsonl');
+    const keepPath = join(keepDir, 'events.jsonl');
+    writeFileSync(sourcePath, JSON.stringify({ type: 'user', text: 'Delete me' }) + '\n');
+    writeFileSync(keepPath, JSON.stringify({ type: 'user', text: 'Keep me' }) + '\n');
+    writeFileSync(
+      join(junieSessionsDir, 'index.jsonl'),
+      [
+        JSON.stringify({
+          sessionId: 'junie-delete',
+          createdAt: '2026-03-11T08:20:00Z',
+          updatedAt: '2026-03-11T08:21:00Z',
+          projectDir: 'C:/repo',
+          taskName: 'Delete me',
+        }),
+        JSON.stringify({
+          sessionId: 'junie-keep',
+          createdAt: '2026-03-11T08:30:00Z',
+          updatedAt: '2026-03-11T08:31:00Z',
+          projectDir: 'C:/repo',
+          taskName: 'Keep me',
+        }),
+      ].join('\n') + '\n',
+    );
+
+    const session = registry.upsertDiscovered('junie-delete', {
+      providerName: 'junie',
+      cwd: 'C:/repo',
+      summary: 'Delete me',
+      sourcePath,
+      messageCount: 1,
+    });
+
+    const res = await app.request(`/sessions/${session!.id}`, {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.status).toBe('deleted');
+    expect(registry.get(session!.id)).toBeUndefined();
+    expect(existsSync(sourcePath)).toBe(false);
+    expect(existsSync(keepPath)).toBe(true);
+
+    const discovered = await new JunieSessionScanner(junieSessionsDir).scan();
+    expect(discovered.some((item) => item.providerSessionId === 'junie-delete')).toBe(false);
+    expect(discovered.some((item) => item.providerSessionId === 'junie-keep')).toBe(true);
   });
 });
