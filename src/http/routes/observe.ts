@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
-import type { AppContext } from '../app.js';
+import { getRuntimeSessionManager, type AppContext } from '../app.js';
 import type { StreamEvent } from '../../backends/cli/providers/types.js';
 
 export const observeRoutes = new Hono();
@@ -15,8 +15,8 @@ observeRoutes.get('/sessions/:id/stream', async (c) => {
     return c.json({ error: 'Session not found' }, 404);
   }
 
-  const worker = ctx.pool.get(id);
-  if (!worker || !worker.alive) {
+  const worker = getRuntimeSessionManager(ctx).get(id);
+  if (!worker || !worker.active) {
     return c.json({ error: 'No active worker for this session' }, 404);
   }
 
@@ -42,7 +42,7 @@ observeRoutes.get('/sessions/:id/stream', async (c) => {
       closed = true;
     };
 
-    worker.on('event', onEvent);
+    worker.on('event', onEvent as (...args: unknown[]) => void);
     worker.on('exit', onExit);
 
     // Keepalive every 15s
@@ -57,14 +57,14 @@ observeRoutes.get('/sessions/:id/stream', async (c) => {
       // Hold the stream open until client disconnects or worker exits
       while (!closed) {
         await new Promise((r) => setTimeout(r, 1000));
-        if (!worker.alive) {
+        if (!worker.active) {
           onExit();
           break;
         }
       }
     } finally {
       clearInterval(keepalive);
-      worker.off('event', onEvent);
+      worker.off('event', onEvent as (...args: unknown[]) => void);
       worker.off('exit', onExit);
     }
   });

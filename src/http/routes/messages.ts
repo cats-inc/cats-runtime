@@ -2,7 +2,7 @@ import { appendFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
-import type { AppContext } from '../app.js';
+import { getRuntimeSessionManager, type AppContext } from '../app.js';
 import { formatSSE } from '../streaming.js';
 import type { SessionInfo } from '../../backends/cli/pool/types.js';
 import type { SessionRegistry } from '../../backends/cli/pool/SessionRegistry.js';
@@ -60,12 +60,12 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     return c.json({ error: 'message is required' }, 400);
   }
 
-  const worker = ctx.pool.get(id);
+  const worker = getRuntimeSessionManager(ctx).get(id);
   if (!worker) {
     return c.json({ error: 'No active worker. Resume the session first.' }, 404);
   }
 
-  if (!worker.alive) {
+  if (!worker.active) {
     ctx.registry.updateStatus(id, 'closed');
     return c.json({ error: 'Worker process has exited' }, 410);
   }

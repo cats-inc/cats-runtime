@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { basename, dirname, join } from 'node:path';
 import { Hono } from 'hono';
-import type { AppContext } from '../app.js';
+import { getRuntimeSessionManager, type AppContext } from '../app.js';
 import {
   getProviderDefaultInstanceId,
   resolveProviderInstance,
@@ -43,7 +43,7 @@ const SESSION_PROVIDERS = KNOWN_PROVIDERS;
 
 function serializeSession(ctx: AppContext, session: SessionInfo) {
   return toSessionView(session, {
-    attached: Boolean(ctx.pool.get(session.id)?.alive),
+    attached: getRuntimeSessionManager(ctx).isAttached(session.id),
     externalSessionLiveWindowMs: ctx.config.externalSessionLiveWindowMs,
   });
 }
@@ -53,7 +53,7 @@ function serializeSessions(
   sessions: SessionInfo[],
 ) {
   return toSessionViews(sessions, {
-    isAttached: (session) => Boolean(ctx.pool.get(session.id)?.alive),
+    isAttached: (session) => getRuntimeSessionManager(ctx).isAttached(session.id),
     externalSessionLiveWindowMs: ctx.config.externalSessionLiveWindowMs,
   });
 }
@@ -231,6 +231,7 @@ sessionRoutes.post('/sessions', async (c) => {
   }>();
 
   const providerName = body.provider ?? 'claude';
+  const runtime = getRuntimeSessionManager(ctx);
 
   if (!(SESSION_PROVIDERS as readonly string[]).includes(providerName)) {
     return c.json({
@@ -261,7 +262,7 @@ sessionRoutes.post('/sessions', async (c) => {
   }
 
   if (providerName === 'cursor') {
-    const caps = ctx.pool.getCapabilities('cursor', providerInstance.id);
+    const caps = runtime.getCapabilities('cursor', providerInstance.id);
     if (!caps.permissions && resolved.workspaceMode === 'read_only') {
       return c.json({
         error: `Provider '${providerName}' does not support permission enforcement required by read_only workspace`,
@@ -286,7 +287,7 @@ sessionRoutes.post('/sessions', async (c) => {
       session.lastActivity = native.lastActivity;
 
       ctx.registry.setProviderSessionId(session.id, native.providerSessionId);
-      ctx.pool.spawn(session.id, providerName, {
+      runtime.spawn(session.id, providerName, {
         cwd: resolved.cwd,
         workspaceMode: resolved.workspaceMode,
         model: body.model || native.model,
@@ -317,7 +318,7 @@ sessionRoutes.post('/sessions', async (c) => {
   }
 
   if (providerName === 'opencode') {
-    const caps = ctx.pool.getCapabilities('opencode', providerInstance.id);
+    const caps = runtime.getCapabilities('opencode', providerInstance.id);
     if (!caps.permissions && resolved.workspaceMode === 'read_only') {
       return c.json({
         error: `Provider '${providerName}' does not support permission enforcement required by read_only workspace`,
@@ -342,7 +343,7 @@ sessionRoutes.post('/sessions', async (c) => {
       session.lastActivity = native.lastActivity;
 
       ctx.registry.setProviderSessionId(session.id, native.providerSessionId);
-      ctx.pool.spawn(session.id, providerName, {
+      runtime.spawn(session.id, providerName, {
         cwd: resolved.cwd,
         workspaceMode: resolved.workspaceMode,
         model: body.model,
@@ -372,7 +373,7 @@ sessionRoutes.post('/sessions', async (c) => {
     }
   }
 
-  const caps = ctx.pool.getCapabilities(providerName, providerInstance.id);
+  const caps = runtime.getCapabilities(providerName, providerInstance.id);
 
   if (!caps.permissions && resolved.workspaceMode === 'read_only') {
     return c.json({
@@ -396,7 +397,7 @@ sessionRoutes.post('/sessions', async (c) => {
   });
 
   try {
-    ctx.pool.spawn(session.id, providerName, {
+    runtime.spawn(session.id, providerName, {
       cwd: resolved.cwd,
       workspaceMode: resolved.workspaceMode,
       model: body.model,
@@ -447,6 +448,7 @@ sessionRoutes.get('/sessions/:id', (c) => {
 /** POST /sessions/:id/close — stop worker, keep session in registry */
 sessionRoutes.post('/sessions/:id/close', (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
+  const runtime = getRuntimeSessionManager(ctx);
   const id = c.req.param('id');
   const session = ctx.registry.get(id);
 
@@ -462,24 +464,24 @@ sessionRoutes.post('/sessions/:id/close', (c) => {
   }
 
   if (session.providerName === 'cursor') {
-    const worker = ctx.pool.get(id);
-    if (worker?.alive) {
+    const worker = runtime.get(id);
+    if (worker?.active) {
       ctx.registry.updateStatus(id, 'closing');
-      ctx.pool.kill(id);
+      runtime.kill(id);
       return c.json({ status: 'closing' });
     }
     ctx.registry.updateStatus(id, 'closed');
     return c.json({ status: 'closed' });
   }
 
-  const worker = ctx.pool.get(id);
-  if (!worker?.alive) {
+  const worker = runtime.get(id);
+  if (!worker?.active) {
     ctx.registry.updateStatus(id, 'closed');
     return c.json({ status: 'closed' });
   }
 
   ctx.registry.updateStatus(id, 'closing');
-  ctx.pool.kill(id);
+  runtime.kill(id);
   return c.json({ status: 'closing' });
 });
 
@@ -561,9 +563,9 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
     });
   }
 
-  const worker = ctx.pool.get(id);
+  const worker = getRuntimeSessionManager(ctx).get(id);
   if (worker) {
-    ctx.pool.kill(id);
+    getRuntimeSessionManager(ctx).kill(id);
   }
 
   const managedDeletion = preparedManagedTranscripts.finalize();
@@ -587,6 +589,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const id = c.req.param('id');
   const session = ctx.registry.get(id);
+  const runtime = getRuntimeSessionManager(ctx);
 
   if (!session) {
     return c.json({ error: 'Session not found' }, 404);
@@ -604,14 +607,14 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
       return c.json({ error: 'No provider session ID to resume' }, 400);
     }
 
-      const existing = ctx.pool.get(id);
-    if (existing?.alive) {
+      const existing = runtime.get(id);
+    if (existing?.active) {
       ctx.registry.updateStatus(id, 'ready');
       return c.json(serializeSession(ctx, ctx.registry.get(id) ?? session));
     }
 
     try {
-      ctx.pool.spawn(id, session.providerName, {
+      runtime.spawn(id, session.providerName, {
         cwd: session.cwd,
         workspaceMode: session.workspaceMode,
         model: session.model,
@@ -631,8 +634,8 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
       return c.json({ error: 'No provider session ID to resume' }, 400);
     }
 
-    const existing = ctx.pool.get(id);
-    if (existing?.alive) {
+    const existing = runtime.get(id);
+    if (existing?.active) {
       ctx.registry.updateStatus(id, 'ready');
       return c.json(serializeSession(ctx, ctx.registry.get(id) ?? session));
     }
@@ -649,7 +652,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         }, 409);
       }
 
-      ctx.pool.spawn(id, session.providerName, {
+      runtime.spawn(id, session.providerName, {
         cwd: session.cwd,
         workspaceMode: session.workspaceMode,
         model: session.model,
@@ -668,7 +671,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
     return c.json({ error: 'No provider session ID to resume' }, 400);
   }
 
-  const caps = ctx.pool.getCapabilities(session.providerName, session.providerInstanceId);
+  const caps = runtime.getCapabilities(session.providerName, session.providerInstanceId);
   if (!caps.resume) {
     return c.json({ error: `Provider '${session.providerName}' does not support resume` }, 501);
   }
@@ -685,7 +688,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
   }
 
   try {
-    ctx.pool.spawn(id, session.providerName, {
+    runtime.spawn(id, session.providerName, {
       cwd: session.cwd,
       workspaceMode: session.workspaceMode,
       model: session.model,
@@ -705,6 +708,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const id = c.req.param('id');
   const session = ctx.registry.get(id);
+  const runtime = getRuntimeSessionManager(ctx);
 
   if (!session) {
     return c.json({ error: 'Session not found' }, 404);
@@ -720,7 +724,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     return c.json({ error: 'No provider session ID to fork from' }, 400);
   }
 
-  const caps = ctx.pool.getCapabilities(session.providerName, session.providerInstanceId);
+  const caps = runtime.getCapabilities(session.providerName, session.providerInstanceId);
   if (!caps.fork) {
     return c.json({ error: `Provider '${session.providerName}' does not support fork` }, 501);
   }
@@ -762,7 +766,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
   });
 
   try {
-    ctx.pool.spawn(forked.id, session.providerName, {
+    runtime.spawn(forked.id, session.providerName, {
       cwd: forkCwd,
       workspaceMode: forkWorkspaceMode,
       model: session.model,

@@ -30,6 +30,7 @@ import { OpencodeNativeSessionService } from './backends/cli/opencode/OpencodeNa
 import { createRuntimeAdapter } from './backends/cli/runtime/runtime.js';
 import { SessionRegistry } from './backends/cli/pool/SessionRegistry.js';
 import { WorkerPool } from './backends/cli/pool/WorkerPool.js';
+import { RuntimeSessionManager } from './core/runtime/RuntimeSessionManager.js';
 import { createRuntimeApp, type AppContext } from './http/app.js';
 import type { ProviderName } from './backends/cli/providers/types.js';
 import {
@@ -565,10 +566,12 @@ export function createRuntimeServer(
       getOpencodeNative: resolveOpencodeNative,
     },
   );
+  const runtime = new RuntimeSessionManager(pool);
   const context: AppContext = {
     config,
     registry,
     pool,
+    runtime,
     cursorNative,
     kiroNative,
     auggieSessions,

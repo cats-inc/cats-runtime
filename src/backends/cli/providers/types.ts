@@ -1,34 +1,21 @@
-import type { WorkspaceMode } from '../pool/types.js';
+import type {
+  ProviderCapabilities,
+  ProviderSpawnOptions,
+  ProviderTurnOptions,
+  StreamEvent,
+} from '../../../core/types.js';
+
+export type {
+  PermissionMode,
+  ProviderCapabilities,
+  ProviderMessage,
+  ProviderSpawnOptions,
+  ProviderTurnOptions,
+  StreamEvent,
+} from '../../../core/types.js';
 
 export const KNOWN_PROVIDERS = ['claude', 'codex', 'gemini', 'copilot', 'cursor', 'kiro', 'auggie', 'opencode'] as const;
 export type ProviderName = typeof KNOWN_PROVIDERS[number];
-
-export interface ProviderCapabilities {
-  resume: boolean;
-  fork: boolean;
-  permissions: boolean;
-}
-
-export interface ProviderSpawnOptions {
-  cwd: string;
-  workspaceMode?: WorkspaceMode;
-  model?: string;
-  resumeSessionId?: string;
-  forkSession?: boolean;
-  permissionMode?: PermissionMode;
-  allowedTools?: string[];
-}
-
-export interface ProviderTurnOptions extends ProviderSpawnOptions {
-  signal?: AbortSignal;
-}
-
-export type PermissionMode = 'skip' | 'whitelist' | 'default';
-
-export interface ProviderMessage {
-  role: 'user';
-  content: string;
-}
 
 /** Raw NDJSON line parsed from CLI stdout */
 export interface ClaudeStreamEvent {
@@ -53,20 +40,6 @@ export interface ClaudeStreamEvent {
     name?: string;
     id?: string;
   };
-}
-
-/** Normalized event emitted to consumers */
-export interface StreamEvent {
-  type: 'init' | 'text' | 'tool_use' | 'result' | 'error' | 'raw';
-  sessionId?: string;
-  text?: string;
-  toolName?: string;
-  toolId?: string;
-  usage?: {
-    inputTokens: number;
-    outputTokens: number;
-  };
-  raw?: ClaudeStreamEvent;
 }
 
 export interface Provider {

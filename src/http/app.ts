@@ -3,7 +3,8 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Hono } from 'hono';
 import { logger } from 'hono/logger';
-import type { CliRuntimeConfig } from '../backends/cli/config.js';
+import type { RuntimeConfig } from '../core/config.js';
+import { RuntimeSessionManager } from '../core/runtime/RuntimeSessionManager.js';
 import type { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
 import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
 import type { CursorNativeSessionService } from '../backends/cli/cursor/CursorNativeSessionService.js';
@@ -28,9 +29,10 @@ import { opencodeRoutes } from './routes/opencode.js';
 import { providerRoutes } from './routes/providers.js';
 
 export interface AppContext {
-  config: CliRuntimeConfig;
+  config: RuntimeConfig;
   registry: SessionRegistry;
   pool: WorkerPool;
+  runtime?: RuntimeSessionManager;
   cursorNative: CursorNativeSessionService;
   kiroNative: KiroNativeSessionService;
   auggieSessions: AuggieSessionService;
@@ -42,7 +44,15 @@ export interface AppContext {
   resolveOpencodeNative?: (instanceId?: string) => OpencodeNativeSessionService;
 }
 
+export function getRuntimeSessionManager(ctx: AppContext): RuntimeSessionManager {
+  if (!ctx.runtime) {
+    ctx.runtime = new RuntimeSessionManager(ctx.pool);
+  }
+  return ctx.runtime;
+}
+
 export function createRuntimeApp(ctx: AppContext) {
+  ctx.runtime = getRuntimeSessionManager(ctx);
   const app = new Hono();
   const __dirname = dirname(fileURLToPath(import.meta.url));
 
