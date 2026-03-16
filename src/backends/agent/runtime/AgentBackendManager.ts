@@ -2,7 +2,7 @@ import type { ExecutionHandle, StreamEvent, TurnInput } from '../../../core/type
 import type { SessionRegistry } from '../../cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig, RemoteProviderInstanceConfig } from '../../cli/config.js';
 import type { ProviderTargetDescriptor } from '../../../core/providerCatalog.js';
-import { ApiExecutionHandle } from '../../api/runtime/ApiExecutionHandle.js';
+import { ManagedExecutionHandle } from '../../../core/runtime/ManagedExecutionHandle.js';
 import { buildAgentAdapter } from '../adapters/registry.js';
 import type {
   AgentBackendOptions,
@@ -23,7 +23,7 @@ function ensureAgentTarget(target: ProviderTargetDescriptor): RemoteProviderInst
 }
 
 export class AgentBackendManager {
-  private readonly handles = new Map<string, ApiExecutionHandle>();
+  private readonly handles = new Map<string, ManagedExecutionHandle>();
   private readonly targets = new Map<string, ProviderTargetDescriptor>();
 
   constructor(
@@ -53,7 +53,7 @@ export class AgentBackendManager {
       return existing;
     }
 
-    const handle = new ApiExecutionHandle({
+    const handle = new ManagedExecutionHandle({
       streamMessage: (input, signal) => this.streamTurn(sessionId, target, input, signal),
       onClose: () => {
         this.handles.delete(sessionId);
@@ -131,9 +131,7 @@ export class AgentBackendManager {
       model,
       turn: {
         ...turn,
-        instructions: [session.instructions, turn.instructions]
-          .filter((value): value is string => Boolean(value && value.trim()))
-          .join('\n\n') || undefined,
+        instructions: turn.instructions,
         context: turn.context || session.context,
         outputDir: turn.outputDir || session.outputDir,
       },

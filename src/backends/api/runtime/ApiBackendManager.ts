@@ -8,7 +8,7 @@ import { AnthropicTransport } from '../transports/anthropic.js';
 import { GeminiTransport } from '../transports/gemini.js';
 import { OllamaTransport } from '../transports/ollama.js';
 import { OpenAiTransport } from '../transports/openai.js';
-import { ApiExecutionHandle } from './ApiExecutionHandle.js';
+import { ManagedExecutionHandle } from '../../../core/runtime/ManagedExecutionHandle.js';
 import type {
   ApiBackendOptions,
   ApiBackendStatus,
@@ -113,7 +113,7 @@ function prependSystemPrompt(
 
 export class ApiBackendManager {
   private readonly options: Required<ApiBackendOptions>;
-  private readonly handles = new Map<string, ApiExecutionHandle>();
+  private readonly handles = new Map<string, ManagedExecutionHandle>();
   private readonly targets = new Map<string, ProviderTargetDescriptor>();
   private readonly tools = new LocalToolRuntime();
 
@@ -149,7 +149,7 @@ export class ApiBackendManager {
       return existing;
     }
 
-    const handle = new ApiExecutionHandle({
+    const handle = new ManagedExecutionHandle({
       streamMessage: (message, signal) => this.streamTurn(sessionId, target, message, signal),
       onClose: () => {
         this.handles.delete(sessionId);

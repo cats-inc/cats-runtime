@@ -67,7 +67,7 @@ backends:
 
 class FakeOpenClawSocket extends EventTarget {
   readyState = WebSocket.CONNECTING;
-  readonly sentFrames: Array<Record<string, unknown>> = [];
+  private requestCount = 0;
 
   constructor(private readonly scripts: FakeOpenClawGatewayScript[]) {
     super();
@@ -84,7 +84,7 @@ class FakeOpenClawSocket extends EventTarget {
 
   send(data: string | ArrayBufferLike | Blob | ArrayBufferView): void {
     const frame = JSON.parse(String(data)) as Record<string, unknown>;
-    this.sentFrames.push(frame);
+    this.requestCount += 1;
     const method = typeof frame.method === 'string' ? frame.method : '';
 
     if (method === 'connect') {
@@ -100,7 +100,7 @@ class FakeOpenClawSocket extends EventTarget {
     if (method === 'agent') {
       const params = frame.params as Record<string, unknown>;
       const script = this.scripts.shift() || {
-        runId: `run-${this.sentFrames.length}`,
+        runId: `run-${this.requestCount}`,
         assistant: ['done'],
       };
 
@@ -316,7 +316,10 @@ describe('agent backend integration', () => {
       expect(agentRequests).toHaveLength(2);
       expect((agentRequests[0].params as Record<string, unknown>).sessionKey).toBe('task-123');
       expect((agentRequests[1].params as Record<string, unknown>).sessionKey).toBe('task-123');
-      expect((agentRequests[0].params as Record<string, unknown>).message).toContain('Focus on architecture.');
+      expect((agentRequests[0].params as Record<string, unknown>).message)
+        .toBe('Focus on architecture.\n\nDraft the report');
+      expect((agentRequests[1].params as Record<string, unknown>).message)
+        .toBe('Focus on architecture.\n\nContinue');
     } finally {
       await runtime.close();
       cleanup();

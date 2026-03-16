@@ -1,21 +1,21 @@
 import { EventEmitter } from 'node:events';
-import type { ExecutionHandle, StreamEvent, TurnInput } from '../../../core/types.js';
+import type { ExecutionHandle, StreamEvent, TurnInput } from '../types.js';
 
 type ExecutionEventName = 'event' | 'exit' | 'error';
 type ExecutionListener = (...args: unknown[]) => void;
 
-export interface ApiExecutionCallbacks {
+export interface ManagedExecutionCallbacks {
   streamMessage(input: TurnInput, signal: AbortSignal): AsyncGenerator<StreamEvent>;
   onClose(): void;
 }
 
-export class ApiExecutionHandle implements ExecutionHandle {
+export class ManagedExecutionHandle implements ExecutionHandle {
   private readonly emitter = new EventEmitter();
   private activeState = true;
   private busyState = false;
   private abortController?: AbortController;
 
-  constructor(private readonly callbacks: ApiExecutionCallbacks) {}
+  constructor(private readonly callbacks: ManagedExecutionCallbacks) {}
 
   get active(): boolean {
     return this.activeState;

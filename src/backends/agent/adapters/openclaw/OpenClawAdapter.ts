@@ -116,7 +116,7 @@ function mergePayloadTemplate(
   };
 }
 
-function appendInstructions(message: string, instructions?: string): string {
+function prependInstructions(message: string, instructions?: string): string {
   if (!instructions) {
     return message;
   }
@@ -499,7 +499,7 @@ export class OpenClawAdapter implements AgentAdapter {
         }, input.signal);
 
         const agentParams = mergePayloadTemplate(input.instance.payloadTemplate, {
-          message: appendInstructions(input.turn.message, input.turn.instructions),
+          message: prependInstructions(input.turn.message, input.turn.instructions),
           sessionKey: input.sessionKey,
           idempotencyKey: input.sessionId,
           model: input.model,
@@ -618,9 +618,10 @@ export class OpenClawAdapter implements AgentAdapter {
     try {
       const url = requireUrl(instance, this.options.env || process.env);
       return {
-        status: 'ok',
+        // MVP probe only validates resolvable config; it does not dial the websocket.
+        status: 'degraded',
         checkedAt: new Date().toISOString(),
-        details: url,
+        details: `Config validated only; live gateway probe not attempted (${url})`,
       };
     } catch (error) {
       return {
