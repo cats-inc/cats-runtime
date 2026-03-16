@@ -505,6 +505,161 @@ describe('API backend integration', () => {
     }
   });
 
+  it('replays multi-tool Claude turns after resume without splitting the batch', async () => {
+    const { root, config, env, cleanup } = createApiConfigRoot();
+    writeFileSync(join(root, 'repo', 'src', 'other.ts'), 'export const other = 9;\n');
+
+    let anthropicCalls = 0;
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (!url.includes('/v1/messages')) {
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      }
+
+      anthropicCalls += 1;
+      if (anthropicCalls === 1) {
+        return jsonResponse({
+          id: 'msg_1',
+          content: [
+            { type: 'text', text: 'Checking both files.' },
+            { type: 'tool_use', id: 'claude-tool-1', name: 'read_file', input: { path: 'src/app.ts' } },
+            { type: 'tool_use', id: 'claude-tool-2', name: 'read_file', input: { path: 'src/other.ts' } },
+          ],
+          usage: { input_tokens: 3, output_tokens: 2 },
+        });
+      }
+
+      if (anthropicCalls === 2) {
+        return jsonResponse({
+          id: 'msg_2',
+          content: [{ type: 'text', text: 'Both files were inspected.' }],
+          usage: { input_tokens: 4, output_tokens: 5 },
+        });
+      }
+
+      const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
+      const messages = Array.isArray(body.messages) ? body.messages : [];
+
+      expect(messages).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          role: 'assistant',
+          content: [
+            { type: 'text', text: 'Checking both files.' },
+            { type: 'tool_use', id: 'claude-tool-1', name: 'read_file', input: { path: 'src/app.ts' } },
+            { type: 'tool_use', id: 'claude-tool-2', name: 'read_file', input: { path: 'src/other.ts' } },
+          ],
+        }),
+        expect.objectContaining({
+          role: 'user',
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: 'claude-tool-1',
+              content: expect.stringContaining('export const value = 7;'),
+              is_error: false,
+            },
+            {
+              type: 'tool_result',
+              tool_use_id: 'claude-tool-2',
+              content: expect.stringContaining('export const other = 9;'),
+              is_error: false,
+            },
+          ],
+        }),
+      ]));
+
+      return jsonResponse({
+        id: 'msg_3',
+        content: [{ type: 'text', text: 'Replay preserved both tool calls.' }],
+        usage: { input_tokens: 5, output_tokens: 6 },
+      });
+    });
+
+    const runtime = createRuntimeServer(config, {
+      apiBackend: {
+        fetch: fetchMock,
+        env: {
+          ...env,
+          OPENAI_API_KEY: 'openai-test-key',
+          ANTHROPIC_API_KEY: 'anthropic-test-key',
+          GEMINI_API_KEY: 'gemini-test-key',
+        },
+      },
+    });
+
+    try {
+      const createResponse = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'claude',
+          instance: 'api/sonnet',
+          cwd: join(env.HOME, 'repo'),
+          workspaceMode: 'shared',
+        }),
+      });
+      expect(createResponse.status).toBe(201);
+      const session = await createResponse.json() as Record<string, unknown>;
+
+      const messageResponse = await runtime.app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({ message: 'Inspect both files.' }),
+      });
+      expect(messageResponse.status).toBe(200);
+      expect(parseNdjson(await messageResponse.text())).toEqual([
+        expect.objectContaining({ type: 'init', sessionId: 'msg_1' }),
+        expect.objectContaining({ type: 'text', text: 'Checking both files.' }),
+        expect.objectContaining({ type: 'tool_use', toolId: 'claude-tool-1' }),
+        expect.objectContaining({ type: 'tool_use', toolId: 'claude-tool-2' }),
+        expect.objectContaining({ type: 'tool_result', toolId: 'claude-tool-1' }),
+        expect.objectContaining({ type: 'tool_result', toolId: 'claude-tool-2' }),
+        expect.objectContaining({ type: 'text', text: 'Both files were inspected.' }),
+        expect.objectContaining({
+          type: 'result',
+          sessionId: 'msg_1',
+          usage: { inputTokens: 7, outputTokens: 7 },
+        }),
+      ]);
+
+      const closeResponse = await runtime.app.request(`/sessions/${session.id}/close`, {
+        method: 'POST',
+      });
+      expect(closeResponse.status).toBe(200);
+
+      const resumeResponse = await runtime.app.request(`/sessions/${session.id}/resume`, {
+        method: 'POST',
+      });
+      expect(resumeResponse.status).toBe(200);
+
+      const replayResponse = await runtime.app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({ message: 'Did replay keep both tool calls?' }),
+      });
+      expect(replayResponse.status).toBe(200);
+      expect(parseNdjson(await replayResponse.text())).toEqual([
+        expect.objectContaining({ type: 'init', sessionId: 'msg_3' }),
+        expect.objectContaining({ type: 'text', text: 'Replay preserved both tool calls.' }),
+        expect.objectContaining({
+          type: 'result',
+          sessionId: 'msg_3',
+          usage: { inputTokens: 5, outputTokens: 6 },
+        }),
+      ]);
+      expect(anthropicCalls).toBe(3);
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
   it('accepts local Ollama targets alongside API providers', async () => {
     const { config, env, cleanup } = createApiConfigRoot();
     const fetchMock = vi.fn<typeof fetch>(async (input) => {

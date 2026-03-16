@@ -30,39 +30,60 @@ function resolveBaseUrl(instance: RemoteProviderInstanceConfig, env: NodeJS.Proc
   return fromEnv || instance.baseUrl || 'https://generativelanguage.googleapis.com';
 }
 
+function extractSystemInstruction(
+  messages: ApiConversationMessage[],
+): Record<string, unknown> | undefined {
+  const text = messages
+    .filter((message) => message.role === 'system')
+    .flatMap((message) => message.parts)
+    .filter((part): part is Extract<ApiConversationPart, { type: 'text' }> => part.type === 'text')
+    .map((part) => part.text)
+    .filter(Boolean)
+    .join('\n');
+
+  return text
+    ? {
+        parts: [{ text }],
+      }
+    : undefined;
+}
+
 function toGeminiContents(messages: ApiConversationMessage[]): Array<Record<string, unknown>> {
-  return messages.map((message) => ({
-    role: message.role === 'assistant' ? 'model' : message.role,
-    parts: message.parts.flatMap<Record<string, unknown>>((part) => {
-      if (part.type === 'text') {
-        return [{ text: part.text }];
-      }
-      if (part.type === 'tool_call' && message.role === 'assistant') {
-        const raw = part.raw && typeof part.raw === 'object'
-          ? part.raw as Record<string, unknown>
-          : {};
-        return [{
-          functionCall: {
-            ...raw,
-            name: part.name,
-            args: part.arguments,
-          },
-        }];
-      }
-      if (part.type === 'tool_result' && message.role === 'user') {
-        return [{
-          functionResponse: {
-            name: part.name,
-            response: {
-              output: part.output,
-              is_error: part.isError === true,
+  return messages
+    .filter((message) => message.role !== 'system')
+    .map((message) => ({
+      role: message.role === 'assistant' ? 'model' : message.role,
+      parts: message.parts.flatMap<Record<string, unknown>>((part) => {
+        if (part.type === 'text') {
+          return [{ text: part.text }];
+        }
+        if (part.type === 'tool_call' && message.role === 'assistant') {
+          const raw = part.raw && typeof part.raw === 'object'
+            ? part.raw as Record<string, unknown>
+            : {};
+          return [{
+            functionCall: {
+              ...raw,
+              name: part.name,
+              args: part.arguments,
             },
-          },
-        }];
-      }
-      return [];
-    }),
-  }));
+          }];
+        }
+        if (part.type === 'tool_result' && message.role === 'user') {
+          return [{
+            functionResponse: {
+              name: part.name,
+              response: {
+                output: part.output,
+                is_error: part.isError === true,
+              },
+            },
+          }];
+        }
+        return [];
+      }),
+    }))
+    .filter((message) => message.parts.length > 0);
 }
 
 function toGeminiTools(input: ApiCompletionInput): Array<Record<string, unknown>> {
@@ -142,6 +163,7 @@ export class GeminiTransport implements ApiTransportClient {
         ...input.instance.headers,
       },
       body: JSON.stringify({
+        systemInstruction: extractSystemInstruction(input.messages),
         contents: toGeminiContents(input.messages),
         tools: toGeminiTools(input),
         generationConfig: {

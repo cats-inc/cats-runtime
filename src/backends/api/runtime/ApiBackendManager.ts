@@ -301,7 +301,9 @@ export class ApiBackendManager {
           toolArgs: toolCall.arguments,
           raw: toolCall.raw,
         };
+      }
 
+      for (const toolCall of toolCalls) {
         const toolResult = await this.tools.execute({
           sessionId,
           cwd: session.cwd,

@@ -166,6 +166,51 @@ describe('API transports', () => {
     expect(result.usage).toEqual({ inputTokens: 3, outputTokens: 4 });
   });
 
+  it('sends Gemini system prompts via systemInstruction instead of contents role', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        candidates: [{
+          content: {
+            parts: [{ text: 'Done.' }],
+          },
+        }],
+        usageMetadata: { promptTokenCount: 2, candidatesTokenCount: 1 },
+      }),
+    );
+
+    const transport = new GeminiTransport(fetchMock, {
+      GEMINI_API_KEY: 'test-key',
+    });
+    const instance: RemoteProviderInstanceConfig = {
+      id: 'pro',
+      providerName: 'gemini',
+      backend: 'api',
+      transport: 'google',
+      apiKeyEnv: 'GEMINI_API_KEY',
+      model: 'gemini-2.5-pro',
+    };
+
+    await transport.completeTurn({
+      ...makeInput(instance),
+      messages: [
+        { role: 'system', parts: [{ type: 'text', text: 'You are precise.' }] },
+        { role: 'user', parts: [{ type: 'text', text: 'Hi' }] },
+      ],
+    });
+
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+    const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
+    expect(body.systemInstruction).toEqual({
+      parts: [{ text: 'You are precise.' }],
+    });
+    expect(body.contents).toEqual([
+      {
+        role: 'user',
+        parts: [{ text: 'Hi' }],
+      },
+    ]);
+  });
+
   it('parses Ollama chat responses with local tool calls', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       jsonResponse({

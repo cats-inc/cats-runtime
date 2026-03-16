@@ -168,6 +168,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
 
             if (event.type === 'error') {
               completed = true;
+              assistantText = flushAssistantText(sourcePath, assistantText);
               restoreReadyIfSessionStillInteractive(ctx.registry, id);
             }
           }
@@ -179,6 +180,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
           }
         } catch (err) {
           const errorEvent = { type: 'error', text: String(err) };
+          assistantText = flushAssistantText(sourcePath, assistantText);
           controller.enqueue(
             new TextEncoder().encode(JSON.stringify(errorEvent) + '\n'),
           );
@@ -263,6 +265,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
 
         if (event.type === 'error') {
           completed = true;
+          assistantText = flushAssistantText(sseSourcePath, assistantText);
           restoreReadyIfSessionStillInteractive(ctx.registry, id);
         }
       }
@@ -273,6 +276,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
         restoreReadyIfSessionStillInteractive(ctx.registry, id);
       }
     } catch (err) {
+      assistantText = flushAssistantText(sseSourcePath, assistantText);
       await stream.writeSSE({
         data: JSON.stringify({ type: 'error', text: String(err) }),
         event: 'error',
