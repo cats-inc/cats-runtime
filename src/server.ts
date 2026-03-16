@@ -1,5 +1,6 @@
 import { once } from 'node:events';
 import type { Server } from 'node:http';
+import os from 'node:os';
 import { join } from 'node:path';
 import { createAdaptorServer } from '@hono/node-server';
 import { AuggieSessionService } from './backends/cli/auggie/AuggieSessionService.js';
@@ -19,6 +20,7 @@ import { CopilotSessionScanner } from './backends/cli/discovery/CopilotSessionSc
 import { GeminiSessionScanner } from './backends/cli/discovery/GeminiSessionScanner.js';
 import { PiSessionScanner } from './backends/cli/discovery/PiSessionScanner.js';
 import { GooseNativeSessionService } from './backends/cli/goose/GooseNativeSessionService.js';
+import { JunieSessionScanner } from './backends/cli/junie/JunieSessionScanner.js';
 import { syncNativeSessions } from './backends/cli/discovery/nativeDiscovery.js';
 import {
   WslDiscoveryStatusStore,
@@ -328,6 +330,25 @@ export function createDiscoveryController(
         instance.id,
       ),
     })),
+    ...listProviderInstances(ctx.config, 'junie').map((instance) => {
+      const junieSessionsDir = join(os.homedir(), '.junie', 'sessions');
+      return {
+        provider: 'junie' as const,
+        instanceId: instance.id,
+        name: instance.id === getProviderDefaultInstanceId(ctx.config, 'junie')
+          ? 'junie'
+          : `junie@${instance.id}`,
+        watchDir: junieSessionsDir,
+        normalizedWatchDir: junieSessionsDir,
+        createWatcher: () => new FileWatcher(
+          junieSessionsDir,
+          new JunieSessionScanner(junieSessionsDir),
+          'junie',
+          ctx.registry,
+          instance.id,
+        ),
+      };
+    }),
   ]);
 
   const timers: Array<ReturnType<typeof setInterval>> = [];

@@ -66,6 +66,10 @@ routing:
       default_target:
         backend: cli
         instance: ubuntu
+    junie:
+      default_target:
+        backend: cli
+        instance: native
     ollama:
       default_target:
         backend: local
@@ -165,6 +169,13 @@ backends:
           ubuntu:
             environment: ubuntu
             command: goose
+            runner: auto
+
+      junie:
+        instances:
+          native:
+            environment: native
+            command: junie
             runner: auto
 
   api:

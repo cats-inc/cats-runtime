@@ -145,6 +145,7 @@ export interface CliRuntimeConfig {
   kiroPath: string;
   opencodePath: string;
   goosePath: string;
+  juniePath: string;
   piPath: string;
   opencodeServerHost: string;
   opencodeServerPort: number;
@@ -320,6 +321,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CliRuntimeConf
     opencodePath: configured.providerCommands.opencode.path,
     piPath: configured.providerCommands.pi.path,
     goosePath: configured.providerCommands.goose.path,
+    juniePath: configured.providerCommands.junie.path,
     opencodeServerHost: configured.opencodeServerHost,
     opencodeServerPort: configured.opencodeServerPort,
     opencodeServerStartupTimeoutMs: configured.opencodeServerStartupTimeoutMs,
@@ -498,6 +500,7 @@ function buildLegacyRuntimeShape(
     opencode: 'default',
     pi: 'default',
     goose: 'default',
+    junie: 'default',
   } satisfies Record<ProviderName, string>;
   const providerDefaultTargets = Object.fromEntries(
     Object.entries(providerDefaultInstances).map(([provider, instance]) => [provider, {
@@ -603,6 +606,13 @@ function buildLegacyRuntimeShape(
         commandConfig: providerCommands.goose,
       },
     },
+    junie: {
+      default: {
+        id: 'default',
+        providerName: 'junie',
+        commandConfig: providerCommands.junie,
+      },
+    },
   };
 
   return {
@@ -644,6 +654,7 @@ function buildLegacyProviderCommands(
   const opencodePath = env.OPENCODE_PATH || 'opencode';
   const piPath = env.PI_PATH || 'pi';
   const goosePath = env.GOOSE_PATH || 'goose';
+  const juniePath = env.JUNIE_PATH || 'junie';
 
   return {
     auggie: readProviderCommandConfig(
@@ -704,6 +715,12 @@ function buildLegacyProviderCommands(
       'GOOSE',
       goosePath,
       defaultProviderRuntimeMode('goose'),
+      env,
+    ),
+    junie: readProviderCommandConfig(
+      'JUNIE',
+      juniePath,
+      defaultProviderRuntimeMode('junie'),
       env,
     ),
   };
@@ -1265,6 +1282,7 @@ function cloneProviderCommands(
     opencode: cloneProviderCommandConfig(commands.opencode),
     pi: cloneProviderCommandConfig(commands.pi),
     goose: cloneProviderCommandConfig(commands.goose),
+    junie: cloneProviderCommandConfig(commands.junie),
   };
 }
 
@@ -1282,6 +1300,7 @@ function cloneProviderInstances(
     opencode: cloneInstanceMap(instances.opencode),
     pi: cloneInstanceMap(instances.pi),
     goose: cloneInstanceMap(instances.goose),
+    junie: cloneInstanceMap(instances.junie),
   };
 }
 

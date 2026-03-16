@@ -18,6 +18,7 @@ const PROVIDER_ORDER = [
   'gemini',
   'pi',
   'goose',
+  'junie',
   'ollama',
   'copilot',
   'cursor',

@@ -221,7 +221,8 @@ function tracksProviderDiscoveryState(session: SessionInfo): boolean {
       || session.providerName === 'codex'
       || session.providerName === 'copilot'
       || session.providerName === 'gemini'
-      || session.providerName === 'pi'),
+      || session.providerName === 'pi'
+      || session.providerName === 'junie'),
   );
 }
 

@@ -14,7 +14,7 @@ export type {
   StreamEvent,
 } from '../../../core/types.js';
 
-export const KNOWN_PROVIDERS = ['claude', 'codex', 'gemini', 'copilot', 'cursor', 'kiro', 'auggie', 'opencode', 'pi', 'goose'] as const;
+export const KNOWN_PROVIDERS = ['claude', 'codex', 'gemini', 'copilot', 'cursor', 'kiro', 'auggie', 'opencode', 'pi', 'goose', 'junie'] as const;
 export type ProviderName = typeof KNOWN_PROVIDERS[number];
 
 /** Raw NDJSON line parsed from CLI stdout */

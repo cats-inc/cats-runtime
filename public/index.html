@@ -32,6 +32,7 @@
     --opencode: #f472b6;
     --pi: #a8a29e;
     --goose: #8b5cf6;
+    --junie: #fc801d;
     --radius: 8px;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -247,6 +248,7 @@
   .project-header[data-provider="opencode"] { border-left-color: var(--opencode); }
   .project-header[data-provider="pi"] { border-left-color: var(--pi); }
   .project-header[data-provider="goose"] { border-left-color: var(--goose); }
+  .project-header[data-provider="junie"] { border-left-color: var(--junie); }
   .project-header[data-provider="mixed"] {
     border-image: linear-gradient(
       to bottom,
@@ -259,7 +261,8 @@
       var(--kiro),
       var(--opencode),
       var(--pi),
-      var(--goose)
+      var(--goose),
+      var(--junie)
     ) 1;
   }
   .provider-badge {
@@ -280,6 +283,7 @@
   .provider-badge[data-p="opencode"] { background: rgba(244,114,182,0.2); color: var(--opencode); }
   .provider-badge[data-p="pi"] { background: rgba(168,162,158,0.2); color: var(--pi); }
   .provider-badge[data-p="goose"] { background: rgba(139,92,246,0.2); color: var(--goose); }
+  .provider-badge[data-p="junie"] { background: rgba(252,128,29,0.2); color: var(--junie); }
   .instance-badge {
     display: inline-flex;
     align-items: center;

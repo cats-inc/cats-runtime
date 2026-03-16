@@ -237,6 +237,7 @@ describe('runtime server', () => {
         opencode: {},
         pi: {},
         goose: {},
+        junie: {},
       },
     }, async (runtime) => {
       const response = await runtime.app.request('/providers/config');

@@ -16,6 +16,7 @@ import { GeminiProvider } from '../providers/gemini.js';
 import { KiroProvider } from '../providers/kiro.js';
 import { OpencodeProvider } from '../providers/opencode.js';
 import { GooseProvider } from '../providers/goose.js';
+import { JunieProvider } from '../providers/junie.js';
 import { PiProvider } from '../providers/pi.js';
 import { WorkerProcess, type SpawnResilienceConfig } from './WorkerProcess.js';
 import type { SessionRegistry } from './SessionRegistry.js';
@@ -110,8 +111,10 @@ export class WorkerPool {
           ),
           commandConfig: instance.commandConfig,
         };
+      case 'junie':
+        return { provider: new JunieProvider(), commandConfig: instance.commandConfig };
       default:
-        throw new Error(`Unknown provider: '${name}'. Valid: claude, codex, gemini, copilot, cursor, kiro, auggie, opencode, pi, goose`);
+        throw new Error(`Unknown provider: '${name}'. Valid: claude, codex, gemini, copilot, cursor, kiro, auggie, opencode, pi, goose, junie`);
     }
   }
 
