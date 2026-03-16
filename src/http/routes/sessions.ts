@@ -182,7 +182,8 @@ function tracksProviderDiscoveryState(session: SessionInfo): boolean {
       || session.providerName === 'claude'
       || session.providerName === 'codex'
       || session.providerName === 'copilot'
-      || session.providerName === 'gemini'),
+      || session.providerName === 'gemini'
+      || session.providerName === 'pi'),
   );
 }
 
