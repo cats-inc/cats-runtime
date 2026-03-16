@@ -16,6 +16,16 @@ export function getCursorNative(ctx: AppContext, instanceId?: string) {
   );
 }
 
+export function getGooseNative(ctx: AppContext, instanceId?: string) {
+  return resolveNativeService(
+    ctx,
+    'goose',
+    instanceId,
+    ctx.resolveGooseNative,
+    ctx.gooseNative,
+  );
+}
+
 export function getKiroNative(ctx: AppContext, instanceId?: string) {
   return resolveNativeService(
     ctx,

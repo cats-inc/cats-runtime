@@ -18,6 +18,7 @@ import { CodexSessionScanner } from './backends/cli/discovery/CodexSessionScanne
 import { CopilotSessionScanner } from './backends/cli/discovery/CopilotSessionScanner.js';
 import { GeminiSessionScanner } from './backends/cli/discovery/GeminiSessionScanner.js';
 import { PiSessionScanner } from './backends/cli/discovery/PiSessionScanner.js';
+import { GooseNativeSessionService } from './backends/cli/goose/GooseNativeSessionService.js';
 import { syncNativeSessions } from './backends/cli/discovery/nativeDiscovery.js';
 import {
   WslDiscoveryStatusStore,
@@ -206,6 +207,14 @@ export function createDiscoveryController(
       ctx.resolveKiroNative,
       ctx.kiroNative,
     );
+  const resolveGooseNative = (instanceId?: string): GooseNativeSessionService =>
+    resolveContextService(
+      ctx.config,
+      'goose',
+      instanceId,
+      ctx.resolveGooseNative,
+      ctx.gooseNative,
+    );
   const resolveOpencodeNative = (instanceId?: string): OpencodeNativeSessionService =>
     resolveContextService(
       ctx.config,
@@ -327,10 +336,10 @@ export function createDiscoveryController(
   const wslDiscoveryPolicy = ctx.config.wslDiscoveryPolicy ?? 'always';
 
   const shouldSkipBackgroundWslDiscovery = (
-    provider: 'cursor' | 'kiro' | 'opencode',
+    provider: 'cursor' | 'goose' | 'kiro' | 'opencode',
     instanceId: string,
   ): boolean => {
-    if (provider === 'opencode' || wslDiscoveryPolicy !== 'manual_only') {
+    if (provider === 'goose' || provider === 'opencode' || wslDiscoveryPolicy !== 'manual_only') {
       return false;
     }
 
@@ -343,7 +352,7 @@ export function createDiscoveryController(
   };
 
   const startNativeDiscovery = (
-    name: 'cursor' | 'kiro' | 'opencode',
+    name: 'cursor' | 'goose' | 'kiro' | 'opencode',
     instanceId: string,
     listAllSessions: () => Promise<Array<{
       providerSessionId: string;
@@ -357,9 +366,11 @@ export function createDiscoveryController(
     let running = false;
     const label = name === 'cursor'
       ? 'Cursor'
-      : name === 'kiro'
-        ? 'Kiro'
-        : 'OpenCode';
+      : name === 'goose'
+        ? 'Goose'
+        : name === 'kiro'
+          ? 'Kiro'
+          : 'OpenCode';
     const discoveryLabel = instanceId === getProviderDefaultInstanceId(ctx.config, name)
       ? name
       : `${name}@${instanceId}`;
@@ -467,6 +478,15 @@ export function createDiscoveryController(
         );
         if (timer) timers.push(timer);
       }
+
+      for (const instance of listProviderInstances(ctx.config, 'goose')) {
+        const timer = startNativeDiscovery(
+          'goose',
+          instance.id,
+          () => resolveGooseNative(instance.id).listAllSessions(),
+        );
+        if (timer) timers.push(timer);
+      }
     },
     stop() {
       if (!started) return;
@@ -521,6 +541,14 @@ export function createRuntimeServer(
       }),
     ]),
   );
+  const gooseNativeByInstance = new Map(
+    listProviderInstances(config, 'goose').map((instance) => [
+      instance.id,
+      new GooseNativeSessionService({
+        command: instance.commandConfig.path,
+      }),
+    ]),
+  );
   const opencodeNativeByInstance = new Map(
     listProviderInstances(config, 'opencode').map((instance) => [
       instance.id,
@@ -535,6 +563,8 @@ export function createRuntimeServer(
     ]),
   );
 
+  const resolveGooseNative = (instanceId?: string): GooseNativeSessionService =>
+    resolveServiceForInstance(config, 'goose', instanceId, gooseNativeByInstance);
   const resolveAuggieSessions = (instanceId?: string): AuggieSessionService =>
     resolveServiceForInstance(config, 'auggie', instanceId, auggieSessionsByInstance);
   const resolveCursorNative = (instanceId?: string): CursorNativeSessionService =>
@@ -570,6 +600,14 @@ export function createRuntimeServer(
       runtime: createRuntimeAdapter(config.kiroRuntime),
     }),
   );
+  const gooseNative = getDefaultService(
+    config,
+    'goose',
+    gooseNativeByInstance,
+    () => new GooseNativeSessionService({
+      command: config.goosePath,
+    }),
+  );
   const opencodeNative = getDefaultService(
     config,
     'opencode',
@@ -585,11 +623,13 @@ export function createRuntimeServer(
   const pool = new WorkerPool(
     config,
     registry,
+    gooseNative,
     kiroNative,
     auggieSessions,
     opencodeNative,
     {
       getAuggieSessions: resolveAuggieSessions,
+      getGooseNative: resolveGooseNative,
       getKiroNative: resolveKiroNative,
       getOpencodeNative: resolveOpencodeNative,
     },
@@ -603,11 +643,13 @@ export function createRuntimeServer(
     agentBackend,
     runtime,
     cursorNative,
+    gooseNative,
     kiroNative,
     auggieSessions,
     opencodeNative,
     wslDiscoveryStatus,
     resolveCursorNative,
+    resolveGooseNative,
     resolveKiroNative,
     resolveAuggieSessions,
     resolveOpencodeNative,

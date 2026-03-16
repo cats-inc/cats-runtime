@@ -54,6 +54,10 @@ routing:
       default_target:
         backend: cli
         instance: native
+    goose:
+      default_target:
+        backend: cli
+        instance: native
     cursor:
       default_target:
         backend: cli
@@ -136,6 +140,13 @@ backends:
             # Pi stores session files under this directory.
             # Session resume uses --session <path> to continue a previous conversation.
             sessions_dir: ~/.pi/agent/sessions
+
+      goose:
+        instances:
+          native:
+            environment: native
+            command: goose
+            runner: auto
 
       cursor:
         instances:

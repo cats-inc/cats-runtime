@@ -12,6 +12,7 @@ import type { AgentBackendManager } from '../backends/agent/runtime/AgentBackend
 import type { CursorNativeSessionService } from '../backends/cli/cursor/CursorNativeSessionService.js';
 import type { KiroNativeSessionService } from '../backends/cli/kiro/KiroNativeSessionService.js';
 import type { AuggieSessionService } from '../backends/cli/auggie/AuggieSessionService.js';
+import type { GooseNativeSessionService } from '../backends/cli/goose/GooseNativeSessionService.js';
 import type { OpencodeNativeSessionService } from '../backends/cli/opencode/OpencodeNativeSessionService.js';
 import type { WslDiscoveryStatusStore } from '../backends/cli/discovery/wslDiscovery.js';
 import { bearerAuth } from './auth.js';
@@ -38,11 +39,13 @@ export interface AppContext {
   agentBackend?: AgentBackendManager;
   runtime?: RuntimeSessionManager;
   cursorNative: CursorNativeSessionService;
+  gooseNative: GooseNativeSessionService;
   kiroNative: KiroNativeSessionService;
   auggieSessions: AuggieSessionService;
   opencodeNative: OpencodeNativeSessionService;
   wslDiscoveryStatus?: WslDiscoveryStatusStore;
   resolveCursorNative?: (instanceId?: string) => CursorNativeSessionService;
+  resolveGooseNative?: (instanceId?: string) => GooseNativeSessionService;
   resolveKiroNative?: (instanceId?: string) => KiroNativeSessionService;
   resolveAuggieSessions?: (instanceId?: string) => AuggieSessionService;
   resolveOpencodeNative?: (instanceId?: string) => OpencodeNativeSessionService;

@@ -144,6 +144,7 @@ export interface CliRuntimeConfig {
   geminiPath: string;
   kiroPath: string;
   opencodePath: string;
+  goosePath: string;
   piPath: string;
   opencodeServerHost: string;
   opencodeServerPort: number;
@@ -318,6 +319,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CliRuntimeConf
     kiroPath: configured.providerCommands.kiro.path,
     opencodePath: configured.providerCommands.opencode.path,
     piPath: configured.providerCommands.pi.path,
+    goosePath: configured.providerCommands.goose.path,
     opencodeServerHost: configured.opencodeServerHost,
     opencodeServerPort: configured.opencodeServerPort,
     opencodeServerStartupTimeoutMs: configured.opencodeServerStartupTimeoutMs,
@@ -495,6 +497,7 @@ function buildLegacyRuntimeShape(
     kiro: 'default',
     opencode: 'default',
     pi: 'default',
+    goose: 'default',
   } satisfies Record<ProviderName, string>;
   const providerDefaultTargets = Object.fromEntries(
     Object.entries(providerDefaultInstances).map(([provider, instance]) => [provider, {
@@ -593,6 +596,13 @@ function buildLegacyRuntimeShape(
         piSessionsDir: env.PI_SESSIONS_DIR || defaultPiSessionsDir(),
       },
     },
+    goose: {
+      default: {
+        id: 'default',
+        providerName: 'goose',
+        commandConfig: providerCommands.goose,
+      },
+    },
   };
 
   return {
@@ -633,6 +643,7 @@ function buildLegacyProviderCommands(
   const kiroPath = env.KIRO_PATH || 'kiro-cli';
   const opencodePath = env.OPENCODE_PATH || 'opencode';
   const piPath = env.PI_PATH || 'pi';
+  const goosePath = env.GOOSE_PATH || 'goose';
 
   return {
     auggie: readProviderCommandConfig(
@@ -687,6 +698,12 @@ function buildLegacyProviderCommands(
       'PI',
       piPath,
       defaultProviderRuntimeMode('pi'),
+      env,
+    ),
+    goose: readProviderCommandConfig(
+      'GOOSE',
+      goosePath,
+      defaultProviderRuntimeMode('goose'),
       env,
     ),
   };
@@ -1247,6 +1264,7 @@ function cloneProviderCommands(
     kiro: cloneProviderCommandConfig(commands.kiro),
     opencode: cloneProviderCommandConfig(commands.opencode),
     pi: cloneProviderCommandConfig(commands.pi),
+    goose: cloneProviderCommandConfig(commands.goose),
   };
 }
 
@@ -1263,6 +1281,7 @@ function cloneProviderInstances(
     kiro: cloneInstanceMap(instances.kiro),
     opencode: cloneInstanceMap(instances.opencode),
     pi: cloneInstanceMap(instances.pi),
+    goose: cloneInstanceMap(instances.goose),
   };
 }
 

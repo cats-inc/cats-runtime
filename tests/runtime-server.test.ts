@@ -236,6 +236,7 @@ describe('runtime server', () => {
         kiro: {},
         opencode: {},
         pi: {},
+        goose: {},
       },
     }, async (runtime) => {
       const response = await runtime.app.request('/providers/config');

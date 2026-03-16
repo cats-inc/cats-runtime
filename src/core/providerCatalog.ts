@@ -17,6 +17,7 @@ const PROVIDER_ORDER = [
   'codex',
   'gemini',
   'pi',
+  'goose',
   'ollama',
   'copilot',
   'cursor',

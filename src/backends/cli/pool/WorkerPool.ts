@@ -4,6 +4,7 @@ import {
 } from '../config.js';
 import { AuggieSessionService } from '../auggie/AuggieSessionService.js';
 import { KiroNativeSessionService } from '../kiro/KiroNativeSessionService.js';
+import { GooseNativeSessionService } from '../goose/GooseNativeSessionService.js';
 import { OpencodeNativeSessionService } from '../opencode/OpencodeNativeSessionService.js';
 import type { Provider, ProviderCapabilities, ProviderName, ProviderSpawnOptions } from '../providers/types.js';
 import { AuggieProvider } from '../providers/auggie.js';
@@ -14,12 +15,14 @@ import { CursorProvider } from '../providers/cursor.js';
 import { GeminiProvider } from '../providers/gemini.js';
 import { KiroProvider } from '../providers/kiro.js';
 import { OpencodeProvider } from '../providers/opencode.js';
+import { GooseProvider } from '../providers/goose.js';
 import { PiProvider } from '../providers/pi.js';
 import { WorkerProcess, type SpawnResilienceConfig } from './WorkerProcess.js';
 import type { SessionRegistry } from './SessionRegistry.js';
 
 interface ProviderServiceResolvers {
   getAuggieSessions?: (instanceId?: string) => AuggieSessionService;
+  getGooseNative?: (instanceId?: string) => GooseNativeSessionService;
   getKiroNative?: (instanceId?: string) => KiroNativeSessionService;
   getOpencodeNative?: (instanceId?: string) => OpencodeNativeSessionService;
 }
@@ -28,6 +31,7 @@ export class WorkerPool {
   private workers = new Map<string, WorkerProcess>();
   private config: CliRuntimeConfig;
   private registry: SessionRegistry;
+  private gooseNative: GooseNativeSessionService;
   private kiroNative: KiroNativeSessionService;
   private auggieSessions: AuggieSessionService;
   private opencodeNative: OpencodeNativeSessionService;
@@ -36,6 +40,7 @@ export class WorkerPool {
   constructor(
     config: CliRuntimeConfig,
     registry: SessionRegistry,
+    gooseNative: GooseNativeSessionService,
     kiroNative: KiroNativeSessionService,
     auggieSessions: AuggieSessionService,
     opencodeNative: OpencodeNativeSessionService,
@@ -43,6 +48,7 @@ export class WorkerPool {
   ) {
     this.config = config;
     this.registry = registry;
+    this.gooseNative = gooseNative;
     this.kiroNative = kiroNative;
     this.auggieSessions = auggieSessions;
     this.opencodeNative = opencodeNative;
@@ -97,8 +103,15 @@ export class WorkerPool {
         };
       case 'pi':
         return { provider: new PiProvider(), commandConfig: instance.commandConfig };
+      case 'goose':
+        return {
+          provider: new GooseProvider(
+            this.resolvers.getGooseNative?.(instance.id) || this.gooseNative,
+          ),
+          commandConfig: instance.commandConfig,
+        };
       default:
-        throw new Error(`Unknown provider: '${name}'. Valid: claude, codex, gemini, copilot, cursor, kiro, auggie, opencode, pi`);
+        throw new Error(`Unknown provider: '${name}'. Valid: claude, codex, gemini, copilot, cursor, kiro, auggie, opencode, pi, goose`);
     }
   }
 

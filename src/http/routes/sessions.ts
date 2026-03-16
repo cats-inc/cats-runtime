@@ -33,6 +33,7 @@ import {
   getCopilotSessionsDir,
   getCursorNative,
   getGeminiSessionsDir,
+  getGooseNative,
   getKiroNative,
   getOpencodeNative,
 } from '../providerServices.js';
@@ -161,6 +162,7 @@ function tracksNativeSessionState(session: SessionInfo): boolean {
     session.providerBackend === 'cli'
     && session.providerSessionId
     && (session.providerName === 'cursor'
+      || session.providerName === 'goose'
       || session.providerName === 'kiro'
       || session.providerName === 'opencode'),
   );
@@ -192,6 +194,11 @@ async function deleteNativeSessionState(
       { startIfNeeded: false },
     );
     return !remaining.some((item) => item.providerSessionId === session.providerSessionId);
+  }
+
+  if (session.providerName === 'goose') {
+    const gooseNative = getGooseNative(ctx, session.providerInstanceId);
+    return gooseNative.deleteSession(session.cwd, session.providerSessionId);
   }
 
   if (session.providerName === 'opencode') {
