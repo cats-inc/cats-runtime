@@ -1272,6 +1272,11 @@ function parseRemoteBackends(
         );
       }
 
+      const providerHeaders = parseStringMap(
+        asOptionalObject(providerDoc.headers),
+        `backends.${backend}.providers.${providerName}.headers`,
+      );
+
       const parsedInstances: Record<string, RemoteProviderInstanceConfig> = {};
       for (const [instanceId, rawInstance] of Object.entries(instances)) {
         const instanceDoc = asObject(
@@ -1280,46 +1285,76 @@ function parseRemoteBackends(
             + `block in '${filePath}'`,
         );
 
+        const instanceHeaders = parseStringMap(
+          asOptionalObject(instanceDoc.headers),
+          `backends.${backend}.providers.${providerName}.instances.${instanceId}.headers`,
+        );
+
         parsedInstances[instanceId] = {
           id: instanceId,
           providerName,
           backend,
-          transport: readString(instanceDoc.transport),
-          model: readString(instanceDoc.model),
+          transport: readString(instanceDoc.transport)
+            || readString(providerDoc.transport),
+          model: readString(instanceDoc.model)
+            || readString(providerDoc.model),
           systemPrompt: readString(instanceDoc.system_prompt)
-            || readString(instanceDoc.systemPrompt),
+            || readString(instanceDoc.systemPrompt)
+            || readString(providerDoc.system_prompt)
+            || readString(providerDoc.systemPrompt),
           apiKeyEnv: readString(instanceDoc.api_key_env)
-            || readString(instanceDoc.apiKeyEnv),
+            || readString(instanceDoc.apiKeyEnv)
+            || readString(providerDoc.api_key_env)
+            || readString(providerDoc.apiKeyEnv),
           baseUrl: readString(instanceDoc.base_url)
-            || readString(instanceDoc.baseUrl),
+            || readString(instanceDoc.baseUrl)
+            || readString(providerDoc.base_url)
+            || readString(providerDoc.baseUrl),
           baseUrlEnv: readString(instanceDoc.base_url_env)
-            || readString(instanceDoc.baseUrlEnv),
+            || readString(instanceDoc.baseUrlEnv)
+            || readString(providerDoc.base_url_env)
+            || readString(providerDoc.baseUrlEnv),
           organizationEnv: readString(instanceDoc.organization_env)
-            || readString(instanceDoc.organizationEnv),
+            || readString(instanceDoc.organizationEnv)
+            || readString(providerDoc.organization_env)
+            || readString(providerDoc.organizationEnv),
           projectEnv: readString(instanceDoc.project_env)
-            || readString(instanceDoc.projectEnv),
-          headers: parseStringMap(
-            asOptionalObject(instanceDoc.headers),
-            `backends.${backend}.providers.${providerName}.instances.${instanceId}.headers`,
-          ),
+            || readString(instanceDoc.projectEnv)
+            || readString(providerDoc.project_env)
+            || readString(providerDoc.projectEnv),
+          headers: mergeStringMaps(providerHeaders, instanceHeaders),
           maxOutputTokens: parseOptionalIntValue(
-            instanceDoc.max_output_tokens ?? instanceDoc.maxOutputTokens,
+            instanceDoc.max_output_tokens
+              ?? instanceDoc.maxOutputTokens
+              ?? providerDoc.max_output_tokens
+              ?? providerDoc.maxOutputTokens,
             `backends.${backend}.providers.${providerName}.instances.${instanceId}.max_output_tokens`,
           ),
           timeoutMs: parseOptionalIntValue(
-            instanceDoc.timeout_ms ?? instanceDoc.timeoutMs,
+            instanceDoc.timeout_ms
+              ?? instanceDoc.timeoutMs
+              ?? providerDoc.timeout_ms
+              ?? providerDoc.timeoutMs,
             `backends.${backend}.providers.${providerName}.instances.${instanceId}.timeout_ms`,
           ),
           maxRetries: parseOptionalIntValue(
-            instanceDoc.max_retries ?? instanceDoc.maxRetries,
+            instanceDoc.max_retries
+              ?? instanceDoc.maxRetries
+              ?? providerDoc.max_retries
+              ?? providerDoc.maxRetries,
             `backends.${backend}.providers.${providerName}.instances.${instanceId}.max_retries`,
           ),
           maxToolSteps: parseOptionalIntValue(
-            instanceDoc.max_tool_steps ?? instanceDoc.maxToolSteps,
+            instanceDoc.max_tool_steps
+              ?? instanceDoc.maxToolSteps
+              ?? providerDoc.max_tool_steps
+              ?? providerDoc.maxToolSteps,
             `backends.${backend}.providers.${providerName}.instances.${instanceId}.max_tool_steps`,
           ),
           toolProfile: readString(instanceDoc.tool_profile)
-            || readString(instanceDoc.toolProfile),
+            || readString(instanceDoc.toolProfile)
+            || readString(providerDoc.tool_profile)
+            || readString(providerDoc.toolProfile),
         };
       }
 
@@ -1497,6 +1532,20 @@ function parseStringMap(
   }
 
   return Object.keys(parsed).length > 0 ? parsed : undefined;
+}
+
+function mergeStringMaps(
+  base: Record<string, string> | undefined,
+  override: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  if (!base && !override) {
+    return undefined;
+  }
+
+  return {
+    ...(base || {}),
+    ...(override || {}),
+  };
 }
 
 function parseOptionalIntValue(

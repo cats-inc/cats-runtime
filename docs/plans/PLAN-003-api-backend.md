@@ -87,64 +87,96 @@ Example target shape:
 ```yaml
 version: 1
 
-providers:
-  # Model values below are illustrative examples and should be refreshed when
-  # implementation starts.
-  claude:
-    default_instance: api
-    instances:
-      native:
-        backend: cli
-        environment: native
-        command: claude
-        runner: auto
-        projects_dir: ~/.claude/projects
-      api:
+routing:
+  providers:
+    claude:
+      default_target:
         backend: api
+        instance: sonnet
+    codex:
+      default_target:
+        backend: api
+        instance: main
+    gemini:
+      default_target:
+        backend: api
+        instance: pro
+    ollama:
+      default_target:
+        backend: local
+        instance: local
+
+backends:
+  cli:
+    providers:
+      claude:
+        instances:
+          native:
+            environment: native
+            command: claude
+            runner: auto
+            projects_dir: ~/.claude/projects
+
+  api:
+    providers:
+      claude:
+        default_instance: sonnet
         transport: anthropic
         api_key_env: ANTHROPIC_API_KEY
-        model: claude-sonnet-4-5
         max_output_tokens: 32000
         tool_profile: standard
+        instances:
+          sonnet:
+            # Model values below are illustrative examples and should be
+            # refreshed when implementation starts.
+            model: claude-sonnet-4-5
+          opus:
+            model: claude-opus-4-1
 
-  codex:
-    default_instance: api
-    instances:
-      api:
-        backend: api
+      codex:
+        default_instance: main
         transport: openai
         api_key_env: OPENAI_API_KEY
-        model: gpt-5
         tool_profile: standard
+        instances:
+          main:
+            model: gpt-5
 
-  gemini:
-    default_instance: api
-    instances:
-      api:
-        backend: api
+      gemini:
+        default_instance: pro
         transport: google
         api_key_env: GEMINI_API_KEY
-        model: gemini-2.5-pro
         tool_profile: standard
+        instances:
+          pro:
+            model: gemini-2.5-pro
+          flash:
+            model: gemini-2.5-flash
 
-  ollama:
-    default_instance: local
-    instances:
-      local:
-        backend: api
-        transport: ollama
-        base_url: http://127.0.0.1:11434
-        model: qwen3:latest
-        tool_profile: standard
+  local:
+    providers:
+      ollama:
+        default_instance: local
+        instances:
+          local:
+            transport: ollama
+            base_url: http://127.0.0.1:11434
+            model: qwen3:latest
+            tool_profile: standard
 ```
 
 Rules:
 
-- `backend` defaults to `cli` for backward compatibility when omitted.
-- `api_key_env` is required for `backend: api`.
+- `routing.providers.<name>.default_target` chooses the default backend and
+  instance for that product family.
+- Shared remote settings such as `transport`, `api_key_env`, common headers,
+  and limits may be defined once at `backends.api.providers.<name>` and
+  inherited by all of that provider's instances.
 - API instances may optionally define `base_url`, `base_url_env`,
   `organization_env`, `project_env`, `headers`, `timeout_ms`, `max_retries`,
   `max_output_tokens`, and `tool_profile`.
+- Individual instances may override inherited remote settings when one API key
+  should expose several models or endpoints.
 - `transport: ollama` does not require an API key for the default local runtime,
   but may still use one if targeting `ollama.com/api` or a secured remote host.
 - Secrets stay in `.env` or host env; YAML only stores references and non-secret

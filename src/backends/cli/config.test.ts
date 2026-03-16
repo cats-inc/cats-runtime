@@ -713,6 +713,107 @@ backends:
     }
   });
 
+  it('inherits remote provider defaults while allowing per-instance overrides', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const configPath = join(tempDir, 'providers.yaml');
+    writeFileSync(configPath, `
+version: 1
+routing:
+  providers:
+    claude:
+      default_target:
+        backend: api
+        instance: sonnet
+backends:
+  api:
+    providers:
+      claude:
+        default_instance: sonnet
+        transport: anthropic
+        api_key_env: ANTHROPIC_API_KEY
+        system_prompt: You are the default Claude worker.
+        headers:
+          x-provider-family: claude
+          x-shared: base
+        max_output_tokens: 8192
+        timeout_ms: 30000
+        max_retries: 2
+        max_tool_steps: 24
+        tool_profile: standard
+        instances:
+          sonnet:
+            model: claude-sonnet-4-20250514
+          opus:
+            model: claude-opus-4-20250514
+            headers:
+              x-shared: opus
+              x-instance: opus
+            max_output_tokens: 16384
+`.trimStart());
+
+    try {
+      const config = loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_CONFIG_PATH: configPath,
+      });
+
+      expect(config.providerDefaultTargets?.claude).toEqual({
+        backend: 'api',
+        instance: 'sonnet',
+      });
+
+      expect(config.remoteProviderCatalog?.api.claude.sonnet).toEqual({
+        id: 'sonnet',
+        providerName: 'claude',
+        backend: 'api',
+        transport: 'anthropic',
+        model: 'claude-sonnet-4-20250514',
+        systemPrompt: 'You are the default Claude worker.',
+        apiKeyEnv: 'ANTHROPIC_API_KEY',
+        baseUrl: undefined,
+        baseUrlEnv: undefined,
+        organizationEnv: undefined,
+        projectEnv: undefined,
+        headers: {
+          'x-provider-family': 'claude',
+          'x-shared': 'base',
+        },
+        maxOutputTokens: 8192,
+        timeoutMs: 30000,
+        maxRetries: 2,
+        maxToolSteps: 24,
+        toolProfile: 'standard',
+      });
+
+      expect(config.remoteProviderCatalog?.api.claude.opus).toEqual({
+        id: 'opus',
+        providerName: 'claude',
+        backend: 'api',
+        transport: 'anthropic',
+        model: 'claude-opus-4-20250514',
+        systemPrompt: 'You are the default Claude worker.',
+        apiKeyEnv: 'ANTHROPIC_API_KEY',
+        baseUrl: undefined,
+        baseUrlEnv: undefined,
+        organizationEnv: undefined,
+        projectEnv: undefined,
+        headers: {
+          'x-provider-family': 'claude',
+          'x-shared': 'opus',
+          'x-instance': 'opus',
+        },
+        maxOutputTokens: 16384,
+        timeoutMs: 30000,
+        maxRetries: 2,
+        maxToolSteps: 24,
+        toolProfile: 'standard',
+      });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('rejects providers that are configured in multiple backends without routing', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
     const configPath = join(tempDir, 'providers.yaml');

@@ -105,10 +105,11 @@ backends:
   api:
     providers:
       claude:
+        default_instance: sonnet
+        transport: anthropic
+        api_key_env: ANTHROPIC_API_KEY
         instances:
           sonnet:
-            transport: anthropic
-            api_key_env: ANTHROPIC_API_KEY
             model: claude-sonnet-4-20250514
   local:
     providers:
@@ -117,12 +118,18 @@ backends:
           local:
             transport: ollama
             base_url: http://127.0.0.1:11434
-            model: qwen3:latest
+            model: qwen2.5-coder:7b
 ```
 
 This lets one provider expose multiple independently logged-in environments,
 such as several WSL distros on one Windows host. Docker is not wired yet, but
 the environment/instance model is intended to extend in that direction.
+
+For remote API providers, shared settings belong at the provider level. Put
+`transport`, `api_key_env`, shared headers, and common limits once under
+`backends.api.providers.<name>`, then let each instance override only what
+actually differs, usually `model`. That avoids copying the same API key across
+`claude.sonnet`, `gemini.flash`, and similar instance variants.
 
 Path semantics matter:
 

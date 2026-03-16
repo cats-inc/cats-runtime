@@ -49,22 +49,27 @@ backends:
   api:
     providers:
       claude:
+        default_instance: sonnet
+        transport: anthropic
+        api_key_env: ANTHROPIC_API_KEY
         instances:
           sonnet:
-            transport: anthropic
-            api_key_env: ANTHROPIC_API_KEY
             model: claude-sonnet-4-6
+          opus:
+            model: claude-opus-4-6
       codex:
+        default_instance: main
+        transport: openai
+        api_key_env: OPENAI_API_KEY
         instances:
           main:
-            transport: openai
-            api_key_env: OPENAI_API_KEY
             model: gpt-5
       gemini:
+        default_instance: pro
+        transport: google
+        api_key_env: GEMINI_API_KEY
         instances:
           pro:
-            transport: google
-            api_key_env: GEMINI_API_KEY
             model: gemini-2.5-pro
   local:
     providers:
@@ -124,6 +129,16 @@ describe('API backend integration', () => {
                 runtime: undefined,
                 transport: 'anthropic',
                 model: 'claude-sonnet-4-6',
+              },
+              {
+                id: 'opus',
+                target: 'api/opus',
+                backend: 'api',
+                command: undefined,
+                runner: undefined,
+                runtime: undefined,
+                transport: 'anthropic',
+                model: 'claude-opus-4-6',
               },
             ],
           },

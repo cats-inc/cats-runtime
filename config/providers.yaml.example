@@ -53,11 +53,11 @@ routing:
     cursor:
       default_target:
         backend: cli
-        instance: native
+        instance: ubuntu
     kiro:
       default_target:
         backend: cli
-        instance: native
+        instance: ubuntu
     ollama:
       default_target:
         backend: local
@@ -121,49 +121,53 @@ backends:
 
       cursor:
         instances:
-          native:
-            environment: native
+          ubuntu:
+            environment: ubuntu
             command: cursor-agent
             runner: auto
             chats_dir: ~/.cursor/chats
 
       kiro:
         instances:
-          native:
-            environment: native
+          ubuntu:
+            environment: ubuntu
             command: kiro-cli
             runner: auto
             # db_path defaults:
             #   macOS:       ~/Library/Application Support/kiro-cli/data.sqlite3
             #   Linux / WSL: ~/.local/share/kiro-cli/data.sqlite3
-            db_path: ~/Library/Application Support/kiro-cli/data.sqlite3
+            db_path: ~/.local/share/kiro-cli/data.sqlite3
 
   api:
     providers:
       claude:
+        default_instance: sonnet
+        transport: anthropic
+        api_key_env: ANTHROPIC_API_KEY
         instances:
           sonnet:
-            transport: anthropic
-            api_key_env: ANTHROPIC_API_KEY
-            # Replace with the Claude API model you actually want to run.
+            # As of 2026-03-16, Anthropic's documented balanced pay-as-you-go
+            # model is Claude Sonnet 4.
             model: claude-sonnet-4-20250514
 
       codex:
+        default_instance: main
+        transport: openai
+        api_key_env: OPENAI_API_KEY
         instances:
           main:
-            transport: openai
-            api_key_env: OPENAI_API_KEY
-            # Keep the provider family as `codex`; the vendor transport is `openai`.
-            # Replace with the OpenAI coding model you want to run.
-            model: gpt-5
+            # As of 2026-03-16, OpenAI's latest documented Codex model is GPT-5.2-Codex.
+            model: gpt-5.2-codex
 
       gemini:
+        default_instance: flash
+        transport: google
+        api_key_env: GEMINI_API_KEY
         instances:
-          pro:
-            transport: google
-            api_key_env: GEMINI_API_KEY
-            # Replace with the Gemini API model you actually want to run.
-            model: gemini-2.5-pro
+          flash:
+            # As of 2026-03-16, Google's documented balanced Gemini 3 API model
+            # is Gemini 3 Flash Preview.
+            model: gemini-3-flash-preview
 
   local:
     providers:
@@ -172,5 +176,6 @@ backends:
           local:
             transport: ollama
             base_url: http://127.0.0.1:11434
-            # Replace with a model you already have in `ollama list`.
-            model: qwen3:latest
+            # Qwen2.5 Coder 7B fits comfortably on an RTX 4060 8GB and remains
+            # one of the strongest Ollama-hosted coding-specialized options.
+            model: qwen2.5-coder:7b
