@@ -55,6 +55,7 @@
 #### Remaining Items
 
 - [ ] Add `src/backends/api` for API-key and Ollama-backed execution paths
+      (tracked by `docs/plans/PLAN-003-api-backend.md`)
 
 ### WP-2: Provider Instance Review Follow-ups
 
