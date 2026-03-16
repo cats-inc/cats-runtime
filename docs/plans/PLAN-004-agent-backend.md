@@ -8,9 +8,9 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | In Progress |
 | **Owner** | Codex |
-| **Assigned To** | Claude |
+| **Assigned To** | Codex |
 | **Reviewer** | Gemini |
 
 ## Related Spec
@@ -158,8 +158,8 @@ difference between logical session identity and provider-managed resume tokens.
 ### Phase 0: Record the Architecture Extension
 
 - [x] Add `ADR-006` for `agent` backend introduction
-- [ ] Document the distinction between `api` and `agent`
-- [ ] Record that Pi remains a `cli` provider family
+- [x] Document the distinction between `api` and `agent`
+- [x] Record that Pi remains a `cli` provider family
 
 **Deliverables**:
 
@@ -186,17 +186,17 @@ difference between logical session identity and provider-managed resume tokens.
 
 #### Phase 1b: Backend Type and Config Expansion
 
-- [ ] Extend `ProviderBackend` from `cli | api | local` to
+- [x] Extend `ProviderBackend` from `cli | api | local` to
       `cli | api | local | agent`
-- [ ] Clarify in code docs and architecture docs that `local` remains a
+- [x] Clarify in code docs and architecture docs that `local` remains a
       distinct backend kind in config/routing, but currently shares runtime
       execution machinery with `api`
-- [ ] Add `backends.agent.providers.<name>.instances.<id>` support in
+- [x] Add `backends.agent.providers.<name>.instances.<id>` support in
       `providers.yaml`
-- [ ] Extend provider catalog and route validation to include `agent`
-- [ ] Generalize `SessionProviderState` so it can store agent session metadata,
+- [x] Extend provider catalog and route validation to include `agent`
+- [x] Generalize `SessionProviderState` so it can store agent session metadata,
       not only Gemini cache state
-- [ ] Define backend-neutral `AgentInvocationContext` and `AgentSessionState`
+- [x] Define backend-neutral `AgentInvocationContext` and `AgentSessionState`
 
 **Deliverables**:
 
@@ -208,12 +208,12 @@ difference between logical session identity and provider-managed resume tokens.
 
 ### Phase 2: `src/backends/agent` Skeleton
 
-- [ ] Create `src/backends/agent/types.ts`
-- [ ] Create `src/backends/agent/runtime/AgentBackendManager.ts`
-- [ ] Create `src/backends/agent/adapters/registry.ts`
-- [ ] Introduce `AgentAdapter` contract
-- [ ] Extend `RuntimeSessionManager` to dispatch into `AgentBackendManager`
-- [ ] Add agent backend status/probe aggregation to pool/status or a sibling
+- [x] Create `src/backends/agent/types.ts`
+- [x] Create `src/backends/agent/runtime/AgentBackendManager.ts`
+- [x] Create `src/backends/agent/adapters/registry.ts`
+- [x] Introduce `AgentAdapter` contract
+- [x] Extend `RuntimeSessionManager` to dispatch into `AgentBackendManager`
+- [x] Add agent backend status/probe aggregation to pool/status or a sibling
       runtime status surface
 
 **Deliverables**:
@@ -223,15 +223,15 @@ difference between logical session identity and provider-managed resume tokens.
 
 ### Phase 3: OpenClaw Gateway MVP
 
-- [ ] Create `src/backends/agent/adapters/openclaw/`
-- [ ] Port the protocol ideas from Paperclip without importing its company
+- [x] Create `src/backends/agent/adapters/openclaw/`
+- [x] Port the protocol ideas from Paperclip without importing its company
       domain
-- [ ] Implement WebSocket connect/challenge/auth flow
-- [ ] Bind OpenClaw session continuity to the shared session-affinity contract
+- [x] Implement WebSocket connect/challenge/auth flow
+- [x] Bind OpenClaw session continuity to the shared session-affinity contract
       and provider-managed state persistence
-- [ ] Map gateway event frames into `StreamEvent`
-- [ ] Support close/cancel semantics as far as gateway capabilities allow
-- [ ] Add OpenClaw-specific `probe()`
+- [x] Map gateway event frames into `StreamEvent`
+- [x] Support close/cancel semantics as far as gateway capabilities allow
+- [x] Add OpenClaw-specific `probe()`
 - [ ] Support optional OpenClaw model listing if the target exposes it
 
 **Deliverables**:
@@ -241,15 +241,15 @@ difference between logical session identity and provider-managed resume tokens.
 
 ### Phase 4: Public Invocation Context, Bootstrap, and Artifact Surfacing
 
-- [ ] Extend internal message dispatch to carry structured invocation context
-- [ ] Extend `POST /sessions` and `POST /sessions/:id/messages` to accept
+- [x] Extend internal message dispatch to carry structured invocation context
+- [x] Extend `POST /sessions` and `POST /sessions/:id/messages` to accept
       optional `sessionKey`, `instructions`, and `context` metadata while
       keeping the current message-only flow valid
-- [ ] Persist invocation metadata that matters for later resume/observability
-- [ ] Add session-level output hints such as `outputDir` and surface generated
+- [x] Persist invocation metadata that matters for later resume/observability
+- [x] Add session-level output hints such as `outputDir` and surface generated
       artifact metadata in history/dashboard views
-- [ ] Surface agent-backed session metadata in history and dashboard views
-- [ ] Clarify `close`, `resume`, and `delete` semantics for provider-managed
+- [x] Surface agent-backed session metadata in history and dashboard views
+- [x] Clarify `close`, `resume`, and `delete` semantics for provider-managed
       sessions
 
 **Deliverables**:
@@ -352,6 +352,7 @@ difference between logical session identity and provider-managed resume tokens.
 | 2026-03-17 | Plan created from direct `cats-runtime` vs `paperclip` comparison, with OpenClaw chosen as first target and Agent SDK reserved as second target |
 | 2026-03-17 | Reprioritized immediate follow-on work toward shared session affinity, bootstrap context, and artifact/output contracts instead of any Git-specific workspace dependency |
 | 2026-03-17 | Added ADR-006 and clarified `sessionKey` semantics, explicit reuse policy, provider-session fallback, and non-Git output assumptions |
+| 2026-03-17 | Landed Phase 1-4 core implementation: shared session/bootstrap/output contract, `backends.agent` config/catalog plumbing, and OpenClaw Gateway MVP |
 
 ---
 

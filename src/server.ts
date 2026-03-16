@@ -31,11 +31,13 @@ import { OpencodeNativeSessionService } from './backends/cli/opencode/OpencodeNa
 import { createRuntimeAdapter } from './backends/cli/runtime/runtime.js';
 import { SessionRegistry } from './backends/cli/pool/SessionRegistry.js';
 import { ApiBackendManager } from './backends/api/runtime/ApiBackendManager.js';
+import { AgentBackendManager } from './backends/agent/runtime/AgentBackendManager.js';
 import { WorkerPool } from './backends/cli/pool/WorkerPool.js';
 import { RuntimeSessionManager } from './core/runtime/RuntimeSessionManager.js';
 import { createRuntimeApp, type AppContext } from './http/app.js';
 import type { ProviderName } from './backends/cli/providers/types.js';
 import type { ApiBackendOptions } from './backends/api/types.js';
+import type { AgentBackendOptions } from './backends/agent/types.js';
 import {
   normalizeFileBackedProviderPath,
   resolveFileBackedProviderPath,
@@ -49,6 +51,7 @@ interface DiscoveryController {
 interface RuntimeServerOptions {
   wslDistroInspector?: WslDistroInspector;
   apiBackend?: ApiBackendOptions;
+  agentBackend?: AgentBackendOptions;
 }
 
 interface WatcherSpec {
@@ -490,6 +493,7 @@ export function createRuntimeServer(
     config.providerDefaultTargets,
   );
   const apiBackend = new ApiBackendManager(config, registry, options.apiBackend);
+  const agentBackend = new AgentBackendManager(config, registry, options.agentBackend);
   const wslDiscoveryStatus = new WslDiscoveryStatusStore(config);
   const auggieSessionsByInstance = new Map(
     listProviderInstances(config, 'auggie').map((instance) => [
@@ -590,12 +594,13 @@ export function createRuntimeServer(
       getOpencodeNative: resolveOpencodeNative,
     },
   );
-  const runtime = new RuntimeSessionManager(config, pool, apiBackend);
+  const runtime = new RuntimeSessionManager(config, pool, apiBackend, agentBackend);
   const context: AppContext = {
     config,
     registry,
     pool,
     apiBackend,
+    agentBackend,
     runtime,
     cursorNative,
     kiroNative,
@@ -636,6 +641,7 @@ export function createRuntimeServer(
     },
     async close() {
       discovery.stop();
+      agentBackend.killAll();
       apiBackend.killAll();
       pool.killAll();
       registry.flush();

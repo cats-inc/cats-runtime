@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { createInterface } from 'node:readline';
 import type { ProviderCommandConfig } from '../config.js';
+import type { TurnInput } from '../../../core/types.js';
 import type { Provider, ProviderSpawnOptions, StreamEvent } from '../providers/types.js';
 import { buildProcessSpawnConfig } from '../runtime/runtime.js';
 
@@ -137,7 +138,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
    * Send a message to the CLI process via stdin.
    * Returns an async iterable of StreamEvents for this turn.
    */
-  async sendMessage(content: string): Promise<StreamEvent[]> {
+  async sendMessage(content: string | TurnInput): Promise<StreamEvent[]> {
     const events: StreamEvent[] = [];
     for await (const event of this.streamMessage(content)) {
       events.push(event);
@@ -148,7 +149,9 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   /**
    * Send a message and yield StreamEvents as they arrive (for SSE streaming).
    */
-  async *streamMessage(content: string): AsyncGenerator<StreamEvent> {
+  async *streamMessage(content: string | TurnInput): AsyncGenerator<StreamEvent> {
+    const turn = typeof content === 'string' ? { message: content } : content;
+
     if (!this.alive) {
       throw new Error('Worker process is not running');
     }
@@ -167,7 +170,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
 
       try {
         await this.runProviderBeforeTurn();
-        for await (const event of this.provider.streamTurn(content, {
+        for await (const event of this.provider.streamTurn(turn.message, {
           ...this.spawnOpts,
           signal: controller.signal,
         })) {
@@ -250,9 +253,9 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
             this.spawnOpts = { ...this.spawnOpts, resumeSessionId: this._providerSessionId };
           }
           await this.runProviderBeforeTurn();
-          this.provider.prepareEphemeralTurn?.(content);
+          this.provider.prepareEphemeralTurn?.(turn.message);
           this.spawnProcess();
-          const msg = this.provider.buildStdinMessage(content);
+          const msg = this.provider.buildStdinMessage(turn.message);
           if (msg) this.process!.stdin!.write(msg);
           this.process!.stdin!.end();
 
@@ -298,7 +301,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
         }
       } else {
         await this.runProviderBeforeTurn();
-        const msg = this.provider.buildStdinMessage(content);
+      const msg = this.provider.buildStdinMessage(turn.message);
         this.process!.stdin!.write(msg);
       }
 

@@ -1,4 +1,4 @@
-import type { ExecutionHandle, StreamEvent } from '../../../core/types.js';
+import type { ExecutionHandle, StreamEvent, TurnInput } from '../../../core/types.js';
 import { LocalToolRuntime } from '../../../core/tools/LocalToolRuntime.js';
 import type { SessionRegistry } from '../../cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig, RemoteProviderInstanceConfig } from '../../cli/config.js';
@@ -83,19 +83,31 @@ function lastUserText(messages: ApiConversationMessage[]): string | undefined {
 
 function prependSystemPrompt(
   messages: ApiConversationMessage[],
-  systemPrompt: string | undefined,
+  ...systemPrompts: Array<string | undefined>
 ): ApiConversationMessage[] {
-  if (!systemPrompt) {
+  const combinedPrompt = systemPrompts
+    .map((prompt) => prompt?.trim())
+    .filter((prompt): prompt is string => Boolean(prompt))
+    .join('\n\n');
+
+  if (!combinedPrompt) {
     return messages;
   }
 
   if (messages[0]?.role === 'system') {
-    return messages;
+    const [first, ...rest] = messages;
+    return [{
+      role: 'system',
+      parts: [{
+        type: 'text',
+        text: [combinedPrompt, ...extractTextParts(first)].filter(Boolean).join('\n\n'),
+      }],
+    }, ...rest];
   }
 
   return [{
     role: 'system',
-    parts: [{ type: 'text', text: systemPrompt }],
+    parts: [{ type: 'text', text: combinedPrompt }],
   }, ...messages];
 }
 
@@ -198,7 +210,7 @@ export class ApiBackendManager {
   private async *streamTurn(
     sessionId: string,
     target: ProviderTargetDescriptor,
-    message: string,
+    turn: TurnInput,
     signal: AbortSignal,
   ): AsyncGenerator<StreamEvent> {
     const initialSession = this.registry.get(sessionId);
@@ -219,11 +231,13 @@ export class ApiBackendManager {
     const conversation = prependSystemPrompt(
       await loadTranscriptMessages(transcriptPath),
       remoteInstance.systemPrompt,
+      initialSession.instructions,
+      turn.instructions,
     );
-    if (lastUserText(conversation) !== message) {
+    if (lastUserText(conversation) !== turn.message) {
       conversation.push({
         role: 'user',
-        parts: [{ type: 'text', text: message }],
+        parts: [{ type: 'text', text: turn.message }],
       });
     }
 

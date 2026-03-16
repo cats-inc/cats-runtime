@@ -7,7 +7,8 @@
 `cats-runtime` now runs as a single service. The CLI runtime that previously
 lived behind the `agent-fleet` HTTP boundary has been ported into this repo and
 organized under `src/backends/cli`, while API-key and local-model execution now
-live under `src/backends/api`.
+live under `src/backends/api`, and external agent runtimes such as OpenClaw now
+live under `src/backends/agent`.
 
 Provider execution topology now comes from `config/providers.yaml` when present.
 That file maps each provider to one or more named instances, and each instance
@@ -19,7 +20,7 @@ environment-relative guest paths.
 The architectural split is:
 
 - `core`: shared runtime config and stable types
-- `backends`: execution implementations for CLI, API, and local-model targets
+- `backends`: execution implementations for CLI, API/local, and agent targets
 - `http`: inbound transport and route wiring
 
 ## Architecture Diagram
@@ -36,13 +37,15 @@ The architectural split is:
 │  core contracts + config + tools         │
 │  backends/cli session pool + discovery   │
 │  backends/api transport + tool loop      │
+│  backends/agent adapter runtime          │
 └──────────┬────────────────────────────────┘
-           │ subprocess / local files / remote APIs / local APIs
+           │ subprocess / local files / remote APIs / local APIs / agent gateways
            ▼
 ┌───────────────────────────────────────────┐
 │ Claude / OpenAI / Gemini / Ollama APIs   │
 │ Claude / Codex / Gemini / Kiro / Cursor  │
 │ Auggie / OpenCode local runtimes         │
+│ OpenClaw / future Agent SDK runtimes     │
 └───────────────────────────────────────────┘
 ```
 
@@ -58,6 +61,10 @@ src/
     tools/
     types.ts
   backends/
+    agent/
+      adapters/
+      runtime/
+      types.ts
     api/
       runtime/
       transports/
@@ -104,6 +111,18 @@ src/
 - Resolves configured remote targets and transport settings per provider instance
 - Runs provider-native function/tool calling through a shared local tool runtime
 - Keeps resume/fork/history source of truth in runtime-managed transcripts
+- Persists provider-native continuation metadata such as OpenAI response IDs,
+  Anthropic prompt-caching hints, and Gemini cached-content state as
+  optimizations under the runtime-owned logical session
+
+### `src/backends/agent`
+
+- Manages external agent runtimes that own more of the run/session lifecycle
+- Resolves configured `backends.agent` targets and adapter settings
+- Dispatches through `AgentAdapter` implementations instead of completion/tool
+  transports
+- Persists provider-managed session continuity state beside runtime-visible
+  history, artifacts, and invocation metadata
 
 ### `src/core/tools`
 
@@ -117,14 +136,17 @@ src/
 - Loads runtime-wide configuration
 - Defines stable exported runtime types
 - Keeps shared utilities out of provider modules
+- Carries the shared turn/bootstrap/output contract used across CLI, API/local,
+  and agent sessions
 
 ## Data Flow
 
 1. A caller sends a request to `cats-runtime`
 2. `src/http` authenticates and routes the request
 3. `RuntimeSessionManager` resolves the configured backend target for the chosen provider instance
-4. CLI targets flow into `WorkerPool`; API/local targets flow into `ApiBackendManager`
+4. CLI targets flow into `WorkerPool`; API/local targets flow into `ApiBackendManager`; agent targets flow into `AgentBackendManager`
 5. API/local turns may enter the shared local tool loop in `src/core/tools`
+6. Agent turns use the shared `TurnInput` contract plus provider-managed session continuity where available
 6. Stream events are returned directly to the caller
 
 For WSL-backed Cursor/Kiro discovery:
@@ -150,6 +172,8 @@ For file-backed providers:
 - Historical `agent-fleet` references should stay confined to ADRs and migration notes
 - Inbound transport code should stay in `src/http`, not in backend modules
 - New API-key or Ollama integrations should land under `src/backends/api`
+- External agent runtimes with their own run/session/event semantics should
+  land under `src/backends/agent`
 - Shared filesystem and shell tools should stay in `src/core/tools`, not inside one backend
 - Keep `.env` focused on runtime-wide values; provider topology belongs in
   `config/providers.yaml`
@@ -161,7 +185,8 @@ For file-backed providers:
 - [003: Move provider execution topology into file-based provider instances](./decisions/003-provider-instance-config.md)
 - [004: Resolve file-backed provider paths on the host](./decisions/004-file-backed-paths-are-host-resolved.md)
 - [005: Introduce a backend-neutral runtime facade for CLI and API backends](./decisions/005-backend-neutral-runtime-and-api-backend.md)
+- [006: Introduce an agent backend and shared runtime contracts](./decisions/006-agent-backend-and-shared-runtime-contracts.md)
 
 ---
 
-*Last updated: 2026-03-16*
+*Last updated: 2026-03-17*

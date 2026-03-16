@@ -55,7 +55,13 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
         ctx,
         session.providerInstanceId,
       ).loadHistory(session.cwd, session.providerSessionId);
-      return c.json({ messages });
+      return c.json({
+        messages,
+        sessionKey: session.sessionKey,
+        outputDir: session.outputDir,
+        artifacts: session.artifacts || [],
+        context: session.context,
+      });
     } catch (err) {
       return c.json({ error: `Failed to load Cursor history: ${err}` }, 500);
     }
@@ -71,7 +77,13 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
         ctx,
         session.providerInstanceId,
       ).loadHistory(session.cwd, session.providerSessionId);
-      return c.json({ messages });
+      return c.json({
+        messages,
+        sessionKey: session.sessionKey,
+        outputDir: session.outputDir,
+        artifacts: session.artifacts || [],
+        context: session.context,
+      });
     } catch (err) {
       return c.json({ error: `Failed to load Kiro history: ${err}` }, 500);
     }
@@ -83,7 +95,13 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
         providerSessionId: session.providerSessionId,
         sourcePath: session.providerSourcePath || session.sourcePath,
       });
-      return c.json({ messages });
+      return c.json({
+        messages,
+        sessionKey: session.sessionKey,
+        outputDir: session.outputDir,
+        artifacts: session.artifacts || [],
+        context: session.context,
+      });
     } catch (err) {
       return c.json({ error: `Failed to load Auggie history: ${err}` }, 500);
     }
@@ -99,7 +117,13 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
         ctx,
         session.providerInstanceId,
       ).loadHistory(session.cwd, session.providerSessionId);
-      return c.json({ messages });
+      return c.json({
+        messages,
+        sessionKey: session.sessionKey,
+        outputDir: session.outputDir,
+        artifacts: session.artifacts || [],
+        context: session.context,
+      });
     } catch (err) {
       return c.json({ error: `Failed to load OpenCode history: ${err}` }, 500);
     }
@@ -111,7 +135,15 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
   if (session.sourcePath && session.sourcePath !== session.providerSourcePath) {
     paths.push(session.sourcePath);
   }
-  if (paths.length === 0) return c.json({ messages: [] });
+  if (paths.length === 0) {
+    return c.json({
+      messages: [],
+      sessionKey: session.sessionKey,
+      outputDir: session.outputDir,
+      artifacts: session.artifacts || [],
+      context: session.context,
+    });
+  }
 
   const messages: HistoryMessage[] = [];
 
@@ -218,5 +250,11 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
     }
   }
 
-  return c.json({ messages });
+  return c.json({
+    messages,
+    sessionKey: session.sessionKey,
+    outputDir: session.outputDir,
+    artifacts: session.artifacts || [],
+    context: session.context,
+  });
 });

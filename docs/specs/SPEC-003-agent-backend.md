@@ -235,20 +235,17 @@ timer/callback integrations.
 
 ## Acceptance Criteria
 
-- [ ] A new `agent` backend kind is defined in shared runtime types
-- [ ] `providers.yaml` can declare `backends.agent.providers.<name>`
-- [ ] `RuntimeSessionManager` can route sessions to an `AgentBackendManager`
-- [ ] An `AgentAdapter` contract exists in `src/backends/agent`
-- [ ] OpenClaw is implementable against that contract without special-casing the
+- [x] A new `agent` backend kind is defined in shared runtime types
+- [x] `providers.yaml` can declare `backends.agent.providers.<name>`
+- [x] `RuntimeSessionManager` can route sessions to an `AgentBackendManager`
+- [x] An `AgentAdapter` contract exists in `src/backends/agent`
+- [x] OpenClaw is implementable against that contract without special-casing the
       HTTP layer
 - [ ] The contract can also host a future `Agent SDK` adapter
-- [ ] Pi remains documented as a `cli` integration, not an `agent` integration
+- [x] Pi remains documented as a `cli` integration, not an `agent` integration
 
 ## Open Questions
 
-- [ ] Should the public `POST /sessions/:id/messages` route accept optional
-      structured invocation metadata, or should that remain an internal-only
-      extension first?
 - [ ] How should agent-managed runtime services or preview URLs surface in the
       dashboard session model?
 - [ ] Should agent backends expose a stronger typed event taxonomy beyond the

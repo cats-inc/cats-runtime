@@ -25,7 +25,7 @@ const CONFIG_FILE_DEFAULT = join('config', 'providers.yaml');
 export type RunnerMode = typeof RUNNER_MODES[number];
 export type RuntimeMode = typeof RUNTIME_MODES[number];
 export type WslDiscoveryPolicy = typeof WSL_DISCOVERY_POLICIES[number];
-export type BackendKind = 'cli' | 'api' | 'local';
+export type BackendKind = 'cli' | 'api' | 'local' | 'agent';
 
 export interface ProviderRuntimeConfig {
   mode: RuntimeMode;
@@ -50,14 +50,25 @@ export interface RemoteProviderInstanceConfig {
   providerName: string;
   backend: Exclude<BackendKind, 'cli'>;
   transport?: string;
+  url?: string;
+  urlEnv?: string;
   model?: string;
   systemPrompt?: string;
   apiKeyEnv?: string;
+  authTokenEnv?: string;
+  passwordEnv?: string;
   baseUrl?: string;
   baseUrlEnv?: string;
   organizationEnv?: string;
   projectEnv?: string;
   headers?: Record<string, string>;
+  clientId?: string;
+  clientMode?: string;
+  clientVersion?: string;
+  role?: string;
+  scopes?: string[];
+  payloadTemplate?: Record<string, unknown>;
+  waitTimeoutMs?: number;
   maxOutputTokens?: number;
   timeoutMs?: number;
   maxRetries?: number;
@@ -68,6 +79,7 @@ export interface RemoteProviderInstanceConfig {
 export interface RemoteProviderCatalog {
   api: Record<string, Record<string, RemoteProviderInstanceConfig>>;
   local: Record<string, Record<string, RemoteProviderInstanceConfig>>;
+  agent: Record<string, Record<string, RemoteProviderInstanceConfig>>;
 }
 
 export class UnknownProviderInstanceError extends Error {
@@ -604,6 +616,7 @@ function buildLegacyRuntimeShape(
     remoteProviderCatalog: {
       api: {},
       local: {},
+      agent: {},
     },
   };
 }
@@ -986,6 +999,7 @@ function applyFileBasedProviderConfig(
     parsedRemote = parseRemoteBackends(rawBackends, filePath);
     Object.assign(remoteProviderCatalog.api, parsedRemote.catalog.api);
     Object.assign(remoteProviderCatalog.local, parsedRemote.catalog.local);
+    Object.assign(remoteProviderCatalog.agent, parsedRemote.catalog.agent);
   }
 
   const resolvedDefaultTargets = resolveProviderDefaultTargets(
@@ -1274,6 +1288,7 @@ function cloneRemoteProviderCatalog(input: RemoteProviderCatalog): RemoteProvide
   return {
     api: cloneRemoteProviderMap(input.api),
     local: cloneRemoteProviderMap(input.local),
+    agent: cloneRemoteProviderMap(input.agent),
   };
 }
 
@@ -1285,6 +1300,8 @@ function cloneRemoteProviderMap(
       Object.entries(instances).map(([instanceId, instance]) => [instanceId, {
         ...instance,
         headers: instance.headers ? { ...instance.headers } : undefined,
+        scopes: instance.scopes ? [...instance.scopes] : undefined,
+        payloadTemplate: instance.payloadTemplate ? structuredClone(instance.payloadTemplate) : undefined,
       }]),
     )]),
   );
@@ -1297,10 +1314,11 @@ function parseRemoteBackends(
   const catalog: RemoteProviderCatalog = {
     api: {},
     local: {},
+    agent: {},
   };
   const defaults: Record<string, ProviderDefaultTarget[]> = {};
 
-  for (const backend of ['api', 'local'] as const) {
+  for (const backend of ['api', 'local', 'agent'] as const) {
     const backendDoc = asOptionalObject(rawBackends?.[backend]);
     const providers = asOptionalObject(backendDoc?.providers);
     if (!providers) {
@@ -1347,6 +1365,12 @@ function parseRemoteBackends(
           backend,
           transport: readString(instanceDoc.transport)
             || readString(providerDoc.transport),
+          url: readString(instanceDoc.url)
+            || readString(providerDoc.url),
+          urlEnv: readString(instanceDoc.url_env)
+            || readString(instanceDoc.urlEnv)
+            || readString(providerDoc.url_env)
+            || readString(providerDoc.urlEnv),
           model: readString(instanceDoc.model)
             || readString(providerDoc.model),
           systemPrompt: readString(instanceDoc.system_prompt)
@@ -1357,6 +1381,14 @@ function parseRemoteBackends(
             || readString(instanceDoc.apiKeyEnv)
             || readString(providerDoc.api_key_env)
             || readString(providerDoc.apiKeyEnv),
+          authTokenEnv: readString(instanceDoc.auth_token_env)
+            || readString(instanceDoc.authTokenEnv)
+            || readString(providerDoc.auth_token_env)
+            || readString(providerDoc.authTokenEnv),
+          passwordEnv: readString(instanceDoc.password_env)
+            || readString(instanceDoc.passwordEnv)
+            || readString(providerDoc.password_env)
+            || readString(providerDoc.passwordEnv),
           baseUrl: readString(instanceDoc.base_url)
             || readString(instanceDoc.baseUrl)
             || readString(providerDoc.base_url)
@@ -1374,6 +1406,38 @@ function parseRemoteBackends(
             || readString(providerDoc.project_env)
             || readString(providerDoc.projectEnv),
           headers: mergeStringMaps(providerHeaders, instanceHeaders),
+          clientId: readString(instanceDoc.client_id)
+            || readString(instanceDoc.clientId)
+            || readString(providerDoc.client_id)
+            || readString(providerDoc.clientId),
+          clientMode: readString(instanceDoc.client_mode)
+            || readString(instanceDoc.clientMode)
+            || readString(providerDoc.client_mode)
+            || readString(providerDoc.clientMode),
+          clientVersion: readString(instanceDoc.client_version)
+            || readString(instanceDoc.clientVersion)
+            || readString(providerDoc.client_version)
+            || readString(providerDoc.clientVersion),
+          role: readString(instanceDoc.role)
+            || readString(providerDoc.role),
+          scopes: parseOptionalStringArray(
+            instanceDoc.scopes ?? providerDoc.scopes,
+            `backends.${backend}.providers.${providerName}.instances.${instanceId}.scopes`,
+          ),
+          payloadTemplate: parseOptionalObjectValue(
+            instanceDoc.payload_template
+              ?? instanceDoc.payloadTemplate
+              ?? providerDoc.payload_template
+              ?? providerDoc.payloadTemplate,
+            `backends.${backend}.providers.${providerName}.instances.${instanceId}.payload_template`,
+          ),
+          waitTimeoutMs: parseOptionalIntValue(
+            instanceDoc.wait_timeout_ms
+              ?? instanceDoc.waitTimeoutMs
+              ?? providerDoc.wait_timeout_ms
+              ?? providerDoc.waitTimeoutMs,
+            `backends.${backend}.providers.${providerName}.instances.${instanceId}.wait_timeout_ms`,
+          ),
           maxOutputTokens: parseOptionalIntValue(
             instanceDoc.max_output_tokens
               ?? instanceDoc.maxOutputTokens
@@ -1558,11 +1622,11 @@ function parseBackendKindValue(
   if (!raw) {
     return fallback;
   }
-  if (raw === 'cli' || raw === 'api' || raw === 'local') {
+  if (raw === 'cli' || raw === 'api' || raw === 'local' || raw === 'agent') {
     return raw;
   }
 
-  throw new Error(`Invalid ${label}='${raw}'. Valid values: cli, api, local`);
+  throw new Error(`Invalid ${label}='${raw}'. Valid values: cli, api, local, agent`);
 }
 
 function parseStringMap(
@@ -1583,6 +1647,52 @@ function parseStringMap(
   }
 
   return Object.keys(parsed).length > 0 ? parsed : undefined;
+}
+
+function parseOptionalStringArray(
+  value: unknown,
+  label: string,
+): string[] | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    return parsed.length > 0 ? parsed : undefined;
+  }
+
+  if (!Array.isArray(value)) {
+    throw new Error(`${label} must be a string or string[]`);
+  }
+
+  const parsed = value.map((entry) => {
+    const stringValue = readString(entry);
+    if (stringValue === undefined) {
+      throw new Error(`${label} entries must be strings`);
+    }
+    return stringValue;
+  }).filter(Boolean);
+
+  return parsed.length > 0 ? parsed : undefined;
+}
+
+function parseOptionalObjectValue(
+  value: unknown,
+  label: string,
+): Record<string, unknown> | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${label} must be an object`);
+  }
+
+  return structuredClone(value as Record<string, unknown>);
 }
 
 function mergeStringMaps(

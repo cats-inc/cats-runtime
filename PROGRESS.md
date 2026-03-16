@@ -7,8 +7,8 @@
 | Component | Status | Description |
 |-----------|--------|-------------|
 | Core | Completed | Embedded CLI runtime, session registry, discovery, and worker pool are in-repo |
-| API Backends | In Progress | `src/backends/api` now runs Claude, OpenAI, Gemini, and Ollama with runtime-managed sessions and a shared local tool loop; provider-specific optimizations and health probes remain |
-| Agent Backend Planning | In Progress | `SPEC-003` and `PLAN-004` now define a separate `agent` backend track for OpenClaw and future Agent SDK runtimes, with shared session/bootstrap/output contracts prioritized before deep backend-specific work |
+| API Backends | In Progress | `src/backends/api` now runs Claude, Codex/OpenAI, Gemini, and Ollama with runtime-managed sessions, provider-native continuation/caching optimizations, and a shared local tool loop; health probes and broader tool/model discovery remain |
+| Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, and room for a second Agent SDK-style validation target |
 | HTTP API | Completed | Health, sessions, messages, history, observe, and provider management routes are served directly from `cats-runtime` |
 | Dashboard | Completed | The embedded dashboard UI is served from `GET /` |
 | Tests | Completed | Vitest covers provider, discovery, pool, HTTP, server bootstrap, and API/local tool-loop behavior |
@@ -57,7 +57,6 @@
 #### Remaining Items
 
 - [ ] Add provider health probes, dashboard health surfacing, and Ollama model discovery
-- [ ] Add provider-specific cost optimizations such as Anthropic prompt caching and Gemini context caching
 - [ ] Expand the shared local tool runtime beyond the first shell/file/search set
 
 ### WP-2: Provider Instance Review Follow-ups
@@ -92,7 +91,7 @@ environment types or providers are added.
 #### Tracking
 
 - Active plan: `docs/plans/PLAN-002-provider-instance-review-followups.md`
-- Verification: `npm test` (`346` tests passed)
+- Verification: `npm test` (`398` tests passed)
 
 ### WP-3: API and Local Model Backend
 
@@ -118,24 +117,24 @@ dashboard integration intact.
 | Add shared local tool runtime for API/local sessions | [x] | `list_files`, `read_file`, `write_file`, `grep`, and `run_shell` are enforced centrally |
 | Cover API/local behavior with automated tests | [x] | Transport, tool runtime, and end-to-end HTTP flows are under Vitest |
 | Add provider health probes and dashboard health surfacing | [ ] | Deferred to a later PLAN-003 phase |
-| Add provider-specific caching/continuation optimizations | [ ] | Deferred to a later PLAN-003 phase |
+| Add provider-specific caching/continuation optimizations | [x] | OpenAI `previous_response_id`, Anthropic prompt caching, and Gemini context caching are in place |
 
 #### Verification
 
 - [x] `npm test`
 
-### WP-4: Agent Backend Planning
+### WP-4: Agent Backend and OpenClaw MVP
 
 **Status**: In Progress  
-**Assigned**: Claude  
+**Assigned**: Codex  
 **Priority**: P1
 
 #### Goal
 
-Define how `cats-runtime` should support external agent runtimes such as
-OpenClaw without forcing them into the existing `cli` or `api` execution
-categories, document Pi as a separate CLI integration track, and identify the
-shared runtime contracts that should land first.
+Add a first-class `agent` backend for external runtimes such as OpenClaw,
+land the shared session/bootstrap/output contract needed by that backend, keep
+Pi documented as a CLI-specific integration track, and validate the first
+adapter end to end through the existing HTTP surface.
 
 #### Delivered
 
@@ -146,13 +145,16 @@ shared runtime contracts that should land first.
 | Write agent backend implementation plan | [x] | `docs/plans/PLAN-004-agent-backend.md` defines phased rollout and target files |
 | Document detailed Pi integration recommendations | [x] | Research note records why Pi belongs in `src/backends/cli`, not `src/backends/agent` |
 | Record `ADR-006` for agent backend and shared runtime contracts | [x] | Decision now fixes `sessionKey` semantics, provider-session fallback, and non-Git output assumptions |
+| Land shared session affinity, bootstrap context, and artifact/output contract updates | [x] | `sessionKey`, `reusePolicy`, `instructions`, `context`, `outputDir`, and `artifacts` now flow through session routes, history, and registry state |
+| Extend runtime types/config/provider catalog to support `backend: agent` | [x] | Config parsing, provider catalog rendering, session manager dispatch, and pool status now include `agent` |
+| Build OpenClaw as the first `src/backends/agent` adapter | [x] | `AgentBackendManager` and `openclaw_gateway` adapter now create, stream, resume, reuse, and persist agent-backed sessions |
+| Cover agent backend flows with automated tests | [x] | Config, route, and OpenClaw integration behavior are covered by Vitest |
 
 #### Next Steps
 
-- [ ] Land shared session affinity, bootstrap context, and artifact/output contract updates before deep adapter work
-- [ ] Extend runtime types/config to support `backend: agent`
-- [ ] Build OpenClaw as the first `src/backends/agent` adapter
 - [ ] Validate the contract with a second target such as an Agent SDK adapter
+- [ ] Expand dashboard surfacing for agent-specific services/artifacts beyond the current generic session views
+- [ ] Add stronger provider probe/model-list coverage where agent runtimes expose it
 
 ---
 

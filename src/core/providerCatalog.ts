@@ -12,6 +12,7 @@ import {
 } from '../backends/cli/providers/types.js';
 
 const PROVIDER_ORDER = [
+  'openclaw',
   'claude',
   'codex',
   'gemini',
@@ -57,7 +58,7 @@ function parseQualifiedTarget(
 
   const backend = value.slice(0, separator);
   const instance = value.slice(separator + 1);
-  if (backend !== 'cli' && backend !== 'api' && backend !== 'local') {
+  if (backend !== 'cli' && backend !== 'api' && backend !== 'local' && backend !== 'agent') {
     return undefined;
   }
   if (!instance) {
@@ -142,6 +143,17 @@ export function getProviderDefaultTarget(
     }
   }
 
+  const remoteAgentInstances = config.remoteProviderCatalog?.agent?.[providerName];
+  if (remoteAgentInstances) {
+    const first = Object.values(remoteAgentInstances)[0];
+    if (first) {
+      return {
+        backend: 'agent',
+        instance: first.id,
+      };
+    }
+  }
+
   return undefined;
 }
 
@@ -172,6 +184,9 @@ export function listConfiguredProviders(
     names.add(providerName);
   }
   for (const providerName of Object.keys(config.remoteProviderCatalog?.local || {})) {
+    names.add(providerName);
+  }
+  for (const providerName of Object.keys(config.remoteProviderCatalog?.agent || {})) {
     names.add(providerName);
   }
 
@@ -230,6 +245,7 @@ export function listProviderCatalog(
     for (const [backend, providers] of Object.entries({
       api: config.remoteProviderCatalog?.api || {},
       local: config.remoteProviderCatalog?.local || {},
+      agent: config.remoteProviderCatalog?.agent || {},
     }) as Array<[Exclude<BackendKind, 'cli'>, Record<string, Record<string, RemoteProviderInstanceConfig>>]>) {
       const remoteInstances = providers[providerName];
       if (!remoteInstances) {

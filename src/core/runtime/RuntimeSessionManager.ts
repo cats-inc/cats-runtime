@@ -3,6 +3,7 @@ import type {
   ProviderCapabilities,
   ProviderSpawnOptions,
   StreamEvent,
+  TurnInput,
 } from '../types.js';
 import type { RuntimeConfig } from '../config.js';
 import type { WorkerPool } from '../../backends/cli/pool/WorkerPool.js';
@@ -10,6 +11,7 @@ import type { WorkerProcess } from '../../backends/cli/pool/WorkerProcess.js';
 import { resolveProviderTarget } from '../providerCatalog.js';
 import type { BackendKind } from '../../backends/cli/config.js';
 import { ApiBackendManager } from '../../backends/api/runtime/ApiBackendManager.js';
+import { AgentBackendManager } from '../../backends/agent/runtime/AgentBackendManager.js';
 
 type ExecutionEventName = 'event' | 'exit' | 'error';
 type ExecutionListener = (...args: unknown[]) => void;
@@ -17,7 +19,7 @@ type ExecutionListener = (...args: unknown[]) => void;
 interface PoolExecutionLike {
   alive?: boolean;
   busy?: boolean;
-  streamMessage?(message: string): AsyncGenerator<StreamEvent>;
+  streamMessage?(message: string | TurnInput): AsyncGenerator<StreamEvent>;
   on?(event: ExecutionEventName, listener: ExecutionListener): unknown;
   off?(event: ExecutionEventName, listener: ExecutionListener): unknown;
 }
@@ -36,7 +38,7 @@ class CliExecutionHandle implements ExecutionHandle {
     return this.worker.busy === true;
   }
 
-  streamMessage(message: string): AsyncGenerator<StreamEvent> {
+  streamMessage(message: string | TurnInput): AsyncGenerator<StreamEvent> {
     if (!this.worker.streamMessage) {
       throw new Error('Execution handle does not support streamMessage');
     }
@@ -63,6 +65,7 @@ export class RuntimeSessionManager {
     private readonly config: RuntimeConfig,
     private readonly pool: WorkerPool,
     private readonly apiBackend?: ApiBackendManager,
+    private readonly agentBackend?: AgentBackendManager,
   ) {}
 
   get(sessionId: string): ExecutionHandle | undefined {
@@ -71,7 +74,7 @@ export class RuntimeSessionManager {
       return new CliExecutionHandle(worker, () => this.pool.kill(sessionId));
     }
 
-    return this.apiBackend?.get(sessionId);
+    return this.apiBackend?.get(sessionId) || this.agentBackend?.get(sessionId);
   }
 
   spawn(
@@ -102,6 +105,13 @@ export class RuntimeSessionManager {
       return worker ? new CliExecutionHandle(worker, () => this.pool.kill(sessionId)) : undefined;
     }
 
+    if (target.backend === 'agent') {
+      if (!this.agentBackend) {
+        throw new Error(`Agent backend is not initialized for '${providerName}'`);
+      }
+      return this.agentBackend.spawn(sessionId, target);
+    }
+
     return this.apiBackend?.spawn(sessionId, target);
   }
 
@@ -122,6 +132,13 @@ export class RuntimeSessionManager {
       return this.pool.getCapabilities(providerName, target.instanceId);
     }
 
+    if (target.backend === 'agent') {
+      if (!this.agentBackend) {
+        throw new Error(`Agent backend is not initialized for '${providerName}'`);
+      }
+      return this.agentBackend.getCapabilities();
+    }
+
     if (!this.apiBackend) {
       throw new Error(`API backend is not initialized for '${providerName}'`);
     }
@@ -130,6 +147,9 @@ export class RuntimeSessionManager {
   }
 
   isAttached(sessionId: string): boolean {
+    if (this.agentBackend?.isAttached(sessionId)) {
+      return true;
+    }
     if (this.apiBackend?.isAttached(sessionId)) {
       return true;
     }
@@ -141,11 +161,13 @@ export class RuntimeSessionManager {
   }
 
   kill(sessionId: string): void {
+    this.agentBackend?.kill(sessionId);
     this.apiBackend?.kill(sessionId);
     this.pool.kill(sessionId);
   }
 
   killAll(): void {
+    this.agentBackend?.killAll();
     this.apiBackend?.killAll();
     this.pool.killAll();
   }
@@ -153,25 +175,30 @@ export class RuntimeSessionManager {
   status() {
     const cliStatus = this.pool.status();
     const apiStatus = this.apiBackend?.status();
+    const agentStatus = this.agentBackend?.status();
 
-    if (!apiStatus) {
+    if (!apiStatus && !agentStatus) {
       return cliStatus;
     }
 
     const providers = { ...cliStatus.providers };
-    for (const [providerName, count] of Object.entries(apiStatus.providers)) {
-      providers[providerName] = (providers[providerName] ?? 0) + count;
+    for (const backendStatus of [apiStatus, agentStatus]) {
+      if (!backendStatus) continue;
+      for (const [providerName, count] of Object.entries(backendStatus.providers)) {
+        providers[providerName] = (providers[providerName] ?? 0) + count;
+      }
     }
 
     return {
       ...cliStatus,
-      active: cliStatus.active + apiStatus.active,
-      busy: cliStatus.busy + apiStatus.busy,
-      idle: cliStatus.idle + apiStatus.idle,
+      active: cliStatus.active + (apiStatus?.active ?? 0) + (agentStatus?.active ?? 0),
+      busy: cliStatus.busy + (apiStatus?.busy ?? 0) + (agentStatus?.busy ?? 0),
+      idle: cliStatus.idle + (apiStatus?.idle ?? 0) + (agentStatus?.idle ?? 0),
       providers,
       backends: {
         cli: cliStatus,
-        api: apiStatus,
+        ...(apiStatus ? { api: apiStatus } : {}),
+        ...(agentStatus ? { agent: agentStatus } : {}),
       },
     };
   }

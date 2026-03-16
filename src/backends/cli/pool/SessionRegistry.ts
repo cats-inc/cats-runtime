@@ -3,8 +3,11 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, w
 import { basename, dirname, join } from 'node:path';
 import type {
   PermissionMode,
+  SessionArtifact,
   SessionInfo,
+  SessionInvocationContext,
   SessionProviderState,
+  SessionReusePolicy,
   SessionStatus,
   WorkspaceMode,
 } from './types.js';
@@ -14,7 +17,7 @@ import { normalizeSessionOrigin } from './sessionView.js';
 export interface CreateSessionInput {
   id?: string;
   providerName: string;
-  providerBackend?: 'cli' | 'api' | 'local';
+  providerBackend?: 'cli' | 'api' | 'local' | 'agent';
   providerInstanceId?: string;
   cwd: string;
   workspaceMode?: WorkspaceMode;
@@ -22,12 +25,18 @@ export interface CreateSessionInput {
   allowedTools?: string[];
   model?: string;
   group?: string;
+  sessionKey?: string;
+  reusePolicy?: SessionReusePolicy;
+  instructions?: string;
+  context?: SessionInvocationContext;
+  outputDir?: string;
+  artifacts?: SessionArtifact[];
 }
 
 interface DiscoveredSessionData {
   cwd: string;
   providerName: string;
-  providerBackend?: 'cli' | 'api' | 'local';
+  providerBackend?: 'cli' | 'api' | 'local' | 'agent';
   providerInstanceId?: string;
   summary?: string;
   messageCount?: number;
@@ -38,6 +47,12 @@ interface DiscoveredSessionData {
   workspaceMode?: WorkspaceMode;
   permissionMode?: PermissionMode;
   allowedTools?: string[];
+  sessionKey?: string;
+  reusePolicy?: SessionReusePolicy;
+  instructions?: string;
+  context?: SessionInvocationContext;
+  outputDir?: string;
+  artifacts?: SessionArtifact[];
 }
 
 export interface PreparedFileDeletion {
@@ -182,13 +197,19 @@ export class SessionRegistry {
       origin: 'runtime',
       cwd: input.cwd,
       workspaceMode: input.workspaceMode,
-      permissionMode: input.permissionMode,
-      allowedTools: input.allowedTools,
-      model: input.model,
-      group: input.group,
-      messageCount: 0,
-      totalInputTokens: 0,
-      totalOutputTokens: 0,
+        permissionMode: input.permissionMode,
+        allowedTools: input.allowedTools,
+        model: input.model,
+        group: input.group,
+        sessionKey: input.sessionKey,
+        reusePolicy: input.reusePolicy,
+        instructions: input.instructions,
+        context: cloneInvocationContext(input.context),
+        outputDir: input.outputDir,
+        artifacts: cloneArtifacts(input.artifacts),
+        messageCount: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
       createdAt: now,
       updatedAt: now,
     };
@@ -254,6 +275,48 @@ export class SessionRegistry {
     const session = this.sessions.get(id);
     if (!session) return false;
     session.providerState = cloneProviderState(providerState);
+    session.updatedAt = new Date().toISOString();
+    this.scheduleSave();
+    return true;
+  }
+
+  updateSessionMetadata(
+    id: string,
+    patch: {
+      sessionKey?: string;
+      reusePolicy?: SessionReusePolicy;
+      instructions?: string;
+      context?: SessionInvocationContext;
+      outputDir?: string;
+      artifacts?: SessionArtifact[];
+      summary?: string;
+    },
+  ): boolean {
+    const session = this.sessions.get(id);
+    if (!session) return false;
+
+    if (patch.sessionKey !== undefined) {
+      session.sessionKey = patch.sessionKey;
+    }
+    if (patch.reusePolicy !== undefined) {
+      session.reusePolicy = patch.reusePolicy;
+    }
+    if (patch.instructions !== undefined) {
+      session.instructions = patch.instructions;
+    }
+    if (patch.context !== undefined) {
+      session.context = cloneInvocationContext(patch.context);
+    }
+    if (patch.outputDir !== undefined) {
+      session.outputDir = patch.outputDir;
+    }
+    if (patch.artifacts !== undefined) {
+      session.artifacts = cloneArtifacts(patch.artifacts);
+    }
+    if (patch.summary !== undefined) {
+      session.summary = patch.summary;
+    }
+
     session.updatedAt = new Date().toISOString();
     this.scheduleSave();
     return true;
@@ -463,6 +526,12 @@ export class SessionRegistry {
       workspaceMode: mergedData.workspaceMode || 'shared',
       model: mergedData.model,
       group: mergedData.group,
+      sessionKey: mergedData.sessionKey,
+      reusePolicy: mergedData.reusePolicy,
+      instructions: mergedData.instructions,
+      context: cloneInvocationContext(mergedData.context),
+      outputDir: mergedData.outputDir,
+      artifacts: cloneArtifacts(mergedData.artifacts),
       summary: mergedData.summary,
       sourcePath: mergedData.sourcePath,
       providerSourcePath: mergedData.sourcePath,
@@ -534,6 +603,14 @@ export class SessionRegistry {
     if (data.group && !session.group) session.group = data.group;
     if (data.workspaceMode) session.workspaceMode = data.workspaceMode;
     if (data.model && !session.model) session.model = data.model;
+    if (data.sessionKey && !session.sessionKey) session.sessionKey = data.sessionKey;
+    if (data.reusePolicy && !session.reusePolicy) session.reusePolicy = data.reusePolicy;
+    if (data.instructions && !session.instructions) session.instructions = data.instructions;
+    if (data.context && !session.context) session.context = cloneInvocationContext(data.context);
+    if (data.outputDir && !session.outputDir) session.outputDir = data.outputDir;
+    if (data.artifacts && (!session.artifacts || session.artifacts.length === 0)) {
+      session.artifacts = cloneArtifacts(data.artifacts);
+    }
 
     // Only attach providerSourcePath if session doesn't already have runtime-managed history
     // (prevents /history from duplicating turns from both sources)
@@ -577,6 +654,12 @@ export class SessionRegistry {
       sourcePath: incoming.sourcePath ?? existing.sourcePath,
       group: incoming.group ?? existing.group,
       workspaceMode: incoming.workspaceMode ?? existing.workspaceMode,
+      sessionKey: incoming.sessionKey ?? existing.sessionKey,
+      reusePolicy: incoming.reusePolicy ?? existing.reusePolicy,
+      instructions: incoming.instructions ?? existing.instructions,
+      context: incoming.context ?? existing.context,
+      outputDir: incoming.outputDir ?? existing.outputDir,
+      artifacts: incoming.artifacts ?? existing.artifacts,
     };
   }
 
@@ -648,8 +731,8 @@ export class SessionRegistry {
   private normalizeProviderBackend(
     providerName: string,
     providerBackend?: string,
-  ): 'cli' | 'api' | 'local' {
-    if (providerBackend === 'cli' || providerBackend === 'api' || providerBackend === 'local') {
+  ): 'cli' | 'api' | 'local' | 'agent' {
+    if (providerBackend === 'cli' || providerBackend === 'api' || providerBackend === 'local' || providerBackend === 'agent') {
       return providerBackend;
     }
 
@@ -708,6 +791,14 @@ export class SessionRegistry {
     if (!target.model && incoming.model) target.model = incoming.model;
     if (!target.group && incoming.group) target.group = incoming.group;
     if (!target.summary && incoming.summary) target.summary = incoming.summary;
+    if (!target.sessionKey && incoming.sessionKey) target.sessionKey = incoming.sessionKey;
+    if (!target.reusePolicy && incoming.reusePolicy) target.reusePolicy = incoming.reusePolicy;
+    if (!target.instructions && incoming.instructions) target.instructions = incoming.instructions;
+    if (!target.context && incoming.context) target.context = cloneInvocationContext(incoming.context);
+    if (!target.outputDir && incoming.outputDir) target.outputDir = incoming.outputDir;
+    if ((!target.artifacts || target.artifacts.length === 0) && incoming.artifacts) {
+      target.artifacts = cloneArtifacts(incoming.artifacts);
+    }
     if (!target.sourcePath && incoming.sourcePath) target.sourcePath = incoming.sourcePath;
     if (!target.providerSourcePath && incoming.providerSourcePath) {
       target.providerSourcePath = incoming.providerSourcePath;
@@ -745,10 +836,17 @@ function cloneProviderState(
     return undefined;
   }
 
-  const normalized: SessionProviderState = {};
-  if (providerState.geminiCachedContent) {
-    normalized.geminiCachedContent = { ...providerState.geminiCachedContent };
-  }
+  return structuredClone(providerState);
+}
 
-  return Object.keys(normalized).length > 0 ? normalized : undefined;
+function cloneInvocationContext(
+  context?: SessionInvocationContext,
+): SessionInvocationContext | undefined {
+  return context ? structuredClone(context) : undefined;
+}
+
+function cloneArtifacts(
+  artifacts?: SessionArtifact[],
+): SessionArtifact[] | undefined {
+  return artifacts ? structuredClone(artifacts) : undefined;
 }

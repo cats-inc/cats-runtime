@@ -8,6 +8,7 @@ import { RuntimeSessionManager } from '../core/runtime/RuntimeSessionManager.js'
 import type { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
 import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
 import type { ApiBackendManager } from '../backends/api/runtime/ApiBackendManager.js';
+import type { AgentBackendManager } from '../backends/agent/runtime/AgentBackendManager.js';
 import type { CursorNativeSessionService } from '../backends/cli/cursor/CursorNativeSessionService.js';
 import type { KiroNativeSessionService } from '../backends/cli/kiro/KiroNativeSessionService.js';
 import type { AuggieSessionService } from '../backends/cli/auggie/AuggieSessionService.js';
@@ -34,6 +35,7 @@ export interface AppContext {
   registry: SessionRegistry;
   pool: WorkerPool;
   apiBackend?: ApiBackendManager;
+  agentBackend?: AgentBackendManager;
   runtime?: RuntimeSessionManager;
   cursorNative: CursorNativeSessionService;
   kiroNative: KiroNativeSessionService;
@@ -48,7 +50,7 @@ export interface AppContext {
 
 export function getRuntimeSessionManager(ctx: AppContext): RuntimeSessionManager {
   if (!ctx.runtime) {
-    ctx.runtime = new RuntimeSessionManager(ctx.config, ctx.pool, ctx.apiBackend);
+    ctx.runtime = new RuntimeSessionManager(ctx.config, ctx.pool, ctx.apiBackend, ctx.agentBackend);
   }
   return ctx.runtime;
 }

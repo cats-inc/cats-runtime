@@ -159,7 +159,12 @@ export function sessionControlMode(
   );
   if (
     resumeStrategy !== 'none'
-    && (session.providerSessionId || session.providerBackend === 'api' || session.providerBackend === 'local')
+    && (
+      session.providerSessionId
+      || session.providerBackend === 'api'
+      || session.providerBackend === 'local'
+      || session.providerBackend === 'agent'
+    )
   ) {
     return 'resume_only';
   }

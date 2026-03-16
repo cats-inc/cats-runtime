@@ -86,6 +86,42 @@ Message example:
 }
 ```
 
+Extended create example:
+
+```json
+{
+  "provider": "openclaw",
+  "instance": "agent/gateway",
+  "cwd": "/workspace/repo",
+  "sessionKey": "task-123",
+  "reusePolicy": "prefer_existing",
+  "instructions": "Focus on architecture risks first.",
+  "context": {
+    "source": "interactive",
+    "taskId": "task-123",
+    "workspace": {
+      "cwd": "/workspace/repo",
+      "repoRef": "main"
+    }
+  },
+  "outputDir": "/workspace/out"
+}
+```
+
+Extended message example:
+
+```json
+{
+  "message": "Draft the implementation plan.",
+  "instructions": "Prefer concise bullet points.",
+  "context": {
+    "reason": "follow_up",
+    "labels": ["planning"]
+  },
+  "outputDir": "/workspace/out"
+}
+```
+
 `POST /sessions/{id}/messages` supports:
 
 - `Accept: text/event-stream`
@@ -96,6 +132,24 @@ workspace-aware UIs. When a provider exposes multiple configured instances,
 session payloads also include `providerInstanceId`. Windows-style paths are
 case-folded in `workspaceKey` while `cwd` remains the original display path.
 API-backed and local-model sessions also include `providerBackend`.
+
+`POST /sessions` also accepts these optional fields:
+
+- `sessionKey`: caller-visible logical session identity for explicit reuse
+- `reusePolicy`: one of `create_new`, `prefer_existing`, or `require_existing`
+- `instructions`: session bootstrap instructions persisted by the runtime
+- `context`: structured invocation metadata such as task/workspace hints
+- `outputDir`: output hint for reports, documents, or generated artifacts
+
+When `reusePolicy` is `prefer_existing` or `require_existing`, the runtime will
+try to attach to an existing session with the same provider target and
+`sessionKey`. Today explicit `sessionKey` reuse is supported for `api`, `local`,
+and `agent` sessions. Matching `cli` sessions still use the existing
+`/sessions/{id}/resume` flow.
+
+`POST /sessions/{id}/messages` accepts optional `instructions`, `context`, and
+`outputDir` fields. These are persisted onto the logical session so later
+history/resume flows can observe the same bootstrap metadata.
 
 `POST /sessions` accepts an optional `instance` field. When omitted, or when the
 caller explicitly sends `"default"`, `cats-runtime` uses the provider family's
@@ -112,6 +166,39 @@ For API-backed and local-model sessions, streamed message output may include
 `tool_use` and `tool_result` events in addition to `init`, `text`, `result`,
 and `error`.
 
+For agent-backed sessions, streamed output may also surface normalized metadata
+such as:
+
+- `providerSessionId`
+- `summary`
+- `artifacts`
+- `services`
+- `providerState`
+
+`GET /sessions/{id}/history` returns:
+
+```json
+{
+  "messages": [
+    { "role": "user", "text": "..." },
+    { "role": "assistant", "text": "..." }
+  ],
+  "sessionKey": "task-123",
+  "outputDir": "/workspace/out",
+  "artifacts": [
+    {
+      "id": "artifact-1",
+      "path": "/workspace/out/report.md",
+      "label": "Draft report"
+    }
+  ],
+  "context": {
+    "source": "interactive",
+    "taskId": "task-123"
+  }
+}
+```
+
 ### Runtime Inspection
 
 ```text
@@ -127,8 +214,11 @@ resolved `instance` alongside the runtime metadata.
 
 `GET /providers/config` returns the configured provider topology for dashboards
 or other clients that need to offer provider-instance selection. Each instance
-entry includes its backend kind (`cli`, `api`, or `local`) plus any transport or
-runtime metadata that applies to that backend.
+entry includes its backend kind (`cli`, `api`, `local`, or `agent`) plus any
+transport or runtime metadata that applies to that backend.
+
+`GET /pool/status` returns aggregated runtime status for all active backend
+managers, including `cli`, `api`, and `agent`.
 
 ### Native Session Discovery
 
@@ -192,7 +282,12 @@ Errors use this format:
   file providers must use host-accessible paths such as `\\wsl$\Distro\...`
 - API-key and Ollama execution now live under `src/backends/api` without
   requiring a second inbound service
+- External agent runtimes such as OpenClaw now live under
+  `src/backends/agent` while preserving the same session API
+- Runtime-managed session history now carries reusable bootstrap/output fields
+  such as `sessionKey`, `instructions`, `context`, `outputDir`, and surfaced
+  `artifacts`
 
 ---
 
-*Last updated: 2026-03-16*
+*Last updated: 2026-03-17*

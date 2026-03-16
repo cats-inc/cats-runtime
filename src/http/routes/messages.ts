@@ -4,7 +4,7 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { getRuntimeSessionManager, type AppContext } from '../app.js';
 import { formatSSE } from '../streaming.js';
-import type { SessionInfo } from '../../backends/cli/pool/types.js';
+import type { SessionInfo, SessionInvocationContext, TurnInput } from '../../backends/cli/pool/types.js';
 import type { SessionRegistry } from '../../backends/cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig } from '../../backends/cli/config.js';
 
@@ -30,6 +30,58 @@ function getOrCreateSourcePath(
 }
 
 export const messageRoutes = new Hono();
+
+function parseOptionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function parseStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const parsed = value
+    .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+    .map((entry) => entry.trim());
+  return parsed.length > 0 ? parsed : undefined;
+}
+
+function parseInvocationContext(value: unknown): SessionInvocationContext | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  const workspaceValue = record.workspace;
+  const workspace = workspaceValue && typeof workspaceValue === 'object' && !Array.isArray(workspaceValue)
+    ? {
+        cwd: parseOptionalString((workspaceValue as Record<string, unknown>).cwd),
+        workspaceId: parseOptionalString((workspaceValue as Record<string, unknown>).workspaceId),
+        repoUrl: parseOptionalString((workspaceValue as Record<string, unknown>).repoUrl),
+        repoRef: parseOptionalString((workspaceValue as Record<string, unknown>).repoRef),
+      }
+    : undefined;
+  const labels = parseStringArray(record.labels);
+  const metadata = record.metadata && typeof record.metadata === 'object' && !Array.isArray(record.metadata)
+    ? record.metadata as Record<string, unknown>
+    : undefined;
+
+  const context: SessionInvocationContext = {
+    source: parseOptionalString(record.source) as SessionInvocationContext['source'] | undefined,
+    reason: parseOptionalString(record.reason),
+    taskId: parseOptionalString(record.taskId),
+    issueId: parseOptionalString(record.issueId),
+    commentId: parseOptionalString(record.commentId),
+    approvalId: parseOptionalString(record.approvalId),
+    workspace,
+    labels,
+    metadata,
+  };
+
+  return Object.values(context).some((entry) => entry !== undefined)
+    ? context
+    : undefined;
+}
 
 function flushAssistantText(
   sourcePath: string | null,
@@ -72,9 +124,32 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     return c.json({ error: 'Session is closed. Resume it first.' }, 400);
   }
 
-  const body = await c.req.json<{ message: string }>();
-  if (!body.message) {
+  const body = await c.req.json<{
+    message: string;
+    instructions?: string;
+    context?: SessionInvocationContext;
+    outputDir?: string;
+  }>();
+  const message = parseOptionalString(body.message);
+  if (!message) {
     return c.json({ error: 'message is required' }, 400);
+  }
+
+  const instructions = parseOptionalString(body.instructions);
+  const context = parseInvocationContext(body.context);
+  const outputDir = parseOptionalString(body.outputDir);
+  const turnInput: TurnInput = {
+    message,
+    instructions: instructions ?? session.instructions,
+    context: context ?? session.context,
+    outputDir: outputDir ?? session.outputDir,
+  };
+  if (instructions !== undefined || context !== undefined || outputDir !== undefined) {
+    ctx.registry.updateSessionMetadata(id, {
+      instructions: turnInput.instructions,
+      context: turnInput.context,
+      outputDir: turnInput.outputDir,
+    });
   }
 
   const worker = getRuntimeSessionManager(ctx).get(id);
@@ -111,7 +186,10 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     if (sourcePath) {
       appendHistory(sourcePath, {
         type: 'user',
-        message: { content: body.message },
+        message: { content: message },
+        instructions: turnInput.instructions,
+        context: turnInput.context,
+        outputDir: turnInput.outputDir,
         timestamp: new Date().toISOString(),
       });
     }
@@ -121,12 +199,21 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
         let assistantText = '';
         let completed = false;
         try {
-          for await (const event of worker.streamMessage(body.message)) {
+          for await (const event of worker.streamMessage(turnInput)) {
             const line = JSON.stringify(event) + '\n';
             controller.enqueue(new TextEncoder().encode(line));
 
-            if ((event.type === 'init' || event.type === 'result') && event.sessionId) {
-              ctx.registry.setProviderSessionId(id, event.sessionId);
+            if ((event.type === 'init' || event.type === 'result') && (event.providerSessionId || event.sessionId)) {
+              ctx.registry.setProviderSessionId(id, event.providerSessionId || event.sessionId!);
+            }
+            if (event.providerState !== undefined) {
+              ctx.registry.setProviderState(id, event.providerState);
+            }
+            if (event.artifacts !== undefined || event.summary !== undefined) {
+              ctx.registry.updateSessionMetadata(id, {
+                artifacts: event.artifacts ?? session.artifacts,
+                summary: event.summary,
+              });
             }
 
             if (event.type === 'text') {
@@ -207,7 +294,10 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
   if (sseSourcePath) {
     appendHistory(sseSourcePath, {
       type: 'user',
-      message: { content: body.message },
+      message: { content: message },
+      instructions: turnInput.instructions,
+      context: turnInput.context,
+      outputDir: turnInput.outputDir,
       timestamp: new Date().toISOString(),
     });
   }
@@ -216,14 +306,23 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     let assistantText = '';
     let completed = false;
     try {
-      for await (const event of worker.streamMessage(body.message)) {
+      for await (const event of worker.streamMessage(turnInput)) {
         await stream.writeSSE({
           data: JSON.stringify(event),
           event: event.type,
         });
 
-        if ((event.type === 'init' || event.type === 'result') && event.sessionId) {
-          ctx.registry.setProviderSessionId(id, event.sessionId);
+        if ((event.type === 'init' || event.type === 'result') && (event.providerSessionId || event.sessionId)) {
+          ctx.registry.setProviderSessionId(id, event.providerSessionId || event.sessionId!);
+        }
+        if (event.providerState !== undefined) {
+          ctx.registry.setProviderState(id, event.providerState);
+        }
+        if (event.artifacts !== undefined || event.summary !== undefined) {
+          ctx.registry.updateSessionMetadata(id, {
+            artifacts: event.artifacts ?? session.artifacts,
+            summary: event.summary,
+          });
         }
 
         if (event.type === 'text') {

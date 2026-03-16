@@ -12,7 +12,8 @@ export type SessionActivity = 'interactive' | 'tearing_down' | 'inactive';
 export type SessionOwnership = 'persistent_process' | 'logical_session' | 'workspace_latest';
 export type SessionResumeStrategy = 'none' | 'provider_session' | 'latest_in_workspace';
 export type SessionControlMode = 'full' | 'resume_only' | 'observe_only';
-export type ProviderBackend = 'cli' | 'api' | 'local';
+export type ProviderBackend = 'cli' | 'api' | 'local' | 'agent';
+export type SessionReusePolicy = 'create_new' | 'prefer_existing' | 'require_existing';
 
 export type WorkspaceMode = 'isolated' | 'shared' | 'read_only';
 
@@ -24,8 +25,58 @@ export interface GeminiCachedContentState {
   expiresAt?: string;
 }
 
+export interface SessionInvocationWorkspace {
+  cwd?: string;
+  workspaceId?: string;
+  repoUrl?: string;
+  repoRef?: string;
+}
+
+export interface SessionInvocationContext {
+  source?: 'interactive' | 'timer' | 'callback' | 'assignment' | 'automation';
+  reason?: string;
+  taskId?: string;
+  issueId?: string;
+  commentId?: string;
+  approvalId?: string;
+  workspace?: SessionInvocationWorkspace;
+  labels?: string[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface SessionArtifact {
+  id: string;
+  kind?: string;
+  label?: string;
+  path?: string;
+  uri?: string;
+  mediaType?: string;
+  createdAt?: string;
+  sizeBytes?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AgentRuntimeService {
+  id: string;
+  name: string;
+  url?: string;
+  status?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AgentSessionState {
+  providerSessionId?: string;
+  sessionKey?: string;
+  runId?: string;
+  status?: string;
+  summary?: string;
+  services?: AgentRuntimeService[];
+  adapterState?: Record<string, unknown>;
+}
+
 export interface SessionProviderState {
   geminiCachedContent?: GeminiCachedContentState;
+  agentSession?: AgentSessionState;
 }
 
 export interface SessionControls {
@@ -43,6 +94,8 @@ export interface SessionInfo {
   providerInstanceId?: string;
   providerSessionId?: string;
   providerState?: SessionProviderState;
+  sessionKey?: string;
+  reusePolicy?: SessionReusePolicy;
   status: SessionStatus;
   origin: SessionOrigin;
   cwd: string;
@@ -51,6 +104,10 @@ export interface SessionInfo {
   allowedTools?: string[];
   model?: string;
   group?: string;
+  instructions?: string;
+  context?: SessionInvocationContext;
+  outputDir?: string;
+  artifacts?: SessionArtifact[];
   // Deprecated legacy flag kept only for backward-compat payload tolerance.
   managed?: boolean;
   summary?: string;
@@ -101,9 +158,17 @@ export interface ProviderMessage {
   content: string;
 }
 
+export interface TurnInput {
+  message: string;
+  instructions?: string;
+  context?: SessionInvocationContext;
+  outputDir?: string;
+}
+
 export interface StreamEvent {
   type: 'init' | 'text' | 'tool_use' | 'tool_result' | 'result' | 'error' | 'raw';
   sessionId?: string;
+  providerSessionId?: string;
   text?: string;
   toolName?: string;
   toolId?: string;
@@ -113,6 +178,11 @@ export interface StreamEvent {
     inputTokens: number;
     outputTokens: number;
   };
+  summary?: string;
+  artifacts?: SessionArtifact[];
+  services?: AgentRuntimeService[];
+  providerState?: SessionProviderState;
+  metadata?: Record<string, unknown>;
   raw?: unknown;
 }
 
@@ -125,7 +195,7 @@ export interface HealthStatus {
 export interface ExecutionHandle {
   readonly active: boolean;
   readonly busy: boolean;
-  streamMessage(message: string): AsyncGenerator<StreamEvent>;
+  streamMessage(input: string | TurnInput): AsyncGenerator<StreamEvent>;
   kill(): void;
   on(event: 'event' | 'exit' | 'error', listener: (...args: unknown[]) => void): this;
   off(event: 'event' | 'exit' | 'error', listener: (...args: unknown[]) => void): this;

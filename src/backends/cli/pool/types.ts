@@ -1,4 +1,8 @@
 export type {
+  AgentRuntimeService,
+  AgentSessionState,
+  SessionArtifact,
+  SessionInvocationContext,
   GeminiCachedContentState,
   PermissionMode,
   SessionActivity,
@@ -8,8 +12,10 @@ export type {
   SessionOrigin,
   SessionOwnership,
   SessionProviderState,
+  SessionReusePolicy,
   SessionResumeStrategy,
   SessionStatus,
   SessionView,
+  TurnInput,
   WorkspaceMode,
 } from '../../../core/types.js';

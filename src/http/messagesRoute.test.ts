@@ -143,6 +143,7 @@ describe('message route transcript persistence', () => {
       const historyResponse = await app.request(`/sessions/${session.id}/history`);
       expect(historyResponse.status).toBe(200);
       expect(await historyResponse.json()).toEqual({
+        artifacts: [],
         messages: [
           { role: 'user', text: 'hello', timestamp: expect.any(String) },
           { role: 'assistant', text: 'Partial reply before failure.', timestamp: expect.any(String) },
@@ -182,6 +183,7 @@ describe('message route transcript persistence', () => {
       const historyResponse = await app.request(`/sessions/${session.id}/history`);
       expect(historyResponse.status).toBe(200);
       expect(await historyResponse.json()).toEqual({
+        artifacts: [],
         messages: [
           { role: 'user', text: 'hello', timestamp: expect.any(String) },
           { role: 'assistant', text: 'Partial reply before throw.', timestamp: expect.any(String) },

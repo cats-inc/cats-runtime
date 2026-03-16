@@ -1,11 +1,11 @@
 import { EventEmitter } from 'node:events';
-import type { ExecutionHandle, StreamEvent } from '../../../core/types.js';
+import type { ExecutionHandle, StreamEvent, TurnInput } from '../../../core/types.js';
 
 type ExecutionEventName = 'event' | 'exit' | 'error';
 type ExecutionListener = (...args: unknown[]) => void;
 
 export interface ApiExecutionCallbacks {
-  streamMessage(message: string, signal: AbortSignal): AsyncGenerator<StreamEvent>;
+  streamMessage(input: TurnInput, signal: AbortSignal): AsyncGenerator<StreamEvent>;
   onClose(): void;
 }
 
@@ -25,7 +25,7 @@ export class ApiExecutionHandle implements ExecutionHandle {
     return this.busyState;
   }
 
-  async *streamMessage(message: string): AsyncGenerator<StreamEvent> {
+  async *streamMessage(message: string | TurnInput): AsyncGenerator<StreamEvent> {
     if (!this.activeState) {
       throw new Error('Session is closed. Resume it first.');
     }
@@ -35,9 +35,10 @@ export class ApiExecutionHandle implements ExecutionHandle {
 
     this.busyState = true;
     this.abortController = new AbortController();
+    const turn = typeof message === 'string' ? { message } : message;
 
     try {
-      for await (const event of this.callbacks.streamMessage(message, this.abortController.signal)) {
+      for await (const event of this.callbacks.streamMessage(turn, this.abortController.signal)) {
         this.emitter.emit('event', event);
         yield event;
       }

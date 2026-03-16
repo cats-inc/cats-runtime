@@ -8,6 +8,8 @@ import {
 } from '../../backends/cli/config.js';
 import type {
   SessionInfo,
+  SessionInvocationContext,
+  SessionReusePolicy,
   SessionStatus,
   WorkspaceMode,
 } from '../../backends/cli/pool/types.js';
@@ -43,6 +45,12 @@ import {
 
 export const sessionRoutes = new Hono();
 
+const REUSE_POLICIES = new Set<SessionReusePolicy>([
+  'create_new',
+  'prefer_existing',
+  'require_existing',
+]);
+
 function serializeSession(ctx: AppContext, session: SessionInfo) {
   return toSessionView(session, {
     attached: getRuntimeSessionManager(ctx).isAttached(session.id),
@@ -66,6 +74,80 @@ function resolveRequestedProviderTarget(
   instanceId?: string,
 ): ProviderTargetDescriptor {
   return resolveProviderTarget(ctx.config, providerName, instanceId);
+}
+
+function parseOptionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function parseStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const parsed = value
+    .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+    .map((entry) => entry.trim());
+  return parsed.length > 0 ? parsed : undefined;
+}
+
+function parseInvocationContext(value: unknown): SessionInvocationContext | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  const workspaceValue = record.workspace;
+  const workspace = workspaceValue && typeof workspaceValue === 'object' && !Array.isArray(workspaceValue)
+    ? {
+        cwd: parseOptionalString((workspaceValue as Record<string, unknown>).cwd),
+        workspaceId: parseOptionalString((workspaceValue as Record<string, unknown>).workspaceId),
+        repoUrl: parseOptionalString((workspaceValue as Record<string, unknown>).repoUrl),
+        repoRef: parseOptionalString((workspaceValue as Record<string, unknown>).repoRef),
+      }
+    : undefined;
+  const labels = parseStringArray(record.labels);
+  const metadata = record.metadata && typeof record.metadata === 'object' && !Array.isArray(record.metadata)
+    ? record.metadata as Record<string, unknown>
+    : undefined;
+
+  const context: SessionInvocationContext = {
+    source: parseOptionalString(record.source) as SessionInvocationContext['source'] | undefined,
+    reason: parseOptionalString(record.reason),
+    taskId: parseOptionalString(record.taskId),
+    issueId: parseOptionalString(record.issueId),
+    commentId: parseOptionalString(record.commentId),
+    approvalId: parseOptionalString(record.approvalId),
+    workspace,
+    labels,
+    metadata,
+  };
+
+  return Object.values(context).some((entry) => entry !== undefined)
+    ? context
+    : undefined;
+}
+
+function parseReusePolicy(value: unknown): SessionReusePolicy | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const normalized = value.trim() as SessionReusePolicy;
+  return REUSE_POLICIES.has(normalized) ? normalized : undefined;
+}
+
+function findReusableSession(
+  ctx: AppContext,
+  providerTarget: ProviderTargetDescriptor,
+  providerName: string,
+  sessionKey: string,
+): SessionInfo | undefined {
+  return ctx.registry.list({ provider: providerName }).find((session) =>
+    session.sessionKey === sessionKey
+      && session.providerBackend === providerTarget.backend
+      && session.providerInstanceId === providerTarget.instanceId,
+  );
 }
 
 function resolveCliProviderInstance(target: ProviderTargetDescriptor): ProviderInstanceConfig {
@@ -269,6 +351,11 @@ sessionRoutes.post('/sessions', async (c) => {
     managed?: boolean;
     permissionMode?: 'skip' | 'whitelist' | 'default';
     allowedTools?: string[];
+    sessionKey?: string;
+    reusePolicy?: SessionReusePolicy;
+    instructions?: string;
+    context?: SessionInvocationContext;
+    outputDir?: string;
   }>();
 
   const providerName = body.provider ?? 'claude';
@@ -291,6 +378,71 @@ sessionRoutes.post('/sessions', async (c) => {
   const providerInstance = providerTarget.backend === 'cli'
     ? resolveCliProviderInstance(providerTarget)
     : undefined;
+
+  const requestedSessionKey = parseOptionalString(body.sessionKey);
+  const reusePolicy = parseReusePolicy(body.reusePolicy) || 'create_new';
+  if (!requestedSessionKey && reusePolicy === 'require_existing') {
+    return c.json({ error: 'sessionKey is required when reusePolicy=require_existing' }, 400);
+  }
+
+  const sessionKey = requestedSessionKey || randomUUID();
+  const instructions = parseOptionalString(body.instructions);
+  const context = parseInvocationContext(body.context);
+  const outputDir = parseOptionalString(body.outputDir);
+
+  if (reusePolicy !== 'create_new' && requestedSessionKey) {
+    const existing = findReusableSession(ctx, providerTarget, providerName, requestedSessionKey);
+    if (!existing) {
+      if (reusePolicy === 'require_existing') {
+        return c.json({
+          error: `No existing ${providerName} session found for sessionKey '${requestedSessionKey}'`,
+        }, 409);
+      }
+    } else {
+      if (
+        (body.cwd && existing.cwd !== body.cwd)
+        || (body.model && existing.model && body.model !== existing.model)
+      ) {
+        return c.json({
+          error: 'Existing sessionKey matches a session with different cwd/model. '
+            + 'Use reusePolicy=create_new to force a new session.',
+        }, 409);
+      }
+
+      ctx.registry.updateSessionMetadata(existing.id, {
+        sessionKey,
+        reusePolicy,
+        instructions: instructions ?? existing.instructions,
+        context: context ?? existing.context,
+        outputDir: outputDir ?? existing.outputDir,
+      });
+
+      const existingHandle = runtime.get(existing.id);
+      if (!existingHandle?.active) {
+        if (existing.providerBackend === 'cli') {
+          return c.json({
+            error: 'Explicit sessionKey reuse currently supports api/local/agent sessions only. '
+              + 'Use /sessions/:id/resume for CLI sessions.',
+          }, 409);
+        }
+
+        try {
+          runtime.spawn(existing.id, existing.providerName, {
+            cwd: existing.cwd,
+            workspaceMode: existing.workspaceMode,
+            model: existing.model,
+            permissionMode: existing.permissionMode,
+            allowedTools: existing.allowedTools,
+          }, existing.providerInstanceId, existing.providerBackend);
+          ctx.registry.updateStatus(existing.id, 'ready');
+        } catch (err) {
+          return c.json({ error: `Failed to reuse session: ${err}` }, 500);
+        }
+      }
+
+      return c.json(serializeSession(ctx, ctx.registry.get(existing.id) ?? existing));
+    }
+  }
 
   const sessionId = randomUUID();
 
@@ -330,6 +482,11 @@ sessionRoutes.post('/sessions', async (c) => {
         allowedTools: body.allowedTools,
         model: body.model || native.model,
         group: body.group,
+        sessionKey,
+        reusePolicy,
+        instructions,
+        context,
+        outputDir,
       });
       session.summary = native.summary;
       session.messageCount = native.messageCount;
@@ -389,6 +546,11 @@ sessionRoutes.post('/sessions', async (c) => {
         allowedTools: body.allowedTools,
         model: body.model,
         group: body.group,
+        sessionKey,
+        reusePolicy,
+        instructions,
+        context,
+        outputDir,
       });
       session.summary = native.summary;
       session.messageCount = native.messageCount;
@@ -453,6 +615,11 @@ sessionRoutes.post('/sessions', async (c) => {
     allowedTools: body.allowedTools,
     model: body.model,
     group: body.group,
+    sessionKey,
+    reusePolicy,
+    instructions,
+    context,
+    outputDir,
   });
 
   try {
@@ -834,10 +1001,10 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
       sessionBaseDir: ctx.config.sessionBaseDir,
       workspaceMode: 'isolated',
     });
-    copyIsolatedWorkspace(ctx.config.sessionBaseDir, id, forkId);
-    forkCwd = resolved.cwd;
-    forkWorkspaceMode = resolved.workspaceMode;
-    forkPermissionMode = resolved.permissionMode;
+      copyIsolatedWorkspace(ctx.config.sessionBaseDir, id, forkId);
+      forkCwd = resolved.cwd;
+      forkWorkspaceMode = resolved.workspaceMode;
+      forkPermissionMode = resolved.permissionMode;
   } else if (session.workspaceMode === 'read_only') {
     forkPermissionMode = 'default';
   }
@@ -853,6 +1020,12 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     allowedTools: (body as { allowedTools?: string[] }).allowedTools ?? session.allowedTools,
     model: session.model,
     group: (body as { group?: string }).group ?? session.group,
+    sessionKey: randomUUID(),
+    reusePolicy: 'create_new',
+    instructions: session.instructions,
+    context: session.context,
+    outputDir: session.outputDir,
+    artifacts: session.artifacts,
   });
   if (session.providerSessionId) {
     ctx.registry.setProviderSessionId(forked.id, session.providerSessionId);

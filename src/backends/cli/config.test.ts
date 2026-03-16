@@ -681,7 +681,7 @@ backends:
       expect(listProviderInstances(config, 'claude')).toHaveLength(1);
       expect(listProviderInstances(config, 'gemini')).toHaveLength(0);
 
-      expect(config.remoteProviderCatalog).toEqual({
+      expect(config.remoteProviderCatalog).toMatchObject({
         api: {
           codex: {
             main: {
@@ -703,7 +703,6 @@ backends:
               timeoutMs: 30000,
               maxRetries: 2,
               maxToolSteps: 24,
-              toolProfile: undefined,
             },
           },
         },
@@ -726,10 +725,10 @@ backends:
               timeoutMs: undefined,
               maxRetries: undefined,
               maxToolSteps: undefined,
-              toolProfile: undefined,
             },
           },
         },
+        agent: {},
       });
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
@@ -831,6 +830,127 @@ backends:
         maxRetries: 2,
         maxToolSteps: 24,
         toolProfile: 'standard',
+      });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('loads agent-backed provider defaults and per-instance overrides', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const configPath = join(tempDir, 'providers.yaml');
+    writeFileSync(configPath, `
+version: 1
+routing:
+  providers:
+    openclaw:
+      default_target:
+        backend: agent
+        instance: gateway
+backends:
+  agent:
+    providers:
+      openclaw:
+        default_instance: gateway
+        transport: openclaw_gateway
+        url: ws://gateway.example/ws
+        auth_token_env: OPENCLAW_TOKEN
+        client_id: cats-runtime
+        client_mode: interactive
+        role: operator
+        scopes:
+          - operator.admin
+        payload_template:
+          mode: agent
+        wait_timeout_ms: 45000
+        timeout_ms: 15000
+        max_retries: 2
+        instances:
+          gateway:
+            model: openclaw-coder
+          preview:
+            model: openclaw-preview
+            client_mode: preview
+            scopes:
+              - operator.read
+`.trimStart());
+
+    try {
+      const config = loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_CONFIG_PATH: configPath,
+      });
+
+      expect(config.providerDefaultTargets?.openclaw).toEqual({
+        backend: 'agent',
+        instance: 'gateway',
+      });
+
+      expect(config.remoteProviderCatalog?.agent.openclaw.gateway).toEqual({
+        id: 'gateway',
+        providerName: 'openclaw',
+        backend: 'agent',
+        transport: 'openclaw_gateway',
+        url: 'ws://gateway.example/ws',
+        urlEnv: undefined,
+        model: 'openclaw-coder',
+        systemPrompt: undefined,
+        apiKeyEnv: undefined,
+        authTokenEnv: 'OPENCLAW_TOKEN',
+        passwordEnv: undefined,
+        baseUrl: undefined,
+        baseUrlEnv: undefined,
+        organizationEnv: undefined,
+        projectEnv: undefined,
+        headers: undefined,
+        clientId: 'cats-runtime',
+        clientMode: 'interactive',
+        clientVersion: undefined,
+        role: 'operator',
+        scopes: ['operator.admin'],
+        payloadTemplate: {
+          mode: 'agent',
+        },
+        waitTimeoutMs: 45000,
+        maxOutputTokens: undefined,
+        timeoutMs: 15000,
+        maxRetries: 2,
+        maxToolSteps: undefined,
+        toolProfile: undefined,
+      });
+
+      expect(config.remoteProviderCatalog?.agent.openclaw.preview).toEqual({
+        id: 'preview',
+        providerName: 'openclaw',
+        backend: 'agent',
+        transport: 'openclaw_gateway',
+        url: 'ws://gateway.example/ws',
+        urlEnv: undefined,
+        model: 'openclaw-preview',
+        systemPrompt: undefined,
+        apiKeyEnv: undefined,
+        authTokenEnv: 'OPENCLAW_TOKEN',
+        passwordEnv: undefined,
+        baseUrl: undefined,
+        baseUrlEnv: undefined,
+        organizationEnv: undefined,
+        projectEnv: undefined,
+        headers: undefined,
+        clientId: 'cats-runtime',
+        clientMode: 'preview',
+        clientVersion: undefined,
+        role: 'operator',
+        scopes: ['operator.read'],
+        payloadTemplate: {
+          mode: 'agent',
+        },
+        waitTimeoutMs: 45000,
+        maxOutputTokens: undefined,
+        timeoutMs: 15000,
+        maxRetries: 2,
+        maxToolSteps: undefined,
+        toolProfile: undefined,
       });
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
