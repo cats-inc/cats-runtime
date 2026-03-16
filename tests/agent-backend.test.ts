@@ -65,6 +65,55 @@ backends:
   };
 }
 
+function createAgentSdkConfigRoot() {
+  const root = mkdtempSync(join(tmpdir(), 'cats-runtime-agent-sdk-test-'));
+  const configPath = join(root, 'providers.yaml');
+  writeFileSync(configPath, `
+version: 1
+routing:
+  providers:
+    claude:
+      default_target:
+        backend: agent
+        instance: sdk
+backends:
+  agent:
+    providers:
+      claude:
+        default_instance: sdk
+        transport: agent_sdk_bridge
+        base_url: http://agent-sdk.test
+        auth_token_env: AGENT_SDK_TOKEN
+        instances:
+          sdk:
+            model: sonnet
+`.trimStart());
+
+  const env = {
+    HOME: root,
+    USERPROFILE: root,
+    CATS_RUNTIME_CONFIG_PATH: configPath,
+    CATS_RUNTIME_HOST: '127.0.0.1',
+    CATS_RUNTIME_PORT: '3110',
+    CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
+    CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
+    CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
+    CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
+    AGENT_SDK_TOKEN: 'bridge-token',
+  };
+
+  mkdirSync(env.CATS_RUNTIME_DATA_DIR, { recursive: true });
+  mkdirSync(env.CATS_RUNTIME_SESSION_BASE_DIR, { recursive: true });
+  mkdirSync(join(root, 'repo'), { recursive: true });
+
+  return {
+    root,
+    env,
+    config: loadConfig(env),
+    cleanup: () => rmSync(root, { recursive: true, force: true }),
+  };
+}
+
 class FakeOpenClawSocket extends EventTarget {
   readyState = WebSocket.CONNECTING;
   private requestCount = 0;
@@ -320,6 +369,218 @@ describe('agent backend integration', () => {
         .toBe('Focus on architecture.\n\nDraft the report');
       expect((agentRequests[1].params as Record<string, unknown>).message)
         .toBe('Focus on architecture.\n\nContinue');
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
+  it('supports an Agent SDK bridge adapter as a second agent target', async () => {
+    const { config, env, cleanup } = createAgentSdkConfigRoot();
+    const fetchCalls: Array<{ url: string; method: string; body?: Record<string, unknown> }> = [];
+    const fakeFetch: typeof fetch = async (input, init) => {
+      const url = String(input);
+      const method = init?.method || 'GET';
+      const body = typeof init?.body === 'string'
+        ? JSON.parse(init.body) as Record<string, unknown>
+        : undefined;
+      fetchCalls.push({ url, method, body });
+
+      if (url === 'http://agent-sdk.test/api/v1/sessions' && method === 'POST') {
+        return new Response(JSON.stringify({
+          id: 'bridge-session-1',
+          provider: 'claude',
+          model: 'sonnet',
+          status: 'idle',
+        }), {
+          status: 201,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
+      if (url === 'http://agent-sdk.test/api/v1/sessions/bridge-session-1/messages/stream' && method === 'POST') {
+        const sse = [
+          'data: {"type":"session_created","sessionId":"bridge-session-1","providerSessionId":"sdk-provider-1"}',
+          '',
+          'data: {"type":"content","content":"bridge hello "}',
+          '',
+          'data: {"type":"tool_use","toolName":"grep","toolInput":{"pattern":"TODO"}}',
+          '',
+          'data: {"type":"content","content":"world"}',
+          '',
+          'data: {"type":"token_usage","usage":{"prompt_tokens":12,"completion_tokens":5,"total_tokens":17}}',
+          '',
+          'data: {"type":"complete","sessionId":"bridge-session-1","finishReason":"stop"}',
+          '',
+          'data: [DONE]',
+          '',
+        ].join('\n');
+        return new Response(sse, {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' },
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    };
+
+    const runtime = createRuntimeServer(config, {
+      agentBackend: {
+        env,
+        fetch: fakeFetch,
+      },
+    });
+
+    try {
+      const providerResponse = await runtime.app.request('/providers/config');
+      expect(providerResponse.status).toBe(200);
+      expect(await providerResponse.json()).toEqual({
+        providers: {
+          claude: {
+            defaultInstance: 'sdk',
+            defaultBackend: 'agent',
+            instances: [{
+              id: 'sdk',
+              target: 'agent/sdk',
+              backend: 'agent',
+              command: undefined,
+              runner: undefined,
+              runtime: undefined,
+              transport: 'agent_sdk_bridge',
+              model: 'sonnet',
+            }],
+          },
+        },
+      });
+
+      const createResponse = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'claude',
+          cwd: config.sessionBaseDir,
+          sessionKey: 'sdk-task-1',
+          reusePolicy: 'prefer_existing',
+          instructions: 'Use the bridge carefully.',
+        }),
+      });
+      expect(createResponse.status).toBe(201);
+      const created = await createResponse.json() as { id: string; providerBackend: string; sessionKey: string };
+      expect(created.providerBackend).toBe('agent');
+      expect(created.sessionKey).toBe('sdk-task-1');
+
+      const messageResponse = await runtime.app.request(`/sessions/${created.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          Accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({
+          message: 'Plan the next step',
+        }),
+      });
+      expect(messageResponse.status).toBe(200);
+      expect(parseNdjson(await messageResponse.text())).toEqual([
+        {
+          type: 'init',
+          providerSessionId: 'bridge-session-1',
+          providerState: {
+            agentSession: {
+              providerSessionId: 'bridge-session-1',
+              sessionKey: 'sdk-task-1',
+              status: 'active',
+              adapterState: {
+                bridgeProvider: 'claude',
+                bridgeSessionId: 'bridge-session-1',
+              },
+            },
+          },
+        },
+        {
+          type: 'text',
+          providerSessionId: 'bridge-session-1',
+          text: 'bridge hello ',
+        },
+        {
+          type: 'tool_use',
+          providerSessionId: 'bridge-session-1',
+          toolName: 'grep',
+          toolArgs: {
+            pattern: 'TODO',
+          },
+        },
+        {
+          type: 'text',
+          providerSessionId: 'bridge-session-1',
+          text: 'world',
+        },
+        {
+          type: 'result',
+          providerSessionId: 'bridge-session-1',
+          usage: {
+            inputTokens: 12,
+            outputTokens: 5,
+          },
+          providerState: {
+            agentSession: {
+              providerSessionId: 'bridge-session-1',
+              sessionKey: 'sdk-task-1',
+              status: 'idle',
+              adapterState: {
+                bridgeProvider: 'claude',
+                bridgeSessionId: 'bridge-session-1',
+                upstreamProviderSessionId: 'sdk-provider-1',
+              },
+            },
+          },
+          metadata: {
+            provider: 'claude',
+          },
+        },
+      ]);
+
+      const closeResponse = await runtime.app.request(`/sessions/${created.id}/close`, {
+        method: 'POST',
+      });
+      expect(closeResponse.status).toBe(200);
+
+      const reuseResponse = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'claude',
+          sessionKey: 'sdk-task-1',
+          reusePolicy: 'require_existing',
+        }),
+      });
+      expect(reuseResponse.status).toBe(200);
+      const reused = await reuseResponse.json() as { id: string };
+      expect(reused.id).toBe(created.id);
+
+      const resumedMessage = await runtime.app.request(`/sessions/${created.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          Accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({
+          message: 'Continue',
+        }),
+      });
+      expect(resumedMessage.status).toBe(200);
+
+      const createCalls = fetchCalls.filter((call) => call.url === 'http://agent-sdk.test/api/v1/sessions');
+      expect(createCalls).toHaveLength(1);
+      const streamCalls = fetchCalls.filter((call) =>
+        call.url === 'http://agent-sdk.test/api/v1/sessions/bridge-session-1/messages/stream',
+      );
+      expect(streamCalls).toHaveLength(2);
+      expect(streamCalls[0]?.body).toEqual({
+        message: 'Use the bridge carefully.\n\nPlan the next step',
+      });
+      expect(streamCalls[1]?.body).toEqual({
+        message: 'Use the bridge carefully.\n\nContinue',
+      });
     } finally {
       await runtime.close();
       cleanup();

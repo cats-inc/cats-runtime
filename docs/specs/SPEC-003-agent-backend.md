@@ -241,7 +241,7 @@ timer/callback integrations.
 - [x] An `AgentAdapter` contract exists in `src/backends/agent`
 - [x] OpenClaw is implementable against that contract without special-casing the
       HTTP layer
-- [ ] The contract can also host a future `Agent SDK` adapter
+- [x] The contract can also host a future `Agent SDK` adapter
 - [x] Pi remains documented as a `cli` integration, not an `agent` integration
 
 ## Open Questions

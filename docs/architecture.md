@@ -45,7 +45,7 @@ The architectural split is:
 │ Claude / OpenAI / Gemini / Ollama APIs   │
 │ Claude / Codex / Gemini / Kiro / Cursor  │
 │ Auggie / OpenCode local runtimes         │
-│ OpenClaw / future Agent SDK runtimes     │
+│ OpenClaw / Agent SDK bridge runtimes     │
 └───────────────────────────────────────────┘
 ```
 

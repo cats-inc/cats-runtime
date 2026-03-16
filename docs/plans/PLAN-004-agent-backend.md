@@ -261,9 +261,9 @@ difference between logical session identity and provider-managed resume tokens.
 
 ### Phase 5: Agent SDK Adapter
 
-- [ ] Implement a second adapter against the same contract
-- [ ] Validate that the contract was not accidentally OpenClaw-specific
-- [ ] Add adapter-specific config examples and tests
+- [x] Implement a second adapter against the same contract
+- [x] Validate that the contract was not accidentally OpenClaw-specific
+- [x] Add adapter-specific config examples and tests
 - [ ] Document how a future third-party agent runtime should plug in
 
 **Deliverables**:
@@ -353,6 +353,7 @@ difference between logical session identity and provider-managed resume tokens.
 | 2026-03-17 | Reprioritized immediate follow-on work toward shared session affinity, bootstrap context, and artifact/output contracts instead of any Git-specific workspace dependency |
 | 2026-03-17 | Added ADR-006 and clarified `sessionKey` semantics, explicit reuse policy, provider-session fallback, and non-Git output assumptions |
 | 2026-03-17 | Landed Phase 1-4 core implementation: shared session/bootstrap/output contract, `backends.agent` config/catalog plumbing, and OpenClaw Gateway MVP |
+| 2026-03-17 | Added `agent_sdk_bridge` as the second adapter target using the external `genai-gateway-agent` boundary and shared agent contract |
 
 ---
 

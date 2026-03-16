@@ -33,6 +33,7 @@ export interface AgentAdapter {
 
 export interface AgentBackendOptions {
   env?: NodeJS.ProcessEnv;
+  fetch?: typeof fetch;
   webSocketFactory?: (url: string | URL, init?: WebSocketInit) => WebSocket;
 }
 

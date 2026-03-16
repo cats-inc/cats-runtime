@@ -8,7 +8,7 @@ import type {
   ApiToolCallPart,
   ApiTransportClient,
 } from '../types.js';
-import { readErrorBody } from './streaming.js';
+import { readErrorBody } from '../../../core/streamParsers.js';
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
 const DEFAULT_CACHE_TTL = '3600s';

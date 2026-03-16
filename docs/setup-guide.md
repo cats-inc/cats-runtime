@@ -165,6 +165,12 @@ Agent backends follow the same pattern. Put shared gateway/auth settings such as
 level, then keep each instance block focused on the fields that actually vary,
 usually `model`.
 
+Currently supported agent transports are:
+
+- `openclaw_gateway`: WebSocket-backed OpenClaw execution
+- `agent_sdk_bridge`: HTTP/SSE bridge to an external Agent SDK service such as
+  `genai-gateway-agent`
+
 Path semantics matter:
 
 - File-backed providers (`claude`, `codex`, `copilot`, `gemini`, `auggie`) use

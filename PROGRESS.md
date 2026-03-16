@@ -8,7 +8,7 @@
 |-----------|--------|-------------|
 | Core | Completed | Embedded CLI runtime, session registry, discovery, and worker pool are in-repo |
 | API Backends | In Progress | `src/backends/api` now runs Claude, Codex/OpenAI, Gemini, and Ollama with runtime-managed sessions, provider-native continuation/caching optimizations, and a shared local tool loop; health probes and broader tool/model discovery remain |
-| Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, and room for a second Agent SDK-style validation target |
+| Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, and an Agent SDK bridge as the second validation target |
 | HTTP API | Completed | Health, sessions, messages, history, observe, and provider management routes are served directly from `cats-runtime` |
 | Dashboard | Completed | The embedded dashboard UI is served from `GET /` |
 | Tests | Completed | Vitest covers provider, discovery, pool, HTTP, server bootstrap, and API/local tool-loop behavior |
@@ -148,11 +148,11 @@ adapter end to end through the existing HTTP surface.
 | Land shared session affinity, bootstrap context, and artifact/output contract updates | [x] | `sessionKey`, `reusePolicy`, `instructions`, `context`, `outputDir`, and `artifacts` now flow through session routes, history, and registry state |
 | Extend runtime types/config/provider catalog to support `backend: agent` | [x] | Config parsing, provider catalog rendering, session manager dispatch, and pool status now include `agent` |
 | Build OpenClaw as the first `src/backends/agent` adapter | [x] | `AgentBackendManager` and `openclaw_gateway` adapter now create, stream, resume, reuse, and persist agent-backed sessions |
-| Cover agent backend flows with automated tests | [x] | Config, route, and OpenClaw integration behavior are covered by Vitest |
+| Validate the contract with a second target such as an Agent SDK adapter | [x] | `agent_sdk_bridge` now validates the same contract against an external Agent SDK gateway |
+| Cover agent backend flows with automated tests | [x] | Config, route, OpenClaw, and Agent SDK bridge integration behavior are covered by Vitest |
 
 #### Next Steps
 
-- [ ] Validate the contract with a second target such as an Agent SDK adapter
 - [ ] Expand dashboard surfacing for agent-specific services/artifacts beyond the current generic session views
 - [ ] Add stronger provider probe/model-list coverage where agent runtimes expose it
 
