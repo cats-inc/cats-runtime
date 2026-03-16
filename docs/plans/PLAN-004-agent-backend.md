@@ -1,7 +1,8 @@
 # PLAN-004: Agent Backend for OpenClaw and Future Agent SDK Runtimes
 
 > Implementation plan for adding `src/backends/agent` beside the existing
-> `cli`, `api`, and `local` execution tracks.
+> `cli` and `api` runtime tracks, while keeping `local` as a distinct
+> routing/config kind that currently shares the API/local runtime manager.
 
 ## Metadata
 
@@ -120,6 +121,9 @@ subset of heartbeat metadata as structured invocation context:
 
 - [ ] Extend `ProviderBackend` from `cli | api | local` to
       `cli | api | local | agent`
+- [ ] Clarify in code docs and architecture docs that `local` remains a
+      distinct backend kind in config/routing, but currently shares runtime
+      execution machinery with `api`
 - [ ] Add `backends.agent.providers.<name>.instances.<id>` support in
       `providers.yaml`
 - [ ] Extend provider catalog and route validation to include `agent`

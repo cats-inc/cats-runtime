@@ -127,7 +127,7 @@ dashboard integration intact.
 ### WP-4: Agent Backend Planning
 
 **Status**: In Progress  
-**Assigned**: Codex  
+**Assigned**: Claude  
 **Priority**: P1
 
 #### Goal

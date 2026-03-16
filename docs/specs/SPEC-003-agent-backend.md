@@ -124,7 +124,9 @@ The new backend taxonomy becomes:
 - `cli`: local subprocess runtimes with local session ownership
 - `api`: chat/completion transports where `cats-runtime` owns transcript and
   tool orchestration
-- `local`: local HTTP model runtimes such as Ollama
+- `local`: a distinct routing/config kind for local HTTP model runtimes such as
+  Ollama; today it still shares the same runtime manager and turn machinery as
+  `api`
 - `agent`: external agent runtimes that own more of the run/session lifecycle
 
 ### Proposed Core Contract
