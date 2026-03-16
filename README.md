@@ -11,7 +11,7 @@ of proxying to a second local sidecar service.
 Current capabilities:
 
 - session lifecycle management for CLI-backed runtimes
-- session lifecycle management for API-backed Claude, OpenAI, and Gemini instances plus local Ollama
+- session lifecycle management for API-backed Claude, Codex, and Gemini families plus local Ollama
 - streamed turns over SSE or NDJSON
 - runtime-hosted local tools for API/local sessions (`list_files`, `read_file`, `write_file`, `grep`, `run_shell`)
 - external session discovery for supported local tools

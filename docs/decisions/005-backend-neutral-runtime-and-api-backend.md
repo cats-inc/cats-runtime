@@ -47,7 +47,7 @@ This decision includes:
    optimization, not required state.
 5. Backend selection remains instance-level in `providers.yaml`, not
    request-level.
-6. Ollama is modeled as its own provider, not as an alias of `openai`.
+6. Ollama is modeled as its own provider, not as an alias of `codex`.
 7. Shared local workspace tools belong in `src/core/tools`, not inside
    `src/backends/api`.
 8. Transport work starts fetch-first, with an explicit escape hatch to vendor

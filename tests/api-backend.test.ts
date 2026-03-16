@@ -33,7 +33,7 @@ routing:
       default_target:
         backend: api
         instance: sonnet
-    openai:
+    codex:
       default_target:
         backend: api
         instance: main
@@ -54,7 +54,7 @@ backends:
             transport: anthropic
             api_key_env: ANTHROPIC_API_KEY
             model: claude-sonnet-4-6
-      openai:
+      codex:
         instances:
           main:
             transport: openai
@@ -127,7 +127,7 @@ describe('API backend integration', () => {
               },
             ],
           },
-          openai: {
+          codex: {
             defaultInstance: 'main',
             defaultBackend: 'api',
             instances: [
@@ -183,7 +183,7 @@ describe('API backend integration', () => {
     }
   });
 
-  it('runs local tools through OpenAI sessions and supports read_only mode', async () => {
+  it('runs local tools through Codex/OpenAI sessions and supports read_only mode', async () => {
     const { config, env, cleanup } = createApiConfigRoot();
     let openAiCalls = 0;
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
@@ -283,7 +283,7 @@ describe('API backend integration', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          provider: 'openai',
+          provider: 'codex',
           cwd: join(env.HOME, 'repo'),
           workspaceMode: 'read_only',
         }),

@@ -47,8 +47,10 @@ Legacy provider-specific env vars still work, but new installs should prefer
 - `environments`: named execution environments such as `native` or a WSL distro
 - `routing.providers.<name>.default_target`: default backend and instance for that provider family
 - `backends.cli.providers.<name>.instances.<id>`: command, runner, runtime, and provider-local storage
-- `backends.api` / `backends.local`: reserved for API-key and local-model catalogs without mixing
-  them into CLI instance maps
+- `backends.api.providers.<name>.instances.<id>`: API-key backed instances where the provider family
+  stays product-facing (`claude`, `codex`, `gemini`) and `transport` names the vendor API
+- `backends.local.providers.<name>.instances.<id>`: local-model runtimes such as Ollama without
+  mixing them into CLI instance maps
 
 Minimal example:
 
@@ -66,10 +68,18 @@ routing:
       default_target:
         backend: cli
         instance: native
+    claude:
+      default_target:
+        backend: api
+        instance: sonnet
     cursor:
       default_target:
         backend: cli
         instance: ubuntu
+    ollama:
+      default_target:
+        backend: local
+        instance: local
 backends:
   cli:
     providers:
@@ -92,6 +102,22 @@ backends:
             command: cursor-agent
             runner: auto
             chats_dir: ~/.cursor/chats
+  api:
+    providers:
+      claude:
+        instances:
+          sonnet:
+            transport: anthropic
+            api_key_env: ANTHROPIC_API_KEY
+            model: claude-sonnet-4-20250514
+  local:
+    providers:
+      ollama:
+        instances:
+          local:
+            transport: ollama
+            base_url: http://127.0.0.1:11434
+            model: qwen3:latest
 ```
 
 This lets one provider expose multiple independently logged-in environments,
@@ -113,8 +139,8 @@ Path semantics matter:
   Cursor/Kiro instances.
 
 The embedded dashboard reads `GET /providers/config` and uses it to populate the
-provider-instance selector in the create-session modal. In YAML mode, only
-providers explicitly listed under `backends.cli.providers:` appear in the dashboard.
+provider-instance selector in the create-session modal. Providers configured in
+`backends.cli`, `backends.api`, or `backends.local` all appear there.
 
 ## Running the Project
 

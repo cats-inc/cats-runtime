@@ -31,7 +31,7 @@ by a local CLI process or a remote API transport.
 Initial scope:
 
 - `claude` via Anthropic API
-- `openai` via OpenAI API (MVP uses chat completions function calling; Responses-specific optimizations remain follow-on work)
+- `codex` via OpenAI API (MVP uses chat completions function calling; Responses-specific optimizations remain follow-on work)
 - `gemini` via Google Gemini API
 - `ollama` via local HTTP transport
 
@@ -107,7 +107,7 @@ providers:
         max_output_tokens: 32000
         tool_profile: standard
 
-  openai:
+  codex:
     default_instance: api
     instances:
       api:
@@ -237,7 +237,7 @@ Provider-catalog ripple effects that Phase 1 must patch explicitly:
 - `src/http/providerServices.ts` should either be generalized or reduced to
   CLI-only helpers behind the new facade.
 - The embedded dashboard ordering and provider badges must be updated for
-  `openai` and `ollama`.
+  `codex` and `ollama`.
 
 ### 3. Add an API Session Runtime
 
@@ -304,7 +304,7 @@ tool runtime has a dedicated scope document before implementation expands.
 - [ ] Introduce backend-aware provider instance types with `backend: cli | api`.
 - [ ] Introduce `RuntimeSessionManager` / `RuntimeFacade` so HTTP routes stop
       depending directly on `WorkerPool`.
-- [ ] Add `openai` and `ollama` to the provider catalog, dashboard ordering,
+- [ ] Add `codex` and `ollama` to the provider catalog, dashboard ordering,
       and provider metadata responses.
 - [ ] Define backend probe semantics so dashboard and operators can distinguish
       "active execution handle" from "backend health / availability".
@@ -406,8 +406,8 @@ tests and operator documentation.
 | `src/http/routes/pool.ts` | Modify | Decide whether pool status stays CLI-specific or is subsumed by runtime status |
 | `src/http/routes/ollama.ts` | Create/Modify | Optional Ollama model-health and model-listing routes if kept separate from generic providers |
 | `src/server.ts` | Modify | Wire CLI and API backends into one runtime app |
-| `public/index.html` | Modify | Extend provider ordering, instance metadata, and badges for OpenAI/Ollama |
-| `config/providers.yaml.example` | Modify | Add example API instances for Claude, OpenAI, Gemini, and Ollama |
+| `public/index.html` | Modify | Extend provider ordering, instance metadata, and badges for Codex/Ollama |
+| `config/providers.yaml.example` | Modify | Add example API instances for Claude, Codex, Gemini, and Ollama |
 | `docs/api.md` | Modify | Document API-backed and Ollama-backed provider instances and any additive stream events |
 | `docs/setup-guide.md` | Modify | Document API key env vars, `OLLAMA_BASE_URL`, and provider instance setup |
 | `docs/architecture.md` | Modify | Reflect the mixed CLI/API/local-model backend model |
@@ -427,7 +427,7 @@ tests and operator documentation.
 - Use `fetch` plus small stream parsers first instead of immediately adopting
   three vendor SDKs. Revisit SDKs only if files, live APIs, or auth flows become
   materially simpler through them.
-- Treat Ollama as its own provider, not as an alias of `openai`. It can reuse an
+- Treat Ollama as its own provider, not as an alias of `codex`. It can reuse an
   OpenAI-compatible parser in the MVP, but its config, health, model listing,
   and lifecycle are distinct enough to justify a dedicated provider boundary.
 - Prefer runtime-managed resume/fork for Ollama because its OpenAI-compatible
@@ -459,7 +459,7 @@ tests and operator documentation.
   `POST /fork`, `GET /history`, and `GET /stream` for each API provider using
   mocked HTTP streams, plus Ollama health/model endpoints if exposed.
 - **Manual Testing**:
-  1. Configure one API instance each for Claude, OpenAI, and Gemini, plus one
+  1. Configure one API instance each for Claude, Codex, and Gemini, plus one
      local Ollama instance.
   2. Create shared, isolated, and read-only sessions from the dashboard.
   3. Send plain-text turns, then tool-using turns that read and modify files.
@@ -505,7 +505,7 @@ The phase ordering above is based on the current vendor API surfaces reviewed on
 
 | Date | Update |
 |------|--------|
-| 2026-03-16 | Plan created for the `src/backends/api` delivery track covering Claude, OpenAI, Gemini, and Ollama execution |
+| 2026-03-16 | Plan created for the `src/backends/api` delivery track covering Claude, Codex, Gemini, and Ollama execution |
 | 2026-03-16 | Phase 1 through the first half of Phase 3 landed: backend-neutral runtime seam, split CLI/API/local provider topology, API/local session lifecycle, Anthropic/OpenAI/Gemini/Ollama transports, and the first shared local tool runtime (`list_files`, `read_file`, `write_file`, `grep`, `run_shell`) |
 
 ---

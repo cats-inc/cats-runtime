@@ -13,10 +13,9 @@ import {
 
 const PROVIDER_ORDER = [
   'claude',
-  'openai',
+  'codex',
   'gemini',
   'ollama',
-  'codex',
   'copilot',
   'cursor',
   'kiro',

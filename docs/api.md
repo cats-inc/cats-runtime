@@ -98,8 +98,8 @@ case-folded in `workspaceKey` while `cwd` remains the original display path.
 API-backed and local-model sessions also include `providerBackend`.
 
 `POST /sessions` accepts an optional `instance` field. When omitted, or when the
-caller explicitly sends `"default"`, `cats-runtime` uses the provider's
-configured `default_instance`.
+caller explicitly sends `"default"`, `cats-runtime` uses the provider family's
+configured default target from `routing.providers.<name>.default_target`.
 
 When a provider has multiple backend kinds configured, callers can target a
 specific instance with `instance: "<backend>/<instance>"`, for example

@@ -106,7 +106,7 @@ describe('API transports', () => {
     });
     const instance: RemoteProviderInstanceConfig = {
       id: 'main',
-      providerName: 'openai',
+      providerName: 'codex',
       backend: 'api',
       transport: 'openai',
       apiKeyEnv: 'OPENAI_API_KEY',

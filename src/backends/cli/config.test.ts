@@ -588,7 +588,7 @@ routing:
       default_target:
         backend: cli
         instance: native
-    openai:
+    codex:
       default_target:
         backend: api
         instance: main
@@ -608,7 +608,7 @@ backends:
             projects_dir: /native/claude/projects
   api:
     providers:
-      openai:
+      codex:
         instances:
           main:
             transport: openai
@@ -643,7 +643,7 @@ backends:
           backend: 'cli',
           instance: 'native',
         },
-        openai: {
+        codex: {
           backend: 'api',
           instance: 'main',
         },
@@ -660,10 +660,10 @@ backends:
 
       expect(config.remoteProviderCatalog).toEqual({
         api: {
-          openai: {
+          codex: {
             main: {
               id: 'main',
-              providerName: 'openai',
+              providerName: 'codex',
               backend: 'api',
               transport: 'openai',
               model: 'gpt-5',
@@ -823,7 +823,7 @@ providers:
 backends:
   api:
     providers:
-      openai:
+      codex:
         instances:
           main:
             transport: openai

@@ -22,7 +22,8 @@ environments:
     distro: Ubuntu
 
 # Routing picks the default execution target for each provider family.
-# The instance itself lives under one backend section below.
+# Provider families use product names (`claude`, `codex`, `gemini`) while
+# `transport` uses the vendor API (`anthropic`, `openai`, `google`, `ollama`).
 routing:
   providers:
     claude:
@@ -57,6 +58,10 @@ routing:
       default_target:
         backend: cli
         instance: native
+    ollama:
+      default_target:
+        backend: local
+        instance: local
 
 backends:
   cli:
@@ -133,31 +138,39 @@ backends:
             #   Linux / WSL: ~/.local/share/kiro-cli/data.sqlite3
             db_path: ~/Library/Application Support/kiro-cli/data.sqlite3
 
-  # API and local model backends use separate sections on purpose so they do not
-  # share the same instance map as CLI providers. Current builds parse these
-  # sections for catalog/routing groundwork; execution support lands in upcoming
-  # phases.
-  #
-  # api:
-  #   providers:
-  #     openai:
-  #       instances:
-  #         main:
-  #           transport: openai
-  #           api_key_env: OPENAI_API_KEY
-  #           model: gpt-5
-  #     claude:
-  #       instances:
-  #         sonnet:
-  #           transport: anthropic
-  #           api_key_env: ANTHROPIC_API_KEY
-  #           model: claude-sonnet-4-6
-  #
-  # local:
-  #   providers:
-  #     ollama:
-  #       instances:
-  #         local:
-  #           transport: ollama
-  #           base_url: http://127.0.0.1:11434
-  #           model: qwen3:latest
+  api:
+    providers:
+      claude:
+        instances:
+          sonnet:
+            transport: anthropic
+            api_key_env: ANTHROPIC_API_KEY
+            # Replace with the Claude API model you actually want to run.
+            model: claude-sonnet-4-20250514
+
+      codex:
+        instances:
+          main:
+            transport: openai
+            api_key_env: OPENAI_API_KEY
+            # Keep the provider family as `codex`; the vendor transport is `openai`.
+            # Replace with the OpenAI coding model you want to run.
+            model: gpt-5
+
+      gemini:
+        instances:
+          pro:
+            transport: google
+            api_key_env: GEMINI_API_KEY
+            # Replace with the Gemini API model you actually want to run.
+            model: gemini-2.5-pro
+
+  local:
+    providers:
+      ollama:
+        instances:
+          local:
+            transport: ollama
+            base_url: http://127.0.0.1:11434
+            # Replace with a model you already have in `ollama list`.
+            model: qwen3:latest
