@@ -1,4 +1,4 @@
-import type { StreamEvent } from '../backends/cli/providers/types.js';
+import type { StreamEvent } from '../core/types.js';
 
 /** Format a StreamEvent as an SSE data line */
 export function formatSSE(event: StreamEvent): string {

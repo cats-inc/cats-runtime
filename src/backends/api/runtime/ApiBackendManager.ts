@@ -19,7 +19,7 @@ import type {
 } from '../types.js';
 import { API_PROVIDER_CAPABILITIES } from '../types.js';
 
-const MAX_TOOL_STEPS = 8;
+const DEFAULT_MAX_TOOL_STEPS = 20;
 
 function defaultFetch(): typeof fetch {
   return fetch;
@@ -79,6 +79,24 @@ function lastUserText(messages: ApiConversationMessage[]): string | undefined {
     .filter((part): part is Extract<ApiConversationPart, { type: 'text' }> => part.type === 'text')
     .map((part) => part.text)
     .join('\n');
+}
+
+function prependSystemPrompt(
+  messages: ApiConversationMessage[],
+  systemPrompt: string | undefined,
+): ApiConversationMessage[] {
+  if (!systemPrompt) {
+    return messages;
+  }
+
+  if (messages[0]?.role === 'system') {
+    return messages;
+  }
+
+  return [{
+    role: 'system',
+    parts: [{ type: 'text', text: systemPrompt }],
+  }, ...messages];
 }
 
 export class ApiBackendManager {
@@ -198,7 +216,10 @@ export class ApiBackendManager {
     }
 
     const transcriptPath = session.sourcePath || session.providerSourcePath;
-    const conversation = await loadTranscriptMessages(transcriptPath);
+    const conversation = prependSystemPrompt(
+      await loadTranscriptMessages(transcriptPath),
+      remoteInstance.systemPrompt,
+    );
     if (lastUserText(conversation) !== message) {
       conversation.push({
         role: 'user',
@@ -215,7 +236,9 @@ export class ApiBackendManager {
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
 
-    for (let step = 0; step < MAX_TOOL_STEPS; step += 1) {
+    const maxToolSteps = remoteInstance.maxToolSteps ?? DEFAULT_MAX_TOOL_STEPS;
+
+    for (let step = 0; step < maxToolSteps; step += 1) {
       const completion = await transport.completeTurn({
         sessionId,
         providerName: session.providerName,
@@ -275,6 +298,7 @@ export class ApiBackendManager {
           toolName: toolCall.name,
           toolId: toolCall.id,
           text: JSON.stringify(toolCall.arguments),
+          toolArgs: toolCall.arguments,
           raw: toolCall.raw,
         };
 
@@ -311,6 +335,6 @@ export class ApiBackendManager {
       conversation.push(toolResultMessage);
     }
 
-    throw new Error(`Exceeded tool loop limit of ${MAX_TOOL_STEPS} steps`);
+    throw new Error(`Exceeded tool loop limit of ${maxToolSteps} steps`);
   }
 }

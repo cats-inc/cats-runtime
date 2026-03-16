@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { readdir, readFile, stat, mkdir, writeFile } from 'node:fs/promises';
-import { dirname, relative, resolve } from 'node:path';
+import { dirname, extname, relative, resolve } from 'node:path';
 import type { PermissionMode, WorkspaceMode } from '../types.js';
 
 export interface ToolDefinition {
@@ -44,6 +44,46 @@ const DEFAULT_LIST_ENTRIES = 200;
 const DEFAULT_GREP_MATCHES = 200;
 const DEFAULT_SHELL_TIMEOUT_MS = 15_000;
 const MAX_SHELL_TIMEOUT_MS = 60_000;
+const IGNORED_DIRECTORIES = new Set([
+  '.git',
+  '.hg',
+  '.svn',
+  'node_modules',
+  'dist',
+  'build',
+  '.next',
+  '.nuxt',
+  'coverage',
+  'target',
+]);
+const BINARY_EXTENSIONS = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.ico',
+  '.pdf',
+  '.zip',
+  '.gz',
+  '.tar',
+  '.7z',
+  '.jar',
+  '.exe',
+  '.dll',
+  '.so',
+  '.dylib',
+  '.bin',
+  '.wasm',
+  '.woff',
+  '.woff2',
+  '.ttf',
+  '.otf',
+  '.mp3',
+  '.mp4',
+  '.mov',
+  '.avi',
+]);
 
 const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
@@ -126,6 +166,14 @@ function toRelativeDisplay(root: string, fullPath: string): string {
   return rel === '' ? '.' : rel.split('\\').join('/');
 }
 
+function shouldIgnoreDirectory(name: string): boolean {
+  return IGNORED_DIRECTORIES.has(name);
+}
+
+function looksBinaryFile(path: string): boolean {
+  return BINARY_EXTENSIONS.has(extname(path).toLowerCase());
+}
+
 function ensureObject(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' ? value as Record<string, unknown> : {};
 }
@@ -192,6 +240,10 @@ async function walkFiles(
       return;
     }
 
+    if (entry.isDirectory() && shouldIgnoreDirectory(entry.name)) {
+      continue;
+    }
+
     const fullPath = resolve(currentPath, entry.name);
     results.push(`${toRelativeDisplay(root, fullPath)}${entry.isDirectory() ? '/' : ''}`);
     if (recursive && entry.isDirectory()) {
@@ -234,12 +286,19 @@ async function collectTextFiles(
       return;
     }
 
+    if (entry.isDirectory() && shouldIgnoreDirectory(entry.name)) {
+      continue;
+    }
+
     const fullPath = resolve(targetPath, entry.name);
     if (entry.isDirectory()) {
       await collectTextFiles(root, fullPath, results, limit);
       continue;
     }
     if (entry.isFile()) {
+      if (looksBinaryFile(fullPath)) {
+        continue;
+      }
       results.push(fullPath);
     }
   }

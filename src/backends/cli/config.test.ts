@@ -614,10 +614,13 @@ backends:
             transport: openai
             api_key_env: OPENAI_API_KEY
             model: gpt-5
+            system_prompt: You are the cats-runtime API backend.
             headers:
               x-project: cats-runtime
+            max_output_tokens: 8192
             timeout_ms: 30000
             max_retries: 2
+            max_tool_steps: 24
   local:
     providers:
       ollama:
@@ -664,6 +667,7 @@ backends:
               backend: 'api',
               transport: 'openai',
               model: 'gpt-5',
+              systemPrompt: 'You are the cats-runtime API backend.',
               apiKeyEnv: 'OPENAI_API_KEY',
               baseUrl: undefined,
               baseUrlEnv: undefined,
@@ -672,8 +676,10 @@ backends:
               headers: {
                 'x-project': 'cats-runtime',
               },
+              maxOutputTokens: 8192,
               timeoutMs: 30000,
               maxRetries: 2,
+              maxToolSteps: 24,
               toolProfile: undefined,
             },
           },
@@ -686,14 +692,17 @@ backends:
               backend: 'local',
               transport: 'ollama',
               model: 'qwen3:latest',
+              systemPrompt: undefined,
               apiKeyEnv: undefined,
               baseUrl: 'http://127.0.0.1:11434',
               baseUrlEnv: undefined,
               organizationEnv: undefined,
               projectEnv: undefined,
               headers: undefined,
+              maxOutputTokens: undefined,
               timeoutMs: undefined,
               maxRetries: undefined,
+              maxToolSteps: undefined,
               toolProfile: undefined,
             },
           },
@@ -782,14 +791,17 @@ backends:
         backend: 'api',
         transport: 'anthropic',
         model: 'claude-sonnet-4-6',
+        systemPrompt: undefined,
         apiKeyEnv: 'ANTHROPIC_API_KEY',
         baseUrl: undefined,
         baseUrlEnv: undefined,
         organizationEnv: undefined,
         projectEnv: undefined,
         headers: undefined,
+        maxOutputTokens: undefined,
         timeoutMs: undefined,
         maxRetries: undefined,
+        maxToolSteps: undefined,
         toolProfile: undefined,
       });
     } finally {

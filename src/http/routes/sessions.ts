@@ -361,7 +361,7 @@ sessionRoutes.post('/sessions', async (c) => {
       if (resolved.workspaceMode === 'isolated') {
         cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, sessionId);
       }
-      return c.json({ error: `Failed to create OpenCode session: ${err}` }, 500);
+      return c.json({ error: `Failed to create Cursor session: ${err}` }, 500);
     }
   }
 
@@ -420,7 +420,7 @@ sessionRoutes.post('/sessions', async (c) => {
       if (resolved.workspaceMode === 'isolated') {
         cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, sessionId);
       }
-      return c.json({ error: `Failed to create Cursor session: ${err}` }, 500);
+      return c.json({ error: `Failed to create OpenCode session: ${err}` }, 500);
     }
   }
 

@@ -31,6 +31,23 @@ function getOrCreateSourcePath(
 
 export const messageRoutes = new Hono();
 
+function flushAssistantText(
+  sourcePath: string | null,
+  assistantText: string,
+): string {
+  if (!assistantText || !sourcePath) {
+    return '';
+  }
+
+  appendHistory(sourcePath, {
+    type: 'assistant',
+    message: { content: [{ type: 'text', text: assistantText }] },
+    timestamp: new Date().toISOString(),
+  });
+
+  return '';
+}
+
 function restoreReadyIfSessionStillInteractive(
   registry: SessionRegistry,
   id: string,
@@ -116,6 +133,17 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
               assistantText += event.text ?? '';
             }
 
+            if (event.type === 'tool_use' && sourcePath) {
+              assistantText = flushAssistantText(sourcePath, assistantText);
+              appendHistory(sourcePath, {
+                type: 'tool_use',
+                toolId: event.toolId,
+                toolName: event.toolName,
+                arguments: event.toolArgs ?? {},
+                timestamp: new Date().toISOString(),
+              });
+            }
+
             if (event.type === 'tool_result' && sourcePath) {
               appendHistory(sourcePath, {
                 type: 'tool_result',
@@ -129,13 +157,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
 
             if (event.type === 'result') {
               completed = true;
-              if (assistantText && sourcePath) {
-                appendHistory(sourcePath, {
-                  type: 'assistant',
-                  message: { content: [{ type: 'text', text: assistantText }] },
-                  timestamp: new Date().toISOString(),
-                });
-              }
+              assistantText = flushAssistantText(sourcePath, assistantText);
               ctx.registry.recordMessage(
                 id,
                 event.usage?.inputTokens,
@@ -151,13 +173,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
           }
 
           if (!completed) {
-            if (assistantText && sourcePath) {
-              appendHistory(sourcePath, {
-                type: 'assistant',
-                message: { content: [{ type: 'text', text: assistantText }] },
-                timestamp: new Date().toISOString(),
-              });
-            }
+            assistantText = flushAssistantText(sourcePath, assistantText);
             ctx.registry.recordMessage(id);
             restoreReadyIfSessionStillInteractive(ctx.registry, id);
           }
@@ -212,6 +228,17 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
           assistantText += event.text ?? '';
         }
 
+        if (event.type === 'tool_use' && sseSourcePath) {
+          assistantText = flushAssistantText(sseSourcePath, assistantText);
+          appendHistory(sseSourcePath, {
+            type: 'tool_use',
+            toolId: event.toolId,
+            toolName: event.toolName,
+            arguments: event.toolArgs ?? {},
+            timestamp: new Date().toISOString(),
+          });
+        }
+
         if (event.type === 'tool_result' && sseSourcePath) {
           appendHistory(sseSourcePath, {
             type: 'tool_result',
@@ -225,13 +252,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
 
         if (event.type === 'result') {
           completed = true;
-          if (assistantText && sseSourcePath) {
-            appendHistory(sseSourcePath, {
-              type: 'assistant',
-              message: { content: [{ type: 'text', text: assistantText }] },
-              timestamp: new Date().toISOString(),
-            });
-          }
+          assistantText = flushAssistantText(sseSourcePath, assistantText);
           ctx.registry.recordMessage(
             id,
             event.usage?.inputTokens,
@@ -247,13 +268,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
       }
 
       if (!completed) {
-        if (assistantText && sseSourcePath) {
-          appendHistory(sseSourcePath, {
-            type: 'assistant',
-            message: { content: [{ type: 'text', text: assistantText }] },
-            timestamp: new Date().toISOString(),
-          });
-        }
+        assistantText = flushAssistantText(sseSourcePath, assistantText);
         ctx.registry.recordMessage(id);
         restoreReadyIfSessionStillInteractive(ctx.registry, id);
       }

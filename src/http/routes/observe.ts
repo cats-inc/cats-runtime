@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { getRuntimeSessionManager, type AppContext } from '../app.js';
-import type { StreamEvent } from '../../backends/cli/providers/types.js';
+import type { StreamEvent } from '../../core/types.js';
 
 export const observeRoutes = new Hono();
 

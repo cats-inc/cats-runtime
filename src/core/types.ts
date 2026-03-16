@@ -94,6 +94,7 @@ export interface StreamEvent {
   text?: string;
   toolName?: string;
   toolId?: string;
+  toolArgs?: Record<string, unknown>;
   isError?: boolean;
   usage?: {
     inputTokens: number;

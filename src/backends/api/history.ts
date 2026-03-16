@@ -1,6 +1,11 @@
 import { createReadStream, existsSync } from 'node:fs';
 import { createInterface } from 'node:readline';
-import type { ApiConversationMessage } from './types.js';
+import type {
+  ApiConversationMessage,
+  ApiConversationPart,
+  ApiToolCallPart,
+  ApiToolResultPart,
+} from './types.js';
 
 function extractAssistantText(content: unknown): string {
   if (!Array.isArray(content)) {
@@ -20,10 +25,55 @@ function extractUserText(content: unknown): string {
   return typeof content === 'string' ? content : '';
 }
 
-function formatToolResult(entry: Record<string, unknown>): string {
-  const toolName = typeof entry.toolName === 'string' ? entry.toolName : 'tool';
+function parseToolCall(entry: Record<string, unknown>): ApiToolCallPart | undefined {
+  const toolId = typeof entry.toolId === 'string' ? entry.toolId : undefined;
+  const toolName = typeof entry.toolName === 'string' ? entry.toolName : undefined;
+  const args = entry.arguments && typeof entry.arguments === 'object'
+    ? entry.arguments as Record<string, unknown>
+    : {};
+
+  if (!toolId || !toolName) {
+    return undefined;
+  }
+
+  return {
+    type: 'tool_call',
+    id: toolId,
+    name: toolName,
+    arguments: args,
+  };
+}
+
+function parseToolResult(entry: Record<string, unknown>): ApiToolResultPart | undefined {
+  const toolName = typeof entry.toolName === 'string' ? entry.toolName : undefined;
+  const toolId = typeof entry.toolId === 'string' ? entry.toolId : undefined;
   const text = typeof entry.text === 'string' ? entry.text : '';
-  return `[tool_result:${toolName}]\n${text}`.trim();
+
+  if (!toolName || !toolId) {
+    return undefined;
+  }
+
+  return {
+    type: 'tool_result',
+    toolCallId: toolId,
+    name: toolName,
+    output: text,
+    isError: entry.isError === true,
+  };
+}
+
+function flushMessage(
+  messages: ApiConversationMessage[],
+  role: 'assistant' | 'user',
+  parts: ApiConversationPart[],
+): ApiConversationPart[] {
+  if (parts.length > 0) {
+    messages.push({
+      role,
+      parts: [...parts],
+    });
+  }
+  return [];
 }
 
 export async function loadTranscriptMessages(
@@ -34,6 +84,8 @@ export async function loadTranscriptMessages(
   }
 
   const messages: ApiConversationMessage[] = [];
+  let pendingAssistantParts: ApiConversationPart[] = [];
+  let pendingToolResults: ApiConversationPart[] = [];
   const reader = createInterface({
     input: createReadStream(filePath, { encoding: 'utf-8' }),
     crlfDelay: Infinity,
@@ -47,7 +99,11 @@ export async function loadTranscriptMessages(
 
       try {
         const entry = JSON.parse(line) as Record<string, unknown>;
+
         if (entry.type === 'user') {
+          pendingAssistantParts = flushMessage(messages, 'assistant', pendingAssistantParts);
+          pendingToolResults = flushMessage(messages, 'user', pendingToolResults);
+
           const content = typeof entry.message === 'object' && entry.message
             ? (entry.message as Record<string, unknown>).content
             : undefined;
@@ -59,20 +115,41 @@ export async function loadTranscriptMessages(
         }
 
         if (entry.type === 'assistant') {
+          pendingToolResults = flushMessage(messages, 'user', pendingToolResults);
+
           const content = typeof entry.message === 'object' && entry.message
             ? (entry.message as Record<string, unknown>).content
             : undefined;
           const text = extractAssistantText(content);
-          if (text) {
-            messages.push({ role: 'assistant', parts: [{ type: 'text', text }] });
+          if (!text) {
+            continue;
+          }
+
+          const hasToolCall = pendingAssistantParts.some((part) => part.type === 'tool_call');
+          if (hasToolCall) {
+            pendingAssistantParts = flushMessage(messages, 'assistant', pendingAssistantParts);
+          }
+
+          pendingAssistantParts.push({ type: 'text', text });
+          continue;
+        }
+
+        if (entry.type === 'tool_use') {
+          pendingToolResults = flushMessage(messages, 'user', pendingToolResults);
+
+          const toolCall = parseToolCall(entry);
+          if (toolCall) {
+            pendingAssistantParts.push(toolCall);
           }
           continue;
         }
 
         if (entry.type === 'tool_result') {
-          const text = formatToolResult(entry);
-          if (text) {
-            messages.push({ role: 'user', parts: [{ type: 'text', text }] });
+          pendingAssistantParts = flushMessage(messages, 'assistant', pendingAssistantParts);
+
+          const toolResult = parseToolResult(entry);
+          if (toolResult) {
+            pendingToolResults.push(toolResult);
           }
         }
       } catch {
@@ -83,5 +160,7 @@ export async function loadTranscriptMessages(
     reader.close();
   }
 
+  flushMessage(messages, 'assistant', pendingAssistantParts);
+  flushMessage(messages, 'user', pendingToolResults);
   return messages;
 }

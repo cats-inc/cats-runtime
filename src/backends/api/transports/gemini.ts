@@ -9,6 +9,8 @@ import type {
 } from '../types.js';
 import { readErrorBody } from './streaming.js';
 
+const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
+
 function requireApiKey(instance: RemoteProviderInstanceConfig, env: NodeJS.ProcessEnv): string {
   const apiKeyEnv = instance.apiKeyEnv;
   if (!apiKeyEnv) {
@@ -142,6 +144,9 @@ export class GeminiTransport implements ApiTransportClient {
       body: JSON.stringify({
         contents: toGeminiContents(input.messages),
         tools: toGeminiTools(input),
+        generationConfig: {
+          maxOutputTokens: input.instance.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+        },
       }),
       signal: input.signal,
     });

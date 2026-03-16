@@ -9,6 +9,8 @@ import type {
 } from '../types.js';
 import { readErrorBody } from './streaming.js';
 
+const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
+
 function requireApiKey(instance: RemoteProviderInstanceConfig, env: NodeJS.ProcessEnv): string {
   const apiKeyEnv = instance.apiKeyEnv;
   if (!apiKeyEnv) {
@@ -172,6 +174,7 @@ export class OpenAiTransport implements ApiTransportClient {
         messages: toOpenAiMessages(input.messages),
         tools: input.tools.length > 0 ? toOpenAiTools(input) : undefined,
         tool_choice: input.tools.length > 0 ? 'auto' : undefined,
+        max_completion_tokens: input.instance.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
       }),
       signal: input.signal,
     });

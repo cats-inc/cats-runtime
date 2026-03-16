@@ -23,7 +23,10 @@ interface PoolExecutionLike {
 }
 
 class CliExecutionHandle implements ExecutionHandle {
-  constructor(private readonly worker: PoolExecutionLike) {}
+  constructor(
+    private readonly worker: PoolExecutionLike,
+    private readonly onKill: () => void,
+  ) {}
 
   get active(): boolean {
     return this.worker.alive === true;
@@ -41,8 +44,7 @@ class CliExecutionHandle implements ExecutionHandle {
   }
 
   kill(): void {
-    // Route-level shutdown still goes through the manager/pool. A handle kill
-    // hook can be added later if routes need direct control.
+    this.onKill();
   }
 
   on(event: ExecutionEventName, listener: ExecutionListener): this {
@@ -66,7 +68,7 @@ export class RuntimeSessionManager {
   get(sessionId: string): ExecutionHandle | undefined {
     const worker = this.pool.get(sessionId) as WorkerProcess | undefined;
     if (worker) {
-      return new CliExecutionHandle(worker);
+      return new CliExecutionHandle(worker, () => this.pool.kill(sessionId));
     }
 
     return this.apiBackend?.get(sessionId);
@@ -97,7 +99,7 @@ export class RuntimeSessionManager {
         opts,
         cliInstanceId,
       ) as WorkerProcess | undefined;
-      return worker ? new CliExecutionHandle(worker) : undefined;
+      return worker ? new CliExecutionHandle(worker, () => this.pool.kill(sessionId)) : undefined;
     }
 
     return this.apiBackend?.spawn(sessionId, target);

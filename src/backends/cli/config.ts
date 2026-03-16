@@ -51,14 +51,17 @@ export interface RemoteProviderInstanceConfig {
   backend: Exclude<BackendKind, 'cli'>;
   transport?: string;
   model?: string;
+  systemPrompt?: string;
   apiKeyEnv?: string;
   baseUrl?: string;
   baseUrlEnv?: string;
   organizationEnv?: string;
   projectEnv?: string;
   headers?: Record<string, string>;
+  maxOutputTokens?: number;
   timeoutMs?: number;
   maxRetries?: number;
+  maxToolSteps?: number;
   toolProfile?: string;
 }
 
@@ -1283,6 +1286,8 @@ function parseRemoteBackends(
           backend,
           transport: readString(instanceDoc.transport),
           model: readString(instanceDoc.model),
+          systemPrompt: readString(instanceDoc.system_prompt)
+            || readString(instanceDoc.systemPrompt),
           apiKeyEnv: readString(instanceDoc.api_key_env)
             || readString(instanceDoc.apiKeyEnv),
           baseUrl: readString(instanceDoc.base_url)
@@ -1297,6 +1302,10 @@ function parseRemoteBackends(
             asOptionalObject(instanceDoc.headers),
             `backends.${backend}.providers.${providerName}.instances.${instanceId}.headers`,
           ),
+          maxOutputTokens: parseOptionalIntValue(
+            instanceDoc.max_output_tokens ?? instanceDoc.maxOutputTokens,
+            `backends.${backend}.providers.${providerName}.instances.${instanceId}.max_output_tokens`,
+          ),
           timeoutMs: parseOptionalIntValue(
             instanceDoc.timeout_ms ?? instanceDoc.timeoutMs,
             `backends.${backend}.providers.${providerName}.instances.${instanceId}.timeout_ms`,
@@ -1304,6 +1313,10 @@ function parseRemoteBackends(
           maxRetries: parseOptionalIntValue(
             instanceDoc.max_retries ?? instanceDoc.maxRetries,
             `backends.${backend}.providers.${providerName}.instances.${instanceId}.max_retries`,
+          ),
+          maxToolSteps: parseOptionalIntValue(
+            instanceDoc.max_tool_steps ?? instanceDoc.maxToolSteps,
+            `backends.${backend}.providers.${providerName}.instances.${instanceId}.max_tool_steps`,
           ),
           toolProfile: readString(instanceDoc.tool_profile)
             || readString(instanceDoc.toolProfile),

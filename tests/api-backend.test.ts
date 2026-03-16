@@ -215,6 +215,37 @@ describe('API backend integration', () => {
 
       const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
       const messages = Array.isArray(body.messages) ? body.messages : [];
+
+      if (openAiCalls === 2) {
+        expect(messages.some((message) => {
+          if (!message || typeof message !== 'object') return false;
+          const payload = message as Record<string, unknown>;
+          return payload.role === 'tool'
+            && typeof payload.content === 'string'
+            && payload.content.includes('export const value = 7;');
+        })).toBe(true);
+
+        return jsonResponse({
+          id: 'chatcmpl-2',
+          choices: [{
+            message: {
+              role: 'assistant',
+              content: 'The file exports value 7.',
+            },
+          }],
+          usage: { prompt_tokens: 6, completion_tokens: 7 },
+        });
+      }
+
+      expect(messages.some((message) => {
+        if (!message || typeof message !== 'object') return false;
+        const payload = message as Record<string, unknown>;
+        return payload.role === 'assistant'
+          && Array.isArray(payload.tool_calls)
+          && (payload.tool_calls as Array<Record<string, unknown>>).some((toolCall) =>
+            toolCall.function && typeof toolCall.function === 'object'
+            && (toolCall.function as Record<string, unknown>).name === 'read_file');
+      })).toBe(true);
       expect(messages.some((message) => {
         if (!message || typeof message !== 'object') return false;
         const payload = message as Record<string, unknown>;
@@ -224,14 +255,14 @@ describe('API backend integration', () => {
       })).toBe(true);
 
       return jsonResponse({
-        id: 'chatcmpl-2',
+        id: 'chatcmpl-3',
         choices: [{
           message: {
             role: 'assistant',
-            content: 'The file exports value 7.',
+            content: 'It was src/app.ts.',
           },
         }],
-        usage: { prompt_tokens: 6, completion_tokens: 7 },
+        usage: { prompt_tokens: 4, completion_tokens: 5 },
       });
     });
 
@@ -311,7 +342,26 @@ describe('API backend integration', () => {
         method: 'POST',
       });
       expect(resumeResponse.status).toBe(200);
-      expect(openAiCalls).toBe(2);
+
+      const secondMessageResponse = await runtime.app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({ message: 'Which file was that?' }),
+      });
+      expect(secondMessageResponse.status).toBe(200);
+      expect(parseNdjson(await secondMessageResponse.text())).toEqual([
+        expect.objectContaining({ type: 'init', sessionId: 'chatcmpl-3' }),
+        expect.objectContaining({ type: 'text', text: 'It was src/app.ts.' }),
+        expect.objectContaining({
+          type: 'result',
+          sessionId: 'chatcmpl-3',
+          usage: { inputTokens: 4, outputTokens: 5 },
+        }),
+      ]);
+      expect(openAiCalls).toBe(3);
     } finally {
       await runtime.close();
       cleanup();

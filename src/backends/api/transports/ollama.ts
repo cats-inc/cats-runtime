@@ -8,6 +8,8 @@ import type {
 } from '../types.js';
 import { readErrorBody } from './streaming.js';
 
+const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
+
 function toOllamaMessages(messages: ApiConversationMessage[]): Array<Record<string, unknown>> {
   const mapped: Array<Record<string, unknown>> = [];
 
@@ -130,6 +132,9 @@ export class OllamaTransport implements ApiTransportClient {
         stream: false,
         messages: toOllamaMessages(input.messages),
         tools: input.tools.length > 0 ? toOllamaTools(input) : undefined,
+        options: {
+          num_predict: input.instance.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+        },
       }),
       signal: input.signal,
     });

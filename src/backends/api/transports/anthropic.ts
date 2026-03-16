@@ -9,6 +9,8 @@ import type {
 } from '../types.js';
 import { readErrorBody } from './streaming.js';
 
+const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
+
 function requireApiKey(instance: RemoteProviderInstanceConfig, env: NodeJS.ProcessEnv): string {
   const apiKeyEnv = instance.apiKeyEnv;
   if (!apiKeyEnv) {
@@ -26,6 +28,16 @@ function requireApiKey(instance: RemoteProviderInstanceConfig, env: NodeJS.Proce
 function resolveBaseUrl(instance: RemoteProviderInstanceConfig, env: NodeJS.ProcessEnv): string {
   const fromEnv = instance.baseUrlEnv ? env[instance.baseUrlEnv] : undefined;
   return fromEnv || instance.baseUrl || 'https://api.anthropic.com';
+}
+
+function extractSystemPrompt(messages: ApiConversationMessage[]): string | undefined {
+  return messages
+    .filter((message) => message.role === 'system')
+    .flatMap((message) => message.parts)
+    .filter((part): part is Extract<ApiConversationPart, { type: 'text' }> => part.type === 'text')
+    .map((part) => part.text)
+    .filter(Boolean)
+    .join('\n') || undefined;
 }
 
 function toAnthropicMessage(message: ApiConversationMessage): Record<string, unknown> | null {
@@ -123,7 +135,8 @@ export class AnthropicTransport implements ApiTransportClient {
       },
       body: JSON.stringify({
         model: input.model,
-        max_tokens: 4096,
+        max_tokens: input.instance.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+        system: extractSystemPrompt(input.messages),
         messages: input.messages
           .map(toAnthropicMessage)
           .filter((message): message is Record<string, unknown> => Boolean(message)),
