@@ -804,7 +804,7 @@ function renderMd(text) {
 }
 
 const API_BASE = window.location.origin;
-const PROVIDER_ORDER = ['claude', 'codex', 'gemini', 'copilot', 'cursor', 'kiro', 'auggie', 'opencode'];
+const PROVIDER_ORDER = ['claude', 'openai', 'gemini', 'ollama', 'codex', 'copilot', 'cursor', 'kiro', 'auggie', 'opencode'];
 let currentSessionId = null;
 let isStreaming = false;
 let observeSource = null;
@@ -863,22 +863,32 @@ function providerMeta(providerName) {
   return providerCatalog?.providers?.[providerName] || null;
 }
 
-function instanceMeta(providerName, instanceId) {
+function instanceMeta(providerName, instanceId, backend) {
   const provider = providerMeta(providerName);
   if (!provider) return null;
-  return (provider.instances || []).find((instance) => instance.id === (instanceId || provider.defaultInstance || 'default')) || null;
+  const requestedTarget = backend && instanceId ? `${backend}/${instanceId}` : null;
+  return (provider.instances || []).find((instance) => {
+    if (requestedTarget && instance.target === requestedTarget) return true;
+    return instance.id === (instanceId || provider.defaultInstance || 'default');
+  }) || null;
 }
 
 function formatInstanceOptionLabel(providerName, instance) {
   if (!instance) return 'default';
   const parts = [instance.id];
+  if (instance.backend && instance.backend !== 'cli') {
+    parts.push(instance.backend);
+  }
   if (instance.runtime?.mode === 'wsl') {
     parts.push(instance.runtime.distro ? `wsl:${instance.runtime.distro}` : 'wsl');
   } else if (instance.runtime?.mode) {
     parts.push(instance.runtime.mode);
   }
+  if (instance.transport) {
+    parts.push(instance.transport);
+  }
   const provider = providerMeta(providerName);
-  if (provider?.defaultInstance === instance.id) {
+  if (provider?.defaultInstance === instance.id && (!provider.defaultBackend || provider.defaultBackend === instance.backend)) {
     parts.push('default');
   }
   return parts.join(' | ');
@@ -892,19 +902,25 @@ function shouldShowInstance(session) {
 
 function formatSessionInstance(session) {
   const instanceId = session.providerInstanceId || 'default';
-  const instance = instanceMeta(session.providerName, instanceId);
+  const instance = instanceMeta(session.providerName, instanceId, session.providerBackend);
   if (instance) {
     return formatInstanceOptionLabel(session.providerName, instance);
   }
-  return instanceId;
+  return session.providerBackend && session.providerBackend !== 'cli'
+    ? `${session.providerBackend}/${instanceId}`
+    : instanceId;
 }
 
 function configuredProviderNames() {
   if (!providerCatalog?.providers) return [];
 
-  return PROVIDER_ORDER.filter(
+  const ordered = PROVIDER_ORDER.filter(
     (providerName) => (providerCatalog.providers[providerName]?.instances?.length || 0) > 0,
   );
+  const extras = Object.keys(providerCatalog.providers)
+    .filter((providerName) => !PROVIDER_ORDER.includes(providerName))
+    .sort((left, right) => left.localeCompare(right));
+  return [...ordered, ...extras];
 }
 
 function setCreateModalEnabled(enabled) {
@@ -958,11 +974,13 @@ function onProviderChange() {
   }
 
   instanceSelect.innerHTML = instances
-    .map((instance) => `<option value="${instance.id}">${formatInstanceOptionLabel(providerName, instance)}</option>`)
+    .map((instance) => `<option value="${instance.target || instance.id}">${formatInstanceOptionLabel(providerName, instance)}</option>`)
     .join('');
-  instanceSelect.value = instances.some((instance) => instance.id === selected)
+  instanceSelect.value = instances.some((instance) => (instance.target || instance.id) === selected)
     ? selected
-    : (provider?.defaultInstance || instances[0]?.id || '');
+    : ((provider?.defaultBackend && provider?.defaultInstance)
+      ? `${provider.defaultBackend}/${provider.defaultInstance}`
+      : (provider?.defaultInstance || instances[0]?.target || instances[0]?.id || ''));
   instanceSelect.disabled = instances.length <= 1;
   instanceGroup.style.display = '';
   setCreateModalEnabled(true);

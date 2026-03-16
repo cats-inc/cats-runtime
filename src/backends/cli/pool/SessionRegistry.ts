@@ -1,15 +1,19 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import type { SessionInfo, SessionStatus, WorkspaceMode } from './types.js';
+import type { PermissionMode, SessionInfo, SessionStatus, WorkspaceMode } from './types.js';
+import type { ProviderDefaultTarget } from '../config.js';
 import { normalizeSessionOrigin } from './sessionView.js';
 
 export interface CreateSessionInput {
   id?: string;
   providerName: string;
+  providerBackend?: 'cli' | 'api' | 'local';
   providerInstanceId?: string;
   cwd: string;
   workspaceMode?: WorkspaceMode;
+  permissionMode?: PermissionMode;
+  allowedTools?: string[];
   model?: string;
   group?: string;
 }
@@ -17,6 +21,7 @@ export interface CreateSessionInput {
 interface DiscoveredSessionData {
   cwd: string;
   providerName: string;
+  providerBackend?: 'cli' | 'api' | 'local';
   providerInstanceId?: string;
   summary?: string;
   messageCount?: number;
@@ -25,6 +30,8 @@ interface DiscoveredSessionData {
   sourcePath?: string;
   group?: string;
   workspaceMode?: WorkspaceMode;
+  permissionMode?: PermissionMode;
+  allowedTools?: string[];
 }
 
 export interface PreparedFileDeletion {
@@ -50,6 +57,7 @@ export class SessionRegistry {
     dataDir?: string,
     private sessionBaseDir?: string,
     private providerDefaultInstances: Record<string, string> = {},
+    private providerDefaultTargets: Record<string, ProviderDefaultTarget> = {},
   ) {
     if (dataDir) {
       mkdirSync(dataDir, { recursive: true });
@@ -72,6 +80,10 @@ export class SessionRegistry {
           ...loaded,
           status: 'closed',
           origin: normalizeSessionOrigin(loaded, this.sessionBaseDir),
+          providerBackend: this.normalizeProviderBackend(
+            loaded.providerName,
+            loaded.providerBackend,
+          ),
           providerInstanceId: this.normalizeProviderInstanceId(
             loaded.providerName,
             loaded.providerInstanceId,
@@ -79,7 +91,11 @@ export class SessionRegistry {
         };
         // Default missing workspaceMode for backward compat
         if (!s.workspaceMode) s.workspaceMode = 'shared';
-        if (s.providerInstanceId !== loaded.providerInstanceId || s.origin !== loaded.origin) {
+        if (
+          s.providerInstanceId !== loaded.providerInstanceId
+          || s.providerBackend !== loaded.providerBackend
+          || s.origin !== loaded.origin
+        ) {
           migrated = true;
         }
         if (loaded.workspaceMode !== s.workspaceMode) {
@@ -90,6 +106,7 @@ export class SessionRegistry {
           const key = this.discoveredKey(
             s.providerName,
             s.providerSessionId,
+            s.providerBackend,
             s.providerInstanceId,
           );
           const existing = loadedByProviderSession.get(key);
@@ -147,6 +164,10 @@ export class SessionRegistry {
     const session: SessionInfo = {
       id,
       providerName: input.providerName,
+      providerBackend: this.normalizeProviderBackend(
+        input.providerName,
+        input.providerBackend,
+      ),
       providerInstanceId: this.normalizeProviderInstanceId(
         input.providerName,
         input.providerInstanceId,
@@ -155,6 +176,8 @@ export class SessionRegistry {
       origin: 'runtime',
       cwd: input.cwd,
       workspaceMode: input.workspaceMode,
+      permissionMode: input.permissionMode,
+      allowedTools: input.allowedTools,
       model: input.model,
       group: input.group,
       messageCount: 0,
@@ -363,6 +386,7 @@ export class SessionRegistry {
     const pendingKey = this.discoveredKey(
       data.providerName,
       providerSessionId,
+      data.providerBackend,
       data.providerInstanceId,
     );
     const mergedData = this.mergeDiscoveredData(
@@ -375,9 +399,11 @@ export class SessionRegistry {
     for (const session of this.sessions.values()) {
       if (
         session.providerSessionId === providerSessionId
-        && this.sameProviderInstance(
+        && this.sameProviderTarget(
           session.providerName,
+          session.providerBackend,
           session.providerInstanceId,
+          mergedData.providerBackend,
           mergedData.providerInstanceId,
         )
       ) {
@@ -411,6 +437,10 @@ export class SessionRegistry {
       id,
       providerSessionId,
       providerName: mergedData.providerName,
+      providerBackend: this.normalizeProviderBackend(
+        mergedData.providerName,
+        mergedData.providerBackend,
+      ),
       providerInstanceId: mergedData.providerInstanceId,
       status: 'closed',
       origin: 'discovered',
@@ -439,6 +469,7 @@ export class SessionRegistry {
       this.discoveredKey(
         session.providerName,
         providerSessionId,
+        session.providerBackend,
         session.providerInstanceId,
       ),
     );
@@ -451,9 +482,11 @@ export class SessionRegistry {
       session.origin === 'runtime'
       && !session.providerSessionId
       && session.providerName === data.providerName
-      && this.sameProviderInstance(
+      && this.sameProviderTarget(
         session.providerName,
+        session.providerBackend,
         session.providerInstanceId,
+        data.providerBackend,
         data.providerInstanceId,
       )
       && session.cwd === data.cwd
@@ -469,6 +502,10 @@ export class SessionRegistry {
     scheduleSave = true,
   ): SessionInfo {
     session.providerSessionId = providerSessionId;
+    session.providerBackend = this.normalizeProviderBackend(
+      session.providerName,
+      data.providerBackend ?? session.providerBackend,
+    );
     session.providerInstanceId = this.normalizeProviderInstanceId(
       session.providerName,
       data.providerInstanceId ?? session.providerInstanceId,
@@ -498,6 +535,7 @@ export class SessionRegistry {
       this.discoveredKey(
         session.providerName,
         providerSessionId,
+        data.providerBackend ?? session.providerBackend,
         data.providerInstanceId ?? session.providerInstanceId,
       ),
     );
@@ -515,6 +553,7 @@ export class SessionRegistry {
     return {
       cwd: incoming.cwd || existing.cwd,
       providerName: incoming.providerName || existing.providerName,
+      providerBackend: incoming.providerBackend ?? existing.providerBackend,
       providerInstanceId: incoming.providerInstanceId ?? existing.providerInstanceId,
       summary: incoming.summary ?? existing.summary,
       messageCount: incoming.messageCount ?? existing.messageCount,
@@ -591,20 +630,57 @@ export class SessionRegistry {
     return providerInstanceId;
   }
 
-  private sameProviderInstance(providerName: string, left?: string, right?: string): boolean {
-    return (this.normalizeProviderInstanceId(providerName, left) || 'default')
-      === (this.normalizeProviderInstanceId(providerName, right) || 'default');
+  private normalizeProviderBackend(
+    providerName: string,
+    providerBackend?: string,
+  ): 'cli' | 'api' | 'local' {
+    if (providerBackend === 'cli' || providerBackend === 'api' || providerBackend === 'local') {
+      return providerBackend;
+    }
+
+    if (providerName === 'openai') {
+      return 'api';
+    }
+    if (providerName === 'ollama') {
+      return 'local';
+    }
+
+    return this.providerDefaultTargets[providerName]?.backend || 'cli';
+  }
+
+  private sameProviderTarget(
+    providerName: string,
+    leftBackend?: string,
+    leftInstanceId?: string,
+    rightBackend?: string,
+    rightInstanceId?: string,
+  ): boolean {
+    const normalizedLeftBackend = this.normalizeProviderBackend(providerName, leftBackend);
+    const normalizedRightBackend = this.normalizeProviderBackend(providerName, rightBackend);
+    if (normalizedLeftBackend !== normalizedRightBackend) {
+      return false;
+    }
+
+    return (this.normalizeProviderInstanceId(providerName, leftInstanceId) || 'default')
+      === (this.normalizeProviderInstanceId(providerName, rightInstanceId) || 'default');
   }
 
   private discoveredKey(
     providerName: string,
     providerSessionId: string,
+    providerBackend?: string,
     providerInstanceId?: string,
   ): string {
-    return `${this.normalizeProviderInstanceId(providerName, providerInstanceId) || 'default'}:${providerSessionId}`;
+    const backend = this.normalizeProviderBackend(providerName, providerBackend);
+    const instanceId = this.normalizeProviderInstanceId(providerName, providerInstanceId) || 'default';
+    return `${backend}:${instanceId}:${providerSessionId}`;
   }
 
   private mergeLoadedDuplicate(target: SessionInfo, incoming: SessionInfo): void {
+    target.providerBackend = this.normalizeProviderBackend(
+      target.providerName,
+      target.providerBackend ?? incoming.providerBackend,
+    );
     target.providerInstanceId = this.normalizeProviderInstanceId(
       target.providerName,
       target.providerInstanceId ?? incoming.providerInstanceId,

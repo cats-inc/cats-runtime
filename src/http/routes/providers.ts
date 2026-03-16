@@ -1,23 +1,29 @@
 import { Hono } from 'hono';
-import {
-  getProviderDefaultInstanceId,
-  listProviderInstances,
-} from '../../backends/cli/config.js';
-import { KNOWN_PROVIDERS } from '../../backends/cli/providers/types.js';
+import { listConfiguredProviders, listProviderCatalog } from '../../core/providerCatalog.js';
 import type { AppContext } from '../app.js';
 
 export const providerRoutes = new Hono();
 
 providerRoutes.get('/providers/config', (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
+  const providerCatalog = listProviderCatalog(ctx.config);
 
   const providers = Object.fromEntries(
-    KNOWN_PROVIDERS.flatMap((providerName) => {
-      const instances = listProviderInstances(ctx.config, providerName).map((instance) => ({
-        id: instance.id,
-        command: instance.commandConfig.path,
-        runner: instance.commandConfig.runner,
-        runtime: instance.commandConfig.runtime,
+    listConfiguredProviders(ctx.config).flatMap((providerName) => {
+      const provider = providerCatalog[providerName];
+      if (!provider) {
+        return [];
+      }
+
+      const instances = provider.instances.map((instance) => ({
+        id: instance.instanceId,
+        target: `${instance.backend}/${instance.instanceId}`,
+        backend: instance.backend,
+        command: instance.cliInstance?.commandConfig.path,
+        runner: instance.cliInstance?.commandConfig.runner,
+        runtime: instance.cliInstance?.commandConfig.runtime,
+        transport: instance.remoteInstance?.transport,
+        model: instance.remoteInstance?.model,
       }));
 
       if (instances.length === 0) {
@@ -27,7 +33,8 @@ providerRoutes.get('/providers/config', (c) => {
       return [[
         providerName,
         {
-          defaultInstance: getProviderDefaultInstanceId(ctx.config, providerName),
+          defaultInstance: provider.defaultTarget?.instance || instances[0]?.id || 'default',
+          defaultBackend: provider.defaultTarget?.backend,
           instances,
         },
       ]];

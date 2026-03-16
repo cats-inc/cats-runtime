@@ -7,10 +7,11 @@
 | Component | Status | Description |
 |-----------|--------|-------------|
 | Core | Completed | Embedded CLI runtime, session registry, discovery, and worker pool are in-repo |
+| API Backends | In Progress | `src/backends/api` now runs Claude, OpenAI, Gemini, and Ollama with runtime-managed sessions and a shared local tool loop; provider-specific optimizations and health probes remain |
 | HTTP API | Completed | Health, sessions, messages, history, observe, and provider management routes are served directly from `cats-runtime` |
 | Dashboard | Completed | The embedded dashboard UI is served from `GET /` |
-| Tests | Completed | Vitest covers provider, discovery, pool, HTTP, and server bootstrap behavior |
-| Docs | Completed | README, API, architecture, testing, and agent guidance match the single-service model |
+| Tests | Completed | Vitest covers provider, discovery, pool, HTTP, server bootstrap, and API/local tool-loop behavior |
+| Docs | In Progress | Core docs match the backend-neutral runtime, but PLAN-003 follow-on items still need ongoing updates as later phases land |
 | Follow-ups | Completed | Accepted post-review findings for provider-instance rollout were implemented and recorded in `docs/plans/PLAN-002-provider-instance-review-followups.md` |
 
 **Legend**: Not Started | In Progress | Completed | Blocked
@@ -54,8 +55,9 @@
 
 #### Remaining Items
 
-- [ ] Add `src/backends/api` for API-key and Ollama-backed execution paths
-      (tracked by `docs/plans/PLAN-003-api-backend.md`)
+- [ ] Add provider health probes, dashboard health surfacing, and Ollama model discovery
+- [ ] Add provider-specific cost optimizations such as Anthropic prompt caching and Gemini context caching
+- [ ] Expand the shared local tool runtime beyond the first shell/file/search set
 
 ### WP-2: Provider Instance Review Follow-ups
 
@@ -89,7 +91,37 @@ environment types or providers are added.
 #### Tracking
 
 - Active plan: `docs/plans/PLAN-002-provider-instance-review-followups.md`
-- Verification: `npm test` (`316` tests passed)
+- Verification: `npm test` (`346` tests passed)
+
+### WP-3: API and Local Model Backend
+
+**Status**: In Progress  
+**Assigned**: Codex  
+**Priority**: P0
+
+#### Goal
+
+Add a backend-neutral execution path under `src/backends/api` so Claude,
+OpenAI, Gemini, and Ollama instances can run through API keys or local HTTP
+transports while keeping the existing HTTP surface, session model, and
+dashboard integration intact.
+
+#### Delivered
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Split provider topology into `routing + backends.cli/api/local` | [x] | `providers.yaml` keeps CLI/API/local concerns separate |
+| Add backend-neutral provider catalog and runtime facade | [x] | Routes resolve provider targets without assuming CLI |
+| Add `src/backends/api` transport/runtime skeleton | [x] | Anthropic, OpenAI, Gemini, and Ollama transports are in-repo |
+| Support API/local session create, message, close, resume, and fork | [x] | Session lifecycle is runtime-managed across CLI and API backends |
+| Add shared local tool runtime for API/local sessions | [x] | `list_files`, `read_file`, `write_file`, `grep`, and `run_shell` are enforced centrally |
+| Cover API/local behavior with automated tests | [x] | Transport, tool runtime, and end-to-end HTTP flows are under Vitest |
+| Add provider health probes and dashboard health surfacing | [ ] | Deferred to a later PLAN-003 phase |
+| Add provider-specific caching/continuation optimizations | [ ] | Deferred to a later PLAN-003 phase |
+
+#### Verification
+
+- [x] `npm test`
 
 ---
 

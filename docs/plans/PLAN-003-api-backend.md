@@ -6,7 +6,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | In Progress |
 | **Owner** | Codex |
 | **Assigned To** | Claude |
 | **Reviewer** | Gemini |
@@ -31,7 +31,7 @@ by a local CLI process or a remote API transport.
 Initial scope:
 
 - `claude` via Anthropic API
-- `openai` via OpenAI Responses API
+- `openai` via OpenAI API (MVP uses chat completions function calling; Responses-specific optimizations remain follow-on work)
 - `gemini` via Google Gemini API
 - `ollama` via local HTTP transport
 
@@ -506,6 +506,7 @@ The phase ordering above is based on the current vendor API surfaces reviewed on
 | Date | Update |
 |------|--------|
 | 2026-03-16 | Plan created for the `src/backends/api` delivery track covering Claude, OpenAI, Gemini, and Ollama execution |
+| 2026-03-16 | Phase 1 through the first half of Phase 3 landed: backend-neutral runtime seam, split CLI/API/local provider topology, API/local session lifecycle, Anthropic/OpenAI/Gemini/Ollama transports, and the first shared local tool runtime (`list_files`, `read_file`, `write_file`, `grep`, `run_shell`) |
 
 ---
 

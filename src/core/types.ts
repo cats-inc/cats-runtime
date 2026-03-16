@@ -12,6 +12,7 @@ export type SessionActivity = 'interactive' | 'tearing_down' | 'inactive';
 export type SessionOwnership = 'persistent_process' | 'logical_session' | 'workspace_latest';
 export type SessionResumeStrategy = 'none' | 'provider_session' | 'latest_in_workspace';
 export type SessionControlMode = 'full' | 'resume_only' | 'observe_only';
+export type ProviderBackend = 'cli' | 'api' | 'local';
 
 export type WorkspaceMode = 'isolated' | 'shared' | 'read_only';
 
@@ -26,12 +27,15 @@ export interface SessionControls {
 export interface SessionInfo {
   id: string;
   providerName: string;
+  providerBackend?: ProviderBackend;
   providerInstanceId?: string;
   providerSessionId?: string;
   status: SessionStatus;
   origin: SessionOrigin;
   cwd: string;
   workspaceMode?: WorkspaceMode;
+  permissionMode?: PermissionMode;
+  allowedTools?: string[];
   model?: string;
   group?: string;
   // Deprecated legacy flag kept only for backward-compat payload tolerance.
@@ -85,11 +89,12 @@ export interface ProviderMessage {
 }
 
 export interface StreamEvent {
-  type: 'init' | 'text' | 'tool_use' | 'result' | 'error' | 'raw';
+  type: 'init' | 'text' | 'tool_use' | 'tool_result' | 'result' | 'error' | 'raw';
   sessionId?: string;
   text?: string;
   toolName?: string;
   toolId?: string;
+  isError?: boolean;
   usage?: {
     inputTokens: number;
     outputTokens: number;

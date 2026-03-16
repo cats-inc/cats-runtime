@@ -100,7 +100,14 @@ export function sessionActivity(
   return 'inactive';
 }
 
-export function sessionOwnership(providerName: string): SessionOwnership {
+export function sessionOwnership(
+  providerName: string,
+  providerBackend: SessionInfo['providerBackend'] = 'cli',
+): SessionOwnership {
+  if (providerBackend !== 'cli') {
+    return 'logical_session';
+  }
+
   switch (providerName) {
     case 'claude':
     case 'codex':
@@ -116,7 +123,14 @@ export function sessionOwnership(providerName: string): SessionOwnership {
   }
 }
 
-export function sessionResumeStrategy(providerName: string): SessionResumeStrategy {
+export function sessionResumeStrategy(
+  providerName: string,
+  providerBackend: SessionInfo['providerBackend'] = 'cli',
+): SessionResumeStrategy {
+  if (providerBackend !== 'cli') {
+    return 'provider_session';
+  }
+
   switch (providerName) {
     case 'kiro':
       return 'latest_in_workspace';
@@ -139,8 +153,14 @@ export function sessionControlMode(
   if (options.attached) return 'full';
   if (activity === 'interactive' || activity === 'tearing_down') return 'observe_only';
 
-  const resumeStrategy = sessionResumeStrategy(session.providerName);
-  if (resumeStrategy !== 'none' && session.providerSessionId) {
+  const resumeStrategy = sessionResumeStrategy(
+    session.providerName,
+    session.providerBackend,
+  );
+  if (
+    resumeStrategy !== 'none'
+    && (session.providerSessionId || session.providerBackend === 'api' || session.providerBackend === 'local')
+  ) {
     return 'resume_only';
   }
 
@@ -172,8 +192,8 @@ export function toSessionView(
     ...session,
     workspaceKey: sessionWorkspaceKey(session.cwd),
     activity: sessionActivity(session, options),
-    ownership: sessionOwnership(session.providerName),
-    resumeStrategy: sessionResumeStrategy(session.providerName),
+    ownership: sessionOwnership(session.providerName, session.providerBackend),
+    resumeStrategy: sessionResumeStrategy(session.providerName, session.providerBackend),
     controlMode: sessionControlMode(session, options),
     attached,
     controls: sessionControls(session, { ...options, attached }),

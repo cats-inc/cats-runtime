@@ -1,10 +1,9 @@
 import { randomUUID } from 'node:crypto';
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { Hono } from 'hono';
 import { getRuntimeSessionManager, type AppContext } from '../app.js';
 import {
-  getProviderDefaultInstanceId,
-  resolveProviderInstance,
   type ProviderInstanceConfig,
 } from '../../backends/cli/config.js';
 import type {
@@ -16,8 +15,6 @@ import { SessionScanner } from '../../backends/cli/discovery/SessionScanner.js';
 import { CodexSessionScanner } from '../../backends/cli/discovery/CodexSessionScanner.js';
 import { CopilotSessionScanner } from '../../backends/cli/discovery/CopilotSessionScanner.js';
 import { GeminiSessionScanner } from '../../backends/cli/discovery/GeminiSessionScanner.js';
-import { KNOWN_PROVIDERS } from '../../backends/cli/providers/types.js';
-import type { ProviderName } from '../../backends/cli/providers/types.js';
 import {
   resolveWorkspace,
   cleanupIsolatedWorkspace,
@@ -37,9 +34,14 @@ import {
   getKiroNative,
   getOpencodeNative,
 } from '../providerServices.js';
+import {
+  getProviderDefaultTarget,
+  listConfiguredProviders,
+  resolveProviderTarget,
+  type ProviderTargetDescriptor,
+} from '../../core/providerCatalog.js';
 
 export const sessionRoutes = new Hono();
-const SESSION_PROVIDERS = KNOWN_PROVIDERS;
 
 function serializeSession(ctx: AppContext, session: SessionInfo) {
   return toSessionView(session, {
@@ -58,16 +60,23 @@ function serializeSessions(
   });
 }
 
-function resolveRequestedProviderInstance(
+function resolveRequestedProviderTarget(
   ctx: AppContext,
   providerName: string,
   instanceId?: string,
-): ProviderInstanceConfig {
-  return resolveProviderInstance(
-    ctx.config,
-    providerName as typeof SESSION_PROVIDERS[number],
-    instanceId,
-  );
+): ProviderTargetDescriptor {
+  return resolveProviderTarget(ctx.config, providerName, instanceId);
+}
+
+function resolveCliProviderInstance(target: ProviderTargetDescriptor): ProviderInstanceConfig {
+  if (!target.cliInstance) {
+    throw new Error(
+      `Provider '${target.providerName}' target '${target.backend}/${target.instanceId}' `
+      + 'does not resolve to a CLI instance',
+    );
+  }
+
+  return target.cliInstance;
 }
 
 function sessionMatchesInstanceFilter(
@@ -75,21 +84,51 @@ function sessionMatchesInstanceFilter(
   session: SessionInfo,
   requestedInstance: string,
 ): boolean {
-  const providerName = session.providerName as ProviderName;
+  const defaultTarget = getProviderDefaultTarget(ctx.config, session.providerName);
+  const actualBackend = session.providerBackend || defaultTarget?.backend || 'cli';
   const actualInstanceId = session.providerInstanceId
-    || getProviderDefaultInstanceId(ctx.config, providerName);
+    || defaultTarget?.instance
+    || 'default';
 
-  if (requestedInstance === 'default') {
-    const defaultInstanceId = getProviderDefaultInstanceId(ctx.config, providerName);
-    return actualInstanceId === defaultInstanceId || actualInstanceId === 'default';
+  try {
+    const requestedTarget = resolveProviderTarget(
+      ctx.config,
+      session.providerName,
+      requestedInstance,
+    );
+    return requestedTarget.backend === actualBackend
+      && requestedTarget.instanceId === actualInstanceId;
+  } catch {
+    return false;
+  }
+}
+
+function cloneManagedHistoryIfPresent(
+  ctx: AppContext,
+  sourceSession: SessionInfo,
+  targetSession: SessionInfo,
+): void {
+  if (!sourceSession.sourcePath) {
+    return;
+  }
+  if (!sourceSession.sourcePath.startsWith(ctx.config.sessionBaseDir)) {
+    return;
+  }
+  if (!existsSync(sourceSession.sourcePath)) {
+    return;
   }
 
-  return actualInstanceId === requestedInstance;
+  const historyDir = join(ctx.config.sessionBaseDir, 'history');
+  mkdirSync(historyDir, { recursive: true });
+  const targetPath = join(historyDir, `${targetSession.id}.jsonl`);
+  copyFileSync(sourceSession.sourcePath, targetPath);
+  ctx.registry.setSourcePath(targetSession.id, targetPath);
 }
 
 function tracksNativeSessionState(session: SessionInfo): boolean {
   return Boolean(
-    session.providerSessionId
+    session.providerBackend === 'cli'
+    && session.providerSessionId
     && (session.providerName === 'cursor'
       || session.providerName === 'kiro'
       || session.providerName === 'opencode'),
@@ -137,7 +176,8 @@ async function deleteNativeSessionState(
 
 function tracksProviderDiscoveryState(session: SessionInfo): boolean {
   return Boolean(
-    session.providerSessionId
+    session.providerBackend === 'cli'
+    && session.providerSessionId
     && (session.providerName === 'auggie'
       || session.providerName === 'claude'
       || session.providerName === 'codex'
@@ -232,19 +272,24 @@ sessionRoutes.post('/sessions', async (c) => {
 
   const providerName = body.provider ?? 'claude';
   const runtime = getRuntimeSessionManager(ctx);
+  const configuredProviders = listConfiguredProviders(ctx.config);
 
-  if (!(SESSION_PROVIDERS as readonly string[]).includes(providerName)) {
+  if (!configuredProviders.includes(providerName)) {
     return c.json({
-      error: `Unknown provider '${providerName}'. Valid: ${SESSION_PROVIDERS.join(', ')}`,
+      error: `Unknown provider '${providerName}'. Valid: ${configuredProviders.join(', ')}`,
     }, 400);
   }
 
-  let providerInstance: ProviderInstanceConfig;
+  let providerTarget: ProviderTargetDescriptor;
   try {
-    providerInstance = resolveRequestedProviderInstance(ctx, providerName, body.instance);
+    providerTarget = resolveRequestedProviderTarget(ctx, providerName, body.instance);
   } catch (err) {
     return c.json({ error: `${err}` }, 400);
   }
+
+  const providerInstance = providerTarget.backend === 'cli'
+    ? resolveCliProviderInstance(providerTarget)
+    : undefined;
 
   const sessionId = randomUUID();
 
@@ -261,8 +306,8 @@ sessionRoutes.post('/sessions', async (c) => {
     return c.json({ error: `${err}` }, 400);
   }
 
-  if (providerName === 'cursor') {
-    const caps = runtime.getCapabilities('cursor', providerInstance.id);
+  if (providerName === 'cursor' && providerTarget.backend === 'cli') {
+    const caps = runtime.getCapabilities('cursor', providerInstance!.id, 'cli');
     if (!caps.permissions && resolved.workspaceMode === 'read_only') {
       return c.json({
         error: `Provider '${providerName}' does not support permission enforcement required by read_only workspace`,
@@ -271,14 +316,17 @@ sessionRoutes.post('/sessions', async (c) => {
 
     let nativeProviderSessionId: string | null = null;
     try {
-      const native = await getCursorNative(ctx, providerInstance.id).createSession(resolved.cwd);
+      const native = await getCursorNative(ctx, providerInstance!.id).createSession(resolved.cwd);
       nativeProviderSessionId = native.providerSessionId;
       const session = ctx.registry.create({
         id: sessionId,
         providerName: 'cursor',
-        providerInstanceId: providerInstance.id,
+        providerBackend: 'cli',
+        providerInstanceId: providerInstance!.id,
         cwd: resolved.cwd,
         workspaceMode: resolved.workspaceMode,
+        permissionMode: resolved.permissionMode,
+        allowedTools: body.allowedTools,
         model: body.model || native.model,
         group: body.group,
       });
@@ -294,7 +342,7 @@ sessionRoutes.post('/sessions', async (c) => {
         resumeSessionId: native.providerSessionId,
         permissionMode: resolved.permissionMode,
         allowedTools: body.allowedTools,
-      }, providerInstance.id);
+      }, providerInstance!.id, 'cli');
       ctx.registry.updateStatus(session.id, 'ready');
 
       return c.json(serializeSession(ctx, session), 201);
@@ -302,63 +350,7 @@ sessionRoutes.post('/sessions', async (c) => {
       ctx.registry.remove(sessionId);
       if (nativeProviderSessionId) {
         try {
-          await getCursorNative(ctx, providerInstance.id).deleteSession(
-            resolved.cwd,
-            nativeProviderSessionId,
-          );
-        } catch {
-          // Best effort rollback only.
-        }
-      }
-      if (resolved.workspaceMode === 'isolated') {
-        cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, sessionId);
-      }
-      return c.json({ error: `Failed to create Cursor session: ${err}` }, 500);
-    }
-  }
-
-  if (providerName === 'opencode') {
-    const caps = runtime.getCapabilities('opencode', providerInstance.id);
-    if (!caps.permissions && resolved.workspaceMode === 'read_only') {
-      return c.json({
-        error: `Provider '${providerName}' does not support permission enforcement required by read_only workspace`,
-      }, 400);
-    }
-
-    let nativeProviderSessionId: string | null = null;
-    try {
-      const native = await getOpencodeNative(ctx, providerInstance.id).createSession(resolved.cwd);
-      nativeProviderSessionId = native.providerSessionId;
-      const session = ctx.registry.create({
-        id: sessionId,
-        providerName: 'opencode',
-        providerInstanceId: providerInstance.id,
-        cwd: resolved.cwd,
-        workspaceMode: resolved.workspaceMode,
-        model: body.model,
-        group: body.group,
-      });
-      session.summary = native.summary;
-      session.messageCount = native.messageCount;
-      session.lastActivity = native.lastActivity;
-
-      ctx.registry.setProviderSessionId(session.id, native.providerSessionId);
-      runtime.spawn(session.id, providerName, {
-        cwd: resolved.cwd,
-        workspaceMode: resolved.workspaceMode,
-        model: body.model,
-        resumeSessionId: native.providerSessionId,
-        permissionMode: resolved.permissionMode,
-        allowedTools: body.allowedTools,
-      }, providerInstance.id);
-      ctx.registry.updateStatus(session.id, 'ready');
-
-      return c.json(serializeSession(ctx, session), 201);
-    } catch (err) {
-      ctx.registry.remove(sessionId);
-      if (nativeProviderSessionId) {
-        try {
-          await getOpencodeNative(ctx, providerInstance.id).deleteSession(
+          await getCursorNative(ctx, providerInstance!.id).deleteSession(
             resolved.cwd,
             nativeProviderSessionId,
           );
@@ -373,7 +365,70 @@ sessionRoutes.post('/sessions', async (c) => {
     }
   }
 
-  const caps = runtime.getCapabilities(providerName, providerInstance.id);
+  if (providerName === 'opencode' && providerTarget.backend === 'cli') {
+    const caps = runtime.getCapabilities('opencode', providerInstance!.id, 'cli');
+    if (!caps.permissions && resolved.workspaceMode === 'read_only') {
+      return c.json({
+        error: `Provider '${providerName}' does not support permission enforcement required by read_only workspace`,
+      }, 400);
+    }
+
+    let nativeProviderSessionId: string | null = null;
+    try {
+      const native = await getOpencodeNative(ctx, providerInstance!.id).createSession(resolved.cwd);
+      nativeProviderSessionId = native.providerSessionId;
+      const session = ctx.registry.create({
+        id: sessionId,
+        providerName: 'opencode',
+        providerBackend: 'cli',
+        providerInstanceId: providerInstance!.id,
+        cwd: resolved.cwd,
+        workspaceMode: resolved.workspaceMode,
+        permissionMode: resolved.permissionMode,
+        allowedTools: body.allowedTools,
+        model: body.model,
+        group: body.group,
+      });
+      session.summary = native.summary;
+      session.messageCount = native.messageCount;
+      session.lastActivity = native.lastActivity;
+
+      ctx.registry.setProviderSessionId(session.id, native.providerSessionId);
+      runtime.spawn(session.id, providerName, {
+        cwd: resolved.cwd,
+        workspaceMode: resolved.workspaceMode,
+        model: body.model,
+        resumeSessionId: native.providerSessionId,
+        permissionMode: resolved.permissionMode,
+        allowedTools: body.allowedTools,
+      }, providerInstance!.id, 'cli');
+      ctx.registry.updateStatus(session.id, 'ready');
+
+      return c.json(serializeSession(ctx, session), 201);
+    } catch (err) {
+      ctx.registry.remove(sessionId);
+      if (nativeProviderSessionId) {
+        try {
+          await getOpencodeNative(ctx, providerInstance!.id).deleteSession(
+            resolved.cwd,
+            nativeProviderSessionId,
+          );
+        } catch {
+          // Best effort rollback only.
+        }
+      }
+      if (resolved.workspaceMode === 'isolated') {
+        cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, sessionId);
+      }
+      return c.json({ error: `Failed to create Cursor session: ${err}` }, 500);
+    }
+  }
+
+  const caps = runtime.getCapabilities(
+    providerName,
+    providerTarget.instanceId,
+    providerTarget.backend,
+  );
 
   if (!caps.permissions && resolved.workspaceMode === 'read_only') {
     return c.json({
@@ -389,9 +444,12 @@ sessionRoutes.post('/sessions', async (c) => {
   const session = ctx.registry.create({
     id: sessionId,
     providerName,
-    providerInstanceId: providerInstance.id,
+    providerBackend: providerTarget.backend,
+    providerInstanceId: providerTarget.instanceId,
     cwd: resolved.cwd,
     workspaceMode: resolved.workspaceMode,
+    permissionMode: resolved.permissionMode,
+    allowedTools: body.allowedTools,
     model: body.model,
     group: body.group,
   });
@@ -403,13 +461,17 @@ sessionRoutes.post('/sessions', async (c) => {
       model: body.model,
       permissionMode: resolved.permissionMode,
       allowedTools: body.allowedTools,
-    }, providerInstance.id);
+    }, providerTarget.instanceId, providerTarget.backend);
   } catch (err) {
     if (resolved.workspaceMode === 'isolated') {
       cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, sessionId);
     }
     ctx.registry.remove(session.id);
     return c.json({ error: `Failed to spawn session: ${err}` }, 500);
+  }
+
+  if (providerTarget.backend !== 'cli') {
+    ctx.registry.updateStatus(session.id, 'ready');
   }
 
   return c.json({ ...serializeSession(ctx, session), ...(warnings.length ? { warnings } : {}) }, 201);
@@ -463,7 +525,7 @@ sessionRoutes.post('/sessions/:id/close', (c) => {
     }, 409);
   }
 
-  if (session.providerName === 'cursor') {
+  if (session.providerName === 'cursor' && session.providerBackend === 'cli') {
     const worker = runtime.get(id);
     if (worker?.active) {
       ctx.registry.updateStatus(id, 'closing');
@@ -602,15 +664,32 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
     }, 409);
   }
 
+  const existing = runtime.get(id);
+  if (existing?.active) {
+    ctx.registry.updateStatus(id, 'ready');
+    return c.json(serializeSession(ctx, ctx.registry.get(id) ?? session));
+  }
+
+  if (session.providerBackend !== 'cli') {
+    try {
+      runtime.spawn(id, session.providerName, {
+        cwd: session.cwd,
+        workspaceMode: session.workspaceMode,
+        model: session.model,
+        permissionMode: session.permissionMode,
+        allowedTools: session.allowedTools,
+      }, session.providerInstanceId, session.providerBackend);
+      ctx.registry.updateStatus(id, 'ready');
+    } catch (err) {
+      return c.json({ error: `Failed to resume: ${err}` }, 500);
+    }
+
+    return c.json(serializeSession(ctx, ctx.registry.get(id) ?? session));
+  }
+
   if (session.providerName === 'cursor') {
     if (!session.providerSessionId) {
       return c.json({ error: 'No provider session ID to resume' }, 400);
-    }
-
-      const existing = runtime.get(id);
-    if (existing?.active) {
-      ctx.registry.updateStatus(id, 'ready');
-      return c.json(serializeSession(ctx, ctx.registry.get(id) ?? session));
     }
 
     try {
@@ -619,8 +698,9 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         workspaceMode: session.workspaceMode,
         model: session.model,
         resumeSessionId: session.providerSessionId,
-        permissionMode: 'skip',
-      }, session.providerInstanceId);
+        permissionMode: session.permissionMode,
+        allowedTools: session.allowedTools,
+      }, session.providerInstanceId, 'cli');
       ctx.registry.updateStatus(id, 'ready');
     } catch (err) {
       return c.json({ error: `Failed to resume: ${err}` }, 500);
@@ -632,12 +712,6 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
   if (session.providerName === 'kiro') {
     if (!session.providerSessionId) {
       return c.json({ error: 'No provider session ID to resume' }, 400);
-    }
-
-    const existing = runtime.get(id);
-    if (existing?.active) {
-      ctx.registry.updateStatus(id, 'ready');
-      return c.json(serializeSession(ctx, ctx.registry.get(id) ?? session));
     }
 
     try {
@@ -657,8 +731,9 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         workspaceMode: session.workspaceMode,
         model: session.model,
         resumeSessionId: session.providerSessionId,
-        permissionMode: 'skip',
-      }, session.providerInstanceId);
+        permissionMode: session.permissionMode,
+        allowedTools: session.allowedTools,
+      }, session.providerInstanceId, 'cli');
       ctx.registry.updateStatus(id, 'ready');
     } catch (err) {
       return c.json({ error: `Failed to resume: ${err}` }, 500);
@@ -671,13 +746,18 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
     return c.json({ error: 'No provider session ID to resume' }, 400);
   }
 
-  const caps = runtime.getCapabilities(session.providerName, session.providerInstanceId);
+  const caps = runtime.getCapabilities(
+    session.providerName,
+    session.providerInstanceId,
+    session.providerBackend,
+  );
   if (!caps.resume) {
     return c.json({ error: `Provider '${session.providerName}' does not support resume` }, 501);
   }
 
   const body = await c.req.json<{
     permissionMode?: 'skip' | 'whitelist' | 'default';
+    allowedTools?: string[];
   }>().catch(() => ({}));
 
   // Derive permissionMode from workspaceMode
@@ -694,8 +774,9 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
       model: session.model,
       resumeSessionId: session.providerSessionId,
       permissionMode,
-    }, session.providerInstanceId);
-    ctx.registry.updateStatus(id, 'initializing');
+      allowedTools: (body as { allowedTools?: string[] }).allowedTools ?? session.allowedTools,
+    }, session.providerInstanceId, session.providerBackend);
+    ctx.registry.updateStatus(id, session.providerBackend === 'cli' ? 'initializing' : 'ready');
   } catch (err) {
     return c.json({ error: `Failed to resume: ${err}` }, 500);
   }
@@ -714,17 +795,21 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     return c.json({ error: 'Session not found' }, 404);
   }
 
-  if (session.providerName === 'cursor') {
+  if (session.providerName === 'cursor' && session.providerBackend === 'cli') {
     return c.json({
       error: 'Cursor native session forking will be enabled after Cursor execution support lands.',
     }, 501);
   }
 
-  if (!session.providerSessionId) {
+  if (session.providerBackend === 'cli' && !session.providerSessionId) {
     return c.json({ error: 'No provider session ID to fork from' }, 400);
   }
 
-  const caps = runtime.getCapabilities(session.providerName, session.providerInstanceId);
+  const caps = runtime.getCapabilities(
+    session.providerName,
+    session.providerInstanceId,
+    session.providerBackend,
+  );
   if (!caps.fork) {
     return c.json({ error: `Provider '${session.providerName}' does not support fork` }, 501);
   }
@@ -732,6 +817,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
   const body = await c.req.json<{
     group?: string;
     permissionMode?: 'skip' | 'whitelist' | 'default';
+    allowedTools?: string[];
   }>().catch(() => ({}));
 
   const forkId = randomUUID();
@@ -758,12 +844,16 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
   const forked = ctx.registry.create({
     id: forkId,
     providerName: session.providerName,
+    providerBackend: session.providerBackend,
     providerInstanceId: session.providerInstanceId,
     cwd: forkCwd,
     workspaceMode: forkWorkspaceMode,
+    permissionMode: forkPermissionMode,
+    allowedTools: (body as { allowedTools?: string[] }).allowedTools ?? session.allowedTools,
     model: session.model,
     group: (body as { group?: string }).group ?? session.group,
   });
+  cloneManagedHistoryIfPresent(ctx, session, forked);
 
   try {
     runtime.spawn(forked.id, session.providerName, {
@@ -773,7 +863,11 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
       resumeSessionId: session.providerSessionId,
       forkSession: true,
       permissionMode: forkPermissionMode,
-    }, session.providerInstanceId);
+      allowedTools: (body as { allowedTools?: string[] }).allowedTools ?? session.allowedTools,
+    }, session.providerInstanceId, session.providerBackend);
+    if (session.providerBackend !== 'cli') {
+      ctx.registry.updateStatus(forked.id, 'ready');
+    }
   } catch (err) {
     if (forkWorkspaceMode === 'isolated') {
       cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, forkId);

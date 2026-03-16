@@ -116,6 +116,17 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
               assistantText += event.text ?? '';
             }
 
+            if (event.type === 'tool_result' && sourcePath) {
+              appendHistory(sourcePath, {
+                type: 'tool_result',
+                toolId: event.toolId,
+                toolName: event.toolName,
+                text: event.text ?? '',
+                isError: event.isError === true,
+                timestamp: new Date().toISOString(),
+              });
+            }
+
             if (event.type === 'result') {
               completed = true;
               if (assistantText && sourcePath) {
@@ -199,6 +210,17 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
 
         if (event.type === 'text') {
           assistantText += event.text ?? '';
+        }
+
+        if (event.type === 'tool_result' && sseSourcePath) {
+          appendHistory(sseSourcePath, {
+            type: 'tool_result',
+            toolId: event.toolId,
+            toolName: event.toolName,
+            text: event.text ?? '',
+            isError: event.isError === true,
+            timestamp: new Date().toISOString(),
+          });
         }
 
         if (event.type === 'result') {

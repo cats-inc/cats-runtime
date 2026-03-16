@@ -1,6 +1,6 @@
 # cats-runtime
 
-> Unified runtime for subscription CLIs today, API backends later.
+> Unified runtime for subscription CLIs, API backends, and local-model backends.
 
 ## Overview
 
@@ -11,7 +11,9 @@ of proxying to a second local sidecar service.
 Current capabilities:
 
 - session lifecycle management for CLI-backed runtimes
+- session lifecycle management for API-backed Claude, OpenAI, and Gemini instances plus local Ollama
 - streamed turns over SSE or NDJSON
+- runtime-hosted local tools for API/local sessions (`list_files`, `read_file`, `write_file`, `grep`, `run_shell`)
 - external session discovery for supported local tools
 - file-based provider topology with separated `routing` / `backends` sections
 - dashboard-side provider instance selection for session creation
@@ -28,15 +30,15 @@ Current capabilities:
 - [x] Migrate `crew-chat-poc` to call `cats-runtime`
 - [x] Add file-based provider instances for multi-environment CLI accounts
 - [x] Resolve accepted review follow-ups for provider-instance hardening
-- [ ] Add `backends/api` for pay-as-you-go API keys and Ollama
+- [x] Add `backends/api` for pay-as-you-go API keys and Ollama
 
 ## Design Rules
 
 - Public callers should depend on `cats-runtime`, not provider-specific CLIs
 - `src/core` holds runtime-wide contracts and config
 - `src/backends/cli` holds the embedded CLI runtime implementation
+- `src/backends/api` holds API-key and local-model runtime implementations
 - `src/http` exposes the inbound HTTP contract
-- Future API-native providers should land under `src/backends/api`
 
 ## Quick Start
 
@@ -61,6 +63,7 @@ Runtime state defaults under the user's home directory:
 - `src/server.ts` - single-service runtime bootstrap
 - `src/http/app.ts` - route registration and auth middleware
 - `src/backends/cli/` - embedded CLI runtime modules
+- `src/backends/api/` - API-key and local-model runtime modules
 - `config/providers.yaml.example` - file-based provider instance topology
 - `docs/api.md` - public HTTP surface
 - `docs/architecture.md` - internal layout and data flow

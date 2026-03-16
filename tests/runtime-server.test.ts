@@ -243,18 +243,27 @@ describe('runtime server', () => {
         providers: {
           cursor: {
             defaultInstance: 'ubuntu',
+            defaultBackend: 'cli',
             instances: [
               {
                 id: 'ubuntu',
+                target: 'cli/ubuntu',
+                backend: 'cli',
                 command: 'cursor-agent',
                 runner: 'auto',
                 runtime: { mode: 'wsl', distro: 'Ubuntu', environmentId: 'ubuntu' },
+                transport: undefined,
+                model: undefined,
               },
               {
                 id: 'debian',
+                target: 'cli/debian',
+                backend: 'cli',
                 command: 'cursor-agent',
                 runner: 'auto',
                 runtime: { mode: 'wsl', distro: 'Debian', environmentId: 'debian' },
+                transport: undefined,
+                model: undefined,
               },
             ],
           },
@@ -308,12 +317,17 @@ providers:
         providers: {
           claude: {
             defaultInstance: 'default',
+            defaultBackend: 'cli',
             instances: [
               {
                 id: 'default',
+                target: 'cli/default',
+                backend: 'cli',
                 command: 'claude',
                 runner: 'auto',
                 runtime: { mode: 'native', environmentId: 'native' },
+                transport: undefined,
+                model: undefined,
               },
             ],
           },
@@ -328,7 +342,7 @@ providers:
 
       expect(response.status).toBe(400);
       const payload = await response.json();
-      expect(payload.error).toMatch(/Provider 'codex' is not configured/);
+      expect(payload.error).toMatch(/Unknown provider 'codex'\. Valid: claude/);
     } finally {
       await runtime.close();
       rmSync(root, { recursive: true, force: true });

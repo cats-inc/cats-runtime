@@ -957,10 +957,7 @@ function applyFileBasedProviderConfig(
 
     const provider = providerName as ProviderName;
     if (target.backend !== 'cli') {
-      throw new Error(
-        `Provider '${provider}' default target '${target.backend}/${target.instance}' `
-        + 'is not supported in this build. Configure a CLI default target for now.',
-      );
+      continue;
     }
 
     const instance = providerInstances[provider][target.instance];

@@ -170,7 +170,7 @@ describe('Cursor native session management', () => {
         cwd: 'C:/repo',
         resumeSessionId: 'cursor-123',
       }),
-      'default',
+      undefined,
     );
   });
 

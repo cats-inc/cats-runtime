@@ -29,10 +29,12 @@ import { KiroNativeSessionService } from './backends/cli/kiro/KiroNativeSessionS
 import { OpencodeNativeSessionService } from './backends/cli/opencode/OpencodeNativeSessionService.js';
 import { createRuntimeAdapter } from './backends/cli/runtime/runtime.js';
 import { SessionRegistry } from './backends/cli/pool/SessionRegistry.js';
+import { ApiBackendManager } from './backends/api/runtime/ApiBackendManager.js';
 import { WorkerPool } from './backends/cli/pool/WorkerPool.js';
 import { RuntimeSessionManager } from './core/runtime/RuntimeSessionManager.js';
 import { createRuntimeApp, type AppContext } from './http/app.js';
 import type { ProviderName } from './backends/cli/providers/types.js';
+import type { ApiBackendOptions } from './backends/api/types.js';
 import {
   normalizeFileBackedProviderPath,
   resolveFileBackedProviderPath,
@@ -45,6 +47,7 @@ interface DiscoveryController {
 
 interface RuntimeServerOptions {
   wslDistroInspector?: WslDistroInspector;
+  apiBackend?: ApiBackendOptions;
 }
 
 interface WatcherSpec {
@@ -465,7 +468,9 @@ export function createRuntimeServer(
     dataDir,
     config.sessionBaseDir,
     config.providerDefaultInstances,
+    config.providerDefaultTargets,
   );
+  const apiBackend = new ApiBackendManager(config, registry, options.apiBackend);
   const wslDiscoveryStatus = new WslDiscoveryStatusStore(config);
   const auggieSessionsByInstance = new Map(
     listProviderInstances(config, 'auggie').map((instance) => [
@@ -566,11 +571,12 @@ export function createRuntimeServer(
       getOpencodeNative: resolveOpencodeNative,
     },
   );
-  const runtime = new RuntimeSessionManager(pool);
+  const runtime = new RuntimeSessionManager(config, pool, apiBackend);
   const context: AppContext = {
     config,
     registry,
     pool,
+    apiBackend,
     runtime,
     cursorNative,
     kiroNative,
@@ -611,6 +617,7 @@ export function createRuntimeServer(
     },
     async close() {
       discovery.stop();
+      apiBackend.killAll();
       pool.killAll();
       registry.flush();
       for (const service of new Set(opencodeNativeByInstance.values())) {

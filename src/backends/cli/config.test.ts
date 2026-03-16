@@ -743,7 +743,7 @@ backends:
     }
   });
 
-  it('rejects API default targets for known CLI providers until API execution ships', () => {
+  it('accepts API default targets for providers that can now run outside CLI', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
     const configPath = join(tempDir, 'providers.yaml');
     writeFileSync(configPath, `
@@ -766,11 +766,32 @@ backends:
 `.trimStart());
 
     try {
-      expect(() => loadConfig({
+      const config = loadConfig({
         HOME: '/home/tester',
         USERPROFILE: '',
         CATS_RUNTIME_CONFIG_PATH: configPath,
-      })).toThrow(/default target 'api\/sonnet' is not supported in this build/);
+      });
+
+      expect(config.providerDefaultTargets?.claude).toEqual({
+        backend: 'api',
+        instance: 'sonnet',
+      });
+      expect(config.remoteProviderCatalog?.api.claude.sonnet).toEqual({
+        id: 'sonnet',
+        providerName: 'claude',
+        backend: 'api',
+        transport: 'anthropic',
+        model: 'claude-sonnet-4-6',
+        apiKeyEnv: 'ANTHROPIC_API_KEY',
+        baseUrl: undefined,
+        baseUrlEnv: undefined,
+        organizationEnv: undefined,
+        projectEnv: undefined,
+        headers: undefined,
+        timeoutMs: undefined,
+        maxRetries: undefined,
+        toolProfile: undefined,
+      });
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

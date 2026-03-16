@@ -165,7 +165,7 @@ describe('OpenCode native session management', () => {
         cwd: 'C:/repo',
         resumeSessionId: 'oc-123',
       }),
-      'default',
+      undefined,
     );
   });
 

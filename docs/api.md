@@ -95,13 +95,22 @@ Session responses also include `workspaceKey`, a normalized grouping key for
 workspace-aware UIs. When a provider exposes multiple configured instances,
 session payloads also include `providerInstanceId`. Windows-style paths are
 case-folded in `workspaceKey` while `cwd` remains the original display path.
+API-backed and local-model sessions also include `providerBackend`.
 
 `POST /sessions` accepts an optional `instance` field. When omitted, or when the
 caller explicitly sends `"default"`, `cats-runtime` uses the provider's
 configured `default_instance`.
 
+When a provider has multiple backend kinds configured, callers can target a
+specific instance with `instance: "<backend>/<instance>"`, for example
+`"api/main"` or `"local/local"`.
+
 `GET /sessions` accepts `?instance=<instance-id>` to filter registry results.
 `?instance=default` matches each provider's configured default instance.
+
+For API-backed and local-model sessions, streamed message output may include
+`tool_use` and `tool_result` events in addition to `init`, `text`, `result`,
+and `error`.
 
 ### Runtime Inspection
 
@@ -117,8 +126,9 @@ GET /kiro/models
 resolved `instance` alongside the runtime metadata.
 
 `GET /providers/config` returns the configured provider topology for dashboards
-or other clients that need to offer provider-instance selection. In positive-list
-YAML mode, providers omitted from `providers:` are not returned at all.
+or other clients that need to offer provider-instance selection. Each instance
+entry includes its backend kind (`cli`, `api`, or `local`) plus any transport or
+runtime metadata that applies to that backend.
 
 ### Native Session Discovery
 
@@ -171,6 +181,8 @@ Errors use this format:
 - The dashboard at `/` is intentionally unauthenticated for local use
 - Provider-specific capabilities still differ; not every provider supports
   resume, fork, or permission enforcement in the same way
+- API-backed and local-model sessions currently use runtime-hosted local tools
+  for filesystem search/read/write and shell execution
 - `GET /discovery/status` reports the configured WSL discovery policy plus the
   current background scan state for WSL-backed Cursor/Kiro discovery; when a
   provider has multiple WSL instances, the payload keys are `provider@instance`
@@ -178,8 +190,8 @@ Errors use this format:
   discover external sessions per configured provider instance as well
 - File-backed provider paths are resolved on the host. On Windows, WSL-backed
   file providers must use host-accessible paths such as `\\wsl$\Distro\...`
-- Future API-key and Ollama support will be added under `backends/api` without
-  requiring a new inbound service
+- API-key and Ollama execution now live under `src/backends/api` without
+  requiring a second inbound service
 
 ---
 

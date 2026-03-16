@@ -159,7 +159,7 @@ describe('Kiro native session management', () => {
         cwd: 'C:/repo',
         model: 'claude-sonnet-4.5',
       }),
-      'default',
+      undefined,
     );
   });
 
