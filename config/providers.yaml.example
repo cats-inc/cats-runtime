@@ -54,6 +54,10 @@ routing:
       default_target:
         backend: cli
         instance: native
+    junie:
+      default_target:
+        backend: cli
+        instance: native
     cursor:
       default_target:
         backend: cli
@@ -66,10 +70,6 @@ routing:
       default_target:
         backend: cli
         instance: ubuntu
-    junie:
-      default_target:
-        backend: cli
-        instance: native
     ollama:
       default_target:
         backend: local
@@ -145,6 +145,13 @@ backends:
             # Session resume uses --session <path> to continue a previous conversation.
             sessions_dir: ~/.pi/agent/sessions
 
+      junie:
+        instances:
+          native:
+            environment: native
+            command: junie
+            runner: auto
+
       cursor:
         instances:
           ubuntu:
@@ -169,13 +176,6 @@ backends:
           ubuntu:
             environment: ubuntu
             command: goose
-            runner: auto
-
-      junie:
-        instances:
-          native:
-            environment: native
-            command: junie
             runner: auto
 
   api:
