@@ -6,6 +6,31 @@ import { describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../src/core/config.js';
 import { createDiscoveryController, createRuntimeServer } from '../src/server.js';
 
+function alignDefaultProviderRuntime(
+  config: ReturnType<typeof loadConfig>,
+  provider: 'cursor' | 'kiro',
+  runtime: { mode: 'native' | 'wsl'; distro?: string },
+): void {
+  const defaultInstanceId = config.providerDefaultInstances?.[provider] || 'default';
+  const instance = config.providerInstances?.[provider]?.[defaultInstanceId];
+  if (!instance) {
+    return;
+  }
+
+  const nextRuntime = {
+    ...instance.commandConfig.runtime,
+    ...runtime,
+  };
+  instance.commandConfig = {
+    ...instance.commandConfig,
+    runtime: nextRuntime,
+  };
+  config.providerCommands[provider] = {
+    ...config.providerCommands[provider],
+    runtime: nextRuntime,
+  };
+}
+
 function createTestConfig(overrides = {}) {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-test-'));
   const env = {
@@ -47,6 +72,29 @@ function createTestConfig(overrides = {}) {
     port: 0,
     ...overrides,
   };
+
+  const overrideRecord = overrides as Record<string, unknown>;
+  const overriddenProviderInstances = (
+    overrideRecord.providerInstances
+    && typeof overrideRecord.providerInstances === 'object'
+    && !Array.isArray(overrideRecord.providerInstances)
+  ) ? overrideRecord.providerInstances as Record<string, unknown> : undefined;
+
+  if (overrideRecord.cursorRuntime && !overriddenProviderInstances?.cursor) {
+    alignDefaultProviderRuntime(
+      config,
+      'cursor',
+      overrideRecord.cursorRuntime as { mode: 'native' | 'wsl'; distro?: string },
+    );
+  }
+
+  if (overrideRecord.kiroRuntime && !overriddenProviderInstances?.kiro) {
+    alignDefaultProviderRuntime(
+      config,
+      'kiro',
+      overrideRecord.kiroRuntime as { mode: 'native' | 'wsl'; distro?: string },
+    );
+  }
 
   return { root, config, cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
@@ -452,8 +500,9 @@ providers:
     process.env.USERPROFILE = root;
 
     const runtime = createRuntimeServer(config);
+    const discovery = createDiscoveryController(runtime.context);
     try {
-      await runtime.start();
+      discovery.start();
 
       for (let attempt = 0; attempt < 20; attempt += 1) {
         if (runtime.context.registry.list({ provider: 'auggie' }).length > 0) {
@@ -482,6 +531,7 @@ providers:
       } else {
         process.env.USERPROFILE = previousUserProfile;
       }
+      discovery.stop();
       warnSpy.mockRestore();
       await runtime.close();
       cleanup();
