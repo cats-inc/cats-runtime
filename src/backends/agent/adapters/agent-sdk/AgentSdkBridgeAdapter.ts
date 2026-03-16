@@ -7,6 +7,7 @@ import type {
 import { parseSseEvents, readErrorBody } from '../../../../core/streamParsers.js';
 import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
 import type { AgentAdapter, AgentBackendOptions, AgentInvokeInput } from '../../types.js';
+import { parseServices, prependInstructions } from '../../utils.js';
 
 const DEFAULT_AGENT_SDK_BASE_URL = 'http://127.0.0.1:8082';
 
@@ -38,14 +39,6 @@ function mapBridgeProvider(providerName: string): string {
   }
 }
 
-function prependInstructions(message: string, instructions?: string): string {
-  if (!instructions) {
-    return message;
-  }
-
-  return `${instructions.trim()}\n\n${message}`;
-}
-
 function buildHeaders(
   instance: RemoteProviderInstanceConfig,
   env: NodeJS.ProcessEnv,
@@ -62,34 +55,6 @@ function buildHeaders(
   }
 
   return headers;
-}
-
-function parseServices(value: unknown): AgentRuntimeService[] | undefined {
-  if (!Array.isArray(value)) {
-    return undefined;
-  }
-
-  const services = value.flatMap((entry, index) => {
-    if (!entry || typeof entry !== 'object') {
-      return [];
-    }
-    const record = entry as Record<string, unknown>;
-    return [{
-      id: typeof record.id === 'string' ? record.id : `service-${index + 1}`,
-      name: typeof record.name === 'string'
-        ? record.name
-        : typeof record.label === 'string'
-          ? record.label
-          : `service-${index + 1}`,
-      url: typeof record.url === 'string' ? record.url : undefined,
-      status: typeof record.status === 'string' ? record.status : undefined,
-      metadata: record.metadata && typeof record.metadata === 'object' && !Array.isArray(record.metadata)
-        ? record.metadata as Record<string, unknown>
-        : undefined,
-    }];
-  });
-
-  return services.length > 0 ? services : undefined;
 }
 
 function buildProviderState(
@@ -124,45 +89,44 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
     this.fetchImpl = options.fetch || defaultFetch();
   }
 
-  async *invoke(input: AgentInvokeInput): AsyncGenerator<StreamEvent> {
-    const env = this.options.env || process.env;
-    const baseUrl = resolveBaseUrl(input.instance, env).replace(/\/$/, '');
-    const bridgeProvider = mapBridgeProvider(input.providerName);
-    const headers = buildHeaders(input.instance, env);
+  private async createBridgeSession(
+    input: AgentInvokeInput,
+    bridgeProvider: string,
+    baseUrl: string,
+    headers: Record<string, string>,
+  ): Promise<string> {
+    const createResponse = await this.fetchImpl(`${baseUrl}/api/v1/sessions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        provider: bridgeProvider,
+        model: input.model || input.instance.model,
+        cwd: input.turn.context?.workspace?.cwd,
+      }),
+      signal: input.signal,
+    });
 
-    let bridgeSessionId = input.providerSessionId;
-    if (!bridgeSessionId) {
-      const createResponse = await this.fetchImpl(`${baseUrl}/api/v1/sessions`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          provider: bridgeProvider,
-          model: input.model || input.instance.model,
-          cwd: input.turn.context?.workspace?.cwd,
-        }),
-        signal: input.signal,
-      });
-
-      if (!createResponse.ok) {
-        throw new Error(
-          `Agent SDK bridge session create failed: ${await readErrorBody(createResponse)}`,
-        );
-      }
-
-      const payload = await createResponse.json() as Record<string, unknown>;
-      if (typeof payload.id !== 'string' || payload.id.length === 0) {
-        throw new Error('Agent SDK bridge session create returned no session id');
-      }
-      bridgeSessionId = payload.id;
+    if (!createResponse.ok) {
+      throw new Error(
+        `Agent SDK bridge session create failed: ${await readErrorBody(createResponse)}`,
+      );
     }
 
-    yield {
-      type: 'init',
-      providerSessionId: bridgeSessionId,
-      providerState: buildProviderState(input, bridgeSessionId, 'active'),
-    };
+    const payload = await createResponse.json() as Record<string, unknown>;
+    if (typeof payload.id !== 'string' || payload.id.length === 0) {
+      throw new Error('Agent SDK bridge session create returned no session id');
+    }
 
-    const messageResponse = await this.fetchImpl(
+    return payload.id;
+  }
+
+  private async startMessageStream(
+    input: AgentInvokeInput,
+    baseUrl: string,
+    headers: Record<string, string>,
+    bridgeSessionId: string,
+  ): Promise<Response> {
+    return this.fetchImpl(
       `${baseUrl}/api/v1/sessions/${encodeURIComponent(bridgeSessionId)}/messages/stream`,
       {
         method: 'POST',
@@ -176,12 +140,36 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
         signal: input.signal,
       },
     );
+  }
+
+  async *invoke(input: AgentInvokeInput): AsyncGenerator<StreamEvent> {
+    const env = this.options.env || process.env;
+    const baseUrl = resolveBaseUrl(input.instance, env).replace(/\/$/, '');
+    const bridgeProvider = mapBridgeProvider(input.providerName);
+    const headers = buildHeaders(input.instance, env);
+
+    let bridgeSessionId = input.providerSessionId;
+    if (!bridgeSessionId) {
+      bridgeSessionId = await this.createBridgeSession(input, bridgeProvider, baseUrl, headers);
+    }
+
+    let messageResponse = await this.startMessageStream(input, baseUrl, headers, bridgeSessionId);
+    if (messageResponse.status === 404 && input.providerSessionId) {
+      bridgeSessionId = await this.createBridgeSession(input, bridgeProvider, baseUrl, headers);
+      messageResponse = await this.startMessageStream(input, baseUrl, headers, bridgeSessionId);
+    }
 
     if (!messageResponse.ok) {
       throw new Error(
         `Agent SDK bridge message failed: ${await readErrorBody(messageResponse)}`,
       );
     }
+
+    yield {
+      type: 'init',
+      providerSessionId: bridgeSessionId,
+      providerState: buildProviderState(input, bridgeSessionId, 'active'),
+    };
 
     let usage: StreamEvent['usage'];
     let services: AgentRuntimeService[] | undefined;
@@ -192,7 +180,12 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
         break;
       }
 
-      const payload = JSON.parse(event.data) as Record<string, unknown>;
+      let payload: Record<string, unknown>;
+      try {
+        payload = JSON.parse(event.data) as Record<string, unknown>;
+      } catch {
+        continue;
+      }
       const type = typeof payload.type === 'string' ? payload.type : undefined;
 
       if (type === 'session_created') {

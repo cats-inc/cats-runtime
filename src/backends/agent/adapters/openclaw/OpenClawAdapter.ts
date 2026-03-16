@@ -7,6 +7,7 @@ import type {
 } from '../../../../core/types.js';
 import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
 import type { AgentAdapter, AgentBackendOptions, AgentInvokeInput } from '../../types.js';
+import { parseRecord, parseServices, prependInstructions, readString } from '../../utils.js';
 
 const DEFAULT_CONNECT_TIMEOUT_MS = 10_000;
 const DEFAULT_WAIT_TIMEOUT_MS = 30_000;
@@ -96,16 +97,6 @@ function resolveHeaders(
   return Object.keys(headers).length > 0 ? headers : undefined;
 }
 
-function parseRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
-}
-
-function readString(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
-}
-
 function mergePayloadTemplate(
   template: Record<string, unknown> | undefined,
   payload: Record<string, unknown>,
@@ -114,14 +105,6 @@ function mergePayloadTemplate(
     ...(template || {}),
     ...payload,
   };
-}
-
-function prependInstructions(message: string, instructions?: string): string {
-  if (!instructions) {
-    return message;
-  }
-
-  return `${instructions.trim()}\n\n${message}`;
 }
 
 function parseArtifacts(value: unknown): SessionArtifact[] | undefined {
@@ -152,28 +135,6 @@ function parseArtifacts(value: unknown): SessionArtifact[] | undefined {
     });
 
   return artifacts.length > 0 ? artifacts : undefined;
-}
-
-function parseServices(value: unknown): AgentRuntimeService[] | undefined {
-  if (!Array.isArray(value)) {
-    return undefined;
-  }
-
-  const services = value.flatMap((entry, index) => {
-      const record = parseRecord(entry);
-      if (!record) {
-        return [];
-      }
-      return [{
-        id: readString(record.id) || `service-${index + 1}`,
-        name: readString(record.name) || readString(record.label) || `service-${index + 1}`,
-        url: readString(record.url),
-        status: readString(record.status),
-        metadata: parseRecord(record.metadata) || undefined,
-      } satisfies AgentRuntimeService];
-    });
-
-  return services.length > 0 ? services : undefined;
 }
 
 function buildProviderState(

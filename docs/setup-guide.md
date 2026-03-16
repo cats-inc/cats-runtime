@@ -38,6 +38,8 @@ Keep `.env` for runtime-wide values and secrets:
 - `PWSH_PATH=...`
 - `OPENCLAW_URL=ws://127.0.0.1:8787/ws`
 - `OPENCLAW_TOKEN=`
+- `AGENT_SDK_URL=http://127.0.0.1:8082`
+- `AGENT_SDK_TOKEN=`
 
 Legacy provider-specific env vars still work, but new installs should prefer
 `config/providers.yaml`.
@@ -148,6 +150,14 @@ backends:
         instances:
           gateway:
             model: openclaw-coder
+      claude:
+        default_instance: sdk
+        transport: agent_sdk_bridge
+        base_url_env: AGENT_SDK_URL
+        auth_token_env: AGENT_SDK_TOKEN
+        instances:
+          sdk:
+            model: claude-sonnet-4-20250514
 ```
 
 This lets one provider expose multiple independently logged-in environments,
@@ -164,6 +174,11 @@ Agent backends follow the same pattern. Put shared gateway/auth settings such as
 `transport`, `url_env`, `auth_token_env`, and `client_id` at the provider
 level, then keep each instance block focused on the fields that actually vary,
 usually `model`.
+
+That means one provider family can expose multiple backend targets at once. For
+example, `claude` can keep its default target on `cli/native`, still offer
+`api/sonnet` under `backends.api.providers.claude`, and additionally expose an
+external `agent/sdk` target through `backends.agent.providers.claude`.
 
 Currently supported agent transports are:
 

@@ -402,6 +402,8 @@ describe('agent backend integration', () => {
         const sse = [
           'data: {"type":"session_created","sessionId":"bridge-session-1","providerSessionId":"sdk-provider-1"}',
           '',
+          'data: not-json',
+          '',
           'data: {"type":"content","content":"bridge hello "}',
           '',
           'data: {"type":"tool_use","toolName":"grep","toolInput":{"pattern":"TODO"}}',
@@ -581,6 +583,190 @@ describe('agent backend integration', () => {
       expect(streamCalls[1]?.body).toEqual({
         message: 'Use the bridge carefully.\n\nContinue',
       });
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
+  it('recreates a missing Agent SDK bridge session on resume', async () => {
+    const { config, env, cleanup } = createAgentSdkConfigRoot();
+    const fetchCalls: Array<{ url: string; method: string; body?: Record<string, unknown> }> = [];
+    let createCount = 0;
+    const fakeFetch: typeof fetch = async (input, init) => {
+      const url = String(input);
+      const method = init?.method || 'GET';
+      const body = typeof init?.body === 'string'
+        ? JSON.parse(init.body) as Record<string, unknown>
+        : undefined;
+      fetchCalls.push({ url, method, body });
+
+      if (url === 'http://agent-sdk.test/api/v1/sessions' && method === 'POST') {
+        createCount += 1;
+        return new Response(JSON.stringify({
+          id: `bridge-session-${createCount}`,
+          provider: 'claude',
+          model: 'sonnet',
+          status: 'idle',
+        }), {
+          status: 201,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
+      if (url === 'http://agent-sdk.test/api/v1/sessions/bridge-session-1/messages/stream' && method === 'POST') {
+        if (fetchCalls.filter((call) => call.url === url).length === 1) {
+          const sse = [
+            'data: {"type":"session_created","sessionId":"bridge-session-1","providerSessionId":"sdk-provider-1"}',
+            '',
+            'data: {"type":"content","content":"first turn"}',
+            '',
+            'data: [DONE]',
+            '',
+          ].join('\n');
+          return new Response(sse, {
+            status: 200,
+            headers: { 'content-type': 'text/event-stream' },
+          });
+        }
+
+        return new Response(JSON.stringify({ error: 'session not found' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
+      if (url === 'http://agent-sdk.test/api/v1/sessions/bridge-session-2/messages/stream' && method === 'POST') {
+        const sse = [
+          'data: {"type":"session_created","sessionId":"bridge-session-2","providerSessionId":"sdk-provider-2"}',
+          '',
+          'data: {"type":"content","content":"second turn"}',
+          '',
+          'data: [DONE]',
+          '',
+        ].join('\n');
+        return new Response(sse, {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' },
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    };
+
+    const runtime = createRuntimeServer(config, {
+      agentBackend: {
+        env,
+        fetch: fakeFetch,
+      },
+    });
+
+    try {
+      const createResponse = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'claude',
+          cwd: config.sessionBaseDir,
+          sessionKey: 'sdk-task-2',
+          reusePolicy: 'prefer_existing',
+          instructions: 'Use the bridge carefully.',
+        }),
+      });
+      expect(createResponse.status).toBe(201);
+      const created = await createResponse.json() as { id: string };
+
+      const firstMessage = await runtime.app.request(`/sessions/${created.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          Accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({
+          message: 'First',
+        }),
+      });
+      expect(firstMessage.status).toBe(200);
+
+      const closeResponse = await runtime.app.request(`/sessions/${created.id}/close`, {
+        method: 'POST',
+      });
+      expect(closeResponse.status).toBe(200);
+
+      const reuseResponse = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'claude',
+          sessionKey: 'sdk-task-2',
+          reusePolicy: 'require_existing',
+        }),
+      });
+      expect(reuseResponse.status).toBe(200);
+
+      const resumedMessage = await runtime.app.request(`/sessions/${created.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          Accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({
+          message: 'Second',
+        }),
+      });
+      expect(resumedMessage.status).toBe(200);
+      expect(parseNdjson(await resumedMessage.text())).toEqual([
+        {
+          type: 'init',
+          providerSessionId: 'bridge-session-2',
+          providerState: {
+            agentSession: {
+              providerSessionId: 'bridge-session-2',
+              sessionKey: 'sdk-task-2',
+              status: 'active',
+              adapterState: {
+                bridgeProvider: 'claude',
+                bridgeSessionId: 'bridge-session-2',
+              },
+            },
+          },
+        },
+        {
+          type: 'text',
+          providerSessionId: 'bridge-session-2',
+          text: 'second turn',
+        },
+        {
+          type: 'result',
+          providerSessionId: 'bridge-session-2',
+          providerState: {
+            agentSession: {
+              providerSessionId: 'bridge-session-2',
+              sessionKey: 'sdk-task-2',
+              status: 'idle',
+              adapterState: {
+                bridgeProvider: 'claude',
+                bridgeSessionId: 'bridge-session-2',
+                upstreamProviderSessionId: 'sdk-provider-2',
+              },
+            },
+          },
+          metadata: {
+            provider: 'claude',
+          },
+        },
+      ]);
+
+      const createCalls = fetchCalls.filter((call) => call.url === 'http://agent-sdk.test/api/v1/sessions');
+      expect(createCalls).toHaveLength(2);
+      expect(fetchCalls.some((call) =>
+        call.url === 'http://agent-sdk.test/api/v1/sessions/bridge-session-1/messages/stream'
+          && call.body?.message === 'Use the bridge carefully.\n\nSecond',
+      )).toBe(true);
+      expect(fetchCalls.some((call) =>
+        call.url === 'http://agent-sdk.test/api/v1/sessions/bridge-session-2/messages/stream'
+          && call.body?.message === 'Use the bridge carefully.\n\nSecond',
+      )).toBe(true);
     } finally {
       await runtime.close();
       cleanup();

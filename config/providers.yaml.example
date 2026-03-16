@@ -211,3 +211,15 @@ backends:
         instances:
           gateway:
             model: openclaw-coder
+
+      # An Agent SDK bridge can also front an existing product family such as
+      # Claude. Keep CLI/API/agent routing independent; this block only makes
+      # the agent-backed target available as `agent/sdk`.
+      claude:
+        default_instance: sdk
+        transport: agent_sdk_bridge
+        base_url_env: AGENT_SDK_URL
+        auth_token_env: AGENT_SDK_TOKEN
+        instances:
+          sdk:
+            model: claude-sonnet-4-20250514
