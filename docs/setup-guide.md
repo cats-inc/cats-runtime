@@ -45,10 +45,10 @@ Legacy provider-specific env vars still work, but new installs should prefer
 `config/providers.yaml` defines provider topology:
 
 - `environments`: named execution environments such as `native` or a WSL distro
-- `providers.<name>.default_instance`: instance used when the caller omits `instance`
-- `providers.<name>.instances.<id>`: command, runner, runtime, and provider-local storage
-- file-scanned providers keep their discovery path on the instance itself
-  (`projects_dir` for Claude, `sessions_dir` for Codex/Copilot/Gemini)
+- `routing.providers.<name>.default_target`: default backend and instance for that provider family
+- `backends.cli.providers.<name>.instances.<id>`: command, runner, runtime, and provider-local storage
+- `backends.api` / `backends.local`: reserved for API-key and local-model catalogs without mixing
+  them into CLI instance maps
 
 Minimal example:
 
@@ -60,28 +60,38 @@ environments:
   ubuntu:
     kind: wsl
     distro: Ubuntu
-providers:
-  codex:
-    default_instance: native
-    instances:
-      native:
-        environment: native
-        command: codex
-        runner: auto
-        sessions_dir: ~/.codex/sessions
-  cursor:
-    default_instance: ubuntu
-    instances:
-      ubuntu:
-        environment: ubuntu
-        command: cursor-agent
-        runner: auto
-        chats_dir: ~/.cursor/chats
-      native:
-        environment: native
-        command: cursor-agent
-        runner: auto
-        chats_dir: ~/.cursor/chats
+routing:
+  providers:
+    codex:
+      default_target:
+        backend: cli
+        instance: native
+    cursor:
+      default_target:
+        backend: cli
+        instance: ubuntu
+backends:
+  cli:
+    providers:
+      codex:
+        instances:
+          native:
+            environment: native
+            command: codex
+            runner: auto
+            sessions_dir: ~/.codex/sessions
+      cursor:
+        instances:
+          ubuntu:
+            environment: ubuntu
+            command: cursor-agent
+            runner: auto
+            chats_dir: ~/.cursor/chats
+          native:
+            environment: native
+            command: cursor-agent
+            runner: auto
+            chats_dir: ~/.cursor/chats
 ```
 
 This lets one provider expose multiple independently logged-in environments,
@@ -104,7 +114,7 @@ Path semantics matter:
 
 The embedded dashboard reads `GET /providers/config` and uses it to populate the
 provider-instance selector in the create-session modal. In YAML mode, only
-providers explicitly listed under `providers:` appear in the dashboard.
+providers explicitly listed under `backends.cli.providers:` appear in the dashboard.
 
 ## Running the Project
 

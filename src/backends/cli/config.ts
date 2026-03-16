@@ -25,6 +25,7 @@ const CONFIG_FILE_DEFAULT = join('config', 'providers.yaml');
 export type RunnerMode = typeof RUNNER_MODES[number];
 export type RuntimeMode = typeof RUNTIME_MODES[number];
 export type WslDiscoveryPolicy = typeof WSL_DISCOVERY_POLICIES[number];
+export type BackendKind = 'cli' | 'api' | 'local';
 
 export interface ProviderRuntimeConfig {
   mode: RuntimeMode;
@@ -37,6 +38,33 @@ export interface ProviderCommandConfig {
   runner: RunnerMode;
   runnerPath?: string;
   runtime: ProviderRuntimeConfig;
+}
+
+export interface ProviderDefaultTarget {
+  backend: BackendKind;
+  instance: string;
+}
+
+export interface RemoteProviderInstanceConfig {
+  id: string;
+  providerName: string;
+  backend: Exclude<BackendKind, 'cli'>;
+  transport?: string;
+  model?: string;
+  apiKeyEnv?: string;
+  baseUrl?: string;
+  baseUrlEnv?: string;
+  organizationEnv?: string;
+  projectEnv?: string;
+  headers?: Record<string, string>;
+  timeoutMs?: number;
+  maxRetries?: number;
+  toolProfile?: string;
+}
+
+export interface RemoteProviderCatalog {
+  api: Record<string, Record<string, RemoteProviderInstanceConfig>>;
+  local: Record<string, Record<string, RemoteProviderInstanceConfig>>;
 }
 
 export class UnknownProviderInstanceError extends Error {
@@ -122,6 +150,8 @@ export interface CliRuntimeConfig {
   providerCommands: Record<ProviderName, ProviderCommandConfig>;
   providerDefaultInstances?: Partial<Record<ProviderName, string>>;
   providerInstances?: Partial<Record<ProviderName, Record<string, ProviderInstanceConfig>>>;
+  providerDefaultTargets?: Record<string, ProviderDefaultTarget>;
+  remoteProviderCatalog?: RemoteProviderCatalog;
 }
 
 interface LegacyRuntimeShape {
@@ -140,11 +170,18 @@ interface LegacyRuntimeShape {
   opencodeServerHost: string;
   opencodeServerPort: number;
   opencodeServerStartupTimeoutMs: number;
+  providerDefaultTargets: Record<string, ProviderDefaultTarget>;
+  remoteProviderCatalog: RemoteProviderCatalog;
 }
 
 interface ParsedEnvironmentConfig {
   mode: RuntimeMode;
   distro?: string;
+}
+
+interface ParsedRemoteBackendsResult {
+  catalog: RemoteProviderCatalog;
+  defaults: Record<string, ProviderDefaultTarget[]>;
 }
 
 export function defaultCursorAndKiroRuntimeMode(
@@ -304,6 +341,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CliRuntimeConf
     providerCommands: configured.providerCommands,
     providerDefaultInstances: configured.providerDefaultInstances,
     providerInstances: configured.providerInstances,
+    providerDefaultTargets: configured.providerDefaultTargets,
+    remoteProviderCatalog: configured.remoteProviderCatalog,
   };
 }
 
@@ -429,6 +468,12 @@ function buildLegacyRuntimeShape(
     kiro: 'default',
     opencode: 'default',
   } satisfies Record<ProviderName, string>;
+  const providerDefaultTargets = Object.fromEntries(
+    Object.entries(providerDefaultInstances).map(([provider, instance]) => [provider, {
+      backend: 'cli' as const,
+      instance,
+    }]),
+  );
 
   const auggieSessionsDir = env.AUGGIE_SESSIONS_DIR || defaultAuggieSessionsDir();
   const cursorChatsDir = env.CURSOR_CHATS_DIR || defaultCursorChatsDir();
@@ -530,6 +575,11 @@ function buildLegacyRuntimeShape(
     opencodeServerHost,
     opencodeServerPort,
     opencodeServerStartupTimeoutMs,
+    providerDefaultTargets,
+    remoteProviderCatalog: {
+      api: {},
+      local: {},
+    },
   };
 }
 
@@ -649,6 +699,8 @@ function applyFileBasedProviderConfig(
   const providerCommands = cloneProviderCommands(legacy.providerCommands);
   const providerDefaultInstances = { ...legacy.providerDefaultInstances };
   const providerInstances = cloneProviderInstances(legacy.providerInstances);
+  const providerDefaultTargets: Record<string, ProviderDefaultTarget> = {};
+  const remoteProviderCatalog = cloneRemoteProviderCatalog(legacy.remoteProviderCatalog);
   let auggieSessionsDir = legacy.auggieSessionsDir;
   let claudeProjectsDir = legacy.claudeProjectsDir;
   let codexSessionsDir = legacy.codexSessionsDir;
@@ -661,8 +713,32 @@ function applyFileBasedProviderConfig(
   let opencodeServerHost = legacy.opencodeServerHost;
   let opencodeServerPort = legacy.opencodeServerPort;
   let opencodeServerStartupTimeoutMs = legacy.opencodeServerStartupTimeoutMs;
+  const rawBackends = asOptionalObject(doc.backends);
+  if (doc.backends !== undefined && !rawBackends) {
+    throw new Error(`Invalid backends block in '${filePath}'`);
+  }
+  if (rawBackends && doc.providers !== undefined) {
+    throw new Error(
+      `Cannot mix top-level providers with backends.* in '${filePath}'. `
+      + 'Move CLI providers under backends.cli.providers.',
+    );
+  }
+  const usesSeparatedBackends = rawBackends !== undefined;
 
-  const rawProviders = doc.providers;
+  if (usesSeparatedBackends) {
+    for (const known of KNOWN_PROVIDERS) {
+      providerInstances[known] = {};
+    }
+  }
+
+  const rawProviders = usesSeparatedBackends
+    ? asOptionalObject(asOptionalObject(rawBackends?.cli)?.providers)
+    : doc.providers;
+  if (rawProviders !== undefined) {
+    for (const known of KNOWN_PROVIDERS) {
+      providerInstances[known] = {};
+    }
+  }
   if (rawProviders !== undefined) {
     const providers = asObject(rawProviders, `Invalid providers block in '${filePath}'`);
 
@@ -801,11 +877,13 @@ function applyFileBasedProviderConfig(
         throw new Error(`Provider '${provider}' must define at least one instance in '${filePath}'`);
       }
 
-      const defaultInstance = readString(providerDoc.default_instance)
-        || readString(providerDoc.defaultInstance)
-        || providerDefaultInstances[provider]
-        || Object.keys(nextInstances)[0];
-      if (!nextInstances[defaultInstance]) {
+      const configuredDefaultInstance = readString(providerDoc.default_instance)
+        || readString(providerDoc.defaultInstance);
+      const defaultInstance = configuredDefaultInstance
+        || (providerDefaultInstances[provider] && nextInstances[providerDefaultInstances[provider]]
+          ? providerDefaultInstances[provider]
+          : Object.keys(nextInstances)[0]);
+      if (configuredDefaultInstance && !nextInstances[defaultInstance]) {
         throw new Error(
           `Provider '${provider}' default instance '${defaultInstance}' is not defined in '${filePath}'`,
         );
@@ -846,14 +924,83 @@ function applyFileBasedProviderConfig(
       }
     }
 
-    // Positive-list: providers not listed in the YAML are disabled.
-    const configuredProviders = new Set(
-      Object.keys(providers) as ProviderName[],
-    );
     for (const known of KNOWN_PROVIDERS) {
-      if (!configuredProviders.has(known)) {
+      if (Object.keys(providerInstances[known]).length === 0) {
         providerInstances[known] = {};
       }
+    }
+  } else if (!usesSeparatedBackends && doc.providers !== undefined) {
+    throw new Error(`Invalid providers block in '${filePath}'`);
+  }
+
+  let parsedRemote: ParsedRemoteBackendsResult | undefined;
+  if (usesSeparatedBackends) {
+    parsedRemote = parseRemoteBackends(rawBackends, filePath);
+    Object.assign(remoteProviderCatalog.api, parsedRemote.catalog.api);
+    Object.assign(remoteProviderCatalog.local, parsedRemote.catalog.local);
+  }
+
+  const resolvedDefaultTargets = resolveProviderDefaultTargets(
+    doc,
+    filePath,
+    providerInstances,
+    providerDefaultInstances,
+    parsedRemote?.defaults || {},
+  );
+
+  for (const [providerName, target] of Object.entries(resolvedDefaultTargets)) {
+    providerDefaultTargets[providerName] = target;
+
+    if (!isKnownProvider(providerName)) {
+      continue;
+    }
+
+    const provider = providerName as ProviderName;
+    if (target.backend !== 'cli') {
+      throw new Error(
+        `Provider '${provider}' default target '${target.backend}/${target.instance}' `
+        + 'is not supported in this build. Configure a CLI default target for now.',
+      );
+    }
+
+    const instance = providerInstances[provider][target.instance];
+    if (!instance) {
+      throw new Error(
+        `Provider '${provider}' default target instance '${target.instance}' is not defined in '${filePath}'`,
+      );
+    }
+
+    providerDefaultInstances[provider] = target.instance;
+    providerCommands[provider] = instance.commandConfig;
+
+    if (provider === 'cursor') {
+      cursorChatsDir = instance.cursorChatsDir || cursorChatsDir;
+      cursorRuntime = instance.commandConfig.runtime;
+    }
+    if (provider === 'claude') {
+      claudeProjectsDir = instance.claudeProjectsDir || claudeProjectsDir;
+    }
+    if (provider === 'codex') {
+      codexSessionsDir = instance.codexSessionsDir || codexSessionsDir;
+    }
+    if (provider === 'copilot') {
+      copilotSessionsDir = instance.copilotSessionsDir || copilotSessionsDir;
+    }
+    if (provider === 'gemini') {
+      geminiSessionsDir = instance.geminiSessionsDir || geminiSessionsDir;
+    }
+    if (provider === 'kiro') {
+      kiroDbPath = instance.kiroDbPath || kiroDbPath;
+      kiroRuntime = instance.commandConfig.runtime;
+    }
+    if (provider === 'opencode') {
+      opencodeServerHost = instance.opencodeServerHost || opencodeServerHost;
+      opencodeServerPort = instance.opencodeServerPort || opencodeServerPort;
+      opencodeServerStartupTimeoutMs = instance.opencodeServerStartupTimeoutMs
+        || opencodeServerStartupTimeoutMs;
+    }
+    if (provider === 'auggie') {
+      auggieSessionsDir = instance.auggieSessionsDir || auggieSessionsDir;
     }
   }
 
@@ -873,6 +1020,8 @@ function applyFileBasedProviderConfig(
     opencodeServerHost,
     opencodeServerPort,
     opencodeServerStartupTimeoutMs,
+    providerDefaultTargets,
+    remoteProviderCatalog,
   };
 }
 
@@ -1070,17 +1219,303 @@ function cloneProviderCommandConfig(input: ProviderCommandConfig): ProviderComma
   };
 }
 
+function cloneRemoteProviderCatalog(input: RemoteProviderCatalog): RemoteProviderCatalog {
+  return {
+    api: cloneRemoteProviderMap(input.api),
+    local: cloneRemoteProviderMap(input.local),
+  };
+}
+
+function cloneRemoteProviderMap(
+  input: Record<string, Record<string, RemoteProviderInstanceConfig>>,
+): Record<string, Record<string, RemoteProviderInstanceConfig>> {
+  return Object.fromEntries(
+    Object.entries(input).map(([providerName, instances]) => [providerName, Object.fromEntries(
+      Object.entries(instances).map(([instanceId, instance]) => [instanceId, {
+        ...instance,
+        headers: instance.headers ? { ...instance.headers } : undefined,
+      }]),
+    )]),
+  );
+}
+
+function parseRemoteBackends(
+  rawBackends: Record<string, unknown> | undefined,
+  filePath: string,
+): ParsedRemoteBackendsResult {
+  const catalog: RemoteProviderCatalog = {
+    api: {},
+    local: {},
+  };
+  const defaults: Record<string, ProviderDefaultTarget[]> = {};
+
+  for (const backend of ['api', 'local'] as const) {
+    const backendDoc = asOptionalObject(rawBackends?.[backend]);
+    const providers = asOptionalObject(backendDoc?.providers);
+    if (!providers) {
+      continue;
+    }
+
+    for (const [providerName, rawProvider] of Object.entries(providers)) {
+      const providerDoc = asObject(
+        rawProvider,
+        `Invalid backends.${backend}.providers.${providerName} block in '${filePath}'`,
+      );
+      const instances = asObject(
+        providerDoc.instances,
+        `Provider '${providerName}' in backends.${backend} must define instances in '${filePath}'`,
+      );
+      if (Object.keys(instances).length === 0) {
+        throw new Error(
+          `Provider '${providerName}' in backends.${backend} must define at least one instance `
+          + `in '${filePath}'`,
+        );
+      }
+
+      const parsedInstances: Record<string, RemoteProviderInstanceConfig> = {};
+      for (const [instanceId, rawInstance] of Object.entries(instances)) {
+        const instanceDoc = asObject(
+          rawInstance,
+          `Invalid backends.${backend}.providers.${providerName}.instances.${instanceId} `
+            + `block in '${filePath}'`,
+        );
+
+        parsedInstances[instanceId] = {
+          id: instanceId,
+          providerName,
+          backend,
+          transport: readString(instanceDoc.transport),
+          model: readString(instanceDoc.model),
+          apiKeyEnv: readString(instanceDoc.api_key_env)
+            || readString(instanceDoc.apiKeyEnv),
+          baseUrl: readString(instanceDoc.base_url)
+            || readString(instanceDoc.baseUrl),
+          baseUrlEnv: readString(instanceDoc.base_url_env)
+            || readString(instanceDoc.baseUrlEnv),
+          organizationEnv: readString(instanceDoc.organization_env)
+            || readString(instanceDoc.organizationEnv),
+          projectEnv: readString(instanceDoc.project_env)
+            || readString(instanceDoc.projectEnv),
+          headers: parseStringMap(
+            asOptionalObject(instanceDoc.headers),
+            `backends.${backend}.providers.${providerName}.instances.${instanceId}.headers`,
+          ),
+          timeoutMs: parseOptionalIntValue(
+            instanceDoc.timeout_ms ?? instanceDoc.timeoutMs,
+            `backends.${backend}.providers.${providerName}.instances.${instanceId}.timeout_ms`,
+          ),
+          maxRetries: parseOptionalIntValue(
+            instanceDoc.max_retries ?? instanceDoc.maxRetries,
+            `backends.${backend}.providers.${providerName}.instances.${instanceId}.max_retries`,
+          ),
+          toolProfile: readString(instanceDoc.tool_profile)
+            || readString(instanceDoc.toolProfile),
+        };
+      }
+
+      catalog[backend][providerName] = parsedInstances;
+
+      const defaultInstance = readString(providerDoc.default_instance)
+        || readString(providerDoc.defaultInstance)
+        || Object.keys(parsedInstances)[0];
+      if (!parsedInstances[defaultInstance]) {
+        throw new Error(
+          `Provider '${providerName}' default instance '${defaultInstance}' `
+          + `is not defined in backends.${backend} of '${filePath}'`,
+        );
+      }
+
+      defaults[providerName] = [
+        ...(defaults[providerName] || []),
+        { backend, instance: defaultInstance },
+      ];
+    }
+  }
+
+  return {
+    catalog,
+    defaults,
+  };
+}
+
+function resolveProviderDefaultTargets(
+  doc: Record<string, unknown>,
+  filePath: string,
+  providerInstances: Record<ProviderName, Record<string, ProviderInstanceConfig>>,
+  providerDefaultInstances: Record<ProviderName, string>,
+  remoteDefaults: Record<string, ProviderDefaultTarget[]>,
+): Record<string, ProviderDefaultTarget> {
+  const availableTargets = new Map<string, ProviderDefaultTarget[]>();
+
+  for (const provider of KNOWN_PROVIDERS) {
+    const instances = providerInstances[provider];
+    if (Object.keys(instances).length === 0) {
+      continue;
+    }
+    const defaultInstance = providerDefaultInstances[provider] || Object.keys(instances)[0];
+    pushProviderTarget(availableTargets, provider, {
+      backend: 'cli',
+      instance: defaultInstance,
+    });
+  }
+
+  for (const [providerName, targets] of Object.entries(remoteDefaults)) {
+    for (const target of targets) {
+      pushProviderTarget(availableTargets, providerName, target);
+    }
+  }
+
+  const routingProviders = asOptionalObject(asOptionalObject(doc.routing)?.providers);
+  const explicitTargets: Record<string, ProviderDefaultTarget> = {};
+  if (routingProviders) {
+    for (const [providerName, rawProvider] of Object.entries(routingProviders)) {
+      const providerDoc = asObject(
+        rawProvider,
+        `Invalid routing.providers.${providerName} block in '${filePath}'`,
+      );
+      const defaultTargetDoc = asOptionalObject(providerDoc.default_target)
+        || asOptionalObject(providerDoc.defaultTarget);
+      if (!defaultTargetDoc) {
+        throw new Error(
+          `routing.providers.${providerName} in '${filePath}' must define default_target`,
+        );
+      }
+
+      const backend = parseBackendKindValue(
+        defaultTargetDoc.backend,
+        'cli',
+        `routing.providers.${providerName}.default_target.backend`,
+      );
+      const instance = readString(defaultTargetDoc.instance)
+        || readString(defaultTargetDoc.instance_id)
+        || readString(defaultTargetDoc.instanceId);
+      if (!instance) {
+        throw new Error(
+          `routing.providers.${providerName}.default_target.instance is required in '${filePath}'`,
+        );
+      }
+
+      explicitTargets[providerName] = { backend, instance };
+    }
+  }
+
+  for (const [providerName, target] of Object.entries(explicitTargets)) {
+    const candidates = availableTargets.get(providerName);
+    if (!candidates) {
+      throw new Error(
+        `routing.providers.${providerName} references an unconfigured provider in '${filePath}'`,
+      );
+    }
+    if (!candidates.some((candidate) => (
+      candidate.backend === target.backend && candidate.instance === target.instance
+    ))) {
+      throw new Error(
+        `routing.providers.${providerName} default target '${target.backend}/${target.instance}' `
+        + `is not defined in '${filePath}'`,
+      );
+    }
+  }
+
+  const resolved: Record<string, ProviderDefaultTarget> = {};
+  for (const [providerName, targets] of availableTargets.entries()) {
+    const explicit = explicitTargets[providerName];
+    if (explicit) {
+      resolved[providerName] = explicit;
+      continue;
+    }
+
+    if (targets.length === 1) {
+      resolved[providerName] = targets[0];
+      continue;
+    }
+
+    throw new Error(
+      `Provider '${providerName}' is configured in multiple backends in '${filePath}'. `
+      + 'Set routing.providers.'
+      + `${providerName}.default_target to disambiguate.`,
+    );
+  }
+
+  return resolved;
+}
+
+function pushProviderTarget(
+  targets: Map<string, ProviderDefaultTarget[]>,
+  providerName: string,
+  target: ProviderDefaultTarget,
+): void {
+  const next = targets.get(providerName) || [];
+  next.push(target);
+  targets.set(providerName, next);
+}
+
 function isKnownProvider(value: string): value is ProviderName {
-  return [
-    'auggie',
-    'claude',
-    'codex',
-    'copilot',
-    'cursor',
-    'gemini',
-    'kiro',
-    'opencode',
-  ].includes(value);
+  return (KNOWN_PROVIDERS as readonly string[]).includes(value);
+}
+
+function parseBackendKindValue(
+  value: unknown,
+  fallback: BackendKind,
+  label: string,
+): BackendKind {
+  const raw = normalizeString(value);
+  if (!raw) {
+    return fallback;
+  }
+  if (raw === 'cli' || raw === 'api' || raw === 'local') {
+    return raw;
+  }
+
+  throw new Error(`Invalid ${label}='${raw}'. Valid values: cli, api, local`);
+}
+
+function parseStringMap(
+  value: Record<string, unknown> | undefined,
+  label: string,
+): Record<string, string> | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    const stringValue = readString(entry);
+    if (stringValue === undefined) {
+      throw new Error(`${label}.${key} must be a string`);
+    }
+    parsed[key] = stringValue;
+  }
+
+  return Object.keys(parsed).length > 0 ? parsed : undefined;
+}
+
+function parseOptionalIntValue(
+  value: unknown,
+  label: string,
+): number | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error(`${label} must be a non-negative integer, got '${String(value)}'`);
+    }
+
+    return Math.trunc(value);
+  }
+
+  const raw = readString(value);
+  if (!raw) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`${label} must be a non-negative integer, got '${String(value)}'`);
+  }
+
+  return parsed;
 }
 
 function readProviderCommandConfig(

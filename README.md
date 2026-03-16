@@ -13,7 +13,7 @@ Current capabilities:
 - session lifecycle management for CLI-backed runtimes
 - streamed turns over SSE or NDJSON
 - external session discovery for supported local tools
-- file-based provider instance config for native and multi-WSL execution
+- file-based provider topology with separated `routing` / `backends` sections
 - dashboard-side provider instance selection for session creation
 - strict `default` instance aliasing and host-path validation for file-backed providers
 - provider-specific helpers such as Kiro model inspection

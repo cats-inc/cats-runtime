@@ -4,24 +4,16 @@ version: 1
 # Today cats-runtime supports native and WSL. Docker can fit this shape later.
 #
 # Supported kinds:
-#   native  — run on the host directly (macOS / Linux / Windows)
-#   wsl     — run inside a WSL distro (Windows only)
-#   (docker — planned; specify container name, image is not needed)
+#   native  - run on the host directly (macOS / Linux / Windows)
+#   wsl     - run inside a WSL distro (Windows only)
 #
-# On macOS / Linux all providers run natively, so you only need:
+# On macOS / Linux all CLI providers usually run natively, so you only need:
 #   environments:
 #     native:
 #       kind: native
 # or simply omit the environments block entirely (defaults to native).
 #
-# WSL: distro names must be unique (as shown by `wsl -l`).
-# To run two Ubuntu environments, import the same image under different names:
-#   wsl --import Ubuntu-Dev D:\wsl\Ubuntu-Dev D:\exports\ubuntu.tar
-# Then reference each by its distinct distro name below.
-#
-# File-backed provider paths are resolved on the host. On Windows, if you add a
-# WSL-backed file provider (Claude/Codex/Copilot/Gemini/Auggie), use a
-# host-accessible path such as \\wsl$\Ubuntu\home\user\... instead of ~/.xxx.
+# WSL distro names must match `wsl -l`.
 environments:
   native:
     kind: native
@@ -29,85 +21,143 @@ environments:
     kind: wsl
     distro: Ubuntu
 
-# Positive-list: only providers listed below are enabled.
-# Any known provider omitted from this block is automatically disabled
-# (attempting to create a session for it will return an error).
-# To enable only a subset, simply remove the providers you don't need.
-providers:
-  claude:
-    default_instance: native
-    instances:
-      native:
-        environment: native
-        command: claude
-        runner: auto
-        projects_dir: ~/.claude/projects
+# Routing picks the default execution target for each provider family.
+# The instance itself lives under one backend section below.
+routing:
+  providers:
+    claude:
+      default_target:
+        backend: cli
+        instance: native
+    codex:
+      default_target:
+        backend: cli
+        instance: native
+    gemini:
+      default_target:
+        backend: cli
+        instance: native
+    copilot:
+      default_target:
+        backend: cli
+        instance: native
+    opencode:
+      default_target:
+        backend: cli
+        instance: native
+    auggie:
+      default_target:
+        backend: cli
+        instance: native
+    cursor:
+      default_target:
+        backend: cli
+        instance: native
+    kiro:
+      default_target:
+        backend: cli
+        instance: native
 
-  codex:
-    default_instance: native
-    instances:
-      native:
-        environment: native
-        command: codex
-        runner: auto
-        sessions_dir: ~/.codex/sessions
+backends:
+  cli:
+    # Positive list: only providers listed here are enabled for CLI execution.
+    # Any known provider omitted from this block is disabled.
+    providers:
+      claude:
+        instances:
+          native:
+            environment: native
+            command: claude
+            runner: auto
+            projects_dir: ~/.claude/projects
 
-  gemini:
-    default_instance: native
-    instances:
-      native:
-        environment: native
-        command: gemini
-        runner: auto
-        sessions_dir: ~/.gemini/tmp
+      codex:
+        instances:
+          native:
+            environment: native
+            command: codex
+            runner: auto
+            sessions_dir: ~/.codex/sessions
 
-  copilot:
-    default_instance: native
-    instances:
-      native:
-        environment: native
-        command: copilot
-        runner: auto
-        sessions_dir: ~/.copilot/session-state
+      gemini:
+        instances:
+          native:
+            environment: native
+            command: gemini
+            runner: auto
+            sessions_dir: ~/.gemini/tmp
 
-  opencode:
-    default_instance: native
-    instances:
-      native:
-        environment: native
-        command: opencode
-        runner: auto
-        server:
-          host: 127.0.0.1
-          port: 4097
-          startup_timeout_ms: 10000
+      copilot:
+        instances:
+          native:
+            environment: native
+            command: copilot
+            runner: auto
+            sessions_dir: ~/.copilot/session-state
 
-  auggie:
-    default_instance: native
-    instances:
-      native:
-        environment: native
-        command: auggie
-        runner: auto
-        sessions_dir: ~/.augment/sessions
+      opencode:
+        instances:
+          native:
+            environment: native
+            command: opencode
+            runner: auto
+            server:
+              host: 127.0.0.1
+              port: 4097
+              startup_timeout_ms: 10000
 
-  cursor:
-    default_instance: ubuntu
-    instances:
-      ubuntu:
-        environment: ubuntu
-        command: cursor-agent
-        runner: auto
-        chats_dir: ~/.cursor/chats
+      auggie:
+        instances:
+          native:
+            environment: native
+            command: auggie
+            runner: auto
+            sessions_dir: ~/.augment/sessions
 
-  kiro:
-    default_instance: ubuntu
-    instances:
-      ubuntu:
-        environment: ubuntu
-        command: kiro-cli
-        runner: auto
-        # db_path defaults:
-        #   macOS:       ~/Library/Application Support/kiro-cli/data.sqlite3
-        #   Linux / WSL: ~/.local/share/kiro-cli/data.sqlite3
-        db_path: ~/.local/share/kiro-cli/data.sqlite3
+      cursor:
+        instances:
+          native:
+            environment: native
+            command: cursor-agent
+            runner: auto
+            chats_dir: ~/.cursor/chats
+
+      kiro:
+        instances:
+          native:
+            environment: native
+            command: kiro-cli
+            runner: auto
+            # db_path defaults:
+            #   macOS:       ~/Library/Application Support/kiro-cli/data.sqlite3
+            #   Linux / WSL: ~/.local/share/kiro-cli/data.sqlite3
+            db_path: ~/Library/Application Support/kiro-cli/data.sqlite3
+
+  # API and local model backends use separate sections on purpose so they do not
+  # share the same instance map as CLI providers. Current builds parse these
+  # sections for catalog/routing groundwork; execution support lands in upcoming
+  # phases.
+  #
+  # api:
+  #   providers:
+  #     openai:
+  #       instances:
+  #         main:
+  #           transport: openai
+  #           api_key_env: OPENAI_API_KEY
+  #           model: gpt-5
+  #     claude:
+  #       instances:
+  #         sonnet:
+  #           transport: anthropic
+  #           api_key_env: ANTHROPIC_API_KEY
+  #           model: claude-sonnet-4-6
+  #
+  # local:
+  #   providers:
+  #     ollama:
+  #       instances:
+  #         local:
+  #           transport: ollama
+  #           base_url: http://127.0.0.1:11434
+  #           model: qwen3:latest

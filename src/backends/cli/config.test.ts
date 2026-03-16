@@ -573,4 +573,239 @@ providers:
       rmSync(tempDir, { recursive: true, force: true });
     }
   });
+
+  it('loads separated backend config without mixing CLI and API instances', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const configPath = join(tempDir, 'providers.yaml');
+    writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+routing:
+  providers:
+    claude:
+      default_target:
+        backend: cli
+        instance: native
+    openai:
+      default_target:
+        backend: api
+        instance: main
+    ollama:
+      default_target:
+        backend: local
+        instance: local
+backends:
+  cli:
+    providers:
+      claude:
+        instances:
+          native:
+            environment: native
+            command: claude
+            runner: auto
+            projects_dir: /native/claude/projects
+  api:
+    providers:
+      openai:
+        instances:
+          main:
+            transport: openai
+            api_key_env: OPENAI_API_KEY
+            model: gpt-5
+            headers:
+              x-project: cats-runtime
+            timeout_ms: 30000
+            max_retries: 2
+  local:
+    providers:
+      ollama:
+        instances:
+          local:
+            transport: ollama
+            base_url: http://127.0.0.1:11434
+            model: qwen3:latest
+`.trimStart());
+
+    try {
+      const config = loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_CONFIG_PATH: configPath,
+      });
+
+      expect(config.providerDefaultTargets).toEqual({
+        claude: {
+          backend: 'cli',
+          instance: 'native',
+        },
+        openai: {
+          backend: 'api',
+          instance: 'main',
+        },
+        ollama: {
+          backend: 'local',
+          instance: 'local',
+        },
+      });
+
+      expect(config.providerDefaultInstances?.claude).toBe('native');
+      expect(config.providerDefaultTargets?.gemini).toBeUndefined();
+      expect(listProviderInstances(config, 'claude')).toHaveLength(1);
+      expect(listProviderInstances(config, 'gemini')).toHaveLength(0);
+
+      expect(config.remoteProviderCatalog).toEqual({
+        api: {
+          openai: {
+            main: {
+              id: 'main',
+              providerName: 'openai',
+              backend: 'api',
+              transport: 'openai',
+              model: 'gpt-5',
+              apiKeyEnv: 'OPENAI_API_KEY',
+              baseUrl: undefined,
+              baseUrlEnv: undefined,
+              organizationEnv: undefined,
+              projectEnv: undefined,
+              headers: {
+                'x-project': 'cats-runtime',
+              },
+              timeoutMs: 30000,
+              maxRetries: 2,
+              toolProfile: undefined,
+            },
+          },
+        },
+        local: {
+          ollama: {
+            local: {
+              id: 'local',
+              providerName: 'ollama',
+              backend: 'local',
+              transport: 'ollama',
+              model: 'qwen3:latest',
+              apiKeyEnv: undefined,
+              baseUrl: 'http://127.0.0.1:11434',
+              baseUrlEnv: undefined,
+              organizationEnv: undefined,
+              projectEnv: undefined,
+              headers: undefined,
+              timeoutMs: undefined,
+              maxRetries: undefined,
+              toolProfile: undefined,
+            },
+          },
+        },
+      });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects providers that are configured in multiple backends without routing', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const configPath = join(tempDir, 'providers.yaml');
+    writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+backends:
+  cli:
+    providers:
+      claude:
+        instances:
+          native:
+            environment: native
+            command: claude
+            runner: auto
+            projects_dir: /native/claude/projects
+  api:
+    providers:
+      claude:
+        instances:
+          sonnet:
+            transport: anthropic
+            api_key_env: ANTHROPIC_API_KEY
+            model: claude-sonnet-4-6
+`.trimStart());
+
+    try {
+      expect(() => loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_CONFIG_PATH: configPath,
+      })).toThrow(/configured in multiple backends/);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects API default targets for known CLI providers until API execution ships', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const configPath = join(tempDir, 'providers.yaml');
+    writeFileSync(configPath, `
+version: 1
+routing:
+  providers:
+    claude:
+      default_target:
+        backend: api
+        instance: sonnet
+backends:
+  api:
+    providers:
+      claude:
+        instances:
+          sonnet:
+            transport: anthropic
+            api_key_env: ANTHROPIC_API_KEY
+            model: claude-sonnet-4-6
+`.trimStart());
+
+    try {
+      expect(() => loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_CONFIG_PATH: configPath,
+      })).toThrow(/default target 'api\/sonnet' is not supported in this build/);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects mixing legacy providers with separated backends blocks', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const configPath = join(tempDir, 'providers.yaml');
+    writeFileSync(configPath, `
+version: 1
+providers:
+  claude:
+    instances:
+      default:
+        command: claude
+        runner: auto
+backends:
+  api:
+    providers:
+      openai:
+        instances:
+          main:
+            transport: openai
+            api_key_env: OPENAI_API_KEY
+            model: gpt-5
+`.trimStart());
+
+    try {
+      expect(() => loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_CONFIG_PATH: configPath,
+      })).toThrow(/Cannot mix top-level providers with backends\.\*/);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
 });
