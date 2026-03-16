@@ -17,6 +17,7 @@ import { SessionScanner } from './backends/cli/discovery/SessionScanner.js';
 import { CodexSessionScanner } from './backends/cli/discovery/CodexSessionScanner.js';
 import { CopilotSessionScanner } from './backends/cli/discovery/CopilotSessionScanner.js';
 import { GeminiSessionScanner } from './backends/cli/discovery/GeminiSessionScanner.js';
+import { PiSessionScanner } from './backends/cli/discovery/PiSessionScanner.js';
 import { syncNativeSessions } from './backends/cli/discovery/nativeDiscovery.js';
 import {
   WslDiscoveryStatusStore,
@@ -293,6 +294,24 @@ export function createDiscoveryController(
           resolveFileBackedProviderPath(ctx.config, 'gemini', instance.id),
         ),
         'gemini',
+        ctx.registry,
+        instance.id,
+      ),
+    })),
+    ...listProviderInstances(ctx.config, 'pi').map((instance) => ({
+      provider: 'pi' as const,
+      instanceId: instance.id,
+      name: instance.id === getProviderDefaultInstanceId(ctx.config, 'pi')
+        ? 'pi'
+        : `pi@${instance.id}`,
+      watchDir: resolveFileBackedProviderPath(ctx.config, 'pi', instance.id),
+      normalizedWatchDir: normalizeFileBackedProviderPath(ctx.config, 'pi', instance.id),
+      createWatcher: () => new FileWatcher(
+        resolveFileBackedProviderPath(ctx.config, 'pi', instance.id),
+        new PiSessionScanner(
+          resolveFileBackedProviderPath(ctx.config, 'pi', instance.id),
+        ),
+        'pi',
         ctx.registry,
         instance.id,
       ),

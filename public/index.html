@@ -30,6 +30,7 @@
     --gemini: #4285f4;
     --kiro: #14b8a6;
     --opencode: #f472b6;
+    --pi: #a8a29e;
     --radius: 8px;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -243,6 +244,7 @@
   .project-header[data-provider="gemini"] { border-left-color: var(--gemini); }
   .project-header[data-provider="kiro"] { border-left-color: var(--kiro); }
   .project-header[data-provider="opencode"] { border-left-color: var(--opencode); }
+  .project-header[data-provider="pi"] { border-left-color: var(--pi); }
   .project-header[data-provider="mixed"] {
     border-image: linear-gradient(
       to bottom,
@@ -253,7 +255,8 @@
       var(--cursorp),
       var(--gemini),
       var(--kiro),
-      var(--opencode)
+      var(--opencode),
+      var(--pi)
     ) 1;
   }
   .provider-badge {
@@ -272,6 +275,7 @@
   .provider-badge[data-p="kiro"] { background: rgba(20,184,166,0.2); color: var(--kiro); }
   .provider-badge[data-p="auggie"] { background: rgba(6,182,212,0.2); color: var(--auggie); }
   .provider-badge[data-p="opencode"] { background: rgba(244,114,182,0.2); color: var(--opencode); }
+  .provider-badge[data-p="pi"] { background: rgba(168,162,158,0.2); color: var(--pi); }
   .instance-badge {
     display: inline-flex;
     align-items: center;
