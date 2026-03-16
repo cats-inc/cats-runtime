@@ -58,6 +58,10 @@ routing:
       default_target:
         backend: cli
         instance: ubuntu
+    pi:
+      default_target:
+        backend: cli
+        instance: native
     ollama:
       default_target:
         backend: local
@@ -137,6 +141,16 @@ backends:
             #   macOS:       ~/Library/Application Support/kiro-cli/data.sqlite3
             #   Linux / WSL: ~/.local/share/kiro-cli/data.sqlite3
             db_path: ~/.local/share/kiro-cli/data.sqlite3
+
+      pi:
+        instances:
+          native:
+            environment: native
+            command: pi
+            runner: auto
+            # Pi stores session files as JSONL under this directory.
+            # Session resume uses --session <path> to continue a previous conversation.
+            sessions_dir: ~/.pi/paperclips
 
   api:
     providers:

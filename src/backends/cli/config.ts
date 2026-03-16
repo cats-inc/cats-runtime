@@ -114,6 +114,7 @@ export interface ProviderInstanceConfig {
   opencodeServerHost?: string;
   opencodeServerPort?: number;
   opencodeServerStartupTimeoutMs?: number;
+  piSessionsDir?: string;
 }
 
 export interface CliRuntimeConfig {
@@ -131,6 +132,7 @@ export interface CliRuntimeConfig {
   geminiPath: string;
   kiroPath: string;
   opencodePath: string;
+  piPath: string;
   opencodeServerHost: string;
   opencodeServerPort: number;
   opencodeServerStartupTimeoutMs: number;
@@ -143,6 +145,7 @@ export interface CliRuntimeConfig {
   geminiSessionsDir: string;
   kiroDbPath: string;
   kiroRuntime: ProviderRuntimeConfig;
+  piSessionsDir: string;
   wslDiscoveryPolicy?: WslDiscoveryPolicy;
   nativeDiscoveryIntervalMs: number;
   externalSessionLiveWindowMs: number;
@@ -173,6 +176,7 @@ interface LegacyRuntimeShape {
   opencodeServerHost: string;
   opencodeServerPort: number;
   opencodeServerStartupTimeoutMs: number;
+  piSessionsDir: string;
   providerDefaultTargets: Record<string, ProviderDefaultTarget>;
   remoteProviderCatalog: RemoteProviderCatalog;
 }
@@ -224,6 +228,10 @@ export function defaultKiroDbPath(
   }
 
   return '~/.local/share/kiro-cli/data.sqlite3';
+}
+
+export function defaultPiSessionsDir(): string {
+  return '~/.pi/paperclips';
 }
 
 export function defaultOpencodeServerHost(): string {
@@ -297,6 +305,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CliRuntimeConf
     geminiPath: configured.providerCommands.gemini.path,
     kiroPath: configured.providerCommands.kiro.path,
     opencodePath: configured.providerCommands.opencode.path,
+    piPath: configured.providerCommands.pi.path,
     opencodeServerHost: configured.opencodeServerHost,
     opencodeServerPort: configured.opencodeServerPort,
     opencodeServerStartupTimeoutMs: configured.opencodeServerStartupTimeoutMs,
@@ -309,6 +318,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CliRuntimeConf
     geminiSessionsDir: configured.geminiSessionsDir,
     kiroDbPath: configured.kiroDbPath,
     kiroRuntime: configured.kiroRuntime,
+    piSessionsDir: configured.piSessionsDir,
     wslDiscoveryPolicy: parseWslDiscoveryPolicy(
       env.CATS_RUNTIME_WSL_DISCOVERY_POLICY,
       defaultWslDiscoveryPolicy(),
@@ -372,6 +382,7 @@ export function listProviderInstances(
     | 'opencodeServerHost'
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
+    | 'piSessionsDir'
   >,
   provider: ProviderName,
 ): ProviderInstanceConfig[] {
@@ -412,6 +423,7 @@ export function resolveProviderInstance(
     | 'opencodeServerHost'
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
+    | 'piSessionsDir'
   >,
   provider: ProviderName,
   instanceId?: string,
@@ -470,6 +482,7 @@ function buildLegacyRuntimeShape(
     gemini: 'default',
     kiro: 'default',
     opencode: 'default',
+    pi: 'default',
   } satisfies Record<ProviderName, string>;
   const providerDefaultTargets = Object.fromEntries(
     Object.entries(providerDefaultInstances).map(([provider, instance]) => [provider, {
@@ -560,6 +573,14 @@ function buildLegacyRuntimeShape(
         opencodeServerStartupTimeoutMs,
       },
     },
+    pi: {
+      default: {
+        id: 'default',
+        providerName: 'pi',
+        commandConfig: providerCommands.pi,
+        piSessionsDir: env.PI_SESSIONS_DIR || defaultPiSessionsDir(),
+      },
+    },
   };
 
   return {
@@ -578,6 +599,7 @@ function buildLegacyRuntimeShape(
     opencodeServerHost,
     opencodeServerPort,
     opencodeServerStartupTimeoutMs,
+    piSessionsDir: env.PI_SESSIONS_DIR || defaultPiSessionsDir(),
     providerDefaultTargets,
     remoteProviderCatalog: {
       api: {},
@@ -597,6 +619,7 @@ function buildLegacyProviderCommands(
   const geminiPath = env.GEMINI_PATH || 'gemini';
   const kiroPath = env.KIRO_PATH || 'kiro-cli';
   const opencodePath = env.OPENCODE_PATH || 'opencode';
+  const piPath = env.PI_PATH || 'pi';
 
   return {
     auggie: readProviderCommandConfig(
@@ -647,6 +670,12 @@ function buildLegacyProviderCommands(
       defaultProviderRuntimeMode('opencode'),
       env,
     ),
+    pi: readProviderCommandConfig(
+      'PI',
+      piPath,
+      defaultProviderRuntimeMode('pi'),
+      env,
+    ),
   };
 }
 
@@ -666,6 +695,7 @@ function buildLegacyProviderInstance(
     | 'opencodeServerHost'
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
+    | 'piSessionsDir'
   >,
 ): ProviderInstanceConfig {
   return {
@@ -684,6 +714,7 @@ function buildLegacyProviderInstance(
     opencodeServerStartupTimeoutMs: provider === 'opencode'
       ? config.opencodeServerStartupTimeoutMs
       : undefined,
+    piSessionsDir: provider === 'pi' ? config.piSessionsDir : undefined,
   };
 }
 
@@ -716,6 +747,7 @@ function applyFileBasedProviderConfig(
   let opencodeServerHost = legacy.opencodeServerHost;
   let opencodeServerPort = legacy.opencodeServerPort;
   let opencodeServerStartupTimeoutMs = legacy.opencodeServerStartupTimeoutMs;
+  let piSessionsDir = legacy.piSessionsDir;
   const rawBackends = asOptionalObject(doc.backends);
   if (doc.backends !== undefined && !rawBackends) {
     throw new Error(`Invalid backends block in '${filePath}'`);
@@ -782,6 +814,11 @@ function applyFileBasedProviderConfig(
           geminiSessionsDir = readString(discovery?.sessions_dir)
             || readString(providerDoc.sessions_dir)
             || geminiSessionsDir;
+          break;
+        case 'pi':
+          piSessionsDir = readString(discovery?.sessions_dir)
+            || readString(providerDoc.sessions_dir)
+            || piSessionsDir;
           break;
         default:
           break;
@@ -873,6 +910,11 @@ function applyFileBasedProviderConfig(
               `${provider}.instances.${instanceId}.server.startup_timeout_ms`,
             )
             : undefined,
+          piSessionsDir: provider === 'pi'
+            ? readString(instanceDoc.sessions_dir)
+              || fallback.piSessionsDir
+              || piSessionsDir
+            : undefined,
         };
       }
 
@@ -924,6 +966,9 @@ function applyFileBasedProviderConfig(
       }
       if (provider === 'auggie') {
         auggieSessionsDir = nextInstances[defaultInstance].auggieSessionsDir || auggieSessionsDir;
+      }
+      if (provider === 'pi') {
+        piSessionsDir = nextInstances[defaultInstance].piSessionsDir || piSessionsDir;
       }
     }
 
@@ -1002,6 +1047,9 @@ function applyFileBasedProviderConfig(
     if (provider === 'auggie') {
       auggieSessionsDir = instance.auggieSessionsDir || auggieSessionsDir;
     }
+    if (provider === 'pi') {
+      piSessionsDir = instance.piSessionsDir || piSessionsDir;
+    }
   }
 
   return {
@@ -1020,6 +1068,7 @@ function applyFileBasedProviderConfig(
     opencodeServerHost,
     opencodeServerPort,
     opencodeServerStartupTimeoutMs,
+    piSessionsDir,
     providerDefaultTargets,
     remoteProviderCatalog,
   };
@@ -1183,6 +1232,7 @@ function cloneProviderCommands(
     gemini: cloneProviderCommandConfig(commands.gemini),
     kiro: cloneProviderCommandConfig(commands.kiro),
     opencode: cloneProviderCommandConfig(commands.opencode),
+    pi: cloneProviderCommandConfig(commands.pi),
   };
 }
 
@@ -1198,6 +1248,7 @@ function cloneProviderInstances(
     gemini: cloneInstanceMap(instances.gemini),
     kiro: cloneInstanceMap(instances.kiro),
     opencode: cloneInstanceMap(instances.opencode),
+    pi: cloneInstanceMap(instances.pi),
   };
 }
 

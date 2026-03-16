@@ -15,6 +15,7 @@ const PROVIDER_ORDER = [
   'claude',
   'codex',
   'gemini',
+  'pi',
   'ollama',
   'copilot',
   'cursor',
@@ -86,6 +87,7 @@ export function getProviderDefaultTarget(
     | 'opencodeServerHost'
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
+    | 'piSessionsDir'
     | 'remoteProviderCatalog'
   >,
   providerName: string,
@@ -160,6 +162,7 @@ export function listConfiguredProviders(
     | 'opencodeServerHost'
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
+    | 'piSessionsDir'
     | 'remoteProviderCatalog'
   >,
 ): string[] {
@@ -201,6 +204,7 @@ export function listProviderCatalog(
     | 'opencodeServerHost'
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
+    | 'piSessionsDir'
     | 'remoteProviderCatalog'
   >,
 ): Record<string, ProviderCatalogEntry> {
@@ -275,6 +279,7 @@ export function resolveProviderTarget(
     | 'opencodeServerHost'
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
+    | 'piSessionsDir'
     | 'remoteProviderCatalog'
   >,
   providerName: string,
