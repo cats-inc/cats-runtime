@@ -114,6 +114,11 @@ src/
 - Persists provider-native continuation metadata such as OpenAI response IDs,
   Anthropic prompt-caching hints, and Gemini cached-content state as
   optimizations under the runtime-owned logical session
+- Also hosts the current execution machinery for `local` targets such as
+  Ollama. `local` remains a distinct backend kind in config/routing/public
+  payloads because its product semantics differ from pay-as-you-go remote APIs,
+  but it does not currently justify a separate `src/backends/local` runtime
+  manager
 
 ### `src/backends/agent`
 

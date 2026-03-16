@@ -36,6 +36,8 @@ Keep `.env` for runtime-wide values and secrets:
 - `CATS_RUNTIME_SPAWN_TIMEOUT_MS=30000`
 - `AUGGIE_MAX_TURNS=50`
 - `PWSH_PATH=...`
+- `OPENCLAW_URL=ws://127.0.0.1:8787/ws`
+- `OPENCLAW_TOKEN=`
 
 Legacy provider-specific env vars still work, but new installs should prefer
 `config/providers.yaml`.
@@ -51,6 +53,18 @@ Legacy provider-specific env vars still work, but new installs should prefer
   stays product-facing (`claude`, `codex`, `gemini`) and `transport` names the vendor API
 - `backends.local.providers.<name>.instances.<id>`: local-model runtimes such as Ollama without
   mixing them into CLI instance maps
+- `backends.agent.providers.<name>.instances.<id>`: external agent runtimes such as OpenClaw that
+  own more of the run/session lifecycle than CLI or completion APIs
+
+`backends.local` is intentionally a public config/routing distinction, even
+though today's implementation still runs local HTTP model targets through
+`src/backends/api`. In other words:
+
+- `local` means "local-model semantics" in provider topology and UI
+- `src/backends/api` is currently the shared execution machinery for both
+  remote completion APIs and local HTTP model runtimes
+- there is no separate `src/backends/local` yet because Ollama does not
+  currently need a second runtime manager
 
 Minimal example:
 
@@ -80,6 +94,10 @@ routing:
       default_target:
         backend: local
         instance: local
+    openclaw:
+      default_target:
+        backend: agent
+        instance: gateway
 backends:
   cli:
     providers:
@@ -119,6 +137,17 @@ backends:
             transport: ollama
             base_url: http://127.0.0.1:11434
             model: qwen2.5-coder:7b
+  agent:
+    providers:
+      openclaw:
+        default_instance: gateway
+        transport: openclaw_gateway
+        url_env: OPENCLAW_URL
+        auth_token_env: OPENCLAW_TOKEN
+        client_id: cats-runtime
+        instances:
+          gateway:
+            model: openclaw-coder
 ```
 
 This lets one provider expose multiple independently logged-in environments,
@@ -130,6 +159,11 @@ For remote API providers, shared settings belong at the provider level. Put
 `backends.api.providers.<name>`, then let each instance override only what
 actually differs, usually `model`. That avoids copying the same API key across
 `claude.sonnet`, `gemini.flash`, and similar instance variants.
+
+Agent backends follow the same pattern. Put shared gateway/auth settings such as
+`transport`, `url_env`, `auth_token_env`, and `client_id` at the provider
+level, then keep each instance block focused on the fields that actually vary,
+usually `model`.
 
 Path semantics matter:
 
@@ -147,7 +181,8 @@ Path semantics matter:
 
 The embedded dashboard reads `GET /providers/config` and uses it to populate the
 provider-instance selector in the create-session modal. Providers configured in
-`backends.cli`, `backends.api`, or `backends.local` all appear there.
+`backends.cli`, `backends.api`, `backends.local`, or `backends.agent` all
+appear there.
 
 ## Running the Project
 

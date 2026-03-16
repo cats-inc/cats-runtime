@@ -66,6 +66,10 @@ routing:
       default_target:
         backend: local
         instance: local
+    openclaw:
+      default_target:
+        backend: agent
+        instance: gateway
 
 backends:
   cli:
@@ -193,3 +197,17 @@ backends:
             # Qwen2.5 Coder 7B fits comfortably on an RTX 4060 8GB and remains
             # one of the strongest Ollama-hosted coding-specialized options.
             model: qwen2.5-coder:7b
+
+  agent:
+    providers:
+      openclaw:
+        default_instance: gateway
+        transport: openclaw_gateway
+        # Keep these in env vars because OpenClaw deployments are usually
+        # environment-specific.
+        url_env: OPENCLAW_URL
+        auth_token_env: OPENCLAW_TOKEN
+        client_id: cats-runtime
+        instances:
+          gateway:
+            model: openclaw-coder
