@@ -88,6 +88,8 @@ Example target shape:
 version: 1
 
 providers:
+  # Model values below are illustrative examples and should be refreshed when
+  # implementation starts.
   claude:
     default_instance: api
     instances:
@@ -167,7 +169,12 @@ Suggested core abstractions:
 
 ```ts
 interface ExecutionHandle {
-  readonly alive: boolean;
+  /**
+   * True while this handle still represents an active runtime execution resource.
+   * For CLI this usually means a live subprocess; for API/Ollama it means the
+   * runtime-owned session handle has not been closed or discarded.
+   */
+  readonly active: boolean;
   readonly busy: boolean;
   streamMessage(message: string): AsyncGenerator<StreamEvent>;
   kill(): void;
@@ -178,6 +185,7 @@ interface ExecutionHandle {
 interface BackendAdapter {
   kind: 'cli' | 'api';
   getCapabilities(provider: RuntimeProviderName, instanceId?: string): ProviderCapabilities;
+  probe?(provider: RuntimeProviderName, instanceId?: string): Promise<HealthStatus>;
   createExecution(
     sessionId: string,
     provider: RuntimeProviderName,
@@ -187,8 +195,23 @@ interface BackendAdapter {
 }
 ```
 
-This allows the current pool-driven routes to stay mostly unchanged while the
-implementation underneath becomes backend-aware.
+Semantics:
+
+- `ExecutionHandle` is execution-resource-scoped, not session-scoped.
+- CLI handles are usually process-scoped and survive across turns until closed.
+- API/Ollama handles are session-backed but turn-scoped in activity; they may
+  exist without an active network call, and `busy` only means an in-flight turn.
+- `kill()` means "stop current execution" rather than "delete session". For CLI
+  that normally terminates the subprocess; for API/Ollama it aborts the active
+  turn/tool loop.
+
+This keeps the public HTTP contract stable while allowing the route internals to
+move behind a backend-aware execution facade.
+
+Phase 1 should make this even more explicit by introducing a backend-neutral
+`RuntimeSessionManager` or `RuntimeFacade` that owns session execution. The
+existing `WorkerPool` should become a CLI implementation detail behind that
+facade rather than remain a route-level dependency.
 
 ### 2. Make Provider Instances Backend-Aware
 
@@ -202,6 +225,20 @@ Recommended config typing:
 - `ApiProviderInstanceConfig`
 - `ProviderInstanceConfig = CliProviderInstanceConfig | ApiProviderInstanceConfig`
 
+Provider-catalog ripple effects that Phase 1 must patch explicitly:
+
+- `src/backends/cli/providers/types.ts` currently hard-codes `KNOWN_PROVIDERS`
+  and a CLI-shaped `StreamEvent`.
+- `src/server.ts` discovery bootstrap and watcher construction should treat
+  API-only providers as an explicit no-discovery path, not as "missing CLI"
+  failures.
+- `src/http/routes/sessions.ts` provider validation must include new API-only
+  providers.
+- `src/http/providerServices.ts` should either be generalized or reduced to
+  CLI-only helpers behind the new facade.
+- The embedded dashboard ordering and provider badges must be updated for
+  `openai` and `ollama`.
+
 ### 3. Add an API Session Runtime
 
 `src/backends/api` should own:
@@ -209,7 +246,7 @@ Recommended config typing:
 - provider transport clients
 - canonical transcript storage
 - active turn lifecycle and stream fan-out
-- tool loop orchestration
+- tool loop orchestration against shared runtime tools
 - API rate limit / retry policy
 - provider-specific response normalization
 - Ollama model inspection and local-runtime health integration
@@ -232,6 +269,7 @@ src/backends/api/
     ApiTurnRunner.ts
     transcriptStore.ts
     eventBus.ts
+src/core/
   tools/
     registry.ts
     policies.ts
@@ -246,18 +284,41 @@ src/backends/api/
 
 ## Implementation Phases
 
+### Phase 0: Architecture Record and Scope Gates
+
+- [ ] Record `ADR-005` before implementation starts, covering:
+      backend-neutral session execution, runtime-managed transcripts as source
+      of truth, instance-level backend selection, fetch-first transport policy,
+      and Ollama as an independent provider.
+- [ ] Create `SPEC-002` for the shared local tool runtime before Phase 3 work
+      begins, because that subsystem is large enough to deserve its own
+      requirements and approval flow.
+
+**Deliverables**: Architecture decisions are recorded up front and the local
+tool runtime has a dedicated scope document before implementation expands.
+
 ### Phase 1: Backend-Neutral Runtime Seam
 
 - [ ] Move stable session, capability, and stream contracts out of
       `src/backends/cli` into `src/core`.
 - [ ] Introduce backend-aware provider instance types with `backend: cli | api`.
+- [ ] Introduce `RuntimeSessionManager` / `RuntimeFacade` so HTTP routes stop
+      depending directly on `WorkerPool`.
 - [ ] Add `openai` and `ollama` to the provider catalog, dashboard ordering,
       and provider metadata responses.
-- [ ] Generalize `AppContext` and routing helpers so they no longer hard-depend
-      on CLI-only classes.
+- [ ] Define backend probe semantics so dashboard and operators can distinguish
+      "active execution handle" from "backend health / availability".
+- [ ] Generalize `AppContext`, config types, and routing helpers so they no
+      longer hard-depend on CLI-only classes.
+- [ ] Enumerate and patch provider-catalog ripple points: `KNOWN_PROVIDERS`,
+      provider validation, discovery no-op behavior, dashboard ordering, and
+      helper resolution.
+- [ ] Generalize `StreamEvent.raw` away from `ClaudeStreamEvent` so non-CLI
+      backends can preserve raw payloads without type abuse.
 
 **Deliverables**: The server can resolve provider instances without assuming
-they are subprocess-backed, and the public HTTP contract remains unchanged.
+they are subprocess-backed, routes depend on a backend-neutral facade rather
+than directly on `WorkerPool`, and the public HTTP contract remains unchanged.
 
 ### Phase 2: API Transport Foundation
 
@@ -267,11 +328,14 @@ they are subprocess-backed, and the public HTTP contract remains unchanged.
 - [ ] Create `ApiExecution` objects that behave like worker handles for active
       turns.
 - [ ] Persist canonical runtime-managed transcripts for every API session.
+- [ ] Reserve transcript metadata and transport hooks for prompt/context caching
+      and continuation IDs so resume is not hard-coded to full-history replay.
 - [ ] Support `create`, `message`, `resume`, `fork`, `close`, `delete`, and
       `history` for API sessions.
 
 **Deliverables**: API-backed and Ollama-backed sessions work end to end for
-text-only turns, with streaming and durable history.
+text-only turns, with streaming, durable history, and a non-blocking path to
+provider-specific resume optimizations.
 
 ### Phase 3: Local Tool Runtime and Workspace Policy
 
@@ -322,25 +386,33 @@ tests and operator documentation.
 |------|--------|-------------|
 | `src/core/types.ts` | Modify | Move shared session / provider / stream contracts out of CLI |
 | `src/core/config.ts` | Modify | Export backend-neutral runtime config and load API settings |
+| `src/core/runtime/RuntimeSessionManager.ts` | Create | Backend-neutral facade that owns session execution and replaces direct route dependence on `WorkerPool` |
 | `src/backends/cli/config.ts` | Modify | Support backend-aware provider instances without breaking CLI config |
+| `src/backends/cli/providers/types.ts` | Modify | Extend provider catalog and generalize CLI-specific `StreamEvent` assumptions |
 | `src/backends/cli/pool/WorkerPool.ts` | Modify | Depend on generalized execution contracts or become a CLI adapter |
 | `src/backends/api/config.ts` | Create | Parse API instance settings and env-backed secrets |
 | `src/backends/api/types.ts` | Create | API transport, transcript, and tool-loop types |
 | `src/backends/api/transports/*.ts` | Create | Anthropic, OpenAI, Gemini, Ollama streaming clients |
 | `src/backends/api/runtime/*.ts` | Create | API execution lifecycle, event bus, transcript store |
-| `src/backends/api/tools/**/*.ts` | Create | Local tool runtime and policy enforcement |
+| `src/core/tools/**/*.ts` | Create | Shared tool runtime, policy enforcement, and workspace guardrails |
 | `src/http/app.ts` | Modify | Carry backend-neutral context and adapters |
+| `src/http/providerServices.ts` | Modify | Reduce or isolate CLI-only service helpers behind the new facade |
 | `src/http/routes/providers.ts` | Modify | Return backend metadata for each provider instance |
 | `src/http/routes/sessions.ts` | Modify | Route create/resume/fork/close semantics through backend-neutral adapters |
 | `src/http/routes/messages.ts` | Modify | Support API execution handles and canonical transcript writes |
 | `src/http/routes/history.ts` | Modify | Read canonical API transcripts in addition to CLI-native sources |
 | `src/http/routes/observe.ts` | Modify | Observe active API turns through the same SSE surface |
+| `src/http/routes/discovery.ts` | Modify | Make API-only providers an explicit no-discovery case instead of an error path |
+| `src/http/routes/pool.ts` | Modify | Decide whether pool status stays CLI-specific or is subsumed by runtime status |
 | `src/http/routes/ollama.ts` | Create/Modify | Optional Ollama model-health and model-listing routes if kept separate from generic providers |
 | `src/server.ts` | Modify | Wire CLI and API backends into one runtime app |
+| `public/index.html` | Modify | Extend provider ordering, instance metadata, and badges for OpenAI/Ollama |
 | `config/providers.yaml.example` | Modify | Add example API instances for Claude, OpenAI, Gemini, and Ollama |
 | `docs/api.md` | Modify | Document API-backed and Ollama-backed provider instances and any additive stream events |
 | `docs/setup-guide.md` | Modify | Document API key env vars, `OLLAMA_BASE_URL`, and provider instance setup |
 | `docs/architecture.md` | Modify | Reflect the mixed CLI/API/local-model backend model |
+| `docs/decisions/005-backend-neutral-runtime-and-api-backend.md` | Create | Record the architecture decisions required before implementation |
+| `docs/specs/SPEC-002-local-tool-runtime.md` | Create | Scope and requirements for the shared local tool runtime |
 | `src/**/*.test.ts` | Modify/Create | Add transport, tool-loop, and route integration coverage |
 
 ## Technical Decisions
@@ -349,8 +421,9 @@ tests and operator documentation.
   the upper-layer contract stable.
 - Runtime-managed transcripts are the source of truth for API session resume and
   fork. Remote provider conversation IDs are optimizations, not required state.
-- Local workspace tools should be hosted by `cats-runtime` for predictable
-  parity across Anthropic, OpenAI, Gemini, and Ollama.
+- Local workspace tools should be hosted by `cats-runtime` in a shared
+  core-level module for predictable parity across Anthropic, OpenAI, Gemini,
+  and Ollama, and to keep policy logic independent of backend choice.
 - Use `fetch` plus small stream parsers first instead of immediately adopting
   three vendor SDKs. Revisit SDKs only if files, live APIs, or auth flows become
   materially simpler through them.
@@ -359,6 +432,19 @@ tests and operator documentation.
   and lifecycle are distinct enough to justify a dedicated provider boundary.
 - Prefer runtime-managed resume/fork for Ollama because its OpenAI-compatible
   `/v1/responses` support is explicitly non-stateful.
+- `StreamEvent.raw` should become backend-neutral in `src/core`, with provider
+  modules owning their own raw payload types; the shared contract should not
+  pretend every raw event is Claude-shaped.
+- Backend health probing is separate from execution-handle liveness. A session
+  may have no active execution handle while its provider instance is still
+  healthy and ready to accept a new turn.
+- Phase 2 should leave explicit hooks for caching/continuation metadata, but the
+  provider-specific cost optimizations themselves remain a later delivery to
+  keep the transport foundation small and testable.
+- The fetch-first transport policy is only the default starting point. Move to a
+  vendor SDK when a provider requires multipart/file-upload flows, significantly
+  more complex auth, unstable or high-maintenance streaming semantics, or SDK
+  support materially reduces custom parser/test burden.
 - Additive stream-event expansion is acceptable, but existing `init`, `text`,
   `tool_use`, `result`, `error`, and `raw` events must remain valid.
 - API keys must never be logged, persisted in session metadata, or written to
@@ -388,7 +474,7 @@ tests and operator documentation.
 | HTTP layer is too coupled to CLI internals | High | Introduce backend-neutral contracts before shipping provider functionality |
 | Provider APIs differ in tool semantics and conversation state | High | Make runtime transcript + local tool loop canonical, treat provider session IDs as optional accelerators |
 | Ollama local availability and model presence are host-specific | Medium | Add health/model checks and fail fast before session creation |
-| API costs spike when replaying long histories | Medium | Add transcript summarization hooks, prompt/context caching, and provider-specific continuation optimizations in Phase 4 |
+| API costs spike when replaying long histories | Medium | Reserve caching/continuation metadata in Phase 2 and add provider-specific optimizations in Phase 4 |
 | Secret leakage through logs or persisted config | High | Only reference env var names in YAML; redact headers and auth fields everywhere |
 | Tool runtime becomes an unsafe shell wrapper | High | Enforce workspace-scoped paths, permission policies, timeouts, and explicit allowlists |
 | Observe / stream semantics drift between CLI and API sessions | Medium | Reuse the same `StreamEvent` contract and active-turn event bus for both backends |
@@ -419,7 +505,7 @@ The phase ordering above is based on the current vendor API surfaces reviewed on
 
 | Date | Update |
 |------|--------|
-| 2026-03-16 | Plan created for the `src/backends/api` delivery track covering Claude, OpenAI, and Gemini API-key execution |
+| 2026-03-16 | Plan created for the `src/backends/api` delivery track covering Claude, OpenAI, Gemini, and Ollama execution |
 
 ---
 
