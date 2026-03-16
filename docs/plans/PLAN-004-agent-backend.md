@@ -35,6 +35,19 @@ systems such as OpenClaw Gateway or future Agent SDK targets. Those runtimes:
 The implementation should add `src/backends/agent` as a sibling backend rather
 than stretching `src/backends/api` to cover a second execution model.
 
+This work should start with backend-neutral runtime contracts that benefit more
+than just OpenClaw. The most useful immediate gaps are:
+
+- session affinity that lets upstream products intentionally reuse or target a
+  logical session across backends
+- bootstrap context that lets callers attach instructions and structured
+  metadata without inventing provider-specific prompt hacks
+- output/artifact surfacing that works for reports, slide decks, documents, and
+  coding artifacts alike
+
+Those contracts are a better first step than introducing a Git-specific
+workspace materializer such as `git_worktree` into the runtime core.
+
 ## Scope
 
 ### In Scope
@@ -45,6 +58,8 @@ than stretching `src/backends/api` to cover a second execution model.
 - Second design target: future Agent SDK integration
 - Add structured invocation context for agent-style runs
 - Persist provider-managed agent session state in the runtime registry
+- Define backend-neutral session affinity, bootstrap context, and output
+  surfacing contracts that agent/api/selected CLI backends can share
 
 ### Out of Scope
 
@@ -52,6 +67,8 @@ than stretching `src/backends/api` to cover a second execution model.
 - Reworking the current API backend into an agent orchestration layer
 - Moving Pi CLI into `src/backends/agent`
 - Implementing every possible external agent runtime in the first pass
+- Making `git_worktree` or another Git-specific workspace materializer a
+  prerequisite for agent-backend delivery
 
 ## Capability Targets
 
@@ -104,6 +121,22 @@ subset of heartbeat metadata as structured invocation context:
 - which task/comment/approval it relates to
 - which workspace is authoritative
 
+### 5. Prioritize Generic Session, Context, and Output Contracts
+
+Before deep OpenClaw-specific work, the runtime should lock in three generic
+contracts:
+
+- `sessionKey` or equivalent session-affinity semantics so upstream apps can
+  intentionally reuse a logical session instead of guessing from `group` or
+  workspace alone
+- bootstrap context fields such as optional `instructions` and structured
+  `context` metadata on session create/message flows
+- output/artifact surfacing such as `outputDir` hints and session-visible
+  artifact metadata for non-code workflows
+
+These additions are useful to agent, API, and selected CLI backends and avoid
+coupling the runtime to coding-only assumptions.
+
 ## Proposed Phases
 
 ### Phase 0: Record the Architecture Extension
@@ -117,7 +150,7 @@ subset of heartbeat metadata as structured invocation context:
 - accepted ADR explaining why `agent` is a separate backend kind
 - docs alignment between spec, plan, and architecture notes
 
-### Phase 1: Core Type and Config Expansion
+### Phase 1: Core Type, Config, and Shared Session Contract Expansion
 
 - [ ] Extend `ProviderBackend` from `cli | api | local` to
       `cli | api | local | agent`
@@ -129,15 +162,21 @@ subset of heartbeat metadata as structured invocation context:
 - [ ] Extend provider catalog and route validation to include `agent`
 - [ ] Generalize `SessionProviderState` so it can store agent session metadata,
       not only Gemini cache state
+- [ ] Define a backend-neutral session affinity contract for `POST /sessions`
+      and resume flows (`sessionKey` and/or explicit reuse policy)
 - [ ] Define backend-neutral `AgentInvocationContext` and `AgentSessionState`
-- [ ] Decide whether internal turn dispatch should remain `message: string` or
-      grow into a structured turn input object
+- [ ] Define a minimal backend-neutral turn/bootstrap contract that can carry
+      `message`, optional `instructions`, and structured `context` metadata
+- [ ] Define optional output hints and surfaced artifact metadata so sessions
+      can model reports/documents/media outputs without assuming a Git repo
 
 **Deliverables**:
 
 - config parser accepts agent-backed instances
 - provider catalog can render agent targets
 - shared types can carry provider-managed agent state
+- public and internal session contracts can express affinity, bootstrap
+  context, and output expectations without backend-specific hacks
 
 ### Phase 2: `src/backends/agent` Skeleton
 
@@ -160,7 +199,8 @@ subset of heartbeat metadata as structured invocation context:
 - [ ] Port the protocol ideas from Paperclip without importing its company
       domain
 - [ ] Implement WebSocket connect/challenge/auth flow
-- [ ] Implement `sessionKey` strategy and provider-managed state persistence
+- [ ] Bind OpenClaw session continuity to the shared session-affinity contract
+      and provider-managed state persistence
 - [ ] Map gateway event frames into `StreamEvent`
 - [ ] Support close/cancel semantics as far as gateway capabilities allow
 - [ ] Add OpenClaw-specific `probe()`
@@ -171,12 +211,15 @@ subset of heartbeat metadata as structured invocation context:
 - `openclaw` provider family or `agent/openclaw` instance target that can be
   created, messaged, resumed, and deleted from `cats-runtime`
 
-### Phase 4: Public Invocation Context and Session Surfacing
+### Phase 4: Public Invocation Context, Bootstrap, and Artifact Surfacing
 
 - [ ] Extend internal message dispatch to carry structured invocation context
-- [ ] Decide whether `POST /sessions/:id/messages` should accept optional
-      `context` metadata publicly
+- [ ] Extend `POST /sessions` and `POST /sessions/:id/messages` to accept
+      optional `sessionKey`, `instructions`, and `context` metadata while
+      keeping the current message-only flow valid
 - [ ] Persist invocation metadata that matters for later resume/observability
+- [ ] Add session-level output hints such as `outputDir` and surface generated
+      artifact metadata in history/dashboard views
 - [ ] Surface agent-backed session metadata in history and dashboard views
 - [ ] Clarify `close`, `resume`, and `delete` semantics for provider-managed
       sessions
@@ -185,6 +228,8 @@ subset of heartbeat metadata as structured invocation context:
 
 - agent backends are not limited to plain chat text
 - UI and HTTP routes can manage agent-backed sessions intentionally
+- non-code outputs are first-class runtime results without introducing a
+  Git-specific workflow dependency
 
 ### Phase 5: Agent SDK Adapter
 
@@ -202,6 +247,7 @@ subset of heartbeat metadata as structured invocation context:
 | File | Action | Description |
 |------|--------|-------------|
 | `src/core/types.ts` | Modify | Add `agent` backend kind and generalized provider state |
+| `src/backends/cli/pool/types.ts` | Modify | Carry session affinity, bootstrap, and artifact/output metadata in the registry model |
 | `src/core/providerCatalog.ts` | Modify | Surface agent-backed instances |
 | `src/core/runtime/RuntimeSessionManager.ts` | Modify | Dispatch sessions to agent backend manager |
 | `src/backends/cli/config.ts` | Modify | Parse `backends.agent` config topology |
@@ -209,10 +255,12 @@ subset of heartbeat metadata as structured invocation context:
 | `src/backends/agent/runtime/AgentBackendManager.ts` | Create | Session lifecycle manager for agent-backed sessions |
 | `src/backends/agent/adapters/registry.ts` | Create | Adapter lookup/registration |
 | `src/backends/agent/adapters/openclaw/*` | Create | OpenClaw Gateway adapter |
-| `src/http/routes/sessions.ts` | Modify | Create/resume/delete behavior through agent backend |
-| `src/http/routes/messages.ts` | Modify | Support optional structured invocation context |
+| `src/http/routes/sessions.ts` | Modify | Create/resume/delete behavior through agent backend plus session affinity/bootstrap/output inputs |
+| `src/http/routes/messages.ts` | Modify | Support optional structured invocation context and bootstrap extensions |
+| `src/http/routes/history.ts` | Modify | Surface artifact/output metadata alongside session history where appropriate |
 | `src/http/routes/providers.ts` | Modify | Return agent-backed catalog entries |
 | `public/index.html` | Modify | Let dashboard create/select agent-backed targets |
+| `docs/api.md` | Modify | Document session affinity, bootstrap context, and artifact/output fields |
 | `tests/*` | Modify/Create | Route, manager, and adapter regression coverage |
 | `docs/decisions/006-agent-backend.md` | Create | Record architecture decision |
 
@@ -222,6 +270,10 @@ subset of heartbeat metadata as structured invocation context:
 - `OpenClaw` is the first adapter because it stresses the new contract the most.
 - `Agent SDK` should be the second adapter so the contract does not collapse
   into an OpenClaw-specific API.
+- Shared session-affinity semantics should land before OpenClaw-specific
+  session-key behavior so upstream callers get one reusable continuity model.
+- Bootstrap context and output contracts should stay backend-neutral and should
+  not assume Git repositories or code-generation workflows.
 - Provider-managed session state becomes the authoritative continuity mechanism
   for agent backends when supported.
 - Runtime transcript remains necessary for UI history and observability even
@@ -257,6 +309,7 @@ subset of heartbeat metadata as structured invocation context:
 | `agent` becomes a dumping ground for unrelated integrations | High | Keep the category definition strict: external agent runtimes with their own run/session semantics |
 | Route layer becomes over-specialized for OpenClaw | High | Force a second adapter target in the plan: Agent SDK |
 | Public API drifts toward Paperclip scheduler semantics | Medium | Limit new inputs to optional invocation metadata, not scheduler/run-store concepts |
+| Runtime contracts drift toward coding-only Git assumptions | Medium | Keep workspace/output additions generic (`sessionKey`, `instructions`, `context`, `outputDir`, artifacts) and defer Git-specific materializers |
 | Session history becomes misleading when provider-managed state is authoritative | Medium | Persist both transcript visibility data and provider-managed session metadata explicitly |
 | Pi integration is delayed because attention shifts to `agent` | Medium | Keep Pi documented as its own `cli` track and plan it separately |
 
@@ -265,6 +318,7 @@ subset of heartbeat metadata as structured invocation context:
 | Date | Update |
 |------|--------|
 | 2026-03-17 | Plan created from direct `cats-runtime` vs `paperclip` comparison, with OpenClaw chosen as first target and Agent SDK reserved as second target |
+| 2026-03-17 | Reprioritized immediate follow-on work toward shared session affinity, bootstrap context, and artifact/output contracts instead of any Git-specific workspace dependency |
 
 ---
 

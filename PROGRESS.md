@@ -8,7 +8,7 @@
 |-----------|--------|-------------|
 | Core | Completed | Embedded CLI runtime, session registry, discovery, and worker pool are in-repo |
 | API Backends | In Progress | `src/backends/api` now runs Claude, OpenAI, Gemini, and Ollama with runtime-managed sessions and a shared local tool loop; provider-specific optimizations and health probes remain |
-| Agent Backend Planning | In Progress | `SPEC-003` and `PLAN-004` now define a separate `agent` backend track for OpenClaw and future Agent SDK runtimes, while Pi remains a CLI integration track |
+| Agent Backend Planning | In Progress | `SPEC-003` and `PLAN-004` now define a separate `agent` backend track for OpenClaw and future Agent SDK runtimes, with shared session/bootstrap/output contracts prioritized before deep backend-specific work |
 | HTTP API | Completed | Health, sessions, messages, history, observe, and provider management routes are served directly from `cats-runtime` |
 | Dashboard | Completed | The embedded dashboard UI is served from `GET /` |
 | Tests | Completed | Vitest covers provider, discovery, pool, HTTP, server bootstrap, and API/local tool-loop behavior |
@@ -134,7 +134,8 @@ dashboard integration intact.
 
 Define how `cats-runtime` should support external agent runtimes such as
 OpenClaw without forcing them into the existing `cli` or `api` execution
-categories, and document Pi as a separate CLI integration track.
+categories, document Pi as a separate CLI integration track, and identify the
+shared runtime contracts that should land first.
 
 #### Delivered
 
@@ -148,6 +149,7 @@ categories, and document Pi as a separate CLI integration track.
 #### Next Steps
 
 - [ ] Record `ADR-006` before implementation starts
+- [ ] Land shared session affinity, bootstrap context, and artifact/output contract updates before deep adapter work
 - [ ] Extend runtime types/config to support `backend: agent`
 - [ ] Build OpenClaw as the first `src/backends/agent` adapter
 - [ ] Validate the contract with a second target such as an Agent SDK adapter
