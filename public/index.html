@@ -908,8 +908,7 @@ function formatInstanceOptionLabel(providerName, instance) {
 
 function shouldShowInstance(session) {
   const provider = providerMeta(session.providerName);
-  if (provider?.instances?.length > 1) return true;
-  return !!session.providerInstanceId && session.providerInstanceId !== 'default';
+  return provider?.instances?.length > 1;
 }
 
 function formatSessionInstance(session) {
