@@ -13,6 +13,7 @@ import {
   defaultOpencodeServerHost,
   defaultOpencodeServerPort,
   defaultOpencodeServerStartupTimeoutMs,
+  defaultPiSessionsDir,
   defaultProviderRuntimeMode,
   defaultSpawnRetries,
   defaultSpawnTimeoutMs,
@@ -49,6 +50,7 @@ describe('config platform defaults', () => {
     expect(defaultProviderRuntimeMode('copilot', 'win32')).toBe('native');
     expect(defaultProviderRuntimeMode('opencode', 'win32')).toBe('native');
     expect(defaultProviderRuntimeMode('auggie', 'win32')).toBe('native');
+    expect(defaultProviderRuntimeMode('pi', 'win32')).toBe('native');
     expect(defaultProviderRuntimeMode('cursor', 'win32')).toBe('wsl');
     expect(defaultProviderRuntimeMode('kiro', 'win32')).toBe('wsl');
     expect(defaultProviderRuntimeMode('cursor', 'darwin')).toBe('native');
@@ -75,6 +77,10 @@ describe('config platform defaults', () => {
   it('uses the Linux/WSL Kiro database path elsewhere', () => {
     expect(defaultKiroDbPath('linux')).toBe('~/.local/share/kiro-cli/data.sqlite3');
     expect(defaultKiroDbPath('win32')).toBe('~/.local/share/kiro-cli/data.sqlite3');
+  });
+
+  it('uses the shared Pi sessions path on every platform', () => {
+    expect(defaultPiSessionsDir()).toBe('~/.pi/paperclips');
   });
 
   it('defaults OpenCode server settings for a sidecar local server', () => {
@@ -186,6 +192,22 @@ describe('config platform defaults', () => {
       path: '/custom/opencode',
       runner: 'direct',
       runnerPath: '/custom/direct-runner',
+      runtime: { mode: 'native', distro: undefined },
+    });
+  });
+
+  it('loads Pi command and sessions dir overrides from the environment', () => {
+    const config = loadConfigWithoutProviderFile({
+      PI_PATH: '/custom/pi',
+      PI_SESSIONS_DIR: '/custom/pi/sessions',
+    });
+
+    expect(config.piPath).toBe('/custom/pi');
+    expect(config.piSessionsDir).toBe('/custom/pi/sessions');
+    expect(config.providerCommands.pi).toEqual({
+      path: '/custom/pi',
+      runner: 'auto',
+      runnerPath: undefined,
       runtime: { mode: 'native', distro: undefined },
     });
   });
@@ -565,6 +587,7 @@ providers:
       expect(listProviderInstances(config, 'copilot')).toHaveLength(0);
       expect(listProviderInstances(config, 'auggie')).toHaveLength(0);
       expect(listProviderInstances(config, 'opencode')).toHaveLength(0);
+      expect(listProviderInstances(config, 'pi')).toHaveLength(0);
 
       // Resolving an unlisted provider throws ProviderNotConfiguredError
       expect(() => resolveProviderInstance(config, 'gemini'))
@@ -905,6 +928,96 @@ backends:
         maxToolSteps: undefined,
         toolProfile: undefined,
       });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('loads Pi provider instances from providers.yaml with sessions_dir', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const configPath = join(tempDir, 'providers.yaml');
+    writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+providers:
+  pi:
+    instances:
+      native:
+        environment: native
+        command: pi
+        runner: auto
+        sessions_dir: /custom/pi/sessions
+`.trimStart());
+
+    try {
+      const config = loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_CONFIG_PATH: configPath,
+      });
+
+      expect(listProviderInstances(config, 'pi')).toHaveLength(1);
+      expect(config.piSessionsDir).toBe('/custom/pi/sessions');
+      expect(resolveProviderInstance(config, 'pi')).toMatchObject({
+        id: 'native',
+        providerName: 'pi',
+        piSessionsDir: '/custom/pi/sessions',
+        commandConfig: {
+          path: 'pi',
+          runner: 'auto',
+          runtime: {
+            mode: 'native',
+            distro: undefined,
+            environmentId: 'native',
+          },
+        },
+      });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('loads Pi provider from separated backends config', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const configPath = join(tempDir, 'providers.yaml');
+    writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+routing:
+  providers:
+    pi:
+      default_target:
+        backend: cli
+        instance: native
+backends:
+  cli:
+    providers:
+      pi:
+        instances:
+          native:
+            environment: native
+            command: pi
+            runner: auto
+            sessions_dir: ~/.pi/paperclips
+`.trimStart());
+
+    try {
+      const config = loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_CONFIG_PATH: configPath,
+      });
+
+      expect(config.providerDefaultTargets?.pi).toEqual({
+        backend: 'cli',
+        instance: 'native',
+      });
+      expect(listProviderInstances(config, 'pi')).toHaveLength(1);
+      expect(config.piSessionsDir).toBe('~/.pi/paperclips');
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
