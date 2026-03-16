@@ -48,6 +48,7 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 
 | Spec | Title | Status | Related Plan |
 |------|-------|--------|--------------|
+| [SPEC-003](./SPEC-003-agent-backend.md) | Agent Backend for External Agent Runtimes | Approved | [PLAN-004](../plans/PLAN-004-agent-backend.md) |
 | [SPEC-002](./SPEC-002-local-tool-runtime.md) | Shared Local Tool Runtime | Approved | [PLAN-003](../plans/PLAN-003-api-backend.md) |
 | [SPEC-001](./SPEC-001-wsl-discovery-policy.md) | WSL Discovery Policy and Dashboard Status | Implemented | [PLAN-001](../plans/PLAN-001-wsl-discovery-policy.md) |
 | [000-template](./000-template.md) | Template | - | - |
@@ -62,4 +63,4 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 ---
 
 *See also: [plans/](../plans/) for implementation plans*
-*Last updated: 2026-03-13*
+*Last updated: 2026-03-17*

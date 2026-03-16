@@ -8,6 +8,7 @@
 |-----------|--------|-------------|
 | Core | Completed | Embedded CLI runtime, session registry, discovery, and worker pool are in-repo |
 | API Backends | In Progress | `src/backends/api` now runs Claude, OpenAI, Gemini, and Ollama with runtime-managed sessions and a shared local tool loop; provider-specific optimizations and health probes remain |
+| Agent Backend Planning | In Progress | `SPEC-003` and `PLAN-004` now define a separate `agent` backend track for OpenClaw and future Agent SDK runtimes, while Pi remains a CLI integration track |
 | HTTP API | Completed | Health, sessions, messages, history, observe, and provider management routes are served directly from `cats-runtime` |
 | Dashboard | Completed | The embedded dashboard UI is served from `GET /` |
 | Tests | Completed | Vitest covers provider, discovery, pool, HTTP, server bootstrap, and API/local tool-loop behavior |
@@ -123,6 +124,34 @@ dashboard integration intact.
 
 - [x] `npm test`
 
+### WP-4: Agent Backend Planning
+
+**Status**: In Progress  
+**Assigned**: Codex  
+**Priority**: P1
+
+#### Goal
+
+Define how `cats-runtime` should support external agent runtimes such as
+OpenClaw without forcing them into the existing `cli` or `api` execution
+categories, and document Pi as a separate CLI integration track.
+
+#### Delivered
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Compare `cats-runtime` with `paperclip` adapter/runtime structure | [x] | OpenClaw and Pi were compared directly against current backend seams |
+| Write agent backend feature specification | [x] | `docs/specs/SPEC-003-agent-backend.md` defines requirements and non-goals |
+| Write agent backend implementation plan | [x] | `docs/plans/PLAN-004-agent-backend.md` defines phased rollout and target files |
+| Document detailed Pi integration recommendations | [x] | Research note records why Pi belongs in `src/backends/cli`, not `src/backends/agent` |
+
+#### Next Steps
+
+- [ ] Record `ADR-006` before implementation starts
+- [ ] Extend runtime types/config to support `backend: agent`
+- [ ] Build OpenClaw as the first `src/backends/agent` adapter
+- [ ] Validate the contract with a second target such as an Agent SDK adapter
+
 ---
 
-*Last updated: 2026-03-16*
+*Last updated: 2026-03-17*

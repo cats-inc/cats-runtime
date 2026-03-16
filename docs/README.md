@@ -50,8 +50,8 @@ Add your project-specific automation scripts here.
 | [AGENT-GUIDE.md](./AGENT-GUIDE.md) | ? Active | Project-specific agent notes |
 | [terminology.md](./terminology.md) | ?? Template | AAIF/A2A/MCP terminology |
 | [a2a/](./a2a/) | ?? | A2A agent card and task templates |
-| [specs/](./specs/) | ? Active | Feature specifications, including WSL discovery planning |
-| [plans/](./plans/) | ? Active | Implementation plans, including WSL discovery rollout |
+| [specs/](./specs/) | ? Active | Feature specifications, including WSL discovery and agent backend planning |
+| [plans/](./plans/) | ? Active | Implementation plans, including WSL discovery, API backend, and agent backend rollout |
 | [decisions/](./decisions/) | ? Active | Architecture Decision Records |
 
 **Legend**: ? Complete | ?? Template (needs content) | ?? Directory
@@ -60,7 +60,7 @@ Add your project-specific automation scripts here.
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| [research/](./research/) | ?? | Research notes and external sources |
+| [research/](./research/) | ?? | Research notes and external sources, including Paperclip alignment notes for OpenClaw and Pi |
 
 ## Context-Driven Development
 
@@ -90,4 +90,4 @@ When working on this project:
 
 ---
 
-*Last updated: 2026-03-16*
+*Last updated: 2026-03-17*
