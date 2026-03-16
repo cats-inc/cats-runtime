@@ -893,7 +893,7 @@ function formatInstanceOptionLabel(providerName, instance) {
   }
   if (instance.runtime?.mode === 'wsl') {
     parts.push(instance.runtime.distro ? `wsl:${instance.runtime.distro}` : 'wsl');
-  } else if (instance.runtime?.mode) {
+  } else if (instance.runtime?.mode && instance.runtime.mode !== instance.id) {
     parts.push(instance.runtime.mode);
   }
   if (instance.transport) {

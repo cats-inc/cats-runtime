@@ -13,10 +13,6 @@ import type {
   SessionStatus,
   WorkspaceMode,
 } from '../../backends/cli/pool/types.js';
-import { SessionScanner } from '../../backends/cli/discovery/SessionScanner.js';
-import { CodexSessionScanner } from '../../backends/cli/discovery/CodexSessionScanner.js';
-import { CopilotSessionScanner } from '../../backends/cli/discovery/CopilotSessionScanner.js';
-import { GeminiSessionScanner } from '../../backends/cli/discovery/GeminiSessionScanner.js';
 import {
   resolveWorkspace,
   cleanupIsolatedWorkspace,
@@ -27,12 +23,7 @@ import {
   toSessionViews,
 } from '../../backends/cli/pool/sessionView.js';
 import {
-  getAuggieSessions,
-  getClaudeProjectsDir,
-  getCodexSessionsDir,
-  getCopilotSessionsDir,
   getCursorNative,
-  getGeminiSessionsDir,
   getGooseNative,
   getKiroNative,
   getOpencodeNative,
@@ -249,49 +240,18 @@ function collectProviderDiscoveryArtifactPaths(ctx: AppContext, session: Session
 }
 
 async function verifyProviderDiscoveryStateDeleted(
-  ctx: AppContext,
+  _ctx: AppContext,
   session: SessionInfo,
 ): Promise<boolean> {
   if (!tracksProviderDiscoveryState(session) || !session.providerSessionId) {
     return true;
   }
 
-  if (session.providerName === 'auggie') {
-    const remaining = await getAuggieSessions(
-      ctx,
-      session.providerInstanceId,
-    ).getSession(session.providerSessionId);
-    return remaining == null;
-  }
-
-  if (session.providerName === 'claude') {
-    const remaining = await new SessionScanner(
-      getClaudeProjectsDir(ctx, session.providerInstanceId),
-    ).scan();
-    return !remaining.some((item) => item.providerSessionId === session.providerSessionId);
-  }
-
-  if (session.providerName === 'codex') {
-    const remaining = await new CodexSessionScanner(
-      getCodexSessionsDir(ctx, session.providerInstanceId),
-    ).scan();
-    return !remaining.some((item) => item.providerSessionId === session.providerSessionId);
-  }
-
-  if (session.providerName === 'copilot') {
-    const remaining = await new CopilotSessionScanner(
-      getCopilotSessionsDir(ctx, session.providerInstanceId),
-    ).scan();
-    return !remaining.some((item) => item.providerSessionId === session.providerSessionId);
-  }
-
-  if (session.providerName === 'gemini') {
-    const remaining = await new GeminiSessionScanner(
-      getGeminiSessionsDir(ctx, session.providerInstanceId),
-    ).scan();
-    return !remaining.some((item) => item.providerSessionId === session.providerSessionId);
-  }
-
+  // File-backed providers (auggie, claude, codex, copilot, gemini, pi, junie)
+  // are cleaned up by preparedProviderDiscovery.finalize() which deletes the
+  // source files. Verifying by re-scanning the disk here would always find the
+  // files still present because finalize() runs AFTER this check, causing the
+  // delete to be incorrectly rolled back. Trust the prepared deletion instead.
   return true;
 }
 
