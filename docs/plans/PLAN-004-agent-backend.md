@@ -137,11 +137,27 @@ contracts:
 These additions are useful to agent, API, and selected CLI backends and avoid
 coupling the runtime to coding-only assumptions.
 
+### 6. Make Session Affinity Explicit
+
+The shared session-affinity contract should not be left implicit:
+
+- `sessionKey` identifies a caller-visible logical conversation, task, or work
+  item across backends
+- callers may provide `sessionKey`; if omitted, the runtime may return an
+  opaque generated key for later reuse
+- reuse behavior should remain explicit through a request policy rather than
+  being inferred from `group`, `cwd`, or the presence of a provider session id
+- `providerSessionId` remains a backend-owned continuity pointer, not the
+  caller-facing identity of the session
+
+This keeps runtime continuity predictable for upstream apps while preserving the
+difference between logical session identity and provider-managed resume tokens.
+
 ## Proposed Phases
 
 ### Phase 0: Record the Architecture Extension
 
-- [ ] Add `ADR-006` for `agent` backend introduction
+- [x] Add `ADR-006` for `agent` backend introduction
 - [ ] Document the distinction between `api` and `agent`
 - [ ] Record that Pi remains a `cli` provider family
 
@@ -151,6 +167,24 @@ coupling the runtime to coding-only assumptions.
 - docs alignment between spec, plan, and architecture notes
 
 ### Phase 1: Core Type, Config, and Shared Session Contract Expansion
+
+#### Phase 1a: Shared Runtime Contract Clarification
+
+- [x] Record and document the `sessionKey` contract before adapter-specific
+      implementations begin
+- [x] Define whether a missing `sessionKey` returns no affinity guarantee or an
+      opaque runtime-assigned key, and document the resulting client behavior
+- [x] Define explicit reuse policy semantics for create/resume flows so reuse is
+      never guessed from `group`, `cwd`, or provider state
+- [x] Define provider-session invalidation fallback semantics: preserve logical
+      session identity and runtime transcript, clear provider continuity state,
+      then fresh-create when resume is no longer possible
+- [x] Define a minimal backend-neutral turn/bootstrap contract that can carry
+      `message`, optional `instructions`, and structured `context` metadata
+- [x] Define optional output hints and surfaced artifact metadata so sessions
+      can model reports/documents/media outputs without assuming a Git repo
+
+#### Phase 1b: Backend Type and Config Expansion
 
 - [ ] Extend `ProviderBackend` from `cli | api | local` to
       `cli | api | local | agent`
@@ -162,13 +196,7 @@ coupling the runtime to coding-only assumptions.
 - [ ] Extend provider catalog and route validation to include `agent`
 - [ ] Generalize `SessionProviderState` so it can store agent session metadata,
       not only Gemini cache state
-- [ ] Define a backend-neutral session affinity contract for `POST /sessions`
-      and resume flows (`sessionKey` and/or explicit reuse policy)
 - [ ] Define backend-neutral `AgentInvocationContext` and `AgentSessionState`
-- [ ] Define a minimal backend-neutral turn/bootstrap contract that can carry
-      `message`, optional `instructions`, and structured `context` metadata
-- [ ] Define optional output hints and surfaced artifact metadata so sessions
-      can model reports/documents/media outputs without assuming a Git repo
 
 **Deliverables**:
 
@@ -262,7 +290,7 @@ coupling the runtime to coding-only assumptions.
 | `public/index.html` | Modify | Let dashboard create/select agent-backed targets |
 | `docs/api.md` | Modify | Document session affinity, bootstrap context, and artifact/output fields |
 | `tests/*` | Modify/Create | Route, manager, and adapter regression coverage |
-| `docs/decisions/006-agent-backend.md` | Create | Record architecture decision |
+| `docs/decisions/006-agent-backend-and-shared-runtime-contracts.md` | Create | Record architecture decision |
 
 ## Technical Decisions
 
@@ -272,6 +300,10 @@ coupling the runtime to coding-only assumptions.
   into an OpenClaw-specific API.
 - Shared session-affinity semantics should land before OpenClaw-specific
   session-key behavior so upstream callers get one reusable continuity model.
+- `sessionKey` is the caller-visible logical identity; `providerSessionId` is a
+  backend-owned continuity pointer that may be cleared and reacquired.
+- Provider resume failure should degrade to fresh provider session creation
+  without discarding runtime-owned logical session identity.
 - Bootstrap context and output contracts should stay backend-neutral and should
   not assume Git repositories or code-generation workflows.
 - Provider-managed session state becomes the authoritative continuity mechanism
@@ -319,6 +351,7 @@ coupling the runtime to coding-only assumptions.
 |------|--------|
 | 2026-03-17 | Plan created from direct `cats-runtime` vs `paperclip` comparison, with OpenClaw chosen as first target and Agent SDK reserved as second target |
 | 2026-03-17 | Reprioritized immediate follow-on work toward shared session affinity, bootstrap context, and artifact/output contracts instead of any Git-specific workspace dependency |
+| 2026-03-17 | Added ADR-006 and clarified `sessionKey` semantics, explicit reuse policy, provider-session fallback, and non-Git output assumptions |
 
 ---
 

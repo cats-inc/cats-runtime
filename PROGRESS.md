@@ -145,10 +145,10 @@ shared runtime contracts that should land first.
 | Write agent backend feature specification | [x] | `docs/specs/SPEC-003-agent-backend.md` defines requirements and non-goals |
 | Write agent backend implementation plan | [x] | `docs/plans/PLAN-004-agent-backend.md` defines phased rollout and target files |
 | Document detailed Pi integration recommendations | [x] | Research note records why Pi belongs in `src/backends/cli`, not `src/backends/agent` |
+| Record `ADR-006` for agent backend and shared runtime contracts | [x] | Decision now fixes `sessionKey` semantics, provider-session fallback, and non-Git output assumptions |
 
 #### Next Steps
 
-- [ ] Record `ADR-006` before implementation starts
 - [ ] Land shared session affinity, bootstrap context, and artifact/output contract updates before deep adapter work
 - [ ] Extend runtime types/config to support `backend: agent`
 - [ ] Build OpenClaw as the first `src/backends/agent` adapter

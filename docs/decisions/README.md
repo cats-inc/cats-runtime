@@ -38,6 +38,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
+| [006-agent-backend-and-shared-runtime-contracts](./006-agent-backend-and-shared-runtime-contracts.md) | Introduce an agent backend and shared runtime contracts | Accepted | 2026-03-17 |
 | [005-backend-neutral-runtime-and-api-backend](./005-backend-neutral-runtime-and-api-backend.md) | Introduce a backend-neutral runtime facade for CLI and API backends | Accepted | 2026-03-16 |
 | [004-file-backed-paths-are-host-resolved](./004-file-backed-paths-are-host-resolved.md) | Resolve file-backed provider paths on the host | Accepted | 2026-03-16 |
 | [003-provider-instance-config](./003-provider-instance-config.md) | Move provider execution topology into file-based provider instances | Accepted | 2026-03-15 |
