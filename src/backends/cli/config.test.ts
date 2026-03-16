@@ -80,7 +80,7 @@ describe('config platform defaults', () => {
   });
 
   it('uses the shared Pi sessions path on every platform', () => {
-    expect(defaultPiSessionsDir()).toBe('~/.pi/paperclips');
+    expect(defaultPiSessionsDir()).toBe('~/.pi/agent/sessions');
   });
 
   it('defaults OpenCode server settings for a sidecar local server', () => {
@@ -1002,7 +1002,7 @@ backends:
             environment: native
             command: pi
             runner: auto
-            sessions_dir: ~/.pi/paperclips
+            sessions_dir: ~/.pi/agent/sessions
 `.trimStart());
 
     try {
@@ -1017,7 +1017,7 @@ backends:
         instance: 'native',
       });
       expect(listProviderInstances(config, 'pi')).toHaveLength(1);
-      expect(config.piSessionsDir).toBe('~/.pi/paperclips');
+      expect(config.piSessionsDir).toBe('~/.pi/agent/sessions');
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

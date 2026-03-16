@@ -231,7 +231,7 @@ export function defaultKiroDbPath(
 }
 
 export function defaultPiSessionsDir(): string {
-  return '~/.pi/paperclips';
+  return '~/.pi/agent/sessions';
 }
 
 export function defaultOpencodeServerHost(): string {

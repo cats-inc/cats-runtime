@@ -33,10 +33,10 @@ describe('PiProvider', () => {
     it('includes session flag for resume', () => {
       const args = provider.buildSpawnArgs({
         cwd: '/tmp',
-        resumeSessionId: '/home/user/.pi/paperclips/session.jsonl',
+        resumeSessionId: '/home/user/.pi/agent/sessions/session.jsonl',
       });
       expect(args).toContain('--session');
-      expect(args).toContain('/home/user/.pi/paperclips/session.jsonl');
+      expect(args).toContain('/home/user/.pi/agent/sessions/session.jsonl');
     });
 
     it('combines model and resume', () => {
