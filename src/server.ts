@@ -43,8 +43,10 @@ import type { ProviderName } from './backends/cli/providers/types.js';
 import type { ApiBackendOptions } from './backends/api/types.js';
 import type { AgentBackendOptions } from './backends/agent/types.js';
 import {
+  getConfiguredFileBackedProviderPath,
   normalizeFileBackedProviderPath,
   resolveFileBackedProviderPath,
+  supportsHostFileBackedProviderDiscovery,
 } from './backends/cli/providerPaths.js';
 
 interface DiscoveryController {
@@ -182,6 +184,16 @@ function getDefaultService<T>(
   return servicesByInstance.get(defaultInstanceId) || buildFallback();
 }
 
+function createAuggieSessionService(
+  config: CliRuntimeConfig,
+  instanceId?: string,
+): AuggieSessionService {
+  const sessionsDir = supportsHostFileBackedProviderDiscovery(config, 'auggie', instanceId)
+    ? resolveFileBackedProviderPath(config, 'auggie', instanceId)
+    : getConfiguredFileBackedProviderPath(config, 'auggie', instanceId);
+  return new AuggieSessionService(sessionsDir);
+}
+
 export function createDiscoveryController(
   ctx: AppContext,
   options: RuntimeServerOptions = {},
@@ -229,7 +241,9 @@ export function createDiscoveryController(
   const wslDiscoveryStatus = ctx.wslDiscoveryStatus || new WslDiscoveryStatusStore(ctx.config);
 
   const watcherEntries = dedupeWatcherSpecs(ctx.config, [
-    ...listProviderInstances(ctx.config, 'auggie').map((instance) => ({
+    ...listProviderInstances(ctx.config, 'auggie')
+      .filter((instance) => supportsHostFileBackedProviderDiscovery(ctx.config, 'auggie', instance.id))
+      .map((instance) => ({
       provider: 'auggie' as const,
       instanceId: instance.id,
       name: instance.id === getProviderDefaultInstanceId(ctx.config, 'auggie')
@@ -245,7 +259,9 @@ export function createDiscoveryController(
         instance.id,
       ),
     })),
-    ...listProviderInstances(ctx.config, 'claude').map((instance) => ({
+    ...listProviderInstances(ctx.config, 'claude')
+      .filter((instance) => supportsHostFileBackedProviderDiscovery(ctx.config, 'claude', instance.id))
+      .map((instance) => ({
       provider: 'claude' as const,
       instanceId: instance.id,
       name: instance.id === getProviderDefaultInstanceId(ctx.config, 'claude')
@@ -261,7 +277,9 @@ export function createDiscoveryController(
         instance.id,
       ),
     })),
-    ...listProviderInstances(ctx.config, 'codex').map((instance) => ({
+    ...listProviderInstances(ctx.config, 'codex')
+      .filter((instance) => supportsHostFileBackedProviderDiscovery(ctx.config, 'codex', instance.id))
+      .map((instance) => ({
       provider: 'codex' as const,
       instanceId: instance.id,
       name: instance.id === getProviderDefaultInstanceId(ctx.config, 'codex')
@@ -277,7 +295,9 @@ export function createDiscoveryController(
         instance.id,
       ),
     })),
-    ...listProviderInstances(ctx.config, 'copilot').map((instance) => ({
+    ...listProviderInstances(ctx.config, 'copilot')
+      .filter((instance) => supportsHostFileBackedProviderDiscovery(ctx.config, 'copilot', instance.id))
+      .map((instance) => ({
       provider: 'copilot' as const,
       instanceId: instance.id,
       name: instance.id === getProviderDefaultInstanceId(ctx.config, 'copilot')
@@ -295,7 +315,9 @@ export function createDiscoveryController(
         instance.id,
       ),
     })),
-    ...listProviderInstances(ctx.config, 'gemini').map((instance) => ({
+    ...listProviderInstances(ctx.config, 'gemini')
+      .filter((instance) => supportsHostFileBackedProviderDiscovery(ctx.config, 'gemini', instance.id))
+      .map((instance) => ({
       provider: 'gemini' as const,
       instanceId: instance.id,
       name: instance.id === getProviderDefaultInstanceId(ctx.config, 'gemini')
@@ -313,7 +335,9 @@ export function createDiscoveryController(
         instance.id,
       ),
     })),
-    ...listProviderInstances(ctx.config, 'pi').map((instance) => ({
+    ...listProviderInstances(ctx.config, 'pi')
+      .filter((instance) => supportsHostFileBackedProviderDiscovery(ctx.config, 'pi', instance.id))
+      .map((instance) => ({
       provider: 'pi' as const,
       instanceId: instance.id,
       name: instance.id === getProviderDefaultInstanceId(ctx.config, 'pi')
@@ -580,7 +604,7 @@ export function createRuntimeServer(
   const auggieSessionsByInstance = new Map(
     listProviderInstances(config, 'auggie').map((instance) => [
       instance.id,
-      new AuggieSessionService(resolveFileBackedProviderPath(config, 'auggie', instance.id)),
+      createAuggieSessionService(config, instance.id),
     ]),
   );
   const cursorNativeByInstance = new Map(

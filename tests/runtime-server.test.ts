@@ -449,6 +449,51 @@ providers:
     });
   });
 
+  it('boots with Docker-backed file providers without trying to host-resolve their container paths', async () => {
+    const { config, cleanup } = createTestConfig({
+      providerDefaultInstances: {
+        auggie: 'docker-dev',
+        copilot: 'docker-dev',
+      },
+      providerInstances: {
+        auggie: {
+          'docker-dev': {
+            id: 'docker-dev',
+            providerName: 'auggie',
+            commandConfig: {
+              path: 'auggie',
+              runner: 'auto',
+              runtime: { mode: 'docker', container: 'cats-cli-test', environmentId: 'docker-dev' },
+            },
+            auggieSessionsDir: '~/.augment/sessions',
+          },
+        },
+        copilot: {
+          'docker-dev': {
+            id: 'docker-dev',
+            providerName: 'copilot',
+            commandConfig: {
+              path: 'copilot',
+              runner: 'auto',
+              runtime: { mode: 'docker', container: 'cats-cli-test', environmentId: 'docker-dev' },
+            },
+            copilotSessionsDir: '~/.copilot/session-state',
+          },
+        },
+      },
+    });
+
+    const runtime = createRuntimeServer(config);
+    try {
+      await runtime.start();
+      const response = await runtime.app.request('/health');
+      expect(response.status).toBe(200);
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
   it('deduplicates overlapping file discovery watchers even when one path uses ~', async () => {
     const { root, config, cleanup } = createTestConfig();
     const sharedDir = join(root, '.augment', 'sessions');

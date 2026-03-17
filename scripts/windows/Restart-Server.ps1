@@ -84,9 +84,20 @@ try {
 
 Write-Host "Starting cats-runtime..." -ForegroundColor Cyan
 
-Start-Process -FilePath "node.exe" -ArgumentList "dist/index.js" `
+$startupLogDir = Join-Path $env:TEMP "cats-runtime"
+if (!(Test-Path $startupLogDir)) {
+    New-Item -ItemType Directory -Path $startupLogDir | Out-Null
+}
+$startupStamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$stdoutLog = Join-Path $startupLogDir "cats-runtime-$startupStamp.stdout.log"
+$stderrLog = Join-Path $startupLogDir "cats-runtime-$startupStamp.stderr.log"
+
+$process = Start-Process -FilePath "node.exe" -ArgumentList "dist/index.js" `
     -WorkingDirectory $repoRoot `
-    -WindowStyle Hidden
+    -WindowStyle Hidden `
+    -RedirectStandardOutput $stdoutLog `
+    -RedirectStandardError $stderrLog `
+    -PassThru
 
 Write-Host "Waiting for health check..." -ForegroundColor Cyan
 Start-Sleep -Seconds 3
@@ -131,5 +142,31 @@ try {
     }
 } catch {
     Write-Host "  Not responding on port $Port" -ForegroundColor Red
+    $process.Refresh()
+    if ($process.HasExited) {
+        Write-Host "  Process exited with code $($process.ExitCode)" -ForegroundColor Yellow
+    } else {
+        Write-Host "  Process is still running (PID $($process.Id))" -ForegroundColor Yellow
+    }
+
+    $stderrLines = @()
+    if (Test-Path $stderrLog) {
+        $stderrLines = Get-Content $stderrLog -ErrorAction SilentlyContinue | Select-Object -Last 20
+    }
+    $stdoutLines = @()
+    if (Test-Path $stdoutLog) {
+        $stdoutLines = Get-Content $stdoutLog -ErrorAction SilentlyContinue | Select-Object -Last 20
+    }
+
+    if ($stderrLines.Count -gt 0) {
+        Write-Host "  stderr tail:" -ForegroundColor Yellow
+        $stderrLines | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+    } elseif ($stdoutLines.Count -gt 0) {
+        Write-Host "  stdout tail:" -ForegroundColor Yellow
+        $stdoutLines | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
+    }
+
+    Write-Host "  Logs: $stdoutLog" -ForegroundColor DarkGray
+    Write-Host "        $stderrLog" -ForegroundColor DarkGray
     Write-Host "  Check logs or run: npm run build; node dist/index.js" -ForegroundColor Yellow
 }

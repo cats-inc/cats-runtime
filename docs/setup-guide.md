@@ -195,6 +195,11 @@ Path semantics matter:
   `runtime: wsl`, do not use guest-relative Linux paths such as
   `~/.codex/sessions` or `/home/user/.codex/sessions`. Use a host-accessible
   path such as `\\wsl$\Ubuntu\home\user\.codex\sessions` instead.
+- Docker-backed file providers are different: host-side file discovery is
+  currently skipped for `runtime: docker`, so `sessions_dir` may remain the
+  container-local path that the CLI itself uses. The tradeoff is that routes
+  which inspect provider-owned files from the host may return no sessions until
+  Docker-backed file discovery is implemented.
 - Cursor `chats_dir` and Kiro `db_path` are different: they are consumed by
   runtime-aware native services inside the selected runtime, so `~/.cursor/chats`
   and `~/.local/share/kiro-cli/data.sqlite3` remain valid for WSL-backed
@@ -353,4 +358,4 @@ and so on.
 
 ---
 
-*Last updated: 2026-03-16*
+*Last updated: 2026-03-18*

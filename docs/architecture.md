@@ -170,6 +170,9 @@ For file-backed providers:
    `\\wsl$\Distro\...`
 3. Ambiguous guest-relative paths are rejected during bootstrap instead of
    falling through to watcher/scanner failures later
+4. Docker-backed file providers currently skip host-side file discovery and
+   keep using their container-local session paths until Docker file discovery is
+   implemented
 
 ## Design Rules
 
@@ -194,4 +197,4 @@ For file-backed providers:
 
 ---
 
-*Last updated: 2026-03-17*
+*Last updated: 2026-03-18*

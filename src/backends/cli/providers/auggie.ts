@@ -199,6 +199,14 @@ export class AuggieProvider implements Provider {
       };
     }
 
+    if (this.lastResult?.remoteSessionId) {
+      return {
+        type: 'result',
+        sessionId: this.lastResult.remoteSessionId,
+        usage,
+      };
+    }
+
     return {
       type: 'result',
       usage,

@@ -83,6 +83,15 @@ export function resolveFileBackedProviderPath(
   );
 }
 
+export function getConfiguredFileBackedProviderPath(
+  config: CliRuntimeConfig,
+  provider: FileBackedProviderName,
+  instanceId?: string,
+): string {
+  const instance = resolveProviderInstance(config, provider, instanceId);
+  return getRawFileBackedProviderPath(config, provider, instance);
+}
+
 export function normalizeFileBackedProviderPath(
   config: CliRuntimeConfig,
   provider: FileBackedProviderName,
@@ -96,6 +105,14 @@ export function normalizeFileBackedProviderPath(
       label: `${provider}.instances.${instance.id}.${FILE_BACKED_PROVIDER_PATHS[provider].configKey}`,
     },
   );
+}
+
+export function supportsHostFileBackedProviderDiscovery(
+  config: CliRuntimeConfig,
+  provider: FileBackedProviderName,
+  instanceId?: string,
+): boolean {
+  return resolveProviderInstance(config, provider, instanceId).commandConfig.runtime.mode !== 'docker';
 }
 
 function getRawFileBackedProviderPath(

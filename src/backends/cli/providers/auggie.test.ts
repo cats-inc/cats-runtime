@@ -189,6 +189,32 @@ describe('AuggieProvider', () => {
     expect(existsSync(instructionFile)).toBe(false);
   });
 
+  it('falls back to the CLI session id when the local session file is not host-readable', async () => {
+    const sessions = {
+      getLatestSession: vi.fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null),
+      getSession: vi.fn().mockResolvedValue(null),
+    } as unknown as AuggieSessionService;
+    const provider = new AuggieProvider(sessions, 10);
+
+    await provider.beforeTurn?.({ cwd: '/tmp/repo' });
+    expect(provider.parseStreamLine(JSON.stringify({
+      type: 'result',
+      result: 'AUGGIE_OK\n',
+      is_error: false,
+      session_id: 'remote-session-id',
+    }))).toEqual({
+      type: 'text',
+      text: 'AUGGIE_OK\n',
+    });
+
+    await expect(provider.afterTurn?.({ cwd: '/tmp/repo' })).resolves.toEqual({
+      type: 'result',
+      sessionId: 'remote-session-id',
+    });
+  });
+
   it('ignores non-json noise lines from the CLI', () => {
     const sessions = {
       getLatestSession: vi.fn().mockResolvedValue(null),
