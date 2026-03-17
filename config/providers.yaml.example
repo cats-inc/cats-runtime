@@ -42,6 +42,10 @@ routing:
       default_target:
         backend: cli
         instance: native
+    cursor:
+      default_target:
+        backend: cli
+        instance: native
     copilot:
       default_target:
         backend: cli
@@ -50,7 +54,7 @@ routing:
       default_target:
         backend: cli
         instance: native
-    auggie:
+    goose:
       default_target:
         backend: cli
         instance: native
@@ -58,19 +62,15 @@ routing:
       default_target:
         backend: cli
         instance: native
+    auggie:
+      default_target:
+        backend: cli
+        instance: native
     junie:
       default_target:
         backend: cli
         instance: native
-    cursor:
-      default_target:
-        backend: cli
-        instance: ubuntu
     kiro:
-      default_target:
-        backend: cli
-        instance: ubuntu
-    goose:
       default_target:
         backend: cli
         instance: ubuntu
@@ -119,6 +119,14 @@ backends:
             runner: auto
             sessions_dir: ~/.gemini/tmp
 
+      cursor:
+        instances:
+          native:
+            environment: native
+            command: cursor-agent
+            runner: auto
+            chats_dir: ~/.cursor/chats
+
       copilot:
         instances:
           native:
@@ -138,13 +146,12 @@ backends:
               port: 4097
               startup_timeout_ms: 10000
 
-      auggie:
+      goose:
         instances:
           native:
             environment: native
-            command: auggie
+            command: goose
             runner: auto
-            sessions_dir: ~/.augment/sessions
 
       pi:
         instances:
@@ -156,20 +163,20 @@ backends:
             # Session resume uses --session <path> to continue a previous conversation.
             sessions_dir: ~/.pi/agent/sessions
 
+      auggie:
+        instances:
+          native:
+            environment: native
+            command: auggie
+            runner: auto
+            sessions_dir: ~/.augment/sessions
+
       junie:
         instances:
           native:
             environment: native
             command: junie
             runner: auto
-
-      cursor:
-        instances:
-          ubuntu:
-            environment: ubuntu
-            command: cursor-agent
-            runner: auto
-            chats_dir: ~/.cursor/chats
 
       kiro:
         instances:
@@ -181,13 +188,6 @@ backends:
             #   macOS:       ~/Library/Application Support/kiro-cli/data.sqlite3
             #   Linux / WSL: ~/.local/share/kiro-cli/data.sqlite3
             db_path: ~/.local/share/kiro-cli/data.sqlite3
-
-      goose:
-        instances:
-          ubuntu:
-            environment: ubuntu
-            command: goose
-            runner: auto
 
   api:
     providers:
