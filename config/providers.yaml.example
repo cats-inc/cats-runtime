@@ -1,11 +1,11 @@
 version: 1
 
 # Environments describe isolated execution/login contexts.
-# Today cats-runtime supports native and WSL. Docker can fit this shape later.
 #
 # Supported kinds:
 #   native  - run on the host directly (macOS / Linux / Windows)
 #   wsl     - run inside a WSL distro (Windows only)
+#   docker  - run inside a named Docker container
 #
 # On macOS / Linux all CLI providers usually run natively, so you only need:
 #   environments:
@@ -14,12 +14,16 @@ version: 1
 # or simply omit the environments block entirely (defaults to native).
 #
 # WSL distro names must match `wsl -l`.
+# Docker container names must match a running `docker ps` container.
 environments:
   native:
     kind: native
   ubuntu:
     kind: wsl
     distro: Ubuntu
+  docker-dev:
+    kind: docker
+    container: cats-cli-dev
 
 # Routing picks the default execution target for each provider family.
 # Provider families use product names (`claude`, `codex`, `gemini`) while
@@ -91,6 +95,13 @@ backends:
             command: claude
             runner: auto
             projects_dir: ~/.claude/projects
+          # Docker-backed instance example: runs claude inside a Docker container.
+          # Requires the container to be running (`docker start cats-cli-dev`).
+          # docker:
+          #   environment: docker-dev
+          #   command: claude
+          #   runner: auto
+          #   projects_dir: ~/.claude/projects
 
       codex:
         instances:

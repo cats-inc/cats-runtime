@@ -44,4 +44,21 @@ describe('host filesystem path resolution', () => {
       cwd: 'C:\\workspace\\cats-runtime',
     })).toThrow(/host-accessible path/);
   });
+
+  it('rejects home-relative Docker paths on Windows because they are container-relative', () => {
+    expect(() => resolveHostFilesystemPath('~/.codex/sessions', {
+      platform: 'win32',
+      runtime: { mode: 'docker' },
+      homeDir: 'C:\\Users\\tester',
+      cwd: 'C:\\workspace\\cats-runtime',
+    })).toThrow(/host-accessible path/);
+  });
+
+  it('rejects Linux-style absolute Docker paths on Windows because they refer to the container', () => {
+    expect(() => resolveHostFilesystemPath('/home/tester/.codex/sessions', {
+      platform: 'win32',
+      runtime: { mode: 'docker' },
+      cwd: 'C:\\workspace\\cats-runtime',
+    })).toThrow(/host-accessible path/);
+  });
 });

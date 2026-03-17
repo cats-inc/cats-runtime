@@ -149,4 +149,64 @@ describe('runtime adapters', () => {
     expect(spawnConfig.cwd).toBe('/Users/kenne/repo');
     expect(spawnConfig.shell).toBe(process.platform === 'win32');
   });
+
+  it('normalizes backslashes in Docker runtime paths', () => {
+    const runtime = createRuntimeAdapter({
+      mode: 'docker',
+      container: 'cats-cli-dev',
+    });
+
+    expect(runtime.toRuntimePath('C:\\Users\\kenne\\repo')).toBe('C:/Users/kenne/repo');
+    expect(runtime.toHostPath('/home/user/repo')).toBe('/home/user/repo');
+  });
+
+  it('builds a Docker spawn config with base64 payload and PATH prepend', () => {
+    const spawnConfig = buildProcessSpawnConfig(
+      {
+        path: 'claude',
+        runner: 'direct',
+        runtime: {
+          mode: 'docker',
+          container: 'cats-cli-dev',
+        },
+      },
+      'claude',
+      ['--help'],
+      '/workspace/repo',
+    );
+
+    const expectedPayload = Buffer.from(JSON.stringify({
+      cwd: '/workspace/repo',
+      command: 'claude',
+      args: ['--help'],
+    }), 'utf8').toString('base64');
+
+    expect(spawnConfig.command).toBe('docker');
+    expect(spawnConfig.args).toEqual([
+      'exec',
+      '-i',
+      '-e',
+      `CATS_RUNTIME_DOCKER_EXEC_B64=${expectedPayload}`,
+      'cats-cli-dev',
+      'bash',
+      '-lc',
+      [
+        'python3 - <<\'PY\'',
+        'import base64',
+        'import json',
+        'import os',
+        '',
+        'payload = json.loads(base64.b64decode(os.environ["CATS_RUNTIME_DOCKER_EXEC_B64"]).decode("utf-8"))',
+        'os.environ["PATH"] = "/root/.local/bin:" + os.environ.get("PATH", "")',
+        'os.chdir(payload["cwd"])',
+        'argv = [payload["command"], *payload.get("args", [])]',
+        'os.execvp(argv[0], argv)',
+        'PY',
+      ].join('\n'),
+    ]);
+    expect(spawnConfig.shell).toBe(false);
+    expect(spawnConfig.env).toEqual({
+      CATS_RUNTIME_DOCKER_EXEC_B64: expectedPayload,
+    });
+  });
 });

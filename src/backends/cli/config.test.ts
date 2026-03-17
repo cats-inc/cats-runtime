@@ -17,6 +17,7 @@ import {
   defaultProviderRuntimeMode,
   defaultSpawnRetries,
   defaultSpawnTimeoutMs,
+  defaultDockerDiscoveryPolicy,
   defaultWslDiscoveryPolicy,
   listProviderInstances,
   loadConfig,
@@ -147,6 +148,24 @@ describe('config platform defaults', () => {
     expect(() => loadConfigWithoutProviderFile({
       CATS_RUNTIME_WSL_DISCOVERY_POLICY: 'sometimes',
     })).toThrow(/Invalid CATS_RUNTIME_WSL_DISCOVERY_POLICY/);
+  });
+
+  it('defaults Docker discovery policy to if_running', () => {
+    expect(defaultDockerDiscoveryPolicy()).toBe('if_running');
+  });
+
+  it('loads Docker discovery policy from the environment', () => {
+    expect(
+      loadConfigWithoutProviderFile({
+        CATS_RUNTIME_DOCKER_DISCOVERY_POLICY: 'always',
+      }).dockerDiscoveryPolicy,
+    ).toBe('always');
+  });
+
+  it('rejects invalid Docker discovery policy values', () => {
+    expect(() => loadConfigWithoutProviderFile({
+      CATS_RUNTIME_DOCKER_DISCOVERY_POLICY: 'sometimes',
+    })).toThrow(/Invalid CATS_RUNTIME_DOCKER_DISCOVERY_POLICY/);
   });
 
   it('defaults runtime data and session directories under ~/.cats-runtime', () => {
@@ -539,6 +558,101 @@ providers:
           },
         },
       });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('parses Docker environments with container in providers.yaml', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const configPath = join(tempDir, 'providers.yaml');
+    writeFileSync(configPath, `
+version: 1
+environments:
+  docker-dev:
+    kind: docker
+    container: cats-cli-dev
+providers:
+  claude:
+    instances:
+      docker:
+        environment: docker-dev
+        command: claude
+        runner: auto
+        projects_dir: ~/.claude/projects
+`.trimStart());
+
+    try {
+      const config = loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_CONFIG_PATH: configPath,
+      });
+
+      expect(resolveProviderInstance(config, 'claude', 'docker')).toMatchObject({
+        id: 'docker',
+        commandConfig: {
+          path: 'claude',
+          runtime: {
+            mode: 'docker',
+            container: 'cats-cli-dev',
+            environmentId: 'docker-dev',
+          },
+        },
+      });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects Docker environments without a container in providers.yaml', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const configPath = join(tempDir, 'providers.yaml');
+    writeFileSync(configPath, `
+version: 1
+environments:
+  docker-dev:
+    kind: docker
+providers:
+  claude:
+    instances:
+      docker:
+        environment: docker-dev
+        command: claude
+        runner: auto
+`.trimStart());
+
+    try {
+      expect(() => loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_CONFIG_PATH: configPath,
+      })).toThrow(/environments\.docker-dev.*container/);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects inline Docker instances without a container in providers.yaml', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const configPath = join(tempDir, 'providers.yaml');
+    writeFileSync(configPath, `
+version: 1
+providers:
+  claude:
+    instances:
+      docker:
+        runtime: docker
+        command: claude
+        runner: auto
+`.trimStart());
+
+    try {
+      expect(() => loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_CONFIG_PATH: configPath,
+      })).toThrow(/claude\.instances\.docker.*container/);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

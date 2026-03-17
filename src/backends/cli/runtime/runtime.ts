@@ -27,6 +27,9 @@ export function createRuntimeAdapter(config: ProviderRuntimeConfig): RuntimeAdap
   if (config.mode === 'wsl') {
     return new WslRuntimeAdapter(config.distro || 'Ubuntu');
   }
+  if (config.mode === 'docker') {
+    return new DockerRuntimeAdapter(config.container || 'cats-cli');
+  }
   return new NativeRuntimeAdapter();
 }
 
@@ -103,6 +106,31 @@ class WslRuntimeAdapter implements RuntimeAdapter {
   }
 }
 
+class DockerRuntimeAdapter implements RuntimeAdapter {
+  readonly mode = 'docker' as const;
+  readonly distro = undefined;
+  readonly container: string;
+
+  constructor(container: string) {
+    this.container = container;
+  }
+
+  toRuntimePath(path: string): string {
+    return path.replace(/\\/g, '/');
+  }
+
+  toHostPath(path: string): string {
+    return path.replace(/\\/g, '/');
+  }
+
+  buildShellInvocation(script: string): ShellInvocation {
+    return {
+      command: 'docker',
+      args: ['exec', this.container, 'bash', '-lc', script],
+    };
+  }
+}
+
 export function buildProcessSpawnConfig(
   commandConfig: ProviderCommandConfig,
   providerName: string,
@@ -111,6 +139,9 @@ export function buildProcessSpawnConfig(
 ): ProcessSpawnConfig {
   if (commandConfig.runtime.mode === 'wsl') {
     return buildWslSpawnConfig(commandConfig, args, cwd);
+  }
+  if (commandConfig.runtime.mode === 'docker') {
+    return buildDockerSpawnConfig(commandConfig, args, cwd);
   }
   return buildNativeSpawnConfig(commandConfig, providerName, args, cwd);
 }
@@ -181,6 +212,51 @@ function buildWslSpawnConfig(
     env: {
       CATS_RUNTIME_WSL_EXEC_B64: payload,
       WSLENV: wslenv,
+    },
+  };
+}
+
+function buildDockerSpawnConfig(
+  commandConfig: ProviderCommandConfig,
+  args: string[],
+  cwd: string,
+): ProcessSpawnConfig {
+  const runtime = createRuntimeAdapter(commandConfig.runtime);
+  const runtimeCwd = runtime.toRuntimePath(cwd);
+  const payload = Buffer.from(JSON.stringify({
+    cwd: runtimeCwd,
+    command: commandConfig.path,
+    args,
+  }), 'utf8').toString('base64');
+  const commandScript = [
+    'python3 - <<\'PY\'',
+    'import base64',
+    'import json',
+    'import os',
+    '',
+    'payload = json.loads(base64.b64decode(os.environ["CATS_RUNTIME_DOCKER_EXEC_B64"]).decode("utf-8"))',
+    'os.environ["PATH"] = "/root/.local/bin:" + os.environ.get("PATH", "")',
+    'os.chdir(payload["cwd"])',
+    'argv = [payload["command"], *payload.get("args", [])]',
+    'os.execvp(argv[0], argv)',
+    'PY',
+  ].join('\n');
+
+  return {
+    command: 'docker',
+    args: [
+      'exec',
+      '-i',
+      '-e',
+      `CATS_RUNTIME_DOCKER_EXEC_B64=${payload}`,
+      commandConfig.runtime.container || 'cats-cli',
+      'bash',
+      '-lc',
+      commandScript,
+    ],
+    shell: false,
+    env: {
+      CATS_RUNTIME_DOCKER_EXEC_B64: payload,
     },
   };
 }

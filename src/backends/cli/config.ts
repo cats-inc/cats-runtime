@@ -14,8 +14,14 @@ const RUNNER_MODES = [
 const RUNTIME_MODES = [
   'native',
   'wsl',
+  'docker',
 ] as const;
 const WSL_DISCOVERY_POLICIES = [
+  'always',
+  'if_running',
+  'manual_only',
+] as const;
+const DOCKER_DISCOVERY_POLICIES = [
   'always',
   'if_running',
   'manual_only',
@@ -25,11 +31,13 @@ const CONFIG_FILE_DEFAULT = join('config', 'providers.yaml');
 export type RunnerMode = typeof RUNNER_MODES[number];
 export type RuntimeMode = typeof RUNTIME_MODES[number];
 export type WslDiscoveryPolicy = typeof WSL_DISCOVERY_POLICIES[number];
+export type DockerDiscoveryPolicy = typeof DOCKER_DISCOVERY_POLICIES[number];
 export type BackendKind = 'cli' | 'api' | 'local' | 'agent';
 
 export interface ProviderRuntimeConfig {
   mode: RuntimeMode;
   distro?: string;
+  container?: string;
   environmentId?: string;
 }
 
@@ -161,6 +169,7 @@ export interface CliRuntimeConfig {
   kiroRuntime: ProviderRuntimeConfig;
   piSessionsDir: string;
   wslDiscoveryPolicy?: WslDiscoveryPolicy;
+  dockerDiscoveryPolicy?: DockerDiscoveryPolicy;
   nativeDiscoveryIntervalMs: number;
   externalSessionLiveWindowMs: number;
   maxSessions: number;
@@ -198,6 +207,7 @@ interface LegacyRuntimeShape {
 interface ParsedEnvironmentConfig {
   mode: RuntimeMode;
   distro?: string;
+  container?: string;
 }
 
 interface ParsedRemoteBackendsResult {
@@ -266,6 +276,10 @@ export function defaultNativeDiscoveryIntervalMs(): number {
 
 export function defaultWslDiscoveryPolicy(): WslDiscoveryPolicy {
   return 'always';
+}
+
+export function defaultDockerDiscoveryPolicy(): DockerDiscoveryPolicy {
+  return 'if_running';
 }
 
 export function defaultExternalSessionLiveWindowMs(): number {
@@ -338,6 +352,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CliRuntimeConf
     wslDiscoveryPolicy: parseWslDiscoveryPolicy(
       env.CATS_RUNTIME_WSL_DISCOVERY_POLICY,
       defaultWslDiscoveryPolicy(),
+    ),
+    dockerDiscoveryPolicy: parseDockerDiscoveryPolicy(
+      env.CATS_RUNTIME_DOCKER_DISCOVERY_POLICY,
+      defaultDockerDiscoveryPolicy(),
     ),
     nativeDiscoveryIntervalMs: parseNonNegativeInt(
       env.CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS
@@ -1180,9 +1198,16 @@ function parseEnvironmentMap(
       `environments.${environmentId}.kind`,
     );
     const distro = readString(environment.distro);
+    const container = readString(environment.container);
     assertExplicitWslHasDistro(
       mode,
       distro,
+      `environments.${environmentId}`,
+      filePath,
+    );
+    assertExplicitDockerHasContainer(
+      mode,
+      container,
       `environments.${environmentId}`,
       filePath,
     );
@@ -1190,6 +1215,7 @@ function parseEnvironmentMap(
     result[environmentId] = {
       mode,
       distro,
+      container,
     };
   }
 
@@ -1217,6 +1243,7 @@ function resolveRuntimeFromFile(
     return {
       mode: resolved.mode,
       distro: resolved.distro,
+      container: resolved.container,
       environmentId,
     };
   }
@@ -1225,15 +1252,24 @@ function resolveRuntimeFromFile(
     || readString(raw.kind)
     || readString(raw.mode);
   const inlineDistro = readString(raw.distro);
+  const inlineContainer = readString(raw.container);
   const mode = parseRuntimeModeValue(
     inlineRuntime,
     fallback.mode,
     `${label}.runtime`,
   );
   const effectiveDistro = inlineDistro || fallback.distro;
+  const effectiveContainer = inlineContainer || fallback.container;
   assertExplicitWslHasDistro(
     mode,
     effectiveDistro,
+    label,
+    filePath,
+    Boolean(inlineRuntime),
+  );
+  assertExplicitDockerHasContainer(
+    mode,
+    effectiveContainer,
     label,
     filePath,
     Boolean(inlineRuntime),
@@ -1242,6 +1278,7 @@ function resolveRuntimeFromFile(
   return {
     mode,
     distro: effectiveDistro,
+    container: effectiveContainer,
     environmentId: fallback.environmentId,
   };
 }
@@ -1264,6 +1301,28 @@ function assertExplicitWslHasDistro(
   if (!distro) {
     throw new Error(
       `'${label}' in '${filePath}' sets runtime to 'wsl' but does not define 'distro'`,
+    );
+  }
+}
+
+function assertExplicitDockerHasContainer(
+  mode: RuntimeMode,
+  container: string | undefined,
+  label: string,
+  filePath: string,
+  isExplicitDocker = true,
+): void {
+  if (mode !== 'docker') {
+    return;
+  }
+
+  if (!isExplicitDocker) {
+    return;
+  }
+
+  if (!container) {
+    throw new Error(
+      `'${label}' in '${filePath}' sets runtime to 'docker' but does not define 'container'`,
     );
   }
 }
@@ -1832,6 +1891,9 @@ function readRuntimeConfig(
     distro: env[`${prefix}_RUNTIME_DISTRO`]
       || env[`${prefix}_WSL_DISTRO`]
       || undefined,
+    container: env[`${prefix}_RUNTIME_CONTAINER`]
+      || env[`${prefix}_DOCKER_CONTAINER`]
+      || undefined,
   };
 }
 
@@ -1869,6 +1931,25 @@ function parseWslDiscoveryPolicy(
   throw new Error(
     `Invalid CATS_RUNTIME_WSL_DISCOVERY_POLICY='${raw}'. `
       + `Valid values: ${WSL_DISCOVERY_POLICIES.join(', ')}`,
+  );
+}
+
+function parseDockerDiscoveryPolicy(
+  value: string | undefined,
+  fallback: DockerDiscoveryPolicy,
+): DockerDiscoveryPolicy {
+  const raw = value?.trim().toLowerCase();
+  if (!raw) {
+    return fallback;
+  }
+
+  if ((DOCKER_DISCOVERY_POLICIES as readonly string[]).includes(raw)) {
+    return raw as DockerDiscoveryPolicy;
+  }
+
+  throw new Error(
+    `Invalid CATS_RUNTIME_DOCKER_DISCOVERY_POLICY='${raw}'. `
+      + `Valid values: ${DOCKER_DISCOVERY_POLICIES.join(', ')}`,
   );
 }
 

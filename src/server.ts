@@ -22,6 +22,7 @@ import { PiSessionScanner } from './backends/cli/discovery/PiSessionScanner.js';
 import { GooseNativeSessionService } from './backends/cli/goose/GooseNativeSessionService.js';
 import { JunieSessionScanner } from './backends/cli/junie/JunieSessionScanner.js';
 import { syncNativeSessions } from './backends/cli/discovery/nativeDiscovery.js';
+import { isDockerContainerRunning } from './backends/cli/discovery/dockerDiscovery.js';
 import {
   WslDiscoveryStatusStore,
   isWslDistroRunning,
@@ -355,6 +356,19 @@ export function createDiscoveryController(
   let started = false;
   const wslDistroInspector = options.wslDistroInspector || isWslDistroRunning;
   const wslDiscoveryPolicy = ctx.config.wslDiscoveryPolicy ?? 'always';
+  const dockerDiscoveryPolicy = ctx.config.dockerDiscoveryPolicy ?? 'if_running';
+
+  const shouldSkipBackgroundDockerDiscovery = (
+    provider: 'cursor' | 'goose' | 'kiro' | 'opencode',
+    instanceId: string,
+  ): boolean => {
+    if (dockerDiscoveryPolicy !== 'manual_only') {
+      return false;
+    }
+    const runtime = resolveProviderInstance(ctx.config, provider, instanceId)
+      .commandConfig.runtime;
+    return runtime.mode === 'docker';
+  };
 
   const shouldSkipBackgroundWslDiscovery = (
     provider: 'cursor' | 'goose' | 'kiro' | 'opencode',
@@ -427,6 +441,29 @@ export function createDiscoveryController(
           }
         }
 
+        const instanceRuntime = resolveProviderInstance(
+          ctx.config,
+          name,
+          instanceId,
+        ).commandConfig.runtime;
+        if (instanceRuntime.mode === 'docker' && dockerDiscoveryPolicy === 'if_running') {
+          const container = instanceRuntime.container || 'cats-cli';
+          try {
+            const containerRunning = await isDockerContainerRunning(container);
+            if (!containerRunning) {
+              console.warn(
+                `[discovery:${discoveryLabel}] Skipping scan: Docker container '${container}' is not running`,
+              );
+              return;
+            }
+          } catch {
+            console.warn(
+              `[discovery:${discoveryLabel}] Skipping scan: could not inspect Docker container '${container}'`,
+            );
+            return;
+          }
+        }
+
         const sessions = await listAllSessions();
         const { newCount } = syncNativeSessions(
           ctx.registry,
@@ -454,6 +491,10 @@ export function createDiscoveryController(
     }
 
     if (shouldSkipBackgroundWslDiscovery(name, instanceId)) {
+      return null;
+    }
+
+    if (shouldSkipBackgroundDockerDiscovery(name, instanceId)) {
       return null;
     }
 

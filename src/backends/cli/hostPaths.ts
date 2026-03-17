@@ -35,6 +35,13 @@ export function resolveHostFilesystemPath(
     );
   }
 
+  if (platform === 'win32' && runtime?.mode === 'docker' && isAmbiguousWindowsWslPath(trimmed)) {
+    throw new Error(
+      `${label} for Docker-backed instances on Windows must be a host-accessible path. `
+      + `Use a Windows path such as 'C:\\path\\to\\sessions'. Received '${pathValue}'.`,
+    );
+  }
+
   const expanded = expandHomeDir(trimmed, options.homeDir, label, pathApi.resolve);
   if (platform === 'win32' && isWslUncPath(expanded)) {
     return normalizeWslUncPath(expanded);

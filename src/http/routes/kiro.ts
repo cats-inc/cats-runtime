@@ -19,7 +19,7 @@ const KIRO_WSL_MODELS = [
   'minimax-m2.1',
 ];
 
-function getKiroModelsForRuntime(mode: 'native' | 'wsl'): string[] {
+function getKiroModelsForRuntime(mode: string): string[] {
   return mode === 'wsl' ? KIRO_WSL_MODELS : KIRO_NATIVE_MODELS;
 }
 
