@@ -48,7 +48,7 @@ export interface Provider {
   ephemeral?: boolean;
   buildSpawnArgs(opts: ProviderSpawnOptions): string[];
   buildStdinMessage(content: string): string;
-  parseStreamLine(line: string): StreamEvent | null;
+  parseStreamLine(line: string): StreamEvent | StreamEvent[] | null;
   buildAutoResponse?(line: string): string | null;
   getPendingTurnStart?(): string | null;
   streamTurn?(content: string, opts: ProviderTurnOptions): AsyncGenerator<StreamEvent>;

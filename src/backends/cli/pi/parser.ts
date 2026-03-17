@@ -1,21 +1,36 @@
 import type { StreamEvent } from '../../../core/types.js';
 
 /** Parsed fields from a single Pi JSONL line. */
+export interface PiMessagePart {
+  type?: string;
+  text?: string;
+  thinking?: string;
+  id?: string;
+  name?: string;
+  arguments?: Record<string, unknown>;
+}
+
 export interface PiStreamEvent {
   type: string;
+  id?: string;
+  stopReason?: string;
   assistantMessageEvent?: {
     type?: string;
     delta?: string;
   };
   message?: {
     role?: string;
-    content?: string | Array<{ type: string; text?: string }>;
+    content?: string | PiMessagePart[];
     usage?: {
       input?: number;
       output?: number;
       cacheRead?: number;
       cost?: { total?: number };
     };
+    stopReason?: string;
+    toolCallId?: string;
+    toolName?: string;
+    isError?: boolean;
   };
   toolCallId?: string;
   toolName?: string;
@@ -24,7 +39,7 @@ export interface PiStreamEvent {
   isError?: boolean;
   messages?: Array<{
     role?: string;
-    content?: string | Array<{ type: string; text?: string }>;
+    content?: string | PiMessagePart[];
   }>;
   toolResults?: Array<{
     toolCallId?: string;
@@ -34,7 +49,7 @@ export interface PiStreamEvent {
 }
 
 function extractTextContent(
-  content: string | Array<{ type: string; text?: string }> | undefined,
+  content: string | PiMessagePart[] | undefined,
 ): string {
   if (!content) return '';
   if (typeof content === 'string') return content;
@@ -43,6 +58,72 @@ function extractTextContent(
     .filter((c) => c.type === 'text' && c.text)
     .map((c) => c.text!)
     .join('');
+}
+
+function extractUsage(message: PiStreamEvent['message']): StreamEvent['usage'] | undefined {
+  const usage = message?.usage;
+  if (!usage) return undefined;
+  return {
+    inputTokens: (usage.input ?? 0) + (usage.cacheRead ?? 0),
+    outputTokens: usage.output ?? 0,
+  };
+}
+
+function parseCurrentMessageEvent(event: PiStreamEvent): StreamEvent | StreamEvent[] | null {
+  const message = event.message;
+  if (!message) return null;
+
+  if (message.role === 'user') {
+    return null;
+  }
+
+  if (message.role === 'toolResult') {
+    const text = extractTextContent(message.content);
+    return {
+      type: 'tool_result',
+      toolId: message.toolCallId,
+      toolName: message.toolName,
+      text,
+      isError: message.isError ?? false,
+    };
+  }
+
+  if (message.role !== 'assistant') {
+    return null;
+  }
+
+  const events: StreamEvent[] = [];
+  const parts = Array.isArray(message.content) ? message.content : [];
+  let hasToolCall = false;
+  for (const part of parts) {
+    if (part.type === 'toolCall') {
+      hasToolCall = true;
+      events.push({
+        type: 'tool_use',
+        toolId: part.id,
+        toolName: part.name ?? 'unknown',
+        toolArgs: part.arguments,
+      });
+    }
+  }
+
+  const text = extractTextContent(message.content);
+  if (text) {
+    events.push({ type: 'text', text });
+  }
+
+  const usage = extractUsage(message);
+  if (usage && event.stopReason !== 'toolUse' && (text || !hasToolCall)) {
+    events.push({
+      type: 'result',
+      usage,
+    });
+  }
+
+  if (events.length === 0) {
+    return null;
+  }
+  return events.length === 1 ? events[0] : events;
 }
 
 /**
@@ -55,7 +136,7 @@ function extractTextContent(
  *  - tool_execution_start/end — tool calls
  *  - response, extension_*    — internal RPC; skip
  */
-export function parsePiStreamLine(line: string): StreamEvent | null {
+export function parsePiStreamLine(line: string): StreamEvent | StreamEvent[] | null {
   const trimmed = line.trim();
   if (!trimmed) return null;
 
@@ -76,6 +157,11 @@ export function parsePiStreamLine(line: string): StreamEvent | null {
     || eventType === 'extension_error'
   ) {
     return null;
+  }
+
+  // Current Pi session/message log format
+  if (eventType === 'message') {
+    return parseCurrentMessageEvent(event);
   }
 
   // Agent lifecycle — agent_end may carry final messages
@@ -99,15 +185,17 @@ export function parsePiStreamLine(line: string): StreamEvent | null {
   if (eventType === 'turn_end') {
     const msg = event.message;
     if (!msg) return { type: 'result' };
+    if (msg.stopReason === 'toolUse') return null;
 
     const usage = msg.usage;
     return {
       type: 'result',
-      usage: usage ? {
-        inputTokens: (usage.input ?? 0) + (usage.cacheRead ?? 0),
-        outputTokens: usage.output ?? 0,
-      } : undefined,
+      usage: usage ? extractUsage(msg) : undefined,
     };
+  }
+
+  if (eventType === 'message_start' || eventType === 'message_end') {
+    return null;
   }
 
   // Streaming text deltas
@@ -138,6 +226,10 @@ export function parsePiStreamLine(line: string): StreamEvent | null {
       text: resultText,
       isError: event.isError ?? false,
     };
+  }
+
+  if (eventType === 'tool_execution_update') {
+    return null;
   }
 
   // Unknown — pass through as raw

@@ -30,7 +30,7 @@ export class PiProvider implements Provider {
     return JSON.stringify({ type: 'prompt', message: content }) + '\n';
   }
 
-  parseStreamLine(line: string): StreamEvent | null {
+  parseStreamLine(line: string): StreamEvent | StreamEvent[] | null {
     return parsePiStreamLine(line);
   }
 }

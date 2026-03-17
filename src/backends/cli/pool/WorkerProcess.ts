@@ -95,20 +95,23 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
         }
       }
 
-      const event = this.provider.parseStreamLine(line);
-      if (event) {
-        // Track session ID for ephemeral resume
-        if ((event.type === 'init' || event.type === 'result') && event.sessionId) {
-          this._providerSessionId = event.sessionId;
-        }
-        // If provider has pending messages after init, send them
-        if (event.type === 'init' && this.provider.getPendingTurnStart) {
-          const pending = this.provider.getPendingTurnStart();
-          if (pending) {
-            this.process!.stdin!.write(pending);
+      const parsed = this.provider.parseStreamLine(line);
+      if (parsed) {
+        const events = Array.isArray(parsed) ? parsed : [parsed];
+        for (const event of events) {
+          // Track session ID for ephemeral resume
+          if ((event.type === 'init' || event.type === 'result') && event.sessionId) {
+            this._providerSessionId = event.sessionId;
           }
+          // If provider has pending messages after init, send them
+          if (event.type === 'init' && this.provider.getPendingTurnStart) {
+            const pending = this.provider.getPendingTurnStart();
+            if (pending) {
+              this.process!.stdin!.write(pending);
+            }
+          }
+          this.emit('event', event);
         }
-        this.emit('event', event);
       }
     });
 
