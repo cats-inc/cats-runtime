@@ -24,14 +24,34 @@ describe('JunieProvider', () => {
       expect(args).toContain('/tmp/test');
     });
 
-    it('includes model flag', () => {
+    it('normalizes Claude Sonnet variants to the Junie sonnet alias', () => {
       const provider = new JunieProvider();
       const args = provider.buildSpawnArgs({
         cwd: '/tmp',
         model: 'claude-sonnet-4',
       });
       expect(args).toContain('--model');
-      expect(args).toContain('claude-sonnet-4');
+      expect(args).toContain('sonnet');
+    });
+
+    it('normalizes generic GPT-family models to Junie aliases', () => {
+      const provider = new JunieProvider();
+      const args = provider.buildSpawnArgs({
+        cwd: '/tmp',
+        model: 'gpt-5.4',
+      });
+      expect(args).toContain('--model');
+      expect(args).toContain('gpt');
+    });
+
+    it('normalizes Codex-family models to gpt-codex', () => {
+      const provider = new JunieProvider();
+      const args = provider.buildSpawnArgs({
+        cwd: '/tmp',
+        model: 'gpt-5.2-codex',
+      });
+      expect(args).toContain('--model');
+      expect(args).toContain('gpt-codex');
     });
 
     it('includes session-id for resume', () => {

@@ -23,8 +23,9 @@ export class JunieProvider implements Provider {
       '--skip-update-check',
     ];
 
-    if (opts.model) {
-      args.push('--model', opts.model);
+    const model = normalizeJunieModelId(opts.model);
+    if (model) {
+      args.push('--model', model);
     }
 
     if (opts.cwd) {
@@ -50,4 +51,50 @@ export class JunieProvider implements Provider {
   parseStreamLine(line: string): StreamEvent | null {
     return parseJunieStreamLine(line);
   }
+}
+
+function normalizeJunieModelId(model?: string): string | undefined {
+  if (!model) return undefined;
+
+  const trimmed = model.trim();
+  if (!trimmed) return undefined;
+
+  const normalized = trimmed
+    .toLowerCase()
+    .replace(/[_\s]+/g, '-')
+    .replace(/^openai\//, '')
+    .replace(/^anthropic\//, '')
+    .replace(/^google\//, '')
+    .replace(/^xai\//, '')
+    .trim();
+
+  if (normalized.includes('codex')) {
+    return 'gpt-codex';
+  }
+
+  if (normalized.startsWith('gpt')) {
+    return 'gpt';
+  }
+
+  if (normalized.includes('opus')) {
+    return 'opus';
+  }
+
+  if (normalized.includes('sonnet')) {
+    return 'sonnet';
+  }
+
+  if (normalized.includes('gemini') && normalized.includes('flash')) {
+    return 'gemini-flash';
+  }
+
+  if (normalized.includes('gemini')) {
+    return 'gemini-pro';
+  }
+
+  if (normalized.includes('grok')) {
+    return 'grok';
+  }
+
+  return trimmed;
 }

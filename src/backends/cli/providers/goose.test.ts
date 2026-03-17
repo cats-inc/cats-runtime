@@ -47,6 +47,18 @@ describe('GooseProvider', () => {
       expect(args).toContain('claude-sonnet-4');
     });
 
+    it('normalizes generic Codex model aliases into Goose provider/model flags', () => {
+      const provider = new GooseProvider(createMockNative());
+      const args = provider.buildSpawnArgs({
+        cwd: '/tmp',
+        model: 'gpt-5.2-codex',
+      });
+      expect(args).toContain('--provider');
+      expect(args).toContain('openai');
+      expect(args).toContain('--model');
+      expect(args).toContain('gpt-5-codex');
+    });
+
     it('includes --name and --resume for session resume', () => {
       const provider = new GooseProvider(createMockNative());
       const args = provider.buildSpawnArgs({
@@ -66,11 +78,11 @@ describe('GooseProvider', () => {
       expect(args).toContain('Fix the bug');
     });
 
-    it('throws for invalid model format', () => {
+    it('throws for unsupported shorthand model format', () => {
       const provider = new GooseProvider(createMockNative());
       expect(() => provider.buildSpawnArgs({
         cwd: '/tmp',
-        model: 'gpt-5',
+        model: 'claude-sonnet-4-6',
       })).toThrow(/Invalid Goose model format/);
     });
   });

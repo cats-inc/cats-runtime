@@ -99,14 +99,77 @@ export function parseGooseStreamLine(line: string): StreamEvent | null {
  */
 export function parseGooseModel(model: string): { provider: string; modelId: string } {
   const trimmed = model.trim();
-  const slashIdx = trimmed.indexOf('/');
-  if (slashIdx < 1 || slashIdx === trimmed.length - 1) {
+  const aliased = normalizeGooseModelAlias(trimmed);
+  const slashIdx = aliased.indexOf('/');
+  if (slashIdx < 1 || slashIdx === aliased.length - 1) {
     throw new Error(
       `Invalid Goose model format '${model}'. Expected 'provider/model' (e.g. 'anthropic/claude-sonnet-4').`,
     );
   }
+
+  const provider = aliased.slice(0, slashIdx).trim();
+  const modelId = aliased.slice(slashIdx + 1).trim();
+  if (!provider || !modelId) {
+    throw new Error(
+      `Invalid Goose model format '${model}'. Expected 'provider/model' (e.g. 'anthropic/claude-sonnet-4').`,
+    );
+  }
+
   return {
-    provider: trimmed.slice(0, slashIdx),
-    modelId: trimmed.slice(slashIdx + 1),
+    provider,
+    modelId: normalizeGooseProviderModelId(provider, modelId),
   };
+}
+
+function normalizeGooseModelAlias(model: string): string {
+  const normalized = model
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, '-')
+    .trim();
+
+  const aliases: Record<string, string> = {
+    'gpt': 'openai/gpt-5',
+    'gpt-5': 'openai/gpt-5',
+    'gpt-5.1': 'openai/gpt-5',
+    'gpt-5.2': 'openai/gpt-5',
+    'gpt-5.3': 'openai/gpt-5',
+    'gpt-5.4': 'openai/gpt-5',
+    'gpt-codex': 'openai/gpt-5-codex',
+    'gpt-5-codex': 'openai/gpt-5-codex',
+    'gpt-5.1-codex': 'openai/gpt-5-codex',
+    'gpt-5.2-codex': 'openai/gpt-5-codex',
+    'gpt-5.3-codex': 'openai/gpt-5-codex',
+    'gpt-5.4-codex': 'openai/gpt-5-codex',
+  };
+
+  return aliases[normalized] ?? model.trim();
+}
+
+function normalizeGooseProviderModelId(provider: string, modelId: string): string {
+  const normalizedProvider = provider.trim().toLowerCase();
+  const normalizedModelId = modelId
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, '-')
+    .trim();
+
+  if (normalizedProvider !== 'openai') {
+    return modelId;
+  }
+
+  const aliases: Record<string, string> = {
+    'gpt': 'gpt-5',
+    'gpt-5.1': 'gpt-5',
+    'gpt-5.2': 'gpt-5',
+    'gpt-5.3': 'gpt-5',
+    'gpt-5.4': 'gpt-5',
+    'gpt-codex': 'gpt-5-codex',
+    'gpt-5.1-codex': 'gpt-5-codex',
+    'gpt-5.2-codex': 'gpt-5-codex',
+    'gpt-5.3-codex': 'gpt-5-codex',
+    'gpt-5.4-codex': 'gpt-5-codex',
+  };
+
+  return aliases[normalizedModelId] ?? modelId;
 }

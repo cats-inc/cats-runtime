@@ -133,11 +133,29 @@ describe('parseGooseModel', () => {
     expect(result.modelId).toBe('gpt-5');
   });
 
-  it('throws for model without slash', () => {
-    expect(() => parseGooseModel('gpt-5')).toThrow(/Invalid Goose model format/);
+  it('normalizes GPT shorthand to the OpenAI provider/model form', () => {
+    const result = parseGooseModel('gpt-5.4');
+    expect(result.provider).toBe('openai');
+    expect(result.modelId).toBe('gpt-5');
+  });
+
+  it('normalizes Codex shorthand to the OpenAI codex model', () => {
+    const result = parseGooseModel('gpt-5.2-codex');
+    expect(result.provider).toBe('openai');
+    expect(result.modelId).toBe('gpt-5-codex');
+  });
+
+  it('normalizes OpenAI provider/model aliases', () => {
+    const result = parseGooseModel('openai/gpt-5.4');
+    expect(result.provider).toBe('openai');
+    expect(result.modelId).toBe('gpt-5');
   });
 
   it('throws for empty string', () => {
     expect(() => parseGooseModel('')).toThrow(/Invalid Goose model format/);
+  });
+
+  it('throws for unsupported shorthand model format', () => {
+    expect(() => parseGooseModel('claude-sonnet-4-6')).toThrow(/Invalid Goose model format/);
   });
 });
