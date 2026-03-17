@@ -88,8 +88,17 @@ describe('JunieProvider', () => {
         result: 'Done',
         llmUsage: [{ inputTokens: 100, outputTokens: 50 }],
       }));
-      expect(event?.type).toBe('result');
-      expect(event?.sessionId).toBe('session-1');
+      expect(event).toEqual([
+        { type: 'text', text: 'Done' },
+        {
+          type: 'result',
+          sessionId: 'session-1',
+          usage: {
+            inputTokens: 100,
+            outputTokens: 50,
+          },
+        },
+      ]);
     });
 
     it('returns null for empty lines', () => {
