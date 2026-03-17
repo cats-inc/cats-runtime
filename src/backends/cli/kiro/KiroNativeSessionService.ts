@@ -1,9 +1,10 @@
 import { spawn } from 'node:child_process';
 import { isWslDistroRunning, type WslDistroInspector } from '../discovery/wslDiscovery.js';
+import type { CommandRunnerOptions } from '../pythonScripts.js';
+import { runPythonJsonScript, type CommandRunner } from '../pythonScripts.js';
 import type { RuntimeAdapter } from '../runtime/runtime.js';
 import {
   createRuntimeAdapter,
-  quoteForBash,
 } from '../runtime/runtime.js';
 
 export interface KiroNativeSessionSummary {
@@ -21,13 +22,7 @@ export interface KiroHistoryMessage {
   timestamp?: string;
 }
 
-interface CommandResult {
-  code: number;
-  stdout: string;
-  stderr: string;
-}
-
-export type KiroCommandRunner = (command: string, args: string[]) => Promise<CommandResult>;
+export type KiroCommandRunner = CommandRunner;
 export interface KiroSessionListOptions {
   startIfNeeded?: boolean;
 }
@@ -169,25 +164,14 @@ export class KiroNativeSessionService {
   }
 
   private async runJsonScript<T>(script: string, args: string[]): Promise<T> {
-    const stdout = await this.runShell(buildPythonCommand(script, args));
-    try {
-      return JSON.parse(stdout) as T;
-    } catch (error) {
-      throw new Error(`Failed to parse Kiro session JSON: ${String(error)}. Output: ${stdout}`);
-    }
-  }
-
-  private async runShell(script: string): Promise<string> {
-    const { command, args } = this.runtime.buildShellInvocation(script);
-    const result = await this.runner(command, args);
-
-    if (result.code !== 0) {
-      const stderr = result.stderr.trim();
-      const stdout = result.stdout.trim();
-      throw new Error(stderr || stdout || `Kiro native command failed with code ${result.code}`);
-    }
-
-    return result.stdout;
+    return runPythonJsonScript<T>({
+      runtime: this.runtime,
+      runner: this.runner,
+      script,
+      args,
+      commandLabel: 'Kiro native command',
+      parseLabel: 'Kiro session',
+    });
   }
 }
 
@@ -203,16 +187,18 @@ export function normalizeKiroWorkspacePath(cwd: string): string {
   }).normalizeWorkspace(cwd);
 }
 
-function buildPythonCommand(script: string, args: string[]): string {
-  const encoded = Buffer.from(script, 'utf-8').toString('base64');
-  const python = `import base64; exec(base64.b64decode("${encoded}"))`;
-  const quotedArgs = args.map(quoteForBash).join(' ');
-  return `python3 -c ${quoteForBash(python)}${quotedArgs ? ` ${quotedArgs}` : ''}`;
-}
-
-async function defaultCommandRunner(command: string, args: string[]): Promise<CommandResult> {
-  return new Promise<CommandResult>((resolve, reject) => {
+async function defaultCommandRunner(
+  command: string,
+  args: string[],
+  options: CommandRunnerOptions = {},
+): Promise<{
+  code: number;
+  stdout: string;
+  stderr: string;
+}> {
+  return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
+      shell: options.shell,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 

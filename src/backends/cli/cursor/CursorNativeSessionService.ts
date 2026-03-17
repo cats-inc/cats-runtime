@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process';
 import { isWslDistroRunning, type WslDistroInspector } from '../discovery/wslDiscovery.js';
+import type { CommandRunnerOptions } from '../pythonScripts.js';
+import { runPythonJsonScript, type CommandRunner } from '../pythonScripts.js';
 import type { RuntimeAdapter } from '../runtime/runtime.js';
 import {
   createRuntimeAdapter,
@@ -21,13 +23,7 @@ export interface CursorHistoryMessage {
   timestamp?: string;
 }
 
-interface CommandResult {
-  code: number;
-  stdout: string;
-  stderr: string;
-}
-
-export type CursorCommandRunner = (command: string, args: string[]) => Promise<CommandResult>;
+export type CursorCommandRunner = CommandRunner;
 export interface CursorSessionListOptions {
   startIfNeeded?: boolean;
 }
@@ -182,12 +178,14 @@ export class CursorNativeSessionService {
   }
 
   private async runJsonScript<T>(script: string, args: string[]): Promise<T> {
-    const stdout = await this.runShell(buildPythonCommand(script, args));
-    try {
-      return JSON.parse(stdout) as T;
-    } catch (error) {
-      throw new Error(`Failed to parse Cursor session JSON: ${String(error)}. Output: ${stdout}`);
-    }
+    return runPythonJsonScript<T>({
+      runtime: this.runtime,
+      runner: this.runner,
+      script,
+      args,
+      commandLabel: 'Cursor native command',
+      parseLabel: 'Cursor session',
+    });
   }
 
   private async runShell(script: string): Promise<string> {
@@ -201,22 +199,6 @@ export class CursorNativeSessionService {
     }
 
     return result.stdout;
-  }
-
-  private mapSummaries(
-    result: RawCursorSession[],
-    cwd: string,
-  ): CursorNativeSessionSummary[] {
-    return result
-      .filter((item) => typeof item?.sessionId === 'string' && item.sessionId.length > 0)
-      .map((item) => ({
-        providerSessionId: item.sessionId!,
-        cwd,
-        summary: item.summary,
-        messageCount: item.messageCount ?? 0,
-        lastActivity: item.lastActivity,
-        model: item.model,
-      }));
   }
 }
 
@@ -232,16 +214,18 @@ export function normalizeCursorWorkspacePath(cwd: string): string {
   }).normalizeWorkspace(cwd);
 }
 
-function buildPythonCommand(script: string, args: string[]): string {
-  const encoded = Buffer.from(script, 'utf-8').toString('base64');
-  const python = `import base64; exec(base64.b64decode("${encoded}"))`;
-  const quotedArgs = args.map(quoteForBash).join(' ');
-  return `python3 -c ${quoteForBash(python)}${quotedArgs ? ` ${quotedArgs}` : ''}`;
-}
-
-async function defaultCommandRunner(command: string, args: string[]): Promise<CommandResult> {
-  return new Promise<CommandResult>((resolve, reject) => {
+async function defaultCommandRunner(
+  command: string,
+  args: string[],
+  options: CommandRunnerOptions = {},
+): Promise<{
+  code: number;
+  stdout: string;
+  stderr: string;
+}> {
+  return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
+      shell: options.shell,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 

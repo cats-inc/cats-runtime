@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import {
   CursorNativeSessionService,
@@ -5,12 +6,6 @@ import {
 import { createRuntimeAdapter } from '../runtime/runtime.js';
 
 describe('CursorNativeSessionService', () => {
-  function decodeEmbeddedPython(shellScript: string): string {
-    const match = shellScript.match(/base64\.b64decode\(\"([^\"]+)\"\)/);
-    expect(match?.[1]).toBeTruthy();
-    return Buffer.from(match![1], 'base64').toString('utf8');
-  }
-
   it('normalizes Windows workspaces to WSL mount paths when using WSL runtime', () => {
     const service = new CursorNativeSessionService({
       command: 'cursor-agent',
@@ -120,13 +115,11 @@ describe('CursorNativeSessionService', () => {
     ]);
   });
 
-  it('uses an immutable SQLite fallback for active Cursor session stores', async () => {
-    let shellScript = '';
-    const runner = vi.fn(async () => ({
-      code: 0,
-      stdout: JSON.stringify([]),
-      stderr: '',
-    }));
+  it('uses a native temp Python file and keeps the immutable SQLite fallback logic', async () => {
+    let executedCommand = '';
+    let executedArgs: string[] = [];
+    let executedShell = false;
+    let capturedScript = '';
     const service = new CursorNativeSessionService({
       command: 'cursor-agent',
       chatsDir: '~/.cursor/chats',
@@ -134,17 +127,62 @@ describe('CursorNativeSessionService', () => {
         mode: 'native',
         toRuntimePath: (path) => path,
         toHostPath: (path) => path,
-        buildShellInvocation: (script) => {
-          shellScript = script;
-          return { command: 'bash', args: ['-lc', script] };
-        },
+        buildShellInvocation: () => ({ command: 'bash', args: ['-lc', 'ignored'] }),
       },
-      runner,
+      runner: vi.fn(async (command, args, options) => {
+        if (process.platform === 'win32' && args[0] === '-c') {
+          return {
+            code: 0,
+            stdout: 'C:\\Python312\\python.exe\n',
+            stderr: '',
+          };
+        }
+        executedCommand = command;
+        executedArgs = args;
+        executedShell = Boolean(options?.shell);
+        capturedScript = readFileSync(args[0]!, 'utf8');
+        return { code: 0, stdout: JSON.stringify([]), stderr: '' };
+      }),
     });
 
     await service.listAllSessions();
 
-    expect(decodeEmbeddedPython(shellScript)).toContain('mode=ro&immutable=1');
+    expect(executedCommand).toMatch(/python(?:\.exe)?$/i);
+    expect(executedArgs[0]).toMatch(/script\.py$/);
+    expect(executedShell).toBe(false);
+    expect(capturedScript).toContain('mode=ro&immutable=1');
+  });
+
+  it('keeps the native temp Python file in place until the runner completes', async () => {
+    let scriptPath = '';
+    const service = new CursorNativeSessionService({
+      command: 'cursor-agent',
+      chatsDir: '~/.cursor/chats',
+      runtime: {
+        mode: 'native',
+        toRuntimePath: (path) => path,
+        toHostPath: (path) => path,
+        buildShellInvocation: () => ({ command: 'bash', args: ['-lc', 'ignored'] }),
+      },
+      runner: vi.fn(async (command, args, options) => {
+        if (process.platform === 'win32' && args[0] === '-c') {
+          return {
+            code: 0,
+            stdout: 'C:\\Python312\\python.exe\n',
+            stderr: '',
+          };
+        }
+
+        scriptPath = args[0]!;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        expect(existsSync(scriptPath)).toBe(true);
+        return { code: 0, stdout: JSON.stringify([]), stderr: '' };
+      }),
+    });
+
+    await service.listAllSessions();
+    expect(scriptPath).toMatch(/script\.py$/);
+    expect(existsSync(scriptPath)).toBe(false);
   });
 
   it('skips WSL discovery when startIfNeeded is false and the distro is stopped', async () => {
