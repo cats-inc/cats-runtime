@@ -17,6 +17,11 @@ export class JunieProvider implements Provider {
     this.pendingPrompt = content;
   }
 
+  resolveFirstEventTimeoutMs(_defaultTimeoutMs: number): number {
+    // Junie only writes its JSON result after the task finishes.
+    return 0;
+  }
+
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
     const args: string[] = [
       '--output-format', 'json',

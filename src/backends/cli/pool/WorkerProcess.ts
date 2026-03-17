@@ -241,7 +241,10 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
 
     try {
       if (this.provider.ephemeral) {
-        const { retries, timeoutMs } = this.spawnResilience;
+        const retries = this.spawnResilience.retries;
+        const timeoutMs = this.provider.resolveFirstEventTimeoutMs?.(
+          this.spawnResilience.timeoutMs,
+        ) ?? this.spawnResilience.timeoutMs;
 
         for (let attempt = 1; attempt <= retries; attempt++) {
           // Reset per-attempt state
@@ -259,7 +262,8 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
           if (msg) this.process!.stdin!.write(msg);
           this.process!.stdin!.end();
 
-          // Per-attempt spawn timeout
+          // Most ephemeral providers stream early progress, but some only emit
+          // stdout once the task has fully completed.
           let timeoutId: ReturnType<typeof setTimeout> | undefined;
           if (timeoutMs > 0) {
             timeoutId = setTimeout(() => {

@@ -54,6 +54,8 @@ export interface Provider {
   streamTurn?(content: string, opts: ProviderTurnOptions): AsyncGenerator<StreamEvent>;
   /** Called before spawn for ephemeral providers that need the message in args (e.g. -p flag). */
   prepareEphemeralTurn?(content: string): void;
+  /** Override the default first-event timeout for ephemeral providers. */
+  resolveFirstEventTimeoutMs?(defaultTimeoutMs: number): number;
   beforeTurn?(opts: ProviderSpawnOptions): Promise<void>;
   afterTurn?(opts: ProviderSpawnOptions): Promise<StreamEvent | StreamEvent[] | null>;
 }

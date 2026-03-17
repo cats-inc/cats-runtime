@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import type { ProviderCommandConfig } from '../config.js';
+import { WorkerProcess } from './WorkerProcess.js';
 import { buildPowerShellCommandScript, buildPowerShellExecEnv } from '../runtime/runtime.js';
+import type { Provider, StreamEvent } from '../providers/types.js';
 
 describe('WorkerProcess PowerShell helpers', () => {
   it('builds a short PowerShell loader command for env-based argv passthrough', () => {
@@ -32,4 +35,71 @@ describe('WorkerProcess PowerShell helpers', () => {
       }), 'utf8').toString('base64'),
     });
   });
+
+  it('times out silent ephemeral providers by default', async () => {
+    const worker = new WorkerProcess(
+      createCompletionOnlyProvider(),
+      { cwd: process.cwd() },
+      createNodeCommandConfig(),
+      { retries: 1, timeoutMs: 10 },
+    );
+
+    await expect(worker.sendMessage('ignored')).rejects.toThrow(
+      'Provider did not respond within 10ms',
+    );
+  });
+
+  it('lets completion-only ephemeral providers disable the first-event timeout', async () => {
+    const worker = new WorkerProcess(
+      createCompletionOnlyProvider(0),
+      { cwd: process.cwd() },
+      createNodeCommandConfig(),
+      { retries: 1, timeoutMs: 10 },
+    );
+
+    await expect(worker.sendMessage('ignored')).resolves.toEqual([
+      { type: 'result', sessionId: 'junie-session' },
+    ]);
+  });
 });
+
+function createNodeCommandConfig(): ProviderCommandConfig {
+  return {
+    path: process.execPath,
+    runner: 'direct',
+    runtime: { mode: 'native' },
+  };
+}
+
+function createCompletionOnlyProvider(
+  timeoutOverrideMs?: number,
+): Provider {
+  return {
+    name: 'junie',
+    capabilities: { resume: true, fork: false, permissions: false },
+    ephemeral: true,
+    buildSpawnArgs() {
+      return [
+        '-e',
+        [
+          "setTimeout(() => {",
+          "  process.stdout.write(JSON.stringify({ sessionId: 'junie-session', result: 'done' }) + '\\n');",
+          '}, 50);',
+        ].join(' '),
+      ];
+    },
+    buildStdinMessage() {
+      return '';
+    },
+    parseStreamLine(line: string): StreamEvent | null {
+      const data = JSON.parse(line) as { sessionId?: string };
+      return {
+        type: 'result',
+        sessionId: data.sessionId,
+      };
+    },
+    resolveFirstEventTimeoutMs(defaultTimeoutMs: number): number {
+      return timeoutOverrideMs ?? defaultTimeoutMs;
+    },
+  };
+}
