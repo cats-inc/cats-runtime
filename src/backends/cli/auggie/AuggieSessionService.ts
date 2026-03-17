@@ -11,6 +11,10 @@ export interface AuggieSavedSession {
   lastActivity?: string;
   model?: string;
   createdAt?: string;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+  };
 }
 
 export interface AuggieHistoryMessage {
@@ -46,6 +50,12 @@ interface RawAuggieSession {
         type?: number;
         content?: string;
         timestamp_ms?: number;
+        token_usage?: {
+          input_tokens?: number;
+          output_tokens?: number;
+          cache_read_input_tokens?: number;
+          cache_creation_input_tokens?: number;
+        } | null;
       }>;
     };
     finishedAt?: string;
@@ -158,6 +168,7 @@ function parseSavedSession(
     lastActivity: raw.modified,
     model: normalizeStoredModelId(raw.agentState?.modelId),
     createdAt: raw.created,
+    usage: extractLatestTokenUsage(chatHistory),
   };
 }
 
@@ -257,6 +268,48 @@ function extractExchangeTimestamp(
   return typeof latestTimestampMs === 'number'
     ? new Date(latestTimestampMs).toISOString()
     : undefined;
+}
+
+function extractLatestTokenUsage(
+  chatHistory: RawAuggieSession['chatHistory'],
+): AuggieSavedSession['usage'] {
+  if (!Array.isArray(chatHistory)) return undefined;
+
+  for (let index = chatHistory.length - 1; index >= 0; index -= 1) {
+    const rawResponseNodes = chatHistory[index]?.exchange?.response_nodes;
+    const responseNodes = Array.isArray(rawResponseNodes) ? rawResponseNodes : [];
+    for (let responseIndex = responseNodes.length - 1; responseIndex >= 0; responseIndex -= 1) {
+      const usage = normalizeTokenUsage(responseNodes[responseIndex]?.token_usage);
+      if (usage) {
+        return usage;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function normalizeTokenUsage(
+  usage: NonNullable<
+    NonNullable<
+      NonNullable<RawAuggieSession['chatHistory']>[number]['exchange']
+    >['response_nodes']
+  >[number]['token_usage'],
+): AuggieSavedSession['usage'] {
+  if (!usage) return undefined;
+
+  const inputTokens = (usage.input_tokens ?? 0)
+    + (usage.cache_read_input_tokens ?? 0)
+    + (usage.cache_creation_input_tokens ?? 0);
+  const outputTokens = usage.output_tokens ?? 0;
+  if (inputTokens <= 0 && outputTokens <= 0) {
+    return undefined;
+  }
+
+  return {
+    inputTokens,
+    outputTokens,
+  };
 }
 
 function normalizeStoredModelId(modelId?: string): string | undefined {

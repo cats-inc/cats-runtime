@@ -61,6 +61,59 @@ describe('AuggieSessionService', () => {
     });
   });
 
+  it('captures the latest token usage from Auggie response nodes', async () => {
+    sessionsDir = await mkdtemp(join(tmpdir(), 'auggie-usage-test-'));
+    await mkdir(sessionsDir, { recursive: true });
+    await writeFile(
+      join(sessionsDir, 'session-usage.json'),
+      JSON.stringify({
+        sessionId: 'auggie-usage',
+        created: '2026-03-10T00:00:00.000Z',
+        modified: '2026-03-10T00:02:00.000Z',
+        chatHistory: [
+          {
+            exchange: {
+              request_message: 'Summarize the repo',
+              request_nodes: [
+                {
+                  ide_state_node: {
+                    workspace_folders: [
+                      {
+                        folder_root: 'C:/Users/kenne/Source/SK2/one-man-digital-company',
+                      },
+                    ],
+                  },
+                },
+              ],
+              response_nodes: [
+                {
+                  type: 10,
+                  content: '',
+                  token_usage: {
+                    input_tokens: 10,
+                    output_tokens: 20,
+                    cache_read_input_tokens: 5,
+                    cache_creation_input_tokens: 7,
+                  },
+                },
+              ],
+            },
+            finishedAt: '2026-03-10T00:01:00.000Z',
+          },
+        ],
+      }, null, 2),
+      'utf-8',
+    );
+
+    const service = new AuggieSessionService(sessionsDir);
+    const session = await service.getSession('auggie-usage');
+
+    expect(session?.usage).toEqual({
+      inputTokens: 22,
+      outputTokens: 20,
+    });
+  });
+
   it('loads conversation history from Auggie session JSON files', async () => {
     sessionsDir = await mkdtemp(join(tmpdir(), 'auggie-history-test-'));
     await mkdir(sessionsDir, { recursive: true });

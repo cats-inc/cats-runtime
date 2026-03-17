@@ -181,10 +181,13 @@ export class AuggieProvider implements Provider {
     opts: ProviderSpawnOptions,
     updatedSession: AuggieSavedSession | null,
   ): StreamEvent {
+    const usage = updatedSession?.usage;
+
     if (opts.resumeSessionId) {
       return {
         type: 'result',
         sessionId: opts.resumeSessionId,
+        usage,
       };
     }
 
@@ -192,11 +195,13 @@ export class AuggieProvider implements Provider {
       return {
         type: 'result',
         sessionId: updatedSession.providerSessionId,
+        usage,
       };
     }
 
     return {
       type: 'result',
+      usage,
     };
   }
 

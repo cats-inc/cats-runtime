@@ -73,6 +73,10 @@ describe('AuggieProvider', () => {
           messageCount: 2,
           exchangeCount: 2,
           lastActivity: '2026-03-10T00:01:00.000Z',
+          usage: {
+            inputTokens: 21,
+            outputTokens: 34,
+          },
         }),
       getSession: vi.fn().mockResolvedValue(null),
     } as unknown as AuggieSessionService;
@@ -92,6 +96,10 @@ describe('AuggieProvider', () => {
     await expect(provider.afterTurn?.({ cwd: '/tmp/repo' })).resolves.toEqual({
       type: 'result',
       sessionId: 'session-new',
+      usage: {
+        inputTokens: 21,
+        outputTokens: 34,
+      },
     });
   });
 
