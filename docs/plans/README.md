@@ -47,6 +47,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 | Plan | Title | Status | Related Spec |
 |------|-------|--------|--------------|
 | [PLAN-005](./PLAN-005-provider-model-catalog-and-discovery.md) | Provider Model Catalog and Discovery | Draft | [SPEC-004](../specs/SPEC-004-provider-model-catalog-and-discovery.md) |
+| [PLAN-006](./PLAN-006-standalone-and-app-managed-startup-contract.md) | Standalone and App-Managed Startup Contract | Draft | N/A |
 | [PLAN-004](./PLAN-004-agent-backend.md) | Agent Backend for OpenClaw and Future Agent SDK Runtimes | In Progress | [SPEC-003](../specs/SPEC-003-agent-backend.md) |
 | [PLAN-003](./PLAN-003-api-backend.md) | API and Ollama Backend for Claude, OpenAI, Gemini, and Ollama | In Progress | N/A |
 | [PLAN-002](./PLAN-002-provider-instance-review-followups.md) | Provider Instance Review Follow-ups | Completed | N/A |

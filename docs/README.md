@@ -51,7 +51,7 @@ Add your project-specific automation scripts here.
 | [terminology.md](./terminology.md) | ?? Template | AAIF/A2A/MCP terminology |
 | [a2a/](./a2a/) | ?? | A2A agent card and task templates |
 | [specs/](./specs/) | ? Active | Feature specifications, including WSL discovery and agent backend planning |
-| [plans/](./plans/) | ? Active | Implementation plans, including WSL discovery, API backend, and agent backend rollout |
+| [plans/](./plans/) | ? Active | Implementation plans, including WSL discovery, API/backend expansion, and the proposed standalone versus app-managed startup contract |
 | [decisions/](./decisions/) | ? Active | Architecture Decision Records, including the proposed app-managed self-hosted runtime packaging direction |
 
 **Legend**: ? Complete | ?? Template (needs content) | ?? Directory
