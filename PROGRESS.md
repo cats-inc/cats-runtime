@@ -58,6 +58,7 @@
 
 - [ ] Add provider health probes, dashboard health surfacing, and Ollama model discovery
 - [ ] Expand the shared local tool runtime beyond the first shell/file/search set
+- [ ] Split Docker discovery snapshot creation out of `createDiscoveryStatusPayload()` so `GET /discovery/status` can reuse the live WSL snapshot without recomputing an unused WSL status store
 
 ### WP-2: Provider Instance Review Follow-ups
 
@@ -158,4 +159,4 @@ adapter end to end through the existing HTTP surface.
 
 ---
 
-*Last updated: 2026-03-17*
+*Last updated: 2026-03-19*
