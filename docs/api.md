@@ -279,7 +279,9 @@ Errors use this format:
 - File-scanned providers (`claude`, `codex`, `copilot`, `gemini`, `auggie`) now
   discover external sessions per configured provider instance as well
 - File-backed provider paths are resolved on the host. On Windows, WSL-backed
-  file providers must use host-accessible paths such as `\\wsl$\Distro\...`
+  file providers may use Linux-style paths such as `~/.codex/sessions`; the
+  runtime translates them to host-readable `\\wsl$\Distro\...` paths
+  automatically
 - API-key and Ollama execution now live under `src/backends/api` without
   requiring a second inbound service
 - External agent runtimes such as OpenClaw now live under

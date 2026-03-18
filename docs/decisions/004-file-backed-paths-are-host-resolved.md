@@ -42,8 +42,9 @@ watchers, or Auggie file-backed session services.
 
 On Windows, when one of those providers is configured with `runtime: wsl`,
 guest-relative Linux paths such as `~/.codex/sessions` or
-`/home/user/.codex/sessions` are rejected. Callers must use a host-accessible
-path, for example:
+`/home/user/.codex/sessions` are accepted and translated into host-accessible
+UNC paths automatically. Callers may still use an explicit host path when they
+want to pin the exact location, for example:
 
 - `\\wsl$\Ubuntu\home\user\.codex\sessions`
 - a Windows path if the provider stores data on the Windows filesystem
@@ -72,10 +73,10 @@ paths remain runtime-side rather than host-side discovery paths.
 
 ### Negative
 
-- Windows users configuring WSL-backed file providers must use more explicit
-  host paths such as `\\wsl$\...`
-- setup docs and examples must explain the distinction between host-side
-  file-backed providers and runtime-side native providers
+- bootstrap may need to resolve the WSL distro home directory when a path uses
+  `~`, and startup now depends on that lookup succeeding
+- setup docs and examples still need to explain the distinction between
+  host-side file-backed providers and runtime-side native providers
 
 ## Follow-up
 

@@ -28,21 +28,21 @@ describe('host filesystem path resolution', () => {
     })).toBe('\\\\wsl$\\Ubuntu\\home\\Tester\\.codex\\sessions');
   });
 
-  it('rejects home-relative WSL paths on Windows because they are guest-relative', () => {
-    expect(() => resolveHostFilesystemPath('~/.codex/sessions', {
+  it('translates home-relative WSL paths on Windows into host-readable UNC paths', () => {
+    expect(resolveHostFilesystemPath('~/.codex/sessions', {
       platform: 'win32',
       runtime: { mode: 'wsl', distro: 'Ubuntu' },
-      homeDir: 'C:\\Users\\tester',
       cwd: 'C:\\workspace\\cats-runtime',
-    })).toThrow(/host-accessible path/);
+      resolveWslHomeDir: () => '/home/tester',
+    })).toBe('\\\\wsl$\\Ubuntu\\home\\tester\\.codex\\sessions');
   });
 
-  it('rejects Linux-style absolute WSL paths on Windows because the host cannot resolve them', () => {
-    expect(() => resolveHostFilesystemPath('/home/tester/.codex/sessions', {
+  it('translates Linux-style absolute WSL paths on Windows into host-readable UNC paths', () => {
+    expect(resolveHostFilesystemPath('/home/tester/.codex/sessions', {
       platform: 'win32',
       runtime: { mode: 'wsl', distro: 'Ubuntu' },
       cwd: 'C:\\workspace\\cats-runtime',
-    })).toThrow(/host-accessible path/);
+    })).toBe('\\\\wsl$\\Ubuntu\\home\\tester\\.codex\\sessions');
   });
 
   it('rejects home-relative Docker paths on Windows because they are container-relative', () => {

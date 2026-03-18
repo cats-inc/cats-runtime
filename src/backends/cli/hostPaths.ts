@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { posix as pathPosix, win32 as pathWin32 } from 'node:path';
 import type { ProviderRuntimeConfig } from './config.js';
 
@@ -7,7 +8,10 @@ interface HostFilesystemPathOptions {
   platform?: NodeJS.Platform;
   homeDir?: string;
   cwd?: string;
+  resolveWslHomeDir?: (distro: string) => string;
 }
+
+const wslHomeDirCache = new Map<string, string>();
 
 export function resolveHostFilesystemPath(
   pathValue: string,
@@ -26,13 +30,17 @@ export function resolveHostFilesystemPath(
     throw new Error(`${label} must not be empty`);
   }
 
-  if (platform === 'win32' && runtime?.mode === 'wsl' && isAmbiguousWindowsWslPath(trimmed)) {
-    const distroExample = runtime.distro || '<distro>';
-    throw new Error(
-      `${label} for WSL-backed instances on Windows must be a host-accessible path. `
-      + `Use a Windows path such as 'C:\\path\\to\\sessions' or a WSL UNC path like `
-      + `'\\\\wsl$\\${distroExample}\\home\\user\\...'. Received '${pathValue}'.`,
-    );
+  if (platform === 'win32' && runtime?.mode === 'wsl') {
+    if (trimmed === '~' || trimmed.startsWith('~/') || trimmed.startsWith('~\\')) {
+      const wslHomeDir = resolveWslHomeDir(runtime, label, options.resolveWslHomeDir);
+      return normalizeWslUncPath(
+        linuxPathToWslUnc(`${wslHomeDir}${trimmed === '~' ? '' : trimmed.slice(1)}`, runtime),
+      );
+    }
+
+    if (isLinuxAbsolutePath(trimmed)) {
+      return normalizeWslUncPath(linuxPathToWslUnc(trimmed, runtime));
+    }
   }
 
   if (platform === 'win32' && runtime?.mode === 'docker' && isAmbiguousWindowsWslPath(trimmed)) {
@@ -104,6 +112,10 @@ function isAmbiguousWindowsWslPath(pathValue: string): boolean {
   return /^[\\/](?![\\/])/.test(pathValue);
 }
 
+function isLinuxAbsolutePath(pathValue: string): boolean {
+  return pathValue.startsWith('/');
+}
+
 function stripTrailingSeparators(pathValue: string): string {
   if (pathValue.length <= 1 || /^[A-Za-z]:[\\/]$/.test(pathValue)) {
     return pathValue;
@@ -118,4 +130,57 @@ function normalizeWslUncPath(pathValue: string): string {
     .replace(/\//g, '\\')
     .replace(/^\\+/, '');
   return `\\\\${withoutLeading.replace(/\\+/g, '\\')}`;
+}
+
+function linuxPathToWslUnc(
+  linuxPath: string,
+  runtime: Pick<ProviderRuntimeConfig, 'mode' | 'distro'>,
+): string {
+  const distro = runtime.distro || 'Ubuntu';
+  const normalized = linuxPath.replace(/\\/g, '/');
+  if (!normalized.startsWith('/')) {
+    throw new Error(`Expected an absolute Linux path for WSL translation. Received '${linuxPath}'.`);
+  }
+  const uncPath = `\\\\wsl$\\${distro}${normalized.replace(/\//g, '\\')}`;
+  return uncPath;
+}
+
+function resolveWslHomeDir(
+  runtime: Pick<ProviderRuntimeConfig, 'mode' | 'distro'>,
+  label: string,
+  resolver?: (distro: string) => string,
+): string {
+  const distro = runtime.distro || 'Ubuntu';
+  const cacheKey = distro.toLowerCase();
+  const cached = wslHomeDirCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  try {
+    const resolved = (
+      resolver
+        ? resolver(distro)
+        : execFileSync('wsl', ['-d', distro, 'bash', '-lc', 'printf %s "$HOME"'], {
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+          windowsHide: true,
+        })
+    ).trim();
+
+    if (!resolved.startsWith('/')) {
+      throw new Error(`WSL reported a non-absolute home directory '${resolved}'`);
+    }
+
+    wslHomeDirCache.set(cacheKey, resolved);
+    return resolved;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Could not resolve ${label} for WSL distro '${distro}' from '~'. `
+      + `Verify that WSL is accessible, or use an explicit WSL path like `
+      + `'/home/user/...' or '\\\\wsl$\\${distro}\\home\\user\\...'. `
+      + `Underlying error: ${reason}`,
+    );
+  }
 }

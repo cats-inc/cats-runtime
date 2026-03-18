@@ -192,9 +192,10 @@ Path semantics matter:
   host-side discovery paths. `projects_dir` / `sessions_dir` must point to a
   path that the `cats-runtime` host process can read directly.
 - On Windows, if one of those file-backed providers is configured as
-  `runtime: wsl`, do not use guest-relative Linux paths such as
-  `~/.codex/sessions` or `/home/user/.codex/sessions`. Use a host-accessible
-  path such as `\\wsl$\Ubuntu\home\user\.codex\sessions` instead.
+  `runtime: wsl`, Linux-style paths such as `~/.codex/sessions` or
+  `/home/user/.codex/sessions` are accepted. `cats-runtime` translates them to
+  host-readable `\\wsl$\...` paths automatically for discovery. Explicit UNC
+  paths still work when you want to pin an exact WSL location.
 - Docker-backed file providers are different: host-side file discovery is
   currently skipped for `runtime: docker`, so `sessions_dir` may remain the
   container-local path that the CLI itself uses. The tradeoff is that routes

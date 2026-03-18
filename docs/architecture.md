@@ -166,10 +166,11 @@ For WSL-backed Cursor/Kiro discovery:
 For file-backed providers:
 
 1. The runtime resolves instance-specific discovery paths on the host
-2. On Windows, WSL-backed file providers must use host-accessible paths such as
-   `\\wsl$\Distro\...`
-3. Ambiguous guest-relative paths are rejected during bootstrap instead of
-   falling through to watcher/scanner failures later
+2. On Windows, WSL-backed file providers may use Linux-style paths such as
+   `~/.codex/sessions`; the runtime translates them to host-readable
+   `\\wsl$\Distro\...` paths automatically
+3. Invalid WSL paths still fail during bootstrap instead of falling through to
+   watcher/scanner failures later
 4. Docker-backed file providers currently skip host-side file discovery and
    keep using their container-local session paths until Docker file discovery is
    implemented
