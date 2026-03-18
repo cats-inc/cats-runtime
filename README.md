@@ -90,6 +90,9 @@ For an app-managed local start, prefer machine-readable readiness output:
 node dist/index.js --startup-mode app-managed --managed-by cats-inc --ready-output json
 ```
 
+For graceful local shutdown, a supervising host may either send `SIGINT` /
+`SIGTERM` or close the child process stdin stream.
+
 `GET /health` now includes runtime startup metadata so supervising hosts can
 confirm mode, PID, readiness state, and bound address over the public HTTP
 boundary.

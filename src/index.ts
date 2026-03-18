@@ -43,19 +43,30 @@ async function main(): Promise<void> {
   }
 
   let shuttingDown = false;
-  const shutdown = (signal: NodeJS.Signals) => {
+  const shutdown = (reason: string) => {
     if (shuttingDown) {
       return;
     }
     shuttingDown = true;
-    process.stdout.write(`received ${signal}, shutting down\n`);
+    process.stdout.write(`received ${reason}, shutting down\n`);
     void runtime.close().finally(() => {
       process.exit(0);
     });
   };
 
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', () => {
+    shutdown('SIGINT');
+  });
+  process.on('SIGTERM', () => {
+    shutdown('SIGTERM');
+  });
+
+  if (startup.mode === 'app-managed' && process.stdin.readable && !process.stdin.isTTY) {
+    process.stdin.resume();
+    process.stdin.on('end', () => {
+      shutdown('stdin-closed');
+    });
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

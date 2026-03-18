@@ -270,6 +270,8 @@ In that mode:
 - `GET /health` remains the authoritative readiness endpoint
 - the process stays a separate HTTP service rather than being source-imported
   into the host app
+- graceful shutdown may be triggered by `SIGINT`, `SIGTERM`, or by closing the
+  child stdin stream from the host process
 
 By default, runtime metadata persists under `~/.cats-runtime/data` and runtime
 session workspaces/transcripts persist under `~/.cats-runtime/sessions`. Override

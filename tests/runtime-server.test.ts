@@ -51,6 +51,7 @@ function createTestConfig(overrides = {}) {
     CURSOR_CHATS_DIR: join(root, '.cursor', 'chats'),
     GEMINI_SESSIONS_DIR: join(root, '.gemini', 'tmp'),
     KIRO_DB_PATH: join(root, '.kiro', 'data.sqlite3'),
+    PI_SESSIONS_DIR: join(root, '.pi', 'agent', 'sessions'),
   };
 
   for (const dir of [
@@ -62,6 +63,8 @@ function createTestConfig(overrides = {}) {
     env.COPILOT_SESSIONS_DIR,
     env.CURSOR_CHATS_DIR,
     env.GEMINI_SESSIONS_DIR,
+    env.PI_SESSIONS_DIR,
+    join(root, '.junie', 'sessions'),
     join(root, 'data'),
   ]) {
     mkdirSync(dir, { recursive: true });

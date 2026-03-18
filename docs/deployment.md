@@ -77,7 +77,10 @@ Expected behavior:
 - stdout emits a single-line JSON `runtime.ready` event after bind succeeds
 - stderr emits a single-line JSON `runtime.startup_error` event on startup failure
 - `GET /health` is the authoritative readiness endpoint after process launch
-- `SIGINT` and `SIGTERM` trigger graceful shutdown of the runtime server
+- `SIGINT` and `SIGTERM` trigger graceful shutdown of the runtime server where
+  the host platform supports them reliably
+- closing the child stdin stream also triggers graceful shutdown in
+  `app-managed` mode and is the most portable host-controlled stop path
 
 ## Configuration
 
