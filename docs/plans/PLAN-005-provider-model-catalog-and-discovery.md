@@ -121,6 +121,9 @@ semantics.
       `cats-inc` server integration is real
 - [ ] Revisit whether an explicit refresh endpoint is needed after cache
       behavior is exercised
+- [ ] Add explicit timeout and abort handling for discovery-backed HTTP fetches
+      such as `ollama` model listing so partial hangs degrade into fallback
+      warnings instead of long-lived requests
 - [ ] Expand dynamic discovery to more CLI or API-backed providers only when
       they have clear, stable listing semantics
       Candidates to evaluate first: `pi`, `opencode`, and `cursor`
@@ -173,6 +176,7 @@ slice.
 |------|--------|------------|
 | Vendor-specific model listing semantics leak into the public contract | High | Keep the public response target-aware and config-scoped, not vendor-account scoped |
 | Dynamic discovery becomes expensive or flaky | Medium | Use short TTL caching and clear fallback rules |
+| Discovery-backed HTTP calls hang instead of failing quickly | Medium | Add explicit timeout/abort handling for remote discovery fetches and rely on fallback ordering when probes fail |
 | Product work starts depending on a runtime aggregate endpoint too early | Medium | Document that multi-provider product flows should compose per-provider calls server-side first |
 | Kiro compatibility logic forks from the generic route again | Medium | Move Kiro model data behind the shared service rather than maintaining two sources of truth |
 
