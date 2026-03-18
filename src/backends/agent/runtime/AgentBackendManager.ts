@@ -108,6 +108,21 @@ export class AgentBackendManager {
     };
   }
 
+  async listModels(
+    target: ProviderTargetDescriptor,
+  ): Promise<Array<{ id: string; label: string }>> {
+    const instance = ensureAgentTarget(target);
+    const adapter = this.buildAdapter(instance);
+    if (!adapter.listModels) {
+      throw new Error(
+        `Agent adapter '${adapter.kind}' does not support model discovery for `
+        + `${target.providerName}/${target.instanceId}`,
+      );
+    }
+
+    return adapter.listModels(instance);
+  }
+
   private async *streamTurn(
     sessionId: string,
     target: ProviderTargetDescriptor,

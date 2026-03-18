@@ -55,6 +55,7 @@ The architectural split is:
 src/
   core/
     config.ts
+    models/
     dotenv.ts
     providerCatalog.ts
     runtime/
@@ -139,6 +140,7 @@ src/
 ### `src/core`
 
 - Loads runtime-wide configuration
+- Hosts shared provider-target and provider-model catalog services
 - Defines stable exported runtime types
 - Keeps shared utilities out of provider modules
 - Carries the shared turn/bootstrap/output contract used across CLI, API/local,
@@ -150,9 +152,11 @@ src/
 2. `src/http` authenticates and routes the request
 3. `RuntimeSessionManager` resolves the configured backend target for the chosen provider instance
 4. CLI targets flow into `WorkerPool`; API/local targets flow into `ApiBackendManager`; agent targets flow into `AgentBackendManager`
-5. API/local turns may enter the shared local tool loop in `src/core/tools`
-6. Agent turns use the shared `TurnInput` contract plus provider-managed session continuity where available
-6. Stream events are returned directly to the caller
+5. Provider model-catalog reads resolve through the shared provider target and
+   model catalog services in `src/core`
+6. API/local turns may enter the shared local tool loop in `src/core/tools`
+7. Agent turns use the shared `TurnInput` contract plus provider-managed session continuity where available
+8. Stream events are returned directly to the caller
 
 For WSL-backed Cursor/Kiro discovery:
 
@@ -198,4 +202,4 @@ For file-backed providers:
 
 ---
 
-*Last updated: 2026-03-18*
+*Last updated: 2026-03-19*

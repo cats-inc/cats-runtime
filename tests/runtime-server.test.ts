@@ -101,10 +101,11 @@ function createTestConfig(overrides = {}) {
 
 async function withRuntime(
   overrides: Record<string, unknown>,
+  options: Parameters<typeof createRuntimeServer>[1],
   run: (runtime: ReturnType<typeof createRuntimeServer>) => Promise<void>,
 ) {
   const { config, cleanup } = createTestConfig(overrides);
-  const runtime = createRuntimeServer(config);
+  const runtime = createRuntimeServer(config, options);
   try {
     await run(runtime);
   } finally {
@@ -115,7 +116,7 @@ async function withRuntime(
 
 describe('runtime server', () => {
   it('GET / serves the embedded dashboard', async () => {
-    await withRuntime({}, async (runtime) => {
+    await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/');
       expect(response.status).toBe(200);
       const html = await response.text();
@@ -140,7 +141,7 @@ describe('runtime server', () => {
   });
 
   it('GET /health enforces optional inbound auth', async () => {
-    await withRuntime({ apiKey: 'runtime-secret' }, async (runtime) => {
+    await withRuntime({ apiKey: 'runtime-secret' }, {}, async (runtime) => {
       const unauthenticated = await runtime.app.request('/health');
       expect(unauthenticated.status).toBe(401);
 
@@ -162,7 +163,7 @@ describe('runtime server', () => {
   });
 
   it('GET /sessions returns the embedded registry state', async () => {
-    await withRuntime({}, async (runtime) => {
+    await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/sessions');
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({
@@ -173,7 +174,7 @@ describe('runtime server', () => {
   });
 
   it('POST /sessions rejects unknown providers before spawning', async () => {
-    await withRuntime({}, async (runtime) => {
+    await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/sessions', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -187,7 +188,7 @@ describe('runtime server', () => {
   });
 
   it('GET /kiro/models returns the local catalog without an upstream proxy', async () => {
-    await withRuntime({ kiroRuntime: { mode: 'wsl' } }, async (runtime) => {
+    await withRuntime({ kiroRuntime: { mode: 'wsl' } }, {}, async (runtime) => {
       const response = await runtime.app.request('/kiro/models');
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({
@@ -238,7 +239,7 @@ describe('runtime server', () => {
         goose: {},
         junie: {},
       },
-    }, async (runtime) => {
+    }, {}, async (runtime) => {
       const response = await runtime.app.request('/providers/config');
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({
@@ -380,7 +381,7 @@ providers:
           },
         },
       },
-    }, async (runtime) => {
+    }, {}, async (runtime) => {
       runtime.context.registry.create({
         providerName: 'cursor',
         providerInstanceId: 'ubuntu',
@@ -413,7 +414,7 @@ providers:
       kiroRuntime: { mode: 'wsl', distro: 'Ubuntu' },
       wslDiscoveryPolicy: 'manual_only',
       nativeDiscoveryIntervalMs: 5000,
-    }, async (runtime) => {
+    }, {}, async (runtime) => {
       const response = await runtime.app.request('/discovery/status');
       expect(response.status).toBe(200);
 
@@ -597,6 +598,143 @@ providers:
       await runtime.close();
       cleanup();
     }
+  });
+
+  it('GET /providers/:provider/models returns structured static fallback for CLI providers', async () => {
+    await withRuntime({}, {}, async (runtime) => {
+      const response = await runtime.app.request('/providers/codex/models');
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        provider: 'codex',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gpt-5.4',
+        source: 'static',
+        cache: null,
+        models: [
+          { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
+          { id: 'gpt-5.3-codex', label: 'gpt-5.3-codex', default: false },
+          { id: 'gpt-5.2-codex', label: 'gpt-5.2-codex', default: false },
+        ],
+        warnings: [],
+      });
+    });
+  });
+
+  it('GET /providers/:provider/models returns dynamic Ollama catalog with cache metadata', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      models: [
+        { name: 'deepseek-r1:14b' },
+        { name: 'qwen2.5-coder:7b' },
+      ],
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
+
+    await withRuntime({
+      providerDefaultTargets: {
+        ollama: { backend: 'local', instance: 'local' },
+      },
+      remoteProviderCatalog: {
+        api: {},
+        local: {
+          ollama: {
+            local: {
+              id: 'local',
+              providerName: 'ollama',
+              backend: 'local',
+              transport: 'ollama',
+              baseUrl: 'http://127.0.0.1:11434',
+              model: 'qwen2.5-coder:7b',
+            },
+          },
+        },
+        agent: {},
+      },
+    }, { apiBackend: { fetch: fetchMock } }, async (runtime) => {
+      const first = await runtime.app.request('/providers/ollama/models');
+      expect(first.status).toBe(200);
+      expect(await first.json()).toEqual({
+        provider: 'ollama',
+        backend: 'local',
+        instance: 'local',
+        defaultModel: 'qwen2.5-coder:7b',
+        source: 'dynamic',
+        cache: {
+          servedFromCache: false,
+          cachedAt: expect.any(String),
+          ttlSec: 60,
+        },
+        models: [
+          { id: 'deepseek-r1:14b', label: 'deepseek-r1:14b', default: false },
+          { id: 'qwen2.5-coder:7b', label: 'qwen2.5-coder:7b', default: true },
+        ],
+        warnings: [],
+      });
+
+      const second = await runtime.app.request('/providers/ollama/models');
+      expect(second.status).toBe(200);
+      expect((await second.json()).cache).toEqual({
+        servedFromCache: true,
+        cachedAt: expect.any(String),
+        ttlSec: 60,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('GET /providers/:provider/models uses agent adapter model discovery when available', async () => {
+    const bridgeFetch = vi.fn(async () => new Response(JSON.stringify({
+      providers: [
+        { name: 'openai', models: ['gpt-5.4', 'gpt-5.3-codex'] },
+      ],
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
+
+    await withRuntime({
+      providerDefaultTargets: {
+        codex: { backend: 'agent', instance: 'bridge' },
+      },
+      remoteProviderCatalog: {
+        api: {},
+        local: {},
+        agent: {
+          codex: {
+            bridge: {
+              id: 'bridge',
+              providerName: 'codex',
+              backend: 'agent',
+              transport: 'agent_sdk_bridge',
+              baseUrl: 'http://127.0.0.1:8082',
+              model: 'gpt-5.4',
+            },
+          },
+        },
+      },
+    }, { agentBackend: { fetch: bridgeFetch } }, async (runtime) => {
+      const response = await runtime.app.request('/providers/codex/models?instance=agent/bridge');
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        provider: 'codex',
+        backend: 'agent',
+        instance: 'bridge',
+        defaultModel: 'gpt-5.4',
+        source: 'dynamic',
+        cache: {
+          servedFromCache: false,
+          cachedAt: expect.any(String),
+          ttlSec: 60,
+        },
+        models: [
+          { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
+          { id: 'gpt-5.3-codex', label: 'gpt-5.3-codex', default: false },
+        ],
+        warnings: [],
+      });
+    });
   });
 
   it('createDiscoveryController falls back to default services when instance resolvers are absent', async () => {

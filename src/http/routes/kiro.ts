@@ -1,39 +1,25 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../app.js';
-import { resolveProviderInstance } from '../../backends/cli/config.js';
 import { toSessionViews } from '../../backends/cli/pool/sessionView.js';
+import { resolveProviderTarget } from '../../core/providerCatalog.js';
+import { getStaticProviderModels } from '../../core/models/providerModelCatalog.js';
 import { getKiroNative } from '../providerServices.js';
 import { getRouteErrorStatus } from '../routeErrors.js';
 
 export const kiroRoutes = new Hono();
-
-const KIRO_NATIVE_MODELS = [
-  'claude-opus-4.6',
-  'deepseek-3.2',
-  'minimax-m2.1',
-];
-
-const KIRO_WSL_MODELS = [
-  'claude-sonnet-4.5',
-  'deepseek-3.2',
-  'minimax-m2.1',
-];
-
-function getKiroModelsForRuntime(mode: string): string[] {
-  return mode === 'wsl' ? KIRO_WSL_MODELS : KIRO_NATIVE_MODELS;
-}
 
 /** GET /kiro/models — return the Kiro model options for the configured runtime */
 kiroRoutes.get('/kiro/models', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const instance = c.req.query('instance') || undefined;
   try {
-    const providerInstance = resolveProviderInstance(ctx.config, 'kiro', instance);
+    const target = resolveProviderTarget(ctx.config, 'kiro', instance);
+    const runtime = target.cliInstance?.commandConfig.runtime;
     return c.json({
-      runtime: providerInstance.commandConfig.runtime,
-      instance: providerInstance.id,
+      runtime,
+      instance: target.instanceId,
       source: 'static',
-      models: getKiroModelsForRuntime(providerInstance.commandConfig.runtime.mode),
+      models: getStaticProviderModels(target).map((model) => model.id),
     });
   } catch (err) {
     return c.json(

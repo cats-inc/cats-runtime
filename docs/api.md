@@ -205,6 +205,7 @@ such as:
 GET /pool/status
 GET /discovery/status
 GET /providers/config
+GET /providers/{provider}/models
 GET /browse?path=...
 GET /kiro/models
 ```
@@ -216,6 +217,37 @@ resolved `instance` alongside the runtime metadata.
 or other clients that need to offer provider-instance selection. Each instance
 entry includes its backend kind (`cli`, `api`, `local`, or `agent`) plus any
 transport or runtime metadata that applies to that backend.
+
+`GET /providers/{provider}/models` is the runtime-owned per-provider model
+catalog route. It accepts optional `?instance=<instance-id>` and returns a
+structured catalog:
+
+```json
+{
+  "provider": "ollama",
+  "backend": "local",
+  "instance": "local",
+  "defaultModel": "qwen2.5-coder:7b",
+  "source": "dynamic",
+  "cache": {
+    "servedFromCache": false,
+    "cachedAt": "2026-03-19T12:00:00.000Z",
+    "ttlSec": 60
+  },
+  "models": [
+    { "id": "qwen2.5-coder:7b", "label": "qwen2.5-coder:7b", "default": true }
+  ],
+  "warnings": []
+}
+```
+
+The first slice supports:
+
+- dynamic discovery for `ollama`
+- dynamic discovery for `agent_sdk_bridge` targets whose adapter exposes
+  `listModels()`
+- static compatibility for `kiro`
+- config or curated static fallback for the remaining configured providers
 
 `GET /pool/status` returns aggregated runtime status for all active backend
 managers, including `cli`, `api`, and `agent`.

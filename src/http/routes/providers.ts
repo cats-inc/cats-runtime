@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { listConfiguredProviders, listProviderCatalog } from '../../core/providerCatalog.js';
 import type { AppContext } from '../app.js';
+import { getRouteErrorStatus } from '../routeErrors.js';
 
 export const providerRoutes = new Hono();
 
@@ -42,4 +43,20 @@ providerRoutes.get('/providers/config', (c) => {
   );
 
   return c.json({ providers });
+});
+
+providerRoutes.get('/providers/:provider/models', async (c) => {
+  const ctx = c.get('ctx' as never) as AppContext;
+  const providerName = c.req.param('provider');
+  const instance = c.req.query('instance') || undefined;
+
+  try {
+    const catalog = await ctx.providerModelCatalog.getCatalog(providerName, instance);
+    return c.json(catalog);
+  } catch (err) {
+    return c.json(
+      { error: `Failed to inspect provider models: ${err}` },
+      getRouteErrorStatus(err),
+    );
+  }
 });

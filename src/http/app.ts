@@ -15,6 +15,7 @@ import type { AuggieSessionService } from '../backends/cli/auggie/AuggieSessionS
 import type { GooseNativeSessionService } from '../backends/cli/goose/GooseNativeSessionService.js';
 import type { OpencodeNativeSessionService } from '../backends/cli/opencode/OpencodeNativeSessionService.js';
 import type { WslDiscoveryStatusStore } from '../backends/cli/discovery/wslDiscovery.js';
+import type { ProviderModelCatalogService } from '../core/models/providerModelCatalog.js';
 import { bearerAuth } from './auth.js';
 import { discoveryRoutes } from './routes/discovery.js';
 import { healthRoutes } from './routes/health.js';
@@ -44,6 +45,7 @@ export interface AppContext {
   auggieSessions: AuggieSessionService;
   opencodeNative: OpencodeNativeSessionService;
   wslDiscoveryStatus?: WslDiscoveryStatusStore;
+  providerModelCatalog: ProviderModelCatalogService;
   resolveCursorNative?: (instanceId?: string) => CursorNativeSessionService;
   resolveGooseNative?: (instanceId?: string) => GooseNativeSessionService;
   resolveKiroNative?: (instanceId?: string) => KiroNativeSessionService;
