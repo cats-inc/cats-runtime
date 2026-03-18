@@ -60,7 +60,7 @@ Add your project-specific automation scripts here.
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| [research/](./research/) | ?? | Research notes and external sources, including Paperclip alignment notes for OpenClaw and Pi |
+| [research/](./research/) | ?? | Research notes and external sources, including Paperclip alignment notes and a current maturity-gap assessment for `cats-runtime` |
 
 ## Context-Driven Development
 
@@ -90,4 +90,4 @@ When working on this project:
 
 ---
 
-*Last updated: 2026-03-17*
+*Last updated: 2026-03-19*
