@@ -14,6 +14,10 @@
 .PARAMETER Port
     Override port (default: from .env or 3110)
 
+.PARAMETER NoRedirect
+    Start the runtime without stdout/stderr redirection. Use this when launching
+    from automation that must detach cleanly from the long-lived Node process.
+
 .EXAMPLE
     .\Restart-Server.ps1
     Restart cats-runtime
@@ -21,11 +25,16 @@
 .EXAMPLE
     .\Restart-Server.ps1 -Stop
     Stop without restarting
+
+.EXAMPLE
+    .\Restart-Server.ps1 -NoRedirect
+    Restart cats-runtime without startup log redirection
 #>
 
 param(
     [switch]$Stop,
-    [int]$Port = 0
+    [int]$Port = 0,
+    [switch]$NoRedirect
 )
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -43,11 +52,30 @@ if ($Port -eq 0) {
 }
 
 function Stop-ServiceOnPort($port) {
-    $conn = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue |
-        Where-Object { $_.State -eq 'Listen' } |
-        Select-Object -First 1
-    if ($conn) {
-        $proc = Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue
+    $owningPid = $null
+
+    try {
+        $conn = Get-NetTCPConnection -LocalPort $port -ErrorAction Stop |
+            Where-Object { $_.State -eq 'Listen' } |
+            Select-Object -First 1
+        if ($conn) {
+            $owningPid = [int]$conn.OwningProcess
+        }
+    } catch {
+        $owningPid = $null
+    }
+
+    if (-not $owningPid) {
+        $netstatMatch = netstat -ano -p tcp |
+            Select-String -Pattern "^\s*TCP\s+\S+:$port\s+\S+\s+LISTENING\s+(\d+)\s*$" |
+            Select-Object -First 1
+        if ($netstatMatch) {
+            $owningPid = [int]$netstatMatch.Matches[0].Groups[1].Value
+        }
+    }
+
+    if ($owningPid) {
+        $proc = Get-Process -Id $owningPid -ErrorAction SilentlyContinue
         if ($proc) {
             Write-Host "  Stopping PID $($proc.Id) on port $port..." -ForegroundColor Yellow
             Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
@@ -84,20 +112,31 @@ try {
 
 Write-Host "Starting cats-runtime..." -ForegroundColor Cyan
 
-$startupLogDir = Join-Path $env:TEMP "cats-runtime"
-if (!(Test-Path $startupLogDir)) {
-    New-Item -ItemType Directory -Path $startupLogDir | Out-Null
-}
-$startupStamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$stdoutLog = Join-Path $startupLogDir "cats-runtime-$startupStamp.stdout.log"
-$stderrLog = Join-Path $startupLogDir "cats-runtime-$startupStamp.stderr.log"
+$stdoutLog = $null
+$stderrLog = $null
 
-$process = Start-Process -FilePath "node.exe" -ArgumentList "dist/index.js" `
-    -WorkingDirectory $repoRoot `
-    -WindowStyle Hidden `
-    -RedirectStandardOutput $stdoutLog `
-    -RedirectStandardError $stderrLog `
-    -PassThru
+if ($NoRedirect) {
+    Write-Host "  Launching without stdout/stderr redirection" -ForegroundColor DarkGray
+    $process = Start-Process -FilePath "node.exe" -ArgumentList "dist/index.js" `
+        -WorkingDirectory $repoRoot `
+        -WindowStyle Hidden `
+        -PassThru
+} else {
+    $startupLogDir = Join-Path $env:TEMP "cats-runtime"
+    if (!(Test-Path $startupLogDir)) {
+        New-Item -ItemType Directory -Path $startupLogDir | Out-Null
+    }
+    $startupStamp = Get-Date -Format "yyyyMMdd-HHmmss"
+    $stdoutLog = Join-Path $startupLogDir "cats-runtime-$startupStamp.stdout.log"
+    $stderrLog = Join-Path $startupLogDir "cats-runtime-$startupStamp.stderr.log"
+
+    $process = Start-Process -FilePath "node.exe" -ArgumentList "dist/index.js" `
+        -WorkingDirectory $repoRoot `
+        -WindowStyle Hidden `
+        -RedirectStandardOutput $stdoutLog `
+        -RedirectStandardError $stderrLog `
+        -PassThru
+}
 
 Write-Host "Waiting for health check..." -ForegroundColor Cyan
 Start-Sleep -Seconds 3
@@ -150,11 +189,11 @@ try {
     }
 
     $stderrLines = @()
-    if (Test-Path $stderrLog) {
+    if ($stderrLog -and (Test-Path $stderrLog)) {
         $stderrLines = Get-Content $stderrLog -ErrorAction SilentlyContinue | Select-Object -Last 20
     }
     $stdoutLines = @()
-    if (Test-Path $stdoutLog) {
+    if ($stdoutLog -and (Test-Path $stdoutLog)) {
         $stdoutLines = Get-Content $stdoutLog -ErrorAction SilentlyContinue | Select-Object -Last 20
     }
 
@@ -166,7 +205,9 @@ try {
         $stdoutLines | ForEach-Object { Write-Host "    $_" -ForegroundColor DarkGray }
     }
 
-    Write-Host "  Logs: $stdoutLog" -ForegroundColor DarkGray
-    Write-Host "        $stderrLog" -ForegroundColor DarkGray
+    if ($stdoutLog -and $stderrLog) {
+        Write-Host "  Logs: $stdoutLog" -ForegroundColor DarkGray
+        Write-Host "        $stderrLog" -ForegroundColor DarkGray
+    }
     Write-Host "  Check logs or run: npm run build; node dist/index.js" -ForegroundColor Yellow
 }

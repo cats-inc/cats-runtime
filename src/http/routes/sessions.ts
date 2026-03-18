@@ -4,6 +4,8 @@ import { basename, dirname, join } from 'node:path';
 import { Hono } from 'hono';
 import { getRuntimeSessionManager, type AppContext } from '../app.js';
 import {
+  isProviderNotConfiguredError,
+  isUnknownProviderInstanceError,
   type ProviderInstanceConfig,
 } from '../../backends/cli/config.js';
 import type { SessionsIndex } from '../../backends/cli/discovery/types.js';
@@ -45,6 +47,8 @@ const REUSE_POLICIES = new Set<SessionReusePolicy>([
   'prefer_existing',
   'require_existing',
 ]);
+
+type NativeCleanupResult = boolean | 'stale_config';
 
 function serializeSession(ctx: AppContext, session: SessionInfo) {
   return toSessionView(session, {
@@ -164,42 +168,55 @@ function tracksNativeSessionState(session: SessionInfo): boolean {
 async function deleteNativeSessionState(
   ctx: AppContext,
   session: SessionInfo,
-): Promise<boolean> {
+): Promise<NativeCleanupResult> {
   if (!session.providerSessionId) return true;
 
-  if (session.providerName === 'cursor') {
-    const cursorNative = getCursorNative(ctx, session.providerInstanceId);
-    const deleted = await cursorNative.deleteSession(session.cwd, session.providerSessionId);
-    if (!deleted) return false;
-    const remaining = await cursorNative.listSessions(
-      session.cwd,
-      { startIfNeeded: false },
-    );
-    return !remaining.some((item) => item.providerSessionId === session.providerSessionId);
-  }
+  try {
+    if (session.providerName === 'cursor') {
+      const cursorNative = getCursorNative(ctx, session.providerInstanceId);
+      const deleted = await cursorNative.deleteSession(session.cwd, session.providerSessionId);
+      if (!deleted) return false;
+      const remaining = await cursorNative.listSessions(
+        session.cwd,
+        { startIfNeeded: false },
+      );
+      return !remaining.some((item) => item.providerSessionId === session.providerSessionId);
+    }
 
-  if (session.providerName === 'kiro') {
-    const kiroNative = getKiroNative(ctx, session.providerInstanceId);
-    const deleted = await kiroNative.deleteSession(session.cwd, session.providerSessionId);
-    if (!deleted) return false;
-    const remaining = await kiroNative.listSessions(
-      session.cwd,
-      { startIfNeeded: false },
-    );
-    return !remaining.some((item) => item.providerSessionId === session.providerSessionId);
-  }
+    if (session.providerName === 'kiro') {
+      const kiroNative = getKiroNative(ctx, session.providerInstanceId);
+      const deleted = await kiroNative.deleteSession(session.cwd, session.providerSessionId);
+      if (!deleted) return false;
+      const remaining = await kiroNative.listSessions(
+        session.cwd,
+        { startIfNeeded: false },
+      );
+      return !remaining.some((item) => item.providerSessionId === session.providerSessionId);
+    }
 
-  if (session.providerName === 'goose') {
-    const gooseNative = getGooseNative(ctx, session.providerInstanceId);
-    return gooseNative.deleteSession(session.cwd, session.providerSessionId);
-  }
+    if (session.providerName === 'goose') {
+      const gooseNative = getGooseNative(ctx, session.providerInstanceId);
+      return gooseNative.deleteSession(session.cwd, session.providerSessionId);
+    }
 
-  if (session.providerName === 'opencode') {
-    const opencodeNative = getOpencodeNative(ctx, session.providerInstanceId);
-    const deleted = await opencodeNative.deleteSession(session.cwd, session.providerSessionId);
-    if (!deleted) return false;
-    const remaining = await opencodeNative.getSession(session.cwd, session.providerSessionId);
-    return remaining == null;
+    if (session.providerName === 'opencode') {
+      const opencodeNative = getOpencodeNative(ctx, session.providerInstanceId);
+      const deleted = await opencodeNative.deleteSession(session.cwd, session.providerSessionId);
+      if (!deleted) return false;
+      const remaining = await opencodeNative.getSession(session.cwd, session.providerSessionId);
+      return remaining == null;
+    }
+  } catch (error) {
+    if (isUnknownProviderInstanceError(error) || isProviderNotConfiguredError(error)) {
+      console.warn(
+        `[sessions] Skipping native cleanup for stale ${session.providerName} `
+        + `session '${session.id}' targeting missing instance `
+        + `'${session.providerInstanceId || 'default'}': `
+        + `${error instanceof Error ? error.message : String(error)}`,
+      );
+      return 'stale_config';
+    }
+    throw error;
   }
 
   return true;
@@ -882,7 +899,7 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
     });
   }
 
-  let nativeDeleted = false;
+  let nativeDeleted: NativeCleanupResult = false;
   try {
     if (hasNativeSessionState) {
       nativeDeleted = await deleteNativeSessionState(ctx, session);
@@ -906,7 +923,9 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
     }, 500);
   }
 
-  const nativeCleanupSucceeded = !hasNativeSessionState || nativeDeleted;
+  const nativeCleanupSucceeded = !hasNativeSessionState
+    || nativeDeleted === true
+    || nativeDeleted === 'stale_config';
   const providerDiscoveryCleanupSucceeded = !hasProviderDiscoveryState || providerDiscoveryDeleted;
   if (!nativeCleanupSucceeded || !providerDiscoveryCleanupSucceeded) {
     preparedManagedTranscripts.rollback();
@@ -932,11 +951,12 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
     workspaceCleaned = cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, id);
   }
   ctx.registry.unregister(id);
+  ctx.registry.flush();
   return c.json({
     status: 'deleted',
     hadTranscript,
     fileDeleted: managedDeletion.fileDeleted || providerDeletion.fileDeleted,
-    nativeDeleted: hasNativeSessionState ? nativeDeleted : false,
+    nativeDeleted: hasNativeSessionState ? nativeDeleted === true : false,
     workspaceCleaned,
   });
 });

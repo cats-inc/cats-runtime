@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { createRuntimeApp as createApp } from './app.js';
 import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig } from '../backends/cli/config.js';
@@ -209,6 +212,98 @@ describe('OpenCode native session management', () => {
     const body = await res.json() as Record<string, unknown>;
     expect(body.nativeDeleted).toBe(true);
     expect(registry.get(session!.id)).toBeUndefined();
+  });
+
+  it('deletes stale OpenCode sessions even when their saved instance is no longer configured', async () => {
+    const config = makeConfig();
+    config.providerDefaultInstances = { opencode: 'docker-dev' };
+    config.providerInstances = {
+      opencode: {
+        'docker-dev': {
+          id: 'docker-dev',
+          providerName: 'opencode',
+          commandConfig: { path: 'opencode', runner: 'auto', runtime: { mode: 'native' } },
+          opencodeServerHost: '127.0.0.1',
+          opencodeServerPort: 4097,
+          opencodeServerStartupTimeoutMs: 10000,
+        },
+      },
+    };
+
+    app = createApp({
+      config,
+      registry,
+      pool,
+      cursorNative,
+      kiroNative,
+      auggieSessions,
+      opencodeNative,
+    });
+
+    const session = registry.create({
+      id: 'stale-opencode',
+      providerName: 'opencode',
+      providerInstanceId: 'native',
+      cwd: 'C:/repo',
+    });
+    registry.setProviderSessionId(session.id, 'oc-stale');
+    registry.updateStatus(session.id, 'closed');
+
+    const res = await app.request(`/sessions/${session.id}`, {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.status).toBe('deleted');
+    expect(body.nativeDeleted).toBe(false);
+    expect(registry.get(session.id)).toBeUndefined();
+    expect(vi.mocked(opencodeNative.deleteSession)).not.toHaveBeenCalled();
+  });
+
+  it('flushes deleted OpenCode sessions to disk before returning success', async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'opencode-delete-persist-'));
+    const sessionBaseDir = join(dataDir, 'sessions');
+    const persistedRegistry = new SessionRegistry(dataDir, sessionBaseDir);
+
+    try {
+      app = createApp({
+        config: {
+          ...makeConfig(),
+          sessionBaseDir,
+        },
+        registry: persistedRegistry,
+        pool,
+        cursorNative,
+        kiroNative,
+        auggieSessions,
+        opencodeNative,
+      });
+
+      const session = persistedRegistry.create({
+        id: 'persisted-opencode',
+        providerName: 'opencode',
+        cwd: 'C:/repo',
+      });
+      persistedRegistry.setProviderSessionId(session.id, 'oc-persisted');
+      persistedRegistry.updateStatus(session.id, 'closed');
+      persistedRegistry.flush();
+
+      vi.mocked(opencodeNative.deleteSession).mockResolvedValue(true);
+      vi.mocked(opencodeNative.getSession).mockResolvedValue(null);
+
+      const res = await app.request(`/sessions/${session.id}`, {
+        method: 'DELETE',
+      });
+
+      expect(res.status).toBe(200);
+      const persisted = JSON.parse(
+        readFileSync(join(dataDir, 'sessions.json'), 'utf-8'),
+      ) as Array<{ id: string }>;
+      expect(persisted.some((item) => item.id === session.id)).toBe(false);
+    } finally {
+      rmSync(dataDir, { recursive: true, force: true });
+    }
   });
 
   it('discovers existing OpenCode sessions for a workspace', async () => {
