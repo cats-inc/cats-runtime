@@ -105,6 +105,13 @@ export class FileWatcher extends EventEmitter<FileWatcherEvents> {
       if (session) newCount++;
     }
 
+    this.registry.pruneMissingDiscovered(
+      this.providerName,
+      discovered.map((session) => session.providerSessionId),
+      'cli',
+      this.providerInstanceId,
+    );
+
     if (newCount > 0) {
       this.emit('discovered', { count: newCount });
     }

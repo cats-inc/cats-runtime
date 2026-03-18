@@ -45,5 +45,12 @@ export function syncNativeSessions(
     }
   }
 
+  registry.pruneMissingDiscovered(
+    providerName,
+    sessions.map((session) => session.providerSessionId),
+    'cli',
+    providerInstanceId,
+  );
+
   return { newCount, syncedCount };
 }
