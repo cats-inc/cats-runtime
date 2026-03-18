@@ -62,6 +62,20 @@ describe('WorkerProcess PowerShell helpers', () => {
     ]);
   });
 
+  it('emits multiple events when a provider parses one line into text and result', async () => {
+    const worker = new WorkerProcess(
+      createMultiEventProvider(),
+      { cwd: process.cwd() },
+      createNodeCommandConfig(),
+      { retries: 1, timeoutMs: 10 },
+    );
+
+    await expect(worker.sendMessage('ignored')).resolves.toEqual([
+      { type: 'text', text: 'hello' },
+      { type: 'result', sessionId: 'multi-session' },
+    ]);
+  });
+
   it('surfaces the real process exit error when an ephemeral provider exits before emitting any events', async () => {
     const worker = new WorkerProcess(
       createMaskingErrorProvider(),
@@ -104,7 +118,7 @@ function createCompletionOnlyProvider(
     buildStdinMessage() {
       return '';
     },
-    parseStreamLine(line: string): StreamEvent | null {
+    parseStreamLine(line: string): StreamEvent | StreamEvent[] | null {
       const data = JSON.parse(line) as { sessionId?: string };
       return {
         type: 'result',
@@ -113,6 +127,32 @@ function createCompletionOnlyProvider(
     },
     resolveFirstEventTimeoutMs(defaultTimeoutMs: number): number {
       return timeoutOverrideMs ?? defaultTimeoutMs;
+    },
+  };
+}
+
+function createMultiEventProvider(): Provider {
+  return {
+    name: 'junie',
+    capabilities: { resume: true, fork: false, permissions: false },
+    ephemeral: true,
+    buildSpawnArgs() {
+      return [
+        '-e',
+        "process.stdout.write('{}\\n');",
+      ];
+    },
+    buildStdinMessage() {
+      return '';
+    },
+    parseStreamLine(): StreamEvent[] {
+      return [
+        { type: 'text', text: 'hello' },
+        { type: 'result', sessionId: 'multi-session' },
+      ];
+    },
+    resolveFirstEventTimeoutMs() {
+      return 0;
     },
   };
 }

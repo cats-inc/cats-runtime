@@ -112,7 +112,10 @@ export class WorkerPool {
           commandConfig: instance.commandConfig,
         };
       case 'junie':
-        return { provider: new JunieProvider(), commandConfig: instance.commandConfig };
+        return {
+          provider: new JunieProvider(instance.commandConfig),
+          commandConfig: instance.commandConfig,
+        };
       default:
         throw new Error(`Unknown provider: '${name}'. Valid: claude, codex, gemini, copilot, cursor, kiro, auggie, opencode, pi, goose, junie`);
     }

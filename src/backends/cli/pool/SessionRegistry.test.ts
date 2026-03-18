@@ -171,6 +171,49 @@ describe('SessionRegistry', () => {
     }
   });
 
+  it('prunes closed discovered sessions that are no longer present for a provider target', () => {
+    registry = new SessionRegistry(undefined, undefined, { pi: 'native' });
+
+    const stale = registry.upsertDiscovered('pi-stale', {
+      providerName: 'pi',
+      providerInstanceId: 'native',
+      cwd: '/tmp/stale',
+      sourcePath: '/tmp/stale.jsonl',
+    });
+    const retained = registry.upsertDiscovered('pi-keep', {
+      providerName: 'pi',
+      providerInstanceId: 'native',
+      cwd: '/tmp/keep',
+      sourcePath: '/tmp/keep.jsonl',
+    });
+    const otherInstance = registry.upsertDiscovered('pi-other', {
+      providerName: 'pi',
+      providerInstanceId: 'lab',
+      cwd: '/tmp/other',
+      sourcePath: '/tmp/other.jsonl',
+    });
+    const resumed = registry.upsertDiscovered('pi-live', {
+      providerName: 'pi',
+      providerInstanceId: 'native',
+      cwd: '/tmp/live',
+      sourcePath: '/tmp/live.jsonl',
+    });
+    registry.updateStatus(resumed!.id, 'ready');
+
+    const removed = registry.pruneMissingDiscovered(
+      'pi',
+      ['pi-keep'],
+      'cli',
+      'native',
+    );
+
+    expect(removed).toBe(1);
+    expect(registry.get(stale!.id)).toBeUndefined();
+    expect(registry.get(retained!.id)).toBeDefined();
+    expect(registry.get(otherInstance!.id)).toBeDefined();
+    expect(registry.get(resumed!.id)?.status).toBe('ready');
+  });
+
   it('normalizes legacy default instance ids to the configured default instance on load', () => {
     const persistDir = mkdtempSync(join(tmpdir(), 'session-registry-load-test-'));
     const persistPath = join(persistDir, 'sessions.json');

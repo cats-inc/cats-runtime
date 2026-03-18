@@ -68,6 +68,11 @@ export class AuggieProvider implements Provider {
     this.sawText = false;
   }
 
+  resolveFirstEventTimeoutMs(_defaultTimeoutMs: number): number {
+    // Auggie print mode emits a single JSON line only after the turn completes.
+    return 0;
+  }
+
   async beforeTurn(opts: ProviderSpawnOptions): Promise<void> {
     this.previousWorkspaceSession = await this.sessions.getLatestSession(opts.cwd);
     this.previousTurnSession = opts.resumeSessionId

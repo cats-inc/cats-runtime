@@ -55,6 +55,15 @@ describe('AuggieProvider', () => {
     expect(args).toContain('launch-process:allow');
   });
 
+  it('disables the first-event timeout because Auggie only emits JSON after completion', () => {
+    const sessions = {
+      getLatestSession: vi.fn().mockResolvedValue(null),
+    } as unknown as AuggieSessionService;
+    const provider = new AuggieProvider(sessions, 10);
+
+    expect(provider.resolveFirstEventTimeoutMs?.(30_000)).toBe(0);
+  });
+
   it('parses a successful result into text and resolves the updated local session after exit', async () => {
     const sessions = {
       getLatestSession: vi.fn()

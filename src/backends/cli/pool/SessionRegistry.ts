@@ -445,6 +445,50 @@ export class SessionRegistry {
     return true;
   }
 
+  /**
+   * Remove closed discovered sessions that no longer appear in the latest
+   * provider scan for the same backend/instance target.
+   */
+  pruneMissingDiscovered(
+    providerName: string,
+    retainedProviderSessionIds: Iterable<string>,
+    providerBackend?: 'cli' | 'api' | 'local' | 'agent',
+    providerInstanceId?: string,
+  ): number {
+    const retained = new Set(retainedProviderSessionIds);
+    let removed = 0;
+
+    for (const [id, session] of this.sessions.entries()) {
+      if (session.origin !== 'discovered' || session.status !== 'closed') {
+        continue;
+      }
+      if (session.providerName !== providerName || !session.providerSessionId) {
+        continue;
+      }
+      if (!this.sameProviderTarget(
+        providerName,
+        session.providerBackend,
+        session.providerInstanceId,
+        providerBackend,
+        providerInstanceId,
+      )) {
+        continue;
+      }
+      if (retained.has(session.providerSessionId)) {
+        continue;
+      }
+
+      this.sessions.delete(id);
+      removed++;
+    }
+
+    if (removed > 0) {
+      this.scheduleSave();
+    }
+
+    return removed;
+  }
+
   /** Remove session from registry and delete source .jsonl file if present */
   remove(id: string): { deleted: boolean; fileDeleted: boolean } {
     const session = this.sessions.get(id);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseJunieStreamLine } from './parser.js';
+import { parseJunieSessionEventLine, parseJunieStreamLine } from './parser.js';
 
 describe('parseJunieStreamLine', () => {
   it('returns null for empty lines', () => {
@@ -24,10 +24,18 @@ describe('parseJunieStreamLine', () => {
         { model: 'gpt-5', inputTokens: 200, outputTokens: 50, cost: 0.02 },
       ],
     }));
-    expect(event?.type).toBe('result');
-    expect(event?.sessionId).toBe('session-260317-070403-d8r2');
-    expect(event?.usage?.inputTokens).toBe(350); // 100+50+200
-    expect(event?.usage?.outputTokens).toBe(80); // 30+50
+    expect(Array.isArray(event)).toBe(true);
+    expect(event).toEqual([
+      { type: 'text', text: '### Summary\n- 4' },
+      {
+        type: 'result',
+        sessionId: 'session-260317-070403-d8r2',
+        usage: {
+          inputTokens: 350,
+          outputTokens: 80,
+        },
+      },
+    ]);
   });
 
   it('parses result without usage', () => {
@@ -36,9 +44,10 @@ describe('parseJunieStreamLine', () => {
       taskName: 'Test',
       result: 'Done',
     }));
-    expect(event?.type).toBe('result');
-    expect(event?.sessionId).toBe('session-1');
-    expect(event?.usage).toBeUndefined();
+    expect(event).toEqual([
+      { type: 'text', text: 'Done' },
+      { type: 'result', sessionId: 'session-1', usage: undefined },
+    ]);
   });
 
   it('returns null for empty object', () => {
@@ -51,5 +60,129 @@ describe('parseJunieStreamLine', () => {
     }));
     expect(event?.type).toBe('result');
     expect(event?.sessionId).toBe('session-2');
+  });
+
+  it('parses Junie status updates into raw progress events', () => {
+    const parsed = parseJunieSessionEventLine(JSON.stringify({
+      kind: 'SessionA2uxEvent',
+      event: {
+        state: 'IN_PROGRESS',
+        agentEvent: {
+          kind: 'AgentCurrentStatusUpdatedEvent',
+          status: 'Sending LLM request',
+        },
+      },
+    }), { sessionId: 'session-3' });
+
+    expect(parsed).toEqual({
+      events: [{
+        type: 'raw',
+        sessionId: 'session-3',
+        text: 'Sending LLM request',
+        raw: {
+          kind: 'AgentCurrentStatusUpdatedEvent',
+          status: 'Sending LLM request',
+        },
+        metadata: {
+          source: 'junie-progress',
+          progressKind: 'status',
+          state: 'IN_PROGRESS',
+        },
+      }],
+    });
+  });
+
+  it('aggregates usage from Junie LLM metadata events', () => {
+    const parsed = parseJunieSessionEventLine(JSON.stringify({
+      kind: 'SessionA2uxEvent',
+      event: {
+        state: 'IN_PROGRESS',
+        agentEvent: {
+          kind: 'LlmResponseMetadataEvent',
+          modelUsage: [
+            {
+              model: 'gpt-5.2',
+              inputTokens: 10,
+              cacheInputTokens: 5,
+              cacheCreateTokens: 2,
+              outputTokens: 3,
+            },
+          ],
+        },
+      },
+    }));
+
+    expect(parsed).toEqual({
+      events: [],
+      usageDelta: {
+        inputTokens: 17,
+        outputTokens: 3,
+      },
+    });
+  });
+
+  it('parses Junie thought updates into raw progress events', () => {
+    const parsed = parseJunieSessionEventLine(JSON.stringify({
+      kind: 'SessionA2uxEvent',
+      event: {
+        state: 'IN_PROGRESS',
+        agentEvent: {
+          kind: 'AgentThoughtBlockUpdatedEvent',
+          text: 'Delivering the PRD now.',
+        },
+      },
+    }), { sessionId: 'session-thought' });
+
+    expect(parsed).toEqual({
+      events: [{
+        type: 'raw',
+        sessionId: 'session-thought',
+        text: 'Delivering the PRD now.',
+        raw: {
+          kind: 'AgentThoughtBlockUpdatedEvent',
+          text: 'Delivering the PRD now.',
+        },
+        metadata: {
+          source: 'junie-progress',
+          progressKind: 'thought',
+          state: 'IN_PROGRESS',
+        },
+      }],
+    });
+  });
+
+  it('parses Junie result block into text and result events', () => {
+    const parsed = parseJunieSessionEventLine(JSON.stringify({
+      kind: 'SessionA2uxEvent',
+      event: {
+        state: 'IN_PROGRESS',
+        agentEvent: {
+          kind: 'ResultBlockUpdatedEvent',
+          cancelled: false,
+          result: 'Implemented the feature.',
+        },
+      },
+    }), {
+      sessionId: 'session-4',
+      usage: {
+        inputTokens: 12,
+        outputTokens: 8,
+      },
+    });
+
+    expect(parsed).toEqual({
+      events: [
+        { type: 'text', text: 'Implemented the feature.' },
+        {
+          type: 'result',
+          sessionId: 'session-4',
+          usage: {
+            inputTokens: 12,
+            outputTokens: 8,
+          },
+        },
+      ],
+      terminal: true,
+    });
   });
 });

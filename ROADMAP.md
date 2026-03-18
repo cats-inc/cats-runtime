@@ -78,4 +78,64 @@ Python readers.
 
 ---
 
-*Last updated: 2026-03-13*
+### OPT-2: Provider-Agnostic Progress Events
+
+**Priority**: P2
+**Status**: Planned
+
+#### Problem
+
+`crew-chat-poc` currently receives live progress updates only from Junie. The
+current bridge works by mapping Junie session events into `raw` runtime events
+with Junie-specific metadata, which is enough for immediate UX recovery but not
+the right long-term contract for the runtime.
+
+Other CLI backends may also expose useful mid-turn state such as:
+
+- reasoning / planning status
+- active tool execution
+- command execution progress
+- file editing milestones
+- long-running task checkpoints
+
+Without a provider-agnostic progress event, each upper-layer product must learn
+provider-specific `raw` payloads or continue showing a generic "thinking"
+spinner even when structured progress is available.
+
+#### Direction
+
+Introduce a first-class runtime progress event that providers can emit without
+leaking backend-specific wire formats to consumers.
+
+- Add a dedicated streamed event type for progress/status updates
+- Define a minimal shared schema:
+  - short human-readable message
+  - stable progress kind/category
+  - optional provider-native metadata
+  - optional provider session id
+- Keep provider-specific parsing inside `src/backends/cli/*`
+- Normalize Junie onto the new event type first, then extend the same contract
+  to other providers that can surface meaningful progress
+- Update upper-layer consumers such as `crew-chat-poc` to react to the generic
+  progress event instead of Junie-only metadata checks
+
+#### Initial Candidate Providers
+
+- `junie`
+- `pi`
+- `goose`
+- `copilot`
+
+#### Affected Files
+
+- `src/core/types.ts`
+- `src/backends/cli/providers/types.ts`
+- `src/backends/cli/junie/*`
+- `src/backends/cli/pi/*`
+- `src/backends/cli/goose/*`
+- `src/backends/cli/providers/copilot.ts`
+- downstream consumers such as `crew-chat-poc`
+
+---
+
+*Last updated: 2026-03-18*

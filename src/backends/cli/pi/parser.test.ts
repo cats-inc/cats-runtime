@@ -70,9 +70,41 @@ describe('parsePiStreamLine', () => {
     expect(event?.usage?.outputTokens).toBe(50);
   });
 
+  it('does not end the stream on turn_end for tool-use turns', () => {
+    const event = parsePiStreamLine(JSON.stringify({
+      type: 'turn_end',
+      message: {
+        role: 'assistant',
+        stopReason: 'toolUse',
+        usage: {
+          input: 100,
+          output: 50,
+        },
+      },
+      toolResults: [
+        {
+          role: 'toolResult',
+          toolCallId: 'tc_1',
+        },
+      ],
+    }));
+    expect(event).toBeNull();
+  });
+
   it('parses turn_end without message as result', () => {
     const event = parsePiStreamLine(JSON.stringify({ type: 'turn_end' }));
     expect(event?.type).toBe('result');
+  });
+
+  it('skips message_start and message_end RPC events', () => {
+    expect(parsePiStreamLine(JSON.stringify({
+      type: 'message_start',
+      message: { role: 'assistant', content: [] },
+    }))).toBeNull();
+    expect(parsePiStreamLine(JSON.stringify({
+      type: 'message_end',
+      message: { role: 'assistant', content: [] },
+    }))).toBeNull();
   });
 
   it('parses message_update with text_delta', () => {
@@ -135,6 +167,16 @@ describe('parsePiStreamLine', () => {
     expect(event?.isError).toBe(true);
   });
 
+  it('skips tool_execution_update', () => {
+    const event = parsePiStreamLine(JSON.stringify({
+      type: 'tool_execution_update',
+      toolCallId: 'tc_1',
+      toolName: 'read',
+      partialResult: { content: [{ type: 'text', text: 'partial' }] },
+    }));
+    expect(event).toBeNull();
+  });
+
   it('returns raw for unknown event types', () => {
     const event = parsePiStreamLine(JSON.stringify({
       type: 'some_future_event',
@@ -177,5 +219,164 @@ describe('parsePiModel', () => {
 
   it('throws for empty string', () => {
     expect(() => parsePiModel('')).toThrow(/Invalid Pi model format/);
+  });
+});
+
+describe('parsePiStreamLine current message schema', () => {
+  it('parses assistant tool-call messages emitted by current Pi sessions', () => {
+    const event = parsePiStreamLine(JSON.stringify({
+      type: 'message',
+      stopReason: 'toolUse',
+      message: {
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: 'checking...' },
+          {
+            type: 'toolCall',
+            id: 'call_123',
+            name: 'bash',
+            arguments: { command: 'pwd' },
+          },
+        ],
+        usage: {
+          input: 10,
+          output: 5,
+        },
+      },
+    }));
+
+    expect(event).toEqual({
+      type: 'tool_use',
+      toolId: 'call_123',
+      toolName: 'bash',
+      toolArgs: { command: 'pwd' },
+    });
+  });
+
+  it('parses final assistant messages into text and result events', () => {
+    const event = parsePiStreamLine(JSON.stringify({
+      type: 'message',
+      stopReason: 'stop',
+      message: {
+        role: 'assistant',
+        content: [
+          { type: 'thinking', thinking: 'done thinking' },
+          { type: 'text', text: 'NEXT: Agent-2' },
+        ],
+        usage: {
+          input: 162,
+          output: 255,
+          cacheRead: 1792,
+        },
+      },
+    }));
+
+    expect(event).toEqual([
+      { type: 'text', text: 'NEXT: Agent-2' },
+      {
+        type: 'result',
+        usage: {
+          inputTokens: 1954,
+          outputTokens: 255,
+        },
+      },
+    ]);
+  });
+
+  it('parses tool result messages emitted by current Pi sessions', () => {
+    const event = parsePiStreamLine(JSON.stringify({
+      type: 'message',
+      message: {
+        role: 'toolResult',
+        toolCallId: 'call_123',
+        toolName: 'bash',
+        content: [{ type: 'text', text: 'MISSING\n' }],
+        isError: false,
+      },
+    }));
+
+    expect(event).toEqual({
+      type: 'tool_result',
+      toolId: 'call_123',
+      toolName: 'bash',
+      text: 'MISSING\n',
+      isError: false,
+    });
+  });
+
+  it('does not emit result during the intermediate tool-use turn in RPC flow', () => {
+    const lines = [
+      JSON.stringify({
+        type: 'tool_execution_start',
+        toolCallId: 'call_1',
+        toolName: 'read',
+        args: { path: 'alpha.txt' },
+      }),
+      JSON.stringify({
+        type: 'tool_execution_end',
+        toolCallId: 'call_1',
+        toolName: 'read',
+        result: { content: [{ type: 'text', text: 'ALPHA_CONTENT\n' }] },
+        isError: false,
+      }),
+      JSON.stringify({
+        type: 'turn_end',
+        message: {
+          role: 'assistant',
+          stopReason: 'toolUse',
+          usage: {
+            input: 900,
+            output: 33,
+          },
+        },
+      }),
+      JSON.stringify({
+        type: 'message_update',
+        assistantMessageEvent: {
+          type: 'text_delta',
+          delta: 'ALPHA_CONTENT',
+        },
+      }),
+      JSON.stringify({
+        type: 'turn_end',
+        message: {
+          role: 'assistant',
+          stopReason: 'stop',
+          usage: {
+            input: 947,
+            output: 7,
+          },
+        },
+      }),
+    ];
+
+    const events = lines
+      .map((line) => parsePiStreamLine(line))
+      .flatMap((event) => (event ? (Array.isArray(event) ? event : [event]) : []));
+
+    expect(events).toEqual([
+      {
+        type: 'tool_use',
+        toolId: 'call_1',
+        toolName: 'read',
+      },
+      {
+        type: 'tool_result',
+        toolId: 'call_1',
+        text: JSON.stringify({ content: [{ type: 'text', text: 'ALPHA_CONTENT\n' }] }),
+        isError: false,
+      },
+      {
+        type: 'text',
+        text: 'ALPHA_CONTENT',
+      },
+      {
+        type: 'result',
+        usage: {
+          inputTokens: 947,
+          outputTokens: 7,
+        },
+      },
+    ]);
   });
 });

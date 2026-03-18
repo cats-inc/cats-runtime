@@ -54,4 +54,37 @@ describe('syncNativeSessions', () => {
     expect(session.messageCount).toBe(4);
     expect(session.lastActivity).toBe('2026-03-10T00:00:00Z');
   });
+
+  it('prunes stale closed discovered native sessions that no longer exist', () => {
+    const registry = new SessionRegistry();
+    const stale = registry.upsertDiscovered('goose-stale', {
+      providerName: 'goose',
+      cwd: '/tmp/stale',
+      summary: 'stale',
+      messageCount: 1,
+    });
+    const resumed = registry.upsertDiscovered('goose-live', {
+      providerName: 'goose',
+      cwd: '/tmp/live',
+      summary: 'live',
+      messageCount: 1,
+    });
+    registry.updateStatus(resumed!.id, 'ready');
+
+    const result = syncNativeSessions(registry, 'goose', [
+      {
+        providerSessionId: 'goose-fresh',
+        cwd: '/tmp/fresh',
+        summary: 'fresh',
+        messageCount: 2,
+      },
+    ]);
+
+    expect(result).toEqual({ newCount: 1, syncedCount: 1 });
+    expect(registry.get(stale!.id)).toBeUndefined();
+    expect(registry.get(resumed!.id)?.status).toBe('ready');
+    expect(
+      registry.list({ provider: 'goose' }).map((session) => session.providerSessionId).sort(),
+    ).toEqual(['goose-fresh', 'goose-live']);
+  });
 });
