@@ -194,24 +194,26 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'rename_file',
-    description: 'Rename or move a file within the workspace.',
+    description: 'Rename or move a file within the workspace. Source must be a file, not a directory.',
     inputSchema: {
       type: 'object',
       properties: {
-        source: { type: 'string', description: 'Current relative path.' },
+        source: { type: 'string', description: 'Current relative path (must be a file).' },
         destination: { type: 'string', description: 'New relative path.' },
+        overwrite: { type: 'boolean', description: 'Allow overwriting an existing destination. Defaults to false.' },
       },
       required: ['source', 'destination'],
     },
   },
   {
     name: 'copy_file',
-    description: 'Copy a file within the workspace.',
+    description: 'Copy a file within the workspace. Source must be a file, not a directory.',
     inputSchema: {
       type: 'object',
       properties: {
-        source: { type: 'string', description: 'Source relative path.' },
+        source: { type: 'string', description: 'Source relative path (must be a file).' },
         destination: { type: 'string', description: 'Destination relative path.' },
+        overwrite: { type: 'boolean', description: 'Allow overwriting an existing destination. Defaults to false.' },
       },
       required: ['source', 'destination'],
     },
@@ -330,6 +332,41 @@ async function walkFiles(
     results.push(`${toRelativeDisplay(root, fullPath)}${entry.isDirectory() ? '/' : ''}`);
     if (recursive && entry.isDirectory()) {
       await walkFiles(root, fullPath, recursive, limit, results);
+    }
+  }
+}
+
+async function walkGlob(
+  root: string,
+  currentPath: string,
+  pattern: string,
+  limit: number,
+  results: string[],
+): Promise<void> {
+  if (results.length >= limit) {
+    return;
+  }
+
+  const entries = await readdir(currentPath, { withFileTypes: true });
+  entries.sort((left, right) => left.name.localeCompare(right.name));
+
+  for (const entry of entries) {
+    if (results.length >= limit) {
+      return;
+    }
+
+    if (entry.isDirectory() && shouldIgnoreDirectory(entry.name)) {
+      continue;
+    }
+
+    const fullPath = resolve(currentPath, entry.name);
+    if (entry.isDirectory()) {
+      await walkGlob(root, fullPath, pattern, limit, results);
+    } else {
+      const rel = toRelativeDisplay(root, fullPath);
+      if (matchesGlob(rel, pattern)) {
+        results.push(rel);
+      }
     }
   }
 }
@@ -648,17 +685,8 @@ export class LocalToolRuntime {
     const startPath = resolveWorkspacePath(context.cwd, String(args.path || '.'));
     const maxResults = readOptionalInteger(args, 'max_results', DEFAULT_GLOB_RESULTS, 1, 1000);
 
-    const allEntries: string[] = [];
-    await walkFiles(context.cwd, startPath, true, maxResults * 10, allEntries);
-
     const matches: string[] = [];
-    for (const entry of allEntries) {
-      if (entry.endsWith('/')) continue;
-      if (matchesGlob(entry, pattern)) {
-        matches.push(entry);
-        if (matches.length >= maxResults) break;
-      }
-    }
+    await walkGlob(context.cwd, startPath, pattern, maxResults, matches);
 
     return {
       callId,
@@ -739,6 +767,23 @@ export class LocalToolRuntime {
     const destPath = requireString(args, 'destination');
     const fullSource = resolveWorkspacePath(context.cwd, sourcePath);
     const fullDest = resolveWorkspacePath(context.cwd, destPath);
+    const overwrite = readOptionalBoolean(args, 'overwrite');
+
+    const sourceInfo = await stat(fullSource);
+    if (!sourceInfo.isFile()) {
+      throw new Error(`Source must be a file, not a directory: ${toRelativeDisplay(context.cwd, fullSource)}`);
+    }
+
+    if (!overwrite) {
+      try {
+        await stat(fullDest);
+        throw new Error(
+          `Destination already exists: ${toRelativeDisplay(context.cwd, fullDest)}; set overwrite=true to replace`,
+        );
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+    }
 
     await mkdir(dirname(fullDest), { recursive: true });
     await rename(fullSource, fullDest);
@@ -759,6 +804,23 @@ export class LocalToolRuntime {
     const destPath = requireString(args, 'destination');
     const fullSource = resolveWorkspacePath(context.cwd, sourcePath);
     const fullDest = resolveWorkspacePath(context.cwd, destPath);
+    const overwrite = readOptionalBoolean(args, 'overwrite');
+
+    const sourceInfo = await stat(fullSource);
+    if (!sourceInfo.isFile()) {
+      throw new Error(`Source must be a file, not a directory: ${toRelativeDisplay(context.cwd, fullSource)}`);
+    }
+
+    if (!overwrite) {
+      try {
+        await stat(fullDest);
+        throw new Error(
+          `Destination already exists: ${toRelativeDisplay(context.cwd, fullDest)}; set overwrite=true to replace`,
+        );
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+    }
 
     await mkdir(dirname(fullDest), { recursive: true });
     await copyFile(fullSource, fullDest);

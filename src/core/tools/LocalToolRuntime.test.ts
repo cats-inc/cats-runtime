@@ -362,6 +362,32 @@ describe('LocalToolRuntime', () => {
         cleanup();
       }
     });
+
+    it('finds late matches beyond initial entries', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        // Create many non-matching files before the target
+        for (let i = 0; i < 50; i++) {
+          mkdirSync(join(cwd, 'filler', `d${String(i).padStart(3, '0')}`), { recursive: true });
+          writeFileSync(join(cwd, 'filler', `d${String(i).padStart(3, '0')}`, 'data.txt'), 'x');
+        }
+        // The target is buried deep
+        mkdirSync(join(cwd, 'zzz'), { recursive: true });
+        writeFileSync(join(cwd, 'zzz', 'target.needle'), 'found');
+
+        const result = await runtime.execute(sharedCtx(cwd), {
+          id: 'glob-6',
+          name: 'glob',
+          arguments: { pattern: '**/*.needle' },
+        });
+        expect(result.isError).toBeUndefined();
+        expect(result.output).toContain('zzz/target.needle');
+      } finally {
+        cleanup();
+      }
+    });
   });
 
   describe('delete_file', () => {
@@ -472,6 +498,60 @@ describe('LocalToolRuntime', () => {
         cleanup();
       }
     });
+
+    it('rejects directory as source', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const result = await runtime.execute(extendedCtx(cwd), {
+          id: 'ren-3',
+          name: 'rename_file',
+          arguments: { source: 'src/utils', destination: 'lib/utils' },
+        });
+        expect(result.isError).toBe(true);
+        expect(result.output).toContain('must be a file');
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('rejects overwrite when destination exists', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const result = await runtime.execute(extendedCtx(cwd), {
+          id: 'ren-4',
+          name: 'rename_file',
+          arguments: { source: 'src/utils/format.js', destination: 'src/app.ts' },
+        });
+        expect(result.isError).toBe(true);
+        expect(result.output).toContain('already exists');
+        // Source should still exist (no side effect)
+        expect(existsSync(join(cwd, 'src', 'utils', 'format.js'))).toBe(true);
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('allows overwrite with explicit flag', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const result = await runtime.execute(extendedCtx(cwd), {
+          id: 'ren-5',
+          name: 'rename_file',
+          arguments: { source: 'src/utils/format.js', destination: 'src/app.ts', overwrite: true },
+        });
+        expect(result.isError).toBeUndefined();
+        expect(existsSync(join(cwd, 'src', 'utils', 'format.js'))).toBe(false);
+        expect(readFileSync(join(cwd, 'src', 'app.ts'), 'utf-8')).toContain('module.exports');
+      } finally {
+        cleanup();
+      }
+    });
   });
 
   describe('copy_file', () => {
@@ -491,6 +571,57 @@ describe('LocalToolRuntime', () => {
         expect(readFileSync(join(cwd, 'backup', 'app.ts'), 'utf-8')).toBe(
           readFileSync(join(cwd, 'src', 'app.ts'), 'utf-8'),
         );
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('rejects directory as source', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const result = await runtime.execute(extendedCtx(cwd), {
+          id: 'cp-2',
+          name: 'copy_file',
+          arguments: { source: 'src/utils', destination: 'backup/utils' },
+        });
+        expect(result.isError).toBe(true);
+        expect(result.output).toContain('must be a file');
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('rejects overwrite when destination exists', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const result = await runtime.execute(extendedCtx(cwd), {
+          id: 'cp-3',
+          name: 'copy_file',
+          arguments: { source: 'src/utils/format.js', destination: 'src/app.ts' },
+        });
+        expect(result.isError).toBe(true);
+        expect(result.output).toContain('already exists');
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('allows overwrite with explicit flag', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const result = await runtime.execute(extendedCtx(cwd), {
+          id: 'cp-4',
+          name: 'copy_file',
+          arguments: { source: 'src/utils/format.js', destination: 'src/app.ts', overwrite: true },
+        });
+        expect(result.isError).toBeUndefined();
+        expect(readFileSync(join(cwd, 'src', 'app.ts'), 'utf-8')).toContain('module.exports');
       } finally {
         cleanup();
       }
