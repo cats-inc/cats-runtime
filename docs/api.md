@@ -47,9 +47,26 @@ Example response:
   "service": "cats-runtime",
   "status": "ok",
   "timestamp": "2026-03-11T12:34:56.000Z",
-  "version": "0.1.0"
+  "version": "0.1.0",
+  "startup": {
+    "mode": "standalone",
+    "readySignal": "http",
+    "ready": true,
+    "pid": 12345,
+    "startedAt": "2026-03-19T12:34:00.000Z",
+    "address": {
+      "host": "127.0.0.1",
+      "port": 3110,
+      "healthUrl": "http://127.0.0.1:3110/health"
+    }
+  }
 }
 ```
+
+`startup.ready` reflects whether the runtime server has completed bind/startup.
+For host-supervised local runs, callers should still treat `GET /health` as the
+authoritative readiness check rather than inferring success from process launch
+alone.
 
 ### Sessions
 
@@ -307,6 +324,8 @@ Errors use this format:
 
 - The public contract is served directly by `cats-runtime`
 - The dashboard at `/` is intentionally unauthenticated for local use
+- `GET /health` now exposes startup metadata so local supervisors can confirm
+  mode, PID, and bound address over the HTTP boundary
 - Provider-specific capabilities still differ; not every provider supports
   resume, fork, or permission enforcement in the same way
 - API-backed and local-model sessions currently use runtime-hosted local tools
@@ -330,4 +349,4 @@ Errors use this format:
 
 ---
 
-*Last updated: 2026-03-17*
+*Last updated: 2026-03-19*

@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { loadConfig } from '../src/core/config.js';
 import { createDiscoveryController, createRuntimeServer } from '../src/server.js';
+import { createRuntimeStartupState } from '../src/startup.js';
 
 function alignDefaultProviderRuntime(
   config: ReturnType<typeof loadConfig>,
@@ -158,8 +159,56 @@ describe('runtime server', () => {
         status: 'ok',
         version: '0.1.0',
         timestamp: expect.any(String),
+        startup: {
+          mode: 'standalone',
+          managedBy: undefined,
+          readySignal: 'http',
+          ready: false,
+          pid: expect.any(Number),
+          startedAt: expect.any(String),
+          address: undefined,
+        },
       });
     });
+  });
+
+  it('GET /health exposes app-managed startup metadata after listen', async () => {
+    const { config, cleanup } = createTestConfig();
+    const runtime = createRuntimeServer(config, {
+      startup: createRuntimeStartupState({
+        mode: 'app-managed',
+        managedBy: 'cats-inc',
+        readyOutput: 'json',
+      }),
+    });
+
+    try {
+      const address = await runtime.start();
+      const response = await fetch(`http://${address.host}:${address.port}/health`);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        service: 'cats-runtime',
+        status: 'ok',
+        version: '0.1.0',
+        timestamp: expect.any(String),
+        startup: {
+          mode: 'app-managed',
+          managedBy: 'cats-inc',
+          readySignal: 'http',
+          ready: true,
+          pid: expect.any(Number),
+          startedAt: expect.any(String),
+          address: {
+            host: address.host,
+            port: address.port,
+            healthUrl: `http://${address.host}:${address.port}/health`,
+          },
+        },
+      });
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
   });
 
   it('GET /sessions returns the embedded registry state', async () => {

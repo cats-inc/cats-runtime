@@ -3,19 +3,44 @@
 import { pathToFileURL } from 'node:url';
 
 import { loadDotEnv } from './core/dotenv.js';
+import { loadConfig } from './core/config.js';
 import { createRuntimeServer } from './server.js';
+import {
+  applyRuntimeCliEnvOverrides,
+  createRuntimeStartupState,
+  formatRuntimeReadyMessage,
+  formatRuntimeStartupError,
+  getRuntimeHelpText,
+  parseRuntimeCliOptions,
+  resolveRuntimeStartupState,
+} from './startup.js';
 
 export { loadConfig } from './core/config.js';
 export { createRuntimeServer } from './server.js';
 export { createRuntimeApp } from './http/app.js';
 
 async function main(): Promise<void> {
+  const cliOptions = parseRuntimeCliOptions(process.argv.slice(2));
+  if (cliOptions.help) {
+    process.stdout.write(`${getRuntimeHelpText()}\n`);
+    return;
+  }
+
   loadDotEnv();
-  const runtime = createRuntimeServer();
+  applyRuntimeCliEnvOverrides(cliOptions, process.env);
+
+  const startup = resolveRuntimeStartupState(cliOptions, process.env);
+  const config = loadConfig();
+  const runtime = createRuntimeServer(config, { startup });
   const address = await runtime.start();
-  process.stdout.write(
-    `cats-runtime listening on http://${address.host}:${address.port}\n`,
-  );
+  const readyMessage = formatRuntimeReadyMessage(startup, {
+    host: address.host,
+    port: address.port,
+    healthUrl: `http://${address.host}:${address.port}/health`,
+  });
+  if (readyMessage) {
+    process.stdout.write(readyMessage);
+  }
 
   let shuttingDown = false;
   const shutdown = (signal: NodeJS.Signals) => {
@@ -35,8 +60,17 @@ async function main(): Promise<void> {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error) => {
-    const message = error instanceof Error ? error.stack ?? error.message : String(error);
-    process.stderr.write(`${message}\n`);
+    let startup = createRuntimeStartupState();
+    try {
+      startup = resolveRuntimeStartupState(
+        parseRuntimeCliOptions(process.argv.slice(2)),
+        process.env,
+      );
+    } catch {
+      // Fall back to a plain startup context so invalid CLI args still render
+      // a readable error instead of causing a secondary parse failure.
+    }
+    process.stderr.write(formatRuntimeStartupError(startup, error));
     process.exitCode = 1;
   });
 }

@@ -20,6 +20,7 @@ environment-relative guest paths.
 The architectural split is:
 
 - `core`: shared runtime config and stable types
+- `startup`: process-level startup mode, readiness, and lifecycle helpers
 - `backends`: execution implementations for CLI, API/local, and agent targets
 - `http`: inbound transport and route wiring
 
@@ -53,6 +54,7 @@ The architectural split is:
 
 ```text
 src/
+  startup.ts
   core/
     config.ts
     models/
@@ -93,6 +95,15 @@ src/
 - Serves the embedded dashboard UI from `/`
 - Applies optional bearer auth
 - Streams turn output as SSE or NDJSON
+- Exposes startup/readiness metadata at `GET /health`
+
+### `src/startup.ts`
+
+- Parses executable startup flags such as `--startup-mode` and `--ready-output`
+- Resolves runtime startup state from CLI and environment inputs
+- Formats machine-readable readiness or startup-failure output for local
+  supervisors
+- Keeps standalone and app-managed process startup on one shared binary path
 
 ### `src/backends/cli`
 
@@ -156,7 +167,9 @@ src/
    model catalog services in `src/core`
 6. API/local turns may enter the shared local tool loop in `src/core/tools`
 7. Agent turns use the shared `TurnInput` contract plus provider-managed session continuity where available
-8. Stream events are returned directly to the caller
+8. Startup/readiness state is exposed over `GET /health`, while optional
+   machine-readable process output can be emitted during startup
+9. Stream events are returned directly to the caller
 
 For WSL-backed Cursor/Kiro discovery:
 
@@ -182,6 +195,8 @@ For file-backed providers:
 ## Design Rules
 
 - Upper layers should depend on `cats-runtime`, not on provider-specific CLIs
+- Product hosts should supervise `cats-runtime` as a separate process and use
+  the HTTP boundary for readiness rather than source-importing runtime internals
 - Historical `agent-fleet` references should stay confined to ADRs and migration notes
 - Inbound transport code should stay in `src/http`, not in backend modules
 - New API-key or Ollama integrations should land under `src/backends/api`

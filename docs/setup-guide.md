@@ -33,6 +33,15 @@ The package is now structured for executable npm distribution:
 Those packaged flows still rely on the same config files or environment
 overrides as the source checkout.
 
+Supported startup flags:
+
+- `--startup-mode <standalone|app-managed>`
+- `--managed-by <host-name>`
+- `--ready-output <plain|json|silent>`
+- `--host <bind-host>`
+- `--port <bind-port>`
+- `--config <providers-config-path>`
+
 ## Environment Variables
 
 Keep `.env` for runtime-wide values and secrets:
@@ -247,6 +256,21 @@ node dist/index.js
 This is the same entrypoint that the npm `bin` command uses for package-style
 execution.
 
+### App-managed local start
+
+For host-supervised local startup, run the same binary in app-managed mode:
+
+```powershell
+node dist/index.js --startup-mode app-managed --managed-by cats-inc --ready-output json
+```
+
+In that mode:
+
+- stdout emits a single-line JSON readiness event when the runtime is ready
+- `GET /health` remains the authoritative readiness endpoint
+- the process stays a separate HTTP service rather than being source-imported
+  into the host app
+
 By default, runtime metadata persists under `~/.cats-runtime/data` and runtime
 session workspaces/transcripts persist under `~/.cats-runtime/sessions`. Override
 either path with `CATS_RUNTIME_DATA_DIR` or `CATS_RUNTIME_SESSION_BASE_DIR` if
@@ -344,6 +368,21 @@ npm test
 Invoke-WebRequest http://127.0.0.1:3110/health -UseBasicParsing
 ```
 
+The health payload includes startup metadata:
+
+```json
+{
+  "service": "cats-runtime",
+  "status": "ok",
+  "version": "0.1.0",
+  "startup": {
+    "mode": "standalone",
+    "readySignal": "http",
+    "ready": true
+  }
+}
+```
+
 To inspect the publish payload locally without using the global npm cache:
 
 ```powershell
@@ -393,4 +432,4 @@ Docker-backed native discovery targets.
 
 ---
 
-*Last updated: 2026-03-18*
+*Last updated: 2026-03-19*

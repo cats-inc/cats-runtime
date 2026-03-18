@@ -31,9 +31,11 @@ import { kiroRoutes } from './routes/kiro.js';
 import { auggieRoutes } from './routes/auggie.js';
 import { opencodeRoutes } from './routes/opencode.js';
 import { providerRoutes } from './routes/providers.js';
+import type { RuntimeStartupState } from '../startup.js';
 
 export interface AppContext {
   config: RuntimeConfig;
+  startup: RuntimeStartupState;
   registry: SessionRegistry;
   pool: WorkerPool;
   apiBackend?: ApiBackendManager;

@@ -44,6 +44,10 @@ import type { ProviderName } from './backends/cli/providers/types.js';
 import type { ApiBackendOptions } from './backends/api/types.js';
 import type { AgentBackendOptions } from './backends/agent/types.js';
 import {
+  createRuntimeStartupState,
+  type RuntimeStartupState,
+} from './startup.js';
+import {
   getConfiguredFileBackedProviderPath,
   normalizeFileBackedProviderPath,
   resolveFileBackedProviderPath,
@@ -59,6 +63,7 @@ interface RuntimeServerOptions {
   wslDistroInspector?: WslDistroInspector;
   apiBackend?: ApiBackendOptions;
   agentBackend?: AgentBackendOptions;
+  startup?: RuntimeStartupState;
 }
 
 interface WatcherSpec {
@@ -592,6 +597,7 @@ export function createRuntimeServer(
   config: RuntimeConfig = loadConfig(),
   options: RuntimeServerOptions = {},
 ): RuntimeServer {
+  const startup = options.startup ?? createRuntimeStartupState();
   const dataDir = config.dataDir || join(config.sessionBaseDir, '..', 'data');
   const registry = new SessionRegistry(
     dataDir,
@@ -729,6 +735,7 @@ export function createRuntimeServer(
   });
   const context: AppContext = {
     config,
+    startup,
     registry,
     pool,
     apiBackend,
@@ -769,12 +776,26 @@ export function createRuntimeServer(
 
       const address = server.address();
       if (!address || typeof address === 'string') {
-        return { host: config.host || '0.0.0.0', port: config.port };
+        const fallback = { host: config.host || '0.0.0.0', port: config.port };
+        startup.ready = true;
+        startup.address = {
+          ...fallback,
+          healthUrl: `http://${fallback.host}:${fallback.port}/health`,
+        };
+        return fallback;
       }
+
+      startup.ready = true;
+      startup.address = {
+        host: address.address,
+        port: address.port,
+        healthUrl: `http://${address.address}:${address.port}/health`,
+      };
 
       return { host: address.address, port: address.port };
     },
     async close() {
+      startup.ready = false;
       discovery.stop();
       agentBackend.killAll();
       apiBackend.killAll();

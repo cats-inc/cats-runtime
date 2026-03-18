@@ -48,6 +48,15 @@ npx cats-runtime
 The executable package uses the same runtime entrypoint and still expects
 config via `.env`, `config/providers.yaml`, or explicit environment variables.
 
+Supported startup flags:
+
+- `--startup-mode <standalone|app-managed>`
+- `--managed-by <host-name>`
+- `--ready-output <plain|json|silent>`
+- `--host <bind-host>`
+- `--port <bind-port>`
+- `--config <providers-config-path>`
+
 ### 4. App-managed local startup
 
 `cats-runtime` may also be started by a local supervisor such as `cats-inc` or
@@ -56,6 +65,19 @@ an Electron host. In that mode:
 - the host process owns process supervision
 - readiness should be checked over the runtime HTTP boundary
 - the runtime remains a separate process, not an in-process product import
+
+Recommended child-process invocation:
+
+```powershell
+node dist/index.js --startup-mode app-managed --managed-by cats-inc --ready-output json
+```
+
+Expected behavior:
+
+- stdout emits a single-line JSON `runtime.ready` event after bind succeeds
+- stderr emits a single-line JSON `runtime.startup_error` event on startup failure
+- `GET /health` is the authoritative readiness endpoint after process launch
+- `SIGINT` and `SIGTERM` trigger graceful shutdown of the runtime server
 
 ## Configuration
 
@@ -91,6 +113,8 @@ an Electron host. In that mode:
 - **Health / readiness**: `GET /health`
 - **Dashboard**: `GET /`
 - **Logs**: stdout / stderr from the runtime process
+- **Startup metadata**: `GET /health` includes `startup.mode`, `managedBy`,
+  `readySignal`, `ready`, `pid`, `startedAt`, and bound address details
 - **State paths**:
   - metadata defaults to `~/.cats-runtime/data`
   - session workspaces/transcripts default to `~/.cats-runtime/sessions`

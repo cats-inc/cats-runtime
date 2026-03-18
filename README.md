@@ -63,12 +63,36 @@ The executable package starts the same runtime entrypoint as `npm start` and
 still expects `.env` plus `config/providers.yaml` or equivalent environment
 overrides.
 
+Supported process startup modes:
+
+- `standalone` for direct local runs
+- `app-managed` for child-process supervision by hosts such as `cats-inc`
+
+The executable entry also supports:
+
+- `--startup-mode <standalone|app-managed>`
+- `--managed-by <host-name>`
+- `--ready-output <plain|json|silent>`
+- `--host <bind-host>`
+- `--port <bind-port>`
+- `--config <providers-config-path>`
+
 For packaged-style local verification before publish:
 
 ```powershell
 npm run build
 node dist/index.js
 ```
+
+For an app-managed local start, prefer machine-readable readiness output:
+
+```powershell
+node dist/index.js --startup-mode app-managed --managed-by cats-inc --ready-output json
+```
+
+`GET /health` now includes runtime startup metadata so supervising hosts can
+confirm mode, PID, readiness state, and bound address over the public HTTP
+boundary.
 
 Runtime state defaults under the user's home directory:
 
