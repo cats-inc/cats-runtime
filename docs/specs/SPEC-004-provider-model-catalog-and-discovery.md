@@ -223,6 +223,11 @@ Recommended consumption path:
 This keeps the direct product API boundary intact and avoids requiring the
 renderer to know runtime auth/base-url details.
 
+Product flows that need more than one provider list, such as setup or
+onboarding screens, can compose multiple per-provider runtime calls inside the
+`cats-inc` server. A runtime-level aggregate endpoint is still optional follow-on
+work, not a prerequisite for first product integration.
+
 ## Dependencies
 
 - provider-instance resolution from `config/providers.yaml`
@@ -253,4 +258,4 @@ renderer to know runtime auth/base-url details.
 
 *Created: 2026-03-19*
 *Author: Codex*
-*Related Plan: TBD*
+*Related Plan: [PLAN-005](../plans/PLAN-005-provider-model-catalog-and-discovery.md)*

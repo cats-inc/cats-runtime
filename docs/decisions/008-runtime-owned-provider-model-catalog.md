@@ -68,7 +68,8 @@ This decision includes:
   is asking for model data
 - aligns with existing optional `listModels()` adapter capabilities instead of
   inventing a second discovery subsystem
-- preserves the `cats-inc` direct-product-API boundary from ADR-008
+- preserves the `cats-inc` direct-product-API boundary from `cats-inc`
+  ADR-008
 
 ## Consequences
 
