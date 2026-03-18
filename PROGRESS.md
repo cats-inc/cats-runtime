@@ -7,7 +7,7 @@
 | Component | Status | Description |
 |-----------|--------|-------------|
 | Core | Completed | Embedded CLI runtime, session registry, discovery, and worker pool are in-repo |
-| API Backends | In Progress | `src/backends/api` now runs Claude, Codex/OpenAI, Gemini, and Ollama with runtime-managed sessions, provider-native continuation/caching optimizations, and a shared local tool loop; health probes and broader tool/model discovery remain |
+| API Backends | In Progress | `src/backends/api` now runs Claude, Codex/OpenAI, Gemini, and Ollama with runtime-managed sessions, provider-native continuation/caching optimizations, and a shared local tool loop with patch/file/search/shell support; health probes and broader tool/model discovery remain |
 | Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, and an Agent SDK bridge as the second validation target |
 | HTTP API | Completed | Health, sessions, messages, history, observe, and provider management routes are served directly from `cats-runtime` |
 | Dashboard | Completed | The embedded dashboard UI is served from `GET /` |
@@ -57,7 +57,9 @@
 #### Remaining Items
 
 - [ ] Add provider health probes, dashboard health surfacing, and Ollama model discovery
-- [ ] Expand the shared local tool runtime beyond the first shell/file/search set
+- [ ] Harden shared local tool runtime safety beyond current workspace-relative guards, especially for symlink/hardlink alias handling and more atomic multi-file mutation behavior
+- [ ] Expand the shared local tool runtime beyond the current filesystem/shell set into richer navigation/materialization helpers
+- [ ] Refine capability partitioning and policy surfacing beyond the current `standard` / `extended` / `read_only` tool-profile split
 - [ ] Split Docker discovery snapshot creation out of `createDiscoveryStatusPayload()` so `GET /discovery/status` can reuse the live WSL snapshot without recomputing an unused WSL status store
 
 ### WP-2: Provider Instance Review Follow-ups
@@ -115,7 +117,7 @@ dashboard integration intact.
 | Add backend-neutral provider catalog and runtime facade | [x] | Routes resolve provider targets without assuming CLI |
 | Add `src/backends/api` transport/runtime skeleton | [x] | Anthropic, OpenAI, Gemini, and Ollama transports are in-repo |
 | Support API/local session create, message, close, resume, and fork | [x] | Session lifecycle is runtime-managed across CLI and API backends |
-| Add shared local tool runtime for API/local sessions | [x] | `list_files`, `read_file`, `write_file`, `grep`, and `run_shell` are enforced centrally |
+| Add shared local tool runtime for API/local sessions | [x] | `list_files`, `read_file`, `write_file`, `edit_file`, `apply_patch`, `grep`, `glob`, and `run_shell` are enforced centrally, with extended `delete_file` / `rename_file` / `copy_file` support behind the opt-in profile |
 | Cover API/local behavior with automated tests | [x] | Transport, tool runtime, and end-to-end HTTP flows are under Vitest |
 | Add provider health probes and dashboard health surfacing | [ ] | Deferred to a later PLAN-003 phase |
 | Add provider-specific caching/continuation optimizations | [x] | OpenAI `previous_response_id`, Anthropic prompt caching, and Gemini context caching are in place |

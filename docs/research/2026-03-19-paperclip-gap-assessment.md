@@ -290,20 +290,25 @@ Still missing:
 
 This is called out in the current work-package follow-ups.
 
-### Gap 6: Shared Local Tool Runtime Is Only the First Cut
+### Gap 6: Shared Local Tool Runtime Is Broader Now, But Still Not Fully Mature
 
-The shared tool loop is useful, but still intentionally small. Today it covers:
+The shared tool loop is no longer just the first five-tool slice. It now covers:
 
 - `list_files`
 - `read_file`
 - `write_file`
+- `edit_file`
+- `apply_patch`
 - `grep`
+- `glob`
 - `run_shell`
+- opt-in extended `delete_file` / `rename_file` / `copy_file`
 
-What is still absent:
+What is still absent or still thin:
 
-- richer patch/edit operations
-- stronger file mutation workflows
+- stronger alias-safe path handling for mutations beyond the current
+  workspace-relative guards
+- more atomic multi-file mutation and rollback semantics
 - broader tool families for search/navigation/materialization
 - more mature safety and capability partitioning beyond the current profile and
   permission checks

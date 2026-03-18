@@ -3,6 +3,7 @@ import { copyFile, readdir, readFile, rmdir, stat, mkdir, rename, unlink, writeF
 import { dirname, extname, relative, resolve } from 'node:path';
 import path from 'node:path';
 import type { PermissionMode, WorkspaceMode } from '../types.js';
+import { applyPatch as applyStructuredPatch } from './applyPatch.js';
 
 // path.matchesGlob — Node 22+ built-in; @types/node@20 lacks the typedef
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -144,6 +145,17 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'apply_patch',
+    description: 'Apply a multi-file patch using the *** Begin Patch / *** End Patch format.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        input: { type: 'string', description: 'Patch text including *** Begin Patch and *** End Patch.' },
+      },
+      required: ['input'],
+    },
+  },
+  {
     name: 'grep',
     description: 'Search workspace text files with a regular expression.',
     inputSchema: {
@@ -224,7 +236,7 @@ const READ_ONLY_TOOLS = new Set(['list_files', 'read_file', 'grep', 'glob']);
 const TOOL_ORDER = new Map(TOOL_DEFINITIONS.map((tool, index) => [tool.name, index]));
 
 const STANDARD_TOOLS = new Set([
-  'list_files', 'read_file', 'write_file', 'edit_file', 'grep', 'glob', 'run_shell',
+  'list_files', 'read_file', 'write_file', 'edit_file', 'apply_patch', 'grep', 'glob', 'run_shell',
 ]);
 const EXTENDED_TOOLS = new Set([
   ...STANDARD_TOOLS, 'delete_file', 'rename_file', 'copy_file',
@@ -483,6 +495,8 @@ export class LocalToolRuntime {
           return await this.writeFile(context, call.id, args);
         case 'edit_file':
           return await this.editFile(context, call.id, args);
+        case 'apply_patch':
+          return await this.applyPatch(context, call.id, args);
         case 'grep':
           return await this.grep(context, call.id, args);
         case 'glob':
@@ -628,6 +642,28 @@ export class LocalToolRuntime {
       output: count === 1
         ? `Replaced 1 occurrence in ${displayPath}`
         : `Replaced ${count} occurrences in ${displayPath}`,
+    };
+  }
+
+  private async applyPatch(
+    context: ToolExecutionContext,
+    callId: string,
+    args: Record<string, unknown>,
+  ): Promise<ToolResult> {
+    const input = typeof args.input === 'string'
+      ? args.input
+      : typeof args.patch === 'string'
+        ? args.patch
+        : '';
+    if (!input.trim()) {
+      throw new Error(`Argument 'input' must be a non-empty string`);
+    }
+
+    const result = await applyStructuredPatch(input, context.cwd);
+    return {
+      callId,
+      name: 'apply_patch',
+      output: result.text,
     };
   }
 

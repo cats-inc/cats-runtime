@@ -272,6 +272,132 @@ describe('LocalToolRuntime', () => {
     });
   });
 
+  describe('apply_patch', () => {
+    it('applies a multi-file patch', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const result = await runtime.execute(sharedCtx(cwd), {
+          id: 'patch-1',
+          name: 'apply_patch',
+          arguments: {
+            input: `*** Begin Patch
+*** Update File: src/app.ts
+@@
+-export const value = 1;
++export const value = 7;
+*** Add File: src/new.ts
++export const created = true;
+*** Delete File: src/utils/format.js
+*** End Patch`,
+          },
+        });
+        expect(result.isError).toBeUndefined();
+        expect(result.output).toContain('M src/app.ts');
+        expect(result.output).toContain('A src/new.ts');
+        expect(result.output).toContain('D src/utils/format.js');
+        expect(readFileSync(join(cwd, 'src', 'app.ts'), 'utf-8')).toContain('value = 7');
+        expect(readFileSync(join(cwd, 'src', 'new.ts'), 'utf-8')).toContain('created = true');
+        expect(existsSync(join(cwd, 'src', 'utils', 'format.js'))).toBe(false);
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('supports move via update hunk', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const result = await runtime.execute(sharedCtx(cwd), {
+          id: 'patch-2',
+          name: 'apply_patch',
+          arguments: {
+            input: `*** Begin Patch
+*** Update File: src/utils/helper.ts
+*** Move to: src/helper.ts
+@@
+-export function help() {}
++export function help() { return 'ok'; }
+*** End Patch`,
+          },
+        });
+        expect(result.isError).toBeUndefined();
+        expect(result.output).toContain('M src/helper.ts');
+        expect(existsSync(join(cwd, 'src', 'utils', 'helper.ts'))).toBe(false);
+        expect(readFileSync(join(cwd, 'src', 'helper.ts'), 'utf-8')).toContain(`return 'ok'`);
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('blocks path traversal in patch hunks', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const result = await runtime.execute(sharedCtx(cwd), {
+          id: 'patch-3',
+          name: 'apply_patch',
+          arguments: {
+            input: `*** Begin Patch
+*** Add File: ../escape.txt
++pwned
+*** End Patch`,
+          },
+        });
+        expect(result.isError).toBe(true);
+        expect(result.output).toContain('outside the workspace');
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('rejects malformed patches', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const result = await runtime.execute(sharedCtx(cwd), {
+          id: 'patch-4',
+          name: 'apply_patch',
+          arguments: {
+            input: '*** Update File: src/app.ts\n@@\n-export const value = 1;\n+export const value = 2;\n',
+          },
+        });
+        expect(result.isError).toBe(true);
+        expect(result.output).toContain('first line of the patch');
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('blocks in read_only workspace mode', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const result = await runtime.execute(readOnlyCtx(cwd), {
+          id: 'patch-5',
+          name: 'apply_patch',
+          arguments: {
+            input: `*** Begin Patch
+*** Update File: src/app.ts
+@@
+-export const value = 1;
++export const value = 2;
+*** End Patch`,
+          },
+        });
+        expect(result.isError).toBe(true);
+        expect(result.output).toContain('not allowed');
+      } finally {
+        cleanup();
+      }
+    });
+  });
+
   describe('glob', () => {
     it('matches files by pattern', async () => {
       const { cwd, cleanup } = createWorkspace();
@@ -629,19 +755,19 @@ describe('LocalToolRuntime', () => {
   });
 
   describe('profiles', () => {
-    it('standard profile lists 7 tools', () => {
+    it('standard profile lists 8 tools', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('standard');
       expect(tools.map((t) => t.name)).toEqual([
-        'list_files', 'read_file', 'write_file', 'edit_file', 'grep', 'glob', 'run_shell',
+        'list_files', 'read_file', 'write_file', 'edit_file', 'apply_patch', 'grep', 'glob', 'run_shell',
       ]);
     });
 
-    it('extended profile lists 10 tools', () => {
+    it('extended profile lists 11 tools', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('extended');
       expect(tools.map((t) => t.name)).toEqual([
-        'list_files', 'read_file', 'write_file', 'edit_file', 'grep', 'glob', 'run_shell',
+        'list_files', 'read_file', 'write_file', 'edit_file', 'apply_patch', 'grep', 'glob', 'run_shell',
         'delete_file', 'rename_file', 'copy_file',
       ]);
     });
@@ -663,7 +789,8 @@ describe('LocalToolRuntime', () => {
     it('unknown profile falls back to standard', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('unknown_profile');
-      expect(tools.length).toBe(7);
+      expect(tools.length).toBe(8);
+      expect(tools.map((t) => t.name)).toContain('apply_patch');
       expect(tools.map((t) => t.name)).toContain('edit_file');
       expect(tools.map((t) => t.name)).toContain('glob');
     });
@@ -671,7 +798,7 @@ describe('LocalToolRuntime', () => {
     it('default profile (undefined) is standard', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools();
-      expect(tools.length).toBe(7);
+      expect(tools.length).toBe(8);
     });
   });
 });
