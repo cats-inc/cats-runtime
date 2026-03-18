@@ -61,6 +61,19 @@ describe('WorkerProcess PowerShell helpers', () => {
       { type: 'result', sessionId: 'junie-session' },
     ]);
   });
+
+  it('surfaces the real process exit error when an ephemeral provider exits before emitting any events', async () => {
+    const worker = new WorkerProcess(
+      createMaskingErrorProvider(),
+      { cwd: process.cwd() },
+      createNodeCommandConfig(),
+      { retries: 1, timeoutMs: 1000 },
+    );
+
+    await expect(worker.sendMessage('ignored')).rejects.toThrow(
+      /Process exited with code 127 before responding\..*stderr: sh: 1: auggie: not found/s,
+    );
+  });
 });
 
 function createNodeCommandConfig(): ProviderCommandConfig {
@@ -100,6 +113,32 @@ function createCompletionOnlyProvider(
     },
     resolveFirstEventTimeoutMs(defaultTimeoutMs: number): number {
       return timeoutOverrideMs ?? defaultTimeoutMs;
+    },
+  };
+}
+
+function createMaskingErrorProvider(): Provider {
+  return {
+    name: 'auggie',
+    capabilities: { resume: true, fork: false, permissions: true },
+    ephemeral: true,
+    buildSpawnArgs() {
+      return [
+        '-e',
+        [
+          "process.stderr.write('sh: 1: auggie: not found\\n');",
+          'process.exit(127);',
+        ].join(' '),
+      ];
+    },
+    buildStdinMessage() {
+      return '';
+    },
+    parseStreamLine() {
+      return null;
+    },
+    async afterTurn() {
+      throw new Error('Auggie exited without emitting a usable JSON result.');
     },
   };
 }

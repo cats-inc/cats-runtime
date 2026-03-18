@@ -1,5 +1,6 @@
-import { existsSync } from 'node:fs';
-import { delimiter, extname, isAbsolute, join } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { delimiter, extname, isAbsolute, join, posix as pathPosix, win32 as pathWin32 } from 'node:path';
 import type { ProviderCommandConfig, ProviderRuntimeConfig } from '../config.js';
 
 export interface ShellInvocation {
@@ -11,6 +12,19 @@ export interface ProcessSpawnConfig extends ShellInvocation {
   shell: boolean | string;
   cwd?: string;
   env?: Record<string, string>;
+}
+
+interface RuntimePayloadFile {
+  path: string;
+  content: string;
+}
+
+interface RuntimeExecPayload {
+  cwd: string;
+  command: string;
+  args: string[];
+  ensureCwd?: boolean;
+  tempFiles?: RuntimePayloadFile[];
 }
 
 const POWERSHELL_EXEC_PAYLOAD_ENV = 'CATS_RUNTIME_PWSH_EXEC_B64';
@@ -138,10 +152,10 @@ export function buildProcessSpawnConfig(
   cwd: string,
 ): ProcessSpawnConfig {
   if (commandConfig.runtime.mode === 'wsl') {
-    return buildWslSpawnConfig(commandConfig, args, cwd);
+    return buildWslSpawnConfig(commandConfig, providerName, args, cwd);
   }
   if (commandConfig.runtime.mode === 'docker') {
-    return buildDockerSpawnConfig(commandConfig, args, cwd);
+    return buildDockerSpawnConfig(commandConfig, providerName, args, cwd);
   }
   return buildNativeSpawnConfig(commandConfig, providerName, args, cwd);
 }
@@ -175,16 +189,13 @@ export function quoteForBash(value: string): string {
 
 function buildWslSpawnConfig(
   commandConfig: ProviderCommandConfig,
+  providerName: string,
   args: string[],
   cwd: string,
 ): ProcessSpawnConfig {
-  const runtime = createRuntimeAdapter(commandConfig.runtime);
-  const runtimeCwd = runtime.toRuntimePath(cwd);
-  const payload = Buffer.from(JSON.stringify({
-    cwd: runtimeCwd,
-    command: commandConfig.path,
-    args,
-  }), 'utf8').toString('base64');
+  const payload = Buffer.from(JSON.stringify(
+    buildRuntimeExecPayload(commandConfig.runtime, providerName, commandConfig.path, args, cwd),
+  ), 'utf8').toString('base64');
   const wslenv = appendWslenv(process.env.WSLENV, 'CATS_RUNTIME_WSL_EXEC_B64');
   const commandScript = [
     'python3 - <<\'PY\'',
@@ -193,6 +204,14 @@ function buildWslSpawnConfig(
     'import os',
     '',
     'payload = json.loads(base64.b64decode(os.environ["CATS_RUNTIME_WSL_EXEC_B64"]).decode("utf-8"))',
+    'if payload.get("ensureCwd"):',
+    '    os.makedirs(payload["cwd"], exist_ok=True)',
+    'for file in payload.get("tempFiles", []):',
+    '    parent = os.path.dirname(file["path"])',
+    '    if parent:',
+    '        os.makedirs(parent, exist_ok=True)',
+    '    with open(file["path"], "w", encoding="utf-8") as handle:',
+    '        handle.write(file["content"])',
     'os.chdir(payload["cwd"])',
     'argv = [payload["command"], *payload.get("args", [])]',
     'os.execvp(argv[0], argv)',
@@ -218,16 +237,13 @@ function buildWslSpawnConfig(
 
 function buildDockerSpawnConfig(
   commandConfig: ProviderCommandConfig,
+  providerName: string,
   args: string[],
   cwd: string,
 ): ProcessSpawnConfig {
-  const runtime = createRuntimeAdapter(commandConfig.runtime);
-  const runtimeCwd = runtime.toRuntimePath(cwd);
-  const payload = Buffer.from(JSON.stringify({
-    cwd: runtimeCwd,
-    command: commandConfig.path,
-    args,
-  }), 'utf8').toString('base64');
+  const payload = Buffer.from(JSON.stringify(
+    buildRuntimeExecPayload(commandConfig.runtime, providerName, commandConfig.path, args, cwd),
+  ), 'utf8').toString('base64');
   const commandScript = [
     'python3 - <<\'PY\'',
     'import base64',
@@ -236,6 +252,14 @@ function buildDockerSpawnConfig(
     '',
     'payload = json.loads(base64.b64decode(os.environ["CATS_RUNTIME_DOCKER_EXEC_B64"]).decode("utf-8"))',
     'os.environ["PATH"] = "/root/.local/bin:" + os.environ.get("PATH", "")',
+    'if payload.get("ensureCwd"):',
+    '    os.makedirs(payload["cwd"], exist_ok=True)',
+    'for file in payload.get("tempFiles", []):',
+    '    parent = os.path.dirname(file["path"])',
+    '    if parent:',
+    '        os.makedirs(parent, exist_ok=True)',
+    '    with open(file["path"], "w", encoding="utf-8") as handle:',
+    '        handle.write(file["content"])',
     'os.chdir(payload["cwd"])',
     'argv = [payload["command"], *payload.get("args", [])]',
     'os.execvp(argv[0], argv)',
@@ -259,6 +283,116 @@ function buildDockerSpawnConfig(
       CATS_RUNTIME_DOCKER_EXEC_B64: payload,
     },
   };
+}
+
+function buildRuntimeExecPayload(
+  runtimeConfig: ProviderRuntimeConfig,
+  providerName: string,
+  commandPath: string,
+  args: string[],
+  cwd: string,
+): RuntimeExecPayload {
+  const runtime = createRuntimeAdapter(runtimeConfig);
+  const cwdInfo = runtimeConfig.mode === 'docker'
+    ? resolveDockerRuntimeCwd(cwd)
+    : {
+      cwd: runtime.toRuntimePath(cwd),
+      ensureCwd: false,
+    };
+
+  const translatedArgs = args.map((arg) => arg === cwd ? cwdInfo.cwd : arg);
+  const tempFiles: RuntimePayloadFile[] = [];
+
+  if (providerName === 'auggie') {
+    const instructionFileIndex = translatedArgs.indexOf('--instruction-file');
+    if (instructionFileIndex !== -1 && instructionFileIndex + 1 < translatedArgs.length) {
+      const hostInstructionFile = translatedArgs[instructionFileIndex + 1]!;
+      if (existsSync(hostInstructionFile)) {
+        if (runtimeConfig.mode === 'wsl') {
+          translatedArgs[instructionFileIndex + 1] = runtime.toRuntimePath(hostInstructionFile);
+        } else if (runtimeConfig.mode === 'docker') {
+          const runtimeInstructionFile = pathPosix.join(
+            '/tmp',
+            'cats-runtime',
+            `auggie-instruction-${randomUUID()}.txt`,
+          );
+          tempFiles.push({
+            path: runtimeInstructionFile,
+            content: readFileSync(hostInstructionFile, 'utf8'),
+          });
+          translatedArgs[instructionFileIndex + 1] = runtimeInstructionFile;
+        }
+      }
+    }
+  }
+
+  return {
+    cwd: cwdInfo.cwd,
+    command: commandPath,
+    args: translatedArgs,
+    ensureCwd: cwdInfo.ensureCwd || undefined,
+    tempFiles: tempFiles.length > 0 ? tempFiles : undefined,
+  };
+}
+
+function resolveDockerRuntimeCwd(cwd: string): { cwd: string; ensureCwd: boolean } {
+  const mapped = mapHostRuntimeSessionPathToDocker(cwd);
+  if (mapped) {
+    return {
+      cwd: mapped,
+      ensureCwd: true,
+    };
+  }
+
+  return {
+    cwd: createRuntimeAdapter({ mode: 'docker' }).toRuntimePath(cwd),
+    ensureCwd: false,
+  };
+}
+
+function mapHostRuntimeSessionPathToDocker(cwd: string): string | null {
+  const sessionBaseDir = resolveHostRuntimeSessionBaseDir();
+  if (!sessionBaseDir) {
+    return null;
+  }
+
+  const pathApi = selectHostPathApi(cwd, sessionBaseDir);
+  const resolvedBase = stripTrailingSeparators(pathApi.resolve(sessionBaseDir));
+  const resolvedCwd = stripTrailingSeparators(pathApi.resolve(cwd));
+  const relative = pathApi.relative(resolvedBase, resolvedCwd);
+
+  if (relative.startsWith('..') || pathApi.isAbsolute(relative)) {
+    return null;
+  }
+
+  const normalizedRelative = relative.replace(/\\/g, '/');
+  return normalizedRelative
+    ? pathPosix.join('/root/.cats-runtime/sessions', normalizedRelative)
+    : '/root/.cats-runtime/sessions';
+}
+
+function resolveHostRuntimeSessionBaseDir(): string {
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  return process.env.CATS_RUNTIME_SESSION_BASE_DIR || (home ? join(home, '.cats-runtime', 'sessions') : '');
+}
+
+function selectHostPathApi(left: string, right: string) {
+  return looksLikeWindowsPath(left) || looksLikeWindowsPath(right)
+    ? pathWin32
+    : pathPosix;
+}
+
+function looksLikeWindowsPath(value: string): boolean {
+  return /^[A-Za-z]:[\\/]/.test(value) || value.includes('\\');
+}
+
+function stripTrailingSeparators(pathValue: string): string {
+  if (!pathValue || pathValue.length <= 1 || /^[A-Za-z]:[\\/]$/.test(pathValue)) {
+    return pathValue;
+  }
+
+  const stripped = pathValue.replace(/[\\/]+$/, '');
+  return stripped || pathValue;
 }
 
 function appendWslenv(existing: string | undefined, name: string): string {

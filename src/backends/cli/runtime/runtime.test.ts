@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildProcessSpawnConfig,
@@ -53,6 +56,14 @@ describe('runtime adapters', () => {
           'import os',
           '',
           'payload = json.loads(base64.b64decode(os.environ["CATS_RUNTIME_WSL_EXEC_B64"]).decode("utf-8"))',
+          'if payload.get("ensureCwd"):',
+          '    os.makedirs(payload["cwd"], exist_ok=True)',
+          'for file in payload.get("tempFiles", []):',
+          '    parent = os.path.dirname(file["path"])',
+          '    if parent:',
+          '        os.makedirs(parent, exist_ok=True)',
+          '    with open(file["path"], "w", encoding="utf-8") as handle:',
+          '        handle.write(file["content"])',
           'os.chdir(payload["cwd"])',
           'argv = [payload["command"], *payload.get("args", [])]',
           'os.execvp(argv[0], argv)',
@@ -193,14 +204,22 @@ describe('runtime adapters', () => {
       [
         'python3 - <<\'PY\'',
         'import base64',
-        'import json',
-        'import os',
-        '',
-        'payload = json.loads(base64.b64decode(os.environ["CATS_RUNTIME_DOCKER_EXEC_B64"]).decode("utf-8"))',
-        'os.environ["PATH"] = "/root/.local/bin:" + os.environ.get("PATH", "")',
-        'os.chdir(payload["cwd"])',
-        'argv = [payload["command"], *payload.get("args", [])]',
-        'os.execvp(argv[0], argv)',
+          'import json',
+          'import os',
+          '',
+          'payload = json.loads(base64.b64decode(os.environ["CATS_RUNTIME_DOCKER_EXEC_B64"]).decode("utf-8"))',
+          'os.environ["PATH"] = "/root/.local/bin:" + os.environ.get("PATH", "")',
+          'if payload.get("ensureCwd"):',
+          '    os.makedirs(payload["cwd"], exist_ok=True)',
+          'for file in payload.get("tempFiles", []):',
+          '    parent = os.path.dirname(file["path"])',
+          '    if parent:',
+          '        os.makedirs(parent, exist_ok=True)',
+          '    with open(file["path"], "w", encoding="utf-8") as handle:',
+          '        handle.write(file["content"])',
+          'os.chdir(payload["cwd"])',
+          'argv = [payload["command"], *payload.get("args", [])]',
+          'os.execvp(argv[0], argv)',
         'PY',
       ].join('\n'),
     ]);
@@ -208,5 +227,130 @@ describe('runtime adapters', () => {
     expect(spawnConfig.env).toEqual({
       CATS_RUNTIME_DOCKER_EXEC_B64: expectedPayload,
     });
+  });
+
+  it('rewrites Auggie instruction files into WSL runtime paths', () => {
+    const promptDir = mkdtempSync(join(tmpdir(), 'cats-runtime-wsl-auggie-'));
+    const promptFile = join(promptDir, 'prompt.txt');
+    writeFileSync(promptFile, 'Review the repo', 'utf8');
+
+    try {
+      const spawnConfig = buildProcessSpawnConfig(
+        {
+          path: 'auggie',
+          runner: 'direct',
+          runtime: {
+            mode: 'wsl',
+            distro: 'Ubuntu',
+          },
+        },
+        'auggie',
+        ['--workspace-root', 'C:\\Users\\kenne\\repo', '--instruction-file', promptFile],
+        'C:\\Users\\kenne\\repo',
+      );
+
+      expect(spawnConfig.env).toEqual({
+        CATS_RUNTIME_WSL_EXEC_B64: Buffer.from(JSON.stringify({
+          cwd: '/mnt/c/Users/kenne/repo',
+          command: 'auggie',
+          args: [
+            '--workspace-root',
+            '/mnt/c/Users/kenne/repo',
+            '--instruction-file',
+            promptFile.replace(/\\/g, '/').replace(/^([A-Za-z]):/, (_, drive) => `/mnt/${drive.toLowerCase()}`),
+          ],
+        }), 'utf8').toString('base64'),
+        WSLENV: process.env.WSLENV
+          ? process.env.WSLENV.includes('CATS_RUNTIME_WSL_EXEC_B64')
+            ? process.env.WSLENV
+            : `${process.env.WSLENV}:CATS_RUNTIME_WSL_EXEC_B64`
+          : 'CATS_RUNTIME_WSL_EXEC_B64',
+      });
+    } finally {
+      rmSync(promptDir, { recursive: true, force: true });
+    }
+  });
+
+  it('maps isolated runtime workspaces into a container-local sessions directory for Docker', () => {
+    const previousSessionBaseDir = process.env.CATS_RUNTIME_SESSION_BASE_DIR;
+    process.env.CATS_RUNTIME_SESSION_BASE_DIR = 'C:\\Users\\sammy\\.cats-runtime\\sessions';
+
+    try {
+      const spawnConfig = buildProcessSpawnConfig(
+        {
+          path: 'auggie',
+          runner: 'direct',
+          runtime: {
+            mode: 'docker',
+            container: 'cats-cli-dev',
+          },
+        },
+        'auggie',
+        ['--workspace-root', 'C:\\Users\\sammy\\.cats-runtime\\sessions\\sess-1'],
+        'C:\\Users\\sammy\\.cats-runtime\\sessions\\sess-1',
+      );
+
+      expect(spawnConfig.env).toEqual({
+        CATS_RUNTIME_DOCKER_EXEC_B64: Buffer.from(JSON.stringify({
+          cwd: '/root/.cats-runtime/sessions/sess-1',
+          command: 'auggie',
+          args: ['--workspace-root', '/root/.cats-runtime/sessions/sess-1'],
+          ensureCwd: true,
+        }), 'utf8').toString('base64'),
+      });
+    } finally {
+      if (previousSessionBaseDir === undefined) {
+        delete process.env.CATS_RUNTIME_SESSION_BASE_DIR;
+      } else {
+        process.env.CATS_RUNTIME_SESSION_BASE_DIR = previousSessionBaseDir;
+      }
+    }
+  });
+
+  it('materializes Auggie instruction files inside the Docker runtime', () => {
+    const promptDir = mkdtempSync(join(tmpdir(), 'cats-runtime-docker-auggie-'));
+    const promptFile = join(promptDir, 'prompt.txt');
+    writeFileSync(promptFile, 'Review the repo', 'utf8');
+
+    try {
+      const spawnConfig = buildProcessSpawnConfig(
+        {
+          path: 'auggie',
+          runner: 'direct',
+          runtime: {
+            mode: 'docker',
+            container: 'cats-cli-dev',
+          },
+        },
+        'auggie',
+        ['--workspace-root', '/workspace/repo', '--instruction-file', promptFile],
+        '/workspace/repo',
+      );
+
+      const payload = JSON.parse(
+        Buffer.from(spawnConfig.env!.CATS_RUNTIME_DOCKER_EXEC_B64, 'base64').toString('utf8'),
+      ) as {
+        cwd: string;
+        command: string;
+        args: string[];
+        ensureCwd?: boolean;
+        tempFiles?: Array<{ path: string; content: string }>;
+      };
+
+      expect(payload.cwd).toBe('/workspace/repo');
+      expect(payload.command).toBe('auggie');
+      expect(payload.args[0]).toBe('--workspace-root');
+      expect(payload.args[1]).toBe('/workspace/repo');
+      expect(payload.args[2]).toBe('--instruction-file');
+      expect(payload.args[3]).toMatch(/^\/tmp\/cats-runtime\/auggie-instruction-.*\.txt$/);
+      expect(payload.tempFiles).toEqual([
+        {
+          path: payload.args[3]!,
+          content: 'Review the repo',
+        },
+      ]);
+    } finally {
+      rmSync(promptDir, { recursive: true, force: true });
+    }
   });
 });

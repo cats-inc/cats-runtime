@@ -221,6 +221,14 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     };
 
     const handleExit = async (code: number | null) => {
+      if (!sawEvent && (error || code !== 0)) {
+        if (!error) {
+          error = this.buildProcessExitError(code);
+        }
+        push(null);
+        return;
+      }
+
       try {
         await this.emitProviderAfterTurnEvents();
       } catch (err) {
