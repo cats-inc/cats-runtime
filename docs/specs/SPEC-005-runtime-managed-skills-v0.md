@@ -61,34 +61,47 @@ platform, MCP tool registry, or scheduler-driven agent behavior model.
 1. The runtime shall treat `skills/` as the canonical source of runtime-managed
    skill packages.
 2. The runtime shall validate that a skill package is structurally usable before
-   it can be attached to a session.
-3. Session create and message flows shall be able to carry an optional explicit
+   it can be attached to a session. The minimum validation bar for v0 is:
+   - the skill lives under `skills/<name>/`
+   - the package contains a `SKILL.md`
+   - `SKILL.md` has parseable YAML frontmatter
+   - frontmatter `name` exists and matches the directory name
+   - frontmatter `description` exists
+   - the markdown instruction body is not empty
+3. The runtime shall reject malformed skill packages as unavailable for runtime
+   attachment instead of attempting best-effort execution from broken metadata.
+4. Session create and message flows shall be able to carry an optional explicit
    list of requested skill names.
-4. The runtime shall resolve requested skill names into a normalized
+5. The runtime shall resolve requested skill names into a normalized
    `ResolvedSkillSet` before backend execution begins.
-5. The runtime shall persist requested and resolved skill metadata in session
+6. The runtime shall persist requested and resolved skill metadata in session
    state so the applied skill context remains visible during history and resume
    flows.
-6. The runtime shall expose a backend-neutral adapter contract for skill
+7. The runtime shall expose a backend-neutral adapter contract for skill
    delivery.
-7. The first slice shall support at least these adapter delivery modes:
+8. The first slice shall support at least these adapter delivery modes:
    - `filesystem`: the runtime materializes a skill bundle for targets that
      discover skills from directories or runtime homes
    - `instructions`: the runtime provides compiled instruction content when
      native filesystem discovery is unavailable
    - `none`: the adapter reports that native skill delivery is unsupported
-8. Explicitly requested unknown skills shall produce a client error instead of
+9. When instruction-based delivery is used, the runtime shall merge instruction
+   sources in this order: resolved skill instructions first, session-level
+   explicit instructions second, and turn-level explicit instructions last.
+   More specific caller-provided instructions should remain later in the merged
+   text so they can narrow or override broader skill guidance.
+10. Explicitly requested unknown skills shall produce a client error instead of
    being silently ignored.
-9. When a target cannot honor the preferred delivery mode, the runtime may
+11. When a target cannot honor the preferred delivery mode, the runtime may
    downgrade to another supported mode only if it can surface a warning in
    session metadata or API responses.
-10. Supporting files inside a skill package shall be treated as runtime-managed
+12. Supporting files inside a skill package shall be treated as runtime-managed
     resources, not automatically executed code.
-11. The first slice should prioritize CLI runtimes with known local skill
+13. The first slice should prioritize CLI runtimes with known local skill
     discovery conventions, especially `codex` and `pi`.
-12. The first slice shall not require a standalone plugin SDK, MCP facade, or
+14. The first slice shall not require a standalone plugin SDK, MCP facade, or
     scheduler concept.
-13. The first slice may leave `skillProfile` as a higher-level product concern
+15. The first slice may leave `skillProfile` as a higher-level product concern
     until the explicit-skill contract is proven, but it should not prevent a
     future runtime-owned profile-to-skill mapping layer.
 
@@ -172,6 +185,37 @@ Responsibilities:
 - adapters: consume the normalized resolved skill payload without rescanning the
   repo
 
+### Validation Criteria
+
+Runtime-managed skills should use the existing Agent Skills layout, but v0 only
+needs a narrow structural validator rather than a full semantic linter.
+
+The validator should confirm:
+
+- the package exists under `skills/<name>/`
+- `SKILL.md` exists at the package root
+- YAML frontmatter is parseable
+- frontmatter `name` matches the directory name
+- frontmatter `description` is present
+- the markdown body contains non-empty instructions after frontmatter removal
+
+The validator does not need to prove that every referenced file, script, or
+example is semantically correct. Supporting assets may be validated more deeply
+later if v0 reveals real failure modes.
+
+### Instruction Merge Guidance
+
+When an adapter uses `instructions` delivery, the runtime should compile one
+merged instruction payload from three layers:
+
+1. resolved skill instructions
+2. session-level explicit instructions
+3. turn-level explicit instructions
+
+This ordering keeps broader skill guidance at the base while preserving caller
+intent as the most local and override-capable layer. Skill-derived instructions
+should complement, not silently replace, the existing `instructions` contract.
+
 ### Delivery Strategy Guidance
 
 The first slice should prefer:
@@ -202,6 +246,9 @@ supports local skill directories.
       should v0 stay session-contract only?
 - [ ] Which non-CLI backends, if any, deserve a meaningful `instructions`
       delivery mode in the first slice?
+- [ ] Should resolved skill state carry an explicit skill version or content
+      fingerprint so cache keys, session resume, and artifact provenance can
+      distinguish skill revisions?
 - [ ] Should callers eventually be able to require strict skill delivery
       instead of accepting best-effort downgrade warnings?
 

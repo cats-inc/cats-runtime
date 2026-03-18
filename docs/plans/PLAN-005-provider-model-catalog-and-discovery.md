@@ -123,6 +123,7 @@ semantics.
       behavior is exercised
 - [ ] Expand dynamic discovery to more CLI or API-backed providers only when
       they have clear, stable listing semantics
+      Candidates to evaluate first: `pi`, `opencode`, and `cursor`
 
 **Deliverables**: a bounded follow-on list instead of scope creep in the first
 slice.
