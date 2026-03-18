@@ -39,6 +39,9 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
 | [008-runtime-owned-provider-model-catalog](./008-runtime-owned-provider-model-catalog.md) | Keep provider model catalog discovery runtime-owned | Accepted | 2026-03-19 |
+| [007-docker-runtime-adapter](./007-docker-runtime-adapter.md) | Docker runtime adapter | Accepted | 2026-03-17 |
+| [009-keep-cats-runtime-separately-packageable-with-app-managed-local-startup](./009-keep-cats-runtime-separately-packageable-with-app-managed-local-startup.md) | Keep `cats-runtime` separately packageable with app-managed local startup | Proposed | 2026-03-19 |
+| [007-docker-runtime-adapter](./007-docker-runtime-adapter.md) | Docker runtime adapter | Accepted | 2026-03-17 |
 | [006-agent-backend-and-shared-runtime-contracts](./006-agent-backend-and-shared-runtime-contracts.md) | Introduce an agent backend and shared runtime contracts | Accepted | 2026-03-17 |
 | [005-backend-neutral-runtime-and-api-backend](./005-backend-neutral-runtime-and-api-backend.md) | Introduce a backend-neutral runtime facade for CLI and API backends | Accepted | 2026-03-16 |
 | [004-file-backed-paths-are-host-resolved](./004-file-backed-paths-are-host-resolved.md) | Resolve file-backed provider paths on the host | Accepted | 2026-03-16 |
@@ -55,5 +58,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 3. **Update the index**: Add the new ADR to the table above
 
 ---
+
+*Last updated: 2026-03-19*
 
 *See also: [AGENTS.md](../../../AGENTS.md) for decision-making protocols*

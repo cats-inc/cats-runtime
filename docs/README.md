@@ -52,7 +52,7 @@ Add your project-specific automation scripts here.
 | [a2a/](./a2a/) | ?? | A2A agent card and task templates |
 | [specs/](./specs/) | ? Active | Feature specifications, including WSL discovery and agent backend planning |
 | [plans/](./plans/) | ? Active | Implementation plans, including WSL discovery, API backend, and agent backend rollout |
-| [decisions/](./decisions/) | ? Active | Architecture Decision Records |
+| [decisions/](./decisions/) | ? Active | Architecture Decision Records, including the proposed app-managed self-hosted runtime packaging direction |
 
 **Legend**: ? Complete | ?? Template (needs content) | ?? Directory
 
