@@ -18,6 +18,21 @@ npm install
 npm test
 ```
 
+For a package-style local run:
+
+```powershell
+npm run build
+node dist/index.js
+```
+
+The package is now structured for executable npm distribution:
+
+- `npm install -g cats-runtime` then `cats-runtime`
+- `npx cats-runtime` once the package is published
+
+Those packaged flows still rely on the same config files or environment
+overrides as the source checkout.
+
 ## Environment Variables
 
 Keep `.env` for runtime-wide values and secrets:
@@ -222,6 +237,16 @@ npm run dev
 Then open `http://127.0.0.1:3110/` for the embedded dashboard, or call the HTTP
 API directly.
 
+### Built executable start
+
+```powershell
+npm run build
+node dist/index.js
+```
+
+This is the same entrypoint that the npm `bin` command uses for package-style
+execution.
+
 By default, runtime metadata persists under `~/.cats-runtime/data` and runtime
 session workspaces/transcripts persist under `~/.cats-runtime/sessions`. Override
 either path with `CATS_RUNTIME_DATA_DIR` or `CATS_RUNTIME_SESSION_BASE_DIR` if
@@ -317,6 +342,14 @@ Remove setup:
 npm run build
 npm test
 Invoke-WebRequest http://127.0.0.1:3110/health -UseBasicParsing
+```
+
+To inspect the publish payload locally without using the global npm cache:
+
+```powershell
+$env:npm_config_cache = "$PWD/.npm-cache"
+npm pack --dry-run
+Remove-Item -Recurse -Force .npm-cache
 ```
 
 ## Common Issues

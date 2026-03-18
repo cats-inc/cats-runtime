@@ -5,10 +5,28 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "cats-runtime": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "public",
+    "config/providers.yaml.example",
+    ".env.example",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
+    "prepack": "npm run build",
     "test": "npm run build && vitest run --pool=threads --poolOptions.threads.singleThread",
     "test:watch": "vitest --pool=threads --poolOptions.threads.singleThread",
     "typecheck": "tsc --noEmit -p tsconfig.json"

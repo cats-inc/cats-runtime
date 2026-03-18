@@ -52,6 +52,24 @@ npm run dev
 
 Default URL: `http://127.0.0.1:3110`
 
+## Package-Ready Startup
+
+`cats-runtime` is now shaped to publish as an executable npm package:
+
+- `npm install -g cats-runtime` then `cats-runtime`
+- `npx cats-runtime` once the package is published
+
+The executable package starts the same runtime entrypoint as `npm start` and
+still expects `.env` plus `config/providers.yaml` or equivalent environment
+overrides.
+
+For packaged-style local verification before publish:
+
+```powershell
+npm run build
+node dist/index.js
+```
+
 Runtime state defaults under the user's home directory:
 
 - registry metadata: `~/.cats-runtime/data`

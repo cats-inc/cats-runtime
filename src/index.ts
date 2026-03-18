@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { pathToFileURL } from 'node:url';
 
 import { loadDotEnv } from './core/dotenv.js';

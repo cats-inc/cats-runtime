@@ -1,91 +1,136 @@
 # Deployment Guide
 
-> Deployment procedures and infrastructure documentation.
+> Deployment and startup guidance for `cats-runtime` in standalone and
+> app-managed local modes.
 
 ## Environments
 
 | Environment | URL | Purpose |
 |-------------|-----|---------|
-| Development | localhost | Local development |
-| Staging | | Pre-production testing |
-| Production | | Live environment |
+| Development | `http://127.0.0.1:3110` | Local development with source checkout |
+| Built local | `http://127.0.0.1:3110` | Production-style local run from built assets |
+| npm package (planned publish path) | `http://127.0.0.1:3110` by default | Executable package run via `cats-runtime` / `npx cats-runtime` |
+| App-managed local | Host-assigned | Started and supervised by a local product app such as `cats-inc` |
 
-## Deployment Methods
+## Deployment Modes
 
-### Manual Deployment
+### 1. Source checkout
 
-```bash
-# Step 1: Build
-(build commands)
-
-# Step 2: Deploy
-(deployment commands)
+```powershell
+copy .env.example .env
+copy config\providers.yaml.example config\providers.yaml
+npm install
+npm run dev
 ```
 
-### Automated Deployment (CI/CD)
+### 2. Built standalone run
 
-- **Platform**: (GitHub Actions / GitLab CI / etc.)
-- **Trigger**: Push to `main` branch
-- **Pipeline**: (Describe pipeline stages)
-
-## Infrastructure
-
-### Requirements
-
-- (List infrastructure requirements)
-
-### Architecture
-
+```powershell
+npm run build
+node dist/index.js
 ```
-┌─────────────┐
-│   Client    │
-└──────┬──────┘
-       │
-┌──────▼──────┐
-│ Load Balancer│
-└──────┬──────┘
-       │
-┌──────▼──────┐
-│   Server    │
-└──────┬──────┘
-       │
-┌──────▼──────┐
-│  Database   │
-└─────────────┘
+
+### 3. Executable npm package
+
+Once published, the intended package flow is:
+
+```powershell
+npm install -g cats-runtime
+cats-runtime
 ```
+
+or:
+
+```powershell
+npx cats-runtime
+```
+
+The executable package uses the same runtime entrypoint and still expects
+config via `.env`, `config/providers.yaml`, or explicit environment variables.
+
+### 4. App-managed local startup
+
+`cats-runtime` may also be started by a local supervisor such as `cats-inc` or
+an Electron host. In that mode:
+
+- the host process owns process supervision
+- readiness should be checked over the runtime HTTP boundary
+- the runtime remains a separate process, not an in-process product import
 
 ## Configuration
 
-### Environment Variables
+### Required runtime inputs
+
+- Node.js 22+
+- `.env` or equivalent environment variables
+- `config/providers.yaml` or `CATS_RUNTIME_CONFIG_PATH` pointing to an
+  equivalent provider-topology file
+- any provider-specific credentials or local CLI installs needed by the chosen
+  targets
+
+### Important environment variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `APP_ENV` | Yes | Environment name |
-| `DATABASE_URL` | Yes | Database connection string |
+| `CATS_RUNTIME_HOST` | No | Bind host, defaults to `127.0.0.1` |
+| `CATS_RUNTIME_PORT` | No | Bind port, defaults to `3110` |
+| `CATS_RUNTIME_API_KEY` | No | Optional bearer token for protected routes |
+| `CATS_RUNTIME_CONFIG_PATH` | No | Override provider-topology config path |
+| `CATS_RUNTIME_DATA_DIR` | No | Override runtime metadata directory |
+| `CATS_RUNTIME_SESSION_BASE_DIR` | No | Override session workspace/transcript directory |
 
-### Secrets Management
+### Secrets management
 
-- (Describe how secrets are managed)
+- Keep `.env` local and uncommitted
+- Keep API keys and auth tokens in environment variables referenced by
+  `config/providers.yaml`
+- Do not hardcode credentials into committed config files
 
-## Rollback Procedure
+## Operational Notes
 
-1. (Step 1)
-2. (Step 2)
-3. (Step 3)
+- **Health / readiness**: `GET /health`
+- **Dashboard**: `GET /`
+- **Logs**: stdout / stderr from the runtime process
+- **State paths**:
+  - metadata defaults to `~/.cats-runtime/data`
+  - session workspaces/transcripts default to `~/.cats-runtime/sessions`
 
-## Monitoring
+## Verification
 
-- **Logs**: (Where to find logs)
-- **Metrics**: (Monitoring dashboard URL)
-- **Alerts**: (Alert configuration)
+```powershell
+npm run build
+npm test
+Invoke-WebRequest http://127.0.0.1:3110/health -UseBasicParsing
+```
+
+To verify publish contents locally:
+
+```powershell
+$env:npm_config_cache = "$PWD/.npm-cache"
+npm pack --dry-run
+Remove-Item -Recurse -Force .npm-cache
+```
 
 ## Troubleshooting
 
-### Issue 1: [Problem]
+### Issue 1: Port already in use
 
-**Symptoms**: (What you observe)
-**Solution**: (How to fix)
+**Symptoms**: startup fails because `3110` or the configured port is occupied  
+**Solution**: set `CATS_RUNTIME_PORT` to an unused port, or stop the existing
+process that owns the port.
+
+### Issue 2: Package starts but providers are unavailable
+
+**Symptoms**: health is up, but provider operations fail  
+**Solution**: verify `.env`, `config/providers.yaml`, and any required local
+CLI/API credentials for the configured targets.
+
+### Issue 3: Dashboard fails in packaged mode
+
+**Symptoms**: `GET /` cannot find the embedded dashboard  
+**Solution**: confirm the published package includes both `dist/` and `public/`
+assets. Use `npm pack --dry-run` to inspect the payload.
 
 ---
 
-*Last updated: YYYY-MM-DD*
+*Last updated: 2026-03-19*
