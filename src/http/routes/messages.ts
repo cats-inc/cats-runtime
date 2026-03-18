@@ -15,6 +15,20 @@ function appendHistory(sourcePath: string, entry: Record<string, unknown>): void
   appendFileSync(sourcePath, JSON.stringify(entry) + '\n');
 }
 
+function appendUserTurnHistory(
+  sourcePath: string,
+  turnInput: TurnInput,
+): void {
+  appendHistory(sourcePath, {
+    type: 'user',
+    message: { content: turnInput.message },
+    instructions: turnInput.instructions,
+    context: turnInput.context,
+    outputDir: turnInput.outputDir,
+    timestamp: new Date().toISOString(),
+  });
+}
+
 function getOrCreateSourcePath(
   session: SessionInfo,
   registry: SessionRegistry,
@@ -114,15 +128,38 @@ function recoverPiUnknownSession(
 
   getRuntimeSessionManager(ctx).kill(id);
   ctx.registry.clearProviderResumeState(id, { clearProviderSourcePath: true });
-  getRuntimeSessionManager(ctx).spawn(id, session.providerName, {
-    cwd: session.cwd,
-    workspaceMode: session.workspaceMode,
-    model: session.model,
-    permissionMode: session.permissionMode,
-    allowedTools: session.allowedTools,
-  }, session.providerInstanceId, 'cli');
+  try {
+    getRuntimeSessionManager(ctx).spawn(id, session.providerName, {
+      cwd: session.cwd,
+      workspaceMode: session.workspaceMode,
+      model: session.model,
+      permissionMode: session.permissionMode,
+      allowedTools: session.allowedTools,
+    }, session.providerInstanceId, 'cli');
+  } catch {
+    return false;
+  }
 
   return true;
+}
+
+function ensureRecoveredPiHistorySourcePath(
+  ctx: AppContext,
+  id: string,
+  turnInput: TurnInput,
+  state: { sourcePath: string | null },
+): void {
+  if (state.sourcePath) {
+    return;
+  }
+
+  const updatedSession = ctx.registry.get(id);
+  if (!updatedSession) {
+    return;
+  }
+
+  state.sourcePath = getOrCreateSourcePath(updatedSession, ctx.registry, ctx.config);
+  appendUserTurnHistory(state.sourcePath, turnInput);
 }
 
 /** POST /sessions/:id/messages — send a message, stream response as SSE */
@@ -195,18 +232,13 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
 
     // Skip runtime-managed synthetic history for sessions with a provider-native transcript
     // (e.g. discovered Claude sessions resumed with --resume write their own)
-    let sourcePath = session.providerSourcePath
+    const historyState = {
+      sourcePath: session.providerSourcePath
       ? null
-      : getOrCreateSourcePath(session, ctx.registry, ctx.config);
-    if (sourcePath) {
-      appendHistory(sourcePath, {
-        type: 'user',
-        message: { content: message },
-        instructions: turnInput.instructions,
-        context: turnInput.context,
-        outputDir: turnInput.outputDir,
-        timestamp: new Date().toISOString(),
-      });
+      : getOrCreateSourcePath(session, ctx.registry, ctx.config),
+    };
+    if (historyState.sourcePath) {
+      appendUserTurnHistory(historyState.sourcePath, turnInput);
     }
 
     const stream = new ReadableStream({
@@ -215,20 +247,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
         let completed = false;
         try {
           for await (const event of streamTurnWithPiRecovery(ctx, id, turnInput, () => {
-            if (!sourcePath) {
-              const updatedSession = ctx.registry.get(id);
-              if (updatedSession) {
-                sourcePath = getOrCreateSourcePath(updatedSession, ctx.registry, ctx.config);
-                appendHistory(sourcePath, {
-                  type: 'user',
-                  message: { content: message },
-                  instructions: turnInput.instructions,
-                  context: turnInput.context,
-                  outputDir: turnInput.outputDir,
-                  timestamp: new Date().toISOString(),
-                });
-              }
-            }
+            ensureRecoveredPiHistorySourcePath(ctx, id, turnInput, historyState);
           })) {
             const line = JSON.stringify(event) + '\n';
             controller.enqueue(new TextEncoder().encode(line));
@@ -250,9 +269,9 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
               assistantText += event.text ?? '';
             }
 
-            if (event.type === 'tool_use' && sourcePath) {
-              assistantText = flushAssistantText(sourcePath, assistantText);
-              appendHistory(sourcePath, {
+            if (event.type === 'tool_use' && historyState.sourcePath) {
+              assistantText = flushAssistantText(historyState.sourcePath, assistantText);
+              appendHistory(historyState.sourcePath, {
                 type: 'tool_use',
                 toolId: event.toolId,
                 toolName: event.toolName,
@@ -261,8 +280,8 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
               });
             }
 
-            if (event.type === 'tool_result' && sourcePath) {
-              appendHistory(sourcePath, {
+            if (event.type === 'tool_result' && historyState.sourcePath) {
+              appendHistory(historyState.sourcePath, {
                 type: 'tool_result',
                 toolId: event.toolId,
                 toolName: event.toolName,
@@ -274,7 +293,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
 
             if (event.type === 'result') {
               completed = true;
-              assistantText = flushAssistantText(sourcePath, assistantText);
+              assistantText = flushAssistantText(historyState.sourcePath, assistantText);
               ctx.registry.recordMessage(
                 id,
                 event.usage?.inputTokens,
@@ -285,19 +304,19 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
 
             if (event.type === 'error') {
               completed = true;
-              assistantText = flushAssistantText(sourcePath, assistantText);
+              assistantText = flushAssistantText(historyState.sourcePath, assistantText);
               restoreReadyIfSessionStillInteractive(ctx.registry, id);
             }
           }
 
           if (!completed) {
-            assistantText = flushAssistantText(sourcePath, assistantText);
+            assistantText = flushAssistantText(historyState.sourcePath, assistantText);
             ctx.registry.recordMessage(id);
             restoreReadyIfSessionStillInteractive(ctx.registry, id);
           }
         } catch (err) {
           const errorEvent = { type: 'error', text: String(err) };
-          assistantText = flushAssistantText(sourcePath, assistantText);
+          assistantText = flushAssistantText(historyState.sourcePath, assistantText);
           controller.enqueue(
             new TextEncoder().encode(JSON.stringify(errorEvent) + '\n'),
           );
@@ -318,18 +337,13 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
   }
 
   // Default: SSE response
-  let sseSourcePath = session.providerSourcePath
+  const sseHistoryState = {
+    sourcePath: session.providerSourcePath
     ? null
-    : getOrCreateSourcePath(session, ctx.registry, ctx.config);
-  if (sseSourcePath) {
-    appendHistory(sseSourcePath, {
-      type: 'user',
-      message: { content: message },
-      instructions: turnInput.instructions,
-      context: turnInput.context,
-      outputDir: turnInput.outputDir,
-      timestamp: new Date().toISOString(),
-    });
+    : getOrCreateSourcePath(session, ctx.registry, ctx.config),
+  };
+  if (sseHistoryState.sourcePath) {
+    appendUserTurnHistory(sseHistoryState.sourcePath, turnInput);
   }
 
   return streamSSE(c, async (stream) => {
@@ -337,20 +351,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     let completed = false;
     try {
       for await (const event of streamTurnWithPiRecovery(ctx, id, turnInput, () => {
-        if (!sseSourcePath) {
-          const updatedSession = ctx.registry.get(id);
-          if (updatedSession) {
-            sseSourcePath = getOrCreateSourcePath(updatedSession, ctx.registry, ctx.config);
-            appendHistory(sseSourcePath, {
-              type: 'user',
-              message: { content: message },
-              instructions: turnInput.instructions,
-              context: turnInput.context,
-              outputDir: turnInput.outputDir,
-              timestamp: new Date().toISOString(),
-            });
-          }
-        }
+        ensureRecoveredPiHistorySourcePath(ctx, id, turnInput, sseHistoryState);
       })) {
         await stream.writeSSE({
           data: JSON.stringify(event),
@@ -374,9 +375,9 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
           assistantText += event.text ?? '';
         }
 
-        if (event.type === 'tool_use' && sseSourcePath) {
-          assistantText = flushAssistantText(sseSourcePath, assistantText);
-          appendHistory(sseSourcePath, {
+        if (event.type === 'tool_use' && sseHistoryState.sourcePath) {
+          assistantText = flushAssistantText(sseHistoryState.sourcePath, assistantText);
+          appendHistory(sseHistoryState.sourcePath, {
             type: 'tool_use',
             toolId: event.toolId,
             toolName: event.toolName,
@@ -385,8 +386,8 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
           });
         }
 
-        if (event.type === 'tool_result' && sseSourcePath) {
-          appendHistory(sseSourcePath, {
+        if (event.type === 'tool_result' && sseHistoryState.sourcePath) {
+          appendHistory(sseHistoryState.sourcePath, {
             type: 'tool_result',
             toolId: event.toolId,
             toolName: event.toolName,
@@ -398,7 +399,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
 
         if (event.type === 'result') {
           completed = true;
-          assistantText = flushAssistantText(sseSourcePath, assistantText);
+          assistantText = flushAssistantText(sseHistoryState.sourcePath, assistantText);
           ctx.registry.recordMessage(
             id,
             event.usage?.inputTokens,
@@ -409,18 +410,18 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
 
         if (event.type === 'error') {
           completed = true;
-          assistantText = flushAssistantText(sseSourcePath, assistantText);
+          assistantText = flushAssistantText(sseHistoryState.sourcePath, assistantText);
           restoreReadyIfSessionStillInteractive(ctx.registry, id);
         }
       }
 
       if (!completed) {
-        assistantText = flushAssistantText(sseSourcePath, assistantText);
+        assistantText = flushAssistantText(sseHistoryState.sourcePath, assistantText);
         ctx.registry.recordMessage(id);
         restoreReadyIfSessionStillInteractive(ctx.registry, id);
       }
     } catch (err) {
-      assistantText = flushAssistantText(sseSourcePath, assistantText);
+      assistantText = flushAssistantText(sseHistoryState.sourcePath, assistantText);
       await stream.writeSSE({
         data: JSON.stringify({ type: 'error', text: String(err) }),
         event: 'error',
