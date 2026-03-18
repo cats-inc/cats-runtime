@@ -119,8 +119,7 @@ describe('runtime server', () => {
       const response = await runtime.app.request('/');
       expect(response.status).toBe(200);
       const html = await response.text();
-      expect(html).toContain('cats-runtime Dashboard');
-      expect(html).toContain('cats-runtime');
+      expect(html).toContain('Cats Runtime Dashboard');
       expect(html.indexOf('<option value="claude">claude</option>'))
         .toBeLessThan(html.indexOf('<option value="codex">codex</option>'));
       expect(html.indexOf('<option value="codex">codex</option>'))
