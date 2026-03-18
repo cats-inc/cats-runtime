@@ -469,6 +469,41 @@ providers:
     }
   });
 
+  it('parses Pi instructions_file from providers.yaml instances', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const configPath = join(tempDir, 'providers.yaml');
+    writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+providers:
+  pi:
+    instances:
+      default:
+        environment: native
+        command: pi
+        runner: auto
+        sessions_dir: /native/pi/sessions
+        instructions_file: /native/pi/system.md
+`.trimStart());
+
+    try {
+      const config = loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_CONFIG_PATH: configPath,
+      });
+
+      expect(resolveProviderInstance(config, 'pi', 'default')).toMatchObject({
+        piSessionsDir: '/native/pi/sessions',
+        piInstructionsFile: '/native/pi/system.md',
+      });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('rejects WSL environments without a distro in providers.yaml', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
     const configPath = join(tempDir, 'providers.yaml');

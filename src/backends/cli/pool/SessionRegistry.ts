@@ -271,6 +271,23 @@ export class SessionRegistry {
     return true;
   }
 
+  clearProviderResumeState(
+    id: string,
+    options: {
+      clearProviderSourcePath?: boolean;
+    } = {},
+  ): boolean {
+    const session = this.sessions.get(id);
+    if (!session) return false;
+    session.providerSessionId = undefined;
+    if (options.clearProviderSourcePath) {
+      session.providerSourcePath = undefined;
+    }
+    session.updatedAt = new Date().toISOString();
+    this.scheduleSave();
+    return true;
+  }
+
   setProviderState(id: string, providerState?: SessionProviderState): boolean {
     const session = this.sessions.get(id);
     if (!session) return false;
@@ -660,7 +677,7 @@ export class SessionRegistry {
     // (prevents /history from duplicating turns from both sources)
     const hasRuntimeHistory = session.sourcePath && this.sessionBaseDir
       && session.sourcePath.startsWith(this.sessionBaseDir);
-    if (data.sourcePath && !hasRuntimeHistory) {
+    if (data.sourcePath && (!hasRuntimeHistory || session.providerName === 'pi')) {
       session.providerSourcePath = data.sourcePath;
     }
     if (data.sourcePath && !session.sourcePath) session.sourcePath = data.sourcePath;

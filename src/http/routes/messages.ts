@@ -3,11 +3,12 @@ import { join, dirname } from 'node:path';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { getRuntimeSessionManager, type AppContext } from '../app.js';
-import { formatSSE } from '../streaming.js';
 import type { SessionInfo, SessionInvocationContext, TurnInput } from '../../backends/cli/pool/types.js';
 import type { SessionRegistry } from '../../backends/cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig } from '../../backends/cli/config.js';
+import type { StreamEvent } from '../../core/types.js';
 import { parseInvocationContext, parseOptionalString } from '../parsing.js';
+import { isPiUnknownSessionError } from '../../backends/cli/pi/resume.js';
 
 function appendHistory(sourcePath: string, entry: Record<string, unknown>): void {
   mkdirSync(dirname(sourcePath), { recursive: true });
@@ -57,6 +58,71 @@ function restoreReadyIfSessionStillInteractive(
   if (!session) return;
   if (session.status === 'closing' || session.status === 'closed') return;
   registry.updateStatus(id, 'ready');
+}
+
+async function* streamTurnWithPiRecovery(
+  ctx: AppContext,
+  id: string,
+  turnInput: TurnInput,
+  onRecovered?: () => void,
+): AsyncGenerator<StreamEvent> {
+  let recovered = false;
+
+  while (true) {
+    const worker = getRuntimeSessionManager(ctx).get(id);
+    if (!worker) {
+      throw new Error('No active worker. Resume the session first.');
+    }
+    if (!worker.active) {
+      ctx.registry.updateStatus(id, 'closed');
+      throw new Error('Worker process has exited');
+    }
+
+    let sawEvent = false;
+
+    try {
+      for await (const event of worker.streamMessage(turnInput)) {
+        sawEvent = true;
+        yield event;
+      }
+      return;
+    } catch (err) {
+      if (recovered || sawEvent || !recoverPiUnknownSession(ctx, id, err)) {
+        throw err;
+      }
+
+      recovered = true;
+      onRecovered?.();
+    }
+  }
+}
+
+function recoverPiUnknownSession(
+  ctx: AppContext,
+  id: string,
+  error: unknown,
+): boolean {
+  const session = ctx.registry.get(id);
+  if (
+    !session
+    || session.providerName !== 'pi'
+    || session.providerBackend !== 'cli'
+    || !isPiUnknownSessionError(error)
+  ) {
+    return false;
+  }
+
+  getRuntimeSessionManager(ctx).kill(id);
+  ctx.registry.clearProviderResumeState(id, { clearProviderSourcePath: true });
+  getRuntimeSessionManager(ctx).spawn(id, session.providerName, {
+    cwd: session.cwd,
+    workspaceMode: session.workspaceMode,
+    model: session.model,
+    permissionMode: session.permissionMode,
+    allowedTools: session.allowedTools,
+  }, session.providerInstanceId, 'cli');
+
+  return true;
 }
 
 /** POST /sessions/:id/messages — send a message, stream response as SSE */
@@ -129,7 +195,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
 
     // Skip runtime-managed synthetic history for sessions with a provider-native transcript
     // (e.g. discovered Claude sessions resumed with --resume write their own)
-    const sourcePath = session.providerSourcePath
+    let sourcePath = session.providerSourcePath
       ? null
       : getOrCreateSourcePath(session, ctx.registry, ctx.config);
     if (sourcePath) {
@@ -148,7 +214,22 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
         let assistantText = '';
         let completed = false;
         try {
-          for await (const event of worker.streamMessage(turnInput)) {
+          for await (const event of streamTurnWithPiRecovery(ctx, id, turnInput, () => {
+            if (!sourcePath) {
+              const updatedSession = ctx.registry.get(id);
+              if (updatedSession) {
+                sourcePath = getOrCreateSourcePath(updatedSession, ctx.registry, ctx.config);
+                appendHistory(sourcePath, {
+                  type: 'user',
+                  message: { content: message },
+                  instructions: turnInput.instructions,
+                  context: turnInput.context,
+                  outputDir: turnInput.outputDir,
+                  timestamp: new Date().toISOString(),
+                });
+              }
+            }
+          })) {
             const line = JSON.stringify(event) + '\n';
             controller.enqueue(new TextEncoder().encode(line));
 
@@ -237,7 +318,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
   }
 
   // Default: SSE response
-  const sseSourcePath = session.providerSourcePath
+  let sseSourcePath = session.providerSourcePath
     ? null
     : getOrCreateSourcePath(session, ctx.registry, ctx.config);
   if (sseSourcePath) {
@@ -255,7 +336,22 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     let assistantText = '';
     let completed = false;
     try {
-      for await (const event of worker.streamMessage(turnInput)) {
+      for await (const event of streamTurnWithPiRecovery(ctx, id, turnInput, () => {
+        if (!sseSourcePath) {
+          const updatedSession = ctx.registry.get(id);
+          if (updatedSession) {
+            sseSourcePath = getOrCreateSourcePath(updatedSession, ctx.registry, ctx.config);
+            appendHistory(sseSourcePath, {
+              type: 'user',
+              message: { content: message },
+              instructions: turnInput.instructions,
+              context: turnInput.context,
+              outputDir: turnInput.outputDir,
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }
+      })) {
         await stream.writeSSE({
           data: JSON.stringify(event),
           event: event.type,

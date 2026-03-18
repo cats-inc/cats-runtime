@@ -260,16 +260,18 @@ What exists:
 
 - `provider/model` parsing
 - `--provider` / `--model` spawn translation
-- `--session` resume argument
+- path-based `--session` resume using discovered Pi session files
 - Pi JSONL stream parsing
 - Pi session discovery
+- Pi resume-path ownership/runtime validation
+- stale `unknown session` fallback to one fresh retry
+- optional per-instance `instructions_file` layering via `--append-system-prompt`
 
 What is still missing relative to the recorded Paperclip comparison:
 
 - `pi --list-models` support
-- explicit session-file ownership and session-path metadata
-- unknown-session fallback to fresh session creation
-- optional instructions-file layering
+- richer Pi-native transcript/history surfacing
+- stronger cwd-compatibility semantics than the current stored-cwd/session-path validation
 - explicit runtime-managed skill installation model
 
 Not all of these should necessarily be ported, but they are still genuine depth
@@ -471,7 +473,7 @@ defensible order is:
 
 1. Provider health/probe/model discovery control plane
 2. Agent cancel/close/delete semantics with real remote cleanup
-3. Pi session-depth improvements and generic adapter-environment validation
+3. Pi model discovery and remaining integration-depth follow-ons
 4. Richer agent observability and model/service surfacing
 5. Shared local tool runtime expansion
 

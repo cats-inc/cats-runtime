@@ -32,6 +32,7 @@ import {
   getKiroNative,
   getOpencodeNative,
 } from '../providerServices.js';
+import { resolvePiResumeTarget } from '../../backends/cli/pi/resume.js';
 import {
   getProviderDefaultTarget,
   listConfiguredProviders,
@@ -1048,6 +1049,44 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         resumeSessionId: session.providerSessionId,
         permissionMode: session.permissionMode,
         allowedTools: session.allowedTools,
+      }, session.providerInstanceId, 'cli');
+      ctx.registry.updateStatus(id, 'ready');
+    } catch (err) {
+      return c.json({ error: `Failed to resume: ${err}` }, 500);
+    }
+
+    return c.json(serializeSession(ctx, ctx.registry.get(id) ?? session));
+  }
+
+  if (session.providerName === 'pi') {
+    const body = await c.req.json<{
+      permissionMode?: 'skip' | 'whitelist' | 'default';
+      allowedTools?: string[];
+    }>().catch(() => ({}));
+
+    let resumeTarget;
+    try {
+      resumeTarget = resolvePiResumeTarget(ctx.config, session);
+    } catch (err) {
+      return c.json({
+        error: err instanceof Error ? err.message : String(err),
+      }, 409);
+    }
+
+    let permissionMode = (body as { permissionMode?: 'skip' | 'whitelist' | 'default' })
+      .permissionMode ?? session.permissionMode ?? 'skip';
+    if (session.workspaceMode === 'read_only') {
+      permissionMode = 'default';
+    }
+
+    try {
+      runtime.spawn(id, session.providerName, {
+        cwd: session.cwd,
+        workspaceMode: session.workspaceMode,
+        model: session.model,
+        resumeSourcePath: resumeTarget.runtimeSourcePath,
+        permissionMode,
+        allowedTools: (body as { allowedTools?: string[] }).allowedTools ?? session.allowedTools,
       }, session.providerInstanceId, 'cli');
       ctx.registry.updateStatus(id, 'ready');
     } catch (err) {

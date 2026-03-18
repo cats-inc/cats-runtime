@@ -153,11 +153,14 @@ adapter end to end through the existing HTTP surface.
 | Build OpenClaw as the first `src/backends/agent` adapter | [x] | `AgentBackendManager` and `openclaw_gateway` adapter now create, stream, resume, reuse, and persist agent-backed sessions |
 | Validate the contract with a second target such as an Agent SDK adapter | [x] | `agent_sdk_bridge` now validates the same contract against an external Agent SDK gateway |
 | Cover agent backend flows with automated tests | [x] | Config, route, OpenClaw, and Agent SDK bridge integration behavior are covered by Vitest |
+| Land the first Pi session-depth/runtime-validation slice on the CLI track | [x] | Pi now resumes via discovered session-file paths, validates resume-path ownership/runtime reachability, retries stale `unknown session` turns once fresh, and supports per-instance `instructions_file` layering |
 
 #### Next Steps
 
 - [ ] Expand dashboard surfacing for agent-specific services/artifacts beyond the current generic session views
 - [ ] Add stronger provider probe/model-list coverage where agent runtimes expose it
+- [ ] Add `pi --list-models` helper/parsing and hand it off to the future provider model-catalog work
+- [ ] Deepen Pi-native transcript/history surfacing so resumed/fallback Pi sessions do not rely on generic JSONL heuristics alone
 
 ---
 

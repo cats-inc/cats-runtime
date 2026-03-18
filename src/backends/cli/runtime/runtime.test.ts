@@ -353,4 +353,94 @@ describe('runtime adapters', () => {
       rmSync(promptDir, { recursive: true, force: true });
     }
   });
+
+  it('rewrites Pi system prompt files into WSL runtime paths', () => {
+    const promptDir = mkdtempSync(join(tmpdir(), 'cats-runtime-wsl-pi-'));
+    const promptFile = join(promptDir, 'system.md');
+    writeFileSync(promptFile, 'Pi instructions', 'utf8');
+
+    try {
+      const spawnConfig = buildProcessSpawnConfig(
+        {
+          path: 'pi',
+          runner: 'direct',
+          runtime: {
+            mode: 'wsl',
+            distro: 'Ubuntu',
+          },
+        },
+        'pi',
+        ['--mode', 'rpc', '--append-system-prompt', promptFile],
+        'C:\\Users\\kenne\\repo',
+      );
+
+      expect(spawnConfig.env).toEqual({
+        CATS_RUNTIME_WSL_EXEC_B64: Buffer.from(JSON.stringify({
+          cwd: '/mnt/c/Users/kenne/repo',
+          command: 'pi',
+          args: [
+            '--mode',
+            'rpc',
+            '--append-system-prompt',
+            promptFile.replace(/\\/g, '/').replace(/^([A-Za-z]):/, (_, drive) => `/mnt/${drive.toLowerCase()}`),
+          ],
+        }), 'utf8').toString('base64'),
+        WSLENV: process.env.WSLENV
+          ? process.env.WSLENV.includes('CATS_RUNTIME_WSL_EXEC_B64')
+            ? process.env.WSLENV
+            : `${process.env.WSLENV}:CATS_RUNTIME_WSL_EXEC_B64`
+          : 'CATS_RUNTIME_WSL_EXEC_B64',
+      });
+    } finally {
+      rmSync(promptDir, { recursive: true, force: true });
+    }
+  });
+
+  it('materializes Pi system prompt files inside the Docker runtime', () => {
+    const promptDir = mkdtempSync(join(tmpdir(), 'cats-runtime-docker-pi-'));
+    const promptFile = join(promptDir, 'system.md');
+    writeFileSync(promptFile, 'Pi instructions', 'utf8');
+
+    try {
+      const spawnConfig = buildProcessSpawnConfig(
+        {
+          path: 'pi',
+          runner: 'direct',
+          runtime: {
+            mode: 'docker',
+            container: 'cats-cli-dev',
+          },
+        },
+        'pi',
+        ['--mode', 'rpc', '--append-system-prompt', promptFile],
+        '/workspace/repo',
+      );
+
+      const payload = JSON.parse(
+        Buffer.from(spawnConfig.env!.CATS_RUNTIME_DOCKER_EXEC_B64, 'base64').toString('utf8'),
+      ) as {
+        cwd: string;
+        command: string;
+        args: string[];
+        tempFiles?: Array<{ path: string; content: string }>;
+      };
+
+      expect(payload.cwd).toBe('/workspace/repo');
+      expect(payload.command).toBe('pi');
+      expect(payload.args).toEqual([
+        '--mode',
+        'rpc',
+        '--append-system-prompt',
+        expect.stringMatching(/^\/tmp\/cats-runtime\/pi-system-prompt-.*\.txt$/),
+      ]);
+      expect(payload.tempFiles).toEqual([
+        {
+          path: payload.args[3]!,
+          content: 'Pi instructions',
+        },
+      ]);
+    } finally {
+      rmSync(promptDir, { recursive: true, force: true });
+    }
+  });
 });

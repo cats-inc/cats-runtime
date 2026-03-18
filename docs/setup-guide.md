@@ -212,7 +212,7 @@ Currently supported agent transports are:
 
 Path semantics matter:
 
-- File-backed providers (`claude`, `codex`, `copilot`, `gemini`, `auggie`) use
+- File-backed providers (`claude`, `codex`, `copilot`, `gemini`, `auggie`, `pi`) use
   host-side discovery paths. `projects_dir` / `sessions_dir` must point to a
   path that the `cats-runtime` host process can read directly.
 - On Windows, if one of those file-backed providers is configured as
@@ -225,6 +225,9 @@ Path semantics matter:
   container-local path that the CLI itself uses. The tradeoff is that routes
   which inspect provider-owned files from the host may return no sessions until
   Docker-backed file discovery is implemented.
+- Pi can additionally define `instructions_file` on an instance. When present,
+  `cats-runtime` passes that file through Pi's `--append-system-prompt` flag and
+  rewrites/materializes the file path for WSL or Docker runtimes when needed.
 - Cursor `chats_dir` and Kiro `db_path` are different: they are consumed by
   runtime-aware native services inside the selected runtime, so `~/.cursor/chats`
   and `~/.local/share/kiro-cli/data.sqlite3` remain valid for WSL-backed

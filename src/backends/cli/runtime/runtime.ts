@@ -304,26 +304,25 @@ function buildRuntimeExecPayload(
   const tempFiles: RuntimePayloadFile[] = [];
 
   if (providerName === 'auggie') {
-    const instructionFileIndex = translatedArgs.indexOf('--instruction-file');
-    if (instructionFileIndex !== -1 && instructionFileIndex + 1 < translatedArgs.length) {
-      const hostInstructionFile = translatedArgs[instructionFileIndex + 1]!;
-      if (existsSync(hostInstructionFile)) {
-        if (runtimeConfig.mode === 'wsl') {
-          translatedArgs[instructionFileIndex + 1] = runtime.toRuntimePath(hostInstructionFile);
-        } else if (runtimeConfig.mode === 'docker') {
-          const runtimeInstructionFile = pathPosix.join(
-            '/tmp',
-            'cats-runtime',
-            `auggie-instruction-${randomUUID()}.txt`,
-          );
-          tempFiles.push({
-            path: runtimeInstructionFile,
-            content: readFileSync(hostInstructionFile, 'utf8'),
-          });
-          translatedArgs[instructionFileIndex + 1] = runtimeInstructionFile;
-        }
-      }
-    }
+    translateRuntimeFileArg(
+      translatedArgs,
+      tempFiles,
+      runtime,
+      runtimeConfig,
+      '--instruction-file',
+      'auggie-instruction',
+    );
+  }
+
+  if (providerName === 'pi') {
+    translateRuntimeFileArg(
+      translatedArgs,
+      tempFiles,
+      runtime,
+      runtimeConfig,
+      '--append-system-prompt',
+      'pi-system-prompt',
+    );
   }
 
   return {
@@ -333,6 +332,43 @@ function buildRuntimeExecPayload(
     ensureCwd: cwdInfo.ensureCwd || undefined,
     tempFiles: tempFiles.length > 0 ? tempFiles : undefined,
   };
+}
+
+function translateRuntimeFileArg(
+  translatedArgs: string[],
+  tempFiles: RuntimePayloadFile[],
+  runtime: RuntimeAdapter,
+  runtimeConfig: ProviderRuntimeConfig,
+  flagName: string,
+  tempFilePrefix: string,
+): void {
+  const fileIndex = translatedArgs.indexOf(flagName);
+  if (fileIndex === -1 || fileIndex + 1 >= translatedArgs.length) {
+    return;
+  }
+
+  const hostFile = translatedArgs[fileIndex + 1]!;
+  if (!existsSync(hostFile)) {
+    return;
+  }
+
+  if (runtimeConfig.mode === 'wsl') {
+    translatedArgs[fileIndex + 1] = runtime.toRuntimePath(hostFile);
+    return;
+  }
+
+  if (runtimeConfig.mode === 'docker') {
+    const runtimeFile = pathPosix.join(
+      '/tmp',
+      'cats-runtime',
+      `${tempFilePrefix}-${randomUUID()}.txt`,
+    );
+    tempFiles.push({
+      path: runtimeFile,
+      content: readFileSync(hostFile, 'utf8'),
+    });
+    translatedArgs[fileIndex + 1] = runtimeFile;
+  }
 }
 
 function resolveDockerRuntimeCwd(cwd: string): { cwd: string; ensureCwd: boolean } {

@@ -214,6 +214,31 @@ describe('SessionRegistry', () => {
     expect(registry.get(resumed!.id)?.status).toBe('ready');
   });
 
+  it('reattaches Pi providerSourcePath after runtime-managed history takes over', () => {
+    registry = new SessionRegistry(undefined, '/tmp/cats-runtime/sessions');
+
+    const session = registry.create({
+      providerName: 'pi',
+      cwd: '/repo',
+    });
+    registry.setSourcePath(session.id, '/tmp/cats-runtime/sessions/history/pi-runtime.jsonl');
+    registry.clearProviderResumeState(session.id, { clearProviderSourcePath: true });
+
+    const merged = registry.upsertDiscovered('pi-new', {
+      providerName: 'pi',
+      cwd: '/repo',
+      sourcePath: '/home/tester/.pi/agent/sessions/repo/session.jsonl',
+    });
+
+    expect(merged?.id).toBe(session.id);
+    expect(registry.get(session.id)?.providerSourcePath).toBe(
+      '/home/tester/.pi/agent/sessions/repo/session.jsonl',
+    );
+    expect(registry.get(session.id)?.sourcePath).toBe(
+      '/tmp/cats-runtime/sessions/history/pi-runtime.jsonl',
+    );
+  });
+
   it('normalizes legacy default instance ids to the configured default instance on load', () => {
     const persistDir = mkdtempSync(join(tmpdir(), 'session-registry-load-test-'));
     const persistPath = join(persistDir, 'sessions.json');

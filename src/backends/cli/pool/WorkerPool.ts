@@ -103,7 +103,12 @@ export class WorkerPool {
           commandConfig: instance.commandConfig,
         };
       case 'pi':
-        return { provider: new PiProvider(), commandConfig: instance.commandConfig };
+        return {
+          provider: new PiProvider({
+            instructionsFile: instance.piInstructionsFile,
+          }),
+          commandConfig: instance.commandConfig,
+        };
       case 'goose':
         return {
           provider: new GooseProvider(
@@ -159,8 +164,10 @@ export class WorkerPool {
       // Ephemeral providers normally exit after each turn; keep the logical worker alive
       // unless it was explicitly killed.
       if (provider.ephemeral && worker.alive) return;
-      this.registry.updateStatus(sessionId, 'closed');
-      this.workers.delete(sessionId);
+      if (this.workers.get(sessionId) === worker) {
+        this.registry.updateStatus(sessionId, 'closed');
+        this.workers.delete(sessionId);
+      }
     });
 
     worker.on('error', (err) => {

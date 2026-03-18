@@ -6,9 +6,15 @@ import type {
   StreamEvent,
 } from './types.js';
 
+interface PiProviderOptions {
+  instructionsFile?: string;
+}
+
 export class PiProvider implements Provider {
   name = 'pi';
   capabilities: ProviderCapabilities = { resume: true, fork: false, permissions: false };
+
+  constructor(private readonly options: PiProviderOptions = {}) {}
 
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
     const args: string[] = ['--mode', 'rpc'];
@@ -19,8 +25,13 @@ export class PiProvider implements Provider {
       args.push('--model', modelId);
     }
 
-    if (opts.resumeSessionId) {
-      args.push('--session', opts.resumeSessionId);
+    const resumeSourcePath = opts.resumeSourcePath || opts.resumeSessionId;
+    if (resumeSourcePath) {
+      args.push('--session', resumeSourcePath);
+    }
+
+    if (this.options.instructionsFile) {
+      args.push('--append-system-prompt', this.options.instructionsFile);
     }
 
     return args;

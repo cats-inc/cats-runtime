@@ -135,6 +135,7 @@ export interface ProviderInstanceConfig {
   opencodeServerPort?: number;
   opencodeServerStartupTimeoutMs?: number;
   piSessionsDir?: string;
+  piInstructionsFile?: string;
 }
 
 export interface CliRuntimeConfig {
@@ -813,6 +814,7 @@ function applyFileBasedProviderConfig(
   let opencodeServerPort = legacy.opencodeServerPort;
   let opencodeServerStartupTimeoutMs = legacy.opencodeServerStartupTimeoutMs;
   let piSessionsDir = legacy.piSessionsDir;
+  let piInstructionsFile: string | undefined;
   const rawBackends = asOptionalObject(doc.backends);
   if (doc.backends !== undefined && !rawBackends) {
     throw new Error(`Invalid backends block in '${filePath}'`);
@@ -884,6 +886,9 @@ function applyFileBasedProviderConfig(
           piSessionsDir = readString(discovery?.sessions_dir)
             || readString(providerDoc.sessions_dir)
             || piSessionsDir;
+          piInstructionsFile = readString(providerDoc.instructions_file)
+            || readString(providerDoc.instructionsFile)
+            || piInstructionsFile;
           break;
         default:
           break;
@@ -979,6 +984,12 @@ function applyFileBasedProviderConfig(
             ? readString(instanceDoc.sessions_dir)
               || fallback.piSessionsDir
               || piSessionsDir
+            : undefined,
+          piInstructionsFile: provider === 'pi'
+            ? readString(instanceDoc.instructions_file)
+              || readString(instanceDoc.instructionsFile)
+              || fallback.piInstructionsFile
+              || piInstructionsFile
             : undefined,
         };
       }

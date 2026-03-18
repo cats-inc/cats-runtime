@@ -144,6 +144,7 @@ export interface ProviderSpawnOptions {
   workspaceMode?: WorkspaceMode;
   model?: string;
   resumeSessionId?: string;
+  resumeSourcePath?: string;
   forkSession?: boolean;
   permissionMode?: PermissionMode;
   allowedTools?: string[];

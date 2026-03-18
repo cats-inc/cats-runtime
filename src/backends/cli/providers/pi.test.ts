@@ -33,7 +33,7 @@ describe('PiProvider', () => {
     it('includes session flag for resume', () => {
       const args = provider.buildSpawnArgs({
         cwd: '/tmp',
-        resumeSessionId: '/home/user/.pi/agent/sessions/session.jsonl',
+        resumeSourcePath: '/home/user/.pi/agent/sessions/session.jsonl',
       });
       expect(args).toContain('--session');
       expect(args).toContain('/home/user/.pi/agent/sessions/session.jsonl');
@@ -43,13 +43,26 @@ describe('PiProvider', () => {
       const args = provider.buildSpawnArgs({
         cwd: '/tmp',
         model: 'openai/gpt-4o',
-        resumeSessionId: '/tmp/session.jsonl',
+        resumeSourcePath: '/tmp/session.jsonl',
       });
       expect(args).toEqual([
         '--mode', 'rpc',
         '--provider', 'openai',
         '--model', 'gpt-4o',
         '--session', '/tmp/session.jsonl',
+      ]);
+    });
+
+    it('includes append-system-prompt when an instructions file is configured', () => {
+      const configuredProvider = new PiProvider({
+        instructionsFile: '/tmp/pi-system-prompt.md',
+      });
+
+      const args = configuredProvider.buildSpawnArgs({ cwd: '/tmp' });
+
+      expect(args).toEqual([
+        '--mode', 'rpc',
+        '--append-system-prompt', '/tmp/pi-system-prompt.md',
       ]);
     });
 
