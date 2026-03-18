@@ -1,7 +1,12 @@
 import { spawn } from 'node:child_process';
-import { readdir, readFile, stat, mkdir, writeFile } from 'node:fs/promises';
+import { copyFile, readdir, readFile, rmdir, stat, mkdir, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname, extname, relative, resolve } from 'node:path';
+import path from 'node:path';
 import type { PermissionMode, WorkspaceMode } from '../types.js';
+
+// path.matchesGlob — Node 22+ built-in; @types/node@20 lacks the typedef
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const matchesGlob: (filePath: string, pattern: string) => boolean = (path as any).matchesGlob;
 
 export interface ToolDefinition {
   name: string;
@@ -41,6 +46,7 @@ interface ShellResult {
 const MAX_TEXT_OUTPUT = 12_000;
 const DEFAULT_READ_LINE_LIMIT = 400;
 const DEFAULT_LIST_ENTRIES = 200;
+const DEFAULT_GLOB_RESULTS = 200;
 const DEFAULT_GREP_MATCHES = 200;
 const DEFAULT_SHELL_TIMEOUT_MS = 15_000;
 const MAX_SHELL_TIMEOUT_MS = 60_000;
@@ -124,6 +130,20 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'edit_file',
+    description: 'Replace exact text in a file. old_string must match precisely.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Relative path to the file.' },
+        old_string: { type: 'string', description: 'Exact text to find and replace.' },
+        new_string: { type: 'string', description: 'Replacement text.' },
+        allow_multiple: { type: 'boolean', description: 'Replace all occurrences if true.' },
+      },
+      required: ['path', 'old_string', 'new_string'],
+    },
+  },
+  {
     name: 'grep',
     description: 'Search workspace text files with a regular expression.',
     inputSchema: {
@@ -132,6 +152,19 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         pattern: { type: 'string', description: 'JavaScript regular expression source.' },
         path: { type: 'string', description: 'Relative directory or file path to search.' },
         max_matches: { type: 'integer', minimum: 1, maximum: 1000 },
+      },
+      required: ['pattern'],
+    },
+  },
+  {
+    name: 'glob',
+    description: 'Find files matching a glob pattern. Returns paths only.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pattern: { type: 'string', description: 'Glob pattern (e.g. "**/*.ts").' },
+        path: { type: 'string', description: 'Starting directory, defaults to workspace root.' },
+        max_results: { type: 'integer', minimum: 1, maximum: 1000 },
       },
       required: ['pattern'],
     },
@@ -148,10 +181,59 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ['command'],
     },
   },
+  {
+    name: 'delete_file',
+    description: 'Delete a file or empty directory from the workspace.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Relative path to the file or empty directory.' },
+      },
+      required: ['path'],
+    },
+  },
+  {
+    name: 'rename_file',
+    description: 'Rename or move a file within the workspace.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        source: { type: 'string', description: 'Current relative path.' },
+        destination: { type: 'string', description: 'New relative path.' },
+      },
+      required: ['source', 'destination'],
+    },
+  },
+  {
+    name: 'copy_file',
+    description: 'Copy a file within the workspace.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        source: { type: 'string', description: 'Source relative path.' },
+        destination: { type: 'string', description: 'Destination relative path.' },
+      },
+      required: ['source', 'destination'],
+    },
+  },
 ];
 
-const READ_ONLY_TOOLS = new Set(['list_files', 'read_file', 'grep']);
+const READ_ONLY_TOOLS = new Set(['list_files', 'read_file', 'grep', 'glob']);
 const TOOL_ORDER = new Map(TOOL_DEFINITIONS.map((tool, index) => [tool.name, index]));
+
+const STANDARD_TOOLS = new Set([
+  'list_files', 'read_file', 'write_file', 'edit_file', 'grep', 'glob', 'run_shell',
+]);
+const EXTENDED_TOOLS = new Set([
+  ...STANDARD_TOOLS, 'delete_file', 'rename_file', 'copy_file',
+]);
+const PROFILE_TOOLS: Record<string, Set<string>> = {
+  standard: STANDARD_TOOLS,
+  extended: EXTENDED_TOOLS,
+  read_only: READ_ONLY_TOOLS,
+  none: new Set(),
+  chat: new Set(),
+};
 
 function normalizeProfile(profile?: string): string {
   return (profile || 'standard').trim().toLowerCase();
@@ -344,16 +426,9 @@ async function executeShell(
 export class LocalToolRuntime {
   listTools(profile?: string): ToolDefinition[] {
     const normalized = normalizeProfile(profile);
-    if (normalized === 'none' || normalized === 'chat') {
-      return [];
-    }
-
-    const allowed = normalized === 'read_only'
-      ? TOOL_DEFINITIONS.filter((tool) => READ_ONLY_TOOLS.has(tool.name))
-      : TOOL_DEFINITIONS;
-
-    return allowed
-      .slice()
+    const allowed = PROFILE_TOOLS[normalized] ?? PROFILE_TOOLS.standard;
+    return TOOL_DEFINITIONS
+      .filter((tool) => allowed.has(tool.name))
       .sort((left, right) => (TOOL_ORDER.get(left.name) ?? 0) - (TOOL_ORDER.get(right.name) ?? 0));
   }
 
@@ -369,10 +444,20 @@ export class LocalToolRuntime {
           return await this.readFile(context, call.id, args);
         case 'write_file':
           return await this.writeFile(context, call.id, args);
+        case 'edit_file':
+          return await this.editFile(context, call.id, args);
         case 'grep':
           return await this.grep(context, call.id, args);
+        case 'glob':
+          return await this.globFiles(context, call.id, args);
         case 'run_shell':
           return await this.runShell(context, call.id, args);
+        case 'delete_file':
+          return await this.deleteFile(context, call.id, args);
+        case 'rename_file':
+          return await this.renameFile(context, call.id, args);
+        case 'copy_file':
+          return await this.copyFileTool(context, call.id, args);
         default:
           throw new Error(`Unknown tool '${call.name}'`);
       }
@@ -461,6 +546,54 @@ export class LocalToolRuntime {
     };
   }
 
+  private async editFile(
+    context: ToolExecutionContext,
+    callId: string,
+    args: Record<string, unknown>,
+  ): Promise<ToolResult> {
+    const inputPath = requireString(args, 'path');
+    const fullPath = resolveWorkspacePath(context.cwd, inputPath);
+    const oldString = requireString(args, 'old_string');
+    const newString = typeof args.new_string === 'string' ? args.new_string : '';
+    const allowMultiple = readOptionalBoolean(args, 'allow_multiple');
+
+    const content = await readFile(fullPath, 'utf-8');
+
+    let count = 0;
+    let searchIndex = 0;
+    while (true) {
+      const found = content.indexOf(oldString, searchIndex);
+      if (found === -1) break;
+      count++;
+      searchIndex = found + oldString.length;
+    }
+
+    if (count === 0) {
+      throw new Error(`old_string not found in ${toRelativeDisplay(context.cwd, fullPath)}`);
+    }
+
+    if (count > 1 && !allowMultiple) {
+      throw new Error(
+        `Found ${count} occurrences; set allow_multiple=true or provide more specific old_string`,
+      );
+    }
+
+    const updated = count === 1
+      ? content.replace(oldString, newString)
+      : content.replaceAll(oldString, newString);
+
+    await writeFile(fullPath, updated, 'utf-8');
+
+    const displayPath = toRelativeDisplay(context.cwd, fullPath);
+    return {
+      callId,
+      name: 'edit_file',
+      output: count === 1
+        ? `Replaced 1 occurrence in ${displayPath}`
+        : `Replaced ${count} occurrences in ${displayPath}`,
+    };
+  }
+
   private async grep(
     context: ToolExecutionContext,
     callId: string,
@@ -506,6 +639,34 @@ export class LocalToolRuntime {
     };
   }
 
+  private async globFiles(
+    context: ToolExecutionContext,
+    callId: string,
+    args: Record<string, unknown>,
+  ): Promise<ToolResult> {
+    const pattern = requireString(args, 'pattern');
+    const startPath = resolveWorkspacePath(context.cwd, String(args.path || '.'));
+    const maxResults = readOptionalInteger(args, 'max_results', DEFAULT_GLOB_RESULTS, 1, 1000);
+
+    const allEntries: string[] = [];
+    await walkFiles(context.cwd, startPath, true, maxResults * 10, allEntries);
+
+    const matches: string[] = [];
+    for (const entry of allEntries) {
+      if (entry.endsWith('/')) continue;
+      if (matchesGlob(entry, pattern)) {
+        matches.push(entry);
+        if (matches.length >= maxResults) break;
+      }
+    }
+
+    return {
+      callId,
+      name: 'glob',
+      output: matches.length > 0 ? matches.join('\n') : '[no matches]',
+    };
+  }
+
   private async runShell(
     context: ToolExecutionContext,
     callId: string,
@@ -539,6 +700,73 @@ export class LocalToolRuntime {
       name: 'run_shell',
       output: truncate(sections.join('\n\n')),
       isError: result.code !== 0 || result.timedOut,
+    };
+  }
+
+  private async deleteFile(
+    context: ToolExecutionContext,
+    callId: string,
+    args: Record<string, unknown>,
+  ): Promise<ToolResult> {
+    const inputPath = requireString(args, 'path');
+    const fullPath = resolveWorkspacePath(context.cwd, inputPath);
+    const displayPath = toRelativeDisplay(context.cwd, fullPath);
+
+    const info = await stat(fullPath);
+    if (info.isDirectory()) {
+      const entries = await readdir(fullPath);
+      if (entries.length > 0) {
+        throw new Error(`Directory is not empty: ${displayPath}`);
+      }
+      await rmdir(fullPath);
+    } else {
+      await unlink(fullPath);
+    }
+
+    return {
+      callId,
+      name: 'delete_file',
+      output: `Deleted ${displayPath}`,
+    };
+  }
+
+  private async renameFile(
+    context: ToolExecutionContext,
+    callId: string,
+    args: Record<string, unknown>,
+  ): Promise<ToolResult> {
+    const sourcePath = requireString(args, 'source');
+    const destPath = requireString(args, 'destination');
+    const fullSource = resolveWorkspacePath(context.cwd, sourcePath);
+    const fullDest = resolveWorkspacePath(context.cwd, destPath);
+
+    await mkdir(dirname(fullDest), { recursive: true });
+    await rename(fullSource, fullDest);
+
+    return {
+      callId,
+      name: 'rename_file',
+      output: `Renamed ${toRelativeDisplay(context.cwd, fullSource)} → ${toRelativeDisplay(context.cwd, fullDest)}`,
+    };
+  }
+
+  private async copyFileTool(
+    context: ToolExecutionContext,
+    callId: string,
+    args: Record<string, unknown>,
+  ): Promise<ToolResult> {
+    const sourcePath = requireString(args, 'source');
+    const destPath = requireString(args, 'destination');
+    const fullSource = resolveWorkspacePath(context.cwd, sourcePath);
+    const fullDest = resolveWorkspacePath(context.cwd, destPath);
+
+    await mkdir(dirname(fullDest), { recursive: true });
+    await copyFile(fullSource, fullDest);
+
+    return {
+      callId,
+      name: 'copy_file',
+      output: `Copied ${toRelativeDisplay(context.cwd, fullSource)} → ${toRelativeDisplay(context.cwd, fullDest)}`,
     };
   }
 }
