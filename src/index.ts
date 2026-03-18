@@ -19,6 +19,8 @@ export { loadConfig } from './core/config.js';
 export { createRuntimeServer } from './server.js';
 export { createRuntimeApp } from './http/app.js';
 
+let startup = createRuntimeStartupState();
+
 async function main(): Promise<void> {
   const cliOptions = parseRuntimeCliOptions(process.argv.slice(2));
   if (cliOptions.help) {
@@ -29,7 +31,7 @@ async function main(): Promise<void> {
   loadDotEnv();
   applyRuntimeCliEnvOverrides(cliOptions, process.env);
 
-  const startup = resolveRuntimeStartupState(cliOptions, process.env);
+  startup = resolveRuntimeStartupState(cliOptions, process.env);
   const config = loadConfig();
   const runtime = createRuntimeServer(config, { startup });
   const address = await runtime.start();
@@ -71,16 +73,6 @@ async function main(): Promise<void> {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error) => {
-    let startup = createRuntimeStartupState();
-    try {
-      startup = resolveRuntimeStartupState(
-        parseRuntimeCliOptions(process.argv.slice(2)),
-        process.env,
-      );
-    } catch {
-      // Fall back to a plain startup context so invalid CLI args still render
-      // a readable error instead of causing a secondary parse failure.
-    }
     process.stderr.write(formatRuntimeStartupError(startup, error));
     process.exitCode = 1;
   });

@@ -376,7 +376,7 @@ The health payload includes startup metadata:
 {
   "service": "cats-runtime",
   "status": "ok",
-  "version": "0.1.0",
+  "version": "<package-version>",
   "startup": {
     "mode": "standalone",
     "readySignal": "http",

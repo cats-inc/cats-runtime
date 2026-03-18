@@ -2,6 +2,15 @@
   "name": "cats-runtime",
   "version": "0.1.0",
   "description": "Unified runtime for subscription CLIs and future API backends.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sammykenny2/one-man-digital-company.git",
+    "directory": "cats-runtime"
+  },
+  "homepage": "https://github.com/sammykenny2/one-man-digital-company/tree/main/cats-runtime#readme",
+  "bugs": {
+    "url": "https://github.com/sammykenny2/one-man-digital-company/issues"
+  },
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -27,6 +36,7 @@
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "prepack": "npm run build",
+    "release:check": "npm run build && npm test && npm pack --dry-run",
     "test": "npm run build && vitest run --pool=threads --poolOptions.threads.singleThread",
     "test:watch": "vitest --pool=threads --poolOptions.threads.singleThread",
     "typecheck": "tsc --noEmit -p tsconfig.json"
@@ -38,6 +48,9 @@
     "cli"
   ],
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "@hono/node-server": "^1.14.0",
     "hono": "^4.7.0",

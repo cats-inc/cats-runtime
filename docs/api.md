@@ -47,7 +47,7 @@ Example response:
   "service": "cats-runtime",
   "status": "ok",
   "timestamp": "2026-03-11T12:34:56.000Z",
-  "version": "0.1.0",
+  "version": "<package-version>",
   "startup": {
     "mode": "standalone",
     "readySignal": "http",

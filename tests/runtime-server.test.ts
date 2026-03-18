@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { loadConfig } from '../src/core/config.js';
 import { createDiscoveryController, createRuntimeServer } from '../src/server.js';
-import { createRuntimeStartupState } from '../src/startup.js';
+import { RUNTIME_VERSION, createRuntimeStartupState } from '../src/startup.js';
 
 function alignDefaultProviderRuntime(
   config: ReturnType<typeof loadConfig>,
@@ -160,7 +160,7 @@ describe('runtime server', () => {
       expect(await authenticated.json()).toEqual({
         service: 'cats-runtime',
         status: 'ok',
-        version: '0.1.0',
+        version: RUNTIME_VERSION,
         timestamp: expect.any(String),
         startup: {
           mode: 'standalone',
@@ -192,7 +192,7 @@ describe('runtime server', () => {
       expect(await response.json()).toEqual({
         service: 'cats-runtime',
         status: 'ok',
-        version: '0.1.0',
+        version: RUNTIME_VERSION,
         timestamp: expect.any(String),
         startup: {
           mode: 'app-managed',

@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { RUNTIME_VERSION } from '../src/startup.js';
 
 interface RuntimeLifecycleEvent {
   event: 'runtime.ready' | 'runtime.startup_error';
@@ -254,7 +255,7 @@ describe('runtime process startup contract', () => {
       expect(await response.json()).toEqual({
         service: 'cats-runtime',
         status: 'ok',
-        version: '0.1.0',
+        version: RUNTIME_VERSION,
         timestamp: expect.any(String),
         startup: {
           mode: 'app-managed',

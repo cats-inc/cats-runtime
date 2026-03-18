@@ -1,4 +1,29 @@
-export const RUNTIME_VERSION = '0.1.0';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+interface RuntimePackageJson {
+  version?: string;
+}
+
+function readRuntimePackageVersion(): string {
+  const packageJsonPath = join(
+    dirname(fileURLToPath(import.meta.url)),
+    '..',
+    'package.json',
+  );
+  const packageJson = JSON.parse(
+    readFileSync(packageJsonPath, 'utf8'),
+  ) as RuntimePackageJson;
+
+  if (!packageJson.version) {
+    throw new Error(`Could not resolve version from ${packageJsonPath}`);
+  }
+
+  return packageJson.version;
+}
+
+export const RUNTIME_VERSION = readRuntimePackageVersion();
 
 export type RuntimeStartupMode = 'standalone' | 'app-managed';
 export type RuntimeReadyOutput = 'plain' | 'json' | 'silent';

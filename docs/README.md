@@ -26,6 +26,7 @@ These important documents live in the project root:
 | [setup-guide.md](./setup-guide.md) | ? Active | Environment setup |
 | [testing.md](./testing.md) | ? Active | Testing strategy |
 | [deployment.md](./deployment.md) | ?? Template | Deployment instructions |
+| [release-guide.md](./release-guide.md) | ? Active | npm packaging, release, and future trusted publishing workflow |
 | [security-guidelines.md](./security-guidelines.md) | ?? Template | Security policies |
 | [mcp-config.md](./mcp-config.md) | ?? Template | MCP server configuration |
 | [services.md](./services.md) | ? Active | Service registry and port assignments |

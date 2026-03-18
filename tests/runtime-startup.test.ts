@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  RUNTIME_VERSION,
   applyRuntimeCliEnvOverrides,
   createRuntimeStartupState,
   formatRuntimeReadyMessage,
@@ -81,7 +82,7 @@ describe('runtime startup helpers', () => {
     expect(JSON.parse(readyMessage!)).toEqual({
       event: 'runtime.ready',
       service: 'cats-runtime',
-      version: '0.1.0',
+      version: RUNTIME_VERSION,
       pid: 1234,
       mode: 'app-managed',
       managedBy: 'cats-inc',
@@ -97,7 +98,7 @@ describe('runtime startup helpers', () => {
     expect(JSON.parse(errorMessage)).toEqual({
       event: 'runtime.startup_error',
       service: 'cats-runtime',
-      version: '0.1.0',
+      version: RUNTIME_VERSION,
       pid: 1234,
       mode: 'app-managed',
       managedBy: 'cats-inc',
