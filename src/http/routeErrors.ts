@@ -3,16 +3,13 @@ import {
   isProviderNotConfiguredError,
   isUnknownProviderInstanceError,
 } from '../backends/cli/config.js';
+import { isProviderTargetResolutionError } from '../core/providerCatalog.js';
 
 export function getRouteErrorStatus(error: unknown): ContentfulStatusCode {
-  if (isUnknownProviderInstanceError(error) || isProviderNotConfiguredError(error)) {
-    return 400;
-  }
-  const message = error instanceof Error ? error.message : '';
   if (
-    message.startsWith('Provider \'')
-    || message.startsWith('Unknown ')
-    || message.startsWith('Ambiguous ')
+    isUnknownProviderInstanceError(error)
+    || isProviderNotConfiguredError(error)
+    || isProviderTargetResolutionError(error)
   ) {
     return 400;
   }

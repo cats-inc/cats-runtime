@@ -737,6 +737,63 @@ providers:
     });
   });
 
+  it('GET /providers/:provider/models falls back to static catalog when dynamic discovery fails', async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error('connection refused');
+    });
+
+    await withRuntime({
+      providerDefaultTargets: {
+        ollama: { backend: 'local', instance: 'local' },
+      },
+      remoteProviderCatalog: {
+        api: {},
+        local: {
+          ollama: {
+            local: {
+              id: 'local',
+              providerName: 'ollama',
+              backend: 'local',
+              transport: 'ollama',
+              baseUrl: 'http://127.0.0.1:11434',
+              model: 'qwen2.5-coder:7b',
+            },
+          },
+        },
+        agent: {},
+      },
+    }, { apiBackend: { fetch: fetchMock } }, async (runtime) => {
+      const response = await runtime.app.request('/providers/ollama/models');
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        provider: 'ollama',
+        backend: 'local',
+        instance: 'local',
+        defaultModel: 'qwen2.5-coder:7b',
+        source: 'config',
+        cache: null,
+        models: [
+          { id: 'qwen2.5-coder:7b', label: 'qwen2.5-coder:7b', default: true },
+        ],
+        warnings: [
+          expect.stringContaining(
+            'Dynamic model discovery failed for ollama/local/local: connection refused',
+          ),
+        ],
+      });
+    });
+  });
+
+  it('GET /providers/:provider/models returns 400 for unknown providers', async () => {
+    await withRuntime({}, {}, async (runtime) => {
+      const response = await runtime.app.request('/providers/missing/models');
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: "Failed to inspect provider models: Error: Provider 'missing' is not configured",
+      });
+    });
+  });
+
   it('createDiscoveryController falls back to default services when instance resolvers are absent', async () => {
     const { config, cleanup } = createTestConfig();
     const runtime = createRuntimeServer(config);

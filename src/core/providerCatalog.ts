@@ -41,6 +41,30 @@ export interface ProviderCatalogEntry {
   instances: ProviderTargetDescriptor[];
 }
 
+export type ProviderTargetResolutionCode =
+  | 'provider_not_configured'
+  | 'multiple_targets_configured'
+  | 'unknown_target'
+  | 'ambiguous_instance'
+  | 'unknown_instance';
+
+export class ProviderTargetResolutionError extends Error {
+  constructor(
+    readonly code: ProviderTargetResolutionCode,
+    message: string,
+  ) {
+    super(message);
+    // Keep stringified route errors backward-compatible with existing "Error: ..."
+    this.name = 'Error';
+  }
+}
+
+export function isProviderTargetResolutionError(
+  error: unknown,
+): error is ProviderTargetResolutionError {
+  return error instanceof ProviderTargetResolutionError;
+}
+
 function isCliProviderName(providerName: string): providerName is CliProviderName {
   return (CLI_PROVIDER_NAMES as readonly string[]).includes(providerName);
 }
@@ -305,7 +329,10 @@ export function resolveProviderTarget(
 ): ProviderTargetDescriptor {
   const providerCatalog = listProviderCatalog(config)[providerName];
   if (!providerCatalog || providerCatalog.instances.length === 0) {
-    throw new Error(`Provider '${providerName}' is not configured`);
+    throw new ProviderTargetResolutionError(
+      'provider_not_configured',
+      `Provider '${providerName}' is not configured`,
+    );
   }
 
   if (!requestedInstance || requestedInstance === 'default') {
@@ -323,7 +350,8 @@ export function resolveProviderTarget(
       return providerCatalog.instances[0];
     }
 
-    throw new Error(
+    throw new ProviderTargetResolutionError(
+      'multiple_targets_configured',
       `Provider '${providerName}' has multiple backend targets configured. `
       + `Specify instance as '<backend>/<instance>' or choose one of: `
       + providerCatalog.instances.map((instance) => `${instance.backend}/${instance.instanceId}`).join(', '),
@@ -336,7 +364,8 @@ export function resolveProviderTarget(
       instance.backend === qualified.backend && instance.instanceId === qualified.instance,
     );
     if (!matched) {
-      throw new Error(
+      throw new ProviderTargetResolutionError(
+        'unknown_target',
         `Unknown ${providerName} target '${requestedInstance}'. Valid: `
         + providerCatalog.instances.map((instance) => `${instance.backend}/${instance.instanceId}`).join(', '),
       );
@@ -351,13 +380,15 @@ export function resolveProviderTarget(
     return bareMatches[0];
   }
   if (bareMatches.length > 1) {
-    throw new Error(
+    throw new ProviderTargetResolutionError(
+      'ambiguous_instance',
       `Ambiguous ${providerName} instance '${requestedInstance}'. Use one of: `
       + bareMatches.map((instance) => `${instance.backend}/${instance.instanceId}`).join(', '),
     );
   }
 
-  throw new Error(
+  throw new ProviderTargetResolutionError(
+    'unknown_instance',
     `Unknown ${providerName} instance '${requestedInstance}'. Valid: `
     + providerCatalog.instances.map((instance) => `${instance.backend}/${instance.instanceId}`).join(', '),
   );
