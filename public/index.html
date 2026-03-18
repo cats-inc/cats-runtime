@@ -656,11 +656,11 @@
 
 <header>
   <h1><span>Cats Runtime</span> Dashboard</h1>
-  <div class="runtime-status-group" id="wslDiscoveryStatus" title="Loading WSL discovery status">
-    <span class="runtime-status-dot" id="wslDiscoveryDot" data-state="idle"></span>
+  <div class="runtime-status-group" id="runtimeStatus" title="Loading runtime summary">
+    <span class="runtime-status-dot" id="runtimeStatusDot" data-state="idle"></span>
     <div class="runtime-status-copy">
-      <div class="runtime-status-title" id="wslDiscoveryPolicy">WSL discovery</div>
-      <div class="runtime-status-meta" id="wslDiscoveryLabel">Loading status...</div>
+      <div class="runtime-status-title" id="runtimeStatusTitle">CLI runtimes</div>
+      <div class="runtime-status-meta" id="runtimeStatusLabel">Loading runtime config...</div>
     </div>
   </div>
   <div class="api-key-group">
@@ -816,13 +816,15 @@ function renderMd(text) {
 }
 
 const API_BASE = window.location.origin;
-const PROVIDER_ORDER = ['claude', 'codex', 'gemini', 'ollama', 'copilot', 'cursor', 'kiro', 'auggie', 'opencode'];
+const PROVIDER_ORDER = ['openclaw', 'claude', 'codex', 'gemini', 'pi', 'goose', 'junie', 'ollama', 'copilot', 'cursor', 'kiro', 'auggie', 'opencode'];
+const CLI_RUNTIME_ORDER = ['native', 'wsl', 'docker'];
 let currentSessionId = null;
 let isStreaming = false;
 let observeSource = null;
 let observeFullText = '';
 let observeAssistantEl = null;
 let providerCatalog = null;
+let discoveryStatusPayload = null;
 
 function apiKey() {
   return document.getElementById('apiKeyInput').value;
@@ -936,6 +938,87 @@ function configuredProviderNames() {
   return [...ordered, ...extras];
 }
 
+function runtimeModeOrder(mode) {
+  const index = CLI_RUNTIME_ORDER.indexOf(mode || 'native');
+  return index >= 0 ? index : CLI_RUNTIME_ORDER.length;
+}
+
+function providerOrderIndex(providerName) {
+  const index = PROVIDER_ORDER.indexOf(providerName);
+  return index >= 0 ? index : PROVIDER_ORDER.length;
+}
+
+function configuredCliRuntimeInstances() {
+  if (!providerCatalog?.providers) return [];
+
+  return configuredProviderNames()
+    .flatMap((providerName) => {
+      const provider = providerMeta(providerName);
+      return (provider?.instances || [])
+        .filter((instance) => instance.backend === 'cli')
+        .map((instance) => ({
+          providerName,
+          provider,
+          instance,
+          runtime: instance.runtime || { mode: 'native' },
+        }));
+    })
+    .sort((left, right) => {
+      const byProvider = providerOrderIndex(left.providerName) - providerOrderIndex(right.providerName);
+      if (byProvider !== 0) return byProvider;
+
+      const byRuntime = runtimeModeOrder(left.runtime.mode) - runtimeModeOrder(right.runtime.mode);
+      if (byRuntime !== 0) return byRuntime;
+
+      return (left.instance.id || '').localeCompare(right.instance.id || '');
+    });
+}
+
+function summarizeCliRuntimes(entries) {
+  if (!entries.length) return 'No CLI runtimes configured';
+
+  const counts = {
+    native: 0,
+    wsl: 0,
+    docker: 0,
+  };
+
+  for (const entry of entries) {
+    const mode = entry.runtime?.mode || 'native';
+    if (Object.prototype.hasOwnProperty.call(counts, mode)) {
+      counts[mode] += 1;
+    }
+  }
+
+  return CLI_RUNTIME_ORDER
+    .filter((mode) => counts[mode] > 0)
+    .map((mode) => `${mode} ${counts[mode]}`)
+    .join(' · ');
+}
+
+function formatRuntimeDescriptor(entry) {
+  const provider = entry.provider;
+  const instance = entry.instance;
+  const runtime = entry.runtime || { mode: 'native' };
+  const target = (provider?.instances?.length || 0) > 1
+    ? `${entry.providerName}@${instance.id}`
+    : entry.providerName;
+  const runtimeLabel = runtime.mode === 'wsl'
+    ? `wsl:${runtime.distro || 'Ubuntu'}`
+    : runtime.mode === 'docker'
+      ? `docker:${runtime.container || 'container'}`
+      : 'native';
+
+  const bits = [`${target}`, `[${runtimeLabel}]`];
+  if (provider?.defaultInstance === instance.id && (!provider.defaultBackend || provider.defaultBackend === instance.backend)) {
+    bits.push('default');
+  }
+  if (instance.command) {
+    bits.push(`cmd:${instance.command}`);
+  }
+  return bits.join(' ');
+}
+
 function setCreateModalEnabled(enabled) {
   document.getElementById('createSessionBtn').disabled = !enabled;
 }
@@ -1010,6 +1093,7 @@ async function refreshProviderCatalog() {
     providerCatalog = data;
     syncProviderSelect();
     onProviderChange();
+    renderDiscoveryStatus(discoveryStatusPayload);
     refreshSessions();
     if (currentSessionId) {
       refreshSession();
@@ -1043,24 +1127,61 @@ function formatDiscoveryState(state) {
 }
 
 function renderDiscoveryStatus(payload) {
-  const group = document.getElementById('wslDiscoveryStatus');
-  const dot = document.getElementById('wslDiscoveryDot');
-  const policyEl = document.getElementById('wslDiscoveryPolicy');
-  const labelEl = document.getElementById('wslDiscoveryLabel');
+  discoveryStatusPayload = payload || discoveryStatusPayload;
+
+  const group = document.getElementById('runtimeStatus');
+  const dot = document.getElementById('runtimeStatusDot');
+  const policyEl = document.getElementById('runtimeStatusTitle');
+  const labelEl = document.getElementById('runtimeStatusLabel');
+  const runtimeEntries = configuredCliRuntimeInstances();
+  const runtimeSummary = summarizeCliRuntimes(runtimeEntries);
   const wsl = payload?.wsl || {};
+  const docker = payload?.docker || {};
   const summary = wsl.summary || {};
-  const policy = wsl.policy || 'always';
-  const state = summary.state || 'idle';
+  const state = summary.state === 'failed'
+    ? 'failed'
+    : runtimeEntries.length > 0
+      ? 'active'
+      : (providerCatalog?.providers ? 'not_applicable' : 'idle');
   const providers = wsl.providers || {};
 
   dot.dataset.state = state;
-  policyEl.textContent = `WSL ${policy}`;
-  labelEl.textContent = summary.message || formatDiscoveryState(state);
+  policyEl.textContent = 'CLI runtimes';
+  labelEl.textContent = runtimeEntries.length > 0
+    ? runtimeSummary
+    : (providerCatalog?.providers
+      ? 'No CLI runtimes configured'
+      : 'Loading runtime config...');
 
-  const tooltipLines = [
-    `Policy: ${policy}`,
-    `State: ${formatDiscoveryState(state)}`,
-  ];
+  const tooltipLines = [];
+
+  if (runtimeEntries.length > 0) {
+    tooltipLines.push(`Configured CLI runtime instances: ${runtimeEntries.length}`);
+    tooltipLines.push(`Summary: ${runtimeSummary}`);
+    for (const entry of runtimeEntries) {
+      tooltipLines.push(`- ${formatRuntimeDescriptor(entry)}`);
+    }
+  } else if (providerCatalog?.providers) {
+    tooltipLines.push('No CLI runtime instances configured');
+  } else {
+    tooltipLines.push('Runtime config is still loading');
+  }
+
+  if (payload?.wsl || payload?.docker) {
+    tooltipLines.push('');
+    tooltipLines.push('Background discovery:');
+  }
+
+  if (payload?.wsl) {
+    tooltipLines.push(
+      `WSL ${wsl.policy || 'always'} - ${summary.message || formatDiscoveryState(summary.state || 'idle')}`,
+    );
+  }
+  if (payload?.docker) {
+    tooltipLines.push(
+      `Docker ${docker.policy || 'if_running'} - ${docker.summary?.message || 'No Docker discovery status'}`,
+    );
+  }
 
   for (const [providerName, provider] of Object.entries(providers).sort(([left], [right]) => left.localeCompare(right))) {
     const bits = [

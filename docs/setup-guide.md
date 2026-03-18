@@ -161,8 +161,8 @@ backends:
 ```
 
 This lets one provider expose multiple independently logged-in environments,
-such as several WSL distros on one Windows host. Docker is not wired yet, but
-the environment/instance model is intended to extend in that direction.
+such as several WSL distros on one Windows host or dedicated Docker-backed
+instances for providers that run inside containers.
 
 For remote API providers, shared settings belong at the provider level. Put
 `transport`, `api_key_env`, shared headers, and common limits once under
@@ -355,7 +355,8 @@ Available values:
 
 If you define multiple WSL-backed provider instances, `GET /discovery/status`
 will report them separately as `cursor@ubuntu`, `cursor@debian`, `kiro@ubuntu`,
-and so on.
+and so on. The same endpoint also reports Docker discovery policy/status for
+Docker-backed native discovery targets.
 
 ---
 

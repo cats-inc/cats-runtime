@@ -13,6 +13,7 @@ describe('WslDiscoveryStatusStore', () => {
       cursorRuntime: { mode: 'native' },
       kiroRuntime: { mode: 'native' },
       nativeDiscoveryIntervalMs: 5000,
+      dockerDiscoveryPolicy: 'if_running',
       wslDiscoveryPolicy: 'always',
     });
 
@@ -22,6 +23,43 @@ describe('WslDiscoveryStatusStore', () => {
     });
     expect(payload.wsl.providers.cursor.state).toBe('not_applicable');
     expect(payload.wsl.providers.kiro.state).toBe('not_applicable');
+    expect(payload.docker.summary).toEqual({
+      state: 'not_applicable',
+      message: 'No Docker-backed native discovery targets configured',
+    });
+  });
+
+  it('reports configured Docker-backed native discovery targets', () => {
+    const payload = createDiscoveryStatusPayload({
+      cursorRuntime: { mode: 'native' },
+      kiroRuntime: { mode: 'native' },
+      nativeDiscoveryIntervalMs: 5000,
+      dockerDiscoveryPolicy: 'if_running',
+      wslDiscoveryPolicy: 'always',
+      providerInstances: {
+        opencode: {
+          'docker-dev': {
+            id: 'docker-dev',
+            providerName: 'opencode',
+            commandConfig: {
+              path: 'opencode',
+              runner: 'auto',
+              runtime: {
+                mode: 'docker',
+                container: 'cats-cli-test',
+              },
+            },
+          },
+        },
+      } as never,
+    });
+
+    expect(payload.docker.policy).toBe('if_running');
+    expect(payload.docker.configuredTargets).toBe(1);
+    expect(payload.docker.summary).toEqual({
+      state: 'active',
+      message: 'Background Docker discovery scans when containers are running',
+    });
   });
 
   it('starts WSL-backed providers in idle state when policy allows background scans', () => {

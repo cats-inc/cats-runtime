@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import type {
   CliRuntimeConfig,
+  DockerDiscoveryPolicy,
   RuntimeMode,
   WslDiscoveryPolicy,
 } from '../config.js';
@@ -10,6 +11,12 @@ import { syncNativeSessions, type NativeSessionSummary } from './nativeDiscovery
 const WSL_DISCOVERY_PROVIDERS = [
   'cursor',
   'kiro',
+] as const;
+const DOCKER_DISCOVERY_PROVIDERS = [
+  'cursor',
+  'goose',
+  'kiro',
+  'opencode',
 ] as const;
 const PROVIDER_STATES = [
   'not_applicable',
@@ -64,8 +71,20 @@ export interface WslDiscoveryStatusSnapshot {
   providers: Record<string, WslDiscoveryProviderStatus>;
 }
 
+export interface DockerDiscoveryStatusSnapshot {
+  backgroundEnabled: boolean;
+  nativeDiscoveryIntervalMs: number;
+  policy: DockerDiscoveryPolicy;
+  summary: {
+    state: 'not_applicable' | 'active' | 'disabled';
+    message: string;
+  };
+  configuredTargets: number;
+}
+
 export interface DiscoveryStatusPayload {
   wsl: WslDiscoveryStatusSnapshot;
+  docker: DockerDiscoveryStatusSnapshot;
 }
 
 export interface RunWslAwareNativeDiscoveryInput {
@@ -390,6 +409,7 @@ export function createDiscoveryStatusPayload(
     | 'cursorRuntime'
     | 'kiroRuntime'
     | 'nativeDiscoveryIntervalMs'
+    | 'dockerDiscoveryPolicy'
     | 'wslDiscoveryPolicy'
     | 'providerDefaultInstances'
     | 'providerInstances'
@@ -397,6 +417,7 @@ export function createDiscoveryStatusPayload(
 ): DiscoveryStatusPayload {
   return {
     wsl: new WslDiscoveryStatusStore(config).snapshot(),
+    docker: createDockerDiscoveryStatusSnapshot(config),
   };
 }
 
@@ -518,4 +539,71 @@ function errorMessage(error: unknown): string {
     return error.message;
   }
   return String(error);
+}
+
+function createDockerDiscoveryStatusSnapshot(
+  config: Pick<
+    CliRuntimeConfig,
+    | 'nativeDiscoveryIntervalMs'
+    | 'dockerDiscoveryPolicy'
+    | 'providerInstances'
+  >,
+): DockerDiscoveryStatusSnapshot {
+  const policy = config.dockerDiscoveryPolicy ?? 'if_running';
+  const configuredTargets = DOCKER_DISCOVERY_PROVIDERS
+    .flatMap((provider) => Object.values(config.providerInstances?.[provider] || {}))
+    .filter((instance) => instance.commandConfig.runtime.mode === 'docker')
+    .length;
+
+  if (configuredTargets === 0) {
+    return {
+      backgroundEnabled: config.nativeDiscoveryIntervalMs > 0,
+      nativeDiscoveryIntervalMs: config.nativeDiscoveryIntervalMs,
+      policy,
+      summary: {
+        state: 'not_applicable',
+        message: 'No Docker-backed native discovery targets configured',
+      },
+      configuredTargets,
+    };
+  }
+
+  if (config.nativeDiscoveryIntervalMs <= 0) {
+    return {
+      backgroundEnabled: false,
+      nativeDiscoveryIntervalMs: config.nativeDiscoveryIntervalMs,
+      policy,
+      summary: {
+        state: 'disabled',
+        message: 'Background native discovery is disabled',
+      },
+      configuredTargets,
+    };
+  }
+
+  if (policy === 'manual_only') {
+    return {
+      backgroundEnabled: true,
+      nativeDiscoveryIntervalMs: config.nativeDiscoveryIntervalMs,
+      policy,
+      summary: {
+        state: 'disabled',
+        message: 'Background Docker discovery is disabled by policy',
+      },
+      configuredTargets,
+    };
+  }
+
+  return {
+    backgroundEnabled: true,
+    nativeDiscoveryIntervalMs: config.nativeDiscoveryIntervalMs,
+    policy,
+    summary: {
+      state: 'active',
+      message: policy === 'if_running'
+        ? 'Background Docker discovery scans when containers are running'
+        : 'Background Docker discovery is active',
+    },
+    configuredTargets,
+  };
 }

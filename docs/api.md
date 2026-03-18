@@ -220,6 +220,12 @@ transport or runtime metadata that applies to that backend.
 `GET /pool/status` returns aggregated runtime status for all active backend
 managers, including `cli`, `api`, and `agent`.
 
+`GET /discovery/status` returns background discovery policy/status metadata for
+runtime-backed discovery families. It currently reports:
+
+- `wsl`: WSL discovery policy/status for Cursor and Kiro
+- `docker`: Docker discovery policy/status for Docker-backed native discovery targets
+
 ### Native Session Discovery
 
 ```text
