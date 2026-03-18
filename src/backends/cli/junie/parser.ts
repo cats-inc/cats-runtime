@@ -156,6 +156,14 @@ export function parseJunieSessionEventLine(
       };
     }
 
+    case 'AgentThoughtBlockUpdatedEvent': {
+      const thought = readString(agentEvent.text);
+      if (!thought) return null;
+      return {
+        events: [buildJunieProgressEvent('thought', thought, options.sessionId, state ?? undefined, agentEvent)],
+      };
+    }
+
     case 'LlmResponseMetadataEvent':
       return {
         events: [],

@@ -20,8 +20,29 @@ describe('JunieProvider', () => {
       expect(args).toContain('--output-format');
       expect(args).toContain('json');
       expect(args).toContain('--skip-update-check');
+      expect(args).toContain('--timeout');
+      expect(args).toContain('600000');
       expect(args).toContain('--project');
       expect(args).toContain('/tmp/test');
+    });
+
+    it('uses the configured Junie turn timeout when provided via env', () => {
+      const previous = process.env.CATS_JUNIE_TURN_TIMEOUT_MS;
+      process.env.CATS_JUNIE_TURN_TIMEOUT_MS = '12345';
+
+      try {
+        const provider = new JunieProvider();
+        const args = provider.buildSpawnArgs({ cwd: '/tmp/test' });
+        const timeoutIndex = args.indexOf('--timeout');
+        expect(timeoutIndex).toBeGreaterThanOrEqual(0);
+        expect(args[timeoutIndex + 1]).toBe('12345');
+      } finally {
+        if (previous === undefined) {
+          delete process.env.CATS_JUNIE_TURN_TIMEOUT_MS;
+        } else {
+          process.env.CATS_JUNIE_TURN_TIMEOUT_MS = previous;
+        }
+      }
     });
 
     it('normalizes Claude Sonnet variants to the Junie sonnet alias', () => {

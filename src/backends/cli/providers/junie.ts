@@ -20,6 +20,8 @@ import type {
 
 const DEFAULT_JUNIE_SESSIONS_DIR = join(os.homedir(), '.junie', 'sessions');
 const SESSION_POLL_INTERVAL_MS = 250;
+const DEFAULT_JUNIE_TURN_TIMEOUT_MS = 10 * 60 * 1000;
+const JUNIE_TURN_TIMEOUT_ENV = 'CATS_JUNIE_TURN_TIMEOUT_MS';
 
 export class JunieProvider implements Provider {
   name = 'junie';
@@ -48,16 +50,28 @@ export class JunieProvider implements Provider {
   }
 
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
-    const args = this.buildArgs(opts, this.pendingPrompt);
+    const args = this.buildArgs(
+      opts,
+      this.pendingPrompt,
+      resolveJunieTurnTimeoutMs(),
+    );
     this.pendingPrompt = null;
     return args;
   }
 
-  private buildArgs(opts: ProviderSpawnOptions, prompt?: string | null): string[] {
+  private buildArgs(
+    opts: ProviderSpawnOptions,
+    prompt?: string | null,
+    turnTimeoutMs: number = resolveJunieTurnTimeoutMs(),
+  ): string[] {
     const args: string[] = [
       '--output-format', 'json',
       '--skip-update-check',
     ];
+
+    if (turnTimeoutMs > 0) {
+      args.push('--timeout', String(turnTimeoutMs));
+    }
 
     const model = normalizeJunieModelId(opts.model);
     if (model) {
@@ -92,7 +106,8 @@ export class JunieProvider implements Provider {
       throw new Error('Junie command config is required before sending a message');
     }
 
-    const args = this.buildArgs(opts, content);
+    const turnTimeoutMs = resolveJunieTurnTimeoutMs();
+    const args = this.buildArgs(opts, content, turnTimeoutMs);
     const env = { ...process.env };
     delete env.CLAUDECODE;
 
@@ -132,6 +147,8 @@ export class JunieProvider implements Provider {
         : 0,
       usage: { inputTokens: 0, outputTokens: 0 },
       lastProgressKey: '',
+      lastProgressText: '',
+      lastMeaningfulProgressText: '',
     };
 
     const wake = () => {
@@ -155,6 +172,17 @@ export class JunieProvider implements Provider {
       }
 
       if (event.type === 'raw' && isJunieProgressEvent(event)) {
+        const progressText = typeof event.text === 'string' ? event.text.trim() : '';
+        if (progressText) {
+          state.lastProgressText = progressText;
+          if (
+            event.metadata?.progressKind !== 'status'
+            || !isLowSignalJunieStatus(progressText)
+          ) {
+            state.lastMeaningfulProgressText = progressText;
+          }
+        }
+
         const key = buildProgressKey(event);
         if (!key || key === state.lastProgressKey) {
           return;
@@ -218,6 +246,20 @@ export class JunieProvider implements Provider {
     };
 
     emitInitIfNeeded();
+
+    let turnTimeoutId: ReturnType<typeof setTimeout> | undefined;
+    if (turnTimeoutMs > 0) {
+      turnTimeoutId = setTimeout(() => {
+        if (finished) {
+          return;
+        }
+        enqueue({
+          type: 'error',
+          sessionId: state.sessionId,
+          text: buildJunieTurnTimeoutError(turnTimeoutMs, state),
+        });
+      }, turnTimeoutMs);
+    }
 
     const abortHandler = () => {
       finished = true;
@@ -316,6 +358,9 @@ export class JunieProvider implements Provider {
       }
     } finally {
       finished = true;
+      if (turnTimeoutId) {
+        clearTimeout(turnTimeoutId);
+      }
       opts.signal?.removeEventListener('abort', abortHandler);
       terminateChild();
       await monitor.catch(() => {});
@@ -426,6 +471,8 @@ interface LiveJunieTurnState {
   processedLineCount: number;
   usage: JunieUsageTotals;
   lastProgressKey: string;
+  lastProgressText: string;
+  lastMeaningfulProgressText: string;
 }
 
 interface JunieIndexEntry {
@@ -439,6 +486,11 @@ function isJunieProgressEvent(event: StreamEvent): boolean {
 
 function buildProgressKey(event: StreamEvent): string {
   return `${event.metadata?.progressKind ?? ''}:${event.text ?? ''}`;
+}
+
+function isLowSignalJunieStatus(text: string): boolean {
+  const normalized = text.trim().toLowerCase();
+  return normalized === 'sending llm request';
 }
 
 function mergeUsage(base: JunieUsageTotals, delta: JunieUsageTotals): JunieUsageTotals {
@@ -499,6 +551,38 @@ function buildJunieExitError(code: number | null, stderrLines: string[]): string
     details.push(`stderr: ${stderrLines.join(' | ')}`);
   }
   return details.join('. ');
+}
+
+function buildJunieTurnTimeoutError(
+  timeoutMs: number,
+  state: LiveJunieTurnState,
+): string {
+  const details = [`Junie did not finish within ${timeoutMs}ms`];
+  if (state.sessionId) {
+    details.push(`session: ${state.sessionId}`);
+  }
+  const progress = state.lastMeaningfulProgressText || state.lastProgressText;
+  if (progress) {
+    details.push(`last progress: ${progress}`);
+  }
+  details.push(
+    `Set ${JUNIE_TURN_TIMEOUT_ENV}=0 to disable the limit or raise it for longer tasks`,
+  );
+  return details.join('. ');
+}
+
+function resolveJunieTurnTimeoutMs(): number {
+  const raw = process.env[JUNIE_TURN_TIMEOUT_ENV]?.trim();
+  if (!raw) {
+    return DEFAULT_JUNIE_TURN_TIMEOUT_MS;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return DEFAULT_JUNIE_TURN_TIMEOUT_MS;
+  }
+
+  return parsed;
 }
 
 async function sleep(ms: number, signal?: AbortSignal): Promise<void> {

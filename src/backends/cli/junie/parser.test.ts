@@ -121,6 +121,36 @@ describe('parseJunieStreamLine', () => {
     });
   });
 
+  it('parses Junie thought updates into raw progress events', () => {
+    const parsed = parseJunieSessionEventLine(JSON.stringify({
+      kind: 'SessionA2uxEvent',
+      event: {
+        state: 'IN_PROGRESS',
+        agentEvent: {
+          kind: 'AgentThoughtBlockUpdatedEvent',
+          text: 'Delivering the PRD now.',
+        },
+      },
+    }), { sessionId: 'session-thought' });
+
+    expect(parsed).toEqual({
+      events: [{
+        type: 'raw',
+        sessionId: 'session-thought',
+        text: 'Delivering the PRD now.',
+        raw: {
+          kind: 'AgentThoughtBlockUpdatedEvent',
+          text: 'Delivering the PRD now.',
+        },
+        metadata: {
+          source: 'junie-progress',
+          progressKind: 'thought',
+          state: 'IN_PROGRESS',
+        },
+      }],
+    });
+  });
+
   it('parses Junie result block into text and result events', () => {
     const parsed = parseJunieSessionEventLine(JSON.stringify({
       kind: 'SessionA2uxEvent',
