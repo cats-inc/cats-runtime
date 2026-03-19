@@ -53,7 +53,7 @@ Add your project-specific automation scripts here.
 | [a2a/](./a2a/) | ?? | A2A protocol examples and templates; some current examples still need A2A v1 alignment |
 | [specs/](./specs/) | ? Active | Feature specifications, including WSL discovery and agent backend planning |
 | [plans/](./plans/) | ? Active | Implementation plans, including WSL discovery, API/backend expansion, and the proposed standalone versus app-managed startup contract |
-| [decisions/](./decisions/) | ? Active | Architecture Decision Records, including the proposed app-managed self-hosted runtime packaging direction |
+| [decisions/](./decisions/) | ? Active | Architecture Decision Records, including the proposed app-managed self-hosted runtime packaging direction and the accepted provider-install metadata manifest direction |
 
 **Legend**: ? Complete | ?? Template (needs content) | ?? Directory
 
@@ -91,4 +91,4 @@ When working on this project:
 
 ---
 
-*Last updated: 2026-03-19*
+*Last updated: 2026-03-20*
