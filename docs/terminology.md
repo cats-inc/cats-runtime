@@ -10,6 +10,10 @@
 | AGENTS.md | "A simple, open format for guiding coding agents, used by over 60k open-source projects. Think of it as a README for agents." |
 | MCP | Model Context Protocol; see modelcontextprotocol.io for the official description. In this project, MCP refers to agent-to-tool integration. |
 | A2A | "An open protocol enabling communication and interoperability between opaque agentic applications." |
+| Agent Card | The A2A capability and identity document that describes an agent's supported interfaces, skills, auth schemes, and interaction defaults. |
+| Project Memory | Durable markdown-based repo knowledge such as progress, ADRs, specs, plans, architecture notes, and handoff state. |
+| Skill Package | A repo-local `skills/<name>/SKILL.md` package plus supporting resources used for reusable procedural know-how. |
+| Agent Skill | Capability metadata advertised through an A2A Agent Card. It is related to, but not identical with, a repo-local `SKILL.md` package. |
 
 ## Template Architecture
 
@@ -40,4 +44,4 @@ If your project does not use layered templates, you can remove this section.
 
 ---
 
-Last updated: YYYY-MM-DD
+Last updated: 2026-03-19
