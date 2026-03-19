@@ -192,6 +192,25 @@ For file-backed providers:
    keep using their container-local session paths until Docker file discovery is
    implemented
 
+## Memory Ownership and Exports
+
+`cats-runtime` now needs an explicit boundary between runtime evidence and
+higher-level product memory.
+
+- **Provider-native continuity** such as thread ids, OpenClaw session keys, or
+  backend compaction state remains runtime/backend-owned.
+- **Runtime evidence history** is the runtime's canonical record of execution
+  events, tool activity, artifacts, and provider metadata.
+- **Durable Cat/owner memory** is not runtime-owned by default; upstream
+  products such as `cats-inc` decide what long-lived memory to derive from
+  runtime evidence.
+- **Archive/RAG retrieval** should consume explicit exports or projections, not
+  reach directly into provider-native transcript stores as the only source of
+  truth.
+
+This keeps agent-native transcripts useful for continuity without making them
+the only durable memory surface for the Cats suite.
+
 ## Design Rules
 
 - Upper layers should depend on `cats-runtime`, not on provider-specific CLIs
