@@ -47,6 +47,8 @@ that depends on runtime setup primitives.
   adapters
 - capture redacted evidence bundles that can be replayed in tests and used to
   accelerate future fixes
+- support hot CLI updates and re-probing without requiring every operator to
+  restart the runtime manually
 
 ## Non-Goals
 
@@ -79,40 +81,61 @@ that depends on runtime setup primitives.
    - runtime mode or environment kind
    - observable output or protocol signature
    - discovered feature or flag support
-3. The runtime shall maintain provider behavior knowledge in runtime-owned
+3. The runtime shall support fingerprints where version data is unavailable,
+   ambiguous, or unreliable.
+   - fingerprinting shall be able to continue with version set to unknown
+   - profile selection shall be able to fall back to output-signature,
+     feature-detection, or protocol-family matching
+4. The runtime shall maintain provider behavior knowledge in runtime-owned
    assets.
-4. Provider behavior knowledge shall be keyed by runtime provider family and be
+5. Provider behavior knowledge shall be keyed by runtime provider family and be
    able to describe version-specific or signature-specific behavior.
-5. The knowledge model shall be able to represent at least:
+6. The knowledge model shall be able to represent at least:
    - spawn hints and expected flags
+   - approval or confirmation handling patterns
    - output or protocol family
+   - tool-result parsing patterns
    - known quirks and breaking changes
    - resume/session semantics
+   - session resume token or identifier extraction hints
    - parser/profile identifiers
    - failure signatures
+   - error categorization hints
    - compatibility notes for setup and diagnostics
-6. Before normal CLI execution or provider setup verification, the runtime
+7. Before normal CLI execution or provider setup verification, the runtime
    shall choose a compatibility profile based on the available fingerprint and
    knowledge records.
-7. Compatibility profiles may be:
+8. Compatibility profile selection should prefer ranked best-fit fallback with
+   operator-visible warnings over exact-match-only behavior.
+   - semver ranges, feature hints, and protocol signatures may all contribute
+     to the ranking
+   - exact matches remain valid, but minor version bumps should not force an
+     automatic hard failure when the behavior still appears compatible
+9. Compatibility profiles may be:
    - declarative
    - code-backed
    - hybrid
-8. Stateful or protocol-heavy providers such as JSON-RPC-backed CLIs may
+10. Stateful or protocol-heavy providers such as JSON-RPC-backed CLIs may
    continue to use handwritten adapters behind the selected compatibility
    profile.
-9. The runtime shall not silently treat unknown provider behavior as known-good.
+11. The runtime shall not silently treat unknown provider behavior as known-good.
    If matching confidence is weak or parsing fails, the runtime shall surface a
    degraded compatibility result.
-10. The compatibility engine shall emit explicit classifications such as:
+12. The compatibility engine shall emit explicit classifications such as:
     - `ready`
     - `degraded`
     - `unrecognized_protocol`
     - `unsupported_version`
     - `probe_failed`
-11. On compatibility failure or unknown behavior, the runtime shall capture a
+13. The runtime shall expose explicit re-probe paths so hot CLI updates can be
+    detected without requiring a full runtime restart.
+    Re-probing should be possible at least:
+    - on new session creation when cached compatibility data is stale or absent
+    - from an explicit dashboard or API action
+    - after a detected compatibility mismatch or probe failure
+14. On compatibility failure or unknown behavior, the runtime shall capture a
     redacted evidence bundle suitable for later replay and review.
-12. Evidence bundles shall be able to include, where available:
+15. Evidence bundles shall be able to include, where available:
     - provider family and instance
     - backend and runtime mode
     - detected version data
@@ -121,16 +144,23 @@ that depends on runtime setup primitives.
     - stdout/stderr samples
     - exit code or failure classification
     - timestamp and platform metadata
-13. The runtime shall provide a replay path so compatibility evidence can be
+16. The runtime shall provide a replay path so compatibility evidence can be
     turned into deterministic fixtures and regression tests.
-14. Runtime-owned setup and diagnostics APIs shall consume the same
+17. The compatibility subsystem shall define an evidence-to-fix feedback loop.
+    At minimum, the workflow shall support:
+    - human review of captured evidence
+    - optional tool-assisted or LLM-assisted analysis outside the hot path
+    - updating runtime-owned knowledge or compatibility profiles
+    - validating those updates with replay fixtures or regression tests before
+      shipping
+18. Runtime-owned setup and diagnostics APIs shall consume the same
     compatibility engine used by normal execution flows.
-15. The embedded dashboard may surface compatibility/readiness findings exposed
+19. The embedded dashboard may surface compatibility/readiness findings exposed
     by this engine.
-16. `cats-runtime` shall not require `environment-bootstrap` to be present at
+20. `cats-runtime` shall not require `environment-bootstrap` to be present at
     runtime. Any reused knowledge must be ported into runtime-owned assets or
     code.
-17. Any future LLM-assisted compatibility analysis shall be optional,
+21. Any future LLM-assisted compatibility analysis shall be optional,
     review-oriented, and outside the hot execution path.
 
 ### Non-Functional Requirements
@@ -189,6 +219,9 @@ profiles:
     match:
       version: "^1.0.0"
       runtime_modes: ["native", "wsl"]
+      output_signatures:
+        - kind: "json-line"
+          fields: ["type", "session_id"]
     spawn:
       args:
         - "-p"
@@ -196,14 +229,55 @@ profiles:
         - "stream-json"
         - "--output-format"
         - "stream-json"
+    approvals:
+      mode: "none"
     output:
       kind: "ndjson"
+      tool_result:
+        pattern: "content_block_delta"
+      resume:
+        session_id_path: "$.session_id"
+    errors:
+      categories:
+        auth:
+          stderr_contains: ["authentication", "login required"]
+        rate_limit:
+          stderr_contains: ["rate limit", "too many requests"]
     known_quirks:
       - "partial assistant chunks arrive as content_block_delta"
+      - "resume token is exposed as session_id on init/result frames"
+  cli-version-unknown:
+    match:
+      version: "unknown"
+      output_signatures:
+        - kind: "json-line"
+          fields: ["type", "message"]
+    selection:
+      warning: "best-fit fallback because version could not be determined"
 ```
 
 Exact field names can change. The important design point is that compatibility
 knowledge should become structured, reviewable, and runtime-owned.
+
+## Version Detection and Fallback
+
+Version detection should be treated as useful but unreliable, not as a hard
+precondition.
+
+Known realities include:
+
+- some CLIs do not expose a stable `--version` flag
+- some output version strings in inconsistent formats
+- some can only reveal meaningful runtime details after partial initialization
+  or authentication
+
+The compatibility engine should therefore support:
+
+- exact version matching when it is available and trustworthy
+- semver-range matching when it is available but broader matching is safer
+- signature or feature-based fallback when version is unknown
+- explicit warnings when the runtime is operating on a best-fit rather than a
+  strongly identified exact match
 
 ## Profile-Driven, Not Schema-Only
 
@@ -221,6 +295,20 @@ That means:
 This keeps the system flexible enough for providers such as `claude`, `codex`,
 `copilot`, `kiro`, or future CLIs that do not share one simple stream grammar.
 
+## Hot Update and Re-Probe Direction
+
+The compatibility engine should assume that local CLIs can change while
+`cats-runtime` remains running.
+
+That means the runtime should not require a full restart just to notice that:
+
+- a CLI was upgraded
+- a CLI was replaced with a different build
+- a previously known provider now produces a different protocol signature
+
+Re-probe may be cached, but the cache must be refreshable through explicit or
+runtime-managed triggers.
+
 ## Evidence Direction
 
 Evidence should be treated as a first-class maintenance asset, not as incidental
@@ -232,6 +320,19 @@ Preferred direction:
 - redact sensitive paths, secrets, and user content where practical
 - store enough metadata to reproduce the failure meaningfully
 - make replay into tests straightforward
+
+## Evidence-to-Fix Loop
+
+The intended maintenance loop is:
+
+1. runtime captures a redacted evidence bundle
+2. a maintainer reviews the bundle, optionally with tool assistance
+3. runtime-owned knowledge or compatibility profiles are updated
+4. replay fixtures or regression tests validate the new behavior
+5. the updated profile ships back into `cats-runtime`
+
+Tooling may assist parts of this loop, including offline LLM analysis, but the
+approval and merge step should remain reviewable by humans.
 
 ## Dependencies
 
@@ -248,9 +349,6 @@ Preferred direction:
 - [ ] What evidence retention policy is appropriate for local runtime installs?
 - [ ] How aggressive should automatic probing be before it starts becoming too
       expensive or noisy for normal startup?
-- [ ] Should compatibility profiles be selectable only by exact fingerprint
-      matches, or also by ranked best-fit fallback with operator-visible
-      warnings?
 
 ## References
 
