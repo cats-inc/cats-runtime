@@ -87,6 +87,18 @@ This decision includes:
    - approval-aware
    - sidecar or review-copy behavior for conflicting local customizations when
      in-place overwrite would be unsafe
+8. Workspace-substrate operations follow a single-point authorization model.
+   - `init-workspace` apply operations are reserved for Boss Cat,
+     system-layer flows, or owner-approved actions
+   - `audit-workspace` is read-only and may be invoked broadly to hydrate
+     local collaboration context
+   - `update-workspace` may generate proposals broadly, but apply operations
+     require Boss Cat or owner approval
+9. Workspace-local collaboration rules remain the default authority for Cats.
+   - `AGENTS.md` and related project-memory docs take precedence over transient
+     Boss Cat instructions by default
+   - explicit override requests require owner approval before Cats may treat
+     the transient instruction as authoritative
 
 ## Rationale
 

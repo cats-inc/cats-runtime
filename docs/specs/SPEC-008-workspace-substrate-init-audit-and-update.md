@@ -97,7 +97,9 @@ dependencies on that repo.
 8. `init-workspace` shall be able to accept structured inputs such as:
    - target workspace path
    - selected substrate profile
-   - optional stack or repo hints
+   - optional repo-shape or collaboration hints, such as monorepo vs.
+     single-project layout, documentation conventions, or technology labels
+     used to tune collaboration docs without scaffolding application code
    - enabled agent set
    - whether A2A starter artifacts should be included
    - whether the operation is preview-only or apply
@@ -136,6 +138,28 @@ dependencies on that repo.
     tools, but they shall not need to duplicate substrate-generation logic.
 20. The substrate tools should remain approval-friendly for Boss Cat or owner
     control flows.
+21. Workspace-substrate operations shall follow an explicit authorization
+    model.
+    - `init-workspace` apply operations are restricted to Boss Cat,
+      system-layer control flows, or owner-approved actions
+    - `audit-workspace` is read-only and may be invoked by any Cat, Boss Cat,
+      product host, or operator flow
+    - `update-workspace` may generate a proposal broadly, but apply operations
+      require Boss Cat or owner approval
+22. Workspace-substrate operations shall expose enough metadata for hosts and
+    skills to enforce the authorization model before apply.
+23. Workspace-substrate behavior shall follow an explicit instruction
+    precedence model.
+    - workspace collaboration rules recorded in files such as `AGENTS.md` and
+      related project-memory docs take precedence over transient Boss Cat
+      instructions by default
+    - Boss Cat may request an override only when the override is explicit and
+      owner-approved
+    - when a transient instruction conflicts with workspace substrate and no
+      approved override exists, Cats shall treat the workspace substrate as the
+      controlling source
+24. The first slice shall standardize review-copy outputs on a fixed
+    `*.bootstrap` suffix for conflicting file updates.
 
 ### Non-Functional Requirements
 
@@ -199,6 +223,8 @@ interface WorkspaceSubstrateAction {
   path: string;
   reason: string;
   preview?: string;
+  sidecarPath?: string; // e.g. AGENTS.md.bootstrap
+  requiresApproval?: boolean;
 }
 ```
 
@@ -215,6 +241,8 @@ The intended layering is:
 - substrate tools own deterministic filesystem and audit behavior
 - skills own when and why those tools should run
 - Boss Cat and product hosts own policy, approval, and follow-on delegation
+- workspace substrate remains the default collaboration authority unless an
+  explicit approved override is in effect
 
 Examples:
 
@@ -223,6 +251,9 @@ Examples:
   `init-workspace`
 - the skill may then ask for approval or trigger downstream Cats after the
   substrate is ready
+- a specialist Cat may run `audit-workspace` to hydrate local collaboration
+  context, but should not unilaterally apply `init-workspace` or
+  `update-workspace`
 
 But the skill should not itself become the only source of `AGENTS.md`,
 `docs/AGENT-GUIDE.md`, or related substrate content.
@@ -235,6 +266,10 @@ But the skill should not itself become the only source of `AGENTS.md`,
 - AAIF-compliant section ordering
 - docs/checklist expectations
 - conservative update patterns such as review-copy behavior
+
+The first slice should adopt the same `*.bootstrap` review-copy convention
+already validated in `project-bootstrap`, while keeping the implementation and
+template assets runtime-owned.
 
 The runtime should port only the collaboration-substrate pieces it actually
 needs. The first slice should not try to embed:
@@ -260,8 +295,6 @@ needs. The first slice should not try to embed:
       `a2a-enabled`?
 - [ ] What is the smallest default file set that still gives Cats reliable
       collaboration substrate in an existing repo?
-- [ ] Should sidecar update outputs use a fixed `.bootstrap` suffix, or should
-      the runtime adopt a more explicit proposal path format?
 - [ ] Should workspace-substrate actions be surfaced first as HTTP endpoints,
       runtime-local tools, or both together?
 
