@@ -75,6 +75,15 @@ This decision includes:
    knowledge and execution assets, but the runtime manifest becomes the place
    where Cats-level provider intent and install metadata are normalized.
 
+This ADR intentionally leaves one implementation detail open:
+
+- the metadata may extend `config/providers.yaml` directly
+- or it may live in a closely related sibling manifest keyed by the same
+  runtime provider families
+
+The architectural requirement is a single runtime-owned source of provider
+install truth, not a premature commitment to one file split.
+
 ## Preferred Manifest Direction
 
 The manifest direction should support fields equivalent to:
@@ -114,6 +123,10 @@ Where practical, the manifest should prefer stable installer identifiers and
 execution metadata over hardcoded end-user-facing script paths, so packaged
 hosts can resolve those identifiers onto bundled `environment-bootstrap`-based
 assets without creating a second provider matrix.
+
+In this example, `claude` is the runtime provider family name, which matches
+current `providers.yaml` naming. `claude-code` is the installer/tool identifier
+used to resolve the concrete install asset for that family on each platform.
 
 ## Consequences
 
@@ -165,6 +178,14 @@ assets without creating a second provider matrix.
 - **Why rejected**: packaged hosts should own install execution and privilege
   flows
 
+### Alternative 4: Force a Two-File Split Up Front
+
+- **Pros**: keeps execution topology and install metadata physically separate
+- **Cons**: commits the project to a file split before implementation proves
+  whether that separation is actually clearer
+- **Why rejected**: the important decision is runtime ownership of provider
+  install truth; the exact file split can stay implementation-driven
+
 ## References
 
 - [ADR-003](./003-provider-instance-config.md)
@@ -176,4 +197,4 @@ assets without creating a second provider matrix.
 ---
 
 *Accepted: 2026-03-20*
-*Accepted by: user direction captured through Codex*
+*Decision makers: user + Codex*
