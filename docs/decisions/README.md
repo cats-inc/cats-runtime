@@ -38,6 +38,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
+| [012-separate-evidence-memory-and-retrieval-layers](./012-separate-evidence-memory-and-retrieval-layers.md) | Separate evidence, durable memory, and retrieval layers | Accepted | 2026-03-19 |
 | [011-runtime-owned-browser-and-preview-subsystem-with-pluggable-drivers](./011-runtime-owned-browser-and-preview-subsystem-with-pluggable-drivers.md) | Add a runtime-owned browser and preview subsystem with pluggable drivers | Proposed | 2026-03-19 |
 | [010-separate-a2a-protocol-project-memory-and-skill-packages](./010-separate-a2a-protocol-project-memory-and-skill-packages.md) | Separate A2A protocol artifacts, project memory, and skill packages | Accepted | 2026-03-19 |
 | [008-runtime-owned-provider-model-catalog](./008-runtime-owned-provider-model-catalog.md) | Keep provider model catalog discovery runtime-owned | Accepted | 2026-03-19 |
