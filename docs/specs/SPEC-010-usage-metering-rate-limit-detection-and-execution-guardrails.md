@@ -109,7 +109,7 @@ for budget governance.
     - backend family
     - session
     - workspace key
-    - caller-provided context tags such as task id or cat id when available
+    - caller-provided opaque tags or labels when available
 13. The runtime shall support execution-side guardrails that can warn, cool
     down, or block when configured thresholds are hit.
 14. Guardrail scopes should be able to include at least:
@@ -165,10 +165,7 @@ interface RuntimeUsageRecord {
   backend: 'api' | 'local' | 'cli' | 'agent';
   sessionId?: string;
   workspaceKey?: string;
-  context?: {
-    taskId?: string;
-    catId?: string;
-  };
+  callerTags?: Record<string, string>;
   observedAt: string;
   inputTokens?: number;
   outputTokens?: number;
