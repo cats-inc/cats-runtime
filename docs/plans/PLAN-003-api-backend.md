@@ -392,7 +392,9 @@ runtime policy that is comparable to CLI agent workflows.
       or URL-context integration.
 - [ ] Ollama: optional native `/api/chat` path, model warm-up hints, and local
       model lifecycle operations such as list / pull / running-model checks.
-- [ ] Add per-instance spending, rate-limit, and concurrency guardrails.
+- [ ] Add runtime-wide per-instance/session/workspace usage, rate-limit, and
+      concurrency guardrails through shared runtime metering rather than an
+      API-only subsystem.
 
 **Deliverables**: API providers and Ollama are cheaper, faster, and more
 capable than a pure history-replay MVP.
@@ -514,8 +516,9 @@ tests and operator documentation.
 ## Open Follow-Ups
 
 1. Record a new ADR once the backend-neutral execution seam is finalized.
-2. Decide whether billing / usage budget enforcement belongs in `src/core` or
-   inside `src/backends/api`.
+2. Align implementation with the accepted runtime split: usage metering,
+   rate-limit detection, and execution guardrails belong in shared runtime
+   layers under `src/core`, with backend modules emitting normalized signals.
 3. Decide whether transcript compaction / summarization should be provider
    specific or runtime generic.
 

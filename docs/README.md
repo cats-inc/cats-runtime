@@ -51,9 +51,9 @@ Add your project-specific automation scripts here.
 | [AGENT-GUIDE.md](./AGENT-GUIDE.md) | ? Active | Project-specific agent notes |
 | [terminology.md](./terminology.md) | ? Active | AAIF, A2A, skills, and project-memory terminology |
 | [a2a/](./a2a/) | ?? | A2A protocol examples and templates; some current examples still need A2A v1 alignment |
-| [specs/](./specs/) | ? Active | Feature specifications, including WSL discovery, agent backend planning, the provider compatibility/evidence-engine direction, the workspace-substrate init/audit/update direction, and the executable delivery/governance primitives direction |
+| [specs/](./specs/) | ? Active | Feature specifications, including WSL discovery, agent backend planning, the provider compatibility/evidence-engine direction, the workspace-substrate init/audit/update direction, the executable delivery/governance primitives direction, and the usage-metering/rate-limit/guardrail direction |
 | [plans/](./plans/) | ? Active | Implementation plans, including WSL discovery, API/backend expansion, and the proposed standalone versus app-managed startup contract |
-| [decisions/](./decisions/) | ? Active | Architecture Decision Records, including the proposed app-managed self-hosted runtime packaging direction, the accepted provider-install metadata manifest direction, the accepted lightweight runtime setup/diagnostics surface, the accepted workspace-substrate tooling direction, and the accepted executable-delivery-vs-policy split |
+| [decisions/](./decisions/) | ? Active | Architecture Decision Records, including the proposed app-managed self-hosted runtime packaging direction, the accepted provider-install metadata manifest direction, the accepted lightweight runtime setup/diagnostics surface, the accepted workspace-substrate tooling direction, the accepted executable-delivery-vs-policy split, and the accepted usage-metering/rate-limit/guardrail split |
 
 **Legend**: ? Complete | ?? Template (needs content) | ?? Directory
 
