@@ -74,6 +74,7 @@ workflow policy or scheduler semantics.
    - parent session id
    - parent checkpoint or handoff summary
    - optional transcript excerpt or message bundle
+   - optional structured blocks or tool-result-like content when available
    - optional artifact or output references
    - requested child provider/model/instance overrides
    - requested child instructions or contextual labels
@@ -186,6 +187,9 @@ The first slice should not require:
 - [ ] Should the first context-transplant slice carry only a summary and curated
       excerpt, or also allow fuller managed transcript cloning when the caller
       requests it?
+- [ ] Should transcript excerpts evolve beyond simple user/assistant text into a
+      richer block format that can retain tool results, structured data, or
+      diagram references?
 - [ ] Which session inspection surfaces should expose branch lineage first:
       HTTP only, dashboard only, or both?
 - [ ] Should branch creation reuse the current `/sessions/{id}/fork` route with
