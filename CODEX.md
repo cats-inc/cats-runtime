@@ -51,6 +51,8 @@ If assigned as Conductor in Project Roles table:
 - **MUST** update documentation when changing public APIs
 - **MUST** follow coding conventions specified in AGENTS.md
 - **MUST** respect `.editorconfig` settings (LF line endings, final newline, trim rules)
+- **MUST NOT** use `git add -f` to commit files ignored by `.gitignore` when they are local machine config, runtime state, or other environment-specific data
+- **MUST** prefer checked-in templates such as `*.example` files when configuration examples need to be documented or updated
 - **SHOULD** make minimal, focused changes
 - **SHOULD** commit frequently with clear messages
 
