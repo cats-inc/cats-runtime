@@ -48,6 +48,7 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 
 | Spec | Title | Status | Related Plan |
 |------|-------|--------|--------------|
+| [SPEC-007](./SPEC-007-provider-compatibility-and-evidence-engine.md) | Provider Compatibility and Evidence Engine | Draft (Pending Review) | TBD |
 | [SPEC-006](./SPEC-006-a2a-protocol-project-memory-and-skill-layering.md) | A2A Protocol, Project Memory, and Skill Layering | Approved | TBD |
 | [SPEC-005](./SPEC-005-runtime-managed-skills-v0.md) | Runtime-Managed Skills v0 | Draft | TBD |
 | [SPEC-004](./SPEC-004-provider-model-catalog-and-discovery.md) | Provider Model Catalog and Discovery | Approved | [PLAN-005](../plans/PLAN-005-provider-model-catalog-and-discovery.md) |
@@ -66,4 +67,4 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 ---
 
 *See also: [plans/](../plans/) for implementation plans*
-*Last updated: 2026-03-19*
+*Last updated: 2026-03-20*

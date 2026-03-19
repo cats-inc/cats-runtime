@@ -71,9 +71,9 @@ This decision includes:
    install scripts.
    - packaged hosts still own shell execution, privilege prompts, and resume
      orchestration
-6. `environment-bootstrap` remains the source of install/check script
-   knowledge and execution assets, but the runtime manifest becomes the place
-   where Cats-level provider intent and install metadata are normalized.
+6. `environment-bootstrap` may remain an internal source of install/check
+   knowledge and experimentation, but the runtime manifest becomes the place
+   where shipped Cats provider intent and install metadata are normalized.
 
 This ADR intentionally leaves one implementation detail open:
 
@@ -121,8 +121,8 @@ preserve this split:
 
 Where practical, the manifest should prefer stable installer identifiers and
 execution metadata over hardcoded end-user-facing script paths, so packaged
-hosts can resolve those identifiers onto bundled `environment-bootstrap`-based
-assets without creating a second provider matrix.
+hosts can resolve those identifiers onto bundled product-owned assets without
+creating a second provider matrix.
 
 In this example, `claude` is the runtime provider family name, which matches
 current `providers.yaml` naming. `claude-code` is the installer/tool identifier
@@ -135,8 +135,8 @@ used to resolve the concrete install asset for that family on each platform.
 - reduces provider drift between runtime execution and product setup UI
 - gives packaged hosts one source of provider-install truth
 - keeps provider pack classification close to provider topology
-- allows `environment-bootstrap` execution assets to stay reusable without
-  forcing product UIs to hardcode install knowledge independently
+- allows internal bootstrap knowledge to be ported into shipped Cats assets
+  without forcing product UIs to hardcode install knowledge independently
 
 ### Negative
 

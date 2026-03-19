@@ -38,6 +38,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
+| [014-keep-lightweight-provider-setup-and-diagnostics-in-cats-runtime](./014-keep-lightweight-provider-setup-and-diagnostics-in-cats-runtime.md) | Keep lightweight provider setup and diagnostics in `cats-runtime` | Accepted | 2026-03-20 |
 | [013-extend-provider-manifests-with-install-and-check-metadata](./013-extend-provider-manifests-with-install-and-check-metadata.md) | Extend provider manifests with install and check metadata | Accepted | 2026-03-20 |
 | [012-separate-evidence-memory-and-retrieval-layers](./012-separate-evidence-memory-and-retrieval-layers.md) | Separate evidence, durable memory, and retrieval layers | Accepted | 2026-03-19 |
 | [011-runtime-owned-browser-and-preview-subsystem-with-pluggable-drivers](./011-runtime-owned-browser-and-preview-subsystem-with-pluggable-drivers.md) | Add a runtime-owned browser and preview subsystem with pluggable drivers | Proposed | 2026-03-19 |

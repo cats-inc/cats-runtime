@@ -51,9 +51,9 @@ Add your project-specific automation scripts here.
 | [AGENT-GUIDE.md](./AGENT-GUIDE.md) | ? Active | Project-specific agent notes |
 | [terminology.md](./terminology.md) | ? Active | AAIF, A2A, skills, and project-memory terminology |
 | [a2a/](./a2a/) | ?? | A2A protocol examples and templates; some current examples still need A2A v1 alignment |
-| [specs/](./specs/) | ? Active | Feature specifications, including WSL discovery and agent backend planning |
+| [specs/](./specs/) | ? Active | Feature specifications, including WSL discovery, agent backend planning, and the provider compatibility/evidence-engine direction |
 | [plans/](./plans/) | ? Active | Implementation plans, including WSL discovery, API/backend expansion, and the proposed standalone versus app-managed startup contract |
-| [decisions/](./decisions/) | ? Active | Architecture Decision Records, including the proposed app-managed self-hosted runtime packaging direction and the accepted provider-install metadata manifest direction |
+| [decisions/](./decisions/) | ? Active | Architecture Decision Records, including the proposed app-managed self-hosted runtime packaging direction, the accepted provider-install metadata manifest direction, and the accepted lightweight runtime setup/diagnostics surface |
 
 **Legend**: ? Complete | ?? Template (needs content) | ?? Directory
 
