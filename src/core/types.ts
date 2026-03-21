@@ -38,6 +38,17 @@ export type WorkspaceSubstrateActionType =
   | 'skip'
   | 'warn'
   | 'write_sidecar';
+export type WorkspaceSubstrateExecutionMode = 'preview' | 'apply';
+export type WorkspaceSubstrateApplyDecision =
+  | 'not_requested'
+  | 'read_only_operation'
+  | 'blocked'
+  | 'applied';
+export type WorkspaceSubstrateMergeStrategy =
+  | 'create'
+  | 'update_managed'
+  | 'review_copy'
+  | 'noop';
 export type WorkspaceSubstrateActorRole =
   | 'boss_cat'
   | 'specialist_cat'
@@ -69,6 +80,14 @@ export interface WorkspaceSubstrateAuthorization {
   reason: string;
 }
 
+export interface WorkspaceSubstrateContract {
+  mode: WorkspaceSubstrateExecutionMode;
+  safeDefaultMode: 'preview';
+  applyRequested: boolean;
+  applyDecision: WorkspaceSubstrateApplyDecision;
+  readOnly: boolean;
+}
+
 export interface WorkspaceSubstrateRequest {
   operation: WorkspaceSubstrateOperation;
   workspacePath: string;
@@ -90,19 +109,60 @@ export interface WorkspaceSubstrateFinding {
   reviewCopyPath?: string;
 }
 
+export interface WorkspaceSubstrateDiffStats {
+  changed: boolean;
+  addedLines: number;
+  removedLines: number;
+}
+
 export interface WorkspaceSubstrateAction {
   type: WorkspaceSubstrateActionType;
   path: string;
   reason: string;
+  outputPath?: string;
+  mergeStrategy?: WorkspaceSubstrateMergeStrategy;
+  managed?: boolean;
+  actualHash?: string;
+  desiredHash?: string;
   preview?: string;
   diff?: string;
+  diffStats?: WorkspaceSubstrateDiffStats;
   reviewCopyPath?: string;
   requiresApproval?: boolean;
+}
+
+export interface WorkspaceSubstrateApplyPayload {
+  operation: 'init-workspace' | 'update-workspace';
+  workspacePath: string;
+  profile: WorkspaceSubstrateProfileId;
+  enabledAgents: Array<'claude' | 'gemini' | 'codex'>;
+  includeA2A: boolean;
+  hints?: WorkspaceSubstrateHints;
+  apply: true;
+}
+
+export interface WorkspaceSubstratePlan {
+  stepCount: number;
+  changedPaths: string[];
+  reviewCopyPaths: string[];
+  pendingApprovalPaths: string[];
+  requiresApproval: boolean;
+  applyPayload?: WorkspaceSubstrateApplyPayload;
+}
+
+export interface WorkspaceSubstrateApprovalPayload {
+  required: boolean;
+  reason: string;
+  privilegedActorRoles: Array<'boss_cat' | 'system' | 'owner'>;
+  blockedPaths: string[];
+  applyPayload?: WorkspaceSubstrateApplyPayload;
 }
 
 export interface WorkspaceSubstrateSummary {
   expectedFileCount: number;
   changedPaths: string[];
+  reviewCopyPaths: string[];
+  pendingApprovalPaths: string[];
   findingCounts: Record<WorkspaceSubstrateFindingStatus, number>;
   actionCounts: Record<WorkspaceSubstrateActionType, number>;
 }
@@ -114,7 +174,10 @@ export interface WorkspaceSubstrateResult {
   enabledAgents: Array<'claude' | 'gemini' | 'codex'>;
   includeA2A: boolean;
   status: WorkspaceSubstrateAuditStatus;
+  contract: WorkspaceSubstrateContract;
   authorization: WorkspaceSubstrateAuthorization;
+  plan: WorkspaceSubstratePlan;
+  approval: WorkspaceSubstrateApprovalPayload;
   findings: WorkspaceSubstrateFinding[];
   actions: WorkspaceSubstrateAction[];
   applied: boolean;

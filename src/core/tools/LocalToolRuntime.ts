@@ -233,7 +233,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'audit-workspace',
-    description: 'Audit workspace collaboration substrate and return a JSON report.',
+    description: 'Audit workspace collaboration substrate and return a read-only JSON report.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -254,7 +254,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'init-workspace',
-    description: 'Plan or apply workspace collaboration substrate initialization and return JSON.',
+    description: 'Plan or apply workspace collaboration substrate initialization and return JSON contract/plan/approval payloads.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -281,7 +281,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'update-workspace',
-    description: 'Plan or apply conservative workspace substrate updates and return JSON.',
+    description: 'Plan or apply conservative workspace substrate updates and return JSON contract/plan/approval payloads.',
     inputSchema: {
       type: 'object',
       properties: {

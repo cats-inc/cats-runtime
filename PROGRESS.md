@@ -11,6 +11,7 @@
 | Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, and an Agent SDK bridge as the second validation target |
 | HTTP API | Completed | Health, sessions, messages, history, observe, provider management, and session branch-lineage inspection routes are served directly from `cats-runtime` |
 | Dashboard | Completed | The embedded dashboard UI is served from `GET /` |
+| Workspace Substrate | Completed | `audit-workspace`, `init-workspace`, and `update-workspace` now return explicit preview/apply contracts, machine-readable action plans/diff stats, approval-friendly payloads, and `*.bootstrap` review-copy behavior without owning product policy |
 | Tests | Completed | Vitest covers provider, discovery, pool, HTTP, server bootstrap, and API/local tool-loop behavior |
 | Docs | In Progress | Core docs now cover the generic provider model catalog route, first-slice API/local progress events, and runtime-owned cache/fallback semantics, but later PLAN-003/PLAN-005 follow-on items still need ongoing updates |
 | Follow-ups | Completed | Accepted post-review findings for provider-instance rollout were implemented and recorded in `docs/plans/PLAN-002-provider-instance-review-followups.md` |
@@ -21,8 +22,8 @@
 
 ### WP-1: Embed CLI Runtime
 
-**Status**: Completed  
-**Assigned**: Codex  
+**Status**: Completed
+**Assigned**: Codex
 **Priority**: P0
 
 #### Tasks
@@ -190,6 +191,36 @@ build on, without moving branch policy into `cats-runtime`.
 
 - [x] `npm run build`
 - [x] `npx vitest run tests/session-branching.test.ts --pool=threads --poolOptions.threads.singleThread`
+
+### WP-6: Workspace Substrate Tools
+
+**Status**: Completed
+**Assigned**: Codex
+**Priority**: P0
+
+#### Goal
+
+Land runtime-owned workspace substrate primitives that can initialize, audit,
+preview, and conservatively apply collaboration substrate files without
+embedding product approval policy into `cats-runtime`.
+
+#### Delivered
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Add runtime-owned `init-workspace`, `audit-workspace`, and `update-workspace` substrate operations | [x] | `WorkspaceSubstrateService` now owns deterministic planning/apply behavior |
+| Return explicit preview/apply contract and apply decision metadata | [x] | Results include `contract.mode`, `applyRequested`, `applyDecision`, and `readOnly` |
+| Return machine-readable action plan and diff metadata | [x] | Actions include `outputPath`, `mergeStrategy`, hashes, unified diff text, and `diffStats` |
+| Return approval-friendly payloads without product policy | [x] | Results include `plan.applyPayload` plus `approval` metadata for hosts/skills |
+| Keep `audit-workspace` strictly read-only | [x] | `apply: true` now yields preview with `read_only_operation` and no writes |
+| Use conservative review-copy behavior for conflicts | [x] | Conflicting files produce `write_sidecar` steps targeting `*.bootstrap` paths |
+| Cover substrate behavior with automated tests | [x] | `tests/workspace-substrate.test.ts` and `src/core/tools/LocalToolRuntime.test.ts` cover the contract |
+
+#### Deferred Boundaries
+
+- [ ] No dedicated HTTP route surface yet; the first slice ships as runtime-owned service/tool primitives only
+- [ ] No product-level approval UX, orchestration policy, or follow-on delegation logic in runtime
+- [ ] No full `project-bootstrap` preset/flavor system; only collaboration substrate files are generated
 
 ---
 

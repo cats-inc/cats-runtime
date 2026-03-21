@@ -13,15 +13,15 @@ locally in the same service that ships them.
 
 ### Unit Tests
 
-- **Location**: `src/backends/cli/**/*.test.ts`
+- **Location**: `src/backends/cli/**/*.test.ts`, `src/core/tools/**/*.test.ts`
 - **Framework**: Vitest
-- **Scope**: provider parsers, runtime adapters, worker helpers, discovery, session registry, native services
+- **Scope**: provider parsers, runtime adapters, worker helpers, discovery, session registry, native services, local tool contracts
 
 ### Integration Tests
 
-- **Location**: `src/http/*.test.ts`, `tests/runtime-server.test.ts`
+- **Location**: `src/http/*.test.ts`, `tests/runtime-server.test.ts`, `tests/workspace-substrate.test.ts`
 - **Framework**: Vitest
-- **Scope**: route behavior, auth, session lifecycle, native session management, server bootstrap
+- **Scope**: route behavior, auth, session lifecycle, native session management, server bootstrap, runtime-neutral workspace substrate planning/apply behavior
 
 ### End-to-End Tests
 
@@ -43,6 +43,7 @@ npm test
 npx vitest run src/backends/cli/runtime/runtime.test.ts
 npx vitest run src/http/cursorManagement.test.ts
 npx vitest run tests/runtime-server.test.ts
+npx vitest run tests/workspace-substrate.test.ts src/core/tools/LocalToolRuntime.test.ts --pool=threads --poolOptions.threads.singleThread
 ```
 
 ## Test Naming Conventions
@@ -60,6 +61,8 @@ describe('ComponentName', () => {
 - Mock provider-native services in HTTP route tests instead of shelling out to real CLIs
 - Keep provider parser tests deterministic with inline sample payloads
 - Prefer temp directories for discovery/history tests so file layout stays realistic
+- For workspace substrate tests, assert machine-readable `contract`, `plan`, and `approval` payloads rather than only final file writes
+- Cover the read-only `audit-workspace` boundary separately from mutable `init-workspace` / `update-workspace` flows
 
 ## CI/CD Integration
 
@@ -71,4 +74,4 @@ describe('ComponentName', () => {
 
 ---
 
-*Last updated: 2026-03-11*
+*Last updated: 2026-03-21*

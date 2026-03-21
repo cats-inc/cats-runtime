@@ -822,16 +822,39 @@ describe('LocalToolRuntime', () => {
         expect(result.isError).toBeUndefined();
 
         const payload = JSON.parse(result.output) as {
+          contract: { mode: string; applyDecision: string; readOnly: boolean };
+          plan: { requiresApproval: boolean; changedPaths: string[] };
+          approval: { required: boolean; applyPayload?: unknown };
           status: string;
           applied: boolean;
-          actions: Array<{ type: string; path: string }>;
+          actions: Array<{
+            type: string;
+            path: string;
+            outputPath?: string;
+            mergeStrategy?: string;
+            diffStats?: { changed: boolean };
+          }>;
         };
         expect(payload.status).toBe('missing');
         expect(payload.applied).toBe(false);
+        expect(payload.contract).toMatchObject({
+          mode: 'preview',
+          applyDecision: 'not_requested',
+          readOnly: true,
+        });
+        expect(payload.plan.requiresApproval).toBe(false);
+        expect(payload.approval.required).toBe(false);
         expect(payload.actions).toEqual(expect.arrayContaining([
-          expect.objectContaining({ type: 'create', path: 'AGENTS.md' }),
+          expect.objectContaining({
+            type: 'create',
+            path: 'AGENTS.md',
+            outputPath: 'AGENTS.md',
+            mergeStrategy: 'create',
+            diffStats: expect.objectContaining({ changed: true }),
+          }),
           expect.objectContaining({ type: 'create', path: 'CODEX.md' }),
         ]));
+        expect(payload.plan.changedPaths).toEqual(expect.arrayContaining(['AGENTS.md', 'CODEX.md']));
       } finally {
         cleanup();
       }
@@ -856,13 +879,24 @@ describe('LocalToolRuntime', () => {
         expect(result.isError).toBeUndefined();
 
         const payload = JSON.parse(result.output) as {
+          approval: { required: boolean };
           applied: boolean;
           status: string;
           summary: { changedPaths: string[] };
+          actions: Array<{ type: string; path: string; requiresApproval?: boolean; outputPath?: string }>;
         };
         expect(payload.applied).toBe(true);
         expect(payload.status).toBe('conflicting');
+        expect(payload.approval.required).toBe(false);
         expect(payload.summary.changedPaths).toContain('AGENTS.md.bootstrap');
+        expect(payload.actions).toEqual(expect.arrayContaining([
+          expect.objectContaining({
+            type: 'write_sidecar',
+            path: 'AGENTS.md',
+            outputPath: 'AGENTS.md.bootstrap',
+            requiresApproval: false,
+          }),
+        ]));
         expect(readFileSync(join(cwd, 'AGENTS.md'), 'utf-8')).toBe('# local custom rules\n');
         expect(readFileSync(join(cwd, 'AGENTS.md.bootstrap'), 'utf-8'))
           .toContain('cats-runtime:workspace-substrate');
@@ -888,7 +922,55 @@ describe('LocalToolRuntime', () => {
         expect(JSON.parse(result.output)).toMatchObject({
           operation: 'init-workspace',
           applied: false,
+          contract: {
+            mode: 'preview',
+            applyDecision: 'not_requested',
+            readOnly: false,
+          },
+          plan: {
+            requiresApproval: true,
+          },
+          approval: {
+            required: true,
+            applyPayload: {
+              operation: 'init-workspace',
+              apply: true,
+            },
+          },
         });
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('returns preview-only output when audit apply is requested', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const result = await runtime.execute(sharedCtx(cwd), {
+          id: 'substrate-4',
+          name: 'audit-workspace',
+          arguments: {
+            profile: 'standard',
+            enabled_agents: ['codex'],
+            apply: true,
+            actor_role: 'boss_cat',
+          },
+        });
+        expect(result.isError).toBeUndefined();
+        expect(JSON.parse(result.output)).toMatchObject({
+          applied: false,
+          contract: {
+            mode: 'apply',
+            applyDecision: 'read_only_operation',
+            readOnly: true,
+          },
+          approval: {
+            required: false,
+          },
+        });
+        expect(existsSync(join(cwd, 'AGENTS.md'))).toBe(false);
       } finally {
         cleanup();
       }

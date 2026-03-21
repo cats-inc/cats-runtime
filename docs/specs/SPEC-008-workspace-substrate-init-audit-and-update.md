@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft (Pending Review) |
+| **Status** | Implemented (First Slice) |
 | **Owner** | Codex |
 | **Reviewer** | User / workspace-substrate workstream |
 
@@ -31,6 +31,26 @@ on each Cat improvising repo scaffolding with generic file-write tools.
 These tools should reuse ideas and structure learned from `project-bootstrap`,
 but they should ship as runtime-owned functionality rather than direct
 dependencies on that repo.
+
+## Implementation Status
+
+The first slice described here is now landed in `cats-runtime` through the
+runtime-owned workspace substrate service and local tool runtime.
+
+Landed boundaries:
+
+- `init-workspace`, `audit-workspace`, and `update-workspace` are implemented
+  as runtime-owned execution primitives
+- results include explicit preview/apply `contract` metadata, machine-readable
+  `actions`, a summarized `plan`, and an approval-friendly `approval` payload
+- `audit-workspace` is strictly read-only even when callers send `apply: true`
+- conflicting files use `*.bootstrap` review copies instead of blind overwrite
+
+Still deferred:
+
+- dedicated HTTP endpoints for workspace substrate operations
+- product-level approval UX, orchestration policy, and delegation behavior
+- full `project-bootstrap` preset/flavor parity beyond collaboration substrate
 
 ## Goals
 
@@ -310,5 +330,6 @@ needs. The first slice should not try to embed:
 ---
 
 *Created: 2026-03-20*
+*Updated: 2026-03-21*
 *Author: Codex*
-*Related Plan: TBD*
+*Related Plan: WP-5 (tracked in PROGRESS.md)*

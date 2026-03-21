@@ -158,6 +158,9 @@ src/
 - Exposes policy-neutral workspace substrate operations (`audit-workspace`,
   `init-workspace`, `update-workspace`) as shared headless/local-tool
   primitives
+- Returns explicit workspace substrate `contract`, `actions`, `plan`, and
+  `approval` payloads so hosts can preview/apply deterministically without
+  embedding product policy in the runtime
 - Normalizes tool activity into stream events and transcript records
 
 ### `src/core/runtime`
@@ -171,6 +174,10 @@ src/
   context-transplant metadata, and machine-readable branch result payloads
 - Owns deterministic workspace substrate planning/apply logic independently of
   product shells or skills
+- Keeps `audit-workspace` read-only even when callers request apply, and uses
+  `*.bootstrap` review copies instead of blind overwrite for conflicting files
+- Does not own product-level approval UX, workspace orchestration policy, or
+  post-apply delegation behavior
 
 ### `src/core`
 

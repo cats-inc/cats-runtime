@@ -482,9 +482,27 @@ operations for API/local sessions:
 - `init-workspace`
 - `update-workspace`
 
-These operations return structured JSON plans/results, default to preview-first
-behavior, and write `*.bootstrap` review copies instead of overwriting
-conflicting workspace files directly.
+These operations return structured JSON plans/results with:
+
+- `contract`: explicit preview/apply mode, `applyRequested`, `applyDecision`,
+  and whether the operation is read-only
+- `actions`: machine-readable plan steps including `outputPath`,
+  `mergeStrategy`, hashes, unified diff text, and `diffStats`
+- `plan`: summary-level `changedPaths`, `pendingApprovalPaths`,
+  `reviewCopyPaths`, and an approval-friendly `applyPayload` for mutable
+  operations
+- `approval`: runtime-owned authorization metadata for hosts or skills without
+  hard-coding product approval UX
+
+Behavioral boundaries:
+
+- Preview is the safe default for `init-workspace` and `update-workspace`.
+- `audit-workspace` is always read-only. Sending `apply: true` returns
+  `contract.applyDecision: "read_only_operation"` and writes nothing.
+- Conflicting existing files are not overwritten. The plan uses
+  `write_sidecar` steps and `*.bootstrap` review copies instead.
+- `cats-runtime` owns execution primitives only. Product shells and Boss Cat
+  flows still own approval UX, policy, and follow-on orchestration.
 
 For agent-backed sessions, streamed output may also surface normalized metadata
 such as:

@@ -8,9 +8,13 @@ import {
 import { dirname, join, relative, resolve } from 'node:path';
 import type {
   WorkspaceSubstrateAction,
+  WorkspaceSubstrateApplyPayload,
   WorkspaceSubstrateActionType,
+  WorkspaceSubstrateApprovalPayload,
   WorkspaceSubstrateAuditStatus,
   WorkspaceSubstrateAuthorization,
+  WorkspaceSubstrateContract,
+  WorkspaceSubstrateDiffStats,
   WorkspaceSubstrateFinding,
   WorkspaceSubstrateFindingStatus,
   WorkspaceSubstrateHints,
@@ -22,10 +26,16 @@ import type {
 const MANAGED_MARKER = 'cats-runtime:workspace-substrate';
 const REVIEW_COPY_SUFFIX = '.bootstrap';
 const DEFAULT_STANDARD_AGENTS = ['claude', 'gemini', 'codex'] as const;
+const PRIVILEGED_ACTOR_ROLES = ['boss_cat', 'system', 'owner'] as const;
 
 interface WorkspaceTemplateFile {
   path: string;
   content: string;
+}
+
+interface DiffPreview {
+  text: string;
+  stats: WorkspaceSubstrateDiffStats;
 }
 
 interface PlannedAction extends WorkspaceSubstrateAction {
@@ -332,13 +342,24 @@ function isManagedContent(content: string): boolean {
   return content.includes(MANAGED_MARKER);
 }
 
-function buildDiff(path: string, before: string, after: string): string {
+function splitLinesForDiff(content: string): string[] {
+  return content === '' ? [] : content.split('\n');
+}
+
+function buildDiff(path: string, before: string, after: string): DiffPreview {
   if (before === after) {
-    return `--- ${path}\n+++ ${path}\n@@ no changes @@`;
+    return {
+      text: `--- ${path}\n+++ ${path}\n@@ no changes @@`,
+      stats: {
+        changed: false,
+        addedLines: 0,
+        removedLines: 0,
+      },
+    };
   }
 
-  const beforeLines = before.split('\n');
-  const afterLines = after.split('\n');
+  const beforeLines = splitLinesForDiff(before);
+  const afterLines = splitLinesForDiff(after);
   let start = 0;
   while (
     start < beforeLines.length
@@ -364,13 +385,24 @@ function buildDiff(path: string, before: string, after: string): string {
   const beforeCount = Math.max(0, beforeEnd - start + 1);
   const afterCount = Math.max(0, afterEnd - start + 1);
 
-  return [
-    `--- ${path}`,
-    `+++ ${path}`,
-    `@@ -${start + 1},${beforeCount} +${start + 1},${afterCount} @@`,
-    ...removed,
-    ...added,
-  ].join('\n');
+  return {
+    text: [
+      `--- ${path}`,
+      `+++ ${path}`,
+      `@@ -${start + 1},${beforeCount} +${start + 1},${afterCount} @@`,
+      ...removed,
+      ...added,
+    ].join('\n'),
+    stats: {
+      changed: true,
+      addedLines: added.length,
+      removedLines: removed.length,
+    },
+  };
+}
+
+function isReadOnlyOperation(operation: WorkspaceSubstrateRequest['operation']): boolean {
+  return operation === 'audit-workspace';
 }
 
 function createAuthorization(
@@ -380,19 +412,19 @@ function createAuthorization(
   const actorRole = request.authorization?.actorRole;
   const applyRequested = request.apply === true;
 
-  if (!applyRequested) {
+  if (isReadOnlyOperation(request.operation)) {
     return {
       actorRole,
       approved,
       canApply: false,
       requiresApproval: false,
-      reason: 'Preview only; no filesystem changes requested.',
+      reason: applyRequested
+        ? 'audit-workspace is read-only; apply requests return preview only.'
+        : 'audit-workspace is read-only.',
     };
   }
 
-  const privileged = actorRole === 'boss_cat'
-    || actorRole === 'system'
-    || actorRole === 'owner';
+  const privileged = actorRole === 'boss_cat' || actorRole === 'system' || actorRole === 'owner';
 
   if (privileged || approved) {
     return {
@@ -400,9 +432,11 @@ function createAuthorization(
       approved,
       canApply: true,
       requiresApproval: false,
-      reason: privileged
-        ? `Apply is authorized for actorRole='${actorRole}'.`
-        : 'Apply is authorized because approval has been recorded.',
+      reason: applyRequested
+        ? privileged
+          ? `Apply is authorized for actorRole='${actorRole}'.`
+          : 'Apply is authorized because approval has been recorded.'
+        : 'Actor context may apply mutable workspace substrate changes when requested.',
     };
   }
 
@@ -412,6 +446,29 @@ function createAuthorization(
     canApply: false,
     requiresApproval: true,
     reason: 'Apply requires Boss Cat, system, owner, or explicit approval.',
+  };
+}
+
+function createApplyPayload(input: {
+  operation: WorkspaceSubstrateRequest['operation'];
+  workspacePath: string;
+  profile: WorkspaceSubstrateProfileId;
+  enabledAgents: Array<'claude' | 'gemini' | 'codex'>;
+  includeA2A: boolean;
+  hints?: WorkspaceSubstrateHints;
+}): WorkspaceSubstrateApplyPayload | undefined {
+  if (isReadOnlyOperation(input.operation)) {
+    return undefined;
+  }
+
+  return {
+    operation: input.operation === 'init-workspace' ? 'init-workspace' : 'update-workspace',
+    workspacePath: input.workspacePath,
+    profile: input.profile,
+    enabledAgents: input.enabledAgents,
+    includeA2A: input.includeA2A,
+    hints: input.hints,
+    apply: true,
   };
 }
 
@@ -499,7 +556,9 @@ export class WorkspaceSubstrateService {
     const profile = normalizeProfile(request.profile);
     const enabledAgents = normalizeAgents(profile, request.enabledAgents);
     const includeA2A = normalizeIncludeA2A(profile, request.includeA2A);
-    const authorization = createAuthorization(request);
+    const eligibility = createAuthorization(request);
+    const applyRequested = request.apply === true;
+    const readOnly = isReadOnlyOperation(request.operation);
     const templates = buildTemplates({
       profile,
       hints: request.hints,
@@ -516,6 +575,7 @@ export class WorkspaceSubstrateService {
       const desiredHash = hashContent(template.content);
 
       if (existing === undefined) {
+        const diff = buildDiff(template.path, '', template.content);
         findings.push({
           path: template.path,
           status: 'missing',
@@ -525,10 +585,14 @@ export class WorkspaceSubstrateService {
         actions.push({
           type: 'create',
           path: template.path,
+          outputPath: template.path,
+          mergeStrategy: 'create',
           reason: 'Create missing substrate file.',
+          desiredHash,
           preview: template.content,
-          diff: buildDiff(template.path, '', template.content),
-          requiresApproval: request.apply === true && !authorization.canApply,
+          diff: diff.text,
+          diffStats: diff.stats,
+          requiresApproval: !readOnly && !eligibility.canApply,
           writePath: fullPath,
           content: template.content,
         });
@@ -548,12 +612,24 @@ export class WorkspaceSubstrateService {
         actions.push({
           type: 'skip',
           path: template.path,
+          outputPath: template.path,
+          mergeStrategy: 'noop',
           reason: 'No changes required.',
+          managed: isManagedContent(existing),
+          actualHash,
+          desiredHash,
+          diffStats: {
+            changed: false,
+            addedLines: 0,
+            removedLines: 0,
+          },
+          requiresApproval: false,
         });
         continue;
       }
 
       if (isManagedContent(existing)) {
+        const diff = buildDiff(template.path, existing, template.content);
         findings.push({
           path: template.path,
           status: 'drifted',
@@ -565,10 +641,16 @@ export class WorkspaceSubstrateService {
         actions.push({
           type: 'update',
           path: template.path,
+          outputPath: template.path,
+          mergeStrategy: 'update_managed',
           reason: 'Update runtime-managed substrate file to converge with the selected profile.',
+          managed: true,
+          actualHash,
+          desiredHash,
           preview: template.content,
-          diff: buildDiff(template.path, existing, template.content),
-          requiresApproval: request.apply === true && !authorization.canApply,
+          diff: diff.text,
+          diffStats: diff.stats,
+          requiresApproval: !readOnly && !eligibility.canApply,
           writePath: fullPath,
           content: template.content,
         });
@@ -576,6 +658,7 @@ export class WorkspaceSubstrateService {
       }
 
       const reviewCopyPath = `${template.path}${REVIEW_COPY_SUFFIX}`;
+      const diff = buildDiff(template.path, existing, template.content);
       findings.push({
         path: template.path,
         status: 'conflicting',
@@ -588,19 +671,30 @@ export class WorkspaceSubstrateService {
       actions.push({
         type: 'write_sidecar',
         path: template.path,
+        outputPath: reviewCopyPath,
+        mergeStrategy: 'review_copy',
         reason: 'Write a review copy because overwriting the existing file would be unsafe.',
+        managed: false,
+        actualHash,
+        desiredHash,
         preview: template.content,
-        diff: buildDiff(template.path, existing, template.content),
+        diff: diff.text,
+        diffStats: diff.stats,
         reviewCopyPath,
-        requiresApproval: true,
+        requiresApproval: !readOnly && !eligibility.canApply,
         writePath: join(workspacePath, reviewCopyPath),
         content: template.content,
       });
       actions.push({
         type: 'warn',
         path: template.path,
+        outputPath: reviewCopyPath,
+        mergeStrategy: 'noop',
         reason: `Review ${reviewCopyPath} before merging substrate changes into ${template.path}.`,
         reviewCopyPath,
+        actualHash,
+        desiredHash,
+        requiresApproval: false,
       });
     }
 
@@ -609,11 +703,85 @@ export class WorkspaceSubstrateService {
       type: action.type,
       path: action.path,
       reason: action.reason,
+      outputPath: action.outputPath,
+      mergeStrategy: action.mergeStrategy,
+      managed: action.managed,
+      actualHash: action.actualHash,
+      desiredHash: action.desiredHash,
       preview: action.preview,
       diff: action.diff,
+      diffStats: action.diffStats,
       reviewCopyPath: action.reviewCopyPath,
       requiresApproval: action.requiresApproval,
     }));
+    const changedPaths = Array.from(new Set(
+      publicActions
+        .filter((action) => action.type === 'create' || action.type === 'update' || action.type === 'write_sidecar')
+        .map((action) => action.outputPath || action.reviewCopyPath || action.path),
+    ));
+    const reviewCopyPaths = Array.from(new Set(
+      publicActions
+        .map((action) => action.reviewCopyPath)
+        .filter((path): path is string => Boolean(path)),
+    ));
+    const pendingApprovalPaths = Array.from(new Set(
+      publicActions
+        .filter((action) => action.requiresApproval === true)
+        .map((action) => action.outputPath || action.reviewCopyPath || action.path),
+    ));
+    const applyPayload = changedPaths.length > 0
+      ? createApplyPayload({
+        operation: request.operation,
+        workspacePath,
+        profile,
+        enabledAgents,
+        includeA2A,
+        hints: request.hints,
+      })
+      : undefined;
+    const approvalRequired = pendingApprovalPaths.length > 0;
+    const authorizationReason = readOnly
+      ? applyRequested
+        ? 'audit-workspace is read-only; preview returned without filesystem changes.'
+        : 'audit-workspace is read-only.'
+      : changedPaths.length === 0
+        ? 'No filesystem changes are pending.'
+        : eligibility.canApply
+          ? applyRequested
+            ? eligibility.reason
+            : 'Actor context may apply this workspace substrate plan when requested.'
+          : 'Apply requires Boss Cat, system, owner, or explicit approval.';
+    const authorization: WorkspaceSubstrateAuthorization = {
+      ...eligibility,
+      requiresApproval: approvalRequired,
+      reason: authorizationReason,
+    };
+    const contract: WorkspaceSubstrateContract = {
+      mode: applyRequested ? 'apply' : 'preview',
+      safeDefaultMode: 'preview',
+      applyRequested,
+      applyDecision: !applyRequested
+        ? 'not_requested'
+        : readOnly
+          ? 'read_only_operation'
+          : eligibility.canApply
+            ? 'applied'
+            : 'blocked',
+      readOnly,
+    };
+    const approval: WorkspaceSubstrateApprovalPayload = {
+      required: approvalRequired,
+      reason: readOnly
+        ? 'audit-workspace never writes; use preview output to choose a later mutable operation.'
+        : changedPaths.length === 0
+          ? 'No approval payload is needed because the plan contains no filesystem writes.'
+          : approvalRequired
+            ? 'Apply is blocked until Boss Cat, system, owner, or explicit approval authorizes the plan.'
+            : 'Current actor context may apply this plan without additional approval.',
+      privilegedActorRoles: [...PRIVILEGED_ACTOR_ROLES] as Array<'boss_cat' | 'system' | 'owner'>,
+      blockedPaths: pendingApprovalPaths,
+      applyPayload,
+    };
 
     const result: WorkspaceSubstrateResult = {
       operation: request.operation,
@@ -622,15 +790,25 @@ export class WorkspaceSubstrateService {
       enabledAgents,
       includeA2A,
       status,
+      contract,
       authorization,
+      plan: {
+        stepCount: publicActions.length,
+        changedPaths,
+        reviewCopyPaths,
+        pendingApprovalPaths,
+        requiresApproval: approvalRequired,
+        applyPayload,
+      },
+      approval,
       findings,
       actions: publicActions,
       applied: false,
       summary: {
         expectedFileCount: templates.length,
-        changedPaths: publicActions
-          .filter((action) => action.type === 'create' || action.type === 'update' || action.type === 'write_sidecar')
-          .map((action) => action.reviewCopyPath || action.path),
+        changedPaths,
+        reviewCopyPaths,
+        pendingApprovalPaths,
         findingCounts: createFindingCounts(),
         actionCounts: createActionCounts(),
       },
@@ -643,7 +821,7 @@ export class WorkspaceSubstrateService {
       result.summary.actionCounts[action.type] += 1;
     }
 
-    if (request.apply !== true || !authorization.canApply) {
+    if (!applyRequested || readOnly || !eligibility.canApply) {
       return result;
     }
 
