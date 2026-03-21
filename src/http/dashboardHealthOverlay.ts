@@ -1,8 +1,34 @@
 import { RUNTIME_DIAGNOSTICS_PATHS } from '../startup.js';
 
+interface RuntimeHealthProviderSummary {
+  status?: string;
+  ok?: number;
+  targets?: number;
+  summary?: string;
+}
+
+export function formatRuntimeHealthLabel(
+  runtimeStatus: string | undefined,
+  runtimeSummary: string,
+  providerSummary: RuntimeHealthProviderSummary,
+): string {
+  if (runtimeStatus === 'unavailable') {
+    return runtimeSummary;
+  }
+
+  const ok = providerSummary.ok || 0;
+  const targets = providerSummary.targets || 0;
+  const providerLabel = providerSummary.status && providerSummary.status !== 'ok'
+    ? providerSummary.summary || `providers ${ok}/${targets} ok`
+    : `providers ${ok}/${targets} ok`;
+
+  return `${runtimeSummary} · ${providerLabel}`;
+}
+
 const DASHBOARD_HEALTH_OVERLAY = `
 <script>
 (() => {
+  const formatRuntimeHealthLabel = ${formatRuntimeHealthLabel.toString()};
   const summaryPath = ${JSON.stringify(RUNTIME_DIAGNOSTICS_PATHS.health)};
   let runtimeHealthPayload = null;
 
@@ -41,10 +67,11 @@ const DASHBOARD_HEALTH_OVERLAY = `
 
     dot.dataset.state = mapRuntimeHealthState(runtimeHealthPayload.status);
     titleEl.textContent = 'Runtime / providers';
-    labelEl.textContent =
-      runtimeHealthPayload.status === 'unavailable'
-        ? runtimeSummary
-        : runtimeSummary + ' · providers ' + (providerSummary.ok || 0) + '/' + (providerSummary.targets || 0) + ' ok';
+    labelEl.textContent = formatRuntimeHealthLabel(
+      runtimeHealthPayload.runtime?.status,
+      runtimeSummary,
+      providerSummary,
+    );
 
     const tooltipLines = [
       'Runtime: ' + (runtimeHealthPayload.runtime?.status || 'unknown') + ' - ' + runtimeSummary,

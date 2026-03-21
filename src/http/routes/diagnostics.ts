@@ -594,7 +594,7 @@ function summarizeProviderDiagnostics(
   }
 
   if (summary.unavailable > 0) {
-    summary.status = 'unavailable';
+    summary.status = summary.unavailable === summary.targets ? 'unavailable' : 'degraded';
     summary.summary = `${summary.unavailable} provider target(s) are unavailable.`;
     return summary;
   }

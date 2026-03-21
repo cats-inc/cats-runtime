@@ -691,6 +691,165 @@ backends:
     }
   });
 
+  it('GET /diagnostics/health stays degraded when only some provider targets are unavailable', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-health-partial-provider-outage-test-'));
+    const configPath = join(root, 'providers.yaml');
+    vi.stubEnv('CATS_RUNTIME_TEST_ANTHROPIC_KEY', 'test-secret');
+
+    writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+routing:
+  providers:
+    codex:
+      default_target:
+        backend: cli
+        instance: missing
+    claude:
+      default_target:
+        backend: api
+        instance: sonnet
+backends:
+  cli:
+    providers:
+      codex:
+        instances:
+          missing:
+            environment: native
+            command: command-that-does-not-exist-for-cats-runtime-tests
+            runner: direct
+            sessions_dir: ~/.codex/sessions
+  api:
+    providers:
+      claude:
+        transport: anthropic
+        api_key_env: CATS_RUNTIME_TEST_ANTHROPIC_KEY
+        instances:
+          sonnet:
+            model: claude-sonnet-4-20250514
+`.trimStart());
+
+    const env = {
+      HOME: root,
+      USERPROFILE: root,
+      CATS_RUNTIME_CONFIG_PATH: configPath,
+      CATS_RUNTIME_HOST: '127.0.0.1',
+      CATS_RUNTIME_PORT: '3110',
+      CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
+      CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
+      CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
+      CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
+      CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
+      CLAUDE_PROJECTS_DIR: join(root, '.claude', 'projects'),
+    };
+
+    for (const dir of [
+      env.CATS_RUNTIME_DATA_DIR,
+      env.CATS_RUNTIME_SESSION_BASE_DIR,
+      env.CODEX_SESSIONS_DIR,
+      env.CLAUDE_PROJECTS_DIR,
+    ]) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    const runtime = createRuntimeServer({
+      ...loadConfig(env),
+      port: 0,
+    });
+    try {
+      const address = await runtime.start();
+      const response = await fetch(`http://${address.host}:${address.port}/diagnostics/health`);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        service: 'cats-runtime',
+        version: RUNTIME_VERSION,
+        timestamp: expect.any(String),
+        status: 'degraded',
+        contract: {
+          startup: RUNTIME_STARTUP_CONTRACT_VERSION,
+          diagnostics: RUNTIME_DIAGNOSTICS_CONTRACT_VERSION,
+          supportedModes: ['standalone', 'app-managed'],
+          readinessPath: '/health',
+          lifecycleEvents: [
+            'runtime.ready',
+            'runtime.startup_error',
+            'runtime.stopping',
+            'runtime.stopped',
+          ],
+          shutdownSignals: [...RUNTIME_SHUTDOWN_SIGNALS],
+          shutdownReasons: [...RUNTIME_SHUTDOWN_REASONS],
+          endpoints: {
+            health: '/health',
+            runtime: RUNTIME_DIAGNOSTICS_PATHS.runtime,
+            providers: RUNTIME_DIAGNOSTICS_PATHS.providers,
+            summary: RUNTIME_DIAGNOSTICS_PATHS.health,
+          },
+        },
+        readiness: {
+          endpoint: '/health',
+          authoritative: true,
+          readySignal: 'http',
+          phase: 'ready',
+          ready: true,
+        },
+        runtime: {
+          status: 'ok',
+          summary: 'Runtime is ready to accept requests.',
+          startup: expect.objectContaining({
+            contractVersion: RUNTIME_STARTUP_CONTRACT_VERSION,
+            mode: 'standalone',
+            phase: 'ready',
+            readySignal: 'http',
+            ready: true,
+            address: {
+              host: address.host,
+              port: address.port,
+              healthUrl: `http://${address.host}:${address.port}/health`,
+            },
+          }),
+          shutdown: {
+            signals: [...RUNTIME_SHUTDOWN_SIGNALS],
+            reasons: [...RUNTIME_SHUTDOWN_REASONS],
+            stdinCloseEnabled: false,
+          },
+        },
+        providers: {
+          probe: 'light',
+          summary: {
+            status: 'degraded',
+            summary: '1 provider target(s) are unavailable.',
+            configuredProviders: 2,
+            targets: 2,
+            defaultTargets: 2,
+            ok: 0,
+            degraded: 1,
+            unavailable: 1,
+          },
+          defaults: expect.arrayContaining([
+            expect.objectContaining({
+              provider: 'claude',
+              target: 'api/sonnet',
+              status: 'degraded',
+              summary: expect.stringContaining('light diagnostics'),
+            }),
+            expect.objectContaining({
+              provider: 'codex',
+              target: 'cli/missing',
+              status: 'unavailable',
+              summary: expect.stringContaining('Could not resolve CLI command'),
+            }),
+          ]),
+        },
+      });
+    } finally {
+      await runtime.close();
+      rmSync(root, { recursive: true, force: true });
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('runtime.start rejects when the configured port is already occupied', async () => {
     const occupiedServer = createServer();
     occupiedServer.listen(0, '127.0.0.1');
