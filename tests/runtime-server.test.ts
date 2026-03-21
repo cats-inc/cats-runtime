@@ -262,6 +262,41 @@ describe('runtime server', () => {
     }
   });
 
+  it('close waits for an in-flight start to settle before tearing resources down', async () => {
+    const { config, cleanup } = createTestConfig();
+    const runtime = createRuntimeServer(config, {
+      startup: createRuntimeStartupState({
+        mode: 'app-managed',
+        managedBy: 'cats-inc',
+        readyOutput: 'json',
+      }),
+    });
+    const poolKillSpy = vi.spyOn(runtime.context.pool, 'killAll');
+    let pendingClose: Promise<void> | undefined;
+
+    runtime.server.once('listening', () => {
+      pendingClose = runtime.close();
+      expect(poolKillSpy).not.toHaveBeenCalled();
+    });
+
+    try {
+      await expect(runtime.start()).rejects.toThrow('cats-runtime closed during startup');
+      expect(pendingClose).toBeDefined();
+      if (!pendingClose) {
+        throw new Error('close() was not triggered during startup');
+      }
+
+      await pendingClose;
+      expect(poolKillSpy).toHaveBeenCalledTimes(1);
+      expect(runtime.context.startup.ready).toBe(false);
+      expect(runtime.context.startup.phase).toBe('stopped');
+    } finally {
+      poolKillSpy.mockRestore();
+      await runtime.close();
+      cleanup();
+    }
+  });
+
   it('GET /diagnostics/runtime exposes the frozen startup contract', async () => {
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/diagnostics/runtime');

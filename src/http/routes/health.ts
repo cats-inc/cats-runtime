@@ -7,10 +7,16 @@ import {
   getRuntimeReadinessSnapshot,
 } from '../../startup.js';
 
-export const healthRoutes = new Hono();
+type RuntimeRouteEnv = {
+  Variables: {
+    ctx: AppContext;
+  };
+};
+
+export const healthRoutes = new Hono<RuntimeRouteEnv>();
 
 healthRoutes.get('/health', (c) => {
-  const ctx = c.get('ctx' as never) as AppContext;
+  const ctx = c.get('ctx');
   const readiness = getRuntimeReadinessSnapshot(ctx.startup);
   return c.json({
     service: RUNTIME_SERVICE_NAME,

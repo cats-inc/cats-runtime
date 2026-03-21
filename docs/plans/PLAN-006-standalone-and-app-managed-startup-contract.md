@@ -163,6 +163,7 @@ coexist without collapsing the runtime into product-app internals.
 |------|--------|
 | 2026-03-19 | Plan created from ADR-008 and follow-up review alignment |
 | 2026-03-21 | Implemented startup contract version 1, readiness/diagnostics routes, and child-process shutdown coverage |
+| 2026-03-21 | Follow-up hardening removed blocking diagnostics probes and fixed the start/close lifecycle race; Phase 2 packaging tasks remain open, so plan status stays In Progress |
 
 ---
 

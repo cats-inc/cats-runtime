@@ -817,6 +817,10 @@ export function createRuntimeServer(
             await listenServer(server, config.host, config.port);
           }
 
+          if (startup.phase !== 'starting') {
+            throw new Error('cats-runtime closed during startup');
+          }
+
           const address = server.address();
           if (!address || typeof address === 'string') {
             const fallback = { host: config.host || '0.0.0.0', port: config.port };
@@ -849,6 +853,10 @@ export function createRuntimeServer(
 
       closePromise = (async () => {
         markRuntimeStopping(startup, startup.shutdownReason);
+        const pendingStart = startPromise;
+        if (pendingStart) {
+          await pendingStart.catch(() => undefined);
+        }
         discovery.stop();
         agentBackend.killAll();
         apiBackend.killAll();

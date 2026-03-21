@@ -1,17 +1,14 @@
-import { spawnSync } from 'node:child_process';
-import { accessSync, constants } from 'node:fs';
-import { isAbsolute, resolve } from 'node:path';
 import { Hono } from 'hono';
-import { buildAgentAdapter } from '../../backends/agent/adapters/registry.js';
 import type { RemoteProviderInstanceConfig } from '../../backends/cli/config.js';
 import {
-  getConfiguredFileBackedProviderPath,
-  resolveFileBackedProviderPath,
-  supportsHostFileBackedProviderDiscovery,
-} from '../../backends/cli/providerPaths.js';
-import {
+  getFileBackedProviderDiscoveryInfo,
+  getRuntimeEnvironment,
   getRuntimeListenerConfig,
   getRuntimeResolvedPaths,
+  isFileBackedProvider,
+  lookupRuntimeCommand,
+  probeRuntimeAgentInstance,
+  runtimePathExists,
 } from '../../core/config.js';
 import {
   listProviderCatalog,
@@ -28,7 +25,11 @@ import {
 
 type DiagnosticStatus = HealthStatus['status'];
 type DiagnosticsProbeMode = 'light' | 'live';
-type FileBackedProviderName = 'auggie' | 'claude' | 'codex' | 'copilot' | 'gemini' | 'pi';
+type RuntimeRouteEnv = {
+  Variables: {
+    ctx: AppContext;
+  };
+};
 
 interface DiagnosticCheck {
   code: string;
@@ -37,65 +38,25 @@ interface DiagnosticCheck {
   details?: Record<string, unknown>;
 }
 
-const diagnosticsRoutes = new Hono();
-
-function isFileBackedProvider(
-  providerName: string,
-): providerName is FileBackedProviderName {
-  return [
-    'auggie',
-    'claude',
-    'codex',
-    'copilot',
-    'gemini',
-    'pi',
-  ].includes(providerName);
+interface ProviderDiagnosticAvailability {
+  status: DiagnosticStatus;
+  checkedAt: string;
+  probe: DiagnosticsProbeMode;
+  summary: string;
 }
 
-function hasPathSeparator(value: string): boolean {
-  return value.includes('/') || value.includes('\\');
+interface ProviderDiagnosticResult {
+  provider: string;
+  backend: ProviderTargetDescriptor['backend'];
+  instance: string;
+  target: string;
+  defaultTarget: boolean;
+  availability: ProviderDiagnosticAvailability;
+  config: Record<string, unknown>;
+  checks: DiagnosticCheck[];
 }
 
-function pathExists(pathValue: string): boolean {
-  try {
-    accessSync(pathValue, constants.F_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function lookupCommand(
-  command: string,
-): { available: boolean; resolvedPath?: string } {
-  if (!command.trim()) {
-    return { available: false };
-  }
-
-  if (isAbsolute(command) || hasPathSeparator(command)) {
-    const resolvedPath = isAbsolute(command) ? command : resolve(command);
-    return {
-      available: pathExists(resolvedPath),
-      resolvedPath,
-    };
-  }
-
-  const lookupCommandName = process.platform === 'win32' ? 'where.exe' : 'which';
-  const result = spawnSync(lookupCommandName, [command], {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-    windowsHide: true,
-  });
-  const resolvedPath = result.stdout
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .find(Boolean);
-
-  return {
-    available: result.status === 0 && Boolean(resolvedPath),
-    resolvedPath,
-  };
-}
+const diagnosticsRoutes = new Hono<RuntimeRouteEnv>();
 
 function combineDiagnosticStatus(checks: DiagnosticCheck[]): DiagnosticStatus {
   if (checks.some((check) => check.status === 'unavailable')) {
@@ -122,7 +83,7 @@ function pickAvailabilitySummary(checks: DiagnosticCheck[]): string {
 }
 
 function buildEnvDescriptor(
-  env: NodeJS.ProcessEnv,
+  env: Readonly<NodeJS.ProcessEnv>,
   envName?: string,
   required = false,
 ): { name?: string; present: boolean; required: boolean } {
@@ -171,10 +132,10 @@ function createCheck(
   return { code, status, message, details };
 }
 
-function diagnoseCliTarget(
+async function diagnoseCliTarget(
   ctx: AppContext,
   target: ProviderTargetDescriptor,
-): { checks: DiagnosticCheck[]; config: Record<string, unknown> } {
+): Promise<{ checks: DiagnosticCheck[]; config: Record<string, unknown> }> {
   const instance = target.cliInstance;
   if (!instance) {
     return {
@@ -199,7 +160,7 @@ function diagnoseCliTarget(
 
   switch (runtime.mode) {
     case 'native': {
-      const command = lookupCommand(instance.commandConfig.path);
+      const command = await lookupRuntimeCommand(instance.commandConfig.path);
       checks.push(
         createCheck(
           'command_available',
@@ -216,7 +177,7 @@ function diagnoseCliTarget(
       break;
     }
     case 'wsl': {
-      const wsl = lookupCommand('wsl.exe');
+      const wsl = await lookupRuntimeCommand('wsl.exe');
       const distro = runtime.distro || 'Ubuntu';
       checks.push(
         createCheck(
@@ -241,7 +202,7 @@ function diagnoseCliTarget(
       break;
     }
     case 'docker': {
-      const docker = lookupCommand('docker');
+      const docker = await lookupRuntimeCommand('docker');
       checks.push(
         createCheck(
           'docker_available',
@@ -268,71 +229,63 @@ function diagnoseCliTarget(
   }
 
   if (isFileBackedProvider(target.providerName)) {
-    const configuredPath = getConfiguredFileBackedProviderPath(
-      ctx.config,
-      target.providerName,
-      target.instanceId,
-    );
-    config.discoveryPath = {
-      configured: configuredPath,
-      hostDiscoverySupported: supportsHostFileBackedProviderDiscovery(
+    try {
+      const discoveryPath = getFileBackedProviderDiscoveryInfo(
         ctx.config,
         target.providerName,
         target.instanceId,
-      ),
-    };
+      );
+      config.discoveryPath = {
+        configured: discoveryPath.configuredPath,
+        hostDiscoverySupported: discoveryPath.hostDiscoverySupported,
+      };
 
-    if (supportsHostFileBackedProviderDiscovery(ctx.config, target.providerName, target.instanceId)) {
-      try {
-        const resolvedPath = resolveFileBackedProviderPath(
-          ctx.config,
-          target.providerName,
-          target.instanceId,
-        );
-        (config.discoveryPath as Record<string, unknown>).resolved = resolvedPath;
+      if (discoveryPath.resolvedPath) {
+        const exists = await runtimePathExists(discoveryPath.resolvedPath);
+        (config.discoveryPath as Record<string, unknown>).resolved = discoveryPath.resolvedPath;
         checks.push(
           createCheck(
             'discovery_path_resolved',
             'ok',
             `Resolved host discovery path for ${target.providerName}/${target.instanceId}`,
             {
-              configuredPath,
-              resolvedPath,
+              configuredPath: discoveryPath.configuredPath,
+              resolvedPath: discoveryPath.resolvedPath,
             },
           ),
         );
         checks.push(
           createCheck(
             'discovery_path_exists',
-            pathExists(resolvedPath) ? 'ok' : 'degraded',
-            pathExists(resolvedPath)
+            exists ? 'ok' : 'degraded',
+            exists
               ? `Discovery path exists for ${target.providerName}/${target.instanceId}`
               : `Discovery path is missing for ${target.providerName}/${target.instanceId}`,
             {
-              resolvedPath,
+              resolvedPath: discoveryPath.resolvedPath,
             },
           ),
         );
-      } catch (error) {
+      } else {
         checks.push(
           createCheck(
-            'discovery_path_invalid',
-            'unavailable',
-            error instanceof Error ? error.message : String(error),
+            'discovery_path_host_unsupported',
+            'degraded',
+            `Host-side discovery is not supported for Docker-backed ${target.providerName}/${target.instanceId}`,
             {
-              configuredPath,
+              configuredPath: discoveryPath.configuredPath,
             },
           ),
         );
       }
-    } else {
+    } catch (error) {
       checks.push(
         createCheck(
-          'discovery_path_host_unsupported',
-          'degraded',
-          `Host-side discovery is not supported for Docker-backed ${target.providerName}/${target.instanceId}`,
+          'discovery_path_invalid',
+          'unavailable',
+          error instanceof Error ? error.message : String(error),
           {
-            configuredPath,
+            instanceId: target.instanceId,
           },
         ),
       );
@@ -345,6 +298,7 @@ function diagnoseCliTarget(
 async function diagnoseAgentTarget(
   target: ProviderTargetDescriptor,
   probeMode: DiagnosticsProbeMode,
+  env: Readonly<NodeJS.ProcessEnv>,
 ): Promise<{ checks: DiagnosticCheck[]; config: Record<string, unknown> }> {
   const instance = target.remoteInstance;
   if (!instance) {
@@ -360,7 +314,6 @@ async function diagnoseAgentTarget(
     };
   }
 
-  const env = process.env;
   const config: Record<string, unknown> = {
     transport: instance.transport,
     model: instance.model || null,
@@ -374,21 +327,21 @@ async function diagnoseAgentTarget(
   const checks: DiagnosticCheck[] = [];
 
   try {
-    const adapter = buildAgentAdapter(instance);
-    if (!adapter.probe) {
+    const shouldProbeLive = probeMode === 'live'
+      || instance.transport === 'openclaw'
+      || instance.transport === 'openclaw_gateway';
+    const probe = await probeRuntimeAgentInstance(instance, shouldProbeLive);
+    if (!probe.supported) {
       checks.push(
         createCheck(
           'probe_unavailable',
           'degraded',
-          `Agent adapter '${adapter.kind}' does not expose a diagnostics probe`,
+          `Agent adapter '${probe.kind}' does not expose a diagnostics probe`,
         ),
       );
       return { checks, config };
     }
 
-    const shouldProbeLive = probeMode === 'live'
-      || instance.transport === 'openclaw'
-      || instance.transport === 'openclaw_gateway';
     if (!shouldProbeLive) {
       checks.push(
         createCheck(
@@ -400,12 +353,22 @@ async function diagnoseAgentTarget(
       return { checks, config };
     }
 
-    const result = await adapter.probe(instance);
+    if (!probe.result) {
+      checks.push(
+        createCheck(
+          'probe_unavailable',
+          'degraded',
+          `Agent adapter '${probe.kind}' did not return probe output`,
+        ),
+      );
+      return { checks, config };
+    }
+
     checks.push(
       createCheck(
         'probe',
-        result.status,
-        result.details || `Probe completed for ${target.providerName}/${target.instanceId}`,
+        probe.result.status,
+        probe.result.details || `Probe completed for ${target.providerName}/${target.instanceId}`,
       ),
     );
   } catch (error) {
@@ -423,6 +386,7 @@ async function diagnoseAgentTarget(
 
 function diagnoseRemoteConfigOnly(
   target: ProviderTargetDescriptor,
+  env: Readonly<NodeJS.ProcessEnv>,
 ): { checks: DiagnosticCheck[]; config: Record<string, unknown> } {
   const instance = target.remoteInstance;
   if (!instance) {
@@ -438,7 +402,6 @@ function diagnoseRemoteConfigOnly(
     };
   }
 
-  const env = process.env;
   const checks: DiagnosticCheck[] = [];
   const requiresApiKey = instance.transport === 'anthropic'
     || instance.transport === 'openai'
@@ -458,15 +421,7 @@ function diagnoseRemoteConfigOnly(
     );
   }
 
-  if (instance.transport === 'ollama') {
-    checks.push(
-      createCheck(
-        'live_probe_unimplemented',
-        'degraded',
-        `Transport '${instance.transport}' is configured, but this contract only exposes light diagnostics for ${target.backend} targets`,
-      ),
-    );
-  } else if (!requiresApiKey || (apiKey.name && apiKey.present)) {
+  if (instance.transport === 'ollama' || !requiresApiKey || (apiKey.name && apiKey.present)) {
     checks.push(
       createCheck(
         'live_probe_unimplemented',
@@ -494,17 +449,18 @@ async function diagnoseTarget(
   ctx: AppContext,
   target: ProviderTargetDescriptor,
   probeMode: DiagnosticsProbeMode,
-): Promise<Record<string, unknown>> {
+  env: Readonly<NodeJS.ProcessEnv>,
+): Promise<ProviderDiagnosticResult> {
   let result: { checks: DiagnosticCheck[]; config: Record<string, unknown> };
   if (target.backend === 'cli') {
-    result = diagnoseCliTarget(ctx, target);
+    result = await diagnoseCliTarget(ctx, target);
   } else if (target.backend === 'agent') {
-    result = await diagnoseAgentTarget(target, probeMode);
+    result = await diagnoseAgentTarget(target, probeMode, env);
   } else {
-    result = diagnoseRemoteConfigOnly(target);
+    result = diagnoseRemoteConfigOnly(target, env);
   }
 
-  const availability = {
+  const availability: ProviderDiagnosticAvailability = {
     status: combineDiagnosticStatus(result.checks),
     checkedAt: new Date().toISOString(),
     probe: probeMode,
@@ -524,7 +480,7 @@ async function diagnoseTarget(
 }
 
 diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
-  const ctx = c.get('ctx' as never) as AppContext;
+  const ctx = c.get('ctx');
   const readiness = getRuntimeReadinessSnapshot(ctx.startup);
   const listener = getRuntimeListenerConfig(ctx.config);
   const paths = getRuntimeResolvedPaths(ctx.config);
@@ -567,13 +523,14 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
 });
 
 diagnosticsRoutes.get('/diagnostics/providers', async (c) => {
-  const ctx = c.get('ctx' as never) as AppContext;
+  const ctx = c.get('ctx');
   const probeMode = c.req.query('probe') === 'live' ? 'live' : 'light';
+  const env = getRuntimeEnvironment();
   const catalog = listProviderCatalog(ctx.config);
   const providers = await Promise.all(
     Object.values(catalog)
       .flatMap((entry) => entry.instances)
-      .map((target) => diagnoseTarget(ctx, target, probeMode)),
+      .map((target) => diagnoseTarget(ctx, target, probeMode, env)),
   );
 
   const summary = providers.reduce<{
@@ -584,13 +541,9 @@ diagnosticsRoutes.get('/diagnostics/providers', async (c) => {
     unavailable: number;
   }>(
     (accumulator, provider) => {
-      const status = provider.availability
-        && typeof provider.availability === 'object'
-        ? (provider.availability as { status?: DiagnosticStatus }).status
-        : undefined;
-      if (status === 'ok') {
+      if (provider.availability.status === 'ok') {
         accumulator.ok += 1;
-      } else if (status === 'degraded') {
+      } else if (provider.availability.status === 'degraded') {
         accumulator.degraded += 1;
       } else {
         accumulator.unavailable += 1;
