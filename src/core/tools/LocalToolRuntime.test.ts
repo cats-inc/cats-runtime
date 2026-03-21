@@ -1122,13 +1122,50 @@ describe('LocalToolRuntime', () => {
       }
     });
 
+    it('rejects delivery path escapes', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+      writeFileSync(join(cwd, 'report.html'), '<html><body>preview</body></html>', 'utf-8');
+
+      try {
+        const escapedWorkspace = await runtime.execute(sharedCtx(cwd), {
+          id: 'delivery-2',
+          name: 'audit-delivery-target',
+          arguments: {
+            path: '../outside',
+          },
+        });
+        expect(escapedWorkspace.isError).toBe(true);
+        expect(escapedWorkspace.output).toContain('outside the workspace');
+
+        const escapedPublicationDirectory = await runtime.execute(sharedCtx(cwd), {
+          id: 'delivery-3',
+          name: 'publish-artifacts',
+          arguments: {
+            artifacts: [
+              {
+                id: 'report',
+                path: 'report.html',
+                mediaType: 'text/html',
+              },
+            ],
+            directory: '../published',
+          },
+        });
+        expect(escapedPublicationDirectory.isError).toBe(true);
+        expect(escapedPublicationDirectory.output).toContain('outside the workspace');
+      } finally {
+        cleanup();
+      }
+    });
+
     it('blocks create-commit apply in read_only mode before execution', async () => {
       const { cwd, cleanup } = createWorkspace();
       const runtime = new LocalToolRuntime();
 
       try {
         const result = await runtime.execute(readOnlyCtx(cwd), {
-          id: 'delivery-2',
+          id: 'delivery-4',
           name: 'create-commit',
           arguments: {
             message: 'feat: blocked',

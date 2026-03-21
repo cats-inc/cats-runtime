@@ -1270,7 +1270,10 @@ export class LocalToolRuntime {
     operation: 'audit-delivery-target' | 'publish-artifacts' | 'inspect-repo-status' | 'create-commit' | 'push-branch',
     args: Record<string, unknown>,
   ): Promise<ToolResult> {
-    const workspacePath = resolveWorkspacePath(context.cwd, String(args.path || '.'));
+    const workspacePath = (await resolveSafeWorkspacePath(
+      context.cwd,
+      String(args.path || '.'),
+    )).fullPath;
     const actorRole = typeof args.actor_role === 'string' && DELIVERY_ACTOR_ROLES.has(args.actor_role)
       ? args.actor_role as 'boss_cat' | 'specialist_cat' | 'system' | 'owner' | 'product_host' | 'operator'
       : undefined;
@@ -1294,7 +1297,7 @@ export class LocalToolRuntime {
       publication: operation === 'publish-artifacts'
         ? {
             directory: typeof args.directory === 'string' && args.directory.trim()
-              ? resolveWorkspacePath(workspacePath, args.directory)
+              ? (await resolveSafeWorkspacePath(workspacePath, args.directory)).fullPath
               : undefined,
             manifestFileName: typeof args.manifest_file_name === 'string' && args.manifest_file_name.trim()
               ? args.manifest_file_name.trim()
