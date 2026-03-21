@@ -46,17 +46,28 @@ Example response:
 {
   "service": "cats-runtime",
   "status": "ok",
+  "summary": "Runtime is ready to accept requests.",
   "timestamp": "2026-03-11T12:34:56.000Z",
   "version": "<package-version>",
   "contract": {
     "startup": 1,
+    "diagnostics": 1,
+    "supportedModes": ["standalone", "app-managed"],
     "readinessPath": "/health",
     "lifecycleEvents": [
       "runtime.ready",
       "runtime.startup_error",
       "runtime.stopping",
       "runtime.stopped"
-    ]
+    ],
+    "shutdownSignals": ["SIGINT", "SIGTERM"],
+    "shutdownReasons": ["sigint", "sigterm", "stdin_closed"],
+    "endpoints": {
+      "health": "/health",
+      "runtime": "/diagnostics/runtime",
+      "providers": "/diagnostics/providers",
+      "summary": "/diagnostics/health"
+    }
   },
   "readiness": {
     "endpoint": "/health",
@@ -78,6 +89,11 @@ Example response:
       "port": 3110,
       "healthUrl": "http://127.0.0.1:3110/health"
     }
+  },
+  "shutdown": {
+    "signals": ["SIGINT", "SIGTERM"],
+    "reasons": ["sigint", "sigterm", "stdin_closed"],
+    "stdinCloseEnabled": false
   }
 }
 ```
@@ -85,26 +101,43 @@ Example response:
 `readiness.ready` is the authoritative startup result for both standalone and
 app-managed modes. Hosts should not infer readiness from process creation
 alone. `startup.phase` is one of `starting`, `ready`, `stopping`, or `stopped`.
+`status` is `ok`, `degraded`, or `unavailable` and reflects the current
+runtime phase truthfully, while `shutdown.stdinCloseEnabled` tells packaged or
+host-managed callers whether closing child stdin is part of the supported
+shutdown contract.
 
 ### Runtime Diagnostics
 
 ```text
+GET /diagnostics/health
 GET /diagnostics/runtime
 GET /diagnostics/providers
 ```
+
+`GET /diagnostics/health` is the machine-readable aggregate for packaged hosts,
+desktop shells, and the embedded dashboard. It combines:
+
+- runtime readiness and startup/shutdown contract metadata
+- a light provider-health summary suitable for polling
+- per-provider default target highlights so hosts do not need to stitch
+  `/health` and `/diagnostics/providers` together themselves
 
 `GET /diagnostics/runtime` returns the frozen startup contract that hosts should
 integrate against:
 
 - startup contract version
+- diagnostics contract version
 - supported startup modes
 - authoritative readiness path
 - lifecycle event names
+- supported shutdown signals/reasons
 - listener and local-state path resolution
 
 `GET /diagnostics/providers` returns the runtime-owned provider availability
 surface for hosts and dashboards. The response includes:
 
+- the active probe mode (`light` or `live`)
+- aggregate summary status and counts
 - per-target `availability.status` (`ok`, `degraded`, `unavailable`)
 - lightweight config/command/path checks
 - sanitized env-variable presence metadata

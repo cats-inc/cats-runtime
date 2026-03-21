@@ -8,6 +8,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../src/core/config.js';
 import { createDiscoveryController, createRuntimeServer } from '../src/server.js';
 import {
+  RUNTIME_DIAGNOSTICS_CONTRACT_VERSION,
+  RUNTIME_DIAGNOSTICS_PATHS,
+  RUNTIME_SHUTDOWN_REASONS,
+  RUNTIME_SHUTDOWN_SIGNALS,
   RUNTIME_STARTUP_CONTRACT_VERSION,
   RUNTIME_VERSION,
   createRuntimeStartupState,
@@ -147,6 +151,8 @@ describe('runtime server', () => {
         .toBeLessThan(openCreateModalBody.indexOf('await refreshProviderCatalog()'));
       expect(html).toContain('id="createSessionBtn"');
       expect(html).not.toContain("{ id: 'default', runtime: { mode: 'native' } }");
+      expect(html).toContain(RUNTIME_DIAGNOSTICS_PATHS.health);
+      expect(html).toContain('refreshRuntimeHealthStatus');
     });
   });
 
@@ -165,11 +171,14 @@ describe('runtime server', () => {
       expect(authenticated.status).toBe(200);
       expect(await authenticated.json()).toEqual({
         service: 'cats-runtime',
-        status: 'ok',
+        status: 'degraded',
+        summary: 'Runtime is starting and is not ready yet.',
         version: RUNTIME_VERSION,
         timestamp: expect.any(String),
         contract: {
           startup: RUNTIME_STARTUP_CONTRACT_VERSION,
+          diagnostics: RUNTIME_DIAGNOSTICS_CONTRACT_VERSION,
+          supportedModes: ['standalone', 'app-managed'],
           readinessPath: '/health',
           lifecycleEvents: [
             'runtime.ready',
@@ -177,6 +186,14 @@ describe('runtime server', () => {
             'runtime.stopping',
             'runtime.stopped',
           ],
+          shutdownSignals: [...RUNTIME_SHUTDOWN_SIGNALS],
+          shutdownReasons: [...RUNTIME_SHUTDOWN_REASONS],
+          endpoints: {
+            health: '/health',
+            runtime: RUNTIME_DIAGNOSTICS_PATHS.runtime,
+            providers: RUNTIME_DIAGNOSTICS_PATHS.providers,
+            summary: RUNTIME_DIAGNOSTICS_PATHS.health,
+          },
         },
         readiness: {
           endpoint: '/health',
@@ -197,6 +214,11 @@ describe('runtime server', () => {
           address: undefined,
           shutdownReason: undefined,
           lastEvent: undefined,
+        },
+        shutdown: {
+          signals: [...RUNTIME_SHUTDOWN_SIGNALS],
+          reasons: [...RUNTIME_SHUTDOWN_REASONS],
+          stdinCloseEnabled: false,
         },
       });
     });
@@ -219,10 +241,13 @@ describe('runtime server', () => {
       expect(await response.json()).toEqual({
         service: 'cats-runtime',
         status: 'ok',
+        summary: 'Runtime is ready to accept requests.',
         version: RUNTIME_VERSION,
         timestamp: expect.any(String),
         contract: {
           startup: RUNTIME_STARTUP_CONTRACT_VERSION,
+          diagnostics: RUNTIME_DIAGNOSTICS_CONTRACT_VERSION,
+          supportedModes: ['standalone', 'app-managed'],
           readinessPath: '/health',
           lifecycleEvents: [
             'runtime.ready',
@@ -230,6 +255,14 @@ describe('runtime server', () => {
             'runtime.stopping',
             'runtime.stopped',
           ],
+          shutdownSignals: [...RUNTIME_SHUTDOWN_SIGNALS],
+          shutdownReasons: [...RUNTIME_SHUTDOWN_REASONS],
+          endpoints: {
+            health: '/health',
+            runtime: RUNTIME_DIAGNOSTICS_PATHS.runtime,
+            providers: RUNTIME_DIAGNOSTICS_PATHS.providers,
+            summary: RUNTIME_DIAGNOSTICS_PATHS.health,
+          },
         },
         readiness: {
           endpoint: '/health',
@@ -254,6 +287,11 @@ describe('runtime server', () => {
           },
           shutdownReason: undefined,
           lastEvent: undefined,
+        },
+        shutdown: {
+          signals: [...RUNTIME_SHUTDOWN_SIGNALS],
+          reasons: [...RUNTIME_SHUTDOWN_REASONS],
+          stdinCloseEnabled: true,
         },
       });
     } finally {
@@ -305,8 +343,11 @@ describe('runtime server', () => {
         service: 'cats-runtime',
         version: RUNTIME_VERSION,
         timestamp: expect.any(String),
+        status: 'degraded',
+        summary: 'Runtime is starting and is not ready yet.',
         contract: {
           startup: RUNTIME_STARTUP_CONTRACT_VERSION,
+          diagnostics: RUNTIME_DIAGNOSTICS_CONTRACT_VERSION,
           supportedModes: ['standalone', 'app-managed'],
           readinessPath: '/health',
           lifecycleEvents: [
@@ -315,6 +356,14 @@ describe('runtime server', () => {
             'runtime.stopping',
             'runtime.stopped',
           ],
+          shutdownSignals: [...RUNTIME_SHUTDOWN_SIGNALS],
+          shutdownReasons: [...RUNTIME_SHUTDOWN_REASONS],
+          endpoints: {
+            health: '/health',
+            runtime: RUNTIME_DIAGNOSTICS_PATHS.runtime,
+            providers: RUNTIME_DIAGNOSTICS_PATHS.providers,
+            summary: RUNTIME_DIAGNOSTICS_PATHS.health,
+          },
         },
         readiness: {
           endpoint: '/health',
@@ -333,6 +382,11 @@ describe('runtime server', () => {
             pid: expect.any(Number),
             startedAt: expect.any(String),
           }),
+          shutdown: {
+            signals: [...RUNTIME_SHUTDOWN_SIGNALS],
+            reasons: [...RUNTIME_SHUTDOWN_REASONS],
+            stdinCloseEnabled: false,
+          },
           listener: {
             host: '127.0.0.1',
             port: 0,
@@ -424,6 +478,7 @@ backends:
         service: 'cats-runtime',
         version: RUNTIME_VERSION,
         timestamp: expect.any(String),
+        probe: 'light',
         readiness: {
           endpoint: '/health',
           authoritative: true,
@@ -432,8 +487,11 @@ backends:
           ready: false,
         },
         summary: {
+          status: 'degraded',
+          summary: '1 provider target(s) need attention.',
           configuredProviders: 2,
           targets: 2,
+          defaultTargets: 2,
           ok: 1,
           degraded: 1,
           unavailable: 0,
@@ -477,6 +535,154 @@ backends:
             ]),
           }),
         ]),
+      });
+    } finally {
+      await runtime.close();
+      rmSync(root, { recursive: true, force: true });
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('GET /diagnostics/health summarizes runtime and default provider readiness for hosts', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-health-summary-test-'));
+    const configPath = join(root, 'providers.yaml');
+    vi.stubEnv('CATS_RUNTIME_TEST_ANTHROPIC_KEY', 'test-secret');
+
+    writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+routing:
+  providers:
+    codex:
+      default_target:
+        backend: cli
+        instance: default
+    claude:
+      default_target:
+        backend: api
+        instance: sonnet
+backends:
+  cli:
+    providers:
+      codex:
+        instances:
+          default:
+            environment: native
+            command: ${JSON.stringify(process.execPath)}
+            runner: direct
+            sessions_dir: ~/.codex/sessions
+  api:
+    providers:
+      claude:
+        transport: anthropic
+        api_key_env: CATS_RUNTIME_TEST_ANTHROPIC_KEY
+        instances:
+          sonnet:
+            model: claude-sonnet-4-20250514
+`.trimStart());
+
+    const env = {
+      HOME: root,
+      USERPROFILE: root,
+      CATS_RUNTIME_CONFIG_PATH: configPath,
+      CATS_RUNTIME_HOST: '127.0.0.1',
+      CATS_RUNTIME_PORT: '3110',
+      CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
+      CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
+      CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
+      CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
+      CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
+      CLAUDE_PROJECTS_DIR: join(root, '.claude', 'projects'),
+    };
+
+    for (const dir of [
+      env.CATS_RUNTIME_DATA_DIR,
+      env.CATS_RUNTIME_SESSION_BASE_DIR,
+      env.CODEX_SESSIONS_DIR,
+      env.CLAUDE_PROJECTS_DIR,
+    ]) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    const runtime = createRuntimeServer(loadConfig(env));
+    try {
+      const response = await runtime.app.request('/diagnostics/health');
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        service: 'cats-runtime',
+        version: RUNTIME_VERSION,
+        timestamp: expect.any(String),
+        status: 'degraded',
+        contract: {
+          startup: RUNTIME_STARTUP_CONTRACT_VERSION,
+          diagnostics: RUNTIME_DIAGNOSTICS_CONTRACT_VERSION,
+          supportedModes: ['standalone', 'app-managed'],
+          readinessPath: '/health',
+          lifecycleEvents: [
+            'runtime.ready',
+            'runtime.startup_error',
+            'runtime.stopping',
+            'runtime.stopped',
+          ],
+          shutdownSignals: [...RUNTIME_SHUTDOWN_SIGNALS],
+          shutdownReasons: [...RUNTIME_SHUTDOWN_REASONS],
+          endpoints: {
+            health: '/health',
+            runtime: RUNTIME_DIAGNOSTICS_PATHS.runtime,
+            providers: RUNTIME_DIAGNOSTICS_PATHS.providers,
+            summary: RUNTIME_DIAGNOSTICS_PATHS.health,
+          },
+        },
+        readiness: {
+          endpoint: '/health',
+          authoritative: true,
+          readySignal: 'http',
+          phase: 'starting',
+          ready: false,
+        },
+        runtime: {
+          status: 'degraded',
+          summary: 'Runtime is starting and is not ready yet.',
+          startup: expect.objectContaining({
+            contractVersion: RUNTIME_STARTUP_CONTRACT_VERSION,
+            mode: 'standalone',
+            phase: 'starting',
+            readySignal: 'http',
+            ready: false,
+          }),
+          shutdown: {
+            signals: [...RUNTIME_SHUTDOWN_SIGNALS],
+            reasons: [...RUNTIME_SHUTDOWN_REASONS],
+            stdinCloseEnabled: false,
+          },
+        },
+        providers: {
+          probe: 'light',
+          summary: {
+            status: 'degraded',
+            summary: '1 provider target(s) need attention.',
+            configuredProviders: 2,
+            targets: 2,
+            defaultTargets: 2,
+            ok: 1,
+            degraded: 1,
+            unavailable: 0,
+          },
+          defaults: expect.arrayContaining([
+            expect.objectContaining({
+              provider: 'claude',
+              target: 'api/sonnet',
+              status: 'degraded',
+            }),
+            expect.objectContaining({
+              provider: 'codex',
+              target: 'cli/default',
+              status: 'ok',
+            }),
+          ]),
+        },
       });
     } finally {
       await runtime.close();

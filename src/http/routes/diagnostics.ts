@@ -20,10 +20,12 @@ import {
   type RuntimeRouteEnv,
 } from './diagnosticsSupport.js';
 import {
-  RUNTIME_LIFECYCLE_EVENTS,
   RUNTIME_SERVICE_NAME,
   RUNTIME_VERSION,
+  getRuntimeLifecycleContract,
+  getRuntimeOperationalStatus,
   getRuntimeReadinessSnapshot,
+  getRuntimeShutdownContract,
 } from '../../startup.js';
 
 type DiagnosticStatus = HealthStatus['status'];
@@ -505,37 +507,125 @@ async function diagnoseTarget(
   };
 }
 
+function getRuntimeStartupDetails(
+  ctx: AppContext,
+  readiness = getRuntimeReadinessSnapshot(ctx.startup),
+) {
+  return {
+    contractVersion: ctx.startup.contractVersion,
+    mode: ctx.startup.mode,
+    managedBy: ctx.startup.managedBy,
+    phase: ctx.startup.phase,
+    readySignal: ctx.startup.readySignal,
+    ready: readiness.ready,
+    pid: ctx.startup.pid,
+    startedAt: ctx.startup.startedAt,
+    address: ctx.startup.address,
+    shutdownReason: ctx.startup.shutdownReason,
+    lastEvent: ctx.startup.lastEvent,
+  };
+}
+
+async function collectProviderDiagnostics(
+  ctx: AppContext,
+  probeMode: DiagnosticsProbeMode,
+  env: Readonly<NodeJS.ProcessEnv>,
+): Promise<{
+  catalog: ReturnType<typeof listProviderCatalog>;
+  providers: ProviderDiagnosticResult[];
+}> {
+  const catalog = listProviderCatalog(ctx.config);
+  const providers = await Promise.all(
+    Object.values(catalog)
+      .flatMap((entry) => entry.instances)
+      .map((target) => diagnoseTarget(ctx, target, probeMode, env)),
+  );
+
+  return {
+    catalog,
+    providers,
+  };
+}
+
+function summarizeProviderDiagnostics(
+  catalog: ReturnType<typeof listProviderCatalog>,
+  providers: ProviderDiagnosticResult[],
+) {
+  const summary = providers.reduce<{
+    status: DiagnosticStatus;
+    summary: string;
+    configuredProviders: number;
+    targets: number;
+    defaultTargets: number;
+    ok: number;
+    degraded: number;
+    unavailable: number;
+  }>(
+    (accumulator, provider) => {
+      if (provider.defaultTarget) {
+        accumulator.defaultTargets += 1;
+      }
+
+      if (provider.availability.status === 'ok') {
+        accumulator.ok += 1;
+      } else if (provider.availability.status === 'degraded') {
+        accumulator.degraded += 1;
+      } else {
+        accumulator.unavailable += 1;
+      }
+      return accumulator;
+    },
+    {
+      status: 'ok',
+      summary: 'All configured provider targets passed the current probe mode.',
+      configuredProviders: Object.keys(catalog).length,
+      targets: providers.length,
+      defaultTargets: 0,
+      ok: 0,
+      degraded: 0,
+      unavailable: 0,
+    },
+  );
+
+  if (summary.configuredProviders === 0 || summary.targets === 0) {
+    summary.status = 'degraded';
+    summary.summary = 'No provider targets are configured yet.';
+    return summary;
+  }
+
+  if (summary.unavailable > 0) {
+    summary.status = 'unavailable';
+    summary.summary = `${summary.unavailable} provider target(s) are unavailable.`;
+    return summary;
+  }
+
+  if (summary.degraded > 0) {
+    summary.status = 'degraded';
+    summary.summary = `${summary.degraded} provider target(s) need attention.`;
+    return summary;
+  }
+
+  return summary;
+}
+
 diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
   const ctx = c.get('ctx');
   const readiness = getRuntimeReadinessSnapshot(ctx.startup);
   const listener = getRuntimeListenerConfig(ctx.config);
   const paths = getRuntimeResolvedPaths(ctx.config);
+  const runtime = getRuntimeOperationalStatus(ctx.startup);
 
   return c.json({
     service: RUNTIME_SERVICE_NAME,
     version: RUNTIME_VERSION,
     timestamp: new Date().toISOString(),
-    contract: {
-      startup: ctx.startup.contractVersion,
-      supportedModes: ['standalone', 'app-managed'],
-      readinessPath: ctx.startup.readinessPath,
-      lifecycleEvents: [...RUNTIME_LIFECYCLE_EVENTS],
-    },
+    status: runtime.status,
+    summary: runtime.summary,
+    contract: getRuntimeLifecycleContract(ctx.startup),
     readiness,
     runtime: {
-      startup: {
-        contractVersion: ctx.startup.contractVersion,
-        mode: ctx.startup.mode,
-        managedBy: ctx.startup.managedBy,
-        phase: ctx.startup.phase,
-        readySignal: ctx.startup.readySignal,
-        ready: readiness.ready,
-        pid: ctx.startup.pid,
-        startedAt: ctx.startup.startedAt,
-        address: ctx.startup.address,
-        shutdownReason: ctx.startup.shutdownReason,
-        lastEvent: ctx.startup.lastEvent,
-      },
+      startup: getRuntimeStartupDetails(ctx, readiness),
+      shutdown: getRuntimeShutdownContract(ctx.startup),
       listener,
       paths,
       process: {
@@ -552,46 +642,63 @@ diagnosticsRoutes.get('/diagnostics/providers', async (c) => {
   const ctx = c.get('ctx');
   const probeMode = c.req.query('probe') === 'live' ? 'live' : 'light';
   const env = getRuntimeEnvironment();
-  const catalog = listProviderCatalog(ctx.config);
-  const providers = await Promise.all(
-    Object.values(catalog)
-      .flatMap((entry) => entry.instances)
-      .map((target) => diagnoseTarget(ctx, target, probeMode, env)),
-  );
-
-  const summary = providers.reduce<{
-    configuredProviders: number;
-    targets: number;
-    ok: number;
-    degraded: number;
-    unavailable: number;
-  }>(
-    (accumulator, provider) => {
-      if (provider.availability.status === 'ok') {
-        accumulator.ok += 1;
-      } else if (provider.availability.status === 'degraded') {
-        accumulator.degraded += 1;
-      } else {
-        accumulator.unavailable += 1;
-      }
-      return accumulator;
-    },
-    {
-      configuredProviders: Object.keys(catalog).length,
-      targets: providers.length,
-      ok: 0,
-      degraded: 0,
-      unavailable: 0,
-    },
-  );
+  const { catalog, providers } = await collectProviderDiagnostics(ctx, probeMode, env);
+  const summary = summarizeProviderDiagnostics(catalog, providers);
 
   return c.json({
     service: RUNTIME_SERVICE_NAME,
     version: RUNTIME_VERSION,
     timestamp: new Date().toISOString(),
+    probe: probeMode,
     readiness: getRuntimeReadinessSnapshot(ctx.startup),
     summary,
     providers,
+  });
+});
+
+diagnosticsRoutes.get('/diagnostics/health', async (c) => {
+  const ctx = c.get('ctx');
+  const probeMode = c.req.query('probe') === 'live' ? 'live' : 'light';
+  const env = getRuntimeEnvironment();
+  const readiness = getRuntimeReadinessSnapshot(ctx.startup);
+  const runtime = getRuntimeOperationalStatus(ctx.startup);
+  const { catalog, providers } = await collectProviderDiagnostics(ctx, probeMode, env);
+  const providerSummary = summarizeProviderDiagnostics(catalog, providers);
+  const status = providerSummary.status === 'unavailable'
+    ? 'unavailable'
+    : runtime.status === 'unavailable'
+      ? 'unavailable'
+      : providerSummary.status === 'degraded' || runtime.status === 'degraded'
+        ? 'degraded'
+        : 'ok';
+
+  return c.json({
+    service: RUNTIME_SERVICE_NAME,
+    version: RUNTIME_VERSION,
+    timestamp: new Date().toISOString(),
+    status,
+    contract: getRuntimeLifecycleContract(ctx.startup),
+    readiness,
+    runtime: {
+      status: runtime.status,
+      summary: runtime.summary,
+      startup: getRuntimeStartupDetails(ctx, readiness),
+      shutdown: getRuntimeShutdownContract(ctx.startup),
+    },
+    providers: {
+      probe: probeMode,
+      summary: providerSummary,
+      defaults: providers
+        .filter((provider) => provider.defaultTarget)
+        .map((provider) => ({
+          provider: provider.provider,
+          backend: provider.backend,
+          instance: provider.instance,
+          target: provider.target,
+          status: provider.availability.status,
+          summary: provider.availability.summary,
+        })),
+    },
   });
 });
 

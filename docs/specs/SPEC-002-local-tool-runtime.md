@@ -76,6 +76,18 @@ The shared tool runtime lives under `src/core/tools` and is composed of:
 Backend-specific orchestrators remain responsible for converting provider tool
 requests into calls into this shared runtime.
 
+## Current Implementation Notes
+
+- Workspace-relative path checks are now shared across direct tool handlers and
+  structured patch application, so `apply_patch` cannot bypass the same
+  boundary rules as `read_file` / `write_file`.
+- Mutating flows now reject symbolic-link/junction alias paths and existing
+  hardlinked mutation targets to reduce accidental writes through aliased
+  filesystem paths.
+- This first safety hardening slice does **not** yet guarantee atomic
+  multi-file rollback for write/edit/patch operations; that remains follow-on
+  work.
+
 ## Dependencies
 
 - [ADR 005: Introduce a Backend-Neutral Runtime Facade for CLI and API Backends](../decisions/005-backend-neutral-runtime-and-api-backend.md)

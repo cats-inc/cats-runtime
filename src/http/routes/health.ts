@@ -1,10 +1,12 @@
 import { Hono } from 'hono';
 import { type RuntimeRouteEnv } from './diagnosticsSupport.js';
 import {
-  RUNTIME_LIFECYCLE_EVENTS,
   RUNTIME_SERVICE_NAME,
   RUNTIME_VERSION,
+  getRuntimeLifecycleContract,
+  getRuntimeOperationalStatus,
   getRuntimeReadinessSnapshot,
+  getRuntimeShutdownContract,
 } from '../../startup.js';
 
 export const healthRoutes = new Hono<RuntimeRouteEnv>();
@@ -12,16 +14,14 @@ export const healthRoutes = new Hono<RuntimeRouteEnv>();
 healthRoutes.get('/health', (c) => {
   const ctx = c.get('ctx');
   const readiness = getRuntimeReadinessSnapshot(ctx.startup);
+  const runtime = getRuntimeOperationalStatus(ctx.startup);
   return c.json({
     service: RUNTIME_SERVICE_NAME,
-    status: 'ok',
+    status: runtime.status,
+    summary: runtime.summary,
     timestamp: new Date().toISOString(),
     version: RUNTIME_VERSION,
-    contract: {
-      startup: ctx.startup.contractVersion,
-      readinessPath: ctx.startup.readinessPath,
-      lifecycleEvents: [...RUNTIME_LIFECYCLE_EVENTS],
-    },
+    contract: getRuntimeLifecycleContract(ctx.startup),
     readiness,
     startup: {
       contractVersion: ctx.startup.contractVersion,
@@ -36,5 +36,6 @@ healthRoutes.get('/health', (c) => {
       shutdownReason: ctx.startup.shutdownReason,
       lastEvent: ctx.startup.lastEvent,
     },
+    shutdown: getRuntimeShutdownContract(ctx.startup),
   });
 });

@@ -96,6 +96,7 @@ src/
 - Applies optional bearer auth
 - Streams turn output as SSE or NDJSON
 - Exposes startup/readiness metadata at `GET /health`
+- Exposes aggregate runtime + provider health at `GET /diagnostics/health`
 - Exposes runtime/host diagnostics at `GET /diagnostics/runtime`
 - Exposes provider availability diagnostics at `GET /diagnostics/providers`
 - Exposes runtime-owned delivery execution routes such as delivery audit,
@@ -157,6 +158,8 @@ src/
 
 - Defines the shared local tool set exposed to API/local sessions
 - Enforces workspace boundaries and permission policy centrally
+- Rejects symbolic-link/junction alias paths and hardlinked mutation targets
+  for mutating tool flows so workspace safety stays backend-neutral
 - Executes file listing, file read/write, grep, and shell commands
 - Exposes policy-neutral workspace substrate operations (`audit-workspace`,
   `init-workspace`, `update-workspace`) as shared headless/local-tool
@@ -217,8 +220,9 @@ src/
    including workspace substrate preview/apply operations
 7. Agent turns use the shared `TurnInput` contract plus provider-managed session continuity where available
 8. Startup/readiness state is exposed over `GET /health`, while
-   `GET /diagnostics/runtime` and `GET /diagnostics/providers` expose the
-   runtime-owned host integration surface
+   `GET /diagnostics/health`, `GET /diagnostics/runtime`, and
+   `GET /diagnostics/providers` expose the runtime-owned host integration
+   surface
 9. Optional machine-readable process output emits startup and shutdown
    lifecycle events for app-managed local hosts
 10. Session branch inspection is available over session payload `branching`
@@ -275,6 +279,8 @@ the only durable memory surface for the Cats suite.
   the HTTP boundary for readiness rather than source-importing runtime internals
 - Hosts should use runtime-owned diagnostics surfaces rather than rebuilding
   provider availability checks above the runtime
+- The embedded dashboard should consume the same runtime-owned diagnostics
+  contracts that packaged or host-managed supervisors poll
 - Historical `agent-fleet` references should stay confined to ADRs and migration notes
 - Inbound transport code should stay in `src/http`, not in backend modules
 - New API-key or Ollama integrations should land under `src/backends/api`

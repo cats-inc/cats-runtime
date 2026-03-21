@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  RUNTIME_DIAGNOSTICS_CONTRACT_VERSION,
+  RUNTIME_DIAGNOSTICS_PATHS,
   RUNTIME_VERSION,
+  RUNTIME_SHUTDOWN_REASONS,
+  RUNTIME_SHUTDOWN_SIGNALS,
   RUNTIME_STARTUP_CONTRACT_VERSION,
   applyRuntimeCliEnvOverrides,
   createRuntimeStartupState,
@@ -10,7 +14,11 @@ import {
   formatRuntimeStoppingMessage,
   formatRuntimeStartupError,
   getRuntimeHelpText,
+  getRuntimeLifecycleContract,
+  getRuntimeOperationalStatus,
   getRuntimeReadinessSnapshot,
+  getRuntimeShutdownContract,
+  isRuntimeManagedStdinShutdownEnabled,
   markRuntimeReady,
   markRuntimeStopped,
   markRuntimeStopping,
@@ -193,6 +201,44 @@ describe('runtime startup helpers', () => {
       readySignal: 'http',
       phase: 'starting',
       ready: false,
+    });
+  });
+
+  it('exposes a shared lifecycle, shutdown, and diagnostics contract', () => {
+    const startup = createRuntimeStartupState({
+      mode: 'app-managed',
+      managedBy: 'cats-inc',
+    });
+
+    expect(getRuntimeLifecycleContract(startup)).toEqual({
+      startup: RUNTIME_STARTUP_CONTRACT_VERSION,
+      diagnostics: RUNTIME_DIAGNOSTICS_CONTRACT_VERSION,
+      supportedModes: ['standalone', 'app-managed'],
+      readinessPath: '/health',
+      lifecycleEvents: [
+        'runtime.ready',
+        'runtime.startup_error',
+        'runtime.stopping',
+        'runtime.stopped',
+      ],
+      shutdownSignals: [...RUNTIME_SHUTDOWN_SIGNALS],
+      shutdownReasons: [...RUNTIME_SHUTDOWN_REASONS],
+      endpoints: {
+        health: '/health',
+        runtime: RUNTIME_DIAGNOSTICS_PATHS.runtime,
+        providers: RUNTIME_DIAGNOSTICS_PATHS.providers,
+        summary: RUNTIME_DIAGNOSTICS_PATHS.health,
+      },
+    });
+    expect(getRuntimeShutdownContract(startup)).toEqual({
+      signals: [...RUNTIME_SHUTDOWN_SIGNALS],
+      reasons: [...RUNTIME_SHUTDOWN_REASONS],
+      stdinCloseEnabled: true,
+    });
+    expect(isRuntimeManagedStdinShutdownEnabled(startup)).toBe(true);
+    expect(getRuntimeOperationalStatus(startup)).toEqual({
+      status: 'degraded',
+      summary: 'Runtime is starting and is not ready yet.',
     });
   });
 

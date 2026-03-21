@@ -7,6 +7,10 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  RUNTIME_DIAGNOSTICS_CONTRACT_VERSION,
+  RUNTIME_DIAGNOSTICS_PATHS,
+  RUNTIME_SHUTDOWN_REASONS,
+  RUNTIME_SHUTDOWN_SIGNALS,
   RUNTIME_STARTUP_CONTRACT_VERSION,
   RUNTIME_VERSION,
 } from '../src/startup.js';
@@ -331,10 +335,13 @@ describe('runtime process startup contract', () => {
       expect(await response.json()).toEqual({
         service: 'cats-runtime',
         status: 'ok',
+        summary: 'Runtime is ready to accept requests.',
         version: RUNTIME_VERSION,
         timestamp: expect.any(String),
         contract: {
           startup: RUNTIME_STARTUP_CONTRACT_VERSION,
+          diagnostics: RUNTIME_DIAGNOSTICS_CONTRACT_VERSION,
+          supportedModes: ['standalone', 'app-managed'],
           readinessPath: '/health',
           lifecycleEvents: [
             'runtime.ready',
@@ -342,6 +349,14 @@ describe('runtime process startup contract', () => {
             'runtime.stopping',
             'runtime.stopped',
           ],
+          shutdownSignals: [...RUNTIME_SHUTDOWN_SIGNALS],
+          shutdownReasons: [...RUNTIME_SHUTDOWN_REASONS],
+          endpoints: {
+            health: '/health',
+            runtime: RUNTIME_DIAGNOSTICS_PATHS.runtime,
+            providers: RUNTIME_DIAGNOSTICS_PATHS.providers,
+            summary: RUNTIME_DIAGNOSTICS_PATHS.health,
+          },
         },
         readiness: {
           endpoint: '/health',
@@ -367,9 +382,66 @@ describe('runtime process startup contract', () => {
           shutdownReason: undefined,
           lastEvent: 'runtime.ready',
         },
+        shutdown: {
+          signals: [...RUNTIME_SHUTDOWN_SIGNALS],
+          reasons: [...RUNTIME_SHUTDOWN_REASONS],
+          stdinCloseEnabled: true,
+        },
       });
     } finally {
       await stopRuntime(child);
+      cleanup();
+    }
+  }, 20000);
+
+  it('emits startup_error when the managed port is already occupied', async () => {
+    const occupiedServer = createServer();
+    occupiedServer.listen(0, '127.0.0.1');
+    await once(occupiedServer, 'listening');
+    const occupiedAddress = occupiedServer.address();
+    if (!occupiedAddress || typeof occupiedAddress === 'string') {
+      throw new Error('Could not resolve occupied test port');
+    }
+
+    const port = occupiedAddress.port;
+    const { env, cleanup } = createRuntimeProcessEnv(port);
+    const child = spawnRuntime(port, env);
+
+    try {
+      const startupError = await waitForLifecycleEvent(child, 'runtime.startup_error');
+      expect(startupError).toMatchObject({
+        event: 'runtime.startup_error',
+        service: 'cats-runtime',
+        contractVersion: RUNTIME_STARTUP_CONTRACT_VERSION,
+        mode: 'app-managed',
+        managedBy: 'cats-inc',
+        phase: 'starting',
+        readySignal: 'http',
+        readinessPath: '/health',
+        ready: false,
+        error: expect.stringContaining('EADDRINUSE'),
+      });
+
+      if (child.exitCode === null) {
+        const [code, signal] = await once(child, 'exit') as [number | null, NodeJS.Signals | null];
+        expect(code).toBe(1);
+        expect(signal).toBeNull();
+      } else {
+        expect(child.exitCode).toBe(1);
+      }
+    } finally {
+      if (child.exitCode === null) {
+        child.kill();
+      }
+      await new Promise<void>((resolveClose, rejectClose) => {
+        occupiedServer.close((error) => {
+          if (error) {
+            rejectClose(error);
+            return;
+          }
+          resolveClose();
+        });
+      });
       cleanup();
     }
   }, 20000);

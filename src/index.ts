@@ -107,5 +107,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   main().catch((error) => {
     process.stderr.write(formatRuntimeStartupError(startup, error));
     process.exitCode = 1;
+    process.exit(1);
   });
 }

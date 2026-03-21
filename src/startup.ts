@@ -26,20 +26,39 @@ function readRuntimePackageVersion(): string {
 export const RUNTIME_VERSION = readRuntimePackageVersion();
 export const RUNTIME_SERVICE_NAME = 'cats-runtime';
 export const RUNTIME_STARTUP_CONTRACT_VERSION = 1;
+export const RUNTIME_DIAGNOSTICS_CONTRACT_VERSION = 1;
 export const RUNTIME_READINESS_PATH = '/health';
+export const RUNTIME_DIAGNOSTICS_PATHS = {
+  runtime: '/diagnostics/runtime',
+  providers: '/diagnostics/providers',
+  health: '/diagnostics/health',
+} as const;
 export const RUNTIME_LIFECYCLE_EVENTS = [
   'runtime.ready',
   'runtime.startup_error',
   'runtime.stopping',
   'runtime.stopped',
 ] as const;
+export const RUNTIME_STARTUP_MODES = [
+  'standalone',
+  'app-managed',
+] as const;
+export const RUNTIME_SHUTDOWN_SIGNALS = [
+  'SIGINT',
+  'SIGTERM',
+] as const;
+export const RUNTIME_SHUTDOWN_REASONS = [
+  'sigint',
+  'sigterm',
+  'stdin_closed',
+] as const;
 
-export type RuntimeStartupMode = 'standalone' | 'app-managed';
+export type RuntimeStartupMode = typeof RUNTIME_STARTUP_MODES[number];
 export type RuntimeReadyOutput = 'plain' | 'json' | 'silent';
 export type RuntimeReadySignal = 'http';
 export type RuntimeLifecycleEventName = typeof RUNTIME_LIFECYCLE_EVENTS[number];
 export type RuntimeLifecyclePhase = 'starting' | 'ready' | 'stopping' | 'stopped';
-export type RuntimeShutdownReason = 'sigint' | 'sigterm' | 'stdin_closed';
+export type RuntimeShutdownReason = typeof RUNTIME_SHUTDOWN_REASONS[number];
 
 export interface RuntimeCliOptions {
   help?: boolean;
@@ -103,8 +122,13 @@ export interface RuntimeReadinessSnapshot {
   ready: boolean;
 }
 
+export interface RuntimeOperationalStatus {
+  status: 'ok' | 'degraded' | 'unavailable';
+  summary: string;
+}
+
 function isStartupMode(value: string): value is RuntimeStartupMode {
-  return value === 'standalone' || value === 'app-managed';
+  return (RUNTIME_STARTUP_MODES as readonly string[]).includes(value);
 }
 
 function isReadyOutput(value: string): value is RuntimeReadyOutput {
@@ -292,6 +316,70 @@ export function getRuntimeReadinessSnapshot(
     phase: startup.phase,
     ready: startup.ready && startup.phase === 'ready',
   };
+}
+
+export function isRuntimeManagedStdinShutdownEnabled(
+  startup: Pick<RuntimeStartupState, 'mode'>,
+): boolean {
+  return startup.mode === 'app-managed';
+}
+
+export function getRuntimeLifecycleContract(
+  startup: Pick<RuntimeStartupState, 'contractVersion' | 'readinessPath'>,
+) {
+  return {
+    startup: startup.contractVersion,
+    diagnostics: RUNTIME_DIAGNOSTICS_CONTRACT_VERSION,
+    supportedModes: [...RUNTIME_STARTUP_MODES],
+    readinessPath: startup.readinessPath,
+    lifecycleEvents: [...RUNTIME_LIFECYCLE_EVENTS],
+    shutdownSignals: [...RUNTIME_SHUTDOWN_SIGNALS],
+    shutdownReasons: [...RUNTIME_SHUTDOWN_REASONS],
+    endpoints: {
+      health: RUNTIME_READINESS_PATH,
+      runtime: RUNTIME_DIAGNOSTICS_PATHS.runtime,
+      providers: RUNTIME_DIAGNOSTICS_PATHS.providers,
+      summary: RUNTIME_DIAGNOSTICS_PATHS.health,
+    },
+  };
+}
+
+export function getRuntimeShutdownContract(
+  startup: Pick<RuntimeStartupState, 'mode'>,
+) {
+  return {
+    signals: [...RUNTIME_SHUTDOWN_SIGNALS],
+    reasons: [...RUNTIME_SHUTDOWN_REASONS],
+    stdinCloseEnabled: isRuntimeManagedStdinShutdownEnabled(startup),
+  };
+}
+
+export function getRuntimeOperationalStatus(
+  startup: RuntimeStartupState,
+): RuntimeOperationalStatus {
+  switch (startup.phase) {
+    case 'ready':
+      return {
+        status: 'ok',
+        summary: 'Runtime is ready to accept requests.',
+      };
+    case 'starting':
+      return {
+        status: 'degraded',
+        summary: 'Runtime is starting and is not ready yet.',
+      };
+    case 'stopping':
+      return {
+        status: 'degraded',
+        summary: `Runtime is stopping${startup.shutdownReason ? ` (${startup.shutdownReason})` : ''}.`,
+      };
+    case 'stopped':
+    default:
+      return {
+        status: 'unavailable',
+        summary: `Runtime is stopped${startup.shutdownReason ? ` (${startup.shutdownReason})` : ''}.`,
+      };
+  }
 }
 
 export function markRuntimeReady(

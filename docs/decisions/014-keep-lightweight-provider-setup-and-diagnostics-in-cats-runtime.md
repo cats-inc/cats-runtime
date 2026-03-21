@@ -108,6 +108,27 @@ This decision includes:
 - provider readiness logic stays near provider execution and compatibility logic
 - the embedded dashboard gains a clearer purpose for direct runtime operators
 
+### Implementation Notes
+
+The current runtime-owned diagnostics slice is intentionally headless-first and
+host-consumable:
+
+- `GET /health` remains the authoritative readiness boundary and now carries the
+  shared startup/shutdown contract metadata that packaged or host-managed
+  supervisors can consume directly
+- `GET /diagnostics/runtime` freezes the machine-readable startup, lifecycle,
+  and shutdown contract exposed by the runtime process
+- `GET /diagnostics/providers` remains the lightweight provider-readiness and
+  probe surface owned by `cats-runtime`
+- `GET /diagnostics/health` is the aggregate host-facing summary for runtime +
+  provider health, so packaged desktop shells and future product hosts do not
+  need to stitch multiple diagnostics routes together
+- the embedded dashboard consumes the same runtime-owned diagnostics surface
+  rather than inventing a separate product-only health contract
+
+This ADR still does not move product onboarding, installation orchestration, or
+policy-heavy approval UX into `cats-runtime`.
+
 ### Negative
 
 - `cats-runtime` must now define and maintain a setup/diagnostics API surface
@@ -159,4 +180,5 @@ This decision includes:
 ---
 
 *Accepted: 2026-03-20*
+*Last updated: 2026-03-22*
 *Decision makers: user + Codex*

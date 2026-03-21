@@ -1,9 +1,15 @@
 import { spawn } from 'node:child_process';
 import { copyFile, readdir, readFile, rmdir, stat, mkdir, rename, unlink, writeFile } from 'node:fs/promises';
-import { dirname, extname, relative, resolve } from 'node:path';
+import { dirname, extname, resolve } from 'node:path';
 import path from 'node:path';
 import type { PermissionMode, WorkspaceMode } from '../types.js';
 import { applyPatch as applyStructuredPatch } from './applyPatch.js';
+import {
+  assertDistinctWorkspaceFiles,
+  assertSafeExistingFileMutation,
+  resolveSafeWorkspacePath,
+  toRelativeDisplay,
+} from './pathSafety.js';
 import { WorkspaceSubstrateService } from '../runtime/WorkspaceSubstrateService.js';
 import { RuntimeDeliveryService } from '../runtime/RuntimeDeliveryService.js';
 
@@ -446,11 +452,6 @@ function normalizeToolName(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function toRelativeDisplay(root: string, fullPath: string): string {
-  const rel = relative(root, fullPath);
-  return rel === '' ? '.' : rel.split('\\').join('/');
-}
-
 function shouldIgnoreDirectory(name: string): boolean {
   return IGNORED_DIRECTORIES.has(name);
 }
@@ -573,15 +574,6 @@ function truncate(text: string, limit = MAX_TEXT_OUTPUT): string {
   return `${text.slice(0, limit)}\n... [truncated ${text.length - limit} chars]`;
 }
 
-function resolveWorkspacePath(root: string, inputPath: string): string {
-  const fullPath = resolve(root, inputPath);
-  const rel = relative(root, fullPath);
-  if (rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) {
-    throw new Error(`Path '${inputPath}' is outside the workspace`);
-  }
-  return fullPath;
-}
-
 async function walkFiles(
   root: string,
   currentPath: string,
@@ -599,6 +591,10 @@ async function walkFiles(
   for (const entry of entries) {
     if (results.length >= limit) {
       return;
+    }
+
+    if (entry.isSymbolicLink()) {
+      continue;
     }
 
     if (entry.isDirectory() && shouldIgnoreDirectory(entry.name)) {
@@ -630,6 +626,10 @@ async function walkGlob(
   for (const entry of entries) {
     if (results.length >= limit) {
       return;
+    }
+
+    if (entry.isSymbolicLink()) {
+      continue;
     }
 
     if (entry.isDirectory() && shouldIgnoreDirectory(entry.name)) {
@@ -680,6 +680,10 @@ async function collectTextFiles(
   for (const entry of entries) {
     if (results.length >= limit) {
       return;
+    }
+
+    if (entry.isSymbolicLink()) {
+      continue;
     }
 
     if (entry.isDirectory() && shouldIgnoreDirectory(entry.name)) {
@@ -849,7 +853,7 @@ export class LocalToolRuntime {
     callId: string,
     args: Record<string, unknown>,
   ): Promise<ToolResult> {
-    const fullPath = resolveWorkspacePath(context.cwd, String(args.path || '.'));
+    const fullPath = (await resolveSafeWorkspacePath(context.cwd, String(args.path || '.'))).fullPath;
     const recursive = readOptionalBoolean(args, 'recursive');
     const maxEntries = readOptionalInteger(args, 'max_entries', DEFAULT_LIST_ENTRIES, 1, 1000);
     const results: string[] = [];
@@ -867,7 +871,7 @@ export class LocalToolRuntime {
     args: Record<string, unknown>,
   ): Promise<ToolResult> {
     const inputPath = requireString(args, 'path');
-    const fullPath = resolveWorkspacePath(context.cwd, inputPath);
+    const { fullPath } = await resolveSafeWorkspacePath(context.cwd, inputPath);
     const offsetLine = readOptionalInteger(args, 'offset_line', 0, 0, Number.MAX_SAFE_INTEGER);
     const limitLines = readOptionalInteger(args, 'limit_lines', DEFAULT_READ_LINE_LIMIT, 1, 2000);
     const content = await readTextFile(fullPath, offsetLine, limitLines);
@@ -884,14 +888,21 @@ export class LocalToolRuntime {
     args: Record<string, unknown>,
   ): Promise<ToolResult> {
     const inputPath = requireString(args, 'path');
-    const fullPath = resolveWorkspacePath(context.cwd, inputPath);
+    const { fullPath, displayPath } = await resolveSafeWorkspacePath(context.cwd, inputPath);
     const content = typeof args.content === 'string' ? args.content : '';
+    try {
+      await assertSafeExistingFileMutation(fullPath, displayPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
+    }
     await mkdir(dirname(fullPath), { recursive: true });
     await writeFile(fullPath, content, 'utf-8');
     return {
       callId,
       name: 'write_file',
-      output: `Wrote ${Buffer.byteLength(content, 'utf-8')} bytes to ${toRelativeDisplay(context.cwd, fullPath)}`,
+      output: `Wrote ${Buffer.byteLength(content, 'utf-8')} bytes to ${displayPath}`,
     };
   }
 
@@ -901,11 +912,12 @@ export class LocalToolRuntime {
     args: Record<string, unknown>,
   ): Promise<ToolResult> {
     const inputPath = requireString(args, 'path');
-    const fullPath = resolveWorkspacePath(context.cwd, inputPath);
+    const { fullPath, displayPath } = await resolveSafeWorkspacePath(context.cwd, inputPath);
     const oldString = requireString(args, 'old_string');
     const newString = typeof args.new_string === 'string' ? args.new_string : '';
     const allowMultiple = readOptionalBoolean(args, 'allow_multiple');
 
+    await assertSafeExistingFileMutation(fullPath, displayPath);
     const content = await readFile(fullPath, 'utf-8');
 
     let count = 0;
@@ -918,7 +930,7 @@ export class LocalToolRuntime {
     }
 
     if (count === 0) {
-      throw new Error(`old_string not found in ${toRelativeDisplay(context.cwd, fullPath)}`);
+      throw new Error(`old_string not found in ${displayPath}`);
     }
 
     if (count > 1 && !allowMultiple) {
@@ -933,7 +945,6 @@ export class LocalToolRuntime {
 
     await writeFile(fullPath, updated, 'utf-8');
 
-    const displayPath = toRelativeDisplay(context.cwd, fullPath);
     return {
       callId,
       name: 'edit_file',
@@ -971,7 +982,7 @@ export class LocalToolRuntime {
     args: Record<string, unknown>,
   ): Promise<ToolResult> {
     const patternSource = requireString(args, 'pattern');
-    const rootPath = resolveWorkspacePath(context.cwd, String(args.path || '.'));
+    const rootPath = (await resolveSafeWorkspacePath(context.cwd, String(args.path || '.'))).fullPath;
     const maxMatches = readOptionalInteger(args, 'max_matches', DEFAULT_GREP_MATCHES, 1, 1000);
     const regexp = new RegExp(patternSource, 'gm');
     const files: string[] = [];
@@ -1016,7 +1027,7 @@ export class LocalToolRuntime {
     args: Record<string, unknown>,
   ): Promise<ToolResult> {
     const pattern = requireString(args, 'pattern');
-    const startPath = resolveWorkspacePath(context.cwd, String(args.path || '.'));
+    const startPath = (await resolveSafeWorkspacePath(context.cwd, String(args.path || '.'))).fullPath;
     const maxResults = readOptionalInteger(args, 'max_results', DEFAULT_GLOB_RESULTS, 1, 1000);
 
     const matches: string[] = [];
@@ -1071,8 +1082,7 @@ export class LocalToolRuntime {
     args: Record<string, unknown>,
   ): Promise<ToolResult> {
     const inputPath = requireString(args, 'path');
-    const fullPath = resolveWorkspacePath(context.cwd, inputPath);
-    const displayPath = toRelativeDisplay(context.cwd, fullPath);
+    const { fullPath, displayPath } = await resolveSafeWorkspacePath(context.cwd, inputPath);
 
     const info = await stat(fullPath);
     if (info.isDirectory()) {
@@ -1082,6 +1092,7 @@ export class LocalToolRuntime {
       }
       await rmdir(fullPath);
     } else {
+      await assertSafeExistingFileMutation(fullPath, displayPath);
       await unlink(fullPath);
     }
 
@@ -1099,23 +1110,38 @@ export class LocalToolRuntime {
   ): Promise<ToolResult> {
     const sourcePath = requireString(args, 'source');
     const destPath = requireString(args, 'destination');
-    const fullSource = resolveWorkspacePath(context.cwd, sourcePath);
-    const fullDest = resolveWorkspacePath(context.cwd, destPath);
+    const { fullPath: fullSource, displayPath: sourceDisplayPath } = await resolveSafeWorkspacePath(context.cwd, sourcePath);
+    const { fullPath: fullDest, displayPath: destinationDisplayPath } = await resolveSafeWorkspacePath(context.cwd, destPath);
     const overwrite = readOptionalBoolean(args, 'overwrite');
 
     const sourceInfo = await stat(fullSource);
     if (!sourceInfo.isFile()) {
-      throw new Error(`Source must be a file, not a directory: ${toRelativeDisplay(context.cwd, fullSource)}`);
+      throw new Error(`Source must be a file, not a directory: ${sourceDisplayPath}`);
     }
+    await assertSafeExistingFileMutation(fullSource, sourceDisplayPath);
 
     if (!overwrite) {
       try {
         await stat(fullDest);
         throw new Error(
-          `Destination already exists: ${toRelativeDisplay(context.cwd, fullDest)}; set overwrite=true to replace`,
+          `Destination already exists: ${destinationDisplayPath}; set overwrite=true to replace`,
         );
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+    } else {
+      try {
+        await assertDistinctWorkspaceFiles(
+          fullSource,
+          sourceDisplayPath,
+          fullDest,
+          destinationDisplayPath,
+        );
+        await assertSafeExistingFileMutation(fullDest, destinationDisplayPath);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+          throw error;
+        }
       }
     }
 
@@ -1125,7 +1151,7 @@ export class LocalToolRuntime {
     return {
       callId,
       name: 'rename_file',
-      output: `Renamed ${toRelativeDisplay(context.cwd, fullSource)} → ${toRelativeDisplay(context.cwd, fullDest)}`,
+      output: `Renamed ${sourceDisplayPath} → ${destinationDisplayPath}`,
     };
   }
 
@@ -1136,23 +1162,37 @@ export class LocalToolRuntime {
   ): Promise<ToolResult> {
     const sourcePath = requireString(args, 'source');
     const destPath = requireString(args, 'destination');
-    const fullSource = resolveWorkspacePath(context.cwd, sourcePath);
-    const fullDest = resolveWorkspacePath(context.cwd, destPath);
+    const { fullPath: fullSource, displayPath: sourceDisplayPath } = await resolveSafeWorkspacePath(context.cwd, sourcePath);
+    const { fullPath: fullDest, displayPath: destinationDisplayPath } = await resolveSafeWorkspacePath(context.cwd, destPath);
     const overwrite = readOptionalBoolean(args, 'overwrite');
 
     const sourceInfo = await stat(fullSource);
     if (!sourceInfo.isFile()) {
-      throw new Error(`Source must be a file, not a directory: ${toRelativeDisplay(context.cwd, fullSource)}`);
+      throw new Error(`Source must be a file, not a directory: ${sourceDisplayPath}`);
     }
 
     if (!overwrite) {
       try {
         await stat(fullDest);
         throw new Error(
-          `Destination already exists: ${toRelativeDisplay(context.cwd, fullDest)}; set overwrite=true to replace`,
+          `Destination already exists: ${destinationDisplayPath}; set overwrite=true to replace`,
         );
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+    } else {
+      try {
+        await assertDistinctWorkspaceFiles(
+          fullSource,
+          sourceDisplayPath,
+          fullDest,
+          destinationDisplayPath,
+        );
+        await assertSafeExistingFileMutation(fullDest, destinationDisplayPath);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+          throw error;
+        }
       }
     }
 
@@ -1162,7 +1202,7 @@ export class LocalToolRuntime {
     return {
       callId,
       name: 'copy_file',
-      output: `Copied ${toRelativeDisplay(context.cwd, fullSource)} → ${toRelativeDisplay(context.cwd, fullDest)}`,
+      output: `Copied ${sourceDisplayPath} → ${destinationDisplayPath}`,
     };
   }
 
@@ -1172,7 +1212,7 @@ export class LocalToolRuntime {
     operation: 'audit-workspace' | 'init-workspace' | 'update-workspace',
     args: Record<string, unknown>,
   ): Promise<ToolResult> {
-    const workspacePath = resolveWorkspacePath(context.cwd, String(args.path || '.'));
+    const workspacePath = (await resolveSafeWorkspacePath(context.cwd, String(args.path || '.'))).fullPath;
     const profile = typeof args.profile === 'string'
       && ['minimal', 'standard', 'a2a-enabled'].includes(args.profile)
       ? args.profile as 'minimal' | 'standard' | 'a2a-enabled'

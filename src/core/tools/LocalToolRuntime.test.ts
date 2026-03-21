@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, linkSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -101,6 +101,73 @@ describe('LocalToolRuntime', () => {
       });
       expect(escaped.isError).toBe(true);
       expect(escaped.output).toContain('outside the workspace');
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('rejects symbolic-link and junction alias paths', async () => {
+    const { cwd, cleanup } = createWorkspace();
+    const outside = mkdtempSync(join(tmpdir(), 'cats-runtime-tools-outside-'));
+    const runtime = new LocalToolRuntime();
+    writeFileSync(join(outside, 'secret.txt'), 'outside\n');
+    symlinkSync(
+      outside,
+      join(cwd, 'linked-outside'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    try {
+      const readResult = await runtime.execute(sharedCtx(cwd), {
+        id: 'alias-1',
+        name: 'read_file',
+        arguments: { path: 'linked-outside/secret.txt' },
+      });
+      expect(readResult.isError).toBe(true);
+      expect(readResult.output).toContain('symbolic-link or junction alias');
+
+      const writeResult = await runtime.execute(sharedCtx(cwd), {
+        id: 'alias-2',
+        name: 'write_file',
+        arguments: { path: 'linked-outside/pwned.txt', content: 'nope\n' },
+      });
+      expect(writeResult.isError).toBe(true);
+      expect(writeResult.output).toContain('symbolic-link or junction alias');
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+      cleanup();
+    }
+  });
+
+  it('rejects hardlinked mutation targets and same-file copy aliases', async () => {
+    const { cwd, cleanup } = createWorkspace();
+    const runtime = new LocalToolRuntime();
+    linkSync(join(cwd, 'src', 'app.ts'), join(cwd, 'src', 'app-hard.ts'));
+
+    try {
+      const editResult = await runtime.execute(sharedCtx(cwd), {
+        id: 'alias-3',
+        name: 'edit_file',
+        arguments: {
+          path: 'src/app-hard.ts',
+          old_string: 'const value = 1',
+          new_string: 'const value = 2',
+        },
+      });
+      expect(editResult.isError).toBe(true);
+      expect(editResult.output).toContain('aliased file');
+
+      const copyResult = await runtime.execute(extendedCtx(cwd), {
+        id: 'alias-4',
+        name: 'copy_file',
+        arguments: {
+          source: 'src/app.ts',
+          destination: 'src/app-hard.ts',
+          overwrite: true,
+        },
+      });
+      expect(copyResult.isError).toBe(true);
+      expect(copyResult.output).toContain('refer to the same file');
     } finally {
       cleanup();
     }
@@ -350,6 +417,35 @@ describe('LocalToolRuntime', () => {
         expect(result.isError).toBe(true);
         expect(result.output).toContain('outside the workspace');
       } finally {
+        cleanup();
+      }
+    });
+
+    it('blocks symbolic-link alias paths in patch hunks', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const outside = mkdtempSync(join(tmpdir(), 'cats-runtime-patch-outside-'));
+      const runtime = new LocalToolRuntime();
+      symlinkSync(
+        outside,
+        join(cwd, 'linked-outside'),
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
+
+      try {
+        const result = await runtime.execute(sharedCtx(cwd), {
+          id: 'patch-3b',
+          name: 'apply_patch',
+          arguments: {
+            input: `*** Begin Patch
+*** Add File: linked-outside/escape.txt
++pwned
+*** End Patch`,
+          },
+        });
+        expect(result.isError).toBe(true);
+        expect(result.output).toContain('symbolic-link or junction alias');
+      } finally {
+        rmSync(outside, { recursive: true, force: true });
         cleanup();
       }
     });

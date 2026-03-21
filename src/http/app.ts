@@ -18,6 +18,7 @@ import type { WslDiscoveryStatusStore } from '../backends/cli/discovery/wslDisco
 import type { ProviderModelCatalogService } from '../core/models/providerModelCatalog.js';
 import { RuntimeDeliveryService } from '../core/runtime/RuntimeDeliveryService.js';
 import { bearerAuth } from './auth.js';
+import { injectRuntimeDashboardHealthOverlay } from './dashboardHealthOverlay.js';
 import { discoveryRoutes } from './routes/discovery.js';
 import { deliveryRoutes } from './routes/delivery.js';
 import { diagnosticsRoutes } from './routes/diagnostics.js';
@@ -83,7 +84,7 @@ export function createRuntimeApp(ctx: AppContext) {
   // Serve the embedded dashboard UI without auth.
   app.get('/', (c) => {
     const htmlPath = resolve(__dirname, '../../public/index.html');
-    const html = readFileSync(htmlPath, 'utf-8');
+    const html = injectRuntimeDashboardHealthOverlay(readFileSync(htmlPath, 'utf-8'));
     return c.html(html);
   });
 
@@ -93,6 +94,7 @@ export function createRuntimeApp(ctx: AppContext) {
       path === '/'
       || path === '/sessions'
       || path === '/health'
+      || path === '/diagnostics/health'
       || path === '/diagnostics/runtime'
       || path === '/diagnostics/providers'
       || path === '/pool/status'

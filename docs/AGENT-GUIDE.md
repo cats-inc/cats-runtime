@@ -20,6 +20,7 @@
 
 - `GET /`
 - `GET /health`
+- `GET /diagnostics/health`
 - `GET /diagnostics/runtime`
 - `GET /diagnostics/providers`
 - `POST /delivery/audit`
@@ -48,6 +49,7 @@
 - Keep inbound transport details in `src/http`, not in backend modules
 - Keep CLI-specific logic in `src/backends/cli`
 - Treat `GET /health` as the authoritative runtime readiness boundary
+- Treat `GET /diagnostics/health` as the host-facing aggregate for runtime + provider health
 - Treat `GET /diagnostics/providers` as the runtime-owned provider availability surface for hosts
 - Treat delivery routes and delivery tools as runtime-owned execution
   primitives; keep delivery-governance policy in upper-layer products

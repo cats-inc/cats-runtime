@@ -1,5 +1,9 @@
 import { mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
-import { dirname, relative, resolve } from 'node:path';
+import { dirname } from 'node:path';
+import {
+  assertSafeExistingFileMutation,
+  resolveSafeWorkspacePath,
+} from './pathSafety.js';
 
 const BEGIN_PATCH_MARKER = '*** Begin Patch';
 const END_PATCH_MARKER = '*** End Patch';
@@ -68,7 +72,7 @@ export async function applyPatch(input: string, cwd: string): Promise<ApplyPatch
 
   for (const hunk of hunks) {
     if (hunk.kind === 'add') {
-      const target = resolvePatchPath(cwd, hunk.path);
+      const target = await resolvePatchPath(cwd, hunk.path);
       await assertDoesNotExist(target.fullPath, target.displayPath);
       await mkdir(dirname(target.fullPath), { recursive: true });
       await writeFile(target.fullPath, hunk.content, 'utf-8');
@@ -77,19 +81,21 @@ export async function applyPatch(input: string, cwd: string): Promise<ApplyPatch
     }
 
     if (hunk.kind === 'delete') {
-      const target = resolvePatchPath(cwd, hunk.path);
+      const target = await resolvePatchPath(cwd, hunk.path);
       await assertFileExists(target.fullPath, target.displayPath);
+      await assertSafeExistingFileMutation(target.fullPath, target.displayPath);
       await unlink(target.fullPath);
       recordSummary(summary, seen, 'deleted', target.displayPath);
       continue;
     }
 
-    const source = resolvePatchPath(cwd, hunk.path);
+    const source = await resolvePatchPath(cwd, hunk.path);
     await assertFileExists(source.fullPath, source.displayPath);
+    await assertSafeExistingFileMutation(source.fullPath, source.displayPath);
     const updated = await applyUpdateHunks(source.fullPath, hunk.chunks);
 
     if (hunk.movePath) {
-      const destination = resolvePatchPath(cwd, hunk.movePath);
+      const destination = await resolvePatchPath(cwd, hunk.movePath);
       if (destination.fullPath === source.fullPath) {
         await writeFile(source.fullPath, updated, 'utf-8');
         recordSummary(summary, seen, 'modified', source.displayPath);
@@ -529,25 +535,11 @@ function normalizePunctuation(value: string): string {
     .join('');
 }
 
-function resolvePatchPath(
+async function resolvePatchPath(
   root: string,
   inputPath: string,
-): { fullPath: string; displayPath: string } {
-  const trimmed = inputPath.trim();
-  if (!trimmed) {
-    throw new Error('Patch path must not be empty');
-  }
-
-  const fullPath = resolve(root, trimmed);
-  const rel = relative(root, fullPath);
-  if (rel.startsWith('..') || rel.includes(`..${rel.includes('/') ? '/' : '\\'}`)) {
-    throw new Error(`Path '${inputPath}' is outside the workspace`);
-  }
-
-  return {
-    fullPath,
-    displayPath: rel === '' ? '.' : rel.split('\\').join('/'),
-  };
+): Promise<{ fullPath: string; displayPath: string }> {
+  return await resolveSafeWorkspacePath(root, inputPath);
 }
 
 async function assertDoesNotExist(fullPath: string, displayPath: string): Promise<void> {

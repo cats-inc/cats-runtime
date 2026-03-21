@@ -15,13 +15,13 @@ locally in the same service that ships them.
 
 - **Location**: `src/backends/cli/**/*.test.ts`, `src/core/tools/**/*.test.ts`
 - **Framework**: Vitest
-- **Scope**: provider parsers, runtime adapters, worker helpers, discovery, session registry, native services, local tool contracts
+- **Scope**: provider parsers, runtime adapters, worker helpers, discovery, session registry, native services, and local tool contracts including alias-safety guards for symlink/junction and hardlink edge cases
 
 ### Integration Tests
 
 - **Location**: `src/http/*.test.ts`, `tests/runtime-server.test.ts`, `tests/workspace-substrate.test.ts`
 - **Framework**: Vitest
-- **Scope**: route behavior, auth, session lifecycle, native session management, server bootstrap, runtime-neutral workspace substrate planning/apply behavior
+- **Scope**: route behavior, auth, session lifecycle, native session management, server bootstrap, startup/readiness diagnostics, and runtime-neutral workspace substrate planning/apply behavior
 
 ### End-to-End Tests
 
@@ -43,6 +43,7 @@ npm test
 npx vitest run src/backends/cli/runtime/runtime.test.ts
 npx vitest run src/http/cursorManagement.test.ts
 npx vitest run tests/runtime-server.test.ts
+npx vitest run tests/runtime-process.test.ts --pool=threads --poolOptions.threads.singleThread
 npx vitest run tests/workspace-substrate.test.ts src/core/tools/LocalToolRuntime.test.ts --pool=threads --poolOptions.threads.singleThread
 ```
 
@@ -63,6 +64,8 @@ describe('ComponentName', () => {
 - Prefer temp directories for discovery/history tests so file layout stays realistic
 - For workspace substrate tests, assert machine-readable `contract`, `plan`, and `approval` payloads rather than only final file writes
 - Cover the read-only `audit-workspace` boundary separately from mutable `init-workspace` / `update-workspace` flows
+- Cover child-process startup failure and shutdown lifecycle paths when changing `src/index.ts`, `src/server.ts`, or `src/startup.ts`
+- Cover path alias rejection separately from plain `..` traversal so symlink/junction and hardlink regressions stay caught
 
 ## CI/CD Integration
 
@@ -74,4 +77,4 @@ describe('ComponentName', () => {
 
 ---
 
-*Last updated: 2026-03-21*
+*Last updated: 2026-03-22*

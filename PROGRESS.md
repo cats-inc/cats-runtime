@@ -7,10 +7,10 @@
 | Component | Status | Description |
 |-----------|--------|-------------|
 | Core | Completed | Embedded CLI runtime, session registry, discovery, and worker pool are in-repo |
-| API Backends | In Progress | `src/backends/api` now runs Claude, Codex/OpenAI, Gemini, and Ollama with runtime-managed sessions, provider-native continuation/caching optimizations, first-slice provider-agnostic `progress` events, and a shared local tool loop with patch/file/search/shell support; health probes and broader tool/model discovery remain |
+| API Backends | In Progress | `src/backends/api` now runs Claude, Codex/OpenAI, Gemini, and Ollama with runtime-managed sessions, provider-native continuation/caching optimizations, first-slice provider-agnostic `progress` events, a shared local tool loop with patch/file/search/shell support, and runtime-owned health/diagnostics summaries; deeper live probes and broader tool/model discovery remain |
 | Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, and an Agent SDK bridge as the second validation target |
 | HTTP API | Completed | Health, sessions, delivery audit/export/repo routes, messages, history, observe, provider management, and session branch-lineage inspection routes are served directly from `cats-runtime` |
-| Dashboard | Completed | The embedded dashboard UI is served from `GET /` |
+| Dashboard | Completed | The embedded dashboard UI is served from `GET /` and now surfaces runtime/provider health from runtime-owned diagnostics contracts |
 | Workspace Substrate | Completed | `audit-workspace`, `init-workspace`, and `update-workspace` now return explicit preview/apply contracts, machine-readable action plans/diff stats, approval-friendly payloads, and `*.bootstrap` review-copy behavior without owning product policy |
 | Delivery Primitives | Completed | Runtime-owned delivery audit, artifact publish/export, repo status, commit, push, and normalized preview-surface metadata are now available over both HTTP routes and local tools |
 | Tests | Completed | Vitest covers provider, discovery, pool, HTTP, delivery, server bootstrap, and API/local tool-loop behavior |
@@ -58,8 +58,8 @@
 
 #### Remaining Items
 
-- [ ] Add provider health probes, dashboard health surfacing, and Ollama model discovery
-- [ ] Harden shared local tool runtime safety beyond current workspace-relative guards, especially for symlink/hardlink alias handling and more atomic multi-file mutation behavior
+- [ ] Deepen provider health probes beyond the current readiness summary/light checks, especially for API/local transports and Ollama model discovery
+- [ ] Harden shared local tool runtime safety beyond the current symlink/junction/hardlink alias guards, especially more atomic multi-file mutation behavior
 - [ ] Expand the shared local tool runtime beyond the current filesystem/shell set into richer navigation/materialization helpers
 - [ ] Refine capability partitioning and policy surfacing beyond the current `standard` / `extended` / `read_only` tool-profile split
 - [ ] Split Docker discovery snapshot creation out of `createDiscoveryStatusPayload()` so `GET /discovery/status` can reuse the live WSL snapshot without recomputing an unused WSL status store
@@ -121,7 +121,7 @@ dashboard integration intact.
 | Support API/local session create, message, close, resume, and fork | [x] | Session lifecycle is runtime-managed across CLI and API backends |
 | Add shared local tool runtime for API/local sessions | [x] | `list_files`, `read_file`, `write_file`, `edit_file`, `apply_patch`, `grep`, `glob`, and `run_shell` are enforced centrally, with extended `delete_file` / `rename_file` / `copy_file` support behind the opt-in profile |
 | Cover API/local behavior with automated tests | [x] | Transport, tool runtime, and end-to-end HTTP flows are under Vitest |
-| Add provider health probes and dashboard health surfacing | [ ] | Deferred to a later PLAN-003 phase |
+| Add provider health probes and dashboard health surfacing | [x] | First slice now exposes `/diagnostics/health`, richer `/health`/`/diagnostics/runtime` contracts, and dashboard header health polling; deeper transport-native live probes remain |
 | Add provider-specific caching/continuation optimizations | [x] | OpenAI `previous_response_id`, Anthropic prompt caching, and Gemini context caching are in place |
 | Stabilize provider model catalog/discovery contract | [x] | `GET /providers/{provider}/models` now documents and tests cache, fallback, error-code, and Ollama running-model semantics |
 | Normalize first provider-agnostic API/local progress events | [x] | API/local sessions now emit additive `progress` events for continuation/cache lifecycle and Ollama warm-state hints |
@@ -257,6 +257,36 @@ without moving delivery-governance policy into `cats-runtime`.
 
 - [x] `npm run build`
 - [x] `npx vitest run tests/runtime-server.test.ts tests/runtime-delivery.test.ts src/core/tools/LocalToolRuntime.test.ts --pool=threads --poolOptions.threads.singleThread`
+ 
+### WP-8: Runtime Health, Startup, Diagnostics, and Tool Safety Hardening
+
+**Status**: Completed
+**Assigned**: Codex
+**Priority**: P0
+
+#### Goal
+
+Make `cats-runtime` easier for packaged hosts and direct operators to supervise
+by freezing readiness/startup/shutdown contracts, exposing aggregate
+machine-readable diagnostics, surfacing runtime/provider health in the embedded
+dashboard, and hardening shared local-tool filesystem safety without adding new
+product policy.
+
+#### Delivered
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Freeze startup/readiness/shutdown contract metadata | [x] | `/health` and `/diagnostics/runtime` now expose shared lifecycle, shutdown-signal, shutdown-reason, and diagnostics endpoint metadata |
+| Add machine-readable aggregate diagnostics | [x] | `GET /diagnostics/health` now combines runtime readiness, startup/shutdown metadata, and default-target provider health summary |
+| Surface runtime/provider health in the embedded dashboard | [x] | Dashboard header now polls runtime-owned diagnostics instead of only static CLI/discovery metadata |
+| Harden local tool runtime path/alias safety | [x] | Shared path-safety helpers now reject symlink/junction alias paths and hardlinked mutation targets for tool operations and patch hunks |
+| Cover child-process startup/shutdown and safety regressions | [x] | Vitest now covers startup error exit behavior, shutdown lifecycle events, dashboard injection, and alias-safety regressions |
+
+#### Deferred Boundaries
+
+- [ ] No full packaged onboarding or provider installation wizard in runtime
+- [ ] No broad live health probes for every API/local transport yet; the first slice is still mostly light checks plus adapter-supported live probes
+- [ ] No atomic multi-file rollback for shared local-tool writes or patch application yet
 
 ---
 
