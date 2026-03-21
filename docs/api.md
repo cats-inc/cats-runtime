@@ -180,8 +180,38 @@ specific instance with `instance: "<backend>/<instance>"`, for example
 `?instance=default` matches each provider's configured default instance.
 
 For API-backed and local-model sessions, streamed message output may include
-`tool_use` and `tool_result` events in addition to `init`, `text`, `result`,
-and `error`.
+`tool_use`, `tool_result`, and `progress` events in addition to `init`, `text`,
+`result`, and `error`.
+
+`progress` is the first provider-agnostic mid-turn status contract for
+API/local transports. It is intended for upper layers that should not need to
+inspect provider-specific raw payloads just to surface runtime status. Example:
+
+```json
+{
+  "type": "progress",
+  "providerSessionId": "resp_2",
+  "text": "Reused OpenAI previous_response_id continuation.",
+  "metadata": {
+    "kind": "provider_cache",
+    "status": "reused",
+    "provider": "codex",
+    "backend": "api",
+    "instance": "main",
+    "transport": "openai",
+    "strategy": "previous_response_id",
+    "previousResponseId": "resp_1"
+  }
+}
+```
+
+Current normalized progress kinds:
+
+- `provider_cache`: provider-native continuation or cache lifecycle such as
+  OpenAI `previous_response_id` reuse/fallback or Gemini cached-content
+  create/reuse/fallback
+- `model_state`: local-model lifecycle hints such as Ollama `keep_alive`
+  requests
 
 For agent-backed sessions, streamed output may also surface normalized metadata
 such as:
@@ -252,11 +282,43 @@ structured catalog:
     "ttlSec": 60
   },
   "models": [
-    { "id": "qwen2.5-coder:7b", "label": "qwen2.5-coder:7b", "default": true }
+    {
+      "id": "qwen2.5-coder:7b",
+      "label": "qwen2.5-coder:7b",
+      "default": true,
+      "status": "running"
+    }
   ],
   "warnings": []
 }
 ```
+
+Catalog semantics:
+
+- `source: dynamic` means runtime discovery succeeded for the resolved target.
+- `source: config` means runtime discovery was unavailable or failed and the
+  result fell back to configured target metadata.
+- `source: static` means the runtime used a curated compatibility table.
+- `cache` is present only for `dynamic` results. Config/static fallbacks return
+  `cache: null`.
+- `warnings` stays empty on clean discovery, and becomes additive when the
+  runtime had to degrade gracefully. For example, dynamic discovery may still
+  return `source: dynamic` with warnings if a secondary probe such as Ollama's
+  running-model check fails, while a full discovery failure falls back to
+  `config` or `static` with a warning instead of returning an empty success.
+- `models[].status` is additive runtime metadata. Current values are:
+  `running` for models that the runtime knows are already warm/loaded,
+  `available` for dynamically discovered but not currently warm models, and
+  `configured` when the runtime injected the configured default into the result
+  because discovery did not report it.
+
+Error semantics:
+
+- Unknown providers or invalid instance/target selectors return HTTP `400`.
+- Resolution failures include a stable `code` field:
+  `provider_not_configured`, `multiple_targets_configured`, `unknown_target`,
+  `ambiguous_instance`, or `unknown_instance`.
+- Unexpected runtime failures still return HTTP `500`.
 
 The first slice supports:
 

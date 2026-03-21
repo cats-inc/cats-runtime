@@ -14,6 +14,7 @@ import type {
   ApiBackendStatus,
   ApiConversationMessage,
   ApiConversationPart,
+  ApiProgressEvent,
   ApiToolCallPart,
   ApiTransportClient,
 } from '../types.js';
@@ -38,7 +39,7 @@ function buildTransport(
     case 'gemini':
       return new GeminiTransport(options.fetch, options.env);
     case 'ollama':
-      return new OllamaTransport(options.fetch);
+      return new OllamaTransport(options.fetch, options.env);
     default:
       throw new Error(
         `Unsupported remote transport '${instance.transport || 'unknown'}' `
@@ -109,6 +110,27 @@ function prependSystemPrompt(
     role: 'system',
     parts: [{ type: 'text', text: combinedPrompt }],
   }, ...messages];
+}
+
+function toProgressStreamEvent(
+  progress: ApiProgressEvent,
+  target: ProviderTargetDescriptor,
+  providerSessionId?: string,
+): StreamEvent {
+  return {
+    type: 'progress',
+    providerSessionId,
+    text: progress.message,
+    metadata: {
+      kind: progress.kind,
+      status: progress.status,
+      provider: target.providerName,
+      backend: target.backend,
+      instance: target.instanceId,
+      transport: target.remoteInstance?.transport,
+      ...progress.metadata,
+    },
+  } as unknown as StreamEvent;
 }
 
 export class ApiBackendManager {
@@ -283,6 +305,10 @@ export class ApiBackendManager {
           sessionId: responseId,
           raw: completion.raw,
         };
+      }
+
+      for (const progress of completion.progress ?? []) {
+        yield toProgressStreamEvent(progress, target, responseId);
       }
 
       totalInputTokens += completion.usage?.inputTokens ?? 0;

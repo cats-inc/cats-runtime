@@ -196,7 +196,7 @@ describe('API transports', () => {
       model: 'gpt-5',
     };
 
-    await transport.completeTurn({
+    const result = await transport.completeTurn({
       ...makeInput(instance),
       previousResponseId: 'resp_prev',
       messages: [
@@ -211,6 +211,76 @@ describe('API transports', () => {
     expect(body.instructions).toBe('Stay terse.');
     expect(body.input).toEqual([
       { role: 'user', content: 'What changed?' },
+    ]);
+    expect(result.progress).toEqual([
+      {
+        kind: 'provider_cache',
+        status: 'reused',
+        message: 'Reused OpenAI previous_response_id continuation.',
+        metadata: {
+          strategy: 'previous_response_id',
+          previousResponseId: 'resp_prev',
+        },
+      },
+    ]);
+  });
+
+  it('falls back to a full OpenAI transcript when previous_response_id is rejected', async () => {
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: {
+          message: 'previous_response_id not found',
+        },
+      }), {
+        status: 404,
+        headers: {
+          'content-type': 'application/json',
+        },
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        id: 'resp_2',
+        output: [{
+          type: 'message',
+          role: 'assistant',
+          content: [{ type: 'output_text', text: 'Recovered.' }],
+        }],
+        usage: { input_tokens: 6, output_tokens: 4 },
+      }));
+
+    const transport = new OpenAiTransport(fetchMock, {
+      OPENAI_API_KEY: 'test-key',
+    });
+    const instance: RemoteProviderInstanceConfig = {
+      id: 'main',
+      providerName: 'codex',
+      backend: 'api',
+      transport: 'openai',
+      apiKeyEnv: 'OPENAI_API_KEY',
+      model: 'gpt-5',
+    };
+
+    const result = await transport.completeTurn({
+      ...makeInput(instance),
+      previousResponseId: 'resp_missing',
+      messages: [
+        { role: 'user', parts: [{ type: 'text', text: 'Try again' }] },
+      ],
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [, retryInit] = fetchMock.mock.calls[1] ?? [];
+    const retryBody = JSON.parse(String(retryInit?.body || '{}')) as Record<string, unknown>;
+    expect(retryBody.previous_response_id).toBeUndefined();
+    expect(result.progress).toEqual([
+      {
+        kind: 'provider_cache',
+        status: 'fallback',
+        message: 'OpenAI previous_response_id continuation was rejected; retried with full transcript.',
+        metadata: {
+          strategy: 'previous_response_id',
+          previousResponseId: 'resp_missing',
+        },
+      },
     ]);
   });
 
@@ -338,7 +408,7 @@ describe('API transports', () => {
       ...makeInput(instance),
       turnStep: 0,
       messages: [
-        { role: 'user', parts: [{ type: 'text', text: 'A'.repeat(5000) }] },
+        { role: 'user', parts: [{ type: 'text', text: 'A'.repeat(18000) }] },
         { role: 'assistant', parts: [{ type: 'text', text: 'Stored context.' }] },
         { role: 'user', parts: [{ type: 'text', text: 'What next?' }] },
       ],
@@ -364,6 +434,91 @@ describe('API transports', () => {
     ]);
     expect(generateBody.tools).toBeUndefined();
     expect(generateBody.systemInstruction).toBeUndefined();
+    expect(result.progress).toEqual([
+      {
+        kind: 'provider_cache',
+        status: 'created',
+        message: 'Created Gemini cached context for the reusable prompt prefix.',
+        metadata: {
+          strategy: 'cached_content',
+          cachedContent: 'cachedContents/test-cache',
+          ttl: '3600s',
+        },
+      },
+    ]);
+  });
+
+  it('reuses Gemini cached content metadata on later turns', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/v1beta/cachedContents')) {
+        return jsonResponse({
+          name: 'cachedContents/existing',
+          expireTime: '2099-01-01T00:00:00Z',
+        });
+      }
+
+      if (url.includes(':generateContent')) {
+        return jsonResponse({
+          candidates: [{
+            content: {
+              parts: [{ text: 'Reused cached context.' }],
+            },
+          }],
+          usageMetadata: { promptTokenCount: 3, candidatesTokenCount: 2 },
+        });
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    const transport = new GeminiTransport(fetchMock, {
+      GEMINI_API_KEY: 'test-key',
+    });
+    const instance: RemoteProviderInstanceConfig = {
+      id: 'pro',
+      providerName: 'gemini',
+      backend: 'api',
+      transport: 'google',
+      apiKeyEnv: 'GEMINI_API_KEY',
+      model: 'gemini-2.5-pro',
+    };
+
+    const first = await transport.completeTurn({
+      ...makeInput(instance),
+      turnStep: 0,
+      messages: [
+        { role: 'user', parts: [{ type: 'text', text: 'A'.repeat(18000) }] },
+        { role: 'assistant', parts: [{ type: 'text', text: 'Stored context.' }] },
+        { role: 'user', parts: [{ type: 'text', text: 'What next?' }] },
+      ],
+    });
+
+    const result = await transport.completeTurn({
+      ...makeInput(instance),
+      turnStep: 0,
+      sessionState: first.sessionState,
+      messages: [
+        { role: 'user', parts: [{ type: 'text', text: 'A'.repeat(18000) }] },
+        { role: 'assistant', parts: [{ type: 'text', text: 'Stored context.' }] },
+        { role: 'user', parts: [{ type: 'text', text: 'What next?' }] },
+      ],
+    });
+
+    const [, init] = fetchMock.mock.calls[2] ?? [];
+    const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
+    expect(body.cachedContent).toBe('cachedContents/existing');
+    expect(result.progress).toEqual([
+      {
+        kind: 'provider_cache',
+        status: 'reused',
+        message: 'Reused Gemini cached context.',
+        metadata: {
+          strategy: 'cached_content',
+          cachedContent: 'cachedContents/existing',
+        },
+      },
+    ]);
   });
 
   it('parses Ollama chat responses with local tool calls', async () => {
@@ -403,5 +558,53 @@ describe('API transports', () => {
       }),
     ]);
     expect(result.usage).toEqual({ inputTokens: 2, outputTokens: 6 });
+  });
+
+  it('applies Ollama keep_alive hints from payload templates and emits model-state progress', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        message: {
+          content: 'Still warm.',
+        },
+        prompt_eval_count: 1,
+        eval_count: 2,
+      }),
+    );
+
+    const transport = new OllamaTransport(fetchMock, {});
+    const instance: RemoteProviderInstanceConfig = {
+      id: 'local',
+      providerName: 'ollama',
+      backend: 'local',
+      transport: 'ollama',
+      baseUrl: 'http://127.0.0.1:11434',
+      model: 'qwen3:latest',
+      payloadTemplate: {
+        keep_alive: '15m',
+        options: {
+          temperature: 0.1,
+        },
+      },
+    };
+
+    const result = await transport.completeTurn(makeInput(instance));
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+    const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
+    expect(body.keep_alive).toBe('15m');
+    expect(body.options).toEqual({
+      temperature: 0.1,
+      num_predict: 8192,
+    });
+    expect(result.progress).toEqual([
+      {
+        kind: 'model_state',
+        status: 'hinted',
+        message: 'Applied an Ollama keep_alive hint to keep the model warm.',
+        metadata: {
+          strategy: 'keep_alive',
+          keepAlive: '15m',
+        },
+      },
+    ]);
   });
 });

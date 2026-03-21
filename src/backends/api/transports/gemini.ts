@@ -5,10 +5,12 @@ import type {
   ApiCompletionResponse,
   ApiConversationMessage,
   ApiConversationPart,
+  ApiProgressEvent,
   ApiToolCallPart,
   ApiTransportClient,
 } from '../types.js';
 import { readErrorBody } from '../../../core/streamParsers.js';
+import { applyPayloadTemplate, readPayloadTemplateString } from '../payloadTemplate.js';
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
 const DEFAULT_CACHE_TTL = '3600s';
@@ -210,12 +212,14 @@ export class GeminiTransport implements ApiTransportClient {
     const contents = toGeminiContents(input.messages);
     const tools = toGeminiTools(input);
     let nextSessionState = input.sessionState;
+    const progress: ApiProgressEvent[] = [];
 
     const generationConfig = {
       maxOutputTokens: input.instance.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
     };
 
     const sendGenerate = async (body: Record<string, unknown>): Promise<ApiCompletionResponse> => {
+      const requestBody = applyPayloadTemplate(body, input.instance.payloadTemplate);
       const response = await this.fetchImpl(endpoint, {
         method: 'POST',
         headers: {
@@ -223,7 +227,7 @@ export class GeminiTransport implements ApiTransportClient {
           'x-goog-api-key': apiKey,
           ...input.instance.headers,
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify(requestBody),
         signal: input.signal,
       });
 
@@ -246,6 +250,7 @@ export class GeminiTransport implements ApiTransportClient {
           outputTokens: typeof usage.candidatesTokenCount === 'number' ? usage.candidatesTokenCount : 0,
         },
         sessionState: nextSessionState,
+        progress: progress.length > 0 ? [...progress] : undefined,
         raw: payload,
       };
     };
@@ -272,7 +277,23 @@ export class GeminiTransport implements ApiTransportClient {
           && !isExpired(existingCache.expiresAt)
         ) {
           cachedContentName = existingCache.name;
+          progress.push({
+            kind: 'provider_cache',
+            status: 'reused',
+            message: 'Reused Gemini cached context.',
+            metadata: {
+              strategy: 'cached_content',
+              cachedContent: cachedContentName,
+            },
+          });
         } else {
+          const cacheTtl = readPayloadTemplateString(
+            input.instance.payloadTemplate,
+            'cachedContentTtl',
+            'cached_content_ttl',
+            'contextCacheTtl',
+            'context_cache_ttl',
+          ) || DEFAULT_CACHE_TTL;
           const cacheResponse = await this.fetchImpl(`${trimmedBaseUrl}/v1beta/cachedContents`, {
             method: 'POST',
             headers: {
@@ -285,7 +306,7 @@ export class GeminiTransport implements ApiTransportClient {
               systemInstruction,
               contents: prefixContents,
               tools: tools.length > 0 ? tools : undefined,
-              ttl: DEFAULT_CACHE_TTL,
+              ttl: cacheTtl,
             }),
             signal: input.signal,
           });
@@ -294,6 +315,16 @@ export class GeminiTransport implements ApiTransportClient {
             const payload = await cacheResponse.json() as Record<string, unknown>;
             if (typeof payload.name === 'string') {
               cachedContentName = payload.name;
+              progress.push({
+                kind: 'provider_cache',
+                status: 'created',
+                message: 'Created Gemini cached context for the reusable prompt prefix.',
+                metadata: {
+                  strategy: 'cached_content',
+                  cachedContent: payload.name,
+                  ttl: cacheTtl,
+                },
+              });
               nextSessionState = {
                 geminiCachedContent: {
                   name: payload.name,
@@ -318,6 +349,15 @@ export class GeminiTransport implements ApiTransportClient {
             });
           } catch (error) {
             if (shouldInvalidateCachedContent(String(error))) {
+              progress.push({
+                kind: 'provider_cache',
+                status: 'fallback',
+                message: 'Gemini cached context was rejected; retried with full conversation.',
+                metadata: {
+                  strategy: 'cached_content',
+                  cachedContent: cachedContentName,
+                },
+              });
               nextSessionState = {};
             } else {
               throw error;

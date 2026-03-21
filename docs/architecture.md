@@ -126,6 +126,11 @@ src/
 - Persists provider-native continuation metadata such as OpenAI response IDs,
   Anthropic prompt-caching hints, and Gemini cached-content state as
   optimizations under the runtime-owned logical session
+- Emits a first normalized `progress` event stream for provider-native cache,
+  continuation, and local-model warm-state hints so upper layers do not need to
+  consume provider-specific raw payloads
+- Applies additive `payload_template` request hints for provider-native options
+  such as OpenAI background/body flags or Ollama `keep_alive` warm-state hints
 - Also hosts the current execution machinery for `local` targets such as
   Ollama. `local` remains a distinct backend kind in config/routing/public
   payloads because its product semantics differ from pay-as-you-go remote APIs,
@@ -156,6 +161,10 @@ src/
 - Keeps shared utilities out of provider modules
 - Carries the shared turn/bootstrap/output contract used across CLI, API/local,
   and agent sessions
+- Owns the provider-model fallback ordering and cache semantics
+  (`dynamic -> config -> static`), including additive model-status metadata such
+  as `running` or `configured` when the runtime can infer warm-state or config
+  injection details
 
 ## Data Flow
 

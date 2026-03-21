@@ -50,6 +50,13 @@ export interface ApiCompletionInput {
   signal?: AbortSignal;
 }
 
+export interface ApiProgressEvent {
+  kind: 'provider_cache' | 'model_state';
+  status: 'created' | 'reused' | 'fallback' | 'hinted';
+  message: string;
+  metadata?: Record<string, unknown>;
+}
+
 export interface ApiCompletionResponse {
   responseId?: string;
   assistant: ApiConversationMessage;
@@ -58,6 +65,7 @@ export interface ApiCompletionResponse {
     outputTokens: number;
   };
   sessionState?: SessionProviderState;
+  progress?: ApiProgressEvent[];
   raw?: unknown;
 }
 

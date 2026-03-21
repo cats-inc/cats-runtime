@@ -8,6 +8,7 @@ import type {
   ApiTransportClient,
 } from '../types.js';
 import { readErrorBody } from '../../../core/streamParsers.js';
+import { applyPayloadTemplate } from '../payloadTemplate.js';
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
 const PROMPT_CACHE_CONTROL = { type: 'ephemeral' } as const;
@@ -188,6 +189,13 @@ export class AnthropicTransport implements ApiTransportClient {
       .filter((message): message is AnthropicMessagePayload => Boolean(message));
     const tools = input.tools.length > 0 ? toAnthropicTools(input) : [];
     applyPromptCacheBreakpoint(system, messages, tools);
+    const requestBody = applyPayloadTemplate({
+      model: input.model,
+      max_tokens: input.instance.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+      system: system.length > 0 ? system : undefined,
+      messages,
+      tools: tools.length > 0 ? tools : undefined,
+    }, input.instance.payloadTemplate);
 
     const response = await this.fetchImpl(`${baseUrl.replace(/\/$/, '')}/v1/messages`, {
       method: 'POST',
@@ -197,13 +205,7 @@ export class AnthropicTransport implements ApiTransportClient {
         'anthropic-version': '2023-06-01',
         ...input.instance.headers,
       },
-      body: JSON.stringify({
-        model: input.model,
-        max_tokens: input.instance.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
-        system: system.length > 0 ? system : undefined,
-        messages,
-        tools: tools.length > 0 ? tools : undefined,
-      }),
+      body: JSON.stringify(requestBody),
       signal: input.signal,
     });
 

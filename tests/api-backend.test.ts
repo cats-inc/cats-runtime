@@ -321,6 +321,19 @@ describe('API backend integration', () => {
           toolId: 'call_1',
           text: expect.stringContaining('export const value = 7;'),
         }),
+        expect.objectContaining({
+          type: 'progress',
+          text: 'Reused OpenAI previous_response_id continuation.',
+          metadata: expect.objectContaining({
+            kind: 'provider_cache',
+            status: 'reused',
+            provider: 'codex',
+            backend: 'api',
+            instance: 'main',
+            strategy: 'previous_response_id',
+            previousResponseId: 'resp_1',
+          }),
+        }),
         expect.objectContaining({ type: 'text', text: 'The file exports value 7.' }),
         expect.objectContaining({
           type: 'result',
@@ -361,6 +374,19 @@ describe('API backend integration', () => {
       expect(secondMessageResponse.status).toBe(200);
       expect(parseNdjson(await secondMessageResponse.text())).toEqual([
         expect.objectContaining({ type: 'init', sessionId: 'resp_3' }),
+        expect.objectContaining({
+          type: 'progress',
+          text: 'Reused OpenAI previous_response_id continuation.',
+          metadata: expect.objectContaining({
+            kind: 'provider_cache',
+            status: 'reused',
+            provider: 'codex',
+            backend: 'api',
+            instance: 'main',
+            strategy: 'previous_response_id',
+            previousResponseId: 'resp_2',
+          }),
+        }),
         expect.objectContaining({ type: 'text', text: 'It was src/app.ts.' }),
         expect.objectContaining({
           type: 'result',
@@ -631,6 +657,19 @@ describe('API backend integration', () => {
       expect(secondMessage.status).toBe(200);
       expect(parseNdjson(await secondMessage.text())).toEqual([
         expect.objectContaining({ type: 'init' }),
+        expect.objectContaining({
+          type: 'progress',
+          text: 'Created Gemini cached context for the reusable prompt prefix.',
+          metadata: expect.objectContaining({
+            kind: 'provider_cache',
+            status: 'created',
+            provider: 'gemini',
+            backend: 'api',
+            instance: 'pro',
+            strategy: 'cached_content',
+            cachedContent: 'cachedContents/gemini-session',
+          }),
+        }),
         expect.objectContaining({ type: 'text', text: 'I reused the cached history.' }),
         expect.objectContaining({
           type: 'result',

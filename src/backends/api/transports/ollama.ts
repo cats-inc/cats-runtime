@@ -3,12 +3,20 @@ import type {
   ApiCompletionResponse,
   ApiConversationMessage,
   ApiConversationPart,
+  ApiProgressEvent,
   ApiToolCallPart,
   ApiTransportClient,
 } from '../types.js';
 import { readErrorBody } from '../../../core/streamParsers.js';
+import type { RemoteProviderInstanceConfig } from '../../cli/config.js';
+import { applyPayloadTemplate, readPayloadTemplateString } from '../payloadTemplate.js';
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
+
+function resolveBaseUrl(instance: RemoteProviderInstanceConfig, env: NodeJS.ProcessEnv): string {
+  const fromEnv = instance.baseUrlEnv ? env[instance.baseUrlEnv] : undefined;
+  return fromEnv || instance.baseUrl || 'http://127.0.0.1:11434';
+}
 
 function toOllamaMessages(messages: ApiConversationMessage[]): Array<Record<string, unknown>> {
   const mapped: Array<Record<string, unknown>> = [];
@@ -117,25 +125,46 @@ function extractAssistantParts(payload: Record<string, unknown>): ApiConversatio
 }
 
 export class OllamaTransport implements ApiTransportClient {
-  constructor(private readonly fetchImpl: typeof fetch) {}
+  constructor(
+    private readonly fetchImpl: typeof fetch,
+    private readonly env: NodeJS.ProcessEnv,
+  ) {}
 
   async completeTurn(input: ApiCompletionInput): Promise<ApiCompletionResponse> {
-    const baseUrl = input.instance.baseUrl || 'http://127.0.0.1:11434';
+    const baseUrl = resolveBaseUrl(input.instance, this.env);
+    const keepAlive = readPayloadTemplateString(
+      input.instance.payloadTemplate,
+      'keep_alive',
+      'keepAlive',
+    );
+    const progress: ApiProgressEvent[] = [];
+    if (keepAlive) {
+      progress.push({
+        kind: 'model_state',
+        status: 'hinted',
+        message: 'Applied an Ollama keep_alive hint to keep the model warm.',
+        metadata: {
+          strategy: 'keep_alive',
+          keepAlive,
+        },
+      });
+    }
+    const requestBody = applyPayloadTemplate({
+      model: input.model,
+      stream: false,
+      messages: toOllamaMessages(input.messages),
+      tools: input.tools.length > 0 ? toOllamaTools(input) : undefined,
+      options: {
+        num_predict: input.instance.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+      },
+    }, input.instance.payloadTemplate);
     const response = await this.fetchImpl(`${baseUrl.replace(/\/$/, '')}/api/chat`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         ...input.instance.headers,
       },
-      body: JSON.stringify({
-        model: input.model,
-        stream: false,
-        messages: toOllamaMessages(input.messages),
-        tools: input.tools.length > 0 ? toOllamaTools(input) : undefined,
-        options: {
-          num_predict: input.instance.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
-        },
-      }),
+      body: JSON.stringify(requestBody),
       signal: input.signal,
     });
 
@@ -153,6 +182,7 @@ export class OllamaTransport implements ApiTransportClient {
         inputTokens: typeof payload.prompt_eval_count === 'number' ? payload.prompt_eval_count : 0,
         outputTokens: typeof payload.eval_count === 'number' ? payload.eval_count : 0,
       },
+      progress: progress.length > 0 ? progress : undefined,
       raw: payload,
     };
   }

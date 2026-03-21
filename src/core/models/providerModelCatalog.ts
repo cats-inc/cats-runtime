@@ -13,6 +13,7 @@ export interface ProviderModelCatalogEntry {
   id: string;
   label: string;
   default?: boolean;
+  status?: 'configured' | 'available' | 'running';
 }
 
 export interface ProviderModelCatalogCacheMetadata {
@@ -42,6 +43,12 @@ interface ProviderModelCatalogServiceOptions {
 interface CachedDynamicModels {
   cachedAt: number;
   models: ProviderModelCatalogEntry[];
+  warnings: string[];
+}
+
+interface DynamicCatalogLoadResult {
+  models: ProviderModelCatalogEntry[];
+  warnings?: string[];
 }
 
 const DEFAULT_TTL_MS = 60_000;
@@ -145,21 +152,71 @@ function resolveBaseUrl(
 function withDefaultModel(
   models: ProviderModelCatalogEntry[],
   defaultModel: string | null,
-): ProviderModelCatalogEntry[] {
+): { models: ProviderModelCatalogEntry[]; defaultInjected: boolean } {
+  const deduped = dedupeModels(models);
   if (!defaultModel) {
-    return cloneModels(models);
+    return {
+      models: deduped,
+      defaultInjected: false,
+    };
   }
 
-  const cloned = cloneModels(models);
-  const existing = cloned.find((model) => model.id === defaultModel);
+  const existing = deduped.find((model) => model.id === defaultModel);
   if (existing) {
-    for (const model of cloned) {
+    for (const model of deduped) {
       model.default = model.id === defaultModel;
     }
-    return cloned;
+    return {
+      models: deduped,
+      defaultInjected: false,
+    };
   }
 
-  return [{ id: defaultModel, label: defaultModel, default: true }, ...cloned];
+  return {
+    models: [
+      {
+        id: defaultModel,
+        label: defaultModel,
+        default: true,
+        status: 'configured',
+      },
+      ...deduped,
+    ],
+    defaultInjected: true,
+  };
+}
+
+function statusRank(status: ProviderModelCatalogEntry['status']): number {
+  switch (status) {
+    case 'running':
+      return 3;
+    case 'available':
+      return 2;
+    case 'configured':
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function dedupeModels(models: ProviderModelCatalogEntry[]): ProviderModelCatalogEntry[] {
+  const deduped = new Map<string, ProviderModelCatalogEntry>();
+
+  for (const model of cloneModels(models)) {
+    const existing = deduped.get(model.id);
+    if (!existing) {
+      deduped.set(model.id, model);
+      continue;
+    }
+
+    existing.label = existing.label || model.label;
+    existing.default = existing.default === true || model.default === true;
+    if (statusRank(model.status) > statusRank(existing.status)) {
+      existing.status = model.status;
+    }
+  }
+
+  return Array.from(deduped.values());
 }
 
 export function getStaticProviderModels(
@@ -229,20 +286,30 @@ export class ProviderModelCatalogService {
           cachedAt: new Date(cached.cachedAt).toISOString(),
           ttlSec: Math.floor(this.ttlMs / 1000),
         },
-        models: withDefaultModel(cached.models, defaultModel),
-        warnings,
+        models: withDefaultModel(cached.models, defaultModel).models,
+        warnings: [...warnings, ...cached.warnings],
       });
     }
 
     try {
-      const models = await this.loadDynamicModels(target);
-      if (!models) {
+      const loaded = await this.loadDynamicModels(target);
+      if (!loaded) {
         return null;
+      }
+
+      const normalized = withDefaultModel(loaded.models, defaultModel);
+      const dynamicWarnings = [...(loaded.warnings ?? [])];
+      if (normalized.defaultInjected && defaultModel) {
+        dynamicWarnings.push(
+          `Configured default model '${defaultModel}' was not returned by dynamic discovery; `
+          + 'added as configured fallback.',
+        );
       }
 
       this.dynamicCache.set(key, {
         cachedAt: now,
-        models: cloneModels(models),
+        models: cloneModels(loaded.models),
+        warnings: [...dynamicWarnings],
       });
 
       return this.buildCatalog(target, {
@@ -253,8 +320,8 @@ export class ProviderModelCatalogService {
           cachedAt: new Date(now).toISOString(),
           ttlSec: Math.floor(this.ttlMs / 1000),
         },
-        models: withDefaultModel(models, defaultModel),
-        warnings,
+        models: normalized.models,
+        warnings: [...warnings, ...dynamicWarnings],
       });
     } catch (error) {
       warnings.push(
@@ -268,13 +335,18 @@ export class ProviderModelCatalogService {
 
   private async loadDynamicModels(
     target: ProviderTargetDescriptor,
-  ): Promise<ProviderModelCatalogEntry[] | null> {
+  ): Promise<DynamicCatalogLoadResult | null> {
     if (target.backend === 'local' && target.remoteInstance?.transport === 'ollama') {
       return this.listOllamaModels(target.remoteInstance);
     }
 
     if (target.backend === 'agent' && target.remoteInstance && this.options.agentBackend) {
-      return this.options.agentBackend.listModels(target);
+      return {
+        models: (await this.options.agentBackend.listModels(target)).map((model) => ({
+          ...model,
+          status: 'available',
+        })),
+      };
     }
 
     return null;
@@ -282,8 +354,9 @@ export class ProviderModelCatalogService {
 
   private async listOllamaModels(
     instance: RemoteProviderInstanceConfig,
-  ): Promise<ProviderModelCatalogEntry[]> {
+  ): Promise<DynamicCatalogLoadResult> {
     const baseUrl = resolveBaseUrl(instance, this.env, 'http://127.0.0.1:11434').replace(/\/$/, '');
+    const warnings: string[] = [];
     const response = await this.fetchImpl(`${baseUrl}/api/tags`);
     if (!response.ok) {
       throw new Error(`Ollama model list failed with status ${response.status}`);
@@ -291,11 +364,49 @@ export class ProviderModelCatalogService {
 
     const payload = await response.json() as { models?: Array<{ name?: unknown; model?: unknown }> };
     const entries = Array.isArray(payload.models) ? payload.models : [];
-
-    return entries
+    const installedModels = entries
       .map((entry) => readNullableString(entry.name) ?? readNullableString(entry.model))
-      .filter((name): name is string => Boolean(name))
-      .map((name) => ({ id: name, label: name }));
+      .filter((name): name is string => Boolean(name));
+
+    const runningModels = new Set<string>();
+    try {
+      const runningResponse = await this.fetchImpl(`${baseUrl}/api/ps`);
+      if (!runningResponse.ok) {
+        warnings.push(`Ollama running-model probe failed with status ${runningResponse.status}`);
+      } else {
+        const runningPayload = await runningResponse.json() as {
+          models?: Array<{ name?: unknown; model?: unknown }>;
+        };
+        const runningEntries = Array.isArray(runningPayload.models) ? runningPayload.models : [];
+        for (const entry of runningEntries) {
+          const name = readNullableString(entry.name) ?? readNullableString(entry.model);
+          if (name) {
+            runningModels.add(name);
+          }
+        }
+      }
+    } catch (error) {
+      warnings.push(
+        `Ollama running-model probe failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+
+    for (const name of runningModels) {
+      if (!installedModels.includes(name)) {
+        installedModels.push(name);
+      }
+    }
+
+    return {
+      models: installedModels.map((name) => ({
+        id: name,
+        label: name,
+        status: runningModels.has(name) ? 'running' : 'available',
+      })),
+      warnings,
+    };
   }
 
   private tryConfigCatalog(
@@ -316,8 +427,9 @@ export class ProviderModelCatalogService {
           id: target.remoteInstance.model,
           label: target.remoteInstance.model,
           default: true,
+          status: 'configured',
         },
-      ], defaultModel),
+      ], defaultModel).models,
       warnings,
     });
   }
@@ -331,7 +443,7 @@ export class ProviderModelCatalogService {
       defaultModel,
       source: 'static',
       cache: null,
-      models: withDefaultModel(getStaticProviderModels(target), defaultModel),
+      models: withDefaultModel(getStaticProviderModels(target), defaultModel).models,
       warnings,
     });
   }

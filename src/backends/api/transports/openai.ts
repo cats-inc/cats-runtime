@@ -4,10 +4,12 @@ import type {
   ApiCompletionResponse,
   ApiConversationMessage,
   ApiConversationPart,
+  ApiProgressEvent,
   ApiToolCallPart,
   ApiTransportClient,
 } from '../types.js';
 import { readErrorBody } from '../../../core/streamParsers.js';
+import { applyPayloadTemplate } from '../payloadTemplate.js';
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
 
@@ -207,31 +209,54 @@ export class OpenAiTransport implements ApiTransportClient {
     const incrementalInput = input.previousResponseId
       ? toIncrementalInput(input.messages)
       : null;
+    const progress: ApiProgressEvent[] = [];
 
     const sendRequest = async (usePreviousResponseId: boolean): Promise<ApiCompletionResponse> => {
+      const requestBody = applyPayloadTemplate({
+        model: input.model,
+        instructions,
+        input: usePreviousResponseId && incrementalInput
+          ? incrementalInput
+          : toOpenAiInputItems(input.messages),
+        previous_response_id: usePreviousResponseId ? input.previousResponseId : undefined,
+        tools: input.tools.length > 0 ? toOpenAiTools(input) : undefined,
+        tool_choice: input.tools.length > 0 ? 'auto' : undefined,
+        max_output_tokens: input.instance.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
+      }, input.instance.payloadTemplate);
       const response = await this.fetchImpl(endpoint, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          model: input.model,
-          instructions,
-          input: usePreviousResponseId && incrementalInput
-            ? incrementalInput
-            : toOpenAiInputItems(input.messages),
-          previous_response_id: usePreviousResponseId ? input.previousResponseId : undefined,
-          tools: input.tools.length > 0 ? toOpenAiTools(input) : undefined,
-          tool_choice: input.tools.length > 0 ? 'auto' : undefined,
-          max_output_tokens: input.instance.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
-        }),
+        body: JSON.stringify(requestBody),
         signal: input.signal,
       });
 
       if (!response.ok) {
         const errorBody = await readErrorBody(response);
         if (usePreviousResponseId && shouldRetryWithoutPreviousResponseId(errorBody)) {
+          progress.push({
+            kind: 'provider_cache',
+            status: 'fallback',
+            message: 'OpenAI previous_response_id continuation was rejected; retried with full transcript.',
+            metadata: {
+              strategy: 'previous_response_id',
+              previousResponseId: input.previousResponseId,
+            },
+          });
           return sendRequest(false);
         }
         throw new Error(`OpenAI request failed: ${errorBody}`);
+      }
+
+      if (usePreviousResponseId) {
+        progress.push({
+          kind: 'provider_cache',
+          status: 'reused',
+          message: 'Reused OpenAI previous_response_id continuation.',
+          metadata: {
+            strategy: 'previous_response_id',
+            previousResponseId: input.previousResponseId,
+          },
+        });
       }
 
       const payload = await response.json() as Record<string, unknown>;
@@ -249,6 +274,7 @@ export class OpenAiTransport implements ApiTransportClient {
           inputTokens: typeof usage.input_tokens === 'number' ? usage.input_tokens : 0,
           outputTokens: typeof usage.output_tokens === 'number' ? usage.output_tokens : 0,
         },
+        progress: progress.length > 0 ? [...progress] : undefined,
         raw: payload,
       };
     };

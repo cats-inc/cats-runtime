@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { listConfiguredProviders, listProviderCatalog } from '../../core/providerCatalog.js';
+import { isProviderTargetResolutionError } from '../../core/providerCatalog.js';
 import type { AppContext } from '../app.js';
 import { getRouteErrorStatus } from '../routeErrors.js';
 
@@ -54,8 +55,15 @@ providerRoutes.get('/providers/:provider/models', async (c) => {
     const catalog = await ctx.providerModelCatalog.getCatalog(providerName, instance);
     return c.json(catalog);
   } catch (err) {
+    const payload: Record<string, unknown> = {
+      error: `Failed to inspect provider models: ${err}`,
+    };
+    if (isProviderTargetResolutionError(err)) {
+      payload.code = err.code;
+    }
+
     return c.json(
-      { error: `Failed to inspect provider models: ${err}` },
+      payload,
       getRouteErrorStatus(err),
     );
   }

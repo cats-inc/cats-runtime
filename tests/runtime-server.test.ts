@@ -674,15 +674,33 @@ providers:
   });
 
   it('GET /providers/:provider/models returns dynamic Ollama catalog with cache metadata', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
-      models: [
-        { name: 'deepseek-r1:14b' },
-        { name: 'qwen2.5-coder:7b' },
-      ],
-    }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    }));
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.endsWith('/api/tags')) {
+        return new Response(JSON.stringify({
+          models: [
+            { name: 'deepseek-r1:14b' },
+            { name: 'qwen2.5-coder:7b' },
+          ],
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
+      if (url.endsWith('/api/ps')) {
+        return new Response(JSON.stringify({
+          models: [
+            { name: 'qwen2.5-coder:7b' },
+          ],
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
 
     await withRuntime({
       providerDefaultTargets: {
@@ -719,8 +737,18 @@ providers:
           ttlSec: 60,
         },
         models: [
-          { id: 'deepseek-r1:14b', label: 'deepseek-r1:14b', default: false },
-          { id: 'qwen2.5-coder:7b', label: 'qwen2.5-coder:7b', default: true },
+          {
+            id: 'deepseek-r1:14b',
+            label: 'deepseek-r1:14b',
+            default: false,
+            status: 'available',
+          },
+          {
+            id: 'qwen2.5-coder:7b',
+            label: 'qwen2.5-coder:7b',
+            default: true,
+            status: 'running',
+          },
         ],
         warnings: [],
       });
@@ -732,7 +760,7 @@ providers:
         cachedAt: expect.any(String),
         ttlSec: 60,
       });
-      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -781,8 +809,8 @@ providers:
           ttlSec: 60,
         },
         models: [
-          { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
-          { id: 'gpt-5.3-codex', label: 'gpt-5.3-codex', default: false },
+          { id: 'gpt-5.4', label: 'gpt-5.4', default: true, status: 'available' },
+          { id: 'gpt-5.3-codex', label: 'gpt-5.3-codex', default: false, status: 'available' },
         ],
         warnings: [],
       });
@@ -825,7 +853,12 @@ providers:
         source: 'config',
         cache: null,
         models: [
-          { id: 'qwen2.5-coder:7b', label: 'qwen2.5-coder:7b', default: true },
+          {
+            id: 'qwen2.5-coder:7b',
+            label: 'qwen2.5-coder:7b',
+            default: true,
+            status: 'configured',
+          },
         ],
         warnings: [
           expect.stringContaining(
@@ -842,6 +875,18 @@ providers:
       expect(response.status).toBe(400);
       expect(await response.json()).toEqual({
         error: "Failed to inspect provider models: Error: Provider 'missing' is not configured",
+        code: 'provider_not_configured',
+      });
+    });
+  });
+
+  it('GET /providers/:provider/models returns a stable resolution code for invalid instances', async () => {
+    await withRuntime({}, {}, async (runtime) => {
+      const response = await runtime.app.request('/providers/codex/models?instance=api/missing');
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: "Failed to inspect provider models: Error: Unknown codex target 'api/missing'. Valid: cli/default",
+        code: 'unknown_target',
       });
     });
   });
