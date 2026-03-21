@@ -150,7 +150,7 @@ describe('session branching route', () => {
         instructions: 'Parent instructions',
         context: { labels: ['parent-label'] },
       });
-      parent.summary = 'Parent summary';
+      registry.updateSessionMetadata(parent.id, { summary: 'Parent summary' });
       registry.setProviderSessionId(parent.id, 'thread-parent');
       registry.updateStatus(parent.id, 'closed');
 

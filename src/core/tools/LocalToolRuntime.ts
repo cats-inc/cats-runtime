@@ -404,7 +404,7 @@ function truncate(text: string, limit = MAX_TEXT_OUTPUT): string {
 function resolveWorkspacePath(root: string, inputPath: string): string {
   const fullPath = resolve(root, inputPath);
   const rel = relative(root, fullPath);
-  if (rel.startsWith('..') || rel.includes(`..${rel.includes('/') ? '/' : '\\'}`)) {
+  if (rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) {
     throw new Error(`Path '${inputPath}' is outside the workspace`);
   }
   return fullPath;

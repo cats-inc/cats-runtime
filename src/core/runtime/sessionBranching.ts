@@ -27,6 +27,60 @@ function toLineageNode(sessionId: string, provider: string): SessionLineageNode 
   return { sessionId, provider };
 }
 
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+}
+
+function isSessionLineageNode(value: unknown): value is SessionLineageNode {
+  return isRecord(value)
+    && typeof value.sessionId === 'string'
+    && typeof value.provider === 'string';
+}
+
+function isSessionBranchLineage(value: unknown): value is SessionBranchLineage {
+  return isRecord(value)
+    && typeof value.rootSessionId === 'string'
+    && typeof value.parentSessionId === 'string'
+    && (value.branchMode === 'native_fork' || value.branchMode === 'context_transplant')
+    && typeof value.parentProvider === 'string'
+    && typeof value.childProvider === 'string'
+    && typeof value.createdAt === 'string'
+    && typeof value.depth === 'number'
+    && Array.isArray(value.chain)
+    && value.chain.every(isSessionLineageNode);
+}
+
+function isSessionArtifact(value: unknown): value is SessionArtifact {
+  return isRecord(value)
+    && typeof value.id === 'string'
+    && (value.kind === undefined || typeof value.kind === 'string')
+    && (value.label === undefined || typeof value.label === 'string')
+    && (value.path === undefined || typeof value.path === 'string')
+    && (value.uri === undefined || typeof value.uri === 'string')
+    && (value.mediaType === undefined || typeof value.mediaType === 'string')
+    && (value.createdAt === undefined || typeof value.createdAt === 'string')
+    && (value.sizeBytes === undefined || typeof value.sizeBytes === 'number')
+    && (value.metadata === undefined || isRecord(value.metadata));
+}
+
+function isTranscriptExcerptEntry(value: unknown): value is NonNullable<SessionContextTransplant['transcriptExcerpt']>[number] {
+  return isRecord(value)
+    && (value.role === 'user' || value.role === 'assistant')
+    && typeof value.content === 'string';
+}
+
+function isSessionContextTransplant(value: unknown): value is SessionContextTransplant {
+  return isRecord(value)
+    && (value.summary === undefined || typeof value.summary === 'string')
+    && (value.checkpoint === undefined || typeof value.checkpoint === 'string')
+    && (value.transcriptExcerpt === undefined
+      || (Array.isArray(value.transcriptExcerpt) && value.transcriptExcerpt.every(isTranscriptExcerptEntry)))
+    && (value.structuredBlocks === undefined || Array.isArray(value.structuredBlocks))
+    && (value.artifacts === undefined || (Array.isArray(value.artifacts) && value.artifacts.every(isSessionArtifact)))
+    && (value.labels === undefined || isStringArray(value.labels))
+    && (value.metadata === undefined || isRecord(value.metadata));
+}
+
 function extractBranchMetadata(
   context?: SessionInvocationContext,
 ): BranchMetadata | undefined {
@@ -43,8 +97,8 @@ function extractBranchMetadata(
   const transplant = namespace.transplant;
 
   return {
-    lineage: isRecord(lineage) ? lineage as SessionBranchLineage : undefined,
-    transplant: isRecord(transplant) ? transplant as SessionContextTransplant : undefined,
+    lineage: isSessionBranchLineage(lineage) ? lineage : undefined,
+    transplant: isSessionContextTransplant(transplant) ? transplant : undefined,
   };
 }
 
