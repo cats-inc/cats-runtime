@@ -240,6 +240,66 @@ describe('WorkspaceSubstrateService', () => {
     }
   });
 
+  it('applies update_managed changes for drifted runtime-managed files', async () => {
+    const { root, cleanup } = createWorkspace();
+    const service = new WorkspaceSubstrateService();
+
+    try {
+      await service.execute({
+        operation: 'init-workspace',
+        workspacePath: root,
+        profile: 'standard',
+        enabledAgents: ['codex'],
+        apply: true,
+        authorization: {
+          actorRole: 'boss_cat',
+        },
+      });
+
+      const agentsPath = join(root, 'AGENTS.md');
+      const managedContent = readFileSync(agentsPath, 'utf-8');
+      writeFileSync(
+        agentsPath,
+        managedContent.replace(
+          '- Prefer conservative updates over overwriting local customizations.',
+          [
+            '- Prefer conservative updates over overwriting local customizations.',
+            '- Local managed drift note for apply coverage.',
+          ].join('\n'),
+        ),
+      );
+
+      const result = await service.execute({
+        operation: 'update-workspace',
+        workspacePath: root,
+        profile: 'standard',
+        enabledAgents: ['codex'],
+        apply: true,
+        authorization: {
+          actorRole: 'boss_cat',
+        },
+      });
+
+      expect(result.applied).toBe(true);
+      expect(result.status).toBe('drifted');
+      expect(result.summary.changedPaths).toContain('AGENTS.md');
+      expect(result.actions).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          type: 'update',
+          path: 'AGENTS.md',
+          outputPath: 'AGENTS.md',
+          mergeStrategy: 'update_managed',
+          managed: true,
+          requiresApproval: false,
+        }),
+      ]));
+      expect(readFileSync(agentsPath, 'utf-8')).toBe(managedContent);
+      expect(readFileSync(agentsPath, 'utf-8')).not.toContain('Local managed drift note for apply coverage.');
+    } finally {
+      cleanup();
+    }
+  });
+
   it('does not require approval when the workspace already matches the profile', async () => {
     const { root, cleanup } = createWorkspace();
     const service = new WorkspaceSubstrateService();
