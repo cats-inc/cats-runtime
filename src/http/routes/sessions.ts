@@ -81,8 +81,9 @@ function buildUnavailableBranchCapabilityTruth(
   return {
     nativeFork: {
       supported: false,
-      compatible: true,
+      compatible: false,
       available: false,
+      errorKind: 'capability_unavailable',
       reason,
     },
     contextTransplant: {
@@ -91,27 +92,35 @@ function buildUnavailableBranchCapabilityTruth(
   };
 }
 
-function resolveSessionBranching(ctx: AppContext, session: SessionInfo) {
-  const runtime = getRuntimeSessionManager(ctx);
+function resolveSessionBranching(
+  ctx: AppContext,
+  session: SessionInfo,
+  options: {
+    includeCapabilities?: boolean;
+  } = {},
+) {
   const lineage = getSessionLineage(session);
   const transplant = getSessionContextTransplant(session);
 
-  let capabilityTruth: SessionBranchCapabilityTruth;
-  try {
-    const caps = runtime.getCapabilities(
-      session.providerName,
-      session.providerInstanceId,
-      session.providerBackend,
-    );
-    capabilityTruth = buildSessionSelfBranchCapabilityTruth(session, caps);
-  } catch (error) {
-    capabilityTruth = buildUnavailableBranchCapabilityTruth(
-      error instanceof Error ? error.message : String(error),
-    );
+  let capabilityTruth: SessionBranchCapabilityTruth | undefined;
+  if (options.includeCapabilities !== false) {
+    const runtime = getRuntimeSessionManager(ctx);
+    try {
+      const caps = runtime.getCapabilities(
+        session.providerName,
+        session.providerInstanceId,
+        session.providerBackend,
+      );
+      capabilityTruth = buildSessionSelfBranchCapabilityTruth(session, caps);
+    } catch (error) {
+      capabilityTruth = buildUnavailableBranchCapabilityTruth(
+        error instanceof Error ? error.message : String(error),
+      );
+    }
   }
 
   return buildSessionBranchObservability({
-    capabilityTruth,
+    ...(capabilityTruth ? { capabilityTruth } : {}),
     lineage,
     transplant,
   });
@@ -134,6 +143,9 @@ function serializeSession(ctx: AppContext, session: SessionInfo) {
 function serializeSessions(
   ctx: AppContext,
   sessions: SessionInfo[],
+  options: {
+    includeBranchCapabilities?: boolean;
+  } = {},
 ) {
   const views = toSessionViews(sessions, {
     isAttached: (session) => getRuntimeSessionManager(ctx).isAttached(session.id),
@@ -141,7 +153,9 @@ function serializeSessions(
   });
   return views.map((view, index) => {
     const lineage = getSessionLineage(sessions[index]);
-    const branching = resolveSessionBranching(ctx, sessions[index]);
+    const branching = resolveSessionBranching(ctx, sessions[index], {
+      includeCapabilities: options.includeBranchCapabilities,
+    });
     return {
       ...view,
       branching,
@@ -288,6 +302,18 @@ function sortSessionsByTimestamp(sessions: SessionInfo[]): SessionInfo[] {
   return [...sessions].sort((left, right) =>
     Date.parse(left.createdAt) - Date.parse(right.createdAt),
   );
+}
+
+function parseIncludeBranchCapabilities(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return normalized === '1'
+    || normalized === 'true'
+    || normalized === 'full'
+    || normalized === 'capabilities';
 }
 
 function findReusableSession(
@@ -1005,6 +1031,7 @@ sessionRoutes.get('/sessions', (c) => {
   const provider = c.req.query('provider');
   const instance = c.req.query('instance');
   const group = c.req.query('group');
+  const includeBranchCapabilities = parseIncludeBranchCapabilities(c.req.query('branching'));
 
   let sessions = ctx.registry.list({ status, provider, group });
   if (instance) {
@@ -1012,7 +1039,10 @@ sessionRoutes.get('/sessions', (c) => {
       (session) => sessionMatchesInstanceFilter(ctx, session, instance),
     );
   }
-  return c.json({ sessions: serializeSessions(ctx, sessions), count: sessions.length });
+  return c.json({
+    sessions: serializeSessions(ctx, sessions, { includeBranchCapabilities }),
+    count: sessions.length,
+  });
 });
 
 /** GET /sessions/:id — get session details */

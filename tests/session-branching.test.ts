@@ -325,12 +325,14 @@ describe('session branching route', () => {
         branch: {
           requestedMode: string;
           resolvedMode?: string;
+          error?: { kind: string };
           target: { provider: string; backend: string; instance: string };
           capabilityTruth: {
             nativeFork: {
               supported: boolean;
               compatible: boolean;
               available: boolean;
+              errorKind?: string;
               reason?: string;
             };
           };
@@ -351,12 +353,86 @@ describe('session branching route', () => {
             supported: true,
             compatible: false,
             available: false,
+            errorKind: 'target_incompatible',
             reason: 'provider override requires context_transplant',
           },
         },
       });
+      expect(body.branch.error?.kind).toBe('target_incompatible');
       expect(body.branch.resolvedMode).toBeUndefined();
       expect(vi.mocked(pool.spawn)).not.toHaveBeenCalled();
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('keeps GET /sessions cheap by default and only resolves branch capabilities on opt-in', async () => {
+    const { config, cleanup } = createTestConfig();
+    const registry = new SessionRegistry();
+    const pool = createMockPool((providerName) => ({
+      resume: true,
+      fork: providerName === 'codex',
+      permissions: true,
+    }));
+    const app = createRuntimeApp({
+      config,
+      registry,
+      pool,
+      cursorNative: {} as never,
+      gooseNative: {} as never,
+      kiroNative: {} as never,
+      auggieSessions: {} as never,
+      opencodeNative: {} as never,
+    } as never);
+
+    try {
+      const session = registry.create({
+        id: 'list-session',
+        providerName: 'codex',
+        cwd: join(config.sessionBaseDir, 'repo'),
+        workspaceMode: 'shared',
+        model: 'gpt-5.4',
+      });
+      registry.updateStatus(session.id, 'closed');
+
+      const listResponse = await app.request('/sessions');
+      expect(listResponse.status).toBe(200);
+      const listBody = await listResponse.json() as {
+        sessions: Array<{ id: string; branching: { capabilities?: unknown } }>;
+      };
+      expect(listBody.sessions).toEqual([
+        expect.objectContaining({
+          id: 'list-session',
+          branching: {},
+        }),
+      ]);
+      expect(vi.mocked(pool.getCapabilities)).not.toHaveBeenCalled();
+
+      const fullResponse = await app.request('/sessions?branching=full');
+      expect(fullResponse.status).toBe(200);
+      const fullBody = await fullResponse.json() as {
+        sessions: Array<{
+          id: string;
+          branching: {
+            capabilities?: {
+              nativeFork: { available: boolean };
+            };
+          };
+        }>;
+      };
+      expect(fullBody.sessions).toMatchObject([
+        {
+          id: 'list-session',
+          branching: {
+            capabilities: {
+              nativeFork: {
+                available: false,
+              },
+            },
+          },
+        },
+      ]);
+      expect(vi.mocked(pool.getCapabilities)).toHaveBeenCalledOnce();
     } finally {
       cleanup();
     }

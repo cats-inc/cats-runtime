@@ -162,6 +162,7 @@ export interface SessionBranchNativeForkCapabilityTruth {
   supported: boolean;
   compatible: boolean;
   available: boolean;
+  errorKind?: SessionBranchErrorKind;
   reason?: string;
 }
 
@@ -201,15 +202,23 @@ export interface SessionBranchDecision extends SessionBranchOperationResult {
   warnings: string[];
   error?: {
     status: 400 | 409 | 500 | 501;
+    kind: SessionBranchErrorKind;
     message: string;
   };
 }
 
 export interface SessionBranchObservability {
-  capabilities: SessionBranchCapabilityTruth;
+  capabilities?: SessionBranchCapabilityTruth;
   lineage?: SessionBranchLineage;
   transplant?: SessionContextTransplant;
 }
+
+export type SessionBranchErrorKind =
+  | 'provider_not_implemented'
+  | 'provider_unsupported'
+  | 'missing_provider_session'
+  | 'target_incompatible'
+  | 'capability_unavailable';
 
 export interface SessionBranchRequest {
   mode?: SessionBranchPreference;

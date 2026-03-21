@@ -2,6 +2,7 @@ import type {
   SessionArtifact,
   SessionBranchCapabilityTruth,
   SessionBranchDecision,
+  SessionBranchErrorKind,
   SessionBranchLineage,
   SessionBranchMode,
   SessionBranchObservability,
@@ -449,23 +450,35 @@ export function buildSessionBranchCapabilityTruth(
     input.target,
     input.request,
   );
-  const reason = input.parentSession.providerName === 'cursor'
+  let errorKind: SessionBranchErrorKind | undefined;
+  let reason: string | undefined;
+
+  if (
+    input.parentSession.providerName === 'cursor'
     && (input.parentSession.providerBackend || 'cli') === 'cli'
-    ? 'Cursor native session forking will be enabled after Cursor execution support lands.'
-    : (input.parentSession.providerBackend || 'cli') === 'cli'
-      && !input.parentSession.providerSessionId
-      ? 'No provider session ID to fork from'
-      : !input.parentCapabilities.fork
-        ? `Provider '${input.parentSession.providerName}' does not support native fork`
-        : !compatibility.compatible
-          ? compatibility.reason
-          : undefined;
+  ) {
+    errorKind = 'provider_not_implemented';
+    reason = 'Cursor native session forking will be enabled after Cursor execution support lands.';
+  } else if (
+    (input.parentSession.providerBackend || 'cli') === 'cli'
+    && !input.parentSession.providerSessionId
+  ) {
+    errorKind = 'missing_provider_session';
+    reason = 'No provider session ID to fork from';
+  } else if (!input.parentCapabilities.fork) {
+    errorKind = 'provider_unsupported';
+    reason = `Provider '${input.parentSession.providerName}' does not support native fork`;
+  } else if (!compatibility.compatible) {
+    errorKind = 'target_incompatible';
+    reason = compatibility.reason;
+  }
 
   return {
     nativeFork: {
       supported: input.parentCapabilities.fork,
       compatible: compatibility.compatible,
       available: reason === undefined,
+      errorKind,
       reason,
     },
     contextTransplant: {
@@ -499,14 +512,14 @@ export function buildSessionSelfBranchCapabilityTruth(
   });
 }
 
-function toBranchErrorStatus(reason: string | undefined): 400 | 409 | 500 | 501 {
-  if (!reason) {
+function toBranchErrorStatus(errorKind: SessionBranchErrorKind | undefined): 400 | 409 | 500 | 501 {
+  if (!errorKind) {
     return 500;
   }
-  if (reason.startsWith('Provider ') || reason.startsWith('Cursor ')) {
+  if (errorKind === 'provider_not_implemented' || errorKind === 'provider_unsupported') {
     return 501;
   }
-  if (reason === 'No provider session ID to fork from') {
+  if (errorKind === 'missing_provider_session') {
     return 400;
   }
   return 409;
@@ -530,7 +543,8 @@ export function resolveSessionBranchDecision(
       return {
         ...result,
         error: {
-          status: toBranchErrorStatus(capabilityTruth.nativeFork.reason),
+          status: toBranchErrorStatus(capabilityTruth.nativeFork.errorKind),
+          kind: capabilityTruth.nativeFork.errorKind || 'capability_unavailable',
           message: capabilityTruth.nativeFork.reason || 'Native fork is unavailable',
         },
       };
@@ -566,12 +580,12 @@ export function resolveSessionBranchDecision(
 }
 
 export function buildSessionBranchObservability(input: {
-  capabilityTruth: SessionBranchCapabilityTruth;
+  capabilityTruth?: SessionBranchCapabilityTruth;
   lineage?: SessionBranchLineage;
   transplant?: SessionContextTransplant;
 }): SessionBranchObservability {
   return {
-    capabilities: cloneMetadata(input.capabilityTruth),
+    ...(input.capabilityTruth ? { capabilities: cloneMetadata(input.capabilityTruth) } : {}),
     ...(input.lineage ? { lineage: cloneMetadata(input.lineage) } : {}),
     ...(input.transplant ? { transplant: cloneMetadata(input.transplant) } : {}),
   };

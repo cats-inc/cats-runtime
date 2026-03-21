@@ -267,6 +267,12 @@ same-target child branch from the current session. `available: false` means the
 runtime already knows native fork cannot be honored from this parent, and
 `reason` explains why when relevant.
 
+`GET /sessions` now keeps list serialization cheap by default: it includes
+persisted branch observability (`lineage` / `transplant`) but skips capability
+resolution unless the caller opts in with `?branching=full`. Detail surfaces
+such as `GET /sessions/{id}`, `GET /sessions/{id}/lineage`, and successful
+`POST /sessions/{id}/fork` responses still include full capability truth.
+
 `POST /sessions` also accepts these optional fields:
 
 - `sessionKey`: caller-visible logical session identity for explicit reuse
@@ -318,6 +324,7 @@ Successful fork responses now also include a machine-readable `branch` result:
         "supported": true,
         "compatible": false,
         "available": false,
+        "errorKind": "target_incompatible",
         "reason": "provider override requires context_transplant"
       },
       "contextTransplant": {
@@ -340,8 +347,9 @@ Successful fork responses now also include a machine-readable `branch` result:
 
 If `mode: "native_fork"` is explicitly requested and cannot be honored, the
 runtime returns the usual error payload plus the same `branch` object with
-`resolvedMode` omitted. Hosts can use that branch object to surface the exact
-compatibility/fallback reason without re-implementing provider logic.
+`resolvedMode` omitted and `branch.error.kind` populated. Hosts can use that
+branch object to surface the exact compatibility/fallback reason without
+re-implementing provider logic.
 
 Session payloads still expose the current session's machine-readable `lineage`
 object at top level for compatibility:
