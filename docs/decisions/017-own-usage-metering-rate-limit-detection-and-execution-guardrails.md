@@ -143,8 +143,8 @@ execution guardrails across backend families.
 - [SPEC-007](../specs/SPEC-007-provider-compatibility-and-evidence-engine.md)
 - [SPEC-003](../specs/SPEC-003-agent-backend.md)
 - [ADR-016](./016-own-executable-delivery-primitives-not-delivery-policy.md)
-- [cats-inc ADR-023](../../../cats-inc/docs/decisions/023-own-budget-policy-and-cost-control-in-product.md)
-- [cats-inc Paperclip Control-Plane Analysis](../../../cats-inc/docs/research/paperclip-control-plane-analysis.md)
+- [cats-inc ADR-023](../../../cats/docs/decisions/023-own-budget-policy-and-cost-control-in-product.md)
+- [cats-inc Paperclip Control-Plane Analysis](../../../cats/docs/research/paperclip-control-plane-analysis.md)
 
 ---
 

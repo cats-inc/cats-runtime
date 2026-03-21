@@ -138,7 +138,7 @@ This decision includes:
 - [ADR 002: Embed the CLI runtime into `cats-runtime`](./002-embed-cli-runtime.md)
 - [ADR 005: Introduce a backend-neutral runtime facade for CLI and API backends](./005-backend-neutral-runtime-and-api-backend.md)
 - [ADR 006: Introduce an agent backend and shared runtime contracts](./006-agent-backend-and-shared-runtime-contracts.md)
-- [cats-inc ADR-013: Ship `cats-inc` as an executable self-hosted npm app](../../../cats-inc/docs/decisions/013-ship-cats-inc-as-an-executable-self-hosted-npm-app.md)
+- [cats-inc ADR-013: Ship `cats-inc` as an executable self-hosted npm app](../../../cats/docs/decisions/013-ship-cats-inc-as-an-executable-self-hosted-npm-app.md)
 
 ---
 

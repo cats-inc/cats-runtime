@@ -257,7 +257,7 @@ supports local skill directories.
 - [SPEC-003: Agent Backend for External Agent Runtimes](./SPEC-003-agent-backend.md)
 - [cats-runtime gap assessment](../research/2026-03-19-paperclip-gap-assessment.md)
 - [Paperclip alignment research](../research/2026-03-17-paperclip-openclaw-pi-alignment.md)
-- [cats-inc paperclip control-plane analysis](../../../cats-inc/docs/research/paperclip-control-plane-analysis.md)
+- [cats-inc paperclip control-plane analysis](../../../cats/docs/research/paperclip-control-plane-analysis.md)
 - [skills README](../../skills/README.md)
 
 ---
