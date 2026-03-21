@@ -2,12 +2,19 @@ import { spawn } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import { isAbsolute, resolve as resolvePath } from 'node:path';
 import { buildAgentAdapter } from '../../backends/agent/adapters/registry.js';
-import type { RemoteProviderInstanceConfig } from '../../backends/cli/config.js';
+import type {
+  ProviderRuntimeConfig,
+  RemoteProviderInstanceConfig,
+} from '../../backends/cli/config.js';
 import {
   getConfiguredFileBackedProviderPath,
   resolveFileBackedProviderPath,
   supportsHostFileBackedProviderDiscovery,
 } from '../../backends/cli/providerPaths.js';
+import {
+  createRuntimeAdapter,
+  quoteForBash,
+} from '../../backends/cli/runtime/runtime.js';
 import type { RuntimeConfig } from '../../core/config.js';
 import type { HealthStatus } from '../../core/types.js';
 import type { AppContext } from '../app.js';
@@ -42,6 +49,14 @@ export interface RuntimeCommandLookupOptions {
   timeoutMs?: number;
   lookupCommandName?: string;
   lookupArgs?: string[];
+}
+
+export interface RuntimeExecutionCommandLookupOptions {
+  timeoutMs?: number;
+  shellRunner?: (
+    invocation: { command: string; args: string[] },
+    timeoutMs: number,
+  ) => Promise<{ status: number | null; stdout: string; timedOut: boolean }>;
 }
 
 export interface FileBackedProviderDiscoveryInfo {
@@ -195,6 +210,40 @@ export async function lookupRuntimeCommand(
   };
 }
 
+export async function lookupRuntimeCommandInExecutionEnvironment(
+  command: string,
+  runtime: ProviderRuntimeConfig,
+  options: RuntimeExecutionCommandLookupOptions = {},
+): Promise<RuntimeCommandLookupResult> {
+  if (!command.trim()) {
+    return { available: false };
+  }
+
+  if (runtime.mode === 'native') {
+    return lookupRuntimeCommand(command, {
+      timeoutMs: options.timeoutMs,
+    });
+  }
+
+  const invocation = createRuntimeAdapter(runtime).buildShellInvocation(
+    `command -v ${quoteForBash(command)}`,
+  );
+  const result = await (options.shellRunner || runShellInvocation)(
+    invocation,
+    options.timeoutMs ?? DEFAULT_RUNTIME_COMMAND_LOOKUP_TIMEOUT_MS,
+  );
+  const resolvedPath = result.stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean);
+
+  return {
+    available: result.status === 0 && Boolean(resolvedPath),
+    resolvedPath,
+    timedOut: result.timedOut,
+  };
+}
+
 export function getFileBackedProviderDiscoveryInfo(
   config: RuntimeConfig,
   provider: FileBackedProviderName,
@@ -250,4 +299,11 @@ export async function probeRuntimeAgentInstance(
       + `${instance.providerName}/${instance.id}`,
     ),
   };
+}
+
+async function runShellInvocation(
+  invocation: { command: string; args: string[] },
+  timeoutMs: number,
+): Promise<{ status: number | null; stdout: string; timedOut: boolean }> {
+  return runCommandLookup(invocation.command, invocation.args, timeoutMs);
 }

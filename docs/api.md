@@ -125,12 +125,13 @@ GET /diagnostics/providers
 desktop shells, and the embedded dashboard. It combines:
 
 - runtime readiness and startup/shutdown contract metadata
-- a light provider-health summary suitable for polling
+- a light provider-health summary over each provider's default target, suitable
+  for polling
 - per-provider default target highlights so hosts do not need to stitch
   `/health` and `/diagnostics/providers` together themselves
 - aggregate status semantics where partial provider outages are reported as
   `degraded`; `unavailable` is reserved for runtime outages or cases where
-  every configured provider target is unavailable
+  every default provider target is unavailable
 
 `GET /diagnostics/runtime` returns the frozen startup contract that hosts should
 integrate against:

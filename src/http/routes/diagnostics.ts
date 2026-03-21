@@ -15,6 +15,7 @@ import {
   getRuntimeEnvironment,
   isFileBackedProvider,
   lookupRuntimeCommand,
+  lookupRuntimeCommandInExecutionEnvironment,
   probeRuntimeAgentInstance,
   runtimePathExists,
   type RuntimeRouteEnv,
@@ -58,6 +59,11 @@ interface ProviderDiagnosticResult {
 
 const diagnosticsRoutes = new Hono<RuntimeRouteEnv>();
 
+interface ProviderSummaryOptions {
+  defaultTargetsOnly?: boolean;
+  useAttentionSummary?: boolean;
+}
+
 function describeCommandResolutionFailure(
   targetName: string,
   command: string,
@@ -67,6 +73,17 @@ function describeCommandResolutionFailure(
     return `Timed out while resolving ${targetName} command '${command}'`;
   }
   return `Could not resolve ${targetName} command '${command}'`;
+}
+
+function describeRuntimeCommandResolutionFailure(
+  runtimeLabel: string,
+  command: string,
+  timedOut?: boolean,
+): string {
+  if (timedOut) {
+    return `Timed out while resolving CLI command '${command}' inside ${runtimeLabel}`;
+  }
+  return `Could not resolve CLI command '${command}' inside ${runtimeLabel}`;
 }
 
 function describeRuntimeDependencyFailure(
@@ -219,13 +236,30 @@ async function diagnoseCliTarget(
           },
         ),
       );
-      checks.push(
-        createCheck(
-          'command_probe_skipped',
-          'degraded',
-          `WSL-backed command '${instance.commandConfig.path}' is configured but not probed inside '${distro}'`,
-        ),
-      );
+      if (wsl.available) {
+        const command = await lookupRuntimeCommandInExecutionEnvironment(
+          instance.commandConfig.path,
+          runtime,
+        );
+        checks.push(
+          createCheck(
+            'command_available',
+            command.available ? 'ok' : 'unavailable',
+            command.available
+              ? `Resolved CLI command '${instance.commandConfig.path}' inside WSL distro '${distro}'`
+              : describeRuntimeCommandResolutionFailure(
+                `WSL distro '${distro}'`,
+                instance.commandConfig.path,
+                command.timedOut,
+              ),
+            {
+              distro,
+              resolvedPath: command.resolvedPath,
+              timedOut: command.timedOut,
+            },
+          ),
+        );
+      }
       break;
     }
     case 'docker': {
@@ -550,8 +584,13 @@ async function collectProviderDiagnostics(
 function summarizeProviderDiagnostics(
   catalog: ReturnType<typeof listProviderCatalog>,
   providers: ProviderDiagnosticResult[],
+  options: ProviderSummaryOptions = {},
 ) {
-  const summary = providers.reduce<{
+  const selectedProviders = options.defaultTargetsOnly
+    ? providers.filter((provider) => provider.defaultTarget)
+    : providers;
+  const defaultTargets = providers.filter((provider) => provider.defaultTarget).length;
+  const summary = selectedProviders.reduce<{
     status: DiagnosticStatus;
     summary: string;
     configuredProviders: number;
@@ -562,10 +601,6 @@ function summarizeProviderDiagnostics(
     unavailable: number;
   }>(
     (accumulator, provider) => {
-      if (provider.defaultTarget) {
-        accumulator.defaultTargets += 1;
-      }
-
       if (provider.availability.status === 'ok') {
         accumulator.ok += 1;
       } else if (provider.availability.status === 'degraded') {
@@ -579,8 +614,8 @@ function summarizeProviderDiagnostics(
       status: 'ok',
       summary: 'All configured provider targets passed the current probe mode.',
       configuredProviders: Object.keys(catalog).length,
-      targets: providers.length,
-      defaultTargets: 0,
+      targets: selectedProviders.length,
+      defaultTargets: options.defaultTargetsOnly ? selectedProviders.length : defaultTargets,
       ok: 0,
       degraded: 0,
       unavailable: 0,
@@ -589,18 +624,31 @@ function summarizeProviderDiagnostics(
 
   if (summary.configuredProviders === 0 || summary.targets === 0) {
     summary.status = 'degraded';
-    summary.summary = 'No provider targets are configured yet.';
+    summary.summary = options.defaultTargetsOnly
+      ? 'No default provider targets are configured yet.'
+      : 'No provider targets are configured yet.';
+    return summary;
+  }
+
+  const attentionCount = summary.degraded + summary.unavailable;
+  if (attentionCount === 0) {
+    return summary;
+  }
+
+  const allUnavailable = summary.unavailable === summary.targets;
+  summary.status = allUnavailable ? 'unavailable' : 'degraded';
+
+  if (options.useAttentionSummary && !allUnavailable) {
+    summary.summary = `${attentionCount} provider target(s) need attention.`;
     return summary;
   }
 
   if (summary.unavailable > 0) {
-    summary.status = summary.unavailable === summary.targets ? 'unavailable' : 'degraded';
     summary.summary = `${summary.unavailable} provider target(s) are unavailable.`;
     return summary;
   }
 
   if (summary.degraded > 0) {
-    summary.status = 'degraded';
     summary.summary = `${summary.degraded} provider target(s) need attention.`;
     return summary;
   }
@@ -663,7 +711,10 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
   const readiness = getRuntimeReadinessSnapshot(ctx.startup);
   const runtime = getRuntimeOperationalStatus(ctx.startup);
   const { catalog, providers } = await collectProviderDiagnostics(ctx, probeMode, env);
-  const providerSummary = summarizeProviderDiagnostics(catalog, providers);
+  const providerSummary = summarizeProviderDiagnostics(catalog, providers, {
+    defaultTargetsOnly: true,
+    useAttentionSummary: true,
+  });
   const status = providerSummary.status === 'unavailable'
     ? 'unavailable'
     : runtime.status === 'unavailable'

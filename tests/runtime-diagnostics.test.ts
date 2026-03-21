@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   lookupRuntimeCommand,
+  lookupRuntimeCommandInExecutionEnvironment,
   probeRuntimeAgentInstance,
 } from '../src/http/routes/diagnosticsSupport.js';
 
@@ -39,5 +40,36 @@ describe('runtime diagnostics helpers', () => {
     })).rejects.toThrow("Timed out while probing agent adapter 'test-agent' for codex/bridge");
 
     expect(Date.now() - startedAt).toBeLessThan(2_000);
+  });
+
+  it('looks up commands inside a WSL execution environment', async () => {
+    const shellRunner = async (
+      invocation: { command: string; args: string[] },
+      _timeoutMs: number,
+    ): Promise<{ status: number | null; stdout: string; timedOut: boolean }> => {
+      expect(invocation).toEqual({
+        command: 'wsl',
+        args: ['-d', 'Ubuntu', 'bash', '-lc', "command -v 'kiro-cli'"],
+      });
+
+      return {
+        status: 0,
+        stdout: '/usr/local/bin/kiro-cli\n',
+        timedOut: false,
+      };
+    };
+
+    await expect(lookupRuntimeCommandInExecutionEnvironment(
+      'kiro-cli',
+      {
+        mode: 'wsl',
+        distro: 'Ubuntu',
+      },
+      { shellRunner },
+    )).resolves.toEqual({
+      available: true,
+      resolvedPath: '/usr/local/bin/kiro-cli',
+      timedOut: false,
+    });
   });
 });

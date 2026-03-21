@@ -691,6 +691,95 @@ backends:
     }
   });
 
+  it('GET /diagnostics/health ignores non-default provider targets in the aggregate summary', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-health-defaults-only-test-'));
+    const configPath = join(root, 'providers.yaml');
+
+    writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+routing:
+  providers:
+    codex:
+      default_target:
+        backend: cli
+        instance: default
+backends:
+  cli:
+    providers:
+      codex:
+        instances:
+          default:
+            environment: native
+            command: ${JSON.stringify(process.execPath)}
+            runner: direct
+            sessions_dir: ~/.codex/sessions
+  api:
+    providers:
+      codex:
+        transport: openai
+        api_key_env: OPENAI_API_KEY
+        instances:
+          main:
+            model: gpt-5.2-codex
+`.trimStart());
+
+    const env = {
+      HOME: root,
+      USERPROFILE: root,
+      CATS_RUNTIME_CONFIG_PATH: configPath,
+      CATS_RUNTIME_HOST: '127.0.0.1',
+      CATS_RUNTIME_PORT: '3110',
+      CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
+      CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
+      CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
+      CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
+      CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
+    };
+
+    for (const dir of [
+      env.CATS_RUNTIME_DATA_DIR,
+      env.CATS_RUNTIME_SESSION_BASE_DIR,
+      env.CODEX_SESSIONS_DIR,
+    ]) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    const runtime = createRuntimeServer(loadConfig(env));
+    try {
+      const response = await runtime.app.request('/diagnostics/health');
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(expect.objectContaining({
+        status: 'degraded',
+        providers: {
+          probe: 'light',
+          summary: {
+            status: 'ok',
+            summary: 'All configured provider targets passed the current probe mode.',
+            configuredProviders: 1,
+            targets: 1,
+            defaultTargets: 1,
+            ok: 1,
+            degraded: 0,
+            unavailable: 0,
+          },
+          defaults: [
+            expect.objectContaining({
+              provider: 'codex',
+              target: 'cli/default',
+              status: 'ok',
+            }),
+          ],
+        },
+      }));
+    } finally {
+      await runtime.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('GET /diagnostics/health stays degraded when only some provider targets are unavailable', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-health-partial-provider-outage-test-'));
     const configPath = join(root, 'providers.yaml');
@@ -819,7 +908,7 @@ backends:
           probe: 'light',
           summary: {
             status: 'degraded',
-            summary: '1 provider target(s) are unavailable.',
+            summary: '2 provider target(s) need attention.',
             configuredProviders: 2,
             targets: 2,
             defaultTargets: 2,
