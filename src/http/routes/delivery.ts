@@ -112,7 +112,6 @@ function parseDeliveryRequest(
     artifacts: parseArtifacts(rawBody.artifacts),
     services: parseServices(rawBody.services),
     apply: rawBody.apply === true,
-    strict: rawBody.strict === true,
     authorization: actorRole || rawBody.approved === true
       ? {
           actorRole,

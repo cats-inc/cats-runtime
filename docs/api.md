@@ -192,6 +192,10 @@ Commit preview example:
 }
 ```
 
+`create-commit` only stages files when the caller explicitly sends
+`"repo": { "stageAll": true }`. Without that flag, apply uses only the
+already-staged index.
+
 Push apply example:
 
 ```json
@@ -586,6 +590,9 @@ Behavioral boundaries:
 - Preview is the safe default for `init-workspace` and `update-workspace`.
 - Preview is also the safe default for `publish-artifacts`, `create-commit`,
   and `push-branch`.
+- `create-commit` does not implicitly stage workspace changes. Hosts must opt in
+  with `repo.stageAll: true` if they want the runtime to run `git add -A`
+  before commit.
 - Preview results may still report `plan.requiresApproval` / `approval.required`
   to describe whether a later mutable apply would need authorization. This is
   prospective approval metadata only; preview itself never writes.

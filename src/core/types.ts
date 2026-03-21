@@ -68,6 +68,7 @@ export type RuntimeDeliveryState =
   | 'unsupported'
   | 'degraded'
   | 'completed';
+export type RuntimeDeliveryExecutionMode = 'preview' | 'apply';
 export type RuntimeDeliveryCapabilityState =
   | 'ready'
   | 'blocked'
@@ -232,7 +233,7 @@ export interface RuntimeDeliveryAuthorization {
 }
 
 export interface RuntimeDeliveryContract {
-  mode: WorkspaceSubstrateExecutionMode;
+  mode: RuntimeDeliveryExecutionMode;
   safeDefaultMode: 'preview';
   applyRequested: boolean;
   applyDecision: RuntimeDeliveryApplyDecision;
@@ -377,7 +378,6 @@ export interface RuntimeDeliveryRequest {
   artifacts?: SessionArtifact[];
   services?: AgentRuntimeService[];
   apply?: boolean;
-  strict?: boolean;
   authorization?: RuntimeDeliveryAuthorizationInput;
   publication?: RuntimeArtifactPublicationRequest;
   repo?: RuntimeRepoDeliveryRequest;

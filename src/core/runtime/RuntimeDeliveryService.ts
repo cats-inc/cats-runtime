@@ -1209,6 +1209,7 @@ export class RuntimeDeliveryService {
     const result = this.createBaseResult(request, resolved, authorization);
 
     const message = request.repo?.message?.trim();
+    const stageAll = request.repo?.stageAll === true;
     if (!message) {
       result.blockedReasons.push(createIssue(
         'commit_message_required',
@@ -1265,7 +1266,7 @@ export class RuntimeDeliveryService {
         ...(result.metadata || {}),
         repo: {
           message,
-          stageAll: request.repo?.stageAll !== false,
+          stageAll,
           allowEmpty: request.repo?.allowEmpty === true,
         },
       };
@@ -1277,7 +1278,7 @@ export class RuntimeDeliveryService {
       return this.updateSummary(result);
     }
 
-    if (request.repo?.stageAll !== false) {
+    if (stageAll) {
       const addResult = await runGit(result.repo.rootPath!, ['add', '-A']);
       if (addResult.code !== 0) {
         result.state = 'blocked';
@@ -1314,7 +1315,7 @@ export class RuntimeDeliveryService {
       commit: {
         oid: headResult.stdout.trim() || result.repo.headOid,
         message,
-        stageAll: request.repo?.stageAll !== false,
+        stageAll,
       },
     };
     return this.updateSummary(result);

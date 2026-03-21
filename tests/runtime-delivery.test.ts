@@ -183,11 +183,11 @@ describe('RuntimeDeliveryService', () => {
       expect(preview.metadata).toMatchObject({
         repo: {
           message: 'feat: update readme',
-          stageAll: true,
+          stageAll: false,
         },
       });
 
-      const applied = await service.execute({
+      const blocked = await service.execute({
         action: 'create-commit',
         workspacePath: root,
         apply: true,
@@ -199,11 +199,31 @@ describe('RuntimeDeliveryService', () => {
         },
       });
 
+      expect(blocked.state).toBe('blocked');
+      expect(blocked.blockedReasons).toEqual(expect.arrayContaining([
+        expect.objectContaining({ code: 'git_commit_failed' }),
+      ]));
+      expect(runGit(root, ['status', '--porcelain'])).toContain('README.md');
+
+      const applied = await service.execute({
+        action: 'create-commit',
+        workspacePath: root,
+        apply: true,
+        authorization: {
+          actorRole: 'boss_cat',
+        },
+        repo: {
+          message: 'feat: update readme',
+          stageAll: true,
+        },
+      });
+
       expect(applied.state).toBe('completed');
       expect(applied.metadata).toMatchObject({
         commit: {
           oid: expect.any(String),
           message: 'feat: update readme',
+          stageAll: true,
         },
       });
       expect(runGit(root, ['log', '-1', '--pretty=%s'])).toBe('feat: update readme');

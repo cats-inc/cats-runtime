@@ -365,7 +365,10 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         path: { type: 'string', description: 'Relative workspace path. Defaults to ".".' },
         session_id: { type: 'string' },
         message: { type: 'string' },
-        stage_all: { type: 'boolean' },
+        stage_all: {
+          type: 'boolean',
+          description: 'Explicitly stage all tracked and untracked changes before commit.',
+        },
         allow_empty: { type: 'boolean' },
         apply: { type: 'boolean' },
         actor_role: {

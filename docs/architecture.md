@@ -187,6 +187,8 @@ src/
   metadata so artifact-only and repo-backed flows can share one execution seam
 - Keeps delivery execution approval-aware (`preview` vs `apply`) without moving
   delivery-governance policy into the runtime
+- Requires explicit delivery-side opt-in before `create-commit` stages workspace
+  changes; apply otherwise uses the existing Git index only
 - Does not own product-level approval UX, workspace orchestration policy, or
   post-apply delegation behavior
 

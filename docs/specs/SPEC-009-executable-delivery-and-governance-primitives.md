@@ -222,6 +222,9 @@ interface RuntimeDeliveryResult {
 }
 ```
 
+Commit creation is intentionally safe by default: apply uses the existing Git
+index unless the caller explicitly opts in to `repo.stageAll: true`.
+
 ## Flow
 
 ```text
