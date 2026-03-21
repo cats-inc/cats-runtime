@@ -11,15 +11,17 @@ import {
 import type { SessionsIndex } from '../../backends/cli/discovery/types.js';
 import type { PreparedFileDeletion } from '../../backends/cli/pool/SessionRegistry.js';
 import type {
-  SessionArtifact,
-  SessionBranchRequest,
   SessionInfo,
   SessionInvocationContext,
+} from '../../backends/cli/pool/types.js';
+import type {
+  SessionArtifact,
+  SessionBranchRequest,
   SessionContextTransplant,
   SessionReusePolicy,
   SessionStatus,
   WorkspaceMode,
-} from '../../backends/cli/pool/types.js';
+} from '../../core/types.js';
 import {
   resolveWorkspace,
   cleanupIsolatedWorkspace,
@@ -106,32 +108,32 @@ function parseSessionArtifactArray(value: unknown): SessionArtifact[] | undefine
     return undefined;
   }
 
-  const artifacts = value
-    .map((entry) => {
-      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
-        return undefined;
-      }
-      const record = entry as Record<string, unknown>;
-      const id = parseOptionalString(record.id);
-      if (!id) {
-        return undefined;
-      }
+  const artifacts: SessionArtifact[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      continue;
+    }
 
-      return {
-        id,
-        kind: parseOptionalString(record.kind),
-        label: parseOptionalString(record.label),
-        path: parseOptionalString(record.path),
-        uri: parseOptionalString(record.uri),
-        mediaType: parseOptionalString(record.mediaType),
-        createdAt: parseOptionalString(record.createdAt),
-        sizeBytes: typeof record.sizeBytes === 'number' ? record.sizeBytes : undefined,
-        metadata: record.metadata && typeof record.metadata === 'object' && !Array.isArray(record.metadata)
-          ? record.metadata as Record<string, unknown>
-          : undefined,
-      } satisfies SessionArtifact;
-    })
-    .filter((artifact): artifact is SessionArtifact => Boolean(artifact));
+    const record = entry as Record<string, unknown>;
+    const id = parseOptionalString(record.id);
+    if (!id) {
+      continue;
+    }
+
+    artifacts.push({
+      id,
+      kind: parseOptionalString(record.kind),
+      label: parseOptionalString(record.label),
+      path: parseOptionalString(record.path),
+      uri: parseOptionalString(record.uri),
+      mediaType: parseOptionalString(record.mediaType),
+      createdAt: parseOptionalString(record.createdAt),
+      sizeBytes: typeof record.sizeBytes === 'number' ? record.sizeBytes : undefined,
+      metadata: record.metadata && typeof record.metadata === 'object' && !Array.isArray(record.metadata)
+        ? record.metadata as Record<string, unknown>
+        : undefined,
+    });
+  }
 
   return artifacts.length > 0 ? artifacts : undefined;
 }
@@ -142,29 +144,28 @@ function parseContextTransplant(value: unknown): SessionContextTransplant | unde
   }
 
   const record = value as Record<string, unknown>;
-  const transcriptExcerpt = Array.isArray(record.transcriptExcerpt)
-    ? record.transcriptExcerpt
-      .map((entry) => {
-        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
-          return undefined;
-        }
-        const excerptRecord = entry as Record<string, unknown>;
-        const role = excerptRecord.role === 'user' || excerptRecord.role === 'assistant'
-          ? excerptRecord.role
-          : undefined;
-        const content = parseOptionalString(excerptRecord.content);
-        if (!role || !content) {
-          return undefined;
-        }
-        return { role, content };
-      })
-      .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
-    : undefined;
+  const transcriptExcerptEntries: NonNullable<SessionContextTransplant['transcriptExcerpt']> = [];
+  if (Array.isArray(record.transcriptExcerpt)) {
+    for (const entry of record.transcriptExcerpt) {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+        continue;
+      }
+      const excerptRecord = entry as Record<string, unknown>;
+      const role = excerptRecord.role === 'user' || excerptRecord.role === 'assistant'
+        ? excerptRecord.role
+        : undefined;
+      const content = parseOptionalString(excerptRecord.content);
+      if (!role || !content) {
+        continue;
+      }
+      transcriptExcerptEntries.push({ role, content });
+    }
+  }
 
   const transplant: SessionContextTransplant = {
     summary: parseOptionalString(record.summary),
     checkpoint: parseOptionalString(record.checkpoint),
-    transcriptExcerpt: transcriptExcerpt && transcriptExcerpt.length > 0 ? transcriptExcerpt : undefined,
+    transcriptExcerpt: transcriptExcerptEntries.length > 0 ? transcriptExcerptEntries : undefined,
     structuredBlocks: Array.isArray(record.structuredBlocks) ? record.structuredBlocks : undefined,
     artifacts: parseSessionArtifactArray(record.artifacts),
     labels: parseStringArray(record.labels),
@@ -1289,7 +1290,9 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     return c.json({ error: 'Session not found' }, 404);
   }
 
-  const rawBody = await c.req.json<SessionBranchRequest>().catch(() => ({}));
+  const rawBody = await c.req.json<Record<string, unknown>>().catch(
+    () => ({} as Record<string, unknown>),
+  );
   const body: SessionBranchRequest = {
     mode: rawBody.mode === 'native_fork' || rawBody.mode === 'context_transplant' || rawBody.mode === 'auto'
       ? rawBody.mode
@@ -1309,7 +1312,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
       ? rawBody.permissionMode
       : undefined,
     allowedTools: Array.isArray(rawBody.allowedTools)
-      ? rawBody.allowedTools.filter((tool): tool is string => typeof tool === 'string')
+      ? rawBody.allowedTools.filter((tool: unknown): tool is string => typeof tool === 'string')
       : undefined,
     group: parseOptionalString(rawBody.group),
     instructions: parseOptionalString(rawBody.instructions),
