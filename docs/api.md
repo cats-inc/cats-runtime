@@ -198,6 +198,23 @@ Extended message example:
 }
 ```
 
+Branching example:
+
+```json
+{
+  "mode": "auto",
+  "provider": "gemini",
+  "instructions": "Child branch should focus on verification.",
+  "context": {
+    "labels": ["branch", "verification"]
+  },
+  "transplant": {
+    "summary": "Parent branch already prepared the implementation diff.",
+    "labels": ["handoff"]
+  }
+}
+```
+
 `POST /sessions/{id}/messages` supports:
 
 - `Accept: text/event-stream`
@@ -226,6 +243,45 @@ and `agent` sessions. Matching `cli` sessions still use the existing
 `POST /sessions/{id}/messages` accepts optional `instructions`, `context`, and
 `outputDir` fields. These are persisted onto the logical session so later
 history/resume flows can observe the same bootstrap metadata.
+
+`POST /sessions/{id}/fork` accepts optional branching fields:
+
+- `mode`: `auto`, `native_fork`, or `context_transplant`
+- `provider` / `instance`: child provider target override
+- `model`, `cwd`, `workspaceMode`, `permissionMode`, `allowedTools`
+- `instructions`, `context`, `outputDir`
+- `transplant`: curated handoff bundle for `context_transplant`
+
+`mode: "auto"` prefers `native_fork` when the child target is compatible with
+the parent provider/backend/instance/workspace and the underlying provider
+supports native fork semantics. Otherwise it falls back to
+`context_transplant` and returns a warning describing why the fallback was
+chosen.
+
+Session payloads may now include a machine-readable `lineage` object:
+
+```json
+{
+  "lineage": {
+    "rootSessionId": "session-root",
+    "parentSessionId": "session-parent",
+    "branchMode": "context_transplant",
+    "parentProvider": "codex",
+    "childProvider": "gemini",
+    "createdAt": "2026-03-21T17:00:00.000Z",
+    "depth": 1,
+    "chain": [
+      { "sessionId": "session-parent", "provider": "codex" },
+      { "sessionId": "session-child", "provider": "gemini" }
+    ]
+  }
+}
+```
+
+For `context_transplant`, `cats-runtime` creates a fresh child session and
+persists the handoff bundle as runtime-visible branch metadata plus child
+bootstrap instructions. The runtime does not decide product-level branch
+convergence or scheduling policy.
 
 `POST /sessions` accepts an optional `instance` field. When omitted, or when the
 caller explicitly sends `"default"`, `cats-runtime` uses the provider family's
@@ -278,6 +334,17 @@ keys that `cats-runtime` recognizes are:
 - Gemini cache TTL override: `cachedContentTtl`, `cached_content_ttl`,
   `contextCacheTtl`, or `context_cache_ttl`
 - Ollama warm-up hint: `keep_alive` or `keepAlive`
+
+The shared local tool runtime now also exposes headless workspace substrate
+operations for API/local sessions:
+
+- `audit-workspace`
+- `init-workspace`
+- `update-workspace`
+
+These operations return structured JSON plans/results, default to preview-first
+behavior, and write `*.bootstrap` review copies instead of overwriting
+conflicting workspace files directly.
 
 For agent-backed sessions, streamed output may also surface normalized metadata
 such as:

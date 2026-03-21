@@ -155,7 +155,19 @@ src/
 - Defines the shared local tool set exposed to API/local sessions
 - Enforces workspace boundaries and permission policy centrally
 - Executes file listing, file read/write, grep, and shell commands
+- Exposes policy-neutral workspace substrate operations (`audit-workspace`,
+  `init-workspace`, `update-workspace`) as shared headless/local-tool
+  primitives
 - Normalizes tool activity into stream events and transcript records
+
+### `src/core/runtime`
+
+- Hosts backend-neutral runtime primitives that are not owned by any one
+  provider backend
+- Keeps session branching helpers policy-neutral while exposing native-fork vs
+  context-transplant lineage metadata
+- Owns deterministic workspace substrate planning/apply logic independently of
+  product shells or skills
 
 ### `src/core`
 
@@ -178,7 +190,8 @@ src/
 4. CLI targets flow into `WorkerPool`; API/local targets flow into `ApiBackendManager`; agent targets flow into `AgentBackendManager`
 5. Provider model-catalog reads resolve through the shared provider target and
    model catalog services in `src/core`
-6. API/local turns may enter the shared local tool loop in `src/core/tools`
+6. API/local turns may enter the shared local tool loop in `src/core/tools`,
+   including workspace substrate preview/apply operations
 7. Agent turns use the shared `TurnInput` contract plus provider-managed session continuity where available
 8. Startup/readiness state is exposed over `GET /health`, while
    `GET /diagnostics/runtime` and `GET /diagnostics/providers` expose the
@@ -239,7 +252,10 @@ the only durable memory surface for the Cats suite.
 - New API-key or Ollama integrations should land under `src/backends/api`
 - External agent runtimes with their own run/session/event semantics should
   land under `src/backends/agent`
-- Shared filesystem and shell tools should stay in `src/core/tools`, not inside one backend
+- Shared filesystem, shell, and workspace-substrate tools should stay in
+  `src/core/tools`, not inside one backend
+- Session branching should stay an execution primitive in runtime; product
+  layers own branch policy, convergence, and delegation semantics
 - Keep `.env` focused on runtime-wide values; provider topology belongs in
   `config/providers.yaml`
 

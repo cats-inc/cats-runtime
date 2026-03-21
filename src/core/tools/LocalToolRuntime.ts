@@ -4,6 +4,7 @@ import { dirname, extname, relative, resolve } from 'node:path';
 import path from 'node:path';
 import type { PermissionMode, WorkspaceMode } from '../types.js';
 import { applyPatch as applyStructuredPatch } from './applyPatch.js';
+import { WorkspaceSubstrateService } from '../runtime/WorkspaceSubstrateService.js';
 
 // path.matchesGlob — Node 22+ built-in; @types/node@20 lacks the typedef
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -230,13 +231,89 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ['source', 'destination'],
     },
   },
+  {
+    name: 'audit-workspace',
+    description: 'Audit workspace collaboration substrate and return a JSON report.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Relative workspace path. Defaults to ".".' },
+        profile: { type: 'string', enum: ['minimal', 'standard', 'a2a-enabled'] },
+        enabled_agents: {
+          type: 'array',
+          items: { type: 'string', enum: ['claude', 'gemini', 'codex'] },
+        },
+        include_a2a: { type: 'boolean' },
+        project_type: { type: 'string', enum: ['single-project', 'monorepo'] },
+        purpose: { type: 'string' },
+        background: { type: 'string' },
+        technology_labels: { type: 'array', items: { type: 'string' } },
+        documentation_style: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'init-workspace',
+    description: 'Plan or apply workspace collaboration substrate initialization and return JSON.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Relative workspace path. Defaults to ".".' },
+        profile: { type: 'string', enum: ['minimal', 'standard', 'a2a-enabled'] },
+        enabled_agents: {
+          type: 'array',
+          items: { type: 'string', enum: ['claude', 'gemini', 'codex'] },
+        },
+        include_a2a: { type: 'boolean' },
+        project_type: { type: 'string', enum: ['single-project', 'monorepo'] },
+        purpose: { type: 'string' },
+        background: { type: 'string' },
+        technology_labels: { type: 'array', items: { type: 'string' } },
+        documentation_style: { type: 'string' },
+        apply: { type: 'boolean' },
+        actor_role: {
+          type: 'string',
+          enum: ['boss_cat', 'specialist_cat', 'system', 'owner', 'product_host', 'operator'],
+        },
+        approved: { type: 'boolean' },
+      },
+    },
+  },
+  {
+    name: 'update-workspace',
+    description: 'Plan or apply conservative workspace substrate updates and return JSON.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Relative workspace path. Defaults to ".".' },
+        profile: { type: 'string', enum: ['minimal', 'standard', 'a2a-enabled'] },
+        enabled_agents: {
+          type: 'array',
+          items: { type: 'string', enum: ['claude', 'gemini', 'codex'] },
+        },
+        include_a2a: { type: 'boolean' },
+        project_type: { type: 'string', enum: ['single-project', 'monorepo'] },
+        purpose: { type: 'string' },
+        background: { type: 'string' },
+        technology_labels: { type: 'array', items: { type: 'string' } },
+        documentation_style: { type: 'string' },
+        apply: { type: 'boolean' },
+        actor_role: {
+          type: 'string',
+          enum: ['boss_cat', 'specialist_cat', 'system', 'owner', 'product_host', 'operator'],
+        },
+        approved: { type: 'boolean' },
+      },
+    },
+  },
 ];
 
-const READ_ONLY_TOOLS = new Set(['list_files', 'read_file', 'grep', 'glob']);
+const READ_ONLY_TOOLS = new Set(['list_files', 'read_file', 'grep', 'glob', 'audit-workspace']);
 const TOOL_ORDER = new Map(TOOL_DEFINITIONS.map((tool, index) => [tool.name, index]));
 
 const STANDARD_TOOLS = new Set([
   'list_files', 'read_file', 'write_file', 'edit_file', 'apply_patch', 'grep', 'glob', 'run_shell',
+  'audit-workspace', 'init-workspace', 'update-workspace',
 ]);
 const EXTENDED_TOOLS = new Set([
   ...STANDARD_TOOLS, 'delete_file', 'rename_file', 'copy_file',
@@ -299,6 +376,22 @@ function readOptionalInteger(
     return fallback;
   }
   return Math.max(min, Math.min(max, Math.trunc(value)));
+}
+
+function readOptionalStringArray(
+  args: Record<string, unknown>,
+  key: string,
+): string[] | undefined {
+  const value = args[key];
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const strings = value
+    .filter((entry): entry is string => typeof entry === 'string')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  return strings.length > 0 ? strings : undefined;
 }
 
 function truncate(text: string, limit = MAX_TEXT_OUTPUT): string {
@@ -473,6 +566,8 @@ async function executeShell(
 }
 
 export class LocalToolRuntime {
+  private readonly substrate = new WorkspaceSubstrateService();
+
   listTools(profile?: string): ToolDefinition[] {
     const normalized = normalizeProfile(profile);
     const allowed = PROFILE_TOOLS[normalized] ?? PROFILE_TOOLS.standard;
@@ -483,8 +578,8 @@ export class LocalToolRuntime {
 
   async execute(context: ToolExecutionContext, call: ToolCall): Promise<ToolResult> {
     try {
-      this.assertToolAllowed(context, call.name);
       const args = ensureObject(call.arguments);
+      this.assertToolAllowed(context, call.name, args);
 
       switch (call.name) {
         case 'list_files':
@@ -509,6 +604,10 @@ export class LocalToolRuntime {
           return await this.renameFile(context, call.id, args);
         case 'copy_file':
           return await this.copyFileTool(context, call.id, args);
+        case 'audit-workspace':
+        case 'init-workspace':
+        case 'update-workspace':
+          return await this.workspaceSubstrateOperation(context, call.id, call.name, args);
         default:
           throw new Error(`Unknown tool '${call.name}'`);
       }
@@ -522,19 +621,34 @@ export class LocalToolRuntime {
     }
   }
 
-  private assertToolAllowed(context: ToolExecutionContext, name: string): void {
+  private isReadOnlyCompatibleTool(name: string, args: Record<string, unknown>): boolean {
+    if (READ_ONLY_TOOLS.has(name)) {
+      return true;
+    }
+
+    return (name === 'init-workspace' || name === 'update-workspace')
+      && args.apply !== true;
+  }
+
+  private assertToolAllowed(
+    context: ToolExecutionContext,
+    name: string,
+    args: Record<string, unknown>,
+  ): void {
     const toolName = normalizeToolName(name);
     const profileTools = new Set(this.listTools(context.toolProfile).map((tool) => tool.name));
     if (!profileTools.has(toolName)) {
       throw new Error(`Tool '${toolName}' is disabled by toolProfile '${context.toolProfile || 'standard'}'`);
     }
 
-    if (context.workspaceMode === 'read_only' && !READ_ONLY_TOOLS.has(toolName)) {
+    const readOnlyCompatible = this.isReadOnlyCompatibleTool(toolName, args);
+
+    if (context.workspaceMode === 'read_only' && !readOnlyCompatible) {
       throw new Error(`Tool '${toolName}' is not allowed in read_only workspace mode`);
     }
 
     const permissionMode = context.permissionMode || (context.workspaceMode === 'read_only' ? 'default' : 'skip');
-    if (permissionMode === 'default' && !READ_ONLY_TOOLS.has(toolName)) {
+    if (permissionMode === 'default' && !readOnlyCompatible) {
       throw new Error(`Tool '${toolName}' requires permissionMode=skip or whitelist`);
     }
 
@@ -865,6 +979,64 @@ export class LocalToolRuntime {
       callId,
       name: 'copy_file',
       output: `Copied ${toRelativeDisplay(context.cwd, fullSource)} → ${toRelativeDisplay(context.cwd, fullDest)}`,
+    };
+  }
+
+  private async workspaceSubstrateOperation(
+    context: ToolExecutionContext,
+    callId: string,
+    operation: 'audit-workspace' | 'init-workspace' | 'update-workspace',
+    args: Record<string, unknown>,
+  ): Promise<ToolResult> {
+    const workspacePath = resolveWorkspacePath(context.cwd, String(args.path || '.'));
+    const profile = typeof args.profile === 'string'
+      && ['minimal', 'standard', 'a2a-enabled'].includes(args.profile)
+      ? args.profile as 'minimal' | 'standard' | 'a2a-enabled'
+      : undefined;
+    const enabledAgents = readOptionalStringArray(args, 'enabled_agents')
+      ?.filter((agent): agent is 'claude' | 'gemini' | 'codex' =>
+        agent === 'claude' || agent === 'gemini' || agent === 'codex');
+    const technologyLabels = readOptionalStringArray(args, 'technology_labels');
+    const actorRole = typeof args.actor_role === 'string'
+      && [
+        'boss_cat',
+        'specialist_cat',
+        'system',
+        'owner',
+        'product_host',
+        'operator',
+      ].includes(args.actor_role)
+      ? args.actor_role as 'boss_cat' | 'specialist_cat' | 'system' | 'owner' | 'product_host' | 'operator'
+      : undefined;
+
+    const result = await this.substrate.execute({
+      operation,
+      workspacePath,
+      profile,
+      enabledAgents,
+      includeA2A: typeof args.include_a2a === 'boolean' ? args.include_a2a : undefined,
+      apply: args.apply === true,
+      hints: {
+        projectType: args.project_type === 'monorepo' || args.project_type === 'single-project'
+          ? args.project_type
+          : undefined,
+        purpose: typeof args.purpose === 'string' ? args.purpose.trim() || undefined : undefined,
+        background: typeof args.background === 'string' ? args.background.trim() || undefined : undefined,
+        technologyLabels,
+        documentationStyle: typeof args.documentation_style === 'string'
+          ? args.documentation_style.trim() || undefined
+          : undefined,
+      },
+      authorization: {
+        actorRole,
+        approved: args.approved === true,
+      },
+    });
+
+    return {
+      callId,
+      name: operation,
+      output: JSON.stringify(result, null, 2),
     };
   }
 }

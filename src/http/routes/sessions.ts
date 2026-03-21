@@ -11,8 +11,11 @@ import {
 import type { SessionsIndex } from '../../backends/cli/discovery/types.js';
 import type { PreparedFileDeletion } from '../../backends/cli/pool/SessionRegistry.js';
 import type {
+  SessionArtifact,
+  SessionBranchRequest,
   SessionInfo,
   SessionInvocationContext,
+  SessionContextTransplant,
   SessionReusePolicy,
   SessionStatus,
   WorkspaceMode,
@@ -39,7 +42,14 @@ import {
   resolveProviderTarget,
   type ProviderTargetDescriptor,
 } from '../../core/providerCatalog.js';
-import { parseInvocationContext, parseOptionalString } from '../parsing.js';
+import {
+  attachBranchMetadata,
+  buildChildLineage,
+  buildContextTransplantInstructions,
+  buildDefaultContextTransplant,
+  getSessionLineage,
+} from '../../core/runtime/sessionBranching.js';
+import { parseInvocationContext, parseOptionalString, parseStringArray } from '../parsing.js';
 
 export const sessionRoutes = new Hono();
 
@@ -52,19 +62,25 @@ const REUSE_POLICIES = new Set<SessionReusePolicy>([
 type NativeCleanupResult = boolean | 'stale_config';
 
 function serializeSession(ctx: AppContext, session: SessionInfo) {
-  return toSessionView(session, {
+  const view = toSessionView(session, {
     attached: getRuntimeSessionManager(ctx).isAttached(session.id),
     externalSessionLiveWindowMs: ctx.config.externalSessionLiveWindowMs,
   });
+  const lineage = getSessionLineage(session);
+  return lineage ? { ...view, lineage } : view;
 }
 
 function serializeSessions(
   ctx: AppContext,
   sessions: SessionInfo[],
 ) {
-  return toSessionViews(sessions, {
+  const views = toSessionViews(sessions, {
     isAttached: (session) => getRuntimeSessionManager(ctx).isAttached(session.id),
     externalSessionLiveWindowMs: ctx.config.externalSessionLiveWindowMs,
+  });
+  return views.map((view, index) => {
+    const lineage = getSessionLineage(sessions[index]);
+    return lineage ? { ...view, lineage } : view;
   });
 }
 
@@ -83,6 +99,130 @@ function parseReusePolicy(value: unknown): SessionReusePolicy | undefined {
 
   const normalized = value.trim() as SessionReusePolicy;
   return REUSE_POLICIES.has(normalized) ? normalized : undefined;
+}
+
+function parseSessionArtifactArray(value: unknown): SessionArtifact[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const artifacts = value
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+        return undefined;
+      }
+      const record = entry as Record<string, unknown>;
+      const id = parseOptionalString(record.id);
+      if (!id) {
+        return undefined;
+      }
+
+      return {
+        id,
+        kind: parseOptionalString(record.kind),
+        label: parseOptionalString(record.label),
+        path: parseOptionalString(record.path),
+        uri: parseOptionalString(record.uri),
+        mediaType: parseOptionalString(record.mediaType),
+        createdAt: parseOptionalString(record.createdAt),
+        sizeBytes: typeof record.sizeBytes === 'number' ? record.sizeBytes : undefined,
+        metadata: record.metadata && typeof record.metadata === 'object' && !Array.isArray(record.metadata)
+          ? record.metadata as Record<string, unknown>
+          : undefined,
+      } satisfies SessionArtifact;
+    })
+    .filter((artifact): artifact is SessionArtifact => Boolean(artifact));
+
+  return artifacts.length > 0 ? artifacts : undefined;
+}
+
+function parseContextTransplant(value: unknown): SessionContextTransplant | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  const transcriptExcerpt = Array.isArray(record.transcriptExcerpt)
+    ? record.transcriptExcerpt
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+          return undefined;
+        }
+        const excerptRecord = entry as Record<string, unknown>;
+        const role = excerptRecord.role === 'user' || excerptRecord.role === 'assistant'
+          ? excerptRecord.role
+          : undefined;
+        const content = parseOptionalString(excerptRecord.content);
+        if (!role || !content) {
+          return undefined;
+        }
+        return { role, content };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
+    : undefined;
+
+  const transplant: SessionContextTransplant = {
+    summary: parseOptionalString(record.summary),
+    checkpoint: parseOptionalString(record.checkpoint),
+    transcriptExcerpt: transcriptExcerpt && transcriptExcerpt.length > 0 ? transcriptExcerpt : undefined,
+    structuredBlocks: Array.isArray(record.structuredBlocks) ? record.structuredBlocks : undefined,
+    artifacts: parseSessionArtifactArray(record.artifacts),
+    labels: parseStringArray(record.labels),
+    metadata: record.metadata && typeof record.metadata === 'object' && !Array.isArray(record.metadata)
+      ? record.metadata as Record<string, unknown>
+      : undefined,
+  };
+
+  return Object.values(transplant).some((entry) => entry !== undefined)
+    ? transplant
+    : undefined;
+}
+
+function selectBranchTargetInstance(
+  session: SessionInfo,
+  requestedProviderName: string,
+  requestedInstance?: string,
+): string | undefined {
+  if (requestedInstance) {
+    return requestedInstance;
+  }
+
+  if (requestedProviderName !== session.providerName) {
+    return undefined;
+  }
+
+  if (session.providerBackend && session.providerInstanceId) {
+    return `${session.providerBackend}/${session.providerInstanceId}`;
+  }
+
+  return session.providerInstanceId;
+}
+
+function isNativeForkCompatible(
+  session: SessionInfo,
+  target: ProviderTargetDescriptor,
+  request: SessionBranchRequest,
+): { compatible: boolean; reason?: string } {
+  if (session.providerName !== target.providerName) {
+    return { compatible: false, reason: 'provider override requires context_transplant' };
+  }
+  if ((session.providerBackend || 'cli') !== target.backend) {
+    return { compatible: false, reason: 'backend override requires context_transplant' };
+  }
+  if ((session.providerInstanceId || 'default') !== target.instanceId) {
+    return { compatible: false, reason: 'instance override requires context_transplant' };
+  }
+  if (request.model !== undefined && request.model !== session.model) {
+    return { compatible: false, reason: 'model override requires context_transplant' };
+  }
+  if (request.cwd !== undefined && request.cwd !== session.cwd) {
+    return { compatible: false, reason: 'workspace cwd override requires context_transplant' };
+  }
+  if (request.workspaceMode !== undefined && request.workspaceMode !== session.workspaceMode) {
+    return { compatible: false, reason: 'workspace mode override requires context_transplant' };
+  }
+
+  return { compatible: true };
 }
 
 function findReusableSession(
@@ -1149,89 +1289,206 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     return c.json({ error: 'Session not found' }, 404);
   }
 
-  if (session.providerName === 'cursor' && session.providerBackend === 'cli') {
-    return c.json({
-      error: 'Cursor native session forking will be enabled after Cursor execution support lands.',
-    }, 501);
+  const rawBody = await c.req.json<SessionBranchRequest>().catch(() => ({}));
+  const body: SessionBranchRequest = {
+    mode: rawBody.mode === 'native_fork' || rawBody.mode === 'context_transplant' || rawBody.mode === 'auto'
+      ? rawBody.mode
+      : undefined,
+    provider: parseOptionalString(rawBody.provider),
+    instance: parseOptionalString(rawBody.instance),
+    model: parseOptionalString(rawBody.model),
+    cwd: parseOptionalString(rawBody.cwd),
+    workspaceMode: rawBody.workspaceMode === 'isolated'
+      || rawBody.workspaceMode === 'shared'
+      || rawBody.workspaceMode === 'read_only'
+      ? rawBody.workspaceMode
+      : undefined,
+    permissionMode: rawBody.permissionMode === 'skip'
+      || rawBody.permissionMode === 'whitelist'
+      || rawBody.permissionMode === 'default'
+      ? rawBody.permissionMode
+      : undefined,
+    allowedTools: Array.isArray(rawBody.allowedTools)
+      ? rawBody.allowedTools.filter((tool): tool is string => typeof tool === 'string')
+      : undefined,
+    group: parseOptionalString(rawBody.group),
+    instructions: parseOptionalString(rawBody.instructions),
+    context: parseInvocationContext(rawBody.context),
+    outputDir: parseOptionalString(rawBody.outputDir),
+    transplant: parseContextTransplant(rawBody.transplant),
+  };
+
+  const requestedProviderName = body.provider ?? session.providerName;
+  let childTarget: ProviderTargetDescriptor;
+  try {
+    childTarget = resolveRequestedProviderTarget(
+      ctx,
+      requestedProviderName,
+      selectBranchTargetInstance(session, requestedProviderName, body.instance),
+    );
+  } catch (err) {
+    return c.json({ error: `${err}` }, 400);
   }
 
-  if (session.providerBackend === 'cli' && !session.providerSessionId) {
-    return c.json({ error: 'No provider session ID to fork from' }, 400);
-  }
-
-  const caps = runtime.getCapabilities(
+  const parentCaps = runtime.getCapabilities(
     session.providerName,
     session.providerInstanceId,
     session.providerBackend,
   );
-  if (!caps.fork) {
-    return c.json({ error: `Provider '${session.providerName}' does not support fork` }, 501);
-  }
+  const childCaps = runtime.getCapabilities(
+    childTarget.providerName,
+    childTarget.instanceId,
+    childTarget.backend,
+  );
 
-  const body = await c.req.json<{
-    group?: string;
-    permissionMode?: 'skip' | 'whitelist' | 'default';
-    allowedTools?: string[];
-  }>().catch(() => ({}));
+  const requestedMode = body.mode ?? 'auto';
+  const compatibility = isNativeForkCompatible(session, childTarget, body);
+  const nativeBlockedReason = session.providerName === 'cursor' && session.providerBackend === 'cli'
+    ? 'Cursor native session forking will be enabled after Cursor execution support lands.'
+    : session.providerBackend === 'cli' && !session.providerSessionId
+      ? 'No provider session ID to fork from'
+      : !parentCaps.fork
+        ? `Provider '${session.providerName}' does not support native fork`
+        : !compatibility.compatible
+          ? compatibility.reason
+          : undefined;
+
+  let branchMode: 'native_fork' | 'context_transplant';
+  const warnings: string[] = [];
+  if (requestedMode === 'native_fork') {
+    if (nativeBlockedReason) {
+      const status = nativeBlockedReason.startsWith('Provider ') || nativeBlockedReason.startsWith('Cursor ')
+        ? 501
+        : nativeBlockedReason === 'No provider session ID to fork from'
+          ? 400
+          : 409;
+      return c.json({ error: nativeBlockedReason }, status);
+    }
+    branchMode = 'native_fork';
+  } else if (requestedMode === 'context_transplant') {
+    branchMode = 'context_transplant';
+  } else if (!nativeBlockedReason) {
+    branchMode = 'native_fork';
+  } else {
+    branchMode = 'context_transplant';
+    warnings.push(`Falling back to context_transplant: ${nativeBlockedReason}.`);
+  }
 
   const forkId = randomUUID();
   let forkCwd = session.cwd;
-  let forkWorkspaceMode = session.workspaceMode;
-  let forkPermissionMode = (body as { permissionMode?: 'skip' | 'whitelist' | 'default' })
-    .permissionMode ?? 'skip';
+  let forkWorkspaceMode = body.workspaceMode ?? session.workspaceMode;
+  let forkPermissionMode = body.permissionMode ?? session.permissionMode ?? 'skip';
+  let usedContextTransplant: SessionContextTransplant | undefined;
 
-  // If parent was isolated, create new sandbox and copy parent's files
-  if (session.workspaceMode === 'isolated') {
-    const resolved = resolveWorkspace({
-      sessionId: forkId,
-      sessionBaseDir: ctx.config.sessionBaseDir,
-      workspaceMode: 'isolated',
-    });
+  if (branchMode === 'native_fork') {
+    if (session.workspaceMode === 'isolated') {
+      const resolved = resolveWorkspace({
+        sessionId: forkId,
+        sessionBaseDir: ctx.config.sessionBaseDir,
+        workspaceMode: 'isolated',
+      });
       copyIsolatedWorkspace(ctx.config.sessionBaseDir, id, forkId);
       forkCwd = resolved.cwd;
       forkWorkspaceMode = resolved.workspaceMode;
       forkPermissionMode = resolved.permissionMode;
-  } else if (session.workspaceMode === 'read_only') {
-    forkPermissionMode = 'default';
+    } else if (session.workspaceMode === 'read_only') {
+      forkPermissionMode = 'default';
+    }
+  } else {
+    const resolved = resolveWorkspace({
+      sessionId: forkId,
+      sessionBaseDir: ctx.config.sessionBaseDir,
+      cwd: body.cwd ?? (forkWorkspaceMode === 'isolated' ? undefined : session.cwd),
+      workspaceMode: forkWorkspaceMode,
+      permissionMode: forkPermissionMode,
+    });
+    forkCwd = resolved.cwd;
+    forkWorkspaceMode = resolved.workspaceMode;
+    forkPermissionMode = resolved.permissionMode;
+
+    if (session.workspaceMode === 'isolated' && forkWorkspaceMode === 'isolated') {
+      copyIsolatedWorkspace(ctx.config.sessionBaseDir, id, forkId);
+    }
   }
+
+  if (!childCaps.permissions && forkWorkspaceMode === 'read_only') {
+    return c.json({
+      error: `Provider '${requestedProviderName}' does not support permission enforcement required by read_only workspace`,
+    }, 400);
+  }
+  if (!childCaps.permissions && body.permissionMode && body.permissionMode !== 'skip') {
+    warnings.push(
+      `Provider '${requestedProviderName}' runs without permission enforcement; `
+      + `permissionMode '${body.permissionMode}' is ignored.`,
+    );
+  }
+
+  const childLineage = buildChildLineage({
+    childSessionId: forkId,
+    childProvider: requestedProviderName,
+    parentSession: session,
+    branchMode,
+  });
+  if (branchMode === 'context_transplant') {
+    usedContextTransplant = buildDefaultContextTransplant(session, body.transplant);
+  }
+
+  const childInstructions = branchMode === 'context_transplant'
+    ? buildContextTransplantInstructions(
+      body.instructions ?? session.instructions,
+      usedContextTransplant!,
+    )
+    : body.instructions ?? session.instructions;
+  const childContext = attachBranchMetadata(
+    session.context,
+    body.context,
+    childLineage,
+    usedContextTransplant,
+  );
 
   const forked = ctx.registry.create({
     id: forkId,
-    providerName: session.providerName,
-    providerBackend: session.providerBackend,
-    providerInstanceId: session.providerInstanceId,
+    providerName: requestedProviderName,
+    providerBackend: childTarget.backend,
+    providerInstanceId: childTarget.instanceId,
     cwd: forkCwd,
     workspaceMode: forkWorkspaceMode,
     permissionMode: forkPermissionMode,
-    allowedTools: (body as { allowedTools?: string[] }).allowedTools ?? session.allowedTools,
-    model: session.model,
-    group: (body as { group?: string }).group ?? session.group,
+    allowedTools: body.allowedTools ?? session.allowedTools,
+    model: body.model ?? session.model,
+    group: body.group ?? session.group,
     sessionKey: randomUUID(),
     reusePolicy: 'create_new',
-    instructions: session.instructions,
-    context: session.context,
-    outputDir: session.outputDir,
-    artifacts: session.artifacts,
+    instructions: childInstructions,
+    context: childContext,
+    outputDir: body.outputDir ?? session.outputDir,
+    artifacts: usedContextTransplant?.artifacts ?? session.artifacts,
   });
-  if (session.providerSessionId) {
+  if (branchMode === 'native_fork' && session.providerSessionId) {
     ctx.registry.setProviderSessionId(forked.id, session.providerSessionId);
   }
-  if (session.providerState) {
+  if (branchMode === 'native_fork' && session.providerState) {
     ctx.registry.setProviderState(forked.id, session.providerState);
   }
-  cloneManagedHistoryIfPresent(ctx, session, forked);
+  if (branchMode === 'native_fork') {
+    cloneManagedHistoryIfPresent(ctx, session, forked);
+  }
 
   try {
-    runtime.spawn(forked.id, session.providerName, {
+    runtime.spawn(forked.id, requestedProviderName, {
       cwd: forkCwd,
       workspaceMode: forkWorkspaceMode,
-      model: session.model,
-      resumeSessionId: session.providerSessionId,
-      forkSession: true,
+      model: body.model ?? session.model,
+      ...(branchMode === 'native_fork'
+        ? {
+            resumeSessionId: session.providerSessionId,
+            forkSession: true,
+          }
+        : {}),
       permissionMode: forkPermissionMode,
-      allowedTools: (body as { allowedTools?: string[] }).allowedTools ?? session.allowedTools,
-    }, session.providerInstanceId, session.providerBackend);
-    if (session.providerBackend !== 'cli') {
+      allowedTools: body.allowedTools ?? session.allowedTools,
+    }, childTarget.instanceId, childTarget.backend);
+    if (childTarget.backend !== 'cli') {
       ctx.registry.updateStatus(forked.id, 'ready');
     }
   } catch (err) {
@@ -1242,5 +1499,8 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     return c.json({ error: `Failed to fork: ${err}` }, 500);
   }
 
-  return c.json(serializeSession(ctx, forked), 201);
+  return c.json({
+    ...serializeSession(ctx, forked),
+    ...(warnings.length > 0 ? { warnings } : {}),
+  }, 201);
 });

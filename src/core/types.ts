@@ -16,6 +16,157 @@ export type ProviderBackend = 'cli' | 'api' | 'local' | 'agent';
 export type SessionReusePolicy = 'create_new' | 'prefer_existing' | 'require_existing';
 
 export type WorkspaceMode = 'isolated' | 'shared' | 'read_only';
+export type WorkspaceSubstrateOperation =
+  | 'init-workspace'
+  | 'audit-workspace'
+  | 'update-workspace';
+export type WorkspaceSubstrateProfileId = 'minimal' | 'standard' | 'a2a-enabled';
+export type WorkspaceSubstrateAuditStatus =
+  | 'missing'
+  | 'partial'
+  | 'present'
+  | 'drifted'
+  | 'conflicting';
+export type WorkspaceSubstrateFindingStatus =
+  | 'missing'
+  | 'present'
+  | 'drifted'
+  | 'conflicting';
+export type WorkspaceSubstrateActionType =
+  | 'create'
+  | 'update'
+  | 'skip'
+  | 'warn'
+  | 'write_sidecar';
+export type WorkspaceSubstrateActorRole =
+  | 'boss_cat'
+  | 'specialist_cat'
+  | 'system'
+  | 'owner'
+  | 'product_host'
+  | 'operator';
+export type SessionBranchMode = 'native_fork' | 'context_transplant';
+export type SessionBranchPreference = 'auto' | SessionBranchMode;
+
+export interface WorkspaceSubstrateHints {
+  projectType?: 'single-project' | 'monorepo';
+  purpose?: string;
+  background?: string;
+  technologyLabels?: string[];
+  documentationStyle?: string;
+}
+
+export interface WorkspaceSubstrateAuthorizationInput {
+  actorRole?: WorkspaceSubstrateActorRole;
+  approved?: boolean;
+}
+
+export interface WorkspaceSubstrateAuthorization {
+  actorRole?: WorkspaceSubstrateActorRole;
+  approved: boolean;
+  canApply: boolean;
+  requiresApproval: boolean;
+  reason: string;
+}
+
+export interface WorkspaceSubstrateRequest {
+  operation: WorkspaceSubstrateOperation;
+  workspacePath: string;
+  profile?: WorkspaceSubstrateProfileId;
+  enabledAgents?: Array<'claude' | 'gemini' | 'codex'>;
+  includeA2A?: boolean;
+  apply?: boolean;
+  hints?: WorkspaceSubstrateHints;
+  authorization?: WorkspaceSubstrateAuthorizationInput;
+}
+
+export interface WorkspaceSubstrateFinding {
+  path: string;
+  status: WorkspaceSubstrateFindingStatus;
+  reason: string;
+  managed?: boolean;
+  actualHash?: string;
+  desiredHash?: string;
+  reviewCopyPath?: string;
+}
+
+export interface WorkspaceSubstrateAction {
+  type: WorkspaceSubstrateActionType;
+  path: string;
+  reason: string;
+  preview?: string;
+  diff?: string;
+  reviewCopyPath?: string;
+  requiresApproval?: boolean;
+}
+
+export interface WorkspaceSubstrateSummary {
+  expectedFileCount: number;
+  changedPaths: string[];
+  findingCounts: Record<WorkspaceSubstrateFindingStatus, number>;
+  actionCounts: Record<WorkspaceSubstrateActionType, number>;
+}
+
+export interface WorkspaceSubstrateResult {
+  operation: WorkspaceSubstrateOperation;
+  workspacePath: string;
+  profile: WorkspaceSubstrateProfileId;
+  enabledAgents: Array<'claude' | 'gemini' | 'codex'>;
+  includeA2A: boolean;
+  status: WorkspaceSubstrateAuditStatus;
+  authorization: WorkspaceSubstrateAuthorization;
+  findings: WorkspaceSubstrateFinding[];
+  actions: WorkspaceSubstrateAction[];
+  applied: boolean;
+  summary: WorkspaceSubstrateSummary;
+}
+
+export interface SessionContextTransplantMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface SessionContextTransplant {
+  summary?: string;
+  checkpoint?: string;
+  transcriptExcerpt?: SessionContextTransplantMessage[];
+  structuredBlocks?: unknown[];
+  artifacts?: SessionArtifact[];
+  labels?: string[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface SessionLineageNode {
+  sessionId: string;
+  provider: string;
+}
+
+export interface SessionBranchLineage {
+  rootSessionId: string;
+  parentSessionId: string;
+  branchMode: SessionBranchMode;
+  parentProvider: string;
+  childProvider: string;
+  createdAt: string;
+  depth: number;
+  chain: SessionLineageNode[];
+}
+
+export interface SessionBranchRequest {
+  mode?: SessionBranchPreference;
+  provider?: string;
+  instance?: string;
+  model?: string;
+  cwd?: string;
+  workspaceMode?: WorkspaceMode;
+  permissionMode?: PermissionMode;
+  allowedTools?: string[];
+  group?: string;
+  instructions?: string;
+  context?: SessionInvocationContext;
+  outputDir?: string;
+  transplant?: SessionContextTransplant;
+}
 
 export interface GeminiCachedContentState {
   name: string;

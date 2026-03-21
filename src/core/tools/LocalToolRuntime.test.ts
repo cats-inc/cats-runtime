@@ -755,28 +755,30 @@ describe('LocalToolRuntime', () => {
   });
 
   describe('profiles', () => {
-    it('standard profile lists 8 tools', () => {
+    it('standard profile lists 11 tools', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('standard');
       expect(tools.map((t) => t.name)).toEqual([
         'list_files', 'read_file', 'write_file', 'edit_file', 'apply_patch', 'grep', 'glob', 'run_shell',
+        'audit-workspace', 'init-workspace', 'update-workspace',
       ]);
     });
 
-    it('extended profile lists 11 tools', () => {
+    it('extended profile lists 14 tools', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('extended');
       expect(tools.map((t) => t.name)).toEqual([
         'list_files', 'read_file', 'write_file', 'edit_file', 'apply_patch', 'grep', 'glob', 'run_shell',
         'delete_file', 'rename_file', 'copy_file',
+        'audit-workspace', 'init-workspace', 'update-workspace',
       ]);
     });
 
-    it('read_only profile lists 4 tools', () => {
+    it('read_only profile lists 5 tools', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('read_only');
       expect(tools.map((t) => t.name)).toEqual([
-        'list_files', 'read_file', 'grep', 'glob',
+        'list_files', 'read_file', 'grep', 'glob', 'audit-workspace',
       ]);
     });
 
@@ -789,16 +791,107 @@ describe('LocalToolRuntime', () => {
     it('unknown profile falls back to standard', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('unknown_profile');
-      expect(tools.length).toBe(8);
+      expect(tools.length).toBe(11);
       expect(tools.map((t) => t.name)).toContain('apply_patch');
       expect(tools.map((t) => t.name)).toContain('edit_file');
       expect(tools.map((t) => t.name)).toContain('glob');
+      expect(tools.map((t) => t.name)).toContain('audit-workspace');
     });
 
     it('default profile (undefined) is standard', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools();
-      expect(tools.length).toBe(8);
+      expect(tools.length).toBe(11);
+    });
+  });
+
+  describe('workspace substrate tools', () => {
+    it('audits missing workspace substrate in preview mode', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const result = await runtime.execute(sharedCtx(cwd), {
+          id: 'substrate-1',
+          name: 'audit-workspace',
+          arguments: {
+            profile: 'standard',
+            enabled_agents: ['codex'],
+          },
+        });
+        expect(result.isError).toBeUndefined();
+
+        const payload = JSON.parse(result.output) as {
+          status: string;
+          applied: boolean;
+          actions: Array<{ type: string; path: string }>;
+        };
+        expect(payload.status).toBe('missing');
+        expect(payload.applied).toBe(false);
+        expect(payload.actions).toEqual(expect.arrayContaining([
+          expect.objectContaining({ type: 'create', path: 'AGENTS.md' }),
+          expect.objectContaining({ type: 'create', path: 'CODEX.md' }),
+        ]));
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('writes review copies for conflicting files on apply', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+      writeFileSync(join(cwd, 'AGENTS.md'), '# local custom rules\n');
+
+      try {
+        const result = await runtime.execute(sharedCtx(cwd), {
+          id: 'substrate-2',
+          name: 'update-workspace',
+          arguments: {
+            profile: 'standard',
+            enabled_agents: ['codex'],
+            apply: true,
+            actor_role: 'boss_cat',
+          },
+        });
+        expect(result.isError).toBeUndefined();
+
+        const payload = JSON.parse(result.output) as {
+          applied: boolean;
+          status: string;
+          summary: { changedPaths: string[] };
+        };
+        expect(payload.applied).toBe(true);
+        expect(payload.status).toBe('conflicting');
+        expect(payload.summary.changedPaths).toContain('AGENTS.md.bootstrap');
+        expect(readFileSync(join(cwd, 'AGENTS.md'), 'utf-8')).toBe('# local custom rules\n');
+        expect(readFileSync(join(cwd, 'AGENTS.md.bootstrap'), 'utf-8'))
+          .toContain('cats-runtime:workspace-substrate');
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('allows preview-only init under permissionMode=default', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const result = await runtime.execute(sharedCtx(cwd, { permissionMode: 'default' }), {
+          id: 'substrate-3',
+          name: 'init-workspace',
+          arguments: {
+            profile: 'minimal',
+            apply: false,
+          },
+        });
+        expect(result.isError).toBeUndefined();
+        expect(JSON.parse(result.output)).toMatchObject({
+          operation: 'init-workspace',
+          applied: false,
+        });
+      } finally {
+        cleanup();
+      }
     });
   });
 });
