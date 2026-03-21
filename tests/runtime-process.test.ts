@@ -6,27 +6,36 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { RUNTIME_VERSION } from '../src/startup.js';
+import {
+  RUNTIME_STARTUP_CONTRACT_VERSION,
+  RUNTIME_VERSION,
+} from '../src/startup.js';
 
 interface RuntimeLifecycleEvent {
-  event: 'runtime.ready' | 'runtime.startup_error';
+  event: 'runtime.ready' | 'runtime.startup_error' | 'runtime.stopping' | 'runtime.stopped';
   service: 'cats-runtime';
+  contractVersion: number;
   version: string;
   pid: number;
   mode: 'standalone' | 'app-managed';
   managedBy?: string;
   startedAt: string;
-  readySignal?: 'http';
-  ready?: boolean;
+  timestamp: string;
+  phase: 'starting' | 'ready' | 'stopping' | 'stopped';
+  readySignal: 'http';
+  readinessPath: '/health';
+  ready: boolean;
   host?: string;
   port?: number;
   healthUrl?: string;
+  reason?: 'sigint' | 'sigterm' | 'stdin_closed';
   error?: string;
 }
 
 const testsDir = dirname(fileURLToPath(import.meta.url));
 const runtimeRoot = resolve(testsDir, '..');
 const runtimeEntry = join(runtimeRoot, 'dist', 'index.js');
+
 function createRuntimeProcessEnv(port: number) {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-process-'));
   const env: NodeJS.ProcessEnv = {
@@ -154,10 +163,7 @@ async function waitForLifecycleEvent(
       rejectEvent(new Error(message));
     };
 
-    const inspectLines = (
-      buffer: string,
-      source: 'stdout' | 'stderr',
-    ): string => {
+    const inspectLines = (buffer: string, source: 'stdout' | 'stderr'): string => {
       const lines = buffer.split(/\r?\n/);
       const nextBuffer = lines.pop() ?? '';
       for (const line of lines) {
@@ -170,7 +176,7 @@ async function waitForLifecycleEvent(
           resolveEvent(payload);
           return nextBuffer;
         }
-        if (payload.event === 'runtime.startup_error') {
+        if (expectedEvent !== 'runtime.startup_error' && payload.event === 'runtime.startup_error') {
           fail(
             `Runtime emitted startup_error on ${source}: ${payload.error ?? 'unknown error'}`,
           );
@@ -210,6 +216,73 @@ async function waitForLifecycleEvent(
   });
 }
 
+async function collectLifecycleEventsUntilExit(
+  child: ChildProcessWithoutNullStreams,
+  triggerShutdown: () => void,
+  timeoutMs = 15000,
+): Promise<{
+  code: number | null;
+  signal: NodeJS.Signals | null;
+  events: RuntimeLifecycleEvent[];
+}> {
+  return new Promise((resolveExit, rejectExit) => {
+    let stdoutBuffer = '';
+    let stderrBuffer = '';
+    const events: RuntimeLifecycleEvent[] = [];
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      child.stdout.off('data', onStdout);
+      child.stderr.off('data', onStderr);
+      child.off('exit', onExit);
+    };
+
+    const fail = (message: string) => {
+      cleanup();
+      rejectExit(new Error(message));
+    };
+
+    const inspectLines = (buffer: string): string => {
+      const lines = buffer.split(/\r?\n/);
+      const nextBuffer = lines.pop() ?? '';
+      for (const line of lines) {
+        const payload = tryParseLifecycleEvent(line.trim());
+        if (payload) {
+          events.push(payload);
+        }
+      }
+      return nextBuffer;
+    };
+
+    const onStdout = (chunk: Buffer) => {
+      stdoutBuffer += chunk.toString('utf8');
+      stdoutBuffer = inspectLines(stdoutBuffer);
+    };
+
+    const onStderr = (chunk: Buffer) => {
+      stderrBuffer += chunk.toString('utf8');
+      stderrBuffer = inspectLines(stderrBuffer);
+    };
+
+    const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
+      cleanup();
+      resolveExit({ code, signal, events });
+    };
+
+    const timer = setTimeout(() => {
+      fail(
+        `Timed out waiting for runtime exit. stdout=${JSON.stringify(stdoutBuffer)} `
+        + `stderr=${JSON.stringify(stderrBuffer)}`,
+      );
+    }, timeoutMs);
+
+    child.stdout.on('data', onStdout);
+    child.stderr.on('data', onStderr);
+    child.on('exit', onExit);
+    triggerShutdown();
+  });
+}
+
 async function stopRuntime(child: ChildProcessWithoutNullStreams): Promise<number | null> {
   if (child.exitCode !== null) {
     return child.exitCode;
@@ -241,9 +314,12 @@ describe('runtime process startup contract', () => {
       expect(ready).toMatchObject({
         event: 'runtime.ready',
         service: 'cats-runtime',
+        contractVersion: RUNTIME_STARTUP_CONTRACT_VERSION,
         mode: 'app-managed',
         managedBy: 'cats-inc',
+        phase: 'ready',
         readySignal: 'http',
+        readinessPath: '/health',
         ready: true,
         host: '127.0.0.1',
         port,
@@ -257,9 +333,28 @@ describe('runtime process startup contract', () => {
         status: 'ok',
         version: RUNTIME_VERSION,
         timestamp: expect.any(String),
+        contract: {
+          startup: RUNTIME_STARTUP_CONTRACT_VERSION,
+          readinessPath: '/health',
+          lifecycleEvents: [
+            'runtime.ready',
+            'runtime.startup_error',
+            'runtime.stopping',
+            'runtime.stopped',
+          ],
+        },
+        readiness: {
+          endpoint: '/health',
+          authoritative: true,
+          readySignal: 'http',
+          phase: 'ready',
+          ready: true,
+        },
         startup: {
+          contractVersion: RUNTIME_STARTUP_CONTRACT_VERSION,
           mode: 'app-managed',
           managedBy: 'cats-inc',
+          phase: 'ready',
           readySignal: 'http',
           ready: true,
           pid: ready.pid,
@@ -269,6 +364,8 @@ describe('runtime process startup contract', () => {
             port,
             healthUrl: `http://127.0.0.1:${port}/health`,
           },
+          shutdownReason: undefined,
+          lastEvent: 'runtime.ready',
         },
       });
     } finally {
@@ -277,17 +374,35 @@ describe('runtime process startup contract', () => {
     }
   }, 20000);
 
-  it('exits cleanly when the host closes the child stdin stream', async () => {
+  it('emits shutdown lifecycle events when the host closes child stdin', async () => {
     const port = await reservePort();
     const { env, cleanup } = createRuntimeProcessEnv(port);
     const child = spawnRuntime(port, env);
 
     try {
       const ready = await waitForLifecycleEvent(child, 'runtime.ready');
-      expect(ready.healthUrl).toBe(`http://127.0.0.1:${port}/health`);
+      const shutdown = await collectLifecycleEventsUntilExit(child, () => {
+        child.stdin.end();
+      });
 
-      const exitCode = await stopRuntime(child);
-      expect(exitCode).toBe(0);
+      expect(shutdown.code).toBe(0);
+      expect(shutdown.signal).toBeNull();
+      expect(shutdown.events).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          event: 'runtime.stopping',
+          reason: 'stdin_closed',
+          phase: 'stopping',
+          ready: false,
+          contractVersion: RUNTIME_STARTUP_CONTRACT_VERSION,
+        }),
+        expect.objectContaining({
+          event: 'runtime.stopped',
+          reason: 'stdin_closed',
+          phase: 'stopped',
+          ready: false,
+          contractVersion: RUNTIME_STARTUP_CONTRACT_VERSION,
+        }),
+      ]));
       await expect(fetch(ready.healthUrl!)).rejects.toThrow();
     } finally {
       if (child.exitCode === null) {
@@ -296,4 +411,45 @@ describe('runtime process startup contract', () => {
       cleanup();
     }
   }, 20000);
+
+  const signalHandlingIt = process.platform === 'win32' ? it.skip : it;
+
+  signalHandlingIt('emits shutdown lifecycle events when terminated by a signal', async () => {
+    const port = await reservePort();
+    const { env, cleanup } = createRuntimeProcessEnv(port);
+    const child = spawnRuntime(port, env);
+    const signal: NodeJS.Signals = 'SIGTERM';
+    const reason = 'sigterm';
+
+    try {
+      const ready = await waitForLifecycleEvent(child, 'runtime.ready');
+      const shutdown = await collectLifecycleEventsUntilExit(child, () => {
+        child.kill(signal);
+      });
+
+      expect(shutdown.code).toBe(0);
+      expect(shutdown.signal).toBeNull();
+      expect(shutdown.events).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          event: 'runtime.stopping',
+          reason,
+          phase: 'stopping',
+          ready: false,
+        }),
+        expect.objectContaining({
+          event: 'runtime.stopped',
+          reason,
+          phase: 'stopped',
+          ready: false,
+        }),
+      ]));
+      await expect(fetch(ready.healthUrl!)).rejects.toThrow();
+    } finally {
+      if (child.exitCode === null) {
+        await stopRuntime(child);
+      }
+      cleanup();
+    }
+  }, 20000);
+
 });

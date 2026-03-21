@@ -45,6 +45,9 @@ import type { ApiBackendOptions } from './backends/api/types.js';
 import type { AgentBackendOptions } from './backends/agent/types.js';
 import {
   createRuntimeStartupState,
+  markRuntimeReady,
+  markRuntimeStopped,
+  markRuntimeStopping,
   type RuntimeStartupState,
 } from './startup.js';
 import {
@@ -198,6 +201,39 @@ function createAuggieSessionService(
     ? resolveFileBackedProviderPath(config, 'auggie', instanceId)
     : getConfiguredFileBackedProviderPath(config, 'auggie', instanceId);
   return new AuggieSessionService(sessionsDir);
+}
+
+function listenServer(
+  server: Server,
+  host: string,
+  port: number,
+): Promise<void> {
+  return new Promise((resolveListen, rejectListen) => {
+    const cleanup = () => {
+      server.off('listening', onListening);
+      server.off('error', onError);
+    };
+
+    const onListening = () => {
+      cleanup();
+      resolveListen();
+    };
+
+    const onError = (error: Error) => {
+      cleanup();
+      rejectListen(error);
+    };
+
+    server.once('listening', onListening);
+    server.once('error', onError);
+
+    if (host) {
+      server.listen(port, host);
+      return;
+    }
+
+    server.listen(port);
+  });
 }
 
 export function createDiscoveryController(
@@ -757,67 +793,89 @@ export function createRuntimeServer(
   const app = createRuntimeApp(context);
   const server = createAdaptorServer({ fetch: app.fetch }) as Server;
   const discovery = createDiscoveryController(context, options);
+  let startPromise: Promise<{ host: string; port: number }> | null = null;
+  let closePromise: Promise<void> | null = null;
 
   return {
     server,
     app,
     context,
     async start() {
-      discovery.start();
+      if (startPromise) {
+        return startPromise;
+      }
+      if (closePromise) {
+        await closePromise;
+        throw new Error('cats-runtime is already closing or closed');
+      }
 
-      if (!server.listening) {
-        if (config.host) {
-          server.listen(config.port, config.host);
-        } else {
-          server.listen(config.port);
+      startPromise = (async () => {
+        discovery.start();
+
+        try {
+          if (!server.listening) {
+            await listenServer(server, config.host, config.port);
+          }
+
+          const address = server.address();
+          if (!address || typeof address === 'string') {
+            const fallback = { host: config.host || '0.0.0.0', port: config.port };
+            markRuntimeReady(startup, {
+              ...fallback,
+              healthUrl: `http://${fallback.host}:${fallback.port}/health`,
+            });
+            return fallback;
+          }
+
+          markRuntimeReady(startup, {
+            host: address.address,
+            port: address.port,
+            healthUrl: `http://${address.address}:${address.port}/health`,
+          });
+
+          return { host: address.address, port: address.port };
+        } catch (error) {
+          discovery.stop();
+          throw error;
         }
-        await once(server, 'listening');
-      }
+      })();
 
-      const address = server.address();
-      if (!address || typeof address === 'string') {
-        const fallback = { host: config.host || '0.0.0.0', port: config.port };
-        startup.ready = true;
-        startup.address = {
-          ...fallback,
-          healthUrl: `http://${fallback.host}:${fallback.port}/health`,
-        };
-        return fallback;
-      }
-
-      startup.ready = true;
-      startup.address = {
-        host: address.address,
-        port: address.port,
-        healthUrl: `http://${address.address}:${address.port}/health`,
-      };
-
-      return { host: address.address, port: address.port };
+      return startPromise;
     },
     async close() {
-      startup.ready = false;
-      discovery.stop();
-      agentBackend.killAll();
-      apiBackend.killAll();
-      pool.killAll();
-      registry.flush();
-      for (const service of new Set(opencodeNativeByInstance.values())) {
-        await service.close();
+      if (closePromise) {
+        return closePromise;
       }
 
-      if (!server.listening) {
-        return;
-      }
+      closePromise = (async () => {
+        markRuntimeStopping(startup, startup.shutdownReason);
+        discovery.stop();
+        agentBackend.killAll();
+        apiBackend.killAll();
+        pool.killAll();
+        registry.flush();
+        for (const service of new Set(opencodeNativeByInstance.values())) {
+          await service.close();
+        }
 
-      if (typeof server.closeIdleConnections === 'function') {
-        server.closeIdleConnections();
-      }
-      if (typeof server.closeAllConnections === 'function') {
-        server.closeAllConnections();
-      }
+        if (!server.listening) {
+          markRuntimeStopped(startup, startup.shutdownReason);
+          return;
+        }
 
-      server.close();
-      await once(server, 'close');
+        if (typeof server.closeIdleConnections === 'function') {
+          server.closeIdleConnections();
+        }
+        if (typeof server.closeAllConnections === 'function') {
+          server.closeAllConnections();
+        }
+
+        server.close();
+        await once(server, 'close');
+        markRuntimeStopped(startup, startup.shutdownReason);
+      })();
+
+      return closePromise;
     },
   };
 }

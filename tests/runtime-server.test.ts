@@ -1,11 +1,17 @@
+import { once } from 'node:events';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import { loadConfig } from '../src/core/config.js';
 import { createDiscoveryController, createRuntimeServer } from '../src/server.js';
-import { RUNTIME_VERSION, createRuntimeStartupState } from '../src/startup.js';
+import {
+  RUNTIME_STARTUP_CONTRACT_VERSION,
+  RUNTIME_VERSION,
+  createRuntimeStartupState,
+} from '../src/startup.js';
 
 function alignDefaultProviderRuntime(
   config: ReturnType<typeof loadConfig>,
@@ -162,14 +168,35 @@ describe('runtime server', () => {
         status: 'ok',
         version: RUNTIME_VERSION,
         timestamp: expect.any(String),
+        contract: {
+          startup: RUNTIME_STARTUP_CONTRACT_VERSION,
+          readinessPath: '/health',
+          lifecycleEvents: [
+            'runtime.ready',
+            'runtime.startup_error',
+            'runtime.stopping',
+            'runtime.stopped',
+          ],
+        },
+        readiness: {
+          endpoint: '/health',
+          authoritative: true,
+          readySignal: 'http',
+          phase: 'starting',
+          ready: false,
+        },
         startup: {
+          contractVersion: RUNTIME_STARTUP_CONTRACT_VERSION,
           mode: 'standalone',
           managedBy: undefined,
+          phase: 'starting',
           readySignal: 'http',
           ready: false,
           pid: expect.any(Number),
           startedAt: expect.any(String),
           address: undefined,
+          shutdownReason: undefined,
+          lastEvent: undefined,
         },
       });
     });
@@ -194,9 +221,28 @@ describe('runtime server', () => {
         status: 'ok',
         version: RUNTIME_VERSION,
         timestamp: expect.any(String),
+        contract: {
+          startup: RUNTIME_STARTUP_CONTRACT_VERSION,
+          readinessPath: '/health',
+          lifecycleEvents: [
+            'runtime.ready',
+            'runtime.startup_error',
+            'runtime.stopping',
+            'runtime.stopped',
+          ],
+        },
+        readiness: {
+          endpoint: '/health',
+          authoritative: true,
+          readySignal: 'http',
+          phase: 'ready',
+          ready: true,
+        },
         startup: {
+          contractVersion: RUNTIME_STARTUP_CONTRACT_VERSION,
           mode: 'app-managed',
           managedBy: 'cats-inc',
+          phase: 'ready',
           readySignal: 'http',
           ready: true,
           pid: expect.any(Number),
@@ -206,10 +252,242 @@ describe('runtime server', () => {
             port: address.port,
             healthUrl: `http://${address.host}:${address.port}/health`,
           },
+          shutdownReason: undefined,
+          lastEvent: undefined,
         },
       });
     } finally {
       await runtime.close();
+      cleanup();
+    }
+  });
+
+  it('GET /diagnostics/runtime exposes the frozen startup contract', async () => {
+    await withRuntime({}, {}, async (runtime) => {
+      const response = await runtime.app.request('/diagnostics/runtime');
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        service: 'cats-runtime',
+        version: RUNTIME_VERSION,
+        timestamp: expect.any(String),
+        contract: {
+          startup: RUNTIME_STARTUP_CONTRACT_VERSION,
+          supportedModes: ['standalone', 'app-managed'],
+          readinessPath: '/health',
+          lifecycleEvents: [
+            'runtime.ready',
+            'runtime.startup_error',
+            'runtime.stopping',
+            'runtime.stopped',
+          ],
+        },
+        readiness: {
+          endpoint: '/health',
+          authoritative: true,
+          readySignal: 'http',
+          phase: 'starting',
+          ready: false,
+        },
+        runtime: {
+          startup: expect.objectContaining({
+            contractVersion: RUNTIME_STARTUP_CONTRACT_VERSION,
+            mode: 'standalone',
+            phase: 'starting',
+            readySignal: 'http',
+            ready: false,
+            pid: expect.any(Number),
+            startedAt: expect.any(String),
+          }),
+          listener: {
+            host: '127.0.0.1',
+            port: 0,
+          },
+          paths: {
+            configPath: null,
+            dataDir: expect.stringContaining('runtime-data'),
+            sessionBaseDir: expect.stringContaining('runtime-sessions'),
+          },
+          process: {
+            pid: process.pid,
+            ppid: process.ppid,
+            platform: process.platform,
+            nodeVersion: process.version,
+          },
+        },
+      });
+    });
+  });
+
+  it('GET /diagnostics/providers reports provider availability for hosts', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-diagnostics-test-'));
+    const configPath = join(root, 'providers.yaml');
+    vi.stubEnv('CATS_RUNTIME_TEST_ANTHROPIC_KEY', 'test-secret');
+
+    writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+routing:
+  providers:
+    codex:
+      default_target:
+        backend: cli
+        instance: default
+    claude:
+      default_target:
+        backend: api
+        instance: sonnet
+backends:
+  cli:
+    providers:
+      codex:
+        instances:
+          default:
+            environment: native
+            command: ${JSON.stringify(process.execPath)}
+            runner: direct
+            sessions_dir: ~/.codex/sessions
+  api:
+    providers:
+      claude:
+        transport: anthropic
+        api_key_env: CATS_RUNTIME_TEST_ANTHROPIC_KEY
+        instances:
+          sonnet:
+            model: claude-sonnet-4-20250514
+`.trimStart());
+
+    const env = {
+      HOME: root,
+      USERPROFILE: root,
+      CATS_RUNTIME_CONFIG_PATH: configPath,
+      CATS_RUNTIME_HOST: '127.0.0.1',
+      CATS_RUNTIME_PORT: '3110',
+      CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
+      CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
+      CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
+      CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
+      CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
+      CLAUDE_PROJECTS_DIR: join(root, '.claude', 'projects'),
+    };
+
+    for (const dir of [
+      env.CATS_RUNTIME_DATA_DIR,
+      env.CATS_RUNTIME_SESSION_BASE_DIR,
+      env.CODEX_SESSIONS_DIR,
+      env.CLAUDE_PROJECTS_DIR,
+    ]) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    const runtime = createRuntimeServer(loadConfig(env));
+    try {
+      const response = await runtime.app.request('/diagnostics/providers');
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        service: 'cats-runtime',
+        version: RUNTIME_VERSION,
+        timestamp: expect.any(String),
+        readiness: {
+          endpoint: '/health',
+          authoritative: true,
+          readySignal: 'http',
+          phase: 'starting',
+          ready: false,
+        },
+        summary: {
+          configuredProviders: 2,
+          targets: 2,
+          ok: 1,
+          degraded: 1,
+          unavailable: 0,
+        },
+        providers: expect.arrayContaining([
+          expect.objectContaining({
+            provider: 'claude',
+            backend: 'api',
+            instance: 'sonnet',
+            target: 'api/sonnet',
+            availability: expect.objectContaining({
+              status: 'degraded',
+              probe: 'light',
+            }),
+            checks: expect.arrayContaining([
+              expect.objectContaining({
+                code: 'api_key_present',
+                status: 'ok',
+              }),
+              expect.objectContaining({
+                code: 'live_probe_unimplemented',
+                status: 'degraded',
+              }),
+            ]),
+          }),
+          expect.objectContaining({
+            provider: 'codex',
+            backend: 'cli',
+            instance: 'default',
+            target: 'cli/default',
+            defaultTarget: true,
+            availability: expect.objectContaining({
+              status: 'ok',
+              probe: 'light',
+            }),
+            checks: expect.arrayContaining([
+              expect.objectContaining({
+                code: 'command_available',
+                status: 'ok',
+              }),
+            ]),
+          }),
+        ]),
+      });
+    } finally {
+      await runtime.close();
+      rmSync(root, { recursive: true, force: true });
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('runtime.start rejects when the configured port is already occupied', async () => {
+    const occupiedServer = createServer();
+    occupiedServer.listen(0, '127.0.0.1');
+    await once(occupiedServer, 'listening');
+    const address = occupiedServer.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('Could not resolve occupied test port');
+    }
+    const port = address.port;
+
+    const { config, cleanup } = createTestConfig();
+    const runtime = createRuntimeServer({
+      ...config,
+      host: '127.0.0.1',
+      port,
+    }, {
+      startup: createRuntimeStartupState({
+        mode: 'app-managed',
+        managedBy: 'cats-inc',
+        readyOutput: 'json',
+      }),
+    });
+
+    try {
+      await expect(runtime.start()).rejects.toThrow(/EADDRINUSE/);
+      expect(runtime.context.startup.ready).toBe(false);
+      expect(runtime.context.startup.phase).toBe('starting');
+    } finally {
+      await runtime.close();
+      await new Promise<void>((resolveClose, rejectClose) => {
+        occupiedServer.close((error) => {
+          if (error) {
+            rejectClose(error);
+            return;
+          }
+          resolveClose();
+        });
+      });
       cleanup();
     }
   });

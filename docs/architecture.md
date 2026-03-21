@@ -96,13 +96,17 @@ src/
 - Applies optional bearer auth
 - Streams turn output as SSE or NDJSON
 - Exposes startup/readiness metadata at `GET /health`
+- Exposes runtime/host diagnostics at `GET /diagnostics/runtime`
+- Exposes provider availability diagnostics at `GET /diagnostics/providers`
 
 ### `src/startup.ts`
 
 - Parses executable startup flags such as `--startup-mode` and `--ready-output`
 - Resolves runtime startup state from CLI and environment inputs
-- Formats machine-readable readiness or startup-failure output for local
-  supervisors
+- Formats machine-readable readiness, startup-failure, and shutdown lifecycle
+  output for local supervisors
+- Carries the frozen startup contract version, readiness path, and lifecycle
+  phase state shared by HTTP and process outputs
 - Keeps standalone and app-managed process startup on one shared binary path
 
 ### `src/backends/cli`
@@ -176,9 +180,12 @@ src/
    model catalog services in `src/core`
 6. API/local turns may enter the shared local tool loop in `src/core/tools`
 7. Agent turns use the shared `TurnInput` contract plus provider-managed session continuity where available
-8. Startup/readiness state is exposed over `GET /health`, while optional
-   machine-readable process output can be emitted during startup
-9. Stream events are returned directly to the caller
+8. Startup/readiness state is exposed over `GET /health`, while
+   `GET /diagnostics/runtime` and `GET /diagnostics/providers` expose the
+   runtime-owned host integration surface
+9. Optional machine-readable process output emits startup and shutdown
+   lifecycle events for app-managed local hosts
+10. Stream events are returned directly to the caller
 
 For WSL-backed Cursor/Kiro discovery:
 
@@ -225,6 +232,8 @@ the only durable memory surface for the Cats suite.
 - Upper layers should depend on `cats-runtime`, not on provider-specific CLIs
 - Product hosts should supervise `cats-runtime` as a separate process and use
   the HTTP boundary for readiness rather than source-importing runtime internals
+- Hosts should use runtime-owned diagnostics surfaces rather than rebuilding
+  provider availability checks above the runtime
 - Historical `agent-fleet` references should stay confined to ADRs and migration notes
 - Inbound transport code should stay in `src/http`, not in backend modules
 - New API-key or Ollama integrations should land under `src/backends/api`
@@ -245,4 +254,4 @@ the only durable memory surface for the Cats suite.
 
 ---
 
-*Last updated: 2026-03-19*
+*Last updated: 2026-03-21*

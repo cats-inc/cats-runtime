@@ -48,8 +48,27 @@ Example response:
   "status": "ok",
   "timestamp": "2026-03-11T12:34:56.000Z",
   "version": "<package-version>",
+  "contract": {
+    "startup": 1,
+    "readinessPath": "/health",
+    "lifecycleEvents": [
+      "runtime.ready",
+      "runtime.startup_error",
+      "runtime.stopping",
+      "runtime.stopped"
+    ]
+  },
+  "readiness": {
+    "endpoint": "/health",
+    "authoritative": true,
+    "readySignal": "http",
+    "phase": "ready",
+    "ready": true
+  },
   "startup": {
+    "contractVersion": 1,
     "mode": "standalone",
+    "phase": "ready",
     "readySignal": "http",
     "ready": true,
     "pid": 12345,
@@ -63,10 +82,50 @@ Example response:
 }
 ```
 
-`startup.ready` reflects whether the runtime server has completed bind/startup.
-For host-supervised local runs, callers should still treat `GET /health` as the
-authoritative readiness check rather than inferring success from process launch
-alone.
+`readiness.ready` is the authoritative startup result for both standalone and
+app-managed modes. Hosts should not infer readiness from process creation
+alone. `startup.phase` is one of `starting`, `ready`, `stopping`, or `stopped`.
+
+### Runtime Diagnostics
+
+```text
+GET /diagnostics/runtime
+GET /diagnostics/providers
+```
+
+`GET /diagnostics/runtime` returns the frozen startup contract that hosts should
+integrate against:
+
+- startup contract version
+- supported startup modes
+- authoritative readiness path
+- lifecycle event names
+- listener and local-state path resolution
+
+`GET /diagnostics/providers` returns the runtime-owned provider availability
+surface for hosts and dashboards. The response includes:
+
+- per-target `availability.status` (`ok`, `degraded`, `unavailable`)
+- lightweight config/command/path checks
+- sanitized env-variable presence metadata
+- target-level diagnostics details for CLI, API/local, and agent backends
+
+`GET /diagnostics/providers?probe=live` enables live probes where the current
+runtime backend supports them. Today that is primarily useful for selected
+agent-backed targets; API/local targets still report light diagnostics only.
+
+### App-Managed Lifecycle Events
+
+When started with `--startup-mode app-managed --ready-output json`, the runtime
+emits single-line JSON lifecycle events on stdout/stderr:
+
+- `runtime.ready`: bind succeeded; use `healthUrl` and then `GET /health`
+- `runtime.startup_error`: startup failed before readiness
+- `runtime.stopping`: graceful shutdown started
+- `runtime.stopped`: graceful shutdown finished
+
+For portable host-controlled shutdown, close the child stdin stream. `SIGINT`
+and `SIGTERM` are also handled where the host platform delivers them reliably.
 
 ### Sessions
 

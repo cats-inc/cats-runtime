@@ -42,6 +42,44 @@ Supported startup flags:
 - `--port <bind-port>`
 - `--config <providers-config-path>`
 
+## Startup Contract
+
+`cats-runtime` now freezes one startup contract for both supported process
+modes:
+
+- `standalone`: direct operator-managed startup
+- `app-managed`: child-process startup supervised by a host such as `cats-inc`
+
+Contract version `1` is exposed through `GET /health` and
+`GET /diagnostics/runtime`.
+
+Readiness rules:
+
+- process creation is not readiness
+- `GET /health` is the authoritative readiness endpoint
+- `readiness.phase` and `startup.phase` move through `starting`, `ready`,
+  `stopping`, and `stopped`
+- `CATS_RUNTIME_PORT=0` is valid when a host wants the OS to assign an
+  ephemeral local port; the actual bound port is returned in `runtime.ready`
+  and `GET /health`
+
+Shutdown rules:
+
+- in `app-managed` mode, prefer closing child stdin for the most portable stop
+  path
+- `SIGINT` and `SIGTERM` are also handled when the platform supports them
+- app-managed JSON lifecycle output includes `runtime.ready`,
+  `runtime.startup_error`, `runtime.stopping`, and `runtime.stopped`
+
+Diagnostics rules:
+
+- `GET /diagnostics/runtime` exposes startup contract, path resolution, and
+  runtime listener metadata
+- `GET /diagnostics/providers` exposes runtime-owned provider availability
+  checks for host UX and setup flows
+- `GET /diagnostics/providers?probe=live` enables live probes where the current
+  backend supports them
+
 ## Environment Variables
 
 Keep `.env` for runtime-wide values and secrets:
@@ -269,8 +307,10 @@ node dist/index.js --startup-mode app-managed --managed-by cats-inc --ready-outp
 
 In that mode:
 
-- stdout emits a single-line JSON readiness event when the runtime is ready
+- stdout emits single-line JSON lifecycle events when the runtime changes state
 - `GET /health` remains the authoritative readiness endpoint
+- `GET /diagnostics/runtime` and `GET /diagnostics/providers` give hosts a
+  machine-readable integration surface beyond raw stdout parsing
 - the process stays a separate HTTP service rather than being source-imported
   into the host app
 - graceful shutdown may be triggered by `SIGINT`, `SIGTERM`, or by closing the
@@ -388,6 +428,13 @@ The health payload includes startup metadata:
 }
 ```
 
+For host-side setup or Settings surfaces, use:
+
+- `GET /diagnostics/runtime` to verify runtime contract, port binding, and
+  resolved state paths
+- `GET /diagnostics/providers` to decide whether a provider is immediately
+  usable, needs user action, or is only partially verified
+
 To inspect the publish payload locally without using the global npm cache:
 
 ```powershell
@@ -437,4 +484,4 @@ Docker-backed native discovery targets.
 
 ---
 
-*Last updated: 2026-03-19*
+*Last updated: 2026-03-21*

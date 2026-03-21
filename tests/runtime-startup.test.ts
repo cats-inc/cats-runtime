@@ -2,11 +2,18 @@ import { describe, expect, it } from 'vitest';
 
 import {
   RUNTIME_VERSION,
+  RUNTIME_STARTUP_CONTRACT_VERSION,
   applyRuntimeCliEnvOverrides,
   createRuntimeStartupState,
   formatRuntimeReadyMessage,
+  formatRuntimeStoppedMessage,
+  formatRuntimeStoppingMessage,
   formatRuntimeStartupError,
   getRuntimeHelpText,
+  getRuntimeReadinessSnapshot,
+  markRuntimeReady,
+  markRuntimeStopped,
+  markRuntimeStopping,
   parseRuntimeCliOptions,
   resolveRuntimeStartupState,
 } from '../src/startup.js';
@@ -60,18 +67,26 @@ describe('runtime startup helpers', () => {
 
     expect(startup.mode).toBe('app-managed');
     expect(startup.managedBy).toBe('cats-inc');
+    expect(startup.contractVersion).toBe(RUNTIME_STARTUP_CONTRACT_VERSION);
+    expect(startup.readinessPath).toBe('/health');
     expect(startup.readyOutput).toBe('json');
     expect(startup.readySignal).toBe('http');
     expect(startup.ready).toBe(false);
+    expect(startup.phase).toBe('starting');
   });
 
-  it('formats JSON ready and startup error messages for managed startup', () => {
+  it('formats JSON lifecycle and startup error messages for managed startup', () => {
     const startup = createRuntimeStartupState({
       mode: 'app-managed',
       managedBy: 'cats-inc',
       readyOutput: 'json',
       pid: 1234,
       startedAt: '2026-03-19T00:00:00.000Z',
+    });
+    markRuntimeReady(startup, {
+      host: '127.0.0.1',
+      port: 3110,
+      healthUrl: 'http://127.0.0.1:3110/health',
     });
 
     const readyMessage = formatRuntimeReadyMessage(startup, {
@@ -82,28 +97,102 @@ describe('runtime startup helpers', () => {
     expect(JSON.parse(readyMessage!)).toEqual({
       event: 'runtime.ready',
       service: 'cats-runtime',
+      contractVersion: RUNTIME_STARTUP_CONTRACT_VERSION,
       version: RUNTIME_VERSION,
       pid: 1234,
       mode: 'app-managed',
       managedBy: 'cats-inc',
       startedAt: '2026-03-19T00:00:00.000Z',
+      timestamp: expect.any(String),
+      phase: 'ready',
       readySignal: 'http',
       ready: true,
+      readinessPath: '/health',
       host: '127.0.0.1',
       port: 3110,
       healthUrl: 'http://127.0.0.1:3110/health',
+    });
+
+    markRuntimeStopping(startup, 'stdin_closed');
+    const stoppingMessage = formatRuntimeStoppingMessage(startup, 'stdin_closed');
+    expect(JSON.parse(stoppingMessage!)).toEqual({
+      event: 'runtime.stopping',
+      service: 'cats-runtime',
+      contractVersion: RUNTIME_STARTUP_CONTRACT_VERSION,
+      version: RUNTIME_VERSION,
+      pid: 1234,
+      mode: 'app-managed',
+      managedBy: 'cats-inc',
+      startedAt: '2026-03-19T00:00:00.000Z',
+      timestamp: expect.any(String),
+      phase: 'stopping',
+      readySignal: 'http',
+      ready: false,
+      readinessPath: '/health',
+      host: '127.0.0.1',
+      port: 3110,
+      healthUrl: 'http://127.0.0.1:3110/health',
+      reason: 'stdin_closed',
+    });
+
+    markRuntimeStopped(startup, 'stdin_closed');
+    const stoppedMessage = formatRuntimeStoppedMessage(startup, 'stdin_closed');
+    expect(JSON.parse(stoppedMessage!)).toEqual({
+      event: 'runtime.stopped',
+      service: 'cats-runtime',
+      contractVersion: RUNTIME_STARTUP_CONTRACT_VERSION,
+      version: RUNTIME_VERSION,
+      pid: 1234,
+      mode: 'app-managed',
+      managedBy: 'cats-inc',
+      startedAt: '2026-03-19T00:00:00.000Z',
+      timestamp: expect.any(String),
+      phase: 'stopped',
+      readySignal: 'http',
+      ready: false,
+      readinessPath: '/health',
+      host: '127.0.0.1',
+      port: 3110,
+      healthUrl: 'http://127.0.0.1:3110/health',
+      reason: 'stdin_closed',
     });
 
     const errorMessage = formatRuntimeStartupError(startup, new Error('boom'));
     expect(JSON.parse(errorMessage)).toEqual({
       event: 'runtime.startup_error',
       service: 'cats-runtime',
+      contractVersion: RUNTIME_STARTUP_CONTRACT_VERSION,
       version: RUNTIME_VERSION,
       pid: 1234,
       mode: 'app-managed',
       managedBy: 'cats-inc',
       startedAt: '2026-03-19T00:00:00.000Z',
+      timestamp: expect.any(String),
+      phase: 'stopped',
+      readySignal: 'http',
+      ready: false,
+      readinessPath: '/health',
+      host: '127.0.0.1',
+      port: 3110,
+      healthUrl: 'http://127.0.0.1:3110/health',
+      reason: 'stdin_closed',
       error: expect.stringContaining('boom'),
+    });
+  });
+
+  it('builds an authoritative readiness snapshot', () => {
+    const startup = createRuntimeStartupState({
+      mode: 'app-managed',
+      managedBy: 'cats-inc',
+      readyOutput: 'json',
+    });
+
+    expect(getRuntimeReadinessSnapshot(startup)).toEqual({
+      endpoint: '/health',
+      authoritative: true,
+      readySignal: 'http',
+      phase: 'starting',
+      ready: false,
     });
   });
 

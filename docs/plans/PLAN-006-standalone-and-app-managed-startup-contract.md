@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | In Progress |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | Human review pending |
@@ -55,17 +55,17 @@ coexist without collapsing the runtime into product-app internals.
 
 ### Phase 1: Startup Contract Freeze
 
-- [ ] Freeze the supported runtime startup modes:
+- [x] Freeze the supported runtime startup modes:
       - direct standalone invocation
       - child-process app-managed invocation
-- [ ] Define required and optional environment variables, config-file
+- [x] Define required and optional environment variables, config-file
       resolution, and data-dir ownership rules for each mode.
-- [ ] Define readiness semantics:
+- [x] Define readiness semantics:
       - which endpoint is authoritative
       - what "ready" means versus "process started"
-- [ ] Define shutdown semantics and signal handling expectations for
+- [x] Define shutdown semantics and signal handling expectations for
       supervisor-managed use.
-- [ ] Define whether app-managed startup should use caller-assigned ports,
+- [x] Define whether app-managed startup should use caller-assigned ports,
       default ports, or allow dynamic port assignment.
 
 **Deliverables**: approved startup/readiness/shutdown contract for both modes.
@@ -86,27 +86,27 @@ coexist without collapsing the runtime into product-app internals.
 
 ### Phase 3: Supervisor-Friendly Lifecycle Behavior
 
-- [ ] Ensure startup logs and readiness failure messages are machine-readable
+- [x] Ensure startup logs and readiness failure messages are machine-readable
       enough for local supervisors to act on them.
-- [ ] Ensure non-interactive child-process startup does not require a TTY.
-- [ ] Ensure graceful shutdown works when the runtime is terminated by a host
+- [x] Ensure non-interactive child-process startup does not require a TTY.
+- [x] Ensure graceful shutdown works when the runtime is terminated by a host
       process.
-- [ ] Define bounded cleanup behavior for session state, worker shutdown, and
+- [x] Define bounded cleanup behavior for session state, worker shutdown, and
       registry flushes during managed stop.
-- [ ] Define how runtime version/contract information is exposed to hosts for
+- [x] Define how runtime version/contract information is exposed to hosts for
       compatibility checks.
 
 **Deliverables**: robust child-process behavior for app-managed local startup.
 
 ### Phase 4: Validation and Host Integration Guidance
 
-- [ ] Add tests that spawn `cats-runtime` as a real child process and wait on
+- [x] Add tests that spawn `cats-runtime` as a real child process and wait on
       readiness.
-- [ ] Add tests for signal handling and managed shutdown behavior where
+- [x] Add tests for signal handling and managed shutdown behavior where
       practical.
-- [ ] Document the recommended host interaction model for `cats-inc` and future
+- [x] Document the recommended host interaction model for `cats-inc` and future
       Electron wrappers.
-- [ ] Update setup/deployment docs to explain standalone versus app-managed
+- [x] Update setup/deployment docs to explain standalone versus app-managed
       startup.
 - [ ] Record any follow-up gaps that belong in separate plans rather than
       expanding this slice.
@@ -162,6 +162,7 @@ coexist without collapsing the runtime into product-app internals.
 | Date | Update |
 |------|--------|
 | 2026-03-19 | Plan created from ADR-008 and follow-up review alignment |
+| 2026-03-21 | Implemented startup contract version 1, readiness/diagnostics routes, and child-process shutdown coverage |
 
 ---
 

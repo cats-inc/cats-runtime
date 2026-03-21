@@ -74,13 +74,21 @@ node dist/index.js --startup-mode app-managed --managed-by cats-inc --ready-outp
 
 Expected behavior:
 
-- stdout emits a single-line JSON `runtime.ready` event after bind succeeds
+- stdout emits single-line JSON lifecycle events:
+  `runtime.ready`, `runtime.stopping`, and `runtime.stopped`
 - stderr emits a single-line JSON `runtime.startup_error` event on startup failure
 - `GET /health` is the authoritative readiness endpoint after process launch
+- `GET /diagnostics/runtime` exposes contract version, listener, and path
+  resolution details for host integration
+- `GET /diagnostics/providers` exposes runtime-owned provider availability and
+  diagnostics for setup/Settings surfaces
 - `SIGINT` and `SIGTERM` trigger graceful shutdown of the runtime server where
   the host platform supports them reliably
 - closing the child stdin stream also triggers graceful shutdown in
   `app-managed` mode and is the most portable host-controlled stop path
+- hosts may set `--port 0` / `CATS_RUNTIME_PORT=0` when they want the OS to
+  assign a local ephemeral port; the actual bind result is returned by
+  `runtime.ready` and `GET /health`
 
 ## Configuration
 
@@ -114,10 +122,12 @@ Expected behavior:
 ## Operational Notes
 
 - **Health / readiness**: `GET /health`
+- **Runtime contract**: `GET /diagnostics/runtime`
+- **Provider diagnostics**: `GET /diagnostics/providers`
 - **Dashboard**: `GET /`
 - **Logs**: stdout / stderr from the runtime process
-- **Startup metadata**: `GET /health` includes `startup.mode`, `managedBy`,
-  `readySignal`, `ready`, `pid`, `startedAt`, and bound address details
+- **Startup metadata**: `GET /health` includes contract version, phase,
+  readiness metadata, `managedBy`, `pid`, `startedAt`, and bound address details
 - **State paths**:
   - metadata defaults to `~/.cats-runtime/data`
   - session workspaces/transcripts default to `~/.cats-runtime/sessions`
@@ -149,8 +159,9 @@ process that owns the port.
 ### Issue 2: Package starts but providers are unavailable
 
 **Symptoms**: health is up, but provider operations fail  
-**Solution**: verify `.env`, `config/providers.yaml`, and any required local
-CLI/API credentials for the configured targets.
+**Solution**: verify `GET /diagnostics/providers`, then check `.env`,
+`config/providers.yaml`, and any required local CLI/API credentials for the
+configured targets.
 
 ### Issue 3: Dashboard fails in packaged mode
 
@@ -160,4 +171,4 @@ assets. Use `npm pack --dry-run` to inspect the payload.
 
 ---
 
-*Last updated: 2026-03-19*
+*Last updated: 2026-03-21*

@@ -1,24 +1,40 @@
 import { Hono } from 'hono';
 import type { AppContext } from '../app.js';
-import { RUNTIME_VERSION } from '../../startup.js';
+import {
+  RUNTIME_LIFECYCLE_EVENTS,
+  RUNTIME_SERVICE_NAME,
+  RUNTIME_VERSION,
+  getRuntimeReadinessSnapshot,
+} from '../../startup.js';
 
 export const healthRoutes = new Hono();
 
 healthRoutes.get('/health', (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
+  const readiness = getRuntimeReadinessSnapshot(ctx.startup);
   return c.json({
-    service: 'cats-runtime',
+    service: RUNTIME_SERVICE_NAME,
     status: 'ok',
     timestamp: new Date().toISOString(),
     version: RUNTIME_VERSION,
+    contract: {
+      startup: ctx.startup.contractVersion,
+      readinessPath: ctx.startup.readinessPath,
+      lifecycleEvents: [...RUNTIME_LIFECYCLE_EVENTS],
+    },
+    readiness,
     startup: {
+      contractVersion: ctx.startup.contractVersion,
       mode: ctx.startup.mode,
       managedBy: ctx.startup.managedBy,
+      phase: ctx.startup.phase,
       readySignal: ctx.startup.readySignal,
-      ready: ctx.startup.ready,
+      ready: readiness.ready,
       pid: ctx.startup.pid,
       startedAt: ctx.startup.startedAt,
       address: ctx.startup.address,
+      shutdownReason: ctx.startup.shutdownReason,
+      lastEvent: ctx.startup.lastEvent,
     },
   });
 });

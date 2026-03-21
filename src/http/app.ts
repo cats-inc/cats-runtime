@@ -18,6 +18,7 @@ import type { WslDiscoveryStatusStore } from '../backends/cli/discovery/wslDisco
 import type { ProviderModelCatalogService } from '../core/models/providerModelCatalog.js';
 import { bearerAuth } from './auth.js';
 import { discoveryRoutes } from './routes/discovery.js';
+import { diagnosticsRoutes } from './routes/diagnostics.js';
 import { healthRoutes } from './routes/health.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { messageRoutes } from './routes/messages.js';
@@ -80,6 +81,8 @@ export function createRuntimeApp(ctx: AppContext) {
       path === '/'
       || path === '/sessions'
       || path === '/health'
+      || path === '/diagnostics/runtime'
+      || path === '/diagnostics/providers'
       || path === '/pool/status'
       || path === '/discovery/status'
       || path === '/providers/config'
@@ -96,6 +99,7 @@ export function createRuntimeApp(ctx: AppContext) {
   });
 
   app.route('/', healthRoutes);
+  app.route('/', diagnosticsRoutes);
   app.route('/', discoveryRoutes);
   app.route('/', sessionRoutes);
   app.route('/', messageRoutes);

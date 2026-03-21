@@ -24,10 +24,22 @@ function readRuntimePackageVersion(): string {
 }
 
 export const RUNTIME_VERSION = readRuntimePackageVersion();
+export const RUNTIME_SERVICE_NAME = 'cats-runtime';
+export const RUNTIME_STARTUP_CONTRACT_VERSION = 1;
+export const RUNTIME_READINESS_PATH = '/health';
+export const RUNTIME_LIFECYCLE_EVENTS = [
+  'runtime.ready',
+  'runtime.startup_error',
+  'runtime.stopping',
+  'runtime.stopped',
+] as const;
 
 export type RuntimeStartupMode = 'standalone' | 'app-managed';
 export type RuntimeReadyOutput = 'plain' | 'json' | 'silent';
 export type RuntimeReadySignal = 'http';
+export type RuntimeLifecycleEventName = typeof RUNTIME_LIFECYCLE_EVENTS[number];
+export type RuntimeLifecyclePhase = 'starting' | 'ready' | 'stopping' | 'stopped';
+export type RuntimeShutdownReason = 'sigint' | 'sigterm' | 'stdin_closed';
 
 export interface RuntimeCliOptions {
   help?: boolean;
@@ -46,31 +58,49 @@ export interface RuntimeListeningAddress {
 }
 
 export interface RuntimeStartupState {
+  contractVersion: number;
   mode: RuntimeStartupMode;
   managedBy?: string;
   readyOutput: RuntimeReadyOutput;
   readySignal: RuntimeReadySignal;
+  readinessPath: string;
+  phase: RuntimeLifecyclePhase;
   pid: number;
   startedAt: string;
   ready: boolean;
   address?: RuntimeListeningAddress;
+  shutdownReason?: RuntimeShutdownReason;
+  lastEvent?: RuntimeLifecycleEventName;
   version: string;
 }
 
 interface LifecycleEventPayload {
-  event: 'runtime.ready' | 'runtime.startup_error';
-  service: 'cats-runtime';
+  event: RuntimeLifecycleEventName;
+  service: typeof RUNTIME_SERVICE_NAME;
+  contractVersion: number;
   version: string;
   pid: number;
   mode: RuntimeStartupMode;
   managedBy?: string;
   startedAt: string;
-  readySignal?: RuntimeReadySignal;
-  ready?: boolean;
+  timestamp: string;
+  phase: RuntimeLifecyclePhase;
+  readySignal: RuntimeReadySignal;
+  readinessPath: string;
+  ready: boolean;
   host?: string;
   port?: number;
   healthUrl?: string;
+  reason?: RuntimeShutdownReason;
   error?: string;
+}
+
+export interface RuntimeReadinessSnapshot {
+  endpoint: string;
+  authoritative: true;
+  readySignal: RuntimeReadySignal;
+  phase: RuntimeLifecyclePhase;
+  ready: boolean;
 }
 
 function isStartupMode(value: string): value is RuntimeStartupMode {
@@ -207,14 +237,19 @@ export function createRuntimeStartupState(
   init: Partial<RuntimeStartupState> = {},
 ): RuntimeStartupState {
   return {
+    contractVersion: init.contractVersion ?? RUNTIME_STARTUP_CONTRACT_VERSION,
     mode: init.mode ?? 'standalone',
     managedBy: init.managedBy,
     readyOutput: init.readyOutput ?? 'plain',
     readySignal: init.readySignal ?? 'http',
+    readinessPath: init.readinessPath ?? RUNTIME_READINESS_PATH,
+    phase: init.phase ?? (init.ready ? 'ready' : 'starting'),
     pid: init.pid ?? process.pid,
     startedAt: init.startedAt ?? new Date().toISOString(),
     ready: init.ready ?? false,
     address: init.address,
+    shutdownReason: init.shutdownReason,
+    lastEvent: init.lastEvent,
     version: init.version ?? RUNTIME_VERSION,
   };
 }
@@ -247,33 +282,139 @@ export function resolveRuntimeStartupState(
   });
 }
 
+export function getRuntimeReadinessSnapshot(
+  startup: RuntimeStartupState,
+): RuntimeReadinessSnapshot {
+  return {
+    endpoint: startup.readinessPath,
+    authoritative: true,
+    readySignal: startup.readySignal,
+    phase: startup.phase,
+    ready: startup.ready && startup.phase === 'ready',
+  };
+}
+
+export function markRuntimeReady(
+  startup: RuntimeStartupState,
+  address: RuntimeListeningAddress,
+): RuntimeStartupState {
+  startup.phase = 'ready';
+  startup.ready = true;
+  startup.address = address;
+  return startup;
+}
+
+export function markRuntimeStopping(
+  startup: RuntimeStartupState,
+  reason?: RuntimeShutdownReason,
+): RuntimeStartupState {
+  startup.phase = 'stopping';
+  startup.ready = false;
+  if (reason) {
+    startup.shutdownReason = reason;
+  }
+  return startup;
+}
+
+export function markRuntimeStopped(
+  startup: RuntimeStartupState,
+  reason?: RuntimeShutdownReason,
+): RuntimeStartupState {
+  startup.phase = 'stopped';
+  startup.ready = false;
+  if (reason) {
+    startup.shutdownReason = reason;
+  }
+  return startup;
+}
+
+function buildLifecycleEventPayload(
+  startup: RuntimeStartupState,
+  event: RuntimeLifecycleEventName,
+  details: {
+    address?: RuntimeListeningAddress;
+    error?: string;
+    reason?: RuntimeShutdownReason;
+  } = {},
+): LifecycleEventPayload {
+  startup.lastEvent = event;
+  const address = details.address ?? startup.address;
+  const readiness = getRuntimeReadinessSnapshot(startup);
+  return {
+    event,
+    service: RUNTIME_SERVICE_NAME,
+    contractVersion: startup.contractVersion,
+    version: startup.version,
+    pid: startup.pid,
+    mode: startup.mode,
+    managedBy: startup.managedBy,
+    startedAt: startup.startedAt,
+    timestamp: new Date().toISOString(),
+    phase: startup.phase,
+    readySignal: startup.readySignal,
+    readinessPath: startup.readinessPath,
+    ready: readiness.ready,
+    host: address?.host,
+    port: address?.port,
+    healthUrl: address?.healthUrl,
+    reason: details.reason ?? startup.shutdownReason,
+    error: details.error,
+  };
+}
+
+export function formatRuntimeLifecycleEvent(
+  startup: RuntimeStartupState,
+  event: RuntimeLifecycleEventName,
+  details: {
+    address?: RuntimeListeningAddress;
+    error?: string;
+    reason?: RuntimeShutdownReason;
+  } = {},
+): string | null {
+  if (startup.readyOutput === 'silent' && event !== 'runtime.startup_error') {
+    startup.lastEvent = event;
+    return null;
+  }
+
+  const payload = buildLifecycleEventPayload(startup, event, details);
+
+  if (startup.readyOutput === 'json') {
+    return `${JSON.stringify(payload)}\n`;
+  }
+
+  switch (event) {
+    case 'runtime.ready':
+      return `cats-runtime listening on http://${payload.host}:${payload.port}\n`;
+    case 'runtime.stopping':
+      return `cats-runtime stopping (${payload.reason || 'shutdown'})\n`;
+    case 'runtime.stopped':
+      return `cats-runtime stopped (${payload.reason || 'shutdown'})\n`;
+    case 'runtime.startup_error':
+      return `${payload.error || 'Unknown startup error'}\n`;
+    default:
+      return null;
+  }
+}
+
 export function formatRuntimeReadyMessage(
   startup: RuntimeStartupState,
   address: RuntimeListeningAddress,
 ): string | null {
-  if (startup.readyOutput === 'silent') {
-    return null;
-  }
+  return formatRuntimeLifecycleEvent(startup, 'runtime.ready', { address });
+}
 
-  if (startup.readyOutput === 'json') {
-    const payload: LifecycleEventPayload = {
-      event: 'runtime.ready',
-      service: 'cats-runtime',
-      version: startup.version,
-      pid: startup.pid,
-      mode: startup.mode,
-      managedBy: startup.managedBy,
-      startedAt: startup.startedAt,
-      readySignal: startup.readySignal,
-      ready: true,
-      host: address.host,
-      port: address.port,
-      healthUrl: address.healthUrl,
-    };
-    return `${JSON.stringify(payload)}\n`;
-  }
+export function formatRuntimeStoppingMessage(
+  startup: RuntimeStartupState,
+  reason: RuntimeShutdownReason,
+): string | null {
+  return formatRuntimeLifecycleEvent(startup, 'runtime.stopping', { reason });
+}
 
-  return `cats-runtime listening on http://${address.host}:${address.port}\n`;
+export function formatRuntimeStoppedMessage(
+  startup: RuntimeStartupState,
+  reason: RuntimeShutdownReason,
+): string | null {
+  return formatRuntimeLifecycleEvent(startup, 'runtime.stopped', { reason });
 }
 
 export function formatRuntimeStartupError(
@@ -281,21 +422,9 @@ export function formatRuntimeStartupError(
   error: unknown,
 ): string {
   const message = error instanceof Error ? error.stack ?? error.message : String(error);
-  if (startup.readyOutput === 'json') {
-    const payload: LifecycleEventPayload = {
-      event: 'runtime.startup_error',
-      service: 'cats-runtime',
-      version: startup.version,
-      pid: startup.pid,
-      mode: startup.mode,
-      managedBy: startup.managedBy,
-      startedAt: startup.startedAt,
-      error: message,
-    };
-    return `${JSON.stringify(payload)}\n`;
-  }
-
-  return `${message}\n`;
+  return formatRuntimeLifecycleEvent(startup, 'runtime.startup_error', {
+    error: message,
+  }) || `${message}\n`;
 }
 
 export function getRuntimeHelpText(): string {

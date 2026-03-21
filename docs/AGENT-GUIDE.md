@@ -20,6 +20,8 @@
 
 - `GET /`
 - `GET /health`
+- `GET /diagnostics/runtime`
+- `GET /diagnostics/providers`
 - `GET /sessions`
 - `GET /sessions/:id`
 - `POST /sessions`
@@ -39,6 +41,8 @@
 - Favor the smallest public contract that keeps upper layers decoupled
 - Keep inbound transport details in `src/http`, not in backend modules
 - Keep CLI-specific logic in `src/backends/cli`
+- Treat `GET /health` as the authoritative runtime readiness boundary
+- Treat `GET /diagnostics/providers` as the runtime-owned provider availability surface for hosts
 - Update `docs/api.md` and `docs/architecture.md` when changing the public surface
 - Add or update tests for every route change
 
@@ -114,4 +118,4 @@ Before completing a task or handing off:
 
 ---
 
-*Last updated: 2026-03-11*
+*Last updated: 2026-03-21*
