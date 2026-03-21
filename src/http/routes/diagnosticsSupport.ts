@@ -22,6 +22,7 @@ const FILE_BACKED_PROVIDER_NAMES = [
 ] as const;
 
 const DEFAULT_RUNTIME_COMMAND_LOOKUP_TIMEOUT_MS = 5000;
+const DEFAULT_RUNTIME_AGENT_PROBE_TIMEOUT_MS = 5000;
 
 export type FileBackedProviderName = (typeof FILE_BACKED_PROVIDER_NAMES)[number];
 
@@ -53,6 +54,14 @@ export interface RuntimeAgentProbeResult {
   kind: string;
   supported: boolean;
   result?: HealthStatus;
+}
+
+export interface RuntimeAgentProbeOptions {
+  timeoutMs?: number;
+  adapter?: {
+    kind: string;
+    probe?: (instance: RemoteProviderInstanceConfig) => Promise<HealthStatus>;
+  };
 }
 
 function hasPathSeparator(value: string): boolean {
@@ -102,6 +111,30 @@ async function runCommandLookup(
       finish({ status, stdout, timedOut });
     });
   });
+}
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> {
+  if (timeoutMs <= 0) {
+    return promise;
+  }
+
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
 }
 
 export function getRuntimeEnvironment(
@@ -190,8 +223,9 @@ export function getFileBackedProviderDiscoveryInfo(
 export async function probeRuntimeAgentInstance(
   instance: RemoteProviderInstanceConfig,
   runProbe = true,
+  options: RuntimeAgentProbeOptions = {},
 ): Promise<RuntimeAgentProbeResult> {
-  const adapter = buildAgentAdapter(instance);
+  const adapter = options.adapter || buildAgentAdapter(instance);
   if (!adapter.probe) {
     return {
       kind: adapter.kind,
@@ -209,6 +243,11 @@ export async function probeRuntimeAgentInstance(
   return {
     kind: adapter.kind,
     supported: true,
-    result: await adapter.probe(instance),
+    result: await withTimeout(
+      adapter.probe(instance),
+      options.timeoutMs ?? DEFAULT_RUNTIME_AGENT_PROBE_TIMEOUT_MS,
+      `Timed out while probing agent adapter '${adapter.kind}' for `
+      + `${instance.providerName}/${instance.id}`,
+    ),
   };
 }
