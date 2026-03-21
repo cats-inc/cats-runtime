@@ -98,6 +98,9 @@ src/
 - Exposes startup/readiness metadata at `GET /health`
 - Exposes runtime/host diagnostics at `GET /diagnostics/runtime`
 - Exposes provider availability diagnostics at `GET /diagnostics/providers`
+- Exposes runtime-owned delivery execution routes such as delivery audit,
+  artifact publication, repo status, commit, and push without embedding
+  product-level delivery governance policy
 
 ### `src/startup.ts`
 
@@ -161,6 +164,10 @@ src/
 - Returns explicit workspace substrate `contract`, `actions`, `plan`, and
   `approval` payloads so hosts can preview/apply deterministically without
   embedding product policy in the runtime
+- Exposes runtime-owned delivery tools (`audit-delivery-target`,
+  `publish-artifacts`, `inspect-repo-status`, `create-commit`, `push-branch`)
+  for runtime-managed skills with the same machine-readable contract as the
+  HTTP layer
 - Normalizes tool activity into stream events and transcript records
 
 ### `src/core/runtime`
@@ -176,6 +183,10 @@ src/
   product shells or skills
 - Keeps `audit-workspace` read-only even when callers request apply, and uses
   `*.bootstrap` review copies instead of blind overwrite for conflicting files
+- Owns delivery audit/export/repo primitives and normalized preview-surface
+  metadata so artifact-only and repo-backed flows can share one execution seam
+- Keeps delivery execution approval-aware (`preview` vs `apply`) without moving
+  delivery-governance policy into the runtime
 - Does not own product-level approval UX, workspace orchestration policy, or
   post-apply delegation behavior
 
@@ -210,7 +221,10 @@ src/
    lifecycle events for app-managed local hosts
 10. Session branch inspection is available over session payload `branching`
     metadata plus `GET /sessions/{id}/lineage`
-11. Stream events are returned directly to the caller
+11. Delivery actions resolve through `RuntimeDeliveryService`, which inspects
+    repo state, exports artifacts, normalizes preview surfaces, and executes
+    Git mutations behind a stable machine-readable contract
+12. Stream events are returned directly to the caller
 
 For WSL-backed Cursor/Kiro discovery:
 
@@ -270,6 +284,9 @@ the only durable memory surface for the Cats suite.
   layers own branch policy, convergence, and delegation semantics
 - Hosts should consume runtime-owned `branch`/`branching` metadata rather than
   rebuilding native-fork compatibility logic above the runtime
+- Delivery policy stays above runtime; hosts should consume runtime-owned
+  delivery primitives and machine-readable blocked/degraded states rather than
+  reimplementing Git/artifact/preview execution logic above the runtime
 - Keep `.env` focused on runtime-wide values; provider topology belongs in
   `config/providers.yaml`
 
@@ -284,4 +301,4 @@ the only durable memory surface for the Cats suite.
 
 ---
 
-*Last updated: 2026-03-21*
+*Last updated: 2026-03-22*

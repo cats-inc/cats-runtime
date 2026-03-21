@@ -5,6 +5,7 @@ import path from 'node:path';
 import type { PermissionMode, WorkspaceMode } from '../types.js';
 import { applyPatch as applyStructuredPatch } from './applyPatch.js';
 import { WorkspaceSubstrateService } from '../runtime/WorkspaceSubstrateService.js';
+import { RuntimeDeliveryService } from '../runtime/RuntimeDeliveryService.js';
 
 // path.matchesGlob — Node 22+ built-in; @types/node@20 lacks the typedef
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -306,14 +307,114 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+  {
+    name: 'audit-delivery-target',
+    description: 'Inspect artifact/repo/preview delivery capability and return a machine-readable JSON audit.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Relative workspace path. Defaults to ".".' },
+        session_id: { type: 'string' },
+        artifact_ids: { type: 'array', items: { type: 'string' } },
+        artifacts: { type: 'array', items: { type: 'object' } },
+        services: { type: 'array', items: { type: 'object' } },
+        include_session_artifacts: { type: 'boolean' },
+        include_session_services: { type: 'boolean' },
+      },
+    },
+  },
+  {
+    name: 'publish-artifacts',
+    description: 'Preview or apply artifact export/publication into a target directory and return JSON metadata.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Relative workspace path. Defaults to ".".' },
+        session_id: { type: 'string' },
+        artifact_ids: { type: 'array', items: { type: 'string' } },
+        artifacts: { type: 'array', items: { type: 'object' } },
+        directory: { type: 'string', description: 'Relative output directory for exported artifacts.' },
+        manifest_file_name: { type: 'string' },
+        public_base_url: { type: 'string' },
+        apply: { type: 'boolean' },
+        actor_role: {
+          type: 'string',
+          enum: ['boss_cat', 'specialist_cat', 'system', 'owner', 'product_host', 'operator'],
+        },
+        approved: { type: 'boolean' },
+      },
+    },
+  },
+  {
+    name: 'inspect-repo-status',
+    description: 'Inspect Git status for a workspace and return machine-readable delivery metadata.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Relative workspace path. Defaults to ".".' },
+        session_id: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'create-commit',
+    description: 'Preview or apply Git commit creation with approval-aware JSON output.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Relative workspace path. Defaults to ".".' },
+        session_id: { type: 'string' },
+        message: { type: 'string' },
+        stage_all: { type: 'boolean' },
+        allow_empty: { type: 'boolean' },
+        apply: { type: 'boolean' },
+        actor_role: {
+          type: 'string',
+          enum: ['boss_cat', 'specialist_cat', 'system', 'owner', 'product_host', 'operator'],
+        },
+        approved: { type: 'boolean' },
+      },
+      required: ['message'],
+    },
+  },
+  {
+    name: 'push-branch',
+    description: 'Preview or apply Git branch push with approval-aware JSON output.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Relative workspace path. Defaults to ".".' },
+        session_id: { type: 'string' },
+        remote: { type: 'string' },
+        branch: { type: 'string' },
+        set_upstream: { type: 'boolean' },
+        force_with_lease: { type: 'boolean' },
+        apply: { type: 'boolean' },
+        actor_role: {
+          type: 'string',
+          enum: ['boss_cat', 'specialist_cat', 'system', 'owner', 'product_host', 'operator'],
+        },
+        approved: { type: 'boolean' },
+      },
+    },
+  },
 ];
 
-const READ_ONLY_TOOLS = new Set(['list_files', 'read_file', 'grep', 'glob', 'audit-workspace']);
+const READ_ONLY_TOOLS = new Set([
+  'list_files',
+  'read_file',
+  'grep',
+  'glob',
+  'audit-workspace',
+  'audit-delivery-target',
+  'inspect-repo-status',
+]);
 const TOOL_ORDER = new Map(TOOL_DEFINITIONS.map((tool, index) => [tool.name, index]));
 
 const STANDARD_TOOLS = new Set([
   'list_files', 'read_file', 'write_file', 'edit_file', 'apply_patch', 'grep', 'glob', 'run_shell',
   'audit-workspace', 'init-workspace', 'update-workspace',
+  'audit-delivery-target', 'publish-artifacts', 'inspect-repo-status', 'create-commit', 'push-branch',
 ]);
 const EXTENDED_TOOLS = new Set([
   ...STANDARD_TOOLS, 'delete_file', 'rename_file', 'copy_file',
@@ -325,6 +426,14 @@ const PROFILE_TOOLS: Record<string, Set<string>> = {
   none: new Set(),
   chat: new Set(),
 };
+const DELIVERY_ACTOR_ROLES = new Set([
+  'boss_cat',
+  'specialist_cat',
+  'system',
+  'owner',
+  'product_host',
+  'operator',
+]);
 
 function normalizeProfile(profile?: string): string {
   return (profile || 'standard').trim().toLowerCase();
@@ -392,6 +501,66 @@ function readOptionalStringArray(
     .map((entry) => entry.trim())
     .filter(Boolean);
   return strings.length > 0 ? strings : undefined;
+}
+
+function parseToolArtifacts(value: unknown) {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      return [];
+    }
+
+    const record = entry as Record<string, unknown>;
+    const id = typeof record.id === 'string' && record.id.trim() ? record.id.trim() : undefined;
+    if (!id) {
+      return [];
+    }
+
+    return [{
+      id,
+      kind: typeof record.kind === 'string' ? record.kind.trim() || undefined : undefined,
+      label: typeof record.label === 'string' ? record.label.trim() || undefined : undefined,
+      path: typeof record.path === 'string' ? record.path.trim() || undefined : undefined,
+      uri: typeof record.uri === 'string' ? record.uri.trim() || undefined : undefined,
+      mediaType: typeof record.mediaType === 'string' ? record.mediaType.trim() || undefined : undefined,
+      createdAt: typeof record.createdAt === 'string' ? record.createdAt.trim() || undefined : undefined,
+      sizeBytes: typeof record.sizeBytes === 'number' ? record.sizeBytes : undefined,
+      metadata: record.metadata && typeof record.metadata === 'object' && !Array.isArray(record.metadata)
+        ? record.metadata as Record<string, unknown>
+        : undefined,
+    }];
+  });
+}
+
+function parseToolServices(value: unknown) {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      return [];
+    }
+
+    const record = entry as Record<string, unknown>;
+    const id = typeof record.id === 'string' && record.id.trim() ? record.id.trim() : undefined;
+    if (!id) {
+      return [];
+    }
+
+    return [{
+      id,
+      name: typeof record.name === 'string' && record.name.trim() ? record.name.trim() : id,
+      url: typeof record.url === 'string' ? record.url.trim() || undefined : undefined,
+      status: typeof record.status === 'string' ? record.status.trim() || undefined : undefined,
+      metadata: record.metadata && typeof record.metadata === 'object' && !Array.isArray(record.metadata)
+        ? record.metadata as Record<string, unknown>
+        : undefined,
+    }];
+  });
 }
 
 function truncate(text: string, limit = MAX_TEXT_OUTPUT): string {
@@ -567,6 +736,7 @@ async function executeShell(
 
 export class LocalToolRuntime {
   private readonly substrate = new WorkspaceSubstrateService();
+  private readonly delivery = new RuntimeDeliveryService({});
 
   listTools(profile?: string): ToolDefinition[] {
     const normalized = normalizeProfile(profile);
@@ -608,6 +778,12 @@ export class LocalToolRuntime {
         case 'init-workspace':
         case 'update-workspace':
           return await this.workspaceSubstrateOperation(context, call.id, call.name, args);
+        case 'audit-delivery-target':
+        case 'publish-artifacts':
+        case 'inspect-repo-status':
+        case 'create-commit':
+        case 'push-branch':
+          return await this.deliveryOperation(context, call.id, call.name, args);
         default:
           throw new Error(`Unknown tool '${call.name}'`);
       }
@@ -626,8 +802,13 @@ export class LocalToolRuntime {
       return true;
     }
 
-    return (name === 'init-workspace' || name === 'update-workspace')
-      && args.apply !== true;
+    return (
+      (name === 'init-workspace' || name === 'update-workspace')
+      && args.apply !== true
+    ) || (
+      (name === 'publish-artifacts' || name === 'create-commit' || name === 'push-branch')
+      && args.apply !== true
+    );
   }
 
   private assertToolAllowed(
@@ -1030,6 +1211,75 @@ export class LocalToolRuntime {
       authorization: {
         actorRole,
         approved: args.approved === true,
+      },
+    });
+
+    return {
+      callId,
+      name: operation,
+      output: JSON.stringify(result, null, 2),
+    };
+  }
+
+  private async deliveryOperation(
+    context: ToolExecutionContext,
+    callId: string,
+    operation: 'audit-delivery-target' | 'publish-artifacts' | 'inspect-repo-status' | 'create-commit' | 'push-branch',
+    args: Record<string, unknown>,
+  ): Promise<ToolResult> {
+    const workspacePath = resolveWorkspacePath(context.cwd, String(args.path || '.'));
+    const actorRole = typeof args.actor_role === 'string' && DELIVERY_ACTOR_ROLES.has(args.actor_role)
+      ? args.actor_role as 'boss_cat' | 'specialist_cat' | 'system' | 'owner' | 'product_host' | 'operator'
+      : undefined;
+
+    const result = await this.delivery.execute({
+      action: operation,
+      workspacePath,
+      sessionId: typeof args.session_id === 'string' && args.session_id.trim()
+        ? args.session_id.trim()
+        : undefined,
+      artifactIds: readOptionalStringArray(args, 'artifact_ids'),
+      artifacts: parseToolArtifacts(args.artifacts),
+      services: parseToolServices(args.services),
+      apply: args.apply === true,
+      authorization: actorRole || args.approved === true
+        ? {
+            actorRole,
+            approved: args.approved === true,
+          }
+        : undefined,
+      publication: operation === 'publish-artifacts'
+        ? {
+            directory: typeof args.directory === 'string' && args.directory.trim()
+              ? resolveWorkspacePath(workspacePath, args.directory)
+              : undefined,
+            manifestFileName: typeof args.manifest_file_name === 'string' && args.manifest_file_name.trim()
+              ? args.manifest_file_name.trim()
+              : undefined,
+            publicBaseUrl: typeof args.public_base_url === 'string' && args.public_base_url.trim()
+              ? args.public_base_url.trim()
+              : undefined,
+          }
+        : undefined,
+      repo: operation === 'create-commit' || operation === 'push-branch'
+        || operation === 'inspect-repo-status'
+        ? {
+            message: typeof args.message === 'string' && args.message.trim() ? args.message.trim() : undefined,
+            stageAll: typeof args.stage_all === 'boolean' ? args.stage_all : undefined,
+            allowEmpty: typeof args.allow_empty === 'boolean' ? args.allow_empty : undefined,
+            remote: typeof args.remote === 'string' && args.remote.trim() ? args.remote.trim() : undefined,
+            branch: typeof args.branch === 'string' && args.branch.trim() ? args.branch.trim() : undefined,
+            setUpstream: typeof args.set_upstream === 'boolean' ? args.set_upstream : undefined,
+            forceWithLease: typeof args.force_with_lease === 'boolean' ? args.force_with_lease : undefined,
+          }
+        : undefined,
+      preview: {
+        includeSessionArtifacts: typeof args.include_session_artifacts === 'boolean'
+          ? args.include_session_artifacts
+          : undefined,
+        includeSessionServices: typeof args.include_session_services === 'boolean'
+          ? args.include_session_services
+          : undefined,
       },
     });
 

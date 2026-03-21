@@ -755,30 +755,33 @@ describe('LocalToolRuntime', () => {
   });
 
   describe('profiles', () => {
-    it('standard profile lists 11 tools', () => {
+    it('standard profile lists 16 tools', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('standard');
       expect(tools.map((t) => t.name)).toEqual([
         'list_files', 'read_file', 'write_file', 'edit_file', 'apply_patch', 'grep', 'glob', 'run_shell',
         'audit-workspace', 'init-workspace', 'update-workspace',
+        'audit-delivery-target', 'publish-artifacts', 'inspect-repo-status', 'create-commit', 'push-branch',
       ]);
     });
 
-    it('extended profile lists 14 tools', () => {
+    it('extended profile lists 19 tools', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('extended');
       expect(tools.map((t) => t.name)).toEqual([
         'list_files', 'read_file', 'write_file', 'edit_file', 'apply_patch', 'grep', 'glob', 'run_shell',
         'delete_file', 'rename_file', 'copy_file',
         'audit-workspace', 'init-workspace', 'update-workspace',
+        'audit-delivery-target', 'publish-artifacts', 'inspect-repo-status', 'create-commit', 'push-branch',
       ]);
     });
 
-    it('read_only profile lists 5 tools', () => {
+    it('read_only profile lists 7 tools', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('read_only');
       expect(tools.map((t) => t.name)).toEqual([
         'list_files', 'read_file', 'grep', 'glob', 'audit-workspace',
+        'audit-delivery-target', 'inspect-repo-status',
       ]);
     });
 
@@ -791,17 +794,18 @@ describe('LocalToolRuntime', () => {
     it('unknown profile falls back to standard', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('unknown_profile');
-      expect(tools.length).toBe(11);
+      expect(tools.length).toBe(16);
       expect(tools.map((t) => t.name)).toContain('apply_patch');
       expect(tools.map((t) => t.name)).toContain('edit_file');
       expect(tools.map((t) => t.name)).toContain('glob');
       expect(tools.map((t) => t.name)).toContain('audit-workspace');
+      expect(tools.map((t) => t.name)).toContain('create-commit');
     });
 
     it('default profile (undefined) is standard', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools();
-      expect(tools.length).toBe(11);
+      expect(tools.length).toBe(16);
     });
   });
 
@@ -971,6 +975,73 @@ describe('LocalToolRuntime', () => {
           },
         });
         expect(existsSync(join(cwd, 'AGENTS.md'))).toBe(false);
+      } finally {
+        cleanup();
+      }
+    });
+  });
+
+  describe('delivery tools', () => {
+    it('audits delivery capability in read_only mode', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+      writeFileSync(join(cwd, 'report.html'), '<html><body>preview</body></html>', 'utf-8');
+
+      try {
+        const result = await runtime.execute(readOnlyCtx(cwd), {
+          id: 'delivery-1',
+          name: 'audit-delivery-target',
+          arguments: {
+            artifacts: [
+              {
+                id: 'report',
+                path: 'report.html',
+                mediaType: 'text/html',
+              },
+            ],
+          },
+        });
+
+        expect(result.isError).toBeUndefined();
+        expect(JSON.parse(result.output)).toMatchObject({
+          action: 'audit-delivery-target',
+          capabilities: {
+            artifactPublication: {
+              state: 'ready',
+            },
+            repoStatus: {
+              state: 'blocked',
+            },
+          },
+          previewSurfaces: expect.arrayContaining([
+            expect.objectContaining({
+              artifactId: 'report',
+              status: 'ready',
+              renderHint: 'iframe',
+            }),
+          ]),
+        });
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('blocks create-commit apply in read_only mode before execution', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const result = await runtime.execute(readOnlyCtx(cwd), {
+          id: 'delivery-2',
+          name: 'create-commit',
+          arguments: {
+            message: 'feat: blocked',
+            apply: true,
+          },
+        });
+
+        expect(result.isError).toBe(true);
+        expect(result.output).toContain('not allowed');
       } finally {
         cleanup();
       }

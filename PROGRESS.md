@@ -9,11 +9,12 @@
 | Core | Completed | Embedded CLI runtime, session registry, discovery, and worker pool are in-repo |
 | API Backends | In Progress | `src/backends/api` now runs Claude, Codex/OpenAI, Gemini, and Ollama with runtime-managed sessions, provider-native continuation/caching optimizations, first-slice provider-agnostic `progress` events, and a shared local tool loop with patch/file/search/shell support; health probes and broader tool/model discovery remain |
 | Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, and an Agent SDK bridge as the second validation target |
-| HTTP API | Completed | Health, sessions, messages, history, observe, provider management, and session branch-lineage inspection routes are served directly from `cats-runtime` |
+| HTTP API | Completed | Health, sessions, delivery audit/export/repo routes, messages, history, observe, provider management, and session branch-lineage inspection routes are served directly from `cats-runtime` |
 | Dashboard | Completed | The embedded dashboard UI is served from `GET /` |
 | Workspace Substrate | Completed | `audit-workspace`, `init-workspace`, and `update-workspace` now return explicit preview/apply contracts, machine-readable action plans/diff stats, approval-friendly payloads, and `*.bootstrap` review-copy behavior without owning product policy |
-| Tests | Completed | Vitest covers provider, discovery, pool, HTTP, server bootstrap, and API/local tool-loop behavior |
-| Docs | In Progress | Core docs now cover the generic provider model catalog route, first-slice API/local progress events, and runtime-owned cache/fallback semantics, but later PLAN-003/PLAN-005 follow-on items still need ongoing updates |
+| Delivery Primitives | Completed | Runtime-owned delivery audit, artifact publish/export, repo status, commit, push, and normalized preview-surface metadata are now available over both HTTP routes and local tools |
+| Tests | Completed | Vitest covers provider, discovery, pool, HTTP, delivery, server bootstrap, and API/local tool-loop behavior |
+| Docs | In Progress | Core docs now cover startup/diagnostics, model catalog, session branching, workspace substrate, and first-slice delivery primitives; later PLAN-003/PLAN-005 follow-on items still need ongoing updates |
 | Follow-ups | Completed | Accepted post-review findings for provider-instance rollout were implemented and recorded in `docs/plans/PLAN-002-provider-instance-review-followups.md` |
 
 **Legend**: Not Started | In Progress | Completed | Blocked
@@ -222,6 +223,41 @@ embedding product approval policy into `cats-runtime`.
 - [ ] No product-level approval UX, orchestration policy, or follow-on delegation logic in runtime
 - [ ] No full `project-bootstrap` preset/flavor system; only collaboration substrate files are generated
 
+### WP-7: Executable Delivery and Preview Primitives
+
+**Status**: Completed
+**Assigned**: Codex
+**Priority**: P0
+
+#### Goal
+
+Land runtime-owned delivery primitives for artifact-only and repo-backed flows
+without moving delivery-governance policy into `cats-runtime`.
+
+#### Delivered
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Add delivery-target audit primitive | [x] | `POST /delivery/audit` and `audit-delivery-target` return capability truth, blocked reasons, and capability gaps |
+| Add artifact publication/export primitive | [x] | `POST /delivery/artifacts/publish` and `publish-artifacts` export local artifacts, write a manifest, and preserve reference-only artifacts when needed |
+| Add repo status inspection primitive | [x] | `POST /delivery/repo/status` and `inspect-repo-status` return normalized Git metadata and repo-backed capability state |
+| Add commit creation primitive | [x] | `POST /delivery/repo/commit` and `create-commit` support preview/apply plus approval-aware commit execution |
+| Add branch push primitive | [x] | `POST /delivery/repo/push` and `push-branch` support preview/apply plus approval-aware push execution |
+| Normalize preview-capable surface metadata | [x] | Delivery results now include `previewSurfaces` derived from session/request artifacts and services |
+| Cover blocked/degraded/artifact-only/repo-backed behavior with tests | [x] | `tests/runtime-delivery.test.ts` and `src/core/tools/LocalToolRuntime.test.ts` cover the first slice |
+| Update runtime docs/specs/progress | [x] | `api.md`, `architecture.md`, `AGENT-GUIDE.md`, `SPEC-009`, and `PROGRESS.md` now reflect the delivered slice |
+
+#### Deferred Boundaries
+
+- [ ] No PR/check automation yet; that remains a later integration seam
+- [ ] No preview/deploy host integration yet; runtime currently reports normalized preview metadata only
+- [ ] No forge-vendor-specific auth/policy logic in runtime
+
+#### Verification
+
+- [x] `npm run build`
+- [x] `npx vitest run tests/runtime-server.test.ts tests/runtime-delivery.test.ts src/core/tools/LocalToolRuntime.test.ts --pool=threads --poolOptions.threads.singleThread`
+
 ---
 
-*Last updated: 2026-03-21*
+*Last updated: 2026-03-22*

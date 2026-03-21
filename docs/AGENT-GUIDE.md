@@ -22,6 +22,11 @@
 - `GET /health`
 - `GET /diagnostics/runtime`
 - `GET /diagnostics/providers`
+- `POST /delivery/audit`
+- `POST /delivery/artifacts/publish`
+- `POST /delivery/repo/status`
+- `POST /delivery/repo/commit`
+- `POST /delivery/repo/push`
 - `GET /sessions`
 - `GET /sessions/:id`
 - `GET /sessions/:id/lineage`
@@ -44,6 +49,8 @@
 - Keep CLI-specific logic in `src/backends/cli`
 - Treat `GET /health` as the authoritative runtime readiness boundary
 - Treat `GET /diagnostics/providers` as the runtime-owned provider availability surface for hosts
+- Treat delivery routes and delivery tools as runtime-owned execution
+  primitives; keep delivery-governance policy in upper-layer products
 - Update `docs/api.md` and `docs/architecture.md` when changing the public surface
 - Add or update tests for every route change
 
@@ -119,4 +126,4 @@ Before completing a task or handing off:
 
 ---
 
-*Last updated: 2026-03-21*
+*Last updated: 2026-03-22*

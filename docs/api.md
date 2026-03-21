@@ -127,6 +127,86 @@ emits single-line JSON lifecycle events on stdout/stderr:
 For portable host-controlled shutdown, close the child stdin stream. `SIGINT`
 and `SIGTERM` are also handled where the host platform delivers them reliably.
 
+### Delivery
+
+```text
+POST /delivery/audit
+POST /delivery/artifacts/publish
+POST /delivery/repo/status
+POST /delivery/repo/commit
+POST /delivery/repo/push
+```
+
+These routes are runtime-owned executable delivery primitives. They execute or
+inspect delivery actions, but they do not decide product-level delivery policy.
+
+Shared response fields:
+
+- `action`: normalized delivery action id
+- `state`: `ready`, `blocked`, `unsupported`, `degraded`, or `completed`
+- `contract`: explicit `preview` / `apply` mode plus `applyDecision`
+- `authorization` / `approval`: approval-aware apply metadata for hosts
+- `capabilities`: machine-readable artifact/repo/push/preview capability truth
+- `blockedReasons`: structured blocking reasons
+- `capabilityGaps`: structured degraded/unsupported gaps
+- `warnings`: additive warnings
+- `repo`: normalized repository inspection metadata
+- `artifacts`: publication/export records when relevant
+- `previewSurfaces`: normalized preview-capable surface metadata
+
+Mutating actions (`publish`, `commit`, `push`) default to preview. Send
+`"apply": true` plus runtime-visible approval context such as
+`"actorRole": "boss_cat"` when the host wants the runtime to perform the
+mutation.
+
+Delivery audit example:
+
+```json
+{
+  "workspacePath": "C:/repo",
+  "artifacts": [
+    {
+      "id": "report",
+      "path": "artifacts/report.html",
+      "mediaType": "text/html"
+    }
+  ],
+  "services": [
+    {
+      "id": "preview",
+      "name": "preview",
+      "url": "http://127.0.0.1:4173"
+    }
+  ]
+}
+```
+
+Commit preview example:
+
+```json
+{
+  "workspacePath": "C:/repo",
+  "repo": {
+    "message": "feat: finalize runtime delivery contract"
+  }
+}
+```
+
+Push apply example:
+
+```json
+{
+  "workspacePath": "C:/repo",
+  "apply": true,
+  "actorRole": "boss_cat",
+  "repo": {
+    "remote": "origin",
+    "branch": "main",
+    "setUpstream": true
+  }
+}
+```
+
 ### Sessions
 
 ```text
@@ -481,6 +561,11 @@ operations for API/local sessions:
 - `audit-workspace`
 - `init-workspace`
 - `update-workspace`
+- `audit-delivery-target`
+- `publish-artifacts`
+- `inspect-repo-status`
+- `create-commit`
+- `push-branch`
 
 These operations return structured JSON plans/results with:
 
@@ -493,15 +578,23 @@ These operations return structured JSON plans/results with:
   operations
 - `approval`: runtime-owned authorization metadata for hosts or skills without
   hard-coding product approval UX
+- `previewSurfaces`: normalized preview-capable service/artifact metadata for
+  later host-side rendering or fallback UX
 
 Behavioral boundaries:
 
 - Preview is the safe default for `init-workspace` and `update-workspace`.
+- Preview is also the safe default for `publish-artifacts`, `create-commit`,
+  and `push-branch`.
 - Preview results may still report `plan.requiresApproval` / `approval.required`
   to describe whether a later mutable apply would need authorization. This is
   prospective approval metadata only; preview itself never writes.
 - `audit-workspace` is always read-only. Sending `apply: true` returns
   `contract.applyDecision: "read_only_operation"` and writes nothing.
+- `audit-delivery-target` and `inspect-repo-status` are always read-only.
+- `publish-artifacts`, `create-commit`, and `push-branch` return machine-
+  readable `blockedReasons` / `capabilityGaps` instead of assuming the host
+  always has repo or preview support.
 - Conflicting existing files are not overwritten. The plan uses
   `write_sidecar` steps and `*.bootstrap` review copies instead.
 - `cats-runtime` owns execution primitives only. Product shells and Boss Cat
@@ -705,4 +798,4 @@ Errors use this format:
 
 ---
 
-*Last updated: 2026-03-21*
+*Last updated: 2026-03-22*

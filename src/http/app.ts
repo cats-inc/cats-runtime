@@ -16,8 +16,10 @@ import type { GooseNativeSessionService } from '../backends/cli/goose/GooseNativ
 import type { OpencodeNativeSessionService } from '../backends/cli/opencode/OpencodeNativeSessionService.js';
 import type { WslDiscoveryStatusStore } from '../backends/cli/discovery/wslDiscovery.js';
 import type { ProviderModelCatalogService } from '../core/models/providerModelCatalog.js';
+import { RuntimeDeliveryService } from '../core/runtime/RuntimeDeliveryService.js';
 import { bearerAuth } from './auth.js';
 import { discoveryRoutes } from './routes/discovery.js';
+import { deliveryRoutes } from './routes/delivery.js';
 import { diagnosticsRoutes } from './routes/diagnostics.js';
 import { healthRoutes } from './routes/health.js';
 import { sessionRoutes } from './routes/sessions.js';
@@ -49,6 +51,7 @@ export interface AppContext {
   opencodeNative: OpencodeNativeSessionService;
   wslDiscoveryStatus?: WslDiscoveryStatusStore;
   providerModelCatalog: ProviderModelCatalogService;
+  delivery?: RuntimeDeliveryService;
   resolveCursorNative?: (instanceId?: string) => CursorNativeSessionService;
   resolveGooseNative?: (instanceId?: string) => GooseNativeSessionService;
   resolveKiroNative?: (instanceId?: string) => KiroNativeSessionService;
@@ -63,9 +66,18 @@ export function getRuntimeSessionManager(ctx: AppContext): RuntimeSessionManager
   return ctx.runtime;
 }
 
+export function getRuntimeDeliveryService(ctx: AppContext): RuntimeDeliveryService {
+  if (!ctx.delivery) {
+    ctx.delivery = new RuntimeDeliveryService({
+      registry: ctx.registry,
+    });
+  }
+  return ctx.delivery;
+}
+
 export function createRuntimeApp(ctx: AppContext) {
   ctx.runtime = getRuntimeSessionManager(ctx);
-  const app = new Hono();
+  const app = new Hono<{ Variables: { ctx: AppContext } }>();
   const __dirname = dirname(fileURLToPath(import.meta.url));
 
   // Serve the embedded dashboard UI without auth.
@@ -94,13 +106,14 @@ export function createRuntimeApp(ctx: AppContext) {
   app.use('*', bearerAuth(ctx.config));
 
   app.use('*', async (c, next) => {
-    c.set('ctx' as never, ctx);
+    c.set('ctx', ctx);
     await next();
   });
 
   app.route('/', healthRoutes);
   app.route('/', diagnosticsRoutes);
   app.route('/', discoveryRoutes);
+  app.route('/', deliveryRoutes);
   app.route('/', sessionRoutes);
   app.route('/', messageRoutes);
   app.route('/', historyRoutes);

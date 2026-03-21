@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft (Pending Review) |
+| **Status** | Implemented (Slice 1) |
 | **Owner** | Codex |
 | **Reviewer** | User / delivery-primitives workstream |
 
@@ -132,9 +132,48 @@ level a workspace ought to use.
 The first slice does not need every family to be equally deep. It does need one
 shared contract shape.
 
+## Implemented Slice 1
+
+The first runtime-owned delivery slice now ships with:
+
+- HTTP routes:
+  - `POST /delivery/audit`
+  - `POST /delivery/artifacts/publish`
+  - `POST /delivery/repo/status`
+  - `POST /delivery/repo/commit`
+  - `POST /delivery/repo/push`
+- Local-tool primitives:
+  - `audit-delivery-target`
+  - `publish-artifacts`
+  - `inspect-repo-status`
+  - `create-commit`
+  - `push-branch`
+- Shared machine-readable result fields:
+  - `action`
+  - `state`
+  - `contract`
+  - `authorization`
+  - `approval`
+  - `capabilities`
+  - `blockedReasons`
+  - `capabilityGaps`
+  - `warnings`
+  - `repo`
+  - `artifacts`
+  - `previewSurfaces`
+
+Slice-1 boundaries:
+
+- runtime supports artifact-only delivery without fake repo requirements
+- repo-backed flows currently stop at repo inspect / commit / push
+- preview metadata is normalized as runtime-owned preview surfaces derived from
+  artifacts and services
+- PR/check and preview/deploy integrations remain explicit future seams, not
+  hidden assumptions in the first slice
+
 ## Conceptual Model
 
-Illustrative runtime-side types:
+Implemented runtime-side shape:
 
 ```ts
 type DeliveryState =
@@ -145,22 +184,41 @@ type DeliveryState =
   | 'completed';
 
 interface RuntimeDeliveryRequest {
-  action: string;
-  cwd?: string;
+  action:
+    | 'audit-delivery-target'
+    | 'publish-artifacts'
+    | 'inspect-repo-status'
+    | 'create-commit'
+    | 'push-branch';
+  workspacePath?: string;
   sessionId?: string;
-  workspaceKey?: string;
-  outputDir?: string;
+  artifactIds?: string[];
+  apply?: boolean;
+  authorization?: {
+    actorRole?: string;
+    approved?: boolean;
+  };
   context?: Record<string, unknown>;
-  strict?: boolean;
 }
 
 interface RuntimeDeliveryResult {
-  action: string;
+  action: RuntimeDeliveryRequest['action'];
   state: DeliveryState;
-  requiresApproval?: boolean;
-  warnings?: string[];
-  blockedReasons?: string[];
-  outputs?: Array<Record<string, unknown>>;
+  contract: {
+    mode: 'preview' | 'apply';
+    applyRequested: boolean;
+    applyDecision: 'not_requested' | 'read_only_operation' | 'blocked' | 'applied';
+  };
+  approval: {
+    required: boolean;
+  };
+  capabilities: Record<string, { state: 'ready' | 'blocked' | 'unsupported' | 'degraded' }>;
+  blockedReasons: Array<Record<string, unknown>>;
+  capabilityGaps: Array<Record<string, unknown>>;
+  warnings: Array<Record<string, unknown>>;
+  repo: Record<string, unknown>;
+  artifacts: Array<Record<string, unknown>>;
+  previewSurfaces: Array<Record<string, unknown>>;
 }
 ```
 
@@ -202,12 +260,14 @@ structured delivery result
 - [ADR-015](../decisions/015-own-workspace-substrate-tools-in-cats-runtime.md)
 - [ADR-011](../decisions/011-runtime-owned-browser-and-preview-subsystem-with-pluggable-drivers.md)
 - [cats-inc ADR-022](../../../cats/docs/decisions/022-own-workspace-delivery-policy-in-product.md)
-- [cats-inc SPEC-024](../../../cats/docs/specs/SPEC-024-workspace-delivery-policy-and-governance-levels.md)
+- [cats-inc SPEC-024](../../../cats/docs/specs/SPEC-024-chat-delivery-policy-and-governance-levels.md)
 
 ## Open Questions
 
-- [ ] Which delivery action names should be part of the first stable HTTP/API
+- [x] Which delivery action names should be part of the first stable HTTP/API
       surface versus exposed first only through runtime-local tools?
+      First slice now freezes audit, artifact publish/export, repo status,
+      commit, and push in both HTTP and local-tool form.
 - [ ] Should PR and CI integration start as a single combined capability family
       or as separate adapters from the first slice?
 - [ ] Which artifact-publication actions need normalized metadata first:

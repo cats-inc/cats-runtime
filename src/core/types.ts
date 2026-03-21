@@ -56,6 +56,40 @@ export type WorkspaceSubstrateActorRole =
   | 'owner'
   | 'product_host'
   | 'operator';
+export type RuntimeDeliveryAction =
+  | 'audit-delivery-target'
+  | 'publish-artifacts'
+  | 'inspect-repo-status'
+  | 'create-commit'
+  | 'push-branch';
+export type RuntimeDeliveryState =
+  | 'ready'
+  | 'blocked'
+  | 'unsupported'
+  | 'degraded'
+  | 'completed';
+export type RuntimeDeliveryCapabilityState =
+  | 'ready'
+  | 'blocked'
+  | 'unsupported'
+  | 'degraded';
+export type RuntimeDeliveryApplyDecision =
+  | 'not_requested'
+  | 'read_only_operation'
+  | 'blocked'
+  | 'applied';
+export type RuntimePreviewSurfaceKind = 'service' | 'artifact';
+export type RuntimePreviewSurfaceSource =
+  | 'session_service'
+  | 'session_artifact'
+  | 'request_service'
+  | 'request_artifact'
+  | 'published_artifact';
+export type RuntimePreviewSurfaceRenderHint =
+  | 'iframe'
+  | 'open_external'
+  | 'download'
+  | 'none';
 export type SessionBranchMode = 'native_fork' | 'context_transplant';
 export type SessionBranchPreference = 'auto' | SessionBranchMode;
 
@@ -182,6 +216,201 @@ export interface WorkspaceSubstrateResult {
   actions: WorkspaceSubstrateAction[];
   applied: boolean;
   summary: WorkspaceSubstrateSummary;
+}
+
+export interface RuntimeDeliveryAuthorizationInput {
+  actorRole?: WorkspaceSubstrateActorRole;
+  approved?: boolean;
+}
+
+export interface RuntimeDeliveryAuthorization {
+  actorRole?: WorkspaceSubstrateActorRole;
+  approved: boolean;
+  canApply: boolean;
+  requiresApproval: boolean;
+  reason: string;
+}
+
+export interface RuntimeDeliveryContract {
+  mode: WorkspaceSubstrateExecutionMode;
+  safeDefaultMode: 'preview';
+  applyRequested: boolean;
+  applyDecision: RuntimeDeliveryApplyDecision;
+  readOnly: boolean;
+}
+
+export interface RuntimeDeliveryIssue {
+  code: string;
+  state: Exclude<RuntimeDeliveryCapabilityState, 'ready'>;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+export interface RuntimeDeliveryWarning {
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+export interface RuntimeDeliveryCapability {
+  supported: boolean;
+  available: boolean;
+  state: RuntimeDeliveryCapabilityState;
+  reason?: string;
+}
+
+export interface RuntimeDeliveryCapabilities {
+  artifactPublication: RuntimeDeliveryCapability;
+  repoStatus: RuntimeDeliveryCapability;
+  commit: RuntimeDeliveryCapability;
+  push: RuntimeDeliveryCapability;
+  previewSurfaces: RuntimeDeliveryCapability;
+}
+
+export interface RuntimeDeliveryApplyPayload {
+  action: RuntimeDeliveryAction;
+  workspacePath?: string;
+  sessionId?: string;
+  artifactIds?: string[];
+  apply: true;
+  authorization?: RuntimeDeliveryAuthorizationInput;
+  publication?: RuntimeArtifactPublicationRequest;
+  repo?: RuntimeRepoDeliveryRequest;
+  preview?: RuntimePreviewCollectionRequest;
+  context?: Record<string, unknown>;
+}
+
+export interface RuntimeDeliveryApprovalPayload {
+  required: boolean;
+  reason: string;
+  privilegedActorRoles: Array<'boss_cat' | 'system' | 'owner'>;
+  applyPayload?: RuntimeDeliveryApplyPayload;
+}
+
+export interface RuntimePreviewSurfaceProvenance {
+  sessionId?: string;
+  provider?: string;
+  workspacePath?: string;
+  artifactId?: string;
+  serviceId?: string;
+  publicationDirectory?: string;
+}
+
+export interface RuntimePreviewSurface {
+  id: string;
+  kind: RuntimePreviewSurfaceKind;
+  source: RuntimePreviewSurfaceSource;
+  status: RuntimeDeliveryCapabilityState;
+  label?: string;
+  renderHint: RuntimePreviewSurfaceRenderHint;
+  url?: string;
+  artifactId?: string;
+  path?: string;
+  mediaType?: string;
+  provenance?: RuntimePreviewSurfaceProvenance;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RuntimeArtifactPublicationRequest {
+  directory?: string;
+  manifestFileName?: string;
+  publicBaseUrl?: string;
+}
+
+export interface RuntimeArtifactPublicationRecord {
+  id: string;
+  label?: string;
+  sourcePath?: string;
+  sourceUri?: string;
+  outputPath?: string;
+  publicUrl?: string;
+  mediaType?: string;
+  sizeBytes?: number;
+  copied: boolean;
+  previewSurfaceId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RuntimeRepoDeliveryRequest {
+  message?: string;
+  stageAll?: boolean;
+  allowEmpty?: boolean;
+  remote?: string;
+  branch?: string;
+  setUpstream?: boolean;
+  forceWithLease?: boolean;
+}
+
+export interface RuntimePreviewCollectionRequest {
+  includeSessionArtifacts?: boolean;
+  includeSessionServices?: boolean;
+}
+
+export interface RuntimeRepoRemoteStatus {
+  name: string;
+  fetchUrl?: string;
+  pushUrl?: string;
+}
+
+export interface RuntimeRepoStatus {
+  supported: boolean;
+  repository: boolean;
+  rootPath?: string;
+  branch?: string | null;
+  detached: boolean;
+  clean?: boolean;
+  stagedCount?: number;
+  modifiedCount?: number;
+  untrackedCount?: number;
+  ahead?: number;
+  behind?: number;
+  remotes: RuntimeRepoRemoteStatus[];
+  defaultRemote?: string;
+  headOid?: string;
+}
+
+export interface RuntimeDeliveryRequest {
+  action: RuntimeDeliveryAction;
+  workspacePath?: string;
+  sessionId?: string;
+  artifactIds?: string[];
+  artifacts?: SessionArtifact[];
+  services?: AgentRuntimeService[];
+  apply?: boolean;
+  strict?: boolean;
+  authorization?: RuntimeDeliveryAuthorizationInput;
+  publication?: RuntimeArtifactPublicationRequest;
+  repo?: RuntimeRepoDeliveryRequest;
+  preview?: RuntimePreviewCollectionRequest;
+  context?: Record<string, unknown>;
+}
+
+export interface RuntimeDeliverySummary {
+  artifactCount: number;
+  publishedArtifactCount: number;
+  previewSurfaceCount: number;
+  readyPreviewSurfaceCount: number;
+  blockedReasonCount: number;
+  capabilityGapCount: number;
+}
+
+export interface RuntimeDeliveryResult {
+  action: RuntimeDeliveryAction;
+  state: RuntimeDeliveryState;
+  contract: RuntimeDeliveryContract;
+  authorization: RuntimeDeliveryAuthorization;
+  approval: RuntimeDeliveryApprovalPayload;
+  sessionId?: string;
+  workspacePath?: string;
+  capabilities: RuntimeDeliveryCapabilities;
+  warnings: RuntimeDeliveryWarning[];
+  blockedReasons: RuntimeDeliveryIssue[];
+  capabilityGaps: RuntimeDeliveryIssue[];
+  repo: RuntimeRepoStatus;
+  artifacts: RuntimeArtifactPublicationRecord[];
+  previewSurfaces: RuntimePreviewSurface[];
+  summary: RuntimeDeliverySummary;
+  metadata?: Record<string, unknown>;
 }
 
 export interface SessionContextTransplantMessage {
