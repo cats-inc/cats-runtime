@@ -117,7 +117,7 @@ function toProgressStreamEvent(
   target: ProviderTargetDescriptor,
   providerSessionId?: string,
 ): StreamEvent {
-  return {
+  const event: StreamEvent = {
     type: 'progress',
     providerSessionId,
     text: progress.message,
@@ -130,7 +130,9 @@ function toProgressStreamEvent(
       transport: target.remoteInstance?.transport,
       ...progress.metadata,
     },
-  } as unknown as StreamEvent;
+  };
+
+  return event;
 }
 
 export class ApiBackendManager {

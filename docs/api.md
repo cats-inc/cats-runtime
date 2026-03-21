@@ -213,6 +213,13 @@ Current normalized progress kinds:
 - `model_state`: local-model lifecycle hints such as Ollama `keep_alive`
   requests
 
+Provider payload templates remain transport-specific, but the current additive
+keys that `cats-runtime` recognizes are:
+
+- Gemini cache TTL override: `cachedContentTtl`, `cached_content_ttl`,
+  `contextCacheTtl`, or `context_cache_ttl`
+- Ollama warm-up hint: `keep_alive` or `keepAlive`
+
 For agent-backed sessions, streamed output may also surface normalized metadata
 such as:
 
@@ -411,4 +418,4 @@ Errors use this format:
 
 ---
 
-*Last updated: 2026-03-19*
+*Last updated: 2026-03-21*

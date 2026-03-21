@@ -167,7 +167,7 @@ export interface TurnInput {
 }
 
 export interface StreamEvent {
-  type: 'init' | 'text' | 'tool_use' | 'tool_result' | 'result' | 'error' | 'raw';
+  type: 'init' | 'text' | 'tool_use' | 'tool_result' | 'result' | 'error' | 'raw' | 'progress';
   sessionId?: string;
   providerSessionId?: string;
   text?: string;

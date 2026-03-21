@@ -1,6 +1,9 @@
 import { Hono } from 'hono';
-import { listConfiguredProviders, listProviderCatalog } from '../../core/providerCatalog.js';
-import { isProviderTargetResolutionError } from '../../core/providerCatalog.js';
+import {
+  isProviderTargetResolutionError,
+  listConfiguredProviders,
+  listProviderCatalog,
+} from '../../core/providerCatalog.js';
 import type { AppContext } from '../app.js';
 import { getRouteErrorStatus } from '../routeErrors.js';
 
