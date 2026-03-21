@@ -106,6 +106,13 @@ runtime phase truthfully, while `shutdown.stdinCloseEnabled` tells packaged or
 host-managed callers whether closing child stdin is part of the supported
 shutdown contract.
 
+Compatibility note: older consumers may have treated top-level `/health`
+`status` as effectively always `ok` once the process existed. That is no longer
+safe. `status` is now phase-aware (`starting` / `stopping` => `degraded`;
+`stopped` => `unavailable`). Use `readiness.ready` as the authoritative
+machine-readable readiness bit, and use `startup.phase` when the caller needs
+lifecycle-aware supervision or UI state.
+
 ### Runtime Diagnostics
 
 ```text
