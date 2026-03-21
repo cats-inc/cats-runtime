@@ -305,15 +305,7 @@ function sortSessionsByTimestamp(sessions: SessionInfo[]): SessionInfo[] {
 }
 
 function parseIncludeBranchCapabilities(value: string | undefined): boolean {
-  if (!value) {
-    return false;
-  }
-
-  const normalized = value.trim().toLowerCase();
-  return normalized === '1'
-    || normalized === 'true'
-    || normalized === 'full'
-    || normalized === 'capabilities';
+  return value === 'full';
 }
 
 function findReusableSession(

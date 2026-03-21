@@ -272,6 +272,7 @@ persisted branch observability (`lineage` / `transplant`) but skips capability
 resolution unless the caller opts in with `?branching=full`. Detail surfaces
 such as `GET /sessions/{id}`, `GET /sessions/{id}/lineage`, and successful
 `POST /sessions/{id}/fork` responses still include full capability truth.
+Other `branching` query values are ignored.
 
 `POST /sessions` also accepts these optional fields:
 

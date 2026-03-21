@@ -408,6 +408,19 @@ describe('session branching route', () => {
       ]);
       expect(vi.mocked(pool.getCapabilities)).not.toHaveBeenCalled();
 
+      const aliasResponse = await app.request('/sessions?branching=true');
+      expect(aliasResponse.status).toBe(200);
+      const aliasBody = await aliasResponse.json() as {
+        sessions: Array<{ id: string; branching: { capabilities?: unknown } }>;
+      };
+      expect(aliasBody.sessions).toEqual([
+        expect.objectContaining({
+          id: 'list-session',
+          branching: {},
+        }),
+      ]);
+      expect(vi.mocked(pool.getCapabilities)).not.toHaveBeenCalled();
+
       const fullResponse = await app.request('/sessions?branching=full');
       expect(fullResponse.status).toBe(200);
       const fullBody = await fullResponse.json() as {
