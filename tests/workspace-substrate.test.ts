@@ -165,6 +165,81 @@ describe('WorkspaceSubstrateService', () => {
     }
   });
 
+  it('plans update_managed actions for drifted runtime-managed files', async () => {
+    const { root, cleanup } = createWorkspace();
+    const service = new WorkspaceSubstrateService();
+
+    try {
+      await service.execute({
+        operation: 'init-workspace',
+        workspacePath: root,
+        profile: 'standard',
+        enabledAgents: ['codex'],
+        apply: true,
+        authorization: {
+          actorRole: 'boss_cat',
+        },
+      });
+
+      const agentsPath = join(root, 'AGENTS.md');
+      const managedContent = readFileSync(agentsPath, 'utf-8');
+      writeFileSync(
+        agentsPath,
+        managedContent.replace(
+          '- Prefer conservative updates over overwriting local customizations.',
+          [
+            '- Prefer conservative updates over overwriting local customizations.',
+            '- Local managed drift note for review coverage.',
+          ].join('\n'),
+        ),
+      );
+
+      const result = await service.execute({
+        operation: 'update-workspace',
+        workspacePath: root,
+        profile: 'standard',
+        enabledAgents: ['codex'],
+        authorization: {
+          actorRole: 'specialist_cat',
+        },
+      });
+
+      expect(result.applied).toBe(false);
+      expect(result.status).toBe('drifted');
+      expect(result.findings).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          path: 'AGENTS.md',
+          status: 'drifted',
+          managed: true,
+        }),
+      ]));
+      expect(result.actions).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          type: 'update',
+          path: 'AGENTS.md',
+          outputPath: 'AGENTS.md',
+          mergeStrategy: 'update_managed',
+          managed: true,
+          requiresApproval: true,
+          diffStats: expect.objectContaining({ changed: true }),
+        }),
+      ]));
+      expect(result.plan.changedPaths).toContain('AGENTS.md');
+      expect(result.plan.pendingApprovalPaths).toContain('AGENTS.md');
+      expect(result.plan.reviewCopyPaths).toEqual([]);
+      expect(result.approval).toMatchObject({
+        required: true,
+        blockedPaths: expect.arrayContaining(['AGENTS.md']),
+        applyPayload: expect.objectContaining({
+          operation: 'update-workspace',
+          apply: true,
+        }),
+      });
+    } finally {
+      cleanup();
+    }
+  });
+
   it('does not require approval when the workspace already matches the profile', async () => {
     const { root, cleanup } = createWorkspace();
     const service = new WorkspaceSubstrateService();

@@ -27,6 +27,7 @@ const MANAGED_MARKER = 'cats-runtime:workspace-substrate';
 const REVIEW_COPY_SUFFIX = '.bootstrap';
 const DEFAULT_STANDARD_AGENTS = ['claude', 'gemini', 'codex'] as const;
 const PRIVILEGED_ACTOR_ROLES = ['boss_cat', 'system', 'owner'] as const;
+type PrivilegedActorRole = (typeof PRIVILEGED_ACTOR_ROLES)[number];
 
 interface WorkspaceTemplateFile {
   path: string;
@@ -405,6 +406,13 @@ function isReadOnlyOperation(operation: WorkspaceSubstrateRequest['operation']):
   return operation === 'audit-workspace';
 }
 
+function isPrivilegedActorRole(
+  actorRole: WorkspaceSubstrateAuthorization['actorRole'],
+): actorRole is PrivilegedActorRole {
+  return actorRole !== undefined
+    && PRIVILEGED_ACTOR_ROLES.includes(actorRole as PrivilegedActorRole);
+}
+
 function createAuthorization(
   request: WorkspaceSubstrateRequest,
 ): WorkspaceSubstrateAuthorization {
@@ -424,7 +432,7 @@ function createAuthorization(
     };
   }
 
-  const privileged = actorRole === 'boss_cat' || actorRole === 'system' || actorRole === 'owner';
+  const privileged = isPrivilegedActorRole(actorRole);
 
   if (privileged || approved) {
     return {
@@ -778,7 +786,7 @@ export class WorkspaceSubstrateService {
           : approvalRequired
             ? 'Apply is blocked until Boss Cat, system, owner, or explicit approval authorizes the plan.'
             : 'Current actor context may apply this plan without additional approval.',
-      privilegedActorRoles: [...PRIVILEGED_ACTOR_ROLES] as Array<'boss_cat' | 'system' | 'owner'>,
+      privilegedActorRoles: [...PRIVILEGED_ACTOR_ROLES],
       blockedPaths: pendingApprovalPaths,
       applyPayload,
     };

@@ -497,6 +497,9 @@ These operations return structured JSON plans/results with:
 Behavioral boundaries:
 
 - Preview is the safe default for `init-workspace` and `update-workspace`.
+- Preview results may still report `plan.requiresApproval` / `approval.required`
+  to describe whether a later mutable apply would need authorization. This is
+  prospective approval metadata only; preview itself never writes.
 - `audit-workspace` is always read-only. Sending `apply: true` returns
   `contract.applyDecision: "read_only_operation"` and writes nothing.
 - Conflicting existing files are not overwritten. The plan uses
