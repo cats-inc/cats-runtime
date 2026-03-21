@@ -133,6 +133,7 @@ and `SIGTERM` are also handled where the host platform delivers them reliably.
 GET    /sessions
 POST   /sessions
 GET    /sessions/{id}
+GET    /sessions/{id}/lineage
 POST   /sessions/{id}/messages
 POST   /sessions/{id}/close
 POST   /sessions/{id}/resume
@@ -224,7 +225,47 @@ Session responses also include `workspaceKey`, a normalized grouping key for
 workspace-aware UIs. When a provider exposes multiple configured instances,
 session payloads also include `providerInstanceId`. Windows-style paths are
 case-folded in `workspaceKey` while `cwd` remains the original display path.
-API-backed and local-model sessions also include `providerBackend`.
+API-backed and local-model sessions also include `providerBackend`. Branch-aware
+session payloads now also include a `branching` block:
+
+```json
+{
+  "branching": {
+    "capabilities": {
+      "nativeFork": {
+        "supported": true,
+        "compatible": true,
+        "available": true
+      },
+      "contextTransplant": {
+        "supported": true
+      }
+    },
+    "lineage": {
+      "rootSessionId": "session-root",
+      "parentSessionId": "session-parent",
+      "branchMode": "context_transplant",
+      "parentProvider": "codex",
+      "childProvider": "gemini",
+      "createdAt": "2026-03-21T17:00:00.000Z",
+      "depth": 1,
+      "chain": [
+        { "sessionId": "session-parent", "provider": "codex" },
+        { "sessionId": "session-child", "provider": "gemini" }
+      ]
+    },
+    "transplant": {
+      "summary": "Parent branch already prepared the implementation diff.",
+      "labels": ["handoff"]
+    }
+  }
+}
+```
+
+`branching.capabilities.nativeFork` is the runtime-owned capability truth for a
+same-target child branch from the current session. `available: false` means the
+runtime already knows native fork cannot be honored from this parent, and
+`reason` explains why when relevant.
 
 `POST /sessions` also accepts these optional fields:
 
@@ -258,7 +299,52 @@ supports native fork semantics. Otherwise it falls back to
 `context_transplant` and returns a warning describing why the fallback was
 chosen.
 
-Session payloads may now include a machine-readable `lineage` object:
+Successful fork responses now also include a machine-readable `branch` result:
+
+```json
+{
+  "branch": {
+    "requestedMode": "auto",
+    "resolvedMode": "context_transplant",
+    "fallbackApplied": true,
+    "fallbackReason": "provider override requires context_transplant",
+    "target": {
+      "provider": "gemini",
+      "backend": "cli",
+      "instance": "default"
+    },
+    "capabilityTruth": {
+      "nativeFork": {
+        "supported": true,
+        "compatible": false,
+        "available": false,
+        "reason": "provider override requires context_transplant"
+      },
+      "contextTransplant": {
+        "supported": true
+      }
+    },
+    "transplant": {
+      "provided": true,
+      "source": "merged",
+      "summaryPresent": true,
+      "checkpointPresent": false,
+      "transcriptExcerptCount": 0,
+      "structuredBlockCount": 0,
+      "artifactCount": 0,
+      "labels": ["handoff"]
+    }
+  }
+}
+```
+
+If `mode: "native_fork"` is explicitly requested and cannot be honored, the
+runtime returns the usual error payload plus the same `branch` object with
+`resolvedMode` omitted. Hosts can use that branch object to surface the exact
+compatibility/fallback reason without re-implementing provider logic.
+
+Session payloads still expose the current session's machine-readable `lineage`
+object at top level for compatibility:
 
 ```json
 {
@@ -282,6 +368,51 @@ For `context_transplant`, `cats-runtime` creates a fresh child session and
 persists the handoff bundle as runtime-visible branch metadata plus child
 bootstrap instructions. The runtime does not decide product-level branch
 convergence or scheduling policy.
+
+`GET /sessions/{id}/lineage` provides lineage inspection/observability across
+the current registry:
+
+```json
+{
+  "session": { "...": "serialized session payload" },
+  "rootSessionId": "session-root",
+  "parentSessionId": "session-parent",
+  "ancestors": [
+    {
+      "sessionId": "session-root",
+      "provider": "codex",
+      "presentInRegistry": true
+    }
+  ],
+  "children": [
+    {
+      "id": "session-child",
+      "providerName": "gemini",
+      "branchMode": "context_transplant",
+      "relativeDepth": 1
+    }
+  ],
+  "descendants": [
+    {
+      "id": "session-child",
+      "providerName": "gemini",
+      "branchMode": "context_transplant",
+      "relativeDepth": 1
+    },
+    {
+      "id": "session-grandchild",
+      "providerName": "claude",
+      "branchMode": "context_transplant",
+      "relativeDepth": 2
+    }
+  ]
+}
+```
+
+`ancestors` is derived from stored lineage chain metadata, so
+`presentInRegistry: false` is possible when an ancestor is no longer retained
+locally. `children` and `descendants` are current-registry views and therefore
+only include sessions the runtime still knows about.
 
 `POST /sessions` accepts an optional `instance` field. When omitted, or when the
 caller explicitly sends `"default"`, `cats-runtime` uses the provider family's

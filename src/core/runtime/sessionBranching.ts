@@ -1,11 +1,19 @@
 import type {
   SessionArtifact,
+  SessionBranchCapabilityTruth,
+  SessionBranchDecision,
   SessionBranchLineage,
   SessionBranchMode,
+  SessionBranchObservability,
+  SessionBranchRequest,
+  SessionBranchTarget,
   SessionContextTransplant,
+  SessionContextTransplantSummary,
   SessionInfo,
   SessionInvocationContext,
   SessionLineageNode,
+  ProviderBackend,
+  ProviderCapabilities,
 } from '../types.js';
 
 const BRANCH_METADATA_NAMESPACE = 'catsRuntime';
@@ -294,6 +302,278 @@ export function buildChildLineage(input: {
     createdAt: input.createdAt || new Date().toISOString(),
     depth: chain.length - 1,
     chain,
+  };
+}
+
+interface BranchTargetLike {
+  providerName: string;
+  backend: ProviderBackend;
+  instanceId?: string;
+}
+
+interface BranchCapabilityInput {
+  parentSession: Pick<
+    SessionInfo,
+    | 'providerName'
+    | 'providerBackend'
+    | 'providerInstanceId'
+    | 'providerSessionId'
+    | 'workspaceMode'
+    | 'cwd'
+    | 'model'
+  >;
+  request: SessionBranchRequest;
+  target: BranchTargetLike;
+  parentCapabilities: Pick<ProviderCapabilities, 'fork'>;
+}
+
+function buildBranchTarget(target: BranchTargetLike): SessionBranchTarget {
+  return {
+    provider: target.providerName,
+    backend: target.backend,
+    instance: target.instanceId || 'default',
+  };
+}
+
+function isTransplantMessageArray(
+  value: SessionContextTransplant['transcriptExcerpt'],
+): value is NonNullable<SessionContextTransplant['transcriptExcerpt']> {
+  return Array.isArray(value) && value.length > 0;
+}
+
+function hasTransplantContent(
+  transplant?: SessionContextTransplant,
+): transplant is SessionContextTransplant {
+  return Boolean(
+    transplant
+    && (
+      transplant.summary
+      || transplant.checkpoint
+      || isTransplantMessageArray(transplant.transcriptExcerpt)
+      || (Array.isArray(transplant.structuredBlocks) && transplant.structuredBlocks.length > 0)
+      || (Array.isArray(transplant.artifacts) && transplant.artifacts.length > 0)
+      || (Array.isArray(transplant.labels) && transplant.labels.length > 0)
+      || (transplant.metadata && Object.keys(transplant.metadata).length > 0)
+    ),
+  );
+}
+
+function didRuntimeAugmentTransplant(
+  requested: SessionContextTransplant | undefined,
+  resolved: SessionContextTransplant,
+): boolean {
+  if (!requested) {
+    return true;
+  }
+
+  return (
+    (requested.summary === undefined && resolved.summary !== undefined)
+    || (requested.artifacts === undefined && (resolved.artifacts?.length ?? 0) > 0)
+    || ((requested.artifacts?.length ?? 0) < (resolved.artifacts?.length ?? 0))
+    || (requested.labels === undefined && (resolved.labels?.length ?? 0) > 0)
+    || ((requested.labels?.length ?? 0) < (resolved.labels?.length ?? 0))
+    || (requested.metadata === undefined && resolved.metadata !== undefined)
+    || (
+      requested.metadata !== undefined
+      && Object.keys(resolved.metadata || {}).length > Object.keys(requested.metadata).length
+    )
+  );
+}
+
+export function summarizeContextTransplant(
+  requested: SessionContextTransplant | undefined,
+  resolved: SessionContextTransplant | undefined,
+): SessionContextTransplantSummary {
+  if (!resolved || !hasTransplantContent(resolved)) {
+    return {
+      provided: false,
+      source: 'none',
+      summaryPresent: false,
+      checkpointPresent: false,
+      transcriptExcerptCount: 0,
+      structuredBlockCount: 0,
+      artifactCount: 0,
+      labels: [],
+    };
+  }
+
+  let source: SessionContextTransplantSummary['source'] = 'default';
+  if (hasTransplantContent(requested)) {
+    source = didRuntimeAugmentTransplant(requested, resolved) ? 'merged' : 'request';
+  }
+
+  return {
+    provided: true,
+    source,
+    summaryPresent: typeof resolved.summary === 'string' && resolved.summary.length > 0,
+    checkpointPresent: typeof resolved.checkpoint === 'string' && resolved.checkpoint.length > 0,
+    transcriptExcerptCount: resolved.transcriptExcerpt?.length ?? 0,
+    structuredBlockCount: resolved.structuredBlocks?.length ?? 0,
+    artifactCount: resolved.artifacts?.length ?? 0,
+    labels: resolved.labels ? [...resolved.labels] : [],
+  };
+}
+
+export function isNativeForkCompatible(
+  session: BranchCapabilityInput['parentSession'],
+  target: BranchTargetLike,
+  request: SessionBranchRequest,
+): { compatible: boolean; reason?: string } {
+  if (session.providerName !== target.providerName) {
+    return { compatible: false, reason: 'provider override requires context_transplant' };
+  }
+  if ((session.providerBackend || 'cli') !== target.backend) {
+    return { compatible: false, reason: 'backend override requires context_transplant' };
+  }
+  if ((session.providerInstanceId || 'default') !== (target.instanceId || 'default')) {
+    return { compatible: false, reason: 'instance override requires context_transplant' };
+  }
+  if (request.model !== undefined && request.model !== session.model) {
+    return { compatible: false, reason: 'model override requires context_transplant' };
+  }
+  if (request.cwd !== undefined && request.cwd !== session.cwd) {
+    return { compatible: false, reason: 'workspace cwd override requires context_transplant' };
+  }
+  if (request.workspaceMode !== undefined && request.workspaceMode !== session.workspaceMode) {
+    return { compatible: false, reason: 'workspace mode override requires context_transplant' };
+  }
+
+  return { compatible: true };
+}
+
+export function buildSessionBranchCapabilityTruth(
+  input: BranchCapabilityInput,
+): SessionBranchCapabilityTruth {
+  const compatibility = isNativeForkCompatible(
+    input.parentSession,
+    input.target,
+    input.request,
+  );
+  const reason = input.parentSession.providerName === 'cursor'
+    && (input.parentSession.providerBackend || 'cli') === 'cli'
+    ? 'Cursor native session forking will be enabled after Cursor execution support lands.'
+    : (input.parentSession.providerBackend || 'cli') === 'cli'
+      && !input.parentSession.providerSessionId
+      ? 'No provider session ID to fork from'
+      : !input.parentCapabilities.fork
+        ? `Provider '${input.parentSession.providerName}' does not support native fork`
+        : !compatibility.compatible
+          ? compatibility.reason
+          : undefined;
+
+  return {
+    nativeFork: {
+      supported: input.parentCapabilities.fork,
+      compatible: compatibility.compatible,
+      available: reason === undefined,
+      reason,
+    },
+    contextTransplant: {
+      supported: true,
+    },
+  };
+}
+
+export function buildSessionSelfBranchCapabilityTruth(
+  session: Pick<
+    SessionInfo,
+    | 'providerName'
+    | 'providerBackend'
+    | 'providerInstanceId'
+    | 'providerSessionId'
+    | 'workspaceMode'
+    | 'cwd'
+    | 'model'
+  >,
+  parentCapabilities: Pick<ProviderCapabilities, 'fork'>,
+): SessionBranchCapabilityTruth {
+  return buildSessionBranchCapabilityTruth({
+    parentSession: session,
+    request: {},
+    target: {
+      providerName: session.providerName,
+      backend: session.providerBackend || 'cli',
+      instanceId: session.providerInstanceId,
+    },
+    parentCapabilities,
+  });
+}
+
+function toBranchErrorStatus(reason: string | undefined): 400 | 409 | 500 | 501 {
+  if (!reason) {
+    return 500;
+  }
+  if (reason.startsWith('Provider ') || reason.startsWith('Cursor ')) {
+    return 501;
+  }
+  if (reason === 'No provider session ID to fork from') {
+    return 400;
+  }
+  return 409;
+}
+
+export function resolveSessionBranchDecision(
+  input: BranchCapabilityInput,
+): SessionBranchDecision {
+  const requestedMode = input.request.mode ?? 'auto';
+  const capabilityTruth = buildSessionBranchCapabilityTruth(input);
+  const result: SessionBranchDecision = {
+    requestedMode,
+    fallbackApplied: false,
+    target: buildBranchTarget(input.target),
+    capabilityTruth,
+    warnings: [],
+  };
+
+  if (requestedMode === 'native_fork') {
+    if (!capabilityTruth.nativeFork.available) {
+      return {
+        ...result,
+        error: {
+          status: toBranchErrorStatus(capabilityTruth.nativeFork.reason),
+          message: capabilityTruth.nativeFork.reason || 'Native fork is unavailable',
+        },
+      };
+    }
+    return {
+      ...result,
+      resolvedMode: 'native_fork',
+    };
+  }
+
+  if (requestedMode === 'context_transplant') {
+    return {
+      ...result,
+      resolvedMode: 'context_transplant',
+    };
+  }
+
+  if (capabilityTruth.nativeFork.available) {
+    return {
+      ...result,
+      resolvedMode: 'native_fork',
+    };
+  }
+
+  const fallbackReason = capabilityTruth.nativeFork.reason || 'Native fork is unavailable';
+  return {
+    ...result,
+    resolvedMode: 'context_transplant',
+    fallbackApplied: true,
+    fallbackReason,
+    warnings: [`Falling back to context_transplant: ${fallbackReason}.`],
+  };
+}
+
+export function buildSessionBranchObservability(input: {
+  capabilityTruth: SessionBranchCapabilityTruth;
+  lineage?: SessionBranchLineage;
+  transplant?: SessionContextTransplant;
+}): SessionBranchObservability {
+  return {
+    capabilities: cloneMetadata(input.capabilityTruth),
+    ...(input.lineage ? { lineage: cloneMetadata(input.lineage) } : {}),
+    ...(input.transplant ? { transplant: cloneMetadata(input.transplant) } : {}),
   };
 }
 

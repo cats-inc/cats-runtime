@@ -152,6 +152,65 @@ export interface SessionBranchLineage {
   chain: SessionLineageNode[];
 }
 
+export interface SessionBranchTarget {
+  provider: string;
+  backend: ProviderBackend;
+  instance: string;
+}
+
+export interface SessionBranchNativeForkCapabilityTruth {
+  supported: boolean;
+  compatible: boolean;
+  available: boolean;
+  reason?: string;
+}
+
+export interface SessionBranchContextTransplantCapabilityTruth {
+  supported: boolean;
+}
+
+export interface SessionBranchCapabilityTruth {
+  nativeFork: SessionBranchNativeForkCapabilityTruth;
+  contextTransplant: SessionBranchContextTransplantCapabilityTruth;
+}
+
+export type SessionContextTransplantSource = 'none' | 'default' | 'request' | 'merged';
+
+export interface SessionContextTransplantSummary {
+  provided: boolean;
+  source: SessionContextTransplantSource;
+  summaryPresent: boolean;
+  checkpointPresent: boolean;
+  transcriptExcerptCount: number;
+  structuredBlockCount: number;
+  artifactCount: number;
+  labels: string[];
+}
+
+export interface SessionBranchOperationResult {
+  requestedMode: SessionBranchPreference;
+  resolvedMode?: SessionBranchMode;
+  fallbackApplied: boolean;
+  fallbackReason?: string;
+  target: SessionBranchTarget;
+  capabilityTruth: SessionBranchCapabilityTruth;
+  transplant?: SessionContextTransplantSummary;
+}
+
+export interface SessionBranchDecision extends SessionBranchOperationResult {
+  warnings: string[];
+  error?: {
+    status: 400 | 409 | 500 | 501;
+    message: string;
+  };
+}
+
+export interface SessionBranchObservability {
+  capabilities: SessionBranchCapabilityTruth;
+  lineage?: SessionBranchLineage;
+  transplant?: SessionContextTransplant;
+}
+
 export interface SessionBranchRequest {
   mode?: SessionBranchPreference;
   provider?: string;

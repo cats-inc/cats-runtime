@@ -164,8 +164,11 @@ src/
 
 - Hosts backend-neutral runtime primitives that are not owned by any one
   provider backend
-- Keeps session branching helpers policy-neutral while exposing native-fork vs
-  context-transplant lineage metadata
+- Resolves session branch mode/capability truth centrally so `native_fork`,
+  `context_transplant`, and fallback semantics do not live as ad-hoc route
+  conditionals
+- Keeps session branching helpers policy-neutral while exposing lineage,
+  context-transplant metadata, and machine-readable branch result payloads
 - Owns deterministic workspace substrate planning/apply logic independently of
   product shells or skills
 
@@ -198,7 +201,9 @@ src/
    runtime-owned host integration surface
 9. Optional machine-readable process output emits startup and shutdown
    lifecycle events for app-managed local hosts
-10. Stream events are returned directly to the caller
+10. Session branch inspection is available over session payload `branching`
+    metadata plus `GET /sessions/{id}/lineage`
+11. Stream events are returned directly to the caller
 
 For WSL-backed Cursor/Kiro discovery:
 
@@ -256,6 +261,8 @@ the only durable memory surface for the Cats suite.
   `src/core/tools`, not inside one backend
 - Session branching should stay an execution primitive in runtime; product
   layers own branch policy, convergence, and delegation semantics
+- Hosts should consume runtime-owned `branch`/`branching` metadata rather than
+  rebuilding native-fork compatibility logic above the runtime
 - Keep `.env` focused on runtime-wide values; provider topology belongs in
   `config/providers.yaml`
 

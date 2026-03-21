@@ -6,6 +6,7 @@ import { loadConfig } from '../src/core/config.js';
 import { createRuntimeApp } from '../src/http/app.js';
 import { SessionRegistry } from '../src/backends/cli/pool/SessionRegistry.js';
 import type { WorkerPool } from '../src/backends/cli/pool/WorkerPool.js';
+import type { ProviderCapabilities } from '../src/core/types.js';
 
 function createTestConfig() {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-branch-'));
@@ -51,9 +52,14 @@ function createTestConfig() {
   };
 }
 
-function createMockPool(): WorkerPool {
+function createMockPool(
+  capabilityResolver: (
+    providerName: string,
+    _instanceId?: string,
+  ) => ProviderCapabilities = () => ({ resume: true, fork: true, permissions: true }),
+): WorkerPool {
   return {
-    getCapabilities: vi.fn(() => ({ resume: true, fork: true, permissions: true })),
+    getCapabilities: vi.fn(capabilityResolver),
     get: vi.fn(() => undefined),
     isAttached: vi.fn(() => false),
     spawn: vi.fn(() => undefined),
@@ -100,6 +106,21 @@ describe('session branching route', () => {
       const body = await response.json() as {
         id: string;
         lineage: { branchMode: string; parentSessionId: string; chain: Array<{ sessionId: string }> };
+        branching: {
+          capabilities: {
+            nativeFork: { available: boolean };
+          };
+        };
+        branch: {
+          requestedMode: string;
+          resolvedMode: string;
+          target: { provider: string; backend: string; instance: string };
+          fallbackApplied: boolean;
+          capabilityTruth: {
+            nativeFork: { available: boolean };
+          };
+          transplant: { provided: boolean; source: string };
+        };
       };
       expect(response.status).toBe(201);
       expect(body.lineage).toMatchObject({
@@ -110,6 +131,26 @@ describe('session branching route', () => {
         { sessionId: 'parent-native', provider: 'codex' },
         { sessionId: body.id, provider: 'codex' },
       ]);
+      expect(body.branching.capabilities.nativeFork.available).toBe(true);
+      expect(body.branch).toMatchObject({
+        requestedMode: 'auto',
+        resolvedMode: 'native_fork',
+        fallbackApplied: false,
+        target: {
+          provider: 'codex',
+          backend: 'cli',
+          instance: 'default',
+        },
+        capabilityTruth: {
+          nativeFork: {
+            available: true,
+          },
+        },
+        transplant: {
+          provided: false,
+          source: 'none',
+        },
+      });
       expect(vi.mocked(pool.spawn)).toHaveBeenCalledWith(
         body.id,
         'codex',
@@ -175,6 +216,22 @@ describe('session branching route', () => {
         id: string;
         providerName: string;
         lineage: { branchMode: string; parentSessionId: string };
+        branching: {
+          transplant: { summary?: string; labels?: string[] };
+        };
+        branch: {
+          requestedMode: string;
+          resolvedMode: string;
+          fallbackApplied: boolean;
+          fallbackReason?: string;
+          target: { provider: string; backend: string; instance: string };
+          transplant: {
+            provided: boolean;
+            source: string;
+            summaryPresent: boolean;
+            labels: string[];
+          };
+        };
         warnings?: string[];
       };
 
@@ -185,6 +242,24 @@ describe('session branching route', () => {
         parentSessionId: 'parent-transplant',
       });
       expect(body.warnings?.[0]).toContain('provider override requires context_transplant');
+      expect(body.branch).toMatchObject({
+        requestedMode: 'auto',
+        resolvedMode: 'context_transplant',
+        fallbackApplied: true,
+        fallbackReason: 'provider override requires context_transplant',
+        target: {
+          provider: 'gemini',
+          backend: 'cli',
+          instance: 'default',
+        },
+        transplant: {
+          provided: true,
+          source: 'merged',
+          summaryPresent: true,
+          labels: ['parent-label', 'handoff-label'],
+        },
+      });
+      expect(body.branching.transplant?.summary).toBe('Handoff summary');
 
       const child = registry.get(body.id);
       expect(child?.providerSessionId).toBeUndefined();
@@ -205,6 +280,179 @@ describe('session branching route', () => {
         }),
         undefined,
       );
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('returns machine-readable branch failure details when native fork is incompatible', async () => {
+    const { config, cleanup } = createTestConfig();
+    const registry = new SessionRegistry();
+    const pool = createMockPool();
+    const app = createRuntimeApp({
+      config,
+      registry,
+      pool,
+      cursorNative: {} as never,
+      gooseNative: {} as never,
+      kiroNative: {} as never,
+      auggieSessions: {} as never,
+      opencodeNative: {} as never,
+    } as never);
+
+    try {
+      const parent = registry.create({
+        id: 'parent-native-failure',
+        providerName: 'codex',
+        cwd: join(config.sessionBaseDir, 'repo'),
+        workspaceMode: 'shared',
+        model: 'gpt-5.4',
+      });
+      registry.setProviderSessionId(parent.id, 'thread-parent');
+      registry.updateStatus(parent.id, 'closed');
+
+      const response = await app.request(`/sessions/${parent.id}/fork`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'native_fork',
+          provider: 'gemini',
+        }),
+      });
+
+      const body = await response.json() as {
+        error: string;
+        branch: {
+          requestedMode: string;
+          resolvedMode?: string;
+          target: { provider: string; backend: string; instance: string };
+          capabilityTruth: {
+            nativeFork: {
+              supported: boolean;
+              compatible: boolean;
+              available: boolean;
+              reason?: string;
+            };
+          };
+        };
+      };
+
+      expect(response.status).toBe(409);
+      expect(body.error).toContain('provider override requires context_transplant');
+      expect(body.branch).toMatchObject({
+        requestedMode: 'native_fork',
+        target: {
+          provider: 'gemini',
+          backend: 'cli',
+          instance: 'default',
+        },
+        capabilityTruth: {
+          nativeFork: {
+            supported: true,
+            compatible: false,
+            available: false,
+            reason: 'provider override requires context_transplant',
+          },
+        },
+      });
+      expect(body.branch.resolvedMode).toBeUndefined();
+      expect(vi.mocked(pool.spawn)).not.toHaveBeenCalled();
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('inspects branch lineage across children and descendants', async () => {
+    const { config, cleanup } = createTestConfig();
+    const registry = new SessionRegistry();
+    const pool = createMockPool();
+    const app = createRuntimeApp({
+      config,
+      registry,
+      pool,
+      cursorNative: {} as never,
+      gooseNative: {} as never,
+      kiroNative: {} as never,
+      auggieSessions: {} as never,
+      opencodeNative: {} as never,
+    } as never);
+
+    try {
+      const root = registry.create({
+        id: 'root-session',
+        providerName: 'codex',
+        cwd: join(config.sessionBaseDir, 'repo'),
+        workspaceMode: 'shared',
+        model: 'gpt-5.4',
+      });
+      registry.updateStatus(root.id, 'closed');
+
+      const childResponse = await app.request(`/sessions/${root.id}/fork`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'context_transplant',
+          transplant: {
+            summary: 'child handoff',
+          },
+        }),
+      });
+      const childBody = await childResponse.json() as { id: string };
+      expect(childResponse.status).toBe(201);
+
+      const grandchildResponse = await app.request(`/sessions/${childBody.id}/fork`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'context_transplant',
+          provider: 'gemini',
+          transplant: {
+            summary: 'grandchild handoff',
+          },
+        }),
+      });
+      const grandchildBody = await grandchildResponse.json() as { id: string };
+      expect(grandchildResponse.status).toBe(201);
+
+      const response = await app.request(`/sessions/${root.id}/lineage`);
+      const body = await response.json() as {
+        session: {
+          id: string;
+          branching: {
+            capabilities: {
+              nativeFork: { available: boolean };
+            };
+          };
+        };
+        rootSessionId: string;
+        parentSessionId: string | null;
+        ancestors: Array<{ sessionId: string; provider: string; presentInRegistry: boolean }>;
+        children: Array<{ id: string; relativeDepth: number }>;
+        descendants: Array<{ id: string; relativeDepth: number }>;
+      };
+
+      expect(response.status).toBe(200);
+      expect(body.session.id).toBe('root-session');
+      expect(body.session.branching.capabilities.nativeFork.available).toBe(false);
+      expect(body.rootSessionId).toBe('root-session');
+      expect(body.parentSessionId).toBeNull();
+      expect(body.ancestors).toEqual([]);
+      expect(body.children).toEqual([
+        expect.objectContaining({
+          id: childBody.id,
+          relativeDepth: 1,
+        }),
+      ]);
+      expect(body.descendants).toEqual([
+        expect.objectContaining({
+          id: childBody.id,
+          relativeDepth: 1,
+        }),
+        expect.objectContaining({
+          id: grandchildBody.id,
+          relativeDepth: 2,
+        }),
+      ]);
     } finally {
       cleanup();
     }

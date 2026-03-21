@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft (Pending Review) |
+| **Status** | Implemented (Slice 1) |
 | **Owner** | Codex |
 | **Reviewer** | User / orchestration-runtime workstream |
 
@@ -175,6 +175,28 @@ The first slice should not require:
 - workflow-aware runtime scheduling
 - product-specific `Boss Cat` semantics
 
+## Slice 1 Delivery
+
+Implemented in `cats-runtime` on 2026-03-21:
+
+- `POST /sessions/{id}/fork` now returns a machine-readable `branch` result
+  that freezes requested mode, resolved mode, target, capability truth, and
+  fallback semantics
+- session payloads now expose a `branching` block with native-fork capability
+  truth plus persisted lineage/transplant metadata
+- `GET /sessions/{id}/lineage` now exposes parent/root ancestry plus
+  current-registry child and descendant inspection
+- explicit `native_fork` failures now return the same `branch` shape alongside
+  the HTTP error so hosts do not need to re-derive compatibility rules
+
+Current first-slice contract intentionally remains minimal:
+
+- native fork compatibility is resolved by runtime against provider/backend/
+  instance/workspace/model compatibility
+- context transplant persists a curated handoff bundle and bootstrap
+  instructions, not full provider-native transcript surgery
+- lineage inspection is HTTP-first; dashboard-specific surfacing can follow
+
 ## Dependencies
 
 - [SPEC-003](./SPEC-003-agent-backend.md)
@@ -190,11 +212,13 @@ The first slice should not require:
 - [ ] Should transcript excerpts evolve beyond simple user/assistant text into a
       richer block format that can retain tool results, structured data, or
       diagram references?
-- [ ] Which session inspection surfaces should expose branch lineage first:
-      HTTP only, dashboard only, or both?
-- [ ] Should branch creation reuse the current `/sessions/{id}/fork` route with
+- [x] Which session inspection surfaces should expose branch lineage first:
+      HTTP first via session payload metadata and `GET /sessions/{id}/lineage`;
+      dashboard surfacing can remain additive later.
+- [x] Should branch creation reuse the current `/sessions/{id}/fork` route with
       a richer request body, or should native fork and context transplant split
       into two explicit routes later?
+      Slice 1 keeps a single richer `/sessions/{id}/fork` contract.
 
 ## References
 

@@ -9,7 +9,7 @@
 | Core | Completed | Embedded CLI runtime, session registry, discovery, and worker pool are in-repo |
 | API Backends | In Progress | `src/backends/api` now runs Claude, Codex/OpenAI, Gemini, and Ollama with runtime-managed sessions, provider-native continuation/caching optimizations, first-slice provider-agnostic `progress` events, and a shared local tool loop with patch/file/search/shell support; health probes and broader tool/model discovery remain |
 | Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, and an Agent SDK bridge as the second validation target |
-| HTTP API | Completed | Health, sessions, messages, history, observe, and provider management routes are served directly from `cats-runtime` |
+| HTTP API | Completed | Health, sessions, messages, history, observe, provider management, and session branch-lineage inspection routes are served directly from `cats-runtime` |
 | Dashboard | Completed | The embedded dashboard UI is served from `GET /` |
 | Tests | Completed | Vitest covers provider, discovery, pool, HTTP, server bootstrap, and API/local tool-loop behavior |
 | Docs | In Progress | Core docs now cover the generic provider model catalog route, first-slice API/local progress events, and runtime-owned cache/fallback semantics, but later PLAN-003/PLAN-005 follow-on items still need ongoing updates |
@@ -164,6 +164,33 @@ adapter end to end through the existing HTTP surface.
 - [ ] Add `pi --list-models` helper/parsing and hand it off to the future provider model-catalog work
 - [ ] Deepen Pi-native transcript/history surfacing so resumed/fallback Pi sessions do not rely on generic JSONL heuristics alone
 
+### WP-5: Session Fork, Context Transplant, and Lineage Primitives
+
+**Status**: Completed  
+**Assigned**: Codex  
+**Priority**: P1
+
+#### Goal
+
+Freeze the runtime-side branching primitive that later room/workflow layers can
+build on, without moving branch policy into `cats-runtime`.
+
+#### Delivered
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Stabilize `POST /sessions/{id}/fork` | [x] | Runtime now returns machine-readable branch mode resolution, target, capability truth, and fallback metadata |
+| Formalize context transplant request/response contract | [x] | Branch responses now summarize whether transplant content was requested, defaulted, or merged |
+| Add lineage inspection / observability | [x] | `GET /sessions/{id}/lineage` exposes ancestors, children, and descendants |
+| Surface capability truth and fallback semantics | [x] | Session payloads now include `branching.capabilities`; explicit native-fork failures return the same branch contract alongside the error |
+| Cover the branching contract with automated tests | [x] | Vitest covers native fork success, auto fallback, explicit failure, and lineage inspection |
+| Update runtime docs/specs/progress | [x] | `api.md`, `architecture.md`, `AGENT-GUIDE.md`, `SPEC-011`, and `PROGRESS.md` now reflect the delivered slice |
+
+#### Verification
+
+- [x] `npm run build`
+- [x] `npx vitest run tests/session-branching.test.ts --pool=threads --poolOptions.threads.singleThread`
+
 ---
 
-*Last updated: 2026-03-19*
+*Last updated: 2026-03-21*

@@ -16,6 +16,7 @@ import type {
 } from '../../backends/cli/pool/types.js';
 import type {
   SessionArtifact,
+  SessionBranchCapabilityTruth,
   SessionBranchRequest,
   SessionContextTransplant,
   SessionReusePolicy,
@@ -46,14 +47,25 @@ import {
 } from '../../core/providerCatalog.js';
 import {
   attachBranchMetadata,
+  buildSessionBranchObservability,
+  buildSessionSelfBranchCapabilityTruth,
   buildChildLineage,
   buildContextTransplantInstructions,
   buildDefaultContextTransplant,
+  getSessionContextTransplant,
   getSessionLineage,
+  resolveSessionBranchDecision,
+  summarizeContextTransplant,
 } from '../../core/runtime/sessionBranching.js';
 import { parseInvocationContext, parseOptionalString, parseStringArray } from '../parsing.js';
 
-export const sessionRoutes = new Hono();
+interface SessionRouteEnv {
+  Variables: {
+    ctx: AppContext;
+  };
+}
+
+export const sessionRoutes = new Hono<SessionRouteEnv>();
 
 const REUSE_POLICIES = new Set<SessionReusePolicy>([
   'create_new',
@@ -63,13 +75,60 @@ const REUSE_POLICIES = new Set<SessionReusePolicy>([
 
 type NativeCleanupResult = boolean | 'stale_config';
 
+function buildUnavailableBranchCapabilityTruth(
+  reason: string,
+): SessionBranchCapabilityTruth {
+  return {
+    nativeFork: {
+      supported: false,
+      compatible: true,
+      available: false,
+      reason,
+    },
+    contextTransplant: {
+      supported: true,
+    },
+  };
+}
+
+function resolveSessionBranching(ctx: AppContext, session: SessionInfo) {
+  const runtime = getRuntimeSessionManager(ctx);
+  const lineage = getSessionLineage(session);
+  const transplant = getSessionContextTransplant(session);
+
+  let capabilityTruth: SessionBranchCapabilityTruth;
+  try {
+    const caps = runtime.getCapabilities(
+      session.providerName,
+      session.providerInstanceId,
+      session.providerBackend,
+    );
+    capabilityTruth = buildSessionSelfBranchCapabilityTruth(session, caps);
+  } catch (error) {
+    capabilityTruth = buildUnavailableBranchCapabilityTruth(
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+
+  return buildSessionBranchObservability({
+    capabilityTruth,
+    lineage,
+    transplant,
+  });
+}
+
 function serializeSession(ctx: AppContext, session: SessionInfo) {
   const view = toSessionView(session, {
     attached: getRuntimeSessionManager(ctx).isAttached(session.id),
     externalSessionLiveWindowMs: ctx.config.externalSessionLiveWindowMs,
   });
   const lineage = getSessionLineage(session);
-  return lineage ? { ...view, lineage } : view;
+  const branching = resolveSessionBranching(ctx, session);
+  return {
+    ...view,
+    branching,
+    ...(lineage ? { lineage } : {}),
+  };
 }
 
 function serializeSessions(
@@ -82,7 +141,12 @@ function serializeSessions(
   });
   return views.map((view, index) => {
     const lineage = getSessionLineage(sessions[index]);
-    return lineage ? { ...view, lineage } : view;
+    const branching = resolveSessionBranching(ctx, sessions[index]);
+    return {
+      ...view,
+      branching,
+      ...(lineage ? { lineage } : {}),
+    };
   });
 }
 
@@ -199,31 +263,31 @@ function selectBranchTargetInstance(
   return session.providerInstanceId;
 }
 
-function isNativeForkCompatible(
+function serializeLineageRelation(
   session: SessionInfo,
-  target: ProviderTargetDescriptor,
-  request: SessionBranchRequest,
-): { compatible: boolean; reason?: string } {
-  if (session.providerName !== target.providerName) {
-    return { compatible: false, reason: 'provider override requires context_transplant' };
-  }
-  if ((session.providerBackend || 'cli') !== target.backend) {
-    return { compatible: false, reason: 'backend override requires context_transplant' };
-  }
-  if ((session.providerInstanceId || 'default') !== target.instanceId) {
-    return { compatible: false, reason: 'instance override requires context_transplant' };
-  }
-  if (request.model !== undefined && request.model !== session.model) {
-    return { compatible: false, reason: 'model override requires context_transplant' };
-  }
-  if (request.cwd !== undefined && request.cwd !== session.cwd) {
-    return { compatible: false, reason: 'workspace cwd override requires context_transplant' };
-  }
-  if (request.workspaceMode !== undefined && request.workspaceMode !== session.workspaceMode) {
-    return { compatible: false, reason: 'workspace mode override requires context_transplant' };
-  }
+  relativeToSessionId: string,
+) {
+  const lineage = getSessionLineage(session);
+  const relativeIndex = lineage?.chain.findIndex((entry) => entry.sessionId === relativeToSessionId) ?? -1;
+  return {
+    id: session.id,
+    providerName: session.providerName,
+    status: session.status,
+    parentSessionId: lineage?.parentSessionId,
+    rootSessionId: lineage?.rootSessionId ?? session.id,
+    branchMode: lineage?.branchMode,
+    createdAt: lineage?.createdAt ?? session.createdAt,
+    depth: lineage?.depth ?? 0,
+    relativeDepth: relativeIndex >= 0
+      ? lineage!.chain.length - 1 - relativeIndex
+      : 0,
+  };
+}
 
-  return { compatible: true };
+function sortSessionsByTimestamp(sessions: SessionInfo[]): SessionInfo[] {
+  return [...sessions].sort((left, right) =>
+    Date.parse(left.createdAt) - Date.parse(right.createdAt),
+  );
 }
 
 function findReusableSession(
@@ -628,7 +692,7 @@ async function verifyProviderDiscoveryStateDeleted(
 
 /** POST /sessions — create a new runtime-owned session */
 sessionRoutes.post('/sessions', async (c) => {
-  const ctx = c.get('ctx' as never) as AppContext;
+  const ctx = c.get('ctx');
   const body = await c.req.json<{
     provider?: string;
     instance?: string;
@@ -935,7 +999,7 @@ sessionRoutes.post('/sessions', async (c) => {
 
 /** GET /sessions — list sessions */
 sessionRoutes.get('/sessions', (c) => {
-  const ctx = c.get('ctx' as never) as AppContext;
+  const ctx = c.get('ctx');
 
   const status = c.req.query('status') as SessionStatus | undefined;
   const provider = c.req.query('provider');
@@ -953,7 +1017,7 @@ sessionRoutes.get('/sessions', (c) => {
 
 /** GET /sessions/:id — get session details */
 sessionRoutes.get('/sessions/:id', (c) => {
-  const ctx = c.get('ctx' as never) as AppContext;
+  const ctx = c.get('ctx');
   const session = ctx.registry.get(c.req.param('id'));
 
   if (!session) {
@@ -963,9 +1027,52 @@ sessionRoutes.get('/sessions/:id', (c) => {
   return c.json(serializeSession(ctx, session));
 });
 
+/** GET /sessions/:id/lineage — inspect branch ancestry/descendants */
+sessionRoutes.get('/sessions/:id/lineage', (c) => {
+  const ctx = c.get('ctx');
+  const session = ctx.registry.get(c.req.param('id'));
+
+  if (!session) {
+    return c.json({ error: 'Session not found' }, 404);
+  }
+
+  const sessions = ctx.registry.list();
+  const lineage = getSessionLineage(session);
+  const sessionsById = new Map(sessions.map((entry) => [entry.id, entry]));
+  const ancestors = (lineage?.chain.slice(0, -1) || []).map((entry) => ({
+    sessionId: entry.sessionId,
+    provider: entry.provider,
+    presentInRegistry: sessionsById.has(entry.sessionId),
+  }));
+  const children = sortSessionsByTimestamp(
+    sessions.filter((candidate) => getSessionLineage(candidate)?.parentSessionId === session.id),
+  ).map((candidate) => serializeLineageRelation(candidate, session.id));
+  const descendants = sortSessionsByTimestamp(
+    sessions.filter((candidate) => {
+      if (candidate.id === session.id) {
+        return false;
+      }
+      const candidateLineage = getSessionLineage(candidate);
+      return Boolean(
+        candidateLineage
+        && candidateLineage.chain.some((entry) => entry.sessionId === session.id),
+      );
+    }),
+  ).map((candidate) => serializeLineageRelation(candidate, session.id));
+
+  return c.json({
+    session: serializeSession(ctx, session),
+    rootSessionId: lineage?.rootSessionId ?? session.id,
+    parentSessionId: lineage?.parentSessionId ?? null,
+    ancestors,
+    children,
+    descendants,
+  });
+});
+
 /** POST /sessions/:id/close — stop worker, keep session in registry */
 sessionRoutes.post('/sessions/:id/close', (c) => {
-  const ctx = c.get('ctx' as never) as AppContext;
+  const ctx = c.get('ctx');
   const runtime = getRuntimeSessionManager(ctx);
   const id = c.req.param('id');
   const session = ctx.registry.get(id);
@@ -1005,7 +1112,7 @@ sessionRoutes.post('/sessions/:id/close', (c) => {
 
 /** DELETE /sessions/:id — permanently remove session and delete .jsonl */
 sessionRoutes.delete('/sessions/:id', async (c) => {
-  const ctx = c.get('ctx' as never) as AppContext;
+  const ctx = c.get('ctx');
   const id = c.req.param('id');
   const session = ctx.registry.get(id);
 
@@ -1105,7 +1212,7 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
 
 /** POST /sessions/:id/resume — resume a discovered/inactive session */
 sessionRoutes.post('/sessions/:id/resume', async (c) => {
-  const ctx = c.get('ctx' as never) as AppContext;
+  const ctx = c.get('ctx');
   const id = c.req.param('id');
   const session = ctx.registry.get(id);
   const runtime = getRuntimeSessionManager(ctx);
@@ -1281,7 +1388,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
 
 /** POST /sessions/:id/fork — fork a runtime-owned session */
 sessionRoutes.post('/sessions/:id/fork', async (c) => {
-  const ctx = c.get('ctx' as never) as AppContext;
+  const ctx = c.get('ctx');
   const id = c.req.param('id');
   const session = ctx.registry.get(id);
   const runtime = getRuntimeSessionManager(ctx);
@@ -1344,38 +1451,20 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     childTarget.backend,
   );
 
-  const requestedMode = body.mode ?? 'auto';
-  const compatibility = isNativeForkCompatible(session, childTarget, body);
-  const nativeBlockedReason = session.providerName === 'cursor' && session.providerBackend === 'cli'
-    ? 'Cursor native session forking will be enabled after Cursor execution support lands.'
-    : session.providerBackend === 'cli' && !session.providerSessionId
-      ? 'No provider session ID to fork from'
-      : !parentCaps.fork
-        ? `Provider '${session.providerName}' does not support native fork`
-        : !compatibility.compatible
-          ? compatibility.reason
-          : undefined;
-
-  let branchMode: 'native_fork' | 'context_transplant';
-  const warnings: string[] = [];
-  if (requestedMode === 'native_fork') {
-    if (nativeBlockedReason) {
-      const status = nativeBlockedReason.startsWith('Provider ') || nativeBlockedReason.startsWith('Cursor ')
-        ? 501
-        : nativeBlockedReason === 'No provider session ID to fork from'
-          ? 400
-          : 409;
-      return c.json({ error: nativeBlockedReason }, status);
-    }
-    branchMode = 'native_fork';
-  } else if (requestedMode === 'context_transplant') {
-    branchMode = 'context_transplant';
-  } else if (!nativeBlockedReason) {
-    branchMode = 'native_fork';
-  } else {
-    branchMode = 'context_transplant';
-    warnings.push(`Falling back to context_transplant: ${nativeBlockedReason}.`);
+  const branchDecision = resolveSessionBranchDecision({
+    parentSession: session,
+    request: body,
+    target: childTarget,
+    parentCapabilities: parentCaps,
+  });
+  if (branchDecision.error) {
+    return c.json({
+      error: branchDecision.error.message,
+      branch: branchDecision,
+    }, branchDecision.error.status);
   }
+  const branchMode = branchDecision.resolvedMode!;
+  const warnings = [...branchDecision.warnings];
 
   const forkId = randomUUID();
   let forkCwd = session.cwd;
@@ -1417,6 +1506,11 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
   if (!childCaps.permissions && forkWorkspaceMode === 'read_only') {
     return c.json({
       error: `Provider '${requestedProviderName}' does not support permission enforcement required by read_only workspace`,
+      branch: {
+        ...branchDecision,
+        warnings,
+        transplant: summarizeContextTransplant(body.transplant, usedContextTransplant),
+      },
     }, 400);
   }
   if (!childCaps.permissions && body.permissionMode && body.permissionMode !== 'skip') {
@@ -1428,7 +1522,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
 
   const childLineage = buildChildLineage({
     childSessionId: forkId,
-    childProvider: requestedProviderName,
+    childProvider: childTarget.providerName,
     parentSession: session,
     branchMode,
   });
@@ -1451,7 +1545,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
 
   const forked = ctx.registry.create({
     id: forkId,
-    providerName: requestedProviderName,
+    providerName: childTarget.providerName,
     providerBackend: childTarget.backend,
     providerInstanceId: childTarget.instanceId,
     cwd: forkCwd,
@@ -1478,7 +1572,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
   }
 
   try {
-    runtime.spawn(forked.id, requestedProviderName, {
+    runtime.spawn(forked.id, childTarget.providerName, {
       cwd: forkCwd,
       workspaceMode: forkWorkspaceMode,
       model: body.model ?? session.model,
@@ -1502,8 +1596,14 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     return c.json({ error: `Failed to fork: ${err}` }, 500);
   }
 
+  const branch = {
+    ...branchDecision,
+    warnings,
+    transplant: summarizeContextTransplant(body.transplant, usedContextTransplant),
+  };
   return c.json({
     ...serializeSession(ctx, forked),
+    branch,
     ...(warnings.length > 0 ? { warnings } : {}),
   }, 201);
 });

@@ -24,6 +24,7 @@
 - `GET /diagnostics/providers`
 - `GET /sessions`
 - `GET /sessions/:id`
+- `GET /sessions/:id/lineage`
 - `POST /sessions`
 - `POST /sessions/:id/messages`
 - `POST /sessions/:id/close`
