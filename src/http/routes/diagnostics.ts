@@ -1,14 +1,8 @@
 import { Hono } from 'hono';
 import type { RemoteProviderInstanceConfig } from '../../backends/cli/config.js';
 import {
-  getFileBackedProviderDiscoveryInfo,
-  getRuntimeEnvironment,
   getRuntimeListenerConfig,
   getRuntimeResolvedPaths,
-  isFileBackedProvider,
-  lookupRuntimeCommand,
-  probeRuntimeAgentInstance,
-  runtimePathExists,
 } from '../../core/config.js';
 import {
   listProviderCatalog,
@@ -16,6 +10,15 @@ import {
 } from '../../core/providerCatalog.js';
 import type { HealthStatus } from '../../core/types.js';
 import type { AppContext } from '../app.js';
+import {
+  getFileBackedProviderDiscoveryInfo,
+  getRuntimeEnvironment,
+  isFileBackedProvider,
+  lookupRuntimeCommand,
+  probeRuntimeAgentInstance,
+  runtimePathExists,
+  type RuntimeRouteEnv,
+} from './diagnosticsSupport.js';
 import {
   RUNTIME_LIFECYCLE_EVENTS,
   RUNTIME_SERVICE_NAME,
@@ -25,11 +28,6 @@ import {
 
 type DiagnosticStatus = HealthStatus['status'];
 type DiagnosticsProbeMode = 'light' | 'live';
-type RuntimeRouteEnv = {
-  Variables: {
-    ctx: AppContext;
-  };
-};
 
 interface DiagnosticCheck {
   code: string;
@@ -57,6 +55,27 @@ interface ProviderDiagnosticResult {
 }
 
 const diagnosticsRoutes = new Hono<RuntimeRouteEnv>();
+
+function describeCommandResolutionFailure(
+  targetName: string,
+  command: string,
+  timedOut?: boolean,
+): string {
+  if (timedOut) {
+    return `Timed out while resolving ${targetName} command '${command}'`;
+  }
+  return `Could not resolve ${targetName} command '${command}'`;
+}
+
+function describeRuntimeDependencyFailure(
+  dependencyName: string,
+  timedOut?: boolean,
+): string {
+  if (timedOut) {
+    return `Timed out while checking ${dependencyName} availability on the host PATH`;
+  }
+  return `${dependencyName} is not available on the host PATH`;
+}
 
 function combineDiagnosticStatus(checks: DiagnosticCheck[]): DiagnosticStatus {
   if (checks.some((check) => check.status === 'unavailable')) {
@@ -167,10 +186,15 @@ async function diagnoseCliTarget(
           command.available ? 'ok' : 'unavailable',
           command.available
             ? `Resolved CLI command '${instance.commandConfig.path}'`
-            : `Could not resolve CLI command '${instance.commandConfig.path}'`,
+            : describeCommandResolutionFailure(
+              'CLI',
+              instance.commandConfig.path,
+              command.timedOut,
+            ),
           {
             command: instance.commandConfig.path,
             resolvedPath: command.resolvedPath,
+            timedOut: command.timedOut,
           },
         ),
       );
@@ -185,10 +209,11 @@ async function diagnoseCliTarget(
           wsl.available ? 'ok' : 'unavailable',
           wsl.available
             ? `WSL is available for distro '${distro}'`
-            : 'WSL is not available on the host PATH',
+            : describeRuntimeDependencyFailure('WSL', wsl.timedOut),
           {
             distro,
             resolvedPath: wsl.resolvedPath,
+            timedOut: wsl.timedOut,
           },
         ),
       );
@@ -209,9 +234,10 @@ async function diagnoseCliTarget(
           docker.available ? 'ok' : 'unavailable',
           docker.available
             ? 'Docker is available for runtime-managed provider execution'
-            : 'Docker is not available on the host PATH',
+            : describeRuntimeDependencyFailure('Docker', docker.timedOut),
           {
             resolvedPath: docker.resolvedPath,
+            timedOut: docker.timedOut,
           },
         ),
       );

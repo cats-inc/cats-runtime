@@ -1,17 +1,11 @@
 import { Hono } from 'hono';
-import type { AppContext } from '../app.js';
+import { type RuntimeRouteEnv } from './diagnosticsSupport.js';
 import {
   RUNTIME_LIFECYCLE_EVENTS,
   RUNTIME_SERVICE_NAME,
   RUNTIME_VERSION,
   getRuntimeReadinessSnapshot,
 } from '../../startup.js';
-
-type RuntimeRouteEnv = {
-  Variables: {
-    ctx: AppContext;
-  };
-};
 
 export const healthRoutes = new Hono<RuntimeRouteEnv>();
 

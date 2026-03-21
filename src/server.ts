@@ -813,6 +813,10 @@ export function createRuntimeServer(
         discovery.start();
 
         try {
+          if (startup.phase !== 'starting') {
+            throw new Error('cats-runtime closed during startup');
+          }
+
           if (!server.listening) {
             await listenServer(server, config.host, config.port);
           }
