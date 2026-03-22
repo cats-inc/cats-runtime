@@ -6,6 +6,7 @@ import {
 } from '../../core/providerCatalog.js';
 import type { ProviderName } from '../../backends/cli/providers/types.js';
 import type { AppContext } from '../app.js';
+import { getProviderCompatibilityService } from '../app.js';
 import { getRouteErrorStatus } from '../routeErrors.js';
 
 export const providerRoutes = new Hono();
@@ -13,6 +14,7 @@ export const providerRoutes = new Hono();
 providerRoutes.get('/providers/config', (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const providerCatalog = listProviderCatalog(ctx.config);
+  const compatibility = getProviderCompatibilityService(ctx);
 
   const providers = Object.fromEntries(
     listConfiguredProviders(ctx.config).flatMap((providerName) => {
@@ -31,7 +33,7 @@ providerRoutes.get('/providers/config', (c) => {
         transport: instance.remoteInstance?.transport,
         model: instance.remoteInstance?.model,
         compatibility: instance.backend === 'cli'
-          ? ctx.compatibility.getCachedSummary(
+          ? compatibility.getCachedSummary(
             instance.providerName as ProviderName,
             instance.instanceId,
           ) || null

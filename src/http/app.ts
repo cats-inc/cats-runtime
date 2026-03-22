@@ -16,7 +16,7 @@ import type { GooseNativeSessionService } from '../backends/cli/goose/GooseNativ
 import type { OpencodeNativeSessionService } from '../backends/cli/opencode/OpencodeNativeSessionService.js';
 import type { WslDiscoveryStatusStore } from '../backends/cli/discovery/wslDiscovery.js';
 import type { ProviderModelCatalogService } from '../core/models/providerModelCatalog.js';
-import type { ProviderCompatibilityService } from '../core/compatibility/ProviderCompatibilityService.js';
+import { ProviderCompatibilityService } from '../core/compatibility/ProviderCompatibilityService.js';
 import { RuntimeDeliveryService } from '../core/runtime/RuntimeDeliveryService.js';
 import { RuntimeMeteringService } from '../core/usage/RuntimeMeteringService.js';
 import { bearerAuth } from './auth.js';
@@ -54,7 +54,7 @@ export interface AppContext {
   opencodeNative: OpencodeNativeSessionService;
   wslDiscoveryStatus?: WslDiscoveryStatusStore;
   providerModelCatalog: ProviderModelCatalogService;
-  compatibility: ProviderCompatibilityService;
+  compatibility?: ProviderCompatibilityService;
   delivery?: RuntimeDeliveryService;
   metering?: RuntimeMeteringService;
   resolveCursorNative?: (instanceId?: string) => CursorNativeSessionService;
@@ -78,6 +78,29 @@ export function getRuntimeMeteringService(ctx: AppContext): RuntimeMeteringServi
   return ctx.metering;
 }
 
+export function getProviderCompatibilityService(ctx: AppContext): ProviderCompatibilityService {
+  if (!ctx.compatibility) {
+    ctx.compatibility = new ProviderCompatibilityService(
+      ctx.config,
+      process.env.VITEST
+        ? {
+            runner: {
+              run: async () => ({
+                exitCode: null,
+                stdout: '',
+                stderr: '',
+                timedOut: false,
+                durationMs: 0,
+                error: 'Compatibility probing disabled for auto-initialized test app context.',
+              }),
+            },
+          }
+        : undefined,
+    );
+  }
+  return ctx.compatibility;
+}
+
 export function getRuntimeDeliveryService(ctx: AppContext): RuntimeDeliveryService {
   if (!ctx.delivery) {
     ctx.delivery = new RuntimeDeliveryService({
@@ -90,6 +113,7 @@ export function getRuntimeDeliveryService(ctx: AppContext): RuntimeDeliveryServi
 export function createRuntimeApp(ctx: AppContext) {
   ctx.runtime = getRuntimeSessionManager(ctx);
   ctx.metering ??= new RuntimeMeteringService(ctx.config.metering);
+  ctx.compatibility = getProviderCompatibilityService(ctx);
   const app = new Hono<{ Variables: { ctx: AppContext } }>();
   const __dirname = dirname(fileURLToPath(import.meta.url));
 

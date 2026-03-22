@@ -12,7 +12,7 @@ import { toCompatibilitySummaryView } from '../../core/compatibility/ProviderCom
 import type { CompatibilitySummaryView } from '../../core/compatibility/types.js';
 import type { HealthStatus } from '../../core/types.js';
 import type { AppContext } from '../app.js';
-import { getRuntimeMeteringService } from '../app.js';
+import { getProviderCompatibilityService, getRuntimeMeteringService } from '../app.js';
 import {
   getFileBackedProviderDiscoveryInfo,
   getRuntimeEnvironment,
@@ -189,7 +189,7 @@ async function diagnoseCliTarget(
     };
   }
 
-  const assessment = await ctx.compatibility.assessCliTarget(target, {
+  const assessment = await getProviderCompatibilityService(ctx).assessCliTarget(target, {
     force: forceRefresh,
     purpose: 'diagnostics',
   });

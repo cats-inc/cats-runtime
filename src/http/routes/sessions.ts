@@ -2,7 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { Hono } from 'hono';
-import { getRuntimeSessionManager, type AppContext } from '../app.js';
+import {
+  getProviderCompatibilityService,
+  getRuntimeSessionManager,
+  type AppContext,
+} from '../app.js';
 import {
   isProviderNotConfiguredError,
   isUnknownProviderInstanceError,
@@ -201,7 +205,7 @@ async function primeCliCompatibility(
     return;
   }
 
-  await ctx.compatibility.assessCliTarget(target, {
+  await getProviderCompatibilityService(ctx).assessCliTarget(target, {
     purpose: 'execution',
   });
 }
