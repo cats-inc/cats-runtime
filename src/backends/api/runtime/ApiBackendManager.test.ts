@@ -92,4 +92,75 @@ describe('ApiBackendManager', () => {
       }),
     ]);
   });
+
+  it('layers session-level instructions before turn-level overrides', async () => {
+    const registry = new SessionRegistry();
+    const session = registry.create({
+      id: 'api-session-layered',
+      providerName: 'codex',
+      providerBackend: 'api',
+      providerInstanceId: 'gateway',
+      cwd: '/repo',
+      instructions: 'Session-level instructions.',
+    });
+
+    let capturedBody: Record<string, unknown> | undefined;
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      capturedBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return new Response(JSON.stringify({
+        id: 'resp_456',
+        output: [{
+          type: 'message',
+          content: [{ type: 'output_text', text: 'hello from layered api backend' }],
+        }],
+        usage: {
+          input_tokens: 8,
+          output_tokens: 3,
+        },
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    const manager = new ApiBackendManager(
+      { sessionBaseDir: '/tmp/cats-runtime-tests' },
+      registry,
+      {
+        fetch: fetchMock as typeof fetch,
+        env: {
+          OPENAI_API_KEY: 'test-key',
+        },
+      },
+    );
+
+    const target: ProviderTargetDescriptor = {
+      providerName: 'codex',
+      backend: 'api',
+      instanceId: 'gateway',
+      defaultTarget: true,
+      remoteInstance: {
+        id: 'gateway',
+        providerName: 'codex',
+        backend: 'api',
+        transport: 'openai',
+        model: 'gpt-4.1',
+        apiKeyEnv: 'OPENAI_API_KEY',
+        baseUrl: 'https://example.test',
+      },
+    };
+
+    const handle = manager.spawn(session.id, target);
+    await collectEvents(handle.streamMessage({
+      message: 'hello',
+      instructions: 'Turn-level instructions.',
+    }));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(capturedBody?.instructions).toContain('Session-level instructions.');
+    expect(capturedBody?.instructions).toContain('Turn-level instructions.');
+    expect(String(capturedBody?.instructions)).toMatch(
+      /Session-level instructions\.\s+Turn-level instructions\./,
+    );
+  });
 });

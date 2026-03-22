@@ -26,6 +26,9 @@ import type {
 const SKILLS_ROOT = path.resolve(fileURLToPath(new URL('../../../skills/', import.meta.url)));
 const CODER_SKILLS_ROOT = path.join('.agents', 'skills');
 const RUNTIME_SKILL_STATE_ROOT = '.runtime-skills';
+// Keep the process-local skill-package cache bounded so long-lived runtimes do not
+// accumulate unbounded entries across many distinct session skill combinations.
+const MAX_RUNTIME_SKILL_PACKAGE_CACHE_ENTRIES = 128;
 const runtimeSkillPackageCache = new Map<string, RuntimeSkillPackage>();
 
 interface RuntimeSkillPackage {
@@ -110,10 +113,17 @@ function buildRuntimeSkillPackageCacheKey(value: {
 }
 
 function cacheRuntimeSkillPackage(skillPackage: RuntimeSkillPackage): RuntimeSkillPackage {
-  runtimeSkillPackageCache.set(
-    buildRuntimeSkillPackageCacheKey(skillPackage),
-    skillPackage,
-  );
+  const cacheKey = buildRuntimeSkillPackageCacheKey(skillPackage);
+  if (runtimeSkillPackageCache.has(cacheKey)) {
+    runtimeSkillPackageCache.delete(cacheKey);
+  } else if (runtimeSkillPackageCache.size >= MAX_RUNTIME_SKILL_PACKAGE_CACHE_ENTRIES) {
+    const oldestKey = runtimeSkillPackageCache.keys().next().value;
+    if (oldestKey) {
+      runtimeSkillPackageCache.delete(oldestKey);
+    }
+  }
+
+  runtimeSkillPackageCache.set(cacheKey, skillPackage);
   return skillPackage;
 }
 
@@ -525,16 +535,34 @@ export function mergeRuntimeSkillInstructions(
   instructions: string | undefined,
   skillState: SessionSkillState | undefined,
 ): string | undefined {
+  return mergeRuntimeInstructionLayers(
+    skillState,
+    instructions,
+  );
+}
+
+export function mergeRuntimeInstructionLayers(
+  skillState: SessionSkillState | undefined,
+  ...instructions: Array<string | undefined>
+): string | undefined {
   const instructionParts = [
     buildRuntimeSkillInstructionOverlay(skillState),
-    instructions?.trim() || undefined,
+    ...instructions.map((instruction) => instruction?.trim() || undefined),
   ].filter((part): part is string => Boolean(part));
 
   if (instructionParts.length === 0) {
     return undefined;
   }
 
-  return instructionParts.join('\n\n');
+  const mergedParts: string[] = [];
+  for (const part of instructionParts) {
+    if (mergedParts.at(-1) === part) {
+      continue;
+    }
+    mergedParts.push(part);
+  }
+
+  return mergedParts.join('\n\n');
 }
 
 export function clearRuntimeSkillState(
