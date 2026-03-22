@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionRegistry } from '../pool/SessionRegistry.js';
 import { FileWatcher, type SessionScannerLike } from './FileWatcher.js';
 
@@ -55,5 +55,23 @@ describe('FileWatcher', () => {
     expect(registry.get(stale!.id)).toBeUndefined();
     expect(registry.get(retained!.id)).toBeDefined();
     expect(registry.get(resumed!.id)?.status).toBe('ready');
+  });
+
+  it('silently skips watching when the target directory does not exist', async () => {
+    const missingDir = join(watchDir, 'missing');
+    const scanner: SessionScannerLike = {
+      scan: async () => [],
+    };
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      const watcher = new FileWatcher(missingDir, scanner, 'pi', registry, 'native');
+      await watcher.start();
+      watcher.stop();
+
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });

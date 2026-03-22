@@ -1,4 +1,4 @@
-import { watch, type FSWatcher } from 'node:fs';
+import { existsSync, watch, type FSWatcher } from 'node:fs';
 import { EventEmitter } from 'node:events';
 import type { DiscoveredSession } from './types.js';
 import type { SessionRegistry } from '../pool/SessionRegistry.js';
@@ -11,6 +11,16 @@ export interface SessionScannerLike {
 interface FileWatcherEvents {
   discovered: [{ count: number }];
   error: [Error];
+}
+
+function isMissingPathError(error: unknown): boolean {
+  return typeof error === 'object'
+    && error !== null
+    && 'code' in error
+    && (
+      (error as NodeJS.ErrnoException).code === 'ENOENT'
+      || (error as NodeJS.ErrnoException).code === 'ENOTDIR'
+    );
 }
 
 export class FileWatcher extends EventEmitter<FileWatcherEvents> {
@@ -40,7 +50,18 @@ export class FileWatcher extends EventEmitter<FileWatcherEvents> {
 
   /** Run initial scan and start watching */
   async start(): Promise<void> {
-    await this.scanAndMerge();
+    try {
+      await this.scanAndMerge();
+    } catch (err) {
+      if (isMissingPathError(err)) {
+        return;
+      }
+      throw err;
+    }
+
+    if (!existsSync(this.watchDir)) {
+      return;
+    }
 
     try {
       this.watcher = watch(this.watchDir, { recursive: true }, (_eventType, _filename) => {
@@ -48,15 +69,26 @@ export class FileWatcher extends EventEmitter<FileWatcherEvents> {
         if (this.debounceTimer) clearTimeout(this.debounceTimer);
         this.debounceTimer = setTimeout(() => {
           this.scanAndMerge().catch((err) => {
+            if (isMissingPathError(err)) {
+              this.stop();
+              return;
+            }
             this.emit('error', err);
           });
         }, this.debounceMs);
       });
 
       this.watcher.on('error', (err) => {
+        if (isMissingPathError(err)) {
+          this.stop();
+          return;
+        }
         this.emit('error', err);
       });
     } catch (err) {
+      if (isMissingPathError(err)) {
+        return;
+      }
       // fs.watch may fail on some platforms/paths — non-fatal
       console.warn(`[discovery] Could not watch ${this.watchDir}:`, err);
     }

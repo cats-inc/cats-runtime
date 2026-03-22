@@ -15,6 +15,16 @@ import type {
 import type { ProviderDefaultTarget } from '../config.js';
 import { normalizeSessionOrigin } from './sessionView.js';
 
+function isMissingPersistencePathError(error: unknown): boolean {
+  return typeof error === 'object'
+    && error !== null
+    && 'code' in error
+    && (
+      (error as NodeJS.ErrnoException).code === 'ENOENT'
+      || (error as NodeJS.ErrnoException).code === 'ENOTDIR'
+    );
+}
+
 export interface CreateSessionInput {
   id?: string;
   providerName: string;
@@ -164,10 +174,16 @@ export class SessionRegistry {
 
   private saveToDisk(): void {
     if (!this.persistPath) return;
+    if (!existsSync(dirname(this.persistPath))) {
+      return;
+    }
     try {
       const arr = Array.from(this.sessions.values());
       writeFileSync(this.persistPath, JSON.stringify(arr, null, 2));
     } catch (err) {
+      if (isMissingPersistencePathError(err)) {
+        return;
+      }
       console.warn('[registry] Failed to save:', (err as Error).message);
     }
   }

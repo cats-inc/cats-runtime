@@ -180,6 +180,29 @@ describe('SessionRegistry', () => {
     }
   });
 
+  it('skips delayed persistence quietly when the persist directory is removed before flush', () => {
+    vi.useFakeTimers();
+    const persistDir = mkdtempSync(join(tmpdir(), 'session-registry-missing-dir-test-'));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      registry = new SessionRegistry(persistDir);
+      registry.create({
+        providerName: 'claude',
+        cwd: '/repo',
+      });
+
+      rmSync(persistDir, { recursive: true, force: true });
+      vi.advanceTimersByTime(1000);
+
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+      warnSpy.mockRestore();
+      rmSync(persistDir, { recursive: true, force: true });
+    }
+  });
+
   it('persists provider state metadata across reloads', () => {
     const persistDir = mkdtempSync(join(tmpdir(), 'session-registry-state-test-'));
 
