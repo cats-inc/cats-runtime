@@ -16,7 +16,7 @@ import {
   parseOptionalString,
   parseRuntimeSkillManifest,
 } from '../parsing.js';
-import { isPiUnknownSessionError } from '../../backends/cli/pi/resume.js';
+import { isPiUnknownSessionError, resolvePiResumeTarget } from '../../backends/cli/pi/resume.js';
 import { toRuntimeSkillErrorResponse } from '../runtimeSkillErrors.js';
 
 function appendHistory(sourcePath: string, entry: Record<string, unknown>): void {
@@ -173,6 +173,53 @@ function ensureRecoveredPiHistorySourcePath(
   appendUserTurnHistory(state.sourcePath, turnInput);
 }
 
+function shouldRespawnPiWorkerForSkillMutation(
+  session: SessionInfo,
+  nextSkills: SessionInfo['skills'],
+  explicitSkillsMutation: boolean,
+): boolean {
+  if (
+    !explicitSkillsMutation
+    || session.providerName !== 'pi'
+    || session.providerBackend !== 'cli'
+  ) {
+    return false;
+  }
+
+  return session.skills?.delivery.instructions?.filePath
+    !== nextSkills?.delivery.instructions?.filePath;
+}
+
+function tryRespawnPiWorkerForSkillMutation(
+  ctx: AppContext,
+  session: SessionInfo,
+): boolean {
+  if (session.providerName !== 'pi' || session.providerBackend !== 'cli') {
+    return false;
+  }
+
+  let resumeTarget;
+  try {
+    resumeTarget = resolvePiResumeTarget(ctx.config, session);
+  } catch {
+    return false;
+  }
+
+  const runtime = getRuntimeSessionManager(ctx);
+  runtime.kill(session.id);
+  runtime.spawn(session.id, session.providerName, {
+    cwd: session.cwd,
+    workspaceMode: session.workspaceMode,
+    model: session.model,
+    resumeSourcePath: resumeTarget.runtimeSourcePath,
+    instructionsFile: session.skills?.delivery.instructions?.filePath,
+    permissionMode: session.permissionMode,
+    allowedTools: session.allowedTools,
+  }, session.providerInstanceId, 'cli');
+  ctx.registry.updateStatus(session.id, 'ready');
+  return true;
+}
+
 /** POST /sessions/:id/messages — send a message, stream response as SSE */
 messageRoutes.post('/sessions/:id/messages', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
@@ -205,29 +252,33 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     return c.json({ error: parsedSkills.error }, 400);
   }
   let skills = session.skills;
-  try {
-    const providerTarget = resolveProviderTarget(
-      ctx.config,
-      session.providerName,
-      session.providerBackend && session.providerInstanceId
-        ? `${session.providerBackend}/${session.providerInstanceId}`
-        : session.providerInstanceId,
-    );
-    skills = resolveRuntimeSkillManifest(parsedSkills.manifest, {
-      sessionId: session.id,
-      providerName: providerTarget.providerName,
-      providerBackend: providerTarget.backend,
-      cwd: session.cwd,
-      workspaceMode: session.workspaceMode,
-      sessionBaseDir: ctx.config.sessionBaseDir,
-      baseInstructionsFile: providerTarget.cliInstance?.piInstructionsFile,
-    }) ?? session.skills;
-  } catch (error) {
-    const runtimeSkillError = toRuntimeSkillErrorResponse(error);
-    if (runtimeSkillError) {
-      return c.json(runtimeSkillError.body, runtimeSkillError.status);
+  if (parsedSkills.clear) {
+    skills = undefined;
+  } else {
+    try {
+      const providerTarget = resolveProviderTarget(
+        ctx.config,
+        session.providerName,
+        session.providerBackend && session.providerInstanceId
+          ? `${session.providerBackend}/${session.providerInstanceId}`
+          : session.providerInstanceId,
+      );
+      skills = resolveRuntimeSkillManifest(parsedSkills.manifest, {
+        sessionId: session.id,
+        providerName: providerTarget.providerName,
+        providerBackend: providerTarget.backend,
+        cwd: session.cwd,
+        workspaceMode: session.workspaceMode,
+        sessionBaseDir: ctx.config.sessionBaseDir,
+        baseInstructionsFile: providerTarget.cliInstance?.piInstructionsFile,
+      }) ?? session.skills;
+    } catch (error) {
+      const runtimeSkillError = toRuntimeSkillErrorResponse(error);
+      if (runtimeSkillError) {
+        return c.json(runtimeSkillError.body, runtimeSkillError.status);
+      }
+      throw error;
     }
-    throw error;
   }
   const context = parseInvocationContext(body.context);
   const outputDir = parseOptionalString(body.outputDir);
@@ -238,6 +289,12 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     context: context ?? session.context,
     outputDir: outputDir ?? session.outputDir,
   };
+  const explicitSkillsMutation = body.skills !== undefined;
+  const shouldRespawnPi = shouldRespawnPiWorkerForSkillMutation(
+    session,
+    skills,
+    explicitSkillsMutation,
+  );
   if (instructions !== undefined || body.skills !== undefined || context !== undefined || outputDir !== undefined) {
     ctx.registry.updateSessionMetadata(id, {
       instructions: instructions ?? session.instructions,
@@ -247,7 +304,8 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     });
   }
 
-  const worker = getRuntimeSessionManager(ctx).get(id);
+  const runtime = getRuntimeSessionManager(ctx);
+  let worker = runtime.get(id);
   if (!worker) {
     return c.json({ error: 'No active worker. Resume the session first.' }, 404);
   }
@@ -259,6 +317,22 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
 
   if (worker.busy) {
     return c.json({ error: 'Session is busy processing another message' }, 409);
+  }
+
+  if (shouldRespawnPi) {
+    const updatedSession = ctx.registry.get(id) ?? session;
+    if (tryRespawnPiWorkerForSkillMutation(ctx, updatedSession)) {
+      worker = runtime.get(id);
+    }
+  }
+
+  if (!worker) {
+    return c.json({ error: 'No active worker. Resume the session first.' }, 404);
+  }
+
+  if (!worker.active) {
+    ctx.registry.updateStatus(id, 'closed');
+    return c.json({ error: 'Worker process has exited' }, 410);
   }
 
   ctx.registry.updateStatus(id, 'busy');

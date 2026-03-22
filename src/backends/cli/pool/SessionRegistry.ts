@@ -326,7 +326,7 @@ export class SessionRegistry {
     if (patch.instructions !== undefined) {
       session.instructions = patch.instructions;
     }
-    if (patch.skills !== undefined) {
+    if (Object.prototype.hasOwnProperty.call(patch, 'skills')) {
       session.skills = cloneSkillState(patch.skills);
     }
     if (patch.context !== undefined) {

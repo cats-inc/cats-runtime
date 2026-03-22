@@ -7,6 +7,7 @@ import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig } from '../backends/cli/config.js';
 import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
 import { resolvePiResumeTarget } from '../backends/cli/pi/resume.js';
+import { resolveRuntimeSkillManifest } from '../core/skills/catalog.js';
 
 function parseNdjson(text: string): Array<Record<string, unknown>> {
   return text
@@ -230,5 +231,113 @@ describe('Pi session management', () => {
         { role: 'assistant', text: 'Recovered reply', timestamp: expect.any(String) },
       ],
     });
+  });
+
+  it('respawns a live Pi worker when runtime skill delivery changes and a resume source is available', async () => {
+    const sourcePath = join(piSessionsDir, 'workspace', 'session.jsonl');
+    mkdirSync(join(piSessionsDir, 'workspace'), { recursive: true });
+    writeFileSync(sourcePath, '');
+
+    const oldSkills = resolveRuntimeSkillManifest({
+      requestedSkills: ['companion'],
+    }, {
+      sessionId: 'pi-live',
+      providerName: 'pi',
+      providerBackend: 'cli',
+      cwd: 'C:/repo',
+      workspaceMode: 'shared',
+      sessionBaseDir,
+    });
+    const expectedNewSkills = resolveRuntimeSkillManifest({
+      requestedSkills: ['delivery-auditor'],
+    }, {
+      sessionId: 'pi-live',
+      providerName: 'pi',
+      providerBackend: 'cli',
+      cwd: 'C:/repo',
+      workspaceMode: 'shared',
+      sessionBaseDir,
+    });
+
+    const session = registry.create({
+      id: 'pi-live',
+      providerName: 'pi',
+      providerBackend: 'cli',
+      providerInstanceId: 'default',
+      cwd: 'C:/repo',
+      workspaceMode: 'shared',
+      skills: oldSkills,
+    });
+    session.providerSourcePath = sourcePath;
+    registry.updateStatus(session.id, 'ready');
+
+    const staleWorker = {
+      alive: true,
+      busy: false,
+      streamMessage: async function* () {
+        throw new Error('stale worker should have been replaced before the turn started');
+      },
+    };
+    const freshWorker = {
+      alive: true,
+      busy: false,
+      streamMessage: async function* () {
+        yield { type: 'text', text: 'Respawned reply' };
+        yield { type: 'result' };
+      },
+    };
+
+    let currentWorker: typeof staleWorker | typeof freshWorker | undefined = staleWorker;
+    pool = {
+      getCapabilities: vi.fn(() => ({ resume: true, fork: false, permissions: false })),
+      get: vi.fn(() => currentWorker as never),
+      spawn: vi.fn(() => {
+        currentWorker = freshWorker;
+        return freshWorker as never;
+      }),
+      kill: vi.fn(() => {
+        currentWorker = undefined;
+      }),
+      status: vi.fn(() => ({ active: currentWorker ? 1 : 0, busy: 0, idle: 1, providers: { pi: 1 } })),
+    } as unknown as WorkerPool;
+    app = createTestApp();
+
+    const expectedResumePath = resolvePiResumeTarget(
+      makeConfig(),
+      registry.get(session.id)!,
+      process.platform,
+    ).runtimeSourcePath;
+
+    const response = await app.request(`/sessions/${session.id}/messages`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/x-ndjson',
+      },
+      body: JSON.stringify({
+        message: 'hello',
+        skills: {
+          requestedSkills: ['delivery-auditor'],
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(parseNdjson(await response.text())).toEqual([
+      { type: 'text', text: 'Respawned reply' },
+      { type: 'result' },
+    ]);
+    expect(vi.mocked(pool.kill)).toHaveBeenCalledWith(session.id);
+    expect(vi.mocked(pool.spawn)).toHaveBeenCalledWith(
+      session.id,
+      'pi',
+      expect.objectContaining({
+        cwd: 'C:/repo',
+        resumeSourcePath: expectedResumePath,
+        instructionsFile: expectedNewSkills?.delivery.instructions?.filePath,
+      }),
+      undefined,
+    );
+    expect(registry.get(session.id)?.skills?.requestedSkills).toEqual(['delivery-auditor']);
   });
 });

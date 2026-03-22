@@ -167,6 +167,11 @@ The first slice should keep explicit named skills as the normative input. A
 future follow-on may add runtime-owned profile mapping once the lower-level
 contract is proven.
 
+Transport-facing routes may additionally treat `skills: null` as an explicit
+instruction to clear previously persisted session skill state. By contrast,
+`skills.requestedSkills: []` should remain a backward-compatible no-op so older
+callers that serialize empty arrays do not accidentally wipe skills.
+
 ### Internal Components
 
 Suggested internal composition:

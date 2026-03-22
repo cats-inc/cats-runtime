@@ -6,6 +6,7 @@ import type {
 
 export interface ParsedRuntimeSkillManifest {
   manifest?: RuntimeSkillManifest;
+  clear?: boolean;
   error?: string;
 }
 
@@ -106,6 +107,12 @@ function parseRuntimeSkillContext(value: unknown): RuntimeSkillManifestContext |
 export function parseRuntimeSkillManifest(value: unknown): ParsedRuntimeSkillManifest {
   if (value === undefined) {
     return {};
+  }
+
+  if (value === null) {
+    return {
+      clear: true,
+    };
   }
 
   if (!value || typeof value !== 'object' || Array.isArray(value)) {

@@ -6,6 +6,7 @@ import { createRuntimeApp as createApp } from './app.js';
 import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig } from '../backends/cli/config.js';
 import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
+import type { SessionSkillState } from '../core/types.js';
 
 describe('runtime-managed skills HTTP contract', () => {
   let rootDir: string;
@@ -62,6 +63,38 @@ describe('runtime-managed skills HTTP contract', () => {
       auggieSessions: {} as never,
       opencodeNative: {} as never,
     });
+  }
+
+  function buildStoredSkillState(): SessionSkillState {
+    return {
+      requestedSkills: ['companion'],
+      resolvedSkills: [{
+        id: 'companion',
+        title: 'Companion',
+        description: 'Companion skill',
+        status: 'resolved',
+        source: 'runtime_catalog',
+        sourcePath: 'skills/companion',
+        entryFile: 'skills/companion/SKILL.md',
+        fingerprint: 'companion-fingerprint',
+      }],
+      strict: false,
+      delivery: {
+        provider: 'codex',
+        backend: 'cli',
+        preferredMode: 'filesystem',
+        mode: 'filesystem',
+        status: 'applied',
+        warnings: [],
+        filesystem: {
+          rootPath: join(rootDir, 'repo', '.agents', 'skills'),
+          entryPaths: [join(rootDir, 'repo', '.agents', 'skills', 'companion', 'SKILL.md')],
+        },
+      },
+      warnings: [],
+      appliedSkillIds: ['companion'],
+      updatedAt: '2026-03-23T00:00:00.000Z',
+    };
   }
 
   beforeEach(() => {
@@ -266,5 +299,62 @@ describe('runtime-managed skills HTTP contract', () => {
     expect(messageResponse.status).toBe(200);
     expect(await messageResponse.text()).toContain('"type":"result"');
     expect(registry.get(session.id)?.skills).toBeUndefined();
+  });
+
+  it('uses skills:null to explicitly clear persisted skill state for messages and forks', async () => {
+    const app = createTestApp();
+
+    const session = registry.create({
+      providerName: 'codex',
+      providerBackend: 'cli',
+      providerInstanceId: 'default',
+      cwd: join(rootDir, 'repo'),
+      workspaceMode: 'shared',
+      skills: buildStoredSkillState(),
+    });
+    registry.updateStatus(session.id, 'ready');
+
+    const messageWorker = {
+      alive: true,
+      busy: false,
+      streamMessage: async function* () {
+        yield { type: 'result' as const };
+      },
+    };
+    vi.mocked(pool.get).mockReturnValue(messageWorker as never);
+
+    const messageResponse = await app.request(`/sessions/${session.id}/messages`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/x-ndjson',
+      },
+      body: JSON.stringify({
+        message: 'hello',
+        skills: null,
+      }),
+    });
+
+    expect(messageResponse.status).toBe(200);
+    expect(await messageResponse.text()).toContain('"type":"result"');
+    expect(registry.get(session.id)?.skills).toBeUndefined();
+
+    registry.setProviderSessionId(session.id, 'thread-parent');
+    registry.updateStatus(session.id, 'closed');
+    registry.updateSessionMetadata(session.id, {
+      skills: buildStoredSkillState(),
+    });
+
+    const forkResponse = await app.request(`/sessions/${session.id}/fork`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        skills: null,
+      }),
+    });
+
+    expect(forkResponse.status).toBe(201);
+    const forkBody = await forkResponse.json() as { skills?: unknown };
+    expect(forkBody.skills).toBeUndefined();
   });
 });

@@ -819,19 +819,23 @@ sessionRoutes.post('/sessions', async (c) => {
       }
 
       let skills = existing.skills;
-      try {
-        skills = resolveSkillStateForTarget(ctx, parsedSkills.manifest, {
-          sessionId: existing.id,
-          providerTarget,
-          cwd: existing.cwd,
-          workspaceMode: existing.workspaceMode,
-        }) ?? existing.skills;
-      } catch (error) {
-        const runtimeSkillError = toRuntimeSkillErrorResponse(error);
-        if (runtimeSkillError) {
-          return c.json(runtimeSkillError.body, runtimeSkillError.status);
+      if (parsedSkills.clear) {
+        skills = undefined;
+      } else {
+        try {
+          skills = resolveSkillStateForTarget(ctx, parsedSkills.manifest, {
+            sessionId: existing.id,
+            providerTarget,
+            cwd: existing.cwd,
+            workspaceMode: existing.workspaceMode,
+          }) ?? existing.skills;
+        } catch (error) {
+          const runtimeSkillError = toRuntimeSkillErrorResponse(error);
+          if (runtimeSkillError) {
+            return c.json(runtimeSkillError.body, runtimeSkillError.status);
+          }
+          throw error;
         }
-        throw error;
       }
 
       ctx.registry.updateSessionMetadata(existing.id, {
@@ -887,22 +891,26 @@ sessionRoutes.post('/sessions', async (c) => {
   }
 
   let skills;
-  try {
-    skills = resolveSkillStateForTarget(ctx, parsedSkills.manifest, {
-      sessionId,
-      providerTarget,
-      cwd: resolved.cwd,
-      workspaceMode: resolved.workspaceMode,
-    });
-  } catch (error) {
-    const runtimeSkillError = toRuntimeSkillErrorResponse(error);
-    if (runtimeSkillError) {
-      if (resolved.workspaceMode === 'isolated') {
-        cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, sessionId);
+  if (parsedSkills.clear) {
+    skills = undefined;
+  } else {
+    try {
+      skills = resolveSkillStateForTarget(ctx, parsedSkills.manifest, {
+        sessionId,
+        providerTarget,
+        cwd: resolved.cwd,
+        workspaceMode: resolved.workspaceMode,
+      });
+    } catch (error) {
+      const runtimeSkillError = toRuntimeSkillErrorResponse(error);
+      if (runtimeSkillError) {
+        if (resolved.workspaceMode === 'isolated') {
+          cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, sessionId);
+        }
+        return c.json(runtimeSkillError.body, runtimeSkillError.status);
       }
-      return c.json(runtimeSkillError.body, runtimeSkillError.status);
+      throw error;
     }
-    throw error;
   }
 
   if (providerName === 'cursor' && providerTarget.backend === 'cli') {
@@ -1661,22 +1669,26 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     usedContextTransplant,
   );
   let childSkills = session.skills;
-  try {
-    childSkills = resolveSkillStateForTarget(ctx, body.skills, {
-      sessionId: forkId,
-      providerTarget: childTarget,
-      cwd: forkCwd,
-      workspaceMode: forkWorkspaceMode,
-    }) ?? session.skills;
-  } catch (error) {
-    const runtimeSkillError = toRuntimeSkillErrorResponse(error);
-    if (runtimeSkillError) {
-      if (forkWorkspaceMode === 'isolated') {
-        cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, forkId);
+  if (parsedSkills.clear) {
+    childSkills = undefined;
+  } else {
+    try {
+      childSkills = resolveSkillStateForTarget(ctx, body.skills, {
+        sessionId: forkId,
+        providerTarget: childTarget,
+        cwd: forkCwd,
+        workspaceMode: forkWorkspaceMode,
+      }) ?? session.skills;
+    } catch (error) {
+      const runtimeSkillError = toRuntimeSkillErrorResponse(error);
+      if (runtimeSkillError) {
+        if (forkWorkspaceMode === 'isolated') {
+          cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, forkId);
+        }
+        return c.json(runtimeSkillError.body, runtimeSkillError.status);
       }
-      return c.json(runtimeSkillError.body, runtimeSkillError.status);
+      throw error;
     }
-    throw error;
   }
 
   const forked = ctx.registry.create({

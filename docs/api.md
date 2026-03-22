@@ -479,6 +479,10 @@ and `agent` sessions. Matching `cli` sessions still use the existing
 `context`, and `outputDir` fields. These are persisted onto the logical session
 so later history/resume flows can observe the same bootstrap metadata.
 
+`skills: null` explicitly clears the persisted runtime skill state for
+`POST /sessions`, `POST /sessions/{id}/messages`, and
+`POST /sessions/{id}/fork`.
+
 An empty `skills.requestedSkills: []` payload is treated as a backward-compatible
 no-op, the same as omitting `skills`.
 
