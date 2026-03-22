@@ -8,6 +8,7 @@ import type {
   SessionInvocationContext,
   SessionProviderState,
   SessionReusePolicy,
+  SessionSkillState,
   SessionStatus,
   WorkspaceMode,
 } from './types.js';
@@ -28,6 +29,7 @@ export interface CreateSessionInput {
   sessionKey?: string;
   reusePolicy?: SessionReusePolicy;
   instructions?: string;
+  skills?: SessionSkillState;
   context?: SessionInvocationContext;
   outputDir?: string;
   artifacts?: SessionArtifact[];
@@ -50,6 +52,7 @@ interface DiscoveredSessionData {
   sessionKey?: string;
   reusePolicy?: SessionReusePolicy;
   instructions?: string;
+  skills?: SessionSkillState;
   context?: SessionInvocationContext;
   outputDir?: string;
   artifacts?: SessionArtifact[];
@@ -204,6 +207,7 @@ export class SessionRegistry {
         sessionKey: input.sessionKey,
         reusePolicy: input.reusePolicy,
         instructions: input.instructions,
+        skills: cloneSkillState(input.skills),
         context: cloneInvocationContext(input.context),
         outputDir: input.outputDir,
         artifacts: cloneArtifacts(input.artifacts),
@@ -303,6 +307,7 @@ export class SessionRegistry {
       sessionKey?: string;
       reusePolicy?: SessionReusePolicy;
       instructions?: string;
+      skills?: SessionSkillState;
       context?: SessionInvocationContext;
       outputDir?: string;
       artifacts?: SessionArtifact[];
@@ -320,6 +325,9 @@ export class SessionRegistry {
     }
     if (patch.instructions !== undefined) {
       session.instructions = patch.instructions;
+    }
+    if (patch.skills !== undefined) {
+      session.skills = cloneSkillState(patch.skills);
     }
     if (patch.context !== undefined) {
       session.context = cloneInvocationContext(patch.context);
@@ -590,6 +598,7 @@ export class SessionRegistry {
       sessionKey: mergedData.sessionKey,
       reusePolicy: mergedData.reusePolicy,
       instructions: mergedData.instructions,
+      skills: cloneSkillState(mergedData.skills),
       context: cloneInvocationContext(mergedData.context),
       outputDir: mergedData.outputDir,
       artifacts: cloneArtifacts(mergedData.artifacts),
@@ -667,6 +676,7 @@ export class SessionRegistry {
     if (data.sessionKey && !session.sessionKey) session.sessionKey = data.sessionKey;
     if (data.reusePolicy && !session.reusePolicy) session.reusePolicy = data.reusePolicy;
     if (data.instructions && !session.instructions) session.instructions = data.instructions;
+    if (data.skills && !session.skills) session.skills = cloneSkillState(data.skills);
     if (data.context && !session.context) session.context = cloneInvocationContext(data.context);
     if (data.outputDir && !session.outputDir) session.outputDir = data.outputDir;
     if (data.artifacts && (!session.artifacts || session.artifacts.length === 0)) {
@@ -855,6 +865,7 @@ export class SessionRegistry {
     if (!target.sessionKey && incoming.sessionKey) target.sessionKey = incoming.sessionKey;
     if (!target.reusePolicy && incoming.reusePolicy) target.reusePolicy = incoming.reusePolicy;
     if (!target.instructions && incoming.instructions) target.instructions = incoming.instructions;
+    if (!target.skills && incoming.skills) target.skills = cloneSkillState(incoming.skills);
     if (!target.context && incoming.context) target.context = cloneInvocationContext(incoming.context);
     if (!target.outputDir && incoming.outputDir) target.outputDir = incoming.outputDir;
     if ((!target.artifacts || target.artifacts.length === 0) && incoming.artifacts) {
@@ -904,6 +915,12 @@ function cloneInvocationContext(
   context?: SessionInvocationContext,
 ): SessionInvocationContext | undefined {
   return context ? structuredClone(context) : undefined;
+}
+
+function cloneSkillState(
+  skillState?: SessionSkillState,
+): SessionSkillState | undefined {
+  return skillState ? structuredClone(skillState) : undefined;
 }
 
 function cloneArtifacts(

@@ -13,6 +13,7 @@ export type {
   SessionOwnership,
   SessionProviderState,
   SessionReusePolicy,
+  SessionSkillState,
   SessionResumeStrategy,
   SessionStatus,
   SessionView,

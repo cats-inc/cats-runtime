@@ -57,7 +57,13 @@ import {
   resolveSessionBranchDecision,
   summarizeContextTransplant,
 } from '../../core/runtime/sessionBranching.js';
-import { parseInvocationContext, parseOptionalString, parseStringArray } from '../parsing.js';
+import { resolveRuntimeSkillManifest } from '../../core/skills/catalog.js';
+import {
+  parseInvocationContext,
+  parseOptionalString,
+  parseRuntimeSkillManifest,
+  parseStringArray,
+} from '../parsing.js';
 
 interface SessionRouteEnv {
   Variables: {
@@ -724,6 +730,7 @@ sessionRoutes.post('/sessions', async (c) => {
     sessionKey?: string;
     reusePolicy?: SessionReusePolicy;
     instructions?: string;
+    skills?: unknown;
     context?: SessionInvocationContext;
     outputDir?: string;
   }>();
@@ -757,6 +764,7 @@ sessionRoutes.post('/sessions', async (c) => {
 
   const sessionKey = requestedSessionKey || randomUUID();
   const instructions = parseOptionalString(body.instructions);
+  const skills = resolveRuntimeSkillManifest(parseRuntimeSkillManifest(body.skills));
   const context = parseInvocationContext(body.context);
   const outputDir = parseOptionalString(body.outputDir);
 
@@ -783,6 +791,7 @@ sessionRoutes.post('/sessions', async (c) => {
         sessionKey,
         reusePolicy,
         instructions: instructions ?? existing.instructions,
+        skills: skills ?? existing.skills,
         context: context ?? existing.context,
         outputDir: outputDir ?? existing.outputDir,
       });
@@ -855,6 +864,7 @@ sessionRoutes.post('/sessions', async (c) => {
         sessionKey,
         reusePolicy,
         instructions,
+        skills,
         context,
         outputDir,
       });
@@ -919,6 +929,7 @@ sessionRoutes.post('/sessions', async (c) => {
         sessionKey,
         reusePolicy,
         instructions,
+        skills,
         context,
         outputDir,
       });
@@ -988,6 +999,7 @@ sessionRoutes.post('/sessions', async (c) => {
     sessionKey,
     reusePolicy,
     instructions,
+    skills,
     context,
     outputDir,
   });
@@ -1010,6 +1022,10 @@ sessionRoutes.post('/sessions', async (c) => {
 
   if (providerTarget.backend !== 'cli') {
     ctx.registry.updateStatus(session.id, 'ready');
+  }
+
+  if (skills?.warnings.length) {
+    warnings.push(...skills.warnings);
   }
 
   return c.json({ ...serializeSession(ctx, session), ...(warnings.length ? { warnings } : {}) }, 201);
@@ -1445,6 +1461,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
       : undefined,
     group: parseOptionalString(rawBody.group),
     instructions: parseOptionalString(rawBody.instructions),
+    skills: parseRuntimeSkillManifest(rawBody.skills),
     context: parseInvocationContext(rawBody.context),
     outputDir: parseOptionalString(rawBody.outputDir),
     transplant: parseContextTransplant(rawBody.transplant),
@@ -1564,6 +1581,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     childLineage,
     usedContextTransplant,
   );
+  const childSkills = resolveRuntimeSkillManifest(body.skills) ?? session.skills;
 
   const forked = ctx.registry.create({
     id: forkId,
@@ -1579,6 +1597,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     sessionKey: randomUUID(),
     reusePolicy: 'create_new',
     instructions: childInstructions,
+    skills: childSkills,
     context: childContext,
     outputDir: body.outputDir ?? session.outputDir,
     artifacts: usedContextTransplant?.artifacts ?? session.artifacts,

@@ -10,7 +10,7 @@ import type { CursorNativeSessionService } from '../backends/cli/cursor/CursorNa
 import type { KiroNativeSessionService } from '../backends/cli/kiro/KiroNativeSessionService.js';
 import type { AuggieSessionService } from '../backends/cli/auggie/AuggieSessionService.js';
 import type { OpencodeNativeSessionService } from '../backends/cli/opencode/OpencodeNativeSessionService.js';
-import type { StreamEvent } from '../core/types.js';
+import type { StreamEvent, TurnInput } from '../core/types.js';
 
 function parseNdjson(text: string): Array<Record<string, unknown>> {
   return text
@@ -71,7 +71,7 @@ function makeConfig(sessionBaseDir: string): CliRuntimeConfig {
 
 function makeApp(
   sessionBaseDir: string,
-  streamMessage: (message: string) => AsyncGenerator<StreamEvent>,
+  streamMessage: (turnInput: TurnInput) => AsyncGenerator<StreamEvent>,
 ) {
   const registry = new SessionRegistry();
   const worker = {
@@ -110,7 +110,7 @@ function makeApp(
   });
   registry.updateStatus(session.id, 'ready');
 
-  return { app, registry, session };
+  return { app, registry, session, worker };
 }
 
 describe('message route transcript persistence', () => {
@@ -189,6 +189,70 @@ describe('message route transcript persistence', () => {
           { role: 'assistant', text: 'Partial reply before throw.', timestamp: expect.any(String) },
         ],
       });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('merges runtime-managed skill instructions into the turn input and session metadata', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-message-route-'));
+    const sessionBaseDir = join(root, 'sessions');
+    mkdirSync(sessionBaseDir, { recursive: true });
+    const receivedInputs: TurnInput[] = [];
+
+    try {
+      const { app, registry, session } = makeApp(
+        sessionBaseDir,
+        async function* (turnInput: TurnInput) {
+          receivedInputs.push(structuredClone(turnInput));
+          yield { type: 'text', text: 'Warm reply.' };
+          yield { type: 'result' };
+        },
+      );
+
+      const response = await app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({
+          message: 'hello',
+          instructions: 'Base room instruction.',
+          skills: {
+            profileId: 'companion',
+            requestedSkills: ['companion'],
+            context: {
+              catId: 'cat-1',
+              roomMode: 'direct_cat_chat',
+              transport: 'web',
+              labels: ['participant:cat'],
+            },
+          },
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(parseNdjson(await response.text())).toEqual([
+        { type: 'text', text: 'Warm reply.' },
+        { type: 'result' },
+      ]);
+
+      expect(receivedInputs).toHaveLength(1);
+      expect(receivedInputs[0].instructions).toContain('Base room instruction.');
+      expect(receivedInputs[0].instructions).toContain('You are a companion');
+      expect(receivedInputs[0].skills).toEqual(expect.objectContaining({
+        profileId: 'companion',
+        requestedSkills: ['companion'],
+        appliedSkillIds: ['companion'],
+      }));
+
+      expect(registry.get(session.id)?.instructions).toBe('Base room instruction.');
+      expect(registry.get(session.id)?.skills).toEqual(expect.objectContaining({
+        profileId: 'companion',
+        requestedSkills: ['companion'],
+        appliedSkillIds: ['companion'],
+      }));
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

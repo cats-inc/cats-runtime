@@ -93,6 +93,8 @@ export type RuntimePreviewSurfaceRenderHint =
   | 'none';
 export type SessionBranchMode = 'native_fork' | 'context_transplant';
 export type SessionBranchPreference = 'auto' | SessionBranchMode;
+export type RuntimeSkillDeliveryMode = 'instructions' | 'none';
+export type RuntimeSkillResolutionStatus = 'resolved' | 'missing';
 
 export interface WorkspaceSubstrateHints {
   projectType?: 'single-project' | 'monorepo';
@@ -523,6 +525,7 @@ export interface SessionBranchRequest {
   allowedTools?: string[];
   group?: string;
   instructions?: string;
+  skills?: RuntimeSkillManifest;
   context?: SessionInvocationContext;
   outputDir?: string;
   transplant?: SessionContextTransplant;
@@ -553,6 +556,41 @@ export interface SessionInvocationContext {
   workspace?: SessionInvocationWorkspace;
   labels?: string[];
   metadata?: Record<string, unknown>;
+}
+
+export interface RuntimeSkillManifestContext {
+  catId?: string;
+  roomMode?: 'boss_chat' | 'direct_cat_chat' | 'transport_inbox';
+  transport?: 'telegram' | 'line' | 'web' | null;
+  labels?: string[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface RuntimeSkillManifest {
+  profileId?: string;
+  requestedSkills: string[];
+  context?: RuntimeSkillManifestContext;
+  strict?: boolean;
+}
+
+export interface ResolvedRuntimeSkill {
+  id: string;
+  title: string;
+  status: RuntimeSkillResolutionStatus;
+  deliveryMode: RuntimeSkillDeliveryMode;
+  source: 'runtime_catalog';
+  skillPath?: string;
+  warning?: string;
+}
+
+export interface SessionSkillState {
+  profileId?: string;
+  requestedSkills: string[];
+  resolvedSkills: ResolvedRuntimeSkill[];
+  strict: boolean;
+  warnings: string[];
+  appliedSkillIds: string[];
+  updatedAt: string;
 }
 
 export interface SessionArtifact {
@@ -616,6 +654,7 @@ export interface SessionInfo {
   model?: string;
   group?: string;
   instructions?: string;
+  skills?: SessionSkillState;
   context?: SessionInvocationContext;
   outputDir?: string;
   artifacts?: SessionArtifact[];
@@ -673,6 +712,7 @@ export interface ProviderMessage {
 export interface TurnInput {
   message: string;
   instructions?: string;
+  skills?: SessionSkillState;
   context?: SessionInvocationContext;
   outputDir?: string;
 }

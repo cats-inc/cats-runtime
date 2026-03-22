@@ -93,6 +93,55 @@ describe('SessionRegistry', () => {
     expect(registry.get(s.id)?.providerSessionId).toBe('claude-xyz');
   });
 
+  it('persists runtime-managed skill state across reloads', () => {
+    const persistDir = mkdtempSync(join(tmpdir(), 'session-registry-skills-test-'));
+
+    try {
+      registry = new SessionRegistry(persistDir);
+      const session = registry.create({
+        providerName: 'claude',
+        cwd: '/repo',
+        skills: {
+          profileId: 'companion',
+          requestedSkills: ['companion'],
+          resolvedSkills: [{
+            id: 'companion',
+            title: 'Companion',
+            status: 'resolved',
+            deliveryMode: 'instructions',
+            source: 'runtime_catalog',
+            skillPath: 'skills/companion/SKILL.md',
+          }],
+          strict: false,
+          warnings: [],
+          appliedSkillIds: ['companion'],
+          updatedAt: '2026-03-22T00:00:00.000Z',
+        },
+      });
+      registry.flush();
+
+      const reloaded = new SessionRegistry(persistDir);
+      expect(reloaded.get(session.id)?.skills).toEqual({
+        profileId: 'companion',
+        requestedSkills: ['companion'],
+        resolvedSkills: [{
+          id: 'companion',
+          title: 'Companion',
+          status: 'resolved',
+          deliveryMode: 'instructions',
+          source: 'runtime_catalog',
+          skillPath: 'skills/companion/SKILL.md',
+        }],
+        strict: false,
+        warnings: [],
+        appliedSkillIds: ['companion'],
+        updatedAt: '2026-03-22T00:00:00.000Z',
+      });
+    } finally {
+      rmSync(persistDir, { recursive: true, force: true });
+    }
+  });
+
   it('persists provider state metadata across reloads', () => {
     const persistDir = mkdtempSync(join(tmpdir(), 'session-registry-state-test-'));
 
