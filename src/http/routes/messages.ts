@@ -7,7 +7,15 @@ import type { SessionInfo, SessionInvocationContext, TurnInput } from '../../bac
 import type { SessionRegistry } from '../../backends/cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig } from '../../backends/cli/config.js';
 import type { StreamEvent } from '../../core/types.js';
-import { parseInvocationContext, parseOptionalString } from '../parsing.js';
+import {
+  mergeRuntimeSkillInstructions,
+  resolveRuntimeSkillManifest,
+} from '../../core/skills/catalog.js';
+import {
+  parseInvocationContext,
+  parseOptionalString,
+  parseRuntimeSkillManifest,
+} from '../parsing.js';
 import { isPiUnknownSessionError } from '../../backends/cli/pi/resume.js';
 
 function appendHistory(sourcePath: string, entry: Record<string, unknown>): void {
@@ -179,6 +187,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
   const body = await c.req.json<{
     message: string;
     instructions?: string;
+    skills?: unknown;
     context?: SessionInvocationContext;
     outputDir?: string;
   }>();
@@ -188,17 +197,20 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
   }
 
   const instructions = parseOptionalString(body.instructions);
+  const skills = resolveRuntimeSkillManifest(parseRuntimeSkillManifest(body.skills)) ?? session.skills;
   const context = parseInvocationContext(body.context);
   const outputDir = parseOptionalString(body.outputDir);
   const turnInput: TurnInput = {
     message,
-    instructions: instructions ?? session.instructions,
+    instructions: mergeRuntimeSkillInstructions(instructions ?? session.instructions, skills),
+    skills,
     context: context ?? session.context,
     outputDir: outputDir ?? session.outputDir,
   };
-  if (instructions !== undefined || context !== undefined || outputDir !== undefined) {
+  if (instructions !== undefined || body.skills !== undefined || context !== undefined || outputDir !== undefined) {
     ctx.registry.updateSessionMetadata(id, {
-      instructions: turnInput.instructions,
+      instructions: instructions ?? session.instructions,
+      skills,
       context: turnInput.context,
       outputDir: turnInput.outputDir,
     });

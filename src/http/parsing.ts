@@ -1,4 +1,8 @@
-import type { SessionInvocationContext } from '../backends/cli/pool/types.js';
+import type {
+  RuntimeSkillManifest,
+  RuntimeSkillManifestContext,
+  SessionInvocationContext,
+} from '../core/types.js';
 
 export function parseOptionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
@@ -50,4 +54,65 @@ export function parseInvocationContext(value: unknown): SessionInvocationContext
   return Object.values(context).some((entry) => entry !== undefined)
     ? context
     : undefined;
+}
+
+function parseRuntimeSkillRoomMode(
+  value: unknown,
+): RuntimeSkillManifestContext['roomMode'] | undefined {
+  return value === 'boss_chat'
+    || value === 'direct_cat_chat'
+    || value === 'transport_inbox'
+    ? value
+    : undefined;
+}
+
+function parseRuntimeSkillTransport(
+  value: unknown,
+): RuntimeSkillManifestContext['transport'] | undefined {
+  return value === 'telegram'
+    || value === 'line'
+    || value === 'web'
+    || value === null
+    ? value
+    : undefined;
+}
+
+function parseRuntimeSkillContext(value: unknown): RuntimeSkillManifestContext | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  const context: RuntimeSkillManifestContext = {
+    catId: parseOptionalString(record.catId),
+    roomMode: parseRuntimeSkillRoomMode(record.roomMode),
+    transport: parseRuntimeSkillTransport(record.transport),
+    labels: parseStringArray(record.labels),
+    metadata: record.metadata && typeof record.metadata === 'object' && !Array.isArray(record.metadata)
+      ? record.metadata as Record<string, unknown>
+      : undefined,
+  };
+
+  return Object.values(context).some((entry) => entry !== undefined)
+    ? context
+    : undefined;
+}
+
+export function parseRuntimeSkillManifest(value: unknown): RuntimeSkillManifest | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  const requestedSkills = parseStringArray(record.requestedSkills) ?? [];
+  if (requestedSkills.length === 0) {
+    return undefined;
+  }
+
+  return {
+    profileId: parseOptionalString(record.profileId),
+    requestedSkills,
+    context: parseRuntimeSkillContext(record.context),
+    strict: record.strict === true,
+  };
 }
