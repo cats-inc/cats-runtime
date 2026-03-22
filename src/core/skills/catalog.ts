@@ -81,6 +81,7 @@ export function resolveRuntimeSkillManifest(
   return {
     profileId: manifest.profileId,
     requestedSkills,
+    context: manifest.context ? structuredClone(manifest.context) : undefined,
     resolvedSkills,
     strict,
     warnings,

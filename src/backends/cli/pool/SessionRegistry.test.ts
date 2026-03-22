@@ -104,6 +104,12 @@ describe('SessionRegistry', () => {
         skills: {
           profileId: 'companion',
           requestedSkills: ['companion'],
+          context: {
+            catId: 'cat-1',
+            roomMode: 'direct_cat_chat',
+            transport: 'web',
+            labels: ['participant:cat'],
+          },
           resolvedSkills: [{
             id: 'companion',
             title: 'Companion',
@@ -124,6 +130,12 @@ describe('SessionRegistry', () => {
       expect(reloaded.get(session.id)?.skills).toEqual({
         profileId: 'companion',
         requestedSkills: ['companion'],
+        context: {
+          catId: 'cat-1',
+          roomMode: 'direct_cat_chat',
+          transport: 'web',
+          labels: ['participant:cat'],
+        },
         resolvedSkills: [{
           id: 'companion',
           title: 'Companion',

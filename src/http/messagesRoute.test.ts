@@ -244,6 +244,12 @@ describe('message route transcript persistence', () => {
       expect(receivedInputs[0].skills).toEqual(expect.objectContaining({
         profileId: 'companion',
         requestedSkills: ['companion'],
+        context: {
+          catId: 'cat-1',
+          roomMode: 'direct_cat_chat',
+          transport: 'web',
+          labels: ['participant:cat'],
+        },
         appliedSkillIds: ['companion'],
       }));
 
@@ -251,6 +257,12 @@ describe('message route transcript persistence', () => {
       expect(registry.get(session.id)?.skills).toEqual(expect.objectContaining({
         profileId: 'companion',
         requestedSkills: ['companion'],
+        context: {
+          catId: 'cat-1',
+          roomMode: 'direct_cat_chat',
+          transport: 'web',
+          labels: ['participant:cat'],
+        },
         appliedSkillIds: ['companion'],
       }));
     } finally {

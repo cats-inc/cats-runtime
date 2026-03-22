@@ -586,6 +586,7 @@ export interface ResolvedRuntimeSkill {
 export interface SessionSkillState {
   profileId?: string;
   requestedSkills: string[];
+  context?: RuntimeSkillManifestContext;
   resolvedSkills: ResolvedRuntimeSkill[];
   strict: boolean;
   warnings: string[];
