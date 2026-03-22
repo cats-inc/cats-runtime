@@ -38,7 +38,7 @@ metering and guardrail responsibility belongs.
 The wrong boundary would be to keep usage/rate logic inside only
 `src/backends/api`, because the runtime must also account for CLI and agent
 execution. The wrong boundary on the other side would be to push provider-level
-metering, cooldowns, and execution blocking entirely up into `cats-inc`.
+metering, cooldowns, and execution blocking entirely up into `cats`.
 
 ## Decision
 
@@ -65,8 +65,8 @@ execution guardrails across backend families.
      its own
 
 4. Product-owned budget policy remains above runtime.
-   - `cats-inc` or another host decides soft vs hard limits
-   - `cats-inc` or another host owns approval, override, and operator-facing
+   - `cats` or another host decides soft vs hard limits
+   - `cats` or another host owns approval, override, and operator-facing
      budget governance
    - runtime provides the telemetry and execution controls those policies need
 
@@ -83,7 +83,7 @@ execution guardrails across backend families.
 - The same session contract should expose consistent metering whether work ran
   through an API, a CLI, or an external agent runtime.
 - Budget policy, approvals, and war-room dashboards are product/control-plane
-  concerns and should stay in `cats-inc`.
+  concerns and should stay in `cats`.
 - This follows the same split already adopted for skills, MCP/tool intent,
   previews, delivery policy, and delivery primitives.
 
@@ -93,7 +93,7 @@ execution guardrails across backend families.
 
 - Metering and rate-limit handling can be shared across all runtime backends.
 - Hosts gain one machine-readable source of truth for usage and cooldown state.
-- `cats-inc` can build budget dashboards and override flows without parsing raw
+- `cats` can build budget dashboards and override flows without parsing raw
   provider output itself.
 - CLI quota events become first-class runtime signals instead of ad hoc stderr
   strings.
@@ -110,7 +110,7 @@ execution guardrails across backend families.
 - This ADR does not require `cats-runtime` to own long-horizon company budgets.
 - This ADR does not require every provider to expose exact cost in the first
   slice.
-- This ADR does not require `cats-inc` to ship a full Cats Work dashboard
+- This ADR does not require `cats` to ship a full Cats Work dashboard
   immediately, only that runtime telemetry makes that possible.
 
 ## Alternatives Considered
@@ -124,7 +124,7 @@ execution guardrails across backend families.
   semantics
 
 ### Alternative 2: Push usage aggregation and rate handling entirely into
-`cats-inc`
+`cats`
 
 - **Pros**: product gets direct operator control
 - **Cons**: product would need to parse provider/runtime-specific execution
@@ -143,10 +143,11 @@ execution guardrails across backend families.
 - [SPEC-007](../specs/SPEC-007-provider-compatibility-and-evidence-engine.md)
 - [SPEC-003](../specs/SPEC-003-agent-backend.md)
 - [ADR-016](./016-own-executable-delivery-primitives-not-delivery-policy.md)
-- [cats-inc ADR-023](../../../cats/docs/decisions/023-own-budget-policy-and-cost-control-in-product.md)
-- [cats-inc Paperclip Control-Plane Analysis](../../../cats/docs/research/paperclip-control-plane-analysis.md)
+- [cats ADR-023](../../../cats/docs/decisions/023-own-budget-policy-and-cost-control-in-product.md)
+- [cats Paperclip Control-Plane Analysis](../../../cats/docs/research/paperclip-control-plane-analysis.md)
 
 ---
 
 *Accepted: 2026-03-20*
 *Decision makers: user + Codex*
+

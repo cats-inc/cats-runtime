@@ -40,7 +40,7 @@ away from standards.
 - Implementing a full A2A server in this spec
 - Replacing existing docs with generated machine-readable artifacts
 - Turning every piece of repo process into a skill
-- Solving `cats-inc` product-side routing or Boss Cat behavior in this spec
+- Solving `cats` product-side routing or Boss Cat behavior in this spec
 - Defining a complete plan for every future skill package
 
 ## User Stories
@@ -144,7 +144,7 @@ follow-on tasks include:
 - [ ] Should `cats-runtime` eventually publish a real machine-readable Agent
       Card endpoint, or keep versioned docs/examples first?
 - [ ] Which collaboration skills belong in `cats-runtime` itself versus
-      higher-level products such as `cats-inc`?
+      higher-level products such as `cats`?
 
 ## References
 
@@ -160,3 +160,4 @@ follow-on tasks include:
 *Created: 2026-03-19*
 *Author: Codex*
 *Related Plan: TBD*
+

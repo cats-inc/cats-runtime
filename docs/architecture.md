@@ -37,7 +37,7 @@ product shells or ad-hoc prompt helpers. The runtime:
 
 ```text
 ┌──────────────────────┐
-│ cats-inc / crew-chat │
+│   cats / crew-chat   │
 └──────────┬───────────┘
            │ stable HTTP contract
            ▼
@@ -218,6 +218,7 @@ src/
 - Discovers runtime-owned skill packages from `skills/`
 - Validates `SKILL.md` frontmatter and instruction bodies before runtime use
 - Resolves session-level requested skill ids into runtime-visible metadata
+- Supports explicit clearing of persisted skill state on create/message/fork
 - Chooses adapter-aware delivery modes per provider/backend
 - Materializes filesystem or instruction-file resources where the target needs
   runtime-owned artifacts (for example Codex isolated workspaces or Pi prompt
@@ -245,7 +246,6 @@ src/
 - Hosts the runtime-managed skill catalog/delivery contract
 - Hosts the shared provider compatibility/evidence engine used by setup,
   diagnostics, and CLI execution priming
-- Hosts the runtime-managed skill catalog/delivery contract
 - Defines stable exported runtime types
 - Keeps shared utilities out of provider modules
 - Owns the shared `progress` event helper and metering/guardrail type contracts
@@ -319,7 +319,7 @@ higher-level product memory.
 - **Runtime evidence history** is the runtime's canonical record of execution
   events, tool activity, artifacts, and provider metadata.
 - **Durable Cat/owner memory** is not runtime-owned by default; upstream
-  products such as `cats-inc` decide what long-lived memory to derive from
+  products such as `cats` decide what long-lived memory to derive from
   runtime evidence.
 - **Archive/RAG retrieval** should consume explicit exports or projections, not
   reach directly into provider-native transcript stores as the only source of
@@ -365,4 +365,4 @@ the only durable memory surface for the Cats suite.
 
 ---
 
-*Last updated: 2026-03-22*
+*Last updated: 2026-03-23*

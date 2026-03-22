@@ -4,19 +4,19 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | In Progress (First Slice Landed) |
 | **Owner** | Codex |
 | **Reviewer** | User review pending |
 
 ## Summary
 
-`cats-runtime` already has a canonical `skills/` directory and sync tooling, but
-those skills are not yet part of runtime execution. Today they are versioned
-assets and agent-discovery conveniences, not execution-time runtime contracts.
+`cats-runtime` now has a first delivered runtime-managed skills slice: session
+payloads carry requested/resolved/applied metadata, delivery modes are
+backend-aware, and callers can explicitly clear persisted skill state with
+`skills: null`.
 
-That leaves a major gap versus the Paperclip comparison: there is still no
-runtime-owned answer to "which skills apply to this run, how are they resolved,
-and how are they attached to the execution target?"
+The remaining gap is not whether skills exist at runtime, but how far the v0
+contract should go beyond the delivered session/runtime slice.
 
 This specification defines a first slice for runtime-managed skills. The goal is
 to make skills a real execution input without jumping straight to a plugin
@@ -40,7 +40,7 @@ platform, MCP tool registry, or scheduler-driven agent behavior model.
 - Copying Paperclip heartbeat, inbox, approval, or company workflow semantics
 - Auto-executing arbitrary scripts from skill packages
 - Replacing the existing `instructions` field with a skill-only mechanism
-- Solving all `cats-inc` profile-to-skill mapping in the same slice
+- Solving all `cats` profile-to-skill mapping in the same slice
 
 ## User Stories
 
@@ -246,7 +246,7 @@ supports local skill directories.
 ## Open Questions
 
 - [ ] Should `skillProfile` map to named runtime skills inside `cats-runtime`,
-      or should `cats-inc` resolve profiles first in the short term?
+      or should `cats` resolve profiles first in the short term?
 - [ ] Should the first public API include a standalone `GET /skills` catalog, or
       should v0 stay session-contract only?
 - [ ] Which non-CLI backends, if any, deserve a meaningful `instructions`
@@ -262,11 +262,13 @@ supports local skill directories.
 - [SPEC-003: Agent Backend for External Agent Runtimes](./SPEC-003-agent-backend.md)
 - [cats-runtime gap assessment](../research/2026-03-19-paperclip-gap-assessment.md)
 - [Paperclip alignment research](../research/2026-03-17-paperclip-openclaw-pi-alignment.md)
-- [cats-inc paperclip control-plane analysis](../../../cats/docs/research/paperclip-control-plane-analysis.md)
+- [cats paperclip control-plane analysis](../../../cats/docs/research/paperclip-control-plane-analysis.md)
 - [skills README](../../skills/README.md)
 
 ---
 
 *Created: 2026-03-19*
 *Author: Codex*
-*Related Plan: TBD*
+*Last updated: 2026-03-23*
+*Related Plan: [PLAN-008-runtime-managed-skills-v0](../plans/PLAN-008-runtime-managed-skills-v0.md)*
+

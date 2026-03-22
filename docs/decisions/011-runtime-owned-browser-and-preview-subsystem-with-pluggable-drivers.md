@@ -13,7 +13,7 @@ Proposed
 
 ## Context
 
-`cats-inc` is converging on three related product surfaces: `Cats Chat`,
+`cats` is converging on three related product surfaces: `Cats Chat`,
 `Cats Work`, and `Cats Code`. Across those surfaces, an important user outcome
 is no longer just "agent can use a browser". The stronger requirement is:
 
@@ -61,7 +61,7 @@ drivers behind a stable runtime contract.
 
 This decision includes:
 
-1. `cats-runtime` remains the only runtime boundary exposed to `cats-inc` and
+1. `cats-runtime` remains the only runtime boundary exposed to `cats` and
    other upper layers. A separate product-facing `rpa-runtime` is not created in
    the first phase.
 2. Browser lifecycle becomes a first-class runtime concern.
@@ -81,7 +81,7 @@ This decision includes:
    - external browser automation services
    - provider-specific browser agents when they can be normalized behind the
      same contract
-5. `cats-inc` continues to own product intent and rendering behavior.
+5. `cats` continues to own product intent and rendering behavior.
    - which Cat/room/transport gets browser capability
    - whether a preview surface appears inline, externally, or as a fallback
    - how Chat/Work/Code canvases present the surface
@@ -108,7 +108,7 @@ This decision includes:
   Cats surfaces rather than from provider-owned windows/tabs
 - leaves room for multiple browser drivers without coupling product behavior to
   one vendor or one browser UX shell
-- fits the existing split where `cats-inc` owns tool intent and rendering while
+- fits the existing split where `cats` owns tool intent and rendering while
   `cats-runtime` owns executable delivery
 - creates a path from today's browser automation experiments to a future
   preview-canvas experience without forcing a custom browser product fork into
@@ -120,7 +120,7 @@ This decision includes:
 
 - Browser-backed preview becomes a runtime-owned concept instead of an accident
   of whichever provider/browser tool happened to run.
-- `cats-inc` can build a stable preview canvas for Chat, Work, and Code against
+- `cats` can build a stable preview canvas for Chat, Work, and Code against
   normalized runtime surfaces.
 - Browser drivers stay replaceable, which lowers lock-in risk.
 - Deploy-preview-test flows can keep room/run affinity and observability.
@@ -185,13 +185,14 @@ permanent foundation
 - [ADR 005: Introduce a backend-neutral runtime facade for CLI and API backends](./005-backend-neutral-runtime-and-api-backend.md)
 - [ADR 006: Introduce an agent backend and shared runtime contracts](./006-agent-backend-and-shared-runtime-contracts.md)
 - [ADR 009: Keep `cats-runtime` separately packageable with app-managed local startup](./009-keep-cats-runtime-separately-packageable-with-app-managed-local-startup.md)
-- [cats-inc ADR-008: Expose `cats-runtime` via direct API and MCP facade](../../../cats/docs/decisions/008-expose-cats-runtime-via-direct-api-and-mcp-facade.md)
-- [cats-inc ADR-019: Normalize runtime previews as surfaces, not provider iframes](../../../cats/docs/decisions/019-normalize-runtime-previews-as-surfaces-not-provider-iframes.md)
-- [cats-inc ADR-020: Own MCP intent in product and tool delivery in runtime](../../../cats/docs/decisions/020-own-mcp-intent-in-product-and-tool-delivery-in-runtime.md)
-- [cats-inc SPEC-020: Embedded preview surfaces for runtime artifacts and services](../../../cats/docs/specs/SPEC-020-embedded-preview-surfaces-for-runtime-artifacts-and-services.md)
-- [cats-inc SPEC-021: Contextual MCP profiles and lazy tool activation](../../../cats/docs/specs/SPEC-021-contextual-mcp-profiles-and-lazy-tool-activation.md)
+- [cats ADR-008: Expose `cats-runtime` via direct API and MCP facade](../../../cats/docs/decisions/008-expose-cats-runtime-via-direct-api-and-mcp-facade.md)
+- [cats ADR-019: Normalize runtime previews as surfaces, not provider iframes](../../../cats/docs/decisions/019-normalize-runtime-previews-as-surfaces-not-provider-iframes.md)
+- [cats ADR-020: Own MCP intent in product and tool delivery in runtime](../../../cats/docs/decisions/020-own-mcp-intent-in-product-and-tool-delivery-in-runtime.md)
+- [cats SPEC-020: Embedded preview surfaces for runtime artifacts and services](../../../cats/docs/specs/SPEC-020-embedded-preview-surfaces-for-runtime-artifacts-and-services.md)
+- [cats SPEC-021: Contextual MCP profiles and lazy tool activation](../../../cats/docs/specs/SPEC-021-contextual-mcp-profiles-and-lazy-tool-activation.md)
 
 ---
 
 *Decision made: 2026-03-19*
 *Decision makers: Proposed by Codex from user direction*
+

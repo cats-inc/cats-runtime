@@ -15,7 +15,7 @@ already advertise native fork capability.
 
 That is not yet enough for higher-layer orchestration.
 
-Upper-layer products such as `cats-inc` now need a clearer branching contract
+Upper-layer products such as `cats` now need a clearer branching contract
 that can support:
 
 - native provider/session fork when available
@@ -166,7 +166,7 @@ The first runtime slice should prioritize:
 
 - stable native fork behavior for providers that already support it
 - explicit lineage in session inspection payloads
-- a minimal context-transplant request shape usable by `cats-inc`
+- a minimal context-transplant request shape usable by `cats`
 - clear failure semantics when native fork cannot be honored
 
 The first slice should not require:
@@ -201,8 +201,8 @@ Current first-slice contract intentionally remains minimal:
 
 - [SPEC-003](./SPEC-003-agent-backend.md)
 - [SPEC-005](./SPEC-005-runtime-managed-skills-v0.md)
-- [cats-inc ADR-024](../../../cats/docs/decisions/024-separate-explicit-mentions-from-dynamic-room-workflow.md)
-- [cats-inc SPEC-026](../../../cats/docs/specs/SPEC-026-explicit-mentions-and-dynamic-room-workflow-orchestration.md)
+- [cats ADR-024](../../../cats/docs/decisions/024-separate-explicit-mentions-from-dynamic-room-workflow.md)
+- [cats SPEC-026](../../../cats/docs/specs/SPEC-026-explicit-mentions-and-dynamic-room-workflow-orchestration.md)
 
 ## Open Questions
 
@@ -232,3 +232,4 @@ Current first-slice contract intentionally remains minimal:
 *Created: 2026-03-20*
 *Author: Codex*
 *Related Plan: TBD*
+

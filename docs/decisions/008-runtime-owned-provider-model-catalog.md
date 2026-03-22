@@ -18,7 +18,7 @@ providers. It already exposes:
 - `GET /kiro/models` as a provider-specific model-listing exception
 - optional `listModels()` capability on agent adapters
 
-At the same time, `cats-inc` still carries renderer-side hardcoded provider
+At the same time, `cats` still carries renderer-side hardcoded provider
 model lists for execution-target dropdowns. That makes the UI the de facto owner
 of model availability even though the renderer does not know:
 
@@ -40,7 +40,7 @@ direct runtime API.
 
 This decision includes:
 
-1. The authoritative model catalog lives in `cats-runtime`, not in `cats-inc`
+1. The authoritative model catalog lives in `cats-runtime`, not in `cats`
    renderer code.
 2. Discovery is **lazy and on-demand**, backed by an in-memory TTL cache.
 3. `cats-runtime` will **not** add background polling or scheduler-driven model
@@ -56,7 +56,7 @@ This decision includes:
    config-derived fallback remains valid for providers that do not.
 7. The first public surface is a **per-provider** model-catalog endpoint.
    Aggregate endpoints and explicit refresh endpoints may be added later.
-8. `cats-inc` should consume this catalog through its server-side product API
+8. `cats` should consume this catalog through its server-side product API
    layer. The renderer should not be required to call `cats-runtime` directly.
 
 ## Rationale
@@ -68,7 +68,7 @@ This decision includes:
   is asking for model data
 - aligns with existing optional `listModels()` adapter capabilities instead of
   inventing a second discovery subsystem
-- preserves the `cats-inc` direct-product-API boundary from `cats-inc`
+- preserves the `cats` direct-product-API boundary from `cats`
   ADR-008
 
 ## Consequences
@@ -107,7 +107,7 @@ This decision includes:
 - **Why rejected**: on-demand discovery with TTL cache matches the actual usage
   pattern better and keeps the first implementation simpler
 
-### Alternative 2: Keep the Catalog in `cats-inc` Renderer Code
+### Alternative 2: Keep the Catalog in `cats` Renderer Code
 
 - **Pros**: fast to keep shipping with the current dropdown implementation
 - **Cons**: duplicates runtime knowledge in the wrong layer and becomes stale as
@@ -129,9 +129,10 @@ This decision includes:
 - [ADR 005: Introduce a backend-neutral runtime facade for CLI and API backends](./005-backend-neutral-runtime-and-api-backend.md)
 - [ADR 006: Introduce an agent backend and shared runtime contracts](./006-agent-backend-and-shared-runtime-contracts.md)
 - [SPEC-004: Provider Model Catalog and Discovery](../specs/SPEC-004-provider-model-catalog-and-discovery.md)
-- [cats-inc ADR-008: Expose cats-runtime via Direct API and MCP Facade](../../../cats/docs/decisions/008-expose-cats-runtime-via-direct-api-and-mcp-facade.md)
+- [cats ADR-008: Expose cats-runtime via Direct API and MCP Facade](../../../cats/docs/decisions/008-expose-cats-runtime-via-direct-api-and-mcp-facade.md)
 
 ---
 
 *Decision made: 2026-03-19*
 *Decision makers: Codex + user direction*
+

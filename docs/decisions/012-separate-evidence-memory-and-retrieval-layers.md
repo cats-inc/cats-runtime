@@ -29,7 +29,7 @@ We need to preserve all of the following at once:
 OpenClaw is a useful benchmark because it already separates transcript history,
 compaction summaries, durable memory files, optional retrieval indexing, and
 hook-driven memory flushes. But `cats-runtime` is not the full product: it is a
-runtime boundary serving upstream products such as `cats-inc`.
+runtime boundary serving upstream products such as `cats`.
 
 That means `cats-runtime` must not accidentally become the canonical owner of
 all long-lived Cats memory simply because it can see the active session.
@@ -50,7 +50,7 @@ clear ownership boundary between runtime continuity and product memory.
      product semantics are not runtime-owned by default.
    - `cats-runtime` may emit signals, checkpoints, and exportable evidence that
      upstream products use to build durable memory.
-   - Upstream products such as `cats-inc` remain responsible for deciding what
+   - Upstream products such as `cats` remain responsible for deciding what
      durable memory to keep and how to scope it.
 
 3. **Retrieval/archive layer**
@@ -82,7 +82,7 @@ This decision also establishes the following rules:
   memory model.
 - Keeps `cats-runtime` responsible for what it can authoritatively know:
   execution evidence and continuity metadata.
-- Gives `cats-inc` room to own Cat/owner memory and `Cats Work` archive policy.
+- Gives `cats` room to own Cat/owner memory and `Cats Work` archive policy.
 - Makes OpenClaw-style session continuity compatible with Cats-owned transcript
   backup and later RAG.
 
@@ -131,8 +131,8 @@ This decision also establishes the following rules:
 - [cats-runtime Architecture](../architecture.md)
 - [SPEC-003: Agent Backend for External Agent Runtimes](../specs/SPEC-003-agent-backend.md)
 - [ADR-006: Introduce an agent backend and shared runtime contracts](./006-agent-backend-and-shared-runtime-contracts.md)
-- [cats-inc SPEC-022: Cats Memory Layering and Ownership](../../../cats/docs/specs/SPEC-022-cats-memory-layering-and-ownership.md)
-- [cats-inc research: OpenClaw memory layering benchmark](../../../cats/docs/research/2026-03-19-openclaw-memory-layering-benchmark.md)
+- [cats SPEC-022: Cats Memory Layering and Ownership](../../../cats/docs/specs/SPEC-022-cats-memory-layering-and-ownership.md)
+- [cats research: OpenClaw memory layering benchmark](../../../cats/docs/research/2026-03-19-openclaw-memory-layering-benchmark.md)
 - [OpenClaw memory](https://docs.openclaw.ai/concepts/memory)
 - [OpenClaw compaction](https://docs.openclaw.ai/concepts/compaction)
 - [OpenClaw session management deep dive](https://docs.openclaw.ai/reference/session-management-compaction)
@@ -142,3 +142,4 @@ This decision also establishes the following rules:
 
 *Decision made: 2026-03-19*
 *Decision makers: Codex with user direction*
+

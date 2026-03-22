@@ -9,7 +9,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | In Progress (First Slice Landed) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User / runtime workstream |
@@ -23,9 +23,10 @@
 ## Overview
 
 `cats-runtime` already owns CLI execution, provider session semantics, and
-runtime diagnostics. The current gap is that provider assumptions still live
-mostly inside handwritten adapters and route-specific checks. That makes the
-runtime brittle when upstream CLIs change:
+runtime diagnostics. The first shipped slice now adds shared compatibility
+assessment, degraded profile selection, and evidence capture, but provider
+assumptions still partly live inside handwritten adapters and route-specific
+checks. That makes the runtime brittle when upstream CLIs change:
 
 - startup flags
 - `--version` output
@@ -228,8 +229,10 @@ bundle structure.
 | Date | Update |
 |------|--------|
 | 2026-03-23 | Plan created to stage the first compatibility/evidence-engine delivery slice before implementation |
+| 2026-03-23 | First compatibility slice landed with cached assessments, degraded profiles, and redacted evidence bundles; remaining work stays in follow-on phases |
 
 ---
 
 *Created: 2026-03-23*
 *Author: Codex*
+*Last updated: 2026-03-23*

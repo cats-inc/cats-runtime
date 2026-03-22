@@ -79,7 +79,7 @@ This decision includes:
    - skills decide when to invoke the tools
    - skills interpret tool results and decide next steps
    - skills do not replace the tools as the source of filesystem truth
-6. Product shells such as `cats-inc` may package these runtime capabilities
+6. Product shells such as `cats` may package these runtime capabilities
    into richer UX, but they should not become the canonical owner of substrate
    generation logic.
 7. Update behavior for existing repositories must be conservative.
@@ -159,7 +159,7 @@ This decision includes:
 - **Why rejected**: skills are the right orchestration layer, not the right
   source of deterministic substrate generation
 
-### Alternative 3: Make `cats-inc` Own Workspace Substrate Generation
+### Alternative 3: Make `cats` Own Workspace Substrate Generation
 
 - **Pros**: one product shell could present a polished UX
 - **Cons**: leaves standalone runtime use cases without the same capability and
@@ -181,10 +181,11 @@ This decision includes:
 - [SPEC-005](../specs/SPEC-005-runtime-managed-skills-v0.md)
 - [SPEC-006](../specs/SPEC-006-a2a-protocol-project-memory-and-skill-layering.md)
 - [SPEC-008](../specs/SPEC-008-workspace-substrate-init-audit-and-update.md)
-- [cats-inc SPEC-019](../../../cats/docs/specs/SPEC-019-product-skill-profiles-and-runtime-skill-manifests.md)
+- [cats SPEC-019](../../../cats/docs/specs/SPEC-019-product-skill-profiles-and-runtime-skill-manifests.md)
 - [project-bootstrap README](../../../project-bootstrap/README.md)
 
 ---
 
 *Accepted: 2026-03-20*
 *Decision makers: user + Codex*
+

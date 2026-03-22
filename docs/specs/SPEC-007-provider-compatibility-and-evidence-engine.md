@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft (Pending Review) |
+| **Status** | In Progress (First Slice Landed) |
 | **Owner** | Codex |
 | **Reviewer** | User / runtime workstream |
 
@@ -20,9 +20,9 @@ includes more than simple process launching:
 - stream parsing
 - session and resume semantics
 
-Today, much of that logic is still hardcoded per provider. That is workable for
-initial support, but it is brittle when upstream CLIs change flags, event
-formats, output schemas, or approval behavior.
+Today, a first compatibility slice is already in place for major CLI-backed
+providers, but follow-on work still remains when upstream CLIs change flags,
+event formats, output schemas, or approval behavior.
 
 The runtime needs a provider compatibility and evidence engine that can:
 
@@ -340,7 +340,7 @@ approval and merge step should remain reviewable by humans.
 - [ADR-013](../decisions/013-extend-provider-manifests-with-install-and-check-metadata.md)
 - [ADR-009](../decisions/009-keep-cats-runtime-separately-packageable-with-app-managed-local-startup.md)
 - [ADR-005](../decisions/005-backend-neutral-runtime-and-api-backend.md)
-- [cats-inc SPEC-023](../../../cats/docs/specs/SPEC-023-packaged-setup-wizard-and-provider-installation.md)
+- [cats SPEC-023](../../../cats/docs/specs/SPEC-023-packaged-setup-wizard-and-provider-installation.md)
 
 ## Open Questions
 
@@ -364,4 +364,6 @@ approval and merge step should remain reviewable by humans.
 
 *Created: 2026-03-20*
 *Author: Codex*
-*Related Plan: TBD*
+*Last updated: 2026-03-23*
+*Related Plan: [PLAN-008-provider-compatibility-and-evidence-engine](../plans/PLAN-008-provider-compatibility-and-evidence-engine.md)*
+

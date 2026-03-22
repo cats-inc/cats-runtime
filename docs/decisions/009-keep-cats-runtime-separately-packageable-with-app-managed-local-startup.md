@@ -11,23 +11,23 @@ Proposed
 ## Context
 
 `cats-runtime` is the accepted runtime boundary for upper-layer products such as
-`cats-inc`. The runtime already owns provider execution, session lifecycle,
+`cats`. The runtime already owns provider execution, session lifecycle,
 streaming, discovery, and backend-specific behavior behind one public HTTP
 contract.
 
 Recent product direction clarified a new distribution goal for the first
-consumer, `cats-inc`:
+consumer, `cats`:
 
 - technical users should be able to try the product through a self-hosted npm
-  app flow such as `npx cats-inc`
+  app flow such as `npx cats`
 - that flow should feel like one product even when multiple local services are
   involved
 
 This creates a tempting but risky shortcut: collapsing `cats-runtime` into
-`cats-inc` internals just to make startup feel simpler.
+`cats` internals just to make startup feel simpler.
 
 That shortcut would conflict with decisions already recorded in this repo and
-in `cats-inc`:
+in `cats`:
 
 - `cats-runtime` is meant to stay the stable runtime boundary
 - the runtime is already useful beyond one product shell
@@ -44,14 +44,14 @@ an app-managed self-hosted distribution model.
 ## Decision
 
 `cats-runtime` will remain a separately packageable runtime boundary while also
-supporting app-managed local startup by upper-layer hosts such as `cats-inc`
+supporting app-managed local startup by upper-layer hosts such as `cats`
 and a future Electron shell.
 
 This decision includes:
 
 1. `cats-runtime` remains its own project, documentation surface, and runtime
    contract. It is not demoted to a private source-level module inside
-   `cats-inc`.
+   `cats`.
 2. The runtime must continue to support **standalone mode**, where an operator
    starts it directly for development, debugging, or independent consumers.
 3. The runtime must also support **app-managed local mode**, where a product
@@ -81,7 +81,7 @@ This decision includes:
 
 ### Positive
 
-- `cats-inc` and future hosts can offer a smoother local startup flow without
+- `cats` and future hosts can offer a smoother local startup flow without
   absorbing runtime internals.
 - The runtime stays reusable for other consumers, including independent local
   tools or future product shells.
@@ -108,7 +108,7 @@ This decision includes:
 
 ## Alternatives Considered
 
-### Alternative 1: Merge `cats-runtime` into `cats-inc`
+### Alternative 1: Merge `cats-runtime` into `cats`
 
 - **Pros**: Simplest story for one-command startup on paper.
 - **Cons**: Destroys the explicit runtime boundary and tightly couples product
@@ -138,9 +138,10 @@ This decision includes:
 - [ADR 002: Embed the CLI runtime into `cats-runtime`](./002-embed-cli-runtime.md)
 - [ADR 005: Introduce a backend-neutral runtime facade for CLI and API backends](./005-backend-neutral-runtime-and-api-backend.md)
 - [ADR 006: Introduce an agent backend and shared runtime contracts](./006-agent-backend-and-shared-runtime-contracts.md)
-- [cats-inc ADR-013: Ship `cats-inc` as an executable self-hosted npm app](../../../cats/docs/decisions/013-ship-cats-inc-as-an-executable-self-hosted-npm-app.md)
+- [cats ADR-013: Ship `cats` as an executable self-hosted npm app](../../../cats/docs/decisions/013-ship-cats-as-an-executable-self-hosted-npm-app.md)
 
 ---
 
 *Decision made: 2026-03-19*
 *Decision makers: Proposed by Codex from user direction*
+

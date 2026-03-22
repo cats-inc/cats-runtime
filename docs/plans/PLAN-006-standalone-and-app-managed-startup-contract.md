@@ -19,14 +19,14 @@ and aligns with existing runtime-boundary ADRs.
 
 `cats-runtime` already has the right high-level role: it is the runtime
 boundary above provider-specific execution details and below product apps such
-as `cats-inc`.
+as `cats`.
 
 What it does not yet have is a sufficiently explicit startup contract for both
 of the modes now required by product direction:
 
 - **standalone mode** for direct local development, debugging, and independent
   operators
-- **app-managed local mode** for hosts such as `cats-inc` or a future Electron
+- **app-managed local mode** for hosts such as `cats` or a future Electron
   shell that want to supervise `cats-runtime` as a child process
 
 This plan formalizes the process-level contract needed for those two modes to
@@ -45,7 +45,7 @@ coexist without collapsing the runtime into product-app internals.
 
 ## Non-Goals for This Slice
 
-- Merging `cats-runtime` into `cats-inc`
+- Merging `cats-runtime` into `cats`
 - Replacing the public HTTP contract with a different transport
 - Reworking provider backends as part of the startup-contract work
 - Shipping the Electron wrapper itself
@@ -104,7 +104,7 @@ coexist without collapsing the runtime into product-app internals.
       readiness.
 - [x] Add tests for signal handling and managed shutdown behavior where
       practical.
-- [x] Document the recommended host interaction model for `cats-inc` and future
+- [x] Document the recommended host interaction model for `cats` and future
       Electron wrappers.
 - [x] Update setup/deployment docs to explain standalone versus app-managed
       startup.
@@ -169,3 +169,4 @@ coexist without collapsing the runtime into product-app internals.
 
 *Created: 2026-03-19*
 *Author: Codex*
+

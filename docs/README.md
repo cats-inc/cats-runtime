@@ -8,29 +8,29 @@ These important documents live in the project root:
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| [PROGRESS.md](../PROGRESS.md) | ? Active | Implementation status and work packages |
-| [ROADMAP.md](../ROADMAP.md) | ? Active | Roadmap and planned optimization tracks |
+| [PROGRESS.md](../PROGRESS.md) | Complete | Implementation status and work packages |
+| [ROADMAP.md](../ROADMAP.md) | Complete | Roadmap and planned optimization tracks |
 
 ## Core Documents
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| [requirements.md](./requirements.md) | ?? Template | Requirements specification |
-| [architecture.md](./architecture.md) | ? Active | Embedded runtime architecture and layering |
-| [api.md](./api.md) | ? Active | Supported public HTTP contract |
+| [requirements.md](./requirements.md) | Template | Requirements specification |
+| [architecture.md](./architecture.md) | Complete | Embedded runtime architecture, backend layering, and runtime-owned skill / compatibility / metering seams |
+| [api.md](./api.md) | Complete | Supported public HTTP contract, including skills, diagnostics, progress, guardrails, and compatibility summaries |
 
 ## Development Guides
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| [setup-guide.md](./setup-guide.md) | ? Active | Environment setup |
-| [testing.md](./testing.md) | ? Active | Testing strategy |
-| [deployment.md](./deployment.md) | ?? Template | Deployment instructions |
-| [release-guide.md](./release-guide.md) | ? Active | npm packaging, release, and future trusted publishing workflow |
-| [security-guidelines.md](./security-guidelines.md) | ?? Template | Security policies |
-| [mcp-config.md](./mcp-config.md) | ?? Template | MCP server configuration |
-| [services.md](./services.md) | ? Active | Service registry and port assignments |
-| [SCRIPT-STANDARDS.md](./SCRIPT-STANDARDS.md) | ?? Template | Script standards and naming |
+| [setup-guide.md](./setup-guide.md) | Complete | Environment setup, startup contract, and diagnostics/compatibility basics |
+| [testing.md](./testing.md) | Complete | Testing strategy |
+| [deployment.md](./deployment.md) | Complete | Standalone and app-managed local deployment guidance |
+| [release-guide.md](./release-guide.md) | Complete | npm packaging, release, and future trusted publishing workflow |
+| [security-guidelines.md](./security-guidelines.md) | Template | Security policies |
+| [mcp-config.md](./mcp-config.md) | Template | MCP server configuration |
+| [services.md](./services.md) | Complete | Service registry and port assignments |
+| [SCRIPT-STANDARDS.md](./SCRIPT-STANDARDS.md) | Template | Script standards and naming |
 
 ## Scripts
 
@@ -48,20 +48,20 @@ Add your project-specific automation scripts here.
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| [AGENT-GUIDE.md](./AGENT-GUIDE.md) | ? Active | Project-specific agent notes |
-| [terminology.md](./terminology.md) | ? Active | AAIF, A2A, skills, and project-memory terminology |
-| [a2a/](./a2a/) | ?? | A2A protocol examples and templates; some current examples still need A2A v1 alignment |
-| [specs/](./specs/) | ? Active | Feature specifications, including WSL discovery, agent backend planning, the provider compatibility/evidence-engine direction, the workspace-substrate init/audit/update direction, the executable delivery/governance primitives direction, the session fork/context-transplant direction, and the usage-metering/rate-limit/guardrail direction |
-| [plans/](./plans/) | ? Active | Implementation plans, including WSL discovery, API/backend expansion, and the proposed standalone versus app-managed startup contract |
-| [decisions/](./decisions/) | ? Active | Architecture Decision Records, including the proposed app-managed self-hosted runtime packaging direction, the accepted provider-install metadata manifest direction, the accepted lightweight runtime setup/diagnostics surface, the accepted workspace-substrate tooling direction, the accepted executable-delivery-vs-policy split, and the accepted usage-metering/rate-limit/guardrail split |
+| [AGENT-GUIDE.md](./AGENT-GUIDE.md) | Complete | Project-specific agent notes |
+| [terminology.md](./terminology.md) | Complete | AAIF, A2A, skills, compatibility, evidence, and runtime-project-memory terminology |
+| [a2a/](./a2a/) | Template | A2A protocol examples and templates; some current examples still need A2A v1 alignment |
+| [specs/](./specs/) | Complete | Feature specifications for WSL discovery, agent backend work, runtime-managed skills, provider compatibility/evidence, workspace substrate, executable delivery, session fork/context-transplant, and usage metering/guardrails |
+| [plans/](./plans/) | Complete | Implementation plans for WSL discovery, API/backend expansion, startup contract, runtime-managed skills, provider compatibility/evidence, and metering/progress/guardrails |
+| [decisions/](./decisions/) | Complete | Architecture Decision Records for packaging, install/check metadata, diagnostics, workspace substrate, delivery policy boundaries, and runtime-owned metering/guardrails |
 
-**Legend**: ? Complete | ?? Template (needs content) | ?? Directory
+**Legend**: Complete | Partial | Template
 
 ## Research
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| [research/](./research/) | ?? | Research notes and external sources, including Paperclip alignment notes, a current maturity-gap assessment, and AAIF/A2A layering guidance |
+| [research/](./research/) | Partial | Research notes and external sources, including Paperclip alignment notes, a current maturity-gap assessment, and AAIF/A2A layering guidance |
 
 ## Context-Driven Development
 
@@ -82,6 +82,16 @@ When working on this project:
 3. Update this index when adding new documents
 4. Follow templates provided in each file
 
+## Current Documentation Gaps
+
+The runtime's main contracts are now documented, but these areas still need
+later passes:
+
+- browser/preview subsystem planning beyond the current ADR/spec direction
+- deeper API/local live-probe and model-discovery follow-ons
+- project-specific security and MCP configuration docs beyond the inherited templates
+- A2A examples once runtime-to-runtime collaboration surfaces stabilize
+
 ## Document Standards
 
 - Use Markdown format
@@ -91,4 +101,4 @@ When working on this project:
 
 ---
 
-*Last updated: 2026-03-20*
+*Last updated: 2026-03-23*

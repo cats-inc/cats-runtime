@@ -23,7 +23,7 @@ Accepted
 At the same time, the Cats product direction now has a stronger packaged
 onboarding requirement:
 
-- `cats-inc` should eventually ship a full first-run setup wizard
+- `cats` should eventually ship a full first-run setup wizard
 - that wizard includes product concepts such as welcome flow, capability-pack
   presentation, Boss Cat initialization, and host-managed resume/elevation UX
 
@@ -74,7 +74,7 @@ This decision includes:
    - capability-pack marketing language or product framing
    - packaged host privilege orchestration and resume UX
 4. Full packaged onboarding for the Cats product remains product-host-owned, as
-   recorded in `cats-inc` ADR-021.
+   recorded in `cats` ADR-021.
 5. Runtime setup and diagnostics must use the same provider compatibility and
    evidence engine used by normal runtime execution paths rather than a second
    ad hoc parser stack.
@@ -85,7 +85,7 @@ This decision includes:
    - packaged hosts may still own multi-step install execution, privilege
      prompts, and interruption resume
 7. `cats-runtime` should remain useful when distributed independently from
-   `cats-inc`.
+   `cats`.
 
 ## Rationale
 
@@ -95,7 +95,7 @@ This decision includes:
   already owns provider behavior
 - avoids forcing every consumer to rebuild the same provider setup and
   diagnostics logic above the runtime
-- stays compatible with `cats-inc` owning the richer product onboarding
+- stays compatible with `cats` owning the richer product onboarding
   experience
 
 ## Consequences
@@ -147,7 +147,7 @@ policy-heavy approval UX into `cats-runtime`.
 
 ## Alternatives Considered
 
-### Alternative 1: Keep All Setup UX Only in `cats-inc`
+### Alternative 1: Keep All Setup UX Only in `cats`
 
 - **Pros**: one obvious place for onboarding UI
 - **Cons**: leaves standalone `cats-runtime` without a practical setup surface
@@ -174,11 +174,12 @@ policy-heavy approval UX into `cats-runtime`.
 - [ADR-009](./009-keep-cats-runtime-separately-packageable-with-app-managed-local-startup.md)
 - [ADR-013](./013-extend-provider-manifests-with-install-and-check-metadata.md)
 - [SPEC-007](../specs/SPEC-007-provider-compatibility-and-evidence-engine.md)
-- [cats-inc ADR-021](../../../cats/docs/decisions/021-keep-packaged-setup-and-provider-installation-in-the-host.md)
-- [cats-inc SPEC-023](../../../cats/docs/specs/SPEC-023-packaged-setup-wizard-and-provider-installation.md)
+- [cats ADR-021](../../../cats/docs/decisions/021-keep-packaged-setup-and-provider-installation-in-the-host.md)
+- [cats SPEC-023](../../../cats/docs/specs/SPEC-023-packaged-setup-wizard-and-provider-installation.md)
 
 ---
 
 *Accepted: 2026-03-20*
 *Last updated: 2026-03-22*
 *Decision makers: user + Codex*
+

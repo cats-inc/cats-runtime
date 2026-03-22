@@ -33,7 +33,7 @@ The implementation should stay deliberately small:
 - no background polling
 - no aggregate endpoint requirement for the first slice
 
-The result should be a stable runtime contract that `cats-inc` can consume
+The result should be a stable runtime contract that `cats` can consume
 server-side while keeping renderer code out of provider-specific discovery
 logic.
 
@@ -57,7 +57,7 @@ logic.
 - background polling or scheduler-driven refresh
 - a first-slice aggregate `GET /providers/models` route
 - a required refresh endpoint in the first slice
-- changing `cats-inc` renderer code in this plan
+- changing `cats` renderer code in this plan
 - treating raw vendor `/models` endpoints as the authoritative UI contract
 
 ## Implementation Phases
@@ -118,7 +118,7 @@ semantics.
 ### Phase 5: Deferred Follow-Ons
 
 - [ ] Revisit whether a runtime aggregate endpoint is still useful after
-      `cats-inc` server integration is real
+      `cats` server integration is real
 - [ ] Revisit whether an explicit refresh endpoint is needed after cache
       behavior is exercised
 - [ ] Add explicit timeout and abort handling for discovery-backed HTTP fetches
@@ -167,7 +167,7 @@ slice.
 - **Manual Testing**:
   - query a configured `ollama` target with changing local models
   - query a target that only has config or static fallback
-  - verify `cats-inc` can consume the per-provider route without needing an
+  - verify `cats` can consume the per-provider route without needing an
     aggregate runtime endpoint
 
 ## Risks & Mitigations
@@ -190,3 +190,4 @@ slice.
 
 *Created: 2026-03-19*
 *Author: Codex*
+

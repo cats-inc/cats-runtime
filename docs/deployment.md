@@ -10,7 +10,7 @@
 | Development | `http://127.0.0.1:3110` | Local development with source checkout |
 | Built local | `http://127.0.0.1:3110` | Production-style local run from built assets |
 | npm package (planned publish path) | `http://127.0.0.1:3110` by default | Executable package run via `cats-runtime` / `npx cats-runtime` |
-| App-managed local | Host-assigned | Started and supervised by a local product app such as `cats-inc` |
+| App-managed local | Host-assigned | Started and supervised by a local product app such as `cats` |
 
 ## Deployment Modes
 
@@ -59,7 +59,7 @@ Supported startup flags:
 
 ### 4. App-managed local startup
 
-`cats-runtime` may also be started by a local supervisor such as `cats-inc` or
+`cats-runtime` may also be started by a local supervisor such as `cats` or
 an Electron host. In that mode:
 
 - the host process owns process supervision
@@ -69,7 +69,7 @@ an Electron host. In that mode:
 Recommended child-process invocation:
 
 ```powershell
-node dist/index.js --startup-mode app-managed --managed-by cats-inc --ready-output json
+node dist/index.js --startup-mode app-managed --managed-by cats --ready-output json
 ```
 
 Expected behavior:
@@ -171,4 +171,4 @@ assets. Use `npm pack --dry-run` to inspect the payload.
 
 ---
 
-*Last updated: 2026-03-21*
+*Last updated: 2026-03-23*

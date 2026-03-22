@@ -21,7 +21,7 @@ The runtime now needs a shared subsystem that can:
 - enforce execution-side warnings, cooldowns, or blocks when configured
 
 This subsystem should not own long-horizon budget policy. It should provide the
-execution facts and controls that upper-layer products such as `cats-inc` use
+execution facts and controls that upper-layer products such as `cats` use
 for budget governance.
 
 ## Goals
@@ -237,8 +237,8 @@ machine-readable runtime responses
 - [ADR-017](../decisions/017-own-usage-metering-rate-limit-detection-and-execution-guardrails.md)
 - [SPEC-007](./SPEC-007-provider-compatibility-and-evidence-engine.md)
 - [SPEC-003](./SPEC-003-agent-backend.md)
-- [cats-inc ADR-023](../../../cats/docs/decisions/023-own-budget-policy-and-cost-control-in-product.md)
-- [cats-inc SPEC-025](../../../cats/docs/specs/SPEC-025-budget-policy-override-flows-and-war-room-dashboard.md)
+- [cats ADR-023](../../../cats/docs/decisions/023-own-budget-policy-and-cost-control-in-product.md)
+- [cats SPEC-025](../../../cats/docs/specs/SPEC-025-budget-policy-override-flows-and-war-room-dashboard.md)
 
 ## Open Questions
 
@@ -261,4 +261,6 @@ machine-readable runtime responses
 
 *Created: 2026-03-20*
 *Author: Codex*
-*Related Plan: TBD*
+*Last updated: 2026-03-23*
+*Related Plan: [PLAN-009-usage-metering-progress-and-guardrails](../plans/PLAN-009-usage-metering-progress-and-guardrails.md)*
+

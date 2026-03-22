@@ -5,7 +5,7 @@
 ## Overview
 
 `cats-runtime` is the stable execution boundary for upper-layer products such as
-`cats-inc` and `crew-chat-poc`. It now embeds the CLI runtime directly instead
+`cats` and `crew-chat-poc`. It now embeds the CLI runtime directly instead
 of proxying to a second local sidecar service.
 
 Current capabilities:
@@ -19,11 +19,12 @@ Current capabilities:
 - file-based provider topology with separated `routing` / `backends` sections
 - dashboard-side provider instance selection for session creation
 - runtime-managed skills with session-level requested/resolved/applied metadata
+- explicit `skills: null` clearing for create/message/fork session flows
 - backend-aware skill delivery modes (`filesystem`, `instructions`, `none`)
 - strict `default` instance aliasing and host-path validation for file-backed providers
 - provider-specific helpers such as Kiro model inspection
 - runtime-owned usage metering, incident surfacing, and additive execution guardrails for warn / block / cooldown flows
-- shared CLI compatibility probing, degraded profile selection, and evidence capture for major provider families
+- shared CLI compatibility probing, degraded profile selection, and replay-friendly evidence capture for major provider families
 
 ## Current Status
 
@@ -74,7 +75,7 @@ overrides.
 Supported process startup modes:
 
 - `standalone` for direct local runs
-- `app-managed` for child-process supervision by hosts such as `cats-inc`
+- `app-managed` for child-process supervision by hosts such as `cats`
 
 The executable entry also supports:
 
@@ -95,7 +96,7 @@ node dist/index.js
 For an app-managed local start, prefer machine-readable readiness output:
 
 ```powershell
-node dist/index.js --startup-mode app-managed --managed-by cats-inc --ready-output json
+node dist/index.js --startup-mode app-managed --managed-by cats --ready-output json
 ```
 
 For graceful local shutdown, a supervising host may either send `SIGINT` /

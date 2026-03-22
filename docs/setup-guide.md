@@ -48,7 +48,7 @@ Supported startup flags:
 modes:
 
 - `standalone`: direct operator-managed startup
-- `app-managed`: child-process startup supervised by a host such as `cats-inc`
+- `app-managed`: child-process startup supervised by a host such as `cats`
 
 Contract version `1` is exposed through `GET /health` and
 `GET /diagnostics/runtime`.
@@ -309,7 +309,7 @@ execution.
 For host-supervised local startup, run the same binary in app-managed mode:
 
 ```powershell
-node dist/index.js --startup-mode app-managed --managed-by cats-inc --ready-output json
+node dist/index.js --startup-mode app-managed --managed-by cats --ready-output json
 ```
 
 In that mode:
@@ -493,4 +493,4 @@ Docker-backed native discovery targets.
 
 ---
 
-*Last updated: 2026-03-21*
+*Last updated: 2026-03-23*

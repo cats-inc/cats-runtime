@@ -33,7 +33,7 @@ flow that can:
 Without a shared provider-install manifest, the likely failure mode is obvious:
 
 - `cats-runtime` owns one provider truth for execution
-- `cats-inc` or the packaged host grows a second provider truth for install UI
+- `cats` or the packaged host grows a second provider truth for install UI
 - `environment-bootstrap` remains a third source of install knowledge
 
 That would create naming drift, pack drift, platform drift, and readiness drift
@@ -156,7 +156,7 @@ used to resolve the concrete install asset for that family on each platform.
 
 ## Alternatives Considered
 
-### Alternative 1: Keep Install Metadata Only in `cats-inc`
+### Alternative 1: Keep Install Metadata Only in `cats`
 
 - **Pros**: product team can move quickly without touching runtime config
 - **Cons**: creates a second provider truth that will drift from runtime
@@ -191,10 +191,11 @@ used to resolve the concrete install asset for that family on each platform.
 - [ADR-003](./003-provider-instance-config.md)
 - [ADR-008](./008-runtime-owned-provider-model-catalog.md)
 - [ADR-009](./009-keep-cats-runtime-separately-packageable-with-app-managed-local-startup.md)
-- [cats-inc SPEC-023](../../../cats/docs/specs/SPEC-023-packaged-setup-wizard-and-provider-installation.md)
+- [cats SPEC-023](../../../cats/docs/specs/SPEC-023-packaged-setup-wizard-and-provider-installation.md)
 - [environment-bootstrap README](../../../environment-bootstrap/README.md)
 
 ---
 
 *Accepted: 2026-03-20*
 *Decision makers: user + Codex*
+

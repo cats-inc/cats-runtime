@@ -52,9 +52,9 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 | [SPEC-010](./SPEC-010-usage-metering-rate-limit-detection-and-execution-guardrails.md) | Usage Metering, Rate-Limit Detection, and Execution Guardrails | In Progress (First Slice Landed) | [PLAN-009](../plans/PLAN-009-usage-metering-progress-and-guardrails.md) |
 | [SPEC-009](./SPEC-009-executable-delivery-and-governance-primitives.md) | Executable Delivery and Governance Primitives | Draft (Pending Review) | TBD |
 | [SPEC-008](./SPEC-008-workspace-substrate-init-audit-and-update.md) | Workspace Substrate Init, Audit, and Update | Draft (Pending Review) | TBD |
-| [SPEC-007](./SPEC-007-provider-compatibility-and-evidence-engine.md) | Provider Compatibility and Evidence Engine | Draft (Pending Review) | TBD |
+| [SPEC-007](./SPEC-007-provider-compatibility-and-evidence-engine.md) | Provider Compatibility and Evidence Engine | In Progress (First Slice Landed) | [PLAN-008-provider-compatibility-and-evidence-engine](../plans/PLAN-008-provider-compatibility-and-evidence-engine.md) |
 | [SPEC-006](./SPEC-006-a2a-protocol-project-memory-and-skill-layering.md) | A2A Protocol, Project Memory, and Skill Layering | Approved | TBD |
-| [SPEC-005](./SPEC-005-runtime-managed-skills-v0.md) | Runtime-Managed Skills v0 | Draft | TBD |
+| [SPEC-005](./SPEC-005-runtime-managed-skills-v0.md) | Runtime-Managed Skills v0 | In Progress (First Slice Landed) | [PLAN-008-runtime-managed-skills-v0](../plans/PLAN-008-runtime-managed-skills-v0.md) |
 | [SPEC-004](./SPEC-004-provider-model-catalog-and-discovery.md) | Provider Model Catalog and Discovery | Approved | [PLAN-005](../plans/PLAN-005-provider-model-catalog-and-discovery.md) |
 | [SPEC-003](./SPEC-003-agent-backend.md) | Agent Backend for External Agent Runtimes | Approved | [PLAN-004](../plans/PLAN-004-agent-backend.md) |
 | [SPEC-002](./SPEC-002-local-tool-runtime.md) | Shared Local Tool Runtime | Approved | [PLAN-003](../plans/PLAN-003-api-backend.md) |

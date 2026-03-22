@@ -154,7 +154,7 @@ Still deferred:
     work shall live as runtime-owned assets or code.
 18. Runtime-managed skills may invoke these tools, but the skills shall not be
     the authoritative source of generated substrate content.
-19. Product shells such as `cats-inc` may layer richer UX on top of these
+19. Product shells such as `cats` may layer richer UX on top of these
     tools, but they shall not need to duplicate substrate-generation logic.
 20. The substrate tools should remain approval-friendly for Boss Cat or owner
     control flows.
@@ -305,7 +305,7 @@ needs. The first slice should not try to embed:
 - [ADR-010](../decisions/010-separate-a2a-protocol-project-memory-and-skill-packages.md)
 - [SPEC-005](./SPEC-005-runtime-managed-skills-v0.md)
 - [SPEC-006](./SPEC-006-a2a-protocol-project-memory-and-skill-layering.md)
-- [cats-inc SPEC-019](../../../cats/docs/specs/SPEC-019-product-skill-profiles-and-runtime-skill-manifests.md)
+- [cats SPEC-019](../../../cats/docs/specs/SPEC-019-product-skill-profiles-and-runtime-skill-manifests.md)
 - [project-bootstrap README](../../../project-bootstrap/README.md)
 
 ## Open Questions
@@ -333,3 +333,4 @@ needs. The first slice should not try to embed:
 *Updated: 2026-03-21*
 *Author: Codex*
 *Related Plan: WP-5 (tracked in PROGRESS.md)*
+

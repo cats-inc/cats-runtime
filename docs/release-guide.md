@@ -9,7 +9,7 @@
 
 - consumers should be able to `npm install cats-runtime`
 - technical evaluators should be able to `npx cats-runtime`
-- upper-layer hosts such as `cats-inc` should continue to treat it as a
+- upper-layer hosts such as `cats` should continue to treat it as a
   separate process and HTTP runtime boundary
 
 This guide documents the release path that matches that packaging direction.
@@ -191,4 +191,4 @@ That keeps the package aligned with the process-boundary ADRs.
 
 ---
 
-*Last updated: 2026-03-19*
+*Last updated: 2026-03-23*

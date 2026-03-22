@@ -11,13 +11,13 @@
 ## Summary
 
 `cats-runtime` should expose a runtime-owned provider model catalog so product
-surfaces such as `cats-inc` can render provider/model selection from runtime-fed
+surfaces such as `cats` can render provider/model selection from runtime-fed
 data instead of renderer-maintained hardcoded lists.
 
 The first slice should introduce a generic, provider-instance-aware model
 catalog endpoint with lazy discovery, TTL caching, and explicit fallback rules.
 It should reuse runtime configuration and backend knowledge instead of creating
-another discovery layer in `cats-inc`.
+another discovery layer in `cats`.
 
 ## Goals
 
@@ -26,7 +26,7 @@ another discovery layer in `cats-inc`.
 - Support dynamic discovery where a backend or provider can expose it safely
 - Preserve useful static or config-derived fallback where dynamic discovery is
   missing or unreliable
-- Keep the `cats-inc` product boundary intact by letting product APIs consume
+- Keep the `cats` product boundary intact by letting product APIs consume
   the runtime catalog server-side
 
 ## Non-Goals
@@ -36,11 +36,11 @@ another discovery layer in `cats-inc`.
 - Make raw vendor `/models` responses the authoritative UI contract
 - Solve provider health probes, approval ownership, or broader runtime
   observability in the same feature
-- Require direct renderer-to-runtime HTTP calls from `cats-inc`
+- Require direct renderer-to-runtime HTTP calls from `cats`
 
 ## User Stories
 
-- As a `cats-inc` product server, I want to ask `cats-runtime` for the model
+- As a `cats` product server, I want to ask `cats-runtime` for the model
   choices of a configured provider target so the UI can render accurate
   dropdowns.
 - As a runtime operator, I want dynamic model discovery when a provider or
@@ -88,7 +88,7 @@ another discovery layer in `cats-inc`.
     endpoint.
 14. The first slice shall not require an explicit refresh route. Manual refresh
     may be added later as an additive endpoint.
-15. `cats-inc` shall be able to consume the catalog through its server-side
+15. `cats` shall be able to consume the catalog through its server-side
     runtime client and expose it to the renderer through product APIs.
 
 ### Non-Functional Requirements
@@ -209,15 +209,15 @@ Future strategies may include:
 - Do not add scheduler-driven background refresh in this slice
 - A future explicit refresh endpoint is allowed, but not required
 
-### `cats-inc` Consumption
+### `cats` Consumption
 
-`cats-inc` should stop treating renderer-side hardcoded model tables as the
+`cats` should stop treating renderer-side hardcoded model tables as the
 authoritative source.
 
 Recommended consumption path:
 
-1. `cats-inc` server calls `cats-runtime`
-2. `cats-inc` product API returns the resolved model catalog to the renderer
+1. `cats` server calls `cats-runtime`
+2. `cats` product API returns the resolved model catalog to the renderer
 3. the renderer uses runtime-fed model options for dropdowns
 
 This keeps the direct product API boundary intact and avoids requiring the
@@ -225,7 +225,7 @@ renderer to know runtime auth/base-url details.
 
 Product flows that need more than one provider list, such as setup or
 onboarding screens, can compose multiple per-provider runtime calls inside the
-`cats-inc` server. A runtime-level aggregate endpoint is still optional follow-on
+`cats` server. A runtime-level aggregate endpoint is still optional follow-on
 work, not a prerequisite for first product integration.
 
 ## Dependencies
@@ -252,10 +252,11 @@ work, not a prerequisite for first product integration.
 - [ADR 003: Move provider execution topology into file-based provider instances](../decisions/003-provider-instance-config.md)
 - [ADR 006: Introduce an agent backend and shared runtime contracts](../decisions/006-agent-backend-and-shared-runtime-contracts.md)
 - [API](../api.md)
-- [cats-inc ADR-008: Expose cats-runtime via Direct API and MCP Facade](../../../cats/docs/decisions/008-expose-cats-runtime-via-direct-api-and-mcp-facade.md)
+- [cats ADR-008: Expose cats-runtime via Direct API and MCP Facade](../../../cats/docs/decisions/008-expose-cats-runtime-via-direct-api-and-mcp-facade.md)
 
 ---
 
 *Created: 2026-03-19*
 *Author: Codex*
 *Related Plan: [PLAN-005](../plans/PLAN-005-provider-model-catalog-and-discovery.md)*
+

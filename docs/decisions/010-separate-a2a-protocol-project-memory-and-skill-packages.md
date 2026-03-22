@@ -87,7 +87,7 @@ This decision also establishes the following boundary rules:
 - Preserves markdown docs as durable project memory instead of treating them as
   temporary prompt fragments.
 - Gives `SKILL.md` a precise and useful role as procedural know-how.
-- Makes future `cats-inc` and other consumer integrations easier because
+- Makes future `cats` and other consumer integrations easier because
   protocol truth, memory, and skills are no longer conflated.
 
 ### Negative
@@ -146,3 +146,4 @@ This decision also establishes the following boundary rules:
 
 *Decision made: 2026-03-19*
 *Decision makers: Codex with user approval*
+

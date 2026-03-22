@@ -11,7 +11,7 @@ Superseded by [ADR 002](./002-embed-cli-runtime.md)
 ## Context
 
 `cats-runtime` is intended to become the stable runtime boundary for upper-layer
-apps such as `cats-inc` and the transitional `crew-chat-poc` migration. The
+apps such as `cats` and the transitional `crew-chat-poc` migration. The
 existing CLI execution engine already lives in `agent-fleet`.
 
 The immediate question was whether `cats-runtime` should:
@@ -36,7 +36,7 @@ The immediate question was whether `cats-runtime` should:
 ### Positive
 
 - Cleaner backend boundary
-- Easier future extraction into `cats-inc/cats-runtime`
+- Easier future extraction into `cats/cats-runtime`
 - Consumers can switch from `agent-fleet` to `cats-runtime` with a smaller diff
 
 ### Negative
@@ -48,3 +48,4 @@ The immediate question was whether `cats-runtime` should:
 
 - Migrate `crew-chat-poc` to `cats-runtime`
 - Add the future `api-runtime` backend under the same facade
+
