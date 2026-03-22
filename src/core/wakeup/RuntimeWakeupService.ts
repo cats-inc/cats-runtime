@@ -1,0 +1,489 @@
+import { randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+
+import type {
+  RuntimeWakeupRequest,
+  RuntimeWakeupStatus,
+  RuntimeWakeupTarget,
+  RuntimeWakeupTriggerOutcome,
+  RuntimeWakeupTriggerSource,
+  SessionWakeupState,
+} from '../types.js';
+
+const DEFAULT_TICK_INTERVAL_MS = 1_000;
+const DEFAULT_MAX_DUE_PER_TICK = 8;
+
+const OPEN_WAKEUP_STATUSES = new Set<RuntimeWakeupStatus>([
+  'scheduled',
+  'triggering',
+]);
+
+export interface RuntimeWakeSessionResult {
+  sessionId: string;
+  providerSessionId?: string;
+  outcome: RuntimeWakeupTriggerOutcome;
+}
+
+export interface CreateRuntimeWakeupInput {
+  reason: string;
+  target: RuntimeWakeupTarget;
+  scheduleAt: string;
+  coalesceKey?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ListRuntimeWakeupsOptions {
+  status?: RuntimeWakeupStatus;
+  sessionId?: string;
+}
+
+export interface RuntimeWakeupServiceOptions {
+  persistPath: string;
+  wakeSession: (
+    sessionId: string,
+    request: RuntimeWakeupRequest,
+  ) => Promise<RuntimeWakeSessionResult>;
+  sessionExists?: (sessionId: string) => boolean;
+  now?: () => Date;
+  tickIntervalMs?: number;
+  maxDuePerTick?: number;
+}
+
+export class RuntimeWakeupValidationError extends Error {
+  constructor(
+    message: string,
+    readonly code: 'invalid_request' | 'unknown_session' = 'invalid_request',
+  ) {
+    super(message);
+    this.name = 'RuntimeWakeupValidationError';
+  }
+}
+
+export class RuntimeWakeupConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RuntimeWakeupConflictError';
+  }
+}
+
+export class RuntimeWakeupNotFoundError extends Error {
+  constructor(id: string) {
+    super(`Wakeup request '${id}' was not found.`);
+    this.name = 'RuntimeWakeupNotFoundError';
+  }
+}
+
+function cloneWakeupRequest(request: RuntimeWakeupRequest): RuntimeWakeupRequest {
+  return structuredClone(request);
+}
+
+function normalizeIsoTimestamp(value: string): string {
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) {
+    throw new RuntimeWakeupValidationError('scheduleAt must be a valid ISO-8601 timestamp.');
+  }
+
+  return new Date(parsed).toISOString();
+}
+
+function normalizeReason(reason: string): string {
+  const normalized = reason.trim();
+  if (!normalized) {
+    throw new RuntimeWakeupValidationError('reason is required.');
+  }
+  return normalized;
+}
+
+function normalizeTarget(
+  target: RuntimeWakeupTarget,
+  sessionExists?: (sessionId: string) => boolean,
+): RuntimeWakeupTarget {
+  if (!target || target.kind !== 'session') {
+    throw new RuntimeWakeupValidationError('target.kind must be \'session\'.');
+  }
+
+  const sessionId = target.sessionId.trim();
+  if (!sessionId) {
+    throw new RuntimeWakeupValidationError('target.sessionId is required.');
+  }
+
+  if (sessionExists && !sessionExists(sessionId)) {
+    throw new RuntimeWakeupValidationError(
+      `Unknown session '${sessionId}' for wakeup target.`,
+      'unknown_session',
+    );
+  }
+
+  return {
+    kind: 'session',
+    sessionId,
+  };
+}
+
+function normalizeMetadata(value: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  return structuredClone(value);
+}
+
+function sortRequests(left: RuntimeWakeupRequest, right: RuntimeWakeupRequest): number {
+  const leftScheduleAt = Date.parse(left.scheduleAt);
+  const rightScheduleAt = Date.parse(right.scheduleAt);
+  if (leftScheduleAt !== rightScheduleAt) {
+    return leftScheduleAt - rightScheduleAt;
+  }
+
+  return Date.parse(left.createdAt) - Date.parse(right.createdAt);
+}
+
+function isDuplicateWakeup(
+  existing: RuntimeWakeupRequest,
+  input: CreateRuntimeWakeupInput,
+): boolean {
+  return OPEN_WAKEUP_STATUSES.has(existing.status)
+    && !existing.coalesceKey
+    && !input.coalesceKey
+    && existing.target.sessionId === input.target.sessionId
+    && existing.reason === input.reason
+    && existing.scheduleAt === input.scheduleAt;
+}
+
+export class RuntimeWakeupService {
+  private readonly now: () => Date;
+  private readonly tickIntervalMs: number;
+  private readonly maxDuePerTick: number;
+  private readonly requests = new Map<string, RuntimeWakeupRequest>();
+  private timer: ReturnType<typeof setInterval> | null = null;
+  private processing = false;
+
+  constructor(private readonly options: RuntimeWakeupServiceOptions) {
+    this.now = options.now ?? (() => new Date());
+    this.tickIntervalMs = options.tickIntervalMs ?? DEFAULT_TICK_INTERVAL_MS;
+    this.maxDuePerTick = options.maxDuePerTick ?? DEFAULT_MAX_DUE_PER_TICK;
+    this.load();
+  }
+
+  start(): void {
+    if (this.timer) {
+      return;
+    }
+
+    this.timer = setInterval(() => {
+      void this.runDueWakeups();
+    }, this.tickIntervalMs);
+  }
+
+  close(): void {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+  }
+
+  list(options: ListRuntimeWakeupsOptions = {}): RuntimeWakeupRequest[] {
+    return Array.from(this.requests.values())
+      .filter((request) => {
+        if (options.status && request.status !== options.status) {
+          return false;
+        }
+        if (options.sessionId && request.target.sessionId !== options.sessionId) {
+          return false;
+        }
+        return true;
+      })
+      .sort(sortRequests)
+      .map((request) => cloneWakeupRequest(request));
+  }
+
+  get(id: string): RuntimeWakeupRequest | undefined {
+    const request = this.requests.get(id);
+    return request ? cloneWakeupRequest(request) : undefined;
+  }
+
+  create(input: CreateRuntimeWakeupInput): {
+    request: RuntimeWakeupRequest;
+    coalesced: boolean;
+  } {
+    const normalizedInput: CreateRuntimeWakeupInput = {
+      reason: normalizeReason(input.reason),
+      target: normalizeTarget(input.target, this.options.sessionExists),
+      scheduleAt: normalizeIsoTimestamp(input.scheduleAt),
+      coalesceKey: input.coalesceKey?.trim() || undefined,
+      metadata: normalizeMetadata(input.metadata),
+    };
+
+    const coalesced = this.findCoalescibleRequest(normalizedInput);
+    if (coalesced) {
+      coalesced.reason = normalizedInput.reason;
+      coalesced.scheduleAt = Date.parse(normalizedInput.scheduleAt) < Date.parse(coalesced.scheduleAt)
+        ? normalizedInput.scheduleAt
+        : coalesced.scheduleAt;
+      coalesced.metadata = {
+        ...(coalesced.metadata ?? {}),
+        ...(normalizedInput.metadata ?? {}),
+      };
+      coalesced.updatedAt = this.now().toISOString();
+      coalesced.coalescedCount += 1;
+      this.persist();
+      return {
+        request: cloneWakeupRequest(coalesced),
+        coalesced: true,
+      };
+    }
+
+    const duplicate = Array.from(this.requests.values()).find((request) =>
+      isDuplicateWakeup(request, normalizedInput),
+    );
+    if (duplicate) {
+      throw new RuntimeWakeupConflictError(
+        'A matching scheduled wakeup already exists. Use coalesceKey to merge duplicate wakeups.',
+      );
+    }
+
+    const now = this.now().toISOString();
+    const request: RuntimeWakeupRequest = {
+      id: randomUUID(),
+      reason: normalizedInput.reason,
+      target: normalizedInput.target,
+      scheduleAt: normalizedInput.scheduleAt,
+      coalesceKey: normalizedInput.coalesceKey,
+      status: 'scheduled',
+      metadata: normalizedInput.metadata,
+      createdAt: now,
+      updatedAt: now,
+      attemptCount: 0,
+      coalescedCount: 0,
+    };
+
+    this.requests.set(request.id, request);
+    this.persist();
+    return {
+      request: cloneWakeupRequest(request),
+      coalesced: false,
+    };
+  }
+
+  cancel(id: string): RuntimeWakeupRequest {
+    const request = this.requests.get(id);
+    if (!request) {
+      throw new RuntimeWakeupNotFoundError(id);
+    }
+
+    if (request.status !== 'scheduled') {
+      throw new RuntimeWakeupConflictError(
+        `Wakeup request '${id}' cannot be cancelled from status '${request.status}'.`,
+      );
+    }
+
+    request.status = 'cancelled';
+    request.updatedAt = this.now().toISOString();
+    this.persist();
+    return cloneWakeupRequest(request);
+  }
+
+  async trigger(
+    id: string,
+    source: RuntimeWakeupTriggerSource = 'manual',
+  ): Promise<RuntimeWakeupRequest> {
+    const request = this.requests.get(id);
+    if (!request) {
+      throw new RuntimeWakeupNotFoundError(id);
+    }
+
+    if (request.status === 'cancelled') {
+      throw new RuntimeWakeupConflictError(
+        `Wakeup request '${id}' is cancelled and cannot be triggered.`,
+      );
+    }
+    if (request.status === 'triggering') {
+      throw new RuntimeWakeupConflictError(
+        `Wakeup request '${id}' is already being triggered.`,
+      );
+    }
+    if (request.status === 'triggered') {
+      throw new RuntimeWakeupConflictError(
+        `Wakeup request '${id}' has already been triggered.`,
+      );
+    }
+
+    request.status = 'triggering';
+    request.updatedAt = this.now().toISOString();
+    request.attemptCount += 1;
+    this.persist();
+
+    const triggeredAt = this.now().toISOString();
+
+    try {
+      const result = await this.options.wakeSession(request.target.sessionId, cloneWakeupRequest(request));
+      request.status = 'triggered';
+      request.updatedAt = this.now().toISOString();
+      request.lastExecution = {
+        source,
+        triggeredAt,
+        sessionId: result.sessionId,
+        providerSessionId: result.providerSessionId,
+        outcome: result.outcome,
+      };
+      this.persist();
+      return cloneWakeupRequest(request);
+    } catch (error) {
+      request.status = 'failed';
+      request.updatedAt = this.now().toISOString();
+      request.lastExecution = {
+        source,
+        triggeredAt,
+        sessionId: request.target.sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      };
+      this.persist();
+      return cloneWakeupRequest(request);
+    }
+  }
+
+  async runDueWakeups(): Promise<RuntimeWakeupRequest[]> {
+    if (this.processing) {
+      return [];
+    }
+
+    this.processing = true;
+    try {
+      const nowMs = this.now().getTime();
+      const dueRequests = Array.from(this.requests.values())
+        .filter((request) =>
+          request.status === 'scheduled'
+          && Date.parse(request.scheduleAt) <= nowMs,
+        )
+        .sort(sortRequests)
+        .slice(0, this.maxDuePerTick);
+
+      const triggered: RuntimeWakeupRequest[] = [];
+      for (const request of dueRequests) {
+        triggered.push(await this.trigger(request.id, 'timer'));
+      }
+      return triggered;
+    } finally {
+      this.processing = false;
+    }
+  }
+
+  getSessionWakeState(sessionId: string): SessionWakeupState | undefined {
+    const sessionRequests = Array.from(this.requests.values())
+      .filter((request) => request.target.sessionId === sessionId)
+      .sort(sortRequests);
+
+    if (sessionRequests.length === 0) {
+      return undefined;
+    }
+
+    const pendingRequests = sessionRequests.filter((request) =>
+      request.status === 'scheduled' || request.status === 'triggering',
+    );
+    const lastRequest = [...sessionRequests].sort((left, right) =>
+      Date.parse(right.updatedAt) - Date.parse(left.updatedAt),
+    )[0];
+
+    return {
+      pending: pendingRequests.length > 0,
+      pendingRequestCount: pendingRequests.length,
+      nextScheduledAt: pendingRequests[0]?.scheduleAt,
+      lastRequest: cloneWakeupRequest(lastRequest),
+    };
+  }
+
+  private findCoalescibleRequest(
+    input: CreateRuntimeWakeupInput,
+  ): RuntimeWakeupRequest | undefined {
+    if (!input.coalesceKey) {
+      return undefined;
+    }
+
+    return Array.from(this.requests.values()).find((request) =>
+      request.status === 'scheduled'
+      && request.coalesceKey === input.coalesceKey
+      && request.target.sessionId === input.target.sessionId,
+    );
+  }
+
+  private load(): void {
+    if (!existsSync(this.options.persistPath)) {
+      return;
+    }
+
+    try {
+      const raw = readFileSync(this.options.persistPath, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return;
+      }
+
+      for (const entry of parsed) {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+          continue;
+        }
+
+        const record = entry as Partial<RuntimeWakeupRequest>;
+        if (
+          typeof record.id !== 'string'
+          || typeof record.reason !== 'string'
+          || !record.target
+          || typeof record.scheduleAt !== 'string'
+          || typeof record.createdAt !== 'string'
+          || typeof record.updatedAt !== 'string'
+        ) {
+          continue;
+        }
+
+        try {
+          const target = normalizeTarget(
+            record.target as RuntimeWakeupTarget,
+            undefined,
+          );
+          const request: RuntimeWakeupRequest = {
+            id: record.id,
+            reason: normalizeReason(record.reason),
+            target,
+            scheduleAt: normalizeIsoTimestamp(record.scheduleAt),
+            coalesceKey: typeof record.coalesceKey === 'string' && record.coalesceKey.trim()
+              ? record.coalesceKey.trim()
+              : undefined,
+            status: record.status === 'triggering'
+              ? 'scheduled'
+              : record.status === 'scheduled'
+                || record.status === 'triggered'
+                || record.status === 'cancelled'
+                || record.status === 'failed'
+                ? record.status
+                : 'scheduled',
+            metadata: record.metadata && typeof record.metadata === 'object' && !Array.isArray(record.metadata)
+              ? structuredClone(record.metadata)
+              : undefined,
+            createdAt: normalizeIsoTimestamp(record.createdAt),
+            updatedAt: normalizeIsoTimestamp(record.updatedAt),
+            attemptCount: typeof record.attemptCount === 'number' ? record.attemptCount : 0,
+            coalescedCount: typeof record.coalescedCount === 'number' ? record.coalescedCount : 0,
+            lastExecution: record.lastExecution && typeof record.lastExecution === 'object' && !Array.isArray(record.lastExecution)
+              ? structuredClone(record.lastExecution)
+              : undefined,
+          };
+          this.requests.set(request.id, request);
+        } catch {
+          continue;
+        }
+      }
+    } catch {
+      // Best effort only. Invalid persisted state should not prevent runtime startup.
+    }
+  }
+
+  private persist(): void {
+    mkdirSync(dirname(this.options.persistPath), { recursive: true });
+    writeFileSync(
+      this.options.persistPath,
+      `${JSON.stringify(Array.from(this.requests.values()).sort(sortRequests), null, 2)}\n`,
+      'utf8',
+    );
+  }
+}

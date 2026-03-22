@@ -603,6 +603,51 @@ export interface SessionInvocationContext {
   metadata?: Record<string, unknown>;
 }
 
+export type RuntimeWakeupStatus =
+  | 'scheduled'
+  | 'triggering'
+  | 'triggered'
+  | 'cancelled'
+  | 'failed';
+export type RuntimeWakeupTriggerSource = 'timer' | 'manual';
+export type RuntimeWakeupTriggerOutcome = 'resumed' | 'already_awake';
+
+export interface RuntimeWakeupTarget {
+  kind: 'session';
+  sessionId: string;
+}
+
+export interface RuntimeWakeupExecution {
+  source: RuntimeWakeupTriggerSource;
+  triggeredAt: string;
+  sessionId: string;
+  providerSessionId?: string;
+  outcome?: RuntimeWakeupTriggerOutcome;
+  error?: string;
+}
+
+export interface RuntimeWakeupRequest {
+  id: string;
+  reason: string;
+  target: RuntimeWakeupTarget;
+  scheduleAt: string;
+  coalesceKey?: string;
+  status: RuntimeWakeupStatus;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  attemptCount: number;
+  coalescedCount: number;
+  lastExecution?: RuntimeWakeupExecution;
+}
+
+export interface SessionWakeupState {
+  pending: boolean;
+  pendingRequestCount: number;
+  nextScheduledAt?: string;
+  lastRequest?: RuntimeWakeupRequest;
+}
+
 export interface RuntimeSkillManifestContext {
   catId?: string;
   roomMode?: 'boss_chat' | 'direct_cat_chat' | 'transport_inbox';

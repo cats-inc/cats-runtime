@@ -1,0 +1,151 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  RuntimeWakeupConflictError,
+  RuntimeWakeupService,
+} from './RuntimeWakeupService.js';
+
+describe('RuntimeWakeupService', () => {
+  const cleanupPaths: string[] = [];
+
+  afterEach(() => {
+    while (cleanupPaths.length > 0) {
+      const target = cleanupPaths.pop();
+      if (target) {
+        rmSync(target, { recursive: true, force: true });
+      }
+    }
+  });
+
+  function createPersistPath(): string {
+    const dir = mkdtempSync(join(tmpdir(), 'cats-runtime-wakeup-service-'));
+    cleanupPaths.push(dir);
+    return join(dir, 'wakeups.json');
+  }
+
+  it('coalesces matching scheduled wakeups and rejects duplicate requests without a coalesce key', () => {
+    let now = new Date('2026-03-23T00:00:00.000Z');
+    const service = new RuntimeWakeupService({
+      persistPath: createPersistPath(),
+      now: () => new Date(now),
+      sessionExists: () => true,
+      wakeSession: vi.fn(async (sessionId) => ({
+        sessionId,
+        outcome: 'resumed',
+      })),
+    });
+
+    const first = service.create({
+      reason: 'Wake the room.',
+      target: { kind: 'session', sessionId: 'session-1' },
+      scheduleAt: '2026-03-23T00:05:00.000Z',
+      coalesceKey: 'room-1',
+      metadata: { source: 'draft' },
+    });
+    now = new Date('2026-03-23T00:00:30.000Z');
+    const second = service.create({
+      reason: 'Wake sooner.',
+      target: { kind: 'session', sessionId: 'session-1' },
+      scheduleAt: '2026-03-23T00:02:00.000Z',
+      coalesceKey: 'room-1',
+      metadata: { priority: 'high' },
+    });
+
+    expect(first.coalesced).toBe(false);
+    expect(second.coalesced).toBe(true);
+    expect(second.request.id).toBe(first.request.id);
+    expect(second.request.reason).toBe('Wake sooner.');
+    expect(second.request.scheduleAt).toBe('2026-03-23T00:02:00.000Z');
+    expect(second.request.coalescedCount).toBe(1);
+    expect(second.request.metadata).toEqual({
+      source: 'draft',
+      priority: 'high',
+    });
+
+    service.create({
+      reason: 'Same wakeup',
+      target: { kind: 'session', sessionId: 'session-2' },
+      scheduleAt: '2026-03-23T00:10:00.000Z',
+    });
+    expect(() => service.create({
+      reason: 'Same wakeup',
+      target: { kind: 'session', sessionId: 'session-2' },
+      scheduleAt: '2026-03-23T00:10:00.000Z',
+    })).toThrowError(RuntimeWakeupConflictError);
+  });
+
+  it('reloads persisted wakeups and triggers due requests after restart', async () => {
+    const persistPath = createPersistPath();
+    let now = new Date('2026-03-23T00:00:00.000Z');
+    const original = new RuntimeWakeupService({
+      persistPath,
+      now: () => new Date(now),
+      sessionExists: () => true,
+      wakeSession: vi.fn(async (sessionId) => ({
+        sessionId,
+        outcome: 'resumed',
+      })),
+    });
+
+    const created = original.create({
+      reason: 'Restart-safe wake.',
+      target: { kind: 'session', sessionId: 'session-1' },
+      scheduleAt: '2026-03-22T23:59:00.000Z',
+    });
+    original.close();
+
+    const wakeSession = vi.fn(async (sessionId: string) => ({
+      sessionId,
+      outcome: 'resumed' as const,
+    }));
+    const reloaded = new RuntimeWakeupService({
+      persistPath,
+      now: () => new Date(now),
+      sessionExists: () => true,
+      wakeSession,
+    });
+
+    const triggered = await reloaded.runDueWakeups();
+    expect(wakeSession).toHaveBeenCalledTimes(1);
+    expect(triggered).toHaveLength(1);
+    expect(triggered[0]).toMatchObject({
+      id: created.request.id,
+      status: 'triggered',
+      lastExecution: {
+        source: 'timer',
+        sessionId: 'session-1',
+        outcome: 'resumed',
+      },
+    });
+  });
+
+  it('limits the number of due wakeups processed per timer tick', async () => {
+    let now = new Date('2026-03-23T00:00:00.000Z');
+    const wakeSession = vi.fn(async (sessionId: string) => ({
+      sessionId,
+      outcome: 'resumed' as const,
+    }));
+    const service = new RuntimeWakeupService({
+      persistPath: createPersistPath(),
+      now: () => new Date(now),
+      sessionExists: () => true,
+      wakeSession,
+      maxDuePerTick: 2,
+    });
+
+    for (const sessionId of ['session-1', 'session-2', 'session-3']) {
+      service.create({
+        reason: `Wake ${sessionId}`,
+        target: { kind: 'session', sessionId },
+        scheduleAt: '2026-03-22T23:59:00.000Z',
+      });
+    }
+
+    const processed = await service.runDueWakeups();
+    expect(processed).toHaveLength(2);
+    expect(wakeSession).toHaveBeenCalledTimes(2);
+    expect(service.list({ status: 'scheduled' })).toHaveLength(1);
+  });
+});

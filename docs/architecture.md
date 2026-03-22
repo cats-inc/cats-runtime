@@ -22,6 +22,7 @@ The architectural split is:
 - `core`: shared runtime config and stable types
 - `startup`: process-level startup mode, readiness, and lifecycle helpers
 - `backends`: execution implementations for CLI, API/local, and agent targets
+- `core/wakeup`: runtime-owned scheduled wakeup substrate and persistence
 - `http`: inbound transport and route wiring
 
 Runtime-managed skills now sit at the shared runtime layer rather than inside
@@ -75,6 +76,7 @@ src/
     tools/
     types.ts
     usage/
+    wakeup/
   backends/
     agent/
       adapters/
@@ -117,6 +119,8 @@ src/
 - Exposes runtime-owned delivery execution routes such as delivery audit,
   artifact publication, repo status, commit, and push without embedding
   product-level delivery governance policy
+- Exposes runtime-owned scheduled wakeup routes without pretending the runtime
+  already owns full product workflow or heartbeat scheduling
 
 ### `src/startup.ts`
 
@@ -212,6 +216,17 @@ src/
   changes; apply otherwise uses the existing Git index only
 - Does not own product-level approval UX, workspace orchestration policy, or
   post-apply delegation behavior
+- Provides the minimal "ensure this known session is awake" helper reused by the
+  scheduled wakeup substrate
+
+### `src/core/wakeup`
+
+- Owns the runtime-managed scheduled wakeup request store
+- Persists wake requests across runtime restart
+- Runs a bounded in-process timer loop for due wakeups
+- Coalesces explicitly keyed duplicates and rejects exact unkeyed duplicates
+- Keeps wakeup observability additive by surfacing request state alongside
+  existing session/history inspection rather than inventing transcript messages
 
 ### `src/core/skills`
 

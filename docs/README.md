@@ -51,7 +51,7 @@ Add your project-specific automation scripts here.
 | [AGENT-GUIDE.md](./AGENT-GUIDE.md) | Complete | Project-specific agent notes |
 | [terminology.md](./terminology.md) | Complete | AAIF, A2A, skills, compatibility, evidence, and runtime-project-memory terminology |
 | [a2a/](./a2a/) | Template | A2A protocol examples and templates; some current examples still need A2A v1 alignment |
-| [specs/](./specs/) | Complete | Feature specifications for WSL discovery, agent backend work, runtime-managed skills, provider compatibility/evidence, workspace substrate, executable delivery, session fork/context-transplant, and usage metering/guardrails |
+| [specs/](./specs/) | Complete | Feature specifications for WSL discovery, agent backend work, runtime-managed skills, scheduled wakeup substrate, provider compatibility/evidence, workspace substrate, executable delivery, session fork/context-transplant, and usage metering/guardrails |
 | [plans/](./plans/) | Complete | Implementation plans for WSL discovery, API/backend expansion, startup contract, runtime-managed skills, provider compatibility/evidence, and metering/progress/guardrails |
 | [decisions/](./decisions/) | Complete | Architecture Decision Records for packaging, install/check metadata, diagnostics, workspace substrate, delivery policy boundaries, and runtime-owned metering/guardrails |
 

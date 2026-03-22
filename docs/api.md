@@ -292,6 +292,43 @@ GET    /sessions/{id}/history
 GET    /sessions/{id}/stream
 ```
 
+### Wakeups
+
+```text
+GET  /wakeups
+POST /wakeups
+POST /wakeups/{id}/cancel
+POST /wakeups/{id}/trigger
+```
+
+Create example:
+
+```json
+{
+  "reason": "wake boss cat for reopened chat",
+  "target": {
+    "kind": "session",
+    "sessionId": "session-123"
+  },
+  "scheduleAt": "2026-03-23T12:00:00.000Z",
+  "coalesceKey": "chat:room-123:boss",
+  "metadata": {
+    "chatId": "room-123",
+    "participantId": "boss-cat"
+  }
+}
+```
+
+First-slice wakeups are intentionally lightweight:
+
+- `target.kind` currently supports only `session`
+- the runtime stores requests durably and replays due scheduled wakeups after restart
+- explicit `(target.sessionId, coalesceKey)` matches coalesce into one scheduled request
+- exact unkeyed duplicates are rejected with `409`
+- `POST /wakeups/{id}/trigger` may return a terminal `failed` request with
+  `lastExecution.error` when the wake attempt could not resume or attach the
+  target session
+
 Minimal create example:
 
 ```json
@@ -511,6 +548,15 @@ no-op, the same as omitting `skills`.
 return `400` for malformed skill payloads or unknown/invalid runtime skill
 packages. When `skills.strict` is true and the target cannot honor the requested
 delivery contract, the runtime returns `409`.
+
+When a session has wakeup activity, session and history payloads also include an
+additive `wakeup` block:
+
+- `pending`: whether at least one scheduled/triggering wakeup still exists
+- `pendingRequestCount`: number of open wakeups targeting this session
+- `nextScheduledAt`: earliest pending scheduled timestamp, when present
+- `lastRequest`: latest wake request metadata, including `status`,
+  `coalescedCount`, and `lastExecution`
 
 Before execution begins, the runtime now evaluates additive execution
 guardrails:

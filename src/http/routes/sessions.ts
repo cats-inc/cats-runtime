@@ -149,6 +149,9 @@ function serializeSession(ctx: AppContext, session: SessionInfo) {
   return {
     ...view,
     branching,
+    ...(ctx.wakeup?.getSessionWakeState(session.id)
+      ? { wakeup: ctx.wakeup.getSessionWakeState(session.id) }
+      : {}),
     ...(lineage ? { lineage } : {}),
   };
 }
@@ -172,6 +175,9 @@ function serializeSessions(
     return {
       ...view,
       branching,
+      ...(ctx.wakeup?.getSessionWakeState(sessions[index].id)
+        ? { wakeup: ctx.wakeup.getSessionWakeState(sessions[index].id) }
+        : {}),
       ...(lineage ? { lineage } : {}),
     };
   });
@@ -201,7 +207,7 @@ async function primeCliCompatibility(
   ctx: AppContext,
   target: ProviderTargetDescriptor | undefined,
 ): Promise<void> {
-  if (!target || target.backend !== 'cli' || !target.cliInstance) {
+  if (!ctx.compatibility || !target || target.backend !== 'cli' || !target.cliInstance) {
     return;
   }
 

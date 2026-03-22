@@ -11,12 +11,13 @@
 | Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, and an Agent SDK bridge as the second validation target |
 | HTTP API | Completed | Health, sessions, delivery audit/export/repo routes, messages, history, observe, provider management, session branch-lineage inspection, and metering/guardrail diagnostics are served directly from `cats-runtime` |
 | Runtime Skills | Completed | `skills/` is now a runtime-owned execution catalog with validation, session-level requested/resolved/applied metadata, explicit `skills: null` clearing, backend-aware delivery modes, and first-slice Codex/Pi verification |
+| Wakeup Substrate | Completed | Runtime-owned scheduled wakeup requests now support create/list/cancel/trigger, restart-safe persistence, bounded timer processing, coalescing, and additive session/history wakeup metadata without introducing full scheduler semantics |
 | Provider Compatibility | In Progress | Shared CLI compatibility probing now classifies `ready` / `degraded` / `unsupported_version` / `unrecognized_protocol` / `probe_failed`, selects degraded profiles for major families, and captures redacted replay-friendly evidence bundles for mismatches or probe failures |
 | Dashboard | Completed | The embedded dashboard UI is served from `GET /` and now surfaces runtime/provider health from runtime-owned diagnostics contracts |
 | Workspace Substrate | Completed | `audit-workspace`, `init-workspace`, and `update-workspace` now return explicit preview/apply contracts, machine-readable action plans/diff stats, approval-friendly payloads, and `*.bootstrap` review-copy behavior without owning product policy |
 | Delivery Primitives | Completed | Runtime-owned delivery audit, artifact publish/export, repo status, commit, push, and normalized preview-surface metadata are now available over both HTTP routes and local tools |
 | Tests | Completed | Vitest covers provider, discovery, pool, HTTP, delivery, server bootstrap, API/local tool-loop behavior, and first-slice metering/guardrail/progress normalization |
-| Docs | In Progress | Core docs now cover startup/diagnostics, provider compatibility/evidence flows, model catalog, session branching, workspace substrate, delivery primitives, runtime-managed skills and explicit clearing, and first-slice metering/progress contracts; later PLAN-003/PLAN-005 follow-on items still need ongoing updates |
+| Docs | In Progress | Core docs now cover startup/diagnostics, provider compatibility/evidence flows, model catalog, session branching, workspace substrate, delivery primitives, runtime-managed skills and explicit clearing, the scheduled wakeup substrate, and first-slice metering/progress contracts; later PLAN-003/PLAN-005 follow-on items still need ongoing updates |
 | Follow-ups | Completed | Accepted post-review findings for provider-instance rollout were implemented and recorded in `docs/plans/PLAN-002-provider-instance-review-followups.md` |
 
 **Legend**: Not Started | In Progress | Completed | Blocked
@@ -396,6 +397,42 @@ replay-friendly evidence when probes fail or behavior is unknown.
 
 - [x] `npm run build`
 - [x] `npx vitest run tests/runtime-diagnostics.test.ts tests/runtime-startup.test.ts tests/runtime-server.test.ts tests/api-backend.test.ts tests/agent-backend.test.ts src/core/compatibility/ProviderCompatibilityService.test.ts src/backends/cli/providers/claude.test.ts src/backends/cli/providers/codex.test.ts src/backends/cli/providers/gemini.test.ts src/backends/cli/providers/copilot.test.ts --pool=threads --poolOptions.threads.singleThread`
+
+### WP-11: Scheduled Wakeup Substrate
+
+**Status**: Completed
+**Assigned**: Codex
+**Priority**: P1
+
+#### Goal
+
+Land a lightweight runtime-owned scheduled wakeup substrate that upper-layer
+products can build on without turning `cats-runtime` into a full heartbeat
+scheduler or workflow engine.
+
+#### Delivered
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Define the scheduled wakeup substrate direction | [x] | `docs/specs/SPEC-012-scheduled-wakeup-substrate.md` freezes scope and first-slice non-goals |
+| Add runtime-owned wakeup service under `src/core/wakeup` | [x] | `RuntimeWakeupService` now owns persistence, coalescing, and bounded due-request processing |
+| Add runtime-owned wakeup HTTP routes | [x] | `GET /wakeups`, `POST /wakeups`, `POST /wakeups/{id}/cancel`, and `POST /wakeups/{id}/trigger` are now public |
+| Make wakeups restart-safe | [x] | Wakeup requests persist under the runtime data dir and are reloaded on server restart |
+| Reuse existing session wake/resume flow | [x] | Triggered wakeups delegate to runtime session ensure-awake logic rather than inventing a second lifecycle |
+| Surface additive wakeup metadata in session/history inspection | [x] | `GET /sessions`, `GET /sessions/{id}`, and `GET /sessions/{id}/history` now expose session-target wakeup state when present |
+| Cover service and route behavior with tests | [x] | Vitest now covers coalescing, restart-safe replay, bounded timer ticks, and HTTP contract behavior |
+
+#### Deferred Boundaries
+
+- [ ] No recurring schedules, retry policy, or cron syntax
+- [ ] No provider/bootstrap wake targets for sessions that do not exist yet
+- [ ] No full runtime diagnostics aggregate for wakeup counts yet
+- [ ] No product workflow/approval semantics in runtime
+
+#### Verification
+
+- [x] `npm run build`
+- [x] `npx vitest run src/core/wakeup/RuntimeWakeupService.test.ts src/http/wakeupRoutes.test.ts src/http/runtimeSkills.test.ts src/http/piManagement.test.ts tests/runtime-server.test.ts --pool=threads --poolOptions.threads.singleThread`
 
 ---
 

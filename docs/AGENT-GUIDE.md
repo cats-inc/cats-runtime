@@ -39,6 +39,10 @@
 - `DELETE /sessions/:id`
 - `GET /sessions/:id/history`
 - `GET /sessions/:id/stream`
+- `GET /wakeups`
+- `POST /wakeups`
+- `POST /wakeups/:id/cancel`
+- `POST /wakeups/:id/trigger`
 - `GET /pool/status`
 - `GET /browse`
 - `GET /kiro/models`
@@ -128,4 +132,4 @@ Before completing a task or handing off:
 
 ---
 
-*Last updated: 2026-03-22*
+*Last updated: 2026-03-23*

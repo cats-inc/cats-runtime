@@ -36,13 +36,16 @@ interface HistoryMessage {
   timestamp?: string;
 }
 
-function buildHistoryMetadata(session: SessionInfo) {
+function buildHistoryMetadata(ctx: AppContext, session: SessionInfo) {
   return {
     sessionKey: session.sessionKey,
     outputDir: session.outputDir,
     artifacts: session.artifacts || [],
     context: session.context,
     skills: session.skills,
+    ...(ctx.wakeup?.getSessionWakeState(session.id)
+      ? { wakeup: ctx.wakeup.getSessionWakeState(session.id) }
+      : {}),
   };
 }
 
@@ -68,7 +71,7 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
       ).loadHistory(session.cwd, session.providerSessionId);
       return c.json({
         messages,
-        ...buildHistoryMetadata(session),
+        ...buildHistoryMetadata(ctx, session),
       });
     } catch (err) {
       return c.json({ error: `Failed to load Cursor history: ${err}` }, 500);
@@ -87,7 +90,7 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
       ).loadHistory(session.cwd, session.providerSessionId);
       return c.json({
         messages,
-        ...buildHistoryMetadata(session),
+        ...buildHistoryMetadata(ctx, session),
       });
     } catch (err) {
       return c.json({ error: `Failed to load Kiro history: ${err}` }, 500);
@@ -102,7 +105,7 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
       });
       return c.json({
         messages,
-        ...buildHistoryMetadata(session),
+        ...buildHistoryMetadata(ctx, session),
       });
     } catch (err) {
       return c.json({ error: `Failed to load Auggie history: ${err}` }, 500);
@@ -121,7 +124,7 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
       ).loadHistory(session.cwd, session.providerSessionId);
       return c.json({
         messages,
-        ...buildHistoryMetadata(session),
+        ...buildHistoryMetadata(ctx, session),
       });
     } catch (err) {
       return c.json({ error: `Failed to load OpenCode history: ${err}` }, 500);
@@ -137,7 +140,7 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
   if (paths.length === 0) {
     return c.json({
       messages: [],
-      ...buildHistoryMetadata(session),
+      ...buildHistoryMetadata(ctx, session),
     });
   }
 
@@ -248,6 +251,6 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
 
   return c.json({
     messages,
-    ...buildHistoryMetadata(session),
+    ...buildHistoryMetadata(ctx, session),
   });
 });

@@ -19,6 +19,7 @@ import type { ProviderModelCatalogService } from '../core/models/providerModelCa
 import { ProviderCompatibilityService } from '../core/compatibility/ProviderCompatibilityService.js';
 import { RuntimeDeliveryService } from '../core/runtime/RuntimeDeliveryService.js';
 import { RuntimeMeteringService } from '../core/usage/RuntimeMeteringService.js';
+import type { RuntimeWakeupService } from '../core/wakeup/RuntimeWakeupService.js';
 import { bearerAuth } from './auth.js';
 import { injectRuntimeDashboardHealthOverlay } from './dashboardHealthOverlay.js';
 import { discoveryRoutes } from './routes/discovery.js';
@@ -37,6 +38,7 @@ import { kiroRoutes } from './routes/kiro.js';
 import { auggieRoutes } from './routes/auggie.js';
 import { opencodeRoutes } from './routes/opencode.js';
 import { providerRoutes } from './routes/providers.js';
+import { wakeupRoutes } from './routes/wakeup.js';
 import type { RuntimeStartupState } from '../startup.js';
 
 export interface AppContext {
@@ -57,6 +59,7 @@ export interface AppContext {
   compatibility?: ProviderCompatibilityService;
   delivery?: RuntimeDeliveryService;
   metering?: RuntimeMeteringService;
+  wakeup?: RuntimeWakeupService;
   resolveCursorNative?: (instanceId?: string) => CursorNativeSessionService;
   resolveGooseNative?: (instanceId?: string) => GooseNativeSessionService;
   resolveKiroNative?: (instanceId?: string) => KiroNativeSessionService;
@@ -164,6 +167,7 @@ export function createRuntimeApp(ctx: AppContext) {
   app.route('/', auggieRoutes);
   app.route('/', opencodeRoutes);
   app.route('/', providerRoutes);
+  app.route('/', wakeupRoutes);
 
   return app;
 }
