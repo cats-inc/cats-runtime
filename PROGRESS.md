@@ -6,16 +6,16 @@
 
 | Component | Status | Description |
 |-----------|--------|-------------|
-| Core | Completed | Embedded CLI runtime, session registry, discovery, and worker pool are in-repo |
-| API Backends | In Progress | `src/backends/api` now runs Claude, Codex/OpenAI, Gemini, and Ollama with runtime-managed sessions, provider-native continuation/caching optimizations, first-slice provider-agnostic `progress` events, a shared local tool loop with patch/file/search/shell support, and runtime-owned health/diagnostics summaries; deeper live probes and broader tool/model discovery remain |
+| Core | Completed | Embedded CLI runtime, shared session contracts, discovery, worker pool, and first-slice runtime-owned usage/incident/guardrail contracts are in-repo |
+| API Backends | In Progress | `src/backends/api` now runs Claude, Codex/OpenAI, Gemini, and Ollama with runtime-managed sessions, provider-native continuation/caching optimizations, additive incident hints plus provider-agnostic `progress` events, a shared local tool loop with patch/file/search/shell support, and runtime-owned health/diagnostics summaries; deeper live probes and broader tool/model discovery remain |
 | Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, and an Agent SDK bridge as the second validation target |
-| HTTP API | Completed | Health, sessions, delivery audit/export/repo routes, messages, history, observe, provider management, and session branch-lineage inspection routes are served directly from `cats-runtime` |
+| HTTP API | Completed | Health, sessions, delivery audit/export/repo routes, messages, history, observe, provider management, session branch-lineage inspection, and metering/guardrail diagnostics are served directly from `cats-runtime` |
 | Runtime Skills | Completed | `skills/` is now a runtime-owned execution catalog with validation, session-level requested/resolved/applied metadata, backend-aware delivery modes, and first-slice Codex/Pi verification |
 | Dashboard | Completed | The embedded dashboard UI is served from `GET /` and now surfaces runtime/provider health from runtime-owned diagnostics contracts |
 | Workspace Substrate | Completed | `audit-workspace`, `init-workspace`, and `update-workspace` now return explicit preview/apply contracts, machine-readable action plans/diff stats, approval-friendly payloads, and `*.bootstrap` review-copy behavior without owning product policy |
 | Delivery Primitives | Completed | Runtime-owned delivery audit, artifact publish/export, repo status, commit, push, and normalized preview-surface metadata are now available over both HTTP routes and local tools |
-| Tests | Completed | Vitest covers provider, discovery, pool, HTTP, delivery, server bootstrap, and API/local tool-loop behavior |
-| Docs | In Progress | Core docs now cover startup/diagnostics, model catalog, session branching, workspace substrate, and first-slice delivery primitives; later PLAN-003/PLAN-005 follow-on items still need ongoing updates |
+| Tests | Completed | Vitest covers provider, discovery, pool, HTTP, delivery, server bootstrap, API/local tool-loop behavior, and first-slice metering/guardrail/progress normalization |
+| Docs | In Progress | Core docs now cover startup/diagnostics, model catalog, session branching, workspace substrate, delivery primitives, and first-slice metering/progress contracts; later PLAN-003/PLAN-005 follow-on items still need ongoing updates |
 | Follow-ups | Completed | Accepted post-review findings for provider-instance rollout were implemented and recorded in `docs/plans/PLAN-002-provider-instance-review-followups.md` |
 
 **Legend**: Not Started | In Progress | Completed | Blocked
@@ -258,6 +258,42 @@ without moving delivery-governance policy into `cats-runtime`.
 
 - [x] `npm run build`
 - [x] `npx vitest run tests/runtime-server.test.ts tests/runtime-delivery.test.ts src/core/tools/LocalToolRuntime.test.ts --pool=threads --poolOptions.threads.singleThread`
+
+### WP-8: Usage Metering, Incidents, Guardrails, and Provider-Agnostic Progress
+
+**Status**: Completed
+**Assigned**: Codex
+**Priority**: P0
+
+#### Goal
+
+Land the first runtime-owned execution telemetry slice so hosts and dashboards
+can consume one additive contract for usage, incidents, guardrails, and
+provider-agnostic progress without moving budget policy into `cats-runtime`.
+
+#### Delivered
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Define shared runtime usage, incident, guardrail, and progress contracts | [x] | `src/core/types.ts` now exposes `RuntimeUsageRecord`, `RuntimeRateLimitIncident`, `RuntimeGuardrailResult`, and normalized progress kinds/status |
+| Add runtime-owned metering service and incident helpers | [x] | `src/core/usage` now records usage, derives incidents, and maintains active cooldown/block state |
+| Add additive metering config surface | [x] | `CATS_RUNTIME_GUARDRAIL_SESSION_TOTAL_TOKENS_WARN`, `CATS_RUNTIME_GUARDRAIL_SESSION_TOTAL_TOKENS_BLOCK`, and `CATS_RUNTIME_RATE_LIMIT_COOLDOWN_MS` are parsed centrally |
+| Enforce warn / block / cooldown preflight behavior on message execution | [x] | `POST /sessions/{id}/messages` now emits warning progress events or returns `guardrail_blocked` / `guardrail_cooldown` responses before turn execution |
+| Surface metering state over diagnostics routes | [x] | `GET /diagnostics/runtime` returns the full metering snapshot and `GET /diagnostics/health` exposes a polling-friendly metering summary |
+| Normalize provider-agnostic progress across multiple CLI providers | [x] | Junie, Pi, Goose, and Copilot now emit `type: "progress"` events with shared runtime metadata |
+| Extend API/local incident and progress surfacing onto the same contract | [x] | API/local transports now emit additive incident hints and normalized progress events for continuation/cache/warm-state flows |
+| Cover metering, incidents, guardrails, and progress with automated tests | [x] | Route, server, parser/provider, API integration, and direct metering-service tests cover the delivered slice |
+
+#### Deferred Boundaries
+
+- [ ] No product budget policy, approval override flow, or war-room orchestration in runtime
+- [ ] No provider compatibility profile selection as part of this slice
+- [ ] No attempt to fabricate exact costs where providers only expose partial or derived usage
+
+#### Verification
+
+- [x] `npm run build`
+- [x] `npx vitest run src/core/usage/RuntimeMeteringService.test.ts src/http/messagesRoute.test.ts tests/api-backend.test.ts tests/runtime-server.test.ts src/backends/cli/junie/parser.test.ts src/backends/cli/pi/parser.test.ts src/backends/cli/goose/parser.test.ts src/backends/cli/providers/copilot.test.ts src/backends/cli/providers/junie.test.ts --pool=threads --poolOptions.threads.singleThread`
  
 ### WP-8: Runtime Health, Startup, Diagnostics, and Tool Safety Hardening
 

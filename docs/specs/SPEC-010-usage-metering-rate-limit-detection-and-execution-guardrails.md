@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft (Pending Review) |
+| **Status** | In Progress (First Slice Landed) |
 | **Owner** | Codex |
 | **Reviewer** | User / metering workstream |
 

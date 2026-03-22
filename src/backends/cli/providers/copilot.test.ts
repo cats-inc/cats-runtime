@@ -161,7 +161,19 @@ describe('CopilotProvider', () => {
           data: { toolRequests: [{ name: 'read_file', id: 'tool-123' }] },
         }),
       );
-      expect(event).toEqual({ type: 'tool_use', toolName: 'read_file', toolId: 'tool-123' });
+      expect(event).toEqual([
+        expect.objectContaining({
+          type: 'progress',
+          text: 'Running tool: read_file',
+          metadata: expect.objectContaining({
+            provider: 'copilot',
+            backend: 'cli',
+            kind: 'tool',
+            status: 'running',
+          }),
+        }),
+        { type: 'tool_use', toolName: 'read_file', toolId: 'tool-123' },
+      ]);
     });
 
     it('parses assistant.message content as text when no deltas were streamed', () => {
@@ -205,11 +217,17 @@ describe('CopilotProvider', () => {
       const event = provider.parseStreamLine(
         JSON.stringify({ type: 'result', sessionId: 'sess-1' }),
       );
-      expect(event).toEqual({
+      expect(event).toEqual(expect.objectContaining({
         type: 'result',
         sessionId: 'sess-1',
         usage: { inputTokens: 0, outputTokens: 42 },
-      });
+        metadata: {
+          runtimeUsage: {
+            totalTokens: 42,
+            sourceConfidence: 'estimated',
+          },
+        },
+      }));
     });
 
     it('parses session.shutdown as the completion result with model usage', () => {
@@ -237,11 +255,17 @@ describe('CopilotProvider', () => {
         }),
       );
 
-      expect(event).toEqual({
+      expect(event).toEqual(expect.objectContaining({
         type: 'result',
         sessionId: 'sess-shutdown',
         usage: { inputTokens: 24504, outputTokens: 94 },
-      });
+        metadata: {
+          runtimeUsage: {
+            totalTokens: 24598,
+            sourceConfidence: 'reported',
+          },
+        },
+      }));
     });
 
     it('parses result event with sessionId', () => {
@@ -299,24 +323,42 @@ describe('CopilotProvider', () => {
       expect(event).toBeNull();
     });
 
-    it('skips assistant.reasoning_delta events', () => {
+    it('parses assistant.reasoning_delta events as progress', () => {
       const event = provider.parseStreamLine(
         JSON.stringify({
           type: 'assistant.reasoning_delta',
           data: { deltaContent: 'thinking...' },
         }),
       );
-      expect(event).toBeNull();
+      expect(event).toEqual(expect.objectContaining({
+        type: 'progress',
+        text: 'thinking...',
+        metadata: expect.objectContaining({
+          provider: 'copilot',
+          backend: 'cli',
+          kind: 'reasoning',
+          status: 'running',
+        }),
+      }));
     });
 
-    it('skips assistant.reasoning events', () => {
+    it('parses assistant.reasoning events as progress', () => {
       const event = provider.parseStreamLine(
         JSON.stringify({
           type: 'assistant.reasoning',
           data: { content: 'full reasoning' },
         }),
       );
-      expect(event).toBeNull();
+      expect(event).toEqual(expect.objectContaining({
+        type: 'progress',
+        text: 'full reasoning',
+        metadata: expect.objectContaining({
+          provider: 'copilot',
+          backend: 'cli',
+          kind: 'reasoning',
+          status: 'updated',
+        }),
+      }));
     });
 
     it('skips assistant.turn_end events', () => {

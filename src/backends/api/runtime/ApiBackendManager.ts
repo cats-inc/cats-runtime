@@ -1,6 +1,7 @@
 import type { ExecutionHandle, StreamEvent, TurnInput } from '../../../core/types.js';
 import { mergeRuntimeInstructionLayers } from '../../../core/skills/catalog.js';
 import { LocalToolRuntime } from '../../../core/tools/LocalToolRuntime.js';
+import { createRuntimeProgressEvent } from '../../../core/progress.js';
 import type { SessionRegistry } from '../../cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig, RemoteProviderInstanceConfig } from '../../cli/config.js';
 import type { ProviderTargetDescriptor } from '../../../core/providerCatalog.js';
@@ -13,6 +14,7 @@ import { ManagedExecutionHandle } from '../../../core/runtime/ManagedExecutionHa
 import type {
   ApiBackendOptions,
   ApiBackendStatus,
+  ApiCompletionResponse,
   ApiConversationMessage,
   ApiConversationPart,
   ApiProgressEvent,
@@ -20,6 +22,7 @@ import type {
   ApiTransportClient,
 } from '../types.js';
 import { API_PROVIDER_CAPABILITIES } from '../types.js';
+import { ApiTransportError } from '../transports/error.js';
 
 const DEFAULT_MAX_TOOL_STEPS = 20;
 
@@ -118,22 +121,55 @@ function toProgressStreamEvent(
   target: ProviderTargetDescriptor,
   providerSessionId?: string,
 ): StreamEvent {
-  const event: StreamEvent = {
-    type: 'progress',
-    providerSessionId,
+  return createRuntimeProgressEvent({
     text: progress.message,
-    metadata: {
-      kind: progress.kind,
-      status: progress.status,
-      provider: target.providerName,
-      backend: target.backend,
-      instance: target.instanceId,
+    providerSessionId,
+    provider: target.providerName,
+    backend: target.backend,
+    instance: target.instanceId,
+    kind: progress.kind,
+    status: progress.status,
+    source: 'runtime',
+    details: {
       transport: target.remoteInstance?.transport,
       ...progress.metadata,
     },
-  };
+  });
+}
 
-  return event;
+function toErrorStreamEvent(
+  error: unknown,
+  target: ProviderTargetDescriptor,
+  providerSessionId?: string,
+): StreamEvent {
+  if (error instanceof ApiTransportError) {
+    return {
+      type: 'error',
+      providerSessionId,
+      text: error.message,
+      metadata: {
+        provider: target.providerName,
+        backend: target.backend,
+        instance: target.instanceId,
+        incidentHint: {
+          statusCode: error.statusCode,
+          retryAfterMs: error.retryAfterMs,
+          body: error.responseBody,
+        },
+      },
+    };
+  }
+
+  return {
+    type: 'error',
+    providerSessionId,
+    text: error instanceof Error ? error.message : String(error),
+    metadata: {
+      provider: target.providerName,
+      backend: target.backend,
+      instance: target.instanceId,
+    },
+  };
 }
 
 export class ApiBackendManager {
@@ -284,18 +320,24 @@ export class ApiBackendManager {
     const maxToolSteps = remoteInstance.maxToolSteps ?? DEFAULT_MAX_TOOL_STEPS;
 
     for (let step = 0; step < maxToolSteps; step += 1) {
-      const completion = await transport.completeTurn({
-        sessionId,
-        providerName: initialSession.providerName,
-        instance: remoteInstance,
-        model,
-        messages: conversation,
-        tools: toolDefinitions,
-        previousResponseId: responseId,
-        sessionState,
-        turnStep: step,
-        signal,
-      });
+      let completion: ApiCompletionResponse;
+      try {
+        completion = await transport.completeTurn({
+          sessionId,
+          providerName: initialSession.providerName,
+          instance: remoteInstance,
+          model,
+          messages: conversation,
+          tools: toolDefinitions,
+          previousResponseId: responseId,
+          sessionState,
+          turnStep: step,
+          signal,
+        });
+      } catch (error) {
+        yield toErrorStreamEvent(error, target, responseId);
+        return;
+      }
 
       if (completion.responseId) {
         responseId = completion.responseId;

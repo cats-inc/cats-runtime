@@ -119,7 +119,7 @@ describe('parsePiStreamLine', () => {
     expect(event?.text).toBe('Hello ');
   });
 
-  it('skips message_update without text_delta', () => {
+  it('parses message_update thinking as reasoning progress', () => {
     const event = parsePiStreamLine(JSON.stringify({
       type: 'message_update',
       assistantMessageEvent: {
@@ -127,7 +127,16 @@ describe('parsePiStreamLine', () => {
         delta: 'hmm...',
       },
     }));
-    expect(event).toBeNull();
+    expect(event).toEqual(expect.objectContaining({
+      type: 'progress',
+      text: 'hmm...',
+      metadata: expect.objectContaining({
+        provider: 'pi',
+        backend: 'cli',
+        kind: 'reasoning',
+        status: 'running',
+      }),
+    }));
   });
 
   it('parses tool_execution_start', () => {
@@ -137,9 +146,23 @@ describe('parsePiStreamLine', () => {
       toolName: 'bash',
       args: { command: 'ls' },
     }));
-    expect(event?.type).toBe('tool_use');
-    expect(event?.toolName).toBe('bash');
-    expect(event?.toolId).toBe('tc_1');
+    expect(event).toEqual([
+      expect.objectContaining({
+        type: 'progress',
+        text: 'Running tool: bash',
+        metadata: expect.objectContaining({
+          provider: 'pi',
+          backend: 'cli',
+          kind: 'tool',
+          status: 'running',
+        }),
+      }),
+      {
+        type: 'tool_use',
+        toolName: 'bash',
+        toolId: 'tc_1',
+      },
+    ]);
   });
 
   it('parses tool_execution_end', () => {
@@ -245,12 +268,24 @@ describe('parsePiStreamLine current message schema', () => {
       },
     }));
 
-    expect(event).toEqual({
-      type: 'tool_use',
-      toolId: 'call_123',
-      toolName: 'bash',
-      toolArgs: { command: 'pwd' },
-    });
+    expect(event).toEqual([
+      expect.objectContaining({
+        type: 'progress',
+        text: 'checking...',
+        metadata: expect.objectContaining({
+          provider: 'pi',
+          backend: 'cli',
+          kind: 'reasoning',
+          status: 'running',
+        }),
+      }),
+      {
+        type: 'tool_use',
+        toolId: 'call_123',
+        toolName: 'bash',
+        toolArgs: { command: 'pwd' },
+      },
+    ]);
   });
 
   it('parses final assistant messages into text and result events', () => {
@@ -272,12 +307,28 @@ describe('parsePiStreamLine current message schema', () => {
     }));
 
     expect(event).toEqual([
+      expect.objectContaining({
+        type: 'progress',
+        text: 'done thinking',
+        metadata: expect.objectContaining({
+          provider: 'pi',
+          backend: 'cli',
+          kind: 'reasoning',
+          status: 'running',
+        }),
+      }),
       { type: 'text', text: 'NEXT: Agent-2' },
       {
         type: 'result',
         usage: {
           inputTokens: 1954,
           outputTokens: 255,
+        },
+        metadata: {
+          runtimeUsage: {
+            totalTokens: 2209,
+            sourceConfidence: 'reported',
+          },
         },
       },
     ]);
@@ -355,6 +406,16 @@ describe('parsePiStreamLine current message schema', () => {
       .flatMap((event) => (event ? (Array.isArray(event) ? event : [event]) : []));
 
     expect(events).toEqual([
+      expect.objectContaining({
+        type: 'progress',
+        text: 'Running tool: read',
+        metadata: expect.objectContaining({
+          provider: 'pi',
+          backend: 'cli',
+          kind: 'tool',
+          status: 'running',
+        }),
+      }),
       {
         type: 'tool_use',
         toolId: 'call_1',
@@ -375,6 +436,12 @@ describe('parsePiStreamLine current message schema', () => {
         usage: {
           inputTokens: 947,
           outputTokens: 7,
+        },
+        metadata: {
+          runtimeUsage: {
+            totalTokens: 954,
+            sourceConfidence: 'reported',
+          },
         },
       },
     ]);

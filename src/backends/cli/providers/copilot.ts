@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createRuntimeProgressEvent } from '../../../core/progress.js';
 import type {
   Provider,
   ProviderCapabilities,
@@ -75,7 +76,7 @@ export class CopilotProvider implements Provider {
     return null;
   }
 
-  parseStreamLine(line: string): StreamEvent | null {
+  parseStreamLine(line: string): StreamEvent | StreamEvent[] | null {
     const trimmed = line.trim();
     if (!trimmed) return null;
 
@@ -119,7 +120,21 @@ export class CopilotProvider implements Provider {
         const toolRequests = inner?.toolRequests as Array<{ name?: string; id?: string }> | undefined;
         if (toolRequests && toolRequests.length > 0) {
           const tool = toolRequests[0];
-          return { type: 'tool_use', toolName: tool.name, toolId: tool.id };
+          return [
+            createRuntimeProgressEvent({
+              text: `Running tool: ${tool.name ?? 'unknown'}`,
+              provider: 'copilot',
+              backend: 'cli',
+              kind: 'tool',
+              status: 'running',
+              source: 'provider',
+              native: {
+                sourceEvent: eventType,
+                toolName: tool.name,
+              },
+            }),
+            { type: 'tool_use', toolName: tool.name, toolId: tool.id },
+          ];
         }
 
         // Copilot CLI 1.0.2 emits the final answer as a full assistant.message,
@@ -138,24 +153,58 @@ export class CopilotProvider implements Provider {
             inputTokens: 0,
             outputTokens: this._lastOutputTokens,
           },
+          metadata: this._lastOutputTokens > 0
+            ? {
+                runtimeUsage: {
+                  totalTokens: this._lastOutputTokens,
+                  sourceConfidence: 'estimated',
+                },
+              }
+            : undefined,
         };
 
       case 'session.shutdown': {
         const usage = extractUsageFromShutdown(inner, this._lastOutputTokens);
+        const runtimeUsage = extractRuntimeUsageFromShutdown(inner, usage);
         return {
           type: 'result',
           sessionId: this._sessionId,
           usage,
+          metadata: runtimeUsage ? { runtimeUsage } : undefined,
         };
       }
 
       // Skip these event types
       case 'user.message':
       case 'session.model_change':
-      case 'assistant.reasoning_delta':
-      case 'assistant.reasoning':
       case 'assistant.turn_end':
         return null;
+
+      case 'assistant.reasoning_delta':
+        return createRuntimeProgressEvent({
+          text: typeof inner?.deltaContent === 'string' ? inner.deltaContent : '',
+          provider: 'copilot',
+          backend: 'cli',
+          kind: 'reasoning',
+          status: 'running',
+          source: 'provider',
+          native: {
+            sourceEvent: eventType,
+          },
+        });
+
+      case 'assistant.reasoning':
+        return createRuntimeProgressEvent({
+          text: extractContent(inner?.content) || 'Copilot updated reasoning state.',
+          provider: 'copilot',
+          backend: 'cli',
+          kind: 'reasoning',
+          status: 'updated',
+          source: 'provider',
+          native: {
+            sourceEvent: eventType,
+          },
+        });
 
       default:
         // Unknown event type — skip
@@ -235,5 +284,36 @@ function extractUsageFromShutdown(
   return {
     inputTokens: (usage?.inputTokens as number) ?? 0,
     outputTokens: (usage?.outputTokens as number) ?? fallbackOutputTokens,
+  };
+}
+
+function extractRuntimeUsageFromShutdown(
+  data: Record<string, unknown> | undefined,
+  usage: { inputTokens: number; outputTokens: number },
+): Record<string, unknown> | undefined {
+  const modelMetrics = data?.modelMetrics as Record<string, unknown> | undefined;
+  const currentModel = data?.currentModel as string | undefined;
+
+  const currentMetrics = (currentModel && modelMetrics?.[currentModel])
+    ? modelMetrics[currentModel] as Record<string, unknown>
+    : Object.values(modelMetrics ?? {})[0] as Record<string, unknown> | undefined;
+  const quotaUsage = currentMetrics?.usage as Record<string, unknown> | undefined;
+  const premiumRequests = typeof quotaUsage?.premiumRequests === 'number'
+    ? quotaUsage.premiumRequests
+    : undefined;
+  const totalApiDurationMs = typeof quotaUsage?.totalApiDurationMs === 'number'
+    ? quotaUsage.totalApiDurationMs
+    : undefined;
+
+  const totalTokens = usage.inputTokens + usage.outputTokens;
+  if (totalTokens <= 0 && premiumRequests === undefined && totalApiDurationMs === undefined) {
+    return undefined;
+  }
+
+  return {
+    totalTokens,
+    ...(totalApiDurationMs !== undefined ? { latencyMs: totalApiDurationMs } : {}),
+    sourceConfidence: 'reported',
+    ...(premiumRequests !== undefined ? { quota: { premiumRequests } } : {}),
   };
 }

@@ -91,6 +91,50 @@ export type RuntimePreviewSurfaceRenderHint =
   | 'open_external'
   | 'download'
   | 'none';
+export type RuntimeUsageSourceConfidence =
+  | 'reported'
+  | 'aggregated'
+  | 'estimated'
+  | 'unknown';
+export type RuntimeIncidentClassification =
+  | 'rate_limited'
+  | 'quota_exhausted'
+  | 'cooldown_active'
+  | 'concurrency_limited';
+export type RuntimeIncidentScope =
+  | 'session'
+  | 'provider_instance'
+  | 'workspace'
+  | 'runtime_global';
+export type RuntimeGuardrailScope = RuntimeIncidentScope;
+export type RuntimeGuardrailMetric =
+  | 'total_tokens'
+  | 'estimated_cost'
+  | 'rate_limit_incidents'
+  | 'active_concurrency';
+export type RuntimeGuardrailAction = 'warn' | 'block' | 'cooldown';
+export type RuntimeGuardrailOutcome = 'allowed' | 'warned' | 'blocked' | 'cooldown';
+export type RuntimeProgressKind =
+  | 'status'
+  | 'plan'
+  | 'reasoning'
+  | 'tool'
+  | 'command'
+  | 'files'
+  | 'provider_cache'
+  | 'model_state'
+  | 'guardrail'
+  | 'session';
+export type RuntimeProgressStatus =
+  | 'running'
+  | 'updated'
+  | 'created'
+  | 'reused'
+  | 'fallback'
+  | 'hinted'
+  | 'warned'
+  | 'blocked'
+  | 'cooldown';
 export type SessionBranchMode = 'native_fork' | 'context_transplant';
 export type SessionBranchPreference = 'auto' | SessionBranchMode;
 export type RuntimeSkillDeliveryMode = 'filesystem' | 'instructions' | 'none';
@@ -661,6 +705,132 @@ export interface SessionControls {
   canRefresh: boolean;
 }
 
+export interface StreamUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens?: number;
+  estimatedCost?: number;
+  currency?: string;
+  latencyMs?: number;
+  sourceConfidence?: RuntimeUsageSourceConfidence;
+}
+
+export interface RuntimeUsageSignal {
+  totalTokens?: number;
+  estimatedCost?: number;
+  currency?: string;
+  latencyMs?: number;
+  sourceConfidence?: RuntimeUsageSourceConfidence;
+  quota?: Record<string, string | number | boolean>;
+}
+
+export interface RuntimeUsageRecord extends RuntimeUsageSignal {
+  id: string;
+  provider: string;
+  instance: string;
+  backend: ProviderBackend;
+  sessionId?: string;
+  providerSessionId?: string;
+  workspaceKey?: string;
+  callerTags?: Record<string, string>;
+  observedAt: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RuntimeRateLimitIncident {
+  id: string;
+  provider: string;
+  instance: string;
+  backend: ProviderBackend;
+  sessionId?: string;
+  providerSessionId?: string;
+  workspaceKey?: string;
+  classification: RuntimeIncidentClassification;
+  scope: RuntimeIncidentScope;
+  observedAt: string;
+  retryAfterMs?: number;
+  retryAt?: string;
+  evidenceSummary?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RuntimeUsageGuardrail {
+  scope: RuntimeGuardrailScope;
+  metric: RuntimeGuardrailMetric;
+  threshold: number;
+  action: RuntimeGuardrailAction;
+  cooldownMs?: number;
+}
+
+export interface RuntimeGuardrailResult {
+  outcome: RuntimeGuardrailOutcome;
+  scope: RuntimeGuardrailScope;
+  metric: RuntimeGuardrailMetric;
+  action: RuntimeGuardrailAction;
+  provider?: string;
+  instance?: string;
+  backend?: ProviderBackend;
+  sessionId?: string;
+  workspaceKey?: string;
+  threshold?: number;
+  currentValue?: number;
+  observedAt: string;
+  reason: string;
+  cooldownUntil?: string;
+  incidentId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RuntimeUsageAggregate extends RuntimeUsageSignal {
+  provider: string;
+  instance: string;
+  backend: ProviderBackend;
+  sessionId?: string;
+  workspaceKey?: string;
+  observationCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  confidenceCounts: Record<RuntimeUsageSourceConfidence, number>;
+  lastObservedAt?: string;
+}
+
+export interface RuntimeUsageTotals extends RuntimeUsageSignal {
+  observationCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  confidenceCounts: Record<RuntimeUsageSourceConfidence, number>;
+  lastObservedAt?: string;
+}
+
+export interface RuntimeMeteringSummary {
+  status: 'ok' | 'degraded';
+  summary: string;
+  usageRecords: number;
+  incidents: number;
+  activeGuardrails: number;
+  activeCooldowns: number;
+  activeBlocks: number;
+}
+
+export interface RuntimeMeteringSnapshot {
+  summary: RuntimeMeteringSummary;
+  usage: {
+    totals: RuntimeUsageTotals;
+    byProviderInstance: RuntimeUsageAggregate[];
+    bySession: RuntimeUsageAggregate[];
+  };
+  incidents: {
+    recent: RuntimeRateLimitIncident[];
+    active: RuntimeGuardrailResult[];
+  };
+  guardrails: {
+    configured: RuntimeUsageGuardrail[];
+    active: RuntimeGuardrailResult[];
+  };
+}
+
 export interface SessionInfo {
   id: string;
   providerName: string;
@@ -752,10 +922,7 @@ export interface StreamEvent {
   toolId?: string;
   toolArgs?: Record<string, unknown>;
   isError?: boolean;
-  usage?: {
-    inputTokens: number;
-    outputTokens: number;
-  };
+  usage?: StreamUsage;
   summary?: string;
   artifacts?: SessionArtifact[];
   services?: AgentRuntimeService[];

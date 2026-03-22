@@ -81,7 +81,7 @@ Python readers.
 ### OPT-2: Provider-Agnostic Progress Events
 
 **Priority**: P2
-**Status**: Planned
+**Status**: In Progress
 
 #### Problem
 
@@ -119,6 +119,17 @@ leaking backend-specific wire formats to consumers.
 - Update upper-layer consumers such as `crew-chat-poc` to react to the generic
   progress event instead of Junie-only metadata checks
 
+#### Current Implementation Status
+
+- Landed a shared runtime `progress` event helper in `src/core/progress.ts`
+- Normalized Junie onto `type: "progress"` instead of runtime `raw` passthrough
+- Extended the same contract to Pi, Goose, and Copilot CLI integrations
+- Kept provider-native details additive under `metadata.native`
+- Reused the same event contract for API/local cache and warm-state hints
+- Added additive metering/guardrail metadata so progress and execution
+  guardrails can share one runtime-owned contract surface without moving
+  product budget policy into the runtime
+
 #### Initial Candidate Providers
 
 - `junie`
@@ -134,6 +145,7 @@ leaking backend-specific wire formats to consumers.
 - `src/backends/cli/pi/*`
 - `src/backends/cli/goose/*`
 - `src/backends/cli/providers/copilot.ts`
+- `src/core/progress.ts`
 - downstream consumers such as `crew-chat-poc`
 
 ---

@@ -70,9 +70,11 @@ src/
     skills/
     dotenv.ts
     providerCatalog.ts
+    progress.ts
     runtime/
     tools/
     types.ts
+    usage/
   backends/
     agent/
       adapters/
@@ -105,6 +107,8 @@ src/
 - Serves the embedded dashboard UI from `/`
 - Applies optional bearer auth
 - Streams turn output as SSE or NDJSON
+- Applies additive metering observation and execution guardrail preflight on
+  streamed message turns
 - Exposes startup/readiness metadata at `GET /health`
 - Exposes aggregate runtime + provider health at `GET /diagnostics/health`
 - Exposes runtime/host diagnostics at `GET /diagnostics/runtime`
@@ -130,6 +134,8 @@ src/
 - Resolves `(provider, instance)` into concrete command/runtime settings
 - Discovers external native/file-backed sessions from supported tools per provider instance
 - Encapsulates provider-specific spawn, resume, fork, and permission logic
+- Normalizes provider-native mid-turn updates onto shared `progress` events for
+  Junie, Pi, Goose, and Copilot
 - Applies policy-aware WSL discovery for Cursor/Kiro and exposes discovery
   status for the dashboard
 - Validates and resolves file-backed provider paths on the host before starting
@@ -144,9 +150,10 @@ src/
 - Persists provider-native continuation metadata such as OpenAI response IDs,
   Anthropic prompt-caching hints, and Gemini cached-content state as
   optimizations under the runtime-owned logical session
-- Emits a first normalized `progress` event stream for provider-native cache,
-  continuation, and local-model warm-state hints so upper layers do not need to
-  consume provider-specific raw payloads
+- Emits normalized `progress` events plus additive incident hints for
+  provider-native cache, continuation, rate-limit/quota, and local-model
+  warm-state hints so upper layers do not need to consume provider-specific raw
+  payloads
 - Applies additive `payload_template` request hints for provider-native options
   such as OpenAI background/body flags or Ollama `keep_alive` warm-state hints
 - Also hosts the current execution machinery for `local` targets such as
@@ -217,6 +224,19 @@ src/
 - Keeps unsupported delivery explicit instead of silently pretending a backend
   consumed the skill package
 
+### `src/core/usage`
+
+- Hosts the runtime-owned metering subsystem for usage normalization, incident
+  detection, and guardrail aggregation
+- Normalizes additive usage facts such as tokens, estimated cost, latency, and
+  source-confidence without requiring provider-specific callers
+- Derives machine-readable incidents for rate-limit, quota, and concurrency
+  failures from API and CLI surfaces
+- Maintains the first execution guardrail slice for warn / block / cooldown
+  behavior without embedding product budget policy
+- Produces diagnostics-friendly aggregates for `GET /diagnostics/runtime` and
+  `GET /diagnostics/health`
+
 ### `src/core`
 
 - Loads runtime-wide configuration
@@ -224,6 +244,7 @@ src/
 - Hosts the runtime-managed skill catalog/delivery contract
 - Defines stable exported runtime types
 - Keeps shared utilities out of provider modules
+- Owns the shared `progress` event helper and metering/guardrail type contracts
 - Carries the shared turn/bootstrap/output contract used across CLI, API/local,
   and agent sessions
 - Owns the provider-model fallback ordering and cache semantics
@@ -244,6 +265,9 @@ src/
 7. API/local turns may enter the shared local tool loop in `src/core/tools`,
    including workspace substrate preview/apply operations
 8. Agent turns use the shared `TurnInput` contract plus provider-managed session continuity where available
+8. Stream events pass through runtime-owned metering observation so usage,
+   incidents, and active guardrails are updated before the caller receives the
+   final event stream
 9. Startup/readiness state is exposed over `GET /health`, while
    `GET /diagnostics/health`, `GET /diagnostics/runtime`, and
    `GET /diagnostics/providers` expose the runtime-owned host integration

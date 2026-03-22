@@ -13,6 +13,7 @@ Current capabilities:
 - session lifecycle management for CLI-backed runtimes
 - session lifecycle management for API-backed Claude, Codex, and Gemini families plus local Ollama
 - streamed turns over SSE or NDJSON
+- provider-agnostic `progress` events across Junie, Pi, Goose, Copilot, and API/local transports
 - runtime-hosted local tools for API/local sessions (`list_files`, `read_file`, `write_file`, `grep`, `run_shell`)
 - external session discovery for supported local tools
 - file-based provider topology with separated `routing` / `backends` sections
@@ -21,6 +22,7 @@ Current capabilities:
 - backend-aware skill delivery modes (`filesystem`, `instructions`, `none`)
 - strict `default` instance aliasing and host-path validation for file-backed providers
 - provider-specific helpers such as Kiro model inspection
+- runtime-owned usage metering, incident surfacing, and additive execution guardrails for warn / block / cooldown flows
 
 ## Current Status
 
@@ -34,6 +36,7 @@ Current capabilities:
 - [x] Resolve accepted review follow-ups for provider-instance hardening
 - [x] Add `backends/api` for pay-as-you-go API keys and Ollama
 - [x] Land runtime-managed skills v0 session and delivery contract
+- [x] Add first-slice runtime usage metering, rate-limit/quota incident surfacing, and provider-agnostic progress contracts
 
 ## Design Rules
 
@@ -110,11 +113,26 @@ Runtime state defaults under the user's home directory:
 - `src/index.ts` - process entrypoint and shutdown wiring
 - `src/server.ts` - single-service runtime bootstrap
 - `src/http/app.ts` - route registration and auth middleware
+- `src/core/usage/` - runtime-owned metering, incident, and guardrail helpers
 - `src/backends/cli/` - embedded CLI runtime modules
 - `src/backends/api/` - API-key and local-model runtime modules
 - `config/providers.yaml.example` - file-based provider instance topology
 - `docs/api.md` - public HTTP surface
 - `docs/architecture.md` - internal layout and data flow
+
+## Usage Metering
+
+`cats-runtime` now adds an additive metering layer over streamed execution:
+
+- `GET /diagnostics/runtime` exposes the full metering snapshot with usage aggregates, recent incidents, and active/configured guardrails
+- `GET /diagnostics/health` includes a compact `metering` summary for host polling and dashboards
+- `POST /sessions/{id}/messages` may emit a leading `progress` event with `metadata.kind: "guardrail"` or reject execution with `guardrail_blocked` / `guardrail_cooldown`
+
+First-slice configuration lives in `.env`:
+
+- `CATS_RUNTIME_GUARDRAIL_SESSION_TOTAL_TOKENS_WARN`
+- `CATS_RUNTIME_GUARDRAIL_SESSION_TOTAL_TOKENS_BLOCK`
+- `CATS_RUNTIME_RATE_LIMIT_COOLDOWN_MS`
 
 ## Documentation
 

@@ -57,9 +57,23 @@ describe('parseGooseStreamLine', () => {
         }],
       },
     }));
-    expect(event?.type).toBe('tool_use');
-    expect(event?.toolName).toBe('todo__todo_write');
-    expect(event?.toolId).toBe('call_123');
+    expect(event).toEqual([
+      expect.objectContaining({
+        type: 'progress',
+        text: 'Running tool: todo__todo_write',
+        metadata: expect.objectContaining({
+          provider: 'goose',
+          backend: 'cli',
+          kind: 'tool',
+          status: 'running',
+        }),
+      }),
+      {
+        type: 'tool_use',
+        toolName: 'todo__todo_write',
+        toolId: 'call_123',
+      },
+    ]);
   });
 
   it('parses tool response', () => {
@@ -80,10 +94,24 @@ describe('parseGooseStreamLine', () => {
         }],
       },
     }));
-    expect(event?.type).toBe('tool_result');
-    expect(event?.toolId).toBe('call_123');
-    expect(event?.text).toBe('Updated (70 chars)');
-    expect(event?.isError).toBe(false);
+    expect(event).toEqual([
+      expect.objectContaining({
+        type: 'progress',
+        text: 'Completed tool: call_123',
+        metadata: expect.objectContaining({
+          provider: 'goose',
+          backend: 'cli',
+          kind: 'tool',
+          status: 'updated',
+        }),
+      }),
+      {
+        type: 'tool_result',
+        toolId: 'call_123',
+        text: 'Updated (70 chars)',
+        isError: false,
+      },
+    ]);
   });
 
   it('parses complete event with token count', () => {

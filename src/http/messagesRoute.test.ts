@@ -9,8 +9,11 @@ import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
 import type { CursorNativeSessionService } from '../backends/cli/cursor/CursorNativeSessionService.js';
 import type { KiroNativeSessionService } from '../backends/cli/kiro/KiroNativeSessionService.js';
 import type { AuggieSessionService } from '../backends/cli/auggie/AuggieSessionService.js';
+import type { GooseNativeSessionService } from '../backends/cli/goose/GooseNativeSessionService.js';
 import type { OpencodeNativeSessionService } from '../backends/cli/opencode/OpencodeNativeSessionService.js';
+import type { ProviderModelCatalogService } from '../core/models/providerModelCatalog.js';
 import type { StreamEvent, TurnInput } from '../core/types.js';
+import { createRuntimeStartupState } from '../startup.js';
 
 function parseNdjson(text: string): Array<Record<string, unknown>> {
   return text
@@ -20,7 +23,10 @@ function parseNdjson(text: string): Array<Record<string, unknown>> {
     .map((line) => JSON.parse(line));
 }
 
-function makeConfig(sessionBaseDir: string): CliRuntimeConfig {
+function makeConfig(
+  sessionBaseDir: string,
+  metering?: CliRuntimeConfig['metering'],
+): CliRuntimeConfig {
   return {
     host: '127.0.0.1',
     port: 3100,
@@ -55,7 +61,10 @@ function makeConfig(sessionBaseDir: string): CliRuntimeConfig {
     nativeDiscoveryIntervalMs: 5000,
     externalSessionLiveWindowMs: 15000,
     maxSessions: 10,
+    spawnRetries: 1,
+    spawnTimeoutMs: 30000,
     sessionBaseDir,
+    metering,
     providerCommands: {
       auggie: { path: 'auggie', runner: 'auto', runtime: { mode: 'native' } },
       claude: { path: 'claude', runner: 'auto', runtime: { mode: 'native' } },
@@ -66,12 +75,13 @@ function makeConfig(sessionBaseDir: string): CliRuntimeConfig {
       kiro: { path: 'kiro-cli', runner: 'auto', runtime: { mode: 'wsl', distro: 'Ubuntu' } },
       opencode: { path: 'opencode', runner: 'auto', runtime: { mode: 'native' } },
     },
-  };
+  } as unknown as CliRuntimeConfig;
 }
 
 function makeApp(
   sessionBaseDir: string,
   streamMessage: (turnInput: TurnInput) => AsyncGenerator<StreamEvent>,
+  metering?: CliRuntimeConfig['metering'],
 ) {
   const registry = new SessionRegistry();
   const worker = {
@@ -94,13 +104,16 @@ function makeApp(
   } as unknown as WorkerPool;
 
   const app = createApp({
-    config: makeConfig(sessionBaseDir),
+    config: makeConfig(sessionBaseDir, metering),
+    startup: createRuntimeStartupState(),
     registry,
     pool,
     cursorNative: {} as CursorNativeSessionService,
+    gooseNative: {} as GooseNativeSessionService,
     kiroNative: {} as KiroNativeSessionService,
     auggieSessions: {} as AuggieSessionService,
     opencodeNative: {} as OpencodeNativeSessionService,
+    providerModelCatalog: {} as ProviderModelCatalogService,
   });
 
   const session = registry.create({
@@ -289,6 +302,182 @@ describe('message route transcript persistence', () => {
           }),
         }),
       }));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('emits a guardrail warning progress event before execution', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-message-route-'));
+    const sessionBaseDir = join(root, 'sessions');
+    mkdirSync(sessionBaseDir, { recursive: true });
+
+    try {
+      const { app, registry, session } = makeApp(
+        sessionBaseDir,
+        async function* () {
+          yield { type: 'result' };
+        },
+        {
+          sessionTotalTokensWarn: 10,
+          rateLimitCooldownMs: 60000,
+        },
+      );
+      registry.recordMessage(session.id, 7, 5);
+      registry.updateStatus(session.id, 'ready');
+
+      const response = await app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({ message: 'hello again' }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(parseNdjson(await response.text())).toEqual([
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'guardrail',
+            guardrail: expect.objectContaining({
+              outcome: 'warned',
+              scope: 'session',
+            }),
+          }),
+        }),
+        { type: 'result' },
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('blocks execution when the session exceeds the hard token limit', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-message-route-'));
+    const sessionBaseDir = join(root, 'sessions');
+    mkdirSync(sessionBaseDir, { recursive: true });
+    const streamMessage = vi.fn(async function* () {
+      yield { type: 'result' };
+    });
+
+    try {
+      const { app, registry, session } = makeApp(
+        sessionBaseDir,
+        streamMessage,
+        {
+          sessionTotalTokensBlock: 10,
+          rateLimitCooldownMs: 60000,
+        },
+      );
+      registry.recordMessage(session.id, 6, 5);
+      registry.updateStatus(session.id, 'ready');
+
+      const response = await app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({ message: 'blocked turn' }),
+      });
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: expect.stringContaining('hard limit'),
+        code: 'guardrail_blocked',
+        guardrail: expect.objectContaining({
+          outcome: 'blocked',
+          scope: 'session',
+          metric: 'total_tokens',
+        }),
+      });
+      expect(streamMessage).not.toHaveBeenCalled();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('records cooldown incidents and exposes them through diagnostics/runtime', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-message-route-'));
+    const sessionBaseDir = join(root, 'sessions');
+    mkdirSync(sessionBaseDir, { recursive: true });
+    const streamMessage = vi.fn(async function* () {
+      yield { type: 'error', text: '429 Too Many Requests. Retry after 2s.' };
+    });
+
+    try {
+      const { app, session } = makeApp(
+        sessionBaseDir,
+        streamMessage,
+        {
+          rateLimitCooldownMs: 5000,
+        },
+      );
+
+      const firstResponse = await app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({ message: 'first try' }),
+      });
+
+      expect(firstResponse.status).toBe(200);
+      expect(parseNdjson(await firstResponse.text())).toEqual([
+        expect.objectContaining({
+          type: 'error',
+          metadata: expect.objectContaining({
+            incident: expect.objectContaining({
+              classification: 'rate_limited',
+            }),
+            guardrail: expect.objectContaining({
+              outcome: 'cooldown',
+            }),
+          }),
+        }),
+      ]);
+
+      const diagnosticsResponse = await app.request('/diagnostics/runtime');
+      expect(diagnosticsResponse.status).toBe(200);
+      expect(await diagnosticsResponse.json()).toEqual(expect.objectContaining({
+        metering: expect.objectContaining({
+          summary: expect.objectContaining({
+            status: 'degraded',
+            incidents: 1,
+            activeCooldowns: 1,
+          }),
+          incidents: expect.objectContaining({
+            recent: [
+              expect.objectContaining({
+                classification: 'rate_limited',
+              }),
+            ],
+          }),
+        }),
+      }));
+
+      const secondResponse = await app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({ message: 'second try' }),
+      });
+
+      expect(secondResponse.status).toBe(429);
+      expect(await secondResponse.json()).toEqual({
+        error: expect.stringContaining('cooled down'),
+        code: 'guardrail_cooldown',
+        guardrail: expect.objectContaining({
+          outcome: 'cooldown',
+          scope: 'provider_instance',
+        }),
+      });
+      expect(streamMessage).toHaveBeenCalledTimes(1);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

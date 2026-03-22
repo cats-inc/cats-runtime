@@ -11,6 +11,7 @@ import type {
 } from '../types.js';
 import { readErrorBody } from '../../../core/streamParsers.js';
 import { applyPayloadTemplate, readPayloadTemplateString } from '../payloadTemplate.js';
+import { ApiTransportError, readRetryAfterMs } from './error.js';
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
 const DEFAULT_CACHE_TTL = '3600s';
@@ -232,7 +233,11 @@ export class GeminiTransport implements ApiTransportClient {
       });
 
       if (!response.ok) {
-        throw new Error(`Gemini request failed: ${await readErrorBody(response)}`);
+        throw new ApiTransportError('Gemini', {
+          statusCode: response.status,
+          retryAfterMs: readRetryAfterMs(response.headers),
+          responseBody: await readErrorBody(response),
+        });
       }
 
       const payload = await response.json() as Record<string, unknown>;

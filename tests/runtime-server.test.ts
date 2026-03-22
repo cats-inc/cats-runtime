@@ -403,6 +403,49 @@ describe('runtime server', () => {
             nodeVersion: process.version,
           },
         },
+        metering: {
+          summary: {
+            status: 'ok',
+            summary: 'No active metering incidents or guardrails.',
+            usageRecords: 0,
+            incidents: 0,
+            activeGuardrails: 0,
+            activeCooldowns: 0,
+            activeBlocks: 0,
+          },
+          usage: {
+            totals: {
+              observationCount: 0,
+              inputTokens: 0,
+              outputTokens: 0,
+              totalTokens: 0,
+              confidenceCounts: {
+                reported: 0,
+                aggregated: 0,
+                estimated: 0,
+                unknown: 0,
+              },
+            },
+            byProviderInstance: [],
+            bySession: [],
+          },
+          incidents: {
+            recent: [],
+            active: [],
+          },
+          guardrails: {
+            configured: [
+              {
+                scope: 'provider_instance',
+                metric: 'rate_limit_incidents',
+                threshold: 1,
+                action: 'cooldown',
+                cooldownMs: 60000,
+              },
+            ],
+            active: [],
+          },
+        },
       });
     });
   });
@@ -683,6 +726,15 @@ backends:
             }),
           ]),
         },
+        metering: {
+          status: 'ok',
+          summary: 'No active metering incidents or guardrails.',
+          usageRecords: 0,
+          incidents: 0,
+          activeGuardrails: 0,
+          activeCooldowns: 0,
+          activeBlocks: 0,
+        },
       });
     } finally {
       await runtime.close();
@@ -930,6 +982,15 @@ backends:
               summary: expect.stringContaining('Could not resolve CLI command'),
             }),
           ]),
+        },
+        metering: {
+          status: 'ok',
+          summary: 'No active metering incidents or guardrails.',
+          usageRecords: 0,
+          incidents: 0,
+          activeGuardrails: 0,
+          activeCooldowns: 0,
+          activeBlocks: 0,
         },
       });
     } finally {

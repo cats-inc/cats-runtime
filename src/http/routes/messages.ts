@@ -2,7 +2,11 @@ import { appendFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
-import { getRuntimeSessionManager, type AppContext } from '../app.js';
+import {
+  getRuntimeMeteringService,
+  getRuntimeSessionManager,
+  type AppContext,
+} from '../app.js';
 import type { SessionInfo, SessionInvocationContext, TurnInput } from '../../backends/cli/pool/types.js';
 import type { SessionRegistry } from '../../backends/cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig } from '../../backends/cli/config.js';
@@ -220,6 +224,12 @@ function tryRespawnPiWorkerForSkillMutation(
   return true;
 }
 
+function guardrailHttpStatus(
+  outcome: 'blocked' | 'cooldown',
+): 403 | 429 {
+  return outcome === 'cooldown' ? 429 : 403;
+}
+
 /** POST /sessions/:id/messages — send a message, stream response as SSE */
 messageRoutes.post('/sessions/:id/messages', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
@@ -335,6 +345,21 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     return c.json({ error: 'Worker process has exited' }, 410);
   }
 
+  const metering = getRuntimeMeteringService(ctx);
+  const preflight = metering.evaluatePreflight(session);
+  if (preflight.outcome === 'blocked' || preflight.outcome === 'cooldown') {
+    return c.json({
+      error: preflight.reason,
+      code: preflight.outcome === 'cooldown' ? 'guardrail_cooldown' : 'guardrail_blocked',
+      guardrail: preflight,
+    }, {
+      status: guardrailHttpStatus(preflight.outcome),
+    });
+  }
+  const warningEvent = preflight.outcome === 'warned'
+    ? metering.createWarningProgressEvent(session, preflight)
+    : undefined;
+
   ctx.registry.updateStatus(id, 'busy');
 
   // Check Accept header for format preference
@@ -362,64 +387,69 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
       async start(controller) {
         let assistantText = '';
         let completed = false;
+        const turnStartedAt = Date.now();
         try {
+          if (warningEvent) {
+            controller.enqueue(new TextEncoder().encode(JSON.stringify(warningEvent) + '\n'));
+          }
           for await (const event of streamTurnWithPiRecovery(ctx, id, turnInput, () => {
             ensureRecoveredPiHistorySourcePath(ctx, id, turnInput, historyState);
           })) {
-            const line = JSON.stringify(event) + '\n';
+            const observedEvent = metering.observeEvent(session, event, { turnStartedAt });
+            const line = JSON.stringify(observedEvent) + '\n';
             controller.enqueue(new TextEncoder().encode(line));
 
-            if ((event.type === 'init' || event.type === 'result') && (event.providerSessionId || event.sessionId)) {
-              ctx.registry.setProviderSessionId(id, event.providerSessionId || event.sessionId!);
+            if ((observedEvent.type === 'init' || observedEvent.type === 'result') && (observedEvent.providerSessionId || observedEvent.sessionId)) {
+              ctx.registry.setProviderSessionId(id, observedEvent.providerSessionId || observedEvent.sessionId!);
             }
-            if (event.providerState !== undefined) {
-              ctx.registry.setProviderState(id, event.providerState);
+            if (observedEvent.providerState !== undefined) {
+              ctx.registry.setProviderState(id, observedEvent.providerState);
             }
-            if (event.artifacts !== undefined || event.summary !== undefined) {
+            if (observedEvent.artifacts !== undefined || observedEvent.summary !== undefined) {
               ctx.registry.updateSessionMetadata(id, {
-                artifacts: event.artifacts ?? session.artifacts,
-                summary: event.summary,
+                artifacts: observedEvent.artifacts ?? session.artifacts,
+                summary: observedEvent.summary,
               });
             }
 
-            if (event.type === 'text') {
-              assistantText += event.text ?? '';
+            if (observedEvent.type === 'text') {
+              assistantText += observedEvent.text ?? '';
             }
 
-            if (event.type === 'tool_use' && historyState.sourcePath) {
+            if (observedEvent.type === 'tool_use' && historyState.sourcePath) {
               assistantText = flushAssistantText(historyState.sourcePath, assistantText);
               appendHistory(historyState.sourcePath, {
                 type: 'tool_use',
-                toolId: event.toolId,
-                toolName: event.toolName,
-                arguments: event.toolArgs ?? {},
+                toolId: observedEvent.toolId,
+                toolName: observedEvent.toolName,
+                arguments: observedEvent.toolArgs ?? {},
                 timestamp: new Date().toISOString(),
               });
             }
 
-            if (event.type === 'tool_result' && historyState.sourcePath) {
+            if (observedEvent.type === 'tool_result' && historyState.sourcePath) {
               appendHistory(historyState.sourcePath, {
                 type: 'tool_result',
-                toolId: event.toolId,
-                toolName: event.toolName,
-                text: event.text ?? '',
-                isError: event.isError === true,
+                toolId: observedEvent.toolId,
+                toolName: observedEvent.toolName,
+                text: observedEvent.text ?? '',
+                isError: observedEvent.isError === true,
                 timestamp: new Date().toISOString(),
               });
             }
 
-            if (event.type === 'result') {
+            if (observedEvent.type === 'result') {
               completed = true;
               assistantText = flushAssistantText(historyState.sourcePath, assistantText);
               ctx.registry.recordMessage(
                 id,
-                event.usage?.inputTokens,
-                event.usage?.outputTokens,
+                observedEvent.usage?.inputTokens,
+                observedEvent.usage?.outputTokens,
               );
               restoreReadyIfSessionStillInteractive(ctx.registry, id);
             }
 
-            if (event.type === 'error') {
+            if (observedEvent.type === 'error') {
               completed = true;
               assistantText = flushAssistantText(historyState.sourcePath, assistantText);
               restoreReadyIfSessionStillInteractive(ctx.registry, id);
@@ -432,7 +462,10 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
             restoreReadyIfSessionStillInteractive(ctx.registry, id);
           }
         } catch (err) {
-          const errorEvent = { type: 'error', text: String(err) };
+          const errorEvent = metering.observeEvent(session, {
+            type: 'error',
+            text: String(err),
+          }, { turnStartedAt });
           assistantText = flushAssistantText(historyState.sourcePath, assistantText);
           controller.enqueue(
             new TextEncoder().encode(JSON.stringify(errorEvent) + '\n'),
@@ -466,66 +499,74 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
   return streamSSE(c, async (stream) => {
     let assistantText = '';
     let completed = false;
+    const turnStartedAt = Date.now();
     try {
+      if (warningEvent) {
+        await stream.writeSSE({
+          data: JSON.stringify(warningEvent),
+          event: warningEvent.type,
+        });
+      }
       for await (const event of streamTurnWithPiRecovery(ctx, id, turnInput, () => {
         ensureRecoveredPiHistorySourcePath(ctx, id, turnInput, sseHistoryState);
       })) {
+        const observedEvent = metering.observeEvent(session, event, { turnStartedAt });
         await stream.writeSSE({
-          data: JSON.stringify(event),
-          event: event.type,
+          data: JSON.stringify(observedEvent),
+          event: observedEvent.type,
         });
 
-        if ((event.type === 'init' || event.type === 'result') && (event.providerSessionId || event.sessionId)) {
-          ctx.registry.setProviderSessionId(id, event.providerSessionId || event.sessionId!);
+        if ((observedEvent.type === 'init' || observedEvent.type === 'result') && (observedEvent.providerSessionId || observedEvent.sessionId)) {
+          ctx.registry.setProviderSessionId(id, observedEvent.providerSessionId || observedEvent.sessionId!);
         }
-        if (event.providerState !== undefined) {
-          ctx.registry.setProviderState(id, event.providerState);
+        if (observedEvent.providerState !== undefined) {
+          ctx.registry.setProviderState(id, observedEvent.providerState);
         }
-        if (event.artifacts !== undefined || event.summary !== undefined) {
+        if (observedEvent.artifacts !== undefined || observedEvent.summary !== undefined) {
           ctx.registry.updateSessionMetadata(id, {
-            artifacts: event.artifacts ?? session.artifacts,
-            summary: event.summary,
+            artifacts: observedEvent.artifacts ?? session.artifacts,
+            summary: observedEvent.summary,
           });
         }
 
-        if (event.type === 'text') {
-          assistantText += event.text ?? '';
+        if (observedEvent.type === 'text') {
+          assistantText += observedEvent.text ?? '';
         }
 
-        if (event.type === 'tool_use' && sseHistoryState.sourcePath) {
+        if (observedEvent.type === 'tool_use' && sseHistoryState.sourcePath) {
           assistantText = flushAssistantText(sseHistoryState.sourcePath, assistantText);
           appendHistory(sseHistoryState.sourcePath, {
             type: 'tool_use',
-            toolId: event.toolId,
-            toolName: event.toolName,
-            arguments: event.toolArgs ?? {},
+            toolId: observedEvent.toolId,
+            toolName: observedEvent.toolName,
+            arguments: observedEvent.toolArgs ?? {},
             timestamp: new Date().toISOString(),
           });
         }
 
-        if (event.type === 'tool_result' && sseHistoryState.sourcePath) {
+        if (observedEvent.type === 'tool_result' && sseHistoryState.sourcePath) {
           appendHistory(sseHistoryState.sourcePath, {
             type: 'tool_result',
-            toolId: event.toolId,
-            toolName: event.toolName,
-            text: event.text ?? '',
-            isError: event.isError === true,
+            toolId: observedEvent.toolId,
+            toolName: observedEvent.toolName,
+            text: observedEvent.text ?? '',
+            isError: observedEvent.isError === true,
             timestamp: new Date().toISOString(),
           });
         }
 
-        if (event.type === 'result') {
+        if (observedEvent.type === 'result') {
           completed = true;
           assistantText = flushAssistantText(sseHistoryState.sourcePath, assistantText);
           ctx.registry.recordMessage(
             id,
-            event.usage?.inputTokens,
-            event.usage?.outputTokens,
+            observedEvent.usage?.inputTokens,
+            observedEvent.usage?.outputTokens,
           );
           restoreReadyIfSessionStillInteractive(ctx.registry, id);
         }
 
-        if (event.type === 'error') {
+        if (observedEvent.type === 'error') {
           completed = true;
           assistantText = flushAssistantText(sseHistoryState.sourcePath, assistantText);
           restoreReadyIfSessionStillInteractive(ctx.registry, id);
@@ -539,9 +580,13 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
       }
     } catch (err) {
       assistantText = flushAssistantText(sseHistoryState.sourcePath, assistantText);
+      const errorEvent = metering.observeEvent(session, {
+        type: 'error',
+        text: String(err),
+      }, { turnStartedAt });
       await stream.writeSSE({
-        data: JSON.stringify({ type: 'error', text: String(err) }),
-        event: 'error',
+        data: JSON.stringify(errorEvent),
+        event: errorEvent.type,
       });
       restoreReadyIfSessionStillInteractive(ctx.registry, id);
     }

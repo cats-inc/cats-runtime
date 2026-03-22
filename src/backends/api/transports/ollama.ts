@@ -10,6 +10,7 @@ import type {
 import { readErrorBody } from '../../../core/streamParsers.js';
 import type { RemoteProviderInstanceConfig } from '../../cli/config.js';
 import { applyPayloadTemplate, readPayloadTemplateString } from '../payloadTemplate.js';
+import { ApiTransportError, readRetryAfterMs } from './error.js';
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
 
@@ -169,7 +170,11 @@ export class OllamaTransport implements ApiTransportClient {
     });
 
     if (!response.ok) {
-      throw new Error(`Ollama request failed: ${await readErrorBody(response)}`);
+      throw new ApiTransportError('Ollama', {
+        statusCode: response.status,
+        retryAfterMs: readRetryAfterMs(response.headers),
+        responseBody: await readErrorBody(response),
+      });
     }
 
     const payload = await response.json() as Record<string, unknown>;

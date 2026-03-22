@@ -27,14 +27,23 @@ describe('parseJunieStreamLine', () => {
     expect(Array.isArray(event)).toBe(true);
     expect(event).toEqual([
       { type: 'text', text: '### Summary\n- 4' },
-      {
+      expect.objectContaining({
         type: 'result',
         sessionId: 'session-260317-070403-d8r2',
         usage: {
           inputTokens: 350,
           outputTokens: 80,
+          estimatedCost: 0.03,
         },
-      },
+        metadata: {
+          runtimeUsage: {
+            totalTokens: 430,
+            estimatedCost: 0.03,
+            currency: 'USD',
+            sourceConfidence: 'aggregated',
+          },
+        },
+      }),
     ]);
   });
 
@@ -62,7 +71,7 @@ describe('parseJunieStreamLine', () => {
     expect(event?.sessionId).toBe('session-2');
   });
 
-  it('parses Junie status updates into raw progress events', () => {
+  it('parses Junie status updates into normalized progress events', () => {
     const parsed = parseJunieSessionEventLine(JSON.stringify({
       kind: 'SessionA2uxEvent',
       event: {
@@ -75,8 +84,8 @@ describe('parseJunieStreamLine', () => {
     }), { sessionId: 'session-3' });
 
     expect(parsed).toEqual({
-      events: [{
-        type: 'raw',
+      events: [expect.objectContaining({
+        type: 'progress',
         sessionId: 'session-3',
         text: 'Sending LLM request',
         raw: {
@@ -84,11 +93,18 @@ describe('parseJunieStreamLine', () => {
           status: 'Sending LLM request',
         },
         metadata: {
-          source: 'junie-progress',
-          progressKind: 'status',
-          state: 'IN_PROGRESS',
+          provider: 'junie',
+          backend: 'cli',
+          kind: 'status',
+          status: 'running',
+          source: 'provider',
+          native: {
+            source: 'junie-progress',
+            progressKind: 'status',
+            state: 'IN_PROGRESS',
+          },
         },
-      }],
+      })],
     });
   });
 
@@ -117,11 +133,12 @@ describe('parseJunieStreamLine', () => {
       usageDelta: {
         inputTokens: 17,
         outputTokens: 3,
+        estimatedCost: undefined,
       },
     });
   });
 
-  it('parses Junie thought updates into raw progress events', () => {
+  it('parses Junie thought updates into normalized progress events', () => {
     const parsed = parseJunieSessionEventLine(JSON.stringify({
       kind: 'SessionA2uxEvent',
       event: {
@@ -134,8 +151,8 @@ describe('parseJunieStreamLine', () => {
     }), { sessionId: 'session-thought' });
 
     expect(parsed).toEqual({
-      events: [{
-        type: 'raw',
+      events: [expect.objectContaining({
+        type: 'progress',
         sessionId: 'session-thought',
         text: 'Delivering the PRD now.',
         raw: {
@@ -143,11 +160,18 @@ describe('parseJunieStreamLine', () => {
           text: 'Delivering the PRD now.',
         },
         metadata: {
-          source: 'junie-progress',
-          progressKind: 'thought',
-          state: 'IN_PROGRESS',
+          provider: 'junie',
+          backend: 'cli',
+          kind: 'reasoning',
+          status: 'running',
+          source: 'provider',
+          native: {
+            source: 'junie-progress',
+            progressKind: 'thought',
+            state: 'IN_PROGRESS',
+          },
         },
-      }],
+      })],
     });
   });
 
@@ -179,6 +203,12 @@ describe('parseJunieStreamLine', () => {
           usage: {
             inputTokens: 12,
             outputTokens: 8,
+          },
+          metadata: {
+            runtimeUsage: {
+              totalTokens: 20,
+              sourceConfidence: 'aggregated',
+            },
           },
         },
       ],

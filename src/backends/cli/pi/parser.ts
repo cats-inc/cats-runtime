@@ -1,4 +1,5 @@
 import type { StreamEvent } from '../../../core/types.js';
+import { createRuntimeProgressEvent } from '../../../core/progress.js';
 
 /** Parsed fields from a single Pi JSONL line. */
 export interface PiMessagePart {
@@ -60,12 +61,46 @@ function extractTextContent(
     .join('');
 }
 
+function extractThinkingContent(
+  content: string | PiMessagePart[] | undefined,
+): string[] {
+  if (!Array.isArray(content)) return [];
+  return content
+    .filter((part) => part.type === 'thinking' && typeof part.thinking === 'string')
+    .map((part) => part.thinking!.trim())
+    .filter(Boolean);
+}
+
 function extractUsage(message: PiStreamEvent['message']): StreamEvent['usage'] | undefined {
   const usage = message?.usage;
   if (!usage) return undefined;
   return {
     inputTokens: (usage.input ?? 0) + (usage.cacheRead ?? 0),
     outputTokens: usage.output ?? 0,
+  };
+}
+
+function buildPiUsageMetadata(
+  message: PiStreamEvent['message'],
+): Record<string, unknown> | undefined {
+  const usage = message?.usage;
+  if (!usage) {
+    return undefined;
+  }
+
+  const totalTokens = (usage.input ?? 0) + (usage.cacheRead ?? 0) + (usage.output ?? 0);
+  const estimatedCost = usage.cost?.total;
+  if (totalTokens <= 0 && (estimatedCost ?? 0) <= 0) {
+    return undefined;
+  }
+
+  return {
+    runtimeUsage: {
+      totalTokens,
+      ...(estimatedCost !== undefined ? { estimatedCost } : {}),
+      ...(estimatedCost !== undefined ? { currency: 'USD' } : {}),
+      sourceConfidence: 'reported',
+    },
   };
 }
 
@@ -94,6 +129,19 @@ function parseCurrentMessageEvent(event: PiStreamEvent): StreamEvent | StreamEve
 
   const events: StreamEvent[] = [];
   const parts = Array.isArray(message.content) ? message.content : [];
+  for (const thought of extractThinkingContent(message.content)) {
+    events.push(createRuntimeProgressEvent({
+      text: thought,
+      provider: 'pi',
+      backend: 'cli',
+      kind: 'reasoning',
+      status: 'running',
+      source: 'provider',
+      native: {
+        sourceEvent: event.type,
+      },
+    }));
+  }
   let hasToolCall = false;
   for (const part of parts) {
     if (part.type === 'toolCall') {
@@ -117,6 +165,7 @@ function parseCurrentMessageEvent(event: PiStreamEvent): StreamEvent | StreamEve
     events.push({
       type: 'result',
       usage,
+      metadata: buildPiUsageMetadata(message),
     });
   }
 
@@ -191,6 +240,7 @@ export function parsePiStreamLine(line: string): StreamEvent | StreamEvent[] | n
     return {
       type: 'result',
       usage: usage ? extractUsage(msg) : undefined,
+      metadata: buildPiUsageMetadata(msg),
     };
   }
 
@@ -204,16 +254,43 @@ export function parsePiStreamLine(line: string): StreamEvent | StreamEvent[] | n
     if (assistantEvent?.type === 'text_delta' && assistantEvent.delta) {
       return { type: 'text', text: assistantEvent.delta };
     }
+    if (assistantEvent?.type === 'thinking' && assistantEvent.delta) {
+      return createRuntimeProgressEvent({
+        text: assistantEvent.delta,
+        provider: 'pi',
+        backend: 'cli',
+        kind: 'reasoning',
+        status: 'running',
+        source: 'provider',
+        native: {
+          sourceEvent: eventType,
+        },
+      });
+    }
     return null;
   }
 
   // Tool execution
   if (eventType === 'tool_execution_start') {
-    return {
-      type: 'tool_use',
-      toolName: event.toolName ?? 'unknown',
-      toolId: event.toolCallId,
-    };
+    return [
+      createRuntimeProgressEvent({
+        text: `Running tool: ${event.toolName ?? 'unknown'}`,
+        provider: 'pi',
+        backend: 'cli',
+        kind: 'tool',
+        status: 'running',
+        source: 'provider',
+        native: {
+          sourceEvent: eventType,
+          toolName: event.toolName,
+        },
+      }),
+      {
+        type: 'tool_use',
+        toolName: event.toolName ?? 'unknown',
+        toolId: event.toolCallId,
+      },
+    ];
   }
 
   if (eventType === 'tool_execution_end') {

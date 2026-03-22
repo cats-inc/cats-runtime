@@ -10,6 +10,7 @@ import {
 } from '../../core/providerCatalog.js';
 import type { HealthStatus } from '../../core/types.js';
 import type { AppContext } from '../app.js';
+import { getRuntimeMeteringService } from '../app.js';
 import {
   getFileBackedProviderDiscoveryInfo,
   getRuntimeEnvironment,
@@ -662,6 +663,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
   const listener = getRuntimeListenerConfig(ctx.config);
   const paths = getRuntimeResolvedPaths(ctx.config);
   const runtime = getRuntimeOperationalStatus(ctx.startup);
+  const metering = getRuntimeMeteringService(ctx).buildSnapshot(ctx.registry.list());
 
   return c.json({
     service: RUNTIME_SERVICE_NAME,
@@ -683,6 +685,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
         nodeVersion: process.version,
       },
     },
+    metering,
   });
 });
 
@@ -710,6 +713,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
   const env = getRuntimeEnvironment();
   const readiness = getRuntimeReadinessSnapshot(ctx.startup);
   const runtime = getRuntimeOperationalStatus(ctx.startup);
+  const metering = getRuntimeMeteringService(ctx).buildSummary(ctx.registry.list());
   const { catalog, providers } = await collectProviderDiagnostics(ctx, probeMode, env);
   const providerSummary = summarizeProviderDiagnostics(catalog, providers, {
     defaultTargetsOnly: true,
@@ -747,9 +751,10 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
           instance: provider.instance,
           target: provider.target,
           status: provider.availability.status,
-          summary: provider.availability.summary,
+            summary: provider.availability.summary,
         })),
     },
+    metering,
   });
 });
 

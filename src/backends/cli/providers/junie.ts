@@ -171,12 +171,12 @@ export class JunieProvider implements Provider {
         state.sessionId = event.sessionId;
       }
 
-      if (event.type === 'raw' && isJunieProgressEvent(event)) {
+      if (event.type === 'progress' && isJunieProgressEvent(event)) {
         const progressText = typeof event.text === 'string' ? event.text.trim() : '';
         if (progressText) {
           state.lastProgressText = progressText;
           if (
-            event.metadata?.progressKind !== 'status'
+            event.metadata?.kind !== 'status'
             || !isLowSignalJunieStatus(progressText)
           ) {
             state.lastMeaningfulProgressText = progressText;
@@ -481,11 +481,14 @@ interface JunieIndexEntry {
 }
 
 function isJunieProgressEvent(event: StreamEvent): boolean {
-  return event.metadata?.source === 'junie-progress';
+  return event.type === 'progress'
+    && typeof event.metadata?.native === 'object'
+    && event.metadata?.native !== null
+    && (event.metadata.native as Record<string, unknown>).source === 'junie-progress';
 }
 
 function buildProgressKey(event: StreamEvent): string {
-  return `${event.metadata?.progressKind ?? ''}:${event.text ?? ''}`;
+  return `${event.metadata?.kind ?? ''}:${event.text ?? ''}`;
 }
 
 function isLowSignalJunieStatus(text: string): boolean {
@@ -497,11 +500,17 @@ function mergeUsage(base: JunieUsageTotals, delta: JunieUsageTotals): JunieUsage
   return {
     inputTokens: base.inputTokens + delta.inputTokens,
     outputTokens: base.outputTokens + delta.outputTokens,
+    estimatedCost: (base.estimatedCost ?? 0) + (delta.estimatedCost ?? 0),
+    currency: base.currency ?? delta.currency,
   };
 }
 
 function normalizeUsage(usage: JunieUsageTotals): JunieUsageTotals | undefined {
-  if (usage.inputTokens <= 0 && usage.outputTokens <= 0) {
+  if (
+    usage.inputTokens <= 0
+    && usage.outputTokens <= 0
+    && (usage.estimatedCost ?? 0) <= 0
+  ) {
     return undefined;
   }
   return usage;

@@ -1,8 +1,11 @@
 import type { StreamEvent } from '../../../core/types.js';
+import { createRuntimeProgressEvent } from '../../../core/progress.js';
 
 export interface JunieUsageTotals {
   inputTokens: number;
   outputTokens: number;
+  estimatedCost?: number;
+  currency?: string;
 }
 
 /**
@@ -70,6 +73,7 @@ export function parseJunieStreamLine(line: string): StreamEvent | StreamEvent[] 
     type: 'result',
     sessionId: data.sessionId,
     usage,
+    metadata: usage ? { runtimeUsage: toJunieRuntimeUsage(usage) } : undefined,
   });
 
   return events.length === 1 ? events[0] : events;
@@ -187,11 +191,12 @@ export function parseJunieSessionEventLine(
       if (resultText) {
         events.push({ type: 'text', text: resultText });
       }
-      events.push({
-        type: 'result',
-        sessionId: options.sessionId,
-        usage: sanitizeUsage(options.usage),
-      });
+        events.push({
+          type: 'result',
+          sessionId: options.sessionId,
+          usage: sanitizeUsage(options.usage),
+          metadata: options.usage ? { runtimeUsage: toJunieRuntimeUsage(options.usage) } : undefined,
+        });
       return {
         events,
         terminal: true,
@@ -210,17 +215,21 @@ function buildJunieProgressEvent(
   state: string | undefined,
   agentEvent: Record<string, unknown>,
 ): StreamEvent {
-  return {
-    type: 'raw',
-    sessionId,
+  return createRuntimeProgressEvent({
     text,
-    raw: agentEvent,
-    metadata: {
+    sessionId,
+    provider: 'junie',
+    backend: 'cli',
+    kind: mapJunieProgressKind(progressKind),
+    status: 'running',
+    source: 'provider',
+    native: {
       source: 'junie-progress',
       progressKind,
       state,
     },
-  };
+    raw: agentEvent,
+  });
 }
 
 function readCurrentPlanStep(items: unknown): string | null {
@@ -241,6 +250,7 @@ function aggregateJunieUsage(entries: unknown): JunieUsageTotals | undefined {
 
   let inputTokens = 0;
   let outputTokens = 0;
+  let estimatedCost = 0;
 
   for (const entry of entries) {
     const usage = asRecord(entry);
@@ -249,17 +259,55 @@ function aggregateJunieUsage(entries: unknown): JunieUsageTotals | undefined {
     inputTokens += readNumber(usage.cacheInputTokens);
     inputTokens += readNumber(usage.cacheCreateTokens);
     outputTokens += readNumber(usage.outputTokens);
+    estimatedCost += readNumber(usage.cost);
   }
 
-  return sanitizeUsage({ inputTokens, outputTokens });
+  return sanitizeUsage({
+    inputTokens,
+    outputTokens,
+    estimatedCost: estimatedCost > 0 ? estimatedCost : undefined,
+  });
 }
 
 function sanitizeUsage(usage?: JunieUsageTotals): JunieUsageTotals | undefined {
   if (!usage) return undefined;
-  if (usage.inputTokens <= 0 && usage.outputTokens <= 0) {
+  if (
+    usage.inputTokens <= 0
+    && usage.outputTokens <= 0
+    && (usage.estimatedCost ?? 0) <= 0
+  ) {
     return undefined;
   }
   return usage;
+}
+
+function toJunieRuntimeUsage(usage: JunieUsageTotals): Record<string, unknown> {
+  return {
+    totalTokens: usage.inputTokens + usage.outputTokens,
+    ...(usage.estimatedCost !== undefined ? { estimatedCost: usage.estimatedCost } : {}),
+    ...(usage.estimatedCost !== undefined ? { currency: 'USD' } : {}),
+    sourceConfidence: 'aggregated',
+  };
+}
+
+function mapJunieProgressKind(progressKind: string) {
+  switch (progressKind) {
+    case 'status':
+      return 'status';
+    case 'plan':
+      return 'plan';
+    case 'thought':
+      return 'reasoning';
+    case 'tool':
+      return 'tool';
+    case 'terminal':
+      return 'command';
+    case 'file_changes':
+    case 'view_files':
+      return 'files';
+    default:
+      return 'status';
+  }
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

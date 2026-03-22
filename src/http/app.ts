@@ -17,6 +17,7 @@ import type { OpencodeNativeSessionService } from '../backends/cli/opencode/Open
 import type { WslDiscoveryStatusStore } from '../backends/cli/discovery/wslDiscovery.js';
 import type { ProviderModelCatalogService } from '../core/models/providerModelCatalog.js';
 import { RuntimeDeliveryService } from '../core/runtime/RuntimeDeliveryService.js';
+import { RuntimeMeteringService } from '../core/usage/RuntimeMeteringService.js';
 import { bearerAuth } from './auth.js';
 import { injectRuntimeDashboardHealthOverlay } from './dashboardHealthOverlay.js';
 import { discoveryRoutes } from './routes/discovery.js';
@@ -53,6 +54,7 @@ export interface AppContext {
   wslDiscoveryStatus?: WslDiscoveryStatusStore;
   providerModelCatalog: ProviderModelCatalogService;
   delivery?: RuntimeDeliveryService;
+  metering?: RuntimeMeteringService;
   resolveCursorNative?: (instanceId?: string) => CursorNativeSessionService;
   resolveGooseNative?: (instanceId?: string) => GooseNativeSessionService;
   resolveKiroNative?: (instanceId?: string) => KiroNativeSessionService;
@@ -65,6 +67,13 @@ export function getRuntimeSessionManager(ctx: AppContext): RuntimeSessionManager
     ctx.runtime = new RuntimeSessionManager(ctx.config, ctx.pool, ctx.apiBackend, ctx.agentBackend);
   }
   return ctx.runtime;
+}
+
+export function getRuntimeMeteringService(ctx: AppContext): RuntimeMeteringService {
+  if (!ctx.metering) {
+    ctx.metering = new RuntimeMeteringService(ctx.config.metering);
+  }
+  return ctx.metering;
 }
 
 export function getRuntimeDeliveryService(ctx: AppContext): RuntimeDeliveryService {

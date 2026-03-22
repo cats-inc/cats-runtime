@@ -138,6 +138,12 @@ export interface ProviderInstanceConfig {
   piInstructionsFile?: string;
 }
 
+export interface RuntimeMeteringConfig {
+  sessionTotalTokensWarn?: number;
+  sessionTotalTokensBlock?: number;
+  rateLimitCooldownMs?: number;
+}
+
 export interface CliRuntimeConfig {
   host: string;
   port: number;
@@ -177,6 +183,7 @@ export interface CliRuntimeConfig {
   spawnRetries: number;
   spawnTimeoutMs: number;
   sessionBaseDir: string;
+  metering?: RuntimeMeteringConfig;
   providerCommands: Record<ProviderName, ProviderCommandConfig>;
   providerDefaultInstances?: Partial<Record<ProviderName, string>>;
   providerInstances?: Partial<Record<ProviderName, Record<string, ProviderInstanceConfig>>>;
@@ -295,6 +302,10 @@ export function defaultSpawnTimeoutMs(): number {
   return 30000;
 }
 
+export function defaultRateLimitCooldownMs(): number {
+  return 60000;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): CliRuntimeConfig {
   const home = env.HOME || env.USERPROFILE || '';
   const apiKey = env.CATS_RUNTIME_API_KEY || '';
@@ -386,6 +397,21 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CliRuntimeConf
       'CATS_RUNTIME_SPAWN_TIMEOUT_MS',
     ),
     sessionBaseDir,
+    metering: {
+      sessionTotalTokensWarn: parseOptionalNonNegativeInt(
+        env.CATS_RUNTIME_GUARDRAIL_SESSION_TOTAL_TOKENS_WARN,
+        'CATS_RUNTIME_GUARDRAIL_SESSION_TOTAL_TOKENS_WARN',
+      ),
+      sessionTotalTokensBlock: parseOptionalNonNegativeInt(
+        env.CATS_RUNTIME_GUARDRAIL_SESSION_TOTAL_TOKENS_BLOCK,
+        'CATS_RUNTIME_GUARDRAIL_SESSION_TOTAL_TOKENS_BLOCK',
+      ),
+      rateLimitCooldownMs: parseNonNegativeInt(
+        env.CATS_RUNTIME_RATE_LIMIT_COOLDOWN_MS,
+        defaultRateLimitCooldownMs(),
+        'CATS_RUNTIME_RATE_LIMIT_COOLDOWN_MS',
+      ),
+    },
     providerCommands: configured.providerCommands,
     providerDefaultInstances: configured.providerDefaultInstances,
     providerInstances: configured.providerInstances,
@@ -1981,6 +2007,23 @@ function parseNonNegativeInt(
   const raw = value?.trim();
   if (!raw) {
     return fallback;
+  }
+
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`${envName} must be a non-negative integer, got '${value}'`);
+  }
+
+  return parsed;
+}
+
+function parseOptionalNonNegativeInt(
+  value: string | undefined,
+  envName: string,
+): number | undefined {
+  const raw = value?.trim();
+  if (!raw) {
+    return undefined;
   }
 
   const parsed = Number.parseInt(raw, 10);

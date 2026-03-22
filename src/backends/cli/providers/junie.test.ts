@@ -111,14 +111,20 @@ describe('JunieProvider', () => {
       }));
       expect(event).toEqual([
         { type: 'text', text: 'Done' },
-        {
+        expect.objectContaining({
           type: 'result',
           sessionId: 'session-1',
           usage: {
             inputTokens: 100,
             outputTokens: 50,
           },
-        },
+          metadata: {
+            runtimeUsage: {
+              totalTokens: 150,
+              sourceConfidence: 'aggregated',
+            },
+          },
+        }),
       ]);
     });
 

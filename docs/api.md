@@ -143,6 +143,11 @@ integrate against:
 - lifecycle event names
 - supported shutdown signals/reasons
 - listener and local-state path resolution
+- full `metering` state:
+  - `summary`: aggregate status/counts
+  - `usage`: totals plus `byProviderInstance` / `bySession`
+  - `incidents`: recent incident evidence plus active provider-instance guardrails
+  - `guardrails`: configured thresholds/cooldowns plus currently active outcomes
 
 `GET /diagnostics/providers` returns the runtime-owned provider availability
 surface for hosts and dashboards. The response includes:
@@ -157,6 +162,10 @@ surface for hosts and dashboards. The response includes:
 `GET /diagnostics/providers?probe=live` enables live probes where the current
 runtime backend supports them. Today that is primarily useful for selected
 agent-backed targets; API/local targets still report light diagnostics only.
+
+`GET /diagnostics/health` now also includes a compact top-level `metering`
+summary so hosts can poll one route for both provider readiness and
+execution-guardrail state.
 
 ### App-Managed Lifecycle Events
 
@@ -491,6 +500,42 @@ return `400` for malformed skill payloads or unknown/invalid runtime skill
 packages. When `skills.strict` is true and the target cannot honor the requested
 delivery contract, the runtime returns `409`.
 
+Before execution begins, the runtime now evaluates additive execution
+guardrails:
+
+- session token warning threshold
+- session token hard block threshold
+- provider-instance cooldown/block state derived from recent incidents
+
+When a warning threshold is crossed, the stream starts with a normalized
+`progress` event carrying `metadata.kind: "guardrail"` and the machine-readable
+`metadata.guardrail` payload. When execution is blocked before the turn starts,
+`POST /sessions/{id}/messages` returns:
+
+- `403` with `code: "guardrail_blocked"` for hard blocks
+- `429` with `code: "guardrail_cooldown"` for active cooldowns
+
+Example cooldown response:
+
+```json
+{
+  "error": "Execution cooled down because claude/main hit rate_limited.",
+  "code": "guardrail_cooldown",
+  "guardrail": {
+    "outcome": "cooldown",
+    "scope": "provider_instance",
+    "metric": "rate_limit_incidents",
+    "action": "cooldown",
+    "provider": "claude",
+    "instance": "main",
+    "backend": "api",
+    "observedAt": "2026-03-23T12:00:00.000Z",
+    "cooldownUntil": "2026-03-23T12:01:00.000Z",
+    "reason": "Execution cooled down because claude/main hit rate_limited."
+  }
+}
+```
+
 `POST /sessions/{id}/fork` accepts optional branching fields:
 
 - `mode`: `auto`, `native_fork`, or `context_transplant`
@@ -633,13 +678,13 @@ specific instance with `instance: "<backend>/<instance>"`, for example
 `GET /sessions` accepts `?instance=<instance-id>` to filter registry results.
 `?instance=default` matches each provider's configured default instance.
 
-For API-backed and local-model sessions, streamed message output may include
-`tool_use`, `tool_result`, and `progress` events in addition to `init`, `text`,
-`result`, and `error`.
+Streamed message output may include `tool_use`, `tool_result`, and `progress`
+events in addition to `init`, `text`, `result`, and `error`.
 
-`progress` is the first provider-agnostic mid-turn status contract for
-API/local transports. It is intended for upper layers that should not need to
-inspect provider-specific raw payloads just to surface runtime status. Example:
+`progress` is now the runtime-owned provider-agnostic mid-turn status contract
+across CLI and API/local transports. It is intended for upper layers that
+should not need to inspect provider-specific raw payloads just to surface
+runtime status. Example:
 
 ```json
 {
@@ -659,13 +704,31 @@ inspect provider-specific raw payloads just to surface runtime status. Example:
 }
 ```
 
+Shared progress metadata fields:
+
+- `metadata.kind`: stable runtime progress category
+- `metadata.status`: additive lifecycle/status hint
+- `metadata.source`: `runtime` or `provider`
+- `metadata.provider` / `metadata.backend` / `metadata.instance`: resolved target identity
+- `metadata.native`: optional provider-native detail
+- `metadata.incident`: optional machine-readable incident payload
+- `metadata.guardrail`: optional machine-readable guardrail outcome
+
 Current normalized progress kinds:
 
+- `status`: generic session/status checkpoints
+- `plan`: planning/milestone checkpoints
+- `reasoning`: provider-reported reasoning or thinking updates
+- `tool`: tool execution lifecycle
+- `command`: command execution lifecycle
+- `files`: file edit/read milestone
 - `provider_cache`: provider-native continuation or cache lifecycle such as
   OpenAI `previous_response_id` reuse/fallback or Gemini cached-content
   create/reuse/fallback
 - `model_state`: local-model lifecycle hints such as Ollama `keep_alive`
   requests
+- `guardrail`: runtime-owned warning/block/cooldown checkpoints
+- `session`: provider session lifecycle checkpoints
 
 Provider payload templates remain transport-specific, but the current additive
 keys that `cats-runtime` recognizes are:

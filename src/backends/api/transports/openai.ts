@@ -10,6 +10,7 @@ import type {
 } from '../types.js';
 import { readErrorBody } from '../../../core/streamParsers.js';
 import { applyPayloadTemplate } from '../payloadTemplate.js';
+import { ApiTransportError, readRetryAfterMs } from './error.js';
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
 
@@ -244,7 +245,11 @@ export class OpenAiTransport implements ApiTransportClient {
           });
           return sendRequest(false);
         }
-        throw new Error(`OpenAI request failed: ${errorBody}`);
+        throw new ApiTransportError('OpenAI', {
+          statusCode: response.status,
+          retryAfterMs: readRetryAfterMs(response.headers),
+          responseBody: errorBody,
+        });
       }
 
       if (usePreviousResponseId) {

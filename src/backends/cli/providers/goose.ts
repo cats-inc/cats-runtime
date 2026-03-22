@@ -63,7 +63,7 @@ export class GooseProvider implements Provider {
     return '';
   }
 
-  parseStreamLine(line: string): StreamEvent | null {
+  parseStreamLine(line: string): StreamEvent | StreamEvent[] | null {
     return parseGooseStreamLine(line);
   }
 }

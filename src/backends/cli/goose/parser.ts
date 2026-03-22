@@ -1,4 +1,5 @@
 import type { StreamEvent } from '../../../core/types.js';
+import { createRuntimeProgressEvent } from '../../../core/progress.js';
 
 /** Raw Goose stream-json event shape. */
 export interface GooseStreamEvent {
@@ -38,7 +39,7 @@ export interface GooseStreamEvent {
  *  - {"type":"message","message":{"role":"user","content":[{"type":"toolResponse",...}]}}
  *  - {"type":"complete","total_tokens":N}
  */
-export function parseGooseStreamLine(line: string): StreamEvent | null {
+export function parseGooseStreamLine(line: string): StreamEvent | StreamEvent[] | null {
   const trimmed = line.trim();
   if (!trimmed) return null;
 
@@ -54,6 +55,14 @@ export function parseGooseStreamLine(line: string): StreamEvent | null {
       type: 'result',
       usage: event.total_tokens != null
         ? { inputTokens: 0, outputTokens: event.total_tokens }
+        : undefined,
+      metadata: event.total_tokens != null
+        ? {
+            runtimeUsage: {
+              totalTokens: event.total_tokens,
+              sourceConfidence: 'reported',
+            },
+          }
         : undefined,
     };
   }
@@ -72,7 +81,21 @@ export function parseGooseStreamLine(line: string): StreamEvent | null {
     // Tool request
     if (role === 'assistant' && block.type === 'toolRequest') {
       const toolName = block.toolCall?.value?.name ?? 'unknown';
-      return { type: 'tool_use', toolName, toolId: block.id };
+      return [
+        createRuntimeProgressEvent({
+          text: `Running tool: ${toolName}`,
+          provider: 'goose',
+          backend: 'cli',
+          kind: 'tool',
+          status: 'running',
+          source: 'provider',
+          native: {
+            sourceEvent: event.type,
+            toolName,
+          },
+        }),
+        { type: 'tool_use', toolName, toolId: block.id },
+      ];
     }
 
     // Tool response
@@ -80,12 +103,25 @@ export function parseGooseStreamLine(line: string): StreamEvent | null {
       const resultTexts = block.toolResult?.value?.content
         ?.filter((c) => c.type === 'text' && c.text)
         .map((c) => c.text!) ?? [];
-      return {
-        type: 'tool_result',
-        toolId: block.id,
-        text: resultTexts.join(''),
-        isError: block.toolResult?.value?.isError ?? false,
-      };
+      return [
+        createRuntimeProgressEvent({
+          text: `Completed tool: ${block.id ?? 'unknown'}`,
+          provider: 'goose',
+          backend: 'cli',
+          kind: 'tool',
+          status: 'updated',
+          source: 'provider',
+          native: {
+            sourceEvent: event.type,
+          },
+        }),
+        {
+          type: 'tool_result',
+          toolId: block.id,
+          text: resultTexts.join(''),
+          isError: block.toolResult?.value?.isError ?? false,
+        },
+      ];
     }
 
     return null;
