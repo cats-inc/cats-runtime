@@ -191,12 +191,12 @@ export function parseJunieSessionEventLine(
       if (resultText) {
         events.push({ type: 'text', text: resultText });
       }
-        events.push({
-          type: 'result',
-          sessionId: options.sessionId,
-          usage: sanitizeUsage(options.usage),
-          metadata: options.usage ? { runtimeUsage: toJunieRuntimeUsage(options.usage) } : undefined,
-        });
+      events.push({
+        type: 'result',
+        sessionId: options.sessionId,
+        usage: sanitizeUsage(options.usage),
+        metadata: options.usage ? { runtimeUsage: toJunieRuntimeUsage(options.usage) } : undefined,
+      });
       return {
         events,
         terminal: true,

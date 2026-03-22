@@ -147,7 +147,7 @@ describe('CursorNativeSessionService', () => {
 
     await service.listAllSessions();
 
-    expect(executedCommand).toMatch(/python(?:\.exe)?$/i);
+    expect(executedCommand).toMatch(/python(?:3)?(?:\.exe)?$/i);
     expect(executedArgs[0]).toMatch(/script\.py$/);
     expect(executedShell).toBe(false);
     expect(capturedScript).toContain('mode=ro&immutable=1');

@@ -537,6 +537,11 @@ describe('agent backend integration', () => {
           },
           metadata: {
             provider: 'claude',
+            runtimeUsage: {
+              totalTokens: 17,
+              sourceConfidence: 'aggregated',
+              latencyMs: expect.any(Number),
+            },
           },
         },
       ]);

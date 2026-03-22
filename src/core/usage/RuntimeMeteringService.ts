@@ -20,6 +20,7 @@ import {
   isGuardrailActive,
   providerGuardrailKey,
 } from './incidentDetection.js';
+import { asRecord, readNumber, readString } from './utils.js';
 
 const MAX_USAGE_RECORDS = 1000;
 const MAX_INCIDENTS = 100;
@@ -546,27 +547,6 @@ function sumTokens(
   }
 
   return (inputTokens ?? 0) + (outputTokens ?? 0);
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return null;
-  }
-
-  return value as Record<string, unknown>;
-}
-
-function readString(value: unknown): string | undefined {
-  if (typeof value !== 'string') {
-    return undefined;
-  }
-
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
-}
-
-function readNumber(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
 function readConfidence(value: unknown): RuntimeUsageSourceConfidence | undefined {

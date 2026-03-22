@@ -71,7 +71,7 @@ export function getRuntimeSessionManager(ctx: AppContext): RuntimeSessionManager
 
 export function getRuntimeMeteringService(ctx: AppContext): RuntimeMeteringService {
   if (!ctx.metering) {
-    ctx.metering = new RuntimeMeteringService(ctx.config.metering);
+    throw new Error('RuntimeMeteringService is not initialized');
   }
   return ctx.metering;
 }
@@ -87,6 +87,7 @@ export function getRuntimeDeliveryService(ctx: AppContext): RuntimeDeliveryServi
 
 export function createRuntimeApp(ctx: AppContext) {
   ctx.runtime = getRuntimeSessionManager(ctx);
+  ctx.metering ??= new RuntimeMeteringService(ctx.config.metering);
   const app = new Hono<{ Variables: { ctx: AppContext } }>();
   const __dirname = dirname(fileURLToPath(import.meta.url));
 

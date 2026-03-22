@@ -39,7 +39,6 @@ import { AgentBackendManager } from './backends/agent/runtime/AgentBackendManage
 import { WorkerPool } from './backends/cli/pool/WorkerPool.js';
 import { RuntimeSessionManager } from './core/runtime/RuntimeSessionManager.js';
 import { ProviderModelCatalogService } from './core/models/providerModelCatalog.js';
-import { RuntimeMeteringService } from './core/usage/RuntimeMeteringService.js';
 import { createRuntimeApp, type AppContext } from './http/app.js';
 import type { ProviderName } from './backends/cli/providers/types.js';
 import type { ApiBackendOptions } from './backends/api/types.js';
@@ -770,7 +769,6 @@ export function createRuntimeServer(
     fetch: options.apiBackend?.fetch,
     env: options.apiBackend?.env,
   });
-  const metering = new RuntimeMeteringService(config.metering);
   const context: AppContext = {
     config,
     startup,
@@ -786,7 +784,6 @@ export function createRuntimeServer(
     opencodeNative,
     wslDiscoveryStatus,
     providerModelCatalog,
-    metering,
     resolveCursorNative,
     resolveGooseNative,
     resolveKiroNative,

@@ -751,7 +751,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
           instance: provider.instance,
           target: provider.target,
           status: provider.availability.status,
-            summary: provider.availability.summary,
+          summary: provider.availability.summary,
         })),
     },
     metering,

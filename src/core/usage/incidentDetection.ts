@@ -6,6 +6,7 @@ import type {
   RuntimeIncidentScope,
   RuntimeRateLimitIncident,
 } from '../types.js';
+import { asRecord, readPositiveNumber, readString } from './utils.js';
 
 interface DetectRuntimeIncidentInput {
   provider: string;
@@ -64,7 +65,7 @@ export function detectRuntimeIncident(
     providerSessionId: input.providerSessionId,
     workspaceKey: input.workspaceKey,
     classification,
-    scope: incidentHint?.scope ?? inferScope(classification),
+    scope: incidentHint?.scope ?? inferScope(),
     observedAt,
     retryAfterMs,
     retryAt: retryAfterMs ? new Date(Date.parse(observedAt) + retryAfterMs).toISOString() : undefined,
@@ -176,17 +177,9 @@ function inferClassification(
   return undefined;
 }
 
-function inferScope(
-  classification: RuntimeIncidentClassification,
-): RuntimeIncidentScope {
-  switch (classification) {
-    case 'rate_limited':
-    case 'quota_exhausted':
-    case 'cooldown_active':
-    case 'concurrency_limited':
-    default:
-      return 'provider_instance';
-  }
+function inferScope(): RuntimeIncidentScope {
+  // First slice only derives incidents at the provider-instance level.
+  return 'provider_instance';
 }
 
 function parseRetryAfterMs(errorText: string): number | undefined {
@@ -261,27 +254,4 @@ function readScope(value: unknown): RuntimeIncidentScope | undefined {
     default:
       return undefined;
   }
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return null;
-  }
-
-  return value as Record<string, unknown>;
-}
-
-function readString(value: unknown): string | undefined {
-  if (typeof value !== 'string') {
-    return undefined;
-  }
-
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
-}
-
-function readPositiveNumber(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0
-    ? value
-    : undefined;
 }

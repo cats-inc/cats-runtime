@@ -214,8 +214,16 @@ describe('PiProvider', () => {
         toolName: 'read',
       });
       const event = provider.parseStreamLine(line);
-      expect(event?.type).toBe('tool_use');
-      expect(event?.toolName).toBe('read');
+      expect(Array.isArray(event)).toBe(true);
+      expect(event).toEqual([
+        expect.objectContaining({
+          type: 'progress',
+        }),
+        expect.objectContaining({
+          type: 'tool_use',
+          toolName: 'read',
+        }),
+      ]);
     });
 
     it('returns null for empty lines', () => {
