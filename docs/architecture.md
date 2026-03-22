@@ -24,6 +24,15 @@ The architectural split is:
 - `backends`: execution implementations for CLI, API/local, and agent targets
 - `http`: inbound transport and route wiring
 
+Runtime-managed skills now sit at the shared runtime layer rather than inside
+product shells or ad-hoc prompt helpers. The runtime:
+
+- validates execution-ready `skills/<name>/SKILL.md` packages
+- resolves requested runtime skill ids into session-owned metadata
+- chooses a backend-aware delivery mode (`filesystem`, `instructions`, `none`)
+- persists requested/resolved/applied skill state into session inspection and
+  history surfaces
+
 ## Architecture Diagram
 
 ```text
@@ -58,6 +67,7 @@ src/
   core/
     config.ts
     models/
+    skills/
     dotenv.ts
     providerCatalog.ts
     runtime/
@@ -195,10 +205,23 @@ src/
 - Does not own product-level approval UX, workspace orchestration policy, or
   post-apply delegation behavior
 
+### `src/core/skills`
+
+- Discovers runtime-owned skill packages from `skills/`
+- Validates `SKILL.md` frontmatter and instruction bodies before runtime use
+- Resolves session-level requested skill ids into runtime-visible metadata
+- Chooses adapter-aware delivery modes per provider/backend
+- Materializes filesystem or instruction-file resources where the target needs
+  runtime-owned artifacts (for example Codex isolated workspaces or Pi prompt
+  files)
+- Keeps unsupported delivery explicit instead of silently pretending a backend
+  consumed the skill package
+
 ### `src/core`
 
 - Loads runtime-wide configuration
 - Hosts shared provider-target and provider-model catalog services
+- Hosts the runtime-managed skill catalog/delivery contract
 - Defines stable exported runtime types
 - Keeps shared utilities out of provider modules
 - Carries the shared turn/bootstrap/output contract used across CLI, API/local,
@@ -213,24 +236,26 @@ src/
 1. A caller sends a request to `cats-runtime`
 2. `src/http` authenticates and routes the request
 3. `RuntimeSessionManager` resolves the configured backend target for the chosen provider instance
-4. CLI targets flow into `WorkerPool`; API/local targets flow into `ApiBackendManager`; agent targets flow into `AgentBackendManager`
-5. Provider model-catalog reads resolve through the shared provider target and
+4. `src/core/skills` validates requested runtime skill ids and resolves a
+   delivery contract for the target backend
+5. CLI targets flow into `WorkerPool`; API/local targets flow into `ApiBackendManager`; agent targets flow into `AgentBackendManager`
+6. Provider model-catalog reads resolve through the shared provider target and
    model catalog services in `src/core`
-6. API/local turns may enter the shared local tool loop in `src/core/tools`,
+7. API/local turns may enter the shared local tool loop in `src/core/tools`,
    including workspace substrate preview/apply operations
-7. Agent turns use the shared `TurnInput` contract plus provider-managed session continuity where available
-8. Startup/readiness state is exposed over `GET /health`, while
+8. Agent turns use the shared `TurnInput` contract plus provider-managed session continuity where available
+9. Startup/readiness state is exposed over `GET /health`, while
    `GET /diagnostics/health`, `GET /diagnostics/runtime`, and
    `GET /diagnostics/providers` expose the runtime-owned host integration
    surface
-9. Optional machine-readable process output emits startup and shutdown
+10. Optional machine-readable process output emits startup and shutdown
    lifecycle events for app-managed local hosts
-10. Session branch inspection is available over session payload `branching`
+11. Session branch inspection is available over session payload `branching`
     metadata plus `GET /sessions/{id}/lineage`
-11. Delivery actions resolve through `RuntimeDeliveryService`, which inspects
+12. Delivery actions resolve through `RuntimeDeliveryService`, which inspects
     repo state, exports artifacts, normalizes preview surfaces, and executes
     Git mutations behind a stable machine-readable contract
-12. Stream events are returned directly to the caller
+13. Stream events are returned directly to the caller
 
 For WSL-backed Cursor/Kiro discovery:
 

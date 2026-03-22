@@ -64,7 +64,9 @@ Note: `allowed-tools` is experimental and may be ignored by some agents.
 
 | Skill | Description |
 |-------|-------------|
-| - | No skills defined yet. Add skills to the `skills/` directory. |
+| `companion` | Companion behavior for memory continuity, emotional awareness, and daily presence. |
+| `repo-maintainer` | Safe repository maintenance, narrow-scope edits, and test/doc discipline. |
+| `delivery-auditor` | Delivery-focused review of repo state, artifacts, previews, and release readiness. |
 
 ## Adding a New Skill
 

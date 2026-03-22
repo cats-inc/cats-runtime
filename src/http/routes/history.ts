@@ -2,6 +2,7 @@ import { createReadStream, readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { Hono } from 'hono';
 import type { AppContext } from '../app.js';
+import type { SessionInfo } from '../../backends/cli/pool/types.js';
 import {
   getAuggieSessions,
   getCursorNative,
@@ -35,6 +36,16 @@ interface HistoryMessage {
   timestamp?: string;
 }
 
+function buildHistoryMetadata(session: SessionInfo) {
+  return {
+    sessionKey: session.sessionKey,
+    outputDir: session.outputDir,
+    artifacts: session.artifacts || [],
+    context: session.context,
+    skills: session.skills,
+  };
+}
+
 /** GET /sessions/:id/history — load conversation history from .jsonl */
 historyRoutes.get('/sessions/:id/history', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
@@ -57,10 +68,7 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
       ).loadHistory(session.cwd, session.providerSessionId);
       return c.json({
         messages,
-        sessionKey: session.sessionKey,
-        outputDir: session.outputDir,
-        artifacts: session.artifacts || [],
-        context: session.context,
+        ...buildHistoryMetadata(session),
       });
     } catch (err) {
       return c.json({ error: `Failed to load Cursor history: ${err}` }, 500);
@@ -79,10 +87,7 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
       ).loadHistory(session.cwd, session.providerSessionId);
       return c.json({
         messages,
-        sessionKey: session.sessionKey,
-        outputDir: session.outputDir,
-        artifacts: session.artifacts || [],
-        context: session.context,
+        ...buildHistoryMetadata(session),
       });
     } catch (err) {
       return c.json({ error: `Failed to load Kiro history: ${err}` }, 500);
@@ -97,10 +102,7 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
       });
       return c.json({
         messages,
-        sessionKey: session.sessionKey,
-        outputDir: session.outputDir,
-        artifacts: session.artifacts || [],
-        context: session.context,
+        ...buildHistoryMetadata(session),
       });
     } catch (err) {
       return c.json({ error: `Failed to load Auggie history: ${err}` }, 500);
@@ -119,10 +121,7 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
       ).loadHistory(session.cwd, session.providerSessionId);
       return c.json({
         messages,
-        sessionKey: session.sessionKey,
-        outputDir: session.outputDir,
-        artifacts: session.artifacts || [],
-        context: session.context,
+        ...buildHistoryMetadata(session),
       });
     } catch (err) {
       return c.json({ error: `Failed to load OpenCode history: ${err}` }, 500);
@@ -138,10 +137,7 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
   if (paths.length === 0) {
     return c.json({
       messages: [],
-      sessionKey: session.sessionKey,
-      outputDir: session.outputDir,
-      artifacts: session.artifacts || [],
-      context: session.context,
+      ...buildHistoryMetadata(session),
     });
   }
 
@@ -252,9 +248,6 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
 
   return c.json({
     messages,
-    sessionKey: session.sessionKey,
-    outputDir: session.outputDir,
-    artifacts: session.artifacts || [],
-    context: session.context,
+    ...buildHistoryMetadata(session),
   });
 });

@@ -224,6 +224,7 @@ describe('Pi session management', () => {
     expect(historyResponse.status).toBe(200);
     await expect(historyResponse.json()).resolves.toEqual({
       artifacts: [],
+      skills: undefined,
       messages: [
         { role: 'user', text: 'hello', timestamp: expect.any(String) },
         { role: 'assistant', text: 'Recovered reply', timestamp: expect.any(String) },

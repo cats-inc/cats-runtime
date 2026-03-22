@@ -1,4 +1,5 @@
 import type { ExecutionHandle, StreamEvent, TurnInput } from '../../../core/types.js';
+import { mergeRuntimeSkillInstructions } from '../../../core/skills/catalog.js';
 import { LocalToolRuntime } from '../../../core/tools/LocalToolRuntime.js';
 import type { SessionRegistry } from '../../cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig, RemoteProviderInstanceConfig } from '../../cli/config.js';
@@ -252,11 +253,14 @@ export class ApiBackendManager {
     }
 
     const transcriptPath = initialSession.sourcePath || initialSession.providerSourcePath;
+    const composedInstructions = mergeRuntimeSkillInstructions(
+      turn.instructions,
+      turn.skills ?? initialSession.skills,
+    );
     const conversation = prependSystemPrompt(
       await loadTranscriptMessages(transcriptPath),
       remoteInstance.systemPrompt,
-      initialSession.instructions,
-      turn.instructions,
+      composedInstructions,
     );
     if (lastUserText(conversation) !== turn.message) {
       conversation.push({

@@ -313,6 +313,24 @@ Extended create example:
 }
 ```
 
+Skill-enabled create example:
+
+```json
+{
+  "provider": "codex",
+  "workspaceMode": "isolated",
+  "skills": {
+    "profileId": "boss_web_room",
+    "requestedSkills": ["companion", "repo-maintainer"],
+    "context": {
+      "catId": "cat-1",
+      "roomMode": "direct_cat_chat",
+      "transport": "web"
+    }
+  }
+}
+```
+
 Extended message example:
 
 ```json
@@ -402,11 +420,52 @@ such as `GET /sessions/{id}`, `GET /sessions/{id}/lineage`, and successful
 `POST /sessions/{id}/fork` responses still include full capability truth.
 Other `branching` query values are ignored.
 
+When runtime-managed skills are requested, session payloads also include a
+`skills` block with:
+
+- `requestedSkills`: explicit runtime skill ids requested by the caller
+- `resolvedSkills`: validated runtime catalog entries with source/fingerprint
+  metadata
+- `delivery`: the runtime-selected delivery contract
+  (`filesystem`, `instructions`, or `none`) plus downgrade/unsupported warnings
+- `appliedSkillIds`: the subset the runtime actually attached to the session
+
+Example shape:
+
+```json
+{
+  "skills": {
+    "requestedSkills": ["companion"],
+    "resolvedSkills": [
+      {
+        "id": "companion",
+        "title": "Companion",
+        "description": "Core companion behavior...",
+        "status": "resolved",
+        "source": "runtime_catalog",
+        "sourcePath": "/repo/cats-runtime/skills/companion",
+        "entryFile": "/repo/cats-runtime/skills/companion/SKILL.md",
+        "fingerprint": "sha256..."
+      }
+    ],
+    "delivery": {
+      "provider": "codex",
+      "backend": "cli",
+      "preferredMode": "filesystem",
+      "mode": "filesystem",
+      "status": "applied"
+    },
+    "appliedSkillIds": ["companion"]
+  }
+}
+```
+
 `POST /sessions` also accepts these optional fields:
 
 - `sessionKey`: caller-visible logical session identity for explicit reuse
 - `reusePolicy`: one of `create_new`, `prefer_existing`, or `require_existing`
 - `instructions`: session bootstrap instructions persisted by the runtime
+- `skills`: runtime-managed skill manifest with explicit `requestedSkills`
 - `context`: structured invocation metadata such as task/workspace hints
 - `outputDir`: output hint for reports, documents, or generated artifacts
 
@@ -416,16 +475,21 @@ try to attach to an existing session with the same provider target and
 and `agent` sessions. Matching `cli` sessions still use the existing
 `/sessions/{id}/resume` flow.
 
-`POST /sessions/{id}/messages` accepts optional `instructions`, `context`, and
-`outputDir` fields. These are persisted onto the logical session so later
-history/resume flows can observe the same bootstrap metadata.
+`POST /sessions/{id}/messages` accepts optional `instructions`, `skills`,
+`context`, and `outputDir` fields. These are persisted onto the logical session
+so later history/resume flows can observe the same bootstrap metadata.
+
+`POST /sessions`, `POST /sessions/{id}/messages`, and `POST /sessions/{id}/fork`
+return `400` for malformed skill payloads or unknown/invalid runtime skill
+packages. When `skills.strict` is true and the target cannot honor the requested
+delivery contract, the runtime returns `409`.
 
 `POST /sessions/{id}/fork` accepts optional branching fields:
 
 - `mode`: `auto`, `native_fork`, or `context_transplant`
 - `provider` / `instance`: child provider target override
 - `model`, `cwd`, `workspaceMode`, `permissionMode`, `allowedTools`
-- `instructions`, `context`, `outputDir`
+- `instructions`, `skills`, `context`, `outputDir`
 - `transplant`: curated handoff bundle for `context_transplant`
 
 `mode: "auto"` prefers `native_fork` when the child target is compatible with
@@ -680,6 +744,14 @@ such as:
   "context": {
     "source": "interactive",
     "taskId": "task-123"
+  },
+  "skills": {
+    "requestedSkills": ["companion"],
+    "appliedSkillIds": ["companion"],
+    "delivery": {
+      "mode": "instructions",
+      "status": "applied"
+    }
   }
 }
 ```

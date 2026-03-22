@@ -66,6 +66,22 @@ describe('PiProvider', () => {
       ]);
     });
 
+    it('prefers a session-scoped instructions file over the provider default', () => {
+      const configuredProvider = new PiProvider({
+        instructionsFile: '/tmp/pi-system-prompt.md',
+      });
+
+      const args = configuredProvider.buildSpawnArgs({
+        cwd: '/tmp',
+        instructionsFile: '/tmp/runtime-skill-prompt.md',
+      });
+
+      expect(args).toEqual([
+        '--mode', 'rpc',
+        '--append-system-prompt', '/tmp/runtime-skill-prompt.md',
+      ]);
+    });
+
     it('throws for invalid model format', () => {
       expect(() => provider.buildSpawnArgs({
         cwd: '/tmp',
@@ -80,6 +96,16 @@ describe('PiProvider', () => {
       const parsed = JSON.parse(msg.trim());
       expect(parsed.type).toBe('prompt');
       expect(parsed.message).toBe('Hello world');
+    });
+
+    it('prefixes explicit instructions into the prompt payload', () => {
+      const msg = provider.buildStdinMessage('Hello world', {
+        message: 'Hello world',
+        instructions: 'Stay terse.',
+      });
+      const parsed = JSON.parse(msg.trim());
+      expect(parsed.message).toContain('Instructions:\nStay terse.');
+      expect(parsed.message).toContain('User message:\nHello world');
     });
   });
 

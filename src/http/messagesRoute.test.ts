@@ -144,6 +144,7 @@ describe('message route transcript persistence', () => {
       expect(historyResponse.status).toBe(200);
       expect(await historyResponse.json()).toEqual({
         artifacts: [],
+        skills: undefined,
         messages: [
           { role: 'user', text: 'hello', timestamp: expect.any(String) },
           { role: 'assistant', text: 'Partial reply before failure.', timestamp: expect.any(String) },
@@ -184,6 +185,7 @@ describe('message route transcript persistence', () => {
       expect(historyResponse.status).toBe(200);
       expect(await historyResponse.json()).toEqual({
         artifacts: [],
+        skills: undefined,
         messages: [
           { role: 'user', text: 'hello', timestamp: expect.any(String) },
           { role: 'assistant', text: 'Partial reply before throw.', timestamp: expect.any(String) },
@@ -194,7 +196,7 @@ describe('message route transcript persistence', () => {
     }
   });
 
-  it('merges runtime-managed skill instructions into the turn input and session metadata', async () => {
+  it('persists runtime-managed skill metadata into the turn input and session metadata', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-message-route-'));
     const sessionBaseDir = join(root, 'sessions');
     mkdirSync(sessionBaseDir, { recursive: true });
@@ -239,8 +241,7 @@ describe('message route transcript persistence', () => {
       ]);
 
       expect(receivedInputs).toHaveLength(1);
-      expect(receivedInputs[0].instructions).toContain('Base room instruction.');
-      expect(receivedInputs[0].instructions).toContain('You are a companion');
+      expect(receivedInputs[0].instructions).toBe('Base room instruction.');
       expect(receivedInputs[0].skills).toEqual(expect.objectContaining({
         profileId: 'companion',
         requestedSkills: ['companion'],
@@ -250,7 +251,14 @@ describe('message route transcript persistence', () => {
           transport: 'web',
           labels: ['participant:cat'],
         },
-        appliedSkillIds: ['companion'],
+        delivery: expect.objectContaining({
+          mode: 'none',
+          status: 'unsupported',
+        }),
+        warnings: expect.arrayContaining([
+          expect.stringContaining("Provider 'claude' does not support runtime-managed skill delivery yet."),
+        ]),
+        appliedSkillIds: [],
       }));
 
       expect(registry.get(session.id)?.instructions).toBe('Base room instruction.');
@@ -263,7 +271,23 @@ describe('message route transcript persistence', () => {
           transport: 'web',
           labels: ['participant:cat'],
         },
-        appliedSkillIds: ['companion'],
+        delivery: expect.objectContaining({
+          mode: 'none',
+          status: 'unsupported',
+        }),
+        appliedSkillIds: [],
+      }));
+
+      const historyResponse = await app.request(`/sessions/${session.id}/history`);
+      expect(historyResponse.status).toBe(200);
+      await expect(historyResponse.json()).resolves.toEqual(expect.objectContaining({
+        skills: expect.objectContaining({
+          requestedSkills: ['companion'],
+          delivery: expect.objectContaining({
+            mode: 'none',
+            status: 'unsupported',
+          }),
+        }),
       }));
     } finally {
       rmSync(root, { recursive: true, force: true });

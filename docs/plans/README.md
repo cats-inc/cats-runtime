@@ -46,6 +46,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 
 | Plan | Title | Status | Related Spec |
 |------|-------|--------|--------------|
+| [PLAN-008](./PLAN-008-runtime-managed-skills-v0.md) | Runtime-Managed Skills v0 | Completed | [SPEC-005](../specs/SPEC-005-runtime-managed-skills-v0.md) |
 | [PLAN-007](./PLAN-007-stream-event-discriminated-union.md) | StreamEvent Discriminated Union Cleanup | Draft | N/A |
 | [PLAN-005](./PLAN-005-provider-model-catalog-and-discovery.md) | Provider Model Catalog and Discovery | Draft | [SPEC-004](../specs/SPEC-004-provider-model-catalog-and-discovery.md) |
 | [PLAN-006](./PLAN-006-standalone-and-app-managed-startup-contract.md) | Standalone and App-Managed Startup Contract | Draft | N/A |
@@ -65,4 +66,4 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 ---
 
 *See also: [specs/](../specs/) for feature specifications*
-*Last updated: 2026-03-21*
+*Last updated: 2026-03-23*

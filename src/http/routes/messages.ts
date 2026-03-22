@@ -8,9 +8,10 @@ import type { SessionRegistry } from '../../backends/cli/pool/SessionRegistry.js
 import type { CliRuntimeConfig } from '../../backends/cli/config.js';
 import type { StreamEvent } from '../../core/types.js';
 import {
-  mergeRuntimeSkillInstructions,
+  RuntimeSkillError,
   resolveRuntimeSkillManifest,
 } from '../../core/skills/catalog.js';
+import { resolveProviderTarget } from '../../core/providerCatalog.js';
 import {
   parseInvocationContext,
   parseOptionalString,
@@ -31,6 +32,7 @@ function appendUserTurnHistory(
     type: 'user',
     message: { content: turnInput.message },
     instructions: turnInput.instructions,
+    skills: turnInput.skills,
     context: turnInput.context,
     outputDir: turnInput.outputDir,
     timestamp: new Date().toISOString(),
@@ -54,6 +56,17 @@ function getOrCreateSourcePath(
 }
 
 export const messageRoutes = new Hono();
+
+function toRuntimeSkillErrorResponse(error: unknown) {
+  if (!(error instanceof RuntimeSkillError)) {
+    return undefined;
+  }
+
+  return {
+    status: error.code === 'strict_skill_delivery_unavailable' ? 409 as const : 400 as const,
+    body: { error: error.message },
+  };
+}
 
 function flushAssistantText(
   sourcePath: string | null,
@@ -141,6 +154,7 @@ function recoverPiUnknownSession(
       cwd: session.cwd,
       workspaceMode: session.workspaceMode,
       model: session.model,
+      instructionsFile: session.skills?.delivery.instructions?.filePath,
       permissionMode: session.permissionMode,
       allowedTools: session.allowedTools,
     }, session.providerInstanceId, 'cli');
@@ -197,12 +211,40 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
   }
 
   const instructions = parseOptionalString(body.instructions);
-  const skills = resolveRuntimeSkillManifest(parseRuntimeSkillManifest(body.skills)) ?? session.skills;
+  const parsedSkills = parseRuntimeSkillManifest(body.skills);
+  if (parsedSkills.error) {
+    return c.json({ error: parsedSkills.error }, 400);
+  }
+  let skills = session.skills;
+  try {
+    const providerTarget = resolveProviderTarget(
+      ctx.config,
+      session.providerName,
+      session.providerBackend && session.providerInstanceId
+        ? `${session.providerBackend}/${session.providerInstanceId}`
+        : session.providerInstanceId,
+    );
+    skills = resolveRuntimeSkillManifest(parsedSkills.manifest, {
+      sessionId: session.id,
+      providerName: providerTarget.providerName,
+      providerBackend: providerTarget.backend,
+      cwd: session.cwd,
+      workspaceMode: session.workspaceMode,
+      sessionBaseDir: ctx.config.sessionBaseDir,
+      baseInstructionsFile: providerTarget.cliInstance?.piInstructionsFile,
+    }) ?? session.skills;
+  } catch (error) {
+    const runtimeSkillError = toRuntimeSkillErrorResponse(error);
+    if (runtimeSkillError) {
+      return c.json(runtimeSkillError.body, runtimeSkillError.status);
+    }
+    throw error;
+  }
   const context = parseInvocationContext(body.context);
   const outputDir = parseOptionalString(body.outputDir);
   const turnInput: TurnInput = {
     message,
-    instructions: mergeRuntimeSkillInstructions(instructions ?? session.instructions, skills),
+    instructions: instructions ?? session.instructions,
     skills,
     context: context ?? session.context,
     outputDir: outputDir ?? session.outputDir,

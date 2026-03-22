@@ -4,7 +4,9 @@ import type {
   PermissionMode,
   ProviderSpawnOptions,
   StreamEvent,
+  TurnInput,
 } from './types.js';
+import { mergeRuntimeSkillInstructions } from '../../../core/skills/catalog.js';
 
 interface JsonRpcRequest {
   jsonrpc: '2.0';
@@ -85,10 +87,15 @@ export class CodexProvider implements Provider {
     return args;
   }
 
-  buildStdinMessage(content: string): string {
+  buildStdinMessage(content: string, turn?: TurnInput): string {
     if (this.state === 'failed') {
       throw new Error('Codex session bootstrap failed earlier. Close and recreate the session.');
     }
+
+    const compiledInstructions = mergeRuntimeSkillInstructions(turn?.instructions, turn?.skills);
+    const effectiveContent = compiledInstructions
+      ? ['Instructions:', compiledInstructions, '', 'User message:', content].join('\n')
+      : content;
 
     if (this.state === 'uninitialized') {
       if (!this._spawnOpts) {
@@ -112,18 +119,18 @@ export class CodexProvider implements Provider {
       // We need the threadId for turn/start, but since we're pipelining,
       // we'll send turn/start after receiving thread/start response.
       // Store the pending message for later.
-      this._pendingMessage = content;
+      this._pendingMessage = effectiveContent;
       return lines.join('\n') + '\n';
     }
 
     if (this.state === 'initializing') {
       // Still waiting for init — queue message
-      this._pendingMessage = content;
+      this._pendingMessage = effectiveContent;
       return '';
     }
 
     // Ready state — send turn/start directly
-    return this.makeTurnStart(content) + '\n';
+    return this.makeTurnStart(effectiveContent) + '\n';
   }
 
   private makeTurnStart(content: string): string {

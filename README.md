@@ -17,6 +17,8 @@ Current capabilities:
 - external session discovery for supported local tools
 - file-based provider topology with separated `routing` / `backends` sections
 - dashboard-side provider instance selection for session creation
+- runtime-managed skills with session-level requested/resolved/applied metadata
+- backend-aware skill delivery modes (`filesystem`, `instructions`, `none`)
 - strict `default` instance aliasing and host-path validation for file-backed providers
 - provider-specific helpers such as Kiro model inspection
 
@@ -31,6 +33,7 @@ Current capabilities:
 - [x] Add file-based provider instances for multi-environment CLI accounts
 - [x] Resolve accepted review follow-ups for provider-instance hardening
 - [x] Add `backends/api` for pay-as-you-go API keys and Ollama
+- [x] Land runtime-managed skills v0 session and delivery contract
 
 ## Design Rules
 

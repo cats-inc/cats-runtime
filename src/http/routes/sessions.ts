@@ -57,7 +57,10 @@ import {
   resolveSessionBranchDecision,
   summarizeContextTransplant,
 } from '../../core/runtime/sessionBranching.js';
-import { resolveRuntimeSkillManifest } from '../../core/skills/catalog.js';
+import {
+  RuntimeSkillError,
+  resolveRuntimeSkillManifest,
+} from '../../core/skills/catalog.js';
 import {
   parseInvocationContext,
   parseOptionalString,
@@ -336,6 +339,42 @@ function resolveCliProviderInstance(target: ProviderTargetDescriptor): ProviderI
   }
 
   return target.cliInstance;
+}
+
+function toRuntimeSkillErrorResponse(error: unknown) {
+  if (!(error instanceof RuntimeSkillError)) {
+    return undefined;
+  }
+
+  return {
+    status: error.code === 'strict_skill_delivery_unavailable' ? 409 as const : 400 as const,
+    body: { error: error.message },
+  };
+}
+
+function resolveSkillStateForTarget(
+  ctx: AppContext,
+  manifest: ReturnType<typeof parseRuntimeSkillManifest>['manifest'],
+  options: {
+    sessionId: string;
+    providerTarget: ProviderTargetDescriptor;
+    cwd: string;
+    workspaceMode?: WorkspaceMode;
+  },
+) {
+  if (!manifest) {
+    return undefined;
+  }
+
+  return resolveRuntimeSkillManifest(manifest, {
+    sessionId: options.sessionId,
+    providerName: options.providerTarget.providerName,
+    providerBackend: options.providerTarget.backend,
+    cwd: options.cwd,
+    workspaceMode: options.workspaceMode,
+    sessionBaseDir: ctx.config.sessionBaseDir,
+    baseInstructionsFile: options.providerTarget.cliInstance?.piInstructionsFile,
+  });
 }
 
 function sessionMatchesInstanceFilter(
@@ -764,7 +803,10 @@ sessionRoutes.post('/sessions', async (c) => {
 
   const sessionKey = requestedSessionKey || randomUUID();
   const instructions = parseOptionalString(body.instructions);
-  const skills = resolveRuntimeSkillManifest(parseRuntimeSkillManifest(body.skills));
+  const parsedSkills = parseRuntimeSkillManifest(body.skills);
+  if (parsedSkills.error) {
+    return c.json({ error: parsedSkills.error }, 400);
+  }
   const context = parseInvocationContext(body.context);
   const outputDir = parseOptionalString(body.outputDir);
 
@@ -787,11 +829,27 @@ sessionRoutes.post('/sessions', async (c) => {
         }, 409);
       }
 
+      let skills = existing.skills;
+      try {
+        skills = resolveSkillStateForTarget(ctx, parsedSkills.manifest, {
+          sessionId: existing.id,
+          providerTarget,
+          cwd: existing.cwd,
+          workspaceMode: existing.workspaceMode,
+        }) ?? existing.skills;
+      } catch (error) {
+        const runtimeSkillError = toRuntimeSkillErrorResponse(error);
+        if (runtimeSkillError) {
+          return c.json(runtimeSkillError.body, runtimeSkillError.status);
+        }
+        throw error;
+      }
+
       ctx.registry.updateSessionMetadata(existing.id, {
         sessionKey,
         reusePolicy,
         instructions: instructions ?? existing.instructions,
-        skills: skills ?? existing.skills,
+        skills,
         context: context ?? existing.context,
         outputDir: outputDir ?? existing.outputDir,
       });
@@ -810,6 +868,7 @@ sessionRoutes.post('/sessions', async (c) => {
             cwd: existing.cwd,
             workspaceMode: existing.workspaceMode,
             model: existing.model,
+            instructionsFile: existing.skills?.delivery.instructions?.filePath,
             permissionMode: existing.permissionMode,
             allowedTools: existing.allowedTools,
           }, existing.providerInstanceId, existing.providerBackend);
@@ -836,6 +895,25 @@ sessionRoutes.post('/sessions', async (c) => {
     });
   } catch (err) {
     return c.json({ error: `${err}` }, 400);
+  }
+
+  let skills;
+  try {
+    skills = resolveSkillStateForTarget(ctx, parsedSkills.manifest, {
+      sessionId,
+      providerTarget,
+      cwd: resolved.cwd,
+      workspaceMode: resolved.workspaceMode,
+    });
+  } catch (error) {
+    const runtimeSkillError = toRuntimeSkillErrorResponse(error);
+    if (runtimeSkillError) {
+      if (resolved.workspaceMode === 'isolated') {
+        cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, sessionId);
+      }
+      return c.json(runtimeSkillError.body, runtimeSkillError.status);
+    }
+    throw error;
   }
 
   if (providerName === 'cursor' && providerTarget.backend === 'cli') {
@@ -878,6 +956,7 @@ sessionRoutes.post('/sessions', async (c) => {
         workspaceMode: resolved.workspaceMode,
         model: body.model || native.model,
         resumeSessionId: native.providerSessionId,
+        instructionsFile: skills?.delivery.instructions?.filePath,
         permissionMode: resolved.permissionMode,
         allowedTools: body.allowedTools,
       }, providerInstance!.id, 'cli');
@@ -943,6 +1022,7 @@ sessionRoutes.post('/sessions', async (c) => {
         workspaceMode: resolved.workspaceMode,
         model: body.model,
         resumeSessionId: native.providerSessionId,
+        instructionsFile: skills?.delivery.instructions?.filePath,
         permissionMode: resolved.permissionMode,
         allowedTools: body.allowedTools,
       }, providerInstance!.id, 'cli');
@@ -1009,6 +1089,7 @@ sessionRoutes.post('/sessions', async (c) => {
       cwd: resolved.cwd,
       workspaceMode: resolved.workspaceMode,
       model: body.model,
+      instructionsFile: skills?.delivery.instructions?.filePath,
       permissionMode: resolved.permissionMode,
       allowedTools: body.allowedTools,
     }, providerTarget.instanceId, providerTarget.backend);
@@ -1278,6 +1359,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         cwd: session.cwd,
         workspaceMode: session.workspaceMode,
         model: session.model,
+        instructionsFile: session.skills?.delivery.instructions?.filePath,
         permissionMode: session.permissionMode,
         allowedTools: session.allowedTools,
       }, session.providerInstanceId, session.providerBackend);
@@ -1300,6 +1382,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         workspaceMode: session.workspaceMode,
         model: session.model,
         resumeSessionId: session.providerSessionId,
+        instructionsFile: session.skills?.delivery.instructions?.filePath,
         permissionMode: session.permissionMode,
         allowedTools: session.allowedTools,
       }, session.providerInstanceId, 'cli');
@@ -1333,6 +1416,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         workspaceMode: session.workspaceMode,
         model: session.model,
         resumeSessionId: session.providerSessionId,
+        instructionsFile: session.skills?.delivery.instructions?.filePath,
         permissionMode: session.permissionMode,
         allowedTools: session.allowedTools,
       }, session.providerInstanceId, 'cli');
@@ -1371,6 +1455,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         workspaceMode: session.workspaceMode,
         model: session.model,
         resumeSourcePath: resumeTarget.runtimeSourcePath,
+        instructionsFile: session.skills?.delivery.instructions?.filePath,
         permissionMode,
         allowedTools: (body as { allowedTools?: string[] }).allowedTools ?? session.allowedTools,
       }, session.providerInstanceId, 'cli');
@@ -1413,6 +1498,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
       workspaceMode: session.workspaceMode,
       model: session.model,
       resumeSessionId: session.providerSessionId,
+      instructionsFile: session.skills?.delivery.instructions?.filePath,
       permissionMode,
       allowedTools: (body as { allowedTools?: string[] }).allowedTools ?? session.allowedTools,
     }, session.providerInstanceId, session.providerBackend);
@@ -1438,6 +1524,10 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
   const rawBody = await c.req.json<Record<string, unknown>>().catch(
     () => ({} as Record<string, unknown>),
   );
+  const parsedSkills = parseRuntimeSkillManifest(rawBody.skills);
+  if (parsedSkills.error) {
+    return c.json({ error: parsedSkills.error }, 400);
+  }
   const body: SessionBranchRequest = {
     mode: rawBody.mode === 'native_fork' || rawBody.mode === 'context_transplant' || rawBody.mode === 'auto'
       ? rawBody.mode
@@ -1461,7 +1551,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
       : undefined,
     group: parseOptionalString(rawBody.group),
     instructions: parseOptionalString(rawBody.instructions),
-    skills: parseRuntimeSkillManifest(rawBody.skills),
+    skills: parsedSkills.manifest,
     context: parseInvocationContext(rawBody.context),
     outputDir: parseOptionalString(rawBody.outputDir),
     transplant: parseContextTransplant(rawBody.transplant),
@@ -1581,7 +1671,24 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     childLineage,
     usedContextTransplant,
   );
-  const childSkills = resolveRuntimeSkillManifest(body.skills) ?? session.skills;
+  let childSkills = session.skills;
+  try {
+    childSkills = resolveSkillStateForTarget(ctx, body.skills, {
+      sessionId: forkId,
+      providerTarget: childTarget,
+      cwd: forkCwd,
+      workspaceMode: forkWorkspaceMode,
+    }) ?? session.skills;
+  } catch (error) {
+    const runtimeSkillError = toRuntimeSkillErrorResponse(error);
+    if (runtimeSkillError) {
+      if (forkWorkspaceMode === 'isolated') {
+        cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, forkId);
+      }
+      return c.json(runtimeSkillError.body, runtimeSkillError.status);
+    }
+    throw error;
+  }
 
   const forked = ctx.registry.create({
     id: forkId,
@@ -1617,6 +1724,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
       cwd: forkCwd,
       workspaceMode: forkWorkspaceMode,
       model: body.model ?? session.model,
+      instructionsFile: childSkills?.delivery.instructions?.filePath,
       ...(branchMode === 'native_fork'
         ? {
             resumeSessionId: session.providerSessionId,

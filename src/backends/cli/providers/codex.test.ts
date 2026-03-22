@@ -138,6 +138,28 @@ describe('CodexProvider', () => {
       expect(parsed.params.threadId).toBe('thread-abc');
       expect(parsed.params.approvalPolicy).toBe('never');
     });
+
+    it('prefixes instruction overlays into the Codex turn input when provided', () => {
+      provider.buildSpawnArgs(baseOpts);
+      provider.buildStdinMessage('First');
+      provider.parseStreamLine(JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        result: { threadId: 'thread-abc' },
+      }));
+      provider.getPendingTurnStart();
+
+      const msg = provider.buildStdinMessage('Second message', {
+        message: 'Second message',
+        instructions: 'Stay terse.',
+      });
+      const parsed = JSON.parse(msg.trim());
+      expect(parsed.params.input).toEqual([{
+        type: 'text',
+        text: expect.stringContaining('Instructions:\nStay terse.'),
+      }]);
+      expect(parsed.params.input[0].text).toContain('User message:\nSecond message');
+    });
   });
 
   describe('getPendingTurnStart', () => {

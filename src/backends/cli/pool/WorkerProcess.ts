@@ -269,7 +269,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
           await this.runProviderBeforeTurn();
           this.provider.prepareEphemeralTurn?.(turn.message);
           this.spawnProcess();
-          const msg = this.provider.buildStdinMessage(turn.message);
+          const msg = this.provider.buildStdinMessage(turn.message, turn);
           if (msg) this.process!.stdin!.write(msg);
           this.process!.stdin!.end();
 
@@ -316,7 +316,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
         }
       } else {
         await this.runProviderBeforeTurn();
-      const msg = this.provider.buildStdinMessage(turn.message);
+      const msg = this.provider.buildStdinMessage(turn.message, turn);
         this.process!.stdin!.write(msg);
       }
 

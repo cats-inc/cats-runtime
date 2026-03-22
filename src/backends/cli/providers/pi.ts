@@ -4,6 +4,7 @@ import type {
   ProviderCapabilities,
   ProviderSpawnOptions,
   StreamEvent,
+  TurnInput,
 } from './types.js';
 
 interface PiProviderOptions {
@@ -30,15 +31,19 @@ export class PiProvider implements Provider {
       args.push('--session', resumeSourcePath);
     }
 
-    if (this.options.instructionsFile) {
-      args.push('--append-system-prompt', this.options.instructionsFile);
+    const instructionsFile = opts.instructionsFile ?? this.options.instructionsFile;
+    if (instructionsFile) {
+      args.push('--append-system-prompt', instructionsFile);
     }
 
     return args;
   }
 
-  buildStdinMessage(content: string): string {
-    return JSON.stringify({ type: 'prompt', message: content }) + '\n';
+  buildStdinMessage(content: string, turn?: TurnInput): string {
+    const prompt = turn?.instructions
+      ? ['Instructions:', turn.instructions, '', 'User message:', content].join('\n')
+      : content;
+    return JSON.stringify({ type: 'prompt', message: prompt }) + '\n';
   }
 
   parseStreamLine(line: string): StreamEvent | StreamEvent[] | null {

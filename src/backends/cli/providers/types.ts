@@ -3,6 +3,7 @@ import type {
   ProviderSpawnOptions,
   ProviderTurnOptions,
   StreamEvent,
+  TurnInput,
 } from '../../../core/types.js';
 
 export type {
@@ -12,6 +13,7 @@ export type {
   ProviderSpawnOptions,
   ProviderTurnOptions,
   StreamEvent,
+  TurnInput,
 } from '../../../core/types.js';
 
 export const KNOWN_PROVIDERS = ['claude', 'codex', 'gemini', 'copilot', 'cursor', 'kiro', 'auggie', 'opencode', 'pi', 'goose', 'junie'] as const;
@@ -47,7 +49,7 @@ export interface Provider {
   capabilities: ProviderCapabilities;
   ephemeral?: boolean;
   buildSpawnArgs(opts: ProviderSpawnOptions): string[];
-  buildStdinMessage(content: string): string;
+  buildStdinMessage(content: string, turn?: TurnInput): string;
   parseStreamLine(line: string): StreamEvent | StreamEvent[] | null;
   buildAutoResponse?(line: string): string | null;
   getPendingTurnStart?(): string | null;

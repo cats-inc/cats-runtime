@@ -93,8 +93,9 @@ export type RuntimePreviewSurfaceRenderHint =
   | 'none';
 export type SessionBranchMode = 'native_fork' | 'context_transplant';
 export type SessionBranchPreference = 'auto' | SessionBranchMode;
-export type RuntimeSkillDeliveryMode = 'instructions' | 'none';
-export type RuntimeSkillResolutionStatus = 'resolved' | 'missing';
+export type RuntimeSkillDeliveryMode = 'filesystem' | 'instructions' | 'none';
+export type RuntimeSkillResolutionStatus = 'resolved';
+export type RuntimeSkillDeliveryStatus = 'applied' | 'degraded' | 'unsupported';
 
 export interface WorkspaceSubstrateHints {
   projectType?: 'single-project' | 'monorepo';
@@ -576,11 +577,33 @@ export interface RuntimeSkillManifest {
 export interface ResolvedRuntimeSkill {
   id: string;
   title: string;
+  description: string;
   status: RuntimeSkillResolutionStatus;
-  deliveryMode: RuntimeSkillDeliveryMode;
   source: 'runtime_catalog';
-  skillPath?: string;
-  warning?: string;
+  sourcePath: string;
+  entryFile: string;
+  fingerprint: string;
+}
+
+export interface RuntimeSkillFilesystemMaterialization {
+  rootPath: string;
+  entryPaths: string[];
+}
+
+export interface RuntimeSkillInstructionMaterialization {
+  filePath?: string;
+  byteLength: number;
+}
+
+export interface RuntimeSkillDeliveryState {
+  provider: string;
+  backend: ProviderBackend;
+  preferredMode: RuntimeSkillDeliveryMode;
+  mode: RuntimeSkillDeliveryMode;
+  status: RuntimeSkillDeliveryStatus;
+  warnings: string[];
+  filesystem?: RuntimeSkillFilesystemMaterialization;
+  instructions?: RuntimeSkillInstructionMaterialization;
 }
 
 export interface SessionSkillState {
@@ -589,6 +612,7 @@ export interface SessionSkillState {
   context?: RuntimeSkillManifestContext;
   resolvedSkills: ResolvedRuntimeSkill[];
   strict: boolean;
+  delivery: RuntimeSkillDeliveryState;
   warnings: string[];
   appliedSkillIds: string[];
   updatedAt: string;
@@ -699,6 +723,7 @@ export interface ProviderSpawnOptions {
   forkSession?: boolean;
   permissionMode?: PermissionMode;
   allowedTools?: string[];
+  instructionsFile?: string;
 }
 
 export interface ProviderTurnOptions extends ProviderSpawnOptions {

@@ -10,6 +10,7 @@
 | API Backends | In Progress | `src/backends/api` now runs Claude, Codex/OpenAI, Gemini, and Ollama with runtime-managed sessions, provider-native continuation/caching optimizations, first-slice provider-agnostic `progress` events, a shared local tool loop with patch/file/search/shell support, and runtime-owned health/diagnostics summaries; deeper live probes and broader tool/model discovery remain |
 | Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, and an Agent SDK bridge as the second validation target |
 | HTTP API | Completed | Health, sessions, delivery audit/export/repo routes, messages, history, observe, provider management, and session branch-lineage inspection routes are served directly from `cats-runtime` |
+| Runtime Skills | Completed | `skills/` is now a runtime-owned execution catalog with validation, session-level requested/resolved/applied metadata, backend-aware delivery modes, and first-slice Codex/Pi verification |
 | Dashboard | Completed | The embedded dashboard UI is served from `GET /` and now surfaces runtime/provider health from runtime-owned diagnostics contracts |
 | Workspace Substrate | Completed | `audit-workspace`, `init-workspace`, and `update-workspace` now return explicit preview/apply contracts, machine-readable action plans/diff stats, approval-friendly payloads, and `*.bootstrap` review-copy behavior without owning product policy |
 | Delivery Primitives | Completed | Runtime-owned delivery audit, artifact publish/export, repo status, commit, push, and normalized preview-surface metadata are now available over both HTTP routes and local tools |
@@ -288,6 +289,42 @@ product policy.
 - [ ] No broad live health probes for every API/local transport yet; the first slice is still mostly light checks plus adapter-supported live probes
 - [ ] No atomic multi-file rollback for shared local-tool writes or patch application yet
 
+### WP-9: Runtime-Managed Skills v0
+
+**Status**: Completed
+**Assigned**: Codex
+**Priority**: P0
+
+#### Goal
+
+Turn repo-local `skills/` packages into a real session/runtime contract with
+runtime-owned validation, resolution, delivery, and observability, without
+turning `cats-runtime` into a general plugin platform.
+
+#### Delivered
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Add implementation plan for runtime-managed skills v0 | [x] | `docs/plans/PLAN-008-runtime-managed-skills-v0.md` records phases, targets, and watchpoints |
+| Replace the hard-coded skill catalog with runtime discovery/validation | [x] | `src/core/skills/catalog.ts` now validates `skills/<name>/SKILL.md` frontmatter and instruction bodies |
+| Freeze session-level requested/resolved/applied skill state | [x] | Session payloads now persist resolved skill metadata, delivery state, warnings, and applied ids |
+| Support delivery modes `filesystem`, `instructions`, and `none` | [x] | Codex isolated sessions use filesystem delivery, Pi/API/agent use instructions, unsupported targets stay explicit with `none` |
+| Verify CLI-first targets | [x] | Codex filesystem delivery and Pi instruction-file delivery are both covered by automated tests |
+| Surface runtime skill state in inspection/history routes | [x] | `GET /sessions`, `GET /sessions/{id}`, and `GET /sessions/{id}/history` now expose runtime skill metadata |
+| Return explicit errors for malformed/unknown skills | [x] | Session create/message/fork flows now reject malformed payloads and invalid skill packages with client-safe errors |
+| Add reference skills and update docs | [x] | `companion`, `repo-maintainer`, and `delivery-auditor` now provide runtime-verifiable catalog entries |
+
+#### Deferred Boundaries
+
+- [ ] No standalone `GET /skills` public catalog route yet; v0 stays session-contract first
+- [ ] No runtime-owned `skillProfile` mapping layer yet; product capability/profile resolution stays outside `cats-runtime`
+- [ ] No repo-native skill merge or conflict-resolution system yet beyond safe fallback from Codex filesystem delivery to instructions
+
+#### Verification
+
+- [x] `npm run build`
+- [x] `npx vitest run src/core/skills/catalog.test.ts src/http/messagesRoute.test.ts src/http/runtimeSkills.test.ts src/backends/cli/providers/pi.test.ts src/backends/cli/providers/codex.test.ts src/backends/cli/pool/SessionRegistry.test.ts src/http/piManagement.test.ts --pool=threads --poolOptions.threads.singleThread`
+
 ---
 
-*Last updated: 2026-03-22*
+*Last updated: 2026-03-23*

@@ -1,4 +1,5 @@
 import type { ExecutionHandle, StreamEvent, TurnInput } from '../../../core/types.js';
+import { mergeRuntimeSkillInstructions } from '../../../core/skills/catalog.js';
 import type { SessionRegistry } from '../../cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig, RemoteProviderInstanceConfig } from '../../cli/config.js';
 import type { ProviderTargetDescriptor } from '../../../core/providerCatalog.js';
@@ -138,6 +139,10 @@ export class AgentBackendManager {
     const adapter = this.buildAdapter(instance);
     const sessionKey = session.sessionKey || sessionId;
     const model = session.model || instance.model;
+    const composedInstructions = mergeRuntimeSkillInstructions(
+      turn.instructions,
+      turn.skills ?? session.skills,
+    );
 
     for await (const event of adapter.invoke({
       sessionId,
@@ -146,7 +151,7 @@ export class AgentBackendManager {
       model,
       turn: {
         ...turn,
-        instructions: turn.instructions,
+        instructions: composedInstructions,
         context: turn.context || session.context,
         outputDir: turn.outputDir || session.outputDir,
       },

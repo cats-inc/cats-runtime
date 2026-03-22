@@ -4,6 +4,11 @@ import type {
   SessionInvocationContext,
 } from '../core/types.js';
 
+export interface ParsedRuntimeSkillManifest {
+  manifest?: RuntimeSkillManifest;
+  error?: string;
+}
+
 export function parseOptionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
 }
@@ -98,21 +103,37 @@ function parseRuntimeSkillContext(value: unknown): RuntimeSkillManifestContext |
     : undefined;
 }
 
-export function parseRuntimeSkillManifest(value: unknown): RuntimeSkillManifest | undefined {
+export function parseRuntimeSkillManifest(value: unknown): ParsedRuntimeSkillManifest {
+  if (value === undefined) {
+    return {};
+  }
+
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return undefined;
+    return {
+      error: 'skills must be an object with requestedSkills.',
+    };
   }
 
   const record = value as Record<string, unknown>;
-  const requestedSkills = parseStringArray(record.requestedSkills) ?? [];
-  if (requestedSkills.length === 0) {
-    return undefined;
+  if (!Array.isArray(record.requestedSkills)) {
+    return {
+      error: 'skills.requestedSkills must be a non-empty string array.',
+    };
+  }
+
+  const requestedSkills = parseStringArray(record.requestedSkills);
+  if (!requestedSkills || requestedSkills.length === 0) {
+    return {
+      error: 'skills.requestedSkills must be a non-empty string array.',
+    };
   }
 
   return {
-    profileId: parseOptionalString(record.profileId),
-    requestedSkills,
-    context: parseRuntimeSkillContext(record.context),
-    strict: record.strict === true,
+    manifest: {
+      profileId: parseOptionalString(record.profileId),
+      requestedSkills,
+      context: parseRuntimeSkillContext(record.context),
+      strict: record.strict === true,
+    },
   };
 }
