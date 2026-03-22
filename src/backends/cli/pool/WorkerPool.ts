@@ -7,6 +7,8 @@ import { KiroNativeSessionService } from '../kiro/KiroNativeSessionService.js';
 import { GooseNativeSessionService } from '../goose/GooseNativeSessionService.js';
 import { OpencodeNativeSessionService } from '../opencode/OpencodeNativeSessionService.js';
 import type { Provider, ProviderCapabilities, ProviderName, ProviderSpawnOptions } from '../providers/types.js';
+import type { CompatibilityProfileSelection } from '../../../core/compatibility/types.js';
+import type { ProviderCompatibilityService } from '../../../core/compatibility/ProviderCompatibilityService.js';
 import { AuggieProvider } from '../providers/auggie.js';
 import { ClaudeProvider } from '../providers/claude.js';
 import { CodexProvider } from '../providers/codex.js';
@@ -36,6 +38,7 @@ export class WorkerPool {
   private kiroNative: KiroNativeSessionService;
   private auggieSessions: AuggieSessionService;
   private opencodeNative: OpencodeNativeSessionService;
+  readonly compatibility: ProviderCompatibilityService;
   private resolvers: ProviderServiceResolvers;
 
   constructor(
@@ -45,6 +48,7 @@ export class WorkerPool {
     kiroNative: KiroNativeSessionService,
     auggieSessions: AuggieSessionService,
     opencodeNative: OpencodeNativeSessionService,
+    compatibility: ProviderCompatibilityService,
     resolvers: ProviderServiceResolvers = {},
   ) {
     this.config = config;
@@ -53,6 +57,7 @@ export class WorkerPool {
     this.kiroNative = kiroNative;
     this.auggieSessions = auggieSessions;
     this.opencodeNative = opencodeNative;
+    this.compatibility = compatibility;
     this.resolvers = resolvers;
   }
 
@@ -67,6 +72,7 @@ export class WorkerPool {
   private resolveProvider(
     name: ProviderName,
     instanceId?: string,
+    compatibilityProfile?: CompatibilityProfileSelection,
   ): { provider: Provider; commandConfig: CliRuntimeConfig['providerCommands'][ProviderName] } {
     const instance = resolveProviderInstance(this.config, name, instanceId);
     switch (name) {
@@ -79,13 +85,25 @@ export class WorkerPool {
           commandConfig: instance.commandConfig,
         };
       case 'codex':
-        return { provider: new CodexProvider(), commandConfig: instance.commandConfig };
+        return {
+          provider: new CodexProvider(compatibilityProfile),
+          commandConfig: instance.commandConfig,
+        };
       case 'claude':
-        return { provider: new ClaudeProvider(), commandConfig: instance.commandConfig };
+        return {
+          provider: new ClaudeProvider(compatibilityProfile),
+          commandConfig: instance.commandConfig,
+        };
       case 'gemini':
-        return { provider: new GeminiProvider(), commandConfig: instance.commandConfig };
+        return {
+          provider: new GeminiProvider(compatibilityProfile),
+          commandConfig: instance.commandConfig,
+        };
       case 'copilot':
-        return { provider: new CopilotProvider(), commandConfig: instance.commandConfig };
+        return {
+          provider: new CopilotProvider(compatibilityProfile),
+          commandConfig: instance.commandConfig,
+        };
       case 'cursor':
         return { provider: new CursorProvider(), commandConfig: instance.commandConfig };
       case 'kiro':
@@ -146,6 +164,14 @@ export class WorkerPool {
     const { provider, commandConfig } = this.resolveProvider(
       providerName as ProviderName,
       providerInstanceId,
+      this.compatibility.getCachedAssessment(
+        providerName as ProviderName,
+        resolveProviderInstance(
+          this.config,
+          providerName as ProviderName,
+          providerInstanceId,
+        ).id,
+      )?.profile,
     );
     const resilience: SpawnResilienceConfig = {
       retries: this.config.spawnRetries,

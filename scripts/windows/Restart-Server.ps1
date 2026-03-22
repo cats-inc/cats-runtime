@@ -39,6 +39,7 @@ param(
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $envFile = Join-Path $repoRoot ".env"
+$bindHost = "127.0.0.1"
 
 if ($Port -eq 0) {
     $Port = 3110
@@ -49,6 +50,30 @@ if ($Port -eq 0) {
             if ($p) { $Port = [int]$p }
         }
     }
+}
+
+if (Test-Path $envFile) {
+    $hostLine = Get-Content $envFile | Select-String '^CATS_RUNTIME_HOST\s*='
+    if ($hostLine) {
+        $configuredHost = ($hostLine.Line -split '=', 2)[1].Trim()
+        if ($configuredHost) { $bindHost = $configuredHost }
+    }
+}
+
+function Get-LoopbackHealthHost($host) {
+    switch ($host) {
+        "0.0.0.0" { return "127.0.0.1" }
+        "::" { return "127.0.0.1" }
+        "[::]" { return "127.0.0.1" }
+        default { return $host }
+    }
+}
+
+function Format-HttpHost($host) {
+    if ($host -match ':') {
+        return "[$host]"
+    }
+    return $host
 }
 
 function Stop-ServiceOnPort($port) {
@@ -151,24 +176,51 @@ try {
         }
     }
 
-    $response = Invoke-WebRequest `
-        -Uri "http://localhost:$Port/health" `
-        -TimeoutSec 5 `
-        -UseBasicParsing `
-        -Headers $headers `
-        -ErrorAction Stop
-
+    $healthHost = Get-LoopbackHealthHost $bindHost
+    $healthHostForUrl = Format-HttpHost $healthHost
+    $runtimeBaseUrl = "http://${healthHostForUrl}:$Port"
+    $healthUrl = "$runtimeBaseUrl/health"
+    $deadline = (Get-Date).AddSeconds(20)
+    $response = $null
     $health = $null
-    try {
-        $health = $response.Content | ConvertFrom-Json
-    } catch {
-        $health = $null
+    $lastHealthError = $null
+
+    while ((Get-Date) -lt $deadline) {
+        try {
+            $response = Invoke-WebRequest `
+                -Uri $healthUrl `
+                -TimeoutSec 5 `
+                -UseBasicParsing `
+                -Headers $headers `
+                -ErrorAction Stop
+
+            try {
+                $health = $response.Content | ConvertFrom-Json
+            } catch {
+                $health = $null
+            }
+
+            if ($response.StatusCode -eq 200 -or $response.StatusCode -eq 503) {
+                break
+            }
+        } catch {
+            $lastHealthError = $_
+        }
+
+        Start-Sleep -Seconds 1
+    }
+
+    if (-not $response -or ($response.StatusCode -ne 200 -and $response.StatusCode -ne 503)) {
+        if ($lastHealthError) {
+            throw $lastHealthError
+        }
+        throw "Timed out waiting for $healthUrl"
     }
 
     if ($response.StatusCode -eq 200 -or $response.StatusCode -eq 503) {
         $status = if ($health -and $health.status) { $health.status } else { "unknown" }
         Write-Host "  Health endpoint responding ($status)" -ForegroundColor Green
-        Write-Host "  Runtime:  http://localhost:$Port" -ForegroundColor White
+        Write-Host "  Runtime:  $runtimeBaseUrl" -ForegroundColor White
         if ($health -and $health.backend) {
             $backendReachable = [bool]$health.backend.reachable
             $backendBaseUrl = [string]$health.backend.baseUrl

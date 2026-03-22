@@ -181,6 +181,31 @@ function resolveRequestedProviderTarget(
   return resolveProviderTarget(ctx.config, providerName, instanceId);
 }
 
+function resolveCliProviderTarget(
+  ctx: AppContext,
+  providerName: string,
+  instanceId?: string,
+): ProviderTargetDescriptor {
+  return resolveProviderTarget(
+    ctx.config,
+    providerName,
+    instanceId ? `cli/${instanceId}` : undefined,
+  );
+}
+
+async function primeCliCompatibility(
+  ctx: AppContext,
+  target: ProviderTargetDescriptor | undefined,
+): Promise<void> {
+  if (!target || target.backend !== 'cli' || !target.cliInstance) {
+    return;
+  }
+
+  await ctx.compatibility.assessCliTarget(target, {
+    purpose: 'execution',
+  });
+}
+
 function parseReusePolicy(value: unknown): SessionReusePolicy | undefined {
   if (typeof value !== 'string') {
     return undefined;
@@ -948,6 +973,10 @@ sessionRoutes.post('/sessions', async (c) => {
       session.lastActivity = native.lastActivity;
 
       ctx.registry.setProviderSessionId(session.id, native.providerSessionId);
+      await primeCliCompatibility(
+        ctx,
+        resolveCliProviderTarget(ctx, providerName, providerInstance!.id),
+      );
       runtime.spawn(session.id, providerName, {
         cwd: resolved.cwd,
         workspaceMode: resolved.workspaceMode,
@@ -1014,6 +1043,10 @@ sessionRoutes.post('/sessions', async (c) => {
       session.lastActivity = native.lastActivity;
 
       ctx.registry.setProviderSessionId(session.id, native.providerSessionId);
+      await primeCliCompatibility(
+        ctx,
+        resolveCliProviderTarget(ctx, providerName, providerInstance!.id),
+      );
       runtime.spawn(session.id, providerName, {
         cwd: resolved.cwd,
         workspaceMode: resolved.workspaceMode,
@@ -1082,6 +1115,7 @@ sessionRoutes.post('/sessions', async (c) => {
   });
 
   try {
+    await primeCliCompatibility(ctx, providerTarget);
     runtime.spawn(session.id, providerName, {
       cwd: resolved.cwd,
       workspaceMode: resolved.workspaceMode,
@@ -1374,6 +1408,10 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
     }
 
     try {
+      await primeCliCompatibility(
+        ctx,
+        resolveCliProviderTarget(ctx, session.providerName, session.providerInstanceId),
+      );
       runtime.spawn(id, session.providerName, {
         cwd: session.cwd,
         workspaceMode: session.workspaceMode,
@@ -1404,10 +1442,14 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
       if (!canResume) {
         return c.json({
           error: 'Kiro can only resume the latest session in a workspace. '
-            + 'This discovered session is no longer the newest one in its directory.',
+          + 'This discovered session is no longer the newest one in its directory.',
         }, 409);
       }
 
+      await primeCliCompatibility(
+        ctx,
+        resolveCliProviderTarget(ctx, session.providerName, session.providerInstanceId),
+      );
       runtime.spawn(id, session.providerName, {
         cwd: session.cwd,
         workspaceMode: session.workspaceMode,
@@ -1447,6 +1489,10 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
     }
 
     try {
+      await primeCliCompatibility(
+        ctx,
+        resolveCliProviderTarget(ctx, session.providerName, session.providerInstanceId),
+      );
       runtime.spawn(id, session.providerName, {
         cwd: session.cwd,
         workspaceMode: session.workspaceMode,
@@ -1490,6 +1536,12 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
   }
 
   try {
+    await primeCliCompatibility(
+      ctx,
+      session.providerBackend === 'cli'
+        ? resolveCliProviderTarget(ctx, session.providerName, session.providerInstanceId)
+        : undefined,
+    );
     runtime.spawn(id, session.providerName, {
       cwd: session.cwd,
       workspaceMode: session.workspaceMode,
@@ -1721,6 +1773,10 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
   }
 
   try {
+    await primeCliCompatibility(
+      ctx,
+      childTarget.backend === 'cli' ? childTarget : undefined,
+    );
     runtime.spawn(forked.id, childTarget.providerName, {
       cwd: forkCwd,
       workspaceMode: forkWorkspaceMode,

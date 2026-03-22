@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createRuntimeProgressEvent } from '../../../core/progress.js';
 import type {
+  CompatibilityProfileSelection,
   Provider,
   ProviderCapabilities,
   ProviderSpawnOptions,
@@ -25,6 +26,10 @@ export class CopilotProvider implements Provider {
   private _lastOutputTokens = 0;
   private _sawMessageDelta = false;
 
+  constructor(
+    private readonly compatibilityProfile?: CompatibilityProfileSelection,
+  ) {}
+
   prepareEphemeralTurn(content: string): void {
     this.cleanupPendingPromptFile();
     this._pendingPrompt = content;
@@ -33,10 +38,12 @@ export class CopilotProvider implements Provider {
   }
 
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
-    const args: string[] = [
-      '--output-format', 'json',
-      '--stream', 'on',
-    ];
+    const args: string[] = this.compatibilityProfile?.spawnBaseArgs
+      ? [...this.compatibilityProfile.spawnBaseArgs]
+      : [
+        '--output-format', 'json',
+        '--stream', 'on',
+      ];
 
     // Permission handling
     if (opts.permissionMode === 'skip') {

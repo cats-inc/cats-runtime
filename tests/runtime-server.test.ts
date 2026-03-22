@@ -395,6 +395,7 @@ describe('runtime server', () => {
             configPath: null,
             dataDir: expect.stringContaining('runtime-data'),
             sessionBaseDir: expect.stringContaining('runtime-sessions'),
+            compatibilityEvidenceDir: expect.stringContaining('runtime-data'),
           },
           process: {
             pid: process.pid,
@@ -531,12 +532,12 @@ backends:
         },
         summary: {
           status: 'degraded',
-          summary: '1 provider target(s) need attention.',
+          summary: '2 provider target(s) need attention.',
           configuredProviders: 2,
           targets: 2,
           defaultTargets: 2,
-          ok: 1,
-          degraded: 1,
+          ok: 0,
+          degraded: 2,
           unavailable: 0,
         },
         providers: expect.arrayContaining([
@@ -567,13 +568,26 @@ backends:
             target: 'cli/default',
             defaultTarget: true,
             availability: expect.objectContaining({
-              status: 'ok',
+              status: 'degraded',
               probe: 'light',
+            }),
+            compatibility: expect.objectContaining({
+              classification: 'degraded',
+              profile: expect.objectContaining({
+                id: 'codex-cli-json-rpc-best-fit',
+              }),
+              evidence: expect.objectContaining({
+                relativePath: expect.stringContaining('codex/'),
+              }),
             }),
             checks: expect.arrayContaining([
               expect.objectContaining({
                 code: 'command_available',
                 status: 'ok',
+              }),
+              expect.objectContaining({
+                code: 'profile_selected',
+                status: 'degraded',
               }),
             ]),
           }),
@@ -705,12 +719,12 @@ backends:
           probe: 'light',
           summary: {
             status: 'degraded',
-            summary: '1 provider target(s) need attention.',
+            summary: '2 provider target(s) need attention.',
             configuredProviders: 2,
             targets: 2,
             defaultTargets: 2,
-            ok: 1,
-            degraded: 1,
+            ok: 0,
+            degraded: 2,
             unavailable: 0,
           },
           defaults: expect.arrayContaining([
@@ -722,7 +736,7 @@ backends:
             expect.objectContaining({
               provider: 'codex',
               target: 'cli/default',
-              status: 'ok',
+              status: 'degraded',
             }),
           ]),
         },
@@ -808,20 +822,20 @@ backends:
         providers: {
           probe: 'light',
           summary: {
-            status: 'ok',
-            summary: 'All configured provider targets passed the current probe mode.',
+            status: 'degraded',
+            summary: '1 provider target(s) need attention.',
             configuredProviders: 1,
             targets: 1,
             defaultTargets: 1,
-            ok: 1,
-            degraded: 0,
+            ok: 0,
+            degraded: 1,
             unavailable: 0,
           },
           defaults: [
             expect.objectContaining({
               provider: 'codex',
               target: 'cli/default',
-              status: 'ok',
+              status: 'degraded',
             }),
           ],
         },
@@ -979,7 +993,7 @@ backends:
               provider: 'codex',
               target: 'cli/missing',
               status: 'unavailable',
-              summary: expect.stringContaining('Could not resolve CLI command'),
+              summary: expect.stringContaining('Failed to execute compatibility probe'),
             }),
           ]),
         },
@@ -1135,8 +1149,7 @@ backends:
                 command: 'cursor-agent',
                 runner: 'auto',
                 runtime: { mode: 'wsl', distro: 'Ubuntu', environmentId: 'ubuntu' },
-                transport: undefined,
-                model: undefined,
+                compatibility: null,
               },
               {
                 id: 'debian',
@@ -1145,8 +1158,7 @@ backends:
                 command: 'cursor-agent',
                 runner: 'auto',
                 runtime: { mode: 'wsl', distro: 'Debian', environmentId: 'debian' },
-                transport: undefined,
-                model: undefined,
+                compatibility: null,
               },
             ],
           },
@@ -1209,8 +1221,7 @@ providers:
                 command: 'claude',
                 runner: 'auto',
                 runtime: { mode: 'native', environmentId: 'native' },
-                transport: undefined,
-                model: undefined,
+                compatibility: null,
               },
             ],
           },

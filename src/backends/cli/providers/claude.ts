@@ -1,4 +1,5 @@
 import type {
+  CompatibilityProfileSelection,
   Provider,
   ProviderCapabilities,
   ProviderSpawnOptions,
@@ -10,14 +11,20 @@ export class ClaudeProvider implements Provider {
   name = 'claude';
   capabilities: ProviderCapabilities = { resume: true, fork: true, permissions: true };
 
+  constructor(
+    private readonly compatibilityProfile?: CompatibilityProfileSelection,
+  ) {}
+
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
-    const args: string[] = [
-      '-p',
-      '--input-format', 'stream-json',
-      '--output-format', 'stream-json',
-      '--verbose',
-      '--include-partial-messages',
-    ];
+    const args: string[] = this.compatibilityProfile?.spawnBaseArgs
+      ? [...this.compatibilityProfile.spawnBaseArgs]
+      : [
+        '-p',
+        '--input-format', 'stream-json',
+        '--output-format', 'stream-json',
+        '--verbose',
+        '--include-partial-messages',
+      ];
 
     if (opts.model) {
       args.push('--model', opts.model);

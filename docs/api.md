@@ -126,12 +126,16 @@ desktop shells, and the embedded dashboard. It combines:
 
 - runtime readiness and startup/shutdown contract metadata
 - a light provider-health summary over each provider's default target, suitable
-  for polling
+  for polling and compatibility-aware setup UX
 - per-provider default target highlights so hosts do not need to stitch
   `/health` and `/diagnostics/providers` together themselves
 - aggregate status semantics where partial provider outages are reported as
   `degraded`; `unavailable` is reserved for runtime outages or cases where
   every default provider target is unavailable
+
+`GET /diagnostics/health?force=1` refreshes cached CLI compatibility assessments
+for default targets before recomputing the aggregate summary. `true` and
+`refresh` are accepted aliases for `1`.
 
 `GET /diagnostics/runtime` returns the frozen startup contract that hosts should
 integrate against:
@@ -142,7 +146,8 @@ integrate against:
 - authoritative readiness path
 - lifecycle event names
 - supported shutdown signals/reasons
-- listener and local-state path resolution
+- listener and local-state path resolution, including the compatibility
+  evidence directory
 - full `metering` state:
   - `summary`: aggregate status/counts
   - `usage`: totals plus `byProviderInstance` / `bySession`
@@ -153,8 +158,13 @@ integrate against:
 surface for hosts and dashboards. The response includes:
 
 - the active probe mode (`light` or `live`)
+- optional forced-refresh semantics for cached CLI compatibility assessments
 - aggregate summary status and counts
 - per-target `availability.status` (`ok`, `degraded`, `unavailable`)
+- per-target CLI `compatibility` summaries with:
+  `classification`, `status`, `summary`, `checkedAt`, selected `profile`,
+  version/runtime `fingerprint`, additive `warnings`, and optional `evidence`
+  artifact metadata
 - lightweight config/command/path checks
 - sanitized env-variable presence metadata
 - target-level diagnostics details for CLI, API/local, and agent backends
@@ -162,6 +172,8 @@ surface for hosts and dashboards. The response includes:
 `GET /diagnostics/providers?probe=live` enables live probes where the current
 runtime backend supports them. Today that is primarily useful for selected
 agent-backed targets; API/local targets still report light diagnostics only.
+`force=1|true|refresh` can be combined with either probe mode to bypass the CLI
+compatibility cache after a provider install or upgrade.
 
 `GET /diagnostics/health` now also includes a compact top-level `metering`
 summary so hosts can poll one route for both provider readiness and
@@ -844,6 +856,20 @@ resolved `instance` alongside the runtime metadata.
 or other clients that need to offer provider-instance selection. Each instance
 entry includes its backend kind (`cli`, `api`, `local`, or `agent`) plus any
 transport or runtime metadata that applies to that backend.
+
+For CLI backends, instance entries also expose cached `compatibility` metadata
+once that target has been primed by diagnostics or execution. When present, the
+compatibility object mirrors the diagnostics summary view:
+
+- `classification` and `status`
+- `summary` and `checkedAt`
+- selected compatibility `profile`
+- version/runtime `fingerprint`
+- additive `warnings`
+- optional `evidence` artifact metadata for degraded or failed probes
+
+Targets that have not been probed yet, plus non-CLI backends, return
+`compatibility: null`.
 
 `GET /providers/{provider}/models` is the runtime-owned per-provider model
 catalog route. It accepts optional `?instance=<instance-id>` and returns a

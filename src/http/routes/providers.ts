@@ -4,6 +4,7 @@ import {
   listConfiguredProviders,
   listProviderCatalog,
 } from '../../core/providerCatalog.js';
+import type { ProviderName } from '../../backends/cli/providers/types.js';
 import type { AppContext } from '../app.js';
 import { getRouteErrorStatus } from '../routeErrors.js';
 
@@ -29,6 +30,12 @@ providerRoutes.get('/providers/config', (c) => {
         runtime: instance.cliInstance?.commandConfig.runtime,
         transport: instance.remoteInstance?.transport,
         model: instance.remoteInstance?.model,
+        compatibility: instance.backend === 'cli'
+          ? ctx.compatibility.getCachedSummary(
+            instance.providerName as ProviderName,
+            instance.instanceId,
+          ) || null
+          : null,
       }));
 
       if (instances.length === 0) {

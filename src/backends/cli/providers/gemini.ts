@@ -1,4 +1,5 @@
 import type {
+  CompatibilityProfileSelection,
   Provider,
   ProviderCapabilities,
   ProviderSpawnOptions,
@@ -43,8 +44,14 @@ export class GeminiProvider implements Provider {
   ephemeral = true;
   capabilities: ProviderCapabilities = { resume: true, fork: false, permissions: false };
 
+  constructor(
+    private readonly compatibilityProfile?: CompatibilityProfileSelection,
+  ) {}
+
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
-    const args: string[] = ['--output-format', 'stream-json', '--yolo'];
+    const args: string[] = this.compatibilityProfile?.spawnBaseArgs
+      ? [...this.compatibilityProfile.spawnBaseArgs]
+      : ['--output-format', 'stream-json', '--yolo'];
 
     if (opts.model) {
       args.push('--model', opts.model);

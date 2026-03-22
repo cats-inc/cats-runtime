@@ -16,6 +16,7 @@ import type { GooseNativeSessionService } from '../backends/cli/goose/GooseNativ
 import type { OpencodeNativeSessionService } from '../backends/cli/opencode/OpencodeNativeSessionService.js';
 import type { WslDiscoveryStatusStore } from '../backends/cli/discovery/wslDiscovery.js';
 import type { ProviderModelCatalogService } from '../core/models/providerModelCatalog.js';
+import type { ProviderCompatibilityService } from '../core/compatibility/ProviderCompatibilityService.js';
 import { RuntimeDeliveryService } from '../core/runtime/RuntimeDeliveryService.js';
 import { RuntimeMeteringService } from '../core/usage/RuntimeMeteringService.js';
 import { bearerAuth } from './auth.js';
@@ -53,6 +54,7 @@ export interface AppContext {
   opencodeNative: OpencodeNativeSessionService;
   wslDiscoveryStatus?: WslDiscoveryStatusStore;
   providerModelCatalog: ProviderModelCatalogService;
+  compatibility: ProviderCompatibilityService;
   delivery?: RuntimeDeliveryService;
   metering?: RuntimeMeteringService;
   resolveCursorNative?: (instanceId?: string) => CursorNativeSessionService;

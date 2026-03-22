@@ -12,15 +12,18 @@ export interface RuntimeResolvedPaths {
   configPath: string | null;
   dataDir: string;
   sessionBaseDir: string;
+  compatibilityEvidenceDir: string;
 }
 
 export function getRuntimeResolvedPaths(
   config: Pick<CliRuntimeConfig, 'configPath' | 'dataDir' | 'sessionBaseDir'>,
 ): RuntimeResolvedPaths {
+  const dataDir = config.dataDir || join(config.sessionBaseDir, '..', 'data');
   return {
     configPath: config.configPath || null,
-    dataDir: config.dataDir || join(config.sessionBaseDir, '..', 'data'),
+    dataDir,
     sessionBaseDir: config.sessionBaseDir,
+    compatibilityEvidenceDir: join(dataDir, 'compatibility'),
   };
 }
 

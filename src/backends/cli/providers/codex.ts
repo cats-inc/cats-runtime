@@ -1,4 +1,5 @@
 import type {
+  CompatibilityProfileSelection,
   Provider,
   ProviderCapabilities,
   PermissionMode,
@@ -54,6 +55,10 @@ export class CodexProvider implements Provider {
   private _permissionMode: PermissionMode = 'skip';
   private _allowedTools: string[] = [];
 
+  constructor(
+    private readonly compatibilityProfile?: CompatibilityProfileSelection,
+  ) {}
+
   private makeRequest(method: string, params?: Record<string, unknown>): string {
     const req: JsonRpcRequest = {
       jsonrpc: '2.0',
@@ -78,7 +83,9 @@ export class CodexProvider implements Provider {
     this._permissionMode = opts.permissionMode ?? 'skip';
     this._allowedTools = [...(opts.allowedTools || [])];
 
-    const args = ['app-server'];
+    const args = this.compatibilityProfile?.spawnBaseArgs
+      ? [...this.compatibilityProfile.spawnBaseArgs]
+      : ['app-server'];
 
     if (opts.model) {
       args.push('-c', `model="${opts.model}"`);

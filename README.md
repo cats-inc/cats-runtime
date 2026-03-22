@@ -23,6 +23,7 @@ Current capabilities:
 - strict `default` instance aliasing and host-path validation for file-backed providers
 - provider-specific helpers such as Kiro model inspection
 - runtime-owned usage metering, incident surfacing, and additive execution guardrails for warn / block / cooldown flows
+- shared CLI compatibility probing, degraded profile selection, and evidence capture for major provider families
 
 ## Current Status
 
@@ -37,6 +38,7 @@ Current capabilities:
 - [x] Add `backends/api` for pay-as-you-go API keys and Ollama
 - [x] Land runtime-managed skills v0 session and delivery contract
 - [x] Add first-slice runtime usage metering, rate-limit/quota incident surfacing, and provider-agnostic progress contracts
+- [x] Add the first provider compatibility/evidence engine slice for CLI-backed providers
 
 ## Design Rules
 

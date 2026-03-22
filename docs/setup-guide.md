@@ -74,11 +74,13 @@ Shutdown rules:
 Diagnostics rules:
 
 - `GET /diagnostics/runtime` exposes startup contract, path resolution, and
-  runtime listener metadata
+  runtime listener metadata, including the compatibility evidence directory
 - `GET /diagnostics/providers` exposes runtime-owned provider availability
-  checks for host UX and setup flows
+  checks plus cached CLI compatibility summaries for host UX and setup flows
 - `GET /diagnostics/providers?probe=live` enables live probes where the current
   backend supports them
+- `force=1|true|refresh` refreshes cached CLI compatibility assessments so
+  install/upgrade flows can re-probe immediately
 
 ## Environment Variables
 
@@ -276,6 +278,11 @@ provider-instance selector in the create-session modal. Providers configured in
 `backends.cli`, `backends.api`, `backends.local`, or `backends.agent` all
 appear there.
 
+For CLI instances, `compatibility` remains `null` until the runtime has probed
+or executed that target. Once primed, the cached summary includes the
+classification, selected profile, version/runtime fingerprint, warnings, and
+optional evidence artifact metadata surfaced by the shared compatibility engine.
+
 ## Running the Project
 
 ### Manual start
@@ -431,9 +438,11 @@ The health payload includes startup metadata:
 For host-side setup or Settings surfaces, use:
 
 - `GET /diagnostics/runtime` to verify runtime contract, port binding, and
-  resolved state paths
-- `GET /diagnostics/providers` to decide whether a provider is immediately
-  usable, needs user action, or is only partially verified
+  resolved state paths, including where compatibility evidence bundles are
+  written
+- `GET /diagnostics/providers?force=1` to decide whether a provider is
+  immediately usable, needs user action, is running in a degraded profile, or
+  failed to probe after an install/update
 
 To inspect the publish payload locally without using the global npm cache:
 

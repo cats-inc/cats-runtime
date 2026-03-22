@@ -85,6 +85,10 @@ routing:
 
 backends:
   cli:
+    # CLI targets are compatibility-probed by cats-runtime during setup,
+    # diagnostics, and execution priming. Degraded or failed probes write
+    # replay-friendly evidence bundles under <dataDir>/compatibility/ and the
+    # cached summary is surfaced via /diagnostics/providers and /providers/config.
     # Positive list: only providers listed here are enabled for CLI execution.
     # Any known provider omitted from this block is disabled.
     providers:

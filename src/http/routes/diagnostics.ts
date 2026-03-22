@@ -8,6 +8,8 @@ import {
   listProviderCatalog,
   type ProviderTargetDescriptor,
 } from '../../core/providerCatalog.js';
+import { toCompatibilitySummaryView } from '../../core/compatibility/ProviderCompatibilityService.js';
+import type { CompatibilitySummaryView } from '../../core/compatibility/types.js';
 import type { HealthStatus } from '../../core/types.js';
 import type { AppContext } from '../app.js';
 import { getRuntimeMeteringService } from '../app.js';
@@ -15,8 +17,6 @@ import {
   getFileBackedProviderDiscoveryInfo,
   getRuntimeEnvironment,
   isFileBackedProvider,
-  lookupRuntimeCommand,
-  lookupRuntimeCommandInExecutionEnvironment,
   probeRuntimeAgentInstance,
   runtimePathExists,
   type RuntimeRouteEnv,
@@ -56,6 +56,7 @@ interface ProviderDiagnosticResult {
   availability: ProviderDiagnosticAvailability;
   config: Record<string, unknown>;
   checks: DiagnosticCheck[];
+  compatibility?: CompatibilitySummaryView;
 }
 
 const diagnosticsRoutes = new Hono<RuntimeRouteEnv>();
@@ -63,38 +64,6 @@ const diagnosticsRoutes = new Hono<RuntimeRouteEnv>();
 interface ProviderSummaryOptions {
   defaultTargetsOnly?: boolean;
   useAttentionSummary?: boolean;
-}
-
-function describeCommandResolutionFailure(
-  targetName: string,
-  command: string,
-  timedOut?: boolean,
-): string {
-  if (timedOut) {
-    return `Timed out while resolving ${targetName} command '${command}'`;
-  }
-  return `Could not resolve ${targetName} command '${command}'`;
-}
-
-function describeRuntimeCommandResolutionFailure(
-  runtimeLabel: string,
-  command: string,
-  timedOut?: boolean,
-): string {
-  if (timedOut) {
-    return `Timed out while resolving CLI command '${command}' inside ${runtimeLabel}`;
-  }
-  return `Could not resolve CLI command '${command}' inside ${runtimeLabel}`;
-}
-
-function describeRuntimeDependencyFailure(
-  dependencyName: string,
-  timedOut?: boolean,
-): string {
-  if (timedOut) {
-    return `Timed out while checking ${dependencyName} availability on the host PATH`;
-  }
-  return `${dependencyName} is not available on the host PATH`;
 }
 
 function combineDiagnosticStatus(checks: DiagnosticCheck[]): DiagnosticStatus {
@@ -174,7 +143,12 @@ function createCheck(
 async function diagnoseCliTarget(
   ctx: AppContext,
   target: ProviderTargetDescriptor,
-): Promise<{ checks: DiagnosticCheck[]; config: Record<string, unknown> }> {
+  forceRefresh = false,
+): Promise<{
+    checks: DiagnosticCheck[];
+    config: Record<string, unknown>;
+    compatibility: CompatibilitySummaryView;
+  }> {
   const instance = target.cliInstance;
   if (!instance) {
     return {
@@ -186,110 +160,49 @@ async function diagnoseCliTarget(
         ),
       ],
       config: {},
+      compatibility: {
+        classification: 'probe_failed',
+        status: 'unavailable',
+        summary: `CLI target '${target.providerName}/${target.instanceId}' is not initialized`,
+        checkedAt: new Date().toISOString(),
+        profile: {
+          id: 'missing-cli-instance',
+          label: 'Missing CLI instance',
+          protocolFamily: 'unknown',
+          parserId: 'none',
+          confidence: 'weak',
+        },
+        fingerprint: {
+          version: {
+            source: 'unknown',
+            detected: false,
+          },
+          features: [],
+          runtime: {
+            mode: 'native',
+          },
+        },
+        warnings: [
+          `CLI target '${target.providerName}/${target.instanceId}' is not initialized`,
+        ],
+      },
     };
   }
 
-  const checks: DiagnosticCheck[] = [];
+  const assessment = await ctx.compatibility.assessCliTarget(target, {
+    force: forceRefresh,
+    purpose: 'diagnostics',
+  });
+  const checks: DiagnosticCheck[] = assessment.checks.map((check) => ({
+    ...check,
+  }));
   const runtime = instance.commandConfig.runtime;
   const config: Record<string, unknown> = {
     command: instance.commandConfig.path,
     runner: instance.commandConfig.runner,
     runtime,
+    compatibility: toCompatibilitySummaryView(assessment),
   };
-
-  switch (runtime.mode) {
-    case 'native': {
-      const command = await lookupRuntimeCommand(instance.commandConfig.path);
-      checks.push(
-        createCheck(
-          'command_available',
-          command.available ? 'ok' : 'unavailable',
-          command.available
-            ? `Resolved CLI command '${instance.commandConfig.path}'`
-            : describeCommandResolutionFailure(
-              'CLI',
-              instance.commandConfig.path,
-              command.timedOut,
-            ),
-          {
-            command: instance.commandConfig.path,
-            resolvedPath: command.resolvedPath,
-            timedOut: command.timedOut,
-          },
-        ),
-      );
-      break;
-    }
-    case 'wsl': {
-      const wsl = await lookupRuntimeCommand('wsl.exe');
-      const distro = runtime.distro || 'Ubuntu';
-      checks.push(
-        createCheck(
-          'wsl_available',
-          wsl.available ? 'ok' : 'unavailable',
-          wsl.available
-            ? `WSL is available for distro '${distro}'`
-            : describeRuntimeDependencyFailure('WSL', wsl.timedOut),
-          {
-            distro,
-            resolvedPath: wsl.resolvedPath,
-            timedOut: wsl.timedOut,
-          },
-        ),
-      );
-      if (wsl.available) {
-        const command = await lookupRuntimeCommandInExecutionEnvironment(
-          instance.commandConfig.path,
-          runtime,
-        );
-        checks.push(
-          createCheck(
-            'command_available',
-            command.available ? 'ok' : 'unavailable',
-            command.available
-              ? `Resolved CLI command '${instance.commandConfig.path}' inside WSL distro '${distro}'`
-              : describeRuntimeCommandResolutionFailure(
-                `WSL distro '${distro}'`,
-                instance.commandConfig.path,
-                command.timedOut,
-              ),
-            {
-              distro,
-              resolvedPath: command.resolvedPath,
-              timedOut: command.timedOut,
-            },
-          ),
-        );
-      }
-      break;
-    }
-    case 'docker': {
-      const docker = await lookupRuntimeCommand('docker');
-      checks.push(
-        createCheck(
-          'docker_available',
-          docker.available ? 'ok' : 'unavailable',
-          docker.available
-            ? 'Docker is available for runtime-managed provider execution'
-            : describeRuntimeDependencyFailure('Docker', docker.timedOut),
-          {
-            resolvedPath: docker.resolvedPath,
-            timedOut: docker.timedOut,
-          },
-        ),
-      );
-      checks.push(
-        createCheck(
-          'command_probe_skipped',
-          'degraded',
-          `Docker-backed command '${instance.commandConfig.path}' is configured but not probed inside the container runtime`,
-        ),
-      );
-      break;
-    }
-    default:
-      break;
-  }
 
   if (isFileBackedProvider(target.providerName)) {
     try {
@@ -355,7 +268,11 @@ async function diagnoseCliTarget(
     }
   }
 
-  return { checks, config };
+  return {
+    checks,
+    config,
+    compatibility: toCompatibilitySummaryView(assessment),
+  };
 }
 
 async function diagnoseAgentTarget(
@@ -450,7 +367,7 @@ async function diagnoseAgentTarget(
 function diagnoseRemoteConfigOnly(
   target: ProviderTargetDescriptor,
   env: Readonly<NodeJS.ProcessEnv>,
-): { checks: DiagnosticCheck[]; config: Record<string, unknown> } {
+): { checks: DiagnosticCheck[]; config: Record<string, unknown>; compatibility?: CompatibilitySummaryView } {
   const instance = target.remoteInstance;
   if (!instance) {
     return {
@@ -513,10 +430,15 @@ async function diagnoseTarget(
   target: ProviderTargetDescriptor,
   probeMode: DiagnosticsProbeMode,
   env: Readonly<NodeJS.ProcessEnv>,
+  forceRefresh = false,
 ): Promise<ProviderDiagnosticResult> {
-  let result: { checks: DiagnosticCheck[]; config: Record<string, unknown> };
+  let result: {
+    checks: DiagnosticCheck[];
+    config: Record<string, unknown>;
+    compatibility?: CompatibilitySummaryView;
+  };
   if (target.backend === 'cli') {
-    result = await diagnoseCliTarget(ctx, target);
+    result = await diagnoseCliTarget(ctx, target, forceRefresh);
   } else if (target.backend === 'agent') {
     result = await diagnoseAgentTarget(target, probeMode, env);
   } else {
@@ -539,6 +461,7 @@ async function diagnoseTarget(
     availability,
     config: result.config,
     checks: result.checks,
+    compatibility: result.compatibility,
   };
 }
 
@@ -565,6 +488,7 @@ async function collectProviderDiagnostics(
   ctx: AppContext,
   probeMode: DiagnosticsProbeMode,
   env: Readonly<NodeJS.ProcessEnv>,
+  forceRefresh = false,
 ): Promise<{
   catalog: ReturnType<typeof listProviderCatalog>;
   providers: ProviderDiagnosticResult[];
@@ -573,7 +497,7 @@ async function collectProviderDiagnostics(
   const providers = await Promise.all(
     Object.values(catalog)
       .flatMap((entry) => entry.instances)
-      .map((target) => diagnoseTarget(ctx, target, probeMode, env)),
+      .map((target) => diagnoseTarget(ctx, target, probeMode, env, forceRefresh)),
   );
 
   return {
@@ -692,8 +616,14 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
 diagnosticsRoutes.get('/diagnostics/providers', async (c) => {
   const ctx = c.get('ctx');
   const probeMode = c.req.query('probe') === 'live' ? 'live' : 'light';
+  const forceRefresh = parseForceRefreshQuery(c.req.query('force'));
   const env = getRuntimeEnvironment();
-  const { catalog, providers } = await collectProviderDiagnostics(ctx, probeMode, env);
+  const { catalog, providers } = await collectProviderDiagnostics(
+    ctx,
+    probeMode,
+    env,
+    forceRefresh,
+  );
   const summary = summarizeProviderDiagnostics(catalog, providers);
 
   return c.json({
@@ -710,11 +640,17 @@ diagnosticsRoutes.get('/diagnostics/providers', async (c) => {
 diagnosticsRoutes.get('/diagnostics/health', async (c) => {
   const ctx = c.get('ctx');
   const probeMode = c.req.query('probe') === 'live' ? 'live' : 'light';
+  const forceRefresh = parseForceRefreshQuery(c.req.query('force'));
   const env = getRuntimeEnvironment();
   const readiness = getRuntimeReadinessSnapshot(ctx.startup);
   const runtime = getRuntimeOperationalStatus(ctx.startup);
   const metering = getRuntimeMeteringService(ctx).buildSummary(ctx.registry.list());
-  const { catalog, providers } = await collectProviderDiagnostics(ctx, probeMode, env);
+  const { catalog, providers } = await collectProviderDiagnostics(
+    ctx,
+    probeMode,
+    env,
+    forceRefresh,
+  );
   const providerSummary = summarizeProviderDiagnostics(catalog, providers, {
     defaultTargetsOnly: true,
     useAttentionSummary: true,
@@ -759,3 +695,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
 });
 
 export { diagnosticsRoutes };
+
+function parseForceRefreshQuery(value: string | undefined): boolean {
+  return value === '1' || value === 'true' || value === 'refresh';
+}

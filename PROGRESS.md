@@ -11,11 +11,12 @@
 | Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, and an Agent SDK bridge as the second validation target |
 | HTTP API | Completed | Health, sessions, delivery audit/export/repo routes, messages, history, observe, provider management, session branch-lineage inspection, and metering/guardrail diagnostics are served directly from `cats-runtime` |
 | Runtime Skills | Completed | `skills/` is now a runtime-owned execution catalog with validation, session-level requested/resolved/applied metadata, backend-aware delivery modes, and first-slice Codex/Pi verification |
+| Provider Compatibility | In Progress | Shared CLI compatibility probing now classifies `ready` / `degraded` / `unsupported_version` / `unrecognized_protocol` / `probe_failed`, selects degraded profiles for major families, and captures replay-friendly evidence bundles for mismatches or probe failures |
 | Dashboard | Completed | The embedded dashboard UI is served from `GET /` and now surfaces runtime/provider health from runtime-owned diagnostics contracts |
 | Workspace Substrate | Completed | `audit-workspace`, `init-workspace`, and `update-workspace` now return explicit preview/apply contracts, machine-readable action plans/diff stats, approval-friendly payloads, and `*.bootstrap` review-copy behavior without owning product policy |
 | Delivery Primitives | Completed | Runtime-owned delivery audit, artifact publish/export, repo status, commit, push, and normalized preview-surface metadata are now available over both HTTP routes and local tools |
 | Tests | Completed | Vitest covers provider, discovery, pool, HTTP, delivery, server bootstrap, API/local tool-loop behavior, and first-slice metering/guardrail/progress normalization |
-| Docs | In Progress | Core docs now cover startup/diagnostics, model catalog, session branching, workspace substrate, delivery primitives, and first-slice metering/progress contracts; later PLAN-003/PLAN-005 follow-on items still need ongoing updates |
+| Docs | In Progress | Core docs now cover startup/diagnostics, provider compatibility/evidence flows, model catalog, session branching, workspace substrate, delivery primitives, runtime-managed skills, and first-slice metering/progress contracts; later PLAN-003/PLAN-005 follow-on items still need ongoing updates |
 | Follow-ups | Completed | Accepted post-review findings for provider-instance rollout were implemented and recorded in `docs/plans/PLAN-002-provider-instance-review-followups.md` |
 
 **Legend**: Not Started | In Progress | Completed | Blocked
@@ -360,6 +361,41 @@ turning `cats-runtime` into a general plugin platform.
 
 - [x] `npm run build`
 - [x] `npx vitest run src/core/skills/catalog.test.ts src/http/messagesRoute.test.ts src/http/runtimeSkills.test.ts src/backends/cli/providers/pi.test.ts src/backends/cli/providers/codex.test.ts src/backends/cli/pool/SessionRegistry.test.ts src/http/piManagement.test.ts --pool=threads --poolOptions.threads.singleThread`
+
+### WP-10: Provider Compatibility and Evidence Engine
+
+**Status**: In Progress
+**Assigned**: Codex
+**Priority**: P0
+
+#### Goal
+
+Make CLI-backed providers more resilient to provider/CLI drift by adding a
+shared compatibility engine that can fingerprint targets, select compatible
+runtime profiles, expose machine-readable readiness/degradation, and capture
+replay-friendly evidence when probes fail or behavior is unknown.
+
+#### Delivered
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Write implementation plan for the first compatibility slice | [x] | `docs/plans/PLAN-008-provider-compatibility-and-evidence-engine.md` records scope, phases, and validation targets |
+| Add shared compatibility engine under `src/core/compatibility` | [x] | Runtime now caches probe results, classifies compatibility, and exposes cached summaries across routes and execution |
+| Reuse compatibility assessment across setup, diagnostics, and execution | [x] | Session create/resume/fork paths prime CLI targets before spawn; diagnostics and provider config read from the same cache |
+| Add first-wave provider-family knowledge and degraded profile selection | [x] | Claude, Codex, Gemini, and Copilot now have curated probe/profile metadata; other CLI families fall back to runtime-default profiles with explicit degradation |
+| Capture replay-friendly evidence for mismatches and unknown behavior | [x] | Non-ready CLI assessments write redacted JSON evidence bundles under the runtime data dir and expose artifact metadata over diagnostics surfaces |
+| Update tests and docs for compatibility contracts | [x] | Vitest, API docs, setup docs, architecture notes, README, and this progress tracker now describe the first slice |
+
+#### Deferred Boundaries
+
+- [ ] No LLM-dependent compatibility hot path; evidence capture remains lightweight probe/output logging only
+- [ ] No provider-family-specific profiles yet for every CLI adapter; several providers still use the generic degraded fallback
+- [ ] No attempt to fold usage metering or progress-event expansion into this slice
+
+#### Verification
+
+- [x] `npm run build`
+- [x] `npx vitest run tests/runtime-diagnostics.test.ts tests/runtime-startup.test.ts tests/runtime-server.test.ts tests/api-backend.test.ts tests/agent-backend.test.ts src/core/compatibility/ProviderCompatibilityService.test.ts src/backends/cli/providers/claude.test.ts src/backends/cli/providers/codex.test.ts src/backends/cli/providers/gemini.test.ts src/backends/cli/providers/copilot.test.ts --pool=threads --poolOptions.threads.singleThread`
 
 ---
 

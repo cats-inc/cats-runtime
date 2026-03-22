@@ -5,6 +5,9 @@ import type {
   StreamEvent,
   TurnInput,
 } from '../../../core/types.js';
+import type { CompatibilityProfileSelection } from '../../../core/compatibility/types.js';
+
+export type { CompatibilityProfileSelection } from '../../../core/compatibility/types.js';
 
 export type {
   PermissionMode,

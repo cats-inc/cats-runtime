@@ -112,7 +112,8 @@ src/
 - Exposes startup/readiness metadata at `GET /health`
 - Exposes aggregate runtime + provider health at `GET /diagnostics/health`
 - Exposes runtime/host diagnostics at `GET /diagnostics/runtime`
-- Exposes provider availability diagnostics at `GET /diagnostics/providers`
+- Exposes provider availability plus CLI compatibility diagnostics at
+  `GET /diagnostics/providers`
 - Exposes runtime-owned delivery execution routes such as delivery audit,
   artifact publication, repo status, commit, and push without embedding
   product-level delivery governance policy
@@ -242,6 +243,9 @@ src/
 - Loads runtime-wide configuration
 - Hosts shared provider-target and provider-model catalog services
 - Hosts the runtime-managed skill catalog/delivery contract
+- Hosts the shared provider compatibility/evidence engine used by setup,
+  diagnostics, and CLI execution priming
+- Hosts the runtime-managed skill catalog/delivery contract
 - Defines stable exported runtime types
 - Keeps shared utilities out of provider modules
 - Owns the shared `progress` event helper and metering/guardrail type contracts
@@ -262,24 +266,27 @@ src/
 5. CLI targets flow into `WorkerPool`; API/local targets flow into `ApiBackendManager`; agent targets flow into `AgentBackendManager`
 6. Provider model-catalog reads resolve through the shared provider target and
    model catalog services in `src/core`
-7. API/local turns may enter the shared local tool loop in `src/core/tools`,
+7. CLI setup, diagnostics, and execution priming resolve through the shared
+   compatibility service in `src/core/compatibility`, which classifies targets,
+   selects degraded profiles, and writes evidence bundles for non-ready results
+8. API/local turns may enter the shared local tool loop in `src/core/tools`,
    including workspace substrate preview/apply operations
-8. Agent turns use the shared `TurnInput` contract plus provider-managed session continuity where available
-8. Stream events pass through runtime-owned metering observation so usage,
-   incidents, and active guardrails are updated before the caller receives the
-   final event stream
-9. Startup/readiness state is exposed over `GET /health`, while
+9. Agent turns use the shared `TurnInput` contract plus provider-managed session continuity where available
+10. Stream events pass through runtime-owned metering observation so usage,
+    incidents, and active guardrails are updated before the caller receives the
+    final event stream
+11. Startup/readiness state is exposed over `GET /health`, while
    `GET /diagnostics/health`, `GET /diagnostics/runtime`, and
    `GET /diagnostics/providers` expose the runtime-owned host integration
    surface
-10. Optional machine-readable process output emits startup and shutdown
+12. Optional machine-readable process output emits startup and shutdown
    lifecycle events for app-managed local hosts
-11. Session branch inspection is available over session payload `branching`
+13. Session branch inspection is available over session payload `branching`
     metadata plus `GET /sessions/{id}/lineage`
-12. Delivery actions resolve through `RuntimeDeliveryService`, which inspects
+14. Delivery actions resolve through `RuntimeDeliveryService`, which inspects
     repo state, exports artifacts, normalizes preview surfaces, and executes
     Git mutations behind a stable machine-readable contract
-13. Stream events are returned directly to the caller
+15. Stream events are returned directly to the caller
 
 For WSL-backed Cursor/Kiro discovery:
 
