@@ -140,7 +140,7 @@ export class AgentBackendManager {
     const sessionKey = session.sessionKey || sessionId;
     const model = session.model || instance.model;
     const composedInstructions = mergeRuntimeSkillInstructions(
-      turn.instructions,
+      turn.instructions ?? session.instructions,
       turn.skills ?? session.skills,
     );
 

@@ -1,8 +1,41 @@
 import { describe, it, expect } from 'vitest';
+import type { SessionSkillState } from '../../../core/types.js';
 import { PiProvider } from './pi.js';
 
 describe('PiProvider', () => {
   const provider = new PiProvider();
+
+  function buildSkillState(filePath?: string): SessionSkillState {
+    return {
+      requestedSkills: ['delivery-auditor'],
+      resolvedSkills: [{
+        id: 'delivery-auditor',
+        title: 'Delivery Auditor',
+        description: 'Checks delivery and outputs.',
+        status: 'resolved',
+        source: 'runtime_catalog',
+        sourcePath: 'skills/delivery-auditor',
+        entryFile: 'skills/delivery-auditor/SKILL.md',
+        fingerprint: 'delivery-auditor-fingerprint',
+      }],
+      strict: false,
+      delivery: {
+        provider: 'pi',
+        backend: 'cli',
+        preferredMode: 'instructions',
+        mode: 'instructions',
+        status: 'applied',
+        warnings: [],
+        instructions: {
+          filePath,
+          byteLength: 120,
+        },
+      },
+      warnings: [],
+      appliedSkillIds: ['delivery-auditor'],
+      updatedAt: '2026-03-23T00:00:00.000Z',
+    };
+  }
 
   it('has correct name and capabilities', () => {
     expect(provider.name).toBe('pi');
@@ -105,6 +138,42 @@ describe('PiProvider', () => {
       });
       const parsed = JSON.parse(msg.trim());
       expect(parsed.message).toContain('Instructions:\nStay terse.');
+      expect(parsed.message).toContain('User message:\nHello world');
+    });
+
+    it('does not duplicate runtime skill overlays when the active prompt file already matches', () => {
+      provider.buildSpawnArgs({
+        cwd: '/tmp',
+        instructionsFile: '/tmp/runtime-skill-prompt.md',
+      });
+
+      const msg = provider.buildStdinMessage('Hello world', {
+        message: 'Hello world',
+        instructions: 'Stay terse.',
+        skills: buildSkillState('/tmp/runtime-skill-prompt.md'),
+      });
+      const parsed = JSON.parse(msg.trim());
+
+      expect(parsed.message).toContain('Instructions:\nStay terse.');
+      expect(parsed.message).not.toContain('Runtime Skill: Delivery Auditor');
+    });
+
+    it('inlines runtime skill overlays when the turn skill prompt file differs from spawn state', () => {
+      provider.buildSpawnArgs({
+        cwd: '/tmp',
+        instructionsFile: '/tmp/runtime-skill-prompt-a.md',
+      });
+
+      const msg = provider.buildStdinMessage('Hello world', {
+        message: 'Hello world',
+        instructions: 'Stay terse.',
+        skills: buildSkillState('/tmp/runtime-skill-prompt-b.md'),
+      });
+      const parsed = JSON.parse(msg.trim());
+
+      expect(parsed.message).toContain('Instructions:\nThe following runtime-managed skills');
+      expect(parsed.message).toContain('Runtime Skill: Delivery Auditor');
+      expect(parsed.message).toContain('Stay terse.');
       expect(parsed.message).toContain('User message:\nHello world');
     });
   });

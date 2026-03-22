@@ -198,7 +198,7 @@ describe('runtime-managed skills HTTP contract', () => {
     });
   });
 
-  it('rejects malformed skill payloads during session create and message flows', async () => {
+  it('rejects malformed skill payloads and treats empty requestedSkills as a no-op', async () => {
     const app = createTestApp();
 
     const createResponse = await app.request('/sessions', {
@@ -216,6 +216,22 @@ describe('runtime-managed skills HTTP contract', () => {
       error: 'skills must be an object with requestedSkills.',
     });
 
+    const emptyCreateResponse = await app.request('/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        provider: 'codex',
+        workspaceMode: 'isolated',
+        skills: {
+          requestedSkills: [],
+        },
+      }),
+    });
+
+    expect(emptyCreateResponse.status).toBe(201);
+    const emptyCreateBody = await emptyCreateResponse.json() as { skills?: unknown };
+    expect(emptyCreateBody.skills).toBeUndefined();
+
     const session = registry.create({
       providerName: 'codex',
       providerBackend: 'cli',
@@ -225,7 +241,7 @@ describe('runtime-managed skills HTTP contract', () => {
     registry.updateStatus(session.id, 'ready');
 
     const messageWorker = {
-      active: true,
+      alive: true,
       busy: false,
       streamMessage: async function* () {
         yield { type: 'result' as const };
@@ -247,9 +263,8 @@ describe('runtime-managed skills HTTP contract', () => {
       }),
     });
 
-    expect(messageResponse.status).toBe(400);
-    await expect(messageResponse.json()).resolves.toEqual({
-      error: 'skills.requestedSkills must be a non-empty string array.',
-    });
+    expect(messageResponse.status).toBe(200);
+    expect(await messageResponse.text()).toContain('"type":"result"');
+    expect(registry.get(session.id)?.skills).toBeUndefined();
   });
 });

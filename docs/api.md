@@ -479,6 +479,9 @@ and `agent` sessions. Matching `cli` sessions still use the existing
 `context`, and `outputDir` fields. These are persisted onto the logical session
 so later history/resume flows can observe the same bootstrap metadata.
 
+An empty `skills.requestedSkills: []` payload is treated as a backward-compatible
+no-op, the same as omitting `skills`.
+
 `POST /sessions`, `POST /sessions/{id}/messages`, and `POST /sessions/{id}/fork`
 return `400` for malformed skill payloads or unknown/invalid runtime skill
 packages. When `skills.strict` is true and the target cannot honor the requested

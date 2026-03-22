@@ -121,6 +121,10 @@ export function parseRuntimeSkillManifest(value: unknown): ParsedRuntimeSkillMan
     };
   }
 
+  if (record.requestedSkills.length === 0) {
+    return {};
+  }
+
   const requestedSkills = parseStringArray(record.requestedSkills);
   if (!requestedSkills || requestedSkills.length === 0) {
     return {

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { resolveRuntimeSkillManifest } from './catalog.js';
+import { mergeRuntimeSkillInstructions, resolveRuntimeSkillManifest } from './catalog.js';
 
 describe('runtime skill catalog', () => {
   const cleanupPaths: string[] = [];
@@ -15,6 +15,29 @@ describe('runtime skill catalog', () => {
       }
     }
   });
+
+  function writeSkillPackage(
+    skillsRoot: string,
+    skillId: string,
+    options: {
+      body?: string;
+      name?: string;
+      description?: string;
+    } = {},
+  ) {
+    const skillDir = join(skillsRoot, skillId);
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(join(skillDir, 'SKILL.md'), [
+      '---',
+      `name: ${options.name ?? skillId}`,
+      `description: ${options.description ?? `${skillId} description.`}`,
+      '---',
+      '',
+      options.body ?? `Use the ${skillId} workflow.`,
+      '',
+    ].join('\n'), 'utf8');
+    return skillDir;
+  }
 
   it('materializes filesystem skills for Codex isolated workspaces', () => {
     const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
@@ -124,18 +147,12 @@ describe('runtime skill catalog', () => {
   it('rejects malformed skill packages during resolution', () => {
     const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
     cleanupPaths.push(sessionBaseDir);
-    const invalidSkillDir = join(process.cwd(), 'skills', 'invalid-runtime-skill-test');
-    cleanupPaths.push(invalidSkillDir);
-    mkdirSync(invalidSkillDir, { recursive: true });
-    writeFileSync(join(invalidSkillDir, 'SKILL.md'), [
-      '---',
-      'name: wrong-name',
-      'description: Invalid skill for tests.',
-      '---',
-      '',
-      'Broken skill body.',
-      '',
-    ].join('\n'), 'utf8');
+    const skillsRoot = join(sessionBaseDir, 'skills');
+    writeSkillPackage(skillsRoot, 'invalid-runtime-skill-test', {
+      name: 'wrong-name',
+      description: 'Invalid skill for tests.',
+      body: 'Broken skill body.',
+    });
 
     expect(() => resolveRuntimeSkillManifest({
       requestedSkills: ['invalid-runtime-skill-test'],
@@ -146,9 +163,39 @@ describe('runtime skill catalog', () => {
       cwd: join(sessionBaseDir, 'repo'),
       workspaceMode: 'shared',
       sessionBaseDir,
+      skillsRoot,
     })).toThrowError(expect.objectContaining({
       name: 'RuntimeSkillError',
       code: 'invalid_skill_package',
     }));
+  });
+
+  it('reuses the resolved skill package when building later instruction overlays', () => {
+    const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
+    cleanupPaths.push(sessionBaseDir);
+    const skillsRoot = join(sessionBaseDir, 'skills');
+    writeSkillPackage(skillsRoot, 'cached-skill', {
+      body: 'Original cached instructions.',
+    });
+
+    const skillState = resolveRuntimeSkillManifest({
+      requestedSkills: ['cached-skill'],
+    }, {
+      sessionId: 'session-cached',
+      providerName: 'claude',
+      providerBackend: 'api',
+      cwd: join(sessionBaseDir, 'repo'),
+      workspaceMode: 'shared',
+      sessionBaseDir,
+      skillsRoot,
+    });
+
+    writeSkillPackage(skillsRoot, 'cached-skill', {
+      body: 'Mutated instructions that should not be re-read for this session.',
+    });
+
+    const mergedInstructions = mergeRuntimeSkillInstructions(undefined, skillState);
+    expect(mergedInstructions).toContain('Original cached instructions.');
+    expect(mergedInstructions).not.toContain('Mutated instructions');
   });
 });

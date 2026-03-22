@@ -26,6 +26,7 @@ import type {
 const SKILLS_ROOT = path.resolve(fileURLToPath(new URL('../../../skills/', import.meta.url)));
 const CODER_SKILLS_ROOT = path.join('.agents', 'skills');
 const RUNTIME_SKILL_STATE_ROOT = '.runtime-skills';
+const runtimeSkillPackageCache = new Map<string, RuntimeSkillPackage>();
 
 interface RuntimeSkillPackage {
   id: string;
@@ -51,6 +52,7 @@ interface ResolveRuntimeSkillManifestOptions {
   workspaceMode?: WorkspaceMode;
   now?: Date;
   baseInstructionsFile?: string;
+  skillsRoot?: string;
 }
 
 interface RuntimeSkillDeliveryPlan {
@@ -98,6 +100,28 @@ function toSkillTitle(skillId: string): string {
 
 function computeFingerprint(content: string): string {
   return createHash('sha256').update(content).digest('hex');
+}
+
+function buildRuntimeSkillPackageCacheKey(value: {
+  entryFile: string;
+  fingerprint: string;
+}): string {
+  return `${value.entryFile}:${value.fingerprint}`;
+}
+
+function cacheRuntimeSkillPackage(skillPackage: RuntimeSkillPackage): RuntimeSkillPackage {
+  runtimeSkillPackageCache.set(
+    buildRuntimeSkillPackageCacheKey(skillPackage),
+    skillPackage,
+  );
+  return skillPackage;
+}
+
+function getCachedRuntimeSkillPackage(value: {
+  entryFile: string;
+  fingerprint: string;
+}): RuntimeSkillPackage | undefined {
+  return runtimeSkillPackageCache.get(buildRuntimeSkillPackageCacheKey(value));
 }
 
 function parseSkillMarkdown(skillId: string, entryFile: string): RuntimeSkillPackage {
@@ -163,8 +187,11 @@ function parseSkillMarkdown(skillId: string, entryFile: string): RuntimeSkillPac
   };
 }
 
-function resolveRuntimeSkillPackage(skillId: string): RuntimeSkillPackage {
-  const skillPath = path.join(SKILLS_ROOT, skillId);
+function resolveRuntimeSkillPackage(
+  skillId: string,
+  skillsRoot: string = SKILLS_ROOT,
+): RuntimeSkillPackage {
+  const skillPath = path.join(skillsRoot, skillId);
   if (!existsSync(skillPath) || !statSync(skillPath).isDirectory()) {
     throw new RuntimeSkillError(
       `Unknown runtime skill '${skillId}'.`,
@@ -180,15 +207,15 @@ function resolveRuntimeSkillPackage(skillId: string): RuntimeSkillPackage {
     );
   }
 
-  return parseSkillMarkdown(skillId, entryFile);
+  return cacheRuntimeSkillPackage(parseSkillMarkdown(skillId, entryFile));
 }
 
-export function listRuntimeSkillIds(): string[] {
-  if (!existsSync(SKILLS_ROOT)) {
+export function listRuntimeSkillIds(skillsRoot: string = SKILLS_ROOT): string[] {
+  if (!existsSync(skillsRoot)) {
     return [];
   }
 
-  return readdirSync(SKILLS_ROOT, { withFileTypes: true })
+  return readdirSync(skillsRoot, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
@@ -259,7 +286,10 @@ function buildPiSkillInstructionFile(
     options.sessionId,
   );
   mkdirSync(outputDir, { recursive: true });
-  const filePath = path.join(outputDir, 'pi-system-prompt.md');
+  const filePath = path.join(
+    outputDir,
+    `pi-system-prompt-${computeFingerprint(content).slice(0, 12)}.md`,
+  );
   writeFileSync(filePath, content + '\n', 'utf8');
   return {
     filePath,
@@ -331,7 +361,7 @@ function materializeCodexFilesystem(
   };
 }
 
-function buildUnsupportedDeliveryPlan(
+function buildRuntimeSkillDeliveryPlan(
   skillPackages: RuntimeSkillPackage[],
   options: ResolveRuntimeSkillManifestOptions,
 ): RuntimeSkillDeliveryPlan {
@@ -418,8 +448,10 @@ export function resolveRuntimeSkillManifest(
     return undefined;
   }
 
-  const skillPackages = requestedSkills.map((skillId) => resolveRuntimeSkillPackage(skillId));
-  const delivery = buildUnsupportedDeliveryPlan(skillPackages, options);
+  const skillPackages = requestedSkills.map((skillId) =>
+    resolveRuntimeSkillPackage(skillId, options.skillsRoot),
+  );
+  const delivery = buildRuntimeSkillDeliveryPlan(skillPackages, options);
 
   if (manifest.strict === true && delivery.status !== 'applied') {
     throw new RuntimeSkillError(
@@ -459,7 +491,24 @@ function rebuildRuntimeSkillPackages(
     return [];
   }
 
-  return skillState.resolvedSkills.map((skill) => resolveRuntimeSkillPackage(skill.id));
+  return skillState.resolvedSkills.map((skill) => {
+    const cached = getCachedRuntimeSkillPackage(skill);
+    if (cached) {
+      return cached;
+    }
+
+    if (!existsSync(skill.entryFile)) {
+      throw new RuntimeSkillError(
+        `Runtime skill '${skill.id}' is missing SKILL.md.`,
+        'invalid_skill_package',
+      );
+    }
+
+    // Fall back to the current on-disk package so persisted sessions remain recoverable
+    // after a runtime restart, but prefer the cached package when this process already
+    // resolved the session skill state.
+    return cacheRuntimeSkillPackage(parseSkillMarkdown(skill.id, skill.entryFile));
+  });
 }
 
 export function buildRuntimeSkillInstructionOverlay(

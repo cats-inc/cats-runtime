@@ -132,12 +132,12 @@ The first slice should make these request failures explicit:
 
 ### Phase 1: Freeze Core Skill Catalog and Validation
 
-- [ ] Replace the hard-coded catalog with discovery from `skills/`
-- [ ] Parse `SKILL.md` frontmatter with YAML
-- [ ] Validate required fields (`name`, `description`, non-empty body)
-- [ ] Normalize requested skill names and return explicit errors for malformed
+- [x] Replace the hard-coded catalog with discovery from `skills/`
+- [x] Parse `SKILL.md` frontmatter with YAML
+- [x] Validate required fields (`name`, `description`, non-empty body)
+- [x] Normalize requested skill names and return explicit errors for malformed
       payloads, unknown skills, and invalid packages
-- [ ] Add 2-3 reference skills for runtime verification
+- [x] Add 2-3 reference skills for runtime verification
 
 **Primary files**:
 
@@ -148,14 +148,14 @@ The first slice should make these request failures explicit:
 
 ### Phase 2: Session Contract and Observability
 
-- [ ] Extend session skill state to distinguish requested, resolved, delivery,
+- [x] Extend session skill state to distinguish requested, resolved, delivery,
       and applied metadata
-- [ ] Resolve skills during `POST /sessions`
-- [ ] Resolve or replace skills during `POST /sessions/{id}/messages`
-- [ ] Carry skill state through `POST /sessions/{id}/fork`
-- [ ] Surface skill metadata in `GET /sessions`, `GET /sessions/{id}`, and
+- [x] Resolve skills during `POST /sessions`
+- [x] Resolve or replace skills during `POST /sessions/{id}/messages`
+- [x] Carry skill state through `POST /sessions/{id}/fork`
+- [x] Surface skill metadata in `GET /sessions`, `GET /sessions/{id}`, and
       `GET /sessions/{id}/history`
-- [ ] Persist the expanded skill state through `SessionRegistry`
+- [x] Persist the expanded skill state through `SessionRegistry`
 
 **Primary files**:
 
@@ -167,12 +167,12 @@ The first slice should make these request failures explicit:
 
 ### Phase 3: Backend Delivery and Materialization
 
-- [ ] Add a backend-neutral skill-delivery/materialization seam
-- [ ] Support Codex filesystem delivery
-- [ ] Support Pi instruction-file delivery
-- [ ] Pass compiled skill instructions through API and agent backends
-- [ ] Record delivery warnings and materialization metadata in session state
-- [ ] Keep unsupported targets explicit with `none`
+- [x] Add a backend-neutral skill-delivery/materialization seam
+- [x] Support Codex filesystem delivery
+- [x] Support Pi instruction-file delivery
+- [x] Pass compiled skill instructions through API and agent backends
+- [x] Record delivery warnings and materialization metadata in session state
+- [x] Keep unsupported targets explicit with `none`
 
 **Primary files**:
 
@@ -184,11 +184,11 @@ The first slice should make these request failures explicit:
 
 ### Phase 4: Tests and Docs
 
-- [ ] Add catalog validation tests
-- [ ] Add session/message error-path tests for malformed and unknown skills
-- [ ] Add Codex/Pi delivery tests that verify skills are actually applied
-- [ ] Update API and architecture docs for the public skill contract
-- [ ] Update `PROGRESS.md`, `README.md`, and `skills/README.md`
+- [x] Add catalog validation tests
+- [x] Add session/message error-path tests for malformed and unknown skills
+- [x] Add Codex/Pi delivery tests that verify skills are actually applied
+- [x] Update API and architecture docs for the public skill contract
+- [x] Update `PROGRESS.md`, `README.md`, and `skills/README.md`
 
 ## Verification Targets
 

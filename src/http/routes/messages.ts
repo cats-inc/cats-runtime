@@ -8,7 +8,6 @@ import type { SessionRegistry } from '../../backends/cli/pool/SessionRegistry.js
 import type { CliRuntimeConfig } from '../../backends/cli/config.js';
 import type { StreamEvent } from '../../core/types.js';
 import {
-  RuntimeSkillError,
   resolveRuntimeSkillManifest,
 } from '../../core/skills/catalog.js';
 import { resolveProviderTarget } from '../../core/providerCatalog.js';
@@ -18,6 +17,7 @@ import {
   parseRuntimeSkillManifest,
 } from '../parsing.js';
 import { isPiUnknownSessionError } from '../../backends/cli/pi/resume.js';
+import { toRuntimeSkillErrorResponse } from '../runtimeSkillErrors.js';
 
 function appendHistory(sourcePath: string, entry: Record<string, unknown>): void {
   mkdirSync(dirname(sourcePath), { recursive: true });
@@ -56,17 +56,6 @@ function getOrCreateSourcePath(
 }
 
 export const messageRoutes = new Hono();
-
-function toRuntimeSkillErrorResponse(error: unknown) {
-  if (!(error instanceof RuntimeSkillError)) {
-    return undefined;
-  }
-
-  return {
-    status: error.code === 'strict_skill_delivery_unavailable' ? 409 as const : 400 as const,
-    body: { error: error.message },
-  };
-}
 
 function flushAssistantText(
   sourcePath: string | null,

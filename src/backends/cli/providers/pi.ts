@@ -1,4 +1,5 @@
 import { parsePiModel, parsePiStreamLine } from '../pi/parser.js';
+import { mergeRuntimeSkillInstructions } from '../../../core/skills/catalog.js';
 import type {
   Provider,
   ProviderCapabilities,
@@ -14,6 +15,7 @@ interface PiProviderOptions {
 export class PiProvider implements Provider {
   name = 'pi';
   capabilities: ProviderCapabilities = { resume: true, fork: false, permissions: false };
+  private activeInstructionsFile?: string;
 
   constructor(private readonly options: PiProviderOptions = {}) {}
 
@@ -32,6 +34,7 @@ export class PiProvider implements Provider {
     }
 
     const instructionsFile = opts.instructionsFile ?? this.options.instructionsFile;
+    this.activeInstructionsFile = instructionsFile;
     if (instructionsFile) {
       args.push('--append-system-prompt', instructionsFile);
     }
@@ -40,8 +43,16 @@ export class PiProvider implements Provider {
   }
 
   buildStdinMessage(content: string, turn?: TurnInput): string {
-    const prompt = turn?.instructions
-      ? ['Instructions:', turn.instructions, '', 'User message:', content].join('\n')
+    const skillInstructionsFile = turn?.skills?.delivery.instructions?.filePath;
+    const inlineSkillState = !skillInstructionsFile || skillInstructionsFile !== this.activeInstructionsFile
+      ? turn?.skills
+      : undefined;
+    const compiledInstructions = mergeRuntimeSkillInstructions(
+      turn?.instructions,
+      inlineSkillState,
+    );
+    const prompt = compiledInstructions
+      ? ['Instructions:', compiledInstructions, '', 'User message:', content].join('\n')
       : content;
     return JSON.stringify({ type: 'prompt', message: prompt }) + '\n';
   }

@@ -58,7 +58,6 @@ import {
   summarizeContextTransplant,
 } from '../../core/runtime/sessionBranching.js';
 import {
-  RuntimeSkillError,
   resolveRuntimeSkillManifest,
 } from '../../core/skills/catalog.js';
 import {
@@ -67,6 +66,7 @@ import {
   parseRuntimeSkillManifest,
   parseStringArray,
 } from '../parsing.js';
+import { toRuntimeSkillErrorResponse } from '../runtimeSkillErrors.js';
 
 interface SessionRouteEnv {
   Variables: {
@@ -339,17 +339,6 @@ function resolveCliProviderInstance(target: ProviderTargetDescriptor): ProviderI
   }
 
   return target.cliInstance;
-}
-
-function toRuntimeSkillErrorResponse(error: unknown) {
-  if (!(error instanceof RuntimeSkillError)) {
-    return undefined;
-  }
-
-  return {
-    status: error.code === 'strict_skill_delivery_unavailable' ? 409 as const : 400 as const,
-    body: { error: error.message },
-  };
 }
 
 function resolveSkillStateForTarget(
