@@ -38,7 +38,7 @@ export class WorkerPool {
   private kiroNative: KiroNativeSessionService;
   private auggieSessions: AuggieSessionService;
   private opencodeNative: OpencodeNativeSessionService;
-  readonly compatibility: ProviderCompatibilityService;
+  private readonly compatibility: ProviderCompatibilityService;
   private resolvers: ProviderServiceResolvers;
 
   constructor(

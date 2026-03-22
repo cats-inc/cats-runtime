@@ -18,6 +18,10 @@
     Start the runtime without stdout/stderr redirection. Use this when launching
     from automation that must detach cleanly from the long-lived Node process.
 
+.PARAMETER StartupTimeoutSec
+    How long to wait for the runtime health endpoint before reporting startup
+    failure. Default: 60 seconds.
+
 .EXAMPLE
     .\Restart-Server.ps1
     Restart cats-runtime
@@ -34,7 +38,8 @@
 param(
     [switch]$Stop,
     [int]$Port = 0,
-    [switch]$NoRedirect
+    [switch]$NoRedirect,
+    [int]$StartupTimeoutSec = 60
 )
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -60,20 +65,20 @@ if (Test-Path $envFile) {
     }
 }
 
-function Get-LoopbackHealthHost($host) {
-    switch ($host) {
+function Get-LoopbackHealthHost($inputHost) {
+    switch ($inputHost) {
         "0.0.0.0" { return "127.0.0.1" }
         "::" { return "127.0.0.1" }
         "[::]" { return "127.0.0.1" }
-        default { return $host }
+        default { return $inputHost }
     }
 }
 
-function Format-HttpHost($host) {
-    if ($host -match ':') {
-        return "[$host]"
+function Format-HttpHost($inputHost) {
+    if ($inputHost -match ':') {
+        return "[$inputHost]"
     }
-    return $host
+    return $inputHost
 }
 
 function Stop-ServiceOnPort($port) {
@@ -180,7 +185,7 @@ try {
     $healthHostForUrl = Format-HttpHost $healthHost
     $runtimeBaseUrl = "http://${healthHostForUrl}:$Port"
     $healthUrl = "$runtimeBaseUrl/health"
-    $deadline = (Get-Date).AddSeconds(20)
+    $deadline = (Get-Date).AddSeconds($StartupTimeoutSec)
     $response = $null
     $health = $null
     $lastHealthError = $null
@@ -233,6 +238,9 @@ try {
     }
 } catch {
     Write-Host "  Not responding on port $Port" -ForegroundColor Red
+    if ($_.Exception -and $_.Exception.Message) {
+        Write-Host "  Last health error: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
     $process.Refresh()
     if ($process.HasExited) {
         Write-Host "  Process exited with code $($process.ExitCode)" -ForegroundColor Yellow

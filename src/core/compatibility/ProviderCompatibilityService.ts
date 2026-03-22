@@ -167,10 +167,9 @@ export class ProviderCompatibilityService {
       )
       : undefined;
 
-    const commandAvailable = Boolean(
-      (versionProbe && (versionProbe.exitCode !== null || !versionProbe.error))
-      || (helpProbe && (helpProbe.exitCode !== null || !helpProbe.error)),
-    );
+    const versionProbeRecord = versionProbe ? toProbeRecord(versionArgs, versionProbe) : undefined;
+    const helpProbeRecord = helpProbe ? toProbeRecord(helpArgs || [], helpProbe) : undefined;
+    const commandAvailable = didExecuteProbe(versionProbeRecord) || didExecuteProbe(helpProbeRecord);
 
     checks.push(createCheck(
       'command_available',
@@ -288,8 +287,8 @@ export class ProviderCompatibilityService {
       warnings,
       checks,
       probes: {
-        version: versionProbe ? toProbeRecord(versionArgs, versionProbe) : undefined,
-        help: helpProbe ? toProbeRecord(helpArgs || [], helpProbe) : undefined,
+        version: versionProbeRecord,
+        help: helpProbeRecord,
       },
       cache: {
         hit: false,
@@ -587,6 +586,15 @@ function toProbeRecord(args: string[], result: ProbeResult): CompatibilityProbeR
   };
 }
 
+function didExecuteProbe(probe: CompatibilityProbeRecord | undefined): boolean {
+  return Boolean(
+    probe
+    && !probe.timedOut
+    && !probe.error
+    && probe.exitCode !== null,
+  );
+}
+
 function redactProbeRecord(
   probe: CompatibilityProbeRecord | undefined,
 ): CompatibilityProbeRecord | undefined {
@@ -616,11 +624,20 @@ function redactText(text: string | undefined): string | undefined {
   }
 
   const home = process.env.HOME || process.env.USERPROFILE;
-  const homeSafe = home ? escapeRegExp(home.replace(/\\/g, '/')) : undefined;
-  let output = text.replace(/[A-Za-z]:\/[^\s"']+/g, '<path>');
+  const homeUnixSafe = home ? escapeRegExp(home.replace(/\\/g, '/')) : undefined;
+  const homeWindowsSafe = home ? escapeRegExp(home.replace(/\//g, '\\')) : undefined;
+  let output = text;
+  output = output.replace(/\b([A-Z0-9_]*(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD|AUTHORIZATION)[A-Z0-9_]*)\s*[:=]\s*([^\s,"']+)/gi, '$1=<redacted>');
+  output = output.replace(/\bBearer\s+[A-Za-z0-9._~+\-/=]+\b/gi, 'Bearer <redacted>');
+  output = output.replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{8,}|github_pat_[A-Za-z0-9_]{8,}|AIza[0-9A-Za-z\-_]{20,})\b/g, '<redacted>');
+  output = output.replace(/"[A-Za-z]:(?:\\[^"\r\n]+)+"/g, '"<path>"');
+  output = output.replace(/[A-Za-z]:(?:\\|\/)[^\s"']+/g, '<path>');
   output = output.replace(/\/(?:Users|home)\/[^\s"']+/g, '<path>');
-  if (homeSafe) {
-    output = output.replace(new RegExp(homeSafe, 'gi'), '<home>');
+  if (homeUnixSafe) {
+    output = output.replace(new RegExp(homeUnixSafe, 'gi'), '<home>');
+  }
+  if (homeWindowsSafe) {
+    output = output.replace(new RegExp(homeWindowsSafe, 'gi'), '<home>');
   }
   return output;
 }

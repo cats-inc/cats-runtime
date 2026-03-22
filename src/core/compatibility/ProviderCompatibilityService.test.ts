@@ -145,6 +145,42 @@ describe('ProviderCompatibilityService', () => {
     expect(evidence.probes.version?.stdoutSample).toContain('codex 0.99.0');
   });
 
+  it('redacts Windows paths and secret-like values in evidence bundles', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-redaction-'));
+    tempDirs.push(root);
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      runner: {
+        run: vi.fn(async (_providerName, _commandConfig, args: string[]) => ({
+          exitCode: 0,
+          stdout: args[0] === '--version'
+            ? 'codex 0.99.0\n'
+            : 'Usage: codex config at "C:\\Users\\Alice\\AppData\\Local\\Codex\\config.json" OPENAI_API_KEY=sk-secret-value Bearer ghp_supersecret\n',
+          stderr: '',
+          timedOut: false,
+          durationMs: 4,
+        })),
+      },
+      now: () => Date.parse('2026-03-23T00:00:15.000Z'),
+    });
+
+    const assessment = await service.assessCliTarget(createCliTarget('codex'));
+    const evidencePath = join(service.getEvidenceDir(), assessment.evidence!.relativePath);
+    const evidenceText = readFileSync(evidencePath, 'utf8');
+    const evidence = JSON.parse(evidenceText) as {
+      probes: { help?: { stdoutSample?: string } };
+    };
+
+    expect(evidenceText).not.toContain('C:\\Users\\Alice');
+    expect(evidenceText).not.toContain('sk-secret-value');
+    expect(evidenceText).not.toContain('ghp_supersecret');
+    expect(evidence.probes.help?.stdoutSample).toContain('<path>');
+    expect(evidence.probes.help?.stdoutSample).toContain('OPENAI_API_KEY=<redacted>');
+    expect(evidence.probes.help?.stdoutSample).toContain('Bearer <redacted>');
+  });
+
   it('falls back to a generic degraded profile for providers without family knowledge', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-generic-'));
     tempDirs.push(root);
