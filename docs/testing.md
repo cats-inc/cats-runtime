@@ -37,6 +37,12 @@ locally in the same service that ships them.
 npm test
 ```
 
+### Skill Catalog Verification
+
+```bash
+npm run verify:skills
+```
+
 ### Specific Test Suite
 
 ```bash

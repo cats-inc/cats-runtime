@@ -167,7 +167,7 @@ leaking backend-specific wire formats to consumers.
 ### OPT-3: Runtime-Owned Browser Driver Hardening and Recovery
 
 **Priority**: P1
-**Status**: Planned
+**Status**: In Progress
 
 #### Problem
 
@@ -184,10 +184,11 @@ browser-backed preview and test workflows. The current gaps are:
 
 - no real Playwright/CDP/browser-service driver yet
 - browser sessions/pages are in-memory only and do not survive runtime restart
-- there is no browser-session cleanup/expiry discipline yet
-- browser state is exposed through `/browser/*`, but not yet folded into the
-  broader session inspection/read-model surfaces that hosts will eventually
-  want to poll
+- reset/delete cleanup and closed-session pruning exist, but there is still no
+  time-based browser-session expiry or retained-session GC policy
+- browser state already contributes additive session/history/observe inspection
+  previews, but host-facing aggregate read models are still thin and restart
+  recovery is absent
 
 Without a second slice, the browser subsystem remains structurally correct but
 operationally shallow.
@@ -205,13 +206,22 @@ Deepen the runtime-owned browser subsystem without coupling it to any monorepo
   improves long-lived preview workflows
 - Add runtime-owned cleanup discipline for stale/closed browser sessions and
   pages
-- Add additive browser summary/inspection hooks to the broader runtime
-  read-model where needed, so hosts can discover browser-backed preview state
-  without polling only the dedicated `/browser/*` routes
+- Broaden the already-landed inspection hooks into any additional host-facing
+  aggregate/read-model surfaces that should expose browser-backed preview state
 - Keep browser capabilities machine-readable so hosts can distinguish:
   - manual registration only
   - preview-only driver
   - richer automated browser control
+
+#### Current Implementation Status
+
+- The manual-driver browser substrate and normalized `browser_page` preview
+  surfaces are landed
+- Browser sessions already surface through session, history, and observe
+  inspection payloads, and reset/delete cleanup clears browser sessions bound
+  to the affected runtime session
+- Real drivers, restart-safe persistence, and time-based cleanup/expiry remain
+  deferred
 
 #### Why This Is Required
 
@@ -377,7 +387,7 @@ schemas.
 ### OPT-6: Runtime Skill Catalog Cache and Discovery Hardening
 
 **Priority**: P2
-**Status**: Planned
+**Status**: In Progress
 
 #### Problem
 
@@ -445,11 +455,13 @@ That freezes the content taxonomy, but the follow-through is still incomplete.
 
 Current gaps:
 
-- there is still no standalone runtime-owned skill catalog route or equivalent
-  read surface for hosts that should not import internal modules directly
-- the runtime catalog contract is stable enough for Team 6, but there is no
-  dedicated publish/lint workflow that proves every shipped skill package keeps
-  the richer metadata complete and internally consistent
+- the standalone runtime-owned catalog read surface now exists at
+  `GET /skills/catalog`, but there is still no versioned/filterable host-facing
+  contract beyond the raw runtime catalog read
+- the runtime catalog contract is stable enough for Team 6, and
+  `npm run verify:skills` now provides a dedicated verification gate, but there
+  is still no richer publish pipeline beyond running the existing catalog
+  validator as a command
 - `agency-agents/` is present only as reference material; there is no explicit
   authoring sync/review process for comparing external inspiration against the
   runtime-owned library without accidentally creating runtime coupling
@@ -465,11 +477,11 @@ Current gaps:
 Deepen the runtime-owned library surface without collapsing it into the
 execution/materialization engine.
 
-- Add a runtime-owned catalog read surface for the internal skill library
-  without forcing upper layers to import `src/core/skills/catalog.ts`
-- Add a stricter library lint/verification step for shipped runtime-owned skill
-  packages so missing family metadata, duplicate ids, and malformed tags fail
-  before publish
+- Keep the standalone runtime-owned catalog read surface minimal and stable so
+  upper layers can consume the library without importing
+  `src/core/skills/catalog.ts`
+- Keep the new `npm run verify:skills` gate aligned with shipped runtime-owned
+  skill packages, then grow it into a stricter publish/lint workflow as needed
 - Add an explicit authoring workflow for `agency-agents/` reference usage
   that keeps the boundary clear:
   - reference-only comparison
@@ -481,6 +493,18 @@ execution/materialization engine.
   anything broader than versioned runtime-owned content
 - Keep requested skill ids stable while improving library discovery,
   observability, and publish discipline
+
+#### Current Implementation Status
+
+- `GET /skills/catalog` now exposes a standalone runtime-owned catalog route
+  backed by `listRuntimeSkillCatalog()`
+- `src/http/routes/skills.ts` and `src/http/app.ts` now publish that read seam
+  without forcing hosts to import internal runtime modules directly
+- `npm run verify:skills` now provides a dedicated runtime-owned verification
+  command for shipped skill packages
+- richer publish/lint discipline, reference-authoring workflow,
+  bundle/composition metadata, and recursive discovery hardening remain
+  deferred
 
 #### Why This Is Required
 
@@ -496,11 +520,18 @@ execution/materialization engine.
 #### Affected Areas
 
 - `src/core/skills/*`
-- possible future runtime-owned skill catalog route surface
+- `src/bin/verifySkills.ts`
+- `src/http/routes/skills.ts`
+- `src/http/app.ts`
+- `package.json`
 - `skills/*`
 - `skills/README.md`
 - `.gitmodules`
 - `agency-agents/`
+- `docs/api.md`
+- `docs/architecture.md`
+- `docs/AGENT-GUIDE.md`
+- `docs/testing.md`
 - `docs/specs/SPEC-013-internal-skill-library-and-role-taxonomy.md`
 - `docs/specs/SPEC-005-runtime-managed-skills-v0.md`
 - `docs/decisions/018-separate-skill-library-content-from-runtime-execution-engine.md`

@@ -37,6 +37,7 @@
 - `POST /delivery/repo/status`
 - `POST /delivery/repo/commit`
 - `POST /delivery/repo/push`
+- `GET /skills/catalog`
 - `GET /sessions`
 - `GET /sessions/:id`
 - `GET /sessions/:id/lineage`

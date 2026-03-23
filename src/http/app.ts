@@ -43,6 +43,7 @@ import { kiroRoutes } from './routes/kiro.js';
 import { auggieRoutes } from './routes/auggie.js';
 import { opencodeRoutes } from './routes/opencode.js';
 import { providerRoutes } from './routes/providers.js';
+import { skillRoutes } from './routes/skills.js';
 import { wakeupRoutes } from './routes/wakeup.js';
 import type { RuntimeStartupState } from '../startup.js';
 
@@ -225,6 +226,7 @@ export function createRuntimeApp(ctx: AppContext) {
   app.route('/', auggieRoutes);
   app.route('/', opencodeRoutes);
   app.route('/', providerRoutes);
+  app.route('/', skillRoutes);
   app.route('/', wakeupRoutes);
 
   return app;

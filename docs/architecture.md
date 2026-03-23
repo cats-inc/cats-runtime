@@ -36,6 +36,7 @@ product shells or ad-hoc prompt helpers. The runtime:
 - chooses a backend-aware delivery mode (`filesystem`, `instructions`, `none`)
 - persists requested/resolved/applied skill state into session inspection and
   history surfaces
+- exposes a standalone runtime-owned library read seam at `GET /skills/catalog`
 
 ## Architecture Diagram
 
@@ -132,6 +133,7 @@ src/
   `GET /diagnostics/providers`
 - Exposes runtime-owned browser session/page routes with pluggable driver
   metadata and normalized `browser_page` preview surfaces
+- Exposes the standalone runtime-owned skill catalog at `GET /skills/catalog`
 - Exposes runtime-owned delivery execution routes such as delivery audit,
   artifact publication, repo status, commit, and push without embedding
   product-level delivery governance policy
@@ -318,6 +320,8 @@ src/
 - Resolves session-level requested skill ids into runtime-visible metadata
 - Exposes `listRuntimeSkillCatalog()` as the runtime-internal contract Team 6
   can consume without coupling to execution/materialization internals
+- Backs the standalone `GET /skills/catalog` HTTP read surface with the same
+  runtime-owned catalog contract
 - Supports explicit clearing of persisted skill state on create/message/fork
 - Chooses adapter-aware delivery modes per provider/backend
 - Materializes filesystem or instruction-file resources where the target needs

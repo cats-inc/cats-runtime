@@ -38,10 +38,11 @@
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "prepack": "npm run build",
-    "release:check": "npm run build && npm test && npm pack --dry-run",
+    "release:check": "npm run verify:skills && npm test && npm pack --dry-run",
     "test": "npm run build && vitest run --pool=threads --poolOptions.threads.singleThread",
     "test:watch": "vitest --pool=threads --poolOptions.threads.singleThread",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "verify:skills": "npm run build && node dist/bin/verifySkills.js"
   },
   "keywords": [
     "cats",

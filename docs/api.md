@@ -446,6 +446,61 @@ Push apply example:
 }
 ```
 
+### Skills
+
+```text
+GET /skills/catalog
+```
+
+This route exposes the standalone runtime-owned skill-library read model for
+hosts that should not import internal runtime modules directly.
+
+The response shape is:
+
+- `count`: total number of discovered runtime-owned skill packages
+- `skills`: array of runtime catalog entries
+- each skill entry includes stable read fields such as `id`, `slug`, `title`,
+  `description`, `status`, `source`, `sourcePath`, `entryFile`, `fingerprint`,
+  and `library`
+- `library`: normalized runtime-owned metadata with `family`, `slug`, `role`,
+  `packageKind`, `version`, `capabilityTags`, `productTags`,
+  `deliveryHints`, and `recommendedCompanions`
+
+Example response:
+
+```json
+{
+  "count": 1,
+  "skills": [
+    {
+      "id": "companion",
+      "slug": "companion",
+      "title": "Companion",
+      "description": "Core companion chat behavior.",
+      "status": "resolved",
+      "source": "runtime_catalog",
+      "sourcePath": "/repo/cats-runtime/skills/chat/companion",
+      "entryFile": "/repo/cats-runtime/skills/chat/companion/SKILL.md",
+      "fingerprint": "sha256...",
+      "library": {
+        "family": "chat",
+        "slug": "companion",
+        "role": "companion_core",
+        "packageKind": "base",
+        "version": "1.0.0",
+        "capabilityTags": ["memory-continuity"],
+        "productTags": ["cats"],
+        "deliveryHints": ["filesystem", "instructions"],
+        "recommendedCompanions": []
+      }
+    }
+  ]
+}
+```
+
+Failures return `500` with an `error` string when the runtime cannot read the
+catalog.
+
 ### Sessions
 
 ```text
@@ -1393,6 +1448,7 @@ GET /pool/status
 GET /discovery/status
 GET /providers/config
 GET /providers/{provider}/models
+GET /skills/catalog
 GET /browse?path=...
 GET /kiro/models
 ```

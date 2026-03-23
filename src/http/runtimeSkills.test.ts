@@ -155,6 +155,36 @@ describe('runtime-managed skills HTTP contract', () => {
     rmSync(rootDir, { recursive: true, force: true });
   });
 
+  it('returns the runtime-owned skill catalog over HTTP', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/skills/catalog');
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      count: number;
+      skills: Array<{
+        id: string;
+        library: {
+          family: string;
+          slug: string;
+          role: string;
+        };
+      }>;
+    };
+    expect(body.count).toBe(body.skills.length);
+    expect(body.skills).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'companion',
+        library: expect.objectContaining({
+          family: 'chat',
+          slug: 'companion',
+          role: 'companion_core',
+        }),
+      }),
+    ]));
+  });
+
   it('creates a Codex session with filesystem-delivered runtime skills and exposes them in history', async () => {
     const app = createTestApp();
 
