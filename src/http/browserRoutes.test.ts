@@ -7,6 +7,8 @@ import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig } from '../backends/cli/config.js';
 import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
 import { createRuntimeStartupState } from '../startup.js';
+import { RuntimeBrowserService } from '../core/browser/RuntimeBrowserService.js';
+import { ManualBrowserDriver } from '../backends/browser/manualDriver.js';
 
 describe('browser HTTP contract', () => {
   let rootDir: string;
@@ -14,6 +16,7 @@ describe('browser HTTP contract', () => {
   let dataDir: string;
   let registry: SessionRegistry;
   let pool: WorkerPool;
+  let browser: RuntimeBrowserService | undefined;
 
   function makeConfig(): CliRuntimeConfig {
     return {
@@ -61,6 +64,7 @@ describe('browser HTTP contract', () => {
       startup: createRuntimeStartupState(),
       registry,
       pool,
+      ...(browser ? { browser } : {}),
       cursorNative: {} as never,
       gooseNative: {} as never,
       kiroNative: {} as never,
@@ -116,6 +120,7 @@ describe('browser HTTP contract', () => {
       kill: vi.fn(),
       status: vi.fn(() => ({ active: 0, busy: 0, idle: 0, providers: {} })),
     } as unknown as WorkerPool;
+    browser = undefined;
   });
 
   afterEach(() => {
@@ -298,6 +303,37 @@ describe('browser HTTP contract', () => {
     expect(pageResponse.status).toBe(400);
     await expect(pageResponse.json()).resolves.toEqual({
       error: "Unsupported browser page binding kind 'room_preview'.",
+    });
+  });
+
+  it('returns a machine-readable client error when browser session capacity is exhausted', async () => {
+    browser = new RuntimeBrowserService({
+      drivers: [
+        new ManualBrowserDriver(),
+      ],
+      maxSessions: 1,
+    });
+    const app = createTestApp();
+
+    const firstResponse = await app.request('/browser/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        label: 'First Browser Session',
+      }),
+    });
+    expect(firstResponse.status).toBe(201);
+
+    const secondResponse = await app.request('/browser/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        label: 'Second Browser Session',
+      }),
+    });
+    expect(secondResponse.status).toBe(400);
+    await expect(secondResponse.json()).resolves.toEqual({
+      error: 'Browser session capacity reached (1). Close existing browser sessions before creating another.',
     });
   });
 });

@@ -165,6 +165,7 @@ export function createRuntimeApp(ctx: AppContext) {
   ctx.runtime = getRuntimeSessionManager(ctx);
   ctx.metering ??= new RuntimeMeteringService(ctx.config.metering);
   ctx.compatibility = getProviderCompatibilityService(ctx);
+  ctx.browser = getRuntimeBrowserService(ctx);
   const app = new Hono<{ Variables: { ctx: AppContext } }>();
   const __dirname = dirname(fileURLToPath(import.meta.url));
 

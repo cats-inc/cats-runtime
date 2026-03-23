@@ -21,20 +21,26 @@ export interface RuntimeBrowserDriverPageState {
   metadata?: Record<string, unknown>;
 }
 
+export interface RuntimeBrowserDriverCreateSessionInput {
+  browserSessionId: string;
+  runtimeSessionId?: string;
+  label?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RuntimeBrowserDriverOpenPageInput {
+  browserSessionId: string;
+  browserPageId: string;
+  target: RuntimeBrowserPageTarget;
+}
+
+export interface RuntimeBrowserDriverCloseSessionInput {
+  browserSessionId: string;
+}
+
 export interface RuntimeBrowserDriver {
   readonly descriptor: RuntimeBrowserDriverDescriptor;
-  createSession(input: {
-    browserSessionId: string;
-    runtimeSessionId?: string;
-    label?: string;
-    metadata?: Record<string, unknown>;
-  }): Promise<RuntimeBrowserDriverSessionState>;
-  openPage(input: {
-    browserSessionId: string;
-    browserPageId: string;
-    target: RuntimeBrowserPageTarget;
-  }): Promise<RuntimeBrowserDriverPageState>;
-  closeSession(input: {
-    browserSessionId: string;
-  }): Promise<void>;
+  createSession(input: RuntimeBrowserDriverCreateSessionInput): Promise<RuntimeBrowserDriverSessionState>;
+  openPage(input: RuntimeBrowserDriverOpenPageInput): Promise<RuntimeBrowserDriverPageState>;
+  closeSession(input: RuntimeBrowserDriverCloseSessionInput): Promise<void>;
 }

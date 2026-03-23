@@ -9,6 +9,9 @@ import type {
   RuntimeBrowserSessionView,
 } from '../types.js';
 
+const DEFAULT_MAX_BROWSER_SESSIONS = 32;
+const DEFAULT_MAX_BROWSER_PAGES_PER_SESSION = 32;
+
 interface StoredBrowserSession {
   id: string;
   driverId: string;
@@ -56,6 +59,8 @@ export interface RuntimeBrowserServiceOptions {
   drivers: RuntimeBrowserDriver[];
   sessionExists?: (sessionId: string) => boolean;
   now?: () => Date;
+  maxSessions?: number;
+  maxPagesPerSession?: number;
 }
 
 export class RuntimeBrowserNotFoundError extends Error {
@@ -74,12 +79,16 @@ export class RuntimeBrowserValidationError extends Error {
 
 export class RuntimeBrowserService {
   private readonly now: () => Date;
+  private readonly maxSessions: number;
+  private readonly maxPagesPerSession: number;
   private readonly drivers = new Map<string, RuntimeBrowserDriver>();
   private readonly sessions = new Map<string, StoredBrowserSession>();
   private readonly pages = new Map<string, StoredBrowserPage>();
 
   constructor(private readonly options: RuntimeBrowserServiceOptions) {
     this.now = options.now ?? (() => new Date());
+    this.maxSessions = Math.max(1, options.maxSessions ?? DEFAULT_MAX_BROWSER_SESSIONS);
+    this.maxPagesPerSession = Math.max(1, options.maxPagesPerSession ?? DEFAULT_MAX_BROWSER_PAGES_PER_SESSION);
     for (const driver of options.drivers) {
       this.drivers.set(driver.descriptor.id, driver);
     }
@@ -124,6 +133,11 @@ export class RuntimeBrowserService {
     if (session.status === 'closed') {
       throw new RuntimeBrowserValidationError(
         `Browser session '${browserSessionId}' is already closed.`,
+      );
+    }
+    if (session.pageIds.length >= this.maxPagesPerSession) {
+      throw new RuntimeBrowserValidationError(
+        `Browser session '${browserSessionId}' reached the maximum page capacity of ${this.maxPagesPerSession}.`,
       );
     }
 
@@ -195,6 +209,7 @@ export class RuntimeBrowserService {
   private async createSessionInternal(
     input: CreateRuntimeBrowserSessionInput = {},
   ): Promise<RuntimeBrowserSessionView> {
+    this.ensureSessionCapacity();
     const driverId = input.driverId?.trim() || 'manual';
     const driver = this.requireDriver(driverId);
     const runtimeSessionId = input.runtimeSessionId?.trim() || undefined;
@@ -225,6 +240,46 @@ export class RuntimeBrowserService {
     };
     this.sessions.set(browserSessionId, session);
     return this.buildSessionView(session);
+  }
+
+  private ensureSessionCapacity(): void {
+    if (this.sessions.size < this.maxSessions) {
+      return;
+    }
+
+    this.pruneClosedSessions();
+    if (this.sessions.size < this.maxSessions) {
+      return;
+    }
+
+    throw new RuntimeBrowserValidationError(
+      `Browser session capacity reached (${this.maxSessions}). Close existing browser sessions before creating another.`,
+    );
+  }
+
+  private pruneClosedSessions(): void {
+    const closedSessions = Array.from(this.sessions.values())
+      .filter((session) => session.status === 'closed')
+      .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt));
+
+    while (this.sessions.size >= this.maxSessions && closedSessions.length > 0) {
+      const session = closedSessions.shift();
+      if (!session) {
+        break;
+      }
+      this.deleteStoredSession(session.id);
+    }
+  }
+
+  private deleteStoredSession(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return;
+    }
+    for (const pageId of session.pageIds) {
+      this.pages.delete(pageId);
+    }
+    this.sessions.delete(sessionId);
   }
 
   private requireDriver(id: string): RuntimeBrowserDriver {
@@ -265,39 +320,30 @@ export class RuntimeBrowserService {
   }
 
   private buildPageView(page: StoredBrowserPage): RuntimeBrowserPage {
-    const previewSurface = createBrowserPagePreviewSurface({
-      id: page.id,
-      browserSessionId: page.browserSessionId,
-      status: page.status,
-      ...(page.label ? { label: page.label } : {}),
-      ...(page.title ? { title: page.title } : {}),
-      ...(page.url ? { url: page.url } : {}),
-      ...(page.path ? { path: page.path } : {}),
-      ...(page.mediaType ? { mediaType: page.mediaType } : {}),
-      createdAt: page.createdAt,
-      updatedAt: page.updatedAt,
-      ...(page.closedAt ? { closedAt: page.closedAt } : {}),
-      binding: cloneBinding(page.binding),
-      ...(page.metadata ? { metadata: { ...page.metadata } } : {}),
-    });
-
+    const snapshot = toBrowserPageSnapshot(page);
     return {
-      id: page.id,
-      browserSessionId: page.browserSessionId,
-      status: page.status,
-      ...(page.label ? { label: page.label } : {}),
-      ...(page.title ? { title: page.title } : {}),
-      ...(page.url ? { url: page.url } : {}),
-      ...(page.path ? { path: page.path } : {}),
-      ...(page.mediaType ? { mediaType: page.mediaType } : {}),
-      createdAt: page.createdAt,
-      updatedAt: page.updatedAt,
-      ...(page.closedAt ? { closedAt: page.closedAt } : {}),
-      binding: cloneBinding(page.binding),
-      previewSurface,
-      ...(page.metadata ? { metadata: { ...page.metadata } } : {}),
+      ...snapshot,
+      previewSurface: createBrowserPagePreviewSurface(snapshot),
     };
   }
+}
+
+function toBrowserPageSnapshot(page: StoredBrowserPage): Omit<RuntimeBrowserPage, 'previewSurface'> {
+  return {
+      id: page.id,
+      browserSessionId: page.browserSessionId,
+      status: page.status,
+      ...(page.label ? { label: page.label } : {}),
+      ...(page.title ? { title: page.title } : {}),
+      ...(page.url ? { url: page.url } : {}),
+      ...(page.path ? { path: page.path } : {}),
+      ...(page.mediaType ? { mediaType: page.mediaType } : {}),
+      createdAt: page.createdAt,
+      updatedAt: page.updatedAt,
+      ...(page.closedAt ? { closedAt: page.closedAt } : {}),
+      binding: cloneBinding(page.binding),
+      ...(page.metadata ? { metadata: { ...page.metadata } } : {}),
+    };
 }
 
 function validateBrowserPageTarget(input: CreateRuntimeBrowserPageInput): void {

@@ -18,6 +18,14 @@ const DOWNLOADABLE_EXTENSIONS = new Set([
   '.txt',
   '.webp',
 ]);
+const IMAGE_EXTENSIONS = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.svg',
+]);
 const HTTP_URL_PREFIX = /^https?:\/\//i;
 
 export function resolveBrowserArtifactPath(
@@ -48,7 +56,7 @@ export function guessBrowserPreviewMediaType(
   if (extension === '.pdf') {
     return 'application/pdf';
   }
-  if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'].includes(extension)) {
+  if (IMAGE_EXTENSIONS.has(extension)) {
     return `image/${extension.slice(1) === 'jpg' ? 'jpeg' : extension.slice(1)}`;
   }
   return undefined;

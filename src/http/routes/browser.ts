@@ -1,8 +1,12 @@
 import { Hono, type Context } from 'hono';
-import type { RuntimeBrowserPageBinding, RuntimeBrowserPageBindingKind } from '../../core/types.js';
+import type {
+  AgentRuntimeService,
+  RuntimeBrowserPageBinding,
+  RuntimeBrowserPageBindingKind,
+  SessionArtifact,
+} from '../../core/types.js';
 import {
   getRuntimeBrowserService,
-  getRuntimeMeteringService,
   getRuntimeSessionManager,
   type AppContext,
 } from '../app.js';
@@ -14,8 +18,6 @@ import {
   guessBrowserPreviewMediaType,
   resolveBrowserArtifactPath,
 } from '../../core/browser/previewSurfaces.js';
-import { toSessionView } from '../../backends/cli/pool/sessionView.js';
-import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
 
 export const browserRoutes = new Hono();
 
@@ -189,25 +191,13 @@ function resolvePageTarget(
     );
   }
 
-  const runtime = getRuntimeSessionManager(ctx);
-  const wakeup = ctx.wakeup?.getSessionWakeState(session.id);
-  const view = toSessionView(session, {
-    attached: runtime.isAttached(session.id),
-    externalSessionLiveWindowMs: ctx.config.externalSessionLiveWindowMs,
-  });
-  const inspection = buildSessionInspection({
-    session,
-    view,
-    trackedState: runtime.getTrackedState(session.id),
-    metering: getRuntimeMeteringService(ctx).buildSessionSnapshot(session),
-    wakeupPending: Boolean(wakeup?.pending),
-  });
+  const { services, artifacts } = collectRuntimeSessionPreviewSources(ctx, runtimeSessionId);
 
   if (binding.kind === 'session_service') {
     if (!binding.serviceId) {
       throw new RuntimeBrowserValidationError('session_service binding requires serviceId.');
     }
-    const service = inspection.services.find((candidate) => candidate.id === binding.serviceId);
+    const service = services.find((candidate) => candidate.id === binding.serviceId);
     if (!service) {
       throw new RuntimeBrowserValidationError(
         `Runtime session '${runtimeSessionId}' does not expose service '${binding.serviceId}'.`,
@@ -231,7 +221,7 @@ function resolvePageTarget(
   if (!binding.artifactId) {
     throw new RuntimeBrowserValidationError('session_artifact binding requires artifactId.');
   }
-  const artifact = inspection.artifacts.find((candidate) => candidate.id === binding.artifactId);
+  const artifact = artifacts.find((candidate) => candidate.id === binding.artifactId);
   if (!artifact) {
     throw new RuntimeBrowserValidationError(
       `Runtime session '${runtimeSessionId}' does not expose artifact '${binding.artifactId}'.`,
@@ -245,15 +235,17 @@ function resolvePageTarget(
       `Runtime session artifact '${binding.artifactId}' does not expose a usable path or URL.`,
     );
   }
+  const mediaType = guessBrowserPreviewMediaType(
+    resolvedPath || artifact.path || artifact.uri,
+    artifact.mediaType,
+  );
 
   return {
     label: parseOptionalString(record.label) || artifact.label || artifact.id,
     ...(parseOptionalString(record.title) ? { title: parseOptionalString(record.title) } : {}),
     ...(artifactUrl ? { url: artifactUrl } : {}),
     ...(resolvedPath ? { path: resolvedPath } : {}),
-    ...(guessBrowserPreviewMediaType(resolvedPath || artifact.path || artifact.uri, artifact.mediaType)
-      ? { mediaType: guessBrowserPreviewMediaType(resolvedPath || artifact.path || artifact.uri, artifact.mediaType) }
-      : {}),
+    ...(mediaType ? { mediaType } : {}),
     binding: {
       ...binding,
       runtimeSessionId,
@@ -262,6 +254,64 @@ function resolvePageTarget(
       sourceKind: 'session_artifact',
     }),
   };
+}
+
+function collectRuntimeSessionPreviewSources(
+  ctx: AppContext,
+  runtimeSessionId: string,
+): {
+  services: AgentRuntimeService[];
+  artifacts: SessionArtifact[];
+} {
+  const session = ctx.registry.get(runtimeSessionId);
+  if (!session) {
+    return {
+      services: [],
+      artifacts: [],
+    };
+  }
+
+  const trackedState = getRuntimeSessionManager(ctx).getTrackedState(runtimeSessionId);
+  return {
+    services: dedupeServices([
+      ...(session.providerState?.agentSession?.services || []),
+      ...(trackedState?.currentRun?.services || []),
+      ...(trackedState?.lastRun?.services || []),
+    ]),
+    artifacts: dedupeArtifacts([
+      ...(session.artifacts || []),
+      ...(trackedState?.currentRun?.artifacts || []),
+      ...(trackedState?.lastRun?.artifacts || []),
+    ]),
+  };
+}
+
+function dedupeServices(services: AgentRuntimeService[]): AgentRuntimeService[] {
+  const deduped = new Map<string, AgentRuntimeService>();
+  for (const service of services) {
+    if (!service.id || deduped.has(service.id)) {
+      continue;
+    }
+    deduped.set(service.id, {
+      ...service,
+      ...(service.metadata ? { metadata: { ...service.metadata } } : {}),
+    });
+  }
+  return Array.from(deduped.values());
+}
+
+function dedupeArtifacts(artifacts: SessionArtifact[]): SessionArtifact[] {
+  const deduped = new Map<string, SessionArtifact>();
+  for (const artifact of artifacts) {
+    if (!artifact.id || deduped.has(artifact.id)) {
+      continue;
+    }
+    deduped.set(artifact.id, {
+      ...artifact,
+      ...(artifact.metadata ? { metadata: { ...artifact.metadata } } : {}),
+    });
+  }
+  return Array.from(deduped.values());
 }
 
 function mergeRecords(

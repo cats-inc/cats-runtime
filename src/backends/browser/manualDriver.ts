@@ -1,4 +1,7 @@
-import type { RuntimeBrowserDriver } from '../../core/browser/driver.js';
+import type {
+  RuntimeBrowserDriver,
+  RuntimeBrowserDriverOpenPageInput,
+} from '../../core/browser/driver.js';
 import type { RuntimeBrowserDriverDescriptor } from '../../core/types.js';
 
 export class ManualBrowserDriver implements RuntimeBrowserDriver {
@@ -28,15 +31,9 @@ export class ManualBrowserDriver implements RuntimeBrowserDriver {
     };
   }
 
-  async openPage(input: {
-    target: {
-      title?: string;
-      metadata?: Record<string, unknown>;
-      binding: {
-        kind: string;
-      };
-    };
-  }): Promise<{ title?: string; metadata: Record<string, unknown> }> {
+  async openPage(
+    input: RuntimeBrowserDriverOpenPageInput,
+  ): Promise<{ title?: string; metadata: Record<string, unknown> }> {
     return {
       ...(input.target.title ? { title: input.target.title } : {}),
       metadata: {

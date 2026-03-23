@@ -326,6 +326,11 @@ Browser session responses include:
 - `inspection.previewSurfaces`: normalized `browser_page` surfaces aligned with
   existing session/delivery preview-surface contracts
 
+The first browser substrate is bounded. When the runtime reaches browser
+session or per-session page capacity, create routes return `400` with a
+machine-readable validation error instead of letting browser state grow
+without limit.
+
 ### Delivery
 
 ```text

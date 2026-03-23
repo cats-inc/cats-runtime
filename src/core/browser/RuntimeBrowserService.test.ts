@@ -72,4 +72,58 @@ describe('RuntimeBrowserService', () => {
     expect(closed.inspection.openPageCount).toBe(0);
     expect(closed.inspection.closedPageCount).toBe(1);
   });
+
+  it('prunes closed browser sessions before creating beyond the configured capacity', async () => {
+    const browser = new RuntimeBrowserService({
+      drivers: [
+        new ManualBrowserDriver(),
+      ],
+      maxSessions: 1,
+      now: () => new Date('2026-03-23T00:00:00.000Z'),
+    });
+
+    const first = await browser.createSession({
+      label: 'First',
+    });
+    await browser.closeSession(first.id);
+
+    const second = await browser.createSession({
+      label: 'Second',
+    });
+
+    expect(browser.getSession(first.id)).toBeUndefined();
+    expect(second.label).toBe('Second');
+    expect(browser.listSessions()).toHaveLength(1);
+  });
+
+  it('rejects new browser sessions or pages when the configured capacity is exhausted', async () => {
+    const browser = new RuntimeBrowserService({
+      drivers: [
+        new ManualBrowserDriver(),
+      ],
+      maxSessions: 1,
+      maxPagesPerSession: 1,
+      now: () => new Date('2026-03-23T00:00:00.000Z'),
+    });
+
+    const session = await browser.createSession({
+      label: 'Only Session',
+    });
+    await expect(browser.createSession({
+      label: 'Overflow Session',
+    })).rejects.toThrow('Browser session capacity reached (1).');
+
+    await browser.createPage(session.id, {
+      url: 'http://127.0.0.1:4173',
+      binding: {
+        kind: 'manual_url',
+      },
+    });
+    await expect(browser.createPage(session.id, {
+      url: 'http://127.0.0.1:4174',
+      binding: {
+        kind: 'manual_url',
+      },
+    })).rejects.toThrow("Browser session '" + session.id + "' reached the maximum page capacity of 1.");
+  });
 });
