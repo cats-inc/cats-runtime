@@ -68,6 +68,7 @@ src/
   core/
     config.ts
     models/
+    provider-install/
     skills/
     dotenv.ts
     providerCatalog.ts
@@ -258,6 +259,10 @@ src/
 
 - Loads runtime-wide configuration
 - Hosts shared provider-target and provider-model catalog services
+- Hosts the runtime-owned provider install/check metadata plus shared command
+  lookup / package-check runner seam, including copied prerequisite, shell PATH
+  persistence, and npm-prefix logic with no runtime dependency on
+  `environment-bootstrap`
 - Hosts the runtime-managed skill catalog/delivery contract
 - Hosts the shared provider compatibility/evidence engine used by setup,
   diagnostics, and CLI execution priming
@@ -282,8 +287,10 @@ src/
 6. Provider model-catalog reads resolve through the shared provider target and
    model catalog services in `src/core`
 7. CLI setup, diagnostics, and execution priming resolve through the shared
-   compatibility service in `src/core/compatibility`, which classifies targets,
-   selects degraded profiles, and writes evidence bundles for non-ready results
+   compatibility service in `src/core/compatibility`, which consumes the
+   runtime-owned metadata in `src/core/provider-install`, classifies targets,
+   selects degraded profiles, evaluates prerequisite / PATH-persistence /
+   npm-prefix setup state, and writes evidence bundles for non-ready results
 8. API/local turns may enter the shared local tool loop in `src/core/tools`,
    including workspace substrate preview/apply operations
 9. Agent turns use the shared `TurnInput` contract plus provider-managed session continuity where available

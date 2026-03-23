@@ -3,6 +3,7 @@ import type {
   ProviderRuntimeConfig,
 } from '../../backends/cli/config.js';
 import type { ProviderName } from '../../backends/cli/providers/types.js';
+import type { ProviderSetupSummary } from '../provider-install/types.js';
 import type { HealthStatus } from '../types.js';
 
 export type CompatibilityClassification =
@@ -102,6 +103,7 @@ export interface CompatibilityAssessment {
   fingerprint: CompatibilityFingerprint;
   profile: CompatibilityProfileSelection;
   warnings: string[];
+  setup: ProviderSetupSummary;
   checks: CompatibilityCheck[];
   probes: {
     version?: CompatibilityProbeRecord;

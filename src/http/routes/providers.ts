@@ -5,6 +5,7 @@ import {
   listProviderCatalog,
 } from '../../core/providerCatalog.js';
 import type { ProviderName } from '../../backends/cli/providers/types.js';
+import { buildProviderInstallCatalogView } from '../../core/provider-install/knowledge.js';
 import type { AppContext } from '../app.js';
 import { getProviderCompatibilityService } from '../app.js';
 import { getRouteErrorStatus } from '../routeErrors.js';
@@ -32,6 +33,12 @@ providerRoutes.get('/providers/config', (c) => {
         runtime: instance.cliInstance?.commandConfig.runtime,
         transport: instance.remoteInstance?.transport,
         model: instance.remoteInstance?.model,
+        install: instance.backend === 'cli' && instance.cliInstance
+          ? buildProviderInstallCatalogView(
+            instance.providerName as ProviderName,
+            instance.cliInstance.commandConfig.runtime,
+          )
+          : null,
         compatibility: instance.backend === 'cli'
           ? compatibility.getCachedSummary(
             instance.providerName as ProviderName,

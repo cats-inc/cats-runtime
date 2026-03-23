@@ -10,6 +10,7 @@ import {
 } from '../../core/providerCatalog.js';
 import { toCompatibilitySummaryView } from '../../core/compatibility/ProviderCompatibilityService.js';
 import type { CompatibilitySummaryView } from '../../core/compatibility/types.js';
+import type { ProviderSetupSummary } from '../../core/provider-install/types.js';
 import type { HealthStatus } from '../../core/types.js';
 import type { AppContext } from '../app.js';
 import { getProviderCompatibilityService, getRuntimeMeteringService } from '../app.js';
@@ -56,6 +57,7 @@ interface ProviderDiagnosticResult {
   availability: ProviderDiagnosticAvailability;
   config: Record<string, unknown>;
   checks: DiagnosticCheck[];
+  setup?: ProviderSetupSummary;
   compatibility?: CompatibilitySummaryView;
 }
 
@@ -147,10 +149,12 @@ async function diagnoseCliTarget(
 ): Promise<{
     checks: DiagnosticCheck[];
     config: Record<string, unknown>;
+    setup?: ProviderSetupSummary;
     compatibility: CompatibilitySummaryView;
   }> {
   const instance = target.cliInstance;
   if (!instance) {
+    const checkedAt = new Date().toISOString();
     return {
       checks: [
         createCheck(
@@ -164,7 +168,7 @@ async function diagnoseCliTarget(
         classification: 'probe_failed',
         status: 'unavailable',
         summary: `CLI target '${target.providerName}/${target.instanceId}' is not initialized`,
-        checkedAt: new Date().toISOString(),
+        checkedAt,
         profile: {
           id: 'missing-cli-instance',
           label: 'Missing CLI instance',
@@ -271,6 +275,7 @@ async function diagnoseCliTarget(
   return {
     checks,
     config,
+    setup: assessment.setup,
     compatibility: toCompatibilitySummaryView(assessment),
   };
 }
@@ -435,6 +440,7 @@ async function diagnoseTarget(
   let result: {
     checks: DiagnosticCheck[];
     config: Record<string, unknown>;
+    setup?: ProviderSetupSummary;
     compatibility?: CompatibilitySummaryView;
   };
   if (target.backend === 'cli') {
@@ -461,6 +467,7 @@ async function diagnoseTarget(
     availability,
     config: result.config,
     checks: result.checks,
+    setup: result.setup,
     compatibility: result.compatibility,
   };
 }

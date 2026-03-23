@@ -42,6 +42,16 @@ function alignDefaultProviderRuntime(
   };
 }
 
+function nativeExecutionPlatform(): 'windows' | 'macos' | 'linux' {
+  if (process.platform === 'win32') {
+    return 'windows';
+  }
+  if (process.platform === 'darwin') {
+    return 'macos';
+  }
+  return 'linux';
+}
+
 function createTestConfig(overrides = {}) {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-test-'));
   const env = {
@@ -570,6 +580,26 @@ backends:
             availability: expect.objectContaining({
               status: 'degraded',
               probe: 'light',
+            }),
+            setup: expect.objectContaining({
+              prerequisites: expect.arrayContaining([
+                expect.objectContaining({
+                  id: 'node',
+                }),
+                expect.objectContaining({
+                  id: 'npm',
+                }),
+              ]),
+              command: expect.objectContaining({
+                status: 'ready',
+              }),
+              install: expect.objectContaining({
+                provider: 'codex',
+                installPack: 'npm-global',
+              }),
+              npm: expect.objectContaining({
+                packageName: '@openai/codex',
+              }),
             }),
             compatibility: expect.objectContaining({
               classification: 'degraded',
@@ -1149,6 +1179,24 @@ backends:
                 command: 'cursor-agent',
                 runner: 'auto',
                 runtime: { mode: 'wsl', distro: 'Ubuntu', environmentId: 'ubuntu' },
+                install: expect.objectContaining({
+                  provider: 'cursor',
+                  executionPlatform: 'linux',
+                  prerequisites: expect.arrayContaining([
+                    expect.objectContaining({
+                      id: 'bash',
+                    }),
+                    expect.objectContaining({
+                      id: 'curl',
+                    }),
+                  ]),
+                  path: expect.objectContaining({
+                    persistenceEntry: '.local/bin',
+                  }),
+                  install: expect.objectContaining({
+                    installerId: 'cursor-agent',
+                  }),
+                }),
                 compatibility: null,
               },
               {
@@ -1158,6 +1206,24 @@ backends:
                 command: 'cursor-agent',
                 runner: 'auto',
                 runtime: { mode: 'wsl', distro: 'Debian', environmentId: 'debian' },
+                install: expect.objectContaining({
+                  provider: 'cursor',
+                  executionPlatform: 'linux',
+                  prerequisites: expect.arrayContaining([
+                    expect.objectContaining({
+                      id: 'bash',
+                    }),
+                    expect.objectContaining({
+                      id: 'curl',
+                    }),
+                  ]),
+                  path: expect.objectContaining({
+                    persistenceEntry: '.local/bin',
+                  }),
+                  install: expect.objectContaining({
+                    installerId: 'cursor-agent',
+                  }),
+                }),
                 compatibility: null,
               },
             ],
@@ -1221,6 +1287,13 @@ providers:
                 command: 'claude',
                 runner: 'auto',
                 runtime: { mode: 'native', environmentId: 'native' },
+                install: expect.objectContaining({
+                  provider: 'claude',
+                  executionPlatform: nativeExecutionPlatform(),
+                  install: expect.objectContaining({
+                    installerId: 'claude-code',
+                  }),
+                }),
                 compatibility: null,
               },
             ],

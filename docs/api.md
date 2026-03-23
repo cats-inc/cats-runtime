@@ -161,6 +161,19 @@ surface for hosts and dashboards. The response includes:
 - optional forced-refresh semantics for cached CLI compatibility assessments
 - aggregate summary status and counts
 - per-target `availability.status` (`ok`, `degraded`, `unavailable`)
+- per-target CLI `setup` summaries with machine-readable:
+  - install metadata (`installerId`, method, platform, command, docs/hints)
+  - install prerequisites (`bash`, `curl`, `node`, `npm`) for the target
+    execution environment
+  - command resolution status (`ready`, `missing_install`, `missing_path`,
+    `misconfigured_command`, `probe_failed`)
+  - shell PATH persistence status for runtime-owned `.local/bin` /
+    `.npm-global/bin` layouts
+  - npm prefix status for npm-global providers when the runtime has an expected
+    baseline
+  - auth status (`not_required`, `missing`, `unknown`)
+  - version status (`ready`, `unsupported`, `unknown`)
+  - additive `remediation` steps that hosts can surface directly
 - per-target CLI `compatibility` summaries with:
   `classification`, `status`, `summary`, `checkedAt`, selected `profile`,
   version/runtime `fingerprint`, additive `warnings`, and optional `evidence`
@@ -904,9 +917,24 @@ or other clients that need to offer provider-instance selection. Each instance
 entry includes its backend kind (`cli`, `api`, `local`, or `agent`) plus any
 transport or runtime metadata that applies to that backend.
 
-For CLI backends, instance entries also expose cached `compatibility` metadata
-once that target has been primed by diagnostics or execution. When present, the
-compatibility object mirrors the diagnostics summary view:
+For CLI backends, instance entries also expose runtime-owned `install` metadata
+even before a probe has run. The `install` object includes:
+
+- resolved execution platform (`windows`, `macos`, `linux`)
+- provider family / binary name
+- install prerequisites for the target runtime
+- installer metadata (`installerId`, method, command, docs URL, restart hints)
+- auth expectations (`requiredAfterInstall`, suggested env vars, interactive hint)
+- PATH hints plus shell-persistence expectations for the target execution
+  environment
+- npm-global package / prefix hints where that provider family uses npm delivery
+
+These install/setup fields are owned directly by `cats-runtime`; hosts do not
+need `environment-bootstrap` present at runtime to read or act on them.
+
+CLI entries also expose cached `compatibility` metadata once that target has
+been primed by diagnostics or execution. When present, the compatibility object
+mirrors the diagnostics summary view:
 
 - `classification` and `status`
 - `summary` and `checkedAt`
@@ -916,7 +944,7 @@ compatibility object mirrors the diagnostics summary view:
 - optional `evidence` artifact metadata for degraded or failed probes
 
 Targets that have not been probed yet, plus non-CLI backends, return
-`compatibility: null`.
+`compatibility: null`. Non-CLI backends also return `install: null`.
 
 `GET /providers/{provider}/models` is the runtime-owned per-provider model
 catalog route. It accepts optional `?instance=<instance-id>` and returns a
@@ -1064,4 +1092,4 @@ Errors use this format:
 
 ---
 
-*Last updated: 2026-03-22*
+*Last updated: 2026-03-23*

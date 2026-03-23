@@ -89,6 +89,10 @@ backends:
     # diagnostics, and execution priming. Degraded or failed probes write
     # replay-friendly evidence bundles under <dataDir>/compatibility/ and the
     # cached summary is surfaced via /diagnostics/providers and /providers/config.
+    # /providers/config also exposes runtime-owned static install metadata, and
+    # /diagnostics/providers adds machine-readable setup status/remediation such
+    # as missing install, missing prerequisites, missing PATH persistence, npm
+    # prefix drift, auth required, or unsupported version.
     # Positive list: only providers listed here are enabled for CLI execution.
     # Any known provider omitted from this block is disabled.
     providers:

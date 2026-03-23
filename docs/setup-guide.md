@@ -77,6 +77,11 @@ Diagnostics rules:
   runtime listener metadata, including the compatibility evidence directory
 - `GET /diagnostics/providers` exposes runtime-owned provider availability
   checks plus cached CLI compatibility summaries for host UX and setup flows
+- CLI targets now also expose a machine-readable `setup` block describing the
+  resolved install metadata, command state (`missing_install`, `missing_path`,
+  `misconfigured_command`, etc.), install prerequisites, shell PATH
+  persistence, npm prefix drift, auth state, version state, and additive
+  remediation steps
 - `GET /diagnostics/providers?probe=live` enables live probes where the current
   backend supports them
 - `force=1|true|refresh` refreshes cached CLI compatibility assessments so
@@ -282,6 +287,11 @@ For CLI instances, `compatibility` remains `null` until the runtime has probed
 or executed that target. Once primed, the cached summary includes the
 classification, selected profile, version/runtime fingerprint, warnings, and
 optional evidence artifact metadata surfaced by the shared compatibility engine.
+Even before a probe runs, CLI instances expose static `install` metadata so
+dashboards or packaged hosts can render install/auth/PATH guidance without
+maintaining a second provider matrix. That metadata now includes copied
+runtime-owned prerequisite, PATH-persistence, and npm-prefix knowledge, so
+removing `environment-bootstrap/` does not break runtime setup diagnostics.
 
 ## Running the Project
 
@@ -443,6 +453,8 @@ For host-side setup or Settings surfaces, use:
 - `GET /diagnostics/providers?force=1` to decide whether a provider is
   immediately usable, needs user action, is running in a degraded profile, or
   failed to probe after an install/update
+- `GET /providers/config` to read the runtime-owned static `install` metadata
+  for each configured CLI target before or between probes
 
 To inspect the publish payload locally without using the global npm cache:
 

@@ -5,10 +5,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ProviderTargetDescriptor } from '../providerCatalog.js';
 import { ProviderCompatibilityService } from './ProviderCompatibilityService.js';
 import type { ProviderName } from '../../backends/cli/providers/types.js';
+import type { ProviderInstallCheckRunner } from '../provider-install/ProviderInstallCheckRunner.js';
 
 function createCliTarget(
   providerName: ProviderName,
   instanceId = 'default',
+  runtimeOverride: Record<string, unknown> = {},
 ): ProviderTargetDescriptor {
   return {
     providerName,
@@ -24,9 +26,39 @@ function createCliTarget(
         runtime: {
           mode: 'native',
           environmentId: 'native',
+          ...runtimeOverride,
         },
       },
     },
+  };
+}
+
+function createInstallCheckRunner(
+  overrides: Partial<ProviderInstallCheckRunner> = {},
+): ProviderInstallCheckRunner {
+  return {
+    lookupCommand: vi.fn(async (command: string) => ({
+      available: true,
+      resolvedPath: `/runtime/bin/${command}`,
+      timedOut: false,
+    })),
+    checkPath: vi.fn(async () => ({
+      exists: false,
+      timedOut: false,
+    })),
+    checkNpmPackage: vi.fn(async () => ({
+      exists: false,
+      timedOut: false,
+    })),
+    checkShellRcEntry: vi.fn(async () => ({
+      exists: false,
+      timedOut: false,
+    })),
+    getNpmPrefix: vi.fn(async () => ({
+      value: undefined,
+      timedOut: false,
+    })),
+    ...overrides,
   };
 }
 
@@ -69,6 +101,7 @@ describe('ProviderCompatibilityService', () => {
       sessionBaseDir: join(root, 'sessions'),
     }, {
       runner,
+      installCheckRunner: createInstallCheckRunner(),
       now: () => Date.parse('2026-03-23T00:00:00.000Z'),
     });
 
@@ -78,6 +111,8 @@ describe('ProviderCompatibilityService', () => {
     expect(assessment.profile.id).toBe('claude-cli-stream-json-v1');
     expect(assessment.fingerprint.version.normalized).toBe('1.2.3');
     expect(assessment.fingerprint.features).toContain('token:--output-format');
+    expect(assessment.setup.command.status).toBe('ready');
+    expect(assessment.setup.install.install.installerId).toBe('claude-code');
     expect(assessment.evidence).toBeUndefined();
   });
 
@@ -101,6 +136,7 @@ describe('ProviderCompatibilityService', () => {
     }, {
       cacheTtlMs: 60_000,
       runner,
+      installCheckRunner: createInstallCheckRunner(),
       now: () => Date.parse('2026-03-23T00:00:00.000Z'),
     });
 
@@ -127,12 +163,19 @@ describe('ProviderCompatibilityService', () => {
           durationMs: 4,
         })),
       },
+      installCheckRunner: createInstallCheckRunner({
+        checkNpmPackage: vi.fn(async () => ({
+          exists: true,
+          timedOut: false,
+        })),
+      }),
       now: () => Date.parse('2026-03-23T00:00:10.000Z'),
     });
 
     const assessment = await service.assessCliTarget(createCliTarget('codex'));
     expect(assessment.classification).toBe('degraded');
     expect(assessment.evidence?.relativePath).toMatch(/^codex\//);
+    expect(assessment.setup.command.status).toBe('ready');
 
     const evidencePath = join(service.getEvidenceDir(), assessment.evidence!.relativePath);
     const evidence = JSON.parse(readFileSync(evidencePath, 'utf8')) as {
@@ -163,6 +206,12 @@ describe('ProviderCompatibilityService', () => {
           durationMs: 4,
         })),
       },
+      installCheckRunner: createInstallCheckRunner({
+        checkNpmPackage: vi.fn(async () => ({
+          exists: true,
+          timedOut: false,
+        })),
+      }),
       now: () => Date.parse('2026-03-23T00:00:15.000Z'),
     });
 
@@ -197,6 +246,7 @@ describe('ProviderCompatibilityService', () => {
           durationMs: 2,
         })),
       },
+      installCheckRunner: createInstallCheckRunner(),
       now: () => Date.parse('2026-03-23T00:00:20.000Z'),
     });
 
@@ -204,5 +254,224 @@ describe('ProviderCompatibilityService', () => {
     expect(assessment.classification).toBe('degraded');
     expect(assessment.profile.id).toBe('cursor-cli-runtime-default');
     expect(assessment.summary).toContain('No provider-specific compatibility profile');
+    expect(assessment.setup.install.familyLabel).toBe('Cursor Agent CLI');
+  });
+
+  it('classifies missing PATH separately when the binary exists at the expected install path', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-path-'));
+    tempDirs.push(root);
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      runner: {
+        run: vi.fn(async () => ({
+          exitCode: null,
+          stdout: '',
+          stderr: '',
+          timedOut: false,
+          durationMs: 2,
+          error: 'spawn ENOENT',
+        })),
+      },
+      installCheckRunner: createInstallCheckRunner({
+        lookupCommand: vi.fn(async () => ({
+          available: false,
+          timedOut: false,
+        })),
+        checkPath: vi.fn(async () => ({
+          exists: true,
+          timedOut: false,
+        })),
+      }),
+      now: () => Date.parse('2026-03-23T00:00:25.000Z'),
+    });
+
+    const assessment = await service.assessCliTarget(createCliTarget(
+      'claude',
+      'default',
+      { mode: 'wsl', distro: 'Ubuntu', environmentId: 'ubuntu' },
+    ));
+    expect(assessment.setup.command.status).toBe('missing_path');
+    expect(assessment.setup.pathPersistence.status).toBe('missing');
+    expect(assessment.setup.remediation.map((step) => step.code)).toContain('fix_path');
+    expect(assessment.setup.remediation.map((step) => step.code)).toContain('persist_path');
+    expect(assessment.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'path_missing',
+        status: 'degraded',
+      }),
+      expect.objectContaining({
+        code: 'path_persistence_missing',
+        status: 'degraded',
+      }),
+    ]));
+  });
+
+  it('surfaces missing install prerequisites for npm-global providers', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-prereq-'));
+    tempDirs.push(root);
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      runner: {
+        run: vi.fn(async () => ({
+          exitCode: null,
+          stdout: '',
+          stderr: '',
+          timedOut: false,
+          durationMs: 2,
+          error: 'spawn ENOENT',
+        })),
+      },
+      installCheckRunner: createInstallCheckRunner({
+        lookupCommand: vi.fn(async (command: string) => {
+          if (command === 'node' || command === 'npm') {
+            return {
+              available: false,
+              timedOut: false,
+            };
+          }
+
+          return {
+            available: false,
+            timedOut: false,
+          };
+        }),
+      }),
+      now: () => Date.parse('2026-03-23T00:00:27.000Z'),
+    });
+
+    const assessment = await service.assessCliTarget(createCliTarget('codex'));
+    expect(assessment.setup.prerequisites).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'node',
+        status: 'missing',
+      }),
+      expect.objectContaining({
+        id: 'npm',
+        status: 'missing',
+      }),
+    ]));
+    expect(assessment.setup.remediation.map((step) => step.code)).toContain('install_prerequisite');
+    expect(assessment.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'prerequisite_missing',
+        status: 'unavailable',
+      }),
+    ]));
+  });
+
+  it('flags missing auth when probes report a login requirement', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-auth-'));
+    tempDirs.push(root);
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      runner: {
+        run: vi.fn(async (providerName, _commandConfig, args: string[]) => ({
+          exitCode: 1,
+          stdout: '',
+          stderr: args[0] === '--version'
+            ? `${providerName} login required`
+            : 'authentication required',
+          timedOut: false,
+          durationMs: 3,
+        })),
+      },
+      installCheckRunner: createInstallCheckRunner(),
+      now: () => Date.parse('2026-03-23T00:00:30.000Z'),
+    });
+
+    const assessment = await service.assessCliTarget(createCliTarget('claude'));
+    expect(assessment.setup.auth.status).toBe('missing');
+    expect(assessment.setup.remediation.map((step) => step.code)).toContain('authenticate_provider');
+    expect(assessment.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'auth_missing',
+        status: 'unavailable',
+      }),
+    ]));
+  });
+
+  it('emits upgrade remediation for unsupported versions', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-version-'));
+    tempDirs.push(root);
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      runner: {
+        run: vi.fn(async (_providerName, _commandConfig, args: string[]) => ({
+          exitCode: 0,
+          stdout: args[0] === '--version'
+            ? 'claude 0.9.0\n'
+            : 'Usage: claude --input-format --output-format --include-partial-messages\n',
+          stderr: '',
+          timedOut: false,
+          durationMs: 4,
+        })),
+      },
+      installCheckRunner: createInstallCheckRunner(),
+      now: () => Date.parse('2026-03-23T00:00:35.000Z'),
+    });
+
+    const assessment = await service.assessCliTarget(createCliTarget('claude'));
+    expect(assessment.classification).toBe('unsupported_version');
+    expect(assessment.setup.version.status).toBe('unsupported');
+    expect(assessment.setup.remediation.map((step) => step.code)).toContain('upgrade_provider');
+  });
+
+  it('reports npm prefix drift when npm-global packages are installed off the expected prefix', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-npm-prefix-'));
+    tempDirs.push(root);
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      runner: {
+        run: vi.fn(async () => ({
+          exitCode: null,
+          stdout: '',
+          stderr: '',
+          timedOut: false,
+          durationMs: 2,
+          error: 'spawn ENOENT',
+        })),
+      },
+      installCheckRunner: createInstallCheckRunner({
+        lookupCommand: vi.fn(async () => ({
+          available: false,
+          timedOut: false,
+        })),
+        checkNpmPackage: vi.fn(async () => ({
+          exists: true,
+          timedOut: false,
+        })),
+        getNpmPrefix: vi.fn(async () => ({
+          value: '/usr/local',
+          timedOut: false,
+        })),
+      }),
+      now: () => Date.parse('2026-03-23T00:00:40.000Z'),
+    });
+
+    const assessment = await service.assessCliTarget(createCliTarget('codex'));
+    if (process.platform === 'win32') {
+      expect(assessment.setup.npm.status).toBe('not_applicable');
+      return;
+    }
+
+    expect(assessment.setup.command.status).toBe('missing_path');
+    expect(assessment.setup.npm.status).toBe('missing_prefix');
+    expect(assessment.setup.remediation.map((step) => step.code)).toContain('configure_npm_prefix');
+    expect(assessment.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'npm_prefix_missing',
+        status: 'degraded',
+      }),
+    ]));
   });
 });
