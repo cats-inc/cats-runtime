@@ -174,10 +174,24 @@ describe('runtime MCP facade', () => {
       'create_session',
       'send_message',
       'fork_session',
+      'list_browser_drivers',
+      'list_browser_sessions',
+      'create_browser_session',
+      'create_browser_page',
+      'close_browser_session',
       'audit_workspace',
       'init_workspace',
       'audit_delivery_target',
       'commit_changes',
+    ]);
+
+    const createSessionTool = listed.result.tools.find((tool) => tool.name === 'create_session') as {
+      inputSchema?: { properties?: Record<string, { enum?: string[] }> };
+    } | undefined;
+    expect(createSessionTool?.inputSchema?.properties?.workspaceIsolation?.enum).toEqual([
+      'shared',
+      'isolated',
+      'worktree',
     ]);
   });
 
@@ -321,6 +335,7 @@ describe('runtime MCP facade', () => {
           arguments: {
             provider: 'claude',
             cwd: workspacePath,
+            workspaceIsolation: 'shared',
           },
         },
       }),
@@ -337,6 +352,11 @@ describe('runtime MCP facade', () => {
     };
     expect(created.result.structuredContent.responseStatus).toBe(201);
     expect(created.result.structuredContent.session.providerName).toBe('claude');
+    expect(created.result.structuredContent.session.workspaceIsolation).toEqual(
+      expect.objectContaining({
+        mode: 'shared',
+      }),
+    );
     expect(created.result.structuredContent.messagePath).toBe(
       `/sessions/${created.result.structuredContent.session.id}/messages`,
     );
@@ -459,6 +479,154 @@ describe('runtime MCP facade', () => {
     expect(commit.result.structuredContent.action).toBe('create-commit');
   });
 
+  it('exposes browser substrate tools over MCP without depending on a separate browser service', async () => {
+    const app = createTestApp();
+
+    const listDriversResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 12,
+        method: 'tools/call',
+        params: {
+          name: 'list_browser_drivers',
+          arguments: {},
+        },
+      }),
+    });
+    expect(listDriversResponse.status).toBe(200);
+    const listedDrivers = await listDriversResponse.json() as {
+      result: {
+        structuredContent: {
+          drivers: Array<{ id: string }>;
+        };
+      };
+    };
+    expect(listedDrivers.result.structuredContent.drivers).toEqual([
+      expect.objectContaining({
+        id: 'manual',
+      }),
+    ]);
+
+    const createBrowserSessionResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 13,
+        method: 'tools/call',
+        params: {
+          name: 'create_browser_session',
+          arguments: {
+            runtimeSessionId: 'session-1',
+            label: 'MCP Browser Session',
+          },
+        },
+      }),
+    });
+    expect(createBrowserSessionResponse.status).toBe(200);
+    const browserSessionResult = await createBrowserSessionResponse.json() as {
+      result: {
+        structuredContent: {
+          session: { id: string; runtimeSessionId: string };
+          createBrowserPagePath: string;
+        };
+      };
+    };
+    expect(browserSessionResult.result.structuredContent.session.runtimeSessionId).toBe('session-1');
+
+    const browserSessionId = browserSessionResult.result.structuredContent.session.id;
+    const createBrowserPageResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 14,
+        method: 'tools/call',
+        params: {
+          name: 'create_browser_page',
+          arguments: {
+            browserSessionId,
+            url: 'http://127.0.0.1:3000',
+            label: 'MCP Preview',
+          },
+        },
+      }),
+    });
+    expect(createBrowserPageResponse.status).toBe(200);
+    const browserPageResult = await createBrowserPageResponse.json() as {
+      result: {
+        structuredContent: {
+          page: { previewSurface: { kind: string; url?: string } };
+        };
+      };
+    };
+    expect(browserPageResult.result.structuredContent.page.previewSurface).toEqual(
+      expect.objectContaining({
+        kind: 'browser_page',
+        url: 'http://127.0.0.1:3000',
+      }),
+    );
+
+    const listBrowserSessionsResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 15,
+        method: 'tools/call',
+        params: {
+          name: 'list_browser_sessions',
+          arguments: {
+            runtimeSessionId: 'session-1',
+          },
+        },
+      }),
+    });
+    expect(listBrowserSessionsResponse.status).toBe(200);
+    const listedSessions = await listBrowserSessionsResponse.json() as {
+      result: {
+        structuredContent: {
+          sessions: Array<{ id: string; inspection: { openPageCount: number } }>;
+        };
+      };
+    };
+    expect(listedSessions.result.structuredContent.sessions).toEqual([
+      expect.objectContaining({
+        id: browserSessionId,
+        inspection: expect.objectContaining({
+          openPageCount: 1,
+        }),
+      }),
+    ]);
+
+    const closeBrowserSessionResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 16,
+        method: 'tools/call',
+        params: {
+          name: 'close_browser_session',
+          arguments: {
+            browserSessionId,
+          },
+        },
+      }),
+    });
+    expect(closeBrowserSessionResponse.status).toBe(200);
+    const closed = await closeBrowserSessionResponse.json() as {
+      result: {
+        structuredContent: {
+          session: { status: string };
+        };
+      };
+    };
+    expect(closed.result.structuredContent.session.status).toBe('closed');
+  });
+
   it('rejects invalid list_sessions status filters with a machine-readable params error', async () => {
     const app = createTestApp();
 
@@ -467,7 +635,7 @@ describe('runtime MCP facade', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 12,
+        id: 17,
         method: 'tools/call',
         params: {
           name: 'list_sessions',
@@ -481,7 +649,7 @@ describe('runtime MCP facade', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       jsonrpc: '2.0',
-      id: 12,
+      id: 17,
       error: {
         code: -32602,
         message: 'status must be a valid session status',
@@ -497,7 +665,7 @@ describe('runtime MCP facade', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 13,
+        id: 18,
         method: 'tools/call',
         params: {
           name: 'audit_workspace',
@@ -512,7 +680,7 @@ describe('runtime MCP facade', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       jsonrpc: '2.0',
-      id: 13,
+      id: 18,
       error: {
         code: -32602,
         message: 'profile must be a valid workspace substrate profile',

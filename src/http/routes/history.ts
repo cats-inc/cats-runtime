@@ -2,6 +2,7 @@ import { createReadStream, readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { Hono } from 'hono';
 import {
+  getRuntimeBrowserService,
   getRuntimeMeteringService,
   getRuntimeSessionManager,
   type AppContext,
@@ -78,6 +79,9 @@ function buildHistoryMetadata(ctx: AppContext, session: SessionInfo) {
       trackedState: runtime.getTrackedState(session.id),
       metering: getRuntimeMeteringService(ctx).buildSessionSnapshot(session),
       wakeupPending: Boolean(wakeup?.pending),
+      browserSessions: getRuntimeBrowserService(ctx).listSessions({
+        runtimeSessionId: session.id,
+      }),
     }),
   };
 }

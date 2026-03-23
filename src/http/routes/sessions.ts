@@ -3,6 +3,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, 
 import { basename, dirname, join } from 'node:path';
 import { Hono } from 'hono';
 import {
+  getRuntimeBrowserService,
   getProviderCompatibilityService,
   getRuntimeMeteringService,
   getRuntimeSessionManager,
@@ -148,6 +149,9 @@ function resolveSessionBranching(
 
 function serializeSession(ctx: AppContext, session: SessionInfo) {
   const runtime = getRuntimeSessionManager(ctx);
+  const browserSessions = getRuntimeBrowserService(ctx).listSessions({
+    runtimeSessionId: session.id,
+  });
   const view = toSessionView(session, {
     attached: runtime.isAttached(session.id),
     externalSessionLiveWindowMs: ctx.config.externalSessionLiveWindowMs,
@@ -161,6 +165,7 @@ function serializeSession(ctx: AppContext, session: SessionInfo) {
     trackedState: runtime.getTrackedState(session.id),
     metering: getRuntimeMeteringService(ctx).buildSessionSnapshot(session),
     wakeupPending: Boolean(wakeup?.pending),
+    browserSessions,
   });
   return {
     ...view,
@@ -196,6 +201,9 @@ function serializeSessions(
     externalSessionLiveWindowMs: ctx.config.externalSessionLiveWindowMs,
   });
   return views.map((view, index) => {
+    const browserSessions = getRuntimeBrowserService(ctx).listSessions({
+      runtimeSessionId: sessions[index].id,
+    });
     const lineage = getSessionLineage(sessions[index]);
     const branching = resolveSessionBranching(ctx, sessions[index], {
       includeCapabilities: options.includeBranchCapabilities,
@@ -209,6 +217,7 @@ function serializeSessions(
         trackedState: runtime.getTrackedState(sessions[index].id),
         metering: metering.buildSessionSnapshot(sessions[index]),
         wakeupPending: Boolean(wakeup?.pending),
+        browserSessions,
       }),
       branching,
       ...(wakeup ? { wakeup } : {}),
@@ -240,6 +249,7 @@ function resolveCliProviderTarget(
 function buildDeleteCleanupSummary(input: {
   workerDetached: boolean;
   wakeupsCleared: boolean;
+  browserSessionsCleared?: number;
   workspaceCleaned: boolean;
   worktreeDetached?: boolean;
   worktreeCleanupPolicy?: WorktreeCleanupPolicy;
@@ -251,6 +261,9 @@ function buildDeleteCleanupSummary(input: {
   return {
     workerDetached: input.workerDetached,
     wakeupsCleared: input.wakeupsCleared,
+    ...(input.browserSessionsCleared !== undefined
+      ? { browserSessionsCleared: input.browserSessionsCleared }
+      : {}),
     workspaceCleaned: input.workspaceCleaned,
     ...(input.worktreeDetached !== undefined ? { worktreeDetached: input.worktreeDetached } : {}),
     ...(input.worktreeCleanupPolicy ? { worktreeCleanupPolicy: input.worktreeCleanupPolicy } : {}),
@@ -259,6 +272,13 @@ function buildDeleteCleanupSummary(input: {
     providerDiscoveryCleared: input.providerDiscoveryCleared,
     registryDropped: input.registryDropped,
   };
+}
+
+async function clearBrowserSessionsForRuntimeSession(
+  ctx: AppContext,
+  sessionId: string,
+): Promise<number> {
+  return getRuntimeBrowserService(ctx).clearRuntimeSessions(sessionId);
 }
 
 async function primeCliCompatibility(
@@ -1629,6 +1649,7 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
   let worktreeDetached: boolean | undefined;
   let worktreeMergedPaths: number | undefined;
   let resolvedCleanupPolicy: WorktreeCleanupPolicy | undefined;
+  let browserSessionsCleared = 0;
 
   if (sessionAfterCleanup.workspaceIsolation?.mode === 'worktree') {
     const cleanup = await prepareWorkspaceCleanupState(
@@ -1668,6 +1689,12 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
     }
   }
 
+  try {
+    browserSessionsCleared = await clearBrowserSessionsForRuntimeSession(ctx, id);
+  } catch (err) {
+    return c.json({ error: `Failed to clear browser sessions during reset: ${err}` }, 500);
+  }
+
   ctx.registry.clearProviderResumeState(id);
   ctx.registry.setProviderState(id, undefined);
   ctx.registry.updateSessionMetadata(id, { hydration: undefined });
@@ -1684,6 +1711,7 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
       providerResumeCleared: true,
       providerStateCleared: true,
       wakeupsCleared: (wakeupResult?.removedCount ?? 0) > 0,
+      browserSessionsCleared,
       workspaceCleaned,
       ...(worktreeDetached !== undefined ? { worktreeDetached } : {}),
       ...(resolvedCleanupPolicy ? { worktreeCleanupPolicy: resolvedCleanupPolicy } : {}),
@@ -1725,6 +1753,7 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
   let worktreeDetached: boolean | undefined;
   let worktreeMergedPaths: number | undefined;
   let resolvedCleanupPolicy: WorktreeCleanupPolicy | undefined;
+  let browserSessionsCleared = 0;
 
   if (session.workspaceIsolation?.mode === 'worktree') {
     const worker = runtime.get(id);
@@ -1889,6 +1918,14 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
     }
   }
 
+  try {
+    browserSessionsCleared = await clearBrowserSessionsForRuntimeSession(ctx, id);
+  } catch (err) {
+    preparedManagedTranscripts.rollback();
+    preparedProviderDiscovery.rollback();
+    return c.json({ error: `Failed to clear browser sessions before delete: ${err}` }, 500);
+  }
+
   const managedDeletion = preparedManagedTranscripts.finalize();
   const providerDeletion = preparedProviderDiscovery.finalize();
   const wakeupResult = ctx.wakeup?.clearSession(id);
@@ -1900,6 +1937,7 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
     cleanup: buildDeleteCleanupSummary({
       workerDetached: !runtime.isAttached(id),
       wakeupsCleared: (wakeupResult?.removedCount ?? 0) > 0,
+      browserSessionsCleared,
       workspaceCleaned,
       ...(worktreeDetached !== undefined ? { worktreeDetached } : {}),
       ...(resolvedCleanupPolicy ? { worktreeCleanupPolicy: resolvedCleanupPolicy } : {}),

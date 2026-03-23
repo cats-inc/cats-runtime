@@ -278,6 +278,35 @@ describe('browser HTTP contract', () => {
         }),
       }),
     }));
+
+    const observeResponse = await app.request('/sessions/session-service/observe');
+    expect(observeResponse.status).toBe(200);
+    await expect(observeResponse.json()).resolves.toEqual(expect.objectContaining({
+      session: expect.objectContaining({
+        id: 'session-service',
+        inspection: expect.objectContaining({
+          browserSessions: [
+            expect.objectContaining({
+              id: serviceBrowser.session.id,
+              runtimeSessionId: 'session-service',
+              inspection: expect.objectContaining({
+                openPageCount: 1,
+              }),
+            }),
+          ],
+          previewSurfaces: expect.arrayContaining([
+            expect.objectContaining({
+              kind: 'browser_page',
+              source: 'browser_page',
+              provenance: expect.objectContaining({
+                sessionId: 'session-service',
+                serviceId: 'preview',
+              }),
+            }),
+          ]),
+        }),
+      }),
+    }));
   });
 
   it('rejects unsupported browser page bindings with a machine-readable client error', async () => {

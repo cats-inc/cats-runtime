@@ -43,6 +43,11 @@ Current tools:
 - `create_session`
 - `send_message`
 - `fork_session`
+- `list_browser_drivers`
+- `list_browser_sessions`
+- `create_browser_session`
+- `create_browser_page`
+- `close_browser_session`
 - `audit_workspace`
 - `init_workspace`
 - `audit_delivery_target`
@@ -172,6 +177,11 @@ tool surface here. The first shared tool names are:
 - `create_session`
 - `send_message`
 - `fork_session`
+- `list_browser_drivers`
+- `list_browser_sessions`
+- `create_browser_session`
+- `create_browser_page`
+- `close_browser_session`
 - `audit_workspace`
 - `init_workspace`
 - `audit_delivery_target`
@@ -180,6 +190,14 @@ tool surface here. The first shared tool names are:
 `list_sessions.arguments.status` accepts the same runtime session states exposed
 by the direct API: `initializing`, `ready`, `busy`, `closed`,
 `closing`. Invalid values return MCP `-32602`.
+
+`create_session.arguments.workspaceIsolation` and
+`fork_session.arguments.workspaceIsolation` accept the same isolation modes as
+the direct runtime API: `shared`, `isolated`, and `worktree`.
+
+The browser MCP tools are additive wrappers over the same runtime-owned
+`/browser/*` substrate. They do not require a separate browser service and do
+not introduce a dependency on other monorepo browser projects.
 
 This keeps the product/runtime ownership split explicit:
 

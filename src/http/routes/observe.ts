@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import {
+  getRuntimeBrowserService,
   getRuntimeMeteringService,
   getRuntimeSessionManager,
   type AppContext,
@@ -37,6 +38,9 @@ observeRoutes.get('/sessions/:id/observe', async (c) => {
         view,
         trackedState: runtime.getTrackedState(session.id),
         metering: getRuntimeMeteringService(ctx).buildSessionSnapshot(session),
+        browserSessions: getRuntimeBrowserService(ctx).listSessions({
+          runtimeSessionId: session.id,
+        }),
       }),
     },
     historyPath: `/sessions/${session.id}/history`,

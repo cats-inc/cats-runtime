@@ -1,6 +1,7 @@
 import type { SessionStatus } from '../backends/cli/pool/types.js';
 import { RUNTIME_VERSION } from '../startup.js';
 import {
+  getRuntimeBrowserService,
   getRuntimeDeliveryService,
   getRuntimeSessionManager,
   getWorkspaceSubstrateService,
@@ -32,11 +33,13 @@ const SESSION_STATUSES: SessionStatus[] = [
   'closing',
 ];
 const WORKSPACE_MODES = ['isolated', 'shared', 'read_only'] as const;
+const WORKSPACE_ISOLATION_MODES = ['shared', 'isolated', 'worktree'] as const;
 const PERMISSION_MODES = ['skip', 'whitelist', 'default'] as const;
 const REUSE_POLICIES = ['create_new', 'prefer_existing', 'require_existing'] as const;
 const FORK_MODES = ['auto', 'native_fork', 'context_transplant'] as const;
 const SUBSTRATE_PROFILES = ['minimal', 'standard', 'a2a-enabled'] as const;
 const ENABLED_AGENTS = ['claude', 'gemini', 'codex'] as const;
+const BROWSER_BINDING_KINDS = ['manual_url', 'session_service', 'session_artifact'] as const;
 const ACTOR_ROLES = [
   'boss_cat',
   'specialist_cat',
@@ -187,6 +190,14 @@ function buildSessionPaths(sessionId: string) {
     observePath: `/sessions/${sessionId}/observe`,
     historyPath: `/sessions/${sessionId}/history`,
     messagePath: `/sessions/${sessionId}/messages`,
+  };
+}
+
+function buildBrowserSessionPaths(browserSessionId: string) {
+  return {
+    browserSessionPath: `/browser/sessions/${browserSessionId}`,
+    createBrowserPagePath: `/browser/sessions/${browserSessionId}/pages`,
+    closeBrowserSessionPath: `/browser/sessions/${browserSessionId}/close`,
   };
 }
 
@@ -415,6 +426,107 @@ async function forkSession(
   };
 }
 
+async function listBrowserDrivers(
+  ctx: AppContext,
+  _args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const drivers = getRuntimeBrowserService(ctx).listDrivers();
+  return {
+    summary: `Returned ${drivers.length} browser driver(s).`,
+    structuredContent: {
+      drivers,
+      driversPath: '/browser/drivers',
+    },
+  };
+}
+
+async function listBrowserSessions(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const driverId = readOptionalString(args, 'driverId');
+  const runtimeSessionId = readOptionalString(args, 'runtimeSessionId');
+  const sessions = getRuntimeBrowserService(ctx).listSessions({
+    ...(driverId ? { driverId } : {}),
+    ...(runtimeSessionId ? { runtimeSessionId } : {}),
+  });
+  return {
+    summary: `Returned ${sessions.length} browser session(s).`,
+    structuredContent: {
+      sessions,
+      sessionsPath: '/browser/sessions',
+    },
+  };
+}
+
+async function createBrowserSession(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const result = await requestRuntimeJson(ctx, '/browser/sessions', {
+    body: args,
+  });
+  ensureRouteSuccess('create_browser_session', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'create_browser_session result');
+  const session = ensureObject(payload.session, 'create_browser_session result.session');
+  const browserSessionId = readRequiredString(session, 'id');
+  return {
+    summary: `Created browser session ${browserSessionId}.`,
+    structuredContent: {
+      responseStatus: result.status,
+      session,
+      ...buildBrowserSessionPaths(browserSessionId),
+    },
+  };
+}
+
+async function createBrowserPage(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const browserSessionId = readRequiredString(args, 'browserSessionId');
+  const { browserSessionId: _browserSessionId, ...body } = args;
+  const result = await requestRuntimeJson(
+    ctx,
+    `/browser/sessions/${encodeURIComponent(browserSessionId)}/pages`,
+    { body },
+  );
+  ensureRouteSuccess('create_browser_page', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'create_browser_page result');
+  return {
+    summary: `Created browser page for session ${browserSessionId}.`,
+    structuredContent: {
+      responseStatus: result.status,
+      ...payload,
+      ...buildBrowserSessionPaths(browserSessionId),
+    },
+  };
+}
+
+async function closeBrowserSession(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const browserSessionId = readRequiredString(args, 'browserSessionId');
+  const result = await requestRuntimeJson(
+    ctx,
+    `/browser/sessions/${encodeURIComponent(browserSessionId)}/close`,
+  );
+  ensureRouteSuccess('close_browser_session', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'close_browser_session result');
+  return {
+    summary: `Closed browser session ${browserSessionId}.`,
+    structuredContent: {
+      responseStatus: result.status,
+      ...payload,
+      ...buildBrowserSessionPaths(browserSessionId),
+    },
+  };
+}
+
 async function initWorkspace(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -548,6 +660,7 @@ const TOOL_HANDLERS: McpToolHandler[] = [
           model: { type: 'string' },
           group: { type: 'string' },
           workspaceMode: { type: 'string', enum: WORKSPACE_MODES },
+          workspaceIsolation: { type: 'string', enum: WORKSPACE_ISOLATION_MODES },
           permissionMode: { type: 'string', enum: PERMISSION_MODES },
           allowedTools: { type: 'array', items: { type: 'string' } },
           sessionKey: { type: 'string' },
@@ -598,6 +711,7 @@ const TOOL_HANDLERS: McpToolHandler[] = [
           model: { type: 'string' },
           cwd: { type: 'string' },
           workspaceMode: { type: 'string', enum: WORKSPACE_MODES },
+          workspaceIsolation: { type: 'string', enum: WORKSPACE_ISOLATION_MODES },
           permissionMode: { type: 'string', enum: PERMISSION_MODES },
           allowedTools: { type: 'array', items: { type: 'string' } },
           group: { type: 'string' },
@@ -612,6 +726,101 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: forkSession,
+  },
+  {
+    definition: {
+      name: 'list_browser_drivers',
+      title: 'List Browser Drivers',
+      description: 'Return runtime-owned browser drivers and capability descriptors.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        additionalProperties: false,
+      },
+    },
+    execute: listBrowserDrivers,
+  },
+  {
+    definition: {
+      name: 'list_browser_sessions',
+      title: 'List Browser Sessions',
+      description: 'Return runtime-owned browser sessions, optionally filtered by driver or runtime session.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          driverId: { type: 'string' },
+          runtimeSessionId: { type: 'string' },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: listBrowserSessions,
+  },
+  {
+    definition: {
+      name: 'create_browser_session',
+      title: 'Create Browser Session',
+      description: 'Create a runtime-owned browser session bound optionally to a runtime session.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          driverId: { type: 'string' },
+          runtimeSessionId: { type: 'string' },
+          label: { type: 'string' },
+          metadata: { type: 'object' },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: createBrowserSession,
+  },
+  {
+    definition: {
+      name: 'create_browser_page',
+      title: 'Create Browser Page',
+      description: 'Create a browser page using a manual URL/path or runtime preview binding.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          browserSessionId: { type: 'string' },
+          label: { type: 'string' },
+          title: { type: 'string' },
+          url: { type: 'string' },
+          path: { type: 'string' },
+          mediaType: { type: 'string' },
+          binding: {
+            type: 'object',
+            properties: {
+              kind: { type: 'string', enum: BROWSER_BINDING_KINDS },
+              runtimeSessionId: { type: 'string' },
+              serviceId: { type: 'string' },
+              artifactId: { type: 'string' },
+            },
+            additionalProperties: false,
+          },
+          metadata: { type: 'object' },
+        },
+        required: ['browserSessionId'],
+        additionalProperties: false,
+      },
+    },
+    execute: createBrowserPage,
+  },
+  {
+    definition: {
+      name: 'close_browser_session',
+      title: 'Close Browser Session',
+      description: 'Close a runtime-owned browser session and mark all pages closed.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          browserSessionId: { type: 'string' },
+        },
+        required: ['browserSessionId'],
+        additionalProperties: false,
+      },
+    },
+    execute: closeBrowserSession,
   },
   {
     definition: {

@@ -65,6 +65,11 @@ Current curated tools:
 - `create_session`
 - `send_message`
 - `fork_session`
+- `list_browser_drivers`
+- `list_browser_sessions`
+- `create_browser_session`
+- `create_browser_page`
+- `close_browser_session`
 - `audit_workspace`
 - `init_workspace`
 - `audit_delivery_target`
@@ -944,6 +949,12 @@ or clean up the same worktree deterministically.
 `context`, and `outputDir` fields. These are persisted onto the logical session
 so later history/resume flows can observe the same bootstrap metadata.
 
+Session inspection payloads now also surface additive `browserSessions` when
+runtime-owned browser sessions are associated with the same runtime session.
+These browser sessions contribute normalized `browser_page` entries into the
+shared `inspection.previewSurfaces` list, so upper layers can keep one preview
+surface contract across artifacts, services, and browser pages.
+
 `skills: null` explicitly clears the persisted runtime skill state for
 `POST /sessions`, `POST /sessions/{id}/messages`, and
 `POST /sessions/{id}/fork`.
@@ -1379,9 +1390,10 @@ without deleting the logical session. `POST /sessions/{id}/reset` clears
 provider resume/session state so the next `resume` starts from a fresh backend
 attachment while keeping the runtime-owned session record and history. Reset
 also clears hydration and scheduled wakeups targeting that session, clears
-stale run/progress snapshots, and records a hard-reset lifecycle boundary so
-stale wake requests and stale inspector state do not survive after provider
-resume state is discarded.
+runtime-owned browser sessions targeting that runtime session, clears stale
+run/progress snapshots, and records a hard-reset lifecycle boundary so stale
+wake requests and stale inspector state do not survive after provider resume
+state is discarded.
 
 `POST /sessions/{id}/reset` also accepts an optional body field:
 
@@ -1407,8 +1419,8 @@ the same control family even though the session snapshot is gone afterward.
 Delete responses also include:
 
 - `cleanup`: machine-readable cleanup results (`workerDetached`,
-  `managedTranscriptDeleted`, `providerDiscoveryCleared`, `workspaceCleaned`,
-  `registryDropped`, etc.)
+  `browserSessionsCleared`, `managedTranscriptDeleted`,
+  `providerDiscoveryCleared`, `workspaceCleaned`, `registryDropped`, etc.)
 - `maintenance`: the terminal lifecycle marker for the delete attempt, with
   `status: "completed"` or `status: "retained"`
 

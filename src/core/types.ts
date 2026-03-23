@@ -1104,6 +1104,7 @@ export interface RuntimeSessionLifecycleCleanupSummary {
   providerResumeCleared?: boolean;
   providerStateCleared?: boolean;
   wakeupsCleared?: boolean;
+  browserSessionsCleared?: number;
   workspaceCleaned?: boolean;
   worktreeDetached?: boolean;
   worktreeCleanupPolicy?: WorktreeCleanupPolicy;
@@ -1221,6 +1222,7 @@ export interface RuntimeSessionInspection {
   artifacts: SessionArtifact[];
   services: AgentRuntimeService[];
   previewSurfaces: RuntimePreviewSurface[];
+  browserSessions?: RuntimeBrowserSessionView[];
   actions: RuntimeSessionInspectionActions;
 }
 

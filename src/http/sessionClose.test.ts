@@ -396,6 +396,63 @@ describe('session close route', () => {
     await expect(wakeupListResponse.json()).resolves.toEqual({ wakeups: [] });
   });
 
+  it('clears runtime-owned browser sessions when resetting a session', async () => {
+    const session = registry.create({
+      id: 'session-reset-browser',
+      providerName: 'claude',
+      cwd: join(rootDir, 'repo-reset-browser'),
+    });
+    registry.updateStatus(session.id, 'ready');
+
+    const createBrowserResponse = await app.request('/browser/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        runtimeSessionId: session.id,
+        label: 'Reset Browser Session',
+      }),
+    });
+    expect(createBrowserResponse.status).toBe(201);
+    const browserSession = await createBrowserResponse.json() as {
+      session: { id: string };
+    };
+
+    const pageResponse = await app.request(`/browser/sessions/${browserSession.session.id}/pages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        url: 'http://127.0.0.1:4173',
+        label: 'Reset Preview',
+      }),
+    });
+    expect(pageResponse.status).toBe(201);
+
+    const res = await app.request(`/sessions/${session.id}/reset`, {
+      method: 'POST',
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as {
+      action: string;
+      inspection: {
+        browserSessions?: unknown[];
+        maintenance: {
+          lastLifecycle: {
+            cleanup: Record<string, unknown>;
+          };
+        };
+      };
+    };
+    expect(body.action).toBe('reset');
+    expect(body.inspection.browserSessions).toBeUndefined();
+    expect(body.inspection.maintenance.lastLifecycle.cleanup).toEqual(expect.objectContaining({
+      browserSessionsCleared: 1,
+    }));
+
+    const browserSessionsResponse = await app.request(`/browser/sessions?runtimeSessionId=${session.id}`);
+    expect(browserSessionsResponse.status).toBe(200);
+    await expect(browserSessionsResponse.json()).resolves.toEqual({ sessions: [] });
+  });
+
   it('clears scheduled wakeups when deleting a session', async () => {
     const session = registry.create({
       id: 'session-delete-wakeup',
@@ -438,6 +495,60 @@ describe('session close route', () => {
     const wakeupListResponse = await app.request(`/wakeups?sessionId=${session.id}`);
     expect(wakeupListResponse.status).toBe(200);
     await expect(wakeupListResponse.json()).resolves.toEqual({ wakeups: [] });
+  });
+
+  it('clears runtime-owned browser sessions when deleting a session', async () => {
+    const session = registry.create({
+      id: 'session-delete-browser',
+      providerName: 'claude',
+      cwd: join(rootDir, 'repo-delete-browser'),
+    });
+    registry.updateStatus(session.id, 'closed');
+
+    const createBrowserResponse = await app.request('/browser/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        runtimeSessionId: session.id,
+        label: 'Delete Browser Session',
+      }),
+    });
+    expect(createBrowserResponse.status).toBe(201);
+    const browserSession = await createBrowserResponse.json() as {
+      session: { id: string };
+    };
+
+    const pageResponse = await app.request(`/browser/sessions/${browserSession.session.id}/pages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        url: 'http://127.0.0.1:3000',
+        label: 'Delete Preview',
+      }),
+    });
+    expect(pageResponse.status).toBe(201);
+
+    const res = await app.request(`/sessions/${session.id}`, {
+      method: 'DELETE',
+    });
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual(expect.objectContaining({
+      status: 'deleted',
+      cleanup: expect.objectContaining({
+        browserSessionsCleared: 1,
+        registryDropped: true,
+      }),
+      maintenance: expect.objectContaining({
+        cleanup: expect.objectContaining({
+          browserSessionsCleared: 1,
+          registryDropped: true,
+        }),
+      }),
+    }));
+
+    const browserSessionsResponse = await app.request(`/browser/sessions?runtimeSessionId=${session.id}`);
+    expect(browserSessionsResponse.status).toBe(200);
+    await expect(browserSessionsResponse.json()).resolves.toEqual({ sessions: [] });
   });
 
   it('returns a machine-readable observe payload with inspection and stream availability', async () => {

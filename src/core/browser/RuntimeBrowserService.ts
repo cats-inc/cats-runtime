@@ -122,6 +122,18 @@ export class RuntimeBrowserService {
     return session ? this.buildSessionView(session) : undefined;
   }
 
+  async clearRuntimeSessions(runtimeSessionId: string): Promise<number> {
+    const sessions = Array.from(this.sessions.values())
+      .filter((session) => session.runtimeSessionId === runtimeSessionId);
+    for (const session of sessions) {
+      if (session.status !== 'closed') {
+        await this.closeSession(session.id);
+      }
+      this.deleteStoredSession(session.id);
+    }
+    return sessions.length;
+  }
+
   async createPage(
     browserSessionId: string,
     input: CreateRuntimeBrowserPageInput,

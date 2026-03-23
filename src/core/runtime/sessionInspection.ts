@@ -1,6 +1,7 @@
 import { extname, isAbsolute, resolve } from 'node:path';
 import type {
   AgentRuntimeService,
+  RuntimeBrowserSessionView,
   RuntimePreviewSurface,
   RuntimePreviewSurfaceRenderHint,
   RuntimeSessionInspection,
@@ -34,6 +35,7 @@ export interface BuildSessionInspectionInput {
   trackedState?: RuntimeTrackedSessionStateSnapshot;
   metering: RuntimeSessionMeteringSnapshot;
   wakeupPending?: boolean;
+  browserSessions?: RuntimeBrowserSessionView[];
 }
 
 export function buildSessionInspection(
@@ -55,10 +57,12 @@ export function buildSessionInspection(
     ...(currentRun?.services || []),
     ...(lastRun?.services || []),
   ]);
-  const previewSurfaces = [
+  const browserSessions = (input.browserSessions || []).map(cloneBrowserSessionView);
+  const previewSurfaces = dedupePreviewSurfaces([
     ...artifacts.map((artifact) => createArtifactPreviewSurface(artifact, input.session)),
     ...services.map((service) => createServicePreviewSurface(service, input.session)),
-  ];
+    ...browserSessions.flatMap((session) => session.inspection.previewSurfaces),
+  ]);
   const busy = input.session.status === 'busy'
     || input.trackedState?.state === 'running'
     || input.trackedState?.state === 'canceling';
@@ -85,6 +89,7 @@ export function buildSessionInspection(
     artifacts,
     services,
     previewSurfaces,
+    ...(browserSessions.length ? { browserSessions } : {}),
     actions: {
       canClose: input.view.controls.canClose,
       canDelete: input.view.controls.canDelete,
@@ -188,6 +193,45 @@ function dedupePreviewSurfaces(
     });
   }
   return Array.from(deduped.values());
+}
+
+function cloneBrowserSessionView(
+  session: RuntimeBrowserSessionView,
+): RuntimeBrowserSessionView {
+  return {
+    ...session,
+    pages: session.pages.map((page) => ({
+      ...page,
+      binding: { ...page.binding },
+      previewSurface: {
+        ...page.previewSurface,
+        ...(page.previewSurface.provenance
+          ? { provenance: { ...page.previewSurface.provenance } }
+          : {}),
+        ...(page.previewSurface.metadata ? { metadata: { ...page.previewSurface.metadata } } : {}),
+      },
+      ...(page.metadata ? { metadata: { ...page.metadata } } : {}),
+    })),
+    inspection: {
+      ...session.inspection,
+      driver: {
+        ...session.inspection.driver,
+        capabilities: {
+          ...session.inspection.driver.capabilities,
+        },
+        warnings: [...session.inspection.driver.warnings],
+        ...(session.inspection.driver.metadata
+          ? { metadata: { ...session.inspection.driver.metadata } }
+          : {}),
+      },
+      previewSurfaces: session.inspection.previewSurfaces.map((surface) => ({
+        ...surface,
+        ...(surface.provenance ? { provenance: { ...surface.provenance } } : {}),
+        ...(surface.metadata ? { metadata: { ...surface.metadata } } : {}),
+      })),
+    },
+    ...(session.metadata ? { metadata: { ...session.metadata } } : {}),
+  };
 }
 
 function resolvePreviewSurfaceDedupeKey(
