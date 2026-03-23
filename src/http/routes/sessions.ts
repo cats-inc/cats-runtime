@@ -248,7 +248,6 @@ function buildDeleteCleanupSummary(input: {
     managedTranscriptDeleted: input.managedTranscriptDeleted,
     providerDiscoveryCleared: input.providerDiscoveryCleared,
     registryDropped: input.registryDropped,
-    runStateCleared: true,
   };
 }
 
@@ -1363,7 +1362,7 @@ sessionRoutes.post('/sessions/:id/close', async (c) => {
   ctx.registry.updateStatus(id, 'closing');
   await runtime.close(session, 'close');
   const workerDetached = !runtime.isAttached(id);
-  if (!runtime.isAttached(id)) {
+  if (workerDetached) {
     ctx.registry.updateStatus(id, 'closed');
   }
   runtime.recordLifecycle(id, {
@@ -1459,7 +1458,7 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
       workerDetached,
       providerResumeCleared: true,
       providerStateCleared: true,
-      wakeupsCleared: true,
+      wakeupsCleared: (wakeupResult?.removedCount ?? 0) > 0,
     },
     clearExecutionState: true,
   });
@@ -1591,7 +1590,7 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
     reasonCodes: ['session_deleted'],
     cleanup: buildDeleteCleanupSummary({
       workerDetached: !runtime.isAttached(id),
-      wakeupsCleared: true,
+      wakeupsCleared: (wakeupResult?.removedCount ?? 0) > 0,
       workspaceCleaned,
       managedTranscriptDeleted: managedDeletion.fileDeleted,
       providerDiscoveryCleared: providerDeletion.fileDeleted || providerDiscoveryDeleted,

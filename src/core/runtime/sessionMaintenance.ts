@@ -138,6 +138,8 @@ function buildCleanupContract(
   if (wakeupPending) {
     reasonCodes.push('scheduled_wakeup_retained');
   }
+  // This captures externally resumed or discovered sessions that are still interactive
+  // even though cats-runtime is no longer attached to the worker handle.
   if (!view.attached && view.activity === 'interactive') {
     reasonCodes.push('externally_active_session');
   }
@@ -177,7 +179,7 @@ function resolveMaintenanceStatus(
 
   if (
     cleanup.status === 'recommended'
-    || compaction.status !== 'not_ready'
+    || compaction.status === 'ready'
     || lastLifecycle?.status === 'retained'
   ) {
     return 'attention';

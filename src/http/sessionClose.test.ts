@@ -333,6 +333,7 @@ describe('session close route', () => {
       cleanup: expect.objectContaining({
         providerResumeCleared: true,
         providerStateCleared: true,
+        wakeupsCleared: false,
         runStateCleared: true,
       }),
     }));
@@ -378,6 +379,17 @@ describe('session close route', () => {
     const body = await res.json() as Record<string, unknown>;
     expect(body.status).toBe('closed');
     expect(body).not.toHaveProperty('wakeup');
+    expect(body).toEqual(expect.objectContaining({
+      inspection: expect.objectContaining({
+        maintenance: expect.objectContaining({
+          lastLifecycle: expect.objectContaining({
+            cleanup: expect.objectContaining({
+              wakeupsCleared: true,
+            }),
+          }),
+        }),
+      }),
+    }));
 
     const wakeupListResponse = await app.request(`/wakeups?sessionId=${session.id}`);
     expect(wakeupListResponse.status).toBe(200);
@@ -415,6 +427,11 @@ describe('session close route', () => {
         action: 'delete',
         boundary: 'permanent_delete',
         status: 'completed',
+        cleanup: expect.objectContaining({
+          workerDetached: true,
+          wakeupsCleared: true,
+          registryDropped: true,
+        }),
       }),
     }));
 

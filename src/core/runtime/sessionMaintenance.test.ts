@@ -41,7 +41,7 @@ describe('buildSessionMaintenance', () => {
       view: createView(),
     });
 
-    expect(maintenance.status).toBe('attention');
+    expect(maintenance.status).toBe('clean');
     expect(maintenance.compaction).toEqual({
       status: 'recommended',
       reasonCodes: ['message_count_threshold', 'token_threshold', 'session_active'],
@@ -57,6 +57,29 @@ describe('buildSessionMaintenance', () => {
           status: 'pending',
         }),
       ],
+    });
+  });
+
+  it('marks inactive high-volume sessions as attention when compaction is ready now', () => {
+    const maintenance = buildSessionMaintenance({
+      session: createSession({
+        status: 'closed',
+        messageCount: 32,
+        totalInputTokens: 8_000,
+        totalOutputTokens: 6_500,
+      }),
+      view: createView({
+        attached: false,
+        activity: 'inactive',
+      }),
+    });
+
+    expect(maintenance.status).toBe('attention');
+    expect(maintenance.compaction).toEqual({
+      status: 'ready',
+      reasonCodes: ['message_count_threshold', 'token_threshold', 'session_inactive'],
+      messageCount: 32,
+      totalTokens: 14_500,
     });
   });
 

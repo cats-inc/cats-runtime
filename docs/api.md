@@ -729,6 +729,12 @@ machine-readable place to read:
 - whether cleanup is merely recommended or is ready to run now
 - the latest close/reset/delete lifecycle marker
 
+`inspection.maintenance.status` is intentionally conservative. Active sessions
+can report `compaction.status: "recommended"` without escalating the overall
+maintenance status to `attention`; `attention` is reserved for retained
+lifecycle boundaries, cleanup that needs operator action, or compaction that is
+ready to run on an inactive session.
+
 `POST /sessions` also accepts these optional fields:
 
 - `sessionKey`: caller-visible logical session identity for explicit reuse
@@ -1200,6 +1206,11 @@ Delete responses also include:
   `registryDropped`, etc.)
 - `maintenance`: the terminal lifecycle marker for the delete attempt, with
   `status: "completed"` or `status: "retained"`
+
+For delete responses, top-level `cleanup` is a flat alias of
+`maintenance.cleanup` so transport-facing consumers can read terminal cleanup
+results without having to unwrap the full lifecycle object after the session
+record itself has been removed.
 
 `GET /providers/config` returns the configured provider topology for dashboards
 or other clients that need to offer provider-instance selection. Each instance

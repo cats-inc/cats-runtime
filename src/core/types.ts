@@ -1015,11 +1015,14 @@ export interface RuntimeSessionLifecycleContract {
   cleanup: RuntimeSessionLifecycleCleanupSummary;
 }
 
+export type RuntimeSessionHookId = 'memory_flush' | (string & {});
+export type RuntimeSessionHookOwner = 'product_memory' | (string & {});
+
 export interface RuntimeSessionHookContract {
-  id: 'memory_flush';
+  id: RuntimeSessionHookId;
   phase: 'pre_reset' | 'pre_compaction';
   status: 'pending';
-  owner: 'product_memory';
+  owner: RuntimeSessionHookOwner;
   reason: string;
 }
 
