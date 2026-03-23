@@ -456,6 +456,9 @@ Current gaps:
 - runtime-managed skills still resolve only explicit leaf ids; bundle
   composition and richer library grouping remain outside the contract even
   though the first taxonomy is now broad enough to need them
+- recursive skill-library discovery still assumes a checked-in, well-formed
+  tree; there is no explicit cycle/depth hardening yet if the catalog root ever
+  grows beyond today's repo-owned `skills/` layout
 
 #### Direction
 
@@ -474,6 +477,8 @@ execution/materialization engine.
   - no automatic shadow sync into `skills/`
 - Add bundle/composition metadata once Team 6 is ready to consume grouped role
   packages without pushing product-specific profile logic into runtime
+- Harden recursive catalog discovery before treating the library root as
+  anything broader than versioned runtime-owned content
 - Keep requested skill ids stable while improving library discovery,
   observability, and publish discipline
 
