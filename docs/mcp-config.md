@@ -4,10 +4,11 @@
 
 ## Overview
 
-`cats-runtime` now exposes a first MCP facade slice over HTTP JSON-RPC:
+`cats-runtime` now exposes the MCP facade over both HTTP JSON-RPC and stdio:
 
 ```text
 POST /mcp
+cats-runtime-mcp
 ```
 
 This route is additive. It does not replace the direct runtime HTTP API used by
@@ -17,16 +18,17 @@ This route is additive. It does not replace the direct runtime HTTP API used by
 
 - direct runtime APIs remain the primary product boundary
 - MCP is for orchestrator-style agents and tool hosts
-- runtime still owns tool delivery, session inspection, workspace audit, and
-  delivery audit behavior
+- runtime still owns session mutation, tool delivery, session inspection,
+  workspace substrate, and delivery behavior
 - product-owned approvals, operator actions, and conversation state remain
   outside this facade
 
 ## Supported JSON-RPC Methods
 
-The current MVP supports:
+The current MCP slice supports:
 
 - `initialize`
+- `ping`
 - `tools/list`
 - `tools/call`
 - `notifications/initialized`
@@ -38,11 +40,17 @@ Current tools:
 - `runtime_summary`
 - `list_sessions`
 - `observe_session`
+- `create_session`
+- `send_message`
+- `fork_session`
 - `audit_workspace`
+- `init_workspace`
 - `audit_delivery_target`
+- `commit_changes`
 
-This is intentionally a read-mostly and preview-first slice. Session mutation
-tools can land later if downstream orchestrators actually need them.
+This remains additive and runtime-owned. Direct product APIs stay primary, but
+the MCP tool plane now covers the minimum mutation surface needed for
+multi-step orchestration.
 
 `POST /mcp` uses the same runtime auth policy as the direct HTTP API. If
 `cats-runtime` is configured with an API key, MCP clients must send the same
@@ -121,6 +129,37 @@ Example `tools/call` response shape:
 `structuredContent` is the machine-readable contract. `content[].text` is only
 the short human summary.
 
+## Stdio Usage
+
+Packaged entrypoint:
+
+```text
+cats-runtime-mcp
+```
+
+Local build entrypoint:
+
+```text
+node dist/bin/mcp.js
+```
+
+Example host config:
+
+```json
+{
+  "mcpServers": {
+    "cats-runtime": {
+      "command": "node",
+      "args": ["./dist/bin/mcp.js"],
+      "cwd": "cats-runtime",
+      "env": {
+        "CATS_RUNTIME_CONFIG_PATH": "./config/providers.yaml"
+      }
+    }
+  }
+}
+```
+
 ## Tool Intent Alignment
 
 `cats` now resolves product-owned `mcpProfile` intent into a direct
@@ -130,8 +169,13 @@ tool surface here. The first shared tool names are:
 - `runtime_summary`
 - `list_sessions`
 - `observe_session`
+- `create_session`
+- `send_message`
+- `fork_session`
 - `audit_workspace`
+- `init_workspace`
 - `audit_delivery_target`
+- `commit_changes`
 
 `list_sessions.arguments.status` accepts the same runtime session states exposed
 by the direct API: `initializing`, `ready`, `busy`, `closed`,
@@ -144,10 +188,9 @@ This keeps the product/runtime ownership split explicit:
 
 ## Boundary Notes
 
-- the MCP facade is not a standalone stdio binary in this slice
 - the dashboard and playground continue to use direct runtime APIs
-- workspace and delivery tools remain preview-first unless later runtime routes
-  explicitly accept apply semantics
+- workspace and delivery tools remain preview-first by default unless callers
+  explicitly request apply semantics already supported by the runtime
 - MCP must not become a back door around product-owned approval or governance
   state
 

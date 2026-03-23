@@ -32,6 +32,7 @@ cases where custom headers are awkward.
 GET /
 GET /playground
 POST /mcp
+stdio: cats-runtime-mcp
 ```
 
 `GET /` returns the embedded `cats-runtime` dashboard HTML.
@@ -43,13 +44,15 @@ public, but the user must enter a bearer token in the playground UI before it
 can call protected routes such as `GET /providers/{provider}/models` or session
 mutation endpoints.
 
-`POST /mcp` exposes the first runtime-owned MCP facade over HTTP JSON-RPC. This
-slice is additive: direct runtime APIs remain the primary app boundary, while
-`/mcp` is the curated tool surface for orchestrator-style agents.
+`POST /mcp` exposes the runtime-owned MCP facade over HTTP JSON-RPC.
+`cats-runtime-mcp` exposes the same tool plane over stdio for external MCP
+hosts. This slice is additive: direct runtime APIs remain the primary app
+boundary, while MCP is the curated tool surface for orchestrator-style agents.
 
 Supported JSON-RPC methods:
 
 - `initialize`
+- `ping`
 - `tools/list`
 - `tools/call`
 - `notifications/initialized`
@@ -59,8 +62,13 @@ Current curated tools:
 - `runtime_summary`
 - `list_sessions`
 - `observe_session`
+- `create_session`
+- `send_message`
+- `fork_session`
 - `audit_workspace`
+- `init_workspace`
 - `audit_delivery_target`
+- `commit_changes`
 
 Example `tools/call` request:
 
@@ -79,8 +87,21 @@ Example `tools/call` request:
 ```
 
 Successful tool calls return short human `content` plus machine-readable
-`structuredContent`. The current MCP slice is intentionally read-mostly and
-preview-first; it does not replace the direct session/delivery HTTP routes.
+`structuredContent`. Session and delivery mutations route into the same runtime
+contracts already exposed over direct HTTP. `init_workspace` remains preview by
+default unless callers explicitly request `apply: true`.
+
+For stdio hosts, start:
+
+```text
+cats-runtime-mcp
+```
+
+or for an unpackaged local build:
+
+```text
+node dist/bin/mcp.js
+```
 
 ### Health
 

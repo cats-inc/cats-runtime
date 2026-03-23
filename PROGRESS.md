@@ -9,7 +9,7 @@
 | Core | Completed | Embedded CLI runtime, shared session contracts, discovery, worker pool, runtime-owned shared/isolated/worktree workspace lifecycle helpers, first-slice runtime-owned usage/incident/guardrail contracts, and additive session-maintenance/reset-boundary hooks are in-repo |
 | API Backends | In Progress | `src/backends/api` now runs Claude, Codex/OpenAI, Gemini, and Ollama with runtime-managed sessions, provider-native continuation/caching optimizations, additive incident hints plus provider-agnostic `progress` events, a shared local tool loop with patch/file/search/shell support, and runtime-owned health/diagnostics summaries; deeper live probes and broader tool/model discovery remain |
 | Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, an Agent SDK bridge as the second validation target, and first-slice remote cleanup hooks for close/cancel/delete/reset semantics |
-| HTTP API | Completed | Health, sessions, delivery audit/export/repo routes, messages, history, observe, wakeups, provider management, session branch-lineage inspection, metering/guardrail diagnostics, additive run-inspector/session-discipline contracts, machine-readable session-maintenance/delete-cleanup payloads, worktree-backed session lifecycle cleanup semantics, and the first MCP facade slice are served directly from `cats-runtime` |
+| HTTP API | Completed | Health, sessions, delivery audit/export/repo routes, messages, history, observe, wakeups, provider management, session branch-lineage inspection, metering/guardrail diagnostics, additive run-inspector/session-discipline contracts, machine-readable session-maintenance/delete-cleanup payloads, worktree-backed session lifecycle cleanup semantics, and the runtime MCP facade over HTTP plus stdio are served directly from `cats-runtime` |
 | Runtime Skills | Completed | `skills/` is now a runtime-owned execution catalog with validation, session-level requested/resolved/applied metadata, explicit `skills: null` clearing, backend-aware delivery modes, first-slice Codex/Pi verification, and shared re-entry hydration across create/resume/fork |
 | Wakeup Substrate | Completed | Runtime-owned scheduled wakeup requests now support create/list/cancel/trigger, restart-safe persistence, bounded timer processing, coalescing, and additive session/history wakeup metadata without introducing full scheduler semantics |
 | Provider Compatibility | In Progress | Shared CLI compatibility probing now classifies `ready` / `degraded` / `unsupported_version` / `unrecognized_protocol` / `probe_failed`, validates `light` vs `live` runtime-flag probes across expanded CLI family profiles, captures redacted replay-friendly evidence bundles, tracks stale cache/reprobe metadata, and exposes runtime-owned install/prerequisite/PATH/npm-prefix/auth/version/remediation hints for CLI targets |
@@ -18,7 +18,7 @@
 | Delivery Primitives | Completed | Runtime-owned delivery audit, artifact publish/export, repo status, commit, push, and normalized preview-surface metadata are now available over both HTTP routes and local tools |
 | Browser Preview Substrate | Completed | Runtime-owned browser driver/session/page contracts, `browser_page` preview surfaces, manual driver validation, and additive `/browser/*` routes now exist without depending on sibling browser projects |
 | Tests | Completed | Vitest covers provider, discovery, pool, HTTP, delivery, server bootstrap, API/local tool-loop behavior, and first-slice metering/guardrail/progress normalization |
-| Docs | In Progress | Core docs now cover startup/diagnostics, provider compatibility/evidence flows, model catalog, session branching, worktree-backed session isolation and cleanup, workspace substrate, runtime hydration/re-entry metadata, delivery primitives, the browser preview substrate, runtime-managed skills and explicit clearing, the scheduled wakeup substrate, first-slice metering/progress contracts, additive session inspection/run-state/maintenance payloads, and the runtime MCP facade; later PLAN-003/PLAN-005 follow-on items still need ongoing updates |
+| Docs | In Progress | Core docs now cover startup/diagnostics, provider compatibility/evidence flows, model catalog, session branching, worktree-backed session isolation and cleanup, workspace substrate, runtime hydration/re-entry metadata, delivery primitives, the browser preview substrate, runtime-managed skills and explicit clearing, the scheduled wakeup substrate, first-slice metering/progress contracts, additive session inspection/run-state/maintenance payloads, and the runtime MCP facade over HTTP plus stdio; later PLAN-003/PLAN-005 follow-on items still need ongoing updates |
 | Follow-ups | Completed | Accepted post-review findings for provider-instance rollout were implemented and recorded in `docs/plans/PLAN-002-provider-instance-review-followups.md` |
 
 **Legend**: Not Started | In Progress | Completed | Blocked
@@ -547,7 +547,7 @@ without moving memory extraction or product policy into `cats-runtime`.
 
 ### WP-15: Runtime MCP Facade
 
-**Status**: In Progress
+**Status**: Completed
 **Assigned**: Codex
 **Priority**: P1
 
@@ -560,16 +560,15 @@ replacing the direct runtime HTTP API used by product code.
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Add runtime-owned MCP module under `src/mcp` | [x] | JSON-RPC handling, tool registry, and runtime read-model helpers now live outside provider adapters |
-| Add `POST /mcp` facade route | [x] | `initialize`, `tools/list`, `tools/call`, and `notifications/initialized` are now supported |
-| Expose first curated tool slice | [x] | `runtime_summary`, `list_sessions`, `observe_session`, `audit_workspace`, and `audit_delivery_target` now ship |
-| Reuse existing runtime services/read models instead of inventing a second execution stack | [x] | MCP tools call the same session inspection, workspace substrate, and delivery primitives already used by HTTP routes/tools |
-| Update MCP docs and route coverage | [x] | `docs/api.md`, `docs/architecture.md`, `docs/mcp-config.md`, and `src/http/mcpRoutes.test.ts` now describe and verify the slice |
+| Add runtime-owned MCP module under `src/mcp` | [x] | JSON-RPC handling, tool registry, stdio framing, and runtime read-model helpers now live outside provider adapters |
+| Add `POST /mcp` facade route | [x] | `initialize`, `ping`, `tools/list`, `tools/call`, and `notifications/initialized` are supported |
+| Expose curated read + mutation tool slice | [x] | `runtime_summary`, `list_sessions`, `observe_session`, `create_session`, `send_message`, `fork_session`, `audit_workspace`, `init_workspace`, `audit_delivery_target`, and `commit_changes` now ship |
+| Reuse existing runtime services/read models instead of inventing a second execution stack | [x] | MCP tools route into the existing session, delivery, and workspace contracts already used by HTTP routes/tools |
+| Add standalone stdio MCP transport | [x] | `cats-runtime-mcp` now exposes the same tool plane over Content-Length framed stdio JSON-RPC |
+| Update MCP docs and coverage | [x] | `docs/api.md`, `docs/architecture.md`, `docs/mcp-config.md`, `../../cats/docs/mcp-config.md`, `src/http/mcpRoutes.test.ts`, and `src/mcp/stdio.test.ts` now describe and verify the slice |
 
 #### Deferred Boundaries
 
-- [ ] No standalone stdio MCP binary yet; the current slice is HTTP JSON-RPC only
-- [ ] No session mutation tools yet; the first slice is read-mostly and preview-first
 - [ ] No attempt to make MCP the primary product/runtime interface
 
 ### WP-16: Browser Preview Substrate v0

@@ -130,6 +130,20 @@ leaking backend-specific wire formats to consumers.
   guardrails can share one runtime-owned contract surface without moving
   product budget policy into the runtime
 
+#### Deferred Follow-up
+
+- If Team 5 needs live tool progress over the MCP facade, add a dedicated
+  notification/streaming slice on top of the current MCP tool plane instead of
+  forcing orchestrators to wait for buffered `send_message` results.
+- Keep that follow-up additive:
+  - preserve the current request/response `tools/call` contract
+  - stream provider-agnostic runtime `progress` events rather than
+    provider-native payloads
+  - reuse the existing runtime `progress` schema from `src/core/progress.ts`
+    and `src/core/types.ts`
+  - avoid turning MCP into a separate execution stack from the direct
+    session/message runtime APIs
+
 #### Initial Candidate Providers
 
 - `junie`
@@ -344,5 +358,4 @@ schemas.
 - `docs/specs/SPEC-011-session-fork-and-context-transplant-primitives.md`
 
 ---
-
 *Last updated: 2026-03-23*

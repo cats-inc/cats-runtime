@@ -8,6 +8,7 @@ import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
 import type { CliRuntimeConfig } from '../backends/cli/config.js';
 import { createRuntimeApp } from './app.js';
 import { createRuntimeStartupState } from '../startup.js';
+import type { StreamEvent, TurnInput } from '../core/types.js';
 
 describe('runtime MCP facade', () => {
   let rootDir: string;
@@ -15,6 +16,11 @@ describe('runtime MCP facade', () => {
   let dataDir: string;
   let registry: SessionRegistry;
   let pool: WorkerPool;
+  let workers: Map<string, {
+    alive: boolean;
+    busy: boolean;
+    streamMessage: (turn: string | TurnInput) => AsyncGenerator<StreamEvent>;
+  }>;
 
   function makeConfig(): CliRuntimeConfig {
     return {
@@ -45,6 +51,39 @@ describe('runtime MCP facade', () => {
   }
 
   function createTestApp() {
+    const workerStream = async function* (turn: string | TurnInput): AsyncGenerator<StreamEvent> {
+      const input = typeof turn === 'string' ? turn : turn.message;
+      yield { type: 'text', text: `reply: ${input}` };
+      yield { type: 'result', summary: `completed: ${input}` };
+    };
+
+    workers.set('session-1', {
+      alive: true,
+      busy: false,
+      streamMessage: workerStream,
+    });
+
+    pool = {
+      getCapabilities: vi.fn(() => ({ resume: true, fork: true, permissions: true })),
+      get: vi.fn((sessionId: string) => workers.get(sessionId)),
+      spawn: vi.fn((sessionId: string) => {
+        const worker = {
+          alive: true,
+          busy: false,
+          streamMessage: workerStream,
+        };
+        workers.set(sessionId, worker);
+        return worker;
+      }),
+      kill: vi.fn((sessionId: string) => {
+        workers.delete(sessionId);
+      }),
+      killAll: vi.fn(() => {
+        workers.clear();
+      }),
+      status: vi.fn(() => ({ active: workers.size, busy: 0, idle: workers.size, providers: { claude: workers.size } })),
+    } as unknown as WorkerPool;
+
     return createRuntimeApp({
       config: makeConfig(),
       startup: createRuntimeStartupState(),
@@ -76,14 +115,7 @@ describe('runtime MCP facade', () => {
       permissionMode: 'skip',
     });
     registry.updateStatus('session-1', 'ready');
-
-    pool = {
-      getCapabilities: vi.fn(() => ({ resume: true, fork: true, permissions: true })),
-      get: vi.fn(() => undefined),
-      spawn: vi.fn(),
-      kill: vi.fn(),
-      status: vi.fn(() => ({ active: 0, busy: 0, idle: 0, providers: { claude: 1 } })),
-    } as unknown as WorkerPool;
+    workers = new Map();
   });
 
   afterEach(() => {
@@ -139,8 +171,13 @@ describe('runtime MCP facade', () => {
       'runtime_summary',
       'list_sessions',
       'observe_session',
+      'create_session',
+      'send_message',
+      'fork_session',
       'audit_workspace',
+      'init_workspace',
       'audit_delivery_target',
+      'commit_changes',
     ]);
   });
 
@@ -202,7 +239,7 @@ describe('runtime MCP facade', () => {
       };
     };
     expect(observe.result.structuredContent.session.id).toBe('session-1');
-    expect(observe.result.structuredContent.session.inspection.state).toBe('closed');
+    expect(observe.result.structuredContent.session.inspection.state).toBe('idle');
     expect(observe.result.structuredContent.observePath).toBe('/sessions/session-1/observe');
   });
 
@@ -267,6 +304,161 @@ describe('runtime MCP facade', () => {
     expect(deliveryAudit.result.structuredContent.contract.mode).toBe('preview');
   });
 
+  it('exposes mutation tools aligned with existing session, workspace, and delivery contracts', async () => {
+    const app = createTestApp();
+    const workspacePath = join(rootDir, 'workspace');
+    mkdirSync(workspacePath, { recursive: true });
+
+    const createResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 7,
+        method: 'tools/call',
+        params: {
+          name: 'create_session',
+          arguments: {
+            provider: 'claude',
+            cwd: workspacePath,
+          },
+        },
+      }),
+    });
+    expect(createResponse.status).toBe(200);
+    const created = await createResponse.json() as {
+      result: {
+        structuredContent: {
+          responseStatus: number;
+          session: { id: string; providerName: string };
+          messagePath: string;
+        };
+      };
+    };
+    expect(created.result.structuredContent.responseStatus).toBe(201);
+    expect(created.result.structuredContent.session.providerName).toBe('claude');
+    expect(created.result.structuredContent.messagePath).toBe(
+      `/sessions/${created.result.structuredContent.session.id}/messages`,
+    );
+
+    const createdSessionId = created.result.structuredContent.session.id;
+    const sendResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 8,
+        method: 'tools/call',
+        params: {
+          name: 'send_message',
+          arguments: {
+            sessionId: createdSessionId,
+            message: 'hello from mcp',
+          },
+        },
+      }),
+    });
+    expect(sendResponse.status).toBe(200);
+    const sent = await sendResponse.json() as {
+      result: {
+        structuredContent: {
+          responseStatus: number;
+          sessionId: string;
+          events: Array<{ type: string; text?: string; summary?: string }>;
+        };
+      };
+    };
+    expect(sent.result.structuredContent.responseStatus).toBe(200);
+    expect(sent.result.structuredContent.sessionId).toBe(createdSessionId);
+    expect(sent.result.structuredContent.events).toEqual([
+      { type: 'text', text: 'reply: hello from mcp' },
+      { type: 'result', summary: 'completed: hello from mcp' },
+    ]);
+
+    const forkResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 9,
+        method: 'tools/call',
+        params: {
+          name: 'fork_session',
+          arguments: {
+            sessionId: createdSessionId,
+            mode: 'context_transplant',
+          },
+        },
+      }),
+    });
+    expect(forkResponse.status).toBe(200);
+    const forked = await forkResponse.json() as {
+      result: {
+        structuredContent: {
+          responseStatus: number;
+          session: { id: string };
+        };
+      };
+    };
+    expect(forked.result.structuredContent.responseStatus).toBe(201);
+    expect(forked.result.structuredContent.session.id).not.toBe(createdSessionId);
+
+    const initWorkspaceResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 10,
+        method: 'tools/call',
+        params: {
+          name: 'init_workspace',
+          arguments: {
+            workspacePath,
+          },
+        },
+      }),
+    });
+    expect(initWorkspaceResponse.status).toBe(200);
+    const initWorkspace = await initWorkspaceResponse.json() as {
+      result: {
+        structuredContent: {
+          operation: string;
+        };
+      };
+    };
+    expect(initWorkspace.result.structuredContent.operation).toBe('init-workspace');
+
+    const commitResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 11,
+        method: 'tools/call',
+        params: {
+          name: 'commit_changes',
+          arguments: {
+            workspacePath,
+            repo: {
+              message: 'feat: mcp test',
+            },
+          },
+        },
+      }),
+    });
+    expect(commitResponse.status).toBe(200);
+    const commit = await commitResponse.json() as {
+      result: {
+        structuredContent: {
+          responseStatus: number;
+          action: string;
+        };
+      };
+    };
+    expect(commit.result.structuredContent.responseStatus).toBe(200);
+    expect(commit.result.structuredContent.action).toBe('create-commit');
+  });
+
   it('rejects invalid list_sessions status filters with a machine-readable params error', async () => {
     const app = createTestApp();
 
@@ -275,7 +467,7 @@ describe('runtime MCP facade', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 7,
+        id: 12,
         method: 'tools/call',
         params: {
           name: 'list_sessions',
@@ -289,7 +481,7 @@ describe('runtime MCP facade', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       jsonrpc: '2.0',
-      id: 7,
+      id: 12,
       error: {
         code: -32602,
         message: 'status must be a valid session status',

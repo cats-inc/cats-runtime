@@ -133,15 +133,16 @@ src/
   product-level delivery governance policy
 - Exposes runtime-owned scheduled wakeup routes without pretending the runtime
   already owns full product workflow or heartbeat scheduling
-- Exposes the additive HTTP JSON-RPC MCP facade at `POST /mcp`
+- Exposes the additive MCP facade over `POST /mcp` plus the `cats-runtime-mcp` stdio binary
 
 ### `src/mcp`
 
 - Owns the runtime MCP facade implementation
-- Maps JSON-RPC methods such as `initialize`, `tools/list`, and `tools/call`
-  onto runtime-owned services and read models
-- Reuses existing session inspection, workspace audit, and delivery audit
-  primitives instead of inventing a second execution stack
+- Maps JSON-RPC methods such as `initialize`, `ping`, `tools/list`, and
+  `tools/call` onto runtime-owned services and read models
+- Reuses existing session inspection, session mutation, workspace substrate,
+  and delivery primitives instead of inventing a second execution stack
+- Supports both HTTP JSON-RPC and Content-Length framed stdio transport
 - Keeps MCP additive so direct HTTP routes remain the primary product boundary
 
 ### `src/startup.ts`

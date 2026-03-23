@@ -21,7 +21,8 @@
     }
   },
   "bin": {
-    "cats-runtime": "./dist/index.js"
+    "cats-runtime": "./dist/index.js",
+    "cats-runtime-mcp": "./dist/bin/mcp.js"
   },
   "files": [
     "dist",

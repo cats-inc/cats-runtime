@@ -11,7 +11,7 @@ import type {
   McpJsonRpcSuccess,
 } from './types.js';
 
-const MCP_PROTOCOL_VERSION = '2024-11-05';
+export const MCP_PROTOCOL_VERSION = '2024-11-05';
 
 function successResponse(
   id: string | number | null,
@@ -94,6 +94,8 @@ export async function handleMcpJsonRpc(
     const method = ensureMethod(request);
 
     switch (method) {
+      case 'ping':
+        return successResponse(id, {});
       case 'notifications/initialized':
         return id === null ? null : successResponse(id, {});
       case 'initialize':
