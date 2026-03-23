@@ -31,6 +31,7 @@ cases where custom headers are awkward.
 ```text
 GET /
 GET /playground
+POST /mcp
 ```
 
 `GET /` returns the embedded `cats-runtime` dashboard HTML.
@@ -41,6 +42,45 @@ same-origin runtime APIs. When inbound auth is enabled, the page itself remains
 public, but the user must enter a bearer token in the playground UI before it
 can call protected routes such as `GET /providers/{provider}/models` or session
 mutation endpoints.
+
+`POST /mcp` exposes the first runtime-owned MCP facade over HTTP JSON-RPC. This
+slice is additive: direct runtime APIs remain the primary app boundary, while
+`/mcp` is the curated tool surface for orchestrator-style agents.
+
+Supported JSON-RPC methods:
+
+- `initialize`
+- `tools/list`
+- `tools/call`
+- `notifications/initialized`
+
+Current curated tools:
+
+- `runtime_summary`
+- `list_sessions`
+- `observe_session`
+- `audit_workspace`
+- `audit_delivery_target`
+
+Example `tools/call` request:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "observe_session",
+    "arguments": {
+      "sessionId": "session-123"
+    }
+  }
+}
+```
+
+Successful tool calls return short human `content` plus machine-readable
+`structuredContent`. The current MCP slice is intentionally read-mostly and
+preview-first; it does not replace the direct session/delivery HTTP routes.
 
 ### Health
 

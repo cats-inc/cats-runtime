@@ -22,6 +22,7 @@ Current capabilities:
 - file-based provider topology with separated `routing` / `backends` sections
 - dashboard-side provider instance selection for session creation
 - embedded multi-agent playground sample at `/playground`
+- first-slice MCP facade at `POST /mcp` for orchestrator-style agents
 - runtime-managed skills with session-level requested/resolved/applied metadata
 - additive workspace/skill hydration metadata that distinguishes runtime cwd from the authoritative workspace source
 - explicit `skills: null` clearing for create/message/fork session flows
@@ -49,6 +50,7 @@ Current capabilities:
 - [x] Add the first provider compatibility/evidence engine slice for CLI-backed providers
 - [x] Add provider-agnostic run-inspector/session-discipline contracts across CLI, API, and agent backends
 - [x] Add session maintenance hooks and cleanup discipline for long-running lifecycle boundaries
+- [x] Add the first runtime-owned MCP facade slice without replacing direct HTTP APIs
 
 ## Design Rules
 

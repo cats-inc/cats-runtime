@@ -1,138 +1,154 @@
 # MCP Configuration Guide
 
-> Model Context Protocol (MCP) server configuration for AI agents.
+> Runtime-owned MCP facade notes for `cats-runtime`.
 
 ## Overview
 
-MCP (Model Context Protocol) is the AAIF standard for connecting AI agents to external tools and data sources. This document describes how to configure MCP servers for this project.
+`cats-runtime` now exposes a first MCP facade slice over HTTP JSON-RPC:
 
-## MCP Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    MCP Host                              │
-│         (Claude Desktop, Cursor, ChatGPT, etc.)         │
-└────────────────────────┬────────────────────────────────┘
-                         │ JSON-RPC
-                         ▼
-┌─────────────────────────────────────────────────────────┐
-│                    MCP Client                            │
-│              (Discovers & invokes servers)               │
-└────────────────────────┬────────────────────────────────┘
-                         │
-         ┌───────────────┼───────────────┐
-         ▼               ▼               ▼
-   ┌──────────┐   ┌──────────┐   ┌──────────┐
-   │MCP Server│   │MCP Server│   │MCP Server│
-   │(Database)│   │  (API)   │   │ (Files)  │
-   └──────────┘   └──────────┘   └──────────┘
+```text
+POST /mcp
 ```
 
-## Configuration
+This route is additive. It does not replace the direct runtime HTTP API used by
+`cats`, the dashboard, or the playground.
 
-### Claude Desktop
+## Current Stance
 
-Location: `%APPDATA%\Claude\claude_desktop_config.json` (Windows)
+- direct runtime APIs remain the primary product boundary
+- MCP is for orchestrator-style agents and tool hosts
+- runtime still owns tool delivery, session inspection, workspace audit, and
+  delivery audit behavior
+- product-owned approvals, operator actions, and conversation state remain
+  outside this facade
+
+## Supported JSON-RPC Methods
+
+The current MVP supports:
+
+- `initialize`
+- `tools/list`
+- `tools/call`
+- `notifications/initialized`
+
+## Curated Tool Set
+
+Current tools:
+
+- `runtime_summary`
+- `list_sessions`
+- `observe_session`
+- `audit_workspace`
+- `audit_delivery_target`
+
+This is intentionally a read-mostly and preview-first slice. Session mutation
+tools can land later if downstream orchestrators actually need them.
+
+## HTTP Usage
+
+When `CATS_RUNTIME_API_KEY` is enabled, send the same bearer auth used by the
+rest of the runtime API:
+
+```text
+Authorization: Bearer <cats-runtime-api-key>
+```
+
+Example `initialize` request:
 
 ```json
 {
-  "mcpServers": {
-    "project-name": {
-      "command": "python",
-      "args": ["-m", "mcp_server"],
-      "cwd": "C:/path/to/project",
-      "env": {
-        "DATABASE_URL": "postgresql://localhost/db"
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {}
+}
+```
+
+Example `tools/list` request:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/list",
+  "params": {}
+}
+```
+
+Example `tools/call` request:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "observe_session",
+    "arguments": {
+      "sessionId": "session-123"
+    }
+  }
+}
+```
+
+Example `tools/call` response shape:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Observation snapshot for session session-123."
       }
+    ],
+    "structuredContent": {
+      "session": {
+        "id": "session-123"
+      },
+      "observePath": "/sessions/session-123/observe"
     }
   }
 }
 ```
 
-### Cursor IDE
+`structuredContent` is the machine-readable contract. `content[].text` is only
+the short human summary.
 
-Location: `.cursor/mcp.json` (project root)
+## Tool Intent Alignment
 
-```json
-{
-  "mcpServers": {
-    "project-name": {
-      "command": "node",
-      "args": ["./mcp-server/index.js"]
-    }
-  }
-}
-```
+`cats` now resolves product-owned `mcpProfile` intent into a direct
+orchestrator plan/dispatch contract, while `cats-runtime` exposes the actual
+tool surface here. The first shared tool names are:
 
-## Common MCP Servers
+- `runtime_summary`
+- `list_sessions`
+- `observe_session`
+- `audit_workspace`
+- `audit_delivery_target`
 
-### Database Access
+This keeps the product/runtime ownership split explicit:
 
-```json
-{
-  "database": {
-    "command": "uvx",
-    "args": ["mcp-server-sqlite", "--db-path", "./data/database.db"]
-  }
-}
-```
+- `cats` chooses tool intent
+- `cats-runtime` exposes runtime-owned tool delivery and read models
 
-### File System
+## Boundary Notes
 
-```json
-{
-  "filesystem": {
-    "command": "npx",
-    "args": ["-y", "@anthropic/mcp-filesystem", "./src"]
-  }
-}
-```
+- the MCP facade is not a standalone stdio binary in this slice
+- the dashboard and playground continue to use direct runtime APIs
+- workspace and delivery tools remain preview-first unless later runtime routes
+  explicitly accept apply semantics
+- MCP must not become a back door around product-owned approval or governance
+  state
 
-### GitHub
+## References
 
-```json
-{
-  "github": {
-    "command": "npx",
-    "args": ["-y", "@anthropic/mcp-github"],
-    "env": {
-      "GITHUB_TOKEN": "${GITHUB_TOKEN}"
-    }
-  }
-}
-```
-
-## Project-Specific Configuration
-
-(Add your project's MCP server configurations here)
-
-### Server 1: [Name]
-
-**Purpose**: (What this server provides)
-
-```json
-{
-  "server-name": {
-    "command": "",
-    "args": [],
-    "env": {}
-  }
-}
-```
-
-## Security Considerations
-
-- Never commit MCP configs with hardcoded secrets
-- Use environment variables for sensitive data
-- Limit server permissions to minimum required
-- Review server code before enabling
-
-## Resources
-
-- [MCP Documentation](https://modelcontextprotocol.io)
-- [MCP GitHub](https://github.com/modelcontextprotocol)
-- [MCP Server Registry](https://github.com/modelcontextprotocol/servers)
+- [api.md](./api.md)
+- [architecture.md](./architecture.md)
+- [cats ADR-008](../../cats/docs/decisions/008-expose-cats-runtime-via-direct-api-and-mcp-facade.md)
 
 ---
 
-*Last updated: YYYY-MM-DD*
+*Last updated: 2026-03-23*

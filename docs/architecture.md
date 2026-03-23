@@ -101,6 +101,7 @@ src/
     auth.ts
     routes/
     streaming.ts
+  mcp/
 ```
 
 ## Components
@@ -124,6 +125,16 @@ src/
   product-level delivery governance policy
 - Exposes runtime-owned scheduled wakeup routes without pretending the runtime
   already owns full product workflow or heartbeat scheduling
+- Exposes the additive HTTP JSON-RPC MCP facade at `POST /mcp`
+
+### `src/mcp`
+
+- Owns the runtime MCP facade implementation
+- Maps JSON-RPC methods such as `initialize`, `tools/list`, and `tools/call`
+  onto runtime-owned services and read models
+- Reuses existing session inspection, workspace audit, and delivery audit
+  primitives instead of inventing a second execution stack
+- Keeps MCP additive so direct HTTP routes remain the primary product boundary
 
 ### `src/startup.ts`
 
@@ -340,14 +351,16 @@ src/
    `GET /diagnostics/health`, `GET /diagnostics/runtime`, and
    `GET /diagnostics/providers` expose the runtime-owned host integration
    surface
-13. Optional machine-readable process output emits startup and shutdown
+13. `POST /mcp` reuses those same runtime-owned services as an additive
+    orchestrator/tool surface
+14. Optional machine-readable process output emits startup and shutdown
    lifecycle events for app-managed local hosts
-14. Session branch inspection is available over session payload `branching`
+15. Session branch inspection is available over session payload `branching`
     metadata plus `GET /sessions/{id}/lineage`
-15. Delivery actions resolve through `RuntimeDeliveryService`, which inspects
+16. Delivery actions resolve through `RuntimeDeliveryService`, which inspects
     repo state, exports artifacts, normalizes preview surfaces, and executes
     Git mutations behind a stable machine-readable contract
-16. Stream events are returned directly to the caller
+17. Stream events are returned directly to the caller
 
 For WSL-backed Cursor/Kiro discovery:
 
