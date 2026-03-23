@@ -5,7 +5,9 @@ import type {
   ProviderSpawnOptions,
   ProviderTurnOptions,
   StreamEvent,
+  TurnInput,
 } from './types.js';
+import { compileRuntimeTurnPrompt } from './prompt.js';
 
 const REQUEST_POLL_INTERVAL_MS = 250;
 
@@ -28,7 +30,7 @@ export class OpencodeProvider implements Provider {
     return null;
   }
 
-  async *streamTurn(content: string, opts: ProviderTurnOptions): AsyncGenerator<StreamEvent> {
+  async *streamTurn(turn: TurnInput, opts: ProviderTurnOptions): AsyncGenerator<StreamEvent> {
     const sessionId = opts.resumeSessionId;
     if (!sessionId) {
       throw new Error('OpenCode session ID is required before sending a message');
@@ -54,7 +56,7 @@ export class OpencodeProvider implements Provider {
       const result = await this.native.prompt({
         cwd: opts.cwd,
         sessionId,
-        content,
+        content: compileRuntimeTurnPrompt(turn.message, turn),
         model: opts.model,
         signal: opts.signal,
       });

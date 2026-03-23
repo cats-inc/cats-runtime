@@ -39,6 +39,14 @@ describe('GeminiProvider', () => {
     it('returns raw content', () => {
       expect(provider.buildStdinMessage('hello')).toBe('hello');
     });
+
+    it('prefixes layered instructions when provided', () => {
+      expect(provider.buildStdinMessage('hello', {
+        message: 'hello',
+        sessionInstructions: 'Session-level instructions.',
+        instructions: 'Turn-level instructions.',
+      })).toContain('Turn-level instructions.');
+    });
   });
 
   describe('parseStreamLine', () => {

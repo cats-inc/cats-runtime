@@ -9,7 +9,7 @@ describe('KiroProvider', () => {
       getLatestSession: vi.fn(),
     } as unknown as KiroNativeSessionService;
     const provider = new KiroProvider(native);
-    provider.prepareEphemeralTurn('Say hi');
+    provider.prepareEphemeralTurn({ message: 'Say hi' });
 
     const args = provider.buildSpawnArgs({
       cwd: '/tmp/repo',

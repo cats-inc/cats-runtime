@@ -114,6 +114,16 @@ export async function loadTranscriptMessages(
           continue;
         }
 
+        if (entry.type === 'compaction_summary') {
+          pendingAssistantParts = flushMessage(messages, 'assistant', pendingAssistantParts);
+          pendingToolResults = flushMessage(messages, 'user', pendingToolResults);
+          const text = typeof entry.text === 'string' ? entry.text.trim() : '';
+          if (text) {
+            messages.push({ role: 'system', parts: [{ type: 'text', text }] });
+          }
+          continue;
+        }
+
         if (entry.type === 'assistant') {
           pendingToolResults = flushMessage(messages, 'user', pendingToolResults);
 

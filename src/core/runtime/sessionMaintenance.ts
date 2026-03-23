@@ -1,6 +1,7 @@
 import type {
   RuntimeSessionCleanupContract,
   RuntimeSessionCompactionContract,
+  RuntimeSessionCompactionRecord,
   RuntimeSessionHookContract,
   RuntimeSessionHookGroup,
   RuntimeSessionLifecycleContract,
@@ -30,7 +31,13 @@ export function buildSessionMaintenance(
   const hasEvidence = input.session.messageCount > 0
     || totalTokens > 0
     || Boolean(input.session.artifacts?.length);
-  const compaction = buildCompactionContract(input.session, input.view.attached, totalTokens, hasEvidence);
+  const compaction = buildCompactionContract(
+    input.session,
+    input.view.attached,
+    totalTokens,
+    hasEvidence,
+    input.trackedMaintenance?.lastCompaction,
+  );
   const preResetHooks = hasEvidence
     ? [
         createMemoryFlushHook(
@@ -91,12 +98,21 @@ function buildCompactionContract(
   attached: boolean,
   totalTokens: number,
   hasEvidence: boolean,
+  lastCompaction?: RuntimeSessionCompactionRecord,
 ): RuntimeSessionCompactionContract {
+  const liveMessageCount = Math.max(
+    0,
+    session.messageCount - Math.min(lastCompaction?.baselineMessageCount ?? 0, session.messageCount),
+  );
+  const liveTotalTokens = Math.max(
+    0,
+    totalTokens - Math.min(lastCompaction?.baselineTotalTokens ?? 0, totalTokens),
+  );
   const thresholdReasons: string[] = [];
-  if (session.messageCount >= COMPACTION_MESSAGE_THRESHOLD) {
+  if (liveMessageCount >= COMPACTION_MESSAGE_THRESHOLD) {
     thresholdReasons.push('message_count_threshold');
   }
-  if (totalTokens >= COMPACTION_TOKEN_THRESHOLD) {
+  if (liveTotalTokens >= COMPACTION_TOKEN_THRESHOLD) {
     thresholdReasons.push('token_threshold');
   }
 
@@ -104,8 +120,9 @@ function buildCompactionContract(
     return {
       status: 'not_ready',
       reasonCodes: ['no_runtime_evidence'],
-      messageCount: session.messageCount,
-      totalTokens,
+      messageCount: liveMessageCount,
+      totalTokens: liveTotalTokens,
+      ...(lastCompaction ? { lastCompaction: cloneCompactionRecord(lastCompaction) } : {}),
     };
   }
 
@@ -113,8 +130,9 @@ function buildCompactionContract(
     return {
       status: 'not_ready',
       reasonCodes: ['below_compaction_threshold'],
-      messageCount: session.messageCount,
-      totalTokens,
+      messageCount: liveMessageCount,
+      totalTokens: liveTotalTokens,
+      ...(lastCompaction ? { lastCompaction: cloneCompactionRecord(lastCompaction) } : {}),
     };
   }
 
@@ -124,8 +142,9 @@ function buildCompactionContract(
       ...thresholdReasons,
       session.status === 'closed' || !attached ? 'session_inactive' : 'session_active',
     ],
-    messageCount: session.messageCount,
-    totalTokens,
+    messageCount: liveMessageCount,
+    totalTokens: liveTotalTokens,
+    ...(lastCompaction ? { lastCompaction: cloneCompactionRecord(lastCompaction) } : {}),
   };
 }
 
@@ -240,6 +259,15 @@ function cloneLifecycle(
     ...lifecycle,
     reasonCodes: [...lifecycle.reasonCodes],
     cleanup: { ...lifecycle.cleanup },
+  };
+}
+
+function cloneCompactionRecord(
+  record: RuntimeSessionCompactionRecord,
+): RuntimeSessionCompactionRecord {
+  return {
+    ...record,
+    ...(record.archivePath ? { archivePath: record.archivePath } : {}),
   };
 }
 

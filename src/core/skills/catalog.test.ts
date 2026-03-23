@@ -165,6 +165,32 @@ describe('runtime skill catalog', () => {
     expect(readFileSync(instructionsFile!, 'utf8')).toContain('Runtime Skill: Delivery Auditor');
   });
 
+  it('enables instruction delivery for prompt-driven CLI providers', () => {
+    const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
+    cleanupPaths.push(sessionBaseDir);
+    const cwd = join(sessionBaseDir, 'repo');
+    mkdirSync(cwd, { recursive: true });
+
+    const skillState = resolveRuntimeSkillManifest({
+      requestedSkills: ['companion'],
+    }, {
+      sessionId: 'claude-cli-session',
+      providerName: 'claude',
+      providerBackend: 'cli',
+      cwd,
+      workspaceMode: 'shared',
+      sessionBaseDir,
+    });
+
+    expect(skillState?.delivery).toEqual(expect.objectContaining({
+      preferredMode: 'instructions',
+      mode: 'instructions',
+      status: 'applied',
+    }));
+    expect(skillState?.appliedSkillIds).toEqual(['companion']);
+    expect(skillState?.warnings).toEqual([]);
+  });
+
   it('rejects unknown skills with a client-safe runtime error', () => {
     const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
     cleanupPaths.push(sessionBaseDir);

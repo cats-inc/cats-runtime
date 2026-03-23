@@ -16,7 +16,9 @@ import type {
   ProviderSpawnOptions,
   ProviderTurnOptions,
   StreamEvent,
+  TurnInput,
 } from './types.js';
+import { compileRuntimeTurnPrompt } from './prompt.js';
 
 const DEFAULT_JUNIE_SESSIONS_DIR = join(os.homedir(), '.junie', 'sessions');
 const SESSION_POLL_INTERVAL_MS = 250;
@@ -40,8 +42,8 @@ export class JunieProvider implements Provider {
     this.sessionsDir = sessionsDir;
   }
 
-  prepareEphemeralTurn(content: string): void {
-    this.pendingPrompt = content;
+  prepareEphemeralTurn(turn: TurnInput): void {
+    this.pendingPrompt = compileRuntimeTurnPrompt(turn.message, turn);
   }
 
   resolveFirstEventTimeoutMs(_defaultTimeoutMs: number): number {
@@ -101,13 +103,17 @@ export class JunieProvider implements Provider {
     return parseJunieStreamLine(line);
   }
 
-  async *streamTurn(content: string, opts: ProviderTurnOptions): AsyncGenerator<StreamEvent> {
+  async *streamTurn(turn: TurnInput, opts: ProviderTurnOptions): AsyncGenerator<StreamEvent> {
     if (!this.commandConfig) {
       throw new Error('Junie command config is required before sending a message');
     }
 
     const turnTimeoutMs = resolveJunieTurnTimeoutMs();
-    const args = this.buildArgs(opts, content, turnTimeoutMs);
+    const args = this.buildArgs(
+      opts,
+      compileRuntimeTurnPrompt(turn.message, turn),
+      turnTimeoutMs,
+    );
     const env = { ...process.env };
     delete env.CLAUDECODE;
 

@@ -4,20 +4,21 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (First Slice Landed) |
+| **Status** | In Progress (Execution Delivery Slice Landed) |
 | **Owner** | Codex |
 | **Reviewer** | User review pending |
 
 ## Summary
 
-`cats-runtime` now has a first delivered runtime-managed skills slice: session
-payloads carry requested/resolved/applied metadata, delivery modes are
+`cats-runtime` now has a delivered runtime-managed skills execution slice:
+session payloads carry requested/resolved/applied metadata, delivery modes are
 backend-aware, callers can explicitly clear persisted skill state with
-`skills: null`, and the resolver can now distinguish canonical family/slug
-library ids from plain slug requests.
+`skills: null`, the resolver can distinguish canonical family/slug library ids
+from plain slug requests, and instruction delivery now reaches live execution
+paths instead of stopping at catalog resolution.
 
 The remaining gap is not whether skills exist at runtime, but how far the v0
-contract should go beyond the delivered session/runtime slice.
+contract should go beyond the delivered session/runtime/execution slice.
 
 The latest follow-on clarification is that runtime-managed execution and the
 internal skill-library taxonomy are separate concerns:
@@ -281,8 +282,9 @@ supports local skill directories.
       or should `cats` resolve profiles first in the short term?
 - [ ] Should the first public API include a standalone `GET /skills` catalog, or
       should v0 stay session-contract only?
-- [ ] Which non-CLI backends, if any, deserve a meaningful `instructions`
-      delivery mode in the first slice?
+- [ ] How far should instruction-delivery reporting go beyond the current
+      session/history inspection surfaces for prompt-driven CLI and API/agent
+      targets?
 - [ ] Should resolved skill state carry an explicit skill version or content
       fingerprint so cache keys, session resume, and artifact provenance can
       distinguish skill revisions?

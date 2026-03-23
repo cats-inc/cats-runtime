@@ -182,4 +182,48 @@ describe('API transcript history replay', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('replays runtime compaction summaries as a system message before the retained transcript tail', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cats-runtime-api-history-'));
+    const filePath = join(dir, 'history.jsonl');
+    writeFileSync(filePath, [
+      JSON.stringify({
+        type: 'compaction_summary',
+        text: 'Runtime compaction summary\n- Earlier user focus: repo cleanup\n- Earlier assistant outcomes: proposed a minimal patch',
+        timestamp: '2026-03-24T01:00:00.000Z',
+      }),
+      JSON.stringify({
+        type: 'user',
+        message: { content: 'Continue from the compacted state.' },
+        timestamp: '2026-03-24T01:00:01.000Z',
+      }),
+      JSON.stringify({
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: 'Continuing from the retained tail.' }] },
+        timestamp: '2026-03-24T01:00:02.000Z',
+      }),
+    ].join('\n') + '\n');
+
+    try {
+      await expect(loadTranscriptMessages(filePath)).resolves.toEqual([
+        {
+          role: 'system',
+          parts: [{
+            type: 'text',
+            text: 'Runtime compaction summary\n- Earlier user focus: repo cleanup\n- Earlier assistant outcomes: proposed a minimal patch',
+          }],
+        },
+        {
+          role: 'user',
+          parts: [{ type: 'text', text: 'Continue from the compacted state.' }],
+        },
+        {
+          role: 'assistant',
+          parts: [{ type: 'text', text: 'Continuing from the retained tail.' }],
+        },
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

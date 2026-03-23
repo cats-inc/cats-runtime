@@ -323,7 +323,7 @@ export class ApiBackendManager {
     const transcriptPath = initialSession.sourcePath || initialSession.providerSourcePath;
     const composedInstructions = mergeRuntimeInstructionLayers(
       turn.skills ?? initialSession.skills,
-      initialSession.instructions,
+      turn.sessionInstructions ?? initialSession.instructions,
       turn.instructions,
     );
     const conversation = prependSystemPrompt(

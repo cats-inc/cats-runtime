@@ -3,7 +3,9 @@ import type {
   ProviderCapabilities,
   ProviderSpawnOptions,
   StreamEvent,
+  TurnInput,
 } from './types.js';
+import { compileRuntimeTurnPrompt } from './prompt.js';
 
 interface CursorStreamEvent {
   type?: string;
@@ -44,8 +46,8 @@ export class CursorProvider implements Provider {
   private pendingPrompt: string | null = null;
   private sawAssistantChunk = false;
 
-  prepareEphemeralTurn(content: string): void {
-    this.pendingPrompt = content;
+  prepareEphemeralTurn(turn: TurnInput): void {
+    this.pendingPrompt = compileRuntimeTurnPrompt(turn.message, turn);
     this.sawAssistantChunk = false;
   }
 

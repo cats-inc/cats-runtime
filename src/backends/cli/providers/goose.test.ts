@@ -72,7 +72,7 @@ describe('GooseProvider', () => {
 
     it('includes --text with prepared prompt', () => {
       const provider = new GooseProvider(createMockNative());
-      provider.prepareEphemeralTurn('Fix the bug');
+      provider.prepareEphemeralTurn({ message: 'Fix the bug' });
       const args = provider.buildSpawnArgs({ cwd: '/tmp' });
       expect(args).toContain('--text');
       expect(args).toContain('Fix the bug');

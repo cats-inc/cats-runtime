@@ -56,9 +56,9 @@ export interface Provider {
   parseStreamLine(line: string): StreamEvent | StreamEvent[] | null;
   buildAutoResponse?(line: string): string | null;
   getPendingTurnStart?(): string | null;
-  streamTurn?(content: string, opts: ProviderTurnOptions): AsyncGenerator<StreamEvent>;
+  streamTurn?(turn: TurnInput, opts: ProviderTurnOptions): AsyncGenerator<StreamEvent>;
   /** Called before spawn for ephemeral providers that need the message in args (e.g. -p flag). */
-  prepareEphemeralTurn?(content: string): void;
+  prepareEphemeralTurn?(turn: TurnInput): void;
   /** Override the default first-event timeout for ephemeral providers. */
   resolveFirstEventTimeoutMs?(defaultTimeoutMs: number): number;
   beforeTurn?(opts: ProviderSpawnOptions): Promise<void>;

@@ -34,6 +34,7 @@ function appendUserTurnHistory(
   appendHistory(sourcePath, {
     type: 'user',
     message: { content: turnInput.message },
+    sessionInstructions: turnInput.sessionInstructions,
     instructions: turnInput.instructions,
     skills: turnInput.skills,
     context: turnInput.context,
@@ -301,7 +302,8 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
   const outputDir = parseOptionalString(body.outputDir);
   const turnInput: TurnInput = {
     message,
-    instructions: instructions ?? session.instructions,
+    sessionInstructions: session.instructions,
+    instructions,
     skills,
     context: context ?? session.context,
     outputDir: outputDir ?? session.outputDir,

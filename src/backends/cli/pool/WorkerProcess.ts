@@ -171,9 +171,9 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
         this.spawnOpts = { ...this.spawnOpts, resumeSessionId: this._providerSessionId };
       }
 
-      try {
-        await this.runProviderBeforeTurn();
-        for await (const event of this.provider.streamTurn(turn.message, {
+        try {
+          await this.runProviderBeforeTurn();
+        for await (const event of this.provider.streamTurn(turn, {
           ...this.spawnOpts,
           signal: controller.signal,
         })) {
@@ -267,7 +267,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
             this.spawnOpts = { ...this.spawnOpts, resumeSessionId: this._providerSessionId };
           }
           await this.runProviderBeforeTurn();
-          this.provider.prepareEphemeralTurn?.(turn.message);
+          this.provider.prepareEphemeralTurn?.(turn);
           this.spawnProcess();
           const msg = this.provider.buildStdinMessage(turn.message, turn);
           if (msg) this.process!.stdin!.write(msg);

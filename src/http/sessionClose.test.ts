@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -586,6 +586,159 @@ describe('session close route', () => {
     expect(persistedBody.inspection.maintenance.lastRequest).toEqual(expect.objectContaining({
       action: 'compact',
       reason: 'hooks_acknowledged',
+    }));
+  });
+
+  it('runtime-compacts managed transcripts, repairs malformed lines, and persists the compaction baseline', async () => {
+    const session = registry.create({
+      id: 'session-runtime-compact',
+      providerName: 'claude',
+      cwd: 'C:/repo',
+    });
+    session.messageCount = 40;
+    session.totalInputTokens = 9_000;
+    session.totalOutputTokens = 5_000;
+    registry.updateStatus(session.id, 'closed');
+
+    const historyDir = join(sessionBaseDir, 'history');
+    mkdirSync(historyDir, { recursive: true });
+    const transcriptPath = join(historyDir, `${session.id}.jsonl`);
+    writeFileSync(transcriptPath, [
+      JSON.stringify({
+        type: 'user',
+        message: { content: 'Need a cleanup plan.' },
+        timestamp: '2026-03-24T00:00:00.000Z',
+      }),
+      JSON.stringify({
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: 'Starting from repo state.' }] },
+        timestamp: '2026-03-24T00:00:01.000Z',
+      }),
+      JSON.stringify({
+        type: 'tool_use',
+        toolId: 'tool-1',
+        toolName: 'inspect-repo-status',
+        arguments: { path: '.' },
+        timestamp: '2026-03-24T00:00:02.000Z',
+      }),
+      JSON.stringify({
+        type: 'tool_result',
+        toolId: 'tool-1',
+        toolName: 'inspect-repo-status',
+        text: 'dirty worktree',
+        timestamp: '2026-03-24T00:00:03.000Z',
+      }),
+      'not-json-at-all',
+      JSON.stringify({
+        type: 'user',
+        message: { content: 'Retry after the fix.' },
+        timestamp: '2026-03-24T00:00:04.000Z',
+      }),
+      JSON.stringify({
+        type: 'assistant',
+        message: { content: [{ type: 'text', text: 'Retrying with a narrower patch.' }] },
+        timestamp: '2026-03-24T00:00:05.000Z',
+      }),
+    ].join('\n') + '\n', 'utf8');
+    registry.setSourcePath(session.id, transcriptPath);
+
+    const response = await app.request(`/sessions/${session.id}/compact`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        acknowledgeHooks: true,
+        maintenance: {
+          reason: 'owner_requested_runtime_compaction',
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      status: string;
+      execution: string;
+      runtimeCompactionExecuted: boolean;
+      runtimeCompaction?: {
+        transcriptPath: string;
+        archivePath?: string;
+        repairedLineCount: number;
+        compactedEntryCount: number;
+        aggressivePassCount: number;
+      };
+      maintenance: {
+        compaction: {
+          status: string;
+          reasonCodes: string[];
+          messageCount: number;
+          totalTokens: number;
+          lastCompaction?: {
+            transcriptPath: string;
+            archivePath?: string;
+          };
+        };
+      };
+    };
+    expect(body).toEqual(expect.objectContaining({
+      status: 'compacted',
+      execution: 'runtime',
+      runtimeCompactionExecuted: true,
+      runtimeCompaction: expect.objectContaining({
+        transcriptPath,
+        repairedLineCount: 1,
+        compactedEntryCount: expect.any(Number),
+        aggressivePassCount: expect.any(Number),
+      }),
+      maintenance: expect.objectContaining({
+        compaction: expect.objectContaining({
+          status: 'not_ready',
+          reasonCodes: ['below_compaction_threshold'],
+        }),
+      }),
+    }));
+    expect(body.runtimeCompaction?.archivePath).toBeTruthy();
+
+    const compactedLines = readFileSync(transcriptPath, 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    expect(compactedLines[0]).toEqual(expect.objectContaining({
+      type: 'compaction_summary',
+      text: expect.stringContaining('Runtime compaction summary'),
+    }));
+
+    const historyResponse = await app.request(`/sessions/${session.id}/history`);
+    expect(historyResponse.status).toBe(200);
+    await expect(historyResponse.json()).resolves.toEqual(expect.objectContaining({
+      messages: expect.arrayContaining([
+        expect.objectContaining({
+          role: 'assistant',
+          text: expect.stringContaining('Runtime compaction summary'),
+        }),
+      ]),
+    }));
+
+    getRuntimeSessionManager(ctx).dropSession(session.id);
+    const persistedResponse = await app.request(`/sessions/${session.id}`);
+    expect(persistedResponse.status).toBe(200);
+    const persistedBody = await persistedResponse.json() as {
+      inspection: {
+        maintenance: {
+          compaction: {
+            status: string;
+            lastCompaction?: {
+              transcriptPath: string;
+              archivePath?: string;
+            };
+          };
+        };
+      };
+    };
+    expect(persistedBody.inspection.maintenance.compaction).toEqual(expect.objectContaining({
+      status: 'not_ready',
+      lastCompaction: expect.objectContaining({
+        transcriptPath,
+        archivePath: expect.any(String),
+      }),
     }));
   });
 

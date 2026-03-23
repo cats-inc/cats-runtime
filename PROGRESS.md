@@ -10,8 +10,8 @@
 | API Backends | In Progress | `src/backends/api` now runs Claude, Codex/OpenAI, Gemini, and Ollama with runtime-managed sessions, provider-native continuation/caching optimizations, additive incident hints plus provider-agnostic `progress` events, a shared local tool loop with patch/file/search/shell support, and runtime-owned health/diagnostics summaries; deeper live probes and broader tool/model discovery remain |
 | Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, an Agent SDK bridge as the second validation target, and first-slice remote cleanup hooks for close/cancel/delete/reset semantics |
 | HTTP API | Completed | Health, sessions, delivery audit/export/repo routes, messages, history, observe, wakeups, provider management, session branch-lineage inspection, metering/guardrail diagnostics, additive run-inspector/session-discipline contracts, machine-readable session-maintenance/delete-cleanup payloads, worktree-backed session lifecycle cleanup semantics including `preserve`, and the runtime MCP facade over HTTP plus stdio are served directly from `cats-runtime` |
-| Runtime Skills | Completed | `skills/` is now a runtime-owned execution catalog and family-aware internal library with validation, session-level requested/resolved/applied metadata, richer slug/family/capability metadata, explicit `skills: null` clearing, backend-aware delivery modes, inspection-level applied-skill reporting, a standalone versioned filterable/paged/sortable `GET /skills/catalog` read surface plus matching `list_runtime_skills` MCP read tool, a dedicated `npm run verify:skills` gate, first-slice Codex/Pi verification, and shared re-entry hydration across create/resume/fork/provider-switch |
-| Wakeup Substrate | Completed | Runtime-owned scheduled wakeup requests now support create/list/cancel/trigger, restart-safe persistence, bounded timer processing, coalescing, and additive session/history wakeup metadata without introducing full scheduler semantics |
+| Runtime Skills | Completed | `skills/` is now a runtime-owned execution catalog and family-aware internal library with validation, session-level requested/resolved/applied metadata, richer slug/family/capability metadata, explicit `skills: null` clearing, backend-aware delivery modes, prompt/instruction execution injection across prompt-driven CLI plus Pi/API/agent targets, inspection-level applied-skill reporting, a standalone versioned filterable/paged/sortable `GET /skills/catalog` read surface plus matching `list_runtime_skills` MCP read tool, a dedicated `npm run verify:skills` gate, and shared re-entry hydration across create/resume/fork/provider-switch |
+| Wakeup Substrate | Completed | Runtime-owned scheduled wakeup requests now support create/list/cancel/trigger, restart-safe persistence, bounded timer processing, coalescing, UTC cron-like recurring schedules with automatic re-arming, and additive session/history wakeup metadata without turning the runtime into a full workflow scheduler |
 | Provider Compatibility | In Progress | Shared CLI compatibility probing now classifies `ready` / `degraded` / `unsupported_version` / `unrecognized_protocol` / `probe_failed`, validates `light` vs `live` runtime-flag probes across expanded CLI family profiles, captures redacted replay-friendly evidence bundles, tracks stale cache/reprobe metadata, exposes runtime-owned install/prerequisite/PATH/npm-prefix/auth/version/remediation hints for CLI targets, and supports target-scoped `provider` / `backend` / `instance` / `defaultOnly` filtering over `/diagnostics/providers` plus the matching MCP seam |
 | Dashboard | Completed | The embedded dashboard UI is served from `GET /` and now surfaces runtime/provider health from runtime-owned diagnostics contracts |
 | Workspace Substrate | Completed | `audit-workspace`, `init-workspace`, and `update-workspace` now return explicit preview/apply contracts, machine-readable action plans/diff stats, approval-friendly payloads, and `*.bootstrap` review-copy behavior without owning product policy |
@@ -350,8 +350,9 @@ turning `cats-runtime` into a general plugin platform.
 | Freeze the internal skill-library taxonomy and metadata contract | [x] | `listRuntimeSkillCatalog()` now reports stable family/slug/role/package metadata for Team 6 and future product mappings |
 | Add a standalone runtime-owned skill catalog route | [x] | `GET /skills/catalog` now exposes the runtime library read seam for hosts without direct internal module imports, supports lightweight metadata/tag filters plus additive `sortBy` / `sortDirection` and `offset` / `limit`, and returns `contract.version`, echoed `query.filters`, optional `query.sort`, and machine-readable `pagination` |
 | Add a dedicated runtime skill verification command | [x] | `npm run verify:skills` now executes the runtime catalog validator as an explicit maintenance/release gate |
-| Support delivery modes `filesystem`, `instructions`, and `none` | [x] | Codex isolated sessions use filesystem delivery, Pi/API/agent use instructions, unsupported targets stay explicit with `none` |
-| Verify CLI-first targets | [x] | Codex filesystem delivery and Pi instruction-file delivery are both covered by automated tests |
+| Support delivery modes `filesystem`, `instructions`, and `none` | [x] | Codex isolated sessions prefer filesystem delivery, prompt-driven CLI plus Pi/API/agent targets can consume instruction delivery, and unsupported targets stay explicit with `none` |
+| Inject runtime skill delivery into live execution paths | [x] | Prompt-driven CLI providers now compile resolved skill instructions into the live turn prompt, while API/agent backends compose the same session/turn instruction layering without rescanning the catalog |
+| Verify CLI-first targets | [x] | Codex filesystem delivery, Pi instruction-file delivery, and prompt-driven instruction injection are covered by automated tests |
 | Surface runtime skill state in inspection/history routes | [x] | `GET /sessions`, `GET /sessions/{id}`, `GET /sessions/{id}/observe`, and `GET /sessions/{id}/history` now expose runtime skill metadata and applied-skill inspection state |
 | Return explicit errors for malformed/unknown skills | [x] | Session create/message/fork flows now reject malformed payloads and invalid skill packages with client-safe errors |
 | Add reference skills and update docs | [x] | Runtime-owned orchestration/work/chat/code packages now provide the first internal skill library slice with authoring docs and compatibility tests |
@@ -432,7 +433,7 @@ scheduler or workflow engine.
 
 #### Deferred Boundaries
 
-- [ ] No recurring schedules, retry policy, or cron syntax
+- [ ] No richer retry/backoff policy or non-UTC scheduling semantics yet beyond the delivered cron recurrence slice
 - [ ] No provider/bootstrap wake targets for sessions that do not exist yet
 - [ ] No full runtime diagnostics aggregate for wakeup counts yet
 - [ ] No product workflow/approval semantics in runtime
@@ -441,7 +442,7 @@ scheduler or workflow engine.
 
 - [x] `npm run build`
 - [x] `npx vitest run src/core/wakeup/RuntimeWakeupService.test.ts src/http/wakeupRoutes.test.ts src/http/runtimeSkills.test.ts src/http/piManagement.test.ts tests/runtime-server.test.ts --pool=threads --poolOptions.threads.singleThread`
-- [x] `npx vitest run src/core/wakeup/RuntimeWakeupService.test.ts src/http/wakeupRoutes.test.ts src/http/runtimeSkills.test.ts src/http/piManagement.test.ts tests/runtime-server.test.ts --pool=threads --poolOptions.threads.singleThread`
+- [x] `npm test`
 
 ### WP-12: Session Discipline and Run Inspector Contracts
 
@@ -469,7 +470,7 @@ cancel / reset / delete behave across CLI, API, and agent backends.
 
 #### Deferred Boundaries
 
-- [ ] No scheduler/wakeup queue or duplicate-wake coalescing layer yet
+- [ ] No product workflow queue yet beyond the runtime-owned wakeup scheduling/coalescing layer
 - [ ] No product-owned approval UX or run-inspector rendering in `cats-runtime`
 - [ ] No full provider-native log archival/export redesign yet beyond compact recent-event excerpts
 
@@ -535,13 +536,14 @@ without moving memory extraction or product policy into `cats-runtime`.
 | Track close/reset/delete lifecycle markers in runtime state | [x] | `RuntimeSessionManager` now records machine-readable lifecycle boundaries instead of leaving close/reset semantics implicit |
 | Clear stale run/progress state on hard reset | [x] | Reset now drops current/last run snapshots, progress, recent events, and stale hydration metadata before the next lifecycle begins |
 | Add machine-readable delete cleanup summary | [x] | Delete responses now expose normalized cleanup booleans plus terminal lifecycle metadata for `completed` vs `retained` deletes |
-| Expose public compaction-preparation route without moving compaction into runtime | [x] | `POST /sessions/{id}/compact` now returns machine-readable readiness/hook state plus persisted maintenance trigger metadata while remaining `external_only` |
+| Expose public compaction-preparation route without moving product compaction policy into runtime | [x] | `POST /sessions/{id}/compact` now returns machine-readable readiness/hook state plus persisted maintenance trigger metadata, and runtime-managed transcripts compact in place when the session is locally ownable |
+| Add runtime-owned compaction for managed transcripts | [x] | Runtime-managed JSONL transcripts now repair malformed lines, archive the repaired baseline, compact aggressively toward the threshold, and persist `lastCompaction` metadata plus `compaction_summary` history entries |
 | Leave additive Team 4/product memory-flush seam without implementing the pipeline | [x] | Runtime now advertises pending `memory_flush` hooks before reset/compaction, accepts additive maintenance trigger payloads, and keeps durable-memory exports product-owned |
 | Cover maintenance and lifecycle-boundary behavior with tests | [x] | Vitest now covers session-maintenance derivation, close/reset lifecycle markers, history reset boundaries, and delete cleanup payloads |
 
 #### Deferred Boundaries
 
-- [ ] No runtime-owned compaction engine yet; `/sessions/{id}/compact` is an external-only coordination seam
+- [ ] No provider-agnostic compaction worker yet beyond runtime-managed transcript repair/summary for locally owned transcripts
 - [ ] No memory extraction / summarization pipeline in runtime; the hook seam is declarative only
 - [ ] No product-side policy for when a host must honor `memory_flush`
 

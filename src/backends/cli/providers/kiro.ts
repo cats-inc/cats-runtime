@@ -4,7 +4,9 @@ import type {
   ProviderCapabilities,
   ProviderSpawnOptions,
   StreamEvent,
+  TurnInput,
 } from './types.js';
+import { compileRuntimeTurnPrompt } from './prompt.js';
 
 const ANSI_RE = /\x1b(?:\[[0-9;?]*[A-Za-z]|][^\u0007]*(?:\u0007|\x1b\\)|[()][AB012])/g;
 const CONTROL_RE = /[\x00-\x08\x0b\x0c\x0e-\x1f]/g;
@@ -22,8 +24,8 @@ export class KiroProvider implements Provider {
     this.native = native;
   }
 
-  prepareEphemeralTurn(content: string): void {
-    this.pendingPrompt = content;
+  prepareEphemeralTurn(turn: TurnInput): void {
+    this.pendingPrompt = compileRuntimeTurnPrompt(turn.message, turn);
     this.sawText = false;
   }
 

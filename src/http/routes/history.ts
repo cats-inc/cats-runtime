@@ -404,6 +404,11 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
             if (content) {
               messages.push({ role: 'user', text: content, timestamp: obj.timestamp });
             }
+          } else if (obj.type === 'compaction_summary' && typeof obj.text === 'string') {
+            const text = obj.text.trim();
+            if (text) {
+              messages.push({ role: 'assistant', text, timestamp: obj.timestamp });
+            }
           } else if (obj.type === 'assistant' && obj.message?.content) {
             const parts = obj.message.content;
             if (Array.isArray(parts)) {

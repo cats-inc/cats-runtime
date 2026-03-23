@@ -184,4 +184,55 @@ describe('RuntimeWakeupService', () => {
     ]);
     expect(service.getSessionWakeState('session-1')?.lastRequest?.reason).toBe('Wake session-1');
   });
+
+  it('reschedules recurring cron wakeups after automatic and manual triggers', async () => {
+    let now = new Date('2026-03-23T00:00:00.000Z');
+    const wakeSession = vi.fn(async (sessionId: string) => ({
+      sessionId,
+      outcome: 'resumed' as const,
+    }));
+    const service = new RuntimeWakeupService({
+      persistPath: createPersistPath(),
+      now: () => new Date(now),
+      sessionExists: () => true,
+      wakeSession,
+    });
+
+    const created = service.create({
+      reason: 'Recurring wake.',
+      target: { kind: 'session', sessionId: 'session-1' },
+      recurrence: {
+        kind: 'cron',
+        expression: '*/5 * * * *',
+        timezone: 'UTC',
+      },
+    });
+
+    expect(created.request.scheduleAt).toBe('2026-03-23T00:05:00.000Z');
+    now = new Date('2026-03-23T00:05:00.000Z');
+    const timerTriggered = await service.runDueWakeups();
+    expect(timerTriggered).toHaveLength(1);
+    expect(timerTriggered[0]).toMatchObject({
+      id: created.request.id,
+      status: 'scheduled',
+      scheduleAt: '2026-03-23T00:10:00.000Z',
+      lastExecution: {
+        source: 'timer',
+        outcome: 'resumed',
+      },
+    });
+
+    now = new Date('2026-03-23T00:07:30.000Z');
+    const manualTriggered = await service.trigger(created.request.id, 'manual');
+    expect(manualTriggered).toMatchObject({
+      id: created.request.id,
+      status: 'scheduled',
+      scheduleAt: '2026-03-23T00:10:00.000Z',
+      lastExecution: {
+        source: 'manual',
+        outcome: 'resumed',
+      },
+    });
+    expect(wakeSession).toHaveBeenCalledTimes(2);
+  });
 });

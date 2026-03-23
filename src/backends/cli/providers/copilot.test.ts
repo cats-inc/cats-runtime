@@ -58,14 +58,14 @@ describe('CopilotProvider', () => {
     });
 
     it('includes -p with message after prepareEphemeralTurn', () => {
-      provider.prepareEphemeralTurn('Hello, copilot!');
+      provider.prepareEphemeralTurn({ message: 'Hello, copilot!' });
       const args = provider.buildSpawnArgs({ cwd: '/tmp' });
       expect(args).toContain('-p');
       expect(args).toContain('Hello, copilot!');
     });
 
     it('clears pending prompt after buildSpawnArgs', () => {
-      provider.prepareEphemeralTurn('First message');
+      provider.prepareEphemeralTurn({ message: 'First message' });
       provider.buildSpawnArgs({ cwd: '/tmp' });
 
       // Second call should NOT include -p
@@ -76,7 +76,7 @@ describe('CopilotProvider', () => {
 
     it('uses a temp prompt file when the inline prompt would be too long', async () => {
       const longPrompt = 'x'.repeat(5000);
-      provider.prepareEphemeralTurn(longPrompt);
+      provider.prepareEphemeralTurn({ message: longPrompt });
 
       const args = provider.buildSpawnArgs({ cwd: '/tmp' });
       const promptArg = args[args.indexOf('-p') + 1]!;
@@ -91,6 +91,19 @@ describe('CopilotProvider', () => {
 
       await provider.afterTurn?.({ cwd: '/tmp' });
       expect(existsSync(promptFilePath)).toBe(false);
+    });
+
+    it('compiles session and turn instructions into the prepared prompt', () => {
+      provider.prepareEphemeralTurn({
+        message: 'Hello, copilot!',
+        sessionInstructions: 'Session-level instructions.',
+        instructions: 'Turn-level instructions.',
+      });
+      const args = provider.buildSpawnArgs({ cwd: '/tmp' });
+      const prompt = args[args.indexOf('-p') + 1];
+      expect(prompt).toContain('Session-level instructions.');
+      expect(prompt).toContain('Turn-level instructions.');
+      expect(prompt).toContain('User message:');
     });
   });
 
@@ -187,7 +200,7 @@ describe('CopilotProvider', () => {
     });
 
     it('does not duplicate assistant.message content after deltas were streamed', () => {
-      provider.prepareEphemeralTurn('test');
+      provider.prepareEphemeralTurn({ message: 'test' });
       provider.parseStreamLine(
         JSON.stringify({
           type: 'assistant.message_delta',
@@ -205,7 +218,7 @@ describe('CopilotProvider', () => {
     });
 
     it('captures outputTokens from assistant.message for result usage', () => {
-      provider.prepareEphemeralTurn('test');
+      provider.prepareEphemeralTurn({ message: 'test' });
       // assistant.message with outputTokens
       provider.parseStreamLine(
         JSON.stringify({
@@ -387,7 +400,7 @@ describe('CopilotProvider', () => {
 
     it('resets outputTokens counter on prepareEphemeralTurn', () => {
       // First turn: capture outputTokens
-      provider.prepareEphemeralTurn('turn 1');
+      provider.prepareEphemeralTurn({ message: 'turn 1' });
       provider.parseStreamLine(
         JSON.stringify({
           type: 'assistant.message',
@@ -396,7 +409,7 @@ describe('CopilotProvider', () => {
       );
 
       // New turn: counter should reset
-      provider.prepareEphemeralTurn('turn 2');
+      provider.prepareEphemeralTurn({ message: 'turn 2' });
       const event = provider.parseStreamLine(
         JSON.stringify({ type: 'result', sessionId: 'sess-2' }),
       );
@@ -404,7 +417,7 @@ describe('CopilotProvider', () => {
     });
 
     it('resets delta tracking on a new turn', () => {
-      provider.prepareEphemeralTurn('turn 1');
+      provider.prepareEphemeralTurn({ message: 'turn 1' });
       provider.parseStreamLine(
         JSON.stringify({
           type: 'assistant.message_delta',
@@ -412,7 +425,7 @@ describe('CopilotProvider', () => {
         }),
       );
 
-      provider.prepareEphemeralTurn('turn 2');
+      provider.prepareEphemeralTurn({ message: 'turn 2' });
       const event = provider.parseStreamLine(
         JSON.stringify({
           type: 'assistant.message',

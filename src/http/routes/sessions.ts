@@ -66,6 +66,10 @@ import {
   summarizeContextTransplant,
 } from '../../core/runtime/sessionBranching.js';
 import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
+import {
+  canRuntimeCompactSessionTranscript,
+  compactRuntimeManagedTranscript,
+} from '../../core/runtime/sessionCompaction.js';
 import { hydrateSessionState } from '../../core/hydration/sessionHydration.js';
 import {
   extractHydrationMetadata,
@@ -633,6 +637,16 @@ function recordSessionLifecycle(
   const lifecycle = getRuntimeSessionManager(ctx).recordLifecycle(sessionId, input);
   persistTrackedMaintenanceState(ctx, sessionId);
   return lifecycle;
+}
+
+function recordSessionCompaction(
+  ctx: AppContext,
+  sessionId: string,
+  record: Parameters<ReturnType<typeof getRuntimeSessionManager>['recordCompaction']>[1],
+) {
+  const compaction = getRuntimeSessionManager(ctx).recordCompaction(sessionId, record);
+  persistTrackedMaintenanceState(ctx, sessionId);
+  return compaction;
 }
 
 async function hydrateSessionForTarget(
@@ -2094,15 +2108,65 @@ sessionRoutes.post('/sessions/:id/compact', async (c) => {
     body.acknowledgeHooks === true,
   );
 
+  if (compaction.status !== 'ready_for_external_compaction') {
+    return c.json({
+      action: 'compact',
+      status: compaction.status,
+      execution: 'external_only',
+      runtimeCompactionExecuted: false,
+      hookStatus: compaction.hookStatus,
+      reasonCodes: compaction.reasonCodes,
+      maintenance: serialized.inspection.maintenance,
+      session: serialized,
+    });
+  }
+
+  const latestSession = ctx.registry.get(id) ?? session;
+  if (!canRuntimeCompactSessionTranscript(latestSession, ctx.config.sessionBaseDir)) {
+    return c.json({
+      action: 'compact',
+      status: compaction.status,
+      execution: 'external_only',
+      runtimeCompactionExecuted: false,
+      hookStatus: compaction.hookStatus,
+      reasonCodes: compaction.reasonCodes,
+      maintenance: serialized.inspection.maintenance,
+      session: serialized,
+    });
+  }
+
+  const runtimeCompaction = compactRuntimeManagedTranscript({
+    sessionId: id,
+    session: latestSession,
+    sessionBaseDir: ctx.config.sessionBaseDir,
+  });
+  if (!runtimeCompaction) {
+    return c.json({
+      action: 'compact',
+      status: compaction.status,
+      execution: 'external_only',
+      runtimeCompactionExecuted: false,
+      hookStatus: compaction.hookStatus,
+      reasonCodes: [...compaction.reasonCodes, 'runtime_transcript_not_compactable'],
+      maintenance: serialized.inspection.maintenance,
+      session: serialized,
+    });
+  }
+
+  recordSessionCompaction(ctx, id, runtimeCompaction.record);
+  const compactedSession = ctx.registry.get(id) ?? latestSession;
+  const serializedCompactedSession = serializeSession(ctx, compactedSession);
+
   return c.json({
     action: 'compact',
-    status: compaction.status,
-    execution: 'external_only',
-    runtimeCompactionExecuted: false,
+    status: 'compacted',
+    execution: 'runtime',
+    runtimeCompactionExecuted: true,
     hookStatus: compaction.hookStatus,
     reasonCodes: compaction.reasonCodes,
-    maintenance: serialized.inspection.maintenance,
-    session: serialized,
+    runtimeCompaction: serializedCompactedSession.inspection.maintenance.compaction.lastCompaction,
+    maintenance: serializedCompactedSession.inspection.maintenance,
+    session: serializedCompactedSession,
   });
 });
 

@@ -9,7 +9,7 @@ describe('AuggieProvider', () => {
       getLatestSession: vi.fn().mockResolvedValue(null),
     } as unknown as AuggieSessionService;
     const provider = new AuggieProvider(sessions, 10);
-    provider.prepareEphemeralTurn('Say hi');
+    provider.prepareEphemeralTurn({ message: 'Say hi' });
 
     const args = provider.buildSpawnArgs({
       cwd: '/tmp/repo',
@@ -43,7 +43,7 @@ describe('AuggieProvider', () => {
       getLatestSession: vi.fn().mockResolvedValue(null),
     } as unknown as AuggieSessionService;
     const provider = new AuggieProvider(sessions, 10);
-    provider.prepareEphemeralTurn('Do it');
+    provider.prepareEphemeralTurn({ message: 'Do it' });
 
     const args = provider.buildSpawnArgs({
       cwd: '/tmp/repo',
@@ -185,7 +185,7 @@ describe('AuggieProvider', () => {
     } as unknown as AuggieSessionService;
     const provider = new AuggieProvider(sessions, 10);
 
-    provider.prepareEphemeralTurn('Still waiting');
+    provider.prepareEphemeralTurn({ message: 'Still waiting' });
     const args = provider.buildSpawnArgs({ cwd: '/tmp/repo' });
     const instructionFile = args[args.indexOf('--instruction-file') + 1]!;
     expect(existsSync(instructionFile)).toBe(true);

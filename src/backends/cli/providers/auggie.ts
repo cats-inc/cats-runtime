@@ -8,7 +8,9 @@ import type {
   ProviderCapabilities,
   ProviderSpawnOptions,
   StreamEvent,
+  TurnInput,
 } from './types.js';
+import { compileRuntimeTurnPrompt } from './prompt.js';
 
 interface AuggieResultLine {
   type?: string;
@@ -60,9 +62,9 @@ export class AuggieProvider implements Provider {
     this.sessions = sessions;
   }
 
-  prepareEphemeralTurn(content: string): void {
+  prepareEphemeralTurn(turn: TurnInput): void {
     this.cleanupPendingPromptFile();
-    this.pendingPrompt = content;
+    this.pendingPrompt = compileRuntimeTurnPrompt(turn.message, turn);
     this.lastResult = null;
     this.sawStructuredResult = false;
     this.sawText = false;

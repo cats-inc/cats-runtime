@@ -270,6 +270,7 @@ describe('message route transcript persistence', () => {
       ]);
 
       expect(receivedInputs).toHaveLength(1);
+      expect(receivedInputs[0].sessionInstructions).toBeUndefined();
       expect(receivedInputs[0].instructions).toBe('Base room instruction.');
       expect(receivedInputs[0].skills).toEqual(expect.objectContaining({
         profileId: 'companion',
@@ -281,13 +282,10 @@ describe('message route transcript persistence', () => {
           labels: ['participant:cat'],
         },
         delivery: expect.objectContaining({
-          mode: 'none',
-          status: 'unsupported',
+          mode: 'instructions',
+          status: 'applied',
         }),
-        warnings: expect.arrayContaining([
-          expect.stringContaining("Provider 'claude' does not support runtime-managed skill delivery yet."),
-        ]),
-        appliedSkillIds: [],
+        appliedSkillIds: ['companion'],
       }));
 
       expect(registry.get(session.id)?.instructions).toBe('Base room instruction.');
@@ -301,10 +299,10 @@ describe('message route transcript persistence', () => {
           labels: ['participant:cat'],
         },
         delivery: expect.objectContaining({
-          mode: 'none',
-          status: 'unsupported',
+          mode: 'instructions',
+          status: 'applied',
         }),
-        appliedSkillIds: [],
+        appliedSkillIds: ['companion'],
       }));
 
       const historyResponse = await app.request(`/sessions/${session.id}/history`);
@@ -313,11 +311,57 @@ describe('message route transcript persistence', () => {
         skills: expect.objectContaining({
           requestedSkills: ['companion'],
           delivery: expect.objectContaining({
-            mode: 'none',
-            status: 'unsupported',
+            mode: 'instructions',
+            status: 'applied',
           }),
         }),
       }));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('preserves previous session instructions separately from new turn instructions', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-message-route-'));
+    const sessionBaseDir = join(root, 'sessions');
+    mkdirSync(sessionBaseDir, { recursive: true });
+    const receivedInputs: TurnInput[] = [];
+
+    try {
+      const { app, registry, session } = makeApp(
+        sessionBaseDir,
+        async function* (turnInput: TurnInput) {
+          receivedInputs.push(structuredClone(turnInput));
+          yield { type: 'result' };
+        },
+      );
+      registry.updateSessionMetadata(session.id, {
+        instructions: 'Session default instruction.',
+      });
+
+      const response = await app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({
+          message: 'hello',
+          instructions: 'Turn override instruction.',
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(parseNdjson(await response.text())).toEqual([
+        { type: 'result' },
+      ]);
+      expect(receivedInputs).toHaveLength(1);
+      expect(receivedInputs[0]).toEqual(expect.objectContaining({
+        message: 'hello',
+        sessionInstructions: 'Session default instruction.',
+        instructions: 'Turn override instruction.',
+      }));
+      expect(registry.get(session.id)?.instructions).toBe('Turn override instruction.');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

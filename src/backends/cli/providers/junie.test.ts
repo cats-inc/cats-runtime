@@ -87,7 +87,7 @@ describe('JunieProvider', () => {
 
     it('includes prompt from prepareEphemeralTurn', () => {
       const provider = new JunieProvider();
-      provider.prepareEphemeralTurn('Fix the bug');
+      provider.prepareEphemeralTurn({ message: 'Fix the bug' });
       const args = provider.buildSpawnArgs({ cwd: '/tmp' });
       expect(args).toContain('Fix the bug');
     });

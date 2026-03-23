@@ -5,7 +5,11 @@ import {
   RuntimeWakeupNotFoundError,
   RuntimeWakeupValidationError,
 } from '../../core/wakeup/RuntimeWakeupService.js';
-import type { RuntimeWakeupStatus, RuntimeWakeupTarget } from '../../core/types.js';
+import type {
+  RuntimeWakeupRecurrence,
+  RuntimeWakeupStatus,
+  RuntimeWakeupTarget,
+} from '../../core/types.js';
 import { parseOptionalString } from '../parsing.js';
 
 type WakeupRouteEnv = {
@@ -55,6 +59,26 @@ function parseWakeupMetadata(value: unknown): Record<string, unknown> | undefine
   }
 
   return value as Record<string, unknown>;
+}
+
+function parseWakeupRecurrence(value: unknown): RuntimeWakeupRecurrence | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  const kind = parseOptionalString(record.kind);
+  const expression = parseOptionalString(record.expression);
+  const timezone = parseOptionalString(record.timezone);
+  if (!kind && !expression && !timezone) {
+    return undefined;
+  }
+
+  return {
+    kind: (kind || '') as RuntimeWakeupRecurrence['kind'],
+    expression: expression || '',
+    ...(timezone ? { timezone: timezone as RuntimeWakeupRecurrence['timezone'] } : {}),
+  };
 }
 
 function toWakeupErrorResponse(error: unknown): { status: number; body: { error: string } } | undefined {
@@ -117,6 +141,7 @@ wakeupRoutes.post('/wakeups', async (c) => {
     reason?: string;
     target?: unknown;
     scheduleAt?: string;
+    recurrence?: unknown;
     coalesceKey?: string;
     metadata?: unknown;
   }>();
@@ -125,7 +150,8 @@ wakeupRoutes.post('/wakeups', async (c) => {
     const created = wakeup.create({
       reason: parseOptionalString(body.reason) || '',
       target: parseWakeupTarget(body.target),
-      scheduleAt: parseOptionalString(body.scheduleAt) || '',
+      scheduleAt: parseOptionalString(body.scheduleAt) || undefined,
+      recurrence: parseWakeupRecurrence(body.recurrence),
       coalesceKey: parseOptionalString(body.coalesceKey),
       metadata: parseWakeupMetadata(body.metadata),
     });

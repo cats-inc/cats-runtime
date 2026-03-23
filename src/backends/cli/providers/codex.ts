@@ -7,7 +7,7 @@ import type {
   StreamEvent,
   TurnInput,
 } from './types.js';
-import { mergeRuntimeSkillInstructions } from '../../../core/skills/catalog.js';
+import { mergeRuntimeInstructionLayers } from '../../../core/skills/catalog.js';
 
 interface JsonRpcRequest {
   jsonrpc: '2.0';
@@ -99,7 +99,11 @@ export class CodexProvider implements Provider {
       throw new Error('Codex session bootstrap failed earlier. Close and recreate the session.');
     }
 
-    const compiledInstructions = mergeRuntimeSkillInstructions(turn?.instructions, turn?.skills);
+    const compiledInstructions = mergeRuntimeInstructionLayers(
+      turn?.skills,
+      turn?.sessionInstructions,
+      turn?.instructions,
+    );
     const effectiveContent = compiledInstructions
       ? ['Instructions:', compiledInstructions, '', 'User message:', content].join('\n')
       : content;

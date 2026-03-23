@@ -1,5 +1,5 @@
 import { parsePiModel, parsePiStreamLine } from '../pi/parser.js';
-import { mergeRuntimeSkillInstructions } from '../../../core/skills/catalog.js';
+import { mergeRuntimeInstructionLayers } from '../../../core/skills/catalog.js';
 import type {
   Provider,
   ProviderCapabilities,
@@ -47,9 +47,10 @@ export class PiProvider implements Provider {
     const inlineSkillState = !skillInstructionsFile || skillInstructionsFile !== this.activeInstructionsFile
       ? turn?.skills
       : undefined;
-    const compiledInstructions = mergeRuntimeSkillInstructions(
-      turn?.instructions,
+    const compiledInstructions = mergeRuntimeInstructionLayers(
       inlineSkillState,
+      turn?.sessionInstructions,
+      turn?.instructions,
     );
     const prompt = compiledInstructions
       ? ['Instructions:', compiledInstructions, '', 'User message:', content].join('\n')

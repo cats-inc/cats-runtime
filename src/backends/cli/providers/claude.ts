@@ -5,7 +5,9 @@ import type {
   ProviderSpawnOptions,
   StreamEvent,
   ClaudeStreamEvent,
+  TurnInput,
 } from './types.js';
+import { compileRuntimeTurnPrompt } from './prompt.js';
 
 export class ClaudeProvider implements Provider {
   name = 'claude';
@@ -53,12 +55,12 @@ export class ClaudeProvider implements Provider {
     return args;
   }
 
-  buildStdinMessage(content: string): string {
+  buildStdinMessage(content: string, turn?: TurnInput): string {
     const msg = {
       type: 'user',
       message: {
         role: 'user',
-        content,
+        content: compileRuntimeTurnPrompt(content, turn),
       },
     };
     return JSON.stringify(msg) + '\n';

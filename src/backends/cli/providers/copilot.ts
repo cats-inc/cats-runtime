@@ -9,7 +9,9 @@ import type {
   ProviderCapabilities,
   ProviderSpawnOptions,
   StreamEvent,
+  TurnInput,
 } from './types.js';
+import { compileRuntimeTurnPrompt } from './prompt.js';
 
 /** Regex to strip ANSI escape sequences from Copilot CLI output */
 const ANSI_RE = /\x1b\[[0-9;]*[A-Za-z]/g;
@@ -30,9 +32,9 @@ export class CopilotProvider implements Provider {
     private readonly compatibilityProfile?: CompatibilityProfileSelection,
   ) {}
 
-  prepareEphemeralTurn(content: string): void {
+  prepareEphemeralTurn(turn: TurnInput): void {
     this.cleanupPendingPromptFile();
-    this._pendingPrompt = content;
+    this._pendingPrompt = compileRuntimeTurnPrompt(turn.message, turn);
     this._lastOutputTokens = 0;
     this._sawMessageDelta = false;
   }

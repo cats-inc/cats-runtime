@@ -205,4 +205,43 @@ describe('buildSessionMaintenance', () => {
     expect(maintenance.lastLifecycle).toEqual(trackedMaintenance.lastLifecycle);
     expect(maintenance.markers).toEqual(trackedMaintenance.markers);
   });
+
+  it('uses the last compaction baseline to evaluate only post-compaction live context', () => {
+    const maintenance = buildSessionMaintenance({
+      session: createSession({
+        messageCount: 40,
+        totalInputTokens: 9_000,
+        totalOutputTokens: 5_000,
+      }),
+      view: createView({
+        attached: false,
+        activity: 'inactive',
+      }),
+      trackedMaintenance: {
+        lastCompaction: {
+          compactedAt: '2026-03-24T01:00:00.000Z',
+          transcriptPath: '/sessions/history/session-1.jsonl',
+          baselineMessageCount: 40,
+          baselineTotalTokens: 14_000,
+          compactedEntryCount: 28,
+          retainedEntryCount: 4,
+          repairedLineCount: 1,
+          aggressivePassCount: 2,
+          archivePath: '/sessions/compactions/session-1/2026-03-24T01-00-00-000Z.jsonl',
+        },
+        markers: [],
+      },
+    });
+
+    expect(maintenance.compaction).toEqual(expect.objectContaining({
+      status: 'not_ready',
+      reasonCodes: ['below_compaction_threshold'],
+      messageCount: 0,
+      totalTokens: 0,
+      lastCompaction: expect.objectContaining({
+        transcriptPath: '/sessions/history/session-1.jsonl',
+        aggressivePassCount: 2,
+      }),
+    }));
+  });
 });

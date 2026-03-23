@@ -34,6 +34,8 @@ product shells or ad-hoc prompt helpers. The runtime:
 - validates execution-ready family-organized `skills/**/SKILL.md` packages
 - resolves requested runtime skill ids into session-owned metadata
 - chooses a backend-aware delivery mode (`filesystem`, `instructions`, `none`)
+- injects instruction delivery into prompt-driven CLI, Pi/API, and agent
+  execution paths while preserving session-vs-turn instruction layering
 - persists requested/resolved/applied skill state into session inspection and
   history surfaces
 - exposes a standalone runtime-owned versioned filterable library read seam at
@@ -140,8 +142,9 @@ src/
 - Exposes runtime-owned delivery execution routes such as delivery audit,
   artifact publication, repo status, commit, and push without embedding
   product-level delivery governance policy
-- Exposes runtime-owned scheduled wakeup routes without pretending the runtime
-  already owns full product workflow or heartbeat scheduling
+- Exposes runtime-owned scheduled wakeup routes, including UTC cron-like
+  recurrence, without pretending the runtime already owns full product workflow
+  or heartbeat scheduling
 - Exposes the additive MCP facade over `POST /mcp` plus the `cats-runtime-mcp` stdio binary
 
 ### `src/mcp`
@@ -268,9 +271,9 @@ src/
   readiness, pending pre-reset/pre-compaction memory-flush hooks, and
   machine-readable cleanup guidance without implementing the product memory
   pipeline itself
-- Exposes `POST /sessions/{id}/compact` as an external-only coordination seam
-  that records compaction trigger intent and readiness but does not execute the
-  compaction step inside runtime
+- Reuses `POST /sessions/{id}/compact` as the same public readiness seam for
+  both external coordination and runtime-managed transcript compaction when the
+  transcript is locally ownable
 - Persists the last accepted maintenance trigger request on the logical session
   so Team 4 style flush/compaction payloads can survive past the immediate
   reset/delete response without making runtime the memory owner
@@ -314,6 +317,8 @@ src/
 - Owns the runtime-managed scheduled wakeup request store
 - Persists wake requests across runtime restart
 - Runs a bounded in-process timer loop for due wakeups
+- Supports UTC cron-like recurring wakeups with automatic re-arming after
+  trigger
 - Coalesces explicitly keyed duplicates and rejects exact unkeyed duplicates
 - Keeps wakeup observability additive by surfacing request state alongside
   existing session/history inspection rather than inventing transcript messages
@@ -334,6 +339,9 @@ src/
 - Materializes filesystem or instruction-file resources where the target needs
   runtime-owned artifacts (for example Codex isolated workspaces or Pi prompt
   files)
+- Compiles resolved skill instructions into live execution paths for
+  prompt-driven CLI providers and reuses the same instruction layering for
+  API/agent backends
 - Rebuilds backend-specific delivery artifacts from persisted requested skills
   during resume/fork/provider switch so runtime-owned skill re-entry does not
   depend on stale materialization state
@@ -437,9 +445,9 @@ src/
     rehydrates persisted workspace/skill state without auto-replaying the rest
     of reset/delete follow-through
 19. `POST /sessions/{id}/compact` reuses the same runtime-owned maintenance
-    read model as a public compaction-preparation route, returning
-    machine-readable readiness plus opaque hook payload persistence while
-    leaving the actual compaction engine external
+    read model as a public compaction route, returning machine-readable
+    readiness plus opaque hook payload persistence and compacting managed
+    transcripts directly when the runtime owns the transcript safely
 20. Stream events are returned directly to the caller
 
 For WSL-backed Cursor/Kiro discovery:

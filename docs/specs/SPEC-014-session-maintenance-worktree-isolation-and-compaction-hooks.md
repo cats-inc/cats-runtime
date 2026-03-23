@@ -4,15 +4,15 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft (Pending Review) |
+| **Status** | In Progress (Maintenance and Runtime Compaction Slices Landed) |
 | **Owner** | Codex |
 | **Reviewer** | User / runtime-maintenance workstream |
 
 ## Summary
 
-`cats-runtime` now has first-slice reset-boundary hooks and worktree-backed
-session lifecycle helpers, but the contract is still underspecified for deeper
-session discipline work.
+`cats-runtime` now has delivered reset-boundary hooks, worktree-backed session
+lifecycle helpers, and a runtime-managed transcript compaction slice, but the
+contract is still underspecified for deeper session discipline work.
 
 This specification defines the runtime-owned maintenance contract for:
 
@@ -22,10 +22,10 @@ This specification defines the runtime-owned maintenance contract for:
 - pre-maintenance hooks
 - future compaction boundaries
 
-The goal is not to ship a full OpenClaw-style compactor in one step. The goal
-is to make long-running session behavior predictable and safe enough that
-product memory flush, worktree cleanup, and future compaction can plug in
-without hidden lifecycle assumptions.
+The goal is not to ship a full provider-agnostic OpenClaw-style compactor in
+one step. The goal is to make long-running session behavior predictable and
+safe enough that product memory flush, worktree cleanup, and future/external
+compaction can plug in without hidden lifecycle assumptions.
 
 ## Goals
 
@@ -39,7 +39,7 @@ without hidden lifecycle assumptions.
 
 ## Non-Goals
 
-- implementing a full runtime compaction engine in this spec
+- implementing a full provider-agnostic compaction engine in this spec
 - defining product memory internals
 - moving workspace delivery policy into runtime
 - designing visible operator UI for maintenance
@@ -187,3 +187,4 @@ remember raw filesystem paths in order to clean up correctly.
 
 *Created: 2026-03-24*
 *Author: Codex*
+*Last updated: 2026-03-24*

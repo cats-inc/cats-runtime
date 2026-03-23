@@ -688,12 +688,18 @@ Create example:
 }
 ```
 
-First-slice wakeups are intentionally lightweight:
+Wakeups remain intentionally lightweight even after the recurring-schedule
+slice:
 
 - `target.kind` currently supports only `session`
 - the runtime stores requests durably and replays due scheduled wakeups after restart
 - explicit `(target.sessionId, coalesceKey)` matches coalesce into one scheduled request
 - exact unkeyed duplicates are rejected with `409`
+- optional `recurrence` currently supports only UTC five-field cron expressions
+  (`{ "kind": "cron", "expression": "*/5 * * * *", "timezone": "UTC" }`)
+- recurring wakeups may omit `scheduleAt`; the runtime computes the first due
+  time from the cron expression and automatically re-arms the request after
+  manual or timer-driven triggers
 - `POST /wakeups/{id}/trigger` may return a terminal `failed` request with
   `lastExecution.error` when the wake attempt could not resume or attach the
   target session
@@ -1197,6 +1203,15 @@ or clean up the same worktree deterministically.
 `context`, and `outputDir` fields. These are persisted onto the logical session
 so later history/resume flows can observe the same bootstrap metadata.
 
+For message turns, the runtime now preserves the session's previously persisted
+instructions as a separate base layer for the current execution. The current
+request's `instructions` field stays turn-scoped, and instruction delivery is
+composed in this order:
+
+1. resolved runtime skill instructions
+2. persisted session-level instructions
+3. the current turn's explicit `instructions`
+
 Session inspection payloads now also surface additive `browserSessions` when
 runtime-owned browser sessions are associated with the same runtime session.
 These browser sessions contribute normalized `browser_page` entries into the
@@ -1214,6 +1229,11 @@ no-op, the same as omitting `skills`.
 return `400` for malformed skill payloads or unknown/invalid runtime skill
 packages. When `skills.strict` is true and the target cannot honor the requested
 delivery contract, the runtime returns `409`.
+
+When the selected delivery mode is `instructions`, the runtime now applies the
+same layered skill/session/turn instruction contract across Pi instruction
+files, API/agent backends, and prompt-driven CLI providers. Codex can still
+prefer filesystem delivery when the target/runtime shape supports it.
 
 When a session has wakeup activity, session, history, and observe payloads also
 include an additive `wakeup` block:
@@ -1704,8 +1724,8 @@ For `POST /sessions/{id}/reset`, `POST /sessions/{id}/workspace/cleanup`, and
 `400` instead of silently falling back to the default cleanup behavior.
 
 `POST /sessions/{id}/compact` exposes the same runtime-owned maintenance
-contract as a public compaction-preparation seam without making
-`cats-runtime` the compaction engine itself. It accepts:
+contract as a public compaction seam. It still accepts additive hook
+coordination input:
 
 - `acknowledgeHooks?: boolean`
 - `maintenance?: { reason?: string; hookPayloads?: Array<{ kind: string; payload?: unknown }> }`
@@ -1720,20 +1740,31 @@ The runtime always returns a machine-readable coordination result:
   compaction, but additive `pre_compaction` hooks have not been acknowledged yet
 - `status: "ready_for_external_compaction"` when the session is inactive and any
   additive `pre_compaction` hooks are either absent or explicitly acknowledged
+- `status: "compacted"` when the same readiness gate passes and the runtime can
+  compact its own managed transcript directly
 
 Responses also include:
 
-- `execution: "external_only"`
-- `runtimeCompactionExecuted: false`
+- `execution: "external_only" | "runtime"`
+- `runtimeCompactionExecuted: boolean`
 - `hookStatus: "none" | "pending" | "acknowledged"`
 - `reasonCodes`: machine-readable readiness reasons copied from
   `inspection.maintenance.compaction`
+- optional `runtimeCompaction`: the persisted
+  `inspection.maintenance.compaction.lastCompaction` record when runtime
+  compaction executed
 - `maintenance`: the latest runtime-owned maintenance contract snapshot
 - `session`: the same additive session payload returned by `GET /sessions/{id}`
 
 Like reset/close/delete, any provided `maintenance` request is persisted under
 `inspection.maintenance.lastRequest` so later session/observe/history reads can
 explain which compaction-preparation trigger was accepted most recently.
+
+When the runtime owns the transcript locally, the compaction step now repairs
+malformed JSONL lines, archives the repaired pre-compaction baseline, rewrites
+the managed transcript with a `compaction_summary` entry plus the retained live
+tail, and persists aggregate metadata such as repaired-line count, compacted
+entry count, aggressive-pass count, and the archive path.
 
 `DELETE /sessions/{id}` also clears any persisted wakeups targeting that
 session before the runtime unregisters it. Delete responses now also include

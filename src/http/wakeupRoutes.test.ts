@@ -16,6 +16,7 @@ describe('wakeup HTTP contract', () => {
   let pool: WorkerPool;
   let wakeup: RuntimeWakeupService;
   let wakeSession: ReturnType<typeof vi.fn>;
+  let now: Date;
 
   function makeConfig(): CliRuntimeConfig {
     return {
@@ -112,8 +113,10 @@ describe('wakeup HTTP contract', () => {
       sessionId,
       outcome: 'resumed' as const,
     }));
+    now = new Date('2026-03-23T00:00:00.000Z');
     wakeup = new RuntimeWakeupService({
       persistPath: join(dataDir, 'wakeups.json'),
+      now: () => new Date(now),
       sessionExists: (sessionId) => registry.get(sessionId) !== undefined,
       wakeSession,
     });
@@ -168,6 +171,7 @@ describe('wakeup HTTP contract', () => {
       }),
     });
 
+    now = new Date('2026-03-23T00:00:10.000Z');
     const secondResponse = await app.request('/wakeups', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -187,6 +191,7 @@ describe('wakeup HTTP contract', () => {
       request: { id: string };
     };
 
+    now = new Date('2026-03-23T00:00:20.000Z');
     const triggerResponse = await app.request(`/wakeups/${second.request.id}/trigger`, {
       method: 'POST',
     });
@@ -354,6 +359,92 @@ describe('wakeup HTTP contract', () => {
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({
       error: "Wakeup request 'missing-request' was not found.",
+    });
+  });
+
+  it('creates recurring cron wakeups without an explicit scheduleAt and keeps them scheduled after trigger', async () => {
+    const app = createTestApp();
+
+    const createResponse = await app.request('/wakeups', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        reason: 'Heartbeat wake.',
+        target: {
+          kind: 'session',
+          sessionId: 'session-1',
+        },
+        recurrence: {
+          kind: 'cron',
+          expression: '*/5 * * * *',
+          timezone: 'UTC',
+        },
+      }),
+    });
+
+    expect(createResponse.status).toBe(201);
+    const created = await createResponse.json() as {
+      request: {
+        id: string;
+        status: string;
+        scheduleAt: string;
+        recurrence?: {
+          kind: string;
+          expression: string;
+          timezone?: string;
+        };
+      };
+    };
+    expect(created.request).toEqual(expect.objectContaining({
+      status: 'scheduled',
+      scheduleAt: '2026-03-23T00:05:00.000Z',
+      recurrence: {
+        kind: 'cron',
+        expression: '*/5 * * * *',
+        timezone: 'UTC',
+      },
+    }));
+
+    const triggerResponse = await app.request(`/wakeups/${created.request.id}/trigger`, {
+      method: 'POST',
+    });
+    expect(triggerResponse.status).toBe(200);
+    await expect(triggerResponse.json()).resolves.toEqual({
+      request: expect.objectContaining({
+        id: created.request.id,
+        status: 'scheduled',
+        scheduleAt: '2026-03-23T00:05:00.000Z',
+        lastExecution: expect.objectContaining({
+          source: 'manual',
+          sessionId: 'session-1',
+          outcome: 'resumed',
+        }),
+      }),
+    });
+  });
+
+  it('rejects invalid recurring cron payloads with a client-safe error', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/wakeups', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        reason: 'Broken recurring wake.',
+        target: {
+          kind: 'session',
+          sessionId: 'session-1',
+        },
+        recurrence: {
+          kind: 'cron',
+          expression: '* *',
+        },
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'recurrence.expression must be a five-field cron expression in UTC.',
     });
   });
 });

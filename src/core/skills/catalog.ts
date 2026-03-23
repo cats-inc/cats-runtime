@@ -32,6 +32,17 @@ import type {
 const SKILLS_ROOT = path.resolve(fileURLToPath(new URL('../../../skills/', import.meta.url)));
 const CODER_SKILLS_ROOT = path.join('.agents', 'skills');
 const RUNTIME_SKILL_STATE_ROOT = '.runtime-skills';
+const INSTRUCTION_DELIVERY_CLI_PROVIDERS = new Set([
+  'claude',
+  'gemini',
+  'copilot',
+  'cursor',
+  'kiro',
+  'auggie',
+  'goose',
+  'junie',
+  'opencode',
+]);
 // Keep the process-local skill-package cache bounded so long-lived runtimes do not
 // accumulate unbounded entries across many distinct session skill combinations.
 const MAX_RUNTIME_SKILL_PACKAGE_CACHE_ENTRIES = 128;
@@ -906,6 +917,24 @@ function buildRuntimeSkillDeliveryPlan(
       status: 'applied',
       warnings: [],
       instructions: buildPiSkillInstructionFile(skillPackages, options),
+    };
+  }
+
+  if (
+    options.providerBackend === 'cli'
+    && INSTRUCTION_DELIVERY_CLI_PROVIDERS.has(options.providerName)
+  ) {
+    const overlay = buildSkillInstructionOverlayFromPackages(skillPackages);
+    return {
+      preferredMode: 'instructions',
+      mode: 'instructions',
+      status: 'applied',
+      warnings: [],
+      instructions: overlay
+        ? {
+            byteLength: Buffer.byteLength(overlay, 'utf8'),
+          }
+        : undefined,
     };
   }
 

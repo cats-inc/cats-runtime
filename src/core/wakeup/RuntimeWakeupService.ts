@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import type {
+  RuntimeWakeupRecurrence,
   RuntimeWakeupRequest,
   RuntimeWakeupStatus,
   RuntimeWakeupTarget,
@@ -10,6 +11,10 @@ import type {
   RuntimeWakeupTriggerSource,
   SessionWakeupState,
 } from '../types.js';
+import {
+  getNextWakeupCronOccurrence,
+  validateWakeupCronExpression,
+} from './cron.js';
 
 const DEFAULT_TICK_INTERVAL_MS = 1_000;
 const DEFAULT_MAX_DUE_PER_TICK = 8;
@@ -35,7 +40,8 @@ export interface RuntimeWakeSessionResult {
 export interface CreateRuntimeWakeupInput {
   reason: string;
   target: RuntimeWakeupTarget;
-  scheduleAt: string;
+  scheduleAt?: string;
+  recurrence?: RuntimeWakeupRecurrence;
   coalesceKey?: string;
   metadata?: Record<string, unknown>;
 }
@@ -101,6 +107,10 @@ function normalizeIsoTimestamp(value: string): string {
   return new Date(parsed).toISOString();
 }
 
+function normalizeOptionalIsoTimestamp(value: string | undefined): string | undefined {
+  return value ? normalizeIsoTimestamp(value) : undefined;
+}
+
 function normalizeReason(reason: string): string {
   const normalized = reason.trim();
   if (!normalized) {
@@ -143,6 +153,35 @@ function normalizeMetadata(value: Record<string, unknown> | undefined): Record<s
   return structuredClone(value);
 }
 
+function normalizeRecurrence(
+  recurrence: RuntimeWakeupRecurrence | undefined,
+): RuntimeWakeupRecurrence | undefined {
+  if (!recurrence) {
+    return undefined;
+  }
+
+  if (recurrence.kind !== 'cron') {
+    throw new RuntimeWakeupValidationError('recurrence.kind must be \'cron\'.');
+  }
+
+  const timezone = recurrence.timezone ?? 'UTC';
+  if (timezone !== 'UTC') {
+    throw new RuntimeWakeupValidationError('recurrence.timezone must be \'UTC\' when provided.');
+  }
+
+  try {
+    return {
+      kind: 'cron',
+      expression: validateWakeupCronExpression(recurrence.expression),
+      timezone,
+    };
+  } catch (error) {
+    throw new RuntimeWakeupValidationError(
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+}
+
 function sortRequests(left: RuntimeWakeupRequest, right: RuntimeWakeupRequest): number {
   const leftScheduleAt = Date.parse(left.scheduleAt);
   const rightScheduleAt = Date.parse(right.scheduleAt);
@@ -162,7 +201,34 @@ function isDuplicateWakeup(
     && !input.coalesceKey
     && existing.target.sessionId === input.target.sessionId
     && existing.reason === input.reason
-    && existing.scheduleAt === input.scheduleAt;
+    && existing.scheduleAt === input.scheduleAt
+    && serializeWakeupRecurrence(existing.recurrence)
+      === serializeWakeupRecurrence(input.recurrence);
+}
+
+function serializeWakeupRecurrence(
+  recurrence: RuntimeWakeupRecurrence | undefined,
+): string {
+  return recurrence
+    ? `${recurrence.kind}:${recurrence.expression}:${recurrence.timezone ?? 'UTC'}`
+    : '';
+}
+
+function resolveWakeupScheduleAt(
+  input: CreateRuntimeWakeupInput,
+  now: Date,
+): string {
+  if (input.scheduleAt) {
+    return input.scheduleAt;
+  }
+
+  if (input.recurrence?.kind === 'cron') {
+    return getNextWakeupCronOccurrence(input.recurrence.expression, now).toISOString();
+  }
+
+  throw new RuntimeWakeupValidationError(
+    'scheduleAt is required when recurrence is not provided.',
+  );
 }
 
 export class RuntimeWakeupService {
@@ -251,17 +317,21 @@ export class RuntimeWakeupService {
     const normalizedInput: CreateRuntimeWakeupInput = {
       reason: normalizeReason(input.reason),
       target: normalizeTarget(input.target, this.options.sessionExists),
-      scheduleAt: normalizeIsoTimestamp(input.scheduleAt),
+      scheduleAt: normalizeOptionalIsoTimestamp(input.scheduleAt),
+      recurrence: normalizeRecurrence(input.recurrence),
       coalesceKey: input.coalesceKey?.trim() || undefined,
       metadata: normalizeMetadata(input.metadata),
     };
+    const scheduleAt = resolveWakeupScheduleAt(normalizedInput, this.now());
+    normalizedInput.scheduleAt = scheduleAt;
 
     const coalesced = this.findCoalescibleRequest(normalizedInput);
     if (coalesced) {
       coalesced.reason = normalizedInput.reason;
-      coalesced.scheduleAt = Date.parse(normalizedInput.scheduleAt) < Date.parse(coalesced.scheduleAt)
-        ? normalizedInput.scheduleAt
+      coalesced.scheduleAt = Date.parse(scheduleAt) < Date.parse(coalesced.scheduleAt)
+        ? scheduleAt
         : coalesced.scheduleAt;
+      coalesced.recurrence = normalizedInput.recurrence;
       coalesced.metadata = {
         ...(coalesced.metadata ?? {}),
         ...(normalizedInput.metadata ?? {}),
@@ -289,7 +359,8 @@ export class RuntimeWakeupService {
       id: randomUUID(),
       reason: normalizedInput.reason,
       target: normalizedInput.target,
-      scheduleAt: normalizedInput.scheduleAt,
+      scheduleAt,
+      ...(normalizedInput.recurrence ? { recurrence: normalizedInput.recurrence } : {}),
       coalesceKey: normalizedInput.coalesceKey,
       status: 'scheduled',
       metadata: normalizedInput.metadata,
@@ -359,8 +430,6 @@ export class RuntimeWakeupService {
 
     try {
       const result = await this.options.wakeSession(request.target.sessionId, cloneWakeupRequest(request));
-      request.status = 'triggered';
-      request.updatedAt = this.now().toISOString();
       request.lastExecution = {
         source,
         triggeredAt,
@@ -368,17 +437,35 @@ export class RuntimeWakeupService {
         providerSessionId: result.providerSessionId,
         outcome: result.outcome,
       };
+      if (request.recurrence) {
+        request.status = 'scheduled';
+        request.scheduleAt = getNextWakeupCronOccurrence(
+          request.recurrence.expression,
+          new Date(triggeredAt),
+        ).toISOString();
+      } else {
+        request.status = 'triggered';
+      }
+      request.updatedAt = this.now().toISOString();
       this.persist();
       return cloneWakeupRequest(request);
     } catch (error) {
-      request.status = 'failed';
-      request.updatedAt = this.now().toISOString();
       request.lastExecution = {
         source,
         triggeredAt,
         sessionId: request.target.sessionId,
         error: error instanceof Error ? error.message : String(error),
       };
+      if (request.recurrence) {
+        request.status = 'scheduled';
+        request.scheduleAt = getNextWakeupCronOccurrence(
+          request.recurrence.expression,
+          new Date(triggeredAt),
+        ).toISOString();
+      } else {
+        request.status = 'failed';
+      }
+      request.updatedAt = this.now().toISOString();
       this.persist();
       return cloneWakeupRequest(request);
     }
@@ -497,6 +584,9 @@ export class RuntimeWakeupService {
             reason: normalizeReason(record.reason),
             target,
             scheduleAt: normalizeIsoTimestamp(record.scheduleAt),
+            ...(record.recurrence && typeof record.recurrence === 'object' && !Array.isArray(record.recurrence)
+              ? { recurrence: normalizeRecurrence(record.recurrence as RuntimeWakeupRecurrence) }
+              : {}),
             coalesceKey: typeof record.coalesceKey === 'string' && record.coalesceKey.trim()
               ? record.coalesceKey.trim()
               : undefined,

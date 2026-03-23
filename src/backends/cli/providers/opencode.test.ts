@@ -4,8 +4,10 @@ import type { OpencodeNativeSessionService } from '../opencode/OpencodeNativeSes
 
 describe('OpencodeProvider', () => {
   it('emits tool, text, and result events and auto-handles pending requests', async () => {
+    let capturedContent = '';
     const native = {
-      prompt: vi.fn(async () => {
+      prompt: vi.fn(async (input: { content: string }) => {
+        capturedContent = input.content;
         await new Promise((resolve) => setTimeout(resolve, 20));
         return {
           sessionId: 'oc-1',
@@ -45,7 +47,11 @@ describe('OpencodeProvider', () => {
     const provider = new OpencodeProvider(native);
 
     const events: unknown[] = [];
-    for await (const event of provider.streamTurn('Ship it', {
+    for await (const event of provider.streamTurn({
+      message: 'Ship it',
+      sessionInstructions: 'Session-level instructions.',
+      instructions: 'Turn-level instructions.',
+    }, {
       cwd: '/tmp/repo',
       resumeSessionId: 'oc-1',
       permissionMode: 'skip',
@@ -72,6 +78,9 @@ describe('OpencodeProvider', () => {
         },
       },
     ]);
+    expect(capturedContent).toContain('Session-level instructions.');
+    expect(capturedContent).toContain('Turn-level instructions.');
+    expect(capturedContent).toContain('User message:');
     expect(vi.mocked(native.replyPermission)).toHaveBeenCalledWith(
       '/tmp/repo',
       'perm-1',

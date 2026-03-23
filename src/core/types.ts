@@ -691,6 +691,12 @@ export type RuntimeWakeupStatus =
 export type RuntimeWakeupTriggerSource = 'timer' | 'manual';
 export type RuntimeWakeupTriggerOutcome = 'resumed' | 'already_awake';
 
+export interface RuntimeWakeupRecurrence {
+  kind: 'cron';
+  expression: string;
+  timezone?: 'UTC';
+}
+
 export interface RuntimeWakeupTarget {
   kind: 'session';
   sessionId: string;
@@ -710,6 +716,7 @@ export interface RuntimeWakeupRequest {
   reason: string;
   target: RuntimeWakeupTarget;
   scheduleAt: string;
+  recurrence?: RuntimeWakeupRecurrence;
   coalesceKey?: string;
   status: RuntimeWakeupStatus;
   metadata?: Record<string, unknown>;
@@ -1213,7 +1220,20 @@ export interface RuntimeSessionMaintenanceState {
   lastRequest?: RuntimeSessionMaintenanceRequest;
   lastResetAt?: string;
   lastLifecycle?: RuntimeSessionLifecycleContract;
+  lastCompaction?: RuntimeSessionCompactionRecord;
   markers: RuntimeSessionMaintenanceMarker[];
+}
+
+export interface RuntimeSessionCompactionRecord {
+  compactedAt: string;
+  transcriptPath: string;
+  baselineMessageCount: number;
+  baselineTotalTokens: number;
+  compactedEntryCount: number;
+  retainedEntryCount: number;
+  repairedLineCount: number;
+  aggressivePassCount: number;
+  archivePath?: string;
 }
 
 export interface RuntimeSessionCompactionContract {
@@ -1221,6 +1241,7 @@ export interface RuntimeSessionCompactionContract {
   reasonCodes: string[];
   messageCount: number;
   totalTokens: number;
+  lastCompaction?: RuntimeSessionCompactionRecord;
 }
 
 export interface RuntimeSessionResetBoundary {
@@ -1383,6 +1404,7 @@ export interface ProviderMessage {
 
 export interface TurnInput {
   message: string;
+  sessionInstructions?: string;
   instructions?: string;
   skills?: SessionSkillState;
   context?: SessionInvocationContext;

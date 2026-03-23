@@ -4,6 +4,7 @@ import type {
   ExecutionHandle,
   RuntimeEventExcerpt,
   RuntimeGuardrailResult,
+  RuntimeSessionCompactionRecord,
   RuntimeSessionMaintenanceRequest,
   RuntimeSessionLifecycleAction,
   RuntimeSessionLifecycleCleanupSummary,
@@ -432,6 +433,28 @@ export class RuntimeSessionManager {
     return cloneLifecycle(lifecycle);
   }
 
+  recordCompaction(
+    sessionId: string,
+    record: RuntimeSessionCompactionRecord,
+  ): RuntimeSessionCompactionRecord {
+    const tracked = this.ensureTrackedState(sessionId);
+    tracked.maintenance.lastCompaction = cloneCompactionRecord(record);
+    this.pushMaintenanceMarker(tracked, {
+      code: 'compact_completed',
+      observedAt: record.compactedAt,
+      status: 'completed',
+      details: {
+        transcriptPath: record.transcriptPath,
+        compactedEntryCount: record.compactedEntryCount,
+        retainedEntryCount: record.retainedEntryCount,
+        repairedLineCount: record.repairedLineCount,
+        aggressivePassCount: record.aggressivePassCount,
+        ...(record.archivePath ? { archivePath: record.archivePath } : {}),
+      },
+    });
+    return cloneCompactionRecord(record);
+  }
+
   dropSession(sessionId: string): void {
     this.sessionStates.delete(sessionId);
   }
@@ -726,10 +749,22 @@ function cloneMaintenanceState(
     ...(maintenance.lastRequest ? { lastRequest: cloneMaintenanceRequest(maintenance.lastRequest) } : {}),
     ...(maintenance.lastResetAt ? { lastResetAt: maintenance.lastResetAt } : {}),
     ...(maintenance.lastLifecycle ? { lastLifecycle: cloneLifecycle(maintenance.lastLifecycle) } : {}),
+    ...(maintenance.lastCompaction
+      ? { lastCompaction: cloneCompactionRecord(maintenance.lastCompaction) }
+      : {}),
     markers: maintenance.markers.map((marker) => ({
       ...marker,
       ...(marker.details ? { details: { ...marker.details } } : {}),
     })),
+  };
+}
+
+function cloneCompactionRecord(
+  record: RuntimeSessionCompactionRecord,
+): RuntimeSessionCompactionRecord {
+  return {
+    ...record,
+    ...(record.archivePath ? { archivePath: record.archivePath } : {}),
   };
 }
 

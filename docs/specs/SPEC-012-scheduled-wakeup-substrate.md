@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (First Slice Landed) |
+| **Status** | In Progress (Recurring Slice Landed) |
 | **Owner** | Codex |
 | **Reviewer** | User / Team 4 |
 
@@ -14,12 +14,14 @@
 products can ask the runtime to wake a known session later without pretending
 that a full autonomous scheduler already exists.
 
-This spec defines a small first slice:
+This spec defines a lightweight runtime-owned wakeup substrate whose delivered
+scope now includes a recurring follow-on slice:
 
 - create, list, inspect, cancel, and trigger wake requests
 - persist requests so scheduled wakeups survive runtime restart
 - coalesce explicitly keyed duplicates and reject exact unkeyed duplicates
 - run due wakeups through a bounded timer loop
+- support UTC cron-like recurring wakeups with automatic re-arming
 - surface additive wakeup metadata in existing session inspection/history
 
 This is intentionally **not** a general scheduler, heartbeat system, or product
@@ -44,7 +46,7 @@ workflow engine.
 ## Non-Goals
 
 - full heartbeat scheduling or company-level autonomy
-- recurring jobs, cron syntax, or complex retry policy
+- complex retry policy, non-UTC recurrence, or workflow-level orchestration
 - background orchestration UI or approval policy
 - product-owned room workflow logic
 - provider/model catalog polling
@@ -105,6 +107,11 @@ creation.
     - pending count
     - next scheduled time
     - the latest wake request metadata
+17. The wakeup contract may support additive recurrence metadata when the
+    runtime can reschedule the same request deterministically after trigger.
+18. The first recurrence slice shall accept only UTC five-field cron
+    expressions and shall compute the next due time inside the runtime-owned
+    wakeup service.
 
 ### Non-Functional Requirements
 
@@ -165,6 +172,8 @@ creation.
 - Persistence uses a runtime-owned JSON store in the runtime data directory.
 - Due wakeups are processed by a bounded interval loop, not by a full job
   runner.
+- Recurring wakeups currently use a minimal UTC five-field cron parser rather
+  than a general calendar/scheduler engine.
 - Wakeup trigger delegates to existing session resume/ensure-awake machinery.
 - Session/history payloads expose additive `wakeup` metadata rather than
   synthesizing transcript messages.
@@ -179,10 +188,10 @@ creation.
 ## Deferred Follow-Ups
 
 - provider/bootstrap wake targets for not-yet-created sessions
-- recurring schedules and retry policy
+- richer retry/backoff policy and broader recurrence semantics
 - richer diagnostics summary for runtime-wide wakeup counts
 - product-owned orchestration rules built on top of wakeup primitives
 
 ---
 
-*Last updated: 2026-03-23*
+*Last updated: 2026-03-24*

@@ -340,8 +340,10 @@ Current gaps:
   reconciliation protocol
 - retained workspace/worktree cleanup can advertise `pre_flush`, but nothing in
   runtime yet coordinates durable memory/export flush before cleanup proceeds
-- `POST /sessions/{id}/compact` now exposes a public external-only seam, but
-  runtime still does not execute compaction or drive hook follow-through itself
+- runtime-managed transcripts now compact in place through
+  `POST /sessions/{id}/compact`, but provider-owned/external sessions still
+  rely on the coordination seam and runtime still does not drive hook
+  follow-through itself
 - Team 3's future memory pipeline seam exists in contracts only; runtime still
   lacks the hook execution/retry envelope around lifecycle flush boundaries
 - persisted maintenance trigger payloads are stored verbatim; there are no
@@ -379,6 +381,8 @@ schemas.
 - non-shared child forks can copy a workspace snapshot once at fork time
 - session maintenance now advertises additive `pre_flush` alongside the
   existing memory-flush hook groups
+- runtime-managed transcripts now repair/archive older JSONL history and record
+  `lastCompaction` metadata when the public compaction seam can execute safely
 - generalized workspace sync and hook execution plumbing remain deferred
 
 #### Affected Files
@@ -515,6 +519,8 @@ execution/materialization engine.
   curated MCP tool plane via `list_runtime_skills`
 - `src/http/routes/skills.ts` and `src/http/app.ts` now publish that read seam
   without forcing hosts to import internal runtime modules directly
+- runtime-managed instruction delivery now reaches prompt-driven CLI providers
+  plus Pi/API/agent execution paths instead of stopping at catalog resolution
 - `npm run verify:skills` now provides a dedicated runtime-owned verification
   command for shipped skill packages
 - richer publish/lint discipline, reference-authoring workflow,

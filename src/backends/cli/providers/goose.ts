@@ -5,7 +5,9 @@ import type {
   ProviderCapabilities,
   ProviderSpawnOptions,
   StreamEvent,
+  TurnInput,
 } from './types.js';
+import { compileRuntimeTurnPrompt } from './prompt.js';
 
 export class GooseProvider implements Provider {
   name = 'goose';
@@ -19,8 +21,8 @@ export class GooseProvider implements Provider {
     this.native = native;
   }
 
-  prepareEphemeralTurn(content: string): void {
-    this.pendingPrompt = content;
+  prepareEphemeralTurn(turn: TurnInput): void {
+    this.pendingPrompt = compileRuntimeTurnPrompt(turn.message, turn);
   }
 
   async afterTurn(opts: ProviderSpawnOptions): Promise<StreamEvent | null> {

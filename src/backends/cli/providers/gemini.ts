@@ -4,7 +4,9 @@ import type {
   ProviderCapabilities,
   ProviderSpawnOptions,
   StreamEvent,
+  TurnInput,
 } from './types.js';
+import { compileRuntimeTurnPrompt } from './prompt.js';
 
 interface GeminiStreamEvent {
   type: string;
@@ -64,8 +66,8 @@ export class GeminiProvider implements Provider {
     return args;
   }
 
-  buildStdinMessage(content: string): string {
-    return content;
+  buildStdinMessage(content: string, turn?: TurnInput): string {
+    return compileRuntimeTurnPrompt(content, turn);
   }
 
   parseStreamLine(line: string): StreamEvent | null {

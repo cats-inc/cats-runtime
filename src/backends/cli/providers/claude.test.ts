@@ -66,6 +66,19 @@ describe('ClaudeProvider', () => {
       expect(parsed.message.role).toBe('user');
       expect(parsed.message.content).toBe('Hello world');
     });
+
+    it('layers session and turn instructions into the prompt payload', () => {
+      const msg = provider.buildStdinMessage('Hello world', {
+        message: 'Hello world',
+        sessionInstructions: 'Session-level instructions.',
+        instructions: 'Turn-level instructions.',
+      });
+      const parsed = JSON.parse(msg.trim());
+      expect(parsed.message.content).toContain('Instructions:');
+      expect(parsed.message.content).toContain('Session-level instructions.');
+      expect(parsed.message.content).toContain('Turn-level instructions.');
+      expect(parsed.message.content).toContain('User message:');
+    });
   });
 
   describe('parseStreamLine', () => {

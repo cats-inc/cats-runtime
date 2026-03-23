@@ -4,7 +4,7 @@ import { CursorProvider } from './cursor.js';
 describe('CursorProvider', () => {
   it('builds ephemeral spawn args with prompt and resume support', () => {
     const provider = new CursorProvider();
-    provider.prepareEphemeralTurn('Say hi');
+    provider.prepareEphemeralTurn({ message: 'Say hi' });
 
     const args = provider.buildSpawnArgs({
       cwd: '/tmp/repo',
