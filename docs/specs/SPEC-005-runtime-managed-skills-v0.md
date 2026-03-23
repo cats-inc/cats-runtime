@@ -18,6 +18,12 @@ backend-aware, and callers can explicitly clear persisted skill state with
 The remaining gap is not whether skills exist at runtime, but how far the v0
 contract should go beyond the delivered session/runtime slice.
 
+The latest follow-on clarification is that runtime-managed execution and the
+internal skill-library taxonomy are separate concerns:
+
+- `SPEC-013` defines the role/library content taxonomy
+- this spec defines resolution, materialization, injection, and reporting
+
 This specification defines a first slice for runtime-managed skills. The goal is
 to make skills a real execution input without jumping straight to a plugin
 platform, MCP tool registry, or scheduler-driven agent behavior model.
@@ -104,6 +110,14 @@ platform, MCP tool registry, or scheduler-driven agent behavior model.
 15. The first slice may leave `skillProfile` as a higher-level product concern
     until the explicit-skill contract is proven, but it should not prevent a
     future runtime-owned profile-to-skill mapping layer.
+16. The runtime shall be able to resolve role/library packages from the
+    internal skill library without requiring product callers to understand the
+    full library taxonomy.
+17. Requested, resolved, and applied skill state should remain stable across
+    create, resume, fork, and provider-switch re-entry flows.
+18. Resolved skill state should be able to carry enough identity metadata to
+    distinguish a named skill from a concrete library revision or bundle
+    fingerprint.
 
 ### Non-Functional Requirements
 
@@ -153,6 +167,8 @@ interface ResolvedSkillRef {
   name: string;
   sourcePath: string;
   entryFile: string;
+  family?: string;
+  fingerprint?: string;
 }
 
 interface SessionSkillState {
@@ -189,6 +205,19 @@ Responsibilities:
   instruction overlays
 - adapters: consume the normalized resolved skill payload without rescanning the
   repo
+
+### Re-entry Guidance
+
+Requested/resolved/applied skill state should survive the same session
+re-entry moments that already preserve runtime instructions and context:
+
+- create -> first execution
+- resume -> continued execution
+- fork -> branched execution
+- provider switch or adapter fallback where supported
+
+The important point is that skill delivery remains part of execution context,
+not a one-time decorate-and-forget field.
 
 ### Validation Criteria
 
@@ -260,6 +289,7 @@ supports local skill directories.
 ## References
 
 - [SPEC-003: Agent Backend for External Agent Runtimes](./SPEC-003-agent-backend.md)
+- [SPEC-013: Internal Skill Library and Role Taxonomy](./SPEC-013-internal-skill-library-and-role-taxonomy.md)
 - [cats-runtime gap assessment](../research/2026-03-19-paperclip-gap-assessment.md)
 - [Paperclip alignment research](../research/2026-03-17-paperclip-openclaw-pi-alignment.md)
 - [cats paperclip control-plane analysis](../../../cats/docs/research/paperclip-control-plane-analysis.md)
@@ -269,6 +299,6 @@ supports local skill directories.
 
 *Created: 2026-03-19*
 *Author: Codex*
-*Last updated: 2026-03-23*
+*Last updated: 2026-03-24*
 *Related Plan: [PLAN-008-runtime-managed-skills-v0](../plans/PLAN-008-runtime-managed-skills-v0.md)*
 

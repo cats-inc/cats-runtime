@@ -38,6 +38,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
+| [018-separate-skill-library-content-from-runtime-execution-engine](./018-separate-skill-library-content-from-runtime-execution-engine.md) | Separate skill-library content from runtime execution engine | Draft (Pending Review) | 2026-03-24 |
 | [017-own-usage-metering-rate-limit-detection-and-execution-guardrails](./017-own-usage-metering-rate-limit-detection-and-execution-guardrails.md) | Own usage metering, rate-limit detection, and execution guardrails | Accepted | 2026-03-20 |
 | [016-own-executable-delivery-primitives-not-delivery-policy](./016-own-executable-delivery-primitives-not-delivery-policy.md) | Own executable delivery primitives, not delivery policy | Accepted | 2026-03-20 |
 | [015-own-workspace-substrate-tools-in-cats-runtime](./015-own-workspace-substrate-tools-in-cats-runtime.md) | Own workspace substrate tools in `cats-runtime` | Accepted | 2026-03-20 |
@@ -67,6 +68,6 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 ---
 
-*Last updated: 2026-03-23*
+*Last updated: 2026-03-24*
 
 *See also: [AGENTS.md](../../../AGENTS.md) for decision-making protocols*
