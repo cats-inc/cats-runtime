@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ExecutionHandle, SessionInfo } from '../types.js';
+import type {
+  ExecutionHandle,
+  SessionInfo,
+  SessionSkillState,
+} from '../types.js';
 import { ensureSessionAwake } from './sessionWakeup.js';
 import { SessionRegistry } from '../../backends/cli/pool/SessionRegistry.js';
 
@@ -85,6 +89,29 @@ function makeConfig() {
   } as const;
 }
 
+function makeInstructionSkillState(instructionsFile: string): SessionSkillState {
+  return {
+    requestedSkills: ['companion'],
+    resolvedSkills: [],
+    strict: false,
+    delivery: {
+      provider: 'claude',
+      backend: 'api',
+      preferredMode: 'instructions',
+      mode: 'instructions',
+      status: 'applied',
+      warnings: [],
+      instructions: {
+        filePath: instructionsFile,
+        byteLength: 18,
+      },
+    },
+    warnings: [],
+    appliedSkillIds: ['companion'],
+    updatedAt: '2026-03-23T00:00:00.000Z',
+  };
+}
+
 describe('ensureSessionAwake', () => {
   it('returns already_awake when an execution handle is already active', async () => {
     const registry = new SessionRegistry();
@@ -118,21 +145,7 @@ describe('ensureSessionAwake', () => {
       providerBackend: 'api',
       providerInstanceId: 'gateway',
       providerSessionId: undefined,
-      skills: {
-        requested: {
-          requestedSkills: ['companion'],
-        },
-        resolved: [],
-        delivery: {
-          mode: 'instructions',
-          status: 'applied',
-          instructions: {
-            content: 'Skill instructions.',
-            filePath: '/tmp/runtime-skills.md',
-          },
-        },
-        appliedAt: '2026-03-23T00:00:00.000Z',
-      },
+      skills: makeInstructionSkillState('/tmp/runtime-skills.md'),
     }));
     const runtime = makeRuntime();
 

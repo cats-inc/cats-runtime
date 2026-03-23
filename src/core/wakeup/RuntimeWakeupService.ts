@@ -511,13 +511,45 @@ export class RuntimeWakeupService {
   }
 
   private persist(): void {
-    this.pruneTerminalRequests();
+    if (this.shouldPruneTerminalRequests()) {
+      this.pruneTerminalRequests();
+    }
     mkdirSync(dirname(this.options.persistPath), { recursive: true });
     writeFileSync(
       this.options.persistPath,
       `${JSON.stringify(Array.from(this.requests.values()).sort(sortRequests), null, 2)}\n`,
       'utf8',
     );
+  }
+
+  private shouldPruneTerminalRequests(): boolean {
+    if (this.maxTerminalRequests === 0 || this.maxTerminalRequestsPerSession === 0) {
+      return Array.from(this.requests.values()).some((request) =>
+        TERMINAL_WAKEUP_STATUSES.has(request.status),
+      );
+    }
+
+    let terminalCount = 0;
+    const perSessionCounts = new Map<string, number>();
+
+    for (const request of this.requests.values()) {
+      if (!TERMINAL_WAKEUP_STATUSES.has(request.status)) {
+        continue;
+      }
+
+      terminalCount += 1;
+      if (terminalCount > this.maxTerminalRequests) {
+        return true;
+      }
+
+      const sessionCount = (perSessionCounts.get(request.target.sessionId) ?? 0) + 1;
+      if (sessionCount > this.maxTerminalRequestsPerSession) {
+        return true;
+      }
+      perSessionCounts.set(request.target.sessionId, sessionCount);
+    }
+
+    return false;
   }
 
   private pruneTerminalRequests(): void {
