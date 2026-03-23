@@ -222,6 +222,8 @@ src/
 ### `src/core/browser`
 
 - Defines runtime-owned browser session/page lifecycle helpers
+- Persists runtime-owned browser session/page state under the runtime data dir
+  so browser inspection/read models survive restart for the current driver set
 - Defines browser-page preview-surface normalization aligned with existing
   service/artifact preview contracts
 - Keeps browser-driver integration replaceable so future Playwright/CDP or

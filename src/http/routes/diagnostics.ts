@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { RemoteProviderInstanceConfig } from '../../backends/cli/config.js';
+import type { BackendKind, RemoteProviderInstanceConfig } from '../../backends/cli/config.js';
 import {
   getRuntimeListenerConfig,
   getRuntimeResolvedPaths,
@@ -34,6 +34,7 @@ import {
 
 type DiagnosticStatus = HealthStatus['status'];
 type DiagnosticsProbeMode = 'light' | 'live';
+const DIAGNOSTIC_BACKENDS: readonly BackendKind[] = ['cli', 'api', 'local', 'agent'];
 
 interface DiagnosticCheck {
   code: string;
@@ -72,7 +73,17 @@ const diagnosticsRoutes = new Hono<RuntimeRouteEnv>();
 interface ProviderSummaryOptions {
   defaultTargetsOnly?: boolean;
   useAttentionSummary?: boolean;
+  queryHasFilters?: boolean;
 }
+
+interface ProviderDiagnosticsFilters {
+  provider?: string;
+  backend?: BackendKind;
+  instance?: string;
+  defaultOnly: boolean;
+}
+
+class DiagnosticsQueryError extends Error {}
 
 function combineDiagnosticStatus(checks: DiagnosticCheck[]): DiagnosticStatus {
   if (checks.some((check) => check.status === 'unavailable')) {
@@ -532,11 +543,13 @@ async function collectProviderDiagnostics(
   probeMode: DiagnosticsProbeMode,
   env: Readonly<NodeJS.ProcessEnv>,
   forceRefresh = false,
+  filters: ProviderDiagnosticsFilters = { defaultOnly: false },
 ): Promise<{
   catalog: ReturnType<typeof listProviderCatalog>;
   providers: ProviderDiagnosticResult[];
 }> {
-  const catalog = listProviderCatalog(ctx.config);
+  const fullCatalog = listProviderCatalog(ctx.config);
+  const catalog = filterProviderDiagnosticsCatalog(fullCatalog, filters);
   const providers = await Promise.all(
     Object.values(catalog)
       .flatMap((entry) => entry.instances)
@@ -592,9 +605,11 @@ function summarizeProviderDiagnostics(
 
   if (summary.configuredProviders === 0 || summary.targets === 0) {
     summary.status = 'degraded';
-    summary.summary = options.defaultTargetsOnly
-      ? 'No default provider targets are configured yet.'
-      : 'No provider targets are configured yet.';
+    summary.summary = options.queryHasFilters
+      ? 'No provider targets matched the requested diagnostics filters.'
+      : options.defaultTargetsOnly
+        ? 'No default provider targets are configured yet.'
+        : 'No provider targets are configured yet.';
     return summary;
   }
 
@@ -657,27 +672,39 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
 });
 
 diagnosticsRoutes.get('/diagnostics/providers', async (c) => {
-  const ctx = c.get('ctx');
-  const probeMode = c.req.query('probe') === 'live' ? 'live' : 'light';
-  const forceRefresh = parseForceRefreshQuery(c.req.query('force'));
-  const env = getRuntimeEnvironment();
-  const { catalog, providers } = await collectProviderDiagnostics(
-    ctx,
-    probeMode,
-    env,
-    forceRefresh,
-  );
-  const summary = summarizeProviderDiagnostics(catalog, providers);
+  try {
+    const ctx = c.get('ctx');
+    const probeMode = c.req.query('probe') === 'live' ? 'live' : 'light';
+    const forceRefresh = parseForceRefreshQuery(c.req.query('force'));
+    const filters = parseProviderDiagnosticsFilters(c.req.query());
+    const env = getRuntimeEnvironment();
+    const { catalog, providers } = await collectProviderDiagnostics(
+      ctx,
+      probeMode,
+      env,
+      forceRefresh,
+      filters,
+    );
+    const summary = summarizeProviderDiagnostics(catalog, providers, {
+      queryHasFilters: hasProviderDiagnosticsFilters(filters),
+    });
 
-  return c.json({
-    service: RUNTIME_SERVICE_NAME,
-    version: RUNTIME_VERSION,
-    timestamp: new Date().toISOString(),
-    probe: probeMode,
-    readiness: getRuntimeReadinessSnapshot(ctx.startup),
-    summary,
-    providers,
-  });
+    return c.json({
+      service: RUNTIME_SERVICE_NAME,
+      version: RUNTIME_VERSION,
+      timestamp: new Date().toISOString(),
+      probe: probeMode,
+      query: buildProviderDiagnosticsQuery(filters),
+      readiness: getRuntimeReadinessSnapshot(ctx.startup),
+      summary,
+      providers,
+    });
+  } catch (error) {
+    if (error instanceof DiagnosticsQueryError) {
+      return c.json({ error: error.message }, 400);
+    }
+    throw error;
+  }
 });
 
 diagnosticsRoutes.get('/diagnostics/health', async (c) => {
@@ -741,4 +768,109 @@ export { diagnosticsRoutes };
 
 function parseForceRefreshQuery(value: string | undefined): boolean {
   return value === '1' || value === 'true' || value === 'refresh';
+}
+
+function parseProviderDiagnosticsFilters(
+  query: Record<string, string | undefined>,
+): ProviderDiagnosticsFilters {
+  const provider = parseOptionalQueryString(query.provider);
+  const backend = parseOptionalBackend(query.backend);
+  const instance = parseOptionalQueryString(query.instance);
+
+  return {
+    ...(provider ? { provider } : {}),
+    ...(backend ? { backend } : {}),
+    ...(instance ? { instance } : {}),
+    defaultOnly: parseOptionalBooleanQuery(query.defaultOnly) === true,
+  };
+}
+
+function parseOptionalQueryString(value: string | undefined): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function parseOptionalBackend(value: string | undefined): BackendKind | undefined {
+  const backend = parseOptionalQueryString(value);
+  if (!backend) {
+    return undefined;
+  }
+  if ((DIAGNOSTIC_BACKENDS as readonly string[]).includes(backend)) {
+    return backend as BackendKind;
+  }
+  throw new DiagnosticsQueryError(`Unsupported provider diagnostics backend '${backend}'.`);
+}
+
+function parseOptionalBooleanQuery(value: string | undefined): boolean | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === '1' || value === 'true') {
+    return true;
+  }
+  if (value === '0' || value === 'false') {
+    return false;
+  }
+  throw new DiagnosticsQueryError(`Invalid boolean query value '${value}'.`);
+}
+
+function hasProviderDiagnosticsFilters(filters: ProviderDiagnosticsFilters): boolean {
+  return Boolean(
+    filters.provider
+    || filters.backend
+    || filters.instance
+    || filters.defaultOnly,
+  );
+}
+
+function buildProviderDiagnosticsQuery(filters: ProviderDiagnosticsFilters) {
+  const appliedFilters = {
+    ...(filters.provider ? { provider: filters.provider } : {}),
+    ...(filters.backend ? { backend: filters.backend } : {}),
+    ...(filters.instance ? { instance: filters.instance } : {}),
+    ...(filters.defaultOnly ? { defaultOnly: true } : {}),
+  };
+
+  return {
+    hasFilters: Object.keys(appliedFilters).length > 0,
+    filters: appliedFilters,
+  };
+}
+
+function filterProviderDiagnosticsCatalog(
+  catalog: ReturnType<typeof listProviderCatalog>,
+  filters: ProviderDiagnosticsFilters,
+): ReturnType<typeof listProviderCatalog> {
+  return Object.entries(catalog).reduce<ReturnType<typeof listProviderCatalog>>(
+    (filteredCatalog, [providerName, entry]) => {
+      const instances = entry.instances.filter((target) => {
+        if (filters.provider && target.providerName !== filters.provider) {
+          return false;
+        }
+        if (filters.backend && target.backend !== filters.backend) {
+          return false;
+        }
+        if (filters.instance && target.instanceId !== filters.instance) {
+          return false;
+        }
+        if (filters.defaultOnly && !target.defaultTarget) {
+          return false;
+        }
+        return true;
+      });
+      if (instances.length === 0) {
+        return filteredCatalog;
+      }
+
+      filteredCatalog[providerName] = {
+        ...entry,
+        instances,
+      };
+      return filteredCatalog;
+    },
+    {},
+  );
 }

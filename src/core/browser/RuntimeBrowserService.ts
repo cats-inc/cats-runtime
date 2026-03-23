@@ -1,4 +1,12 @@
 import { randomUUID } from 'node:crypto';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname } from 'node:path';
 import type { RuntimeBrowserDriver, RuntimeBrowserPageTarget } from './driver.js';
 import { createBrowserPagePreviewSurface } from './previewSurfaces.js';
 import type {
@@ -39,6 +47,12 @@ interface StoredBrowserPage {
   closedAt?: string;
   binding: RuntimeBrowserPageBinding;
   metadata?: Record<string, unknown>;
+}
+
+interface PersistedRuntimeBrowserState {
+  version: 1;
+  sessions: StoredBrowserSession[];
+  pages: StoredBrowserPage[];
 }
 
 export interface CreateRuntimeBrowserSessionInput {
@@ -123,6 +137,7 @@ export interface RuntimeBrowserServiceOptions {
   now?: () => Date;
   maxSessions?: number;
   maxPagesPerSession?: number;
+  storageFile?: string;
 }
 
 export class RuntimeBrowserNotFoundError extends Error {
@@ -154,6 +169,7 @@ export class RuntimeBrowserService {
     for (const driver of options.drivers) {
       this.drivers.set(driver.descriptor.id, driver);
     }
+    this.loadPersistedState();
   }
 
   listDrivers(): RuntimeBrowserDriverDescriptor[] {
@@ -234,6 +250,9 @@ export class RuntimeBrowserService {
       removedPageCount += session.pageIds.length;
       this.deleteStoredSession(session.id);
     }
+    if (removedSessionIds.length > 0) {
+      this.persistState();
+    }
 
     return {
       action: 'cleanup_browser_sessions',
@@ -261,6 +280,9 @@ export class RuntimeBrowserService {
         await this.closeSession(session.id);
       }
       this.deleteStoredSession(session.id);
+    }
+    if (sessions.length > 0) {
+      this.persistState();
     }
     return sessions.length;
   }
@@ -312,6 +334,7 @@ export class RuntimeBrowserService {
     this.pages.set(pageId, page);
     session.pageIds.push(pageId);
     session.updatedAt = now;
+    this.persistState();
     return {
       session: this.buildSessionView(session),
       page: this.buildPageView(page),
@@ -345,6 +368,7 @@ export class RuntimeBrowserService {
       page.closedAt = now;
       page.updatedAt = now;
     }
+    this.persistState();
 
     return this.buildSessionView(session);
   }
@@ -382,6 +406,7 @@ export class RuntimeBrowserService {
       metadata: mergeMetadata(input.metadata, driverSessionState.metadata),
     };
     this.sessions.set(browserSessionId, session);
+    this.persistState();
     return this.buildSessionView(session);
   }
 
@@ -390,7 +415,10 @@ export class RuntimeBrowserService {
       return;
     }
 
-    this.pruneClosedSessions();
+    const pruned = this.pruneClosedSessions();
+    if (pruned) {
+      this.persistState();
+    }
     if (this.sessions.size < this.maxSessions) {
       return;
     }
@@ -400,10 +428,11 @@ export class RuntimeBrowserService {
     );
   }
 
-  private pruneClosedSessions(): void {
+  private pruneClosedSessions(): boolean {
     const closedSessions = Array.from(this.sessions.values())
       .filter((session) => session.status === 'closed')
       .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt));
+    let pruned = false;
 
     while (this.sessions.size >= this.maxSessions && closedSessions.length > 0) {
       const session = closedSessions.shift();
@@ -411,7 +440,9 @@ export class RuntimeBrowserService {
         break;
       }
       this.deleteStoredSession(session.id);
+      pruned = true;
     }
+    return pruned;
   }
 
   private deleteStoredSession(sessionId: string): void {
@@ -485,6 +516,61 @@ export class RuntimeBrowserService {
       status: 'closed',
     }).filter((session) => isClosedBrowserSessionOlderThan(session, olderThanMs, now));
   }
+
+  private loadPersistedState(): void {
+    const storageFile = this.options.storageFile;
+    if (!storageFile || !existsSync(storageFile)) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(readFileSync(storageFile, 'utf8')) as Partial<PersistedRuntimeBrowserState>;
+      const sessions = Array.isArray(parsed.sessions) ? parsed.sessions : [];
+      const pages = Array.isArray(parsed.pages) ? parsed.pages : [];
+
+      for (const session of sessions) {
+        if (!isStoredBrowserSession(session) || !this.drivers.has(session.driverId)) {
+          continue;
+        }
+        this.sessions.set(session.id, cloneStoredSession(session));
+      }
+
+      for (const page of pages) {
+        if (!isStoredBrowserPage(page) || !this.sessions.has(page.browserSessionId)) {
+          continue;
+        }
+        this.pages.set(page.id, cloneStoredPage(page));
+      }
+
+      for (const session of this.sessions.values()) {
+        session.pageIds = session.pageIds.filter((pageId) => {
+          const page = this.pages.get(pageId);
+          return Boolean(page && page.browserSessionId === session.id);
+        });
+      }
+    } catch {
+      this.sessions.clear();
+      this.pages.clear();
+    }
+  }
+
+  private persistState(): void {
+    const storageFile = this.options.storageFile;
+    if (!storageFile) {
+      return;
+    }
+
+    const payload: PersistedRuntimeBrowserState = {
+      version: 1,
+      sessions: Array.from(this.sessions.values()).map((session) => cloneStoredSession(session)),
+      pages: Array.from(this.pages.values()).map((page) => cloneStoredPage(page)),
+    };
+    mkdirSync(dirname(storageFile), { recursive: true });
+    const nextContent = `${JSON.stringify(payload, null, 2)}\n`;
+    const tempFile = `${storageFile}.tmp`;
+    writeFileSync(tempFile, nextContent, 'utf8');
+    renameSync(tempFile, storageFile);
+  }
 }
 
 function toBrowserPageSnapshot(page: StoredBrowserPage): Omit<RuntimeBrowserPage, 'previewSurface'> {
@@ -555,6 +641,22 @@ function clonePreviewSurface(
     ...previewSurface,
     ...(previewSurface.provenance ? { provenance: { ...previewSurface.provenance } } : {}),
     ...(previewSurface.metadata ? { metadata: { ...previewSurface.metadata } } : {}),
+  };
+}
+
+function cloneStoredSession(session: StoredBrowserSession): StoredBrowserSession {
+  return {
+    ...session,
+    pageIds: [...session.pageIds],
+    ...(session.metadata ? { metadata: { ...session.metadata } } : {}),
+  };
+}
+
+function cloneStoredPage(page: StoredBrowserPage): StoredBrowserPage {
+  return {
+    ...page,
+    binding: cloneBinding(page.binding),
+    ...(page.metadata ? { metadata: { ...page.metadata } } : {}),
   };
 }
 
@@ -637,4 +739,36 @@ function isClosedBrowserSessionOlderThan(
     return false;
   }
   return now - referenceTime >= olderThanMs;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isStoredBrowserSession(value: unknown): value is StoredBrowserSession {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    typeof value.id === 'string'
+    && typeof value.driverId === 'string'
+    && typeof value.status === 'string'
+    && typeof value.createdAt === 'string'
+    && typeof value.updatedAt === 'string'
+    && Array.isArray(value.pageIds)
+  );
+}
+
+function isStoredBrowserPage(value: unknown): value is StoredBrowserPage {
+  if (!isRecord(value) || !isRecord(value.binding)) {
+    return false;
+  }
+  return (
+    typeof value.id === 'string'
+    && typeof value.browserSessionId === 'string'
+    && typeof value.status === 'string'
+    && typeof value.createdAt === 'string'
+    && typeof value.updatedAt === 'string'
+    && typeof value.binding.kind === 'string'
+  );
 }

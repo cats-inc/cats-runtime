@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Hono } from 'hono';
 import { logger } from 'hono/logger';
@@ -152,11 +152,15 @@ export function getWorkspaceSubstrateService(ctx: AppContext): WorkspaceSubstrat
 
 export function getRuntimeBrowserService(ctx: AppContext): RuntimeBrowserService {
   if (!ctx.browser) {
+    const browserStorageFile = typeof ctx.config.dataDir === 'string' && ctx.config.dataDir.length > 0
+      ? join(ctx.config.dataDir, 'browser', 'sessions.json')
+      : undefined;
     ctx.browser = new RuntimeBrowserService({
       drivers: [
         new ManualBrowserDriver(),
       ],
       sessionExists: (sessionId) => Boolean(ctx.registry.get(sessionId)),
+      ...(browserStorageFile ? { storageFile: browserStorageFile } : {}),
     });
   }
   return ctx.browser;

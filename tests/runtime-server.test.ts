@@ -545,6 +545,10 @@ backends:
         version: RUNTIME_VERSION,
         timestamp: expect.any(String),
         probe: 'light',
+        query: {
+          hasFilters: false,
+          filters: {},
+        },
         readiness: {
           endpoint: '/health',
           authoritative: true,

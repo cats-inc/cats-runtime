@@ -176,8 +176,9 @@ describe('MCP stdio transport', () => {
         params: {
           name: 'list_runtime_skills',
           arguments: {
-            family: ['chat'],
-            slug: ['companion'],
+            sortBy: 'id',
+            sortDirection: 'desc',
+            limit: 3,
           },
         },
       }),
@@ -233,18 +234,19 @@ describe('MCP stdio transport', () => {
             version: 1,
           },
           query: {
-            hasFilters: true,
-            filters: {
-              family: ['chat'],
-              slug: ['companion'],
+            hasFilters: false,
+            filters: {},
+            sort: {
+              by: 'id',
+              direction: 'desc',
             },
           },
-          count: 1,
-          skills: [
-            {
-              id: 'companion',
-            },
-          ],
+          catalogPath: '/skills/catalog?sortBy=id&sortDirection=desc&limit=3',
+          skills: expect.arrayContaining([
+            expect.objectContaining({
+              id: expect.any(String),
+            }),
+          ]),
         },
       },
     });

@@ -36,6 +36,27 @@ const RUNTIME_SKILL_DELIVERY_HINTS = new Set<RuntimeSkillDeliveryMode>(
   RUNTIME_SKILL_DELIVERY_HINT_VALUES,
 );
 
+const RUNTIME_SKILL_SORT_FIELD_VALUES = [
+  'id',
+  'title',
+  'family',
+  'slug',
+  'role',
+] as const;
+type RuntimeSkillCatalogSortField = typeof RUNTIME_SKILL_SORT_FIELD_VALUES[number];
+const RUNTIME_SKILL_SORT_FIELDS = new Set<RuntimeSkillCatalogSortField>(
+  RUNTIME_SKILL_SORT_FIELD_VALUES,
+);
+
+const RUNTIME_SKILL_SORT_DIRECTION_VALUES = [
+  'asc',
+  'desc',
+] as const;
+type RuntimeSkillCatalogSortDirection = typeof RUNTIME_SKILL_SORT_DIRECTION_VALUES[number];
+const RUNTIME_SKILL_SORT_DIRECTIONS = new Set<RuntimeSkillCatalogSortDirection>(
+  RUNTIME_SKILL_SORT_DIRECTION_VALUES,
+);
+
 const RUNTIME_SKILL_CATALOG_CONTRACT = {
   version: 1,
   acceptedFilterEncodings: ['repeat', 'csv'],
@@ -46,6 +67,10 @@ const RUNTIME_SKILL_CATALOG_CONTRACT = {
   pagination: {
     offset: { minimum: 0 },
     limit: { minimum: 1 },
+  },
+  sorting: {
+    sortBy: RUNTIME_SKILL_SORT_FIELD_VALUES,
+    sortDirection: RUNTIME_SKILL_SORT_DIRECTION_VALUES,
   },
   supportedFilters: {
     id: { type: 'string' },
@@ -77,6 +102,11 @@ interface RuntimeSkillCatalogPagination {
   hasMore: boolean;
 }
 
+interface RuntimeSkillCatalogSort {
+  by: RuntimeSkillCatalogSortField;
+  direction: RuntimeSkillCatalogSortDirection;
+}
+
 class SkillCatalogQueryError extends Error {}
 
 function readQueryValues(searchParams: URLSearchParams, key: string): string[] {
@@ -104,11 +134,7 @@ function readOptionalSingleIntegerQueryValue(
   key: string,
   minimum: number,
 ): number | undefined {
-  const values = searchParams
-    .getAll(key)
-    .flatMap((value) => value.split(','))
-    .map((value) => value.trim())
-    .filter((value) => value.length > 0);
+  const values = readQueryValues(searchParams, key);
   if (values.length === 0) {
     return undefined;
   }
@@ -120,6 +146,20 @@ function readOptionalSingleIntegerQueryValue(
     throw new SkillCatalogQueryError(`Invalid ${key}: expected an integer >= ${minimum}.`);
   }
   return parsed;
+}
+
+function readOptionalSingleQueryValue(
+  searchParams: URLSearchParams,
+  key: string,
+): string | undefined {
+  const values = readQueryValues(searchParams, key);
+  if (values.length === 0) {
+    return undefined;
+  }
+  if (values.length !== 1) {
+    throw new SkillCatalogQueryError(`Invalid ${key}: expected a single value.`);
+  }
+  return values[0];
 }
 
 function readRuntimeSkillCatalogFilters(
@@ -147,6 +187,34 @@ function readRuntimeSkillCatalogFilters(
     capabilityTag,
     productTag,
     deliveryHint,
+  };
+}
+
+function readRuntimeSkillCatalogSort(
+  searchParams: URLSearchParams,
+): RuntimeSkillCatalogSort | undefined {
+  const sortBy = readOptionalSingleQueryValue(searchParams, 'sortBy');
+  const sortDirection = readOptionalSingleQueryValue(searchParams, 'sortDirection');
+
+  if (!sortBy && !sortDirection) {
+    return undefined;
+  }
+  if (!sortBy) {
+    throw new SkillCatalogQueryError('Invalid sortBy: sortDirection requires sortBy.');
+  }
+  if (!RUNTIME_SKILL_SORT_FIELDS.has(sortBy as RuntimeSkillCatalogSortField)) {
+    throw new SkillCatalogQueryError(`Invalid sortBy: ${sortBy}`);
+  }
+  if (
+    sortDirection
+    && !RUNTIME_SKILL_SORT_DIRECTIONS.has(sortDirection as RuntimeSkillCatalogSortDirection)
+  ) {
+    throw new SkillCatalogQueryError(`Invalid sortDirection: ${sortDirection}`);
+  }
+
+  return {
+    by: sortBy as RuntimeSkillCatalogSortField,
+    direction: (sortDirection ?? 'asc') as RuntimeSkillCatalogSortDirection,
   };
 }
 
@@ -211,6 +279,59 @@ function filterRuntimeSkillCatalog(
   });
 }
 
+function readRuntimeSkillCatalogSortValue(
+  skill: RuntimeSkillCatalogEntry,
+  field: RuntimeSkillCatalogSortField,
+): string {
+  switch (field) {
+    case 'id':
+      return skill.id;
+    case 'title':
+      return skill.title;
+    case 'family':
+      return skill.library.family;
+    case 'slug':
+      return skill.library.slug;
+    case 'role':
+      return skill.library.role;
+    default:
+      return skill.id;
+  }
+}
+
+function compareRuntimeSkillCatalogEntries(
+  left: RuntimeSkillCatalogEntry,
+  right: RuntimeSkillCatalogEntry,
+  sort: RuntimeSkillCatalogSort,
+): number {
+  const primaryComparison = readRuntimeSkillCatalogSortValue(left, sort.by).localeCompare(
+    readRuntimeSkillCatalogSortValue(right, sort.by),
+  );
+  if (primaryComparison !== 0) {
+    return sort.direction === 'desc' ? -primaryComparison : primaryComparison;
+  }
+
+  for (const field of RUNTIME_SKILL_SORT_FIELD_VALUES) {
+    const tieBreaker = readRuntimeSkillCatalogSortValue(left, field).localeCompare(
+      readRuntimeSkillCatalogSortValue(right, field),
+    );
+    if (tieBreaker !== 0) {
+      return tieBreaker;
+    }
+  }
+  return 0;
+}
+
+function sortRuntimeSkillCatalog(
+  skills: RuntimeSkillCatalogEntry[],
+  sort: RuntimeSkillCatalogSort | undefined,
+): RuntimeSkillCatalogEntry[] {
+  if (!sort) {
+    return skills;
+  }
+  return [...skills].sort((left, right) => compareRuntimeSkillCatalogEntries(left, right, sort));
+}
+
 function paginateRuntimeSkillCatalog(
   skills: RuntimeSkillCatalogEntry[],
   offset: number,
@@ -237,16 +358,19 @@ skillRoutes.get('/skills/catalog', (c) => {
   try {
     const searchParams = new URL(c.req.url).searchParams;
     const filters = readRuntimeSkillCatalogFilters(searchParams);
+    const sort = readRuntimeSkillCatalogSort(searchParams);
     const offset = readOptionalSingleIntegerQueryValue(searchParams, 'offset', 0) ?? 0;
     const limit = readOptionalSingleIntegerQueryValue(searchParams, 'limit', 1);
     const appliedFilters = buildAppliedRuntimeSkillCatalogFilters(filters);
     const filteredSkills = filterRuntimeSkillCatalog(listRuntimeSkillCatalog(), filters);
-    const { skills, pagination } = paginateRuntimeSkillCatalog(filteredSkills, offset, limit);
+    const sortedSkills = sortRuntimeSkillCatalog(filteredSkills, sort);
+    const { skills, pagination } = paginateRuntimeSkillCatalog(sortedSkills, offset, limit);
     return c.json({
       contract: RUNTIME_SKILL_CATALOG_CONTRACT,
       query: {
         hasFilters: Object.keys(appliedFilters).length > 0,
         filters: appliedFilters,
+        ...(sort ? { sort } : {}),
       },
       count: filteredSkills.length,
       pagination,

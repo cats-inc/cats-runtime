@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ManualBrowserDriver } from '../../backends/browser/manualDriver.js';
 import { RuntimeBrowserService } from './RuntimeBrowserService.js';
@@ -247,5 +250,60 @@ describe('RuntimeBrowserService', () => {
       id: readySession.id,
       status: 'ready',
     }));
+  });
+
+  it('persists browser sessions/pages across service restarts when storage is configured', async () => {
+    const rootDir = mkdtempSync(join(tmpdir(), 'cats-runtime-browser-persist-'));
+    const storageFile = join(rootDir, 'browser', 'sessions.json');
+
+    try {
+      const firstBrowser = new RuntimeBrowserService({
+        drivers: [
+          new ManualBrowserDriver(),
+        ],
+        now: () => new Date('2026-03-23T00:00:00.000Z'),
+        storageFile,
+      });
+
+      const session = await firstBrowser.createSession({
+        runtimeSessionId: 'session-1',
+        label: 'Persisted Browser',
+      });
+      await firstBrowser.createPage(session.id, {
+        url: 'http://127.0.0.1:4173',
+        binding: {
+          kind: 'manual_url',
+          runtimeSessionId: 'session-1',
+        },
+      });
+      await firstBrowser.closeSession(session.id);
+
+      const secondBrowser = new RuntimeBrowserService({
+        drivers: [
+          new ManualBrowserDriver(),
+        ],
+        now: () => new Date('2026-03-23T00:30:00.000Z'),
+        storageFile,
+      });
+
+      expect(secondBrowser.getSession(session.id)).toEqual(expect.objectContaining({
+        id: session.id,
+        runtimeSessionId: 'session-1',
+        label: 'Persisted Browser',
+        status: 'closed',
+        pages: [
+          expect.objectContaining({
+            status: 'closed',
+            url: 'http://127.0.0.1:4173',
+            binding: expect.objectContaining({
+              kind: 'manual_url',
+              runtimeSessionId: 'session-1',
+            }),
+          }),
+        ],
+      }));
+    } finally {
+      rmSync(rootDir, { recursive: true, force: true });
+    }
   });
 });

@@ -73,6 +73,7 @@ describe('ComponentName', () => {
 - Cover child-process startup failure and shutdown lifecycle paths when changing `src/index.ts`, `src/server.ts`, or `src/startup.ts`
 - Cover path alias rejection separately from plain `..` traversal so symlink/junction and hardlink regressions stay caught
 - Cover skill-library metadata normalization and duplicate-id rejection when changing `src/core/skills/catalog.ts` or `skills/`
+- Cover skill-catalog route/MCP query echoes when changing `src/http/routes/skills.ts` or `src/mcp/tools.ts`, especially filters, sorting, and pagination
 
 ## CI/CD Integration
 

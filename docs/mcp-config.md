@@ -64,12 +64,16 @@ multi-step orchestration.
 `provider_diagnostics` is the curated MCP wrapper over
 `GET /diagnostics/providers`. It returns the same provider readiness,
 compatibility, setup, and remediation payload, while accepting additive
-`probe: "light" | "live"` and `forceRefresh: true` inputs.
+`probe: "light" | "live"`, `provider`, `backend`, `instance`, `defaultOnly`,
+and `forceRefresh: true` inputs. This keeps the MCP seam aligned with the
+runtime-owned filtered diagnostics route instead of forcing hosts to fetch the
+full provider catalog and narrow it themselves.
 
 `list_runtime_skills` is the curated MCP wrapper over the same versioned
 filterable/paged runtime-owned skill catalog exposed by `GET /skills/catalog`,
-including the additive `contract.version`, `query.filters`, and `pagination`
-payloads. The MCP wrapper also accepts `offset` and `limit`.
+including the additive `contract.version`, `query.filters`, optional
+`query.sort`, and `pagination` payloads. The MCP wrapper also accepts `sortBy`,
+`sortDirection`, `offset`, and `limit`.
 
 `POST /mcp` uses the same runtime auth policy as the direct HTTP API. If
 `cats-runtime` is configured with an API key, MCP clients must send the same

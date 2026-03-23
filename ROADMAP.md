@@ -183,7 +183,6 @@ That is enough to freeze the substrate, but not enough for production-grade
 browser-backed preview and test workflows. The current gaps are:
 
 - no real Playwright/CDP/browser-service driver yet
-- browser sessions/pages are in-memory only and do not survive runtime restart
 - reset/delete cleanup and closed-session pruning exist, but there is still no
   automatic background browser-session expiry or retained-session GC policy
 - browser state already contributes additive session/history/observe inspection
@@ -217,20 +216,21 @@ Deepen the runtime-owned browser subsystem without coupling it to any monorepo
 
 - The manual-driver browser substrate and normalized `browser_page` preview
   surfaces are landed
+- Browser session/page state now persists under the runtime data dir and can be
+  reloaded on restart for the current runtime-owned browser contract
 - Browser sessions already surface through session, history, and observe
   inspection payloads, and reset/delete cleanup clears browser sessions bound
   to the affected runtime session
 - `GET /browser/summary`, `POST /browser/sessions/cleanup`, and matching MCP
   tools now provide a host-facing aggregate read/maintenance seam for closed
   session cleanup without waiting for capacity-pressure pruning
-- Real drivers, restart-safe persistence, and automatic background
-  cleanup/expiry remain deferred
+- Real drivers and automatic background cleanup/expiry remain deferred
 
 #### Why This Is Required
 
 - A manual-only driver is not sufficient for deploy-preview-test workflows.
-- In-memory-only browser state is too fragile for long-running sessions and
-  runtime restarts.
+- Persisted browser state is required so long-running preview sessions do not
+  disappear on routine runtime restarts.
 - Browser pages need the same lifecycle discipline already applied to sessions,
   wakeups, and delivery surfaces.
 - Future Cats Code preview canvases need a more complete runtime substrate
@@ -442,7 +442,7 @@ skill execution contract.
 ### OPT-7: Internal Skill Library Publishing and Catalog Follow-through
 
 **Priority**: P1
-**Status**: Planned
+**Status**: In Progress
 
 #### Problem
 
@@ -459,10 +459,10 @@ That freezes the content taxonomy, but the follow-through is still incomplete.
 Current gaps:
 
 - the standalone runtime-owned catalog read surface now exists at
-  `GET /skills/catalog`, and it now supports lightweight metadata/tag filters
-  plus a versioned host-facing read contract with additive `offset` / `limit`
-  pagination, but there is still no richer projection/sorting surface beyond
-  that minimal seam
+  `GET /skills/catalog`, and it now supports lightweight metadata/tag filters,
+  additive `sortBy` / `sortDirection`, and a versioned host-facing read
+  contract with additive `offset` / `limit` pagination, but there is still no
+  richer projection surface beyond that minimal seam
 - the runtime catalog contract is stable enough for Team 6, and
   `npm run verify:skills` now provides a dedicated verification gate, but there
   is still no richer publish pipeline beyond running the existing catalog
@@ -504,8 +504,9 @@ execution/materialization engine.
 - `GET /skills/catalog` now exposes a standalone runtime-owned catalog route
   backed by `listRuntimeSkillCatalog()`, with lightweight filtering across
   stable library metadata, tags, and delivery hints plus `contract.version: 1`,
-  machine-readable `query.filters` echoing, and additive `offset` / `limit`
-  pagination metadata
+  machine-readable `query.filters` echoing, explicit additive
+  `sortBy` / `sortDirection`, and additive `offset` / `limit` pagination
+  metadata
 - the same runtime-owned catalog read seam is now also reachable from the
   curated MCP tool plane via `list_runtime_skills`
 - `src/http/routes/skills.ts` and `src/http/app.ts` now publish that read seam

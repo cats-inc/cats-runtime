@@ -81,11 +81,13 @@ Current curated tools:
 
 `list_runtime_skills` reuses the same runtime-owned skill catalog contract as
 `GET /skills/catalog`, including lightweight filtering across stable metadata,
-tags, delivery hints, and additive `offset` / `limit` pagination.
+tags, delivery hints, additive `sortBy` / `sortDirection`, and additive
+`offset` / `limit` pagination.
 
 `provider_diagnostics` reuses the same runtime-owned readiness/remediation
 contract as `GET /diagnostics/providers`, including additive `probe` (`light`
-or `live`) and `forceRefresh` semantics for cached compatibility assessments.
+or `live`), `provider` / `backend` / `instance` / `defaultOnly` target
+filters, and `forceRefresh` semantics for cached compatibility assessments.
 
 Example `tools/call` request:
 
@@ -287,6 +289,23 @@ a safe live probe; API/local targets still report light diagnostics only.
 `force=1|true|refresh` can be combined with either probe mode to bypass the CLI
 compatibility cache after a provider install or upgrade.
 
+`GET /diagnostics/providers` also accepts additive target filters:
+
+- `provider`
+- `backend=cli|api|local|agent`
+- `instance`
+- `defaultOnly=true|false`
+
+These filters narrow the provider catalog before diagnostics run, so host tools
+and orchestrators can inspect one target or one default-only subset without
+re-filtering the full response client-side. The response now also includes:
+
+- `query.hasFilters`
+- `query.filters`
+
+Invalid `backend` values or malformed boolean filters such as
+`defaultOnly=maybe` return `400` with a client-safe `error` string.
+
 `GET /diagnostics/health` now also includes a compact top-level `metering`
 summary so hosts can poll one route for both provider readiness and
 execution-guardrail state.
@@ -324,6 +343,8 @@ first slice is intentionally lightweight:
 - browser drivers are pluggable, but the first built-in driver is `manual`
 - the `manual` driver does not launch or automate a real browser; it validates
   the contract for future Playwright/CDP/BrowserOS-style drivers
+- browser session/page state now persists under the runtime data dir so browser
+  inspection and cleanup routes survive process restart for the current driver
 - page bindings may be direct (`url`/`path`) or may bind to an existing runtime
   session `service` / `artifact`
 
@@ -514,6 +535,8 @@ supporting library lookups without importing runtime internals:
 - `capabilityTag`
 - `productTag`
 - `deliveryHint`
+- `sortBy`
+- `sortDirection`
 - `offset`
 - `limit`
 
@@ -528,9 +551,11 @@ The response shape is:
   - `version`: current catalog read contract version
   - `acceptedFilterEncodings`: currently `repeat` and `csv`
   - `filterSemantics`: `withinField: "or"` and `acrossFields: "and"`
+  - `sorting`: accepted `sortBy` fields and `sortDirection` values
 - `query`: machine-readable summary of the applied filters
   - `hasFilters`: whether the request applied any filter
   - `filters`: the non-empty filter arrays echoed back by the runtime
+  - optional `sort`: the applied sort block when requested
 - `count`: total number of discovered runtime-owned skill packages
 - `pagination`: machine-readable paging metadata
   - `offset`: applied offset
@@ -555,6 +580,10 @@ Example response:
     "filterSemantics": {
       "withinField": "or",
       "acrossFields": "and"
+    },
+    "sorting": {
+      "sortBy": ["id", "title", "family", "slug", "role"],
+      "sortDirection": ["asc", "desc"]
     },
     "pagination": {
       "offset": {
@@ -607,7 +636,9 @@ Example response:
 ```
 
 Invalid `family`, `packageKind`, or `deliveryHint` filters, plus malformed
-`offset` / `limit` values, return `400` with a client-safe `error` string.
+`offset` / `limit` values, invalid `sortBy` / `sortDirection` values, or
+`sortDirection` without `sortBy` return `400` with a client-safe `error`
+string.
 Unexpected catalog read failures return `500`.
 
 ### Sessions

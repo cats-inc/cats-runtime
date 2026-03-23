@@ -271,6 +271,10 @@ describe('runtime MCP facade', () => {
           name: 'provider_diagnostics',
           arguments: {
             probe: 'live',
+            provider: 'claude',
+            backend: 'cli',
+            instance: 'default',
+            defaultOnly: true,
             forceRefresh: true,
           },
         },
@@ -282,17 +286,42 @@ describe('runtime MCP facade', () => {
         structuredContent: {
           probe: string;
           providersPath: string;
+          query: {
+            hasFilters: boolean;
+            filters: Record<string, string | boolean>;
+          };
           summary: { targets: number };
-          providers: unknown[];
+          providers: Array<{
+            provider: string;
+            backend: string;
+            instance: string;
+            defaultTarget: boolean;
+          }>;
         };
       };
     };
     expect(providerDiagnostics.result.structuredContent.probe).toBe('live');
+    expect(providerDiagnostics.result.structuredContent.query).toEqual({
+      hasFilters: true,
+      filters: {
+        provider: 'claude',
+        backend: 'cli',
+        instance: 'default',
+        defaultOnly: true,
+      },
+    });
     expect(providerDiagnostics.result.structuredContent.providersPath).toBe(
-      '/diagnostics/providers?probe=live&force=1',
+      '/diagnostics/providers?probe=live&provider=claude&backend=cli&instance=default&defaultOnly=true&force=1',
     );
-    expect(providerDiagnostics.result.structuredContent.summary.targets).toBeGreaterThan(0);
-    expect(providerDiagnostics.result.structuredContent.providers).toBeInstanceOf(Array);
+    expect(providerDiagnostics.result.structuredContent.summary.targets).toBe(1);
+    expect(providerDiagnostics.result.structuredContent.providers).toEqual([
+      expect.objectContaining({
+        provider: 'claude',
+        backend: 'cli',
+        instance: 'default',
+        defaultTarget: true,
+      }),
+    ]);
 
     const observeResponse = await app.request('/mcp', {
       method: 'POST',
@@ -475,6 +504,85 @@ describe('runtime MCP facade', () => {
     expect(payload.result.structuredContent.count).toBeGreaterThan(
       payload.result.structuredContent.skills.length,
     );
+  });
+
+  it('passes runtime skill catalog sorting arguments through MCP', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 22,
+        method: 'tools/call',
+        params: {
+          name: 'list_runtime_skills',
+          arguments: {
+            sortBy: 'id',
+            sortDirection: 'desc',
+            limit: 3,
+          },
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json() as {
+      result: {
+        structuredContent: {
+          catalogPath: string;
+          query: {
+            sort?: {
+              by: string;
+              direction: string;
+            };
+          };
+          skills: Array<{ id: string }>;
+        };
+      };
+    };
+    expect(payload.result.structuredContent.catalogPath).toBe(
+      '/skills/catalog?sortBy=id&sortDirection=desc&limit=3',
+    );
+    expect(payload.result.structuredContent.query.sort).toEqual({
+      by: 'id',
+      direction: 'desc',
+    });
+    expect(payload.result.structuredContent.skills.map((skill) => skill.id)).toEqual(
+      [...payload.result.structuredContent.skills.map((skill) => skill.id)]
+        .sort((left, right) => right.localeCompare(left)),
+    );
+  });
+
+  it('rejects runtime skill sort directions without a sort field through MCP', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 23,
+        method: 'tools/call',
+        params: {
+          name: 'list_runtime_skills',
+          arguments: {
+            sortDirection: 'desc',
+          },
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 23,
+      error: {
+        code: -32602,
+        message: 'sortDirection requires sortBy',
+      },
+    });
   });
 
   it('exposes runtime-owned browser summary and cleanup through MCP', async () => {

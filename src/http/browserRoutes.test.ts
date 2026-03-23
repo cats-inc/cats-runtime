@@ -476,6 +476,62 @@ describe('browser HTTP contract', () => {
     }));
   });
 
+  it('reloads persisted browser sessions from the runtime data dir on a fresh app instance', async () => {
+    const firstApp = createTestApp();
+
+    const createResponse = await firstApp.request('/browser/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        runtimeSessionId: 'session-service',
+        label: 'Persisted Browser Session',
+      }),
+    });
+    expect(createResponse.status).toBe(201);
+    const created = await createResponse.json() as {
+      session: { id: string };
+    };
+
+    const pageResponse = await firstApp.request(`/browser/sessions/${created.session.id}/pages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        url: 'http://127.0.0.1:4173',
+        binding: {
+          kind: 'manual_url',
+          runtimeSessionId: 'session-service',
+        },
+      }),
+    });
+    expect(pageResponse.status).toBe(201);
+
+    const closeResponse = await firstApp.request(`/browser/sessions/${created.session.id}/close`, {
+      method: 'POST',
+    });
+    expect(closeResponse.status).toBe(200);
+
+    browser = undefined;
+    const secondApp = createTestApp();
+    const restoredResponse = await secondApp.request('/browser/sessions?status=closed');
+    expect(restoredResponse.status).toBe(200);
+    await expect(restoredResponse.json()).resolves.toEqual({
+      sessions: [
+        expect.objectContaining({
+          id: created.session.id,
+          runtimeSessionId: 'session-service',
+          label: 'Persisted Browser Session',
+          status: 'closed',
+          pages: [
+            expect.objectContaining({
+              status: 'closed',
+              url: 'http://127.0.0.1:4173',
+            }),
+          ],
+        }),
+      ],
+    });
+  });
+
   it('returns a machine-readable client error when browser session capacity is exhausted', async () => {
     browser = new RuntimeBrowserService({
       drivers: [

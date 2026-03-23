@@ -295,6 +295,55 @@ describe('runtime-managed skills HTTP contract', () => {
     expect(body.count).toBeGreaterThan(body.skills.length);
   });
 
+  it('sorts the runtime-owned skill catalog and echoes explicit query metadata', async () => {
+    const app = createTestApp();
+
+    const baselineResponse = await app.request('/skills/catalog');
+    expect(baselineResponse.status).toBe(200);
+    const baseline = await baselineResponse.json() as {
+      skills: Array<{ id: string }>;
+    };
+
+    const response = await app.request('/skills/catalog?sortBy=id&sortDirection=desc&limit=5');
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      query: {
+        hasFilters: boolean;
+        filters: Record<string, string[]>;
+        sort?: {
+          by: string;
+          direction: string;
+        };
+      };
+      pagination: {
+        offset: number;
+        limit: number | null;
+        returned: number;
+        hasMore: boolean;
+      };
+      skills: Array<{ id: string }>;
+    };
+    const expectedIds = [...baseline.skills.map((skill) => skill.id)]
+      .sort((left, right) => right.localeCompare(left))
+      .slice(0, 5);
+    expect(body.query).toEqual({
+      hasFilters: false,
+      filters: {},
+      sort: {
+        by: 'id',
+        direction: 'desc',
+      },
+    });
+    expect(body.pagination).toEqual({
+      offset: 0,
+      limit: 5,
+      returned: expectedIds.length,
+      hasMore: baseline.skills.length > 5,
+    });
+    expect(body.skills.map((skill) => skill.id)).toEqual(expectedIds);
+  });
+
   it('rejects invalid skill catalog filters with a client-safe error', async () => {
     const app = createTestApp();
 
@@ -303,6 +352,17 @@ describe('runtime-managed skills HTTP contract', () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
       error: 'Invalid family: invalid',
+    });
+  });
+
+  it('rejects invalid skill catalog sort values with a client-safe error', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/skills/catalog?sortBy=updatedAt');
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Invalid sortBy: updatedAt',
     });
   });
 

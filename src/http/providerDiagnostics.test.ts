@@ -17,8 +17,8 @@ describe('provider diagnostics HTTP contract', () => {
   let registry: SessionRegistry;
   let pool: WorkerPool;
 
-  function makeConfig(): CliRuntimeConfig {
-    return {
+  function makeConfig(overrides: Partial<CliRuntimeConfig> = {}): CliRuntimeConfig {
+    const config = {
       host: '127.0.0.1',
       port: 3110,
       apiKey: '',
@@ -84,6 +84,11 @@ describe('provider diagnostics HTTP contract', () => {
         pi: {},
       },
     } as unknown as CliRuntimeConfig;
+
+    return {
+      ...config,
+      ...overrides,
+    };
   }
 
   function createInstallCheckRunner(): ProviderInstallCheckRunner {
@@ -112,8 +117,8 @@ describe('provider diagnostics HTTP contract', () => {
     };
   }
 
-  function createTestApp() {
-    const compatibility = new ProviderCompatibilityService(makeConfig(), {
+  function createTestApp(config: CliRuntimeConfig = makeConfig()) {
+    const compatibility = new ProviderCompatibilityService(config, {
       runner: {
         run: vi.fn(async (_providerName, _commandConfig, args: string[]) => {
           if (args[0] === '--version') {
@@ -140,7 +145,7 @@ describe('provider diagnostics HTTP contract', () => {
     });
 
     return createApp({
-      config: makeConfig(),
+      config,
       startup: createRuntimeStartupState(),
       registry,
       pool,
@@ -258,5 +263,89 @@ describe('provider diagnostics HTTP contract', () => {
       }),
       attentionCodes: [],
     }));
+  });
+
+  it('filters provider diagnostics by provider/backend/instance and echoes the applied query', async () => {
+    const app = createTestApp(makeConfig({
+      providerInstances: {
+        auggie: {},
+        claude: {
+          default: {
+            id: 'default',
+            providerName: 'claude',
+            commandConfig: {
+              path: 'claude',
+              runner: 'auto',
+              runtime: { mode: 'native' },
+            },
+          },
+          mirror: {
+            id: 'mirror',
+            providerName: 'claude',
+            commandConfig: {
+              path: 'claude',
+              runner: 'auto',
+              runtime: { mode: 'native' },
+            },
+          },
+        },
+        codex: {},
+        copilot: {},
+        cursor: {},
+        gemini: {},
+        goose: {},
+        junie: {},
+        kiro: {},
+        opencode: {},
+        pi: {},
+      },
+    }));
+
+    const response = await app.request(
+      '/diagnostics/providers?provider=claude&backend=cli&instance=mirror&defaultOnly=false',
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      query: {
+        hasFilters: true,
+        filters: {
+          provider: 'claude',
+          backend: 'cli',
+          instance: 'mirror',
+        },
+      },
+      summary: expect.objectContaining({
+        configuredProviders: 1,
+        targets: 1,
+      }),
+      providers: [
+        expect.objectContaining({
+          provider: 'claude',
+          backend: 'cli',
+          instance: 'mirror',
+          defaultTarget: false,
+        }),
+      ],
+    }));
+  });
+
+  it('returns 400 for invalid provider diagnostics query filters', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/diagnostics/providers?backend=desktop');
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Unsupported provider diagnostics backend 'desktop'.",
+    });
+  });
+
+  it('returns 400 for malformed provider diagnostics boolean filters', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/diagnostics/providers?defaultOnly=maybe');
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Invalid boolean query value 'maybe'.",
+    });
   });
 });

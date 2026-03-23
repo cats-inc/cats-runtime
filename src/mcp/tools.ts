@@ -40,9 +40,12 @@ const FORK_MODES = ['auto', 'native_fork', 'context_transplant'] as const;
 const SUBSTRATE_PROFILES = ['minimal', 'standard', 'a2a-enabled'] as const;
 const ENABLED_AGENTS = ['claude', 'gemini', 'codex'] as const;
 const DIAGNOSTICS_PROBE_MODES = ['light', 'live'] as const;
+const PROVIDER_BACKENDS = ['cli', 'api', 'local', 'agent'] as const;
 const RUNTIME_SKILL_FAMILIES = ['base', 'orchestration', 'work', 'chat', 'code'] as const;
 const RUNTIME_SKILL_PACKAGE_KINDS = ['base', 'role', 'bundle'] as const;
 const RUNTIME_SKILL_DELIVERY_HINTS = ['filesystem', 'instructions', 'none'] as const;
+const RUNTIME_SKILL_SORT_FIELDS = ['id', 'title', 'family', 'slug', 'role'] as const;
+const SORT_DIRECTIONS = ['asc', 'desc'] as const;
 const RUNTIME_BROWSER_SESSION_STATUSES = ['ready', 'closed'] as const;
 const BROWSER_BINDING_KINDS = ['manual_url', 'session_service', 'session_artifact'] as const;
 const ACTOR_ROLES = [
@@ -325,6 +328,21 @@ async function providerDiagnostics(
       'probe must be a valid diagnostics probe mode',
     ),
   );
+  appendSingleQueryValue(searchParams, 'provider', readOptionalString(args, 'provider'));
+  appendSingleQueryValue(
+    searchParams,
+    'backend',
+    readOptionalEnumString(
+      args,
+      'backend',
+      PROVIDER_BACKENDS,
+      'backend must be a valid provider backend',
+    ),
+  );
+  appendSingleQueryValue(searchParams, 'instance', readOptionalString(args, 'instance'));
+  if (readOptionalBoolean(args, 'defaultOnly') === true) {
+    searchParams.set('defaultOnly', 'true');
+  }
   if (readOptionalBoolean(args, 'forceRefresh') === true) {
     searchParams.set('force', '1');
   }
@@ -408,6 +426,23 @@ async function listRuntimeSkills(
       'deliveryHint must be a valid runtime skill delivery hint',
     ),
   );
+  const sortBy = readOptionalEnumString(
+    args,
+    'sortBy',
+    RUNTIME_SKILL_SORT_FIELDS,
+    'sortBy must be a valid runtime skill sort field',
+  );
+  const sortDirection = readOptionalEnumString(
+    args,
+    'sortDirection',
+    SORT_DIRECTIONS,
+    'sortDirection must be a valid sort direction',
+  );
+  if (sortDirection && !sortBy) {
+    throw new McpToolError(-32602, 'sortDirection requires sortBy');
+  }
+  appendSingleQueryValue(searchParams, 'sortBy', sortBy);
+  appendSingleQueryValue(searchParams, 'sortDirection', sortBy ? sortDirection : undefined);
   const offset = readOptionalInteger(args, 'offset', 0);
   const limit = readOptionalInteger(args, 'limit', 1);
   if (offset !== undefined) {
@@ -890,6 +925,10 @@ const TOOL_HANDLERS: McpToolHandler[] = [
         type: 'object',
         properties: {
           probe: { type: 'string', enum: DIAGNOSTICS_PROBE_MODES },
+          provider: { type: 'string' },
+          backend: { type: 'string', enum: PROVIDER_BACKENDS },
+          instance: { type: 'string' },
+          defaultOnly: { type: 'boolean' },
           forceRefresh: { type: 'boolean' },
         },
         additionalProperties: false,
@@ -936,6 +975,14 @@ const TOOL_HANDLERS: McpToolHandler[] = [
           productTag: { type: 'array', items: { type: 'string' } },
           offset: { type: 'integer', minimum: 0 },
           limit: { type: 'integer', minimum: 1 },
+          sortBy: {
+            type: 'string',
+            enum: RUNTIME_SKILL_SORT_FIELDS,
+          },
+          sortDirection: {
+            type: 'string',
+            enum: SORT_DIRECTIONS,
+          },
           deliveryHint: {
             type: 'array',
             items: { type: 'string', enum: RUNTIME_SKILL_DELIVERY_HINTS },
