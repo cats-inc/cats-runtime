@@ -279,7 +279,7 @@ describe('session worktree routes', () => {
 
   it('resets a worktree-backed session and discards the runtime worktree', async () => {
     const repoDir = createGitWorkspace(rootDir, 'repo-reset');
-    const prepared = prepareSessionWorkspace({
+    const prepared = await prepareSessionWorkspace({
       sessionId: 'worktree-reset',
       sessionBaseDir,
       cwd: repoDir,
@@ -358,14 +358,14 @@ describe('session worktree routes', () => {
 
   it('re-prepares a missing worktree before resuming a closed session', async () => {
     const repoDir = createGitWorkspace(rootDir, 'repo-resume');
-    const prepared = prepareSessionWorkspace({
+    const prepared = await prepareSessionWorkspace({
       sessionId: 'worktree-resume',
       sessionBaseDir,
       cwd: repoDir,
       workspaceMode: 'shared',
       workspaceIsolationMode: 'worktree',
     });
-    const cleanup = cleanupSessionWorkspace({
+    const cleanup = await cleanupSessionWorkspace({
       sessionId: 'worktree-resume',
       sessionBaseDir,
       workspaceMode: prepared.workspaceMode,
@@ -417,9 +417,76 @@ describe('session worktree routes', () => {
     expect(existsSync(registry.get(session.id)?.workspaceIsolation?.worktree?.worktreePath || '')).toBe(true);
   });
 
+  it('fails fork before preparing a worktree when the target cannot honor read_only permissions', async () => {
+    const repoDir = createGitWorkspace(rootDir, 'repo-fork-readonly');
+    const session = registry.create({
+      id: 'worktree-fork-readonly',
+      providerName: 'codex',
+      cwd: repoDir,
+      workspaceMode: 'shared',
+    });
+    vi.mocked(pool.getCapabilities).mockImplementation(() => ({
+      resume: true,
+      fork: true,
+      permissions: false,
+    }));
+
+    const response = await app.request(`/sessions/${session.id}/fork`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        workspaceMode: 'read_only',
+        workspaceIsolation: 'worktree',
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(existsSync(join(sessionBaseDir, 'worktrees'))).toBe(false);
+  });
+
+  it('cleans up a recreated worktree when resume cannot persist the prepared workspace', async () => {
+    const repoDir = createGitWorkspace(rootDir, 'repo-resume-failure');
+    const prepared = await prepareSessionWorkspace({
+      sessionId: 'worktree-resume-failure',
+      sessionBaseDir,
+      cwd: repoDir,
+      workspaceMode: 'shared',
+      workspaceIsolationMode: 'worktree',
+    });
+    const cleanup = await cleanupSessionWorkspace({
+      sessionId: 'worktree-resume-failure',
+      sessionBaseDir,
+      workspaceMode: prepared.workspaceMode,
+      workspaceIsolation: prepared.workspaceIsolation,
+      worktreeCleanupPolicy: 'discard',
+    });
+
+    const session = registry.create({
+      id: 'worktree-resume-failure',
+      providerName: 'codex',
+      cwd: cleanup.nextCwd || repoDir,
+      workspaceMode: prepared.workspaceMode,
+      workspaceIsolation: cleanup.nextWorkspaceIsolation,
+    });
+    registry.setProviderSessionId(session.id, 'thread-resume-failure');
+    registry.updateStatus(session.id, 'closed');
+    vi.spyOn(registry, 'updateWorkspace').mockReturnValue(false);
+
+    const response = await app.request(`/sessions/${session.id}/resume`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+
+    expect(response.status).toBe(500);
+    const body = await response.json() as { error: string };
+    expect(body.error).toContain('Failed to prepare workspace for resume');
+    expect(existsSync(prepared.workspaceIsolation.worktree!.worktreePath)).toBe(false);
+  });
+
   it('merges a worktree back into the source repo during DELETE cleanup', async () => {
     const repoDir = createGitWorkspace(rootDir, 'repo-delete');
-    const prepared = prepareSessionWorkspace({
+    const prepared = await prepareSessionWorkspace({
       sessionId: 'worktree-delete',
       sessionBaseDir,
       cwd: repoDir,

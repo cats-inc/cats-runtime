@@ -74,6 +74,7 @@ import { toRuntimeSkillErrorResponse } from '../runtimeSkillErrors.js';
 import {
   cleanupSessionWorkspace,
   copyWorkspaceSnapshot,
+  deriveWorkspaceIsolationMode,
   prepareSessionWorkspace,
   type PrepareSessionWorkspaceResult,
 } from '../../core/workspace/sessionWorkspace.js';
@@ -509,10 +510,10 @@ function resolveSessionWorkspaceIsolationMode(
   session: Pick<SessionInfo, 'workspaceIsolation' | 'workspaceMode'>,
 ): WorkspaceIsolationMode {
   return session.workspaceIsolation?.mode
-    ?? (session.workspaceMode === 'isolated' ? 'isolated' : 'shared');
+    ?? deriveWorkspaceIsolationMode(session.workspaceMode);
 }
 
-function prepareWorkspaceCleanupState(
+async function prepareWorkspaceCleanupState(
   session: Pick<SessionInfo, 'id' | 'workspaceMode' | 'workspaceIsolation'>,
   worktreeCleanupPolicy: WorktreeCleanupPolicy | undefined,
   ctx: AppContext,
@@ -526,11 +527,11 @@ function prepareWorkspaceCleanupState(
   });
 }
 
-function discardPreparedWorkspace(
+async function discardPreparedWorkspace(
   ctx: AppContext,
   session: Pick<SessionInfo, 'id' | 'workspaceMode' | 'workspaceIsolation'>,
-): void {
-  cleanupSessionWorkspace({
+): Promise<void> {
+  await cleanupSessionWorkspace({
     sessionId: session.id,
     sessionBaseDir: ctx.config.sessionBaseDir,
     workspaceMode: session.workspaceMode,
@@ -542,18 +543,21 @@ function discardPreparedWorkspace(
 function persistWorkspaceCleanupState(
   ctx: AppContext,
   sessionId: string,
-  cleanup: ReturnType<typeof cleanupSessionWorkspace>,
+  cleanup: Awaited<ReturnType<typeof cleanupSessionWorkspace>>,
 ): SessionInfo | undefined {
   if (cleanup.nextCwd === undefined && cleanup.nextWorkspaceIsolation === undefined) {
     return ctx.registry.get(sessionId);
   }
 
-  ctx.registry.updateWorkspace(sessionId, {
+  const updated = ctx.registry.updateWorkspace(sessionId, {
     ...(cleanup.nextCwd !== undefined ? { cwd: cleanup.nextCwd } : {}),
     ...(cleanup.nextWorkspaceIsolation !== undefined
       ? { workspaceIsolation: cleanup.nextWorkspaceIsolation }
       : {}),
   });
+  if (!updated) {
+    return undefined;
+  }
   return ctx.registry.get(sessionId);
 }
 
@@ -562,19 +566,22 @@ function applyPreparedWorkspace(
   sessionId: string,
   prepared: PrepareSessionWorkspaceResult,
 ): SessionInfo | undefined {
-  ctx.registry.updateWorkspace(sessionId, {
+  const updated = ctx.registry.updateWorkspace(sessionId, {
     cwd: prepared.cwd,
     workspaceMode: prepared.workspaceMode,
     workspaceIsolation: prepared.workspaceIsolation,
     permissionMode: prepared.permissionMode,
   });
+  if (!updated) {
+    return undefined;
+  }
   return ctx.registry.get(sessionId);
 }
 
-function ensureSessionWorkspacePrepared(
+async function ensureSessionWorkspacePrepared(
   ctx: AppContext,
   session: SessionInfo,
-): SessionInfo {
+): Promise<SessionInfo> {
   const isolationMode = resolveSessionWorkspaceIsolationMode(session);
   if (isolationMode !== 'worktree') {
     return session;
@@ -585,7 +592,7 @@ function ensureSessionWorkspacePrepared(
     return session;
   }
 
-  const prepared = prepareSessionWorkspace({
+  const prepared = await prepareSessionWorkspace({
     sessionId: session.id,
     sessionBaseDir: ctx.config.sessionBaseDir,
     cwd: getSessionWorkspaceSourceCwd(session),
@@ -593,7 +600,17 @@ function ensureSessionWorkspacePrepared(
     workspaceIsolationMode: 'worktree',
     permissionMode: session.permissionMode,
   });
-  return applyPreparedWorkspace(ctx, session.id, prepared) ?? session;
+  const updatedSession = applyPreparedWorkspace(ctx, session.id, prepared);
+  if (updatedSession) {
+    return updatedSession;
+  }
+
+  await discardPreparedWorkspace(ctx, {
+    id: session.id,
+    workspaceMode: prepared.workspaceMode,
+    workspaceIsolation: prepared.workspaceIsolation,
+  });
+  throw new Error(`Session '${session.id}' disappeared while applying prepared workspace state.`);
 }
 
 function sessionMatchesInstanceFilter(
@@ -1060,7 +1077,12 @@ sessionRoutes.post('/sessions', async (c) => {
         }, 409);
       }
 
-      const preparedExisting = ensureSessionWorkspacePrepared(ctx, existing);
+      let preparedExisting: SessionInfo;
+      try {
+        preparedExisting = await ensureSessionWorkspacePrepared(ctx, existing);
+      } catch (err) {
+        return c.json({ error: `Failed to prepare reusable session workspace: ${err}` }, 500);
+      }
       let skills = existing.skills;
       let hydration = existing.hydration;
       try {
@@ -1127,9 +1149,9 @@ sessionRoutes.post('/sessions', async (c) => {
 
   const sessionId = randomUUID();
 
-  let resolved;
+  let resolved: PrepareSessionWorkspaceResult;
   try {
-    resolved = prepareSessionWorkspace({
+    resolved = await prepareSessionWorkspace({
       sessionId,
       sessionBaseDir: ctx.config.sessionBaseDir,
       cwd: body.cwd || undefined,
@@ -1161,7 +1183,7 @@ sessionRoutes.post('/sessions', async (c) => {
   } catch (error) {
     const runtimeSkillError = toRuntimeSkillErrorResponse(error);
     if (runtimeSkillError) {
-      discardPreparedWorkspace(ctx, {
+      await discardPreparedWorkspace(ctx, {
         id: sessionId,
         workspaceMode: resolved.workspaceMode,
         workspaceIsolation: resolved.workspaceIsolation,
@@ -1174,7 +1196,7 @@ sessionRoutes.post('/sessions', async (c) => {
   if (providerName === 'cursor' && providerTarget.backend === 'cli') {
     const caps = runtime.getCapabilities('cursor', providerInstance!.id, 'cli');
     if (!caps.permissions && resolved.workspaceMode === 'read_only') {
-      discardPreparedWorkspace(ctx, {
+      await discardPreparedWorkspace(ctx, {
         id: sessionId,
         workspaceMode: resolved.workspaceMode,
         workspaceIsolation: resolved.workspaceIsolation,
@@ -1240,7 +1262,7 @@ sessionRoutes.post('/sessions', async (c) => {
           // Best effort rollback only.
         }
       }
-      discardPreparedWorkspace(ctx, {
+      await discardPreparedWorkspace(ctx, {
         id: sessionId,
         workspaceMode: resolved.workspaceMode,
         workspaceIsolation: resolved.workspaceIsolation,
@@ -1252,7 +1274,7 @@ sessionRoutes.post('/sessions', async (c) => {
   if (providerName === 'opencode' && providerTarget.backend === 'cli') {
     const caps = runtime.getCapabilities('opencode', providerInstance!.id, 'cli');
     if (!caps.permissions && resolved.workspaceMode === 'read_only') {
-      discardPreparedWorkspace(ctx, {
+      await discardPreparedWorkspace(ctx, {
         id: sessionId,
         workspaceMode: resolved.workspaceMode,
         workspaceIsolation: resolved.workspaceIsolation,
@@ -1318,7 +1340,7 @@ sessionRoutes.post('/sessions', async (c) => {
           // Best effort rollback only.
         }
       }
-      discardPreparedWorkspace(ctx, {
+      await discardPreparedWorkspace(ctx, {
         id: sessionId,
         workspaceMode: resolved.workspaceMode,
         workspaceIsolation: resolved.workspaceIsolation,
@@ -1334,7 +1356,7 @@ sessionRoutes.post('/sessions', async (c) => {
   );
 
   if (!caps.permissions && resolved.workspaceMode === 'read_only') {
-    discardPreparedWorkspace(ctx, {
+    await discardPreparedWorkspace(ctx, {
       id: sessionId,
       workspaceMode: resolved.workspaceMode,
       workspaceIsolation: resolved.workspaceIsolation,
@@ -1381,7 +1403,7 @@ sessionRoutes.post('/sessions', async (c) => {
       allowedTools: body.allowedTools,
     }, providerTarget.instanceId, providerTarget.backend);
   } catch (err) {
-    discardPreparedWorkspace(ctx, {
+    await discardPreparedWorkspace(ctx, {
       id: sessionId,
       workspaceMode: resolved.workspaceMode,
       workspaceIsolation: resolved.workspaceIsolation,
@@ -1609,7 +1631,7 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
   let resolvedCleanupPolicy: WorktreeCleanupPolicy | undefined;
 
   if (sessionAfterCleanup.workspaceIsolation?.mode === 'worktree') {
-    const cleanup = prepareWorkspaceCleanupState(
+    const cleanup = await prepareWorkspaceCleanupState(
       sessionAfterCleanup,
       worktreeCleanupPolicy,
       ctx,
@@ -1715,7 +1737,7 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
       }
     }
 
-    const cleanup = prepareWorkspaceCleanupState(session, worktreeCleanupPolicy, ctx);
+    const cleanup = await prepareWorkspaceCleanupState(session, worktreeCleanupPolicy, ctx);
     workspaceCleaned = cleanup.workspaceCleaned;
     worktreeDetached = cleanup.worktreeDetached;
     worktreeMergedPaths = cleanup.mergedPathCount;
@@ -1760,12 +1782,12 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
       });
     }
   } else if (session.workspaceMode === 'isolated') {
-    workspaceCleaned = cleanupSessionWorkspace({
+    workspaceCleaned = (await cleanupSessionWorkspace({
       sessionId: id,
       sessionBaseDir: ctx.config.sessionBaseDir,
       workspaceMode: session.workspaceMode,
       workspaceIsolation: session.workspaceIsolation,
-    }).workspaceCleaned;
+    })).workspaceCleaned;
   }
 
   const preparedManagedTranscripts = ctx.registry.prepareManagedTranscriptDeletion(id);
@@ -1930,7 +1952,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
 
   let preparedSession = session;
   try {
-    preparedSession = ensureSessionWorkspacePrepared(ctx, session);
+    preparedSession = await ensureSessionWorkspacePrepared(ctx, session);
   } catch (err) {
     return c.json({ error: `Failed to prepare workspace for resume: ${err}` }, 500);
   }
@@ -2309,8 +2331,25 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     }
   }
 
+  if (!childCaps.permissions && forkWorkspaceMode === 'read_only') {
+    return c.json({
+      error: `Provider '${requestedProviderName}' does not support permission enforcement required by read_only workspace`,
+      branch: {
+        ...branchDecision,
+        warnings,
+        transplant: summarizeContextTransplant(body.transplant, usedContextTransplant),
+      },
+    }, 400);
+  }
+  if (!childCaps.permissions && body.permissionMode && body.permissionMode !== 'skip') {
+    warnings.push(
+      `Provider '${requestedProviderName}' runs without permission enforcement; `
+      + `permissionMode '${body.permissionMode}' is ignored.`,
+    );
+  }
+
   try {
-    forkPrepared = prepareSessionWorkspace({
+    forkPrepared = await prepareSessionWorkspace({
       sessionId: forkId,
       sessionBaseDir: ctx.config.sessionBaseDir,
       cwd: body.cwd ?? getSessionWorkspaceSourceCwd(session) ?? session.cwd,
@@ -2327,29 +2366,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
   }
 
   if (forkPrepared.workspaceIsolation.mode !== 'shared' && session.cwd !== forkCwd) {
-    copyWorkspaceSnapshot(session.cwd, forkCwd, { skipGitMetadata: true });
-  }
-
-  if (!childCaps.permissions && forkWorkspaceMode === 'read_only') {
-    discardPreparedWorkspace(ctx, {
-      id: forkId,
-      workspaceMode: forkWorkspaceMode,
-      workspaceIsolation: forkPrepared.workspaceIsolation,
-    });
-    return c.json({
-      error: `Provider '${requestedProviderName}' does not support permission enforcement required by read_only workspace`,
-      branch: {
-        ...branchDecision,
-        warnings,
-        transplant: summarizeContextTransplant(body.transplant, usedContextTransplant),
-      },
-    }, 400);
-  }
-  if (!childCaps.permissions && body.permissionMode && body.permissionMode !== 'skip') {
-    warnings.push(
-      `Provider '${requestedProviderName}' runs without permission enforcement; `
-      + `permissionMode '${body.permissionMode}' is ignored.`,
-    );
+    await copyWorkspaceSnapshot(session.cwd, forkCwd, { skipGitMetadata: true });
   }
 
   const childLineage = buildChildLineage({
@@ -2400,7 +2417,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
   } catch (error) {
     const runtimeSkillError = toRuntimeSkillErrorResponse(error);
     if (runtimeSkillError) {
-      discardPreparedWorkspace(ctx, {
+      await discardPreparedWorkspace(ctx, {
         id: forkId,
         workspaceMode: forkWorkspaceMode,
         workspaceIsolation: forkPrepared.workspaceIsolation,
@@ -2459,12 +2476,12 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
         : {}),
       permissionMode: forkPermissionMode,
       allowedTools: body.allowedTools ?? session.allowedTools,
-    }, childTarget.instanceId, childTarget.backend);
+      }, childTarget.instanceId, childTarget.backend);
     if (childTarget.backend !== 'cli') {
       ctx.registry.updateStatus(forked.id, 'ready');
     }
   } catch (err) {
-    discardPreparedWorkspace(ctx, {
+    await discardPreparedWorkspace(ctx, {
       id: forkId,
       workspaceMode: forkWorkspaceMode,
       workspaceIsolation: forkPrepared.workspaceIsolation,

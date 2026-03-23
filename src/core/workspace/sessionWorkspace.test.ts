@@ -65,11 +65,11 @@ afterEach(() => {
 });
 
 describe('sessionWorkspace', () => {
-  it('prepares a deterministic worktree-backed runtime cwd', () => {
+  it('prepares a deterministic worktree-backed runtime cwd', async () => {
     const { repoDir, sessionBaseDir } = createGitWorkspace();
     const sourceCwd = join(repoDir, 'subdir');
 
-    const prepared = prepareSessionWorkspace({
+    const prepared = await prepareSessionWorkspace({
       sessionId: 'session-1',
       sessionBaseDir,
       cwd: sourceCwd,
@@ -100,9 +100,9 @@ describe('sessionWorkspace', () => {
     expect(existsSync(join(prepared.cwd, 'nested.txt'))).toBe(true);
   });
 
-  it('discards a prepared worktree and removes its runtime cwd', () => {
+  it('discards a prepared worktree and removes its runtime cwd', async () => {
     const { repoDir, sessionBaseDir } = createGitWorkspace();
-    const prepared = prepareSessionWorkspace({
+    const prepared = await prepareSessionWorkspace({
       sessionId: 'session-discard',
       sessionBaseDir,
       cwd: repoDir,
@@ -112,7 +112,7 @@ describe('sessionWorkspace', () => {
 
     writeFileSync(join(prepared.cwd, 'tracked.txt'), 'discarded change\n', 'utf8');
 
-    const cleanup = cleanupSessionWorkspace({
+    const cleanup = await cleanupSessionWorkspace({
       sessionId: 'session-discard',
       sessionBaseDir,
       workspaceMode: prepared.workspaceMode,
@@ -147,9 +147,9 @@ describe('sessionWorkspace', () => {
     expect(runGit(repoDir, ['status', '--porcelain'])).toBe('');
   });
 
-  it('merges worktree changes back into the source repository before cleanup', () => {
+  it('merges worktree changes back into the source repository before cleanup', async () => {
     const { repoDir, sessionBaseDir } = createGitWorkspace();
-    const prepared = prepareSessionWorkspace({
+    const prepared = await prepareSessionWorkspace({
       sessionId: 'session-merge',
       sessionBaseDir,
       cwd: repoDir,
@@ -161,7 +161,7 @@ describe('sessionWorkspace', () => {
     writeFileSync(join(prepared.cwd, 'new-file.txt'), 'new file\n', 'utf8');
     rmSync(join(prepared.cwd, 'delete-me.txt'));
 
-    const cleanup = cleanupSessionWorkspace({
+    const cleanup = await cleanupSessionWorkspace({
       sessionId: 'session-merge',
       sessionBaseDir,
       workspaceMode: prepared.workspaceMode,

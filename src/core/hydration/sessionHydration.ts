@@ -11,6 +11,7 @@ import type {
 } from '../types.js';
 import { resolveRuntimeSkillManifest } from '../skills/catalog.js';
 import { WorkspaceSubstrateService } from '../runtime/WorkspaceSubstrateService.js';
+import { deriveWorkspaceIsolationMode } from '../workspace/sessionWorkspace.js';
 
 const DEFAULT_WORKSPACE_SUBSTRATE_PROFILE: WorkspaceSubstrateProfileId = 'standard';
 const DEFAULT_WORKSPACE_SUBSTRATE_SERVICE = new WorkspaceSubstrateService();
@@ -197,12 +198,6 @@ async function hydrateWorkspace(
     substrate,
     warnings,
   };
-}
-
-function deriveWorkspaceIsolationMode(
-  workspaceMode: WorkspaceMode | undefined,
-): WorkspaceIsolationMode {
-  return workspaceMode === 'isolated' ? 'isolated' : 'shared';
 }
 
 function resolveWorkspaceSourceCwd(

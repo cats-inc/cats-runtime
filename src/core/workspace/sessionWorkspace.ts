@@ -1,15 +1,15 @@
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  renameSync,
-  rmSync,
-  statSync,
-  unlinkSync,
-} from 'node:fs';
+  access,
+  copyFile,
+  mkdir,
+  readdir,
+  rename,
+  rm,
+  stat,
+  unlink,
+} from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import type {
   PermissionMode,
@@ -78,9 +78,9 @@ export interface CleanupSessionWorkspaceResult {
   nextWorkspaceIsolation?: SessionWorkspaceIsolationState;
 }
 
-export function prepareSessionWorkspace(
+export async function prepareSessionWorkspace(
   input: PrepareSessionWorkspaceInput,
-): PrepareSessionWorkspaceResult {
+): Promise<PrepareSessionWorkspaceResult> {
   const requestedIsolation = input.workspaceIsolationMode
     ?? deriveWorkspaceIsolationMode(input.workspaceMode);
   const requestedMode = input.workspaceMode;
@@ -88,7 +88,7 @@ export function prepareSessionWorkspace(
 
   if (requestedIsolation === 'isolated') {
     const sandboxDir = join(input.sessionBaseDir, input.sessionId);
-    mkdirSync(sandboxDir, { recursive: true });
+    await mkdir(sandboxDir, { recursive: true });
     return {
       cwd: sandboxDir,
       ...(input.cwd ? { sourceCwd: input.cwd } : {}),
@@ -125,21 +125,21 @@ export function prepareSessionWorkspace(
   }
 
   const sourceCwd = input.cwd;
-  const sourceRepoRoot = resolveGitRepoRoot(sourceCwd);
+  const sourceRepoRoot = await resolveGitRepoRoot(sourceCwd);
   const relativeCwd = resolveRelativeRepoPath(sourceRepoRoot, sourceCwd);
   const worktreePath = buildWorktreePath(input.sessionBaseDir, sourceRepoRoot, input.sessionId);
 
-  if (!existsSync(worktreePath)) {
-    mkdirSync(dirname(worktreePath), { recursive: true });
-    const addResult = runGit(sourceRepoRoot, ['worktree', 'add', '--detach', worktreePath, 'HEAD']);
+  if (!(await pathExists(worktreePath))) {
+    await mkdir(dirname(worktreePath), { recursive: true });
+    const addResult = await runGit(sourceRepoRoot, ['worktree', 'add', '--detach', worktreePath, 'HEAD']);
     if (addResult.code !== 0) {
       throw new Error(addResult.stderr.trim() || 'Failed to prepare git worktree');
     }
   }
 
   const runtimeCwd = relativeCwd ? join(worktreePath, relativeCwd) : worktreePath;
-  const sourceHeadRef = readGitValue(sourceRepoRoot, ['symbolic-ref', '-q', '--short', 'HEAD']);
-  const sourceHeadOid = readGitValue(sourceRepoRoot, ['rev-parse', 'HEAD']);
+  const sourceHeadRef = await readGitValue(sourceRepoRoot, ['symbolic-ref', '-q', '--short', 'HEAD']);
+  const sourceHeadOid = await readGitValue(sourceRepoRoot, ['rev-parse', 'HEAD']);
 
   return {
     cwd: runtimeCwd,
@@ -164,9 +164,9 @@ export function prepareSessionWorkspace(
   };
 }
 
-export function cleanupSessionWorkspace(
+export async function cleanupSessionWorkspace(
   input: CleanupSessionWorkspaceInput,
-): CleanupSessionWorkspaceResult {
+): Promise<CleanupSessionWorkspaceResult> {
   const isolation = input.workspaceIsolation;
   if (isolation?.mode === 'worktree' && isolation.worktree) {
     return cleanupWorktreeWorkspace(
@@ -181,7 +181,7 @@ export function cleanupSessionWorkspace(
   if ((isolation?.mode ?? deriveWorkspaceIsolationMode(input.workspaceMode)) === 'isolated') {
     const sandboxDir = join(input.sessionBaseDir, input.sessionId);
     try {
-      rmSync(sandboxDir, { recursive: true, force: true });
+      await rm(sandboxDir, { recursive: true, force: true });
       return {
         status: 'completed',
         workspaceCleaned: true,
@@ -209,42 +209,59 @@ export function cleanupSessionWorkspace(
   };
 }
 
-export function copyWorkspaceSnapshot(
+export async function copyWorkspaceSnapshot(
   sourceCwd: string,
   targetCwd: string,
   options: {
     skipGitMetadata?: boolean;
   } = {},
-): void {
-  if (!existsSync(sourceCwd)) {
+): Promise<void> {
+  if (!(await pathExists(sourceCwd))) {
     return;
   }
 
-  mkdirSync(targetCwd, { recursive: true });
-  for (const entry of readdirSync(sourceCwd, { withFileTypes: true })) {
-    if (options.skipGitMetadata && entry.name === '.git') {
-      continue;
-    }
+  const queue: Array<{ source: string; target: string }> = [
+    { source: sourceCwd, target: targetCwd },
+  ];
 
-    const sourcePath = join(sourceCwd, entry.name);
-    const targetPath = join(targetCwd, entry.name);
-    if (entry.isDirectory()) {
-      copyWorkspaceSnapshot(sourcePath, targetPath, options);
-      continue;
-    }
-    if (!entry.isFile()) {
-      continue;
-    }
+  while (queue.length > 0) {
+    const current = queue.pop()!;
+    await mkdir(current.target, { recursive: true });
+    const entries = await readdir(current.source, { withFileTypes: true });
+    for (const entry of entries) {
+      if (options.skipGitMetadata && entry.name === '.git') {
+        continue;
+      }
 
-    mkdirSync(dirname(targetPath), { recursive: true });
-    copyFileSync(sourcePath, targetPath);
+      const sourcePath = join(current.source, entry.name);
+      const targetPath = join(current.target, entry.name);
+      if (entry.isDirectory()) {
+        queue.push({ source: sourcePath, target: targetPath });
+        continue;
+      }
+      if (!entry.isFile()) {
+        continue;
+      }
+
+      await mkdir(dirname(targetPath), { recursive: true });
+      await copyFile(sourcePath, targetPath);
+    }
   }
 }
 
-function cleanupWorktreeWorkspace(
+export function deriveWorkspaceIsolationMode(
+  workspaceMode: WorkspaceMode | undefined,
+): WorkspaceIsolationMode {
+  return workspaceMode === 'isolated' ? 'isolated' : 'shared';
+}
+
+async function cleanupWorktreeWorkspace(
   input: CleanupSessionWorkspaceInput,
-  isolation: SessionWorkspaceIsolationState & { mode: 'worktree'; worktree: NonNullable<SessionWorkspaceIsolationState['worktree']> },
-): CleanupSessionWorkspaceResult {
+  isolation: SessionWorkspaceIsolationState & {
+    mode: 'worktree';
+    worktree: NonNullable<SessionWorkspaceIsolationState['worktree']>;
+  },
+): Promise<CleanupSessionWorkspaceResult> {
   const policy = input.worktreeCleanupPolicy ?? 'discard';
   const observedAt = (input.now ?? new Date()).toISOString();
   const reasonCodes: string[] = [];
@@ -253,7 +270,7 @@ function cleanupWorktreeWorkspace(
   let mergedPathCount = 0;
 
   if (policy === 'merge') {
-    if (!sourceRepoIsClean(worktree.sourceRepoRoot)) {
+    if (!(await sourceRepoIsClean(worktree.sourceRepoRoot))) {
       return {
         status: 'retained',
         workspaceCleaned: false,
@@ -279,8 +296,8 @@ function cleanupWorktreeWorkspace(
     }
 
     try {
-      const changes = collectWorktreeChanges(worktree.worktreePath);
-      mergedPathCount = applyWorktreeMerge(
+      const changes = await collectWorktreeChanges(worktree.worktreePath);
+      mergedPathCount = await applyWorktreeMerge(
         worktree.worktreePath,
         worktree.sourceRepoRoot,
         changes,
@@ -322,7 +339,7 @@ function cleanupWorktreeWorkspace(
     reasonCodes.push('worktree_changes_discarded');
   }
 
-  const detached = detachWorktree(worktree.sourceRepoRoot, worktree.worktreePath);
+  const detached = await detachWorktree(worktree.sourceRepoRoot, worktree.worktreePath);
   if (!detached) {
     return {
       status: 'retained',
@@ -373,12 +390,6 @@ function cleanupWorktreeWorkspace(
   };
 }
 
-function deriveWorkspaceIsolationMode(
-  workspaceMode: WorkspaceMode | undefined,
-): WorkspaceIsolationMode {
-  return workspaceMode === 'isolated' ? 'isolated' : 'shared';
-}
-
 function buildWorktreeId(sourceRepoRoot: string, sessionId: string): string {
   return `${sanitizePathSegment(basename(sourceRepoRoot))}-${sessionId}`;
 }
@@ -405,11 +416,14 @@ function sanitizePathSegment(value: string): string {
     .trim()
     .replace(/[^a-zA-Z0-9._-]+/g, '-')
     .replace(/^-+|-+$/g, '');
-  return normalized.length > 0 ? normalized : 'workspace';
+  if (normalized.length === 0 || normalized === '.' || normalized === '..') {
+    return 'workspace';
+  }
+  return normalized;
 }
 
-function resolveGitRepoRoot(cwd: string): string {
-  const result = runGit(cwd, ['rev-parse', '--show-toplevel']);
+async function resolveGitRepoRoot(cwd: string): Promise<string> {
+  const result = await runGit(cwd, ['rev-parse', '--show-toplevel']);
   if (result.code !== 0) {
     throw new Error(`worktree isolation requires a Git workspace: ${result.stderr.trim() || result.stdout.trim() || cwd}`);
   }
@@ -426,8 +440,8 @@ function resolveRelativeRepoPath(sourceRepoRoot: string, cwd: string): string | 
   return relativePath.length > 0 ? relativePath : undefined;
 }
 
-function readGitValue(cwd: string, args: string[]): string | undefined {
-  const result = runGit(cwd, args);
+async function readGitValue(cwd: string, args: string[]): Promise<string | undefined> {
+  const result = await runGit(cwd, args);
   if (result.code !== 0) {
     return undefined;
   }
@@ -435,14 +449,14 @@ function readGitValue(cwd: string, args: string[]): string | undefined {
   return value.length > 0 ? value : undefined;
 }
 
-function sourceRepoIsClean(sourceRepoRoot: string): boolean {
-  const result = runGit(sourceRepoRoot, ['status', '--porcelain']);
+async function sourceRepoIsClean(sourceRepoRoot: string): Promise<boolean> {
+  const result = await runGit(sourceRepoRoot, ['status', '--porcelain']);
   return result.code === 0 && result.stdout.trim().length === 0;
 }
 
-function collectWorktreeChanges(worktreePath: string): WorktreeChange[] {
+async function collectWorktreeChanges(worktreePath: string): Promise<WorktreeChange[]> {
   const changes: WorktreeChange[] = [];
-  const tracked = runGit(worktreePath, ['diff', '--name-status', '--find-renames=50%', 'HEAD']);
+  const tracked = await runGit(worktreePath, ['diff', '--name-status', '--find-renames=50%', 'HEAD']);
   if (tracked.code !== 0) {
     throw new Error(tracked.stderr.trim() || 'Failed to inspect worktree diff');
   }
@@ -476,7 +490,7 @@ function collectWorktreeChanges(worktreePath: string): WorktreeChange[] {
     seenPaths.add(path);
   }
 
-  const untracked = runGit(worktreePath, ['ls-files', '--others', '--exclude-standard']);
+  const untracked = await runGit(worktreePath, ['ls-files', '--others', '--exclude-standard']);
   if (untracked.code !== 0) {
     throw new Error(untracked.stderr.trim() || 'Failed to inspect untracked worktree files');
   }
@@ -491,19 +505,19 @@ function collectWorktreeChanges(worktreePath: string): WorktreeChange[] {
   return changes;
 }
 
-function applyWorktreeMerge(
+async function applyWorktreeMerge(
   worktreePath: string,
   sourceRepoRoot: string,
   changes: WorktreeChange[],
   sessionBaseDir: string,
   sessionId: string,
-): number {
+): Promise<number> {
   if (changes.length === 0) {
     return 0;
   }
 
   const backupRoot = join(sessionBaseDir, '.worktree-merge-backups', sessionId);
-  mkdirSync(backupRoot, { recursive: true });
+  await mkdir(backupRoot, { recursive: true });
   const backups: BackupEntry[] = [];
   const createdPaths: string[] = [];
 
@@ -511,59 +525,59 @@ function applyWorktreeMerge(
     for (const change of changes) {
       if (change.kind === 'rename' && change.previousPath) {
         const previousTarget = resolveRepoFilePath(sourceRepoRoot, change.previousPath);
-        backupExisting(previousTarget, backupRoot, backups);
-        removePathIfPresent(previousTarget);
+        await backupExisting(previousTarget, backupRoot, backups);
+        await removePathIfPresent(previousTarget);
       }
 
       if (change.kind === 'delete') {
         const targetPath = resolveRepoFilePath(sourceRepoRoot, change.path);
-        backupExisting(targetPath, backupRoot, backups);
-        removePathIfPresent(targetPath);
+        await backupExisting(targetPath, backupRoot, backups);
+        await removePathIfPresent(targetPath);
         continue;
       }
 
       const sourcePath = resolveRepoFilePath(worktreePath, change.path);
       const targetPath = resolveRepoFilePath(sourceRepoRoot, change.path);
-      const existed = existsSync(targetPath);
-      backupExisting(targetPath, backupRoot, backups);
-      mkdirSync(dirname(targetPath), { recursive: true });
-      copyFileSync(sourcePath, targetPath);
+      const existed = await pathExists(targetPath);
+      await backupExisting(targetPath, backupRoot, backups);
+      await mkdir(dirname(targetPath), { recursive: true });
+      await copyFile(sourcePath, targetPath);
       if (!existed) {
         createdPaths.push(targetPath);
       }
     }
   } catch (error) {
-    rollbackMerge(createdPaths, backups);
-    rmSync(backupRoot, { recursive: true, force: true });
+    await rollbackMerge(createdPaths, backups);
+    await rm(backupRoot, { recursive: true, force: true });
     throw error;
   }
 
-  rmSync(backupRoot, { recursive: true, force: true });
+  await rm(backupRoot, { recursive: true, force: true });
   return changes.length;
 }
 
-function rollbackMerge(
+async function rollbackMerge(
   createdPaths: string[],
   backups: BackupEntry[],
-): void {
+): Promise<void> {
   for (const createdPath of createdPaths) {
-    removePathIfPresent(createdPath);
+    await removePathIfPresent(createdPath);
   }
   for (const backup of [...backups].reverse()) {
-    if (!existsSync(backup.backupPath)) {
+    if (!(await pathExists(backup.backupPath))) {
       continue;
     }
-    mkdirSync(dirname(backup.originalPath), { recursive: true });
-    renameSync(backup.backupPath, backup.originalPath);
+    await mkdir(dirname(backup.originalPath), { recursive: true });
+    await rename(backup.backupPath, backup.originalPath);
   }
 }
 
-function backupExisting(
+async function backupExisting(
   targetPath: string,
   backupRoot: string,
   backups: BackupEntry[],
-): void {
-  if (!existsSync(targetPath)) {
+): Promise<void> {
+  if (!(await pathExists(targetPath))) {
     return;
   }
 
@@ -572,54 +586,89 @@ function backupExisting(
     createHash('sha1').update(targetPath).digest('hex'),
     basename(targetPath),
   );
-  mkdirSync(dirname(backupPath), { recursive: true });
-  renameSync(targetPath, backupPath);
+  await mkdir(dirname(backupPath), { recursive: true });
+  await rename(targetPath, backupPath);
   backups.push({
     originalPath: targetPath,
     backupPath,
   });
 }
 
-function removePathIfPresent(targetPath: string): void {
-  if (!existsSync(targetPath)) {
+async function removePathIfPresent(targetPath: string): Promise<void> {
+  if (!(await pathExists(targetPath))) {
     return;
   }
 
-  const stats = statSync(targetPath);
+  const stats = await stat(targetPath);
   if (stats.isDirectory()) {
-    rmSync(targetPath, { recursive: true, force: true });
+    await rm(targetPath, { recursive: true, force: true });
     return;
   }
 
-  unlinkSync(targetPath);
+  await unlink(targetPath);
 }
 
-function detachWorktree(sourceRepoRoot: string, worktreePath: string): boolean {
-  const removeResult = runGit(sourceRepoRoot, ['worktree', 'remove', '--force', worktreePath]);
-  if (removeResult.code !== 0 && existsSync(worktreePath)) {
+async function detachWorktree(sourceRepoRoot: string, worktreePath: string): Promise<boolean> {
+  const removeResult = await runGit(sourceRepoRoot, ['worktree', 'remove', '--force', worktreePath]);
+  if (removeResult.code !== 0 && await pathExists(worktreePath)) {
     return false;
   }
 
-  runGit(sourceRepoRoot, ['worktree', 'prune']);
-  return !existsSync(worktreePath);
+  await runGit(sourceRepoRoot, ['worktree', 'prune']);
+  return !(await pathExists(worktreePath));
 }
 
 function resolveRepoFilePath(rootPath: string, relativePath: string): string {
   return join(rootPath, ...relativePath.split('/'));
 }
 
-function runGit(cwd: string, args: string[]): CommandResult {
-  const result = spawnSync('git', args, {
-    cwd,
-    encoding: 'utf8',
-    timeout: GIT_TIMEOUT_MS,
-    windowsHide: true,
-  });
+async function pathExists(path: string | undefined): Promise<boolean> {
+  if (!path) {
+    return false;
+  }
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
-  return {
-    code: result.status,
-    stdout: result.stdout || '',
-    stderr: result.stderr || '',
-    timedOut: result.signal === 'SIGTERM',
-  };
+function runGit(cwd: string, args: string[]): Promise<CommandResult> {
+  return new Promise((resolveResult, reject) => {
+    const child = spawn('git', args, {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill();
+    }, GIT_TIMEOUT_MS);
+
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => {
+      stdout += chunk;
+    });
+    child.stderr.on('data', (chunk: string) => {
+      stderr += chunk;
+    });
+    child.on('error', (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      resolveResult({
+        code,
+        stdout,
+        stderr,
+        timedOut,
+      });
+    });
+  });
 }
