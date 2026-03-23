@@ -52,6 +52,7 @@ If assigned as Conductor in Project Roles table:
 - **MUST** follow coding conventions specified in AGENTS.md
 - **MUST** respect `.editorconfig` settings (LF line endings, final newline, trim rules)
 - **MUST NOT** use `git add -f` to commit files ignored by `.gitignore` when they are local machine config, runtime state, or other environment-specific data
+- **MUST NOT** use interactive rebase; always use non-interactive rebase commands only
 - **MUST** prefer checked-in templates such as `*.example` files when configuration examples need to be documented or updated
 - **SHOULD** make minimal, focused changes
 - **SHOULD** commit frequently with clear messages
@@ -92,4 +93,4 @@ To sync skills after changes:
 
 This file is maintained by Codex only. Other agents should not modify this file.
 
-Last updated: 2026-01-05
+Last updated: 2026-03-23
