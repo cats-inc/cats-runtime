@@ -488,4 +488,35 @@ describe('runtime MCP facade', () => {
       },
     });
   });
+
+  it('rejects invalid audit_workspace enum values before reaching the substrate service', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 13,
+        method: 'tools/call',
+        params: {
+          name: 'audit_workspace',
+          arguments: {
+            workspacePath: join(rootDir, 'workspace'),
+            profile: 'banana',
+          },
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 13,
+      error: {
+        code: -32602,
+        message: 'profile must be a valid workspace substrate profile',
+      },
+    });
+  });
 });

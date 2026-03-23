@@ -277,18 +277,25 @@ async function auditWorkspace(
 ): Promise<McpToolCallResult> {
   const service = getWorkspaceSubstrateService(ctx);
   const workspacePath = readRequiredString(args, 'workspacePath');
+  const profile = readOptionalEnumString(
+    args,
+    'profile',
+    SUBSTRATE_PROFILES,
+    'profile must be a valid workspace substrate profile',
+  );
+  const enabledAgents = readOptionalEnumStringArray(
+    args,
+    'enabledAgents',
+    ENABLED_AGENTS,
+    'enabledAgents must be one of: claude, gemini, codex',
+  );
+  const includeA2A = readOptionalBoolean(args, 'includeA2A');
   const result = await service.execute({
     operation: 'audit-workspace',
     workspacePath,
-    ...(readOptionalString(args, 'profile') ? { profile: readOptionalString(args, 'profile') as 'minimal' | 'standard' | 'a2a-enabled' } : {}),
-    ...(readOptionalStringArray(args, 'enabledAgents')
-      ? {
-          enabledAgents: readOptionalStringArray(args, 'enabledAgents') as Array<'claude' | 'gemini' | 'codex'>,
-        }
-      : {}),
-    ...(readOptionalBoolean(args, 'includeA2A') !== undefined
-      ? { includeA2A: readOptionalBoolean(args, 'includeA2A') }
-      : {}),
+    ...(profile ? { profile } : {}),
+    ...(enabledAgents ? { enabledAgents } : {}),
+    ...(includeA2A !== undefined ? { includeA2A } : {}),
   });
 
   return {

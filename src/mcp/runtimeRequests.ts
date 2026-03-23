@@ -100,10 +100,11 @@ export async function requestRuntimeNdjson(
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
+  const events = lines.map((line) => JSON.parse(line) as Record<string, unknown>);
 
   return {
     status: response.status,
-    body: lines.map((line) => JSON.parse(line) as Record<string, unknown>),
-    events: lines.map((line) => JSON.parse(line) as Record<string, unknown>),
+    body: events,
+    events,
   };
 }
