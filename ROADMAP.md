@@ -456,8 +456,9 @@ That freezes the content taxonomy, but the follow-through is still incomplete.
 Current gaps:
 
 - the standalone runtime-owned catalog read surface now exists at
-  `GET /skills/catalog`, but there is still no versioned/filterable host-facing
-  contract beyond the raw runtime catalog read
+  `GET /skills/catalog`, and it now supports lightweight metadata/tag filters,
+  but there is still no versioned host-facing contract beyond that minimal read
+  seam
 - the runtime catalog contract is stable enough for Team 6, and
   `npm run verify:skills` now provides a dedicated verification gate, but there
   is still no richer publish pipeline beyond running the existing catalog
@@ -477,8 +478,8 @@ Current gaps:
 Deepen the runtime-owned library surface without collapsing it into the
 execution/materialization engine.
 
-- Keep the standalone runtime-owned catalog read surface minimal and stable so
-  upper layers can consume the library without importing
+- Keep the standalone runtime-owned filterable catalog read surface minimal and
+  stable so upper layers can consume the library without importing
   `src/core/skills/catalog.ts`
 - Keep the new `npm run verify:skills` gate aligned with shipped runtime-owned
   skill packages, then grow it into a stricter publish/lint workflow as needed
@@ -497,7 +498,10 @@ execution/materialization engine.
 #### Current Implementation Status
 
 - `GET /skills/catalog` now exposes a standalone runtime-owned catalog route
-  backed by `listRuntimeSkillCatalog()`
+  backed by `listRuntimeSkillCatalog()`, with lightweight filtering across
+  stable library metadata, tags, and delivery hints
+- the same runtime-owned catalog read seam is now also reachable from the
+  curated MCP tool plane via `list_runtime_skills`
 - `src/http/routes/skills.ts` and `src/http/app.ts` now publish that read seam
   without forcing hosts to import internal runtime modules directly
 - `npm run verify:skills` now provides a dedicated runtime-owned verification

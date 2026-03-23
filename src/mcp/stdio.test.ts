@@ -88,7 +88,7 @@ describe('MCP stdio transport', () => {
     rmSync(rootDir, { recursive: true, force: true });
   });
 
-  it('handles initialize, tools/list, and mutation tool calls over stdio frames', async () => {
+  it('handles initialize, tools/list, read, and mutation tool calls over stdio frames', async () => {
     const input = new PassThrough();
     const output = new PassThrough();
     const workerStream = async function* (turn: string | TurnInput): AsyncGenerator<StreamEvent> {
@@ -169,10 +169,22 @@ describe('MCP stdio transport', () => {
           },
         },
       }),
+      encodeMessage({
+        jsonrpc: '2.0',
+        id: 4,
+        method: 'tools/call',
+        params: {
+          name: 'list_runtime_skills',
+          arguments: {
+            family: ['chat'],
+            slug: ['companion'],
+          },
+        },
+      }),
     ]));
 
     await vi.waitFor(() => {
-      expect(decodeMessages(Buffer.concat(chunks))).toHaveLength(3);
+      expect(decodeMessages(Buffer.concat(chunks))).toHaveLength(4);
     });
 
     const messages = decodeMessages(Buffer.concat(chunks)) as Array<Record<string, unknown>>;
@@ -188,13 +200,14 @@ describe('MCP stdio transport', () => {
     expect(messages[1]).toMatchObject({
       jsonrpc: '2.0',
       id: 2,
-      result: {
-        tools: expect.arrayContaining([
-          expect.objectContaining({ name: 'create_session' }),
-          expect.objectContaining({ name: 'send_message' }),
-          expect.objectContaining({ name: 'commit_changes' }),
-        ]),
-      },
+        result: {
+          tools: expect.arrayContaining([
+            expect.objectContaining({ name: 'create_session' }),
+            expect.objectContaining({ name: 'send_message' }),
+            expect.objectContaining({ name: 'list_runtime_skills' }),
+            expect.objectContaining({ name: 'commit_changes' }),
+          ]),
+        },
     });
     expect(messages[2]).toMatchObject({
       jsonrpc: '2.0',
@@ -205,6 +218,20 @@ describe('MCP stdio transport', () => {
           session: {
             providerName: 'claude',
           },
+        },
+      },
+    });
+    expect(messages[3]).toMatchObject({
+      jsonrpc: '2.0',
+      id: 4,
+      result: {
+        structuredContent: {
+          count: 1,
+          skills: [
+            {
+              id: 'companion',
+            },
+          ],
         },
       },
     });

@@ -40,6 +40,7 @@ Current tools:
 - `runtime_summary`
 - `list_sessions`
 - `observe_session`
+- `list_runtime_skills`
 - `create_session`
 - `send_message`
 - `fork_session`
@@ -56,6 +57,9 @@ Current tools:
 This remains additive and runtime-owned. Direct product APIs stay primary, but
 the MCP tool plane now covers the minimum mutation surface needed for
 multi-step orchestration.
+
+`list_runtime_skills` is the curated MCP wrapper over the same filterable
+runtime-owned skill catalog exposed by `GET /skills/catalog`.
 
 `POST /mcp` uses the same runtime auth policy as the direct HTTP API. If
 `cats-runtime` is configured with an API key, MCP clients must send the same
@@ -174,6 +178,7 @@ tool surface here. The first shared tool names are:
 - `runtime_summary`
 - `list_sessions`
 - `observe_session`
+- `list_runtime_skills`
 - `create_session`
 - `send_message`
 - `fork_session`

@@ -185,6 +185,49 @@ describe('runtime-managed skills HTTP contract', () => {
     ]));
   });
 
+  it('filters the runtime-owned skill catalog by stable library metadata', async () => {
+    const app = createTestApp();
+
+    const response = await app.request(
+      '/skills/catalog?family=chat&slug=companion&role=companion_core',
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      count: number;
+      skills: Array<{
+        id: string;
+        library: {
+          family: string;
+          slug: string;
+          role: string;
+        };
+      }>;
+    };
+    expect(body.count).toBe(1);
+    expect(body.skills).toEqual([
+      expect.objectContaining({
+        id: 'companion',
+        library: expect.objectContaining({
+          family: 'chat',
+          slug: 'companion',
+          role: 'companion_core',
+        }),
+      }),
+    ]);
+  });
+
+  it('rejects invalid skill catalog filters with a client-safe error', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/skills/catalog?family=invalid');
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Invalid family: invalid',
+    });
+  });
+
   it('creates a Codex session with filesystem-delivered runtime skills and exposes them in history', async () => {
     const app = createTestApp();
 

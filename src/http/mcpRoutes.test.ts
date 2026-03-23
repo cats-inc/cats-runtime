@@ -171,6 +171,7 @@ describe('runtime MCP facade', () => {
       'runtime_summary',
       'list_sessions',
       'observe_session',
+      'list_runtime_skills',
       'create_session',
       'send_message',
       'fork_session',
@@ -257,6 +258,90 @@ describe('runtime MCP facade', () => {
     expect(observe.result.structuredContent.observePath).toBe('/sessions/session-1/observe');
   });
 
+  it('exposes the runtime skill catalog through MCP with the same lightweight filters as HTTP', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 5,
+        method: 'tools/call',
+        params: {
+          name: 'list_runtime_skills',
+          arguments: {
+            family: ['chat'],
+            slug: ['companion'],
+            role: ['companion_core'],
+          },
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const payload = await response.json() as {
+      result: {
+        structuredContent: {
+          count: number;
+          catalogPath: string;
+          skills: Array<{
+            id: string;
+            library: {
+              family: string;
+              slug: string;
+              role: string;
+            };
+          }>;
+        };
+      };
+    };
+    expect(payload.result.structuredContent.count).toBe(1);
+    expect(payload.result.structuredContent.catalogPath).toBe(
+      '/skills/catalog?family=chat&slug=companion&role=companion_core',
+    );
+    expect(payload.result.structuredContent.skills).toEqual([
+      expect.objectContaining({
+        id: 'companion',
+        library: expect.objectContaining({
+          family: 'chat',
+          slug: 'companion',
+          role: 'companion_core',
+        }),
+      }),
+    ]);
+  });
+
+  it('rejects invalid runtime skill catalog filters through MCP with params errors', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 6,
+        method: 'tools/call',
+        params: {
+          name: 'list_runtime_skills',
+          arguments: {
+            family: ['invalid'],
+          },
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 6,
+      error: {
+        code: -32602,
+        message: 'family must be a valid runtime skill family',
+      },
+    });
+  });
+
   it('exposes workspace and delivery audit tools without making MCP the only runtime API', async () => {
     const app = createTestApp();
     const workspacePath = join(rootDir, 'workspace');
@@ -267,7 +352,7 @@ describe('runtime MCP facade', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 5,
+        id: 7,
         method: 'tools/call',
         params: {
           name: 'audit_workspace',
@@ -294,7 +379,7 @@ describe('runtime MCP facade', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 6,
+        id: 8,
         method: 'tools/call',
         params: {
           name: 'audit_delivery_target',
@@ -328,7 +413,7 @@ describe('runtime MCP facade', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 7,
+        id: 9,
         method: 'tools/call',
         params: {
           name: 'create_session',
@@ -367,7 +452,7 @@ describe('runtime MCP facade', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 8,
+        id: 10,
         method: 'tools/call',
         params: {
           name: 'send_message',
@@ -400,7 +485,7 @@ describe('runtime MCP facade', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 9,
+        id: 11,
         method: 'tools/call',
         params: {
           name: 'fork_session',
@@ -428,7 +513,7 @@ describe('runtime MCP facade', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 10,
+        id: 12,
         method: 'tools/call',
         params: {
           name: 'init_workspace',
@@ -453,7 +538,7 @@ describe('runtime MCP facade', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 11,
+        id: 13,
         method: 'tools/call',
         params: {
           name: 'commit_changes',
@@ -487,7 +572,7 @@ describe('runtime MCP facade', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 12,
+        id: 14,
         method: 'tools/call',
         params: {
           name: 'list_browser_drivers',
@@ -514,7 +599,7 @@ describe('runtime MCP facade', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 13,
+        id: 15,
         method: 'tools/call',
         params: {
           name: 'create_browser_session',
@@ -542,7 +627,7 @@ describe('runtime MCP facade', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 14,
+        id: 16,
         method: 'tools/call',
         params: {
           name: 'create_browser_page',
@@ -574,7 +659,7 @@ describe('runtime MCP facade', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 15,
+        id: 17,
         method: 'tools/call',
         params: {
           name: 'list_browser_sessions',
@@ -606,7 +691,7 @@ describe('runtime MCP facade', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 16,
+        id: 18,
         method: 'tools/call',
         params: {
           name: 'close_browser_session',
@@ -635,7 +720,7 @@ describe('runtime MCP facade', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 17,
+        id: 19,
         method: 'tools/call',
         params: {
           name: 'list_sessions',
@@ -649,7 +734,7 @@ describe('runtime MCP facade', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       jsonrpc: '2.0',
-      id: 17,
+      id: 19,
       error: {
         code: -32602,
         message: 'status must be a valid session status',
@@ -665,7 +750,7 @@ describe('runtime MCP facade', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 18,
+        id: 20,
         method: 'tools/call',
         params: {
           name: 'audit_workspace',
@@ -680,7 +765,7 @@ describe('runtime MCP facade', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       jsonrpc: '2.0',
-      id: 18,
+      id: 20,
       error: {
         code: -32602,
         message: 'profile must be a valid workspace substrate profile',

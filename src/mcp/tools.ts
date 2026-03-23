@@ -39,6 +39,9 @@ const REUSE_POLICIES = ['create_new', 'prefer_existing', 'require_existing'] as 
 const FORK_MODES = ['auto', 'native_fork', 'context_transplant'] as const;
 const SUBSTRATE_PROFILES = ['minimal', 'standard', 'a2a-enabled'] as const;
 const ENABLED_AGENTS = ['claude', 'gemini', 'codex'] as const;
+const RUNTIME_SKILL_FAMILIES = ['base', 'orchestration', 'work', 'chat', 'code'] as const;
+const RUNTIME_SKILL_PACKAGE_KINDS = ['base', 'role', 'bundle'] as const;
+const RUNTIME_SKILL_DELIVERY_HINTS = ['filesystem', 'instructions', 'none'] as const;
 const BROWSER_BINDING_KINDS = ['manual_url', 'session_service', 'session_artifact'] as const;
 const ACTOR_ROLES = [
   'boss_cat',
@@ -201,6 +204,19 @@ function buildBrowserSessionPaths(browserSessionId: string) {
   };
 }
 
+function appendQueryValues(
+  searchParams: URLSearchParams,
+  key: string,
+  values: string[] | undefined,
+): void {
+  if (!values?.length) {
+    return;
+  }
+  for (const value of values) {
+    searchParams.append(key, value);
+  }
+}
+
 function runtimeSummary(ctx: AppContext): McpToolCallResult {
   const sessions = ctx.registry.list();
   const byStatus: Record<string, number> = {};
@@ -279,6 +295,73 @@ async function observeSession(
   return {
     summary: `Observation snapshot for session ${sessionId}.`,
     structuredContent: buildMcpObserveSessionPayload(ctx, session),
+  };
+}
+
+async function listRuntimeSkills(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const searchParams = new URLSearchParams();
+  appendQueryValues(searchParams, 'id', readOptionalStringArray(args, 'id'));
+  appendQueryValues(
+    searchParams,
+    'family',
+    readOptionalEnumStringArray(
+      args,
+      'family',
+      RUNTIME_SKILL_FAMILIES,
+      'family must be a valid runtime skill family',
+    ),
+  );
+  appendQueryValues(searchParams, 'slug', readOptionalStringArray(args, 'slug'));
+  appendQueryValues(searchParams, 'role', readOptionalStringArray(args, 'role'));
+  appendQueryValues(
+    searchParams,
+    'packageKind',
+    readOptionalEnumStringArray(
+      args,
+      'packageKind',
+      RUNTIME_SKILL_PACKAGE_KINDS,
+      'packageKind must be a valid runtime skill package kind',
+    ),
+  );
+  appendQueryValues(
+    searchParams,
+    'capabilityTag',
+    readOptionalStringArray(args, 'capabilityTag'),
+  );
+  appendQueryValues(searchParams, 'productTag', readOptionalStringArray(args, 'productTag'));
+  appendQueryValues(
+    searchParams,
+    'deliveryHint',
+    readOptionalEnumStringArray(
+      args,
+      'deliveryHint',
+      RUNTIME_SKILL_DELIVERY_HINTS,
+      'deliveryHint must be a valid runtime skill delivery hint',
+    ),
+  );
+
+  const path = searchParams.size > 0
+    ? `/skills/catalog?${searchParams.toString()}`
+    : '/skills/catalog';
+  const result = await requestRuntimeJson(ctx, path, { method: 'GET' });
+  ensureRouteSuccess('list_runtime_skills', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'list_runtime_skills result');
+  const count = typeof payload.count === 'number'
+    ? payload.count
+    : Array.isArray(payload.skills)
+      ? payload.skills.length
+      : 0;
+
+  return {
+    summary: `Returned ${count} runtime skill(s).`,
+    structuredContent: {
+      ...payload,
+      catalogPath: path,
+    },
   };
 }
 
@@ -645,6 +728,37 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: observeSession,
+  },
+  {
+    definition: {
+      name: 'list_runtime_skills',
+      title: 'List Runtime Skills',
+      description: 'Return the runtime-owned skill catalog using the same filterable read contract exposed by GET /skills/catalog.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: { type: 'array', items: { type: 'string' } },
+          family: {
+            type: 'array',
+            items: { type: 'string', enum: RUNTIME_SKILL_FAMILIES },
+          },
+          slug: { type: 'array', items: { type: 'string' } },
+          role: { type: 'array', items: { type: 'string' } },
+          packageKind: {
+            type: 'array',
+            items: { type: 'string', enum: RUNTIME_SKILL_PACKAGE_KINDS },
+          },
+          capabilityTag: { type: 'array', items: { type: 'string' } },
+          productTag: { type: 'array', items: { type: 'string' } },
+          deliveryHint: {
+            type: 'array',
+            items: { type: 'string', enum: RUNTIME_SKILL_DELIVERY_HINTS },
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: listRuntimeSkills,
   },
   {
     definition: {

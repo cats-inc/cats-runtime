@@ -62,6 +62,7 @@ Current curated tools:
 - `runtime_summary`
 - `list_sessions`
 - `observe_session`
+- `list_runtime_skills`
 - `create_session`
 - `send_message`
 - `fork_session`
@@ -74,6 +75,10 @@ Current curated tools:
 - `init_workspace`
 - `audit_delivery_target`
 - `commit_changes`
+
+`list_runtime_skills` reuses the same runtime-owned skill catalog contract as
+`GET /skills/catalog`, including lightweight filtering across stable metadata,
+tags, and delivery hints.
 
 Example `tools/call` request:
 
@@ -455,6 +460,22 @@ GET /skills/catalog
 This route exposes the standalone runtime-owned skill-library read model for
 hosts that should not import internal runtime modules directly.
 
+Optional query filters keep the host-facing read seam lightweight while still
+supporting library lookups without importing runtime internals:
+
+- `id`
+- `family`
+- `slug`
+- `role`
+- `packageKind`
+- `capabilityTag`
+- `productTag`
+- `deliveryHint`
+
+Each filter accepts either repeated query params or comma-separated values. The
+route applies OR semantics within the same filter and AND semantics across
+different filters.
+
 The response shape is:
 
 - `count`: total number of discovered runtime-owned skill packages
@@ -498,8 +519,8 @@ Example response:
 }
 ```
 
-Failures return `500` with an `error` string when the runtime cannot read the
-catalog.
+Invalid `family`, `packageKind`, or `deliveryHint` filters return `400` with a
+client-safe `error` string. Unexpected catalog read failures return `500`.
 
 ### Sessions
 

@@ -10,7 +10,7 @@
 | API Backends | In Progress | `src/backends/api` now runs Claude, Codex/OpenAI, Gemini, and Ollama with runtime-managed sessions, provider-native continuation/caching optimizations, additive incident hints plus provider-agnostic `progress` events, a shared local tool loop with patch/file/search/shell support, and runtime-owned health/diagnostics summaries; deeper live probes and broader tool/model discovery remain |
 | Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, an Agent SDK bridge as the second validation target, and first-slice remote cleanup hooks for close/cancel/delete/reset semantics |
 | HTTP API | Completed | Health, sessions, delivery audit/export/repo routes, messages, history, observe, wakeups, provider management, session branch-lineage inspection, metering/guardrail diagnostics, additive run-inspector/session-discipline contracts, machine-readable session-maintenance/delete-cleanup payloads, worktree-backed session lifecycle cleanup semantics including `preserve`, and the runtime MCP facade over HTTP plus stdio are served directly from `cats-runtime` |
-| Runtime Skills | Completed | `skills/` is now a runtime-owned execution catalog and family-aware internal library with validation, session-level requested/resolved/applied metadata, richer slug/family/capability metadata, explicit `skills: null` clearing, backend-aware delivery modes, inspection-level applied-skill reporting, a standalone `GET /skills/catalog` read surface, a dedicated `npm run verify:skills` gate, first-slice Codex/Pi verification, and shared re-entry hydration across create/resume/fork/provider-switch |
+| Runtime Skills | Completed | `skills/` is now a runtime-owned execution catalog and family-aware internal library with validation, session-level requested/resolved/applied metadata, richer slug/family/capability metadata, explicit `skills: null` clearing, backend-aware delivery modes, inspection-level applied-skill reporting, a standalone filterable `GET /skills/catalog` read surface plus matching `list_runtime_skills` MCP read tool, a dedicated `npm run verify:skills` gate, first-slice Codex/Pi verification, and shared re-entry hydration across create/resume/fork/provider-switch |
 | Wakeup Substrate | Completed | Runtime-owned scheduled wakeup requests now support create/list/cancel/trigger, restart-safe persistence, bounded timer processing, coalescing, and additive session/history wakeup metadata without introducing full scheduler semantics |
 | Provider Compatibility | In Progress | Shared CLI compatibility probing now classifies `ready` / `degraded` / `unsupported_version` / `unrecognized_protocol` / `probe_failed`, validates `light` vs `live` runtime-flag probes across expanded CLI family profiles, captures redacted replay-friendly evidence bundles, tracks stale cache/reprobe metadata, and exposes runtime-owned install/prerequisite/PATH/npm-prefix/auth/version/remediation hints for CLI targets |
 | Dashboard | Completed | The embedded dashboard UI is served from `GET /` and now surfaces runtime/provider health from runtime-owned diagnostics contracts |
@@ -348,7 +348,7 @@ turning `cats-runtime` into a general plugin platform.
 | Replace the hard-coded skill catalog with runtime discovery/validation | [x] | `src/core/skills/catalog.ts` now validates family-organized `skills/**/SKILL.md` frontmatter and instruction bodies |
 | Freeze session-level requested/resolved/applied skill state | [x] | Session payloads now persist requested refs, resolved skill metadata, delivery state, warnings, and applied ids |
 | Freeze the internal skill-library taxonomy and metadata contract | [x] | `listRuntimeSkillCatalog()` now reports stable family/slug/role/package metadata for Team 6 and future product mappings |
-| Add a standalone runtime-owned skill catalog route | [x] | `GET /skills/catalog` now exposes the runtime library read seam for hosts without direct internal module imports |
+| Add a standalone runtime-owned skill catalog route | [x] | `GET /skills/catalog` now exposes the runtime library read seam for hosts without direct internal module imports and supports lightweight metadata/tag filters |
 | Add a dedicated runtime skill verification command | [x] | `npm run verify:skills` now executes the runtime catalog validator as an explicit maintenance/release gate |
 | Support delivery modes `filesystem`, `instructions`, and `none` | [x] | Codex isolated sessions use filesystem delivery, Pi/API/agent use instructions, unsupported targets stay explicit with `none` |
 | Verify CLI-first targets | [x] | Codex filesystem delivery and Pi instruction-file delivery are both covered by automated tests |
@@ -358,7 +358,7 @@ turning `cats-runtime` into a general plugin platform.
 
 #### Deferred Boundaries
 
-- [ ] No versioned/filterable host catalog contract yet beyond the raw standalone `GET /skills/catalog` runtime read
+- [ ] No versioned host catalog contract yet beyond the minimal standalone filterable `GET /skills/catalog` runtime read
 - [ ] No richer publish workflow yet beyond `npm run verify:skills` running the existing catalog validator
 - [ ] No runtime-owned `skillProfile` mapping layer yet; product capability/profile resolution stays outside `cats-runtime`
 - [ ] No repo-native skill merge or conflict-resolution system yet beyond safe fallback from Codex filesystem delivery to instructions
@@ -568,7 +568,7 @@ replacing the direct runtime HTTP API used by product code.
 |------|--------|-------|
 | Add runtime-owned MCP module under `src/mcp` | [x] | JSON-RPC handling, tool registry, stdio framing, and runtime read-model helpers now live outside provider adapters |
 | Add `POST /mcp` facade route | [x] | `initialize`, `ping`, `tools/list`, `tools/call`, and `notifications/initialized` are supported |
-| Expose curated read + mutation tool slice | [x] | `runtime_summary`, `list_sessions`, `observe_session`, `create_session`, `send_message`, `fork_session`, `audit_workspace`, `init_workspace`, `audit_delivery_target`, and `commit_changes` now ship |
+| Expose curated read + mutation tool slice | [x] | `runtime_summary`, `list_sessions`, `observe_session`, `list_runtime_skills`, `create_session`, `send_message`, `fork_session`, `audit_workspace`, `init_workspace`, `audit_delivery_target`, and `commit_changes` now ship |
 | Reuse existing runtime services/read models instead of inventing a second execution stack | [x] | MCP tools route into the existing session, delivery, and workspace contracts already used by HTTP routes/tools |
 | Add standalone stdio MCP transport | [x] | `cats-runtime-mcp` now exposes the same tool plane over Content-Length framed stdio JSON-RPC |
 | Update MCP docs and coverage | [x] | `docs/api.md`, `docs/architecture.md`, `docs/mcp-config.md`, `../../cats/docs/mcp-config.md`, `src/http/mcpRoutes.test.ts`, and `src/mcp/stdio.test.ts` now describe and verify the slice |

@@ -45,6 +45,12 @@ function buildHeaders(
   return headers;
 }
 
+function buildRequestBody(method: string, body: unknown): string | undefined {
+  return method === 'GET' || method === 'HEAD'
+    ? undefined
+    : JSON.stringify(body ?? {});
+}
+
 function tryParseJson(text: string): unknown {
   if (!text) {
     return {};
@@ -62,10 +68,11 @@ export async function requestRuntimeJson(
   path: string,
   options: RuntimeRequestOptions = {},
 ): Promise<RuntimeJsonRequestResult> {
+  const method = options.method ?? 'POST';
   const response = await getRuntimeApp(ctx).request(path, {
-    method: options.method ?? 'POST',
+    method,
     headers: buildHeaders(ctx, options),
-    body: JSON.stringify(options.body ?? {}),
+    body: buildRequestBody(method, options.body),
   });
   const text = await response.text();
   return {
@@ -79,13 +86,14 @@ export async function requestRuntimeNdjson(
   path: string,
   options: RuntimeRequestOptions = {},
 ): Promise<RuntimeNdjsonRequestResult> {
+  const method = options.method ?? 'POST';
   const response = await getRuntimeApp(ctx).request(path, {
-    method: options.method ?? 'POST',
+    method,
     headers: buildHeaders(ctx, {
       ...options,
       accept: options.accept ?? 'application/x-ndjson',
     }),
-    body: JSON.stringify(options.body ?? {}),
+    body: buildRequestBody(method, options.body),
   });
   const text = await response.text();
   if (!response.ok) {
