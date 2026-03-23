@@ -358,4 +358,56 @@ schemas.
 - `docs/specs/SPEC-011-session-fork-and-context-transplant-primitives.md`
 
 ---
-*Last updated: 2026-03-23*
+### OPT-6: Runtime Skill Catalog Cache and Discovery Hardening
+
+**Priority**: P2
+**Status**: Planned
+
+#### Problem
+
+`cats-runtime` now has a family-aware runtime skill library, persisted
+skill-state re-entry compatibility, and a per-root catalog cache. That closes
+the immediate correctness gaps, but two small hardening items remain:
+
+- the current watch-key builder duplicates the same two-level discovery shape
+  used by runtime skill entry discovery, so future nesting/layout changes would
+  require touching both code paths
+- the cache invalidation key uses truncated `mtimeMs`, which is acceptable for
+  normal skill-package edits but can miss ultra-fast same-second rewrites on
+  low-resolution filesystems
+
+These are not correctness blockers for the current skill library rollout, but
+they are worth cleaning up before the library grows further.
+
+#### Direction
+
+Harden runtime skill discovery/cache maintenance without changing the public
+skill execution contract.
+
+- Collapse watch-key generation and catalog discovery onto one shared
+  enumeration path so future library layout changes do not duplicate traversal
+  rules
+- Revisit cache invalidation precision if field evidence shows same-second
+  rewrites on low-resolution filesystems are a practical issue
+- Keep this follow-up internal to `cats-runtime`; do not change the public
+  requested/resolved/applied skill contract just to service cache maintenance
+
+#### Current Implementation Status
+
+- family-aware skill resolution is landed
+- persisted-session re-entry is backward compatible with missing `slug`
+- persisted session-state rebuild intentionally drops historical
+  `version`/`fingerprint` pinning on re-entry
+- per-root catalog cache with file-content invalidation heuristics is landed
+- shared discovery/cache enumeration and higher-precision invalidation remain
+  deferred
+
+#### Affected Files
+
+- `src/core/skills/catalog.ts`
+- `src/core/skills/catalog.test.ts`
+- `docs/specs/SPEC-005-runtime-managed-skills-v0.md`
+- `docs/specs/SPEC-013-internal-skill-library-and-role-taxonomy.md`
+
+---
+*Last updated: 2026-03-24*
