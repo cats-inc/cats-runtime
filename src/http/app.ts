@@ -5,6 +5,7 @@ import { Hono } from 'hono';
 import { logger } from 'hono/logger';
 import type { RuntimeConfig } from '../core/config.js';
 import { RuntimeSessionManager } from '../core/runtime/RuntimeSessionManager.js';
+import { RuntimeBrowserService } from '../core/browser/RuntimeBrowserService.js';
 import type { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
 import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
 import type { ApiBackendManager } from '../backends/api/runtime/ApiBackendManager.js';
@@ -21,9 +22,11 @@ import { RuntimeDeliveryService } from '../core/runtime/RuntimeDeliveryService.j
 import { WorkspaceSubstrateService } from '../core/runtime/WorkspaceSubstrateService.js';
 import { RuntimeMeteringService } from '../core/usage/RuntimeMeteringService.js';
 import type { RuntimeWakeupService } from '../core/wakeup/RuntimeWakeupService.js';
+import { ManualBrowserDriver } from '../backends/browser/manualDriver.js';
 import { bearerAuth } from './auth.js';
 import { injectRuntimeDashboardHealthOverlay } from './dashboardHealthOverlay.js';
 import { discoveryRoutes } from './routes/discovery.js';
+import { browserRoutes } from './routes/browser.js';
 import { deliveryRoutes } from './routes/delivery.js';
 import { diagnosticsRoutes } from './routes/diagnostics.js';
 import { healthRoutes } from './routes/health.js';
@@ -63,6 +66,7 @@ export interface AppContext {
   workspaceSubstrate?: WorkspaceSubstrateService;
   metering?: RuntimeMeteringService;
   wakeup?: RuntimeWakeupService;
+  browser?: RuntimeBrowserService;
   resolveCursorNative?: (instanceId?: string) => CursorNativeSessionService;
   resolveGooseNative?: (instanceId?: string) => GooseNativeSessionService;
   resolveKiroNative?: (instanceId?: string) => KiroNativeSessionService;
@@ -145,6 +149,18 @@ export function getWorkspaceSubstrateService(ctx: AppContext): WorkspaceSubstrat
   return ctx.workspaceSubstrate;
 }
 
+export function getRuntimeBrowserService(ctx: AppContext): RuntimeBrowserService {
+  if (!ctx.browser) {
+    ctx.browser = new RuntimeBrowserService({
+      drivers: [
+        new ManualBrowserDriver(),
+      ],
+      sessionExists: (sessionId) => Boolean(ctx.registry.get(sessionId)),
+    });
+  }
+  return ctx.browser;
+}
+
 export function createRuntimeApp(ctx: AppContext) {
   ctx.runtime = getRuntimeSessionManager(ctx);
   ctx.metering ??= new RuntimeMeteringService(ctx.config.metering);
@@ -193,6 +209,7 @@ export function createRuntimeApp(ctx: AppContext) {
   app.route('/', healthRoutes);
   app.route('/', diagnosticsRoutes);
   app.route('/', discoveryRoutes);
+  app.route('/', browserRoutes);
   app.route('/', deliveryRoutes);
   app.route('/', sessionRoutes);
   app.route('/', messageRoutes);

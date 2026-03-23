@@ -1,0 +1,303 @@
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createRuntimeApp as createApp } from './app.js';
+import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
+import type { CliRuntimeConfig } from '../backends/cli/config.js';
+import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
+import { createRuntimeStartupState } from '../startup.js';
+
+describe('browser HTTP contract', () => {
+  let rootDir: string;
+  let sessionBaseDir: string;
+  let dataDir: string;
+  let registry: SessionRegistry;
+  let pool: WorkerPool;
+
+  function makeConfig(): CliRuntimeConfig {
+    return {
+      host: '127.0.0.1',
+      port: 3110,
+      apiKey: '',
+      dataDir,
+      sessionBaseDir,
+      auggiePath: 'auggie',
+      claudePath: 'claude',
+      codexPath: 'codex',
+      copilotPath: 'copilot',
+      cursorPath: 'cursor-agent',
+      geminiPath: 'gemini',
+      goosePath: 'goose',
+      juniePath: 'junie',
+      kiroPath: 'kiro-cli',
+      opencodePath: 'opencode',
+      piPath: 'pi',
+      opencodeServerHost: '127.0.0.1',
+      opencodeServerPort: 4097,
+      opencodeServerStartupTimeoutMs: 10_000,
+      auggieSessionsDir: join(rootDir, '.augment', 'sessions'),
+      claudeProjectsDir: join(rootDir, '.claude', 'projects'),
+      codexSessionsDir: join(rootDir, '.codex', 'sessions'),
+      copilotSessionsDir: join(rootDir, '.copilot', 'session-state'),
+      cursorChatsDir: join(rootDir, '.cursor', 'chats'),
+      cursorRuntime: { mode: 'native' },
+      geminiSessionsDir: join(rootDir, '.gemini', 'tmp'),
+      kiroDbPath: join(rootDir, '.kiro', 'data.sqlite3'),
+      kiroRuntime: { mode: 'native' },
+      piSessionsDir: join(rootDir, '.pi', 'sessions'),
+      nativeDiscoveryIntervalMs: 0,
+      externalSessionLiveWindowMs: 0,
+      maxSessions: 10,
+      providerCommands: {
+        claude: { path: 'claude', runner: 'auto', runtime: { mode: 'native' } },
+      },
+    } as unknown as CliRuntimeConfig;
+  }
+
+  function createTestApp() {
+    return createApp({
+      config: makeConfig(),
+      startup: createRuntimeStartupState(),
+      registry,
+      pool,
+      cursorNative: {} as never,
+      gooseNative: {} as never,
+      kiroNative: {} as never,
+      auggieSessions: {} as never,
+      opencodeNative: {} as never,
+      providerModelCatalog: {} as never,
+    });
+  }
+
+  beforeEach(() => {
+    rootDir = mkdtempSync(join(tmpdir(), 'cats-runtime-browser-http-'));
+    sessionBaseDir = join(rootDir, 'sessions');
+    dataDir = join(rootDir, 'data');
+    mkdirSync(sessionBaseDir, { recursive: true });
+    mkdirSync(dataDir, { recursive: true });
+    mkdirSync(join(rootDir, 'repo-service'), { recursive: true });
+    mkdirSync(join(rootDir, 'repo-artifact'), { recursive: true });
+    registry = new SessionRegistry();
+    const serviceSession = registry.create({
+      id: 'session-service',
+      providerName: 'claude',
+      providerBackend: 'agent',
+      cwd: join(rootDir, 'repo-service'),
+    });
+    registry.setProviderState(serviceSession.id, {
+      agentSession: {
+        providerSessionId: 'agent-session-1',
+        status: 'idle',
+        services: [{
+          id: 'preview',
+          name: 'Preview Server',
+          url: 'http://127.0.0.1:4173',
+        }],
+      },
+    });
+    registry.create({
+      id: 'session-artifact',
+      providerName: 'claude',
+      providerBackend: 'api',
+      cwd: join(rootDir, 'repo-artifact'),
+      artifacts: [{
+        id: 'report',
+        label: 'Report',
+        path: 'dist/report.html',
+        mediaType: 'text/html',
+      }],
+    });
+
+    pool = {
+      getCapabilities: vi.fn(() => ({ resume: true, fork: true, permissions: true })),
+      get: vi.fn(() => undefined),
+      spawn: vi.fn(),
+      kill: vi.fn(),
+      status: vi.fn(() => ({ active: 0, busy: 0, idle: 0, providers: {} })),
+    } as unknown as WorkerPool;
+  });
+
+  afterEach(() => {
+    rmSync(rootDir, { recursive: true, force: true });
+  });
+
+  it('reports manual-driver capabilities and manages browser pages with normalized preview surfaces', async () => {
+    const app = createTestApp();
+
+    const driversResponse = await app.request('/browser/drivers');
+    expect(driversResponse.status).toBe(200);
+    await expect(driversResponse.json()).resolves.toEqual({
+      drivers: [
+        expect.objectContaining({
+          id: 'manual',
+          status: 'ready',
+          capabilities: expect.objectContaining({
+            manualUrlEntry: true,
+            serviceBindings: true,
+            artifactBindings: true,
+            liveAutomation: false,
+          }),
+        }),
+      ],
+    });
+
+    const createResponse = await app.request('/browser/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        label: 'Manual Preview Session',
+      }),
+    });
+    expect(createResponse.status).toBe(201);
+    const created = await createResponse.json() as {
+      session: { id: string };
+    };
+
+    const pageResponse = await app.request(`/browser/sessions/${created.session.id}/pages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        url: 'http://127.0.0.1:3000',
+        label: 'Manual Preview',
+      }),
+    });
+    expect(pageResponse.status).toBe(201);
+    await expect(pageResponse.json()).resolves.toEqual(expect.objectContaining({
+      page: expect.objectContaining({
+        previewSurface: expect.objectContaining({
+          kind: 'browser_page',
+          source: 'browser_page',
+          status: 'ready',
+          renderHint: 'iframe',
+          url: 'http://127.0.0.1:3000',
+        }),
+      }),
+      session: expect.objectContaining({
+        inspection: expect.objectContaining({
+          openPageCount: 1,
+          previewSurfaces: [
+            expect.objectContaining({
+              kind: 'browser_page',
+              status: 'ready',
+            }),
+          ],
+        }),
+      }),
+    }));
+  });
+
+  it('binds browser pages to runtime session services and artifacts without changing the preview-surface schema', async () => {
+    const app = createTestApp();
+
+    const serviceBrowserResponse = await app.request('/browser/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        runtimeSessionId: 'session-service',
+        label: 'Service Browser Session',
+      }),
+    });
+    const serviceBrowser = await serviceBrowserResponse.json() as {
+      session: { id: string };
+    };
+
+    const servicePageResponse = await app.request(`/browser/sessions/${serviceBrowser.session.id}/pages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        binding: {
+          kind: 'session_service',
+          serviceId: 'preview',
+        },
+      }),
+    });
+    expect(servicePageResponse.status).toBe(201);
+    await expect(servicePageResponse.json()).resolves.toEqual(expect.objectContaining({
+      page: expect.objectContaining({
+        binding: expect.objectContaining({
+          kind: 'session_service',
+          runtimeSessionId: 'session-service',
+          serviceId: 'preview',
+        }),
+        previewSurface: expect.objectContaining({
+          kind: 'browser_page',
+          renderHint: 'iframe',
+          url: 'http://127.0.0.1:4173',
+          provenance: expect.objectContaining({
+            sessionId: 'session-service',
+            serviceId: 'preview',
+          }),
+        }),
+      }),
+    }));
+
+    const artifactBrowserResponse = await app.request('/browser/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        runtimeSessionId: 'session-artifact',
+        label: 'Artifact Browser Session',
+      }),
+    });
+    const artifactBrowser = await artifactBrowserResponse.json() as {
+      session: { id: string };
+    };
+
+    const artifactPageResponse = await app.request(`/browser/sessions/${artifactBrowser.session.id}/pages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        binding: {
+          kind: 'session_artifact',
+          artifactId: 'report',
+        },
+      }),
+    });
+    expect(artifactPageResponse.status).toBe(201);
+    await expect(artifactPageResponse.json()).resolves.toEqual(expect.objectContaining({
+      page: expect.objectContaining({
+        binding: expect.objectContaining({
+          kind: 'session_artifact',
+          runtimeSessionId: 'session-artifact',
+          artifactId: 'report',
+        }),
+        previewSurface: expect.objectContaining({
+          kind: 'browser_page',
+          renderHint: 'iframe',
+          mediaType: 'text/html',
+          provenance: expect.objectContaining({
+            sessionId: 'session-artifact',
+            artifactId: 'report',
+          }),
+        }),
+      }),
+    }));
+  });
+
+  it('rejects unsupported browser page bindings with a machine-readable client error', async () => {
+    const app = createTestApp();
+    const createResponse = await app.request('/browser/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const created = await createResponse.json() as {
+      session: { id: string };
+    };
+
+    const pageResponse = await app.request(`/browser/sessions/${created.session.id}/pages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        binding: {
+          kind: 'room_preview',
+        },
+      }),
+    });
+    expect(pageResponse.status).toBe(400);
+    await expect(pageResponse.json()).resolves.toEqual({
+      error: "Unsupported browser page binding kind 'room_preview'.",
+    });
+  });
+});

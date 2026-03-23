@@ -266,6 +266,66 @@ emits single-line JSON lifecycle events on stdout/stderr:
 For portable host-controlled shutdown, close the child stdin stream. `SIGINT`
 and `SIGTERM` are also handled where the host platform delivers them reliably.
 
+### Browser
+
+```text
+GET /browser/drivers
+GET /browser/sessions
+GET /browser/sessions/{id}
+POST /browser/sessions
+POST /browser/sessions/{id}/pages
+POST /browser/sessions/{id}/close
+```
+
+These routes expose the first runtime-owned browser/preview substrate. The
+first slice is intentionally lightweight:
+
+- browser sessions/pages are runtime-owned records
+- browser drivers are pluggable, but the first built-in driver is `manual`
+- the `manual` driver does not launch or automate a real browser; it validates
+  the contract for future Playwright/CDP/BrowserOS-style drivers
+- page bindings may be direct (`url`/`path`) or may bind to an existing runtime
+  session `service` / `artifact`
+
+Create browser session example:
+
+```json
+{
+  "driverId": "manual",
+  "runtimeSessionId": "session-123",
+  "label": "Preview Browser"
+}
+```
+
+Create browser page from a runtime service example:
+
+```json
+{
+  "binding": {
+    "kind": "session_service",
+    "serviceId": "preview"
+  }
+}
+```
+
+Create browser page from an artifact example:
+
+```json
+{
+  "binding": {
+    "kind": "session_artifact",
+    "artifactId": "report"
+  }
+}
+```
+
+Browser session responses include:
+
+- `pages`: runtime-owned page records
+- `inspection.driver`: machine-readable driver capability summary
+- `inspection.previewSurfaces`: normalized `browser_page` surfaces aligned with
+  existing session/delivery preview-surface contracts
+
 ### Delivery
 
 ```text
@@ -292,6 +352,11 @@ Shared response fields:
 - `repo`: normalized repository inspection metadata
 - `artifacts`: publication/export records when relevant
 - `previewSurfaces`: normalized preview-capable surface metadata
+
+Normalized preview surfaces now share one schema across delivery, session
+inspection, and browser routes. `kind` may be `service`, `artifact`, or
+`browser_page`; `source` may be one of the existing session/request/published
+values or `browser_page`.
 
 Mutating actions (`publish`, `commit`, `push`) default to preview. Send
 `"apply": true` plus runtime-visible approval context such as

@@ -150,4 +150,77 @@ leaking backend-specific wire formats to consumers.
 
 ---
 
-*Last updated: 2026-03-18*
+### OPT-3: Runtime-Owned Browser Driver Hardening and Recovery
+
+**Priority**: P1
+**Status**: Planned
+
+#### Problem
+
+`cats-runtime` now has the first browser/preview substrate slice:
+
+- runtime-owned browser sessions and pages
+- a pluggable browser driver seam
+- normalized `browser_page` preview surfaces
+- a `manual` driver that validates the contract without launching a real
+  browser
+
+That is enough to freeze the substrate, but not enough for production-grade
+browser-backed preview and test workflows. The current gaps are:
+
+- no real Playwright/CDP/browser-service driver yet
+- browser sessions/pages are in-memory only and do not survive runtime restart
+- there is no browser-session cleanup/expiry discipline yet
+- browser state is exposed through `/browser/*`, but not yet folded into the
+  broader session inspection/read-model surfaces that hosts will eventually
+  want to poll
+
+Without a second slice, the browser subsystem remains structurally correct but
+operationally shallow.
+
+#### Direction
+
+Deepen the runtime-owned browser subsystem without coupling it to any monorepo
+  sibling browser project or turning it into a full BrowserOS product.
+
+- Add at least one real driver behind the existing `RuntimeBrowserDriver`
+  interface
+  - likely candidates: Playwright/CDP or a replaceable external browser service
+  - keep the public route and preview-surface contract stable
+- Add browser-session persistence and restart-safe recovery where it materially
+  improves long-lived preview workflows
+- Add runtime-owned cleanup discipline for stale/closed browser sessions and
+  pages
+- Add additive browser summary/inspection hooks to the broader runtime
+  read-model where needed, so hosts can discover browser-backed preview state
+  without polling only the dedicated `/browser/*` routes
+- Keep browser capabilities machine-readable so hosts can distinguish:
+  - manual registration only
+  - preview-only driver
+  - richer automated browser control
+
+#### Why This Is Required
+
+- A manual-only driver is not sufficient for deploy-preview-test workflows.
+- In-memory-only browser state is too fragile for long-running sessions and
+  runtime restarts.
+- Browser pages need the same lifecycle discipline already applied to sessions,
+  wakeups, and delivery surfaces.
+- Future Cats Code preview canvases need a more complete runtime substrate
+  before UI work can safely depend on it.
+
+#### Affected Areas
+
+- `src/core/browser/*`
+- `src/backends/browser/*`
+- `src/http/routes/browser.ts`
+- `src/http/app.ts`
+- additive session inspection/read-model surfaces where browser summary is
+  eventually exposed
+- `docs/api.md`
+- `docs/architecture.md`
+- `docs/decisions/011-runtime-owned-browser-and-preview-subsystem-with-pluggable-drivers.md`
+
+---
+
+*Last updated: 2026-03-23*

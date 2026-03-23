@@ -22,6 +22,8 @@ The architectural split is:
 - `core`: shared runtime config and stable types
 - `startup`: process-level startup mode, readiness, and lifecycle helpers
 - `backends`: execution implementations for CLI, API/local, and agent targets
+- `core/browser`: runtime-owned browser/session/page contracts plus preview helpers
+- `backends/browser`: pluggable browser driver implementations
 - `core/wakeup`: runtime-owned scheduled wakeup substrate and persistence
 - `http`: inbound transport and route wiring
 
@@ -68,6 +70,7 @@ src/
   core/
     config.ts
     models/
+    browser/
     providerActiveConfig.ts
     provider-install/
     skills/
@@ -80,6 +83,7 @@ src/
     usage/
     wakeup/
   backends/
+    browser/
     agent/
       adapters/
       runtime/
@@ -120,6 +124,8 @@ src/
 - Exposes runtime/host diagnostics at `GET /diagnostics/runtime`
 - Exposes provider availability plus CLI compatibility diagnostics at
   `GET /diagnostics/providers`
+- Exposes runtime-owned browser session/page routes with pluggable driver
+  metadata and normalized `browser_page` preview surfaces
 - Exposes runtime-owned delivery execution routes such as delivery audit,
   artifact publication, repo status, commit, and push without embedding
   product-level delivery governance policy
@@ -191,6 +197,22 @@ src/
   history, artifacts, and invocation metadata
 - Routes close/cancel/delete/reset through adapter-aware remote cleanup hooks
   instead of only dropping local runtime handles
+
+### `src/backends/browser`
+
+- Hosts pluggable browser drivers behind one runtime-owned contract
+- Keeps the first slice dependency-light and runtime-local
+- Starts with a `manual` driver that validates browser session/page lifecycle
+  and preview-surface registration without launching a managed browser process
+
+### `src/core/browser`
+
+- Defines runtime-owned browser session/page lifecycle helpers
+- Defines browser-page preview-surface normalization aligned with existing
+  service/artifact preview contracts
+- Keeps browser-driver integration replaceable so future Playwright/CDP or
+  BrowserOS-style adapters can plug in without rewriting the public HTTP
+  contract
 
 ### `src/core/tools`
 

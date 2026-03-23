@@ -26,6 +26,12 @@
 - `GET /diagnostics/providers`
 - `GET /providers/config`
 - `GET /providers/:provider/models`
+- `GET /browser/drivers`
+- `GET /browser/sessions`
+- `GET /browser/sessions/:id`
+- `POST /browser/sessions`
+- `POST /browser/sessions/:id/pages`
+- `POST /browser/sessions/:id/close`
 - `POST /delivery/audit`
 - `POST /delivery/artifacts/publish`
 - `POST /delivery/repo/status`

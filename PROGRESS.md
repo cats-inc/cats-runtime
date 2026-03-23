@@ -16,8 +16,9 @@
 | Dashboard | Completed | The embedded dashboard UI is served from `GET /` and now surfaces runtime/provider health from runtime-owned diagnostics contracts |
 | Workspace Substrate | Completed | `audit-workspace`, `init-workspace`, and `update-workspace` now return explicit preview/apply contracts, machine-readable action plans/diff stats, approval-friendly payloads, and `*.bootstrap` review-copy behavior without owning product policy |
 | Delivery Primitives | Completed | Runtime-owned delivery audit, artifact publish/export, repo status, commit, push, and normalized preview-surface metadata are now available over both HTTP routes and local tools |
+| Browser Preview Substrate | Completed | Runtime-owned browser driver/session/page contracts, `browser_page` preview surfaces, manual driver validation, and additive `/browser/*` routes now exist without depending on sibling browser projects |
 | Tests | Completed | Vitest covers provider, discovery, pool, HTTP, delivery, server bootstrap, API/local tool-loop behavior, and first-slice metering/guardrail/progress normalization |
-| Docs | In Progress | Core docs now cover startup/diagnostics, provider compatibility/evidence flows, model catalog, session branching, workspace substrate, runtime hydration/re-entry metadata, delivery primitives, runtime-managed skills and explicit clearing, the scheduled wakeup substrate, first-slice metering/progress contracts, additive session inspection/run-state/maintenance payloads, and the runtime MCP facade; later PLAN-003/PLAN-005 follow-on items still need ongoing updates |
+| Docs | In Progress | Core docs now cover startup/diagnostics, provider compatibility/evidence flows, model catalog, session branching, workspace substrate, runtime hydration/re-entry metadata, delivery primitives, the browser preview substrate, runtime-managed skills and explicit clearing, the scheduled wakeup substrate, first-slice metering/progress contracts, additive session inspection/run-state/maintenance payloads, and the runtime MCP facade; later PLAN-003/PLAN-005 follow-on items still need ongoing updates |
 | Follow-ups | Completed | Accepted post-review findings for provider-instance rollout were implemented and recorded in `docs/plans/PLAN-002-provider-instance-review-followups.md` |
 
 **Legend**: Not Started | In Progress | Completed | Blocked
@@ -570,6 +571,35 @@ replacing the direct runtime HTTP API used by product code.
 - [ ] No standalone stdio MCP binary yet; the current slice is HTTP JSON-RPC only
 - [ ] No session mutation tools yet; the first slice is read-mostly and preview-first
 - [ ] No attempt to make MCP the primary product/runtime interface
+
+### WP-16: Browser Preview Substrate v0
+
+**Status**: Completed
+**Assigned**: Codex
+**Priority**: P1
+
+#### Goal
+
+Land a runtime-owned browser/preview substrate with pluggable drivers and
+normalized browser-page preview surfaces, without turning `cats-runtime` into a
+full BrowserOS product or depending on sibling browser projects.
+
+#### Delivered
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Add browser driver/session/page contracts | [x] | `src/core/types.ts` now defines runtime-owned browser driver/session/page and `browser_page` preview-surface shapes |
+| Add `src/core/browser` substrate | [x] | `RuntimeBrowserService` now manages runtime-owned browser sessions/pages and preview-surface inspection |
+| Add first pluggable browser driver | [x] | `src/backends/browser/manualDriver.ts` validates the contract without launching a managed browser |
+| Add browser HTTP routes | [x] | `/browser/drivers`, `/browser/sessions`, `/browser/sessions/{id}`, `/browser/sessions/{id}/pages`, and `/browser/sessions/{id}/close` now ship |
+| Align service/artifact/browser-page preview surfaces | [x] | Browser routes can bind to runtime session services/artifacts while preserving the existing preview-surface schema |
+| Update docs and tests | [x] | `README.md`, `docs/api.md`, `docs/architecture.md`, `docs/AGENT-GUIDE.md`, `docs/plans/PLAN-013-*.md`, and browser tests now cover the slice |
+
+#### Deferred Boundaries
+
+- [ ] No real Playwright/CDP/BrowserOS driver yet; the first slice validates contracts with a manual driver only
+- [ ] No browser-session persistence or restart-safe recovery yet
+- [ ] No product-side preview UI or browser takeover workflow yet
 
 ---
 

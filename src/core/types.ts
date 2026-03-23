@@ -79,18 +79,27 @@ export type RuntimeDeliveryApplyDecision =
   | 'read_only_operation'
   | 'blocked'
   | 'applied';
-export type RuntimePreviewSurfaceKind = 'service' | 'artifact';
+export type RuntimePreviewSurfaceKind = 'service' | 'artifact' | 'browser_page';
 export type RuntimePreviewSurfaceSource =
   | 'session_service'
   | 'session_artifact'
   | 'request_service'
   | 'request_artifact'
-  | 'published_artifact';
+  | 'published_artifact'
+  | 'browser_page';
 export type RuntimePreviewSurfaceRenderHint =
   | 'iframe'
   | 'open_external'
   | 'download'
   | 'none';
+export type RuntimeBrowserDriverKind = 'manual' | 'service_preview_only' | 'noop' | (string & {});
+export type RuntimeBrowserDriverStatus = 'ready' | 'degraded' | 'unsupported';
+export type RuntimeBrowserSessionStatus = 'ready' | 'closed';
+export type RuntimeBrowserPageStatus = 'open' | 'closed';
+export type RuntimeBrowserPageBindingKind =
+  | 'manual_url'
+  | 'session_service'
+  | 'session_artifact';
 export type RuntimeUsageSourceConfidence =
   | 'reported'
   | 'aggregated'
@@ -341,6 +350,8 @@ export interface RuntimePreviewSurfaceProvenance {
   workspacePath?: string;
   artifactId?: string;
   serviceId?: string;
+  browserSessionId?: string;
+  browserPageId?: string;
   publicationDirectory?: string;
 }
 
@@ -356,6 +367,70 @@ export interface RuntimePreviewSurface {
   path?: string;
   mediaType?: string;
   provenance?: RuntimePreviewSurfaceProvenance;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RuntimeBrowserDriverCapabilities {
+  persistentSessions: boolean;
+  manualUrlEntry: boolean;
+  serviceBindings: boolean;
+  artifactBindings: boolean;
+  liveAutomation: boolean;
+}
+
+export interface RuntimeBrowserDriverDescriptor {
+  id: string;
+  kind: RuntimeBrowserDriverKind;
+  status: RuntimeBrowserDriverStatus;
+  title: string;
+  summary: string;
+  capabilities: RuntimeBrowserDriverCapabilities;
+  warnings: string[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface RuntimeBrowserPageBinding {
+  kind: RuntimeBrowserPageBindingKind;
+  runtimeSessionId?: string;
+  serviceId?: string;
+  artifactId?: string;
+}
+
+export interface RuntimeBrowserPage {
+  id: string;
+  browserSessionId: string;
+  status: RuntimeBrowserPageStatus;
+  label?: string;
+  title?: string;
+  url?: string;
+  path?: string;
+  mediaType?: string;
+  createdAt: string;
+  updatedAt: string;
+  closedAt?: string;
+  binding: RuntimeBrowserPageBinding;
+  previewSurface: RuntimePreviewSurface;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RuntimeBrowserSessionInspection {
+  driver: RuntimeBrowserDriverDescriptor;
+  openPageCount: number;
+  closedPageCount: number;
+  previewSurfaces: RuntimePreviewSurface[];
+}
+
+export interface RuntimeBrowserSessionView {
+  id: string;
+  driverId: string;
+  status: RuntimeBrowserSessionStatus;
+  runtimeSessionId?: string;
+  label?: string;
+  createdAt: string;
+  updatedAt: string;
+  closedAt?: string;
+  pages: RuntimeBrowserPage[];
+  inspection: RuntimeBrowserSessionInspection;
   metadata?: Record<string, unknown>;
 }
 

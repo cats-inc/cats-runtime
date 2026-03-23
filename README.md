@@ -16,6 +16,7 @@ Current capabilities:
 - streamed turns over SSE or NDJSON
 - machine-readable session/run inspection payloads over `/sessions`, `/sessions/{id}/history`, and `/sessions/{id}/observe`
 - runtime-owned maintenance metadata for reset boundaries, compaction readiness, pending memory-flush hooks, and delete cleanup summaries
+- a lightweight browser/preview substrate with runtime-owned browser sessions/pages, a pluggable driver seam, and manual browser-page preview registration
 - provider-agnostic `progress` events across Junie, Pi, Goose, Copilot, and API/local transports
 - runtime-hosted local tools for API/local sessions (`list_files`, `read_file`, `write_file`, `grep`, `run_shell`)
 - external session discovery for supported local tools
@@ -50,6 +51,7 @@ Current capabilities:
 - [x] Add the first provider compatibility/evidence engine slice for CLI-backed providers
 - [x] Add provider-agnostic run-inspector/session-discipline contracts across CLI, API, and agent backends
 - [x] Add session maintenance hooks and cleanup discipline for long-running lifecycle boundaries
+- [x] Add the first browser/preview substrate with manual driver validation and normalized `browser_page` surfaces
 - [x] Add the first runtime-owned MCP facade slice without replacing direct HTTP APIs
 
 ## Design Rules

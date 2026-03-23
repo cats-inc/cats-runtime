@@ -16,8 +16,8 @@ These important documents live in the project root:
 | Document | Status | Description |
 |----------|--------|-------------|
 | [requirements.md](./requirements.md) | Template | Requirements specification |
-| [architecture.md](./architecture.md) | Complete | Embedded runtime architecture, backend layering, and runtime-owned skill / compatibility / metering / session-maintenance seams |
-| [api.md](./api.md) | Complete | Supported public HTTP contract, including skills, diagnostics, progress, guardrails, compatibility summaries, and session maintenance metadata |
+| [architecture.md](./architecture.md) | Complete | Embedded runtime architecture, backend layering, and runtime-owned skill / compatibility / metering / session-maintenance / browser-preview seams |
+| [api.md](./api.md) | Complete | Supported public HTTP contract, including skills, diagnostics, progress, guardrails, browser sessions/pages, preview surfaces, compatibility summaries, and session maintenance metadata |
 
 ## Development Guides
 
@@ -52,7 +52,7 @@ Add your project-specific automation scripts here.
 | [terminology.md](./terminology.md) | Complete | AAIF, A2A, skills, compatibility, evidence, and runtime-project-memory terminology |
 | [a2a/](./a2a/) | Template | A2A protocol examples and templates; some current examples still need A2A v1 alignment |
 | [specs/](./specs/) | Complete | Feature specifications for WSL discovery, agent backend work, runtime-managed skills, scheduled wakeup substrate, provider compatibility/evidence, workspace substrate, executable delivery, session fork/context-transplant, and usage metering/guardrails |
-| [plans/](./plans/) | Complete | Implementation plans for WSL discovery, API/backend expansion, startup contract, runtime-managed skills, provider compatibility/evidence, and metering/progress/guardrails |
+| [plans/](./plans/) | Complete | Implementation plans for WSL discovery, API/backend expansion, startup contract, runtime-managed skills, browser-preview substrate, provider compatibility/evidence, and metering/progress/guardrails |
 | [decisions/](./decisions/) | Complete | Architecture Decision Records for packaging, install/check metadata, diagnostics, workspace substrate, delivery policy boundaries, and runtime-owned metering/guardrails |
 
 **Legend**: Complete | Partial | Template
@@ -87,7 +87,7 @@ When working on this project:
 The runtime's main contracts are now documented, but these areas still need
 later passes:
 
-- browser/preview subsystem planning beyond the current ADR/spec direction
+- deeper browser-driver persistence, cleanup, and real-driver follow-ons beyond the current manual-driver substrate
 - deeper API/local live-probe and model-discovery follow-ons
 - project-specific security and MCP configuration docs beyond the inherited templates
 - A2A examples once runtime-to-runtime collaboration surfaces stabilize
