@@ -629,8 +629,8 @@ return `400` for malformed skill payloads or unknown/invalid runtime skill
 packages. When `skills.strict` is true and the target cannot honor the requested
 delivery contract, the runtime returns `409`.
 
-When a session has wakeup activity, session and history payloads also include an
-additive `wakeup` block:
+When a session has wakeup activity, session, history, and observe payloads also
+include an additive `wakeup` block:
 
 - `pending`: whether at least one scheduled/triggering wakeup still exists
 - `pendingRequestCount`: number of open wakeups targeting this session
@@ -985,13 +985,20 @@ GET /kiro/models
 resolved `instance` alongside the runtime metadata.
 
 `GET /sessions/{id}/observe` returns a machine-readable run-inspection snapshot
-without requiring a live stream connection:
+without requiring a live stream connection. When wakeups exist for the session,
+the same additive `wakeup` block returned by `GET /sessions/{id}` and
+`GET /sessions/{id}/history` is also included:
 
 ```json
 {
   "session": {
     "id": "session-123",
     "providerName": "claude",
+    "wakeup": {
+      "pending": true,
+      "pendingRequestCount": 1,
+      "nextScheduledAt": "2026-03-23T12:05:00.000Z"
+    },
     "inspection": {
       "state": "running"
     }
@@ -1008,7 +1015,12 @@ without requiring a live stream connection:
 `POST /sessions/{id}/cancel` is additive and attempts to stop the current run
 without deleting the logical session. `POST /sessions/{id}/reset` clears
 provider resume/session state so the next `resume` starts from a fresh backend
-attachment while keeping the runtime-owned session record and history.
+attachment while keeping the runtime-owned session record and history. Reset
+also clears any scheduled wakeups targeting that session so stale wake requests
+do not survive after provider resume state is discarded.
+
+`DELETE /sessions/{id}` also clears any persisted wakeups targeting that
+session before the runtime unregisters it.
 
 `GET /providers/config` returns the configured provider topology for dashboards
 or other clients that need to offer provider-instance selection. Each instance

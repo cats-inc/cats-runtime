@@ -124,7 +124,7 @@ describe('wakeup HTTP contract', () => {
     rmSync(rootDir, { recursive: true, force: true });
   });
 
-  it('creates, cancels, and manually triggers wakeups while surfacing additive session/history metadata', async () => {
+  it('creates, cancels, and manually triggers wakeups while surfacing additive session/history/observe metadata', async () => {
     const app = createTestApp();
 
     const createResponse = await app.request('/wakeups', {
@@ -227,6 +227,21 @@ describe('wakeup HTTP contract', () => {
         lastRequest: expect.objectContaining({
           id: second.request.id,
           status: 'triggered',
+        }),
+      }),
+    }));
+
+    const observeResponse = await app.request('/sessions/session-1/observe');
+    expect(observeResponse.status).toBe(200);
+    await expect(observeResponse.json()).resolves.toEqual(expect.objectContaining({
+      session: expect.objectContaining({
+        id: 'session-1',
+        wakeup: expect.objectContaining({
+          pending: false,
+          lastRequest: expect.objectContaining({
+            id: second.request.id,
+            status: 'triggered',
+          }),
         }),
       }),
     }));

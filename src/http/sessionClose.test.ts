@@ -1,4 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRuntimeApp as createApp, getRuntimeSessionManager, type AppContext } from './app.js';
 import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig } from '../backends/cli/config.js';
@@ -7,6 +10,7 @@ import type { CursorNativeSessionService } from '../backends/cli/cursor/CursorNa
 import type { KiroNativeSessionService } from '../backends/cli/kiro/KiroNativeSessionService.js';
 import type { AuggieSessionService } from '../backends/cli/auggie/AuggieSessionService.js';
 import type { OpencodeNativeSessionService } from '../backends/cli/opencode/OpencodeNativeSessionService.js';
+import { RuntimeWakeupService } from '../core/wakeup/RuntimeWakeupService.js';
 
 describe('session close route', () => {
   const makeConfig = (): CliRuntimeConfig => ({
@@ -43,7 +47,7 @@ describe('session close route', () => {
     nativeDiscoveryIntervalMs: 5000,
     externalSessionLiveWindowMs: 15000,
     maxSessions: 10,
-    sessionBaseDir: 'C:/tmp/cats-runtime/sessions',
+    sessionBaseDir,
     providerCommands: {
       auggie: { path: 'auggie', runner: 'auto', runtime: { mode: 'native' } },
       claude: { path: 'claude', runner: 'auto', runtime: { mode: 'native' } },
@@ -65,8 +69,17 @@ describe('session close route', () => {
   let app: ReturnType<typeof createApp>;
   let ctx: AppContext;
   let attachedWorkers: Map<string, { alive: boolean; busy?: boolean }>;
+  let rootDir: string;
+  let sessionBaseDir: string;
+  let dataDir: string;
+  let wakeup: RuntimeWakeupService;
 
   beforeEach(() => {
+    rootDir = mkdtempSync(join(tmpdir(), 'cats-runtime-session-close-'));
+    sessionBaseDir = join(rootDir, 'sessions');
+    dataDir = join(rootDir, 'data');
+    mkdirSync(sessionBaseDir, { recursive: true });
+    mkdirSync(dataDir, { recursive: true });
     registry = new SessionRegistry();
     attachedWorkers = new Map();
     pool = {
@@ -84,6 +97,14 @@ describe('session close route', () => {
       }),
       status: vi.fn(() => ({ active: attachedWorkers.size })),
     } as unknown as WorkerPool;
+    wakeup = new RuntimeWakeupService({
+      persistPath: join(dataDir, 'wakeups.json'),
+      sessionExists: (sessionId) => registry.get(sessionId) !== undefined,
+      wakeSession: vi.fn(async (sessionId: string) => ({
+        sessionId,
+        outcome: 'resumed' as const,
+      })),
+    });
     cursorNative = {
       createSession: vi.fn(),
       listSessions: vi.fn(),
@@ -131,8 +152,14 @@ describe('session close route', () => {
       kiroNative,
       auggieSessions,
       opencodeNative,
+      wakeup,
     } as AppContext;
     app = createApp(ctx);
+  });
+
+  afterEach(() => {
+    wakeup.close();
+    rmSync(rootDir, { recursive: true, force: true });
   });
 
   it('returns closed when the worker is already gone', async () => {
@@ -236,6 +263,65 @@ describe('session close route', () => {
     expect(body.inspection.services).toEqual([]);
   });
 
+  it('clears scheduled wakeups when resetting a session', async () => {
+    const session = registry.create({
+      id: 'session-reset-wakeup',
+      providerName: 'claude',
+      cwd: join(rootDir, 'repo-reset'),
+    });
+    registry.setProviderSessionId(session.id, 'provider-session-reset');
+    wakeup.create({
+      reason: 'Wake after reopen.',
+      target: {
+        kind: 'session',
+        sessionId: session.id,
+      },
+      scheduleAt: '2026-03-23T00:05:00.000Z',
+    });
+
+    const res = await app.request(`/sessions/${session.id}/reset`, {
+      method: 'POST',
+    });
+    expect(res.status).toBe(200);
+
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.status).toBe('closed');
+    expect(body).not.toHaveProperty('wakeup');
+
+    const wakeupListResponse = await app.request(`/wakeups?sessionId=${session.id}`);
+    expect(wakeupListResponse.status).toBe(200);
+    await expect(wakeupListResponse.json()).resolves.toEqual({ wakeups: [] });
+  });
+
+  it('clears scheduled wakeups when deleting a session', async () => {
+    const session = registry.create({
+      id: 'session-delete-wakeup',
+      providerName: 'claude',
+      cwd: join(rootDir, 'repo-delete'),
+    });
+    registry.updateStatus(session.id, 'closed');
+    wakeup.create({
+      reason: 'Wake before follow-up.',
+      target: {
+        kind: 'session',
+        sessionId: session.id,
+      },
+      scheduleAt: '2026-03-23T00:10:00.000Z',
+    });
+
+    const res = await app.request(`/sessions/${session.id}`, {
+      method: 'DELETE',
+    });
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual(expect.objectContaining({
+      status: 'deleted',
+    }));
+
+    const wakeupListResponse = await app.request(`/wakeups?sessionId=${session.id}`);
+    expect(wakeupListResponse.status).toBe(200);
+    await expect(wakeupListResponse.json()).resolves.toEqual({ wakeups: [] });
+  });
+
   it('returns a machine-readable observe payload with inspection and stream availability', async () => {
     const session = registry.create({
       id: 'session-5',
@@ -260,6 +346,14 @@ describe('session close route', () => {
         status: 'running',
       },
     });
+    wakeup.create({
+      reason: 'Wake for owner follow-up.',
+      target: {
+        kind: 'session',
+        sessionId: session.id,
+      },
+      scheduleAt: '2026-03-23T00:15:00.000Z',
+    });
 
     const res = await app.request(`/sessions/${session.id}/observe`);
     expect(res.status).toBe(200);
@@ -272,6 +366,15 @@ describe('session close route', () => {
       },
       session: {
         id: session.id,
+        wakeup: {
+          pending: true,
+          pendingRequestCount: 1,
+          nextScheduledAt: '2026-03-23T00:15:00.000Z',
+          lastRequest: {
+            reason: 'Wake for owner follow-up.',
+            status: 'scheduled',
+          },
+        },
         inspection: {
           state: 'running',
           wake: {

@@ -45,6 +45,11 @@ export interface ListRuntimeWakeupsOptions {
   sessionId?: string;
 }
 
+export interface ClearSessionWakeupsResult {
+  removedCount: number;
+  removedIds: string[];
+}
+
 export interface RuntimeWakeupServiceOptions {
   persistPath: string;
   wakeSession: (
@@ -217,6 +222,26 @@ export class RuntimeWakeupService {
   get(id: string): RuntimeWakeupRequest | undefined {
     const request = this.requests.get(id);
     return request ? cloneWakeupRequest(request) : undefined;
+  }
+
+  clearSession(sessionId: string): ClearSessionWakeupsResult {
+    const removedIds: string[] = [];
+    for (const [id, request] of this.requests.entries()) {
+      if (request.target.sessionId !== sessionId) {
+        continue;
+      }
+      this.requests.delete(id);
+      removedIds.push(id);
+    }
+
+    if (removedIds.length > 0) {
+      this.persist();
+    }
+
+    return {
+      removedCount: removedIds.length,
+      removedIds,
+    };
   }
 
   create(input: CreateRuntimeWakeupInput): {

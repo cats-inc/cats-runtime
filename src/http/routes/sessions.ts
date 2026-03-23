@@ -1358,6 +1358,7 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
   ctx.registry.updateStatus(id, 'closed');
   runtime.clearProviderState(id);
   runtime.markClosed(id);
+  ctx.wakeup?.clearSession(id);
   return c.json(serializeSession(ctx, ctx.registry.get(id) ?? session));
 });
 
@@ -1458,6 +1459,7 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
   if (session.workspaceMode === 'isolated') {
     workspaceCleaned = cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, id);
   }
+  ctx.wakeup?.clearSession(id);
   ctx.registry.unregister(id);
   runtime.dropSession(id);
   ctx.registry.flush();

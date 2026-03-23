@@ -22,6 +22,7 @@ observeRoutes.get('/sessions/:id/observe', async (c) => {
   }
 
   const runtime = getRuntimeSessionManager(ctx);
+  const wakeup = ctx.wakeup?.getSessionWakeState(session.id);
   const view = toSessionView(session, {
     attached: runtime.isAttached(session.id),
     externalSessionLiveWindowMs: ctx.config.externalSessionLiveWindowMs,
@@ -30,6 +31,7 @@ observeRoutes.get('/sessions/:id/observe', async (c) => {
   return c.json({
     session: {
       ...view,
+      ...(wakeup ? { wakeup } : {}),
       inspection: buildSessionInspection({
         session,
         view,
