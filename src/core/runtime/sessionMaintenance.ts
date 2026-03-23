@@ -260,7 +260,7 @@ function cloneHook(
   };
 }
 
-function cloneMaintenanceRequest(
+export function cloneMaintenanceRequest(
   request: NonNullable<RuntimeSessionMaintenanceState['lastRequest']>,
 ): NonNullable<RuntimeSessionMaintenanceState['lastRequest']> {
   return {

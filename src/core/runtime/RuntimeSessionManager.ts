@@ -31,7 +31,10 @@ import type { BackendKind } from '../../backends/cli/config.js';
 import { ApiBackendManager } from '../../backends/api/runtime/ApiBackendManager.js';
 import { AgentBackendManager } from '../../backends/agent/runtime/AgentBackendManager.js';
 import { extractWakeReason } from './wakeReason.js';
-import type { RuntimeTrackedSessionMaintenanceState } from './sessionMaintenance.js';
+import {
+  cloneMaintenanceRequest,
+  type RuntimeTrackedSessionMaintenanceState,
+} from './sessionMaintenance.js';
 
 type ExecutionEventName = 'event' | 'exit' | 'error';
 type ExecutionListener = (...args: unknown[]) => void;
@@ -737,20 +740,6 @@ function cloneLifecycle(
     ...lifecycle,
     reasonCodes: [...lifecycle.reasonCodes],
     cleanup: { ...lifecycle.cleanup },
-  };
-}
-
-function cloneMaintenanceRequest(
-  request: RuntimeSessionMaintenanceRequest,
-): RuntimeSessionMaintenanceRequest {
-  return {
-    ...request,
-    hookPayloads: request.hookPayloads.map((payload) => ({
-      ...payload,
-      ...(Object.prototype.hasOwnProperty.call(payload, 'payload')
-        ? { payload: structuredClone(payload.payload) }
-        : {}),
-    })),
   };
 }
 

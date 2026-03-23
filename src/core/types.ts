@@ -1079,6 +1079,8 @@ export type RuntimeSessionCleanupStatus =
 export type RuntimeSessionLifecycleAction = 'close' | 'reset' | 'delete';
 export type RuntimeSessionLifecycleBoundary = 'soft_close' | 'hard_reset' | 'permanent_delete';
 export type RuntimeSessionLifecycleStatus = 'completed' | 'retained';
+// Reserved for a future hook-only pre-compaction handshake if runtime later
+// distinguishes "prepare" from the external compaction trigger itself.
 export type RuntimeSessionMaintenanceAction =
   | RuntimeSessionLifecycleAction
   | 'prepare_compaction'
