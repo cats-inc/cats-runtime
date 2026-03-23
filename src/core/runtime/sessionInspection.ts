@@ -166,11 +166,13 @@ function dedupePreviewSurfaces(
 ): RuntimePreviewSurface[] {
   const deduped = new Map<string, RuntimePreviewSurface>();
   for (const previewSurface of previewSurfaces) {
-    if (!previewSurface.id || deduped.has(previewSurface.id)) {
+    const dedupeKey = resolvePreviewSurfaceDedupeKey(previewSurface);
+    if (!dedupeKey || deduped.has(dedupeKey)) {
       continue;
     }
-    deduped.set(previewSurface.id, {
+    deduped.set(dedupeKey, {
       ...previewSurface,
+      id: normalizePreviewSurfaceId(previewSurface, dedupeKey),
       ...(previewSurface.metadata ? { metadata: { ...previewSurface.metadata } } : {}),
       ...(previewSurface.provenance
         ? { provenance: { ...previewSurface.provenance } }
@@ -178,6 +180,39 @@ function dedupePreviewSurfaces(
     });
   }
   return Array.from(deduped.values());
+}
+
+function resolvePreviewSurfaceDedupeKey(
+  previewSurface: RuntimePreviewSurface,
+): string | undefined {
+  const id = previewSurface.id?.trim();
+  if (id) {
+    return id;
+  }
+
+  const fallbackSegments = [
+    previewSurface.kind,
+    previewSurface.source,
+    previewSurface.artifactId,
+    previewSurface.provenance?.serviceId,
+    previewSurface.url,
+    previewSurface.path,
+    previewSurface.label,
+  ].filter((segment): segment is string => typeof segment === 'string' && segment.trim().length > 0);
+
+  if (fallbackSegments.length === 0) {
+    return undefined;
+  }
+
+  return `derived:${fallbackSegments.join('|')}`;
+}
+
+function normalizePreviewSurfaceId(
+  previewSurface: RuntimePreviewSurface,
+  dedupeKey: string,
+): string {
+  const id = previewSurface.id?.trim();
+  return id || dedupeKey;
 }
 
 function createArtifactPreviewSurface(

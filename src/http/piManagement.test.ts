@@ -310,6 +310,82 @@ describe('Pi session management', () => {
     });
   });
 
+  it('dedupes Pi streaming assistant text when turn_end and agent_end repeat the same final reply', async () => {
+    const sourcePath = join(piSessionsDir, 'workspace', 'streaming-session.jsonl');
+    mkdirSync(join(piSessionsDir, 'workspace'), { recursive: true });
+    writeFileSync(sourcePath, [
+      JSON.stringify({
+        type: 'message',
+        timestamp: '2026-03-23T00:00:00.000Z',
+        message: {
+          role: 'user',
+          content: [{ type: 'text', text: 'Summarize the diff.' }],
+        },
+      }),
+      JSON.stringify({
+        type: 'message_update',
+        timestamp: '2026-03-23T00:00:01.000Z',
+        assistantMessageEvent: {
+          type: 'text_delta',
+          delta: 'Looks ',
+        },
+      }),
+      JSON.stringify({
+        type: 'message_update',
+        timestamp: '2026-03-23T00:00:01.500Z',
+        assistantMessageEvent: {
+          type: 'text_delta',
+          delta: 'good.',
+        },
+      }),
+      JSON.stringify({
+        type: 'turn_end',
+        timestamp: '2026-03-23T00:00:02.000Z',
+        message: {
+          stopReason: 'stop',
+        },
+      }),
+      JSON.stringify({
+        type: 'agent_end',
+        timestamp: '2026-03-23T00:00:02.000Z',
+        messages: [{
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Looks good.' }],
+        }],
+      }),
+      '',
+    ].join('\n'));
+
+    const session = registry.upsertDiscovered('pi-streaming-history', {
+      providerName: 'pi',
+      cwd: 'C:/repo',
+      sourcePath,
+      messageCount: 2,
+    });
+
+    const response = await app.request(`/sessions/${session!.id}/history`);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      transcript: {
+        ownership: 'provider',
+        source: 'jsonl',
+        parser: 'pi_native',
+      },
+      messages: [
+        {
+          role: 'user',
+          text: 'Summarize the diff.',
+          timestamp: '2026-03-23T00:00:00.000Z',
+        },
+        {
+          role: 'assistant',
+          text: 'Looks good.',
+          timestamp: '2026-03-23T00:00:01.000Z',
+        },
+      ],
+    });
+  });
+
   it('respawns a live Pi worker when runtime skill delivery changes and a resume source is available', async () => {
     const sourcePath = join(piSessionsDir, 'workspace', 'session.jsonl');
     mkdirSync(join(piSessionsDir, 'workspace'), { recursive: true });

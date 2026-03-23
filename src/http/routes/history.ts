@@ -108,30 +108,34 @@ async function loadPiHistory(filePath: string): Promise<HistoryMessage[]> {
   let streamingAssistantText = '';
   let streamingAssistantTimestamp: string | undefined;
 
-  const flushStreamingAssistant = () => {
-    const text = streamingAssistantText.trim();
+  const pushMessage = (
+    role: HistoryMessage['role'],
+    textValue: string,
+    timestamp?: string,
+  ) => {
+    const text = textValue.trim();
     if (!text) {
-      streamingAssistantText = '';
-      streamingAssistantTimestamp = undefined;
       return;
     }
 
     const previous = messages.at(-1);
     if (
-      previous?.role === 'assistant'
+      previous?.role === role
       && previous.text === text
-      && previous.timestamp === streamingAssistantTimestamp
+      && previous.timestamp === timestamp
     ) {
-      streamingAssistantText = '';
-      streamingAssistantTimestamp = undefined;
       return;
     }
 
     messages.push({
-      role: 'assistant',
+      role,
       text,
-      timestamp: streamingAssistantTimestamp,
+      timestamp,
     });
+  };
+
+  const flushStreamingAssistant = () => {
+    pushMessage('assistant', streamingAssistantText, streamingAssistantTimestamp);
     streamingAssistantText = '';
     streamingAssistantTimestamp = undefined;
   };
@@ -156,10 +160,10 @@ async function loadPiHistory(filePath: string): Promise<HistoryMessage[]> {
       const role = obj.message?.role;
       const text = extractPiTextContent(obj.message?.content);
       if (role === 'user' && text) {
-        messages.push({ role: 'user', text, timestamp });
+        pushMessage('user', text, timestamp);
       } else if (role === 'assistant' && text) {
         flushStreamingAssistant();
-        messages.push({ role: 'assistant', text, timestamp });
+        pushMessage('assistant', text, timestamp);
       }
       continue;
     }
@@ -200,7 +204,10 @@ async function loadPiHistory(filePath: string): Promise<HistoryMessage[]> {
       const text = extractPiTextContent(lastAssistant?.content);
       if (text) {
         flushStreamingAssistant();
-        messages.push({ role: 'assistant', text, timestamp });
+        const previous = messages.at(-1);
+        if (previous?.role !== 'assistant' || previous.text !== text.trim()) {
+          pushMessage('assistant', text, timestamp);
+        }
       } else {
         flushStreamingAssistant();
       }
