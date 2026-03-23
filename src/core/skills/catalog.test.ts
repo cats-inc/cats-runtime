@@ -18,22 +18,37 @@ describe('runtime skill catalog', () => {
 
   function writeSkillPackage(
     skillsRoot: string,
-    skillId: string,
+    skillPath: string,
     options: {
       body?: string;
       name?: string;
       description?: string;
+      family?: string;
+      title?: string;
+      version?: string;
+      aliases?: string[];
     } = {},
   ) {
-    const skillDir = join(skillsRoot, skillId);
+    const pathSegments = skillPath.split('/').filter(Boolean);
+    const slug = pathSegments.at(-1)!;
+    const skillDir = join(skillsRoot, ...pathSegments);
     mkdirSync(skillDir, { recursive: true });
     writeFileSync(join(skillDir, 'SKILL.md'), [
       '---',
-      `name: ${options.name ?? skillId}`,
-      `description: ${options.description ?? `${skillId} description.`}`,
+      `name: ${options.name ?? slug}`,
+      ...(options.title ? [`title: ${options.title}`] : []),
+      `description: ${options.description ?? `${slug} description.`}`,
+      ...(options.family ? [`family: ${options.family}`] : []),
+      ...(options.version ? [`version: ${options.version}`] : []),
+      ...(options.aliases?.length
+        ? [
+            'aliases:',
+            ...options.aliases.map((alias) => `  - ${alias}`),
+          ]
+        : []),
       '---',
       '',
-      options.body ?? `Use the ${skillId} workflow.`,
+      options.body ?? `Use the ${slug} workflow.`,
       '',
     ].join('\n'), 'utf8');
     return skillDir;
@@ -168,6 +183,115 @@ describe('runtime skill catalog', () => {
       name: 'RuntimeSkillError',
       code: 'invalid_skill_package',
     }));
+  });
+
+  it('resolves family-aware library skills and preserves requested refs', () => {
+    const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
+    cleanupPaths.push(sessionBaseDir);
+    const skillsRoot = join(sessionBaseDir, 'skills');
+    const cwd = join(sessionBaseDir, 'repo');
+    mkdirSync(cwd, { recursive: true });
+    writeSkillPackage(skillsRoot, 'work/product-manager', {
+      family: 'work',
+      title: 'Product Manager',
+      version: '2026.03',
+      aliases: ['pm'],
+      body: 'Shape product outcomes.',
+    });
+
+    const skillState = resolveRuntimeSkillManifest({
+      requestedSkills: [{
+        family: 'work',
+        slug: 'product-manager',
+        version: '2026.03',
+      }],
+    }, {
+      sessionId: 'session-work-role',
+      providerName: 'claude',
+      providerBackend: 'api',
+      cwd,
+      workspaceMode: 'shared',
+      sessionBaseDir,
+      skillsRoot,
+    });
+
+    expect(skillState).toEqual(expect.objectContaining({
+      requestedSkills: ['work/product-manager'],
+      requestedSkillRefs: [{
+        id: 'work/product-manager',
+        family: 'work',
+        slug: 'product-manager',
+        version: '2026.03',
+        requestedAs: 'work/product-manager',
+      }],
+      appliedSkillIds: ['work/product-manager'],
+      resolvedSkills: [expect.objectContaining({
+        id: 'work/product-manager',
+        family: 'work',
+        slug: 'product-manager',
+        version: '2026.03',
+        title: 'Product Manager',
+      })],
+    }));
+  });
+
+  it('rejects ambiguous slug-only requests when multiple families share the same slug', () => {
+    const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
+    cleanupPaths.push(sessionBaseDir);
+    const skillsRoot = join(sessionBaseDir, 'skills');
+    writeSkillPackage(skillsRoot, 'work/architect', {
+      family: 'work',
+    });
+    writeSkillPackage(skillsRoot, 'code/architect', {
+      family: 'code',
+    });
+
+    expect(() => resolveRuntimeSkillManifest({
+      requestedSkills: ['architect'],
+    }, {
+      sessionId: 'session-ambiguous',
+      providerName: 'claude',
+      providerBackend: 'api',
+      cwd: join(sessionBaseDir, 'repo'),
+      workspaceMode: 'shared',
+      sessionBaseDir,
+      skillsRoot,
+    })).toThrowError("Runtime skill 'architect' is ambiguous. Request it as family/slug instead.");
+  });
+
+  it('downgrades Codex filesystem delivery when selected skills collide on materialized slug', () => {
+    const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
+    cleanupPaths.push(sessionBaseDir);
+    const skillsRoot = join(sessionBaseDir, 'skills');
+    const cwd = join(sessionBaseDir, 'repo');
+    mkdirSync(cwd, { recursive: true });
+    writeSkillPackage(skillsRoot, 'work/architect', {
+      family: 'work',
+    });
+    writeSkillPackage(skillsRoot, 'code/architect', {
+      family: 'code',
+    });
+
+    const skillState = resolveRuntimeSkillManifest({
+      requestedSkills: ['work/architect', 'code/architect'],
+    }, {
+      sessionId: 'session-collision',
+      providerName: 'codex',
+      providerBackend: 'cli',
+      cwd,
+      workspaceMode: 'isolated',
+      sessionBaseDir,
+      skillsRoot,
+    });
+
+    expect(skillState?.delivery).toEqual(expect.objectContaining({
+      preferredMode: 'filesystem',
+      mode: 'instructions',
+      status: 'degraded',
+    }));
+    expect(skillState?.warnings).toEqual(expect.arrayContaining([
+      expect.stringContaining("slug 'architect'"),
+    ]));
   });
 
   it('reuses the resolved skill package when building later instruction overlays', () => {

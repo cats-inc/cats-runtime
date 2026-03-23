@@ -60,7 +60,21 @@ export function buildRuntimeSkillManifestFromState(
 
   return {
     ...(skillState.profileId ? { profileId: skillState.profileId } : {}),
-    requestedSkills: [...skillState.requestedSkills],
+    requestedSkills: skillState.requestedSkillRefs?.length
+      ? skillState.requestedSkillRefs.map((skillRef) => {
+          if (skillRef.family || skillRef.version || skillRef.fingerprint) {
+            return {
+              id: skillRef.id,
+              ...(skillRef.family ? { family: skillRef.family } : {}),
+              slug: skillRef.slug,
+              ...(skillRef.version ? { version: skillRef.version } : {}),
+              ...(skillRef.fingerprint ? { fingerprint: skillRef.fingerprint } : {}),
+            };
+          }
+
+          return skillRef.id;
+        })
+      : [...skillState.requestedSkills],
     ...(skillState.context ? { context: structuredClone(skillState.context) } : {}),
     strict: skillState.strict === true,
   };
@@ -88,6 +102,15 @@ export async function hydrateSessionState(
             skills: {
               source: resolvedSkills.source,
               requestedSkills: [...resolvedSkills.skillState.requestedSkills],
+              ...(resolvedSkills.skillState.requestedSkillRefs?.length
+                ? {
+                    requestedSkillRefs: resolvedSkills.skillState.requestedSkillRefs
+                      .map((skillRef) => structuredClone(skillRef)),
+                  }
+                : {}),
+              resolvedSkills: resolvedSkills.skillState.resolvedSkills
+                .map((skill) => structuredClone(skill)),
+              appliedSkillIds: [...resolvedSkills.skillState.appliedSkillIds],
               provider: resolvedSkills.skillState.delivery.provider,
               backend: resolvedSkills.skillState.delivery.backend,
               preferredMode: resolvedSkills.skillState.delivery.preferredMode,

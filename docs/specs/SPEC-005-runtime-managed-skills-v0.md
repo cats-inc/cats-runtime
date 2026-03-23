@@ -12,8 +12,9 @@
 
 `cats-runtime` now has a first delivered runtime-managed skills slice: session
 payloads carry requested/resolved/applied metadata, delivery modes are
-backend-aware, and callers can explicitly clear persisted skill state with
-`skills: null`.
+backend-aware, callers can explicitly clear persisted skill state with
+`skills: null`, and the resolver can now distinguish canonical family/slug
+library ids from plain slug requests.
 
 The remaining gap is not whether skills exist at runtime, but how far the v0
 contract should go beyond the delivered session/runtime slice.
@@ -77,7 +78,7 @@ platform, MCP tool registry, or scheduler-driven agent behavior model.
 3. The runtime shall reject malformed skill packages as unavailable for runtime
    attachment instead of attempting best-effort execution from broken metadata.
 4. Session create and message flows shall be able to carry an optional explicit
-   list of requested skill names.
+   list of requested skill names or richer request refs.
 5. The runtime shall resolve requested skill names into a normalized
    `ResolvedSkillSet` before backend execution begins.
 6. The runtime shall persist requested and resolved skill metadata in session
@@ -165,9 +166,11 @@ interface SessionSkillSelection {
 
 interface ResolvedSkillRef {
   name: string;
+  slug: string;
   sourcePath: string;
   entryFile: string;
   family?: string;
+  version?: string;
   fingerprint?: string;
 }
 

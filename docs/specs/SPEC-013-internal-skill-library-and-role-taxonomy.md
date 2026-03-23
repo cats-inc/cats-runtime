@@ -105,6 +105,11 @@ this repo and must not depend on a sibling/submodule role catalog at runtime.
    - `capabilityTags`
 6. The library shall define canonical naming and slug rules so future role
    additions remain deterministic.
+   - runtime resolution should accept canonical family-qualified ids such as
+     `work/product-manager`
+   - authors should prefer globally unique slugs for execution-critical skills
+     because some runtime delivery targets may flatten packages during
+     materialization
 7. The library shall distinguish:
    - reusable base skills
    - role-specialized skills

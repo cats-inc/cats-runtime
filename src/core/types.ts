@@ -778,6 +778,9 @@ export interface SessionWorkspaceHydrationState {
 export interface SessionSkillHydrationState {
   source: SessionHydrationSkillSource;
   requestedSkills: string[];
+  requestedSkillRefs?: RequestedSessionSkillRef[];
+  resolvedSkills: ResolvedRuntimeSkill[];
+  appliedSkillIds: string[];
   provider: string;
   backend: ProviderBackend;
   preferredMode: RuntimeSkillDeliveryMode;
@@ -802,15 +805,35 @@ export interface RuntimeSkillManifestContext {
   metadata?: Record<string, unknown>;
 }
 
+export interface RuntimeRequestedSkillRef {
+  id?: string;
+  family?: string;
+  slug?: string;
+  version?: string;
+  fingerprint?: string;
+}
+
+export interface RequestedSessionSkillRef {
+  id: string;
+  slug: string;
+  family?: string;
+  version?: string;
+  fingerprint?: string;
+  requestedAs: string;
+}
+
 export interface RuntimeSkillManifest {
   profileId?: string;
-  requestedSkills: string[];
+  requestedSkills: Array<string | RuntimeRequestedSkillRef>;
   context?: RuntimeSkillManifestContext;
   strict?: boolean;
 }
 
 export interface ResolvedRuntimeSkill {
   id: string;
+  slug: string;
+  family?: string;
+  version?: string;
   title: string;
   description: string;
   status: RuntimeSkillResolutionStatus;
@@ -844,6 +867,7 @@ export interface RuntimeSkillDeliveryState {
 export interface SessionSkillState {
   profileId?: string;
   requestedSkills: string[];
+  requestedSkillRefs?: RequestedSessionSkillRef[];
   context?: RuntimeSkillManifestContext;
   resolvedSkills: ResolvedRuntimeSkill[];
   strict: boolean;
@@ -1219,6 +1243,7 @@ export interface RuntimeSessionInspection {
   recentEvents: RuntimeEventExcerpt[];
   metering: RuntimeSessionMeteringSnapshot;
   maintenance: RuntimeSessionMaintenance;
+  skills?: SessionSkillState;
   artifacts: SessionArtifact[];
   services: AgentRuntimeService[];
   previewSurfaces: RuntimePreviewSurface[];

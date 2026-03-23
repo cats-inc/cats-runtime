@@ -696,8 +696,10 @@ When runtime-managed skills are requested, session payloads also include a
 `skills` block with:
 
 - `requestedSkills`: explicit runtime skill ids requested by the caller
+- `requestedSkillRefs`: normalized request refs, including family/slug/version
+  or fingerprint constraints when the caller supplied them
 - `resolvedSkills`: validated runtime catalog entries with source/fingerprint
-  metadata
+  metadata plus family/slug/version identity
 - `delivery`: the runtime-selected delivery contract
   (`filesystem`, `instructions`, or `none`) plus downgrade/unsupported warnings
 - `appliedSkillIds`: the subset the runtime actually attached to the session
@@ -708,9 +710,17 @@ Example shape:
 {
   "skills": {
     "requestedSkills": ["companion"],
+    "requestedSkillRefs": [
+      {
+        "id": "companion",
+        "slug": "companion",
+        "requestedAs": "companion"
+      }
+    ],
     "resolvedSkills": [
       {
         "id": "companion",
+        "slug": "companion",
         "title": "Companion",
         "description": "Core companion behavior...",
         "status": "resolved",
@@ -746,7 +756,8 @@ workspace/skill context for the current target:
 - `workspace.substrate`: read-only workspace substrate audit summary for the
   authoritative workspace path
 - `skills`: machine-readable summary of whether skill delivery was resolved from
-  a new request or rehydrated from persisted session state
+  a new request or rehydrated from persisted session state, including the
+  normalized requested refs, resolved skills, and applied ids
 
 Example shape:
 
@@ -928,6 +939,10 @@ ready to run on an inactive session.
 - `reusePolicy`: one of `create_new`, `prefer_existing`, or `require_existing`
 - `instructions`: session bootstrap instructions persisted by the runtime
 - `skills`: runtime-managed skill manifest with explicit `requestedSkills`
+  where each entry may be either:
+  - a plain string skill id such as `"companion"`
+  - a structured ref such as
+    `{ "family": "work", "slug": "product-manager", "version": "2026.03" }`
 - `context`: structured invocation metadata such as task/workspace hints
 - `outputDir`: output hint for reports, documents, or generated artifacts
 - `workspaceIsolation`: one of `shared`, `isolated`, or `worktree`

@@ -1,6 +1,7 @@
 import type {
   RuntimeSkillManifest,
   RuntimeSkillManifestContext,
+  RuntimeRequestedSkillRef,
   SessionInvocationContext,
 } from '../core/types.js';
 
@@ -59,6 +60,31 @@ export function parseInvocationContext(value: unknown): SessionInvocationContext
 
   return Object.values(context).some((entry) => entry !== undefined)
     ? context
+    : undefined;
+}
+
+function parseRuntimeRequestedSkillRef(
+  value: unknown,
+): string | RuntimeRequestedSkillRef | undefined {
+  if (typeof value === 'string') {
+    return parseOptionalString(value);
+  }
+
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  const ref: RuntimeRequestedSkillRef = {
+    id: parseOptionalString(record.id),
+    family: parseOptionalString(record.family),
+    slug: parseOptionalString(record.slug),
+    version: parseOptionalString(record.version),
+    fingerprint: parseOptionalString(record.fingerprint),
+  };
+
+  return Object.values(ref).some((entry) => entry !== undefined)
+    ? ref
     : undefined;
 }
 
@@ -141,7 +167,7 @@ export function parseRuntimeSkillManifest(value: unknown): ParsedRuntimeSkillMan
   const record = value as Record<string, unknown>;
   if (!Array.isArray(record.requestedSkills)) {
     return {
-      error: 'skills.requestedSkills must be a non-empty string array.',
+      error: 'skills.requestedSkills must be a non-empty array of skill names or refs.',
     };
   }
 
@@ -149,10 +175,20 @@ export function parseRuntimeSkillManifest(value: unknown): ParsedRuntimeSkillMan
     return {};
   }
 
-  const requestedSkills = parseStringArray(record.requestedSkills);
-  if (!requestedSkills || requestedSkills.length === 0) {
+  const requestedSkills: Array<string | RuntimeRequestedSkillRef> = [];
+  for (const entry of record.requestedSkills) {
+    const parsed = parseRuntimeRequestedSkillRef(entry);
+    if (!parsed) {
+      return {
+        error: 'skills.requestedSkills must be a non-empty array of skill names or refs.',
+      };
+    }
+    requestedSkills.push(parsed);
+  }
+
+  if (requestedSkills.length === 0) {
     return {
-      error: 'skills.requestedSkills must be a non-empty string array.',
+      error: 'skills.requestedSkills must be a non-empty array of skill names or refs.',
     };
   }
 

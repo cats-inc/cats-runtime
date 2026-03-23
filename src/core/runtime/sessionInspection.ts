@@ -86,6 +86,7 @@ export function buildSessionInspection(
       wakeupPending: input.wakeupPending,
       trackedMaintenance: input.trackedState?.maintenance,
     }),
+    ...(input.session.skills ? { skills: cloneSkillState(input.session.skills) } : {}),
     artifacts,
     services,
     previewSurfaces,
@@ -231,6 +232,48 @@ function cloneBrowserSessionView(
       })),
     },
     ...(session.metadata ? { metadata: { ...session.metadata } } : {}),
+  };
+}
+
+function cloneSkillState(
+  skillState: SessionInfo['skills'],
+): SessionInfo['skills'] {
+  if (!skillState) {
+    return undefined;
+  }
+
+  return {
+    ...skillState,
+    requestedSkills: [...skillState.requestedSkills],
+    ...(skillState.requestedSkillRefs?.length
+      ? {
+          requestedSkillRefs: skillState.requestedSkillRefs
+            .map((skillRef) => structuredClone(skillRef)),
+        }
+      : {}),
+    ...(skillState.context ? { context: structuredClone(skillState.context) } : {}),
+    resolvedSkills: skillState.resolvedSkills.map((skill) => structuredClone(skill)),
+    delivery: {
+      ...skillState.delivery,
+      warnings: [...skillState.delivery.warnings],
+      ...(skillState.delivery.filesystem
+        ? {
+            filesystem: {
+              ...skillState.delivery.filesystem,
+              entryPaths: [...skillState.delivery.filesystem.entryPaths],
+            },
+          }
+        : {}),
+      ...(skillState.delivery.instructions
+        ? {
+            instructions: {
+              ...skillState.delivery.instructions,
+            },
+          }
+        : {}),
+    },
+    warnings: [...skillState.warnings],
+    appliedSkillIds: [...skillState.appliedSkillIds],
   };
 }
 

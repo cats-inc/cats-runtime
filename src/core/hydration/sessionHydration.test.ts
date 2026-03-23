@@ -57,6 +57,14 @@ describe('session hydration', () => {
       sessionBaseDir,
       skillsRoot,
     });
+    if (existingSkills) {
+      existingSkills.requestedSkillRefs = [{
+        id: 'companion',
+        slug: 'companion',
+        fingerprint: existingSkills.resolvedSkills[0]?.fingerprint,
+        requestedAs: 'companion',
+      }];
+    }
 
     const hydrated = await hydrateSessionState({
       trigger: 'fork',
@@ -72,11 +80,20 @@ describe('session hydration', () => {
     });
 
     expect(buildRuntimeSkillManifestFromState(existingSkills)).toEqual({
-      requestedSkills: ['companion'],
+      requestedSkills: [{
+        id: 'companion',
+        slug: 'companion',
+        fingerprint: existingSkills?.resolvedSkills[0]?.fingerprint,
+      }],
       strict: false,
     });
     expect(hydrated.skills).toEqual(expect.objectContaining({
       requestedSkills: ['companion'],
+      requestedSkillRefs: [expect.objectContaining({
+        id: 'companion',
+        slug: 'companion',
+        fingerprint: existingSkills?.resolvedSkills[0]?.fingerprint,
+      })],
       delivery: expect.objectContaining({
         provider: 'codex',
         backend: 'cli',
@@ -86,6 +103,11 @@ describe('session hydration', () => {
     }));
     expect(hydrated.hydration.skills).toEqual(expect.objectContaining({
       source: 'session_state',
+      requestedSkillRefs: [expect.objectContaining({
+        id: 'companion',
+        slug: 'companion',
+      })],
+      appliedSkillIds: ['companion'],
       provider: 'codex',
       backend: 'cli',
       mode: 'filesystem',

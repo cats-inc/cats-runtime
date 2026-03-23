@@ -39,10 +39,13 @@ Skill directories may include supporting files (for example `scripts/`, `referen
 
 Each skill is a directory containing a `SKILL.md` file:
 
-```
+```text
 skills/
-  └── skill-name/
-      └── SKILL.md
+  ├── skill-name/
+  │   └── SKILL.md
+  └── family/
+      └── skill-name/
+          └── SKILL.md
 ```
 
 The `SKILL.md` file uses YAML frontmatter:
@@ -51,12 +54,27 @@ The `SKILL.md` file uses YAML frontmatter:
 ---
 name: skill-name          # Required: 1-64 chars, lowercase, hyphens, no leading/trailing hyphen, no consecutive hyphens, must match directory
 description: What and when # Required: 1-1024 chars
+title: Human Friendly Title # Optional
+family: work               # Optional but recommended for family-grouped skills
+version: 2026.03           # Optional
+aliases:                   # Optional
+  - short-name
 allowed-tools: Read Bash   # Optional (experimental; support varies by agent implementation)
 ---
 Markdown instructions...
 ```
 
 Note: `allowed-tools` is experimental and may be ignored by some agents.
+
+### Runtime Library Notes
+
+- Runtime resolution accepts either flat slugs like `companion` or canonical
+  family-qualified ids like `work/product-manager`.
+- Family-grouped packages should keep `name:` equal to the leaf directory
+  (`product-manager`), not the canonical id.
+- Runtime-managed filesystem delivery may flatten packages to agent discovery
+  paths, so role-library authors should prefer globally unique slugs for
+  execution-critical skills unless instruction-only delivery is acceptable.
 
 ## Available Skills
 

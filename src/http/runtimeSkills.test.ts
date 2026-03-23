@@ -69,8 +69,14 @@ describe('runtime-managed skills HTTP contract', () => {
   function buildStoredSkillState(): SessionSkillState {
     return {
       requestedSkills: ['companion'],
+      requestedSkillRefs: [{
+        id: 'companion',
+        slug: 'companion',
+        requestedAs: 'companion',
+      }],
       resolvedSkills: [{
         id: 'companion',
+        slug: 'companion',
         title: 'Companion',
         description: 'Companion skill',
         status: 'resolved',
@@ -235,6 +241,64 @@ describe('runtime-managed skills HTTP contract', () => {
       }),
       undefined,
     );
+  });
+
+  it('accepts structured requested skill refs and exposes applied skill state in observe inspection', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        provider: 'codex',
+        workspaceMode: 'isolated',
+        skills: {
+          profileId: 'companion',
+          requestedSkills: [{
+            slug: 'companion',
+          }],
+        },
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    const body = await response.json() as {
+      id: string;
+      skills: {
+        requestedSkills: string[];
+        requestedSkillRefs?: Array<{ id: string; slug: string }>;
+      };
+    };
+    expect(body.skills).toEqual(expect.objectContaining({
+      requestedSkills: ['companion'],
+      requestedSkillRefs: [{
+        id: 'companion',
+        slug: 'companion',
+        requestedAs: 'companion',
+      }],
+    }));
+
+    const observeResponse = await app.request(`/sessions/${body.id}/observe`);
+    expect(observeResponse.status).toBe(200);
+    await expect(observeResponse.json()).resolves.toEqual(expect.objectContaining({
+      session: expect.objectContaining({
+        skills: expect.objectContaining({
+          requestedSkillRefs: [expect.objectContaining({
+            id: 'companion',
+            slug: 'companion',
+          })],
+        }),
+        inspection: expect.objectContaining({
+          skills: expect.objectContaining({
+            appliedSkillIds: ['companion'],
+            resolvedSkills: [expect.objectContaining({
+              id: 'companion',
+              slug: 'companion',
+            })],
+          }),
+        }),
+      }),
+    }));
   });
 
   it('persists companion hydration metadata into the session hydration contract', async () => {

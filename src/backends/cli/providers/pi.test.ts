@@ -8,8 +8,14 @@ describe('PiProvider', () => {
   function buildSkillState(filePath?: string): SessionSkillState {
     return {
       requestedSkills: ['delivery-auditor'],
+      requestedSkillRefs: [{
+        id: 'delivery-auditor',
+        slug: 'delivery-auditor',
+        requestedAs: 'delivery-auditor',
+      }],
       resolvedSkills: [{
         id: 'delivery-auditor',
+        slug: 'delivery-auditor',
         title: 'Delivery Auditor',
         description: 'Checks delivery and outputs.',
         status: 'resolved',
