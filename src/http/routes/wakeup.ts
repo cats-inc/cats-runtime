@@ -38,8 +38,13 @@ function parseWakeupTarget(value: unknown): RuntimeWakeupTarget {
   }
 
   const record = value as Record<string, unknown>;
+  const kind = parseOptionalString(record.kind);
+  if (kind !== 'session') {
+    throw new RuntimeWakeupValidationError('target.kind must be \'session\'.');
+  }
+
   return {
-    kind: record.kind === 'session' ? 'session' : 'session',
+    kind: 'session',
     sessionId: parseOptionalString(record.sessionId) || '',
   };
 }
@@ -89,6 +94,20 @@ wakeupRoutes.get('/wakeups', (c) => {
       sessionId: parseOptionalString(sessionId),
     }),
   });
+});
+
+wakeupRoutes.get('/wakeups/:id', (c) => {
+  const ctx = c.get('ctx');
+  const wakeup = getWakeupService(ctx);
+  const request = wakeup.get(c.req.param('id'));
+
+  if (!request) {
+    return c.json({
+      error: `Wakeup request '${c.req.param('id')}' was not found.`,
+    }, 404);
+  }
+
+  return c.json({ request });
 });
 
 wakeupRoutes.post('/wakeups', async (c) => {

@@ -16,7 +16,7 @@ that a full autonomous scheduler already exists.
 
 This spec defines a small first slice:
 
-- create, list, cancel, and trigger wake requests
+- create, list, inspect, cancel, and trigger wake requests
 - persist requests so scheduled wakeups survive runtime restart
 - coalesce explicitly keyed duplicates and reject exact unkeyed duplicates
 - run due wakeups through a bounded timer loop
@@ -69,7 +69,7 @@ creation.
 
 1. The runtime shall expose a wake request contract containing `reason`,
    `target`, `scheduleAt`, `coalesceKey`, `status`, and optional `metadata`.
-2. The runtime shall expose HTTP routes to create, list, cancel, and trigger
+2. The runtime shall expose HTTP routes to create, list, inspect, cancel, and trigger
    wake requests.
 3. The first slice shall support `target.kind = "session"` with a required
    `sessionId`.

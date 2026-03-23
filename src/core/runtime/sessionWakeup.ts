@@ -84,6 +84,9 @@ export async function ensureSessionAwake(
         );
       }
     }
+
+    // Kiro still resumes through the generic CLI provider-session path below after
+    // enforcing its "latest session in workspace" constraint here.
   }
 
   if (session.providerName === 'pi') {

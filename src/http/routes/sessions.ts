@@ -146,12 +146,11 @@ function serializeSession(ctx: AppContext, session: SessionInfo) {
   });
   const lineage = getSessionLineage(session);
   const branching = resolveSessionBranching(ctx, session);
+  const wakeup = ctx.wakeup?.getSessionWakeState(session.id);
   return {
     ...view,
     branching,
-    ...(ctx.wakeup?.getSessionWakeState(session.id)
-      ? { wakeup: ctx.wakeup.getSessionWakeState(session.id) }
-      : {}),
+    ...(wakeup ? { wakeup } : {}),
     ...(lineage ? { lineage } : {}),
   };
 }
@@ -172,12 +171,11 @@ function serializeSessions(
     const branching = resolveSessionBranching(ctx, sessions[index], {
       includeCapabilities: options.includeBranchCapabilities,
     });
+    const wakeup = ctx.wakeup?.getSessionWakeState(sessions[index].id);
     return {
       ...view,
       branching,
-      ...(ctx.wakeup?.getSessionWakeState(sessions[index].id)
-        ? { wakeup: ctx.wakeup.getSessionWakeState(sessions[index].id) }
-        : {}),
+      ...(wakeup ? { wakeup } : {}),
       ...(lineage ? { lineage } : {}),
     };
   });

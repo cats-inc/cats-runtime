@@ -296,6 +296,7 @@ GET    /sessions/{id}/stream
 
 ```text
 GET  /wakeups
+GET  /wakeups/{id}
 POST /wakeups
 POST /wakeups/{id}/cancel
 POST /wakeups/{id}/trigger

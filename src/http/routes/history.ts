@@ -37,15 +37,14 @@ interface HistoryMessage {
 }
 
 function buildHistoryMetadata(ctx: AppContext, session: SessionInfo) {
+  const wakeup = ctx.wakeup?.getSessionWakeState(session.id);
   return {
     sessionKey: session.sessionKey,
     outputDir: session.outputDir,
     artifacts: session.artifacts || [],
     context: session.context,
     skills: session.skills,
-    ...(ctx.wakeup?.getSessionWakeState(session.id)
-      ? { wakeup: ctx.wakeup.getSessionWakeState(session.id) }
-      : {}),
+    ...(wakeup ? { wakeup } : {}),
   };
 }
 

@@ -148,4 +148,40 @@ describe('RuntimeWakeupService', () => {
     expect(wakeSession).toHaveBeenCalledTimes(2);
     expect(service.list({ status: 'scheduled' })).toHaveLength(1);
   });
+
+  it('prunes older terminal wakeups while retaining recent history within bounded limits', async () => {
+    let now = new Date('2026-03-23T00:00:00.000Z');
+    const service = new RuntimeWakeupService({
+      persistPath: createPersistPath(),
+      now: () => new Date(now),
+      sessionExists: () => true,
+      wakeSession: vi.fn(async (sessionId: string) => ({
+        sessionId,
+        outcome: 'resumed' as const,
+      })),
+      maxTerminalRequests: 2,
+      maxTerminalRequestsPerSession: 1,
+    });
+
+    for (const sessionId of ['session-1', 'session-1', 'session-2']) {
+      const created = service.create({
+        reason: `Wake ${sessionId}`,
+        target: { kind: 'session', sessionId },
+        scheduleAt: now.toISOString(),
+      });
+      await service.trigger(created.request.id, 'manual');
+      now = new Date(now.getTime() + 1_000);
+    }
+
+    const terminal = service.list().filter((request) =>
+      request.status === 'triggered',
+    );
+
+    expect(terminal).toHaveLength(2);
+    expect(terminal.map((request) => request.target.sessionId)).toEqual([
+      'session-1',
+      'session-2',
+    ]);
+    expect(service.getSessionWakeState('session-1')?.lastRequest?.reason).toBe('Wake session-1');
+  });
 });

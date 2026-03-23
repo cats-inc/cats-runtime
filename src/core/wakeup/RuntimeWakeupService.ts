@@ -13,10 +13,17 @@ import type {
 
 const DEFAULT_TICK_INTERVAL_MS = 1_000;
 const DEFAULT_MAX_DUE_PER_TICK = 8;
+const DEFAULT_MAX_TERMINAL_REQUESTS = 256;
+const DEFAULT_MAX_TERMINAL_REQUESTS_PER_SESSION = 16;
 
 const OPEN_WAKEUP_STATUSES = new Set<RuntimeWakeupStatus>([
   'scheduled',
   'triggering',
+]);
+const TERMINAL_WAKEUP_STATUSES = new Set<RuntimeWakeupStatus>([
+  'triggered',
+  'cancelled',
+  'failed',
 ]);
 
 export interface RuntimeWakeSessionResult {
@@ -48,6 +55,8 @@ export interface RuntimeWakeupServiceOptions {
   now?: () => Date;
   tickIntervalMs?: number;
   maxDuePerTick?: number;
+  maxTerminalRequests?: number;
+  maxTerminalRequestsPerSession?: number;
 }
 
 export class RuntimeWakeupValidationError extends Error {
@@ -155,6 +164,8 @@ export class RuntimeWakeupService {
   private readonly now: () => Date;
   private readonly tickIntervalMs: number;
   private readonly maxDuePerTick: number;
+  private readonly maxTerminalRequests: number;
+  private readonly maxTerminalRequestsPerSession: number;
   private readonly requests = new Map<string, RuntimeWakeupRequest>();
   private timer: ReturnType<typeof setInterval> | null = null;
   private processing = false;
@@ -163,6 +174,11 @@ export class RuntimeWakeupService {
     this.now = options.now ?? (() => new Date());
     this.tickIntervalMs = options.tickIntervalMs ?? DEFAULT_TICK_INTERVAL_MS;
     this.maxDuePerTick = options.maxDuePerTick ?? DEFAULT_MAX_DUE_PER_TICK;
+    this.maxTerminalRequests = Math.max(0, options.maxTerminalRequests ?? DEFAULT_MAX_TERMINAL_REQUESTS);
+    this.maxTerminalRequestsPerSession = Math.max(
+      0,
+      options.maxTerminalRequestsPerSession ?? DEFAULT_MAX_TERMINAL_REQUESTS_PER_SESSION,
+    );
     this.load();
   }
 
@@ -370,25 +386,35 @@ export class RuntimeWakeupService {
   }
 
   getSessionWakeState(sessionId: string): SessionWakeupState | undefined {
-    const sessionRequests = Array.from(this.requests.values())
-      .filter((request) => request.target.sessionId === sessionId)
-      .sort(sortRequests);
+    let pendingRequestCount = 0;
+    let nextPendingRequest: RuntimeWakeupRequest | undefined;
+    let lastRequest: RuntimeWakeupRequest | undefined;
 
-    if (sessionRequests.length === 0) {
+    for (const request of this.requests.values()) {
+      if (request.target.sessionId !== sessionId) {
+        continue;
+      }
+
+      if (!lastRequest || this.compareRecency(request, lastRequest) < 0) {
+        lastRequest = request;
+      }
+
+      if (request.status === 'scheduled' || request.status === 'triggering') {
+        pendingRequestCount += 1;
+        if (!nextPendingRequest || sortRequests(request, nextPendingRequest) < 0) {
+          nextPendingRequest = request;
+        }
+      }
+    }
+
+    if (!lastRequest) {
       return undefined;
     }
 
-    const pendingRequests = sessionRequests.filter((request) =>
-      request.status === 'scheduled' || request.status === 'triggering',
-    );
-    const lastRequest = [...sessionRequests].sort((left, right) =>
-      Date.parse(right.updatedAt) - Date.parse(left.updatedAt),
-    )[0];
-
     return {
-      pending: pendingRequests.length > 0,
-      pendingRequestCount: pendingRequests.length,
-      nextScheduledAt: pendingRequests[0]?.scheduleAt,
+      pending: pendingRequestCount > 0,
+      pendingRequestCount,
+      nextScheduledAt: nextPendingRequest?.scheduleAt,
       lastRequest: cloneWakeupRequest(lastRequest),
     };
   }
@@ -473,17 +499,66 @@ export class RuntimeWakeupService {
           continue;
         }
       }
+
+      const countBeforePrune = this.requests.size;
+      this.pruneTerminalRequests();
+      if (this.requests.size !== countBeforePrune) {
+        this.persist();
+      }
     } catch {
       // Best effort only. Invalid persisted state should not prevent runtime startup.
     }
   }
 
   private persist(): void {
+    this.pruneTerminalRequests();
     mkdirSync(dirname(this.options.persistPath), { recursive: true });
     writeFileSync(
       this.options.persistPath,
       `${JSON.stringify(Array.from(this.requests.values()).sort(sortRequests), null, 2)}\n`,
       'utf8',
     );
+  }
+
+  private pruneTerminalRequests(): void {
+    if (this.maxTerminalRequests === 0 || this.maxTerminalRequestsPerSession === 0) {
+      for (const request of Array.from(this.requests.values())) {
+        if (TERMINAL_WAKEUP_STATUSES.has(request.status)) {
+          this.requests.delete(request.id);
+        }
+      }
+      return;
+    }
+
+    const terminalRequests = Array.from(this.requests.values())
+      .filter((request) => TERMINAL_WAKEUP_STATUSES.has(request.status))
+      .sort((left, right) => this.compareRecency(left, right));
+
+    let kept = 0;
+    const keptPerSession = new Map<string, number>();
+    for (const request of terminalRequests) {
+      const sessionId = request.target.sessionId;
+      const sessionCount = keptPerSession.get(sessionId) ?? 0;
+      if (
+        kept < this.maxTerminalRequests
+        && sessionCount < this.maxTerminalRequestsPerSession
+      ) {
+        kept += 1;
+        keptPerSession.set(sessionId, sessionCount + 1);
+        continue;
+      }
+
+      this.requests.delete(request.id);
+    }
+  }
+
+  private compareRecency(left: RuntimeWakeupRequest, right: RuntimeWakeupRequest): number {
+    const leftUpdatedAt = Date.parse(left.updatedAt);
+    const rightUpdatedAt = Date.parse(right.updatedAt);
+    if (leftUpdatedAt !== rightUpdatedAt) {
+      return rightUpdatedAt - leftUpdatedAt;
+    }
+
+    return Date.parse(right.createdAt) - Date.parse(left.createdAt);
   }
 }

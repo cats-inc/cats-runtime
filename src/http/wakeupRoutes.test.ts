@@ -147,6 +147,16 @@ describe('wakeup HTTP contract', () => {
     expect(created.coalesced).toBe(false);
     expect(created.request.status).toBe('scheduled');
 
+    const inspectResponse = await app.request(`/wakeups/${created.request.id}`);
+    expect(inspectResponse.status).toBe(200);
+    await expect(inspectResponse.json()).resolves.toEqual({
+      request: expect.objectContaining({
+        id: created.request.id,
+        reason: 'Wake the chat.',
+        status: 'scheduled',
+      }),
+    });
+
     const cancelResponse = await app.request(`/wakeups/${created.request.id}/cancel`, {
       method: 'POST',
     });
@@ -296,6 +306,39 @@ describe('wakeup HTTP contract', () => {
     expect(rejected.status).toBe(409);
     await expect(rejected.json()).resolves.toEqual({
       error: 'A matching scheduled wakeup already exists. Use coalesceKey to merge duplicate wakeups.',
+    });
+  });
+
+  it('rejects unsupported wakeup targets instead of silently coercing them', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/wakeups', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        reason: 'Wake something invalid.',
+        target: {
+          kind: 'room',
+          sessionId: 'session-1',
+        },
+        scheduleAt: '2026-03-23T00:10:00.000Z',
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'target.kind must be \'session\'.',
+    });
+  });
+
+  it('returns 404 when inspecting an unknown wakeup request id', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/wakeups/missing-request');
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      error: "Wakeup request 'missing-request' was not found.",
     });
   });
 });
