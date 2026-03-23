@@ -50,6 +50,14 @@ export function buildSessionMaintenance(
         ),
       ]
     : [];
+  const preFlushHooks = hasEvidence || sessionHasRetainedWorkspace(input.session)
+    ? [
+        createMemoryFlushHook(
+          'pre_flush',
+          'Export or flush durable memory before workspace cleanup or lifecycle flush runs.',
+        ),
+      ]
+    : [];
   const cleanup = buildCleanupContract(input.session, input.view, Boolean(input.wakeupPending));
   const lastLifecycle = input.trackedMaintenance?.lastLifecycle
     ? cloneLifecycle(input.trackedMaintenance.lastLifecycle)
@@ -61,6 +69,7 @@ export function buildSessionMaintenance(
     hooks: {
       preReset: buildHookGroup(preResetHooks),
       preCompaction: buildHookGroup(preCompactionHooks),
+      preFlush: buildHookGroup(preFlushHooks),
     },
     resetBoundary: {
       status: input.trackedMaintenance?.lastResetAt ? 'cleared' : 'none',
@@ -129,6 +138,9 @@ function buildCleanupContract(
   if (session.workspaceMode === 'isolated') {
     reasonCodes.push('isolated_workspace_retained');
   }
+  if (session.workspaceIsolation?.mode === 'worktree' && session.workspaceIsolation.worktree) {
+    reasonCodes.push('worktree_retained');
+  }
   if (session.providerSessionId) {
     reasonCodes.push('provider_resume_state_retained');
   }
@@ -154,7 +166,9 @@ function buildCleanupContract(
   if (
     session.status === 'closed'
     && !view.attached
-    && reasonCodes.every((reason) => reason === 'isolated_workspace_retained')
+    && reasonCodes.every((reason) =>
+      reason === 'isolated_workspace_retained' || reason === 'worktree_retained',
+    )
   ) {
     return {
       status: 'ready',
@@ -166,6 +180,11 @@ function buildCleanupContract(
     status: 'recommended',
     reasonCodes,
   };
+}
+
+function sessionHasRetainedWorkspace(session: SessionInfo): boolean {
+  return session.workspaceMode === 'isolated'
+    || session.workspaceIsolation?.mode === 'worktree';
 }
 
 function resolveMaintenanceStatus(

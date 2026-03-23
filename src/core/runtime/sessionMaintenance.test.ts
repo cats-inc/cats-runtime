@@ -102,6 +102,46 @@ describe('buildSessionMaintenance', () => {
     });
   });
 
+  it('surfaces a pre-flush hook when a closed worktree session still has retained workspace state', () => {
+    const maintenance = buildSessionMaintenance({
+      session: createSession({
+        status: 'closed',
+        workspaceMode: 'shared',
+        cwd: '/sessions/worktrees/repo/session-1',
+        workspaceIsolation: {
+          mode: 'worktree',
+          sourceCwd: '/repo',
+          worktree: {
+            id: 'repo-session-1',
+            sourceRepoRoot: '/repo',
+            worktreePath: '/sessions/worktrees/repo/session-1',
+            preparedAt: '2026-03-23T00:00:00.000Z',
+          },
+        },
+      }),
+      view: createView({
+        attached: false,
+        activity: 'inactive',
+      }),
+    });
+
+    expect(maintenance.status).toBe('cleanup_ready');
+    expect(maintenance.cleanup).toEqual({
+      status: 'ready',
+      reasonCodes: ['worktree_retained'],
+    });
+    expect(maintenance.hooks.preFlush).toEqual({
+      available: true,
+      pending: [
+        expect.objectContaining({
+          id: 'memory_flush',
+          phase: 'pre_flush',
+          status: 'pending',
+        }),
+      ],
+    });
+  });
+
   it('surfaces reset boundary and retained lifecycle markers from tracked maintenance state', () => {
     const trackedMaintenance: RuntimeTrackedSessionMaintenanceState = {
       lastResetAt: '2026-03-23T00:10:00.000Z',

@@ -223,4 +223,126 @@ Deepen the runtime-owned browser subsystem without coupling it to any monorepo
 
 ---
 
+### OPT-4: Worktree Cleanup Discipline and Recovery
+
+**Priority**: P1
+**Status**: In Progress
+
+#### Problem
+
+`cats-runtime` now supports `workspaceIsolation: "worktree"` across session
+create/resume/reset/delete/fork, but the current cleanup discipline still
+depends on explicit lifecycle actions only.
+
+Current gaps:
+
+- abandoned worktrees are not swept in the background if a host crashes or a
+  session is never explicitly reset/deleted
+- `worktreeCleanupPolicy: "merge"` intentionally stops and returns
+  `status: "retained"` when the source repo is already dirty, because runtime
+  does not yet own conflict-resolution policy
+- reset/delete can report retained cleanup metadata, but there is no dedicated
+  recovery flow for operators beyond retrying the same lifecycle action later
+- worktree prepare/merge/discard still runs inline with the HTTP lifecycle; the
+  runtime no longer blocks the event loop with sync I/O, but it still lacks a
+  queued/background execution envelope, backpressure, and concurrency guards
+  for expensive git/worktree operations
+
+#### Direction
+
+Extend the first-slice worktree execution layer with stronger recovery and
+cleanup discipline while keeping product approval/policy above runtime.
+
+- Add a runtime-owned abandoned-worktree sweeper for sessions that no longer
+  exist or have already reached terminal lifecycle states
+- Add more explicit retained-cleanup diagnostics so hosts can distinguish
+  "source repo dirty", "detach failed", and "merge apply failed" without
+  scraping generic error text
+- Add a bounded recovery primitive for retrying retained worktree cleanup
+  without requiring a full session recreate
+- Move expensive worktree lifecycle operations behind runtime-owned operation
+  scheduling so session routes can hand off prepare/cleanup work without tying
+  end-user latency directly to git execution time
+- Keep merge behavior conservative: runtime may assist with safe re-apply, but
+  product/host layers still own conflict policy and operator approval
+
+#### Current Implementation Status
+
+- Deterministic worktree prepare/recreate is landed
+- `discard` and `merge` cleanup policies are landed for reset/delete
+- retained cleanup metadata is surfaced over session lifecycle responses and
+  session maintenance state
+- background sweeping and retained-cleanup recovery flows remain deferred
+
+#### Affected Files
+
+- `src/core/workspace/*`
+- `src/core/runtime/sessionMaintenance.ts`
+- `src/backends/cli/pool/SessionRegistry.ts`
+- `src/http/routes/sessions.ts`
+- `docs/api.md`
+- `docs/architecture.md`
+
+---
+
+### OPT-5: Workspace Sync and Lifecycle Flush Follow-through
+
+**Priority**: P1
+**Status**: In Progress
+
+#### Problem
+
+The current worktree/fork slice intentionally uses conservative copy semantics
+for non-shared child workspaces and exposes additive `pre_reset`,
+`pre_compaction`, and `pre_flush` hooks without implementing the follow-through
+pipeline.
+
+Current gaps:
+
+- fork-time workspace copying is a one-shot snapshot, not a generalized sync or
+  reconciliation protocol
+- retained workspace/worktree cleanup can advertise `pre_flush`, but nothing in
+  runtime yet coordinates durable memory/export flush before cleanup proceeds
+- Team 3's future memory pipeline seam exists in contracts only; runtime still
+  lacks the hook execution/retry envelope around lifecycle flush boundaries
+- non-shared fork copy still clones the whole workspace opportunistically in
+  the request path; runtime does not yet have bounded snapshot planning,
+  progress reporting, or large-workspace safeguards
+
+#### Direction
+
+Deepen the lifecycle seam so products can rely on workspace-backed sessions for
+longer-running workflows without teaching runtime product-specific memory
+schemas.
+
+- Add a stronger runtime-owned workspace sync primitive for fork/reset flows
+  where snapshot copy is no longer sufficient
+- Add explicit lifecycle-flush orchestration around `pre_reset`,
+  `pre_compaction`, and `pre_flush` so products can plug in export pipelines
+  without patching session routes directly
+- Add bounded snapshot/sync orchestration for large workspaces so fork/reset
+  flows can avoid unstructured full-tree copies when the workspace is too large
+  or needs resumable/progressive sync behavior
+- Keep hook payloads schema-light and additive so Team 3 can attach memory
+  flush/retrieval later without baking `cats` product models into runtime
+
+#### Current Implementation Status
+
+- hydration now records authoritative source workspace vs runtime cwd
+- non-shared child forks can copy a workspace snapshot once at fork time
+- session maintenance now advertises additive `pre_flush` alongside the
+  existing memory-flush hook groups
+- generalized workspace sync and hook execution plumbing remain deferred
+
+#### Affected Files
+
+- `src/core/workspace/*`
+- `src/core/hydration/*`
+- `src/core/runtime/sessionMaintenance.ts`
+- `src/http/routes/sessions.ts`
+- future Team 3 lifecycle-hook integrations
+- `docs/specs/SPEC-011-session-fork-and-context-transplant-primitives.md`
+
+---
+
 *Last updated: 2026-03-23*

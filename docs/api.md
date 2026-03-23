@@ -537,6 +537,17 @@ Skill-enabled create example:
 }
 ```
 
+Worktree-backed create example:
+
+```json
+{
+  "provider": "codex",
+  "cwd": "C:/repo",
+  "workspaceMode": "shared",
+  "workspaceIsolation": "worktree"
+}
+```
+
 Extended message example:
 
 ```json
@@ -577,8 +588,32 @@ Session responses also include `workspaceKey`, a normalized grouping key for
 workspace-aware UIs. When a provider exposes multiple configured instances,
 session payloads also include `providerInstanceId`. Windows-style paths are
 case-folded in `workspaceKey` while `cwd` remains the original display path.
-API-backed and local-model sessions also include `providerBackend`. Branch-aware
-session payloads now also include a `branching` block:
+For worktree-backed sessions, `workspaceKey` resolves from the authoritative
+source workspace instead of the transient worktree path. API-backed and
+local-model sessions also include `providerBackend`. Session payloads now also
+carry additive `workspaceIsolation` metadata when the runtime is tracking a
+shared, isolated, or worktree-backed workspace surface. Branch-aware session
+payloads now also include a `branching` block:
+
+Example `workspaceIsolation` shape:
+
+```json
+{
+  "workspaceIsolation": {
+    "mode": "worktree",
+    "sourceCwd": "C:/repo",
+    "worktree": {
+      "id": "repo-session-123",
+      "sourceRepoRoot": "C:/repo",
+      "sourceHeadOid": "abc123",
+      "sourceHeadRef": "main",
+      "relativeCwd": "packages/app",
+      "worktreePath": "C:/Users/example/.cats-runtime/sessions/worktrees/repo-deadbeef/session-123",
+      "preparedAt": "2026-03-23T12:00:00.000Z"
+    }
+  }
+}
+```
 
 ```json
 {
@@ -676,6 +711,8 @@ runtime-owned `hydration` block. This records how the runtime re-entered the
 workspace/skill context for the current target:
 
 - `workspace.runtimeCwd`: the actual cwd used for execution
+- `workspace.isolationMode`: the runtime-owned isolation mode (`shared`,
+  `isolated`, or `worktree`) used for the current session lifecycle
 - `workspace.sourceCwd`: the authoritative source workspace when it differs
   from the runtime cwd
 - `workspace.sourceOfTruth`: whether the runtime should treat the source
@@ -693,6 +730,7 @@ Example shape:
     "trigger": "resume",
     "updatedAt": "2026-03-23T12:00:00.000Z",
     "workspace": {
+      "isolationMode": "worktree",
       "runtimeCwd": "/tmp/cats-runtime/sessions/session-123",
       "sourceCwd": "/repo/project-a",
       "sourceOfTruth": "source_workspace",
@@ -801,6 +839,18 @@ intended for host/dashboard run inspectors:
               "reason": "Export or flush durable memory before compaction trims working context."
             }
           ]
+        },
+        "preFlush": {
+          "available": true,
+          "pending": [
+            {
+              "id": "memory_flush",
+              "phase": "pre_flush",
+              "status": "pending",
+              "owner": "product_memory",
+              "reason": "Export or flush durable memory before workspace cleanup or lifecycle flush runs."
+            }
+          ]
         }
       },
       "resetBoundary": {
@@ -834,7 +884,8 @@ additive: existing session fields remain stable.
 machine-readable place to read:
 
 - whether the session is nearing compaction territory
-- whether Team 6 style `memory_flush` hooks should run before reset/compaction
+- whether Team 6 style `memory_flush` hooks should run before reset,
+  compaction, or lifecycle flush/cleanup
 - whether a hard reset boundary was applied already
 - whether cleanup is merely recommended or is ready to run now
 - the latest close/reset/delete lifecycle marker
@@ -853,12 +904,20 @@ ready to run on an inactive session.
 - `skills`: runtime-managed skill manifest with explicit `requestedSkills`
 - `context`: structured invocation metadata such as task/workspace hints
 - `outputDir`: output hint for reports, documents, or generated artifacts
+- `workspaceIsolation`: one of `shared`, `isolated`, or `worktree`
 
 When `reusePolicy` is `prefer_existing` or `require_existing`, the runtime will
 try to attach to an existing session with the same provider target and
 `sessionKey`. Today explicit `sessionKey` reuse is supported for `api`, `local`,
 and `agent` sessions. Matching `cli` sessions still use the existing
 `/sessions/{id}/resume` flow.
+
+`workspaceIsolation: "worktree"` tells the runtime to execute in a Git
+worktree rooted under the runtime session base dir instead of using the source
+workspace path directly. This requires `cwd` to point at a Git-controlled
+workspace. The runtime persists both the transient worktree path and the
+authoritative source workspace so later resume/reset/delete flows can recreate
+or clean up the same worktree deterministically.
 
 `POST /sessions/{id}/messages` accepts optional `instructions`, `skills`,
 `context`, and `outputDir` fields. These are persisted onto the logical session
@@ -925,9 +984,13 @@ Example cooldown response:
 
 - `mode`: `auto`, `native_fork`, or `context_transplant`
 - `provider` / `instance`: child provider target override
-- `model`, `cwd`, `workspaceMode`, `permissionMode`, `allowedTools`
+- `model`, `cwd`, `workspaceMode`, `workspaceIsolation`, `permissionMode`, `allowedTools`
 - `instructions`, `skills`, `context`, `outputDir`
 - `transplant`: curated handoff bundle for `context_transplant`
+
+When the parent session is already worktree-backed, child forks default to
+`workspaceIsolation: "worktree"` unless the caller explicitly requests a
+different isolation mode such as `isolated`.
 
 `mode: "auto"` prefers `native_fork` when the child target is compatible with
 the parent provider/backend/instance/workspace and the underlying provider
@@ -1299,6 +1362,17 @@ stale run/progress snapshots, and records a hard-reset lifecycle boundary so
 stale wake requests and stale inspector state do not survive after provider
 resume state is discarded.
 
+`POST /sessions/{id}/reset` also accepts an optional body field:
+
+- `worktreeCleanupPolicy`: `discard` or `merge`
+
+For worktree-backed sessions, `discard` removes the worktree and keeps the
+source workspace untouched, while `merge` attempts to copy the worktree diff
+back into the authoritative source repository before detaching the worktree. If
+cleanup cannot finish safely, reset returns `status: "retained"` with the
+session snapshot still present so a host can retry or resolve the source
+workspace first.
+
 `POST /sessions/{id}/close`, `POST /sessions/{id}/cancel`, and
 `POST /sessions/{id}/reset` now all return the same additive session snapshot
 shape used by `GET /sessions/{id}`, plus an `action` field (`close`, `cancel`,
@@ -1316,6 +1390,12 @@ Delete responses also include:
   `registryDropped`, etc.)
 - `maintenance`: the terminal lifecycle marker for the delete attempt, with
   `status: "completed"` or `status: "retained"`
+
+`DELETE /sessions/{id}` accepts the same optional
+`worktreeCleanupPolicy: "discard" | "merge"` body field. For worktree-backed
+sessions, the runtime closes any attached worker first, then either detaches the
+worktree and removes the session or returns `status: "retained"` with
+machine-readable cleanup metadata when merge/discard cannot be completed.
 
 For delete responses, top-level `cleanup` is a flat alias of
 `maintenance.cleanup` so transport-facing consumers can read terminal cleanup

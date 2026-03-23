@@ -13,9 +13,10 @@ Current capabilities:
 - session lifecycle management for CLI-backed runtimes
 - session lifecycle management for API-backed Claude, Codex, and Gemini families plus local Ollama
 - additive `cancel` / `reset` lifecycle primitives plus stronger remote-agent close/delete cleanup
+- worktree-backed session isolation with deterministic prepare/recreate/cleanup semantics and merge-or-discard reset/delete policies
 - streamed turns over SSE or NDJSON
 - machine-readable session/run inspection payloads over `/sessions`, `/sessions/{id}/history`, and `/sessions/{id}/observe`
-- runtime-owned maintenance metadata for reset boundaries, compaction readiness, pending memory-flush hooks, and delete cleanup summaries
+- runtime-owned maintenance metadata for reset boundaries, compaction readiness, pending memory-flush hooks, additive `pre_flush` seams, and delete cleanup summaries
 - a lightweight browser/preview substrate with runtime-owned browser sessions/pages, a pluggable driver seam, and manual browser-page preview registration
 - provider-agnostic `progress` events across Junie, Pi, Goose, Copilot, and API/local transports
 - runtime-hosted local tools for API/local sessions (`list_files`, `read_file`, `write_file`, `grep`, `run_shell`)
@@ -47,6 +48,7 @@ Current capabilities:
 - [x] Add `backends/api` for pay-as-you-go API keys and Ollama
 - [x] Land runtime-managed skills v0 session and delivery contract
 - [x] Stabilize workspace hydration and runtime skill re-entry across create/resume/fork
+- [x] Add worktree-backed session isolation and cleanup discipline across create/resume/reset/delete/fork
 - [x] Add first-slice runtime usage metering, rate-limit/quota incident surfacing, and provider-agnostic progress contracts
 - [x] Add the first provider compatibility/evidence engine slice for CLI-backed providers
 - [x] Add provider-agnostic run-inspector/session-discipline contracts across CLI, API, and agent backends
@@ -135,6 +137,7 @@ Runtime state defaults under the user's home directory:
 - `src/server.ts` - single-service runtime bootstrap
 - `src/http/app.ts` - route registration and auth middleware
 - `src/core/hydration/` - runtime-owned workspace/skill re-entry helpers
+- `src/core/workspace/` - shared/isolated/worktree workspace prepare and cleanup helpers
 - `src/core/usage/` - runtime-owned metering, incident, and guardrail helpers
 - `src/backends/cli/` - embedded CLI runtime modules
 - `src/backends/api/` - API-key and local-model runtime modules

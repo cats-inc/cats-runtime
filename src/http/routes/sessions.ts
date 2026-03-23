@@ -27,13 +27,10 @@ import type {
   SessionContextTransplant,
   SessionReusePolicy,
   SessionStatus,
+  WorktreeCleanupPolicy,
+  WorkspaceIsolationMode,
   WorkspaceMode,
 } from '../../core/types.js';
-import {
-  resolveWorkspace,
-  cleanupIsolatedWorkspace,
-  copyIsolatedWorkspace,
-} from '../../backends/cli/pool/workspace.js';
 import {
   toSessionView,
   toSessionViews,
@@ -74,6 +71,12 @@ import {
   parseStringArray,
 } from '../parsing.js';
 import { toRuntimeSkillErrorResponse } from '../runtimeSkillErrors.js';
+import {
+  cleanupSessionWorkspace,
+  copyWorkspaceSnapshot,
+  prepareSessionWorkspace,
+  type PrepareSessionWorkspaceResult,
+} from '../../core/workspace/sessionWorkspace.js';
 
 interface SessionRouteEnv {
   Variables: {
@@ -237,6 +240,9 @@ function buildDeleteCleanupSummary(input: {
   workerDetached: boolean;
   wakeupsCleared: boolean;
   workspaceCleaned: boolean;
+  worktreeDetached?: boolean;
+  worktreeCleanupPolicy?: WorktreeCleanupPolicy;
+  worktreeMergedPaths?: number;
   managedTranscriptDeleted: boolean;
   providerDiscoveryCleared: boolean;
   registryDropped: boolean;
@@ -245,6 +251,9 @@ function buildDeleteCleanupSummary(input: {
     workerDetached: input.workerDetached,
     wakeupsCleared: input.wakeupsCleared,
     workspaceCleaned: input.workspaceCleaned,
+    ...(input.worktreeDetached !== undefined ? { worktreeDetached: input.worktreeDetached } : {}),
+    ...(input.worktreeCleanupPolicy ? { worktreeCleanupPolicy: input.worktreeCleanupPolicy } : {}),
+    ...(input.worktreeMergedPaths !== undefined ? { worktreeMergedPaths: input.worktreeMergedPaths } : {}),
     managedTranscriptDeleted: input.managedTranscriptDeleted,
     providerDiscoveryCleared: input.providerDiscoveryCleared,
     registryDropped: input.registryDropped,
@@ -276,6 +285,18 @@ function parseReusePolicy(value: unknown): SessionReusePolicy | undefined {
 
   const normalized = value.trim() as SessionReusePolicy;
   return REUSE_POLICIES.has(normalized) ? normalized : undefined;
+}
+
+function parseWorkspaceIsolationMode(value: unknown): WorkspaceIsolationMode | undefined {
+  return value === 'shared' || value === 'isolated' || value === 'worktree'
+    ? value
+    : undefined;
+}
+
+function parseWorktreeCleanupPolicy(value: unknown): WorktreeCleanupPolicy | undefined {
+  return value === 'discard' || value === 'merge'
+    ? value
+    : undefined;
 }
 
 function parseSessionArtifactArray(value: unknown): SessionArtifact[] | undefined {
@@ -430,14 +451,15 @@ function resolveCliProviderInstance(target: ProviderTargetDescriptor): ProviderI
 }
 
 function getSessionWorkspaceSourceCwd(
-  session: Pick<SessionInfo, 'cwd' | 'workspaceMode' | 'hydration'>,
+  session: Pick<SessionInfo, 'cwd' | 'workspaceMode' | 'workspaceIsolation' | 'hydration'>,
 ): string | undefined {
-  return session.hydration?.workspace.sourceCwd
+  return session.workspaceIsolation?.sourceCwd
+    ?? session.hydration?.workspace.sourceCwd
     ?? (session.workspaceMode === 'isolated' ? undefined : session.cwd);
 }
 
 function resolveForkWorkspaceSourceCwd(
-  session: Pick<SessionInfo, 'cwd' | 'workspaceMode' | 'hydration'>,
+  session: Pick<SessionInfo, 'cwd' | 'workspaceMode' | 'workspaceIsolation' | 'hydration'>,
   requestedCwd: string | undefined,
   forkCwd: string,
   forkWorkspaceMode: WorkspaceMode | undefined,
@@ -457,6 +479,7 @@ async function hydrateSessionForTarget(
     providerTarget: ProviderTargetDescriptor;
     cwd: string;
     workspaceMode?: WorkspaceMode;
+    workspaceIsolationMode?: WorkspaceIsolationMode;
     requestedSkills?: ReturnType<typeof parseRuntimeSkillManifest>['manifest'];
     existingSkills?: SessionInfo['skills'];
     existingHydration?: SessionInfo['hydration'];
@@ -471,6 +494,7 @@ async function hydrateSessionForTarget(
     providerBackend: options.providerTarget.backend,
     runtimeCwd: options.cwd,
     workspaceMode: options.workspaceMode,
+    workspaceIsolationMode: options.workspaceIsolationMode,
     sessionBaseDir: ctx.config.sessionBaseDir,
     requestedSkills: options.requestedSkills,
     existingSkills: options.existingSkills,
@@ -479,6 +503,97 @@ async function hydrateSessionForTarget(
     baseInstructionsFile: options.providerTarget.cliInstance?.piInstructionsFile,
     metadata: options.metadata,
   });
+}
+
+function resolveSessionWorkspaceIsolationMode(
+  session: Pick<SessionInfo, 'workspaceIsolation' | 'workspaceMode'>,
+): WorkspaceIsolationMode {
+  return session.workspaceIsolation?.mode
+    ?? (session.workspaceMode === 'isolated' ? 'isolated' : 'shared');
+}
+
+function prepareWorkspaceCleanupState(
+  session: Pick<SessionInfo, 'id' | 'workspaceMode' | 'workspaceIsolation'>,
+  worktreeCleanupPolicy: WorktreeCleanupPolicy | undefined,
+  ctx: AppContext,
+) {
+  return cleanupSessionWorkspace({
+    sessionId: session.id,
+    sessionBaseDir: ctx.config.sessionBaseDir,
+    workspaceMode: session.workspaceMode,
+    workspaceIsolation: session.workspaceIsolation,
+    worktreeCleanupPolicy,
+  });
+}
+
+function discardPreparedWorkspace(
+  ctx: AppContext,
+  session: Pick<SessionInfo, 'id' | 'workspaceMode' | 'workspaceIsolation'>,
+): void {
+  cleanupSessionWorkspace({
+    sessionId: session.id,
+    sessionBaseDir: ctx.config.sessionBaseDir,
+    workspaceMode: session.workspaceMode,
+    workspaceIsolation: session.workspaceIsolation,
+    worktreeCleanupPolicy: 'discard',
+  });
+}
+
+function persistWorkspaceCleanupState(
+  ctx: AppContext,
+  sessionId: string,
+  cleanup: ReturnType<typeof cleanupSessionWorkspace>,
+): SessionInfo | undefined {
+  if (cleanup.nextCwd === undefined && cleanup.nextWorkspaceIsolation === undefined) {
+    return ctx.registry.get(sessionId);
+  }
+
+  ctx.registry.updateWorkspace(sessionId, {
+    ...(cleanup.nextCwd !== undefined ? { cwd: cleanup.nextCwd } : {}),
+    ...(cleanup.nextWorkspaceIsolation !== undefined
+      ? { workspaceIsolation: cleanup.nextWorkspaceIsolation }
+      : {}),
+  });
+  return ctx.registry.get(sessionId);
+}
+
+function applyPreparedWorkspace(
+  ctx: AppContext,
+  sessionId: string,
+  prepared: PrepareSessionWorkspaceResult,
+): SessionInfo | undefined {
+  ctx.registry.updateWorkspace(sessionId, {
+    cwd: prepared.cwd,
+    workspaceMode: prepared.workspaceMode,
+    workspaceIsolation: prepared.workspaceIsolation,
+    permissionMode: prepared.permissionMode,
+  });
+  return ctx.registry.get(sessionId);
+}
+
+function ensureSessionWorkspacePrepared(
+  ctx: AppContext,
+  session: SessionInfo,
+): SessionInfo {
+  const isolationMode = resolveSessionWorkspaceIsolationMode(session);
+  if (isolationMode !== 'worktree') {
+    return session;
+  }
+
+  const worktreePath = session.workspaceIsolation?.worktree?.worktreePath;
+  if (worktreePath && existsSync(worktreePath)) {
+    return session;
+  }
+
+  const prepared = prepareSessionWorkspace({
+    sessionId: session.id,
+    sessionBaseDir: ctx.config.sessionBaseDir,
+    cwd: getSessionWorkspaceSourceCwd(session),
+    workspaceMode: session.workspaceMode,
+    workspaceIsolationMode: 'worktree',
+    permissionMode: session.permissionMode,
+  });
+  return applyPreparedWorkspace(ctx, session.id, prepared) ?? session;
 }
 
 function sessionMatchesInstanceFilter(
@@ -867,6 +982,7 @@ sessionRoutes.post('/sessions', async (c) => {
     model?: string;
     group?: string;
     workspaceMode?: WorkspaceMode;
+    workspaceIsolation?: WorkspaceIsolationMode;
     managed?: boolean;
     permissionMode?: 'skip' | 'whitelist' | 'default';
     allowedTools?: string[];
@@ -917,6 +1033,7 @@ sessionRoutes.post('/sessions', async (c) => {
     parsedSkills.clear ? undefined : parsedSkills.manifest,
   );
   const outputDir = parseOptionalString(body.outputDir);
+  const workspaceIsolationMode = parseWorkspaceIsolationMode(body.workspaceIsolation);
 
   if (reusePolicy !== 'create_new' && requestedSessionKey) {
     const existing = findReusableSession(ctx, providerTarget, providerName, requestedSessionKey);
@@ -927,29 +1044,37 @@ sessionRoutes.post('/sessions', async (c) => {
         }, 409);
       }
     } else {
+      const existingSourceCwd = getSessionWorkspaceSourceCwd(existing) ?? existing.cwd;
       if (
-        (body.cwd && existing.cwd !== body.cwd)
+        (body.cwd && existingSourceCwd !== body.cwd)
+        || (body.workspaceMode && existing.workspaceMode !== body.workspaceMode)
+        || (
+          workspaceIsolationMode
+          && resolveSessionWorkspaceIsolationMode(existing) !== workspaceIsolationMode
+        )
         || (body.model && existing.model && body.model !== existing.model)
       ) {
         return c.json({
-          error: 'Existing sessionKey matches a session with different cwd/model. '
+          error: 'Existing sessionKey matches a session with different cwd/model/workspace settings. '
             + 'Use reusePolicy=create_new to force a new session.',
         }, 409);
       }
 
+      const preparedExisting = ensureSessionWorkspacePrepared(ctx, existing);
       let skills = existing.skills;
       let hydration = existing.hydration;
       try {
         const hydrated = await hydrateSessionForTarget(ctx, {
           trigger: 'create',
-          sessionId: existing.id,
+          sessionId: preparedExisting.id,
           providerTarget,
-          cwd: existing.cwd,
-          workspaceMode: existing.workspaceMode,
+          cwd: preparedExisting.cwd,
+          workspaceMode: preparedExisting.workspaceMode,
+          workspaceIsolationMode: resolveSessionWorkspaceIsolationMode(preparedExisting),
           requestedSkills: parsedSkills.clear ? undefined : parsedSkills.manifest,
-          existingSkills: parsedSkills.clear ? undefined : existing.skills,
-          existingHydration: existing.hydration,
-          workspaceSourceCwd: getSessionWorkspaceSourceCwd(existing),
+          existingSkills: parsedSkills.clear ? undefined : preparedExisting.skills,
+          existingHydration: preparedExisting.hydration,
+          workspaceSourceCwd: getSessionWorkspaceSourceCwd(preparedExisting),
           metadata: requestedHydrationMetadata,
         });
         skills = hydrated.skills;
@@ -965,16 +1090,16 @@ sessionRoutes.post('/sessions', async (c) => {
       ctx.registry.updateSessionMetadata(existing.id, {
         sessionKey,
         reusePolicy,
-        instructions: instructions ?? existing.instructions,
+        instructions: instructions ?? preparedExisting.instructions,
         skills,
         hydration,
-        context: context ?? existing.context,
-        outputDir: outputDir ?? existing.outputDir,
+        context: context ?? preparedExisting.context,
+        outputDir: outputDir ?? preparedExisting.outputDir,
       });
 
       const existingHandle = runtime.get(existing.id);
       if (!existingHandle?.active) {
-        if (existing.providerBackend === 'cli') {
+        if (preparedExisting.providerBackend === 'cli') {
           return c.json({
             error: 'Explicit sessionKey reuse currently supports api/local/agent sessions only. '
               + 'Use /sessions/:id/resume for CLI sessions.',
@@ -982,14 +1107,14 @@ sessionRoutes.post('/sessions', async (c) => {
         }
 
         try {
-          runtime.spawn(existing.id, existing.providerName, {
-            cwd: existing.cwd,
-            workspaceMode: existing.workspaceMode,
-            model: existing.model,
-            instructionsFile: existing.skills?.delivery.instructions?.filePath,
-            permissionMode: existing.permissionMode,
-            allowedTools: existing.allowedTools,
-          }, existing.providerInstanceId, existing.providerBackend);
+          runtime.spawn(preparedExisting.id, preparedExisting.providerName, {
+            cwd: preparedExisting.cwd,
+            workspaceMode: preparedExisting.workspaceMode,
+            model: preparedExisting.model,
+            instructionsFile: preparedExisting.skills?.delivery.instructions?.filePath,
+            permissionMode: preparedExisting.permissionMode,
+            allowedTools: preparedExisting.allowedTools,
+          }, preparedExisting.providerInstanceId, preparedExisting.providerBackend);
           ctx.registry.updateStatus(existing.id, 'ready');
         } catch (err) {
           return c.json({ error: `Failed to reuse session: ${err}` }, 500);
@@ -1004,11 +1129,12 @@ sessionRoutes.post('/sessions', async (c) => {
 
   let resolved;
   try {
-    resolved = resolveWorkspace({
+    resolved = prepareSessionWorkspace({
       sessionId,
       sessionBaseDir: ctx.config.sessionBaseDir,
       cwd: body.cwd || undefined,
       workspaceMode: body.workspaceMode,
+      workspaceIsolationMode,
       permissionMode: body.permissionMode,
     });
   } catch (err) {
@@ -1024,6 +1150,7 @@ sessionRoutes.post('/sessions', async (c) => {
       providerTarget,
       cwd: resolved.cwd,
       workspaceMode: resolved.workspaceMode,
+      workspaceIsolationMode: resolved.workspaceIsolation.mode,
       requestedSkills: parsedSkills.clear ? undefined : parsedSkills.manifest,
       existingHydration: undefined,
       workspaceSourceCwd: resolved.sourceCwd,
@@ -1034,9 +1161,11 @@ sessionRoutes.post('/sessions', async (c) => {
   } catch (error) {
     const runtimeSkillError = toRuntimeSkillErrorResponse(error);
     if (runtimeSkillError) {
-      if (resolved.workspaceMode === 'isolated') {
-        cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, sessionId);
-      }
+      discardPreparedWorkspace(ctx, {
+        id: sessionId,
+        workspaceMode: resolved.workspaceMode,
+        workspaceIsolation: resolved.workspaceIsolation,
+      });
       return c.json(runtimeSkillError.body, runtimeSkillError.status);
     }
     throw error;
@@ -1045,6 +1174,11 @@ sessionRoutes.post('/sessions', async (c) => {
   if (providerName === 'cursor' && providerTarget.backend === 'cli') {
     const caps = runtime.getCapabilities('cursor', providerInstance!.id, 'cli');
     if (!caps.permissions && resolved.workspaceMode === 'read_only') {
+      discardPreparedWorkspace(ctx, {
+        id: sessionId,
+        workspaceMode: resolved.workspaceMode,
+        workspaceIsolation: resolved.workspaceIsolation,
+      });
       return c.json({
         error: `Provider '${providerName}' does not support permission enforcement required by read_only workspace`,
       }, 400);
@@ -1061,6 +1195,7 @@ sessionRoutes.post('/sessions', async (c) => {
         providerInstanceId: providerInstance!.id,
         cwd: resolved.cwd,
         workspaceMode: resolved.workspaceMode,
+        workspaceIsolation: resolved.workspaceIsolation,
         permissionMode: resolved.permissionMode,
         allowedTools: body.allowedTools,
         model: body.model || native.model,
@@ -1105,9 +1240,11 @@ sessionRoutes.post('/sessions', async (c) => {
           // Best effort rollback only.
         }
       }
-      if (resolved.workspaceMode === 'isolated') {
-        cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, sessionId);
-      }
+      discardPreparedWorkspace(ctx, {
+        id: sessionId,
+        workspaceMode: resolved.workspaceMode,
+        workspaceIsolation: resolved.workspaceIsolation,
+      });
       return c.json({ error: `Failed to create Cursor session: ${err}` }, 500);
     }
   }
@@ -1115,6 +1252,11 @@ sessionRoutes.post('/sessions', async (c) => {
   if (providerName === 'opencode' && providerTarget.backend === 'cli') {
     const caps = runtime.getCapabilities('opencode', providerInstance!.id, 'cli');
     if (!caps.permissions && resolved.workspaceMode === 'read_only') {
+      discardPreparedWorkspace(ctx, {
+        id: sessionId,
+        workspaceMode: resolved.workspaceMode,
+        workspaceIsolation: resolved.workspaceIsolation,
+      });
       return c.json({
         error: `Provider '${providerName}' does not support permission enforcement required by read_only workspace`,
       }, 400);
@@ -1131,6 +1273,7 @@ sessionRoutes.post('/sessions', async (c) => {
         providerInstanceId: providerInstance!.id,
         cwd: resolved.cwd,
         workspaceMode: resolved.workspaceMode,
+        workspaceIsolation: resolved.workspaceIsolation,
         permissionMode: resolved.permissionMode,
         allowedTools: body.allowedTools,
         model: body.model,
@@ -1175,9 +1318,11 @@ sessionRoutes.post('/sessions', async (c) => {
           // Best effort rollback only.
         }
       }
-      if (resolved.workspaceMode === 'isolated') {
-        cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, sessionId);
-      }
+      discardPreparedWorkspace(ctx, {
+        id: sessionId,
+        workspaceMode: resolved.workspaceMode,
+        workspaceIsolation: resolved.workspaceIsolation,
+      });
       return c.json({ error: `Failed to create OpenCode session: ${err}` }, 500);
     }
   }
@@ -1189,6 +1334,11 @@ sessionRoutes.post('/sessions', async (c) => {
   );
 
   if (!caps.permissions && resolved.workspaceMode === 'read_only') {
+    discardPreparedWorkspace(ctx, {
+      id: sessionId,
+      workspaceMode: resolved.workspaceMode,
+      workspaceIsolation: resolved.workspaceIsolation,
+    });
     return c.json({
       error: `Provider '${providerName}' does not support permission enforcement required by read_only workspace`,
     }, 400);
@@ -1206,6 +1356,7 @@ sessionRoutes.post('/sessions', async (c) => {
     providerInstanceId: providerTarget.instanceId,
     cwd: resolved.cwd,
     workspaceMode: resolved.workspaceMode,
+    workspaceIsolation: resolved.workspaceIsolation,
     permissionMode: resolved.permissionMode,
     allowedTools: body.allowedTools,
     model: body.model,
@@ -1230,9 +1381,11 @@ sessionRoutes.post('/sessions', async (c) => {
       allowedTools: body.allowedTools,
     }, providerTarget.instanceId, providerTarget.backend);
   } catch (err) {
-    if (resolved.workspaceMode === 'isolated') {
-      cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, sessionId);
-    }
+    discardPreparedWorkspace(ctx, {
+      id: sessionId,
+      workspaceMode: resolved.workspaceMode,
+      workspaceIsolation: resolved.workspaceIsolation,
+    });
     ctx.registry.remove(session.id);
     return c.json({ error: `Failed to spawn session: ${err}` }, 500);
   }
@@ -1422,6 +1575,12 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
   const runtime = getRuntimeSessionManager(ctx);
   const id = c.req.param('id');
   const session = ctx.registry.get(id);
+  const body = await c.req.json<{
+    worktreeCleanupPolicy?: WorktreeCleanupPolicy;
+  }>().catch(() => ({}) as {
+    worktreeCleanupPolicy?: WorktreeCleanupPolicy;
+  });
+  const worktreeCleanupPolicy = parseWorktreeCleanupPolicy(body.worktreeCleanupPolicy);
 
   if (!session) {
     return c.json({ error: 'Session not found' }, 404);
@@ -1442,10 +1601,54 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
     workerDetached = !runtime.isAttached(id);
   }
 
+  ctx.registry.updateStatus(id, 'closed');
+  let sessionAfterCleanup = ctx.registry.get(id) ?? session;
+  let workspaceCleaned = false;
+  let worktreeDetached: boolean | undefined;
+  let worktreeMergedPaths: number | undefined;
+  let resolvedCleanupPolicy: WorktreeCleanupPolicy | undefined;
+
+  if (sessionAfterCleanup.workspaceIsolation?.mode === 'worktree') {
+    const cleanup = prepareWorkspaceCleanupState(
+      sessionAfterCleanup,
+      worktreeCleanupPolicy,
+      ctx,
+    );
+    sessionAfterCleanup = persistWorkspaceCleanupState(ctx, id, cleanup) ?? sessionAfterCleanup;
+    workspaceCleaned = cleanup.workspaceCleaned;
+    worktreeDetached = cleanup.worktreeDetached;
+    worktreeMergedPaths = cleanup.mergedPathCount;
+    resolvedCleanupPolicy = cleanup.policy;
+
+    if (cleanup.status === 'retained') {
+      runtime.markClosed(id);
+      const maintenance = runtime.recordLifecycle(id, {
+        action: 'reset',
+        boundary: 'hard_reset',
+        status: 'retained',
+        reasonCodes: ['manual_reset', 'workspace_cleanup_retained', ...cleanup.reasonCodes],
+        cleanup: {
+          workerDetached,
+          workspaceCleaned,
+          ...(worktreeDetached !== undefined ? { worktreeDetached } : {}),
+          ...(resolvedCleanupPolicy ? { worktreeCleanupPolicy: resolvedCleanupPolicy } : {}),
+          ...(worktreeMergedPaths !== undefined ? { worktreeMergedPaths } : {}),
+        },
+      });
+      return c.json({
+        action: 'reset',
+        status: 'retained',
+        reason: 'Worktree cleanup could not be completed. Session state was kept for retry.',
+        cleanup: maintenance.cleanup,
+        maintenance,
+        session: serializeSession(ctx, sessionAfterCleanup),
+      });
+    }
+  }
+
   ctx.registry.clearProviderResumeState(id);
   ctx.registry.setProviderState(id, undefined);
   ctx.registry.updateSessionMetadata(id, { hydration: undefined });
-  ctx.registry.updateStatus(id, 'closed');
   runtime.clearProviderState(id);
   runtime.markClosed(id);
   const wakeupResult = ctx.wakeup?.clearSession(id);
@@ -1459,10 +1662,14 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
       providerResumeCleared: true,
       providerStateCleared: true,
       wakeupsCleared: (wakeupResult?.removedCount ?? 0) > 0,
+      workspaceCleaned,
+      ...(worktreeDetached !== undefined ? { worktreeDetached } : {}),
+      ...(resolvedCleanupPolicy ? { worktreeCleanupPolicy: resolvedCleanupPolicy } : {}),
+      ...(worktreeMergedPaths !== undefined ? { worktreeMergedPaths } : {}),
     },
     clearExecutionState: true,
   });
-  return c.json(serializeLifecycleSession(ctx, ctx.registry.get(id) ?? session, 'reset'));
+  return c.json(serializeLifecycleSession(ctx, ctx.registry.get(id) ?? sessionAfterCleanup, 'reset'));
 });
 
 /** DELETE /sessions/:id — permanently remove session and delete .jsonl */
@@ -1471,6 +1678,12 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
   const id = c.req.param('id');
   const session = ctx.registry.get(id);
   const runtime = getRuntimeSessionManager(ctx);
+  const body = await c.req.json<{
+    worktreeCleanupPolicy?: WorktreeCleanupPolicy;
+  }>().catch(() => ({}) as {
+    worktreeCleanupPolicy?: WorktreeCleanupPolicy;
+  });
+  const worktreeCleanupPolicy = parseWorktreeCleanupPolicy(body.worktreeCleanupPolicy);
 
   if (!session) {
     return c.json({ error: 'Session not found' }, 404);
@@ -1483,10 +1696,80 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
     }, 409);
   }
 
-  const preparedManagedTranscripts = ctx.registry.prepareManagedTranscriptDeletion(id);
-  const preparedProviderDiscovery = prepareProviderDiscoveryDeletion(ctx, session);
   const hasNativeSessionState = tracksNativeSessionState(session);
   const hasProviderDiscoveryState = tracksProviderDiscoveryState(session);
+
+  let workspaceCleaned = false;
+  let worktreeDetached: boolean | undefined;
+  let worktreeMergedPaths: number | undefined;
+  let resolvedCleanupPolicy: WorktreeCleanupPolicy | undefined;
+
+  if (session.workspaceIsolation?.mode === 'worktree') {
+    const worker = runtime.get(id);
+    if (worker?.active) {
+      try {
+        await runtime.close(session, 'delete');
+        ctx.registry.updateStatus(id, 'closed');
+      } catch (err) {
+        return c.json({ error: `Failed to close session before delete: ${err}` }, 500);
+      }
+    }
+
+    const cleanup = prepareWorkspaceCleanupState(session, worktreeCleanupPolicy, ctx);
+    workspaceCleaned = cleanup.workspaceCleaned;
+    worktreeDetached = cleanup.worktreeDetached;
+    worktreeMergedPaths = cleanup.mergedPathCount;
+    resolvedCleanupPolicy = cleanup.policy;
+
+    if (cleanup.status === 'retained') {
+      const sessionAfterCleanup = persistWorkspaceCleanupState(ctx, id, cleanup) ?? session;
+      const maintenance = runtime.recordLifecycle(id, {
+        action: 'delete',
+        boundary: 'permanent_delete',
+        status: 'retained',
+        reasonCodes: ['workspace_cleanup_retained', ...cleanup.reasonCodes],
+        cleanup: buildDeleteCleanupSummary({
+          workerDetached: !runtime.isAttached(id),
+          wakeupsCleared: false,
+          workspaceCleaned,
+          ...(worktreeDetached !== undefined ? { worktreeDetached } : {}),
+          ...(resolvedCleanupPolicy ? { worktreeCleanupPolicy: resolvedCleanupPolicy } : {}),
+          ...(worktreeMergedPaths !== undefined ? { worktreeMergedPaths } : {}),
+          managedTranscriptDeleted: false,
+          providerDiscoveryCleared: false,
+          registryDropped: false,
+        }),
+      });
+      return c.json({
+        action: 'delete',
+        sessionId: id,
+        status: 'retained',
+        hadTranscript: Boolean(
+          session.sourcePath
+          || session.providerSourcePath
+          || hasNativeSessionState
+          || hasProviderDiscoveryState
+        ),
+        fileDeleted: false,
+        nativeDeleted: false,
+        workspaceCleaned,
+        cleanup: maintenance.cleanup,
+        reason: 'Worktree cleanup could not be completed. Session files were kept for retry.',
+        maintenance,
+        session: serializeSession(ctx, sessionAfterCleanup),
+      });
+    }
+  } else if (session.workspaceMode === 'isolated') {
+    workspaceCleaned = cleanupSessionWorkspace({
+      sessionId: id,
+      sessionBaseDir: ctx.config.sessionBaseDir,
+      workspaceMode: session.workspaceMode,
+      workspaceIsolation: session.workspaceIsolation,
+    }).workspaceCleaned;
+  }
+
+  const preparedManagedTranscripts = ctx.registry.prepareManagedTranscriptDeletion(id);
+  const preparedProviderDiscovery = prepareProviderDiscoveryDeletion(ctx, session);
   const hadTranscript = preparedManagedTranscripts.hadFiles
     || preparedProviderDiscovery.hadFiles
     || hasNativeSessionState
@@ -1502,6 +1785,10 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
       reasonCodes: ['cleanup_staging_failed'],
       cleanup: {
         workerDetached: !runtime.isAttached(id),
+        workspaceCleaned,
+        ...(worktreeDetached !== undefined ? { worktreeDetached } : {}),
+        ...(resolvedCleanupPolicy ? { worktreeCleanupPolicy: resolvedCleanupPolicy } : {}),
+        ...(worktreeMergedPaths !== undefined ? { worktreeMergedPaths } : {}),
       },
     });
     return c.json({
@@ -1552,6 +1839,10 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
       reasonCodes: ['cleanup_verification_failed'],
       cleanup: {
         workerDetached: !runtime.isAttached(id),
+        workspaceCleaned,
+        ...(worktreeDetached !== undefined ? { worktreeDetached } : {}),
+        ...(resolvedCleanupPolicy ? { worktreeCleanupPolicy: resolvedCleanupPolicy } : {}),
+        ...(worktreeMergedPaths !== undefined ? { worktreeMergedPaths } : {}),
       },
     });
     return c.json({
@@ -1578,10 +1869,6 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
 
   const managedDeletion = preparedManagedTranscripts.finalize();
   const providerDeletion = preparedProviderDiscovery.finalize();
-  let workspaceCleaned = false;
-  if (session.workspaceMode === 'isolated') {
-    workspaceCleaned = cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, id);
-  }
   const wakeupResult = ctx.wakeup?.clearSession(id);
   const maintenance = runtime.recordLifecycle(id, {
     action: 'delete',
@@ -1592,6 +1879,9 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
       workerDetached: !runtime.isAttached(id),
       wakeupsCleared: (wakeupResult?.removedCount ?? 0) > 0,
       workspaceCleaned,
+      ...(worktreeDetached !== undefined ? { worktreeDetached } : {}),
+      ...(resolvedCleanupPolicy ? { worktreeCleanupPolicy: resolvedCleanupPolicy } : {}),
+      ...(worktreeMergedPaths !== undefined ? { worktreeMergedPaths } : {}),
       managedTranscriptDeleted: managedDeletion.fileDeleted,
       providerDiscoveryCleared: providerDeletion.fileDeleted || providerDiscoveryDeleted,
       registryDropped: true,
@@ -1638,25 +1928,33 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
     return c.json(serializeSession(ctx, ctx.registry.get(id) ?? session));
   }
 
-  if (session.providerBackend !== 'cli') {
-    let hydratedSession = session;
+  let preparedSession = session;
+  try {
+    preparedSession = ensureSessionWorkspacePrepared(ctx, session);
+  } catch (err) {
+    return c.json({ error: `Failed to prepare workspace for resume: ${err}` }, 500);
+  }
+
+  if (preparedSession.providerBackend !== 'cli') {
+    let hydratedSession = preparedSession;
     try {
-      const providerTarget = resolveSessionProviderTarget(ctx.config, session);
+      const providerTarget = resolveSessionProviderTarget(ctx.config, preparedSession);
       const hydrated = await hydrateSessionForTarget(ctx, {
         trigger: 'resume',
-        sessionId: session.id,
+        sessionId: preparedSession.id,
         providerTarget,
-        cwd: session.cwd,
-        workspaceMode: session.workspaceMode,
-        existingSkills: session.skills,
-        existingHydration: session.hydration,
-        workspaceSourceCwd: getSessionWorkspaceSourceCwd(session),
+        cwd: preparedSession.cwd,
+        workspaceMode: preparedSession.workspaceMode,
+        workspaceIsolationMode: resolveSessionWorkspaceIsolationMode(preparedSession),
+        existingSkills: preparedSession.skills,
+        existingHydration: preparedSession.hydration,
+        workspaceSourceCwd: getSessionWorkspaceSourceCwd(preparedSession),
       });
       ctx.registry.updateSessionMetadata(id, {
         skills: hydrated.skills,
         hydration: hydrated.hydration,
       });
-      hydratedSession = ctx.registry.get(id) ?? session;
+      hydratedSession = ctx.registry.get(id) ?? preparedSession;
       runtime.spawn(id, hydratedSession.providerName, {
         cwd: hydratedSession.cwd,
         workspaceMode: hydratedSession.workspaceMode,
@@ -1674,28 +1972,29 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
   }
 
   if (session.providerName === 'cursor') {
-    if (!session.providerSessionId) {
+    if (!preparedSession.providerSessionId) {
       return c.json({ error: 'No provider session ID to resume' }, 400);
     }
 
-    let hydratedSession = session;
+    let hydratedSession = preparedSession;
     try {
-      const providerTarget = resolveSessionProviderTarget(ctx.config, session);
+      const providerTarget = resolveSessionProviderTarget(ctx.config, preparedSession);
       const hydrated = await hydrateSessionForTarget(ctx, {
         trigger: 'resume',
-        sessionId: session.id,
+        sessionId: preparedSession.id,
         providerTarget,
-        cwd: session.cwd,
-        workspaceMode: session.workspaceMode,
-        existingSkills: session.skills,
-        existingHydration: session.hydration,
-        workspaceSourceCwd: getSessionWorkspaceSourceCwd(session),
+        cwd: preparedSession.cwd,
+        workspaceMode: preparedSession.workspaceMode,
+        workspaceIsolationMode: resolveSessionWorkspaceIsolationMode(preparedSession),
+        existingSkills: preparedSession.skills,
+        existingHydration: preparedSession.hydration,
+        workspaceSourceCwd: getSessionWorkspaceSourceCwd(preparedSession),
       });
       ctx.registry.updateSessionMetadata(id, {
         skills: hydrated.skills,
         hydration: hydrated.hydration,
       });
-      hydratedSession = ctx.registry.get(id) ?? session;
+      hydratedSession = ctx.registry.get(id) ?? preparedSession;
       await primeCliCompatibility(
         ctx,
         resolveCliProviderTarget(ctx, hydratedSession.providerName, hydratedSession.providerInstanceId),
@@ -1718,16 +2017,16 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
   }
 
   if (session.providerName === 'kiro') {
-    if (!session.providerSessionId) {
+    if (!preparedSession.providerSessionId) {
       return c.json({ error: 'No provider session ID to resume' }, 400);
     }
 
-    let hydratedSession = session;
+    let hydratedSession = preparedSession;
     try {
       const canResume = await getKiroNative(
         ctx,
-        session.providerInstanceId,
-      ).canResumeSession(session.cwd, session.providerSessionId);
+        preparedSession.providerInstanceId,
+      ).canResumeSession(preparedSession.cwd, preparedSession.providerSessionId);
       if (!canResume) {
         return c.json({
           error: 'Kiro can only resume the latest session in a workspace. '
@@ -1735,22 +2034,23 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         }, 409);
       }
 
-      const providerTarget = resolveSessionProviderTarget(ctx.config, session);
+      const providerTarget = resolveSessionProviderTarget(ctx.config, preparedSession);
       const hydrated = await hydrateSessionForTarget(ctx, {
         trigger: 'resume',
-        sessionId: session.id,
+        sessionId: preparedSession.id,
         providerTarget,
-        cwd: session.cwd,
-        workspaceMode: session.workspaceMode,
-        existingSkills: session.skills,
-        existingHydration: session.hydration,
-        workspaceSourceCwd: getSessionWorkspaceSourceCwd(session),
+        cwd: preparedSession.cwd,
+        workspaceMode: preparedSession.workspaceMode,
+        workspaceIsolationMode: resolveSessionWorkspaceIsolationMode(preparedSession),
+        existingSkills: preparedSession.skills,
+        existingHydration: preparedSession.hydration,
+        workspaceSourceCwd: getSessionWorkspaceSourceCwd(preparedSession),
       });
       ctx.registry.updateSessionMetadata(id, {
         skills: hydrated.skills,
         hydration: hydrated.hydration,
       });
-      hydratedSession = ctx.registry.get(id) ?? session;
+      hydratedSession = ctx.registry.get(id) ?? preparedSession;
       await primeCliCompatibility(
         ctx,
         resolveCliProviderTarget(ctx, hydratedSession.providerName, hydratedSession.providerInstanceId),
@@ -1780,7 +2080,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
 
     let resumeTarget;
     try {
-      resumeTarget = resolvePiResumeTarget(ctx.config, session);
+      resumeTarget = resolvePiResumeTarget(ctx.config, preparedSession);
     } catch (err) {
       return c.json({
         error: err instanceof Error ? err.message : String(err),
@@ -1789,28 +2089,29 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
 
     let permissionMode = (body as { permissionMode?: 'skip' | 'whitelist' | 'default' })
       .permissionMode ?? session.permissionMode ?? 'skip';
-    if (session.workspaceMode === 'read_only') {
+    if (preparedSession.workspaceMode === 'read_only') {
       permissionMode = 'default';
     }
 
-    let hydratedSession = session;
+    let hydratedSession = preparedSession;
     try {
-      const providerTarget = resolveSessionProviderTarget(ctx.config, session);
+      const providerTarget = resolveSessionProviderTarget(ctx.config, preparedSession);
       const hydrated = await hydrateSessionForTarget(ctx, {
         trigger: 'resume',
-        sessionId: session.id,
+        sessionId: preparedSession.id,
         providerTarget,
-        cwd: session.cwd,
-        workspaceMode: session.workspaceMode,
-        existingSkills: session.skills,
-        existingHydration: session.hydration,
-        workspaceSourceCwd: getSessionWorkspaceSourceCwd(session),
+        cwd: preparedSession.cwd,
+        workspaceMode: preparedSession.workspaceMode,
+        workspaceIsolationMode: resolveSessionWorkspaceIsolationMode(preparedSession),
+        existingSkills: preparedSession.skills,
+        existingHydration: preparedSession.hydration,
+        workspaceSourceCwd: getSessionWorkspaceSourceCwd(preparedSession),
       });
       ctx.registry.updateSessionMetadata(id, {
         skills: hydrated.skills,
         hydration: hydrated.hydration,
       });
-      hydratedSession = ctx.registry.get(id) ?? session;
+      hydratedSession = ctx.registry.get(id) ?? preparedSession;
       await primeCliCompatibility(
         ctx,
         resolveCliProviderTarget(ctx, hydratedSession.providerName, hydratedSession.providerInstanceId),
@@ -1832,17 +2133,17 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
     return c.json(serializeSession(ctx, ctx.registry.get(id) ?? hydratedSession));
   }
 
-  if (!session.providerSessionId) {
+  if (!preparedSession.providerSessionId) {
     return c.json({ error: 'No provider session ID to resume' }, 400);
   }
 
   const caps = runtime.getCapabilities(
-    session.providerName,
-    session.providerInstanceId,
-    session.providerBackend,
+    preparedSession.providerName,
+    preparedSession.providerInstanceId,
+    preparedSession.providerBackend,
   );
   if (!caps.resume) {
-    return c.json({ error: `Provider '${session.providerName}' does not support resume` }, 501);
+    return c.json({ error: `Provider '${preparedSession.providerName}' does not support resume` }, 501);
   }
 
   const body = await c.req.json<{
@@ -1853,28 +2154,29 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
   // Derive permissionMode from workspaceMode
   let permissionMode = (body as { permissionMode?: 'skip' | 'whitelist' | 'default' })
     .permissionMode ?? 'skip';
-  if (session.workspaceMode === 'read_only') {
+  if (preparedSession.workspaceMode === 'read_only') {
     permissionMode = 'default';
   }
 
-  let hydratedSession = session;
+  let hydratedSession = preparedSession;
   try {
-    const providerTarget = resolveSessionProviderTarget(ctx.config, session);
+    const providerTarget = resolveSessionProviderTarget(ctx.config, preparedSession);
     const hydrated = await hydrateSessionForTarget(ctx, {
       trigger: 'resume',
-      sessionId: session.id,
+      sessionId: preparedSession.id,
       providerTarget,
-      cwd: session.cwd,
-      workspaceMode: session.workspaceMode,
-      existingSkills: session.skills,
-      existingHydration: session.hydration,
-      workspaceSourceCwd: getSessionWorkspaceSourceCwd(session),
+      cwd: preparedSession.cwd,
+      workspaceMode: preparedSession.workspaceMode,
+      workspaceIsolationMode: resolveSessionWorkspaceIsolationMode(preparedSession),
+      existingSkills: preparedSession.skills,
+      existingHydration: preparedSession.hydration,
+      workspaceSourceCwd: getSessionWorkspaceSourceCwd(preparedSession),
     });
     ctx.registry.updateSessionMetadata(id, {
       skills: hydrated.skills,
       hydration: hydrated.hydration,
     });
-    hydratedSession = ctx.registry.get(id) ?? session;
+    hydratedSession = ctx.registry.get(id) ?? preparedSession;
     await primeCliCompatibility(
       ctx,
       hydratedSession.providerBackend === 'cli'
@@ -1929,6 +2231,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
       || rawBody.workspaceMode === 'read_only'
       ? rawBody.workspaceMode
       : undefined,
+    workspaceIsolation: parseWorkspaceIsolationMode(rawBody.workspaceIsolation),
     permissionMode: rawBody.permissionMode === 'skip'
       || rawBody.permissionMode === 'whitelist'
       || rawBody.permissionMode === 'default'
@@ -1944,6 +2247,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     outputDir: parseOptionalString(rawBody.outputDir),
     transplant: parseContextTransplant(rawBody.transplant),
   };
+  const requestedWorkspaceIsolationMode = body.workspaceIsolation;
   const requestedHydrationMetadata = extractHydrationMetadata(
     body.context,
     parsedSkills.clear ? undefined : body.skills,
@@ -1988,45 +2292,50 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
   const warnings = [...branchDecision.warnings];
 
   const forkId = randomUUID();
+  const parentIsolationMode = resolveSessionWorkspaceIsolationMode(session);
   let forkCwd = session.cwd;
   let forkWorkspaceMode = body.workspaceMode ?? session.workspaceMode;
   let forkPermissionMode = body.permissionMode ?? session.permissionMode ?? 'skip';
+  let forkWorkspaceIsolationMode = requestedWorkspaceIsolationMode
+    ?? (parentIsolationMode === 'worktree' && body.workspaceMode !== 'isolated'
+      ? 'worktree'
+      : undefined);
+  let forkPrepared: PrepareSessionWorkspaceResult;
   let usedContextTransplant: SessionContextTransplant | undefined;
 
   if (branchMode === 'native_fork') {
-    if (session.workspaceMode === 'isolated') {
-      const resolved = resolveWorkspace({
-        sessionId: forkId,
-        sessionBaseDir: ctx.config.sessionBaseDir,
-        workspaceMode: 'isolated',
-      });
-      copyIsolatedWorkspace(ctx.config.sessionBaseDir, id, forkId);
-      forkCwd = resolved.cwd;
-      forkWorkspaceMode = resolved.workspaceMode;
-      forkPermissionMode = resolved.permissionMode;
-    } else if (session.workspaceMode === 'read_only') {
+    if (session.workspaceMode === 'read_only') {
       forkPermissionMode = 'default';
-    }
-  } else {
-    const resolved = resolveWorkspace({
-      sessionId: forkId,
-      sessionBaseDir: ctx.config.sessionBaseDir,
-      cwd: body.cwd ?? (forkWorkspaceMode === 'isolated'
-        ? undefined
-        : getSessionWorkspaceSourceCwd(session) ?? session.cwd),
-      workspaceMode: forkWorkspaceMode,
-      permissionMode: forkPermissionMode,
-    });
-    forkCwd = resolved.cwd;
-    forkWorkspaceMode = resolved.workspaceMode;
-    forkPermissionMode = resolved.permissionMode;
-
-    if (session.workspaceMode === 'isolated' && forkWorkspaceMode === 'isolated') {
-      copyIsolatedWorkspace(ctx.config.sessionBaseDir, id, forkId);
     }
   }
 
+  try {
+    forkPrepared = prepareSessionWorkspace({
+      sessionId: forkId,
+      sessionBaseDir: ctx.config.sessionBaseDir,
+      cwd: body.cwd ?? getSessionWorkspaceSourceCwd(session) ?? session.cwd,
+      workspaceMode: forkWorkspaceMode,
+      workspaceIsolationMode: forkWorkspaceIsolationMode,
+      permissionMode: forkPermissionMode,
+    });
+    forkCwd = forkPrepared.cwd;
+    forkWorkspaceMode = forkPrepared.workspaceMode;
+    forkPermissionMode = forkPrepared.permissionMode;
+    forkWorkspaceIsolationMode = forkPrepared.workspaceIsolation.mode;
+  } catch (error) {
+    return c.json({ error: `${error}` }, 400);
+  }
+
+  if (forkPrepared.workspaceIsolation.mode !== 'shared' && session.cwd !== forkCwd) {
+    copyWorkspaceSnapshot(session.cwd, forkCwd, { skipGitMetadata: true });
+  }
+
   if (!childCaps.permissions && forkWorkspaceMode === 'read_only') {
+    discardPreparedWorkspace(ctx, {
+      id: forkId,
+      workspaceMode: forkWorkspaceMode,
+      workspaceIsolation: forkPrepared.workspaceIsolation,
+    });
     return c.json({
       error: `Provider '${requestedProviderName}' does not support permission enforcement required by read_only workspace`,
       branch: {
@@ -2074,6 +2383,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
       providerTarget: childTarget,
       cwd: forkCwd,
       workspaceMode: forkWorkspaceMode,
+      workspaceIsolationMode: forkWorkspaceIsolationMode,
       requestedSkills: parsedSkills.clear ? undefined : body.skills,
       existingSkills: parsedSkills.clear ? undefined : session.skills,
       existingHydration: session.hydration,
@@ -2090,9 +2400,11 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
   } catch (error) {
     const runtimeSkillError = toRuntimeSkillErrorResponse(error);
     if (runtimeSkillError) {
-      if (forkWorkspaceMode === 'isolated') {
-        cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, forkId);
-      }
+      discardPreparedWorkspace(ctx, {
+        id: forkId,
+        workspaceMode: forkWorkspaceMode,
+        workspaceIsolation: forkPrepared.workspaceIsolation,
+      });
       return c.json(runtimeSkillError.body, runtimeSkillError.status);
     }
     throw error;
@@ -2105,6 +2417,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     providerInstanceId: childTarget.instanceId,
     cwd: forkCwd,
     workspaceMode: forkWorkspaceMode,
+    workspaceIsolation: forkPrepared.workspaceIsolation,
     permissionMode: forkPermissionMode,
     allowedTools: body.allowedTools ?? session.allowedTools,
     model: body.model ?? session.model,
@@ -2151,9 +2464,11 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
       ctx.registry.updateStatus(forked.id, 'ready');
     }
   } catch (err) {
-    if (forkWorkspaceMode === 'isolated') {
-      cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, forkId);
-    }
+    discardPreparedWorkspace(ctx, {
+      id: forkId,
+      workspaceMode: forkWorkspaceMode,
+      workspaceIsolation: forkPrepared.workspaceIsolation,
+    });
     ctx.registry.remove(forked.id);
     return c.json({ error: `Failed to fork: ${err}` }, 500);
   }

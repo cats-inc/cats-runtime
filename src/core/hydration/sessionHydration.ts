@@ -4,6 +4,7 @@ import type {
   SessionHydrationSkillSource,
   SessionHydrationState,
   SessionSkillState,
+  WorkspaceIsolationMode,
   WorkspaceMode,
   WorkspaceSubstrateFindingStatus,
   WorkspaceSubstrateProfileId,
@@ -25,6 +26,7 @@ export interface HydrateSessionStateInput {
   providerBackend: ProviderBackend;
   runtimeCwd: string;
   workspaceMode?: WorkspaceMode;
+  workspaceIsolationMode?: WorkspaceIsolationMode;
   sessionBaseDir: string;
   requestedSkills?: RuntimeSkillManifest;
   existingSkills?: SessionSkillState;
@@ -188,12 +190,19 @@ async function hydrateWorkspace(
   );
 
   return {
+    isolationMode: input.workspaceIsolationMode ?? deriveWorkspaceIsolationMode(input.workspaceMode),
     runtimeCwd: input.runtimeCwd,
     ...(sourceCwd ? { sourceCwd } : {}),
     sourceOfTruth,
     substrate,
     warnings,
   };
+}
+
+function deriveWorkspaceIsolationMode(
+  workspaceMode: WorkspaceMode | undefined,
+): WorkspaceIsolationMode {
+  return workspaceMode === 'isolated' ? 'isolated' : 'shared';
 }
 
 function resolveWorkspaceSourceCwd(

@@ -193,9 +193,12 @@ export function toSessionView(
   options: SessionViewOptions = {},
 ): SessionView {
   const attached = options.attached === true;
+  const workspaceKeyPath = session.workspaceIsolation?.sourceCwd
+    ?? session.hydration?.workspace.sourceCwd
+    ?? session.cwd;
   return {
     ...session,
-    workspaceKey: sessionWorkspaceKey(session.cwd),
+    workspaceKey: sessionWorkspaceKey(workspaceKeyPath),
     activity: sessionActivity(session, options),
     ownership: sessionOwnership(session.providerName, session.providerBackend),
     resumeStrategy: sessionResumeStrategy(session.providerName, session.providerBackend),

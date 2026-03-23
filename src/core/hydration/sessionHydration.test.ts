@@ -148,6 +148,7 @@ describe('session hydration', () => {
         trigger: 'create',
         updatedAt: '2026-03-23T00:00:00.000Z',
         workspace: {
+          isolationMode: 'shared',
           runtimeCwd,
           sourceCwd: runtimeCwd,
           sourceOfTruth: 'runtime_cwd',

@@ -15,9 +15,12 @@ export type {
   SessionProviderState,
   SessionReusePolicy,
   SessionSkillState,
+  SessionWorkspaceIsolationState,
   SessionResumeStrategy,
   SessionStatus,
   SessionView,
   TurnInput,
+  WorkspaceIsolationMode,
   WorkspaceMode,
+  WorktreeCleanupPolicy,
 } from '../../../core/types.js';

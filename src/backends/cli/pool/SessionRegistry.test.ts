@@ -140,6 +140,7 @@ describe('SessionRegistry', () => {
           trigger: 'create',
           updatedAt: '2026-03-23T00:00:00.000Z',
           workspace: {
+            isolationMode: 'isolated',
             runtimeCwd: '/repo/.sandbox/session-1',
             sourceCwd: '/repo',
             sourceOfTruth: 'source_workspace',
@@ -203,6 +204,7 @@ describe('SessionRegistry', () => {
         trigger: 'create',
         updatedAt: '2026-03-23T00:00:00.000Z',
         workspace: {
+          isolationMode: 'isolated',
           runtimeCwd: '/repo/.sandbox/session-1',
           sourceCwd: '/repo',
           sourceOfTruth: 'source_workspace',

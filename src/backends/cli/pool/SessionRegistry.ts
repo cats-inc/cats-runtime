@@ -11,6 +11,7 @@ import type {
   SessionReusePolicy,
   SessionSkillState,
   SessionStatus,
+  SessionWorkspaceIsolationState,
   WorkspaceMode,
 } from './types.js';
 import type { ProviderDefaultTarget } from '../config.js';
@@ -33,6 +34,7 @@ export interface CreateSessionInput {
   providerInstanceId?: string;
   cwd: string;
   workspaceMode?: WorkspaceMode;
+  workspaceIsolation?: SessionWorkspaceIsolationState;
   permissionMode?: PermissionMode;
   allowedTools?: string[];
   model?: string;
@@ -59,6 +61,7 @@ interface DiscoveredSessionData {
   sourcePath?: string;
   group?: string;
   workspaceMode?: WorkspaceMode;
+  workspaceIsolation?: SessionWorkspaceIsolationState;
   permissionMode?: PermissionMode;
   allowedTools?: string[];
   sessionKey?: string;
@@ -127,6 +130,18 @@ export class SessionRegistry {
         };
         // Default missing workspaceMode for backward compat
         if (!s.workspaceMode) s.workspaceMode = 'shared';
+        const normalizedWorkspaceIsolation = normalizeWorkspaceIsolationState({
+          cwd: s.cwd,
+          workspaceMode: s.workspaceMode,
+          workspaceIsolation: s.workspaceIsolation,
+        });
+        if (
+          JSON.stringify(normalizedWorkspaceIsolation)
+          !== JSON.stringify(s.workspaceIsolation)
+        ) {
+          s.workspaceIsolation = normalizedWorkspaceIsolation;
+          migrated = true;
+        }
         if (
           s.providerInstanceId !== loaded.providerInstanceId
           || s.providerBackend !== loaded.providerBackend
@@ -218,21 +233,26 @@ export class SessionRegistry {
       origin: 'runtime',
       cwd: input.cwd,
       workspaceMode: input.workspaceMode,
-        permissionMode: input.permissionMode,
-        allowedTools: input.allowedTools,
-        model: input.model,
-        group: input.group,
-        sessionKey: input.sessionKey,
-        reusePolicy: input.reusePolicy,
+      workspaceIsolation: normalizeWorkspaceIsolationState({
+        cwd: input.cwd,
+        workspaceMode: input.workspaceMode,
+        workspaceIsolation: input.workspaceIsolation,
+      }),
+      permissionMode: input.permissionMode,
+      allowedTools: input.allowedTools,
+      model: input.model,
+      group: input.group,
+      sessionKey: input.sessionKey,
+      reusePolicy: input.reusePolicy,
       instructions: input.instructions,
       skills: cloneSkillState(input.skills),
       hydration: cloneHydrationState(input.hydration),
       context: cloneInvocationContext(input.context),
       outputDir: input.outputDir,
       artifacts: cloneArtifacts(input.artifacts),
-        messageCount: 0,
-        totalInputTokens: 0,
-        totalOutputTokens: 0,
+      messageCount: 0,
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
       createdAt: now,
       updatedAt: now,
     };
@@ -363,6 +383,42 @@ export class SessionRegistry {
     }
     if (patch.summary !== undefined) {
       session.summary = patch.summary;
+    }
+
+    session.updatedAt = new Date().toISOString();
+    this.scheduleSave();
+    return true;
+  }
+
+  updateWorkspace(
+    id: string,
+    patch: {
+      cwd?: string;
+      workspaceMode?: WorkspaceMode;
+      workspaceIsolation?: SessionWorkspaceIsolationState;
+      permissionMode?: PermissionMode;
+    },
+  ): boolean {
+    const session = this.sessions.get(id);
+    if (!session) return false;
+
+    if (patch.cwd !== undefined) {
+      session.cwd = patch.cwd;
+    }
+    if (patch.workspaceMode !== undefined) {
+      session.workspaceMode = patch.workspaceMode;
+    }
+    if (patch.workspaceIsolation !== undefined) {
+      session.workspaceIsolation = cloneWorkspaceIsolationState(patch.workspaceIsolation);
+    } else if (patch.cwd !== undefined || patch.workspaceMode !== undefined) {
+      session.workspaceIsolation = normalizeWorkspaceIsolationState({
+        cwd: session.cwd,
+        workspaceMode: session.workspaceMode,
+        workspaceIsolation: session.workspaceIsolation,
+      });
+    }
+    if (patch.permissionMode !== undefined) {
+      session.permissionMode = patch.permissionMode;
     }
 
     session.updatedAt = new Date().toISOString();
@@ -616,6 +672,11 @@ export class SessionRegistry {
       origin: 'discovered',
       cwd: mergedData.cwd,
       workspaceMode: mergedData.workspaceMode || 'shared',
+      workspaceIsolation: normalizeWorkspaceIsolationState({
+        cwd: mergedData.cwd,
+        workspaceMode: mergedData.workspaceMode || 'shared',
+        workspaceIsolation: mergedData.workspaceIsolation,
+      }),
       model: mergedData.model,
       group: mergedData.group,
       sessionKey: mergedData.sessionKey,
@@ -695,6 +756,11 @@ export class SessionRegistry {
     if (data.summary) session.summary = data.summary;
     if (data.group && !session.group) session.group = data.group;
     if (data.workspaceMode) session.workspaceMode = data.workspaceMode;
+    session.workspaceIsolation = normalizeWorkspaceIsolationState({
+      cwd: session.cwd,
+      workspaceMode: session.workspaceMode,
+      workspaceIsolation: data.workspaceIsolation ?? session.workspaceIsolation,
+    });
     if (data.model && !session.model) session.model = data.model;
     if (data.sessionKey && !session.sessionKey) session.sessionKey = data.sessionKey;
     if (data.reusePolicy && !session.reusePolicy) session.reusePolicy = data.reusePolicy;
@@ -748,6 +814,7 @@ export class SessionRegistry {
       sourcePath: incoming.sourcePath ?? existing.sourcePath,
       group: incoming.group ?? existing.group,
       workspaceMode: incoming.workspaceMode ?? existing.workspaceMode,
+      workspaceIsolation: incoming.workspaceIsolation ?? existing.workspaceIsolation,
       sessionKey: incoming.sessionKey ?? existing.sessionKey,
       reusePolicy: incoming.reusePolicy ?? existing.reusePolicy,
       instructions: incoming.instructions ?? existing.instructions,
@@ -882,6 +949,11 @@ export class SessionRegistry {
     }
     if (!target.cwd && incoming.cwd) target.cwd = incoming.cwd;
     if (!target.workspaceMode && incoming.workspaceMode) target.workspaceMode = incoming.workspaceMode;
+    target.workspaceIsolation = normalizeWorkspaceIsolationState({
+      cwd: target.cwd,
+      workspaceMode: target.workspaceMode,
+      workspaceIsolation: target.workspaceIsolation ?? incoming.workspaceIsolation,
+    });
     if (!target.model && incoming.model) target.model = incoming.model;
     if (!target.group && incoming.group) target.group = incoming.group;
     if (!target.summary && incoming.summary) target.summary = incoming.summary;
@@ -959,4 +1031,31 @@ function cloneArtifacts(
   artifacts?: SessionArtifact[],
 ): SessionArtifact[] | undefined {
   return artifacts ? structuredClone(artifacts) : undefined;
+}
+
+function cloneWorkspaceIsolationState(
+  workspaceIsolation?: SessionWorkspaceIsolationState,
+): SessionWorkspaceIsolationState | undefined {
+  return workspaceIsolation ? structuredClone(workspaceIsolation) : undefined;
+}
+
+function normalizeWorkspaceIsolationState(input: {
+  cwd: string;
+  workspaceMode?: WorkspaceMode;
+  workspaceIsolation?: SessionWorkspaceIsolationState;
+}): SessionWorkspaceIsolationState {
+  if (input.workspaceIsolation) {
+    return cloneWorkspaceIsolationState(input.workspaceIsolation)!;
+  }
+
+  if (input.workspaceMode === 'isolated') {
+    return {
+      mode: 'isolated',
+    };
+  }
+
+  return {
+    mode: 'shared',
+    sourceCwd: input.cwd,
+  };
 }

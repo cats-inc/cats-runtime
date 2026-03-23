@@ -20,6 +20,7 @@ environment-relative guest paths.
 The architectural split is:
 
 - `core`: shared runtime config and stable types
+- `core/workspace`: runtime-owned shared/isolated/worktree workspace lifecycle helpers
 - `startup`: process-level startup mode, readiness, and lifecycle helpers
 - `backends`: execution implementations for CLI, API/local, and agent targets
 - `core/browser`: runtime-owned browser/session/page contracts plus preview helpers
@@ -78,6 +79,7 @@ src/
     providerCatalog.ts
     progress.ts
     runtime/
+    workspace/
     tools/
     types.ts
     usage/
@@ -155,7 +157,7 @@ src/
 ### `src/backends/cli`
 
 - Manages subprocess-backed sessions
-- Tracks session registry and workspace modes
+- Tracks session registry, workspace modes, and persisted workspace-isolation metadata
 - Resolves `(provider, instance)` into concrete command/runtime settings
 - Discovers external native/file-backed sessions from supported tools per provider instance
 - Encapsulates provider-specific spawn, resume, fork, and permission logic
@@ -271,6 +273,19 @@ src/
 - Provides the minimal "ensure this known session is awake" helper reused by the
   scheduled wakeup substrate
 
+### `src/core/workspace`
+
+- Owns the runtime-side workspace execution layer used by session lifecycle
+  routes
+- Prepares shared, isolated, and worktree-backed runtime cwd state without
+  moving product orchestration policy into runtime
+- Uses deterministic worktree ids and paths rooted under the runtime session
+  base dir so resume/reset/delete can recreate or clean up the same worktree
+- Supports explicit worktree cleanup policies (`discard` or `merge`) and
+  returns retained/completed cleanup summaries instead of assuming cleanup
+  always succeeds
+- Provides a conservative snapshot-copy helper for non-shared fork flows
+
 ### `src/core/wakeup`
 
 - Owns the runtime-managed scheduled wakeup request store
@@ -302,6 +317,8 @@ src/
   paths
 - Distinguishes runtime cwd from the authoritative workspace source when an
   isolated sandbox is only a temporary execution surface
+- Records runtime-owned `workspace.isolationMode` so hosts can distinguish
+  shared, isolated, and worktree-backed execution surfaces machine-readably
 - Reuses read-only workspace substrate audit output for additive hydration
   metadata without auto-applying substrate changes
 - Re-derives runtime-managed skill delivery per target/backend so session state
@@ -348,41 +365,46 @@ src/
 1. A caller sends a request to `cats-runtime`
 2. `src/http` authenticates and routes the request
 3. `RuntimeSessionManager` resolves the configured backend target for the chosen provider instance
-4. `src/core/hydration` resolves workspace provenance and skill re-entry state
+4. `src/core/workspace` prepares the runtime execution surface for the chosen
+   isolation mode (`shared`, `isolated`, or `worktree`)
+5. `src/core/hydration` resolves workspace provenance and skill re-entry state
    for the target backend
-5. `src/core/skills` validates requested runtime skill ids and resolves a
+6. `src/core/skills` validates requested runtime skill ids and resolves a
    delivery contract for the target backend
-6. CLI targets flow into `WorkerPool`; API/local targets flow into `ApiBackendManager`; agent targets flow into `AgentBackendManager`
-7. Provider model-catalog reads resolve through the shared provider target and
+7. CLI targets flow into `WorkerPool`; API/local targets flow into `ApiBackendManager`; agent targets flow into `AgentBackendManager`
+8. Provider model-catalog reads resolve through the shared provider target and
    model catalog services in `src/core`, including runtime-owned active-config
    hints when a provider family exposes a readable local default selection
-8. CLI setup, diagnostics, and execution priming resolve through the shared
+9. CLI setup, diagnostics, and execution priming resolve through the shared
    compatibility service in `src/core/compatibility`, which consumes the
    runtime-owned metadata in `src/core/provider-install`, classifies targets,
    selects degraded profiles, validates runtime flags through `light` and
    optional `live` probes, evaluates prerequisite / PATH-persistence /
    npm-prefix setup state, tracks cache staleness for reprobe flows, and
    writes evidence bundles for non-ready results
-9. API/local turns may enter the shared local tool loop in `src/core/tools`,
+10. API/local turns may enter the shared local tool loop in `src/core/tools`,
    including workspace substrate preview/apply operations
-10. Agent turns use the shared `TurnInput` contract plus provider-managed session continuity where available
-11. Stream events pass through runtime-owned metering observation so usage,
+11. Agent turns use the shared `TurnInput` contract plus provider-managed session continuity where available
+12. Stream events pass through runtime-owned metering observation so usage,
     incidents, and active guardrails are updated before the caller receives the
     final event stream
-12. Startup/readiness state is exposed over `GET /health`, while
+13. Startup/readiness state is exposed over `GET /health`, while
    `GET /diagnostics/health`, `GET /diagnostics/runtime`, and
    `GET /diagnostics/providers` expose the runtime-owned host integration
    surface
-13. `POST /mcp` reuses those same runtime-owned services as an additive
+14. `POST /mcp` reuses those same runtime-owned services as an additive
     orchestrator/tool surface
-14. Optional machine-readable process output emits startup and shutdown
+15. Optional machine-readable process output emits startup and shutdown
    lifecycle events for app-managed local hosts
-15. Session branch inspection is available over session payload `branching`
+16. Session branch inspection is available over session payload `branching`
     metadata plus `GET /sessions/{id}/lineage`
-16. Delivery actions resolve through `RuntimeDeliveryService`, which inspects
+17. Delivery actions resolve through `RuntimeDeliveryService`, which inspects
     repo state, exports artifacts, normalizes preview surfaces, and executes
     Git mutations behind a stable machine-readable contract
-17. Stream events are returned directly to the caller
+18. Session reset/delete lifecycle now routes worktree cleanup through the same
+    runtime-owned workspace layer, returning retained cleanup metadata when the
+    source repo is dirty or detachment fails
+19. Stream events are returned directly to the caller
 
 For WSL-backed Cursor/Kiro discovery:
 

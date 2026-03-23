@@ -16,6 +16,9 @@ export type ProviderBackend = 'cli' | 'api' | 'local' | 'agent';
 export type SessionReusePolicy = 'create_new' | 'prefer_existing' | 'require_existing';
 
 export type WorkspaceMode = 'isolated' | 'shared' | 'read_only';
+export type WorkspaceIsolationMode = 'shared' | 'isolated' | 'worktree';
+export type WorktreeCleanupPolicy = 'discard' | 'merge';
+export type WorktreeCleanupStatus = 'completed' | 'retained';
 export type WorkspaceSubstrateOperation =
   | 'init-workspace'
   | 'audit-workspace'
@@ -641,6 +644,7 @@ export interface SessionBranchRequest {
   model?: string;
   cwd?: string;
   workspaceMode?: WorkspaceMode;
+  workspaceIsolation?: WorkspaceIsolationMode;
   permissionMode?: PermissionMode;
   allowedTools?: string[];
   group?: string;
@@ -727,6 +731,31 @@ export type SessionHydrationTrigger = 'create' | 'resume' | 'fork' | 'message';
 export type SessionHydrationSkillSource = 'request' | 'session_state';
 export type SessionHydrationWorkspaceSource = 'runtime_cwd' | 'source_workspace';
 
+export interface SessionWorktreeCleanupState {
+  policy: WorktreeCleanupPolicy;
+  status: WorktreeCleanupStatus;
+  observedAt: string;
+  reasonCodes: string[];
+  mergedPathCount: number;
+}
+
+export interface SessionWorktreeState {
+  id: string;
+  sourceRepoRoot: string;
+  sourceHeadOid?: string;
+  sourceHeadRef?: string | null;
+  relativeCwd?: string;
+  worktreePath: string;
+  preparedAt: string;
+  lastCleanup?: SessionWorktreeCleanupState;
+}
+
+export interface SessionWorkspaceIsolationState {
+  mode: WorkspaceIsolationMode;
+  sourceCwd?: string;
+  worktree?: SessionWorktreeState;
+}
+
 export interface SessionWorkspaceHydrationSubstrateState {
   auditPath: string;
   profile: WorkspaceSubstrateProfileId;
@@ -738,6 +767,7 @@ export interface SessionWorkspaceHydrationSubstrateState {
 }
 
 export interface SessionWorkspaceHydrationState {
+  isolationMode: WorkspaceIsolationMode;
   runtimeCwd: string;
   sourceCwd?: string;
   sourceOfTruth: SessionHydrationWorkspaceSource;
@@ -1075,6 +1105,9 @@ export interface RuntimeSessionLifecycleCleanupSummary {
   providerStateCleared?: boolean;
   wakeupsCleared?: boolean;
   workspaceCleaned?: boolean;
+  worktreeDetached?: boolean;
+  worktreeCleanupPolicy?: WorktreeCleanupPolicy;
+  worktreeMergedPaths?: number;
   managedTranscriptDeleted?: boolean;
   providerDiscoveryCleared?: boolean;
   registryDropped?: boolean;
@@ -1095,7 +1128,7 @@ export type RuntimeSessionHookOwner = 'product_memory' | (string & {});
 
 export interface RuntimeSessionHookContract {
   id: RuntimeSessionHookId;
-  phase: 'pre_reset' | 'pre_compaction';
+  phase: 'pre_reset' | 'pre_compaction' | 'pre_flush';
   status: 'pending';
   owner: RuntimeSessionHookOwner;
   reason: string;
@@ -1130,6 +1163,7 @@ export interface RuntimeSessionMaintenance {
   hooks: {
     preReset: RuntimeSessionHookGroup;
     preCompaction: RuntimeSessionHookGroup;
+    preFlush: RuntimeSessionHookGroup;
   };
   resetBoundary: RuntimeSessionResetBoundary;
   cleanup: RuntimeSessionCleanupContract;
@@ -1203,6 +1237,7 @@ export interface SessionInfo {
   origin: SessionOrigin;
   cwd: string;
   workspaceMode?: WorkspaceMode;
+  workspaceIsolation?: SessionWorkspaceIsolationState;
   permissionMode?: PermissionMode;
   allowedTools?: string[];
   model?: string;
