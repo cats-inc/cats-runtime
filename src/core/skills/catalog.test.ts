@@ -363,6 +363,9 @@ describe('runtime skill catalog', () => {
       requestedSkills: ['detached-skill'],
       resolvedSkills: [{
         id: 'detached-skill',
+        slug: 'detached-skill',
+        family: 'code' as const,
+        version: '1.0.0',
         title: 'Detached Skill',
         description: 'Detached skill for tests.',
         status: 'resolved' as const,

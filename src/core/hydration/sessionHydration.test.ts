@@ -147,7 +147,7 @@ describe('session hydration', () => {
 
     if (existingSkills) {
       existingSkills.requestedSkillRefs = [{
-        id: 'work/product-manager',
+        id: 'product-manager',
         family: 'work',
         slug: 'product-manager',
         version: '2026.03',
@@ -172,21 +172,23 @@ describe('session hydration', () => {
 
     expect(buildRuntimeSkillManifestFromState(existingSkills)).toEqual({
       requestedSkills: [{
-        id: 'work/product-manager',
+        id: 'product-manager',
         family: 'work',
         slug: 'product-manager',
       }],
       strict: false,
     });
     expect(hydrated.skills).toEqual(expect.objectContaining({
-      requestedSkills: ['work/product-manager'],
+      requestedSkills: ['product-manager'],
       requestedSkillRefs: [expect.objectContaining({
-        id: 'work/product-manager',
+        id: 'product-manager',
         family: 'work',
         slug: 'product-manager',
       })],
       resolvedSkills: [expect.objectContaining({
-        id: 'work/product-manager',
+        id: 'product-manager',
+        family: 'work',
+        slug: 'product-manager',
       })],
     }));
   });

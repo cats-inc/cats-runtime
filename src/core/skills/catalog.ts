@@ -6,6 +6,7 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
@@ -15,7 +16,9 @@ import { parse as parseYaml } from 'yaml';
 
 import type {
   ProviderBackend,
+  RequestedSessionSkillRef,
   ResolvedRuntimeSkill,
+  RuntimeRequestedSkillRef,
   RuntimeSkillCatalogEntry,
   RuntimeSkillDeliveryMode,
   RuntimeSkillFamily,
@@ -33,6 +36,10 @@ const RUNTIME_SKILL_STATE_ROOT = '.runtime-skills';
 // accumulate unbounded entries across many distinct session skill combinations.
 const MAX_RUNTIME_SKILL_PACKAGE_CACHE_ENTRIES = 128;
 const runtimeSkillPackageCache = new Map<string, RuntimeSkillPackage>();
+const runtimeSkillCatalogCache = new Map<string, {
+  watchKey: string;
+  packages: RuntimeSkillPackage[];
+}>();
 
 interface RuntimeSkillPackage {
   id: string;
@@ -44,8 +51,6 @@ interface RuntimeSkillPackage {
   fingerprint: string;
   library: RuntimeSkillLibraryMetadata;
 }
-
-type RuntimeSkillCatalogIndex = ReadonlyMap<string, RuntimeSkillPackage>;
 
 interface RuntimeSkillFrontmatter {
   name?: unknown;
@@ -59,6 +64,21 @@ interface RuntimeSkillFrontmatter {
   productTags?: unknown;
   deliveryHints?: unknown;
   recommendedCompanions?: unknown;
+}
+
+interface NormalizedRequestedSkillRef {
+  id: string;
+  slug: string;
+  family?: string;
+  version?: string;
+  fingerprint?: string;
+  requestedAs: string;
+  canonicalId: string;
+}
+
+interface ResolvedRequestedSkillPackage {
+  request: NormalizedRequestedSkillRef;
+  skillPackage: RuntimeSkillPackage;
 }
 
 interface ResolveRuntimeSkillManifestOptions {
@@ -122,10 +142,103 @@ const RUNTIME_SKILL_DELIVERY_HINT_SET = new Set<RuntimeSkillDeliveryMode>([
   'none',
 ]);
 
-function normalizeSkillIds(skillIds: string[] | undefined): string[] {
-  return (skillIds ?? [])
-    .map((skillId) => skillId.trim())
-    .filter((skillId, index, list) => skillId.length > 0 && list.indexOf(skillId) === index);
+function normalizeOptionalToken(value: string | undefined): string | undefined {
+  const normalized = value?.trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+  return normalized && normalized.length > 0 ? normalized : undefined;
+}
+
+function splitRequestedSkillId(
+  value: string,
+): { family?: string; slug: string } {
+  const normalized = normalizeOptionalToken(value);
+  if (!normalized) {
+    throw new RuntimeSkillError(
+      'Runtime skill refs must include a non-empty id or slug.',
+      'invalid_skill_manifest',
+    );
+  }
+
+  const segments = normalized.split('/').filter(Boolean);
+  if (segments.length === 0) {
+    throw new RuntimeSkillError(
+      'Runtime skill refs must include a non-empty id or slug.',
+      'invalid_skill_manifest',
+    );
+  }
+
+  const slug = segments.at(-1)!;
+  const family = segments.length > 1 ? segments.slice(0, -1).join('/') : undefined;
+  return { family, slug };
+}
+
+function normalizeRequestedSkillRef(
+  value: string | RuntimeRequestedSkillRef,
+): NormalizedRequestedSkillRef {
+  if (typeof value === 'string') {
+    const normalized = normalizeOptionalToken(value);
+    const parsed = splitRequestedSkillId(value);
+    return {
+      id: parsed.slug,
+      slug: parsed.slug,
+      ...(parsed.family ? { family: parsed.family } : {}),
+      requestedAs: normalized!,
+      canonicalId: parsed.family ? `${parsed.family}/${parsed.slug}` : parsed.slug,
+    };
+  }
+
+  const literalId = normalizeOptionalToken(value.id);
+  const literalFamily = normalizeOptionalToken(value.family);
+  const literalSlug = normalizeOptionalToken(value.slug);
+  const version = normalizeOptionalToken(value.version);
+  const fingerprint = normalizeOptionalToken(value.fingerprint);
+
+  const parsedId = literalId ? splitRequestedSkillId(literalId) : undefined;
+  const family = literalFamily ?? parsedId?.family;
+  const slug = literalSlug ?? parsedId?.slug;
+  if (!slug) {
+    throw new RuntimeSkillError(
+      'Runtime skill refs must include a non-empty id or slug.',
+      'invalid_skill_manifest',
+    );
+  }
+
+  if (literalFamily && parsedId?.family && literalFamily !== parsedId.family) {
+    throw new RuntimeSkillError(
+      `Runtime skill ref '${literalId}' conflicts with family '${literalFamily}'.`,
+      'invalid_skill_manifest',
+    );
+  }
+
+  const id = parsedId?.slug ?? literalId ?? slug;
+  const canonicalId = family ? `${family}/${slug}` : slug;
+  return {
+    id,
+    slug,
+    ...(family ? { family } : {}),
+    ...(version ? { version } : {}),
+    ...(fingerprint ? { fingerprint } : {}),
+    requestedAs: literalId ?? canonicalId,
+    canonicalId,
+  };
+}
+
+function normalizeRequestedSkillRefs(
+  skillRefs: Array<string | RuntimeRequestedSkillRef> | undefined,
+): NormalizedRequestedSkillRef[] {
+  const deduped = new Map<string, NormalizedRequestedSkillRef>();
+  for (const skillRef of skillRefs ?? []) {
+    const normalized = normalizeRequestedSkillRef(skillRef);
+    const dedupeKey = [
+      normalized.canonicalId,
+      normalized.version ?? '',
+      normalized.fingerprint ?? '',
+    ].join('|');
+    if (!deduped.has(dedupeKey)) {
+      deduped.set(dedupeKey, normalized);
+    }
+  }
+
+  return Array.from(deduped.values());
 }
 
 function toSkillTitle(skillId: string): string {
@@ -309,8 +422,9 @@ function parseSkillMarkdown(
   skillId: string,
   entryFile: string,
   skillsRoot: string,
+  rawContent?: string,
 ): RuntimeSkillPackage {
-  const raw = readFileSync(entryFile, 'utf-8');
+  const raw = rawContent ?? readFileSync(entryFile, 'utf-8');
   const match = raw.match(/^---\s*\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n([\s\S]*))?$/);
   if (!match) {
     throw new RuntimeSkillError(
@@ -373,21 +487,22 @@ function parseSkillMarkdown(
   };
 }
 
-function resolveRuntimeSkillPackage(
+function loadRuntimeSkillPackage(
   skillId: string,
-  skillsRoot: string = SKILLS_ROOT,
-  catalogIndex?: RuntimeSkillCatalogIndex,
+  entryFile: string,
+  skillsRoot: string,
 ): RuntimeSkillPackage {
-  const resolvedCatalog = catalogIndex ?? buildRuntimeSkillCatalogIndex(skillsRoot);
-  const skillPackage = resolvedCatalog.get(skillId);
-  if (!skillPackage) {
-    throw new RuntimeSkillError(
-      `Unknown runtime skill '${skillId}'.`,
-      'unknown_skill',
-    );
+  const raw = readFileSync(entryFile, 'utf-8');
+  const fingerprint = computeFingerprint(raw);
+  const cached = getCachedRuntimeSkillPackage({
+    entryFile,
+    fingerprint,
+  });
+  if (cached) {
+    return cached;
   }
 
-  return skillPackage;
+  return cacheRuntimeSkillPackage(parseSkillMarkdown(skillId, entryFile, skillsRoot, raw));
 }
 
 function discoverRuntimeSkillEntryFiles(
@@ -428,10 +543,40 @@ function inferSkillsRootFromEntryFile(entryFile: string): string | undefined {
   }
 }
 
+function buildSkillsRootWatchKey(
+  skillsRoot: string,
+): string {
+  const entryFiles = discoverRuntimeSkillEntryFiles(skillsRoot).sort();
+  if (entryFiles.length === 0) {
+    return existsSync(skillsRoot) ? 'empty' : 'missing';
+  }
+
+  return entryFiles
+    .map((entryFile) => {
+      const stat = statSync(entryFile);
+      return [
+        path.relative(skillsRoot, entryFile).replace(/\\/g, '/'),
+        stat.size,
+        Math.trunc(stat.mtimeMs),
+      ].join(':');
+    })
+    .join('|');
+}
+
 function buildRuntimeSkillCatalogPackages(
   skillsRoot: string = SKILLS_ROOT,
 ): RuntimeSkillPackage[] {
+  const watchKey = buildSkillsRootWatchKey(skillsRoot);
+  const cachedCatalog = runtimeSkillCatalogCache.get(skillsRoot);
+  if (cachedCatalog?.watchKey === watchKey) {
+    return cachedCatalog.packages;
+  }
+
   if (!existsSync(skillsRoot)) {
+    runtimeSkillCatalogCache.set(skillsRoot, {
+      watchKey,
+      packages: [],
+    });
     return [];
   }
 
@@ -440,7 +585,7 @@ function buildRuntimeSkillCatalogPackages(
 
   for (const entryFile of discoverRuntimeSkillEntryFiles(skillsRoot).sort()) {
     const skillId = path.basename(path.dirname(entryFile));
-    const skillPackage = parseSkillMarkdown(skillId, entryFile, skillsRoot);
+    const skillPackage = loadRuntimeSkillPackage(skillId, entryFile, skillsRoot);
     const duplicateEntry = seenSkillIds.get(skillId);
     if (duplicateEntry) {
       throw new RuntimeSkillError(
@@ -449,23 +594,21 @@ function buildRuntimeSkillCatalogPackages(
       );
     }
     seenSkillIds.set(skillId, entryFile);
-    packages.push(cacheRuntimeSkillPackage(skillPackage));
+    packages.push(skillPackage);
   }
 
-  return packages.sort((left, right) => {
+  const sortedPackages = packages.sort((left, right) => {
     if (left.library.family !== right.library.family) {
       return left.library.family.localeCompare(right.library.family);
     }
     return left.id.localeCompare(right.id);
   });
-}
 
-function buildRuntimeSkillCatalogIndex(
-  skillsRoot: string = SKILLS_ROOT,
-): Map<string, RuntimeSkillPackage> {
-  return new Map(
-    buildRuntimeSkillCatalogPackages(skillsRoot).map((skillPackage) => [skillPackage.id, skillPackage]),
-  );
+  runtimeSkillCatalogCache.set(skillsRoot, {
+    watchKey,
+    packages: sortedPackages,
+  });
+  return sortedPackages;
 }
 
 export function listRuntimeSkillIds(skillsRoot: string = SKILLS_ROOT): string[] {
@@ -481,6 +624,9 @@ export function listRuntimeSkillCatalog(
 function toResolvedSkill(skillPackage: RuntimeSkillPackage): ResolvedRuntimeSkill {
   return {
     id: skillPackage.id,
+    slug: skillPackage.library.slug,
+    ...(skillPackage.library.family ? { family: skillPackage.library.family } : {}),
+    ...(skillPackage.library.version ? { version: skillPackage.library.version } : {}),
     title: skillPackage.title,
     description: skillPackage.description,
     status: 'resolved',
@@ -496,6 +642,95 @@ function toResolvedSkill(skillPackage: RuntimeSkillPackage): ResolvedRuntimeSkil
       recommendedCompanions: [...skillPackage.library.recommendedCompanions],
     },
   };
+}
+
+function buildRequestedSessionSkillRef(
+  request: NormalizedRequestedSkillRef,
+): RequestedSessionSkillRef {
+  return {
+    id: request.id,
+    slug: request.slug,
+    ...(request.family ? { family: request.family } : {}),
+    ...(request.version ? { version: request.version } : {}),
+    ...(request.fingerprint ? { fingerprint: request.fingerprint } : {}),
+    requestedAs: request.requestedAs,
+  };
+}
+
+function resolvePersistedSkillPathParts(
+  skill: ResolvedRuntimeSkill,
+): { family?: string; slug: string } {
+  const parsed = splitRequestedSkillId(skill.id);
+  return {
+    family: normalizeOptionalToken(skill.family) ?? parsed.family,
+    slug: normalizeOptionalToken(skill.slug) ?? parsed.slug,
+  };
+}
+
+function resolveRequestedSkillPackage(
+  request: NormalizedRequestedSkillRef,
+  skillPackages: RuntimeSkillPackage[],
+): RuntimeSkillPackage {
+  let candidates = request.family
+    ? skillPackages.filter((skillPackage) =>
+        skillPackage.library.family === request.family
+        && skillPackage.library.slug === request.slug)
+    : skillPackages.filter((skillPackage) => skillPackage.id === request.id);
+
+  if (candidates.length === 0 && !request.family) {
+    const slugMatches = skillPackages.filter((skillPackage) => skillPackage.library.slug === request.slug);
+    if (slugMatches.length === 1) {
+      candidates = slugMatches;
+    } else if (slugMatches.length > 1) {
+      throw new RuntimeSkillError(
+        `Runtime skill '${request.requestedAs}' is ambiguous. Request it as family/slug instead.`,
+        'invalid_skill_manifest',
+      );
+    }
+  }
+
+  if (candidates.length === 0) {
+    throw new RuntimeSkillError(
+      `Unknown runtime skill '${request.requestedAs}'.`,
+      'unknown_skill',
+    );
+  }
+
+  if (candidates.length > 1) {
+    throw new RuntimeSkillError(
+      `Runtime skill '${request.requestedAs}' is ambiguous. Request it as family/slug instead.`,
+      'invalid_skill_manifest',
+    );
+  }
+
+  const resolved = candidates[0];
+  if (request.version && resolved.library.version !== request.version) {
+    throw new RuntimeSkillError(
+      `Runtime skill '${request.requestedAs}' resolved version '${resolved.library.version}' instead of '${request.version}'.`,
+      'invalid_skill_manifest',
+    );
+  }
+
+  if (request.fingerprint && resolved.fingerprint !== request.fingerprint) {
+    throw new RuntimeSkillError(
+      `Runtime skill '${request.requestedAs}' resolved fingerprint '${resolved.fingerprint}' instead of '${request.fingerprint}'.`,
+      'invalid_skill_manifest',
+    );
+  }
+
+  return resolved;
+}
+
+function resolveRequestedSkillPackages(
+  requestedSkills: Array<string | RuntimeRequestedSkillRef>,
+  skillsRoot: string = SKILLS_ROOT,
+): ResolvedRequestedSkillPackage[] {
+  const normalizedRequests = normalizeRequestedSkillRefs(requestedSkills);
+  const skillPackages = buildRuntimeSkillCatalogPackages(skillsRoot);
+  return normalizedRequests.map((request) => ({
+    request,
+    skillPackage: resolveRequestedSkillPackage(request, skillPackages),
+  }));
 }
 
 function buildSkillInstructionOverlayFromPackages(
@@ -707,15 +942,12 @@ export function resolveRuntimeSkillManifest(
     return undefined;
   }
 
-  const requestedSkills = normalizeSkillIds(manifest.requestedSkills);
-  if (requestedSkills.length === 0) {
+  const resolvedRequests = resolveRequestedSkillPackages(manifest.requestedSkills, options.skillsRoot);
+  if (resolvedRequests.length === 0) {
     return undefined;
   }
 
-  const catalogIndex = buildRuntimeSkillCatalogIndex(options.skillsRoot);
-  const skillPackages = requestedSkills.map((skillId) =>
-    resolveRuntimeSkillPackage(skillId, options.skillsRoot, catalogIndex),
-  );
+  const skillPackages = resolvedRequests.map((entry) => entry.skillPackage);
   const delivery = buildRuntimeSkillDeliveryPlan(skillPackages, options);
 
   if (manifest.strict === true && delivery.status !== 'applied') {
@@ -727,7 +959,8 @@ export function resolveRuntimeSkillManifest(
 
   return {
     profileId: manifest.profileId,
-    requestedSkills,
+    requestedSkills: resolvedRequests.map((entry) => entry.skillPackage.id),
+    requestedSkillRefs: resolvedRequests.map((entry) => buildRequestedSessionSkillRef(entry.request)),
     context: manifest.context ? structuredClone(manifest.context) : undefined,
     resolvedSkills: skillPackages.map((skillPackage) => toResolvedSkill(skillPackage)),
     strict: manifest.strict === true,
@@ -780,9 +1013,9 @@ function rebuildRuntimeSkillPackages(
       );
     }
 
-    return cacheRuntimeSkillPackage(
-      parseSkillMarkdown(skill.id, skill.entryFile, inferredSkillsRoot),
-    );
+    const pathParts = resolvePersistedSkillPathParts(skill);
+    const reloadedSkillId = pathParts.slug;
+    return loadRuntimeSkillPackage(reloadedSkillId, skill.entryFile, inferredSkillsRoot);
   });
 }
 
