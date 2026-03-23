@@ -169,6 +169,8 @@ surface for hosts and dashboards. The response includes:
 - optional forced-refresh semantics for cached CLI compatibility assessments
 - aggregate summary status and counts
 - per-target `availability.status` (`ok`, `degraded`, `unavailable`)
+- per-target `availability.attentionCodes` for machine-readable degraded/failure
+  routing
 - per-target CLI `setup` summaries with machine-readable:
   - install metadata (`installerId`, method, platform, command, docs/hints)
   - install prerequisites (`bash`, `curl`, `node`, `npm`) for the target
@@ -184,8 +186,12 @@ surface for hosts and dashboards. The response includes:
   - additive `remediation` steps that hosts can surface directly
 - per-target CLI `compatibility` summaries with:
   `classification`, `status`, `summary`, `checkedAt`, selected `profile`,
-  version/runtime `fingerprint`, additive `warnings`, and optional `evidence`
-  artifact metadata
+  version/runtime `fingerprint`, additive `warnings`, machine-readable
+  `attentionCodes`, probe metadata (`mode`, `supportsLive`, `liveValidated`),
+  cache metadata (`stale`, `ttlMs`, `ageMs`, `freshUntil`), and optional
+  `evidence` artifact metadata
+- per-target `reprobe` metadata describing whether `force=1` and `probe=live`
+  are supported for that target
 - provider-owned `config.activeConfig` metadata when the runtime can inspect a
   local provider config directly; the first slice reports Goose
   `~/.config/goose/config.yaml` state (`detected`, `partial`, `missing`,
@@ -195,8 +201,9 @@ surface for hosts and dashboards. The response includes:
 - target-level diagnostics details for CLI, API/local, and agent backends
 
 `GET /diagnostics/providers?probe=live` enables live probes where the current
-runtime backend supports them. Today that is primarily useful for selected
-agent-backed targets; API/local targets still report light diagnostics only.
+runtime backend supports them. For CLI targets this now validates the runtime
+execution flags that `cats-runtime` actually uses when a family profile defines
+a safe live probe; API/local targets still report light diagnostics only.
 `force=1|true|refresh` can be combined with either probe mode to bypass the CLI
 compatibility cache after a provider install or upgrade.
 
@@ -1062,6 +1069,9 @@ mirrors the diagnostics summary view:
 - `summary` and `checkedAt`
 - selected compatibility `profile`
 - version/runtime `fingerprint`
+- machine-readable `attentionCodes`
+- probe metadata (`mode`, `supportsLive`, `liveValidated`)
+- cache metadata (`stale`, `ttlMs`, `ageMs`, `freshUntil`)
 - additive `warnings`
 - optional `evidence` artifact metadata for degraded or failed probes
 

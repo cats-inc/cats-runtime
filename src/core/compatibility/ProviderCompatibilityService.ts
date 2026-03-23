@@ -38,13 +38,15 @@ import type {
   CompatibilityCheck,
   CompatibilityClassification,
   CompatibilityEvidenceArtifact,
+  CompatibilityProbeMode,
   CompatibilityProbeRecord,
   CompatibilityProfileSelection,
   CompatibilitySummaryView,
+  ProviderCompatibilityProfile,
 } from './types.js';
 
 const DEFAULT_CACHE_TTL_MS = 5 * 60_000;
-const DEFAULT_PROBE_TIMEOUT_MS = 5_000;
+const DEFAULT_PROBE_TIMEOUT_MS = 1_500;
 const DEFAULT_SAMPLE_LIMIT = 2_048;
 const EVIDENCE_SCHEMA_VERSION = 3;
 interface ProbeResult {
@@ -106,19 +108,62 @@ export class ProviderCompatibilityService {
     return this.evidenceDir;
   }
 
+  private getBestCachedEntry(
+    providerName: ProviderName,
+    instanceId: string,
+  ): CacheEntry | undefined {
+    const entries = (['light', 'live'] as const)
+      .map((probeMode) => this.cache.get(createCacheKey(providerName, instanceId, probeMode)))
+      .filter((entry): entry is CacheEntry => Boolean(entry));
+
+    if (entries.length === 0) {
+      return undefined;
+    }
+
+    const freshEntries = entries.filter((entry) => !this.buildCacheState(entry.cachedAtMs).stale);
+    const candidates = freshEntries.length > 0 ? freshEntries : entries;
+    return candidates.reduce((latest, entry) => (
+      entry.cachedAtMs > latest.cachedAtMs ? entry : latest
+    ));
+  }
+
+  private buildCacheState(
+    cachedAtMs: number,
+    hit = false,
+    staleOverride?: boolean,
+  ): CompatibilityAssessment['cache'] {
+    const ageMs = Math.max(0, this.now() - cachedAtMs);
+    const stale = staleOverride ?? ageMs > this.cacheTtlMs;
+    return {
+      hit,
+      stale,
+      ttlMs: this.cacheTtlMs,
+      ageMs,
+      freshUntil: new Date(cachedAtMs + this.cacheTtlMs).toISOString(),
+    };
+  }
+
   getCachedAssessment(
     providerName: ProviderName,
     instanceId: string,
+    probeMode: CompatibilityProbeMode = 'light',
   ): CompatibilityAssessment | undefined {
-    return this.cache.get(createCacheKey(providerName, instanceId))?.assessment;
+    return this.cache.get(createCacheKey(providerName, instanceId, probeMode))?.assessment;
   }
 
   getCachedSummary(
     providerName: ProviderName,
     instanceId: string,
   ): CompatibilitySummaryView | undefined {
-    const assessment = this.getCachedAssessment(providerName, instanceId);
-    return assessment ? toCompatibilitySummaryView(assessment) : undefined;
+    const cached = this.getBestCachedEntry(providerName, instanceId);
+    if (!cached) {
+      return undefined;
+    }
+
+    return toCompatibilitySummaryView(
+      cached.assessment,
+      this.buildCacheState(cached.cachedAtMs),
+    );
   }
 
   async assessCliTarget(
@@ -129,24 +174,25 @@ export class ProviderCompatibilityService {
       throw new Error('Compatibility probes only support CLI targets');
     }
 
-    const cacheKey = createCacheKey(target.providerName as ProviderName, target.instanceId);
+    const probeMode = options.probeMode || 'light';
+    const cacheKey = createCacheKey(
+      target.providerName as ProviderName,
+      target.instanceId,
+      probeMode,
+    );
     const cached = this.cache.get(cacheKey);
     const ageMs = cached ? this.now() - cached.cachedAtMs : Number.POSITIVE_INFINITY;
     const stale = ageMs > this.cacheTtlMs;
     if (!options.force && cached && !stale) {
       return {
         ...cached.assessment,
-        cache: {
-          hit: true,
-          stale: false,
-          ttlMs: this.cacheTtlMs,
-        },
+        cache: this.buildCacheState(cached.cachedAtMs, true),
       };
     }
 
     const assessment = await this.buildAssessment(target, {
       purpose: options.purpose || 'diagnostics',
-      stale,
+      probeMode,
     });
     this.cache.set(cacheKey, {
       assessment,
@@ -157,7 +203,10 @@ export class ProviderCompatibilityService {
 
   private async buildAssessment(
     target: ProviderTargetDescriptor,
-    options: { purpose: 'diagnostics' | 'execution' | 'setup'; stale: boolean },
+    options: {
+      purpose: 'diagnostics' | 'execution' | 'setup';
+      probeMode: CompatibilityProbeMode;
+    },
   ): Promise<CompatibilityAssessment> {
     const instance = target.cliInstance as ProviderInstanceConfig;
     const providerName = target.providerName as ProviderName;
@@ -168,20 +217,22 @@ export class ProviderCompatibilityService {
       instance.commandConfig.runtime,
     );
     const defaultProfile = getDefaultCompatibilityProfile(target.providerName as ProviderName);
-    const checkedAt = new Date(this.now()).toISOString();
-    const key = createCacheKey(providerName, target.instanceId);
+    const key = createCacheKey(providerName, target.instanceId, options.probeMode);
     const checks: CompatibilityCheck[] = [];
     const probeCwd = this.config.dataDir || this.config.sessionBaseDir;
-    const versionArgs = installKnowledge.check.versionArgs?.length
-      ? installKnowledge.check.versionArgs
-      : compatibilityKnowledge?.versionArgs?.length
-        ? compatibilityKnowledge.versionArgs
+    const versionArgs = compatibilityKnowledge?.versionArgs?.length
+      ? compatibilityKnowledge.versionArgs
+      : installKnowledge.check.versionArgs?.length
+        ? installKnowledge.check.versionArgs
         : ['--version'];
-    const helpArgs = installKnowledge.check.helpArgs?.length
-      ? installKnowledge.check.helpArgs
-      : compatibilityKnowledge?.helpArgs?.length
-        ? compatibilityKnowledge.helpArgs
+    const helpArgs = compatibilityKnowledge?.helpArgs?.length
+      ? compatibilityKnowledge.helpArgs
+      : installKnowledge.check.helpArgs?.length
+        ? installKnowledge.check.helpArgs
         : undefined;
+    const nowMs = this.now();
+    const checkedAt = new Date(nowMs).toISOString();
+    const baseCacheState = this.buildCacheState(nowMs, false);
     const versionProbePromise = versionArgs.length
       ? this.runner.run(
         providerName,
@@ -205,8 +256,12 @@ export class ProviderCompatibilityService {
       helpProbePromise,
     ]);
 
-    const versionProbeRecord = versionProbe ? toProbeRecord(versionArgs, versionProbe) : undefined;
-    const helpProbeRecord = helpProbe ? toProbeRecord(helpArgs || [], helpProbe) : undefined;
+    const versionProbeRecord = versionProbe
+      ? toProbeRecord('version', versionArgs, versionProbe)
+      : undefined;
+    const helpProbeRecord = helpProbe
+      ? toProbeRecord('help', helpArgs || [], helpProbe)
+      : undefined;
     const commandAvailable = didExecuteProbe(versionProbeRecord) || didExecuteProbe(helpProbeRecord);
     const configuredLookupPromise = this.installCheckRunner.lookupCommand(
       instance.commandConfig.path,
@@ -413,12 +468,7 @@ export class ProviderCompatibilityService {
       ));
     }
 
-    const {
-      classification,
-      profile,
-      summary,
-      warnings,
-    } = selectProfile({
+    const selection = selectProfile({
       providerName,
       parsedVersion,
       commandAvailable,
@@ -426,6 +476,37 @@ export class ProviderCompatibilityService {
       knowledge: compatibilityKnowledge,
       defaultProfile,
     });
+    let classification = selection.classification;
+    let summary = selection.summary;
+    let warnings = [...selection.warnings];
+    const profileDefinition = selection.profileDefinition;
+    let profile = selection.profile;
+
+    const liveProbeRecord = await this.maybeRunLiveProbe({
+      instance,
+      providerName,
+      probeCwd,
+      probeMode: options.probeMode,
+      profile: profileDefinition,
+    });
+    const liveProbeEvaluation = evaluateLiveProbe({
+      profile: profileDefinition,
+      probe: liveProbeRecord,
+      classification,
+      reason: selection.reason,
+      familyLabel: compatibilityKnowledge?.familyLabel || installView.familyLabel,
+    });
+    if (liveProbeEvaluation.validated) {
+      detectedFeatures.push(
+        ...(profileDefinition.liveProbeTokens || []).map((token) => `live:${token}`),
+      );
+    }
+    classification = liveProbeEvaluation.classification;
+    summary = liveProbeEvaluation.summary || summary;
+    warnings = dedupeStrings([...warnings, ...liveProbeEvaluation.warnings]);
+    if (liveProbeEvaluation.check) {
+      checks.push(liveProbeEvaluation.check);
+    }
 
     const authSummary = buildAuthSummary({
       installKnowledge,
@@ -522,7 +603,7 @@ export class ProviderCompatibilityService {
           source: 'unknown',
           detected: false,
         },
-        features: detectedFeatures,
+        features: dedupeStrings(detectedFeatures),
         checkedAt,
       },
       profile,
@@ -532,11 +613,15 @@ export class ProviderCompatibilityService {
       probes: {
         version: versionProbeRecord,
         help: helpProbeRecord,
+        live: liveProbeRecord,
+      },
+      probe: {
+        mode: options.probeMode,
+        supportsLive: Boolean(profileDefinition.liveProbeArgs?.length),
+        liveValidated: liveProbeEvaluation.validated,
       },
       cache: {
-        hit: false,
-        stale: options.stale,
-        ttlMs: this.cacheTtlMs,
+        ...baseCacheState,
       },
     };
 
@@ -601,10 +686,32 @@ export class ProviderCompatibilityService {
       return undefined;
     }
   }
+
+  private async maybeRunLiveProbe(input: {
+    instance: ProviderInstanceConfig;
+    providerName: ProviderName;
+    probeCwd: string;
+    probeMode: CompatibilityProbeMode;
+    profile: ProviderCompatibilityProfile;
+  }): Promise<CompatibilityProbeRecord | undefined> {
+    if (input.probeMode !== 'live' || !input.profile.liveProbeArgs?.length) {
+      return undefined;
+    }
+
+    const result = await this.runner.run(
+      input.providerName,
+      input.instance.commandConfig,
+      input.profile.liveProbeArgs,
+      input.probeCwd,
+      this.probeTimeoutMs,
+    );
+    return toProbeRecord('live', input.profile.liveProbeArgs, result);
+  }
 }
 
 export function toCompatibilitySummaryView(
   assessment: CompatibilityAssessment,
+  cache: CompatibilityAssessment['cache'] = assessment.cache,
 ): CompatibilitySummaryView {
   return {
     classification: assessment.classification,
@@ -617,8 +724,17 @@ export function toCompatibilitySummaryView(
       features: [...assessment.fingerprint.features],
       runtime: { ...assessment.fingerprint.runtime },
     },
+    attentionCodes: assessment.checks
+      .filter((check) => check.status !== 'ok')
+      .map((check) => check.code),
     warnings: [...assessment.warnings],
     evidence: assessment.evidence ? { ...assessment.evidence } : undefined,
+    probe: {
+      ...assessment.probe,
+    },
+    cache: {
+      ...cache,
+    },
   };
 }
 
@@ -1048,7 +1164,11 @@ function buildRemediationSteps(input: {
 }
 
 function matchesExpectedPrefix(expectedPrefix: string, detectedPrefix: string): boolean {
-  const normalizedExpected = expectedPrefix.replace(/\\/gu, '/').replace(/^~\//u, '/');
+  const expandedExpectedPrefix = expectedPrefix.replace(
+    /%APPDATA%/giu,
+    process.env.APPDATA || '%APPDATA%',
+  );
+  const normalizedExpected = expandedExpectedPrefix.replace(/\\/gu, '/').replace(/^~\//u, '/');
   const normalizedDetected = detectedPrefix.replace(/\\/gu, '/');
   return normalizedDetected === normalizedExpected || normalizedDetected.endsWith(normalizedExpected);
 }
@@ -1149,6 +1269,15 @@ function detectAuthFailure(
   });
 }
 
+type ProfileSelectionReason =
+  | 'command_unavailable'
+  | 'no_knowledge'
+  | 'unsupported_version'
+  | 'ready'
+  | 'version_unknown'
+  | 'missing_help_tokens'
+  | 'fallback';
+
 function selectProfile(input: {
   providerName: ProviderName;
   parsedVersion: ParsedVersion | undefined;
@@ -1159,15 +1288,19 @@ function selectProfile(input: {
 }): {
   classification: CompatibilityClassification;
   profile: CompatibilityProfileSelection;
+  profileDefinition: ProviderCompatibilityProfile;
   summary: string;
   warnings: string[];
+  reason: ProfileSelectionReason;
 } {
   if (!input.commandAvailable) {
     return {
       classification: 'probe_failed',
       profile: toSelection(input.defaultProfile, 'weak'),
+      profileDefinition: input.defaultProfile,
       summary: `Compatibility probe could not execute '${input.providerName}' in the configured runtime.`,
       warnings: ['The runtime could not execute the configured provider command.'],
+      reason: 'command_unavailable',
     };
   }
 
@@ -1176,8 +1309,10 @@ function selectProfile(input: {
     return {
       classification: 'degraded',
       profile: toSelection(input.defaultProfile, 'weak'),
+      profileDefinition: input.defaultProfile,
       summary: `No provider-specific compatibility profile is shipped for '${input.providerName}'.`,
       warnings: ['Using the runtime default provider adapter without family-specific compatibility knowledge.'],
+      reason: 'no_knowledge',
     };
   }
 
@@ -1186,11 +1321,14 @@ function selectProfile(input: {
     && knowledge.primaryProfile.minVersionMajor !== undefined
     && input.parsedVersion.major < knowledge.primaryProfile.minVersionMajor
   ) {
+    const profileDefinition = knowledge.fallbackProfile || knowledge.primaryProfile;
     return {
       classification: 'unsupported_version',
-      profile: toSelection(knowledge.fallbackProfile || knowledge.primaryProfile, 'weak'),
+      profile: toSelection(profileDefinition, 'weak'),
+      profileDefinition,
       summary: `${knowledge.familyLabel} version ${input.parsedVersion.normalized} is older than the supported compatibility baseline.`,
       warnings: ['The detected CLI version is older than the first supported compatibility profile.'],
+      reason: 'unsupported_version',
     };
   }
 
@@ -1198,37 +1336,149 @@ function selectProfile(input: {
     return {
       classification: 'ready',
       profile: toSelection(knowledge.primaryProfile, 'exact'),
+      profileDefinition: knowledge.primaryProfile,
       summary: `${knowledge.familyLabel} matched compatibility profile '${knowledge.primaryProfile.id}'.`,
       warnings: [],
+      reason: 'ready',
     };
   }
 
   if (!input.parsedVersion && knowledge.primaryProfile.allowUnknownVersion) {
+    const profileDefinition = knowledge.fallbackProfile || knowledge.primaryProfile;
     return {
       classification: 'degraded',
-      profile: toSelection(knowledge.fallbackProfile || knowledge.primaryProfile, 'fallback'),
+      profile: toSelection(profileDefinition, 'fallback'),
+      profileDefinition,
       summary: `${knowledge.familyLabel} is running with a best-fit compatibility profile because version detection was inconclusive.`,
       warnings: ['Version detection was inconclusive; the runtime selected a best-fit compatibility profile.'],
+      reason: 'version_unknown',
     };
   }
 
   if (input.missingHelpTokens.length > 0) {
+    const profileDefinition = knowledge.fallbackProfile || knowledge.primaryProfile;
     return {
       classification: 'degraded',
-      profile: toSelection(knowledge.fallbackProfile || knowledge.primaryProfile, 'weak'),
+      profile: toSelection(profileDefinition, 'weak'),
+      profileDefinition,
       summary: `${knowledge.familyLabel} did not expose the full expected compatibility signature; the runtime is using a degraded path.`,
       warnings: [
         `Expected feature markers were missing: ${input.missingHelpTokens.join(', ')}`,
       ],
+      reason: 'missing_help_tokens',
+    };
+  }
+
+  const profileDefinition = knowledge.fallbackProfile || knowledge.primaryProfile;
+  return {
+    classification: 'degraded',
+    profile: toSelection(profileDefinition, 'fallback'),
+    profileDefinition,
+    summary: `${knowledge.familyLabel} is using a degraded compatibility fallback.`,
+    warnings: ['The runtime selected a degraded compatibility fallback.'],
+    reason: 'fallback',
+  };
+}
+
+function evaluateLiveProbe(input: {
+  profile: ProviderCompatibilityProfile;
+  probe: CompatibilityProbeRecord | undefined;
+  classification: CompatibilityClassification;
+  reason: ProfileSelectionReason;
+  familyLabel: string;
+}): {
+  classification: CompatibilityClassification;
+  summary?: string;
+  warnings: string[];
+  validated: boolean;
+  check?: CompatibilityCheck;
+} {
+  if (!input.profile.liveProbeArgs?.length) {
+    return {
+      classification: input.classification,
+      warnings: [],
+      validated: false,
+    };
+  }
+
+  if (!input.probe) {
+    return {
+      classification: input.classification,
+      warnings: [],
+      validated: false,
+    };
+  }
+
+  if (!input.probe.ok) {
+    return {
+      classification: input.classification === 'unsupported_version'
+        ? 'unsupported_version'
+        : 'probe_failed',
+      summary: `Live runtime-flag probe failed for ${input.familyLabel}.`,
+      warnings: ['The runtime could not validate the provider-specific execution flags with a live probe.'],
+      validated: false,
+      check: createCheck(
+        'live_probe_failed',
+        'unavailable',
+        `Live runtime-flag probe failed for ${input.familyLabel}.`,
+        {
+          command: input.probe.commandSummary,
+          exitCode: input.probe.exitCode,
+          timedOut: input.probe.timedOut,
+        },
+      ),
+    };
+  }
+
+  const missingTokens = (input.profile.liveProbeTokens || [])
+    .filter((token) => {
+      const output = `${input.probe?.stdoutSample || ''}\n${input.probe?.stderrSample || ''}`;
+      return !output.includes(token);
+    });
+  if (missingTokens.length > 0) {
+    return {
+      classification: input.classification === 'ready' ? 'degraded' : input.classification,
+      summary: input.reason === 'ready'
+        ? `${input.familyLabel} validated its CLI binary, but the live runtime probe still missed expected execution markers.`
+        : undefined,
+      warnings: [
+        `Live probe did not observe all expected execution markers: ${missingTokens.join(', ')}`,
+      ],
+      validated: false,
+      check: createCheck(
+        'live_probe_signature_partial',
+        'degraded',
+        `Live runtime probe for ${input.familyLabel} missed one or more expected execution markers.`,
+        {
+          command: input.probe.commandSummary,
+          missingTokens,
+        },
+      ),
     };
   }
 
   return {
-    classification: 'degraded',
-    profile: toSelection(knowledge.fallbackProfile || knowledge.primaryProfile, 'fallback'),
-    summary: `${knowledge.familyLabel} is using a degraded compatibility fallback.`,
-    warnings: ['The runtime selected a degraded compatibility fallback.'],
+    classification: input.classification,
+    summary: input.reason === 'missing_help_tokens'
+      ? `${input.familyLabel} still uses a degraded compatibility path, but the live probe validated the runtime execution flags.`
+      : undefined,
+    warnings: input.reason === 'missing_help_tokens'
+      ? ['Help-signature coverage was partial, but a live probe validated the runtime execution flags.']
+      : [],
+    validated: true,
+    check: createCheck(
+      'live_probe_validated',
+      'ok',
+      `Validated ${input.familyLabel} execution flags with a live runtime probe.`,
+      {
+        command: input.probe.commandSummary,
+      },
+    ),
   };
+}
+
+function dedupeStrings(values: string[]): string[] {
+  return Array.from(new Set(values));
 }
 
 function toSelection(
@@ -1254,8 +1504,9 @@ function toSelection(
 function createCacheKey(
   providerName: ProviderName,
   instanceId: string,
+  probeMode: CompatibilityProbeMode,
 ): string {
-  return `${providerName}:${instanceId}`;
+  return `${providerName}:${instanceId}:${probeMode}`;
 }
 
 function buildEvidenceId(assessment: CompatibilityAssessment): string {
@@ -1338,8 +1589,13 @@ function parseVersion(text: string | undefined): ParsedVersion | undefined {
   };
 }
 
-function toProbeRecord(args: string[], result: ProbeResult): CompatibilityProbeRecord {
+function toProbeRecord(
+  kind: CompatibilityProbeRecord['kind'],
+  args: string[],
+  result: ProbeResult,
+): CompatibilityProbeRecord {
   return {
+    kind,
     commandSummary: args.join(' '),
     exitCode: result.exitCode,
     timedOut: result.timedOut,

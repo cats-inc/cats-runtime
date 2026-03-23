@@ -27,7 +27,7 @@ Current capabilities:
 - strict `default` instance aliasing and host-path validation for file-backed providers
 - provider-specific helpers such as Kiro model inspection
 - runtime-owned usage metering, incident surfacing, and additive execution guardrails for warn / block / cooldown flows
-- shared CLI compatibility probing, degraded profile selection, and replay-friendly evidence capture for major provider families
+- shared CLI compatibility probing with `light` / `live` validation, degraded profile selection, stale-cache-aware summaries, machine-readable reprobe metadata, and replay-friendly evidence capture across first-party CLI provider families
 
 ## Current Status
 

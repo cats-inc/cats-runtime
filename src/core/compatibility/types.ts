@@ -14,6 +14,8 @@ export type CompatibilityClassification =
   | 'probe_failed';
 
 export type CompatibilityConfidence = 'exact' | 'fallback' | 'weak';
+export type CompatibilityProbeMode = 'light' | 'live';
+export type CompatibilityProbeKind = 'version' | 'help' | 'live';
 
 export interface CompatibilityCheck {
   code: string;
@@ -33,6 +35,8 @@ export interface ProviderCompatibilityProfile {
   maxVersionMajor?: number;
   allowUnknownVersion?: boolean;
   helpTokens?: string[];
+  liveProbeArgs?: string[];
+  liveProbeTokens?: string[];
 }
 
 export interface ProviderCompatibilityKnowledge {
@@ -45,6 +49,7 @@ export interface ProviderCompatibilityKnowledge {
 }
 
 export interface CompatibilityProbeRecord {
+  kind: CompatibilityProbeKind;
   commandSummary: string;
   exitCode: number | null;
   timedOut: boolean;
@@ -108,18 +113,27 @@ export interface CompatibilityAssessment {
   probes: {
     version?: CompatibilityProbeRecord;
     help?: CompatibilityProbeRecord;
+    live?: CompatibilityProbeRecord;
   };
   evidence?: CompatibilityEvidenceArtifact;
+  probe: {
+    mode: CompatibilityProbeMode;
+    supportsLive: boolean;
+    liveValidated: boolean;
+  };
   cache: {
     hit: boolean;
     stale: boolean;
     ttlMs: number;
+    ageMs: number;
+    freshUntil: string;
   };
 }
 
 export interface CompatibilityAssessmentOptions {
   force?: boolean;
   purpose?: 'diagnostics' | 'execution' | 'setup';
+  probeMode?: CompatibilityProbeMode;
 }
 
 export interface CompatibilitySummaryView {
@@ -129,6 +143,9 @@ export interface CompatibilitySummaryView {
   checkedAt: string;
   profile: CompatibilityProfileSelection;
   fingerprint: Pick<CompatibilityFingerprint, 'version' | 'features' | 'runtime'>;
+  attentionCodes: string[];
   warnings: string[];
   evidence?: CompatibilityEvidenceArtifact;
+  probe: CompatibilityAssessment['probe'];
+  cache: CompatibilityAssessment['cache'];
 }

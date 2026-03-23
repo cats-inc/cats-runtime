@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (First Slice Landed) |
+| **Status** | In Progress (Second Slice Landed) |
 | **Owner** | Codex |
 | **Reviewer** | User / runtime workstream |
 
@@ -23,6 +23,14 @@ includes more than simple process launching:
 Today, a first compatibility slice is already in place for major CLI-backed
 providers, but follow-on work still remains when upstream CLIs change flags,
 event formats, output schemas, or approval behavior.
+
+The current second slice now adds:
+
+- runtime-owned `light` vs `live` probe semantics for CLI targets
+- broader first-class provider-family profile coverage beyond the original
+  Claude/Codex/Gemini/Copilot set
+- stale-cache-aware compatibility summaries and machine-readable reprobe hints
+  for host-facing diagnostics surfaces
 
 The runtime needs a provider compatibility and evidence engine that can:
 
@@ -366,4 +374,3 @@ approval and merge step should remain reviewable by humans.
 *Author: Codex*
 *Last updated: 2026-03-23*
 *Related Plan: [PLAN-008-provider-compatibility-and-evidence-engine](../plans/PLAN-008-provider-compatibility-and-evidence-engine.md)*
-

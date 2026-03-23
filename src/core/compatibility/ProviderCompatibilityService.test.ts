@@ -239,7 +239,7 @@ describe('ProviderCompatibilityService', () => {
     expect(evidenceText).toContain('"resolvedCommand": "<path>"');
   });
 
-  it('falls back to a generic degraded profile for providers without family knowledge', async () => {
+  it('uses first-class family knowledge for Cursor instead of the generic fallback', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-generic-'));
     tempDirs.push(root);
     const service = new ProviderCompatibilityService({
@@ -261,8 +261,8 @@ describe('ProviderCompatibilityService', () => {
 
     const assessment = await service.assessCliTarget(createCliTarget('cursor'));
     expect(assessment.classification).toBe('degraded');
-    expect(assessment.profile.id).toBe('cursor-cli-runtime-default');
-    expect(assessment.summary).toContain('No provider-specific compatibility profile');
+    expect(assessment.profile.id).toBe('cursor-cli-stream-json-best-fit');
+    expect(assessment.summary).toContain('Cursor Agent CLI');
     expect(assessment.setup.install.familyLabel).toBe('Cursor Agent CLI');
   });
 
@@ -508,6 +508,156 @@ describe('ProviderCompatibilityService', () => {
       expect.objectContaining({
         code: 'npm_prefix_missing',
         status: 'degraded',
+      }),
+    ]));
+  });
+
+  it('expands first-class compatibility coverage to Pi and records live probe metadata', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-pi-live-'));
+    tempDirs.push(root);
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      runner: {
+        run: vi.fn(async (_providerName, _commandConfig, args: string[]) => {
+          if (args[0] === '--version') {
+            return {
+              exitCode: 0,
+              stdout: 'pi 1.4.0\n',
+              stderr: '',
+              timedOut: false,
+              durationMs: 3,
+            };
+          }
+
+          return {
+            exitCode: 0,
+            stdout: 'Usage: pi --mode rpc --session <path>\n',
+            stderr: '',
+            timedOut: false,
+            durationMs: 3,
+          };
+        }),
+      },
+      installCheckRunner: createInstallCheckRunner(),
+      now: () => Date.parse('2026-03-23T00:00:45.000Z'),
+    });
+
+    const assessment = await service.assessCliTarget(createCliTarget('pi'), {
+      probeMode: 'live',
+    });
+    expect(assessment.classification).toBe('ready');
+    expect(assessment.profile.id).toBe('pi-cli-rpc-v1');
+    expect(assessment.probe).toEqual({
+      mode: 'live',
+      supportsLive: true,
+      liveValidated: true,
+    });
+    expect(assessment.probes.live).toEqual(expect.objectContaining({
+      kind: 'live',
+      commandSummary: '--mode rpc --help',
+      ok: true,
+    }));
+    expect(assessment.fingerprint.features).toEqual(expect.arrayContaining([
+      'token:--mode',
+      'live:--mode',
+    ]));
+  });
+
+  it('marks cached summaries as stale once the ttl expires', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-cache-summary-'));
+    tempDirs.push(root);
+    let now = Date.parse('2026-03-23T00:01:00.000Z');
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      cacheTtlMs: 1_000,
+      runner: {
+        run: vi.fn(async (_providerName, _commandConfig, args: string[]) => ({
+          exitCode: 0,
+          stdout: args[0] === '--version'
+            ? 'claude 1.2.3\n'
+            : 'Usage: claude --input-format --output-format --include-partial-messages\n',
+          stderr: '',
+          timedOut: false,
+          durationMs: 2,
+        })),
+      },
+      installCheckRunner: createInstallCheckRunner(),
+      now: () => now,
+    });
+
+    await service.assessCliTarget(createCliTarget('claude'));
+    now += 1_500;
+
+    const summary = service.getCachedSummary('claude', 'default');
+    expect(summary).toEqual(expect.objectContaining({
+      probe: expect.objectContaining({
+        mode: 'light',
+      }),
+      cache: expect.objectContaining({
+        stale: true,
+        ttlMs: 1_000,
+        ageMs: 1_500,
+      }),
+      attentionCodes: [],
+    }));
+  });
+
+  it('turns otherwise-ready assessments into probe_failed when the live runtime probe fails', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-live-fail-'));
+    tempDirs.push(root);
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      runner: {
+        run: vi.fn(async (_providerName, _commandConfig, args: string[]) => {
+          if (args[0] === '--version') {
+            return {
+              exitCode: 0,
+              stdout: 'gemini 1.3.0\n',
+              stderr: '',
+              timedOut: false,
+              durationMs: 2,
+            };
+          }
+
+          if (args.includes('--yolo')) {
+            return {
+              exitCode: 2,
+              stdout: '',
+              stderr: 'unknown option --yolo',
+              timedOut: false,
+              durationMs: 2,
+            };
+          }
+
+          return {
+            exitCode: 0,
+            stdout: 'Usage: gemini --output-format --resume\n',
+            stderr: '',
+            timedOut: false,
+            durationMs: 2,
+          };
+        }),
+      },
+      installCheckRunner: createInstallCheckRunner(),
+      now: () => Date.parse('2026-03-23T00:01:10.000Z'),
+    });
+
+    const assessment = await service.assessCliTarget(createCliTarget('gemini'), {
+      probeMode: 'live',
+    });
+    expect(assessment.classification).toBe('probe_failed');
+    expect(assessment.probe.liveValidated).toBe(false);
+    expect(assessment.evidence?.relativePath).toMatch(/^gemini\//);
+    expect(assessment.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'live_probe_failed',
+        status: 'unavailable',
       }),
     ]));
   });

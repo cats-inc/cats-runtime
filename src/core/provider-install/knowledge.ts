@@ -59,7 +59,9 @@ function createNpmPathHints(
 ): Partial<Record<ProviderExecutionPlatform, ProviderPathHint>> {
   return {
     windows: {
+      expectedPath: '%APPDATA%\\npm',
       directoryHint: '%APPDATA%\\npm',
+      exportCommand: 'setx PATH "%APPDATA%\\npm;%PATH%"',
       reloadHint: `Open a new terminal window after installing ${binaryName}.`,
     },
     macos: {
@@ -234,6 +236,7 @@ function createGenericNpmKnowledge(
       prerequisites: createNpmPrerequisites(familyLabel),
       npmPackage,
       npmExpectedPrefix: {
+        windows: '%APPDATA%\\npm',
         macos: '~/.npm-global',
         linux: '~/.npm-global',
       },

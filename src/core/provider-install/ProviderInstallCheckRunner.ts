@@ -4,7 +4,7 @@ import { isAbsolute, resolve as resolvePath } from 'node:path';
 import type { ProviderRuntimeConfig } from '../../backends/cli/config.js';
 import { createRuntimeAdapter, quoteForBash } from '../../backends/cli/runtime/runtime.js';
 
-const DEFAULT_CHECK_TIMEOUT_MS = 5_000;
+const DEFAULT_CHECK_TIMEOUT_MS = 1_500;
 
 export interface RuntimeCheckCommandResult {
   exitCode: number | null;
@@ -70,16 +70,23 @@ function isHomeRelativePath(pathValue: string): boolean {
   return pathValue.startsWith('~/') || pathValue.startsWith('~\\');
 }
 
+function expandNativeEnvPath(pathValue: string): string {
+  return pathValue.replace(/%([^%]+)%/g, (_match, envName: string) => (
+    process.env[envName] || `%${envName}%`
+  ));
+}
+
 function resolveHomePath(pathValue: string): string {
+  const expanded = expandNativeEnvPath(pathValue);
   if (!isHomeRelativePath(pathValue)) {
-    return pathValue;
+    return expanded;
   }
 
   const home = process.env.HOME || process.env.USERPROFILE || '';
   if (!home) {
-    return pathValue;
+    return expanded;
   }
-  return `${home}${pathValue.slice(1)}`;
+  return `${home}${expanded.slice(1)}`;
 }
 
 function quotePathForRuntimeShell(pathValue: string): string {

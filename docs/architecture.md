@@ -273,7 +273,9 @@ src/
   `environment-bootstrap`
 - Hosts the runtime-managed skill catalog/delivery contract
 - Hosts the shared provider compatibility/evidence engine used by setup,
-  diagnostics, and CLI execution priming
+  diagnostics, and CLI execution priming, including `light` vs `live`
+  runtime-flag probes, stale-cache-aware summaries, and replay-friendly
+  evidence bundles
 - Defines stable exported runtime types
 - Keeps shared utilities out of provider modules
 - Owns the shared `progress` event helper and metering/guardrail type contracts
@@ -298,8 +300,10 @@ src/
 7. CLI setup, diagnostics, and execution priming resolve through the shared
    compatibility service in `src/core/compatibility`, which consumes the
    runtime-owned metadata in `src/core/provider-install`, classifies targets,
-   selects degraded profiles, evaluates prerequisite / PATH-persistence /
-   npm-prefix setup state, and writes evidence bundles for non-ready results
+   selects degraded profiles, validates runtime flags through `light` and
+   optional `live` probes, evaluates prerequisite / PATH-persistence /
+   npm-prefix setup state, tracks cache staleness for reprobe flows, and
+   writes evidence bundles for non-ready results
 8. API/local turns may enter the shared local tool loop in `src/core/tools`,
    including workspace substrate preview/apply operations
 9. Agent turns use the shared `TurnInput` contract plus provider-managed session continuity where available

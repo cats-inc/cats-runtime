@@ -47,6 +47,7 @@ interface ProviderDiagnosticAvailability {
   checkedAt: string;
   probe: DiagnosticsProbeMode;
   summary: string;
+  attentionCodes: string[];
 }
 
 interface ProviderDiagnosticResult {
@@ -60,6 +61,10 @@ interface ProviderDiagnosticResult {
   checks: DiagnosticCheck[];
   setup?: ProviderSetupSummary;
   compatibility?: CompatibilitySummaryView;
+  reprobe: {
+    forceSupported: boolean;
+    liveSupported: boolean;
+  };
 }
 
 const diagnosticsRoutes = new Hono<RuntimeRouteEnv>();
@@ -146,6 +151,7 @@ function createCheck(
 async function diagnoseCliTarget(
   ctx: AppContext,
   target: ProviderTargetDescriptor,
+  probeMode: DiagnosticsProbeMode,
   forceRefresh = false,
 ): Promise<{
     checks: DiagnosticCheck[];
@@ -190,6 +196,19 @@ async function diagnoseCliTarget(
         warnings: [
           `CLI target '${target.providerName}/${target.instanceId}' is not initialized`,
         ],
+        attentionCodes: ['cli_instance_missing'],
+        probe: {
+          mode: probeMode,
+          supportsLive: false,
+          liveValidated: false,
+        },
+        cache: {
+          hit: false,
+          stale: true,
+          ttlMs: 0,
+          ageMs: 0,
+          freshUntil: checkedAt,
+        },
       },
     };
   }
@@ -197,6 +216,7 @@ async function diagnoseCliTarget(
   const assessment = await getProviderCompatibilityService(ctx).assessCliTarget(target, {
     force: forceRefresh,
     purpose: 'diagnostics',
+    probeMode,
   });
   const checks: DiagnosticCheck[] = assessment.checks.map((check) => ({
     ...check,
@@ -449,18 +469,23 @@ async function diagnoseTarget(
     compatibility?: CompatibilitySummaryView;
   };
   if (target.backend === 'cli') {
-    result = await diagnoseCliTarget(ctx, target, forceRefresh);
+    result = await diagnoseCliTarget(ctx, target, probeMode, forceRefresh);
   } else if (target.backend === 'agent') {
     result = await diagnoseAgentTarget(target, probeMode, env);
   } else {
     result = diagnoseRemoteConfigOnly(target, env);
   }
 
+  const attentionCodes = result.checks
+    .filter((check) => check.status !== 'ok')
+    .map((check) => check.code);
+
   const availability: ProviderDiagnosticAvailability = {
     status: combineDiagnosticStatus(result.checks),
     checkedAt: new Date().toISOString(),
     probe: probeMode,
     summary: pickAvailabilitySummary(result.checks),
+    attentionCodes,
   };
 
   return {
@@ -474,6 +499,12 @@ async function diagnoseTarget(
     checks: result.checks,
     setup: result.setup,
     compatibility: result.compatibility,
+    reprobe: {
+      forceSupported: target.backend === 'cli',
+      liveSupported: target.backend === 'cli'
+        ? Boolean(result.compatibility?.probe.supportsLive)
+        : target.backend === 'agent',
+    },
   };
 }
 

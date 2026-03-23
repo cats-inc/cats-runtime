@@ -97,6 +97,28 @@ export function getProviderCompatibilityService(ctx: AppContext): ProviderCompat
                 error: 'Compatibility probing disabled for auto-initialized test app context.',
               }),
             },
+            installCheckRunner: {
+              lookupCommand: async () => ({
+                available: false,
+                timedOut: false,
+              }),
+              checkPath: async () => ({
+                exists: false,
+                timedOut: false,
+              }),
+              checkNpmPackage: async () => ({
+                exists: false,
+                timedOut: false,
+              }),
+              checkShellRcEntry: async () => ({
+                exists: false,
+                timedOut: false,
+              }),
+              getNpmPrefix: async () => ({
+                value: undefined,
+                timedOut: false,
+              }),
+            },
           }
         : undefined,
     );

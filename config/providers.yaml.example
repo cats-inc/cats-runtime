@@ -89,6 +89,9 @@ backends:
     # diagnostics, and execution priming. Degraded or failed probes write
     # replay-friendly evidence bundles under <dataDir>/compatibility/ and the
     # cached summary is surfaced via /diagnostics/providers and /providers/config.
+    # /diagnostics/providers?probe=live validates runtime execution flags for
+    # provider families that define a safe live probe; force=1 refreshes stale
+    # cache entries after installs, upgrades, or PATH/auth changes.
     # /providers/config also exposes runtime-owned static install metadata, and
     # /diagnostics/providers adds machine-readable setup status/remediation such
     # as missing install, missing prerequisites, missing PATH persistence, npm
