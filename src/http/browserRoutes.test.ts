@@ -335,6 +335,147 @@ describe('browser HTTP contract', () => {
     });
   });
 
+  it('summarizes browser sessions and cleanup candidates through runtime-owned routes', async () => {
+    let now = new Date('2026-03-23T00:00:00.000Z');
+    browser = new RuntimeBrowserService({
+      drivers: [
+        new ManualBrowserDriver(),
+      ],
+      now: () => now,
+    });
+    const readySession = await browser.createSession({
+      runtimeSessionId: 'session-service',
+      label: 'Attached Browser',
+    });
+    await browser.createPage(readySession.id, {
+      url: 'http://127.0.0.1:4173',
+      binding: {
+        kind: 'manual_url',
+        runtimeSessionId: 'session-service',
+      },
+    });
+
+    now = new Date('2026-03-23T00:05:00.000Z');
+    const closedSession = await browser.createSession({
+      label: 'Closed Browser',
+    });
+    await browser.createPage(closedSession.id, {
+      path: '/tmp/report.html',
+      binding: {
+        kind: 'manual_url',
+      },
+    });
+    await browser.closeSession(closedSession.id);
+
+    now = new Date('2026-03-23T00:20:00.000Z');
+    const app = createTestApp();
+
+    const response = await app.request('/browser/summary?olderThanMs=300000');
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      filters: {},
+      sessions: {
+        total: 2,
+        ready: 1,
+        closed: 1,
+      },
+      pages: {
+        total: 2,
+        open: 1,
+        closed: 1,
+      },
+      attachedRuntimeSessionCount: 1,
+      drivers: [
+        {
+          driverId: 'manual',
+          sessions: {
+            total: 2,
+            ready: 1,
+            closed: 1,
+          },
+          pages: {
+            total: 2,
+            open: 1,
+            closed: 1,
+          },
+        },
+      ],
+      cleanupCandidates: {
+        olderThanMs: 300000,
+        sessionCount: 1,
+        pageCount: 1,
+        sessionIds: [closedSession.id],
+      },
+    });
+
+    const filteredSessions = await app.request('/browser/sessions?status=closed');
+    expect(filteredSessions.status).toBe(200);
+    await expect(filteredSessions.json()).resolves.toEqual({
+      sessions: [
+        expect.objectContaining({
+          id: closedSession.id,
+          status: 'closed',
+        }),
+      ],
+    });
+  });
+
+  it('cleans up closed browser sessions through the runtime-owned maintenance route', async () => {
+    let now = new Date('2026-03-23T00:00:00.000Z');
+    browser = new RuntimeBrowserService({
+      drivers: [
+        new ManualBrowserDriver(),
+      ],
+      now: () => now,
+    });
+
+    const keepSession = await browser.createSession({
+      label: 'Keep Browser',
+    });
+    now = new Date('2026-03-23T00:05:00.000Z');
+    const closedSession = await browser.createSession({
+      label: 'Cleanup Browser',
+    });
+    await browser.createPage(closedSession.id, {
+      path: '/tmp/report.html',
+      binding: {
+        kind: 'manual_url',
+      },
+    });
+    await browser.closeSession(closedSession.id);
+
+    now = new Date('2026-03-23T00:20:00.000Z');
+    const app = createTestApp();
+    const cleanupResponse = await app.request('/browser/sessions/cleanup', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        olderThanMs: 300000,
+      }),
+    });
+    expect(cleanupResponse.status).toBe(200);
+    await expect(cleanupResponse.json()).resolves.toEqual({
+      action: 'cleanup_browser_sessions',
+      filters: {
+        olderThanMs: 300000,
+        status: 'closed',
+      },
+      matchedSessionCount: 1,
+      matchedPageCount: 1,
+      removedSessionCount: 1,
+      removedPageCount: 1,
+      removedSessionIds: [closedSession.id],
+      remainingSessionCount: 1,
+      remainingClosedSessionCount: 0,
+    });
+
+    expect(browser.getSession(closedSession.id)).toBeUndefined();
+    expect(browser.getSession(keepSession.id)).toEqual(expect.objectContaining({
+      id: keepSession.id,
+      status: 'ready',
+    }));
+  });
+
   it('returns a machine-readable client error when browser session capacity is exhausted', async () => {
     browser = new RuntimeBrowserService({
       drivers: [

@@ -162,6 +162,19 @@ describe('runtime-managed skills HTTP contract', () => {
 
     expect(response.status).toBe(200);
     const body = await response.json() as {
+      contract: {
+        version: number;
+      };
+      query: {
+        hasFilters: boolean;
+        filters: Record<string, string[]>;
+      };
+      pagination: {
+        offset: number;
+        limit: number | null;
+        returned: number;
+        hasMore: boolean;
+      };
       count: number;
       skills: Array<{
         id: string;
@@ -172,6 +185,17 @@ describe('runtime-managed skills HTTP contract', () => {
         };
       }>;
     };
+    expect(body.contract.version).toBe(1);
+    expect(body.query).toEqual({
+      hasFilters: false,
+      filters: {},
+    });
+    expect(body.pagination).toEqual({
+      offset: 0,
+      limit: null,
+      returned: body.skills.length,
+      hasMore: false,
+    });
     expect(body.count).toBe(body.skills.length);
     expect(body.skills).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -194,6 +218,19 @@ describe('runtime-managed skills HTTP contract', () => {
 
     expect(response.status).toBe(200);
     const body = await response.json() as {
+      contract: {
+        version: number;
+      };
+      query: {
+        hasFilters: boolean;
+        filters: Record<string, string[]>;
+      };
+      pagination: {
+        offset: number;
+        limit: number | null;
+        returned: number;
+        hasMore: boolean;
+      };
       count: number;
       skills: Array<{
         id: string;
@@ -204,6 +241,21 @@ describe('runtime-managed skills HTTP contract', () => {
         };
       }>;
     };
+    expect(body.contract.version).toBe(1);
+    expect(body.query).toEqual({
+      hasFilters: true,
+      filters: {
+        family: ['chat'],
+        slug: ['companion'],
+        role: ['companion_core'],
+      },
+    });
+    expect(body.pagination).toEqual({
+      offset: 0,
+      limit: null,
+      returned: 1,
+      hasMore: false,
+    });
     expect(body.count).toBe(1);
     expect(body.skills).toEqual([
       expect.objectContaining({
@@ -215,6 +267,32 @@ describe('runtime-managed skills HTTP contract', () => {
         }),
       }),
     ]);
+  });
+
+  it('pages the runtime-owned skill catalog with machine-readable pagination metadata', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/skills/catalog?limit=1&offset=0');
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      count: number;
+      pagination: {
+        offset: number;
+        limit: number | null;
+        returned: number;
+        hasMore: boolean;
+      };
+      skills: Array<{ id: string }>;
+    };
+    expect(body.pagination).toEqual({
+      offset: 0,
+      limit: 1,
+      returned: 1,
+      hasMore: true,
+    });
+    expect(body.skills).toHaveLength(1);
+    expect(body.count).toBeGreaterThan(body.skills.length);
   });
 
   it('rejects invalid skill catalog filters with a client-safe error', async () => {

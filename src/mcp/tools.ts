@@ -39,9 +39,11 @@ const REUSE_POLICIES = ['create_new', 'prefer_existing', 'require_existing'] as 
 const FORK_MODES = ['auto', 'native_fork', 'context_transplant'] as const;
 const SUBSTRATE_PROFILES = ['minimal', 'standard', 'a2a-enabled'] as const;
 const ENABLED_AGENTS = ['claude', 'gemini', 'codex'] as const;
+const DIAGNOSTICS_PROBE_MODES = ['light', 'live'] as const;
 const RUNTIME_SKILL_FAMILIES = ['base', 'orchestration', 'work', 'chat', 'code'] as const;
 const RUNTIME_SKILL_PACKAGE_KINDS = ['base', 'role', 'bundle'] as const;
 const RUNTIME_SKILL_DELIVERY_HINTS = ['filesystem', 'instructions', 'none'] as const;
+const RUNTIME_BROWSER_SESSION_STATUSES = ['ready', 'closed'] as const;
 const BROWSER_BINDING_KINDS = ['manual_url', 'session_service', 'session_artifact'] as const;
 const ACTOR_ROLES = [
   'boss_cat',
@@ -92,6 +94,21 @@ function readRequiredString(record: Record<string, unknown>, key: string): strin
 
 function readOptionalBoolean(record: Record<string, unknown>, key: string): boolean | undefined {
   return typeof record[key] === 'boolean' ? record[key] as boolean : undefined;
+}
+
+function readOptionalInteger(
+  record: Record<string, unknown>,
+  key: string,
+  minimum: number,
+): number | undefined {
+  const value = record[key];
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < minimum) {
+    throw new McpToolError(-32602, `${key} must be an integer >= ${minimum}`);
+  }
+  return value;
 }
 
 function readOptionalObject(
@@ -217,6 +234,17 @@ function appendQueryValues(
   }
 }
 
+function appendSingleQueryValue(
+  searchParams: URLSearchParams,
+  key: string,
+  value: string | number | undefined,
+): void {
+  if (value === undefined) {
+    return;
+  }
+  searchParams.set(key, String(value));
+}
+
 function runtimeSummary(ctx: AppContext): McpToolCallResult {
   const sessions = ctx.registry.list();
   const byStatus: Record<string, number> = {};
@@ -282,6 +310,44 @@ async function listSessions(
   };
 }
 
+async function providerDiagnostics(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const searchParams = new URLSearchParams();
+  appendSingleQueryValue(
+    searchParams,
+    'probe',
+    readOptionalEnumString(
+      args,
+      'probe',
+      DIAGNOSTICS_PROBE_MODES,
+      'probe must be a valid diagnostics probe mode',
+    ),
+  );
+  if (readOptionalBoolean(args, 'forceRefresh') === true) {
+    searchParams.set('force', '1');
+  }
+
+  const path = searchParams.size > 0
+    ? `/diagnostics/providers?${searchParams.toString()}`
+    : '/diagnostics/providers';
+  const result = await requestRuntimeJson(ctx, path, { method: 'GET' });
+  ensureRouteSuccess('provider_diagnostics', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'provider_diagnostics result');
+  const summary = asRecord(payload.summary);
+  const targets = typeof summary?.targets === 'number' ? summary.targets : 0;
+
+  return {
+    summary: `Provider diagnostics cover ${targets} target(s).`,
+    structuredContent: {
+      ...payload,
+      providersPath: path,
+    },
+  };
+}
+
 async function observeSession(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -342,6 +408,14 @@ async function listRuntimeSkills(
       'deliveryHint must be a valid runtime skill delivery hint',
     ),
   );
+  const offset = readOptionalInteger(args, 'offset', 0);
+  const limit = readOptionalInteger(args, 'limit', 1);
+  if (offset !== undefined) {
+    searchParams.set('offset', String(offset));
+  }
+  if (limit !== undefined) {
+    searchParams.set('limit', String(limit));
+  }
 
   const path = searchParams.size > 0
     ? `/skills/catalog?${searchParams.toString()}`
@@ -529,15 +603,60 @@ async function listBrowserSessions(
 ): Promise<McpToolCallResult> {
   const driverId = readOptionalString(args, 'driverId');
   const runtimeSessionId = readOptionalString(args, 'runtimeSessionId');
+  const status = readOptionalEnumString(
+    args,
+    'status',
+    RUNTIME_BROWSER_SESSION_STATUSES,
+    'status must be a valid browser session status',
+  );
   const sessions = getRuntimeBrowserService(ctx).listSessions({
     ...(driverId ? { driverId } : {}),
     ...(runtimeSessionId ? { runtimeSessionId } : {}),
+    ...(status ? { status } : {}),
   });
   return {
     summary: `Returned ${sessions.length} browser session(s).`,
     structuredContent: {
       sessions,
       sessionsPath: '/browser/sessions',
+    },
+  };
+}
+
+async function browserSummary(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const searchParams = new URLSearchParams();
+  appendSingleQueryValue(searchParams, 'driverId', readOptionalString(args, 'driverId'));
+  appendSingleQueryValue(searchParams, 'runtimeSessionId', readOptionalString(args, 'runtimeSessionId'));
+  appendSingleQueryValue(
+    searchParams,
+    'status',
+    readOptionalEnumString(
+      args,
+      'status',
+      RUNTIME_BROWSER_SESSION_STATUSES,
+      'status must be a valid browser session status',
+    ),
+  );
+  appendSingleQueryValue(searchParams, 'olderThanMs', readOptionalInteger(args, 'olderThanMs', 0));
+
+  const path = searchParams.size > 0
+    ? `/browser/summary?${searchParams.toString()}`
+    : '/browser/summary';
+  const result = await requestRuntimeJson(ctx, path, { method: 'GET' });
+  ensureRouteSuccess('browser_summary', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'browser_summary result');
+  const sessionSummary = asRecord(payload.sessions);
+  const total = typeof sessionSummary?.total === 'number' ? sessionSummary.total : 0;
+
+  return {
+    summary: `Browser summary covers ${total} session(s).`,
+    structuredContent: {
+      ...payload,
+      summaryPath: path,
     },
   };
 }
@@ -606,6 +725,55 @@ async function closeBrowserSession(
       responseStatus: result.status,
       ...payload,
       ...buildBrowserSessionPaths(browserSessionId),
+    },
+  };
+}
+
+async function cleanupBrowserSessions(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const status = readOptionalEnumString(
+    args,
+    'status',
+    RUNTIME_BROWSER_SESSION_STATUSES,
+    'status must be a valid browser session status',
+  );
+  if (status && status !== 'closed') {
+    throw new McpToolError(-32602, 'cleanup_browser_sessions only supports status "closed"');
+  }
+
+  const body: Record<string, unknown> = {};
+  const driverId = readOptionalString(args, 'driverId');
+  const runtimeSessionId = readOptionalString(args, 'runtimeSessionId');
+  const olderThanMs = readOptionalInteger(args, 'olderThanMs', 0);
+  if (driverId) {
+    body.driverId = driverId;
+  }
+  if (runtimeSessionId) {
+    body.runtimeSessionId = runtimeSessionId;
+  }
+  if (status) {
+    body.status = status;
+  }
+  if (olderThanMs !== undefined) {
+    body.olderThanMs = olderThanMs;
+  }
+
+  const result = await requestRuntimeJson(ctx, '/browser/sessions/cleanup', {
+    body,
+  });
+  ensureRouteSuccess('cleanup_browser_sessions', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'cleanup_browser_sessions result');
+  const removedSessionCount = typeof payload.removedSessionCount === 'number'
+    ? payload.removedSessionCount
+    : 0;
+  return {
+    summary: `Removed ${removedSessionCount} browser session(s) during cleanup.`,
+    structuredContent: {
+      ...payload,
+      cleanupPath: '/browser/sessions/cleanup',
     },
   };
 }
@@ -715,6 +883,22 @@ const TOOL_HANDLERS: McpToolHandler[] = [
   },
   {
     definition: {
+      name: 'provider_diagnostics',
+      title: 'Provider Diagnostics',
+      description: 'Return runtime-owned provider readiness, remediation, and compatibility diagnostics.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          probe: { type: 'string', enum: DIAGNOSTICS_PROBE_MODES },
+          forceRefresh: { type: 'boolean' },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: providerDiagnostics,
+  },
+  {
+    definition: {
       name: 'observe_session',
       title: 'Observe Session',
       description: 'Return the same machine-readable session/run inspection snapshot exposed by the observe route.',
@@ -750,6 +934,8 @@ const TOOL_HANDLERS: McpToolHandler[] = [
           },
           capabilityTag: { type: 'array', items: { type: 'string' } },
           productTag: { type: 'array', items: { type: 'string' } },
+          offset: { type: 'integer', minimum: 0 },
+          limit: { type: 'integer', minimum: 1 },
           deliveryHint: {
             type: 'array',
             items: { type: 'string', enum: RUNTIME_SKILL_DELIVERY_HINTS },
@@ -864,11 +1050,30 @@ const TOOL_HANDLERS: McpToolHandler[] = [
         properties: {
           driverId: { type: 'string' },
           runtimeSessionId: { type: 'string' },
+          status: { type: 'string', enum: RUNTIME_BROWSER_SESSION_STATUSES },
         },
         additionalProperties: false,
       },
     },
     execute: listBrowserSessions,
+  },
+  {
+    definition: {
+      name: 'browser_summary',
+      title: 'Browser Summary',
+      description: 'Return aggregate runtime-owned browser counts plus cleanup candidates.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          driverId: { type: 'string' },
+          runtimeSessionId: { type: 'string' },
+          status: { type: 'string', enum: RUNTIME_BROWSER_SESSION_STATUSES },
+          olderThanMs: { type: 'integer', minimum: 0 },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: browserSummary,
   },
   {
     definition: {
@@ -935,6 +1140,24 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: closeBrowserSession,
+  },
+  {
+    definition: {
+      name: 'cleanup_browser_sessions',
+      title: 'Cleanup Browser Sessions',
+      description: 'Delete closed runtime-owned browser sessions, optionally filtered by driver, runtime session, or age.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          driverId: { type: 'string' },
+          runtimeSessionId: { type: 'string' },
+          status: { type: 'string', enum: RUNTIME_BROWSER_SESSION_STATUSES },
+          olderThanMs: { type: 'integer', minimum: 0 },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: cleanupBrowserSessions,
   },
   {
     definition: {

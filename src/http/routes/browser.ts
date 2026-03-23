@@ -3,6 +3,7 @@ import type {
   AgentRuntimeService,
   RuntimeBrowserPageBinding,
   RuntimeBrowserPageBindingKind,
+  RuntimeBrowserSessionView,
   SessionArtifact,
 } from '../../core/types.js';
 import {
@@ -28,17 +29,37 @@ browserRoutes.get('/browser/drivers', (c) => {
   });
 });
 
+browserRoutes.get('/browser/summary', (c) => {
+  const ctx = c.get('ctx' as never) as AppContext;
+  try {
+    return c.json(getRuntimeBrowserService(ctx).summarizeSessions({
+      driverId: parseOptionalString(c.req.query('driverId')),
+      runtimeSessionId: parseOptionalString(c.req.query('runtimeSessionId')),
+      status: parseOptionalBrowserSessionStatus(c.req.query('status')),
+      olderThanMs: parseOptionalNonNegativeInteger(c.req.query('olderThanMs'), 'olderThanMs'),
+    }));
+  } catch (error) {
+    return toBrowserErrorResponse(c, error);
+  }
+});
+
 browserRoutes.get('/browser/sessions', (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const browser = getRuntimeBrowserService(ctx);
-  const runtimeSessionId = parseOptionalString(c.req.query('runtimeSessionId'));
-  const driverId = parseOptionalString(c.req.query('driverId'));
-  return c.json({
-    sessions: browser.listSessions({
-      ...(runtimeSessionId ? { runtimeSessionId } : {}),
-      ...(driverId ? { driverId } : {}),
-    }),
-  });
+  try {
+    const runtimeSessionId = parseOptionalString(c.req.query('runtimeSessionId'));
+    const driverId = parseOptionalString(c.req.query('driverId'));
+    const status = parseOptionalBrowserSessionStatus(c.req.query('status'));
+    return c.json({
+      sessions: browser.listSessions({
+        ...(runtimeSessionId ? { runtimeSessionId } : {}),
+        ...(driverId ? { driverId } : {}),
+        ...(status ? { status } : {}),
+      }),
+    });
+  } catch (error) {
+    return toBrowserErrorResponse(c, error);
+  }
 });
 
 browserRoutes.post('/browser/sessions', async (c) => {
@@ -96,6 +117,27 @@ browserRoutes.post('/browser/sessions/:id/close', async (c) => {
   }
 });
 
+browserRoutes.post('/browser/sessions/cleanup', async (c) => {
+  const ctx = c.get('ctx' as never) as AppContext;
+  const body = await c.req.json().catch(() => ({}));
+  try {
+    const status = parseOptionalBrowserSessionStatus(body?.status);
+    if (status && status !== 'closed') {
+      throw new RuntimeBrowserValidationError(
+        'Browser session cleanup only supports status \'closed\'.',
+      );
+    }
+    return c.json(getRuntimeBrowserService(ctx).cleanupSessions({
+      driverId: parseOptionalString(body?.driverId),
+      runtimeSessionId: parseOptionalString(body?.runtimeSessionId),
+      status: 'closed',
+      olderThanMs: parseOptionalNonNegativeInteger(body?.olderThanMs, 'olderThanMs'),
+    }));
+  } catch (error) {
+    return toBrowserErrorResponse(c, error);
+  }
+});
+
 function parseOptionalString(value: unknown): string | undefined {
   if (typeof value !== 'string') {
     return undefined;
@@ -110,6 +152,39 @@ function parseOptionalRecord(value: unknown): Record<string, unknown> | undefine
     return undefined;
   }
   return structuredClone(value) as Record<string, unknown>;
+}
+
+function parseOptionalBrowserSessionStatus(
+  value: unknown,
+): RuntimeBrowserSessionView['status'] | undefined {
+  const status = parseOptionalString(value);
+  if (!status) {
+    return undefined;
+  }
+  if (status === 'ready' || status === 'closed') {
+    return status;
+  }
+  throw new RuntimeBrowserValidationError(
+    `Unsupported browser session status '${status}'.`,
+  );
+}
+
+function parseOptionalNonNegativeInteger(value: unknown, label: string): number | undefined {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+  if (typeof value !== 'number' && typeof value !== 'string') {
+    throw new RuntimeBrowserValidationError(`${label} must be a non-negative integer.`);
+  }
+  const text = String(value).trim();
+  if (!/^\d+$/.test(text)) {
+    throw new RuntimeBrowserValidationError(`${label} must be a non-negative integer.`);
+  }
+  const parsed = Number.parseInt(text, 10);
+  if (!Number.isSafeInteger(parsed)) {
+    throw new RuntimeBrowserValidationError(`${label} must be a non-negative integer.`);
+  }
+  return parsed;
 }
 
 function parseBinding(value: unknown): RuntimeBrowserPageBinding | undefined {

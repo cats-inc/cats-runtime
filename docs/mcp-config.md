@@ -39,6 +39,7 @@ Current tools:
 
 - `runtime_summary`
 - `list_sessions`
+- `provider_diagnostics`
 - `observe_session`
 - `list_runtime_skills`
 - `create_session`
@@ -46,9 +47,11 @@ Current tools:
 - `fork_session`
 - `list_browser_drivers`
 - `list_browser_sessions`
+- `browser_summary`
 - `create_browser_session`
 - `create_browser_page`
 - `close_browser_session`
+- `cleanup_browser_sessions`
 - `audit_workspace`
 - `init_workspace`
 - `audit_delivery_target`
@@ -58,8 +61,15 @@ This remains additive and runtime-owned. Direct product APIs stay primary, but
 the MCP tool plane now covers the minimum mutation surface needed for
 multi-step orchestration.
 
-`list_runtime_skills` is the curated MCP wrapper over the same filterable
-runtime-owned skill catalog exposed by `GET /skills/catalog`.
+`provider_diagnostics` is the curated MCP wrapper over
+`GET /diagnostics/providers`. It returns the same provider readiness,
+compatibility, setup, and remediation payload, while accepting additive
+`probe: "light" | "live"` and `forceRefresh: true` inputs.
+
+`list_runtime_skills` is the curated MCP wrapper over the same versioned
+filterable/paged runtime-owned skill catalog exposed by `GET /skills/catalog`,
+including the additive `contract.version`, `query.filters`, and `pagination`
+payloads. The MCP wrapper also accepts `offset` and `limit`.
 
 `POST /mcp` uses the same runtime auth policy as the direct HTTP API. If
 `cats-runtime` is configured with an API key, MCP clients must send the same
@@ -177,6 +187,7 @@ tool surface here. The first shared tool names are:
 
 - `runtime_summary`
 - `list_sessions`
+- `provider_diagnostics`
 - `observe_session`
 - `list_runtime_skills`
 - `create_session`
@@ -184,9 +195,11 @@ tool surface here. The first shared tool names are:
 - `fork_session`
 - `list_browser_drivers`
 - `list_browser_sessions`
+- `browser_summary`
 - `create_browser_session`
 - `create_browser_page`
 - `close_browser_session`
+- `cleanup_browser_sessions`
 - `audit_workspace`
 - `init_workspace`
 - `audit_delivery_target`
@@ -201,8 +214,12 @@ by the direct API: `initializing`, `ready`, `busy`, `closed`,
 the direct runtime API: `shared`, `isolated`, and `worktree`.
 
 The browser MCP tools are additive wrappers over the same runtime-owned
-`/browser/*` substrate. They do not require a separate browser service and do
-not introduce a dependency on other monorepo browser projects.
+`/browser/*` substrate. `list_browser_sessions` now accepts the same
+`status=ready|closed` filter as direct HTTP, `browser_summary` exposes the
+aggregate read model for hosts, and `cleanup_browser_sessions` provides the
+same explicit closed-session maintenance seam as `POST /browser/sessions/cleanup`.
+They do not require a separate browser service and do not introduce a
+dependency on other monorepo browser projects.
 
 This keeps the product/runtime ownership split explicit:
 

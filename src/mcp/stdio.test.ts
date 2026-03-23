@@ -204,7 +204,10 @@ describe('MCP stdio transport', () => {
           tools: expect.arrayContaining([
             expect.objectContaining({ name: 'create_session' }),
             expect.objectContaining({ name: 'send_message' }),
+            expect.objectContaining({ name: 'provider_diagnostics' }),
             expect.objectContaining({ name: 'list_runtime_skills' }),
+            expect.objectContaining({ name: 'browser_summary' }),
+            expect.objectContaining({ name: 'cleanup_browser_sessions' }),
             expect.objectContaining({ name: 'commit_changes' }),
           ]),
         },
@@ -226,6 +229,16 @@ describe('MCP stdio transport', () => {
       id: 4,
       result: {
         structuredContent: {
+          contract: {
+            version: 1,
+          },
+          query: {
+            hasFilters: true,
+            filters: {
+              family: ['chat'],
+              slug: ['companion'],
+            },
+          },
           count: 1,
           skills: [
             {

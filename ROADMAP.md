@@ -185,10 +185,10 @@ browser-backed preview and test workflows. The current gaps are:
 - no real Playwright/CDP/browser-service driver yet
 - browser sessions/pages are in-memory only and do not survive runtime restart
 - reset/delete cleanup and closed-session pruning exist, but there is still no
-  time-based browser-session expiry or retained-session GC policy
+  automatic background browser-session expiry or retained-session GC policy
 - browser state already contributes additive session/history/observe inspection
-  previews, but host-facing aggregate read models are still thin and restart
-  recovery is absent
+  previews, and the runtime now exposes an explicit aggregate summary plus
+  manual closed-session cleanup seam, but restart recovery is still absent
 
 Without a second slice, the browser subsystem remains structurally correct but
 operationally shallow.
@@ -220,8 +220,11 @@ Deepen the runtime-owned browser subsystem without coupling it to any monorepo
 - Browser sessions already surface through session, history, and observe
   inspection payloads, and reset/delete cleanup clears browser sessions bound
   to the affected runtime session
-- Real drivers, restart-safe persistence, and time-based cleanup/expiry remain
-  deferred
+- `GET /browser/summary`, `POST /browser/sessions/cleanup`, and matching MCP
+  tools now provide a host-facing aggregate read/maintenance seam for closed
+  session cleanup without waiting for capacity-pressure pruning
+- Real drivers, restart-safe persistence, and automatic background
+  cleanup/expiry remain deferred
 
 #### Why This Is Required
 
@@ -456,9 +459,10 @@ That freezes the content taxonomy, but the follow-through is still incomplete.
 Current gaps:
 
 - the standalone runtime-owned catalog read surface now exists at
-  `GET /skills/catalog`, and it now supports lightweight metadata/tag filters,
-  but there is still no versioned host-facing contract beyond that minimal read
-  seam
+  `GET /skills/catalog`, and it now supports lightweight metadata/tag filters
+  plus a versioned host-facing read contract with additive `offset` / `limit`
+  pagination, but there is still no richer projection/sorting surface beyond
+  that minimal seam
 - the runtime catalog contract is stable enough for Team 6, and
   `npm run verify:skills` now provides a dedicated verification gate, but there
   is still no richer publish pipeline beyond running the existing catalog
@@ -478,8 +482,8 @@ Current gaps:
 Deepen the runtime-owned library surface without collapsing it into the
 execution/materialization engine.
 
-- Keep the standalone runtime-owned filterable catalog read surface minimal and
-  stable so upper layers can consume the library without importing
+- Keep the standalone runtime-owned versioned filterable catalog read surface
+  minimal and stable so upper layers can consume the library without importing
   `src/core/skills/catalog.ts`
 - Keep the new `npm run verify:skills` gate aligned with shipped runtime-owned
   skill packages, then grow it into a stricter publish/lint workflow as needed
@@ -499,7 +503,9 @@ execution/materialization engine.
 
 - `GET /skills/catalog` now exposes a standalone runtime-owned catalog route
   backed by `listRuntimeSkillCatalog()`, with lightweight filtering across
-  stable library metadata, tags, and delivery hints
+  stable library metadata, tags, and delivery hints plus `contract.version: 1`,
+  machine-readable `query.filters` echoing, and additive `offset` / `limit`
+  pagination metadata
 - the same runtime-owned catalog read seam is now also reachable from the
   curated MCP tool plane via `list_runtime_skills`
 - `src/http/routes/skills.ts` and `src/http/app.ts` now publish that read seam

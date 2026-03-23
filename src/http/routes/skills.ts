@@ -9,25 +9,73 @@ import type {
 
 export const skillRoutes = new Hono();
 
-const RUNTIME_SKILL_FAMILIES = new Set<RuntimeSkillFamily>([
+const RUNTIME_SKILL_FAMILY_VALUES = [
   'base',
   'orchestration',
   'work',
   'chat',
   'code',
-]);
+ ] as const satisfies readonly RuntimeSkillFamily[];
+const RUNTIME_SKILL_FAMILIES = new Set<RuntimeSkillFamily>(RUNTIME_SKILL_FAMILY_VALUES);
 
-const RUNTIME_SKILL_PACKAGE_KINDS = new Set<RuntimeSkillPackageKind>([
+const RUNTIME_SKILL_PACKAGE_KIND_VALUES = [
   'base',
   'role',
   'bundle',
-]);
+ ] as const satisfies readonly RuntimeSkillPackageKind[];
+const RUNTIME_SKILL_PACKAGE_KINDS = new Set<RuntimeSkillPackageKind>(
+  RUNTIME_SKILL_PACKAGE_KIND_VALUES,
+);
 
-const RUNTIME_SKILL_DELIVERY_HINTS = new Set<RuntimeSkillDeliveryMode>([
+const RUNTIME_SKILL_DELIVERY_HINT_VALUES = [
   'filesystem',
   'instructions',
   'none',
-]);
+ ] as const satisfies readonly RuntimeSkillDeliveryMode[];
+const RUNTIME_SKILL_DELIVERY_HINTS = new Set<RuntimeSkillDeliveryMode>(
+  RUNTIME_SKILL_DELIVERY_HINT_VALUES,
+);
+
+const RUNTIME_SKILL_CATALOG_CONTRACT = {
+  version: 1,
+  acceptedFilterEncodings: ['repeat', 'csv'],
+  filterSemantics: {
+    withinField: 'or',
+    acrossFields: 'and',
+  },
+  pagination: {
+    offset: { minimum: 0 },
+    limit: { minimum: 1 },
+  },
+  supportedFilters: {
+    id: { type: 'string' },
+    family: { type: 'enum', values: RUNTIME_SKILL_FAMILY_VALUES },
+    slug: { type: 'string' },
+    role: { type: 'string' },
+    packageKind: { type: 'enum', values: RUNTIME_SKILL_PACKAGE_KIND_VALUES },
+    capabilityTag: { type: 'string' },
+    productTag: { type: 'string' },
+    deliveryHint: { type: 'enum', values: RUNTIME_SKILL_DELIVERY_HINT_VALUES },
+  },
+} as const;
+
+interface RuntimeSkillCatalogFilters {
+  id: string[];
+  family: RuntimeSkillFamily[];
+  slug: string[];
+  role: string[];
+  packageKind: RuntimeSkillPackageKind[];
+  capabilityTag: string[];
+  productTag: string[];
+  deliveryHint: RuntimeSkillDeliveryMode[];
+}
+
+interface RuntimeSkillCatalogPagination {
+  offset: number;
+  limit: number | null;
+  returned: number;
+  hasMore: boolean;
+}
 
 class SkillCatalogQueryError extends Error {}
 
@@ -51,54 +99,111 @@ function validateEnumValues<T extends string>(
   }
 }
 
+function readOptionalSingleIntegerQueryValue(
+  searchParams: URLSearchParams,
+  key: string,
+  minimum: number,
+): number | undefined {
+  const values = searchParams
+    .getAll(key)
+    .flatMap((value) => value.split(','))
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+  if (values.length === 0) {
+    return undefined;
+  }
+  if (values.length !== 1 || !/^\d+$/.test(values[0])) {
+    throw new SkillCatalogQueryError(`Invalid ${key}: expected a single integer.`);
+  }
+  const parsed = Number.parseInt(values[0], 10);
+  if (!Number.isSafeInteger(parsed) || parsed < minimum) {
+    throw new SkillCatalogQueryError(`Invalid ${key}: expected an integer >= ${minimum}.`);
+  }
+  return parsed;
+}
+
+function readRuntimeSkillCatalogFilters(
+  searchParams: URLSearchParams,
+): RuntimeSkillCatalogFilters {
+  const id = readQueryValues(searchParams, 'id');
+  const family = readQueryValues(searchParams, 'family');
+  const slug = readQueryValues(searchParams, 'slug');
+  const role = readQueryValues(searchParams, 'role');
+  const packageKind = readQueryValues(searchParams, 'packageKind');
+  const capabilityTag = readQueryValues(searchParams, 'capabilityTag');
+  const productTag = readQueryValues(searchParams, 'productTag');
+  const deliveryHint = readQueryValues(searchParams, 'deliveryHint');
+
+  validateEnumValues(family, RUNTIME_SKILL_FAMILIES, 'family');
+  validateEnumValues(packageKind, RUNTIME_SKILL_PACKAGE_KINDS, 'packageKind');
+  validateEnumValues(deliveryHint, RUNTIME_SKILL_DELIVERY_HINTS, 'deliveryHint');
+
+  return {
+    id,
+    family,
+    slug,
+    role,
+    packageKind,
+    capabilityTag,
+    productTag,
+    deliveryHint,
+  };
+}
+
+function buildAppliedRuntimeSkillCatalogFilters(
+  filters: RuntimeSkillCatalogFilters,
+): Partial<RuntimeSkillCatalogFilters> {
+  return Object.fromEntries(
+    Object.entries(filters).filter(([, values]) => values.length > 0),
+  ) as Partial<RuntimeSkillCatalogFilters>;
+}
+
 function filterRuntimeSkillCatalog(
   skills: RuntimeSkillCatalogEntry[],
-  searchParams: URLSearchParams,
+  filters: RuntimeSkillCatalogFilters,
 ): RuntimeSkillCatalogEntry[] {
-  const ids = readQueryValues(searchParams, 'id');
-  const families = readQueryValues(searchParams, 'family');
-  const slugs = readQueryValues(searchParams, 'slug');
-  const roles = readQueryValues(searchParams, 'role');
-  const packageKinds = readQueryValues(searchParams, 'packageKind');
-  const capabilityTags = readQueryValues(searchParams, 'capabilityTag');
-  const productTags = readQueryValues(searchParams, 'productTag');
-  const deliveryHints = readQueryValues(searchParams, 'deliveryHint');
-
-  validateEnumValues(families, RUNTIME_SKILL_FAMILIES, 'family');
-  validateEnumValues(packageKinds, RUNTIME_SKILL_PACKAGE_KINDS, 'packageKind');
-  validateEnumValues(deliveryHints, RUNTIME_SKILL_DELIVERY_HINTS, 'deliveryHint');
+  const {
+    id,
+    family,
+    slug,
+    role,
+    packageKind,
+    capabilityTag,
+    productTag,
+    deliveryHint,
+  } = filters;
 
   return skills.filter((skill) => {
-    if (ids.length > 0 && !ids.includes(skill.id)) {
+    if (id.length > 0 && !id.includes(skill.id)) {
       return false;
     }
-    if (families.length > 0 && !families.includes(skill.library.family)) {
+    if (family.length > 0 && !family.includes(skill.library.family)) {
       return false;
     }
-    if (slugs.length > 0 && !slugs.includes(skill.library.slug)) {
+    if (slug.length > 0 && !slug.includes(skill.library.slug)) {
       return false;
     }
-    if (roles.length > 0 && !roles.includes(skill.library.role)) {
+    if (role.length > 0 && !role.includes(skill.library.role)) {
       return false;
     }
-    if (packageKinds.length > 0 && !packageKinds.includes(skill.library.packageKind)) {
+    if (packageKind.length > 0 && !packageKind.includes(skill.library.packageKind)) {
       return false;
     }
     if (
-      capabilityTags.length > 0
-      && !capabilityTags.some((tag) => skill.library.capabilityTags.includes(tag))
+      capabilityTag.length > 0
+      && !capabilityTag.some((tag) => skill.library.capabilityTags.includes(tag))
     ) {
       return false;
     }
     if (
-      productTags.length > 0
-      && !productTags.some((tag) => skill.library.productTags.includes(tag))
+      productTag.length > 0
+      && !productTag.some((tag) => skill.library.productTags.includes(tag))
     ) {
       return false;
     }
     if (
-      deliveryHints.length > 0
-      && !deliveryHints.some((hint) => skill.library.deliveryHints.includes(hint))
+      deliveryHint.length > 0
+      && !deliveryHint.some((hint) => skill.library.deliveryHints.includes(hint))
     ) {
       return false;
     }
@@ -106,12 +211,45 @@ function filterRuntimeSkillCatalog(
   });
 }
 
+function paginateRuntimeSkillCatalog(
+  skills: RuntimeSkillCatalogEntry[],
+  offset: number,
+  limit: number | undefined,
+): {
+  skills: RuntimeSkillCatalogEntry[];
+  pagination: RuntimeSkillCatalogPagination;
+} {
+  const pagedSkills = limit === undefined
+    ? skills.slice(offset)
+    : skills.slice(offset, offset + limit);
+  return {
+    skills: pagedSkills,
+    pagination: {
+      offset,
+      limit: limit ?? null,
+      returned: pagedSkills.length,
+      hasMore: offset + pagedSkills.length < skills.length,
+    },
+  };
+}
+
 skillRoutes.get('/skills/catalog', (c) => {
   try {
     const searchParams = new URL(c.req.url).searchParams;
-    const skills = filterRuntimeSkillCatalog(listRuntimeSkillCatalog(), searchParams);
+    const filters = readRuntimeSkillCatalogFilters(searchParams);
+    const offset = readOptionalSingleIntegerQueryValue(searchParams, 'offset', 0) ?? 0;
+    const limit = readOptionalSingleIntegerQueryValue(searchParams, 'limit', 1);
+    const appliedFilters = buildAppliedRuntimeSkillCatalogFilters(filters);
+    const filteredSkills = filterRuntimeSkillCatalog(listRuntimeSkillCatalog(), filters);
+    const { skills, pagination } = paginateRuntimeSkillCatalog(filteredSkills, offset, limit);
     return c.json({
-      count: skills.length,
+      contract: RUNTIME_SKILL_CATALOG_CONTRACT,
+      query: {
+        hasFilters: Object.keys(appliedFilters).length > 0,
+        filters: appliedFilters,
+      },
+      count: filteredSkills.length,
+      pagination,
       skills,
     });
   } catch (err) {

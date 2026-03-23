@@ -126,4 +126,126 @@ describe('RuntimeBrowserService', () => {
       },
     })).rejects.toThrow("Browser session '" + session.id + "' reached the maximum page capacity of 1.");
   });
+
+  it('summarizes browser sessions/pages and cleanup candidates', async () => {
+    let now = new Date('2026-03-23T00:00:00.000Z');
+    const browser = new RuntimeBrowserService({
+      drivers: [
+        new ManualBrowserDriver(),
+      ],
+      now: () => now,
+    });
+
+    const readySession = await browser.createSession({
+      runtimeSessionId: 'session-1',
+      label: 'Ready Browser',
+    });
+    await browser.createPage(readySession.id, {
+      url: 'http://127.0.0.1:4173',
+      binding: {
+        kind: 'manual_url',
+        runtimeSessionId: 'session-1',
+      },
+    });
+
+    now = new Date('2026-03-23T00:10:00.000Z');
+    const closedSession = await browser.createSession({
+      label: 'Closed Browser',
+    });
+    await browser.createPage(closedSession.id, {
+      path: '/tmp/report.html',
+      binding: {
+        kind: 'manual_url',
+      },
+    });
+    await browser.closeSession(closedSession.id);
+
+    now = new Date('2026-03-23T00:20:00.000Z');
+    expect(browser.summarizeSessions({
+      olderThanMs: 5 * 60 * 1000,
+    })).toEqual({
+      filters: {},
+      sessions: {
+        total: 2,
+        ready: 1,
+        closed: 1,
+      },
+      pages: {
+        total: 2,
+        open: 1,
+        closed: 1,
+      },
+      attachedRuntimeSessionCount: 1,
+      drivers: [
+        {
+          driverId: 'manual',
+          sessions: {
+            total: 2,
+            ready: 1,
+            closed: 1,
+          },
+          pages: {
+            total: 2,
+            open: 1,
+            closed: 1,
+          },
+        },
+      ],
+      cleanupCandidates: {
+        olderThanMs: 5 * 60 * 1000,
+        sessionCount: 1,
+        pageCount: 1,
+        sessionIds: [closedSession.id],
+      },
+    });
+  });
+
+  it('cleans up closed browser sessions older than the requested threshold', async () => {
+    let now = new Date('2026-03-23T00:00:00.000Z');
+    const browser = new RuntimeBrowserService({
+      drivers: [
+        new ManualBrowserDriver(),
+      ],
+      now: () => now,
+    });
+
+    const readySession = await browser.createSession({
+      label: 'Keep Me',
+    });
+
+    now = new Date('2026-03-23T00:05:00.000Z');
+    const closedSession = await browser.createSession({
+      label: 'Remove Me',
+    });
+    await browser.createPage(closedSession.id, {
+      path: '/tmp/report.html',
+      binding: {
+        kind: 'manual_url',
+      },
+    });
+    await browser.closeSession(closedSession.id);
+
+    now = new Date('2026-03-23T00:15:00.000Z');
+    expect(browser.cleanupSessions({
+      olderThanMs: 5 * 60 * 1000,
+    })).toEqual({
+      action: 'cleanup_browser_sessions',
+      filters: {
+        olderThanMs: 5 * 60 * 1000,
+        status: 'closed',
+      },
+      matchedSessionCount: 1,
+      matchedPageCount: 1,
+      removedSessionCount: 1,
+      removedPageCount: 1,
+      removedSessionIds: [closedSession.id],
+      remainingSessionCount: 1,
+      remainingClosedSessionCount: 0,
+    });
+    expect(browser.getSession(closedSession.id)).toBeUndefined();
+    expect(browser.getSession(readySession.id)).toEqual(expect.objectContaining({
+      id: readySession.id,
+      status: 'ready',
+    }));
+  });
 });

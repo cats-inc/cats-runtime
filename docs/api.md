@@ -61,6 +61,7 @@ Current curated tools:
 
 - `runtime_summary`
 - `list_sessions`
+- `provider_diagnostics`
 - `observe_session`
 - `list_runtime_skills`
 - `create_session`
@@ -68,9 +69,11 @@ Current curated tools:
 - `fork_session`
 - `list_browser_drivers`
 - `list_browser_sessions`
+- `browser_summary`
 - `create_browser_session`
 - `create_browser_page`
 - `close_browser_session`
+- `cleanup_browser_sessions`
 - `audit_workspace`
 - `init_workspace`
 - `audit_delivery_target`
@@ -78,7 +81,11 @@ Current curated tools:
 
 `list_runtime_skills` reuses the same runtime-owned skill catalog contract as
 `GET /skills/catalog`, including lightweight filtering across stable metadata,
-tags, and delivery hints.
+tags, delivery hints, and additive `offset` / `limit` pagination.
+
+`provider_diagnostics` reuses the same runtime-owned readiness/remediation
+contract as `GET /diagnostics/providers`, including additive `probe` (`light`
+or `live`) and `forceRefresh` semantics for cached compatibility assessments.
 
 Example `tools/call` request:
 
@@ -301,9 +308,11 @@ and `SIGTERM` are also handled where the host platform delivers them reliably.
 
 ```text
 GET /browser/drivers
+GET /browser/summary
 GET /browser/sessions
 GET /browser/sessions/{id}
 POST /browser/sessions
+POST /browser/sessions/cleanup
 POST /browser/sessions/{id}/pages
 POST /browser/sessions/{id}/close
 ```
@@ -356,6 +365,40 @@ Browser session responses include:
 - `inspection.driver`: machine-readable driver capability summary
 - `inspection.previewSurfaces`: normalized `browser_page` surfaces aligned with
   existing session/delivery preview-surface contracts
+- `GET /browser/summary`: aggregate session/page counts plus machine-readable
+  cleanup candidates
+- `POST /browser/sessions/cleanup`: explicit maintenance route for deleting
+  closed browser sessions without waiting for capacity-pressure pruning
+
+`GET /browser/sessions` now also accepts optional `status=ready|closed`.
+
+`GET /browser/summary` accepts the same `driverId`, `runtimeSessionId`, and
+`status` filters as `GET /browser/sessions`, plus `olderThanMs` to preview
+cleanup candidates. The response includes:
+
+- `filters`: the applied browser-session filter block
+- `sessions`: aggregate session counts (`total`, `ready`, `closed`)
+- `pages`: aggregate page counts (`total`, `open`, `closed`)
+- `attachedRuntimeSessionCount`: number of matching browser sessions still
+  attached to a runtime session
+- `drivers`: per-driver aggregate counts
+- `cleanupCandidates`: closed-session candidates for explicit cleanup
+
+`POST /browser/sessions/cleanup` accepts:
+
+- `driverId`
+- `runtimeSessionId`
+- `olderThanMs`
+- optional `status`, but only `closed` is accepted
+
+The cleanup response is machine-readable and includes:
+
+- `action: "cleanup_browser_sessions"`
+- `filters`: resolved cleanup filters
+- `matchedSessionCount` / `matchedPageCount`
+- `removedSessionCount` / `removedPageCount`
+- `removedSessionIds`
+- `remainingSessionCount` / `remainingClosedSessionCount`
 
 The first browser substrate is bounded. When the runtime reaches browser
 session or per-session page capacity, create routes return `400` with a
@@ -471,14 +514,29 @@ supporting library lookups without importing runtime internals:
 - `capabilityTag`
 - `productTag`
 - `deliveryHint`
+- `offset`
+- `limit`
 
 Each filter accepts either repeated query params or comma-separated values. The
 route applies OR semantics within the same filter and AND semantics across
-different filters.
+different filters. `offset` must be an integer `>= 0`; `limit` must be an
+integer `>= 1`.
 
 The response shape is:
 
+- `contract`: machine-readable catalog contract metadata
+  - `version`: current catalog read contract version
+  - `acceptedFilterEncodings`: currently `repeat` and `csv`
+  - `filterSemantics`: `withinField: "or"` and `acrossFields: "and"`
+- `query`: machine-readable summary of the applied filters
+  - `hasFilters`: whether the request applied any filter
+  - `filters`: the non-empty filter arrays echoed back by the runtime
 - `count`: total number of discovered runtime-owned skill packages
+- `pagination`: machine-readable paging metadata
+  - `offset`: applied offset
+  - `limit`: applied limit or `null`
+  - `returned`: number of entries returned in `skills`
+  - `hasMore`: whether additional matches remain after the current page
 - `skills`: array of runtime catalog entries
 - each skill entry includes stable read fields such as `id`, `slug`, `title`,
   `description`, `status`, `source`, `sourcePath`, `entryFile`, `fingerprint`,
@@ -491,7 +549,36 @@ Example response:
 
 ```json
 {
+  "contract": {
+    "version": 1,
+    "acceptedFilterEncodings": ["repeat", "csv"],
+    "filterSemantics": {
+      "withinField": "or",
+      "acrossFields": "and"
+    },
+    "pagination": {
+      "offset": {
+        "minimum": 0
+      },
+      "limit": {
+        "minimum": 1
+      }
+    }
+  },
+  "query": {
+    "hasFilters": true,
+    "filters": {
+      "family": ["chat"],
+      "slug": ["companion"]
+    }
+  },
   "count": 1,
+  "pagination": {
+    "offset": 0,
+    "limit": null,
+    "returned": 1,
+    "hasMore": false
+  },
   "skills": [
     {
       "id": "companion",
@@ -519,8 +606,9 @@ Example response:
 }
 ```
 
-Invalid `family`, `packageKind`, or `deliveryHint` filters return `400` with a
-client-safe `error` string. Unexpected catalog read failures return `500`.
+Invalid `family`, `packageKind`, or `deliveryHint` filters, plus malformed
+`offset` / `limit` values, return `400` with a client-safe `error` string.
+Unexpected catalog read failures return `500`.
 
 ### Sessions
 

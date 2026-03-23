@@ -53,6 +53,68 @@ export interface CreateRuntimeBrowserPageInput extends RuntimeBrowserPageTarget 
 export interface ListRuntimeBrowserSessionsOptions {
   driverId?: string;
   runtimeSessionId?: string;
+  status?: RuntimeBrowserSessionView['status'];
+}
+
+export interface SummarizeRuntimeBrowserSessionsOptions
+  extends ListRuntimeBrowserSessionsOptions {
+  olderThanMs?: number;
+}
+
+export interface CleanupRuntimeBrowserSessionsOptions
+  extends ListRuntimeBrowserSessionsOptions {
+  olderThanMs?: number;
+}
+
+export interface RuntimeBrowserSessionCountSummary {
+  total: number;
+  ready: number;
+  closed: number;
+}
+
+export interface RuntimeBrowserPageCountSummary {
+  total: number;
+  open: number;
+  closed: number;
+}
+
+export interface RuntimeBrowserDriverSummary {
+  driverId: string;
+  sessions: RuntimeBrowserSessionCountSummary;
+  pages: RuntimeBrowserPageCountSummary;
+}
+
+export interface RuntimeBrowserCleanupCandidateSummary {
+  olderThanMs: number;
+  sessionCount: number;
+  pageCount: number;
+  sessionIds: string[];
+}
+
+export interface RuntimeBrowserSummary {
+  filters: ListRuntimeBrowserSessionsOptions;
+  sessions: RuntimeBrowserSessionCountSummary;
+  pages: RuntimeBrowserPageCountSummary;
+  attachedRuntimeSessionCount: number;
+  drivers: RuntimeBrowserDriverSummary[];
+  cleanupCandidates: RuntimeBrowserCleanupCandidateSummary;
+}
+
+export interface RuntimeBrowserCleanupResult {
+  action: 'cleanup_browser_sessions';
+  filters: {
+    driverId?: string;
+    runtimeSessionId?: string;
+    status: 'closed';
+    olderThanMs: number;
+  };
+  matchedSessionCount: number;
+  matchedPageCount: number;
+  removedSessionCount: number;
+  removedPageCount: number;
+  removedSessionIds: string[];
+  remainingSessionCount: number;
+  remainingClosedSessionCount: number;
 }
 
 export interface RuntimeBrowserServiceOptions {
@@ -103,23 +165,92 @@ export class RuntimeBrowserService {
   }
 
   listSessions(options: ListRuntimeBrowserSessionsOptions = {}): RuntimeBrowserSessionView[] {
-    return Array.from(this.sessions.values())
-      .filter((session) => {
-        if (options.driverId && session.driverId !== options.driverId) {
-          return false;
-        }
-        if (options.runtimeSessionId && session.runtimeSessionId !== options.runtimeSessionId) {
-          return false;
-        }
-        return true;
-      })
+    return this.listStoredSessions(options)
       .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
       .map((session) => this.buildSessionView(session));
+  }
+
+  summarizeSessions(
+    options: SummarizeRuntimeBrowserSessionsOptions = {},
+  ): RuntimeBrowserSummary {
+    const sessions = this.listStoredSessions(options);
+    const cleanupCandidates = this.selectCleanupSessions({
+      ...options,
+      status: 'closed',
+      olderThanMs: options.olderThanMs ?? 0,
+    });
+
+    const drivers = new Map<string, StoredBrowserSession[]>();
+    for (const session of sessions) {
+      const bucket = drivers.get(session.driverId);
+      if (bucket) {
+        bucket.push(session);
+        continue;
+      }
+      drivers.set(session.driverId, [session]);
+    }
+
+    return {
+      filters: buildBrowserSessionFilters(options),
+      sessions: summarizeSessionCounts(sessions),
+      pages: summarizePageCounts(sessions, this.pages),
+      attachedRuntimeSessionCount: sessions.filter((session) => session.runtimeSessionId).length,
+      drivers: Array.from(drivers.entries())
+        .map(([driverId, driverSessions]) => ({
+          driverId,
+          sessions: summarizeSessionCounts(driverSessions),
+          pages: summarizePageCounts(driverSessions, this.pages),
+        }))
+        .sort((left, right) => left.driverId.localeCompare(right.driverId)),
+      cleanupCandidates: {
+        olderThanMs: options.olderThanMs ?? 0,
+        sessionCount: cleanupCandidates.length,
+        pageCount: cleanupCandidates.reduce((total, session) => total + session.pageIds.length, 0),
+        sessionIds: cleanupCandidates.map((session) => session.id),
+      },
+    };
   }
 
   getSession(id: string): RuntimeBrowserSessionView | undefined {
     const session = this.sessions.get(id);
     return session ? this.buildSessionView(session) : undefined;
+  }
+
+  cleanupSessions(
+    options: CleanupRuntimeBrowserSessionsOptions = {},
+  ): RuntimeBrowserCleanupResult {
+    const olderThanMs = Math.max(0, options.olderThanMs ?? 0);
+    const candidates = this.selectCleanupSessions({
+      ...options,
+      status: 'closed',
+      olderThanMs,
+    });
+    const matchedPageCount = candidates.reduce((total, session) => total + session.pageIds.length, 0);
+    const removedSessionIds: string[] = [];
+    let removedPageCount = 0;
+
+    for (const session of candidates) {
+      removedSessionIds.push(session.id);
+      removedPageCount += session.pageIds.length;
+      this.deleteStoredSession(session.id);
+    }
+
+    return {
+      action: 'cleanup_browser_sessions',
+      filters: {
+        ...buildBrowserSessionFilters(options),
+        status: 'closed',
+        olderThanMs,
+      },
+      matchedSessionCount: candidates.length,
+      matchedPageCount,
+      removedSessionCount: removedSessionIds.length,
+      removedPageCount,
+      removedSessionIds,
+      remainingSessionCount: this.sessions.size,
+      remainingClosedSessionCount: Array.from(this.sessions.values())
+        .filter((session) => session.status === 'closed').length,
+    };
   }
 
   async clearRuntimeSessions(runtimeSessionId: string): Promise<number> {
@@ -338,6 +469,22 @@ export class RuntimeBrowserService {
       previewSurface: createBrowserPagePreviewSurface(snapshot),
     };
   }
+
+  private listStoredSessions(options: ListRuntimeBrowserSessionsOptions = {}): StoredBrowserSession[] {
+    return Array.from(this.sessions.values())
+      .filter((session) => matchesBrowserSessionFilters(session, options));
+  }
+
+  private selectCleanupSessions(
+    options: CleanupRuntimeBrowserSessionsOptions = {},
+  ): StoredBrowserSession[] {
+    const olderThanMs = Math.max(0, options.olderThanMs ?? 0);
+    const now = this.now().getTime();
+    return this.listStoredSessions({
+      ...options,
+      status: 'closed',
+    }).filter((session) => isClosedBrowserSessionOlderThan(session, olderThanMs, now));
+  }
 }
 
 function toBrowserPageSnapshot(page: StoredBrowserPage): Omit<RuntimeBrowserPage, 'previewSurface'> {
@@ -409,4 +556,85 @@ function clonePreviewSurface(
     ...(previewSurface.provenance ? { provenance: { ...previewSurface.provenance } } : {}),
     ...(previewSurface.metadata ? { metadata: { ...previewSurface.metadata } } : {}),
   };
+}
+
+function buildBrowserSessionFilters(
+  options: ListRuntimeBrowserSessionsOptions,
+): ListRuntimeBrowserSessionsOptions {
+  return {
+    ...(options.driverId ? { driverId: options.driverId } : {}),
+    ...(options.runtimeSessionId ? { runtimeSessionId: options.runtimeSessionId } : {}),
+    ...(options.status ? { status: options.status } : {}),
+  };
+}
+
+function matchesBrowserSessionFilters(
+  session: StoredBrowserSession,
+  options: ListRuntimeBrowserSessionsOptions,
+): boolean {
+  if (options.driverId && session.driverId !== options.driverId) {
+    return false;
+  }
+  if (options.runtimeSessionId && session.runtimeSessionId !== options.runtimeSessionId) {
+    return false;
+  }
+  if (options.status && session.status !== options.status) {
+    return false;
+  }
+  return true;
+}
+
+function summarizeSessionCounts(
+  sessions: StoredBrowserSession[],
+): RuntimeBrowserSessionCountSummary {
+  return {
+    total: sessions.length,
+    ready: sessions.filter((session) => session.status === 'ready').length,
+    closed: sessions.filter((session) => session.status === 'closed').length,
+  };
+}
+
+function summarizePageCounts(
+  sessions: StoredBrowserSession[],
+  pages: Map<string, StoredBrowserPage>,
+): RuntimeBrowserPageCountSummary {
+  let total = 0;
+  let open = 0;
+  let closed = 0;
+
+  for (const session of sessions) {
+    for (const pageId of session.pageIds) {
+      const page = pages.get(pageId);
+      if (!page) {
+        continue;
+      }
+      total += 1;
+      if (page.status === 'open') {
+        open += 1;
+        continue;
+      }
+      closed += 1;
+    }
+  }
+
+  return {
+    total,
+    open,
+    closed,
+  };
+}
+
+function isClosedBrowserSessionOlderThan(
+  session: StoredBrowserSession,
+  olderThanMs: number,
+  now: number,
+): boolean {
+  if (session.status !== 'closed') {
+    return false;
+  }
+  const referenceTime = Date.parse(session.closedAt || session.updatedAt);
+  if (!Number.isFinite(referenceTime)) {
+    return false;
+  }
+  return now - referenceTime >= olderThanMs;
 }

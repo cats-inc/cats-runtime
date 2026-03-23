@@ -10,13 +10,13 @@
 | API Backends | In Progress | `src/backends/api` now runs Claude, Codex/OpenAI, Gemini, and Ollama with runtime-managed sessions, provider-native continuation/caching optimizations, additive incident hints plus provider-agnostic `progress` events, a shared local tool loop with patch/file/search/shell support, and runtime-owned health/diagnostics summaries; deeper live probes and broader tool/model discovery remain |
 | Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, an Agent SDK bridge as the second validation target, and first-slice remote cleanup hooks for close/cancel/delete/reset semantics |
 | HTTP API | Completed | Health, sessions, delivery audit/export/repo routes, messages, history, observe, wakeups, provider management, session branch-lineage inspection, metering/guardrail diagnostics, additive run-inspector/session-discipline contracts, machine-readable session-maintenance/delete-cleanup payloads, worktree-backed session lifecycle cleanup semantics including `preserve`, and the runtime MCP facade over HTTP plus stdio are served directly from `cats-runtime` |
-| Runtime Skills | Completed | `skills/` is now a runtime-owned execution catalog and family-aware internal library with validation, session-level requested/resolved/applied metadata, richer slug/family/capability metadata, explicit `skills: null` clearing, backend-aware delivery modes, inspection-level applied-skill reporting, a standalone filterable `GET /skills/catalog` read surface plus matching `list_runtime_skills` MCP read tool, a dedicated `npm run verify:skills` gate, first-slice Codex/Pi verification, and shared re-entry hydration across create/resume/fork/provider-switch |
+| Runtime Skills | Completed | `skills/` is now a runtime-owned execution catalog and family-aware internal library with validation, session-level requested/resolved/applied metadata, richer slug/family/capability metadata, explicit `skills: null` clearing, backend-aware delivery modes, inspection-level applied-skill reporting, a standalone versioned filterable/paged `GET /skills/catalog` read surface plus matching `list_runtime_skills` MCP read tool, a dedicated `npm run verify:skills` gate, first-slice Codex/Pi verification, and shared re-entry hydration across create/resume/fork/provider-switch |
 | Wakeup Substrate | Completed | Runtime-owned scheduled wakeup requests now support create/list/cancel/trigger, restart-safe persistence, bounded timer processing, coalescing, and additive session/history wakeup metadata without introducing full scheduler semantics |
 | Provider Compatibility | In Progress | Shared CLI compatibility probing now classifies `ready` / `degraded` / `unsupported_version` / `unrecognized_protocol` / `probe_failed`, validates `light` vs `live` runtime-flag probes across expanded CLI family profiles, captures redacted replay-friendly evidence bundles, tracks stale cache/reprobe metadata, and exposes runtime-owned install/prerequisite/PATH/npm-prefix/auth/version/remediation hints for CLI targets |
 | Dashboard | Completed | The embedded dashboard UI is served from `GET /` and now surfaces runtime/provider health from runtime-owned diagnostics contracts |
 | Workspace Substrate | Completed | `audit-workspace`, `init-workspace`, and `update-workspace` now return explicit preview/apply contracts, machine-readable action plans/diff stats, approval-friendly payloads, and `*.bootstrap` review-copy behavior without owning product policy |
 | Delivery Primitives | Completed | Runtime-owned delivery audit, artifact publish/export, repo status, commit, push, and normalized preview-surface metadata are now available over both HTTP routes and local tools |
-| Browser Preview Substrate | Completed | Runtime-owned browser driver/session/page contracts, `browser_page` preview surfaces, manual driver validation, additive `/browser/*` routes, session/history/observe inspection integration, and reset/delete cleanup for runtime-bound browser sessions now exist without depending on sibling browser projects |
+| Browser Preview Substrate | Completed | Runtime-owned browser driver/session/page contracts, `browser_page` preview surfaces, manual driver validation, additive `/browser/*` routes, session/history/observe inspection integration, aggregate browser summary/cleanup seams, and reset/delete cleanup for runtime-bound browser sessions now exist without depending on sibling browser projects |
 | Tests | Completed | Vitest covers provider, discovery, pool, HTTP, delivery, server bootstrap, API/local tool-loop behavior, and first-slice metering/guardrail/progress normalization |
 | Docs | In Progress | Core docs now cover startup/diagnostics, provider compatibility/evidence flows, model catalog, session branching, worktree-backed session isolation and cleanup, workspace substrate, runtime hydration/re-entry metadata, delivery primitives, the browser preview substrate, runtime-managed skills plus the internal skill-library taxonomy/metadata contract, the scheduled wakeup substrate, first-slice metering/progress contracts, additive session inspection/run-state/maintenance payloads including persisted maintenance requests, and the runtime MCP facade over HTTP plus stdio; later PLAN-003/PLAN-005 follow-on items still need ongoing updates |
 | Follow-ups | Completed | Accepted post-review findings for provider-instance rollout were implemented and recorded in `docs/plans/PLAN-002-provider-instance-review-followups.md` |
@@ -348,7 +348,7 @@ turning `cats-runtime` into a general plugin platform.
 | Replace the hard-coded skill catalog with runtime discovery/validation | [x] | `src/core/skills/catalog.ts` now validates family-organized `skills/**/SKILL.md` frontmatter and instruction bodies |
 | Freeze session-level requested/resolved/applied skill state | [x] | Session payloads now persist requested refs, resolved skill metadata, delivery state, warnings, and applied ids |
 | Freeze the internal skill-library taxonomy and metadata contract | [x] | `listRuntimeSkillCatalog()` now reports stable family/slug/role/package metadata for Team 6 and future product mappings |
-| Add a standalone runtime-owned skill catalog route | [x] | `GET /skills/catalog` now exposes the runtime library read seam for hosts without direct internal module imports and supports lightweight metadata/tag filters |
+| Add a standalone runtime-owned skill catalog route | [x] | `GET /skills/catalog` now exposes the runtime library read seam for hosts without direct internal module imports, supports lightweight metadata/tag filters plus `offset` / `limit`, and returns `contract.version`, echoed `query.filters`, and machine-readable `pagination` |
 | Add a dedicated runtime skill verification command | [x] | `npm run verify:skills` now executes the runtime catalog validator as an explicit maintenance/release gate |
 | Support delivery modes `filesystem`, `instructions`, and `none` | [x] | Codex isolated sessions use filesystem delivery, Pi/API/agent use instructions, unsupported targets stay explicit with `none` |
 | Verify CLI-first targets | [x] | Codex filesystem delivery and Pi instruction-file delivery are both covered by automated tests |
@@ -358,7 +358,7 @@ turning `cats-runtime` into a general plugin platform.
 
 #### Deferred Boundaries
 
-- [ ] No versioned host catalog contract yet beyond the minimal standalone filterable `GET /skills/catalog` runtime read
+- [ ] No richer projection/sorting contract yet beyond the current versioned standalone filterable/paged `GET /skills/catalog` runtime read
 - [ ] No richer publish workflow yet beyond `npm run verify:skills` running the existing catalog validator
 - [ ] No runtime-owned `skillProfile` mapping layer yet; product capability/profile resolution stays outside `cats-runtime`
 - [ ] No repo-native skill merge or conflict-resolution system yet beyond safe fallback from Codex filesystem delivery to instructions
@@ -568,7 +568,7 @@ replacing the direct runtime HTTP API used by product code.
 |------|--------|-------|
 | Add runtime-owned MCP module under `src/mcp` | [x] | JSON-RPC handling, tool registry, stdio framing, and runtime read-model helpers now live outside provider adapters |
 | Add `POST /mcp` facade route | [x] | `initialize`, `ping`, `tools/list`, `tools/call`, and `notifications/initialized` are supported |
-| Expose curated read + mutation tool slice | [x] | `runtime_summary`, `list_sessions`, `observe_session`, `list_runtime_skills`, `create_session`, `send_message`, `fork_session`, `audit_workspace`, `init_workspace`, `audit_delivery_target`, and `commit_changes` now ship |
+| Expose curated read + mutation tool slice | [x] | `runtime_summary`, `list_sessions`, `provider_diagnostics`, `observe_session`, `list_runtime_skills`, `list_browser_drivers`, `list_browser_sessions`, `browser_summary`, `create_browser_session`, `create_browser_page`, `close_browser_session`, `cleanup_browser_sessions`, `create_session`, `send_message`, `fork_session`, `audit_workspace`, `init_workspace`, `audit_delivery_target`, and `commit_changes` now ship |
 | Reuse existing runtime services/read models instead of inventing a second execution stack | [x] | MCP tools route into the existing session, delivery, and workspace contracts already used by HTTP routes/tools |
 | Add standalone stdio MCP transport | [x] | `cats-runtime-mcp` now exposes the same tool plane over Content-Length framed stdio JSON-RPC |
 | Update MCP docs and coverage | [x] | `docs/api.md`, `docs/architecture.md`, `docs/mcp-config.md`, `../../cats/docs/mcp-config.md`, `src/http/mcpRoutes.test.ts`, and `src/mcp/stdio.test.ts` now describe and verify the slice |
@@ -596,7 +596,7 @@ full BrowserOS product or depending on sibling browser projects.
 | Add browser driver/session/page contracts | [x] | `src/core/types.ts` now defines runtime-owned browser driver/session/page and `browser_page` preview-surface shapes |
 | Add `src/core/browser` substrate | [x] | `RuntimeBrowserService` now manages runtime-owned browser sessions/pages and preview-surface inspection |
 | Add first pluggable browser driver | [x] | `src/backends/browser/manualDriver.ts` validates the contract without launching a managed browser |
-| Add browser HTTP routes | [x] | `/browser/drivers`, `/browser/sessions`, `/browser/sessions/{id}`, `/browser/sessions/{id}/pages`, and `/browser/sessions/{id}/close` now ship |
+| Add browser HTTP routes | [x] | `/browser/drivers`, `/browser/summary`, `/browser/sessions`, `/browser/sessions/{id}`, `/browser/sessions/cleanup`, `/browser/sessions/{id}/pages`, and `/browser/sessions/{id}/close` now ship |
 | Align service/artifact/browser-page preview surfaces | [x] | Browser routes can bind to runtime session services/artifacts while preserving the existing preview-surface schema |
 | Update docs and tests | [x] | `README.md`, `docs/api.md`, `docs/architecture.md`, `docs/AGENT-GUIDE.md`, `docs/plans/PLAN-013-*.md`, and browser tests now cover the slice |
 
@@ -604,6 +604,7 @@ full BrowserOS product or depending on sibling browser projects.
 
 - [ ] No real Playwright/CDP/BrowserOS driver yet; the first slice validates contracts with a manual driver only
 - [ ] No browser-session persistence or restart-safe recovery yet
+- [ ] No automatic background expiry/GC yet; cleanup is explicit plus capacity-pressure pruning only
 - [ ] No product-side preview UI or browser takeover workflow yet
 
 ### WP-17: Worktree Isolation Execution Layer
