@@ -1676,6 +1676,33 @@ follow-up fetch.
 so hosts can record additive pre-maintenance trigger context even when the
 operation is only a soft close.
 
+`POST /sessions/{id}/workspace/cleanup` is a bounded retained-worktree recovery
+primitive for closed worktree-backed sessions whose most recent cleanup attempt
+ended with `status: "retained"`. It accepts the same optional `maintenance`
+body plus `worktreeCleanupPolicy: "discard" | "merge" | "preserve"`.
+
+If `worktreeCleanupPolicy` is omitted, the runtime retries the most recent
+retained policy. Responses always include:
+
+- `action: "cleanup_workspace"`
+- `status: "completed" | "retained"`
+- `reasonCodes`: machine-readable cleanup result codes from the retried cleanup
+- `cleanup`: flat cleanup booleans/counts (`workspaceCleaned`,
+  `worktreeDetached`, `worktreeCleanupPolicy`, `worktreeMergedPaths`)
+- `maintenance`: the latest persisted maintenance inspection snapshot
+- `session`: the updated session payload after the retry
+
+Unlike replaying `reset` or `delete`, this route only retries workspace
+cleanup. It does not clear provider resume state, clear browser sessions, or
+delete the logical session record for you. When cleanup changes the runtime cwd
+or worktree metadata, the runtime also refreshes persisted hydration/skill
+delivery state so `cwd`, `workspaceIsolation`, and `hydration.workspace`
+continue to agree afterward.
+
+For `POST /sessions/{id}/reset`, `POST /sessions/{id}/workspace/cleanup`, and
+`DELETE /sessions/{id}`, invalid `worktreeCleanupPolicy` values now return
+`400` instead of silently falling back to the default cleanup behavior.
+
 `POST /sessions/{id}/compact` exposes the same runtime-owned maintenance
 contract as a public compaction-preparation seam without making
 `cats-runtime` the compaction engine itself. It accepts:

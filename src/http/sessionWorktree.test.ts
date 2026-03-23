@@ -451,6 +451,287 @@ describe('session worktree routes', () => {
     }));
   });
 
+  it('rejects invalid worktree cleanup policies for reset, delete, and retry routes', async () => {
+    const repoDir = createGitWorkspace(rootDir, 'repo-invalid-worktree-policy');
+    const prepared = await prepareSessionWorkspace({
+      sessionId: 'worktree-invalid-policy',
+      sessionBaseDir,
+      cwd: repoDir,
+      workspaceMode: 'shared',
+      workspaceIsolationMode: 'worktree',
+    });
+
+    const session = registry.create({
+      id: 'worktree-invalid-policy',
+      providerName: 'codex',
+      cwd: prepared.cwd,
+      workspaceMode: prepared.workspaceMode,
+      workspaceIsolation: prepared.workspaceIsolation,
+      hydration: buildHydration(prepared.cwd, repoDir),
+    });
+    registry.updateStatus(session.id, 'closed');
+
+    const invalidReset = await app.request(`/sessions/${session.id}/reset`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        worktreeCleanupPolicy: 'drop',
+      }),
+    });
+    expect(invalidReset.status).toBe(400);
+    await expect(invalidReset.json()).resolves.toEqual({
+      error: 'Error: worktreeCleanupPolicy must be one of: discard, merge, preserve',
+    });
+
+    const invalidDelete = await app.request(`/sessions/${session.id}`, {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        worktreeCleanupPolicy: 'drop',
+      }),
+    });
+    expect(invalidDelete.status).toBe(400);
+    await expect(invalidDelete.json()).resolves.toEqual({
+      error: 'Error: worktreeCleanupPolicy must be one of: discard, merge, preserve',
+    });
+
+    const retainResponse = await app.request(`/sessions/${session.id}/reset`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        worktreeCleanupPolicy: 'preserve',
+      }),
+    });
+    expect(retainResponse.status).toBe(200);
+
+    const invalidRetry = await app.request(`/sessions/${session.id}/workspace/cleanup`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        worktreeCleanupPolicy: 'drop',
+      }),
+    });
+    expect(invalidRetry.status).toBe(400);
+    await expect(invalidRetry.json()).resolves.toEqual({
+      error: 'Error: worktreeCleanupPolicy must be one of: discard, merge, preserve',
+    });
+  });
+
+  it('retries retained worktree cleanup without replaying reset follow-through', async () => {
+    const repoDir = createGitWorkspace(rootDir, 'repo-cleanup-retry');
+    const prepared = await prepareSessionWorkspace({
+      sessionId: 'worktree-cleanup-retry',
+      sessionBaseDir,
+      cwd: repoDir,
+      workspaceMode: 'shared',
+      workspaceIsolationMode: 'worktree',
+    });
+
+    const session = registry.create({
+      id: 'worktree-cleanup-retry',
+      providerName: 'codex',
+      cwd: prepared.cwd,
+      workspaceMode: prepared.workspaceMode,
+      workspaceIsolation: prepared.workspaceIsolation,
+      hydration: buildHydration(prepared.cwd, repoDir),
+    });
+    registry.setProviderSessionId(session.id, 'thread-cleanup-retry');
+    registry.updateStatus(session.id, 'closed');
+
+    writeFileSync(join(prepared.cwd, 'tracked.txt'), 'cleanup retry me\n', 'utf8');
+
+    const retainedResponse = await app.request(`/sessions/${session.id}/reset`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        worktreeCleanupPolicy: 'preserve',
+      }),
+    });
+
+    expect(retainedResponse.status).toBe(200);
+
+    const response = await app.request(`/sessions/${session.id}/workspace/cleanup`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        worktreeCleanupPolicy: 'discard',
+        maintenance: {
+          reason: 'operator_retry_cleanup',
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      action: string;
+      status: string;
+      reasonCodes: string[];
+      cleanup: {
+        workspaceCleaned: boolean;
+        worktreeDetached: boolean;
+        worktreeCleanupPolicy: string;
+        worktreeMergedPaths: number;
+      };
+      maintenance: {
+        lastRequest: {
+          action: string;
+          reason?: string;
+          worktreeDisposition?: string;
+        };
+      };
+      session: {
+        cwd: string;
+        hydration: {
+          workspace: {
+            runtimeCwd: string;
+            sourceCwd: string;
+            sourceOfTruth: string;
+          };
+        };
+      };
+    };
+    expect(body.action).toBe('cleanup_workspace');
+    expect(body.status).toBe('completed');
+    expect(body.reasonCodes).toContain('worktree_changes_discarded');
+    expect(body.cleanup).toEqual(expect.objectContaining({
+      workspaceCleaned: true,
+      worktreeDetached: true,
+      worktreeCleanupPolicy: 'discard',
+      worktreeMergedPaths: 0,
+    }));
+    expect(body.maintenance.lastRequest).toEqual(expect.objectContaining({
+      action: 'cleanup_workspace',
+      reason: 'operator_retry_cleanup',
+      worktreeDisposition: 'discard',
+    }));
+    expect(body.session.cwd).toBe(repoDir);
+    expect(body.session.hydration.workspace).toEqual(expect.objectContaining({
+      runtimeCwd: repoDir,
+      sourceCwd: repoDir,
+      sourceOfTruth: 'runtime_cwd',
+    }));
+    expect(existsSync(prepared.workspaceIsolation.worktree!.worktreePath)).toBe(false);
+
+    const stored = registry.get(session.id);
+    expect(stored?.cwd).toBe(repoDir);
+    expect(stored?.providerSessionId).toBe('thread-cleanup-retry');
+    expect(stored?.workspaceIsolation?.worktree?.lastCleanup).toEqual(expect.objectContaining({
+      policy: 'discard',
+      status: 'completed',
+    }));
+    expect(stored?.hydration?.workspace).toEqual(expect.objectContaining({
+      runtimeCwd: repoDir,
+      sourceCwd: repoDir,
+      sourceOfTruth: 'runtime_cwd',
+    }));
+  });
+
+  it('keeps retained worktree cleanup retry bounded when merge still sees a dirty source repo', async () => {
+    const repoDir = createGitWorkspace(rootDir, 'repo-cleanup-retry-dirty');
+    const prepared = await prepareSessionWorkspace({
+      sessionId: 'worktree-cleanup-retry-dirty',
+      sessionBaseDir,
+      cwd: repoDir,
+      workspaceMode: 'shared',
+      workspaceIsolationMode: 'worktree',
+    });
+
+    const session = registry.create({
+      id: 'worktree-cleanup-retry-dirty',
+      providerName: 'codex',
+      cwd: prepared.cwd,
+      workspaceMode: prepared.workspaceMode,
+      workspaceIsolation: prepared.workspaceIsolation,
+      hydration: buildHydration(prepared.cwd, repoDir),
+    });
+    registry.updateStatus(session.id, 'closed');
+
+    writeFileSync(join(prepared.cwd, 'tracked.txt'), 'preserve before merge retry\n', 'utf8');
+
+    const retainedResponse = await app.request(`/sessions/${session.id}/reset`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        worktreeCleanupPolicy: 'preserve',
+      }),
+    });
+
+    expect(retainedResponse.status).toBe(200);
+    writeFileSync(join(repoDir, 'dirty-source.txt'), 'dirty\n', 'utf8');
+
+    const response = await app.request(`/sessions/${session.id}/workspace/cleanup`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        worktreeCleanupPolicy: 'merge',
+        maintenance: {
+          reason: 'retry_after_manual_review',
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      action: string;
+      status: string;
+      reason: string;
+      reasonCodes: string[];
+      cleanup: {
+        workspaceCleaned: boolean;
+        worktreeDetached: boolean;
+        worktreeCleanupPolicy: string;
+        worktreeMergedPaths: number;
+      };
+      maintenance: {
+        lastRequest: {
+          action: string;
+          reason?: string;
+          worktreeDisposition?: string;
+        };
+      };
+      session: {
+        cwd: string;
+        hydration: {
+          workspace: {
+            runtimeCwd: string;
+            sourceCwd: string;
+            sourceOfTruth: string;
+          };
+        };
+      };
+    };
+    expect(body.action).toBe('cleanup_workspace');
+    expect(body.status).toBe('retained');
+    expect(body.reason).toContain('could not be completed');
+    expect(body.reasonCodes).toContain('source_workspace_dirty');
+    expect(body.cleanup).toEqual(expect.objectContaining({
+      workspaceCleaned: false,
+      worktreeDetached: false,
+      worktreeCleanupPolicy: 'merge',
+      worktreeMergedPaths: 0,
+    }));
+    expect(body.maintenance.lastRequest).toEqual(expect.objectContaining({
+      action: 'cleanup_workspace',
+      reason: 'retry_after_manual_review',
+      worktreeDisposition: 'merge',
+    }));
+    expect(body.session.cwd).toBe(prepared.workspaceIsolation.worktree!.worktreePath);
+    expect(body.session.hydration.workspace).toEqual(expect.objectContaining({
+      runtimeCwd: prepared.workspaceIsolation.worktree!.worktreePath,
+      sourceCwd: repoDir,
+      sourceOfTruth: 'source_workspace',
+    }));
+    expect(existsSync(prepared.workspaceIsolation.worktree!.worktreePath)).toBe(true);
+
+    const stored = registry.get(session.id);
+    expect(stored?.cwd).toBe(prepared.workspaceIsolation.worktree!.worktreePath);
+    expect(stored?.workspaceIsolation?.worktree?.lastCleanup).toEqual(expect.objectContaining({
+      policy: 'merge',
+      status: 'retained',
+      reasonCodes: ['source_workspace_dirty'],
+    }));
+  });
+
   it('re-prepares a missing worktree before resuming a closed session', async () => {
     const repoDir = createGitWorkspace(rootDir, 'repo-resume');
     const prepared = await prepareSessionWorkspace({

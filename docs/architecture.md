@@ -432,7 +432,10 @@ src/
     Git mutations behind a stable machine-readable contract
 18. Session reset/delete lifecycle now routes worktree cleanup through the same
     runtime-owned workspace layer, returning retained cleanup metadata when the
-    source repo is dirty or detachment fails
+    source repo is dirty or detachment fails, while
+    `POST /sessions/{id}/workspace/cleanup` provides a bounded retry seam that
+    rehydrates persisted workspace/skill state without auto-replaying the rest
+    of reset/delete follow-through
 19. `POST /sessions/{id}/compact` reuses the same runtime-owned maintenance
     read model as a public compaction-preparation route, returning
     machine-readable readiness plus opaque hook payload persistence while

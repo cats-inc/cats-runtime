@@ -1102,6 +1102,7 @@ export type RuntimeSessionLifecycleStatus = 'completed' | 'retained';
 // distinguishes "prepare" from the external compaction trigger itself.
 export type RuntimeSessionMaintenanceAction =
   | RuntimeSessionLifecycleAction
+  | 'cleanup_workspace'
   | 'prepare_compaction'
   | 'compact';
 

@@ -205,6 +205,9 @@ describe('MCP stdio transport', () => {
           tools: expect.arrayContaining([
             expect.objectContaining({ name: 'create_session' }),
             expect.objectContaining({ name: 'send_message' }),
+            expect.objectContaining({ name: 'close_session' }),
+            expect.objectContaining({ name: 'reset_session' }),
+            expect.objectContaining({ name: 'cleanup_session_workspace' }),
             expect.objectContaining({ name: 'provider_diagnostics' }),
             expect.objectContaining({ name: 'list_runtime_skills' }),
             expect.objectContaining({ name: 'browser_summary' }),

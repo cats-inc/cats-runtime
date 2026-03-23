@@ -1,4 +1,5 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -81,6 +82,34 @@ describe('runtime MCP facade', () => {
       externalSessionLiveWindowMs: 0,
       maxSessions: 10,
     } as unknown as CliRuntimeConfig;
+  }
+
+  function runGit(cwd: string, args: string[]): string {
+    const result = spawnSync('git', args, {
+      cwd,
+      encoding: 'utf8',
+      windowsHide: true,
+    });
+
+    if (result.status !== 0) {
+      throw new Error(result.stderr || result.stdout || `git ${args.join(' ')} failed`);
+    }
+
+    return result.stdout.trim();
+  }
+
+  function createGitWorkspace(repoName: string): string {
+    const repoDir = join(rootDir, repoName);
+    mkdirSync(repoDir, { recursive: true });
+    writeFileSync(join(repoDir, 'tracked.txt'), 'initial\n', 'utf8');
+
+    runGit(repoDir, ['init']);
+    runGit(repoDir, ['config', 'user.email', 'cats-runtime@example.test']);
+    runGit(repoDir, ['config', 'user.name', 'Cats Runtime Test']);
+    runGit(repoDir, ['add', '.']);
+    runGit(repoDir, ['commit', '-m', 'initial']);
+
+    return repoDir;
   }
 
   function createTestApp() {
@@ -208,7 +237,10 @@ describe('runtime MCP facade', () => {
       'list_runtime_skills',
       'create_session',
       'send_message',
+      'close_session',
+      'reset_session',
       'fork_session',
+      'cleanup_session_workspace',
       'list_browser_drivers',
       'list_browser_sessions',
       'browser_summary',
@@ -857,12 +889,158 @@ describe('runtime MCP facade', () => {
     expect(forked.result.structuredContent.responseStatus).toBe(201);
     expect(forked.result.structuredContent.session.id).not.toBe(createdSessionId);
 
-    const initWorkspaceResponse = await app.request('/mcp', {
+    const closeResponse = await app.request('/mcp', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
         id: 13,
+        method: 'tools/call',
+        params: {
+          name: 'close_session',
+          arguments: {
+            sessionId: createdSessionId,
+            maintenance: {
+              reason: 'prepare_for_reset',
+            },
+          },
+        },
+      }),
+    });
+    expect(closeResponse.status).toBe(200);
+    const closed = await closeResponse.json() as {
+      result: {
+        structuredContent: {
+          responseStatus: number;
+          action: string;
+          closePath: string;
+          status: string;
+        };
+      };
+    };
+    expect(closed.result.structuredContent.responseStatus).toBe(200);
+    expect(closed.result.structuredContent.action).toBe('close');
+    expect(closed.result.structuredContent.closePath).toBe(
+      `/sessions/${createdSessionId}/close`,
+    );
+    expect(closed.result.structuredContent.status).toBe('closed');
+
+    const repoDir = createGitWorkspace('workspace-cleanup-retry');
+    const createWorktreeResponse = await app.request('/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        provider: 'claude',
+        cwd: repoDir,
+        workspaceIsolation: 'worktree',
+      }),
+    });
+    expect(createWorktreeResponse.status).toBe(201);
+    const createdWorktree = await createWorktreeResponse.json() as {
+      id: string;
+      cwd: string;
+    };
+    writeFileSync(join(createdWorktree.cwd, 'tracked.txt'), 'retain for mcp cleanup\n', 'utf8');
+
+    const resetResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 14,
+        method: 'tools/call',
+        params: {
+          name: 'reset_session',
+          arguments: {
+            sessionId: createdWorktree.id,
+            worktreeCleanupPolicy: 'preserve',
+          },
+        },
+      }),
+    });
+    expect(resetResponse.status).toBe(200);
+    const reset = await resetResponse.json() as {
+      result: {
+        structuredContent: {
+          responseStatus: number;
+          action: string;
+          status: string;
+          resetPath: string;
+          session: {
+            cwd: string;
+          };
+        };
+      };
+    };
+    expect(reset.result.structuredContent.responseStatus).toBe(200);
+    expect(reset.result.structuredContent.action).toBe('reset');
+    expect(reset.result.structuredContent.status).toBe('retained');
+    expect(reset.result.structuredContent.resetPath).toBe(
+      `/sessions/${createdWorktree.id}/reset`,
+    );
+    expect(reset.result.structuredContent.session.cwd).toBe(createdWorktree.cwd);
+
+    const cleanupResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 15,
+        method: 'tools/call',
+        params: {
+          name: 'cleanup_session_workspace',
+          arguments: {
+            sessionId: createdWorktree.id,
+            worktreeCleanupPolicy: 'discard',
+            maintenance: {
+              reason: 'operator_retry_cleanup',
+            },
+          },
+        },
+      }),
+    });
+    expect(cleanupResponse.status).toBe(200);
+    const cleaned = await cleanupResponse.json() as {
+      result: {
+        structuredContent: {
+          responseStatus: number;
+          action: string;
+          status: string;
+          cleanupPath: string;
+          cleanup: {
+            workspaceCleaned: boolean;
+            worktreeCleanupPolicy: string;
+          };
+          session: {
+            cwd: string;
+            hydration: {
+              workspace: {
+                runtimeCwd: string;
+              };
+            };
+          };
+        };
+      };
+    };
+    expect(cleaned.result.structuredContent.responseStatus).toBe(200);
+    expect(cleaned.result.structuredContent.action).toBe('cleanup_workspace');
+    expect(cleaned.result.structuredContent.status).toBe('completed');
+    expect(cleaned.result.structuredContent.cleanupPath).toBe(
+      `/sessions/${createdWorktree.id}/workspace/cleanup`,
+    );
+    expect(cleaned.result.structuredContent.cleanup).toEqual(expect.objectContaining({
+      workspaceCleaned: true,
+      worktreeCleanupPolicy: 'discard',
+    }));
+    expect(cleaned.result.structuredContent.session.cwd).toBe(repoDir);
+    expect(cleaned.result.structuredContent.session.hydration.workspace.runtimeCwd).toBe(repoDir);
+
+    const initWorkspaceResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 16,
         method: 'tools/call',
         params: {
           name: 'init_workspace',
@@ -887,7 +1065,7 @@ describe('runtime MCP facade', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 14,
+        id: 17,
         method: 'tools/call',
         params: {
           name: 'commit_changes',

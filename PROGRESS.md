@@ -628,13 +628,15 @@ into `cats-runtime`.
 | Freeze additive workspace isolation metadata in runtime session contracts | [x] | Session payloads, hydration metadata, registry persistence, and workspace grouping now retain `workspaceIsolation` and `hydration.workspace.isolationMode` |
 | Wire worktree preparation into create/resume/fork | [x] | `POST /sessions`, `POST /sessions/{id}/resume`, and `POST /sessions/{id}/fork` now prepare or recreate worktree-backed runtime cwd state before spawn |
 | Wire worktree cleanup into reset/delete | [x] | `POST /sessions/{id}/reset` and `DELETE /sessions/{id}` now support `worktreeCleanupPolicy: "discard" | "merge" | "preserve"` plus retained cleanup responses |
+| Add bounded retained cleanup retry route | [x] | `POST /sessions/{id}/workspace/cleanup` plus MCP `cleanup_session_workspace` now retry retained worktree cleanup and refresh persisted hydration/skill delivery state without replaying reset/delete side effects |
+| Extend MCP session lifecycle controls for recovery flows | [x] | MCP now exposes `close_session`, `reset_session`, and `cleanup_session_workspace`, so orchestrators can drive close/reset/retry cleanup flows without dropping back to bespoke HTTP calls |
 | Leave additive pre-reset / pre-compaction / pre-flush hook seams | [x] | Session maintenance now advertises `pre_flush` alongside the existing Team 3 memory-flush seam instead of hard-coding a product memory pipeline |
 | Cover lifecycle behavior with automated tests | [x] | Vitest now covers worktree preparation, merge/discard cleanup, resume re-prepare, registry persistence, and route-level worktree flows |
 | Update docs/progress/plan tracking | [x] | `README.md`, `docs/api.md`, `docs/architecture.md`, `docs/plans/PLAN-014-worktree-isolation-execution-layer.md`, and `PROGRESS.md` now describe the slice |
 
 #### Deferred Boundaries
 
-- [ ] No background garbage collector for abandoned worktrees yet; cleanup still runs at explicit reset/delete lifecycle boundaries
+- [ ] No background garbage collector for abandoned worktrees yet; cleanup still runs at explicit reset/delete or operator-invoked retry boundaries
 - [ ] No automatic dirty-source merge resolution; `merge` intentionally retains the session/worktree when the source repo is already dirty
 - [ ] No generalized two-way workspace sync beyond the current fork-time snapshot copy for non-shared child workspaces
 

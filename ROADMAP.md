@@ -271,8 +271,9 @@ Current gaps:
 - `worktreeCleanupPolicy: "merge"` intentionally stops and returns
   `status: "retained"` when the source repo is already dirty, because runtime
   does not yet own conflict-resolution policy
-- reset/delete can report retained cleanup metadata, but there is no dedicated
-  recovery flow for operators beyond retrying the same lifecycle action later
+- reset/delete can now hand operators retained cleanup metadata plus a bounded
+  retry route, but runtime still does not auto-complete the rest of the
+  retained reset/delete follow-through after cleanup succeeds
 - worktree prepare/merge/discard still runs inline with the HTTP lifecycle; the
   runtime no longer blocks the event loop with sync I/O, but it still lacks a
   queued/background execution envelope, backpressure, and concurrency guards
@@ -291,8 +292,9 @@ cleanup discipline while keeping product approval/policy above runtime.
 - Add more explicit retained-cleanup diagnostics so hosts can distinguish
   "source repo dirty", "detach failed", and "merge apply failed" without
   scraping generic error text
-- Add a bounded recovery primitive for retrying retained worktree cleanup
-  without requiring a full session recreate
+- Extend the bounded retained-cleanup recovery primitive with richer operator
+  diagnostics and follow-through guidance instead of forcing hosts to infer
+  next steps from generic lifecycle payloads
 - Move expensive worktree lifecycle operations behind runtime-owned operation
   scheduling so session routes can hand off prepare/cleanup work without tying
   end-user latency directly to git execution time
@@ -303,9 +305,11 @@ cleanup discipline while keeping product approval/policy above runtime.
 
 - Deterministic worktree prepare/recreate is landed
 - `discard` and `merge` cleanup policies are landed for reset/delete
-- retained cleanup metadata is surfaced over session lifecycle responses and
+- retained cleanup metadata plus `POST /sessions/{id}/workspace/cleanup` are
+  surfaced over session/session-lifecycle routes, the MCP tool plane, and
   session maintenance state
-- background sweeping and retained-cleanup recovery flows remain deferred
+- background sweeping, retained-worktree GC, and broader retained-lifecycle
+  follow-through still remain deferred
 
 #### Affected Files
 

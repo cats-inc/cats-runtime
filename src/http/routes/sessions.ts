@@ -330,6 +330,27 @@ function parseWorktreeCleanupPolicy(value: unknown): WorktreeCleanupPolicy | und
     : undefined;
 }
 
+function readOptionalWorktreeCleanupPolicy(
+  record: Record<string, unknown>,
+  key = 'worktreeCleanupPolicy',
+): WorktreeCleanupPolicy | undefined {
+  if (!Object.prototype.hasOwnProperty.call(record, key)) {
+    return undefined;
+  }
+
+  const value = record[key];
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const policy = parseWorktreeCleanupPolicy(value);
+  if (!policy) {
+    throw new Error(`${key} must be one of: discard, merge, preserve`);
+  }
+
+  return policy;
+}
+
 function parseMaintenanceHookPayloads(value: unknown): RuntimeSessionMaintenanceHookPayload[] {
   if (!Array.isArray(value)) {
     return [];
@@ -646,6 +667,30 @@ async function hydrateSessionForTarget(
     baseInstructionsFile: options.providerTarget.cliInstance?.piInstructionsFile,
     metadata: options.metadata,
   });
+}
+
+async function rehydratePersistedSessionState(
+  ctx: AppContext,
+  session: SessionInfo,
+): Promise<SessionInfo> {
+  const providerTarget = resolveSessionProviderTarget(ctx.config, session);
+  const hydrated = await hydrateSessionForTarget(ctx, {
+    trigger: 'resume',
+    sessionId: session.id,
+    providerTarget,
+    cwd: session.cwd,
+    workspaceMode: session.workspaceMode,
+    workspaceIsolationMode: resolveSessionWorkspaceIsolationMode(session),
+    existingSkills: session.skills,
+    existingHydration: session.hydration,
+    workspaceSourceCwd: getSessionWorkspaceSourceCwd(session),
+  });
+
+  ctx.registry.updateSessionMetadata(session.id, {
+    skills: hydrated.skills,
+    hydration: hydrated.hydration,
+  });
+  return ctx.registry.get(session.id) ?? session;
 }
 
 function resolveSessionWorkspaceIsolationMode(
@@ -1802,20 +1847,13 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
   const runtime = getRuntimeSessionManager(ctx);
   const id = c.req.param('id');
   const session = ctx.registry.get(id);
-  const body = await c.req.json<{
-    worktreeCleanupPolicy?: WorktreeCleanupPolicy;
-    maintenance?: {
-      reason?: string;
-      hookPayloads?: RuntimeSessionMaintenanceHookPayload[];
-    };
-  }>().catch(() => ({}) as {
-    worktreeCleanupPolicy?: WorktreeCleanupPolicy;
-    maintenance?: {
-      reason?: string;
-      hookPayloads?: RuntimeSessionMaintenanceHookPayload[];
-    };
-  });
-  const worktreeCleanupPolicy = parseWorktreeCleanupPolicy(body.worktreeCleanupPolicy);
+  const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
+  let worktreeCleanupPolicy: WorktreeCleanupPolicy | undefined;
+  try {
+    worktreeCleanupPolicy = readOptionalWorktreeCleanupPolicy(body);
+  } catch (error) {
+    return c.json({ error: `${error}` }, 400);
+  }
   const maintenanceRequest = parseMaintenanceRequestBody(body.maintenance);
 
   if (!session) {
@@ -1924,6 +1962,107 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
   return c.json(serializeLifecycleSession(ctx, ctx.registry.get(id) ?? sessionAfterCleanup, 'reset'));
 });
 
+/**
+ * POST /sessions/:id/workspace/cleanup — retry retained worktree cleanup
+ * without replaying reset/delete follow-through.
+ */
+sessionRoutes.post('/sessions/:id/workspace/cleanup', async (c) => {
+  const ctx = c.get('ctx');
+  const runtime = getRuntimeSessionManager(ctx);
+  const id = c.req.param('id');
+  const session = ctx.registry.get(id);
+  const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
+  let requestedCleanupPolicy: WorktreeCleanupPolicy | undefined;
+  try {
+    requestedCleanupPolicy = readOptionalWorktreeCleanupPolicy(body);
+  } catch (error) {
+    return c.json({ error: `${error}` }, 400);
+  }
+  const maintenanceRequest = parseMaintenanceRequestBody(body.maintenance);
+
+  if (!session) {
+    return c.json({ error: 'Session not found' }, 404);
+  }
+
+  if (session.workspaceIsolation?.mode !== 'worktree' || !session.workspaceIsolation.worktree) {
+    return c.json({
+      error: 'This session is not worktree-backed, so there is no retained worktree cleanup to retry.',
+    }, 409);
+  }
+
+  const lastCleanup = session.workspaceIsolation.worktree.lastCleanup;
+  if (lastCleanup?.status !== 'retained') {
+    return c.json({
+      error: 'This session does not currently have a retained worktree cleanup to retry.',
+    }, 409);
+  }
+
+  const view = serializeSession(ctx, session);
+  if (view.attached || runtime.isAttached(id)) {
+    return c.json({
+      error: 'Close or detach this session before retrying retained worktree cleanup.',
+    }, 409);
+  }
+
+  if (!view.attached && view.activity === 'interactive') {
+    return c.json({
+      error: 'This session appears to be active outside cats-runtime and can only be observed right now.',
+    }, 409);
+  }
+
+  const worktreeCleanupPolicy = requestedCleanupPolicy ?? lastCleanup.policy;
+  recordSessionMaintenanceRequest(
+    ctx,
+    session,
+    'cleanup_workspace',
+    maintenanceRequest,
+    worktreeCleanupPolicy,
+  );
+
+  const cleanup = await prepareWorkspaceCleanupState(
+    session,
+    worktreeCleanupPolicy,
+    ctx,
+  );
+  let sessionAfterCleanup = persistWorkspaceCleanupState(ctx, id, cleanup) ?? session;
+  if (cleanup.nextCwd !== undefined || cleanup.nextWorkspaceIsolation !== undefined) {
+    try {
+      sessionAfterCleanup = await rehydratePersistedSessionState(ctx, sessionAfterCleanup);
+    } catch (error) {
+      return c.json({
+        error: `Retained worktree cleanup changed workspace state but failed to refresh hydration: ${error}`,
+        action: 'cleanup_workspace',
+        status: cleanup.status,
+        reasonCodes: [...cleanup.reasonCodes],
+        cleanup: {
+          workspaceCleaned: cleanup.workspaceCleaned,
+          worktreeDetached: cleanup.worktreeDetached,
+          ...(cleanup.policy ? { worktreeCleanupPolicy: cleanup.policy } : {}),
+          worktreeMergedPaths: cleanup.mergedPathCount,
+        },
+      }, 500);
+    }
+  }
+  const serialized = serializeSession(ctx, sessionAfterCleanup);
+
+  return c.json({
+    action: 'cleanup_workspace',
+    status: cleanup.status,
+    ...(cleanup.status === 'retained'
+      ? { reason: describeRetainedWorktreeCleanup(cleanup) }
+      : {}),
+    reasonCodes: [...cleanup.reasonCodes],
+    cleanup: {
+      workspaceCleaned: cleanup.workspaceCleaned,
+      worktreeDetached: cleanup.worktreeDetached,
+      ...(cleanup.policy ? { worktreeCleanupPolicy: cleanup.policy } : {}),
+      worktreeMergedPaths: cleanup.mergedPathCount,
+    },
+    maintenance: serialized.inspection.maintenance,
+    session: serialized,
+  });
+});
+
 /** POST /sessions/:id/compact — expose a public compaction-preparation seam */
 sessionRoutes.post('/sessions/:id/compact', async (c) => {
   const ctx = c.get('ctx');
@@ -1973,20 +2112,13 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
   const id = c.req.param('id');
   const session = ctx.registry.get(id);
   const runtime = getRuntimeSessionManager(ctx);
-  const body = await c.req.json<{
-    worktreeCleanupPolicy?: WorktreeCleanupPolicy;
-    maintenance?: {
-      reason?: string;
-      hookPayloads?: RuntimeSessionMaintenanceHookPayload[];
-    };
-  }>().catch(() => ({}) as {
-    worktreeCleanupPolicy?: WorktreeCleanupPolicy;
-    maintenance?: {
-      reason?: string;
-      hookPayloads?: RuntimeSessionMaintenanceHookPayload[];
-    };
-  });
-  const worktreeCleanupPolicy = parseWorktreeCleanupPolicy(body.worktreeCleanupPolicy);
+  const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
+  let worktreeCleanupPolicy: WorktreeCleanupPolicy | undefined;
+  try {
+    worktreeCleanupPolicy = readOptionalWorktreeCleanupPolicy(body);
+  } catch (error) {
+    return c.json({ error: `${error}` }, 400);
+  }
   const maintenanceRequest = parseMaintenanceRequestBody(body.maintenance);
 
   if (!session) {

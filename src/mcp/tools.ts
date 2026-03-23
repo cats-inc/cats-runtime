@@ -34,6 +34,7 @@ const SESSION_STATUSES: SessionStatus[] = [
 ];
 const WORKSPACE_MODES = ['isolated', 'shared', 'read_only'] as const;
 const WORKSPACE_ISOLATION_MODES = ['shared', 'isolated', 'worktree'] as const;
+const WORKTREE_CLEANUP_POLICIES = ['discard', 'merge', 'preserve'] as const;
 const PERMISSION_MODES = ['skip', 'whitelist', 'default'] as const;
 const REUSE_POLICIES = ['create_new', 'prefer_existing', 'require_existing'] as const;
 const FORK_MODES = ['auto', 'native_fork', 'context_transplant'] as const;
@@ -593,6 +594,77 @@ async function sendMessage(
   };
 }
 
+async function closeSession(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const sessionId = readRequiredString(args, 'sessionId');
+  const body: Record<string, unknown> = {};
+  const maintenance = readOptionalObject(args, 'maintenance');
+  if (maintenance) {
+    body.maintenance = maintenance;
+  }
+
+  const closePath = `/sessions/${encodeURIComponent(sessionId)}/close`;
+  const result = await requestRuntimeJson(ctx, closePath, {
+    body,
+  });
+  ensureRouteSuccess('close_session', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'close_session result');
+  return {
+    summary: `Closed session ${sessionId}.`,
+    structuredContent: {
+      responseStatus: result.status,
+      ...payload,
+      closePath,
+      ...buildSessionPaths(sessionId),
+    },
+  };
+}
+
+async function resetSession(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const sessionId = readRequiredString(args, 'sessionId');
+  const body: Record<string, unknown> = {};
+  const worktreeCleanupPolicy = readOptionalEnumString(
+    args,
+    'worktreeCleanupPolicy',
+    WORKTREE_CLEANUP_POLICIES,
+    'worktreeCleanupPolicy must be a valid worktree cleanup policy',
+  );
+  if (worktreeCleanupPolicy) {
+    body.worktreeCleanupPolicy = worktreeCleanupPolicy;
+  }
+
+  const maintenance = readOptionalObject(args, 'maintenance');
+  if (maintenance) {
+    body.maintenance = maintenance;
+  }
+
+  const resetPath = `/sessions/${encodeURIComponent(sessionId)}/reset`;
+  const result = await requestRuntimeJson(ctx, resetPath, {
+    body,
+  });
+  ensureRouteSuccess('reset_session', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'reset_session result');
+  const status = readOptionalString(payload, 'status');
+  return {
+    summary: status === 'retained'
+      ? `Reset session ${sessionId}, but workspace cleanup still needs attention.`
+      : `Reset session ${sessionId}.`,
+    structuredContent: {
+      responseStatus: result.status,
+      ...payload,
+      resetPath,
+      ...buildSessionPaths(sessionId),
+    },
+  };
+}
+
 async function forkSession(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -614,6 +686,48 @@ async function forkSession(
       responseStatus: result.status,
       session: forked,
       ...buildSessionPaths(forkedId),
+    },
+  };
+}
+
+async function cleanupSessionWorkspace(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const sessionId = readRequiredString(args, 'sessionId');
+  const body: Record<string, unknown> = {};
+  const worktreeCleanupPolicy = readOptionalEnumString(
+    args,
+    'worktreeCleanupPolicy',
+    WORKTREE_CLEANUP_POLICIES,
+    'worktreeCleanupPolicy must be a valid worktree cleanup policy',
+  );
+  if (worktreeCleanupPolicy) {
+    body.worktreeCleanupPolicy = worktreeCleanupPolicy;
+  }
+
+  const maintenance = readOptionalObject(args, 'maintenance');
+  if (maintenance) {
+    body.maintenance = maintenance;
+  }
+
+  const cleanupPath = `/sessions/${encodeURIComponent(sessionId)}/workspace/cleanup`;
+  const result = await requestRuntimeJson(ctx, cleanupPath, {
+    body,
+  });
+  ensureRouteSuccess('cleanup_session_workspace', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'cleanup_session_workspace result');
+  const status = readOptionalString(payload, 'status');
+  return {
+    summary: status === 'retained'
+      ? `Retained worktree cleanup still needs attention for session ${sessionId}.`
+      : `Retried worktree cleanup for session ${sessionId}.`,
+    structuredContent: {
+      responseStatus: result.status,
+      ...payload,
+      cleanupPath,
+      ...buildSessionPaths(sessionId),
     },
   };
 }
@@ -1045,6 +1159,77 @@ const TOOL_HANDLERS: McpToolHandler[] = [
   },
   {
     definition: {
+      name: 'close_session',
+      title: 'Close Session',
+      description: 'Close a runtime session using the same contract as POST /sessions/{id}/close.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sessionId: { type: 'string' },
+          maintenance: {
+            type: 'object',
+            properties: {
+              reason: { type: 'string' },
+              hookPayloads: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    kind: { type: 'string' },
+                    payload: {},
+                  },
+                  required: ['kind'],
+                  additionalProperties: false,
+                },
+              },
+            },
+            additionalProperties: false,
+          },
+        },
+        required: ['sessionId'],
+        additionalProperties: false,
+      },
+    },
+    execute: closeSession,
+  },
+  {
+    definition: {
+      name: 'reset_session',
+      title: 'Reset Session',
+      description: 'Reset a runtime session using the same contract as POST /sessions/{id}/reset.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sessionId: { type: 'string' },
+          worktreeCleanupPolicy: { type: 'string', enum: WORKTREE_CLEANUP_POLICIES },
+          maintenance: {
+            type: 'object',
+            properties: {
+              reason: { type: 'string' },
+              hookPayloads: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    kind: { type: 'string' },
+                    payload: {},
+                  },
+                  required: ['kind'],
+                  additionalProperties: false,
+                },
+              },
+            },
+            additionalProperties: false,
+          },
+        },
+        required: ['sessionId'],
+        additionalProperties: false,
+      },
+    },
+    execute: resetSession,
+  },
+  {
+    definition: {
       name: 'fork_session',
       title: 'Fork Session',
       description: 'Fork an existing runtime session using the same contract as POST /sessions/{id}/fork.',
@@ -1073,6 +1258,42 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: forkSession,
+  },
+  {
+    definition: {
+      name: 'cleanup_session_workspace',
+      title: 'Cleanup Session Workspace',
+      description: 'Retry retained worktree cleanup for a closed worktree-backed runtime session.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sessionId: { type: 'string' },
+          worktreeCleanupPolicy: { type: 'string', enum: WORKTREE_CLEANUP_POLICIES },
+          maintenance: {
+            type: 'object',
+            properties: {
+              reason: { type: 'string' },
+              hookPayloads: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    kind: { type: 'string' },
+                    payload: {},
+                  },
+                  required: ['kind'],
+                  additionalProperties: false,
+                },
+              },
+            },
+            additionalProperties: false,
+          },
+        },
+        required: ['sessionId'],
+        additionalProperties: false,
+      },
+    },
+    execute: cleanupSessionWorkspace,
   },
   {
     definition: {

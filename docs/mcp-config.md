@@ -44,7 +44,10 @@ Current tools:
 - `list_runtime_skills`
 - `create_session`
 - `send_message`
+- `close_session`
+- `reset_session`
 - `fork_session`
+- `cleanup_session_workspace`
 - `list_browser_drivers`
 - `list_browser_sessions`
 - `browser_summary`
@@ -74,6 +77,24 @@ filterable/paged runtime-owned skill catalog exposed by `GET /skills/catalog`,
 including the additive `contract.version`, `query.filters`, optional
 `query.sort`, and `pagination` payloads. The MCP wrapper also accepts `sortBy`,
 `sortDirection`, `offset`, and `limit`.
+
+`close_session` is the curated MCP wrapper over `POST /sessions/{id}/close`. It
+preserves the direct runtime close contract, including optional additive
+`maintenance` metadata, while returning the same normalized session snapshot
+shape as the HTTP lifecycle route.
+
+`reset_session` is the curated MCP wrapper over `POST /sessions/{id}/reset`.
+It preserves the direct runtime reset contract, including optional
+`worktreeCleanupPolicy`, additive `maintenance` metadata, and retained cleanup
+responses when worktree cleanup cannot finish safely.
+
+`cleanup_session_workspace` is the curated MCP wrapper over
+`POST /sessions/{id}/workspace/cleanup`. It gives orchestrators the same
+bounded retained-worktree cleanup retry seam as the direct HTTP API, including
+optional `worktreeCleanupPolicy`, additive `maintenance` metadata, and the
+updated session/maintenance snapshot after the retry. Like the direct route, it
+does not auto-replay reset/delete follow-through; it only retries workspace
+cleanup and refreshes persisted workspace hydration/skill delivery state.
 
 `POST /mcp` uses the same runtime auth policy as the direct HTTP API. If
 `cats-runtime` is configured with an API key, MCP clients must send the same
@@ -196,7 +217,10 @@ tool surface here. The first shared tool names are:
 - `list_runtime_skills`
 - `create_session`
 - `send_message`
+- `close_session`
+- `reset_session`
 - `fork_session`
+- `cleanup_session_workspace`
 - `list_browser_drivers`
 - `list_browser_sessions`
 - `browser_summary`
