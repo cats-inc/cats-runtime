@@ -2476,7 +2476,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
         : {}),
       permissionMode: forkPermissionMode,
       allowedTools: body.allowedTools ?? session.allowedTools,
-      }, childTarget.instanceId, childTarget.backend);
+    }, childTarget.instanceId, childTarget.backend);
     if (childTarget.backend !== 'cli') {
       ctx.registry.updateStatus(forked.id, 'ready');
     }
