@@ -207,6 +207,13 @@ describe('ProviderCompatibilityService', () => {
         })),
       },
       installCheckRunner: createInstallCheckRunner({
+        lookupCommand: vi.fn(async (command: string) => ({
+          available: true,
+          resolvedPath: command === 'codex-cli'
+            ? 'C:\\Users\\Alice\\AppData\\Local\\Programs\\Codex\\codex.exe'
+            : '/home/alice/.npm-global/bin/codex',
+          timedOut: false,
+        })),
         checkNpmPackage: vi.fn(async () => ({
           exists: true,
           timedOut: false,
@@ -223,11 +230,13 @@ describe('ProviderCompatibilityService', () => {
     };
 
     expect(evidenceText).not.toContain('C:\\Users\\Alice');
+    expect(evidenceText).not.toContain('/home/alice');
     expect(evidenceText).not.toContain('sk-secret-value');
     expect(evidenceText).not.toContain('ghp_supersecret');
     expect(evidence.probes.help?.stdoutSample).toContain('<path>');
     expect(evidence.probes.help?.stdoutSample).toContain('OPENAI_API_KEY=<redacted>');
     expect(evidence.probes.help?.stdoutSample).toContain('Bearer <redacted>');
+    expect(evidenceText).toContain('"resolvedCommand": "<path>"');
   });
 
   it('falls back to a generic degraded profile for providers without family knowledge', async () => {
@@ -396,6 +405,33 @@ describe('ProviderCompatibilityService', () => {
     ]));
   });
 
+  it('does not infer missing auth from incidental stderr text when probes otherwise succeed', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-auth-noise-'));
+    tempDirs.push(root);
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      runner: {
+        run: vi.fn(async (_providerName, _commandConfig, args: string[]) => ({
+          exitCode: 0,
+          stdout: args[0] === '--version'
+            ? 'claude 1.2.3\n'
+            : 'Usage: claude --input-format --output-format --include-partial-messages\n',
+          stderr: 'copyright text about unauthorized reproduction',
+          timedOut: false,
+          durationMs: 3,
+        })),
+      },
+      installCheckRunner: createInstallCheckRunner(),
+      now: () => Date.parse('2026-03-23T00:00:32.000Z'),
+    });
+
+    const assessment = await service.assessCliTarget(createCliTarget('claude'));
+    expect(assessment.setup.auth.status).toBe('unknown');
+    expect(assessment.checks.find((check) => check.code === 'auth_missing')).toBeUndefined();
+  });
+
   it('emits upgrade remediation for unsupported versions', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-version-'));
     tempDirs.push(root);
@@ -460,6 +496,7 @@ describe('ProviderCompatibilityService', () => {
 
     const assessment = await service.assessCliTarget(createCliTarget('codex'));
     if (process.platform === 'win32') {
+      // Windows native targets do not ship a runtime-owned ~/.npm-global prefix baseline yet.
       expect(assessment.setup.npm.status).toBe('not_applicable');
       return;
     }

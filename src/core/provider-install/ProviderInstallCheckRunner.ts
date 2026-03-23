@@ -66,8 +66,12 @@ function hasPathSeparator(value: string): boolean {
   return value.includes('/') || value.includes('\\');
 }
 
+function isHomeRelativePath(pathValue: string): boolean {
+  return pathValue.startsWith('~/') || pathValue.startsWith('~\\');
+}
+
 function resolveHomePath(pathValue: string): string {
-  if (!pathValue.startsWith('~/')) {
+  if (!isHomeRelativePath(pathValue)) {
     return pathValue;
   }
 
@@ -79,8 +83,8 @@ function resolveHomePath(pathValue: string): string {
 }
 
 function quotePathForRuntimeShell(pathValue: string): string {
-  if (pathValue.startsWith('~/')) {
-    return `"$HOME/${pathValue.slice(2).replace(/"/g, '\\"')}"`;
+  if (isHomeRelativePath(pathValue)) {
+    return `"$HOME/${pathValue.slice(2).replace(/[\\"]/g, (value) => value === '\\' ? '/' : '\\"')}"`;
   }
 
   return quoteForBash(pathValue);

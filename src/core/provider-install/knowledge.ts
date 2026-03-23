@@ -9,7 +9,7 @@ import type {
   ProviderPlatformInstallMetadata,
 } from './types.js';
 
-const GENERIC_AUTH_ERROR_PATTERNS = [
+export const GENERIC_AUTH_ERROR_PATTERNS = [
   'login required',
   'not logged in',
   'authentication required',

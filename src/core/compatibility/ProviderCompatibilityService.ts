@@ -19,6 +19,7 @@ import {
 } from '../provider-install/ProviderInstallCheckRunner.js';
 import {
   buildProviderInstallCatalogView,
+  GENERIC_AUTH_ERROR_PATTERNS,
   getProviderInstallKnowledge,
 } from '../provider-install/knowledge.js';
 import type {
@@ -46,16 +47,6 @@ const DEFAULT_CACHE_TTL_MS = 5 * 60_000;
 const DEFAULT_PROBE_TIMEOUT_MS = 5_000;
 const DEFAULT_SAMPLE_LIMIT = 2_048;
 const EVIDENCE_SCHEMA_VERSION = 3;
-const GENERIC_AUTH_PATTERNS = [
-  'login required',
-  'not logged in',
-  'authentication required',
-  'please sign in',
-  'sign in to continue',
-  'unauthorized',
-  'forbidden',
-];
-
 interface ProbeResult {
   exitCode: number | null;
   stdout: string;
@@ -191,56 +182,74 @@ export class ProviderCompatibilityService {
       : compatibilityKnowledge?.helpArgs?.length
         ? compatibilityKnowledge.helpArgs
         : undefined;
-    const versionProbe = versionArgs.length
-      ? await this.runner.run(
+    const versionProbePromise = versionArgs.length
+      ? this.runner.run(
         providerName,
         instance.commandConfig,
         versionArgs,
         probeCwd,
         this.probeTimeoutMs,
       )
-      : undefined;
-    const helpProbe = helpArgs?.length
-      ? await this.runner.run(
+      : Promise.resolve(undefined);
+    const helpProbePromise = helpArgs?.length
+      ? this.runner.run(
         providerName,
         instance.commandConfig,
         helpArgs,
         probeCwd,
         this.probeTimeoutMs,
       )
-      : undefined;
+      : Promise.resolve(undefined);
+    const [versionProbe, helpProbe] = await Promise.all([
+      versionProbePromise,
+      helpProbePromise,
+    ]);
 
     const versionProbeRecord = versionProbe ? toProbeRecord(versionArgs, versionProbe) : undefined;
     const helpProbeRecord = helpProbe ? toProbeRecord(helpArgs || [], helpProbe) : undefined;
     const commandAvailable = didExecuteProbe(versionProbeRecord) || didExecuteProbe(helpProbeRecord);
-    const configuredLookup = await this.installCheckRunner.lookupCommand(
+    const configuredLookupPromise = this.installCheckRunner.lookupCommand(
       instance.commandConfig.path,
       instance.commandConfig.runtime,
       this.probeTimeoutMs,
     );
-    const binaryLookup = instance.commandConfig.path === installKnowledge.binaryName
-      ? configuredLookup
-      : await this.installCheckRunner.lookupCommand(
+    const binaryLookupPromise = instance.commandConfig.path === installKnowledge.binaryName
+      ? configuredLookupPromise
+      : this.installCheckRunner.lookupCommand(
         installKnowledge.binaryName,
         instance.commandConfig.runtime,
         this.probeTimeoutMs,
       );
     const expectedPath = installView.path.expectedPath;
-    const expectedPathCheck = expectedPath
-      ? await this.installCheckRunner.checkPath(
+    const expectedPathCheckPromise = expectedPath
+      ? this.installCheckRunner.checkPath(
         expectedPath,
         instance.commandConfig.runtime,
         this.probeTimeoutMs,
       )
-      : undefined;
-    const packageCheck = installKnowledge.check.npmPackage
-      ? await this.installCheckRunner.checkNpmPackage(
+      : Promise.resolve(undefined);
+    const packageCheckPromise = installKnowledge.check.npmPackage
+      ? this.installCheckRunner.checkNpmPackage(
         installKnowledge.check.npmPackage,
         instance.commandConfig.runtime,
         this.probeTimeoutMs,
       )
-      : undefined;
-    const prerequisiteLookups = await Promise.all(
+      : Promise.resolve(undefined);
+    const pathPersistenceCheckPromise = installView.path.shellRcPath && installView.path.persistenceEntry
+      ? this.installCheckRunner.checkShellRcEntry(
+        installView.path.shellRcPath,
+        installView.path.persistenceEntry,
+        instance.commandConfig.runtime,
+        this.probeTimeoutMs,
+      )
+      : Promise.resolve(undefined);
+    const npmPrefixPromise = installView.npm?.expectedPrefix
+      ? this.installCheckRunner.getNpmPrefix(
+        instance.commandConfig.runtime,
+        this.probeTimeoutMs,
+      )
+      : Promise.resolve(undefined);
+    const prerequisiteLookupsPromise = Promise.all(
       installView.prerequisites.map(async (prerequisite) => ({
         prerequisite,
         lookup: await this.installCheckRunner.lookupCommand(
@@ -250,20 +259,23 @@ export class ProviderCompatibilityService {
         ),
       })),
     );
-    const pathPersistenceCheck = installView.path.shellRcPath && installView.path.persistenceEntry
-      ? await this.installCheckRunner.checkShellRcEntry(
-        installView.path.shellRcPath,
-        installView.path.persistenceEntry,
-        instance.commandConfig.runtime,
-        this.probeTimeoutMs,
-      )
-      : undefined;
-    const npmPrefix = installView.npm?.expectedPrefix
-      ? await this.installCheckRunner.getNpmPrefix(
-        instance.commandConfig.runtime,
-        this.probeTimeoutMs,
-      )
-      : undefined;
+    const [
+      configuredLookup,
+      binaryLookup,
+      expectedPathCheck,
+      packageCheck,
+      prerequisiteLookups,
+      pathPersistenceCheck,
+      npmPrefix,
+    ] = await Promise.all([
+      configuredLookupPromise,
+      binaryLookupPromise,
+      expectedPathCheckPromise,
+      packageCheckPromise,
+      prerequisiteLookupsPromise,
+      pathPersistenceCheckPromise,
+      npmPrefixPromise,
+    ]);
 
     checks.push(createCheck(
       'command_available',
@@ -555,7 +567,7 @@ export class ProviderCompatibilityService {
       `${captureId}.json`,
     );
     const outputPath = join(this.evidenceDir, relativePath);
-    const payload = {
+    const payload = redactJsonValue({
       schemaVersion: EVIDENCE_SCHEMA_VERSION,
       id: captureId,
       capturedAt: assessment.checkedAt,
@@ -566,22 +578,16 @@ export class ProviderCompatibilityService {
         instanceId: assessment.instanceId,
       },
       profile: assessment.profile,
-      fingerprint: {
-        ...assessment.fingerprint,
-        command: redactText(assessment.fingerprint.command),
-      },
+      fingerprint: assessment.fingerprint,
       command: {
         runner: commandConfig.runner,
         runtime: commandConfig.runtime,
       },
       warnings: assessment.warnings,
       setup: assessment.setup,
-      probes: {
-        version: redactProbeRecord(assessment.probes.version),
-        help: redactProbeRecord(assessment.probes.help),
-      },
+      probes: assessment.probes,
       checks: assessment.checks,
-    };
+    });
 
     try {
       await mkdir(join(this.evidenceDir, assessment.provider), { recursive: true });
@@ -1114,20 +1120,12 @@ function detectAuthFailure(
   ...probes: Array<CompatibilityProbeRecord | undefined>
 ): boolean {
   const authPatterns = [
-    ...GENERIC_AUTH_PATTERNS,
+    ...GENERIC_AUTH_ERROR_PATTERNS,
     ...(patterns || []).map((pattern) => pattern.toLowerCase()),
     ...envVars.map((envVar) => envVar.toLowerCase()),
   ];
   return probes.some((probe) => {
     if (!probe) {
-      return false;
-    }
-
-    const likelyFailure = Boolean(probe.error)
-      || probe.timedOut
-      || (probe.exitCode !== null && probe.exitCode !== 0)
-      || Boolean(probe.stderrSample);
-    if (!likelyFailure) {
       return false;
     }
 
@@ -1140,7 +1138,14 @@ function detectAuthFailure(
       .join('\n')
       .toLowerCase();
 
-    return authPatterns.some((pattern) => haystack.includes(pattern));
+    const hasAuthPattern = authPatterns.some((pattern) => haystack.includes(pattern));
+    if (!hasAuthPattern) {
+      return false;
+    }
+
+    return Boolean(probe.error)
+      || probe.timedOut
+      || (probe.exitCode !== null && probe.exitCode !== 0);
   });
 }
 
@@ -1355,19 +1360,22 @@ function didExecuteProbe(probe: CompatibilityProbeRecord | undefined): boolean {
   );
 }
 
-function redactProbeRecord(
-  probe: CompatibilityProbeRecord | undefined,
-): CompatibilityProbeRecord | undefined {
-  if (!probe) {
-    return undefined;
+function redactJsonValue<T>(value: T): T {
+  if (typeof value === 'string') {
+    return (redactText(value) || value) as T;
   }
 
-  return {
-    ...probe,
-    stdoutSample: redactText(probe.stdoutSample),
-    stderrSample: redactText(probe.stderrSample),
-    error: redactText(probe.error),
-  };
+  if (Array.isArray(value)) {
+    return value.map((item) => redactJsonValue(item)) as T;
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entryValue]) => [key, redactJsonValue(entryValue)]),
+    ) as T;
+  }
+
+  return value;
 }
 
 function truncateSample(text: string): string | undefined {
