@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, existsSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -170,7 +170,6 @@ describe('copyIsolatedWorkspace', () => {
 
     copyIsolatedWorkspace(testBaseDir, parentId, childId);
 
-    const { readFileSync } = require('node:fs');
     expect(existsSync(join(testBaseDir, childId, 'file.txt'))).toBe(true);
     expect(readFileSync(join(testBaseDir, childId, 'file.txt'), 'utf-8')).toBe('content');
     expect(readFileSync(join(testBaseDir, childId, 'subdir', 'nested.txt'), 'utf-8')).toBe('nested');

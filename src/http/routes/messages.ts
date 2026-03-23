@@ -12,7 +12,7 @@ import type { SessionRegistry } from '../../backends/cli/pool/SessionRegistry.js
 import type { CliRuntimeConfig } from '../../backends/cli/config.js';
 import type { StreamEvent } from '../../core/types.js';
 import { hydrateSessionState } from '../../core/hydration/sessionHydration.js';
-import { resolveProviderTarget } from '../../core/providerCatalog.js';
+import { resolveSessionProviderTarget } from '../providerTargets.js';
 import {
   parseInvocationContext,
   parseOptionalString,
@@ -228,19 +228,6 @@ function guardrailHttpStatus(
   return outcome === 'cooldown' ? 429 : 403;
 }
 
-function resolveSessionProviderTarget(
-  ctx: AppContext,
-  session: SessionInfo,
-) {
-  return resolveProviderTarget(
-    ctx.config,
-    session.providerName,
-    session.providerBackend && session.providerInstanceId
-      ? `${session.providerBackend}/${session.providerInstanceId}`
-      : session.providerInstanceId,
-  );
-}
-
 /** POST /sessions/:id/messages — send a message, stream response as SSE */
 messageRoutes.post('/sessions/:id/messages', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
@@ -279,7 +266,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
   }
   if (body.skills !== undefined || !session.hydration) {
     try {
-      const providerTarget = resolveSessionProviderTarget(ctx, session);
+      const providerTarget = resolveSessionProviderTarget(ctx.config, session);
       const hydrated = await hydrateSessionState({
         trigger: 'message',
         sessionId: session.id,

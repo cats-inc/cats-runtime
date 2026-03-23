@@ -12,7 +12,11 @@ import { resolveRuntimeSkillManifest } from '../skills/catalog.js';
 import { WorkspaceSubstrateService } from '../runtime/WorkspaceSubstrateService.js';
 
 const DEFAULT_WORKSPACE_SUBSTRATE_PROFILE: WorkspaceSubstrateProfileId = 'standard';
-const workspaceSubstrate = new WorkspaceSubstrateService();
+const DEFAULT_WORKSPACE_SUBSTRATE_SERVICE = new WorkspaceSubstrateService();
+
+export interface WorkspaceHydrationSubstrateService {
+  execute: Pick<WorkspaceSubstrateService, 'execute'>['execute'];
+}
 
 export interface HydrateSessionStateInput {
   trigger: SessionHydrationState['trigger'];
@@ -29,6 +33,7 @@ export interface HydrateSessionStateInput {
   workspaceSubstrateProfile?: WorkspaceSubstrateProfileId;
   baseInstructionsFile?: string;
   skillsRoot?: string;
+  substrateService?: WorkspaceHydrationSubstrateService;
   metadata?: Record<string, unknown>;
   now?: Date;
 }
@@ -148,7 +153,13 @@ async function hydrateWorkspace(
   const profile = input.workspaceSubstrateProfile
     ?? input.existingHydration?.workspace.substrate.profile
     ?? DEFAULT_WORKSPACE_SUBSTRATE_PROFILE;
-  const substrate = await auditWorkspaceSubstrate(auditPath, profile, checkedAt, warnings);
+  const substrate = await auditWorkspaceSubstrate(
+    input.substrateService ?? DEFAULT_WORKSPACE_SUBSTRATE_SERVICE,
+    auditPath,
+    profile,
+    checkedAt,
+    warnings,
+  );
 
   return {
     runtimeCwd: input.runtimeCwd,
@@ -177,13 +188,14 @@ function normalizeOptionalPath(value: string | undefined): string | undefined {
 }
 
 async function auditWorkspaceSubstrate(
+  substrateService: WorkspaceHydrationSubstrateService,
   workspacePath: string,
   profile: WorkspaceSubstrateProfileId,
   checkedAt: string,
   warnings: string[],
 ): Promise<SessionHydrationState['workspace']['substrate']> {
   try {
-    const result = await workspaceSubstrate.execute({
+    const result = await substrateService.execute({
       operation: 'audit-workspace',
       workspacePath,
       profile,
@@ -204,6 +216,10 @@ async function auditWorkspaceSubstrate(
       },
     };
   } catch (error) {
+    if (!isRecoverableWorkspaceAuditError(error)) {
+      throw error;
+    }
+
     warnings.push(
       `Workspace substrate audit failed for '${workspacePath}': ${
         error instanceof Error ? error.message : String(error)
@@ -228,4 +244,28 @@ function createEmptyFindingCounts(): Record<WorkspaceSubstrateFindingStatus, num
     drifted: 0,
     conflicting: 0,
   };
+}
+
+function isRecoverableWorkspaceAuditError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  if (
+    error instanceof TypeError
+    || error instanceof ReferenceError
+    || error instanceof SyntaxError
+    || error instanceof RangeError
+    || error instanceof EvalError
+    || error instanceof URIError
+  ) {
+    return false;
+  }
+
+  const code = (error as NodeJS.ErrnoException).code;
+  if (typeof code === 'string' && code.length > 0) {
+    return true;
+  }
+
+  return error.message.startsWith('Workspace path ');
 }

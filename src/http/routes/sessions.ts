@@ -50,6 +50,7 @@ import {
   resolveProviderTarget,
   type ProviderTargetDescriptor,
 } from '../../core/providerCatalog.js';
+import { resolveSessionProviderTarget } from '../providerTargets.js';
 import {
   attachBranchMetadata,
   buildSessionBranchObservability,
@@ -404,19 +405,6 @@ function resolveCliProviderInstance(target: ProviderTargetDescriptor): ProviderI
   }
 
   return target.cliInstance;
-}
-
-function resolveSessionProviderTarget(
-  ctx: AppContext,
-  session: Pick<SessionInfo, 'providerName' | 'providerBackend' | 'providerInstanceId'>,
-): ProviderTargetDescriptor {
-  return resolveProviderTarget(
-    ctx.config,
-    session.providerName,
-    session.providerBackend && session.providerInstanceId
-      ? `${session.providerBackend}/${session.providerInstanceId}`
-      : session.providerInstanceId,
-  );
 }
 
 function getSessionWorkspaceSourceCwd(
@@ -1551,7 +1539,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
   if (session.providerBackend !== 'cli') {
     let hydratedSession = session;
     try {
-      const providerTarget = resolveSessionProviderTarget(ctx, session);
+      const providerTarget = resolveSessionProviderTarget(ctx.config, session);
       const hydrated = await hydrateSessionForTarget(ctx, {
         trigger: 'resume',
         sessionId: session.id,
@@ -1590,7 +1578,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
 
     let hydratedSession = session;
     try {
-      const providerTarget = resolveSessionProviderTarget(ctx, session);
+      const providerTarget = resolveSessionProviderTarget(ctx.config, session);
       const hydrated = await hydrateSessionForTarget(ctx, {
         trigger: 'resume',
         sessionId: session.id,
@@ -1645,7 +1633,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         }, 409);
       }
 
-      const providerTarget = resolveSessionProviderTarget(ctx, session);
+      const providerTarget = resolveSessionProviderTarget(ctx.config, session);
       const hydrated = await hydrateSessionForTarget(ctx, {
         trigger: 'resume',
         sessionId: session.id,
@@ -1705,7 +1693,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
 
     let hydratedSession = session;
     try {
-      const providerTarget = resolveSessionProviderTarget(ctx, session);
+      const providerTarget = resolveSessionProviderTarget(ctx.config, session);
       const hydrated = await hydrateSessionForTarget(ctx, {
         trigger: 'resume',
         sessionId: session.id,
@@ -1769,7 +1757,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
 
   let hydratedSession = session;
   try {
-    const providerTarget = resolveSessionProviderTarget(ctx, session);
+    const providerTarget = resolveSessionProviderTarget(ctx.config, session);
     const hydrated = await hydrateSessionForTarget(ctx, {
       trigger: 'resume',
       sessionId: session.id,

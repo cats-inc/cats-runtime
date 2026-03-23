@@ -2,7 +2,11 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { hydrateSessionState, buildRuntimeSkillManifestFromState } from './sessionHydration.js';
+import {
+  buildRuntimeSkillManifestFromState,
+  hydrateSessionState,
+  type WorkspaceHydrationSubstrateService,
+} from './sessionHydration.js';
 import { resolveRuntimeSkillManifest } from '../skills/catalog.js';
 
 describe('session hydration', () => {
@@ -124,5 +128,61 @@ describe('session hydration', () => {
     expect(hydrated.hydration.workspace.warnings).toEqual(expect.arrayContaining([
       expect.stringContaining('session-scoped state only'),
     ]));
+  });
+
+  it('downgrades operational workspace audit failures into warnings', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-hydration-'));
+    cleanupPaths.push(root);
+    const runtimeCwd = join(root, 'sandbox');
+    mkdirSync(runtimeCwd, { recursive: true });
+
+    const ioFailure = Object.assign(new Error('permission denied'), {
+      code: 'EACCES',
+    });
+    const substrateService: WorkspaceHydrationSubstrateService = {
+      execute: async () => {
+        throw ioFailure;
+      },
+    };
+
+    const hydrated = await hydrateSessionState({
+      trigger: 'create',
+      sessionId: 'io-failure',
+      providerName: 'codex',
+      providerBackend: 'cli',
+      runtimeCwd,
+      workspaceMode: 'shared',
+      sessionBaseDir: join(root, 'sessions'),
+      substrateService,
+    });
+
+    expect(hydrated.hydration.workspace.substrate.status).toBe('conflicting');
+    expect(hydrated.hydration.workspace.warnings).toEqual(expect.arrayContaining([
+      expect.stringContaining('permission denied'),
+    ]));
+  });
+
+  it('rethrows programming errors from workspace audit execution', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-hydration-'));
+    cleanupPaths.push(root);
+    const runtimeCwd = join(root, 'sandbox');
+    mkdirSync(runtimeCwd, { recursive: true });
+
+    const substrateService: WorkspaceHydrationSubstrateService = {
+      execute: async () => {
+        throw new TypeError('broken substrate');
+      },
+    };
+
+    await expect(hydrateSessionState({
+      trigger: 'create',
+      sessionId: 'programming-error',
+      providerName: 'codex',
+      providerBackend: 'cli',
+      runtimeCwd,
+      workspaceMode: 'shared',
+      sessionBaseDir: join(root, 'sessions'),
+      substrateService,
+    })).rejects.toThrow('broken substrate');
   });
 });
