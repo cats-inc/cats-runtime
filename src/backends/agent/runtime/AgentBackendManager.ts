@@ -98,7 +98,16 @@ export class AgentBackendManager {
       return;
     }
 
-    await handle.close(reason);
+    try {
+      await handle.close(reason);
+    } catch (error) {
+      // Remote cleanup can fail after the local handle has already detached.
+      // At that point the runtime-facing close operation is complete.
+      if (!this.handles.has(sessionId)) {
+        return;
+      }
+      throw error;
+    }
   }
 
   killAll(): void {

@@ -799,4 +799,118 @@ describe('agent backend integration', () => {
       cleanup();
     }
   });
+
+  it('keeps close successful when remote agent abort fails after local detach', async () => {
+    const { config, env, cleanup } = createAgentSdkConfigRoot();
+    const fetchCalls: Array<{ url: string; method: string; body?: Record<string, unknown> }> = [];
+    const fakeFetch: typeof fetch = async (input, init) => {
+      const url = String(input);
+      const method = init?.method || 'GET';
+      const body = typeof init?.body === 'string'
+        ? JSON.parse(init.body) as Record<string, unknown>
+        : undefined;
+      fetchCalls.push({ url, method, body });
+
+      if (url === 'http://agent-sdk.test/api/v1/sessions' && method === 'POST') {
+        return new Response(JSON.stringify({
+          id: 'bridge-session-1',
+          provider: 'claude',
+          model: 'sonnet',
+          status: 'idle',
+        }), {
+          status: 201,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
+      if (url === 'http://agent-sdk.test/api/v1/sessions/bridge-session-1/messages/stream' && method === 'POST') {
+        const sse = [
+          'data: {"type":"session_created","sessionId":"bridge-session-1","providerSessionId":"sdk-provider-1"}',
+          '',
+          'data: {"type":"content","content":"bridge hello"}',
+          '',
+          'data: {"type":"complete","sessionId":"bridge-session-1","finishReason":"stop"}',
+          '',
+          'data: [DONE]',
+          '',
+        ].join('\n');
+        return new Response(sse, {
+          status: 200,
+          headers: { 'content-type': 'text/event-stream' },
+        });
+      }
+
+      if (url === 'http://agent-sdk.test/api/v1/sessions/bridge-session-1/abort' && method === 'POST') {
+        return new Response(JSON.stringify({
+          error: 'upstream unavailable',
+        }), {
+          status: 503,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    };
+
+    const runtime = createRuntimeServer(config, {
+      agentBackend: {
+        env,
+        fetch: fakeFetch,
+      },
+    });
+
+    try {
+      const createResponse = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'claude',
+          cwd: config.sessionBaseDir,
+          sessionKey: 'sdk-task-close-failure',
+        }),
+      });
+      expect(createResponse.status).toBe(201);
+      const created = await createResponse.json() as { id: string };
+
+      const messageResponse = await runtime.app.request(`/sessions/${created.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          Accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({
+          message: 'Plan the next step',
+        }),
+      });
+      expect(messageResponse.status).toBe(200);
+
+      runtime.context.registry.setProviderState(created.id, {
+        agentSession: {
+          providerSessionId: 'bridge-session-1',
+          sessionKey: 'sdk-task-close-failure',
+          status: 'active',
+          adapterState: {
+            bridgeProvider: 'claude',
+            bridgeSessionId: 'bridge-session-1',
+            upstreamProviderSessionId: 'sdk-provider-1',
+          },
+        },
+      });
+
+      const closeResponse = await runtime.app.request(`/sessions/${created.id}/close`, {
+        method: 'POST',
+      });
+      expect(closeResponse.status).toBe(200);
+      expect(await closeResponse.json()).toEqual({ status: 'closing' });
+      expect(runtime.context.registry.get(created.id)?.status).toBe('closed');
+      expect(runtime.context.runtime?.isAttached(created.id)).toBe(false);
+      expect(fetchCalls).toContainEqual(expect.objectContaining({
+        url: 'http://agent-sdk.test/api/v1/sessions/bridge-session-1/abort',
+        method: 'POST',
+      }));
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
 });

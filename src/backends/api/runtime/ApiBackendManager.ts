@@ -251,7 +251,15 @@ export class ApiBackendManager {
       return;
     }
 
-    await handle.close(reason);
+    try {
+      await handle.close(reason);
+    } catch (error) {
+      // API transport cleanup can fail after the local handle has already detached.
+      if (!this.handles.has(sessionId)) {
+        return;
+      }
+      throw error;
+    }
   }
 
   killAll(): void {
