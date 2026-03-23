@@ -561,6 +561,63 @@ Example shape:
 }
 ```
 
+Session, history, and observe payloads now also include an additive
+runtime-owned `hydration` block. This records how the runtime re-entered the
+workspace/skill context for the current target:
+
+- `workspace.runtimeCwd`: the actual cwd used for execution
+- `workspace.sourceCwd`: the authoritative source workspace when it differs
+  from the runtime cwd
+- `workspace.sourceOfTruth`: whether the runtime should treat the source
+  workspace or the runtime cwd as the durable truth
+- `workspace.substrate`: read-only workspace substrate audit summary for the
+  authoritative workspace path
+- `skills`: machine-readable summary of whether skill delivery was resolved from
+  a new request or rehydrated from persisted session state
+
+Example shape:
+
+```json
+{
+  "hydration": {
+    "trigger": "resume",
+    "updatedAt": "2026-03-23T12:00:00.000Z",
+    "workspace": {
+      "runtimeCwd": "/tmp/cats-runtime/sessions/session-123",
+      "sourceCwd": "/repo/project-a",
+      "sourceOfTruth": "source_workspace",
+      "substrate": {
+        "auditPath": "/repo/project-a",
+        "profile": "standard",
+        "status": "partial",
+        "checkedAt": "2026-03-23T12:00:00.000Z",
+        "changedPaths": ["AGENTS.md"],
+        "reviewCopyPaths": [],
+        "findingCounts": {
+          "missing": 1,
+          "present": 2,
+          "drifted": 0,
+          "conflicting": 0
+        }
+      },
+      "warnings": [
+        "The runtime cwd is an isolated sandbox; re-entry should hydrate from the source workspace."
+      ]
+    },
+    "skills": {
+      "source": "session_state",
+      "requestedSkills": ["companion"],
+      "provider": "codex",
+      "backend": "cli",
+      "preferredMode": "filesystem",
+      "mode": "filesystem",
+      "status": "applied",
+      "warnings": []
+    }
+  }
+}
+```
+
 Session payloads now also include an additive runtime-owned `inspection` block
 intended for host/dashboard run inspectors:
 
@@ -979,6 +1036,12 @@ such as:
     "source": "interactive",
     "taskId": "task-123"
   },
+  "hydration": {
+    "trigger": "resume",
+    "workspace": {
+      "sourceOfTruth": "source_workspace"
+    }
+  },
   "inspection": {
     "state": "idle",
     "lastRun": {
@@ -1030,6 +1093,12 @@ the same additive `wakeup` block returned by `GET /sessions/{id}` and
   "session": {
     "id": "session-123",
     "providerName": "claude",
+    "hydration": {
+      "trigger": "resume",
+      "workspace": {
+        "sourceOfTruth": "source_workspace"
+      }
+    },
     "wakeup": {
       "pending": true,
       "pendingRequestCount": 1,

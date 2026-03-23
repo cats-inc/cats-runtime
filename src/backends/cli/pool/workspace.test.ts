@@ -39,6 +39,7 @@ describe('resolveWorkspace', () => {
 
     expect(result.workspaceMode).toBe('shared');
     expect(result.cwd).toBe('/some/project');
+    expect(result.sourceCwd).toBe('/some/project');
     expect(result.permissionMode).toBe('skip');
   });
 
@@ -48,10 +49,12 @@ describe('resolveWorkspace', () => {
       sessionId,
       sessionBaseDir: testBaseDir,
       workspaceMode: 'isolated',
+      cwd: '/source/project',
     });
 
     expect(result.workspaceMode).toBe('isolated');
     expect(result.cwd).toBe(join(testBaseDir, sessionId));
+    expect(result.sourceCwd).toBe('/source/project');
     expect(result.permissionMode).toBe('skip');
     expect(existsSync(result.cwd)).toBe(true);
   });
@@ -86,6 +89,7 @@ describe('resolveWorkspace', () => {
 
     expect(result.permissionMode).toBe('whitelist');
     expect(result.cwd).toBe('/project');
+    expect(result.sourceCwd).toBe('/project');
   });
 
   it('read_only mode requires cwd', () => {
@@ -107,6 +111,7 @@ describe('resolveWorkspace', () => {
     expect(result.workspaceMode).toBe('read_only');
     expect(result.permissionMode).toBe('default');
     expect(result.cwd).toBe('/project');
+    expect(result.sourceCwd).toBe('/project');
   });
 });
 

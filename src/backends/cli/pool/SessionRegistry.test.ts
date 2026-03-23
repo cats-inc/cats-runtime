@@ -136,6 +136,30 @@ describe('SessionRegistry', () => {
           appliedSkillIds: ['companion'],
           updatedAt: '2026-03-22T00:00:00.000Z',
         },
+        hydration: {
+          trigger: 'create',
+          updatedAt: '2026-03-23T00:00:00.000Z',
+          workspace: {
+            runtimeCwd: '/repo/.sandbox/session-1',
+            sourceCwd: '/repo',
+            sourceOfTruth: 'source_workspace',
+            substrate: {
+              auditPath: '/repo',
+              profile: 'standard',
+              status: 'partial',
+              checkedAt: '2026-03-23T00:00:00.000Z',
+              changedPaths: ['AGENTS.md'],
+              reviewCopyPaths: [],
+              findingCounts: {
+                missing: 1,
+                present: 2,
+                drifted: 0,
+                conflicting: 0,
+              },
+            },
+            warnings: ['Use the source workspace as the long-term truth.'],
+          },
+        },
       });
       registry.flush();
 
@@ -174,6 +198,30 @@ describe('SessionRegistry', () => {
         warnings: [],
         appliedSkillIds: ['companion'],
         updatedAt: '2026-03-22T00:00:00.000Z',
+      });
+      expect(reloaded.get(session.id)?.hydration).toEqual({
+        trigger: 'create',
+        updatedAt: '2026-03-23T00:00:00.000Z',
+        workspace: {
+          runtimeCwd: '/repo/.sandbox/session-1',
+          sourceCwd: '/repo',
+          sourceOfTruth: 'source_workspace',
+          substrate: {
+            auditPath: '/repo',
+            profile: 'standard',
+            status: 'partial',
+            checkedAt: '2026-03-23T00:00:00.000Z',
+            changedPaths: ['AGENTS.md'],
+            reviewCopyPaths: [],
+            findingCounts: {
+              missing: 1,
+              present: 2,
+              drifted: 0,
+              conflicting: 0,
+            },
+          },
+          warnings: ['Use the source workspace as the long-term truth.'],
+        },
       });
     } finally {
       rmSync(persistDir, { recursive: true, force: true });

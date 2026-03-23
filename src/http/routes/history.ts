@@ -70,6 +70,7 @@ function buildHistoryMetadata(ctx: AppContext, session: SessionInfo) {
     artifacts: session.artifacts || [],
     context: session.context,
     skills: session.skills,
+    hydration: session.hydration,
     ...(wakeup ? { wakeup } : {}),
     inspection: buildSessionInspection({
       session,

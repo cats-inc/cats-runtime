@@ -46,6 +46,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 
 | Plan | Title | Status | Related Spec |
 |------|-------|--------|--------------|
+| [PLAN-011](./PLAN-011-workspace-hydration-and-runtime-skill-reentry.md) | Workspace Hydration and Runtime Skill Re-entry | Completed | [SPEC-005](../specs/SPEC-005-runtime-managed-skills-v0.md), [SPEC-008](../specs/SPEC-008-workspace-substrate-init-audit-and-update.md) |
 | [PLAN-010](./PLAN-010-session-discipline-and-run-inspector.md) | Session Discipline and Run Inspector Contracts | Completed | [SPEC-003](../specs/SPEC-003-agent-backend.md), [SPEC-010](../specs/SPEC-010-usage-metering-rate-limit-detection-and-execution-guardrails.md), [SPEC-011](../specs/SPEC-011-session-fork-and-context-transplant-primitives.md) |
 | [PLAN-008-provider-compatibility-and-evidence-engine](./PLAN-008-provider-compatibility-and-evidence-engine.md) | Provider Compatibility and Evidence Engine | In Progress (First Slice Landed) | [SPEC-007](../specs/SPEC-007-provider-compatibility-and-evidence-engine.md) |
 | [PLAN-008-runtime-managed-skills-v0](./PLAN-008-runtime-managed-skills-v0.md) | Runtime-Managed Skills v0 | Completed | [SPEC-005](../specs/SPEC-005-runtime-managed-skills-v0.md) |

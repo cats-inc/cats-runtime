@@ -8,6 +8,7 @@ export type {
   SessionActivity,
   SessionControlMode,
   SessionControls,
+  SessionHydrationState,
   SessionInfo,
   SessionOrigin,
   SessionOwnership,

@@ -4,6 +4,7 @@ import { basename, dirname, join } from 'node:path';
 import type {
   PermissionMode,
   SessionArtifact,
+  SessionHydrationState,
   SessionInfo,
   SessionInvocationContext,
   SessionProviderState,
@@ -40,6 +41,7 @@ export interface CreateSessionInput {
   reusePolicy?: SessionReusePolicy;
   instructions?: string;
   skills?: SessionSkillState;
+  hydration?: SessionHydrationState;
   context?: SessionInvocationContext;
   outputDir?: string;
   artifacts?: SessionArtifact[];
@@ -222,11 +224,12 @@ export class SessionRegistry {
         group: input.group,
         sessionKey: input.sessionKey,
         reusePolicy: input.reusePolicy,
-        instructions: input.instructions,
-        skills: cloneSkillState(input.skills),
-        context: cloneInvocationContext(input.context),
-        outputDir: input.outputDir,
-        artifacts: cloneArtifacts(input.artifacts),
+      instructions: input.instructions,
+      skills: cloneSkillState(input.skills),
+      hydration: cloneHydrationState(input.hydration),
+      context: cloneInvocationContext(input.context),
+      outputDir: input.outputDir,
+      artifacts: cloneArtifacts(input.artifacts),
         messageCount: 0,
         totalInputTokens: 0,
         totalOutputTokens: 0,
@@ -324,6 +327,7 @@ export class SessionRegistry {
       reusePolicy?: SessionReusePolicy;
       instructions?: string;
       skills?: SessionSkillState;
+      hydration?: SessionHydrationState;
       context?: SessionInvocationContext;
       outputDir?: string;
       artifacts?: SessionArtifact[];
@@ -344,6 +348,9 @@ export class SessionRegistry {
     }
     if (Object.prototype.hasOwnProperty.call(patch, 'skills')) {
       session.skills = cloneSkillState(patch.skills);
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'hydration')) {
+      session.hydration = cloneHydrationState(patch.hydration);
     }
     if (patch.context !== undefined) {
       session.context = cloneInvocationContext(patch.context);
@@ -882,6 +889,9 @@ export class SessionRegistry {
     if (!target.reusePolicy && incoming.reusePolicy) target.reusePolicy = incoming.reusePolicy;
     if (!target.instructions && incoming.instructions) target.instructions = incoming.instructions;
     if (!target.skills && incoming.skills) target.skills = cloneSkillState(incoming.skills);
+    if (!target.hydration && incoming.hydration) {
+      target.hydration = cloneHydrationState(incoming.hydration);
+    }
     if (!target.context && incoming.context) target.context = cloneInvocationContext(incoming.context);
     if (!target.outputDir && incoming.outputDir) target.outputDir = incoming.outputDir;
     if ((!target.artifacts || target.artifacts.length === 0) && incoming.artifacts) {
@@ -931,6 +941,12 @@ function cloneInvocationContext(
   context?: SessionInvocationContext,
 ): SessionInvocationContext | undefined {
   return context ? structuredClone(context) : undefined;
+}
+
+function cloneHydrationState(
+  hydration?: SessionHydrationState,
+): SessionHydrationState | undefined {
+  return hydration ? structuredClone(hydration) : undefined;
 }
 
 function cloneSkillState(

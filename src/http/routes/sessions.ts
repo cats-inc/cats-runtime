@@ -63,9 +63,7 @@ import {
   summarizeContextTransplant,
 } from '../../core/runtime/sessionBranching.js';
 import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
-import {
-  resolveRuntimeSkillManifest,
-} from '../../core/skills/catalog.js';
+import { hydrateSessionState } from '../../core/hydration/sessionHydration.js';
 import {
   parseInvocationContext,
   parseOptionalString,
@@ -408,27 +406,65 @@ function resolveCliProviderInstance(target: ProviderTargetDescriptor): ProviderI
   return target.cliInstance;
 }
 
-function resolveSkillStateForTarget(
+function resolveSessionProviderTarget(
   ctx: AppContext,
-  manifest: ReturnType<typeof parseRuntimeSkillManifest>['manifest'],
+  session: Pick<SessionInfo, 'providerName' | 'providerBackend' | 'providerInstanceId'>,
+): ProviderTargetDescriptor {
+  return resolveProviderTarget(
+    ctx.config,
+    session.providerName,
+    session.providerBackend && session.providerInstanceId
+      ? `${session.providerBackend}/${session.providerInstanceId}`
+      : session.providerInstanceId,
+  );
+}
+
+function getSessionWorkspaceSourceCwd(
+  session: Pick<SessionInfo, 'cwd' | 'workspaceMode' | 'hydration'>,
+): string | undefined {
+  return session.hydration?.workspace.sourceCwd
+    ?? (session.workspaceMode === 'isolated' ? undefined : session.cwd);
+}
+
+function resolveForkWorkspaceSourceCwd(
+  session: Pick<SessionInfo, 'cwd' | 'workspaceMode' | 'hydration'>,
+  requestedCwd: string | undefined,
+  forkCwd: string,
+  forkWorkspaceMode: WorkspaceMode | undefined,
+): string | undefined {
+  if (forkWorkspaceMode === 'isolated') {
+    return requestedCwd ?? getSessionWorkspaceSourceCwd(session);
+  }
+
+  return requestedCwd ?? getSessionWorkspaceSourceCwd(session) ?? forkCwd;
+}
+
+async function hydrateSessionForTarget(
+  ctx: AppContext,
   options: {
+    trigger: 'create' | 'resume' | 'fork' | 'message';
     sessionId: string;
     providerTarget: ProviderTargetDescriptor;
     cwd: string;
     workspaceMode?: WorkspaceMode;
+    requestedSkills?: ReturnType<typeof parseRuntimeSkillManifest>['manifest'];
+    existingSkills?: SessionInfo['skills'];
+    existingHydration?: SessionInfo['hydration'];
+    workspaceSourceCwd?: string;
   },
 ) {
-  if (!manifest) {
-    return undefined;
-  }
-
-  return resolveRuntimeSkillManifest(manifest, {
+  return hydrateSessionState({
+    trigger: options.trigger,
     sessionId: options.sessionId,
     providerName: options.providerTarget.providerName,
     providerBackend: options.providerTarget.backend,
-    cwd: options.cwd,
+    runtimeCwd: options.cwd,
     workspaceMode: options.workspaceMode,
     sessionBaseDir: ctx.config.sessionBaseDir,
+    requestedSkills: options.requestedSkills,
+    existingSkills: options.existingSkills,
+    requestedWorkspaceSourceCwd: options.workspaceSourceCwd,
+    existingHydration: options.existingHydration,
     baseInstructionsFile: options.providerTarget.cliInstance?.piInstructionsFile,
   });
 }
@@ -886,23 +922,27 @@ sessionRoutes.post('/sessions', async (c) => {
       }
 
       let skills = existing.skills;
-      if (parsedSkills.clear) {
-        skills = undefined;
-      } else {
-        try {
-          skills = resolveSkillStateForTarget(ctx, parsedSkills.manifest, {
-            sessionId: existing.id,
-            providerTarget,
-            cwd: existing.cwd,
-            workspaceMode: existing.workspaceMode,
-          }) ?? existing.skills;
-        } catch (error) {
-          const runtimeSkillError = toRuntimeSkillErrorResponse(error);
-          if (runtimeSkillError) {
-            return c.json(runtimeSkillError.body, runtimeSkillError.status);
-          }
-          throw error;
+      let hydration = existing.hydration;
+      try {
+        const hydrated = await hydrateSessionForTarget(ctx, {
+          trigger: 'create',
+          sessionId: existing.id,
+          providerTarget,
+          cwd: existing.cwd,
+          workspaceMode: existing.workspaceMode,
+          requestedSkills: parsedSkills.clear ? undefined : parsedSkills.manifest,
+          existingSkills: parsedSkills.clear ? undefined : existing.skills,
+          existingHydration: existing.hydration,
+          workspaceSourceCwd: getSessionWorkspaceSourceCwd(existing),
+        });
+        skills = hydrated.skills;
+        hydration = hydrated.hydration;
+      } catch (error) {
+        const runtimeSkillError = toRuntimeSkillErrorResponse(error);
+        if (runtimeSkillError) {
+          return c.json(runtimeSkillError.body, runtimeSkillError.status);
         }
+        throw error;
       }
 
       ctx.registry.updateSessionMetadata(existing.id, {
@@ -910,6 +950,7 @@ sessionRoutes.post('/sessions', async (c) => {
         reusePolicy,
         instructions: instructions ?? existing.instructions,
         skills,
+        hydration,
         context: context ?? existing.context,
         outputDir: outputDir ?? existing.outputDir,
       });
@@ -958,26 +999,29 @@ sessionRoutes.post('/sessions', async (c) => {
   }
 
   let skills;
-  if (parsedSkills.clear) {
-    skills = undefined;
-  } else {
-    try {
-      skills = resolveSkillStateForTarget(ctx, parsedSkills.manifest, {
-        sessionId,
-        providerTarget,
-        cwd: resolved.cwd,
-        workspaceMode: resolved.workspaceMode,
-      });
-    } catch (error) {
-      const runtimeSkillError = toRuntimeSkillErrorResponse(error);
-      if (runtimeSkillError) {
-        if (resolved.workspaceMode === 'isolated') {
-          cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, sessionId);
-        }
-        return c.json(runtimeSkillError.body, runtimeSkillError.status);
+  let hydration;
+  try {
+    const hydrated = await hydrateSessionForTarget(ctx, {
+      trigger: 'create',
+      sessionId,
+      providerTarget,
+      cwd: resolved.cwd,
+      workspaceMode: resolved.workspaceMode,
+      requestedSkills: parsedSkills.clear ? undefined : parsedSkills.manifest,
+      existingHydration: undefined,
+      workspaceSourceCwd: resolved.sourceCwd,
+    });
+    skills = hydrated.skills;
+    hydration = hydrated.hydration;
+  } catch (error) {
+    const runtimeSkillError = toRuntimeSkillErrorResponse(error);
+    if (runtimeSkillError) {
+      if (resolved.workspaceMode === 'isolated') {
+        cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, sessionId);
       }
-      throw error;
+      return c.json(runtimeSkillError.body, runtimeSkillError.status);
     }
+    throw error;
   }
 
   if (providerName === 'cursor' && providerTarget.backend === 'cli') {
@@ -1152,6 +1196,7 @@ sessionRoutes.post('/sessions', async (c) => {
     reusePolicy,
     instructions,
     skills,
+    hydration,
     context,
     outputDir,
   });
@@ -1504,21 +1549,38 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
   }
 
   if (session.providerBackend !== 'cli') {
+    let hydratedSession = session;
     try {
-      runtime.spawn(id, session.providerName, {
+      const providerTarget = resolveSessionProviderTarget(ctx, session);
+      const hydrated = await hydrateSessionForTarget(ctx, {
+        trigger: 'resume',
+        sessionId: session.id,
+        providerTarget,
         cwd: session.cwd,
         workspaceMode: session.workspaceMode,
-        model: session.model,
-        instructionsFile: session.skills?.delivery.instructions?.filePath,
-        permissionMode: session.permissionMode,
-        allowedTools: session.allowedTools,
-      }, session.providerInstanceId, session.providerBackend);
+        existingSkills: session.skills,
+        existingHydration: session.hydration,
+        workspaceSourceCwd: getSessionWorkspaceSourceCwd(session),
+      });
+      ctx.registry.updateSessionMetadata(id, {
+        skills: hydrated.skills,
+        hydration: hydrated.hydration,
+      });
+      hydratedSession = ctx.registry.get(id) ?? session;
+      runtime.spawn(id, hydratedSession.providerName, {
+        cwd: hydratedSession.cwd,
+        workspaceMode: hydratedSession.workspaceMode,
+        model: hydratedSession.model,
+        instructionsFile: hydratedSession.skills?.delivery.instructions?.filePath,
+        permissionMode: hydratedSession.permissionMode,
+        allowedTools: hydratedSession.allowedTools,
+      }, hydratedSession.providerInstanceId, hydratedSession.providerBackend);
       ctx.registry.updateStatus(id, 'ready');
     } catch (err) {
       return c.json({ error: `Failed to resume: ${err}` }, 500);
     }
 
-    return c.json(serializeSession(ctx, ctx.registry.get(id) ?? session));
+    return c.json(serializeSession(ctx, ctx.registry.get(id) ?? hydratedSession));
   }
 
   if (session.providerName === 'cursor') {
@@ -1526,26 +1588,43 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
       return c.json({ error: 'No provider session ID to resume' }, 400);
     }
 
+    let hydratedSession = session;
     try {
-      await primeCliCompatibility(
-        ctx,
-        resolveCliProviderTarget(ctx, session.providerName, session.providerInstanceId),
-      );
-      runtime.spawn(id, session.providerName, {
+      const providerTarget = resolveSessionProviderTarget(ctx, session);
+      const hydrated = await hydrateSessionForTarget(ctx, {
+        trigger: 'resume',
+        sessionId: session.id,
+        providerTarget,
         cwd: session.cwd,
         workspaceMode: session.workspaceMode,
-        model: session.model,
-        resumeSessionId: session.providerSessionId,
-        instructionsFile: session.skills?.delivery.instructions?.filePath,
-        permissionMode: session.permissionMode,
-        allowedTools: session.allowedTools,
-      }, session.providerInstanceId, 'cli');
+        existingSkills: session.skills,
+        existingHydration: session.hydration,
+        workspaceSourceCwd: getSessionWorkspaceSourceCwd(session),
+      });
+      ctx.registry.updateSessionMetadata(id, {
+        skills: hydrated.skills,
+        hydration: hydrated.hydration,
+      });
+      hydratedSession = ctx.registry.get(id) ?? session;
+      await primeCliCompatibility(
+        ctx,
+        resolveCliProviderTarget(ctx, hydratedSession.providerName, hydratedSession.providerInstanceId),
+      );
+      runtime.spawn(id, hydratedSession.providerName, {
+        cwd: hydratedSession.cwd,
+        workspaceMode: hydratedSession.workspaceMode,
+        model: hydratedSession.model,
+        resumeSessionId: hydratedSession.providerSessionId,
+        instructionsFile: hydratedSession.skills?.delivery.instructions?.filePath,
+        permissionMode: hydratedSession.permissionMode,
+        allowedTools: hydratedSession.allowedTools,
+      }, hydratedSession.providerInstanceId, 'cli');
       ctx.registry.updateStatus(id, 'ready');
     } catch (err) {
       return c.json({ error: `Failed to resume: ${err}` }, 500);
     }
 
-    return c.json(serializeSession(ctx, ctx.registry.get(id) ?? session));
+    return c.json(serializeSession(ctx, ctx.registry.get(id) ?? hydratedSession));
   }
 
   if (session.providerName === 'kiro') {
@@ -1553,6 +1632,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
       return c.json({ error: 'No provider session ID to resume' }, 400);
     }
 
+    let hydratedSession = session;
     try {
       const canResume = await getKiroNative(
         ctx,
@@ -1565,25 +1645,41 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         }, 409);
       }
 
-      await primeCliCompatibility(
-        ctx,
-        resolveCliProviderTarget(ctx, session.providerName, session.providerInstanceId),
-      );
-      runtime.spawn(id, session.providerName, {
+      const providerTarget = resolveSessionProviderTarget(ctx, session);
+      const hydrated = await hydrateSessionForTarget(ctx, {
+        trigger: 'resume',
+        sessionId: session.id,
+        providerTarget,
         cwd: session.cwd,
         workspaceMode: session.workspaceMode,
-        model: session.model,
-        resumeSessionId: session.providerSessionId,
-        instructionsFile: session.skills?.delivery.instructions?.filePath,
-        permissionMode: session.permissionMode,
-        allowedTools: session.allowedTools,
-      }, session.providerInstanceId, 'cli');
+        existingSkills: session.skills,
+        existingHydration: session.hydration,
+        workspaceSourceCwd: getSessionWorkspaceSourceCwd(session),
+      });
+      ctx.registry.updateSessionMetadata(id, {
+        skills: hydrated.skills,
+        hydration: hydrated.hydration,
+      });
+      hydratedSession = ctx.registry.get(id) ?? session;
+      await primeCliCompatibility(
+        ctx,
+        resolveCliProviderTarget(ctx, hydratedSession.providerName, hydratedSession.providerInstanceId),
+      );
+      runtime.spawn(id, hydratedSession.providerName, {
+        cwd: hydratedSession.cwd,
+        workspaceMode: hydratedSession.workspaceMode,
+        model: hydratedSession.model,
+        resumeSessionId: hydratedSession.providerSessionId,
+        instructionsFile: hydratedSession.skills?.delivery.instructions?.filePath,
+        permissionMode: hydratedSession.permissionMode,
+        allowedTools: hydratedSession.allowedTools,
+      }, hydratedSession.providerInstanceId, 'cli');
       ctx.registry.updateStatus(id, 'ready');
     } catch (err) {
       return c.json({ error: `Failed to resume: ${err}` }, 500);
     }
 
-    return c.json(serializeSession(ctx, ctx.registry.get(id) ?? session));
+    return c.json(serializeSession(ctx, ctx.registry.get(id) ?? hydratedSession));
   }
 
   if (session.providerName === 'pi') {
@@ -1607,26 +1703,43 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
       permissionMode = 'default';
     }
 
+    let hydratedSession = session;
     try {
-      await primeCliCompatibility(
-        ctx,
-        resolveCliProviderTarget(ctx, session.providerName, session.providerInstanceId),
-      );
-      runtime.spawn(id, session.providerName, {
+      const providerTarget = resolveSessionProviderTarget(ctx, session);
+      const hydrated = await hydrateSessionForTarget(ctx, {
+        trigger: 'resume',
+        sessionId: session.id,
+        providerTarget,
         cwd: session.cwd,
         workspaceMode: session.workspaceMode,
-        model: session.model,
+        existingSkills: session.skills,
+        existingHydration: session.hydration,
+        workspaceSourceCwd: getSessionWorkspaceSourceCwd(session),
+      });
+      ctx.registry.updateSessionMetadata(id, {
+        skills: hydrated.skills,
+        hydration: hydrated.hydration,
+      });
+      hydratedSession = ctx.registry.get(id) ?? session;
+      await primeCliCompatibility(
+        ctx,
+        resolveCliProviderTarget(ctx, hydratedSession.providerName, hydratedSession.providerInstanceId),
+      );
+      runtime.spawn(id, hydratedSession.providerName, {
+        cwd: hydratedSession.cwd,
+        workspaceMode: hydratedSession.workspaceMode,
+        model: hydratedSession.model,
         resumeSourcePath: resumeTarget.runtimeSourcePath,
-        instructionsFile: session.skills?.delivery.instructions?.filePath,
+        instructionsFile: hydratedSession.skills?.delivery.instructions?.filePath,
         permissionMode,
-        allowedTools: (body as { allowedTools?: string[] }).allowedTools ?? session.allowedTools,
-      }, session.providerInstanceId, 'cli');
+        allowedTools: (body as { allowedTools?: string[] }).allowedTools ?? hydratedSession.allowedTools,
+      }, hydratedSession.providerInstanceId, 'cli');
       ctx.registry.updateStatus(id, 'ready');
     } catch (err) {
       return c.json({ error: `Failed to resume: ${err}` }, 500);
     }
 
-    return c.json(serializeSession(ctx, ctx.registry.get(id) ?? session));
+    return c.json(serializeSession(ctx, ctx.registry.get(id) ?? hydratedSession));
   }
 
   if (!session.providerSessionId) {
@@ -1654,28 +1767,45 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
     permissionMode = 'default';
   }
 
+  let hydratedSession = session;
   try {
-    await primeCliCompatibility(
-      ctx,
-      session.providerBackend === 'cli'
-        ? resolveCliProviderTarget(ctx, session.providerName, session.providerInstanceId)
-        : undefined,
-    );
-    runtime.spawn(id, session.providerName, {
+    const providerTarget = resolveSessionProviderTarget(ctx, session);
+    const hydrated = await hydrateSessionForTarget(ctx, {
+      trigger: 'resume',
+      sessionId: session.id,
+      providerTarget,
       cwd: session.cwd,
       workspaceMode: session.workspaceMode,
-      model: session.model,
-      resumeSessionId: session.providerSessionId,
-      instructionsFile: session.skills?.delivery.instructions?.filePath,
+      existingSkills: session.skills,
+      existingHydration: session.hydration,
+      workspaceSourceCwd: getSessionWorkspaceSourceCwd(session),
+    });
+    ctx.registry.updateSessionMetadata(id, {
+      skills: hydrated.skills,
+      hydration: hydrated.hydration,
+    });
+    hydratedSession = ctx.registry.get(id) ?? session;
+    await primeCliCompatibility(
+      ctx,
+      hydratedSession.providerBackend === 'cli'
+        ? resolveCliProviderTarget(ctx, hydratedSession.providerName, hydratedSession.providerInstanceId)
+        : undefined,
+    );
+    runtime.spawn(id, hydratedSession.providerName, {
+      cwd: hydratedSession.cwd,
+      workspaceMode: hydratedSession.workspaceMode,
+      model: hydratedSession.model,
+      resumeSessionId: hydratedSession.providerSessionId,
+      instructionsFile: hydratedSession.skills?.delivery.instructions?.filePath,
       permissionMode,
-      allowedTools: (body as { allowedTools?: string[] }).allowedTools ?? session.allowedTools,
-    }, session.providerInstanceId, session.providerBackend);
-    ctx.registry.updateStatus(id, session.providerBackend === 'cli' ? 'initializing' : 'ready');
+      allowedTools: (body as { allowedTools?: string[] }).allowedTools ?? hydratedSession.allowedTools,
+    }, hydratedSession.providerInstanceId, hydratedSession.providerBackend);
+    ctx.registry.updateStatus(id, hydratedSession.providerBackend === 'cli' ? 'initializing' : 'ready');
   } catch (err) {
     return c.json({ error: `Failed to resume: ${err}` }, 500);
   }
 
-  return c.json(serializeSession(ctx, ctx.registry.get(id) ?? session));
+  return c.json(serializeSession(ctx, ctx.registry.get(id) ?? hydratedSession));
 });
 
 /** POST /sessions/:id/fork — fork a runtime-owned session */
@@ -1787,7 +1917,9 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     const resolved = resolveWorkspace({
       sessionId: forkId,
       sessionBaseDir: ctx.config.sessionBaseDir,
-      cwd: body.cwd ?? (forkWorkspaceMode === 'isolated' ? undefined : session.cwd),
+      cwd: body.cwd ?? (forkWorkspaceMode === 'isolated'
+        ? undefined
+        : getSessionWorkspaceSourceCwd(session) ?? session.cwd),
       workspaceMode: forkWorkspaceMode,
       permissionMode: forkPermissionMode,
     });
@@ -1840,26 +1972,35 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     usedContextTransplant,
   );
   let childSkills = session.skills;
-  if (parsedSkills.clear) {
-    childSkills = undefined;
-  } else {
-    try {
-      childSkills = resolveSkillStateForTarget(ctx, body.skills, {
-        sessionId: forkId,
-        providerTarget: childTarget,
-        cwd: forkCwd,
-        workspaceMode: forkWorkspaceMode,
-      }) ?? session.skills;
-    } catch (error) {
-      const runtimeSkillError = toRuntimeSkillErrorResponse(error);
-      if (runtimeSkillError) {
-        if (forkWorkspaceMode === 'isolated') {
-          cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, forkId);
-        }
-        return c.json(runtimeSkillError.body, runtimeSkillError.status);
+  let childHydration = session.hydration;
+  try {
+    const hydrated = await hydrateSessionForTarget(ctx, {
+      trigger: 'fork',
+      sessionId: forkId,
+      providerTarget: childTarget,
+      cwd: forkCwd,
+      workspaceMode: forkWorkspaceMode,
+      requestedSkills: parsedSkills.clear ? undefined : body.skills,
+      existingSkills: parsedSkills.clear ? undefined : session.skills,
+      existingHydration: session.hydration,
+      workspaceSourceCwd: resolveForkWorkspaceSourceCwd(
+        session,
+        body.cwd,
+        forkCwd,
+        forkWorkspaceMode,
+      ),
+    });
+    childSkills = hydrated.skills;
+    childHydration = hydrated.hydration;
+  } catch (error) {
+    const runtimeSkillError = toRuntimeSkillErrorResponse(error);
+    if (runtimeSkillError) {
+      if (forkWorkspaceMode === 'isolated') {
+        cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, forkId);
       }
-      throw error;
+      return c.json(runtimeSkillError.body, runtimeSkillError.status);
     }
+    throw error;
   }
 
   const forked = ctx.registry.create({
@@ -1877,6 +2018,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     reusePolicy: 'create_new',
     instructions: childInstructions,
     skills: childSkills,
+    hydration: childHydration,
     context: childContext,
     outputDir: body.outputDir ?? session.outputDir,
     artifacts: usedContextTransplant?.artifacts ?? session.artifacts,

@@ -22,8 +22,10 @@ Current capabilities:
 - dashboard-side provider instance selection for session creation
 - embedded multi-agent playground sample at `/playground`
 - runtime-managed skills with session-level requested/resolved/applied metadata
+- additive workspace/skill hydration metadata that distinguishes runtime cwd from the authoritative workspace source
 - explicit `skills: null` clearing for create/message/fork session flows
 - backend-aware skill delivery modes (`filesystem`, `instructions`, `none`)
+- shared skill re-entry for create/resume/fork so persisted skills are re-derived per target/backend instead of reusing stale delivery artifacts
 - strict `default` instance aliasing and host-path validation for file-backed providers
 - provider-specific helpers such as Kiro model inspection
 - runtime-owned usage metering, incident surfacing, and additive execution guardrails for warn / block / cooldown flows
@@ -41,6 +43,7 @@ Current capabilities:
 - [x] Resolve accepted review follow-ups for provider-instance hardening
 - [x] Add `backends/api` for pay-as-you-go API keys and Ollama
 - [x] Land runtime-managed skills v0 session and delivery contract
+- [x] Stabilize workspace hydration and runtime skill re-entry across create/resume/fork
 - [x] Add first-slice runtime usage metering, rate-limit/quota incident surfacing, and provider-agnostic progress contracts
 - [x] Add the first provider compatibility/evidence engine slice for CLI-backed providers
 - [x] Add provider-agnostic run-inspector/session-discipline contracts across CLI, API, and agent backends
@@ -125,6 +128,7 @@ Runtime state defaults under the user's home directory:
 - `src/index.ts` - process entrypoint and shutdown wiring
 - `src/server.ts` - single-service runtime bootstrap
 - `src/http/app.ts` - route registration and auth middleware
+- `src/core/hydration/` - runtime-owned workspace/skill re-entry helpers
 - `src/core/usage/` - runtime-owned metering, incident, and guardrail helpers
 - `src/backends/cli/` - embedded CLI runtime modules
 - `src/backends/api/` - API-key and local-model runtime modules

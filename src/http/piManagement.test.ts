@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createRuntimeApp as createApp } from './app.js';
@@ -492,5 +492,82 @@ describe('Pi session management', () => {
       undefined,
     );
     expect(registry.get(session.id)?.skills?.requestedSkills).toEqual(['delivery-auditor']);
+  });
+
+  it('rehydrates a missing Pi instructions file before resume', async () => {
+    const sourcePath = join(piSessionsDir, 'workspace', 'session.jsonl');
+    mkdirSync(join(piSessionsDir, 'workspace'), { recursive: true });
+    writeFileSync(sourcePath, '');
+
+    const skills = resolveRuntimeSkillManifest({
+      requestedSkills: ['delivery-auditor'],
+    }, {
+      sessionId: 'pi-resume',
+      providerName: 'pi',
+      providerBackend: 'cli',
+      cwd: 'C:/repo',
+      workspaceMode: 'shared',
+      sessionBaseDir,
+    });
+    const missingInstructionsFile = skills?.delivery.instructions?.filePath;
+    if (missingInstructionsFile) {
+      rmSync(missingInstructionsFile, { force: true });
+    }
+
+    const session = registry.create({
+      id: 'pi-resume',
+      providerName: 'pi',
+      providerBackend: 'cli',
+      providerInstanceId: 'default',
+      cwd: 'C:/repo',
+      workspaceMode: 'shared',
+      skills,
+    });
+    session.providerSourcePath = sourcePath;
+    registry.updateStatus(session.id, 'closed');
+
+    const response = await app.request(`/sessions/${session.id}/resume`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+
+    expect(response.status).toBe(200);
+    const responseBody = await response.json() as {
+      hydration: {
+        trigger: string;
+        skills?: {
+          source: string;
+          provider: string;
+          mode: string;
+        };
+      };
+      skills?: {
+        delivery?: {
+          instructions?: {
+            filePath?: string;
+          };
+        };
+      };
+    };
+    const regeneratedInstructionsFile = responseBody.skills?.delivery?.instructions?.filePath;
+    expect(regeneratedInstructionsFile).toBeTruthy();
+    expect(existsSync(regeneratedInstructionsFile!)).toBe(true);
+    expect(vi.mocked(pool.spawn)).toHaveBeenCalledWith(
+      session.id,
+      'pi',
+      expect.objectContaining({
+        instructionsFile: regeneratedInstructionsFile,
+      }),
+      undefined,
+    );
+    expect(responseBody.hydration).toEqual(expect.objectContaining({
+      trigger: 'resume',
+      skills: expect.objectContaining({
+        source: 'session_state',
+        provider: 'pi',
+        mode: 'instructions',
+      }),
+    }));
   });
 });

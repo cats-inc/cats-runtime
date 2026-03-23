@@ -11,9 +11,7 @@ import type { SessionInfo, SessionInvocationContext, TurnInput } from '../../bac
 import type { SessionRegistry } from '../../backends/cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig } from '../../backends/cli/config.js';
 import type { StreamEvent } from '../../core/types.js';
-import {
-  resolveRuntimeSkillManifest,
-} from '../../core/skills/catalog.js';
+import { hydrateSessionState } from '../../core/hydration/sessionHydration.js';
 import { resolveProviderTarget } from '../../core/providerCatalog.js';
 import {
   parseInvocationContext,
@@ -230,6 +228,19 @@ function guardrailHttpStatus(
   return outcome === 'cooldown' ? 429 : 403;
 }
 
+function resolveSessionProviderTarget(
+  ctx: AppContext,
+  session: SessionInfo,
+) {
+  return resolveProviderTarget(
+    ctx.config,
+    session.providerName,
+    session.providerBackend && session.providerInstanceId
+      ? `${session.providerBackend}/${session.providerInstanceId}`
+      : session.providerInstanceId,
+  );
+}
+
 /** POST /sessions/:id/messages — send a message, stream response as SSE */
 messageRoutes.post('/sessions/:id/messages', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
@@ -262,26 +273,29 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     return c.json({ error: parsedSkills.error }, 400);
   }
   let skills = session.skills;
+  let hydration = session.hydration;
   if (parsedSkills.clear) {
     skills = undefined;
-  } else {
+  }
+  if (body.skills !== undefined || !session.hydration) {
     try {
-      const providerTarget = resolveProviderTarget(
-        ctx.config,
-        session.providerName,
-        session.providerBackend && session.providerInstanceId
-          ? `${session.providerBackend}/${session.providerInstanceId}`
-          : session.providerInstanceId,
-      );
-      skills = resolveRuntimeSkillManifest(parsedSkills.manifest, {
+      const providerTarget = resolveSessionProviderTarget(ctx, session);
+      const hydrated = await hydrateSessionState({
+        trigger: 'message',
         sessionId: session.id,
         providerName: providerTarget.providerName,
         providerBackend: providerTarget.backend,
-        cwd: session.cwd,
+        runtimeCwd: session.cwd,
         workspaceMode: session.workspaceMode,
         sessionBaseDir: ctx.config.sessionBaseDir,
+        requestedSkills: parsedSkills.clear ? undefined : parsedSkills.manifest,
+        existingSkills: parsedSkills.clear ? undefined : session.skills,
+        requestedWorkspaceSourceCwd: session.hydration?.workspace.sourceCwd,
+        existingHydration: session.hydration,
         baseInstructionsFile: providerTarget.cliInstance?.piInstructionsFile,
-      }) ?? session.skills;
+      });
+      skills = hydrated.skills;
+      hydration = hydrated.hydration;
     } catch (error) {
       const runtimeSkillError = toRuntimeSkillErrorResponse(error);
       if (runtimeSkillError) {
@@ -305,10 +319,17 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     skills,
     explicitSkillsMutation,
   );
-  if (instructions !== undefined || body.skills !== undefined || context !== undefined || outputDir !== undefined) {
+  if (
+    instructions !== undefined
+    || body.skills !== undefined
+    || context !== undefined
+    || outputDir !== undefined
+    || !session.hydration
+  ) {
     ctx.registry.updateSessionMetadata(id, {
       instructions: instructions ?? session.instructions,
       skills,
+      hydration,
       context: turnInput.context,
       outputDir: turnInput.outputDir,
     });

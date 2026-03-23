@@ -7,6 +7,7 @@ import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig } from '../backends/cli/config.js';
 import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
 import type { SessionSkillState } from '../core/types.js';
+import { resolveRuntimeSkillManifest } from '../core/skills/catalog.js';
 
 describe('runtime-managed skills HTTP contract', () => {
   let rootDir: string;
@@ -97,6 +98,19 @@ describe('runtime-managed skills HTTP contract', () => {
     };
   }
 
+  function buildPiStoredSkillState(sessionId = 'pi-parent', cwd = join(rootDir, 'repo')) {
+    return resolveRuntimeSkillManifest({
+      requestedSkills: ['delivery-auditor'],
+    }, {
+      sessionId,
+      providerName: 'pi',
+      providerBackend: 'cli',
+      cwd,
+      workspaceMode: 'shared',
+      sessionBaseDir,
+    });
+  }
+
   beforeEach(() => {
     rootDir = mkdtempSync(join(tmpdir(), 'cats-runtime-http-skills-'));
     sessionBaseDir = join(rootDir, 'sessions');
@@ -155,6 +169,19 @@ describe('runtime-managed skills HTTP contract', () => {
       appliedSkillIds: ['companion', 'repo-maintainer'],
       delivery: expect.objectContaining({
         mode: 'filesystem',
+      }),
+    }));
+    expect(body).toEqual(expect.objectContaining({
+      hydration: expect.objectContaining({
+        trigger: 'create',
+        workspace: expect.objectContaining({
+          runtimeCwd: body.cwd,
+          sourceOfTruth: 'runtime_cwd',
+        }),
+        skills: expect.objectContaining({
+          provider: 'codex',
+          mode: 'filesystem',
+        }),
       }),
     }));
     expect(body.skills.delivery.filesystem?.rootPath).toBe(join(body.cwd, '.agents', 'skills'));
@@ -356,5 +383,81 @@ describe('runtime-managed skills HTTP contract', () => {
     expect(forkResponse.status).toBe(201);
     const forkBody = await forkResponse.json() as { skills?: unknown };
     expect(forkBody.skills).toBeUndefined();
+  });
+
+  it('rehydrates persisted Pi skills when forking into a Codex isolated workspace', async () => {
+    const app = createTestApp();
+    const parentSkills = buildPiStoredSkillState();
+
+    const session = registry.create({
+      providerName: 'pi',
+      providerBackend: 'cli',
+      providerInstanceId: 'default',
+      cwd: join(rootDir, 'repo'),
+      workspaceMode: 'shared',
+      skills: parentSkills,
+    });
+    registry.updateStatus(session.id, 'ready');
+
+    const response = await app.request(`/sessions/${session.id}/fork`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        provider: 'codex',
+        workspaceMode: 'isolated',
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    const body = await response.json() as {
+      cwd: string;
+      skills: {
+        requestedSkills: string[];
+        delivery: {
+          provider: string;
+          backend: string;
+          mode: string;
+          filesystem?: { rootPath: string };
+        };
+      };
+      hydration: {
+        trigger: string;
+        workspace: {
+          runtimeCwd: string;
+          sourceCwd?: string;
+          sourceOfTruth: string;
+        };
+        skills: {
+          source: string;
+          provider: string;
+          backend: string;
+          mode: string;
+        };
+      };
+    };
+
+    expect(body.skills).toEqual(expect.objectContaining({
+      requestedSkills: ['delivery-auditor'],
+      delivery: expect.objectContaining({
+        provider: 'codex',
+        backend: 'cli',
+        mode: 'filesystem',
+      }),
+    }));
+    expect(body.skills.delivery.filesystem?.rootPath).toBe(join(body.cwd, '.agents', 'skills'));
+    expect(body.hydration).toEqual(expect.objectContaining({
+      trigger: 'fork',
+      workspace: expect.objectContaining({
+        runtimeCwd: body.cwd,
+        sourceCwd: join(rootDir, 'repo'),
+        sourceOfTruth: 'source_workspace',
+      }),
+      skills: expect.objectContaining({
+        source: 'session_state',
+        provider: 'codex',
+        backend: 'cli',
+        mode: 'filesystem',
+      }),
+    }));
   });
 });

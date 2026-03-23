@@ -10,14 +10,14 @@
 | API Backends | In Progress | `src/backends/api` now runs Claude, Codex/OpenAI, Gemini, and Ollama with runtime-managed sessions, provider-native continuation/caching optimizations, additive incident hints plus provider-agnostic `progress` events, a shared local tool loop with patch/file/search/shell support, and runtime-owned health/diagnostics summaries; deeper live probes and broader tool/model discovery remain |
 | Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, an Agent SDK bridge as the second validation target, and first-slice remote cleanup hooks for close/cancel/delete/reset semantics |
 | HTTP API | Completed | Health, sessions, delivery audit/export/repo routes, messages, history, observe, wakeups, provider management, session branch-lineage inspection, metering/guardrail diagnostics, and additive run-inspector/session-discipline contracts are served directly from `cats-runtime` |
-| Runtime Skills | Completed | `skills/` is now a runtime-owned execution catalog with validation, session-level requested/resolved/applied metadata, explicit `skills: null` clearing, backend-aware delivery modes, and first-slice Codex/Pi verification |
+| Runtime Skills | Completed | `skills/` is now a runtime-owned execution catalog with validation, session-level requested/resolved/applied metadata, explicit `skills: null` clearing, backend-aware delivery modes, first-slice Codex/Pi verification, and shared re-entry hydration across create/resume/fork |
 | Wakeup Substrate | Completed | Runtime-owned scheduled wakeup requests now support create/list/cancel/trigger, restart-safe persistence, bounded timer processing, coalescing, and additive session/history wakeup metadata without introducing full scheduler semantics |
 | Provider Compatibility | In Progress | Shared CLI compatibility probing now classifies `ready` / `degraded` / `unsupported_version` / `unrecognized_protocol` / `probe_failed`, validates `light` vs `live` runtime-flag probes across expanded CLI family profiles, captures redacted replay-friendly evidence bundles, tracks stale cache/reprobe metadata, and exposes runtime-owned install/prerequisite/PATH/npm-prefix/auth/version/remediation hints for CLI targets |
 | Dashboard | Completed | The embedded dashboard UI is served from `GET /` and now surfaces runtime/provider health from runtime-owned diagnostics contracts |
 | Workspace Substrate | Completed | `audit-workspace`, `init-workspace`, and `update-workspace` now return explicit preview/apply contracts, machine-readable action plans/diff stats, approval-friendly payloads, and `*.bootstrap` review-copy behavior without owning product policy |
 | Delivery Primitives | Completed | Runtime-owned delivery audit, artifact publish/export, repo status, commit, push, and normalized preview-surface metadata are now available over both HTTP routes and local tools |
 | Tests | Completed | Vitest covers provider, discovery, pool, HTTP, delivery, server bootstrap, API/local tool-loop behavior, and first-slice metering/guardrail/progress normalization |
-| Docs | In Progress | Core docs now cover startup/diagnostics, provider compatibility/evidence flows, model catalog, session branching, workspace substrate, delivery primitives, runtime-managed skills and explicit clearing, the scheduled wakeup substrate, first-slice metering/progress contracts, and additive session inspection/run-state payloads; later PLAN-003/PLAN-005 follow-on items still need ongoing updates |
+| Docs | In Progress | Core docs now cover startup/diagnostics, provider compatibility/evidence flows, model catalog, session branching, workspace substrate, runtime hydration/re-entry metadata, delivery primitives, runtime-managed skills and explicit clearing, the scheduled wakeup substrate, first-slice metering/progress contracts, and additive session inspection/run-state payloads; later PLAN-003/PLAN-005 follow-on items still need ongoing updates |
 | Follow-ups | Completed | Accepted post-review findings for provider-instance rollout were implemented and recorded in `docs/plans/PLAN-002-provider-instance-review-followups.md` |
 
 **Legend**: Not Started | In Progress | Completed | Blocked
@@ -471,6 +471,42 @@ cancel / reset / delete behave across CLI, API, and agent backends.
 
 - [x] `npm run build`
 - [x] `npx vitest run src/http/sessionClose.test.ts src/http/messagesRoute.test.ts tests/agent-backend.test.ts src/http/cursorManagement.test.ts src/http/kiroManagement.test.ts src/http/opencodeManagement.test.ts src/http/auggieManagement.test.ts src/http/runtimeSkills.test.ts tests/session-branching.test.ts tests/api-backend.test.ts src/http/piManagement.test.ts tests/runtime-server.test.ts --pool=threads --poolOptions.threads.singleThread`
+
+### WP-13: Workspace Hydration and Runtime Skill Re-entry
+
+**Status**: Completed
+**Assigned**: Codex
+**Priority**: P0
+
+#### Goal
+
+Make session create/resume/fork re-enter the same workspace and runtime-skill
+context reliably, especially for provider-specific skill materialization such as
+Codex filesystem skills and Pi instruction files.
+
+#### Delivered
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Add implementation plan for hydration/re-entry work | [x] | `docs/plans/PLAN-011-workspace-hydration-and-runtime-skill-reentry.md` records scope, phases, and watchpoints |
+| Add a shared hydration seam under `src/core/hydration` | [x] | Runtime now rebuilds skill delivery from persisted requested skills and records additive workspace/skill hydration metadata |
+| Preserve authoritative workspace provenance across isolated sandboxes | [x] | Session hydration now distinguishes `runtimeCwd` from `sourceCwd` so temporary sandboxes are not mistaken for long-term workspace truth |
+| Rehydrate backend-specific skill delivery on resume | [x] | Codex filesystem skills and Pi instruction files are re-materialized before resume when needed |
+| Re-resolve skill delivery on fork/provider switch | [x] | Child sessions now derive fresh delivery state for the target backend instead of copying parent delivery metadata blindly |
+| Surface additive hydration metadata in session/history/observe payloads | [x] | Public session-facing reads now expose `hydration.workspace` and `hydration.skills` without redesigning the routes |
+| Cover hydration/re-entry behavior with tests | [x] | Vitest covers session hydration helpers, workspace provenance, persisted registry metadata, Codex provider-switch forks, and Pi resume regeneration |
+
+#### Deferred Boundaries
+
+- [ ] No product-owned companion schema or durable companion-box state is stored in runtime
+- [ ] No automatic workspace substrate apply behavior; hydration only reuses read-only audit metadata
+- [ ] No generalized workspace copy/sync engine beyond existing isolated sandbox copy semantics
+
+#### Verification
+
+- [x] `npm run build`
+- [x] `npx vitest run src/core/hydration/sessionHydration.test.ts src/backends/cli/pool/workspace.test.ts src/backends/cli/pool/SessionRegistry.test.ts src/http/runtimeSkills.test.ts src/http/piManagement.test.ts --pool=threads --poolOptions.threads.singleThread`
+- [x] `npm test` (known pre-existing failures remain in `tests/runtime-process.test.ts`, `tests/runtime-server.test.ts`, and `src/backends/cli/pool/WorkerProcess.test.ts`; targeted hydration suites passed)
 
 ---
 

@@ -648,6 +648,47 @@ export interface SessionWakeupState {
   lastRequest?: RuntimeWakeupRequest;
 }
 
+export type SessionHydrationTrigger = 'create' | 'resume' | 'fork' | 'message';
+export type SessionHydrationSkillSource = 'request' | 'session_state';
+export type SessionHydrationWorkspaceSource = 'runtime_cwd' | 'source_workspace';
+
+export interface SessionWorkspaceHydrationSubstrateState {
+  auditPath: string;
+  profile: WorkspaceSubstrateProfileId;
+  status: WorkspaceSubstrateAuditStatus;
+  checkedAt: string;
+  changedPaths: string[];
+  reviewCopyPaths: string[];
+  findingCounts: Record<WorkspaceSubstrateFindingStatus, number>;
+}
+
+export interface SessionWorkspaceHydrationState {
+  runtimeCwd: string;
+  sourceCwd?: string;
+  sourceOfTruth: SessionHydrationWorkspaceSource;
+  substrate: SessionWorkspaceHydrationSubstrateState;
+  warnings: string[];
+}
+
+export interface SessionSkillHydrationState {
+  source: SessionHydrationSkillSource;
+  requestedSkills: string[];
+  provider: string;
+  backend: ProviderBackend;
+  preferredMode: RuntimeSkillDeliveryMode;
+  mode: RuntimeSkillDeliveryMode;
+  status: RuntimeSkillDeliveryStatus;
+  warnings: string[];
+}
+
+export interface SessionHydrationState {
+  trigger: SessionHydrationTrigger;
+  updatedAt: string;
+  workspace: SessionWorkspaceHydrationState;
+  skills?: SessionSkillHydrationState;
+  metadata?: Record<string, unknown>;
+}
+
 export interface RuntimeSkillManifestContext {
   catId?: string;
   roomMode?: 'boss_chat' | 'direct_cat_chat' | 'transport_inbox';
@@ -998,6 +1039,7 @@ export interface SessionInfo {
   group?: string;
   instructions?: string;
   skills?: SessionSkillState;
+  hydration?: SessionHydrationState;
   context?: SessionInvocationContext;
   outputDir?: string;
   artifacts?: SessionArtifact[];

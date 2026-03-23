@@ -13,6 +13,7 @@ export interface ResolveWorkspaceInput {
 
 export interface ResolveWorkspaceResult {
   cwd: string;
+  sourceCwd?: string;
   workspaceMode: WorkspaceMode;
   permissionMode: PermissionMode;
 }
@@ -32,6 +33,7 @@ export function resolveWorkspace(input: ResolveWorkspaceInput): ResolveWorkspace
       mkdirSync(sandboxDir, { recursive: true });
       return {
         cwd: sandboxDir,
+        ...(cwd ? { sourceCwd: cwd } : {}),
         workspaceMode: 'isolated',
         permissionMode: 'skip',
       };
@@ -43,6 +45,7 @@ export function resolveWorkspace(input: ResolveWorkspaceInput): ResolveWorkspace
       }
       return {
         cwd,
+        sourceCwd: cwd,
         workspaceMode: 'shared',
         permissionMode: permissionMode ?? 'skip',
       };
@@ -54,6 +57,7 @@ export function resolveWorkspace(input: ResolveWorkspaceInput): ResolveWorkspace
       }
       return {
         cwd,
+        sourceCwd: cwd,
         workspaceMode: 'read_only',
         permissionMode: 'default',
       };
