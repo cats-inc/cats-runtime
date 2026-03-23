@@ -292,6 +292,11 @@ dashboards or packaged hosts can render install/auth/PATH guidance without
 maintaining a second provider matrix. That metadata now includes copied
 runtime-owned prerequisite, PATH-persistence, and npm-prefix knowledge, so
 removing `environment-bootstrap/` does not break runtime setup diagnostics.
+When the runtime can inspect provider-owned local config directly, the same
+route may also expose additive `activeConfig` metadata. The first slice reads
+Goose's local config file and reports the inferred upstream provider/model so
+dashboards or playground samples can start from the runtime-owned default
+selection instead of a hardcoded guess.
 
 ## Running the Project
 
@@ -302,7 +307,8 @@ npm run dev
 ```
 
 Then open `http://127.0.0.1:3110/` for the embedded dashboard, or call the HTTP
-API directly.
+API directly. For the embedded multi-agent sample, open
+`http://127.0.0.1:3110/playground`.
 
 ### Built executable start
 
@@ -454,7 +460,9 @@ For host-side setup or Settings surfaces, use:
   immediately usable, needs user action, is running in a degraded profile, or
   failed to probe after an install/update
 - `GET /providers/config` to read the runtime-owned static `install` metadata
-  for each configured CLI target before or between probes
+  for each configured CLI target before or between probes, plus any additive
+  runtime-owned `activeConfig` hints such as Goose's detected local
+  provider/model selection
 
 To inspect the publish payload locally without using the global npm cache:
 

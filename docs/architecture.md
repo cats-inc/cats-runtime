@@ -68,6 +68,7 @@ src/
   core/
     config.ts
     models/
+    providerActiveConfig.ts
     provider-install/
     skills/
     dotenv.ts
@@ -108,6 +109,7 @@ src/
 
 - Exposes the public `cats-runtime` HTTP API
 - Serves the embedded dashboard UI from `/`
+- Serves the embedded multi-agent playground sample from `/playground`
 - Applies optional bearer auth
 - Streams turn output as SSE or NDJSON
 - Applies additive metering observation and execution guardrail preflight on
@@ -291,7 +293,8 @@ src/
    delivery contract for the target backend
 5. CLI targets flow into `WorkerPool`; API/local targets flow into `ApiBackendManager`; agent targets flow into `AgentBackendManager`
 6. Provider model-catalog reads resolve through the shared provider target and
-   model catalog services in `src/core`
+   model catalog services in `src/core`, including runtime-owned active-config
+   hints when a provider family exposes a readable local default selection
 7. CLI setup, diagnostics, and execution priming resolve through the shared
    compatibility service in `src/core/compatibility`, which consumes the
    runtime-owned metadata in `src/core/provider-install`, classifies targets,

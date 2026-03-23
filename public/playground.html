@@ -920,10 +920,24 @@ async function loadProviderOptions() {
           const mData = await mRes.json();
           const models = mData.models || mData.catalog || [];
           if (Array.isArray(models) && models.length) {
-            PROVIDER_MODELS[name] = models.map((m, i) => ({
-              value: typeof m === 'string' ? m : (m.id || m.value || m.name),
-              label: typeof m === 'string' ? (i === 0 ? `${m} (default)` : m) : (m.label || m.id || m.name),
-            }));
+            const mapped = models.map((m, i) => {
+              const value = typeof m === 'string' ? m : (m.id || m.value || m.name);
+              const defaultFlag = typeof m === 'object' && m !== null && (m.default === true || m.isDefault === true);
+              const label = typeof m === 'string'
+                ? (i === 0 ? `${m} (default)` : m)
+                : (m.label || m.id || m.name);
+              return {
+                value,
+                label: defaultFlag && !String(label).includes('(default)') ? `${label} (default)` : label,
+                default: defaultFlag,
+              };
+            });
+            const defaultIndex = mapped.findIndex((entry) => entry.default);
+            if (defaultIndex > 0) {
+              const [defaultEntry] = mapped.splice(defaultIndex, 1);
+              mapped.unshift(defaultEntry);
+            }
+            PROVIDER_MODELS[name] = mapped.map(({ value, label }) => ({ value, label }));
           }
         }
       } catch {}

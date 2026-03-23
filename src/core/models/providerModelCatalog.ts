@@ -4,6 +4,7 @@ import type {
   RemoteProviderInstanceConfig,
 } from '../../backends/cli/config.js';
 import type { AgentBackendManager } from '../../backends/agent/runtime/AgentBackendManager.js';
+import { inspectProviderActiveConfig } from '../providerActiveConfig.js';
 import {
   resolveProviderTarget,
   type ProviderTargetDescriptor,
@@ -130,10 +131,21 @@ function readNullableString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value : null;
 }
 
-function resolveDefaultModel(target: ProviderTargetDescriptor): string | null {
+function resolveDefaultModel(
+  target: ProviderTargetDescriptor,
+  env: NodeJS.ProcessEnv,
+): string | null {
   const configuredModel = target.remoteInstance?.model?.trim();
   if (configuredModel) {
     return configuredModel;
+  }
+
+  const activeConfig = inspectProviderActiveConfig(target, { env });
+  const activeModel = activeConfig?.state === 'detected'
+    ? activeConfig.model?.trim() || null
+    : null;
+  if (activeModel) {
+    return activeModel;
   }
 
   const staticModels = getStaticProviderModels(target);
@@ -180,7 +192,7 @@ function withDefaultModel(
         default: true,
         status: 'configured',
       },
-      ...deduped,
+      ...deduped.map(({ default: _default, ...model }) => ({ ...model })),
     ],
     defaultInjected: true,
   };
@@ -250,7 +262,7 @@ export class ProviderModelCatalogService {
     requestedInstance?: string,
   ): Promise<ProviderModelCatalogResult> {
     const target = resolveProviderTarget(this.config, providerName, requestedInstance);
-    const defaultModel = resolveDefaultModel(target);
+    const defaultModel = resolveDefaultModel(target, this.env);
     const warnings: string[] = [];
     const dynamic = await this.tryDynamicCatalog(target, defaultModel, warnings);
     if (dynamic) {

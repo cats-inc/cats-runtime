@@ -20,6 +20,7 @@ Current capabilities:
 - external session discovery for supported local tools
 - file-based provider topology with separated `routing` / `backends` sections
 - dashboard-side provider instance selection for session creation
+- embedded multi-agent playground sample at `/playground`
 - runtime-managed skills with session-level requested/resolved/applied metadata
 - explicit `skills: null` clearing for create/message/fork session flows
 - backend-aware skill delivery modes (`filesystem`, `instructions`, `none`)
@@ -63,6 +64,11 @@ npm run dev
 ```
 
 Default URL: `http://127.0.0.1:3110`
+
+Embedded UIs:
+
+- dashboard: `http://127.0.0.1:3110/`
+- playground: `http://127.0.0.1:3110/playground`
 
 ## Package-Ready Startup
 

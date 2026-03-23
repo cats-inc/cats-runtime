@@ -166,6 +166,18 @@ describe('runtime server', () => {
     });
   });
 
+  it('GET /playground serves the embedded playground without auth', async () => {
+    await withRuntime({ apiKey: 'runtime-secret' }, {}, async (runtime) => {
+      const response = await runtime.app.request('/playground');
+      expect(response.status).toBe(200);
+      const html = await response.text();
+      expect(html).toContain('Playground');
+      expect(html).toContain('Direct (same-origin API)');
+      expect(html).toContain('class RuntimeClient');
+      expect(html).toContain('/providers/config');
+    });
+  });
+
   it('GET /health enforces optional inbound auth', async () => {
     await withRuntime({ apiKey: 'runtime-secret' }, {}, async (runtime) => {
       const unauthenticated = await runtime.app.request('/health');
@@ -1231,6 +1243,136 @@ backends:
         },
       });
     });
+  });
+
+  it('surfaces runtime-owned Goose active config in provider metadata and model catalogs', async () => {
+    const { root, config, cleanup } = createTestConfig({
+      providerDefaultInstances: {
+        goose: 'default',
+      },
+      providerInstances: {
+        auggie: {},
+        claude: {},
+        codex: {},
+        copilot: {},
+        cursor: {},
+        gemini: {},
+        goose: {
+          default: {
+            id: 'default',
+            providerName: 'goose',
+            commandConfig: {
+              path: process.execPath,
+              runner: 'direct',
+              runtime: { mode: 'native', environmentId: 'native' },
+            },
+          },
+        },
+        junie: {},
+        kiro: {},
+        opencode: {},
+        pi: {},
+      },
+    });
+    const gooseConfigPath = join(root, '.config', 'goose', 'config.yaml');
+    mkdirSync(join(root, '.config', 'goose'), { recursive: true });
+    writeFileSync(gooseConfigPath, [
+      'GOOSE_PROVIDER: anthropic',
+      'GOOSE_MODEL: claude-sonnet-4-5',
+      '',
+    ].join('\n'));
+    vi.stubEnv('HOME', root);
+    vi.stubEnv('USERPROFILE', root);
+
+    const runtime = createRuntimeServer(config);
+    try {
+      const providerResponse = await runtime.app.request('/providers/config');
+      expect(providerResponse.status).toBe(200);
+      const providerPayload = await providerResponse.json() as {
+        providers: Record<string, {
+          defaultInstance: string;
+          defaultBackend: string;
+          instances: Array<Record<string, unknown>>;
+        }>;
+      };
+      expect(providerPayload.providers.goose).toEqual({
+        defaultInstance: 'default',
+        defaultBackend: 'cli',
+        instances: [{
+          id: 'default',
+          target: 'cli/default',
+          backend: 'cli',
+          command: process.execPath,
+          runner: 'direct',
+          runtime: { mode: 'native', environmentId: 'native' },
+          activeConfig: {
+            source: 'goose_config',
+            state: 'detected',
+            configuredPath: '~/.config/goose/config.yaml',
+            resolvedPath: gooseConfigPath,
+            provider: 'anthropic',
+            model: 'anthropic/claude-sonnet-4-5',
+          },
+          install: expect.objectContaining({
+            provider: 'goose',
+          }),
+          compatibility: null,
+        }],
+      });
+
+      const catalogResponse = await runtime.app.request('/providers/goose/models');
+      expect(catalogResponse.status).toBe(200);
+      expect(await catalogResponse.json()).toEqual({
+        provider: 'goose',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'anthropic/claude-sonnet-4-5',
+        source: 'static',
+        cache: null,
+        models: [
+          {
+            id: 'anthropic/claude-sonnet-4-5',
+            label: 'anthropic/claude-sonnet-4-5',
+            default: true,
+            status: 'configured',
+          },
+          {
+            id: 'openai/gpt-5-codex',
+            label: 'openai/gpt-5-codex',
+          },
+          {
+            id: 'openai/gpt-5',
+            label: 'openai/gpt-5',
+          },
+        ],
+        warnings: [],
+      });
+
+      const diagnosticsResponse = await runtime.app.request('/diagnostics/providers');
+      expect(diagnosticsResponse.status).toBe(200);
+      const diagnostics = await diagnosticsResponse.json() as {
+        providers: Array<{ provider: string; config: Record<string, unknown> }>;
+      };
+      expect(diagnostics.providers).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          provider: 'goose',
+          config: expect.objectContaining({
+            activeConfig: {
+              source: 'goose_config',
+              state: 'detected',
+              configuredPath: '~/.config/goose/config.yaml',
+              resolvedPath: gooseConfigPath,
+              provider: 'anthropic',
+              model: 'anthropic/claude-sonnet-4-5',
+            },
+          }),
+        }),
+      ]));
+    } finally {
+      vi.unstubAllEnvs();
+      await runtime.close();
+      cleanup();
+    }
   });
 
   it('POST /sessions rejects providers omitted by positive-list YAML config', async () => {

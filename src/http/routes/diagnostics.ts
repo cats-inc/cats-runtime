@@ -8,6 +8,7 @@ import {
   listProviderCatalog,
   type ProviderTargetDescriptor,
 } from '../../core/providerCatalog.js';
+import { inspectProviderActiveConfig } from '../../core/providerActiveConfig.js';
 import { toCompatibilitySummaryView } from '../../core/compatibility/ProviderCompatibilityService.js';
 import type { CompatibilitySummaryView } from '../../core/compatibility/types.js';
 import type { ProviderSetupSummary } from '../../core/provider-install/types.js';
@@ -207,6 +208,10 @@ async function diagnoseCliTarget(
     runtime,
     compatibility: toCompatibilitySummaryView(assessment),
   };
+  const activeConfig = inspectProviderActiveConfig(target);
+  if (activeConfig) {
+    config.activeConfig = activeConfig;
+  }
 
   if (isFileBackedProvider(target.providerName)) {
     try {

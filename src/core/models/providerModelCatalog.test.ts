@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { ProviderModelCatalogService } from './providerModelCatalog.js';
 
@@ -6,10 +9,29 @@ function createCatalogConfig() {
     providerDefaultTargets: {
       ollama: { backend: 'local', instance: 'local' },
       codex: { backend: 'agent', instance: 'bridge' },
+      goose: { backend: 'cli', instance: 'default' },
     },
     providerDefaultInstances: {},
-    providerInstances: {},
-    providerCommands: {},
+    providerInstances: {
+      goose: {
+        default: {
+          id: 'default',
+          providerName: 'goose',
+          commandConfig: {
+            path: 'goose',
+            runner: 'auto',
+            runtime: { mode: 'native' },
+          },
+        },
+      },
+    },
+    providerCommands: {
+      goose: {
+        path: 'goose',
+        runner: 'auto',
+        runtime: { mode: 'native' },
+      },
+    },
     remoteProviderCatalog: {
       api: {},
       local: {
@@ -47,6 +69,23 @@ function jsonResponse(body: Record<string, unknown>, status = 200): Response {
       'content-type': 'application/json',
     },
   });
+}
+
+function createGooseConfigRoot(content: string) {
+  const root = mkdtempSync(join(tmpdir(), 'cats-runtime-goose-models-'));
+  const gooseConfigPath = join(root, '.config', 'goose', 'config.yaml');
+  mkdirSync(join(root, '.config', 'goose'), { recursive: true });
+  writeFileSync(gooseConfigPath, content);
+
+  return {
+    root,
+    gooseConfigPath,
+    env: {
+      HOME: root,
+      USERPROFILE: root,
+    },
+    cleanup: () => rmSync(root, { recursive: true, force: true }),
+  };
 }
 
 describe('ProviderModelCatalogService', () => {
@@ -154,5 +193,48 @@ describe('ProviderModelCatalogService', () => {
     expect(catalog.warnings).toEqual([
       'Ollama running-model probe failed with status 503',
     ]);
+  });
+
+  it('uses runtime-owned Goose config as the default-model hint for CLI catalogs', async () => {
+    const { env, cleanup } = createGooseConfigRoot([
+      'GOOSE_PROVIDER: anthropic',
+      'GOOSE_MODEL: claude-sonnet-4-5',
+      '',
+    ].join('\n'));
+
+    try {
+      const service = new ProviderModelCatalogService(createCatalogConfig() as never, {
+        env,
+      });
+
+      const catalog = await service.getCatalog('goose');
+      expect(catalog).toEqual({
+        provider: 'goose',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'anthropic/claude-sonnet-4-5',
+        source: 'static',
+        cache: null,
+        models: [
+          {
+            id: 'anthropic/claude-sonnet-4-5',
+            label: 'anthropic/claude-sonnet-4-5',
+            default: true,
+            status: 'configured',
+          },
+          {
+            id: 'openai/gpt-5-codex',
+            label: 'openai/gpt-5-codex',
+          },
+          {
+            id: 'openai/gpt-5',
+            label: 'openai/gpt-5',
+          },
+        ],
+        warnings: [],
+      });
+    } finally {
+      cleanup();
+    }
   });
 });

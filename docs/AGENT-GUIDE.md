@@ -19,10 +19,13 @@
 ## Current API Surface
 
 - `GET /`
+- `GET /playground`
 - `GET /health`
 - `GET /diagnostics/health`
 - `GET /diagnostics/runtime`
 - `GET /diagnostics/providers`
+- `GET /providers/config`
+- `GET /providers/:provider/models`
 - `POST /delivery/audit`
 - `POST /delivery/artifacts/publish`
 - `POST /delivery/repo/status`

@@ -30,9 +30,17 @@ cases where custom headers are awkward.
 
 ```text
 GET /
+GET /playground
 ```
 
-Returns the embedded `cats-runtime` dashboard HTML.
+`GET /` returns the embedded `cats-runtime` dashboard HTML.
+
+`GET /playground` returns the embedded multi-agent playground HTML. The page
+hosts a browser-side orchestration sample that talks directly to the existing
+same-origin runtime APIs. When inbound auth is enabled, the page itself remains
+public, but the user must enter a bearer token in the playground UI before it
+can call protected routes such as `GET /providers/{provider}/models` or session
+mutation endpoints.
 
 ### Health
 
@@ -178,6 +186,10 @@ surface for hosts and dashboards. The response includes:
   `classification`, `status`, `summary`, `checkedAt`, selected `profile`,
   version/runtime `fingerprint`, additive `warnings`, and optional `evidence`
   artifact metadata
+- provider-owned `config.activeConfig` metadata when the runtime can inspect a
+  local provider config directly; the first slice reports Goose
+  `~/.config/goose/config.yaml` state (`detected`, `partial`, `missing`,
+  `invalid`) plus the inferred provider/model pair
 - lightweight config/command/path checks
 - sanitized env-variable presence metadata
 - target-level diagnostics details for CLI, API/local, and agent backends
@@ -1055,6 +1067,19 @@ mirrors the diagnostics summary view:
 
 Targets that have not been probed yet, plus non-CLI backends, return
 `compatibility: null`. Non-CLI backends also return `install: null`.
+
+Some CLI entries may also expose runtime-owned `activeConfig` metadata when the
+runtime can inspect provider-local configuration directly. The first slice is
+Goose-specific and returns:
+
+- `source: "goose_config"`
+- `state`: `detected`, `partial`, `missing`, or `invalid`
+- `configuredPath` plus host-readable `resolvedPath`
+- inferred upstream `provider` / `model` when available
+
+This metadata is additive. It does not replace setup/compatibility diagnostics,
+but it gives hosts and playgrounds a runtime-owned hint about the provider's
+current local default selection without reviving a sample-only shim route.
 
 `GET /providers/{provider}/models` is the runtime-owned per-provider model
 catalog route. It accepts optional `?instance=<instance-id>` and returns a

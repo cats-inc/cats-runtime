@@ -4,6 +4,7 @@ import {
   listConfiguredProviders,
   listProviderCatalog,
 } from '../../core/providerCatalog.js';
+import { inspectProviderActiveConfig } from '../../core/providerActiveConfig.js';
 import type { ProviderName } from '../../backends/cli/providers/types.js';
 import { buildProviderInstallCatalogView } from '../../core/provider-install/knowledge.js';
 import type { AppContext } from '../app.js';
@@ -25,6 +26,12 @@ providerRoutes.get('/providers/config', (c) => {
       }
 
       const instances = provider.instances.map((instance) => ({
+        ...(instance.backend === 'cli' && instance.cliInstance
+          ? (() => {
+            const activeConfig = inspectProviderActiveConfig(instance);
+            return activeConfig ? { activeConfig } : {};
+          })()
+          : {}),
         id: instance.instanceId,
         target: `${instance.backend}/${instance.instanceId}`,
         backend: instance.backend,
