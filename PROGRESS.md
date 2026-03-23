@@ -8,8 +8,8 @@
 |-----------|--------|-------------|
 | Core | Completed | Embedded CLI runtime, shared session contracts, discovery, worker pool, and first-slice runtime-owned usage/incident/guardrail contracts are in-repo |
 | API Backends | In Progress | `src/backends/api` now runs Claude, Codex/OpenAI, Gemini, and Ollama with runtime-managed sessions, provider-native continuation/caching optimizations, additive incident hints plus provider-agnostic `progress` events, a shared local tool loop with patch/file/search/shell support, and runtime-owned health/diagnostics summaries; deeper live probes and broader tool/model discovery remain |
-| Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, and an Agent SDK bridge as the second validation target |
-| HTTP API | Completed | Health, sessions, delivery audit/export/repo routes, messages, history, observe, provider management, session branch-lineage inspection, and metering/guardrail diagnostics are served directly from `cats-runtime` |
+| Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, an Agent SDK bridge as the second validation target, and first-slice remote cleanup hooks for close/cancel/delete/reset semantics |
+| HTTP API | Completed | Health, sessions, delivery audit/export/repo routes, messages, history, observe, wakeups, provider management, session branch-lineage inspection, metering/guardrail diagnostics, and additive run-inspector/session-discipline contracts are served directly from `cats-runtime` |
 | Runtime Skills | Completed | `skills/` is now a runtime-owned execution catalog with validation, session-level requested/resolved/applied metadata, explicit `skills: null` clearing, backend-aware delivery modes, and first-slice Codex/Pi verification |
 | Wakeup Substrate | Completed | Runtime-owned scheduled wakeup requests now support create/list/cancel/trigger, restart-safe persistence, bounded timer processing, coalescing, and additive session/history wakeup metadata without introducing full scheduler semantics |
 | Provider Compatibility | In Progress | Shared CLI compatibility probing now classifies `ready` / `degraded` / `unsupported_version` / `unrecognized_protocol` / `probe_failed`, selects degraded profiles for major families, captures redacted replay-friendly evidence bundles, and exposes runtime-owned install/prerequisite/PATH/npm-prefix/auth/version metadata plus remediation hints for CLI targets |
@@ -17,7 +17,7 @@
 | Workspace Substrate | Completed | `audit-workspace`, `init-workspace`, and `update-workspace` now return explicit preview/apply contracts, machine-readable action plans/diff stats, approval-friendly payloads, and `*.bootstrap` review-copy behavior without owning product policy |
 | Delivery Primitives | Completed | Runtime-owned delivery audit, artifact publish/export, repo status, commit, push, and normalized preview-surface metadata are now available over both HTTP routes and local tools |
 | Tests | Completed | Vitest covers provider, discovery, pool, HTTP, delivery, server bootstrap, API/local tool-loop behavior, and first-slice metering/guardrail/progress normalization |
-| Docs | In Progress | Core docs now cover startup/diagnostics, provider compatibility/evidence flows, model catalog, session branching, workspace substrate, delivery primitives, runtime-managed skills and explicit clearing, the scheduled wakeup substrate, and first-slice metering/progress contracts; later PLAN-003/PLAN-005 follow-on items still need ongoing updates |
+| Docs | In Progress | Core docs now cover startup/diagnostics, provider compatibility/evidence flows, model catalog, session branching, workspace substrate, delivery primitives, runtime-managed skills and explicit clearing, the scheduled wakeup substrate, first-slice metering/progress contracts, and additive session inspection/run-state payloads; later PLAN-003/PLAN-005 follow-on items still need ongoing updates |
 | Follow-ups | Completed | Accepted post-review findings for provider-instance rollout were implemented and recorded in `docs/plans/PLAN-002-provider-instance-review-followups.md` |
 
 **Legend**: Not Started | In Progress | Completed | Blocked
@@ -435,6 +435,42 @@ scheduler or workflow engine.
 
 - [x] `npm run build`
 - [x] `npx vitest run src/core/wakeup/RuntimeWakeupService.test.ts src/http/wakeupRoutes.test.ts src/http/runtimeSkills.test.ts src/http/piManagement.test.ts tests/runtime-server.test.ts --pool=threads --poolOptions.threads.singleThread`
+- [x] `npx vitest run src/core/wakeup/RuntimeWakeupService.test.ts src/http/wakeupRoutes.test.ts src/http/runtimeSkills.test.ts src/http/piManagement.test.ts tests/runtime-server.test.ts --pool=threads --poolOptions.threads.singleThread`
+
+### WP-12: Session Discipline and Run Inspector Contracts
+
+**Status**: Completed
+**Assigned**: Codex
+**Priority**: P0
+
+#### Goal
+
+Strengthen runtime lifecycle rigor and observability so hosts can inspect what a
+session is doing now, why it woke, what the last run did, and how close /
+cancel / reset / delete behave across CLI, API, and agent backends.
+
+#### Delivered
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Add runtime-owned current/last-run inspection contract | [x] | Session payloads now expose `inspection.state`, `wake`, `currentRun`, `lastRun`, `progress`, `recentEvents`, and action affordances |
+| Add session-scoped metering/incident/guardrail inspection reads | [x] | `inspection.metering` now projects per-session usage, preflight guardrails, active guardrails, and recent incidents |
+| Add additive `/sessions/{id}/observe` snapshot route | [x] | Hosts can fetch run-inspector state plus history/stream links without opening SSE |
+| Add additive `/sessions/{id}/cancel` and `/sessions/{id}/reset` routes | [x] | Runtime now exposes explicit cancel vs reset semantics without breaking existing close/delete flows |
+| Strengthen backend cleanup symmetry | [x] | Agent-backed close/cancel/delete/reset now route through adapter-aware remote cleanup; CLI/API now expose best-effort cancel semantics too |
+| Extend history/session routes with the same inspection contract | [x] | `GET /sessions`, `GET /sessions/{id}`, and `GET /sessions/{id}/history` now share one additive inspection payload |
+| Cover lifecycle/inspection behavior with automated tests | [x] | Vitest covers session close/cancel/reset/observe, agent remote cleanup, history inspection, and broad route regressions |
+
+#### Deferred Boundaries
+
+- [ ] No scheduler/wakeup queue or duplicate-wake coalescing layer yet
+- [ ] No product-owned approval UX or run-inspector rendering in `cats-runtime`
+- [ ] No full provider-native log archival/export redesign yet beyond compact recent-event excerpts
+
+#### Verification
+
+- [x] `npm run build`
+- [x] `npx vitest run src/http/sessionClose.test.ts src/http/messagesRoute.test.ts tests/agent-backend.test.ts src/http/cursorManagement.test.ts src/http/kiroManagement.test.ts src/http/opencodeManagement.test.ts src/http/auggieManagement.test.ts src/http/runtimeSkills.test.ts tests/session-branching.test.ts tests/api-backend.test.ts src/http/piManagement.test.ts tests/runtime-server.test.ts --pool=threads --poolOptions.threads.singleThread`
 
 ---
 

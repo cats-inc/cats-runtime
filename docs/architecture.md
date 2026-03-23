@@ -176,6 +176,8 @@ src/
   transports
 - Persists provider-managed session continuity state beside runtime-visible
   history, artifacts, and invocation metadata
+- Routes close/cancel/delete/reset through adapter-aware remote cleanup hooks
+  instead of only dropping local runtime handles
 
 ### `src/core/tools`
 
@@ -207,6 +209,10 @@ src/
   context-transplant metadata, and machine-readable branch result payloads
 - Owns deterministic workspace substrate planning/apply logic independently of
   product shells or skills
+- Tracks runtime-owned per-session execution/read-model state such as current
+  run, last run, wake reason, recent normalized events, and lifecycle state so
+  session/history/observe routes can expose a provider-agnostic run inspector
+  contract
 - Keeps `audit-workspace` read-only even when callers request apply, and uses
   `*.bootstrap` review copies instead of blind overwrite for conflicting files
 - Owns delivery audit/export/repo primitives and normalized preview-surface

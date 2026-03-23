@@ -876,6 +876,108 @@ export interface RuntimeMeteringSnapshot {
   };
 }
 
+export type RuntimeSessionExecutionState =
+  | 'idle'
+  | 'running'
+  | 'canceling'
+  | 'closing'
+  | 'closed';
+
+export type RuntimeRunStatus =
+  | 'running'
+  | 'succeeded'
+  | 'failed'
+  | 'canceled'
+  | 'blocked'
+  | 'cooldown';
+
+export interface RuntimeWakeReason {
+  source?: SessionInvocationContext['source'];
+  reason?: string;
+  taskId?: string;
+  issueId?: string;
+  commentId?: string;
+  approvalId?: string;
+  labels?: string[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface RuntimeProgressSnapshot {
+  updatedAt: string;
+  eventType: StreamEvent['type'];
+  text?: string;
+  summary?: string;
+  toolName?: string;
+  toolId?: string;
+  isError?: boolean;
+  kind?: RuntimeProgressKind;
+  status?: RuntimeProgressStatus;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RuntimeEventExcerpt {
+  observedAt: string;
+  eventType: StreamEvent['type'];
+  text?: string;
+  summary?: string;
+  toolName?: string;
+  toolId?: string;
+  isError?: boolean;
+  kind?: RuntimeProgressKind;
+  status?: RuntimeProgressStatus;
+}
+
+export interface RuntimeRunInspection {
+  id: string;
+  status: RuntimeRunStatus;
+  startedAt: string;
+  endedAt?: string;
+  providerSessionId?: string;
+  wake?: RuntimeWakeReason | null;
+  inputPreview?: string;
+  resultSummary?: string;
+  error?: string;
+  progress?: RuntimeProgressSnapshot;
+  usage?: RuntimeUsageSignal;
+  guardrail?: RuntimeGuardrailResult;
+  incident?: RuntimeRateLimitIncident;
+  artifacts?: SessionArtifact[];
+  services?: AgentRuntimeService[];
+}
+
+export interface RuntimeSessionMeteringSnapshot {
+  usage?: RuntimeUsageAggregate;
+  preflight: RuntimeGuardrailResult;
+  activeGuardrails: RuntimeGuardrailResult[];
+  recentIncidents: RuntimeRateLimitIncident[];
+}
+
+export interface RuntimeSessionInspectionActions {
+  canClose: boolean;
+  canDelete: boolean;
+  canResume: boolean;
+  canRefresh: boolean;
+  canCancel: boolean;
+  canReset: boolean;
+  canRetry: boolean;
+}
+
+export interface RuntimeSessionInspection {
+  state: RuntimeSessionExecutionState;
+  attached: boolean;
+  busy: boolean;
+  wake: RuntimeWakeReason | null;
+  currentRun?: RuntimeRunInspection;
+  lastRun?: RuntimeRunInspection;
+  progress?: RuntimeProgressSnapshot;
+  recentEvents: RuntimeEventExcerpt[];
+  metering: RuntimeSessionMeteringSnapshot;
+  artifacts: SessionArtifact[];
+  services: AgentRuntimeService[];
+  previewSurfaces: RuntimePreviewSurface[];
+  actions: RuntimeSessionInspectionActions;
+}
+
 export interface SessionInfo {
   id: string;
   providerName: string;

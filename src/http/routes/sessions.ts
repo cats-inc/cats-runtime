@@ -4,6 +4,7 @@ import { basename, dirname, join } from 'node:path';
 import { Hono } from 'hono';
 import {
   getProviderCompatibilityService,
+  getRuntimeMeteringService,
   getRuntimeSessionManager,
   type AppContext,
 } from '../app.js';
@@ -61,6 +62,7 @@ import {
   resolveSessionBranchDecision,
   summarizeContextTransplant,
 } from '../../core/runtime/sessionBranching.js';
+import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
 import {
   resolveRuntimeSkillManifest,
 } from '../../core/skills/catalog.js';
@@ -140,15 +142,23 @@ function resolveSessionBranching(
 }
 
 function serializeSession(ctx: AppContext, session: SessionInfo) {
+  const runtime = getRuntimeSessionManager(ctx);
   const view = toSessionView(session, {
-    attached: getRuntimeSessionManager(ctx).isAttached(session.id),
+    attached: runtime.isAttached(session.id),
     externalSessionLiveWindowMs: ctx.config.externalSessionLiveWindowMs,
   });
   const lineage = getSessionLineage(session);
   const branching = resolveSessionBranching(ctx, session);
   const wakeup = ctx.wakeup?.getSessionWakeState(session.id);
+  const inspection = buildSessionInspection({
+    session,
+    view,
+    trackedState: runtime.getTrackedState(session.id),
+    metering: getRuntimeMeteringService(ctx).buildSessionSnapshot(session),
+  });
   return {
     ...view,
+    inspection,
     branching,
     ...(wakeup ? { wakeup } : {}),
     ...(lineage ? { lineage } : {}),
@@ -162,8 +172,10 @@ function serializeSessions(
     includeBranchCapabilities?: boolean;
   } = {},
 ) {
+  const runtime = getRuntimeSessionManager(ctx);
+  const metering = getRuntimeMeteringService(ctx);
   const views = toSessionViews(sessions, {
-    isAttached: (session) => getRuntimeSessionManager(ctx).isAttached(session.id),
+    isAttached: (session) => runtime.isAttached(session.id),
     externalSessionLiveWindowMs: ctx.config.externalSessionLiveWindowMs,
   });
   return views.map((view, index) => {
@@ -174,6 +186,12 @@ function serializeSessions(
     const wakeup = ctx.wakeup?.getSessionWakeState(sessions[index].id);
     return {
       ...view,
+      inspection: buildSessionInspection({
+        session: sessions[index],
+        view,
+        trackedState: runtime.getTrackedState(sessions[index].id),
+        metering: metering.buildSessionSnapshot(sessions[index]),
+      }),
       branching,
       ...(wakeup ? { wakeup } : {}),
       ...(lineage ? { lineage } : {}),
@@ -209,7 +227,12 @@ async function primeCliCompatibility(
     return;
   }
 
-  await getProviderCompatibilityService(ctx).assessCliTarget(target, {
+  const compatibility = getProviderCompatibilityService(ctx);
+  if (typeof compatibility.assessCliTarget !== 'function') {
+    return;
+  }
+
+  await compatibility.assessCliTarget(target, {
     purpose: 'execution',
   });
 }
@@ -1229,7 +1252,7 @@ sessionRoutes.get('/sessions/:id/lineage', (c) => {
 });
 
 /** POST /sessions/:id/close — stop worker, keep session in registry */
-sessionRoutes.post('/sessions/:id/close', (c) => {
+sessionRoutes.post('/sessions/:id/close', async (c) => {
   const ctx = c.get('ctx');
   const runtime = getRuntimeSessionManager(ctx);
   const id = c.req.param('id');
@@ -1241,31 +1264,101 @@ sessionRoutes.post('/sessions/:id/close', (c) => {
 
   const view = serializeSession(ctx, session);
   if (!view.attached && view.activity === 'interactive') {
-      return c.json({
+    return c.json({
       error: 'This session appears to be active outside cats-runtime and can only be observed right now.',
     }, 409);
-  }
-
-  if (session.providerName === 'cursor' && session.providerBackend === 'cli') {
-    const worker = runtime.get(id);
-    if (worker?.active) {
-      ctx.registry.updateStatus(id, 'closing');
-      runtime.kill(id);
-      return c.json({ status: 'closing' });
-    }
-    ctx.registry.updateStatus(id, 'closed');
-    return c.json({ status: 'closed' });
   }
 
   const worker = runtime.get(id);
   if (!worker?.active) {
     ctx.registry.updateStatus(id, 'closed');
+    runtime.markClosed(id);
     return c.json({ status: 'closed' });
   }
 
   ctx.registry.updateStatus(id, 'closing');
-  runtime.kill(id);
+  await runtime.close(session, 'close');
+  if (session.providerBackend !== 'cli' && !runtime.isAttached(id)) {
+    ctx.registry.updateStatus(id, 'closed');
+  }
   return c.json({ status: 'closing' });
+});
+
+/** POST /sessions/:id/cancel — cancel the active turn but keep the session */
+sessionRoutes.post('/sessions/:id/cancel', async (c) => {
+  const ctx = c.get('ctx');
+  const runtime = getRuntimeSessionManager(ctx);
+  const id = c.req.param('id');
+  const session = ctx.registry.get(id);
+
+  if (!session) {
+    return c.json({ error: 'Session not found' }, 404);
+  }
+
+  const view = serializeSession(ctx, session);
+  if (!view.attached && view.activity === 'interactive') {
+    return c.json({
+      error: 'This session appears to be active outside cats-runtime and can only be observed right now.',
+    }, 409);
+  }
+
+  const worker = runtime.get(id);
+  if (!worker?.active) {
+    ctx.registry.updateStatus(id, session.status === 'closed' ? 'closed' : 'ready');
+    return c.json({
+      status: session.status === 'closed' ? 'closed' : 'idle',
+      attached: false,
+    });
+  }
+
+  if (!worker.busy) {
+    return c.json({
+      status: 'idle',
+      attached: true,
+    });
+  }
+
+  const result = await runtime.cancel(session);
+  if (!result.attached) {
+    ctx.registry.updateStatus(id, 'closed');
+  }
+
+  return c.json({
+    status: 'canceling',
+    attached: result.attached,
+  });
+});
+
+/** POST /sessions/:id/reset — clear provider resume state and detach the worker */
+sessionRoutes.post('/sessions/:id/reset', async (c) => {
+  const ctx = c.get('ctx');
+  const runtime = getRuntimeSessionManager(ctx);
+  const id = c.req.param('id');
+  const session = ctx.registry.get(id);
+
+  if (!session) {
+    return c.json({ error: 'Session not found' }, 404);
+  }
+
+  const view = serializeSession(ctx, session);
+  if (!view.attached && view.activity === 'interactive') {
+    return c.json({
+      error: 'This session appears to be active outside cats-runtime and can only be observed right now.',
+    }, 409);
+  }
+
+  const worker = runtime.get(id);
+  if (worker?.active) {
+    ctx.registry.updateStatus(id, 'closing');
+    await runtime.close(session, 'reset');
+  }
+
+  ctx.registry.clearProviderResumeState(id);
+  ctx.registry.setProviderState(id, undefined);
+  ctx.registry.updateStatus(id, 'closed');
+  runtime.clearProviderState(id);
+  runtime.markClosed(id);
+  return c.json(serializeSession(ctx, ctx.registry.get(id) ?? session));
 });
 
 /** DELETE /sessions/:id — permanently remove session and delete .jsonl */
@@ -1346,9 +1439,17 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
     });
   }
 
-  const worker = getRuntimeSessionManager(ctx).get(id);
-  if (worker) {
-    getRuntimeSessionManager(ctx).kill(id);
+  const runtime = getRuntimeSessionManager(ctx);
+  const worker = runtime.get(id);
+  if (worker?.active) {
+    try {
+      await runtime.close(session, 'delete');
+      ctx.registry.updateStatus(id, 'closed');
+    } catch (err) {
+      preparedManagedTranscripts.rollback();
+      preparedProviderDiscovery.rollback();
+      return c.json({ error: `Failed to close session before delete: ${err}` }, 500);
+    }
   }
 
   const managedDeletion = preparedManagedTranscripts.finalize();
@@ -1358,6 +1459,7 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
     workspaceCleaned = cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, id);
   }
   ctx.registry.unregister(id);
+  runtime.dropSession(id);
   ctx.registry.flush();
   return c.json({
     status: 'deleted',

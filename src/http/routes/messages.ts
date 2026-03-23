@@ -345,9 +345,11 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     return c.json({ error: 'Worker process has exited' }, 410);
   }
 
+  const executionSession = ctx.registry.get(id) ?? session;
   const metering = getRuntimeMeteringService(ctx);
-  const preflight = metering.evaluatePreflight(session);
+  const preflight = metering.evaluatePreflight(executionSession);
   if (preflight.outcome === 'blocked' || preflight.outcome === 'cooldown') {
+    runtime.recordRejectedRun(executionSession, turnInput, preflight);
     return c.json({
       error: preflight.reason,
       code: preflight.outcome === 'cooldown' ? 'guardrail_cooldown' : 'guardrail_blocked',
@@ -357,9 +359,14 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     });
   }
   const warningEvent = preflight.outcome === 'warned'
-    ? metering.createWarningProgressEvent(session, preflight)
+    ? metering.createWarningProgressEvent(executionSession, preflight)
     : undefined;
 
+  runtime.beginRun(
+    executionSession,
+    turnInput,
+    preflight.outcome === 'warned' ? { guardrail: preflight } : {},
+  );
   ctx.registry.updateStatus(id, 'busy');
 
   // Check Accept header for format preference
@@ -390,12 +397,14 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
         const turnStartedAt = Date.now();
         try {
           if (warningEvent) {
+            runtime.observeEvent(id, warningEvent);
             controller.enqueue(new TextEncoder().encode(JSON.stringify(warningEvent) + '\n'));
           }
           for await (const event of streamTurnWithPiRecovery(ctx, id, turnInput, () => {
             ensureRecoveredPiHistorySourcePath(ctx, id, turnInput, historyState);
           })) {
-            const observedEvent = metering.observeEvent(session, event, { turnStartedAt });
+            const observedEvent = metering.observeEvent(executionSession, event, { turnStartedAt });
+            runtime.observeEvent(id, observedEvent);
             const line = JSON.stringify(observedEvent) + '\n';
             controller.enqueue(new TextEncoder().encode(line));
 
@@ -462,10 +471,11 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
             restoreReadyIfSessionStillInteractive(ctx.registry, id);
           }
         } catch (err) {
-          const errorEvent = metering.observeEvent(session, {
+          const errorEvent = metering.observeEvent(executionSession, {
             type: 'error',
             text: String(err),
           }, { turnStartedAt });
+          runtime.observeEvent(id, errorEvent);
           assistantText = flushAssistantText(historyState.sourcePath, assistantText);
           controller.enqueue(
             new TextEncoder().encode(JSON.stringify(errorEvent) + '\n'),
@@ -502,6 +512,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     const turnStartedAt = Date.now();
     try {
       if (warningEvent) {
+        runtime.observeEvent(id, warningEvent);
         await stream.writeSSE({
           data: JSON.stringify(warningEvent),
           event: warningEvent.type,
@@ -510,7 +521,8 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
       for await (const event of streamTurnWithPiRecovery(ctx, id, turnInput, () => {
         ensureRecoveredPiHistorySourcePath(ctx, id, turnInput, sseHistoryState);
       })) {
-        const observedEvent = metering.observeEvent(session, event, { turnStartedAt });
+        const observedEvent = metering.observeEvent(executionSession, event, { turnStartedAt });
+        runtime.observeEvent(id, observedEvent);
         await stream.writeSSE({
           data: JSON.stringify(observedEvent),
           event: observedEvent.type,
@@ -580,10 +592,11 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
       }
     } catch (err) {
       assistantText = flushAssistantText(sseHistoryState.sourcePath, assistantText);
-      const errorEvent = metering.observeEvent(session, {
+      const errorEvent = metering.observeEvent(executionSession, {
         type: 'error',
         text: String(err),
       }, { turnStartedAt });
+      runtime.observeEvent(id, errorEvent);
       await stream.writeSSE({
         data: JSON.stringify(errorEvent),
         event: errorEvent.type,

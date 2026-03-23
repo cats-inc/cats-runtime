@@ -425,6 +425,13 @@ describe('agent backend integration', () => {
         });
       }
 
+      if (url === 'http://agent-sdk.test/api/v1/sessions/bridge-session-1/abort' && method === 'POST') {
+        return new Response(null, {
+          status: 202,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
       throw new Error(`Unexpected fetch: ${method} ${url}`);
     };
 
@@ -660,6 +667,13 @@ describe('agent backend integration', () => {
         });
       }
 
+      if (url === 'http://agent-sdk.test/api/v1/sessions/bridge-session-1/abort' && method === 'POST') {
+        return new Response(null, {
+          status: 202,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
       throw new Error(`Unexpected fetch: ${method} ${url}`);
     };
 
@@ -768,6 +782,10 @@ describe('agent backend integration', () => {
 
       const createCalls = fetchCalls.filter((call) => call.url === 'http://agent-sdk.test/api/v1/sessions');
       expect(createCalls).toHaveLength(2);
+      expect(fetchCalls.some((call) =>
+        call.url === 'http://agent-sdk.test/api/v1/sessions/bridge-session-1/abort'
+          && call.method === 'POST',
+      )).toBe(true);
       expect(fetchCalls.some((call) =>
         call.url === 'http://agent-sdk.test/api/v1/sessions/bridge-session-1/messages/stream'
           && call.body?.message === 'Use the bridge carefully.\n\nSecond',

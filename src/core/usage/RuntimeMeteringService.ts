@@ -4,6 +4,7 @@ import type {
   RuntimeMeteringSnapshot,
   RuntimeMeteringSummary,
   RuntimeRateLimitIncident,
+  RuntimeSessionMeteringSnapshot,
   RuntimeUsageAggregate,
   RuntimeUsageGuardrail,
   RuntimeUsageRecord,
@@ -269,6 +270,53 @@ export class RuntimeMeteringService {
 
   buildSummary(sessions: SessionInfo[]): RuntimeMeteringSummary {
     return this.buildSnapshot(sessions).summary;
+  }
+
+  buildSessionSnapshot(session: SessionInfo): RuntimeSessionMeteringSnapshot {
+    this.evictExpiredGuardrails();
+
+    const provider = session.providerName;
+    const instance = session.providerInstanceId || 'default';
+    const backend = session.providerBackend || 'cli';
+    const preflight = this.evaluatePreflight(session);
+    const activeGuardrails = [
+      ...Array.from(this.providerGuardrails.values()).filter((guardrail) =>
+        isGuardrailActive(guardrail)
+        && guardrail.provider === provider
+        && guardrail.instance === instance
+        && guardrail.backend === backend,
+      ),
+      ...(preflight.outcome === 'warned' || preflight.outcome === 'blocked' ? [preflight] : []),
+    ];
+    const usage = aggregateUsageRecords(
+      this.usageRecords.filter((record) => record.sessionId === session.id),
+      () => session.id,
+      (record) => ({
+        provider: record.provider,
+        instance: record.instance,
+        backend: record.backend,
+        sessionId: record.sessionId,
+        workspaceKey: record.workspaceKey,
+      }),
+    ).at(0);
+    const recentIncidents = [...this.incidents]
+      .filter((incident) =>
+        incident.sessionId === session.id
+        || (
+          incident.provider === provider
+          && incident.instance === instance
+          && incident.backend === backend
+        ),
+      )
+      .slice(-10)
+      .reverse();
+
+    return {
+      usage,
+      preflight,
+      activeGuardrails,
+      recentIncidents,
+    };
   }
 
   private buildUsageRecord(

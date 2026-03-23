@@ -4,9 +4,23 @@ import type { ExecutionHandle, StreamEvent, TurnInput } from '../types.js';
 type ExecutionEventName = 'event' | 'exit' | 'error';
 type ExecutionListener = (...args: unknown[]) => void;
 
+export type ManagedExecutionLifecycleReason =
+  | 'cancel'
+  | 'close'
+  | 'delete'
+  | 'reset'
+  | 'shutdown';
+
+export interface ManagedExecutionLifecycleInput {
+  reason: ManagedExecutionLifecycleReason;
+  busy: boolean;
+  signal?: AbortSignal;
+}
+
 export interface ManagedExecutionCallbacks {
   streamMessage(input: TurnInput, signal: AbortSignal): AsyncGenerator<StreamEvent>;
-  onClose(): void;
+  onCancel?(input: ManagedExecutionLifecycleInput): Promise<void> | void;
+  onClose?(input: ManagedExecutionLifecycleInput): Promise<void> | void;
 }
 
 export class ManagedExecutionHandle implements ExecutionHandle {
@@ -14,6 +28,7 @@ export class ManagedExecutionHandle implements ExecutionHandle {
   private activeState = true;
   private busyState = false;
   private abortController?: AbortController;
+  private cancelPromise?: Promise<void>;
 
   constructor(private readonly callbacks: ManagedExecutionCallbacks) {}
 
@@ -56,15 +71,33 @@ export class ManagedExecutionHandle implements ExecutionHandle {
     }
   }
 
-  kill(): void {
+  async cancel(reason: ManagedExecutionLifecycleReason = 'cancel'): Promise<void> {
+    if (!this.activeState && !this.busyState) {
+      return;
+    }
+
+    await this.runCancel(reason);
+  }
+
+  async close(reason: ManagedExecutionLifecycleReason = 'close'): Promise<void> {
     if (!this.activeState) {
       return;
     }
 
+    const lifecycleInput = {
+      reason,
+      busy: this.busyState,
+      signal: this.abortController?.signal,
+    } satisfies ManagedExecutionLifecycleInput;
+
     this.activeState = false;
-    this.abortController?.abort();
-    this.callbacks.onClose();
+    await this.runCancel(reason);
+    await this.callbacks.onClose?.(lifecycleInput);
     this.emitter.emit('exit');
+  }
+
+  kill(): void {
+    void this.close('close');
   }
 
   on(event: ExecutionEventName, listener: ExecutionListener): this {
@@ -75,5 +108,28 @@ export class ManagedExecutionHandle implements ExecutionHandle {
   off(event: ExecutionEventName, listener: ExecutionListener): this {
     this.emitter.off(event, listener);
     return this;
+  }
+
+  private async runCancel(reason: ManagedExecutionLifecycleReason): Promise<void> {
+    if (this.cancelPromise) {
+      await this.cancelPromise;
+      return;
+    }
+
+    const lifecycleInput = {
+      reason,
+      busy: this.busyState,
+      signal: this.abortController?.signal,
+    } satisfies ManagedExecutionLifecycleInput;
+
+    this.abortController?.abort();
+    const promise = Promise.resolve(this.callbacks.onCancel?.(lifecycleInput))
+      .finally(() => {
+        if (this.cancelPromise === promise) {
+          this.cancelPromise = undefined;
+        }
+      });
+    this.cancelPromise = promise;
+    await promise;
   }
 }

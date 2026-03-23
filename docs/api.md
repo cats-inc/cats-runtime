@@ -298,10 +298,13 @@ GET    /sessions/{id}
 GET    /sessions/{id}/lineage
 POST   /sessions/{id}/messages
 POST   /sessions/{id}/close
+POST   /sessions/{id}/cancel
+POST   /sessions/{id}/reset
 POST   /sessions/{id}/resume
 POST   /sessions/{id}/fork
 DELETE /sessions/{id}
 GET    /sessions/{id}/history
+GET    /sessions/{id}/observe
 GET    /sessions/{id}/stream
 ```
 
@@ -485,10 +488,15 @@ same-target child branch from the current session. `available: false` means the
 runtime already knows native fork cannot be honored from this parent, and
 `reason` explains why when relevant.
 
-`GET /sessions` now keeps list serialization cheap by default: it includes
-persisted branch observability (`lineage` / `transplant`) but skips capability
-resolution unless the caller opts in with `?branching=full`. Detail surfaces
-such as `GET /sessions/{id}`, `GET /sessions/{id}/lineage`, and successful
+`GET /sessions` now returns a compact session read model that includes:
+
+- persisted branch observability (`lineage` / `transplant`)
+- additive runtime `inspection` state for current/last run, wake reason,
+  metering, recent events, and action affordances
+
+Branch capability truth is still skipped by default for list responses. Callers
+can opt in with `?branching=full`. Detail surfaces such as
+`GET /sessions/{id}`, `GET /sessions/{id}/lineage`, and successful
 `POST /sessions/{id}/fork` responses still include full capability truth.
 Other `branching` query values are ignored.
 
@@ -531,6 +539,64 @@ Example shape:
   }
 }
 ```
+
+Session payloads now also include an additive runtime-owned `inspection` block
+intended for host/dashboard run inspectors:
+
+```json
+{
+  "inspection": {
+    "state": "idle",
+    "attached": true,
+    "busy": false,
+    "wake": {
+      "source": "assignment",
+      "reason": "follow up",
+      "taskId": "task-123"
+    },
+    "lastRun": {
+      "status": "succeeded",
+      "inputPreview": "Summarize the latest draft.",
+      "providerSessionId": "resp_2"
+    },
+    "progress": {
+      "eventType": "result",
+      "updatedAt": "2026-03-23T12:00:00.000Z"
+    },
+    "recentEvents": [
+      {
+        "eventType": "progress",
+        "kind": "guardrail",
+        "status": "warned",
+        "text": "Session crossed the configured token warning threshold."
+      }
+    ],
+    "metering": {
+      "preflight": {
+        "outcome": "allowed",
+        "scope": "session",
+        "metric": "total_tokens",
+        "action": "warn"
+      },
+      "activeGuardrails": [],
+      "recentIncidents": []
+    },
+    "artifacts": [],
+    "services": [],
+    "previewSurfaces": [],
+    "actions": {
+      "canClose": true,
+      "canCancel": false,
+      "canReset": true,
+      "canRetry": true
+    }
+  }
+}
+```
+
+`inspection.state` is runtime-owned and can differ from the persisted session
+status when the runtime is actively canceling or closing a run. The block is
+additive: existing session fields remain stable.
 
 `POST /sessions` also accepts these optional fields:
 
@@ -887,6 +953,12 @@ such as:
     "source": "interactive",
     "taskId": "task-123"
   },
+  "inspection": {
+    "state": "idle",
+    "lastRun": {
+      "status": "succeeded"
+    }
+  },
   "skills": {
     "requestedSkills": ["companion"],
     "appliedSkillIds": ["companion"],
@@ -911,6 +983,32 @@ GET /kiro/models
 
 `GET /kiro/models` also accepts `?instance=<instance-id>` and returns the
 resolved `instance` alongside the runtime metadata.
+
+`GET /sessions/{id}/observe` returns a machine-readable run-inspection snapshot
+without requiring a live stream connection:
+
+```json
+{
+  "session": {
+    "id": "session-123",
+    "providerName": "claude",
+    "inspection": {
+      "state": "running"
+    }
+  },
+  "historyPath": "/sessions/session-123/history",
+  "observePath": "/sessions/session-123/observe",
+  "stream": {
+    "path": "/sessions/session-123/stream",
+    "available": true
+  }
+}
+```
+
+`POST /sessions/{id}/cancel` is additive and attempts to stop the current run
+without deleting the logical session. `POST /sessions/{id}/reset` clears
+provider resume/session state so the next `resume` starts from a fresh backend
+attachment while keeping the runtime-owned session record and history.
 
 `GET /providers/config` returns the configured provider topology for dashboards
 or other clients that need to offer provider-instance selection. Each instance

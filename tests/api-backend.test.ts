@@ -354,13 +354,21 @@ describe('API backend integration', () => {
 
       const historyResponse = await runtime.app.request(`/sessions/${session.id}/history`);
       expect(historyResponse.status).toBe(200);
-      expect(await historyResponse.json()).toEqual({
+      const historyBody = await historyResponse.json();
+      expect(historyBody).toMatchObject({
         sessionKey: expect.any(String),
         artifacts: [],
         messages: [
           { role: 'user', text: 'Read src/app.ts and summarize it.', timestamp: expect.any(String) },
           { role: 'assistant', text: 'The file exports value 7.', timestamp: expect.any(String) },
         ],
+      });
+      expect(historyBody.inspection).toMatchObject({
+        state: 'idle',
+        lastRun: {
+          status: 'succeeded',
+          providerSessionId: 'resp_2',
+        },
       });
 
       const closeResponse = await runtime.app.request(`/sessions/${session.id}/close`, {

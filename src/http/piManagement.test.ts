@@ -223,13 +223,20 @@ describe('Pi session management', () => {
 
     const historyResponse = await app.request(`/sessions/${session!.id}/history`);
     expect(historyResponse.status).toBe(200);
-    await expect(historyResponse.json()).resolves.toEqual({
+    const historyBody = await historyResponse.json();
+    expect(historyBody).toMatchObject({
       artifacts: [],
-      skills: undefined,
       messages: [
         { role: 'user', text: 'hello', timestamp: expect.any(String) },
         { role: 'assistant', text: 'Recovered reply', timestamp: expect.any(String) },
       ],
+    });
+    expect(historyBody.inspection).toMatchObject({
+      state: 'idle',
+      lastRun: {
+        status: 'succeeded',
+        inputPreview: 'hello',
+      },
     });
   });
 

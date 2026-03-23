@@ -1,9 +1,50 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
-import { getRuntimeSessionManager, type AppContext } from '../app.js';
+import {
+  getRuntimeMeteringService,
+  getRuntimeSessionManager,
+  type AppContext,
+} from '../app.js';
+import { toSessionView } from '../../backends/cli/pool/sessionView.js';
+import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
 import type { StreamEvent } from '../../core/types.js';
 
 export const observeRoutes = new Hono();
+
+/** GET /sessions/:id/observe — machine-readable session/run inspection payload */
+observeRoutes.get('/sessions/:id/observe', async (c) => {
+  const ctx = c.get('ctx' as never) as AppContext;
+  const id = c.req.param('id');
+  const session = ctx.registry.get(id);
+
+  if (!session) {
+    return c.json({ error: 'Session not found' }, 404);
+  }
+
+  const runtime = getRuntimeSessionManager(ctx);
+  const view = toSessionView(session, {
+    attached: runtime.isAttached(session.id),
+    externalSessionLiveWindowMs: ctx.config.externalSessionLiveWindowMs,
+  });
+
+  return c.json({
+    session: {
+      ...view,
+      inspection: buildSessionInspection({
+        session,
+        view,
+        trackedState: runtime.getTrackedState(session.id),
+        metering: getRuntimeMeteringService(ctx).buildSessionSnapshot(session),
+      }),
+    },
+    historyPath: `/sessions/${session.id}/history`,
+    observePath: `/sessions/${session.id}/observe`,
+    stream: {
+      path: `/sessions/${session.id}/stream`,
+      available: Boolean(runtime.get(session.id)?.active),
+    },
+  });
+});
 
 /** GET /sessions/:id/stream — read-only SSE endpoint for live observation */
 observeRoutes.get('/sessions/:id/stream', async (c) => {

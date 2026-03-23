@@ -10,7 +10,10 @@ import { AnthropicTransport } from '../transports/anthropic.js';
 import { GeminiTransport } from '../transports/gemini.js';
 import { OllamaTransport } from '../transports/ollama.js';
 import { OpenAiTransport } from '../transports/openai.js';
-import { ManagedExecutionHandle } from '../../../core/runtime/ManagedExecutionHandle.js';
+import {
+  ManagedExecutionHandle,
+  type ManagedExecutionLifecycleReason,
+} from '../../../core/runtime/ManagedExecutionHandle.js';
 import type {
   ApiBackendOptions,
   ApiBackendStatus,
@@ -212,7 +215,7 @@ export class ApiBackendManager {
 
     const handle = new ManagedExecutionHandle({
       streamMessage: (message, signal) => this.streamTurn(sessionId, target, message, signal),
-      onClose: () => {
+      onClose: async () => {
         this.handles.delete(sessionId);
         this.targets.delete(sessionId);
       },
@@ -224,15 +227,36 @@ export class ApiBackendManager {
   }
 
   kill(sessionId: string): void {
+    void this.close(sessionId, 'close');
+  }
+
+  async cancel(
+    sessionId: string,
+    reason: ManagedExecutionLifecycleReason = 'cancel',
+  ): Promise<void> {
     const handle = this.handles.get(sessionId);
-    if (handle) {
-      handle.kill();
+    if (!handle) {
+      return;
     }
+
+    await handle.cancel(reason);
+  }
+
+  async close(
+    sessionId: string,
+    reason: ManagedExecutionLifecycleReason = 'close',
+  ): Promise<void> {
+    const handle = this.handles.get(sessionId);
+    if (!handle) {
+      return;
+    }
+
+    await handle.close(reason);
   }
 
   killAll(): void {
     for (const sessionId of Array.from(this.handles.keys())) {
-      this.kill(sessionId);
+      void this.close(sessionId, 'shutdown').catch(() => {});
     }
   }
 

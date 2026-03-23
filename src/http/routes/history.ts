@@ -1,8 +1,14 @@
 import { createReadStream, readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { Hono } from 'hono';
-import type { AppContext } from '../app.js';
+import {
+  getRuntimeMeteringService,
+  getRuntimeSessionManager,
+  type AppContext,
+} from '../app.js';
 import type { SessionInfo } from '../../backends/cli/pool/types.js';
+import { toSessionView } from '../../backends/cli/pool/sessionView.js';
+import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
 import {
   getAuggieSessions,
   getCursorNative,
@@ -38,6 +44,11 @@ interface HistoryMessage {
 
 function buildHistoryMetadata(ctx: AppContext, session: SessionInfo) {
   const wakeup = ctx.wakeup?.getSessionWakeState(session.id);
+  const runtime = getRuntimeSessionManager(ctx);
+  const view = toSessionView(session, {
+    attached: runtime.isAttached(session.id),
+    externalSessionLiveWindowMs: ctx.config.externalSessionLiveWindowMs,
+  });
   return {
     sessionKey: session.sessionKey,
     outputDir: session.outputDir,
@@ -45,6 +56,12 @@ function buildHistoryMetadata(ctx: AppContext, session: SessionInfo) {
     context: session.context,
     skills: session.skills,
     ...(wakeup ? { wakeup } : {}),
+    inspection: buildSessionInspection({
+      session,
+      view,
+      trackedState: runtime.getTrackedState(session.id),
+      metering: getRuntimeMeteringService(ctx).buildSessionSnapshot(session),
+    }),
   };
 }
 

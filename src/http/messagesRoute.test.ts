@@ -155,13 +155,21 @@ describe('message route transcript persistence', () => {
 
       const historyResponse = await app.request(`/sessions/${session.id}/history`);
       expect(historyResponse.status).toBe(200);
-      expect(await historyResponse.json()).toEqual({
+      const historyBody = await historyResponse.json();
+      expect(historyBody).toMatchObject({
         artifacts: [],
-        skills: undefined,
         messages: [
           { role: 'user', text: 'hello', timestamp: expect.any(String) },
           { role: 'assistant', text: 'Partial reply before failure.', timestamp: expect.any(String) },
         ],
+      });
+      expect(historyBody.inspection).toMatchObject({
+        state: 'idle',
+        lastRun: {
+          status: 'failed',
+          error: 'Synthetic provider error',
+          inputPreview: 'hello',
+        },
       });
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -196,13 +204,21 @@ describe('message route transcript persistence', () => {
 
       const historyResponse = await app.request(`/sessions/${session.id}/history`);
       expect(historyResponse.status).toBe(200);
-      expect(await historyResponse.json()).toEqual({
+      const historyBody = await historyResponse.json();
+      expect(historyBody).toMatchObject({
         artifacts: [],
-        skills: undefined,
         messages: [
           { role: 'user', text: 'hello', timestamp: expect.any(String) },
           { role: 'assistant', text: 'Partial reply before throw.', timestamp: expect.any(String) },
         ],
+      });
+      expect(historyBody.inspection).toMatchObject({
+        state: 'idle',
+        lastRun: {
+          status: 'failed',
+          error: 'Error: Synthetic thrown failure',
+          inputPreview: 'hello',
+        },
       });
     } finally {
       rmSync(root, { recursive: true, force: true });

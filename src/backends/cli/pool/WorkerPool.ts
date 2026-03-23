@@ -216,6 +216,13 @@ export class WorkerPool {
     return Boolean(this.workers.get(sessionId)?.alive);
   }
 
+  cancel(sessionId: string): void {
+    const worker = this.workers.get(sessionId);
+    if (worker) {
+      worker.cancel();
+    }
+  }
+
   kill(sessionId: string): void {
     const worker = this.workers.get(sessionId);
     if (worker) {

@@ -340,21 +340,25 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     }
   }
 
-  kill(): void {
+  cancel(): void {
     this.activeTurnController?.abort();
-    if (this.provider.ephemeral) this._ephemeralKilled = true;
 
     if (this.process && this.process.exitCode === null) {
       this.process.stdin?.end();
       this.process.kill('SIGTERM');
 
-      // Force kill after 5 seconds
       setTimeout(() => {
         if (this.process && this.process.exitCode === null) {
           this.process.kill('SIGKILL');
         }
       }, 5000);
     }
+  }
+
+  kill(): void {
+    this.activeTurnController?.abort();
+    if (this.provider.ephemeral) this._ephemeralKilled = true;
+    this.cancel();
 
     if (this.provider.ephemeral && !this.process) {
       this.emit('exit', 0, null);

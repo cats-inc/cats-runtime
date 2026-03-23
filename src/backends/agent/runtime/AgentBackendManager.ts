@@ -3,7 +3,10 @@ import { mergeRuntimeInstructionLayers } from '../../../core/skills/catalog.js';
 import type { SessionRegistry } from '../../cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig, RemoteProviderInstanceConfig } from '../../cli/config.js';
 import type { ProviderTargetDescriptor } from '../../../core/providerCatalog.js';
-import { ManagedExecutionHandle } from '../../../core/runtime/ManagedExecutionHandle.js';
+import {
+  ManagedExecutionHandle,
+  type ManagedExecutionLifecycleReason,
+} from '../../../core/runtime/ManagedExecutionHandle.js';
 import { buildAgentAdapter } from '../adapters/registry.js';
 import type {
   AgentBackendOptions,
@@ -56,7 +59,10 @@ export class AgentBackendManager {
 
     const handle = new ManagedExecutionHandle({
       streamMessage: (input, signal) => this.streamTurn(sessionId, target, input, signal),
-      onClose: () => {
+      onCancel: async (input) => {
+        await this.cancelRemoteSession(sessionId, target, input.busy);
+      },
+      onClose: async () => {
         this.handles.delete(sessionId);
         this.targets.delete(sessionId);
       },
@@ -68,12 +74,36 @@ export class AgentBackendManager {
   }
 
   kill(sessionId: string): void {
-    this.handles.get(sessionId)?.kill();
+    void this.close(sessionId, 'close');
+  }
+
+  async cancel(
+    sessionId: string,
+    reason: ManagedExecutionLifecycleReason = 'cancel',
+  ): Promise<void> {
+    const handle = this.handles.get(sessionId);
+    if (!handle) {
+      return;
+    }
+
+    await handle.cancel(reason);
+  }
+
+  async close(
+    sessionId: string,
+    reason: ManagedExecutionLifecycleReason = 'close',
+  ): Promise<void> {
+    const handle = this.handles.get(sessionId);
+    if (!handle) {
+      return;
+    }
+
+    await handle.close(reason);
   }
 
   killAll(): void {
     for (const sessionId of this.handles.keys()) {
-      this.kill(sessionId);
+      void this.close(sessionId, 'shutdown').catch(() => {});
     }
   }
 
@@ -179,5 +209,25 @@ export class AgentBackendManager {
 
   private buildAdapter(instance: RemoteProviderInstanceConfig): AgentAdapter {
     return buildAgentAdapter(instance, this.options);
+  }
+
+  private async cancelRemoteSession(
+    sessionId: string,
+    target: ProviderTargetDescriptor,
+    busy: boolean,
+  ): Promise<void> {
+    const session = this.registry.get(sessionId);
+    const instance = ensureAgentTarget(target);
+    const adapter = this.buildAdapter(instance);
+    if (!adapter.cancel) {
+      return;
+    }
+
+    const agentStatus = session?.providerState?.agentSession?.status;
+    if (!busy && agentStatus !== 'active') {
+      return;
+    }
+
+    await adapter.cancel(sessionId, instance, session?.providerState);
   }
 }
