@@ -62,6 +62,13 @@ function ensureMethod(request: McpJsonRpcRequest): string {
   return request.method;
 }
 
+function resolveRequestId(value: unknown): string | number | null {
+  if (typeof value === 'string' || typeof value === 'number') {
+    return value;
+  }
+  return null;
+}
+
 function toolResultPayload(summary: string, structuredContent: unknown) {
   return {
     content: [
@@ -78,9 +85,12 @@ export async function handleMcpJsonRpc(
   ctx: AppContext,
   rawBody: unknown,
 ): Promise<McpJsonRpcSuccess | McpJsonRpcError | null> {
+  let requestId: string | number | null = null;
+
   try {
     const request = ensureRequest(rawBody);
-    const id = request.id ?? null;
+    const id = resolveRequestId(request.id);
+    requestId = id;
     const method = ensureMethod(request);
 
     switch (method) {
@@ -118,11 +128,11 @@ export async function handleMcpJsonRpc(
     }
   } catch (error) {
     if (error instanceof McpToolError) {
-      return errorResponse(null, error.code, error.message, error.data);
+      return errorResponse(requestId, error.code, error.message, error.data);
     }
 
     return errorResponse(
-      null,
+      requestId,
       -32603,
       error instanceof Error ? error.message : 'Unexpected MCP error',
     );

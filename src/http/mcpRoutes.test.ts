@@ -289,7 +289,7 @@ describe('runtime MCP facade', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       jsonrpc: '2.0',
-      id: null,
+      id: 7,
       error: {
         code: -32602,
         message: 'status must be a valid session status',
