@@ -91,13 +91,34 @@ export class ManagedExecutionHandle implements ExecutionHandle {
     } satisfies ManagedExecutionLifecycleInput;
 
     this.activeState = false;
-    await this.runCancel(reason);
-    await this.callbacks.onClose?.(lifecycleInput);
+    let lifecycleError: unknown;
+
+    try {
+      await this.runCancel(reason);
+    } catch (error) {
+      lifecycleError = error;
+    }
+
+    try {
+      await this.callbacks.onClose?.(lifecycleInput);
+    } catch (error) {
+      if (!lifecycleError) {
+        lifecycleError = error;
+      } else {
+        this.emitter.emit('error', error);
+      }
+    }
+
     this.emitter.emit('exit');
+    if (lifecycleError) {
+      throw lifecycleError;
+    }
   }
 
   kill(): void {
-    void this.close('close');
+    void this.close('close').catch((error) => {
+      this.emitter.emit('error', error);
+    });
   }
 
   on(event: ExecutionEventName, listener: ExecutionListener): this {

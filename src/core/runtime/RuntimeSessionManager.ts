@@ -25,6 +25,7 @@ import { resolveProviderTarget } from '../providerCatalog.js';
 import type { BackendKind } from '../../backends/cli/config.js';
 import { ApiBackendManager } from '../../backends/api/runtime/ApiBackendManager.js';
 import { AgentBackendManager } from '../../backends/agent/runtime/AgentBackendManager.js';
+import { extractWakeReason } from './wakeReason.js';
 
 type ExecutionEventName = 'event' | 'exit' | 'error';
 type ExecutionListener = (...args: unknown[]) => void;
@@ -483,25 +484,6 @@ export class RuntimeSessionManager {
       tracked.recentEvents.splice(0, tracked.recentEvents.length - MAX_RECENT_EVENTS);
     }
   }
-}
-
-function extractWakeReason(
-  context: SessionInfo['context'] | TurnInput['context'],
-): RuntimeWakeReason | null {
-  if (!context) {
-    return null;
-  }
-
-  return {
-    source: context.source,
-    reason: context.reason,
-    taskId: context.taskId,
-    issueId: context.issueId,
-    commentId: context.commentId,
-    approvalId: context.approvalId,
-    ...(context.labels ? { labels: [...context.labels] } : {}),
-    ...(context.metadata ? { metadata: { ...context.metadata } } : {}),
-  };
 }
 
 function summarizeInput(message: string): string {

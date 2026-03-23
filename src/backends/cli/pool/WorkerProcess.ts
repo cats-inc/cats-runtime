@@ -356,7 +356,6 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   }
 
   kill(): void {
-    this.activeTurnController?.abort();
     if (this.provider.ephemeral) this._ephemeralKilled = true;
     this.cancel();
 

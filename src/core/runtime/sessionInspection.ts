@@ -5,12 +5,12 @@ import type {
   RuntimePreviewSurfaceRenderHint,
   RuntimeSessionInspection,
   RuntimeSessionMeteringSnapshot,
-  RuntimeWakeReason,
   SessionArtifact,
   SessionInfo,
   SessionView,
 } from '../types.js';
 import type { RuntimeTrackedSessionStateSnapshot } from './RuntimeSessionManager.js';
+import { extractWakeReason } from './wakeReason.js';
 
 const HTML_EXTENSIONS = new Set(['.htm', '.html']);
 const DOWNLOADABLE_EXTENSIONS = new Set([
@@ -59,7 +59,10 @@ export function buildSessionInspection(
     state: resolveExecutionState(input),
     attached: input.view.attached,
     busy,
-    wake: input.trackedState?.wake || input.trackedState?.currentRun?.wake || input.trackedState?.lastRun?.wake || extractWakeReason(input.session),
+    wake: input.trackedState?.wake
+      || input.trackedState?.currentRun?.wake
+      || input.trackedState?.lastRun?.wake
+      || extractWakeReason(input.session.context),
     ...(input.trackedState?.currentRun ? { currentRun: input.trackedState.currentRun } : {}),
     ...(input.trackedState?.lastRun ? { lastRun: input.trackedState.lastRun } : {}),
     ...(input.trackedState?.progress ? { progress: input.trackedState.progress } : {}),
@@ -103,25 +106,6 @@ function resolveExecutionState(
     return 'closed';
   }
   return tracked?.state || 'idle';
-}
-
-function extractWakeReason(
-  session: SessionInfo,
-): RuntimeWakeReason | null {
-  if (!session.context) {
-    return null;
-  }
-
-  return {
-    source: session.context.source,
-    reason: session.context.reason,
-    taskId: session.context.taskId,
-    issueId: session.context.issueId,
-    commentId: session.context.commentId,
-    approvalId: session.context.approvalId,
-    ...(session.context.labels ? { labels: [...session.context.labels] } : {}),
-    ...(session.context.metadata ? { metadata: { ...session.context.metadata } } : {}),
-  };
 }
 
 function dedupeArtifacts(artifacts: SessionArtifact[]): SessionArtifact[] {
