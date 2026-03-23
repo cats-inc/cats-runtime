@@ -236,7 +236,6 @@ function createGenericNpmKnowledge(
       prerequisites: createNpmPrerequisites(familyLabel),
       npmPackage,
       npmExpectedPrefix: {
-        windows: '%APPDATA%\\npm',
         macos: '~/.npm-global',
         linux: '~/.npm-global',
       },

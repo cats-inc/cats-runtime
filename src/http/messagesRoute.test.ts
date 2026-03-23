@@ -323,6 +323,115 @@ describe('message route transcript persistence', () => {
     }
   });
 
+  it('hydrates companion metadata into session state during skill mutations', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-message-route-'));
+    const sessionBaseDir = join(root, 'sessions');
+    mkdirSync(sessionBaseDir, { recursive: true });
+    const receivedInputs: TurnInput[] = [];
+    const companionSession = {
+      catId: 'cat-1',
+      boxId: 'companion-box-1',
+      hydratedAt: '2026-03-23T12:00:00.000Z',
+      requestedSkills: ['companion'],
+      sourceIds: ['source-1'],
+      derivedIds: [],
+      memoryIds: [],
+      responseProfile: {
+        expressionMode: 'animalistic',
+        outputMode: 'text',
+        voiceProfileId: null,
+        notes: 'Keep replies warm.',
+        updatedAt: '2026-03-23T11:59:00.000Z',
+      },
+      sources: [],
+      derived: [],
+      memory: [],
+      ownerNotes: ['Keep replies warm.'],
+      constraints: ['channel:Companion lane'],
+      channelContext: {
+        channelId: 'channel-1',
+        roomMode: 'direct_cat_chat',
+        transport: 'web',
+      },
+    };
+
+    try {
+      const { app, registry, session } = makeApp(
+        sessionBaseDir,
+        async function* (turnInput: TurnInput) {
+          receivedInputs.push(structuredClone(turnInput));
+          yield { type: 'result' };
+        },
+      );
+
+      const response = await app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({
+          message: 'hello companion',
+          context: {
+            source: 'interactive',
+            metadata: {
+              companionSession,
+            },
+          },
+          skills: {
+            profileId: 'companion',
+            requestedSkills: ['companion'],
+            context: {
+              catId: 'cat-1',
+              roomMode: 'direct_cat_chat',
+              transport: 'web',
+              metadata: {
+                companionSession,
+              },
+            },
+          },
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(parseNdjson(await response.text())).toEqual([
+        { type: 'result' },
+      ]);
+      expect(receivedInputs).toHaveLength(1);
+      expect(receivedInputs[0].context?.metadata).toEqual(expect.objectContaining({
+        companionSession: expect.objectContaining({
+          boxId: 'companion-box-1',
+        }),
+      }));
+
+      expect(registry.get(session.id)?.hydration).toEqual(expect.objectContaining({
+        trigger: 'message',
+        metadata: expect.objectContaining({
+          companionSession: expect.objectContaining({
+            boxId: 'companion-box-1',
+            channelContext: expect.objectContaining({
+              channelId: 'channel-1',
+            }),
+          }),
+        }),
+      }));
+
+      const historyResponse = await app.request(`/sessions/${session.id}/history`);
+      expect(historyResponse.status).toBe(200);
+      await expect(historyResponse.json()).resolves.toEqual(expect.objectContaining({
+        hydration: expect.objectContaining({
+          metadata: expect.objectContaining({
+            companionSession: expect.objectContaining({
+              boxId: 'companion-box-1',
+            }),
+          }),
+        }),
+      }));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('emits a guardrail warning progress event before execution', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-message-route-'));
     const sessionBaseDir = join(root, 'sessions');

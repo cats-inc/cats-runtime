@@ -14,6 +14,7 @@ import type { StreamEvent } from '../../core/types.js';
 import { hydrateSessionState } from '../../core/hydration/sessionHydration.js';
 import { resolveSessionProviderTarget } from '../providerTargets.js';
 import {
+  extractHydrationMetadata,
   parseInvocationContext,
   parseOptionalString,
   parseRuntimeSkillManifest,
@@ -259,12 +260,17 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
   if (parsedSkills.error) {
     return c.json({ error: parsedSkills.error }, 400);
   }
+  const context = parseInvocationContext(body.context);
+  const requestedHydrationMetadata = extractHydrationMetadata(
+    context,
+    parsedSkills.clear ? undefined : parsedSkills.manifest,
+  );
   let skills = session.skills;
   let hydration = session.hydration;
   if (parsedSkills.clear) {
     skills = undefined;
   }
-  if (body.skills !== undefined || !session.hydration) {
+  if (body.skills !== undefined || requestedHydrationMetadata !== undefined || !session.hydration) {
     try {
       const providerTarget = resolveSessionProviderTarget(ctx.config, session);
       const hydrated = await hydrateSessionState({
@@ -280,6 +286,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
         requestedWorkspaceSourceCwd: session.hydration?.workspace.sourceCwd,
         existingHydration: session.hydration,
         baseInstructionsFile: providerTarget.cliInstance?.piInstructionsFile,
+        metadata: requestedHydrationMetadata,
       });
       skills = hydrated.skills;
       hydration = hydrated.hydration;
@@ -291,7 +298,6 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
       throw error;
     }
   }
-  const context = parseInvocationContext(body.context);
   const outputDir = parseOptionalString(body.outputDir);
   const turnInput: TurnInput = {
     message,

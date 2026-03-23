@@ -237,6 +237,95 @@ describe('runtime-managed skills HTTP contract', () => {
     );
   });
 
+  it('persists companion hydration metadata into the session hydration contract', async () => {
+    const app = createTestApp();
+    const companionSession = {
+      catId: 'cat-1',
+      boxId: 'companion-box-1',
+      hydratedAt: '2026-03-23T12:00:00.000Z',
+      requestedSkills: ['companion'],
+      sourceIds: ['source-1'],
+      derivedIds: [],
+      memoryIds: [],
+      responseProfile: {
+        expressionMode: 'animalistic',
+        outputMode: 'text',
+        voiceProfileId: null,
+        notes: 'Keep replies warm.',
+        updatedAt: '2026-03-23T11:59:00.000Z',
+      },
+      sources: [],
+      derived: [],
+      memory: [],
+      ownerNotes: ['Keep replies warm.'],
+      constraints: ['channel:Companion lane'],
+      channelContext: {
+        channelId: 'channel-1',
+        roomMode: 'direct_cat_chat',
+        transport: 'web',
+      },
+    };
+
+    const response = await app.request('/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        provider: 'codex',
+        workspaceMode: 'isolated',
+        context: {
+          source: 'interactive',
+          metadata: {
+            companionSession,
+          },
+        },
+        skills: {
+          profileId: 'companion',
+          requestedSkills: ['companion'],
+          context: {
+            catId: 'cat-1',
+            roomMode: 'direct_cat_chat',
+            transport: 'web',
+            metadata: {
+              companionSession,
+            },
+          },
+        },
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    const body = await response.json() as {
+      id: string;
+      hydration: {
+        metadata?: {
+          companionSession?: {
+            boxId?: string;
+            channelContext?: { channelId?: string };
+          };
+        };
+      };
+    };
+
+    expect(body.hydration.metadata?.companionSession).toEqual(expect.objectContaining({
+      boxId: 'companion-box-1',
+      channelContext: expect.objectContaining({
+        channelId: 'channel-1',
+      }),
+    }));
+
+    const historyResponse = await app.request(`/sessions/${body.id}/history`);
+    expect(historyResponse.status).toBe(200);
+    await expect(historyResponse.json()).resolves.toEqual(expect.objectContaining({
+      hydration: expect.objectContaining({
+        metadata: expect.objectContaining({
+          companionSession: expect.objectContaining({
+            boxId: 'companion-box-1',
+          }),
+        }),
+      }),
+    }));
+  });
+
   it('rejects unknown skills during session creation', async () => {
     const app = createTestApp();
 

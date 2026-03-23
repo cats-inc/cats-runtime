@@ -69,6 +69,10 @@ export async function hydrateSessionState(
   const now = (input.now ?? new Date()).toISOString();
   const resolvedSkills = resolveSkillHydration(input);
   const workspace = await hydrateWorkspace(input, now);
+  const metadata = mergeHydrationMetadata(
+    input.existingHydration?.metadata,
+    input.metadata,
+  );
 
   return {
     ...(resolvedSkills ? { skills: resolvedSkills.skillState } : {}),
@@ -90,8 +94,30 @@ export async function hydrateSessionState(
             },
           }
         : {}),
-      ...(input.metadata ? { metadata: structuredClone(input.metadata) } : {}),
+      ...(metadata ? { metadata } : {}),
     },
+  };
+}
+
+function mergeHydrationMetadata(
+  existing: Record<string, unknown> | undefined,
+  next: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!existing && !next) {
+    return undefined;
+  }
+
+  if (!existing) {
+    return structuredClone(next);
+  }
+
+  if (!next) {
+    return structuredClone(existing);
+  }
+
+  return {
+    ...structuredClone(existing),
+    ...structuredClone(next),
   };
 }
 

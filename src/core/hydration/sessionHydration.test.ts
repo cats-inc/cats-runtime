@@ -130,6 +130,64 @@ describe('session hydration', () => {
     ]));
   });
 
+  it('preserves existing hydration metadata and overlays new metadata on top', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-hydration-'));
+    cleanupPaths.push(root);
+    const runtimeCwd = join(root, 'repo');
+    mkdirSync(runtimeCwd, { recursive: true });
+
+    const hydrated = await hydrateSessionState({
+      trigger: 'message',
+      sessionId: 'metadata-session',
+      providerName: 'codex',
+      providerBackend: 'cli',
+      runtimeCwd,
+      workspaceMode: 'shared',
+      sessionBaseDir: join(root, 'sessions'),
+      existingHydration: {
+        trigger: 'create',
+        updatedAt: '2026-03-23T00:00:00.000Z',
+        workspace: {
+          runtimeCwd,
+          sourceCwd: runtimeCwd,
+          sourceOfTruth: 'runtime_cwd',
+          substrate: {
+            auditPath: runtimeCwd,
+            profile: 'standard',
+            status: 'present',
+            checkedAt: '2026-03-23T00:00:00.000Z',
+            changedPaths: [],
+            reviewCopyPaths: [],
+            findingCounts: {
+              missing: 0,
+              present: 0,
+              drifted: 0,
+              conflicting: 0,
+            },
+          },
+          warnings: [],
+        },
+        metadata: {
+          companionSession: {
+            boxId: 'companion-box-1',
+          },
+          preserved: true,
+        },
+      },
+      metadata: {
+        requestId: 'req-123',
+      },
+    });
+
+    expect(hydrated.hydration.metadata).toEqual({
+      companionSession: {
+        boxId: 'companion-box-1',
+      },
+      preserved: true,
+      requestId: 'req-123',
+    });
+  });
+
   it('downgrades operational workspace audit failures into warnings', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-hydration-'));
     cleanupPaths.push(root);

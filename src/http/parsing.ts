@@ -62,6 +62,23 @@ export function parseInvocationContext(value: unknown): SessionInvocationContext
     : undefined;
 }
 
+export function extractHydrationMetadata(
+  context: SessionInvocationContext | undefined,
+  skills: RuntimeSkillManifest | undefined,
+): Record<string, unknown> | undefined {
+  const metadataParts = [context?.metadata, skills?.context?.metadata].filter(
+    (entry): entry is Record<string, unknown> => Boolean(entry),
+  );
+  if (metadataParts.length === 0) {
+    return undefined;
+  }
+
+  return metadataParts.reduce<Record<string, unknown>>((merged, entry) => ({
+    ...merged,
+    ...structuredClone(entry),
+  }), {});
+}
+
 function parseRuntimeSkillRoomMode(
   value: unknown,
 ): RuntimeSkillManifestContext['roomMode'] | undefined {

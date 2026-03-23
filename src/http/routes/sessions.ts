@@ -66,6 +66,7 @@ import {
 import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
 import { hydrateSessionState } from '../../core/hydration/sessionHydration.js';
 import {
+  extractHydrationMetadata,
   parseInvocationContext,
   parseOptionalString,
   parseRuntimeSkillManifest,
@@ -439,6 +440,7 @@ async function hydrateSessionForTarget(
     existingSkills?: SessionInfo['skills'];
     existingHydration?: SessionInfo['hydration'];
     workspaceSourceCwd?: string;
+    metadata?: Record<string, unknown>;
   },
 ) {
   return hydrateSessionState({
@@ -454,6 +456,7 @@ async function hydrateSessionForTarget(
     requestedWorkspaceSourceCwd: options.workspaceSourceCwd,
     existingHydration: options.existingHydration,
     baseInstructionsFile: options.providerTarget.cliInstance?.piInstructionsFile,
+    metadata: options.metadata,
   });
 }
 
@@ -888,6 +891,10 @@ sessionRoutes.post('/sessions', async (c) => {
     return c.json({ error: parsedSkills.error }, 400);
   }
   const context = parseInvocationContext(body.context);
+  const requestedHydrationMetadata = extractHydrationMetadata(
+    context,
+    parsedSkills.clear ? undefined : parsedSkills.manifest,
+  );
   const outputDir = parseOptionalString(body.outputDir);
 
   if (reusePolicy !== 'create_new' && requestedSessionKey) {
@@ -922,6 +929,7 @@ sessionRoutes.post('/sessions', async (c) => {
           existingSkills: parsedSkills.clear ? undefined : existing.skills,
           existingHydration: existing.hydration,
           workspaceSourceCwd: getSessionWorkspaceSourceCwd(existing),
+          metadata: requestedHydrationMetadata,
         });
         skills = hydrated.skills;
         hydration = hydrated.hydration;
@@ -998,6 +1006,7 @@ sessionRoutes.post('/sessions', async (c) => {
       requestedSkills: parsedSkills.clear ? undefined : parsedSkills.manifest,
       existingHydration: undefined,
       workspaceSourceCwd: resolved.sourceCwd,
+      metadata: requestedHydrationMetadata,
     });
     skills = hydrated.skills;
     hydration = hydrated.hydration;
@@ -1842,6 +1851,10 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     outputDir: parseOptionalString(rawBody.outputDir),
     transplant: parseContextTransplant(rawBody.transplant),
   };
+  const requestedHydrationMetadata = extractHydrationMetadata(
+    body.context,
+    parsedSkills.clear ? undefined : body.skills,
+  );
 
   const requestedProviderName = body.provider ?? session.providerName;
   let childTarget: ProviderTargetDescriptor;
@@ -1977,6 +1990,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
         forkCwd,
         forkWorkspaceMode,
       ),
+      metadata: requestedHydrationMetadata,
     });
     childSkills = hydrated.skills;
     childHydration = hydrated.hydration;
