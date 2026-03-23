@@ -127,10 +127,17 @@ export function createRuntimeApp(ctx: AppContext) {
     return c.html(html);
   });
 
+  // Serve the playground (multi-agent chat) without auth.
+  app.get('/playground', (c) => {
+    const htmlPath = resolve(__dirname, '../../public/playground.html');
+    return c.html(readFileSync(htmlPath, 'utf-8'));
+  });
+
   app.use('*', async (c, next) => {
     const path = c.req.path;
     if (
       path === '/'
+      || path === '/playground'
       || path === '/sessions'
       || path === '/health'
       || path === '/diagnostics/health'
