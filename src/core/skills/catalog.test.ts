@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import type { SessionSkillState } from '../types.js';
 import { mergeRuntimeSkillInstructions, resolveRuntimeSkillManifest } from './catalog.js';
 
 describe('runtime skill catalog', () => {
@@ -321,5 +322,91 @@ describe('runtime skill catalog', () => {
     const mergedInstructions = mergeRuntimeSkillInstructions(undefined, skillState);
     expect(mergedInstructions).toContain('Original cached instructions.');
     expect(mergedInstructions).not.toContain('Mutated instructions');
+  });
+
+  it('refreshes the catalog cache when a skill package changes on disk between resolves', async () => {
+    const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
+    cleanupPaths.push(sessionBaseDir);
+    const skillsRoot = join(sessionBaseDir, 'skills');
+    const cwd = join(sessionBaseDir, 'repo');
+    mkdirSync(cwd, { recursive: true });
+    writeSkillPackage(skillsRoot, 'work/product-manager', {
+      family: 'work',
+      body: 'Catalog cache version one.',
+    });
+
+    const firstSkillState = resolveRuntimeSkillManifest({
+      requestedSkills: ['work/product-manager'],
+    }, {
+      sessionId: 'session-cache-refresh-1',
+      providerName: 'claude',
+      providerBackend: 'api',
+      cwd,
+      workspaceMode: 'shared',
+      sessionBaseDir,
+      skillsRoot,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    writeSkillPackage(skillsRoot, 'work/product-manager', {
+      family: 'work',
+      body: 'Catalog cache version two with updated content.',
+    });
+
+    const secondSkillState = resolveRuntimeSkillManifest({
+      requestedSkills: ['work/product-manager'],
+    }, {
+      sessionId: 'session-cache-refresh-2',
+      providerName: 'claude',
+      providerBackend: 'api',
+      cwd,
+      workspaceMode: 'shared',
+      sessionBaseDir,
+      skillsRoot,
+    });
+
+    expect(firstSkillState?.resolvedSkills[0]?.fingerprint).not.toBe(
+      secondSkillState?.resolvedSkills[0]?.fingerprint,
+    );
+    expect(mergeRuntimeSkillInstructions(undefined, secondSkillState)).toContain(
+      'Catalog cache version two with updated content.',
+    );
+  });
+
+  it('rebuilds instruction overlays for legacy persisted skill state without slug metadata', () => {
+    const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
+    cleanupPaths.push(sessionBaseDir);
+    const skillsRoot = join(sessionBaseDir, 'skills');
+    const cwd = join(sessionBaseDir, 'repo');
+    mkdirSync(cwd, { recursive: true });
+    writeSkillPackage(skillsRoot, 'work/product-manager', {
+      family: 'work',
+      body: 'Legacy persisted skill body.',
+    });
+
+    const skillState = resolveRuntimeSkillManifest({
+      requestedSkills: ['work/product-manager'],
+    }, {
+      sessionId: 'session-legacy-skill-state',
+      providerName: 'claude',
+      providerBackend: 'api',
+      cwd,
+      workspaceMode: 'shared',
+      sessionBaseDir,
+      skillsRoot,
+    });
+
+    const legacyState: SessionSkillState = {
+      ...skillState!,
+      resolvedSkills: skillState!.resolvedSkills.map((skill) => {
+        const legacySkill = { ...skill } as Partial<typeof skill>;
+        delete legacySkill.slug;
+        return legacySkill as typeof skill;
+      }),
+    };
+
+    const mergedInstructions = mergeRuntimeSkillInstructions(undefined, legacyState);
+    expect(mergedInstructions).toContain('Legacy persisted skill body.');
+    expect(mergedInstructions).toContain('Runtime Skill: Product Manager');
   });
 });

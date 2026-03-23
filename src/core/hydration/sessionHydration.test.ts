@@ -22,12 +22,16 @@ describe('session hydration', () => {
   });
 
   function writeSkillPackage(skillsRoot: string, skillId: string, body = 'Use the skill.') {
-    const skillDir = join(skillsRoot, skillId);
+    const pathSegments = skillId.split('/').filter(Boolean);
+    const slug = pathSegments.at(-1)!;
+    const family = pathSegments.length > 1 ? pathSegments.slice(0, -1).join('/') : undefined;
+    const skillDir = join(skillsRoot, ...pathSegments);
     mkdirSync(skillDir, { recursive: true });
     writeFileSync(join(skillDir, 'SKILL.md'), [
       '---',
-      `name: ${skillId}`,
+      `name: ${slug}`,
       `description: ${skillId} description.`,
+      ...(family ? [`family: ${family}`] : []),
       '---',
       '',
       body,
@@ -80,11 +84,7 @@ describe('session hydration', () => {
     });
 
     expect(buildRuntimeSkillManifestFromState(existingSkills)).toEqual({
-      requestedSkills: [{
-        id: 'companion',
-        slug: 'companion',
-        fingerprint: existingSkills?.resolvedSkills[0]?.fingerprint,
-      }],
+      requestedSkills: ['companion'],
       strict: false,
     });
     expect(hydrated.skills).toEqual(expect.objectContaining({
@@ -92,7 +92,6 @@ describe('session hydration', () => {
       requestedSkillRefs: [expect.objectContaining({
         id: 'companion',
         slug: 'companion',
-        fingerprint: existingSkills?.resolvedSkills[0]?.fingerprint,
       })],
       delivery: expect.objectContaining({
         provider: 'codex',
@@ -121,6 +120,75 @@ describe('session hydration', () => {
       }),
     }));
     expect(existsSync(join(childCwd, '.agents', 'skills', 'companion', 'SKILL.md'))).toBe(true);
+  });
+
+  it('rehydrates persisted sessions even when stored skill refs pin an older version or fingerprint', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-hydration-'));
+    cleanupPaths.push(root);
+    const sessionBaseDir = join(root, 'sessions');
+    const skillsRoot = join(root, 'skills');
+    const parentCwd = join(root, 'repo');
+    const childCwd = join(sessionBaseDir, 'child');
+    mkdirSync(parentCwd, { recursive: true });
+    mkdirSync(childCwd, { recursive: true });
+    writeSkillPackage(skillsRoot, 'work/product-manager', 'Version one body.');
+
+    const existingSkills = resolveRuntimeSkillManifest({
+      requestedSkills: ['work/product-manager'],
+    }, {
+      sessionId: 'parent-versioned',
+      providerName: 'claude',
+      providerBackend: 'api',
+      cwd: parentCwd,
+      workspaceMode: 'shared',
+      sessionBaseDir,
+      skillsRoot,
+    });
+
+    if (existingSkills) {
+      existingSkills.requestedSkillRefs = [{
+        id: 'work/product-manager',
+        family: 'work',
+        slug: 'product-manager',
+        version: '2026.03',
+        fingerprint: 'old-fingerprint',
+        requestedAs: 'work/product-manager',
+      }];
+    }
+
+    writeSkillPackage(skillsRoot, 'work/product-manager', 'Version two body.');
+
+    const hydrated = await hydrateSessionState({
+      trigger: 'resume',
+      sessionId: 'child-versioned',
+      providerName: 'claude',
+      providerBackend: 'api',
+      runtimeCwd: childCwd,
+      workspaceMode: 'shared',
+      sessionBaseDir,
+      existingSkills,
+      skillsRoot,
+    });
+
+    expect(buildRuntimeSkillManifestFromState(existingSkills)).toEqual({
+      requestedSkills: [{
+        id: 'work/product-manager',
+        family: 'work',
+        slug: 'product-manager',
+      }],
+      strict: false,
+    });
+    expect(hydrated.skills).toEqual(expect.objectContaining({
+      requestedSkills: ['work/product-manager'],
+      requestedSkillRefs: [expect.objectContaining({
+        id: 'work/product-manager',
+        family: 'work',
+        slug: 'product-manager',
+      })],
+      resolvedSkills: [expect.objectContaining({
+        id: 'work/product-manager',
+      })],
+    }));
   });
 
   it('marks isolated sandboxes without a source workspace as session-scoped state', async () => {

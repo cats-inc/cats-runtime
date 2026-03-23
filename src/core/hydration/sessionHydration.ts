@@ -62,13 +62,15 @@ export function buildRuntimeSkillManifestFromState(
     ...(skillState.profileId ? { profileId: skillState.profileId } : {}),
     requestedSkills: skillState.requestedSkillRefs?.length
       ? skillState.requestedSkillRefs.map((skillRef) => {
-          if (skillRef.family || skillRef.version || skillRef.fingerprint) {
+          // Re-entry should preserve identity/family, but not pin sessions to a
+          // historical package fingerprint or version that may drift after a
+          // library update. Explicit request-time pinning still works because it
+          // bypasses this persisted-state rebuild path.
+          if (skillRef.family) {
             return {
               id: skillRef.id,
-              ...(skillRef.family ? { family: skillRef.family } : {}),
+              family: skillRef.family,
               slug: skillRef.slug,
-              ...(skillRef.version ? { version: skillRef.version } : {}),
-              ...(skillRef.fingerprint ? { fingerprint: skillRef.fingerprint } : {}),
             };
           }
 

@@ -6,6 +6,7 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
@@ -29,6 +30,10 @@ const CODER_SKILLS_ROOT = path.join('.agents', 'skills');
 const RUNTIME_SKILL_STATE_ROOT = '.runtime-skills';
 const MAX_RUNTIME_SKILL_PACKAGE_CACHE_ENTRIES = 128;
 const runtimeSkillPackageCache = new Map<string, RuntimeSkillPackage>();
+const runtimeSkillCatalogCache = new Map<string, {
+  watchKey: string;
+  packages: RuntimeSkillPackage[];
+}>();
 
 interface RuntimeSkillPackage {
   id: string;
@@ -141,6 +146,16 @@ function splitRequestedSkillId(
   const slug = segments.at(-1)!;
   const family = segments.length > 1 ? segments.slice(0, -1).join('/') : undefined;
   return { family, slug };
+}
+
+function resolvePersistedSkillPathParts(
+  skill: Pick<ResolvedRuntimeSkill, 'id' | 'slug' | 'family'>,
+): { family?: string; slug: string } {
+  const parsed = splitRequestedSkillId(skill.id);
+  return {
+    family: normalizeOptionalToken(skill.family) ?? parsed.family,
+    slug: normalizeOptionalToken(skill.slug) ?? parsed.slug,
+  };
 }
 
 function normalizeRequestedSkillRef(
@@ -318,8 +333,9 @@ function parseAliases(
 
 function parseSkillMarkdown(
   entry: DiscoverableRuntimeSkillEntry,
+  rawContent?: string,
 ): RuntimeSkillPackage {
-  const raw = readFileSync(entry.entryFile, 'utf-8');
+  const raw = rawContent ?? readFileSync(entry.entryFile, 'utf-8');
   const match = raw.match(/^---\s*\r?\n([\s\S]*?)\r?\n---\s*(?:\r?\n([\s\S]*))?$/);
   const pathSkillId = entry.pathSegments.join('/');
   if (!match) {
@@ -420,13 +436,72 @@ function loadRuntimeSkillPackage(
     return cached;
   }
 
-  return cacheRuntimeSkillPackage(parseSkillMarkdown(entry));
+  return cacheRuntimeSkillPackage(parseSkillMarkdown(entry, raw));
+}
+
+function buildSkillsRootWatchKey(
+  skillsRoot: string,
+): string {
+  if (!existsSync(skillsRoot)) {
+    return 'missing';
+  }
+
+  const parts: string[] = [];
+  const appendEntry = (
+    entryFile: string,
+    pathSegments: string[],
+  ) => {
+    const stat = statSync(entryFile);
+    parts.push([
+      pathSegments.join('/'),
+      stat.size,
+      Math.trunc(stat.mtimeMs),
+    ].join(':'));
+  };
+
+  for (const entry of readdirSync(skillsRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+
+    const packagePath = path.join(skillsRoot, entry.name);
+    const directEntryFile = path.join(packagePath, 'SKILL.md');
+    if (existsSync(directEntryFile)) {
+      appendEntry(directEntryFile, [entry.name]);
+      continue;
+    }
+
+    for (const child of readdirSync(packagePath, { withFileTypes: true })) {
+      if (!child.isDirectory()) {
+        continue;
+      }
+
+      const childEntryFile = path.join(packagePath, child.name, 'SKILL.md');
+      if (!existsSync(childEntryFile)) {
+        continue;
+      }
+      appendEntry(childEntryFile, [entry.name, child.name]);
+    }
+  }
+
+  return parts.sort().join('|');
 }
 
 function listRuntimeSkillPackages(
   skillsRoot: string = SKILLS_ROOT,
 ): RuntimeSkillPackage[] {
-  return discoverRuntimeSkillEntries(skillsRoot).map((entry) => loadRuntimeSkillPackage(entry));
+  const watchKey = buildSkillsRootWatchKey(skillsRoot);
+  const cachedCatalog = runtimeSkillCatalogCache.get(skillsRoot);
+  if (cachedCatalog?.watchKey === watchKey) {
+    return cachedCatalog.packages;
+  }
+
+  const packages = discoverRuntimeSkillEntries(skillsRoot).map((entry) => loadRuntimeSkillPackage(entry));
+  runtimeSkillCatalogCache.set(skillsRoot, {
+    watchKey,
+    packages,
+  });
+  return packages;
 }
 
 export function listRuntimeSkillIds(skillsRoot: string = SKILLS_ROOT): string[] {
@@ -831,12 +906,14 @@ function rebuildRuntimeSkillPackages(
       );
     }
 
+    const pathParts = resolvePersistedSkillPathParts(skill);
+
     return cacheRuntimeSkillPackage(parseSkillMarkdown({
       packagePath: path.dirname(skill.entryFile),
       entryFile: skill.entryFile,
-      pathSegments: skill.family
-        ? [...skill.family.split('/').filter(Boolean), skill.slug]
-        : [skill.slug],
+      pathSegments: pathParts.family
+        ? [...pathParts.family.split('/').filter(Boolean), pathParts.slug]
+        : [pathParts.slug],
     }));
   });
 }
