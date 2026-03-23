@@ -453,12 +453,12 @@ cancel / reset / delete behave across CLI, API, and agent backends.
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Add runtime-owned current/last-run inspection contract | [x] | Session payloads now expose `inspection.state`, `wake`, `currentRun`, `lastRun`, `progress`, `recentEvents`, and action affordances |
+| Add runtime-owned current/last-run inspection contract | [x] | Session payloads now expose `inspection.state`, `wake`, `currentRun`, `lastRun`, `progress`, `recentEvents`, action affordances, and per-run `previewSurfaces` |
 | Add session-scoped metering/incident/guardrail inspection reads | [x] | `inspection.metering` now projects per-session usage, preflight guardrails, active guardrails, and recent incidents |
 | Add additive `/sessions/{id}/observe` snapshot route | [x] | Hosts can fetch run-inspector state plus history/stream links without opening SSE |
-| Add additive `/sessions/{id}/cancel` and `/sessions/{id}/reset` routes | [x] | Runtime now exposes explicit cancel vs reset semantics without breaking existing close/delete flows |
+| Add additive `/sessions/{id}/cancel` and `/sessions/{id}/reset` routes | [x] | Runtime now exposes explicit cancel vs reset semantics and additive lifecycle snapshots without breaking existing close/delete flows |
 | Strengthen backend cleanup symmetry | [x] | Agent-backed close/cancel/delete/reset now route through adapter-aware remote cleanup; CLI/API now expose best-effort cancel semantics too |
-| Extend history/session routes with the same inspection contract | [x] | `GET /sessions`, `GET /sessions/{id}`, and `GET /sessions/{id}/history` now share one additive inspection payload |
+| Extend history/session routes with the same inspection contract | [x] | `GET /sessions`, `GET /sessions/{id}`, and `GET /sessions/{id}/history` now share one additive inspection payload, plus history-level transcript provenance and Pi-native parsing |
 | Cover lifecycle/inspection behavior with automated tests | [x] | Vitest covers session close/cancel/reset/observe, agent remote cleanup, history inspection, and broad route regressions |
 
 #### Deferred Boundaries

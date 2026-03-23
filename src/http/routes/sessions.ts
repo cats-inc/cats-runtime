@@ -165,6 +165,17 @@ function serializeSession(ctx: AppContext, session: SessionInfo) {
   };
 }
 
+function serializeLifecycleSession(
+  ctx: AppContext,
+  session: SessionInfo,
+  action: 'close' | 'cancel' | 'reset',
+) {
+  return {
+    action,
+    ...serializeSession(ctx, session),
+  };
+}
+
 function serializeSessions(
   ctx: AppContext,
   sessions: SessionInfo[],
@@ -1273,15 +1284,15 @@ sessionRoutes.post('/sessions/:id/close', async (c) => {
   if (!worker?.active) {
     ctx.registry.updateStatus(id, 'closed');
     runtime.markClosed(id);
-    return c.json({ status: 'closed' });
+    return c.json(serializeLifecycleSession(ctx, ctx.registry.get(id) ?? session, 'close'));
   }
 
   ctx.registry.updateStatus(id, 'closing');
   await runtime.close(session, 'close');
-  if (session.providerBackend !== 'cli' && !runtime.isAttached(id)) {
+  if (!runtime.isAttached(id)) {
     ctx.registry.updateStatus(id, 'closed');
   }
-  return c.json({ status: 'closing' });
+  return c.json(serializeLifecycleSession(ctx, ctx.registry.get(id) ?? session, 'close'));
 });
 
 /** POST /sessions/:id/cancel — cancel the active turn but keep the session */
@@ -1305,28 +1316,22 @@ sessionRoutes.post('/sessions/:id/cancel', async (c) => {
   const worker = runtime.get(id);
   if (!worker?.active) {
     ctx.registry.updateStatus(id, session.status === 'closed' ? 'closed' : 'ready');
-    return c.json({
-      status: session.status === 'closed' ? 'closed' : 'idle',
-      attached: false,
-    });
+    return c.json(serializeLifecycleSession(ctx, ctx.registry.get(id) ?? session, 'cancel'));
   }
 
   if (!worker.busy) {
-    return c.json({
-      status: 'idle',
-      attached: true,
-    });
+    ctx.registry.updateStatus(id, 'ready');
+    return c.json(serializeLifecycleSession(ctx, ctx.registry.get(id) ?? session, 'cancel'));
   }
 
   const result = await runtime.cancel(session);
   if (!result.attached) {
     ctx.registry.updateStatus(id, 'closed');
+  } else if (!runtime.get(id)?.busy) {
+    ctx.registry.updateStatus(id, 'ready');
   }
 
-  return c.json({
-    status: 'canceling',
-    attached: result.attached,
-  });
+  return c.json(serializeLifecycleSession(ctx, ctx.registry.get(id) ?? session, 'cancel'));
 });
 
 /** POST /sessions/:id/reset — clear provider resume state and detach the worker */
@@ -1359,7 +1364,7 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
   runtime.clearProviderState(id);
   runtime.markClosed(id);
   ctx.wakeup?.clearSession(id);
-  return c.json(serializeSession(ctx, ctx.registry.get(id) ?? session));
+  return c.json(serializeLifecycleSession(ctx, ctx.registry.get(id) ?? session, 'reset'));
 });
 
 /** DELETE /sessions/:id — permanently remove session and delete .jsonl */
@@ -1464,6 +1469,8 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
   runtime.dropSession(id);
   ctx.registry.flush();
   return c.json({
+    action: 'delete',
+    sessionId: id,
     status: 'deleted',
     hadTranscript,
     fileDeleted: managedDeletion.fileDeleted || providerDeletion.fileDeleted,

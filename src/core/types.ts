@@ -943,6 +943,7 @@ export interface RuntimeRunInspection {
   incident?: RuntimeRateLimitIncident;
   artifacts?: SessionArtifact[];
   services?: AgentRuntimeService[];
+  previewSurfaces?: RuntimePreviewSurface[];
 }
 
 export interface RuntimeSessionMeteringSnapshot {

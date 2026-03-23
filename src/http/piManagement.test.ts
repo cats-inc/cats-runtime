@@ -225,6 +225,11 @@ describe('Pi session management', () => {
     expect(historyResponse.status).toBe(200);
     const historyBody = await historyResponse.json();
     expect(historyBody).toMatchObject({
+      transcript: {
+        ownership: 'runtime',
+        source: 'jsonl',
+        parser: 'generic_jsonl',
+      },
       artifacts: [],
       messages: [
         { role: 'user', text: 'hello', timestamp: expect.any(String) },
@@ -236,6 +241,71 @@ describe('Pi session management', () => {
       lastRun: {
         status: 'succeeded',
         inputPreview: 'hello',
+      },
+    });
+  });
+
+  it('parses Pi-native transcript history and surfaces transcript metadata', async () => {
+    const sourcePath = join(piSessionsDir, 'workspace', 'session.jsonl');
+    mkdirSync(join(piSessionsDir, 'workspace'), { recursive: true });
+    writeFileSync(sourcePath, [
+      JSON.stringify({
+        type: 'message',
+        timestamp: '2026-03-23T00:00:00.000Z',
+        message: {
+          role: 'user',
+          content: [{ type: 'text', text: 'Review the patch.' }],
+        },
+      }),
+      JSON.stringify({
+        type: 'message',
+        timestamp: '2026-03-23T00:00:02.000Z',
+        stopReason: 'stop',
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'thinking', thinking: 'checking diff' },
+            { type: 'text', text: 'The patch looks good.' },
+          ],
+          usage: {
+            input: 12,
+            output: 4,
+          },
+        },
+      }),
+      '',
+    ].join('\n'));
+
+    const session = registry.upsertDiscovered('pi-native-history', {
+      providerName: 'pi',
+      cwd: 'C:/repo',
+      sourcePath,
+      messageCount: 2,
+    });
+
+    const response = await app.request(`/sessions/${session!.id}/history`);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      transcript: {
+        ownership: 'provider',
+        source: 'jsonl',
+        parser: 'pi_native',
+      },
+      messages: [
+        {
+          role: 'user',
+          text: 'Review the patch.',
+          timestamp: '2026-03-23T00:00:00.000Z',
+        },
+        {
+          role: 'assistant',
+          text: 'The patch looks good.',
+          timestamp: '2026-03-23T00:00:02.000Z',
+        },
+      ],
+      inspection: {
+        state: 'closed',
+        wake: null,
       },
     });
   });

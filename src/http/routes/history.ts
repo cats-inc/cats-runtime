@@ -15,6 +15,7 @@ import {
   getKiroNative,
   getOpencodeNative,
 } from '../providerServices.js';
+import type { PiMessagePart, PiStreamEvent } from '../../backends/cli/pi/parser.js';
 
 export const historyRoutes = new Hono();
 
@@ -42,6 +43,20 @@ interface HistoryMessage {
   timestamp?: string;
 }
 
+interface HistoryTranscriptMetadata {
+  ownership: 'provider' | 'runtime' | 'none';
+  source: 'service' | 'jsonl' | 'json' | 'none';
+  parser:
+    | 'cursor_native'
+    | 'kiro_native'
+    | 'auggie_native'
+    | 'opencode_native'
+    | 'gemini_native'
+    | 'generic_jsonl'
+    | 'pi_native'
+    | 'none';
+}
+
 function buildHistoryMetadata(ctx: AppContext, session: SessionInfo) {
   const wakeup = ctx.wakeup?.getSessionWakeState(session.id);
   const runtime = getRuntimeSessionManager(ctx);
@@ -65,6 +80,137 @@ function buildHistoryMetadata(ctx: AppContext, session: SessionInfo) {
   };
 }
 
+function buildHistoryResponse(
+  ctx: AppContext,
+  session: SessionInfo,
+  messages: HistoryMessage[],
+  transcript: HistoryTranscriptMetadata,
+) {
+  return {
+    messages,
+    transcript,
+    ...buildHistoryMetadata(ctx, session),
+  };
+}
+
+function extractPiTextContent(content: string | PiMessagePart[] | undefined): string {
+  if (!content) return '';
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  return content
+    .filter((part) => part.type === 'text' && typeof part.text === 'string')
+    .map((part) => part.text!)
+    .join('');
+}
+
+async function loadPiHistory(filePath: string): Promise<HistoryMessage[]> {
+  const messages: HistoryMessage[] = [];
+  let streamingAssistantText = '';
+  let streamingAssistantTimestamp: string | undefined;
+
+  const flushStreamingAssistant = () => {
+    const text = streamingAssistantText.trim();
+    if (!text) {
+      streamingAssistantText = '';
+      streamingAssistantTimestamp = undefined;
+      return;
+    }
+
+    const previous = messages.at(-1);
+    if (
+      previous?.role === 'assistant'
+      && previous.text === text
+      && previous.timestamp === streamingAssistantTimestamp
+    ) {
+      streamingAssistantText = '';
+      streamingAssistantTimestamp = undefined;
+      return;
+    }
+
+    messages.push({
+      role: 'assistant',
+      text,
+      timestamp: streamingAssistantTimestamp,
+    });
+    streamingAssistantText = '';
+    streamingAssistantTimestamp = undefined;
+  };
+
+  const rl = createInterface({
+    input: createReadStream(filePath, { encoding: 'utf-8' }),
+    crlfDelay: Infinity,
+  });
+
+  for await (const line of rl) {
+    if (!line.trim()) continue;
+
+    let obj: PiStreamEvent & { timestamp?: string };
+    try {
+      obj = JSON.parse(line);
+    } catch {
+      continue;
+    }
+
+    const timestamp = typeof obj.timestamp === 'string' ? obj.timestamp : undefined;
+    if (obj.type === 'message') {
+      const role = obj.message?.role;
+      const text = extractPiTextContent(obj.message?.content);
+      if (role === 'user' && text) {
+        messages.push({ role: 'user', text, timestamp });
+      } else if (role === 'assistant' && text) {
+        flushStreamingAssistant();
+        messages.push({ role: 'assistant', text, timestamp });
+      }
+      continue;
+    }
+
+    if (
+      obj.type === 'message_update'
+      && obj.assistantMessageEvent?.type === 'text_delta'
+      && obj.assistantMessageEvent.delta
+    ) {
+      streamingAssistantText += obj.assistantMessageEvent.delta;
+      streamingAssistantTimestamp = streamingAssistantTimestamp || timestamp;
+      continue;
+    }
+
+    if (obj.type === 'turn_end') {
+      if (obj.message?.stopReason !== 'toolUse') {
+        flushStreamingAssistant();
+      }
+      continue;
+    }
+
+    if (obj.type === 'agent_end') {
+      let lastAssistant:
+        | {
+          role?: string;
+          content?: string | PiMessagePart[];
+        }
+        | undefined;
+      if (Array.isArray(obj.messages)) {
+        for (let index = obj.messages.length - 1; index >= 0; index -= 1) {
+          const candidate = obj.messages[index];
+          if (candidate?.role === 'assistant') {
+            lastAssistant = candidate;
+            break;
+          }
+        }
+      }
+      const text = extractPiTextContent(lastAssistant?.content);
+      if (text) {
+        flushStreamingAssistant();
+        messages.push({ role: 'assistant', text, timestamp });
+      } else {
+        flushStreamingAssistant();
+      }
+    }
+  }
+
+  flushStreamingAssistant();
+  return messages;
+}
+
 /** GET /sessions/:id/history — load conversation history from .jsonl */
 historyRoutes.get('/sessions/:id/history', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
@@ -77,7 +223,11 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
 
   if (session.providerName === 'cursor') {
     if (!session.providerSessionId) {
-      return c.json({ messages: [] });
+      return c.json(buildHistoryResponse(ctx, session, [], {
+        ownership: 'provider',
+        source: 'none',
+        parser: 'cursor_native',
+      }));
     }
 
     try {
@@ -85,10 +235,11 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
         ctx,
         session.providerInstanceId,
       ).loadHistory(session.cwd, session.providerSessionId);
-      return c.json({
-        messages,
-        ...buildHistoryMetadata(ctx, session),
-      });
+      return c.json(buildHistoryResponse(ctx, session, messages, {
+        ownership: 'provider',
+        source: 'service',
+        parser: 'cursor_native',
+      }));
     } catch (err) {
       return c.json({ error: `Failed to load Cursor history: ${err}` }, 500);
     }
@@ -96,7 +247,11 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
 
   if (session.providerName === 'kiro') {
     if (!session.providerSessionId) {
-      return c.json({ messages: [] });
+      return c.json(buildHistoryResponse(ctx, session, [], {
+        ownership: 'provider',
+        source: 'none',
+        parser: 'kiro_native',
+      }));
     }
 
     try {
@@ -104,10 +259,11 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
         ctx,
         session.providerInstanceId,
       ).loadHistory(session.cwd, session.providerSessionId);
-      return c.json({
-        messages,
-        ...buildHistoryMetadata(ctx, session),
-      });
+      return c.json(buildHistoryResponse(ctx, session, messages, {
+        ownership: 'provider',
+        source: 'service',
+        parser: 'kiro_native',
+      }));
     } catch (err) {
       return c.json({ error: `Failed to load Kiro history: ${err}` }, 500);
     }
@@ -119,10 +275,11 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
         providerSessionId: session.providerSessionId,
         sourcePath: session.providerSourcePath || session.sourcePath,
       });
-      return c.json({
-        messages,
-        ...buildHistoryMetadata(ctx, session),
-      });
+      return c.json(buildHistoryResponse(ctx, session, messages, {
+        ownership: 'provider',
+        source: 'service',
+        parser: 'auggie_native',
+      }));
     } catch (err) {
       return c.json({ error: `Failed to load Auggie history: ${err}` }, 500);
     }
@@ -130,7 +287,11 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
 
   if (session.providerName === 'opencode') {
     if (!session.providerSessionId) {
-      return c.json({ messages: [] });
+      return c.json(buildHistoryResponse(ctx, session, [], {
+        ownership: 'provider',
+        source: 'none',
+        parser: 'opencode_native',
+      }));
     }
 
     try {
@@ -138,10 +299,11 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
         ctx,
         session.providerInstanceId,
       ).loadHistory(session.cwd, session.providerSessionId);
-      return c.json({
-        messages,
-        ...buildHistoryMetadata(ctx, session),
-      });
+      return c.json(buildHistoryResponse(ctx, session, messages, {
+        ownership: 'provider',
+        source: 'service',
+        parser: 'opencode_native',
+      }));
     } catch (err) {
       return c.json({ error: `Failed to load OpenCode history: ${err}` }, 500);
     }
@@ -154,15 +316,36 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
     paths.push(session.sourcePath);
   }
   if (paths.length === 0) {
-    return c.json({
-      messages: [],
-      ...buildHistoryMetadata(ctx, session),
-    });
+    return c.json(buildHistoryResponse(ctx, session, [], {
+      ownership: 'none',
+      source: 'none',
+      parser: 'none',
+    }));
   }
 
   const messages: HistoryMessage[] = [];
+  let transcript: HistoryTranscriptMetadata = {
+    ownership: session.providerSourcePath ? 'provider' : 'runtime',
+    source: 'jsonl',
+    parser: 'generic_jsonl',
+  };
 
   for (const filePath of paths) {
+    if (session.providerName === 'pi' && filePath === session.providerSourcePath) {
+      try {
+        const piMessages = await loadPiHistory(filePath);
+        messages.push(...piMessages);
+        transcript = {
+          ownership: 'provider',
+          source: 'jsonl',
+          parser: 'pi_native',
+        };
+      } catch {
+        // Fall through to the generic parser for any unreadable Pi transcripts.
+      }
+      continue;
+    }
+
     // Gemini single-JSON session format
     if (filePath.endsWith('.json')) {
       try {
@@ -175,6 +358,11 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
           else if (msg.type === 'gemini' && text)
             messages.push({ role: 'assistant', text, timestamp: msg.timestamp });
         }
+        transcript = {
+          ownership: filePath === session.providerSourcePath ? 'provider' : 'runtime',
+          source: 'json',
+          parser: 'gemini_native',
+        };
       } catch {
         // Non-fatal
       }
@@ -265,8 +453,5 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
     }
   }
 
-  return c.json({
-    messages,
-    ...buildHistoryMetadata(ctx, session),
-  });
+  return c.json(buildHistoryResponse(ctx, session, messages, transcript));
 });

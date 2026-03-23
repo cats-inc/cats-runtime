@@ -961,6 +961,11 @@ such as:
     { "role": "user", "text": "..." },
     { "role": "assistant", "text": "..." }
   ],
+  "transcript": {
+    "ownership": "provider",
+    "source": "jsonl",
+    "parser": "pi_native"
+  },
   "sessionKey": "task-123",
   "outputDir": "/workspace/out",
   "artifacts": [
@@ -977,7 +982,8 @@ such as:
   "inspection": {
     "state": "idle",
     "lastRun": {
-      "status": "succeeded"
+      "status": "succeeded",
+      "previewSurfaces": []
     }
   },
   "skills": {
@@ -990,6 +996,15 @@ such as:
   }
 }
 ```
+
+`transcript` is additive machine-readable history provenance:
+
+- `ownership`: whether the transcript source is provider-owned, runtime-owned, or absent
+- `source`: `service`, `jsonl`, `json`, or `none`
+- `parser`: runtime parser/service path used to build the returned message list
+
+This makes Pi-native and other provider-native history reads easier to inspect
+without forcing hosts to infer transcript semantics from provider names alone.
 
 ### Runtime Inspection
 
@@ -1021,7 +1036,11 @@ the same additive `wakeup` block returned by `GET /sessions/{id}` and
       "nextScheduledAt": "2026-03-23T12:05:00.000Z"
     },
     "inspection": {
-      "state": "running"
+      "state": "running",
+      "currentRun": {
+        "status": "running",
+        "previewSurfaces": []
+      }
     }
   },
   "historyPath": "/sessions/session-123/history",
@@ -1040,8 +1059,16 @@ attachment while keeping the runtime-owned session record and history. Reset
 also clears any scheduled wakeups targeting that session so stale wake requests
 do not survive after provider resume state is discarded.
 
+`POST /sessions/{id}/close`, `POST /sessions/{id}/cancel`, and
+`POST /sessions/{id}/reset` now all return the same additive session snapshot
+shape used by `GET /sessions/{id}`, plus an `action` field (`close`, `cancel`,
+or `reset`) so hosts can update run-inspector state without an immediate
+follow-up fetch.
+
 `DELETE /sessions/{id}` also clears any persisted wakeups targeting that
-session before the runtime unregisters it.
+session before the runtime unregisters it. Delete responses now also include
+`action: "delete"` plus `sessionId` so lifecycle consumers can treat delete as
+the same control family even though the session snapshot is gone afterward.
 
 `GET /providers/config` returns the configured provider topology for dashboards
 or other clients that need to offer provider-instance selection. Each instance

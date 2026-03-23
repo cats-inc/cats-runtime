@@ -37,15 +37,21 @@ export interface BuildSessionInspectionInput {
 export function buildSessionInspection(
   input: BuildSessionInspectionInput,
 ): RuntimeSessionInspection {
+  const currentRun = input.trackedState?.currentRun
+    ? enrichRunInspection(input.trackedState.currentRun, input.session)
+    : undefined;
+  const lastRun = input.trackedState?.lastRun
+    ? enrichRunInspection(input.trackedState.lastRun, input.session)
+    : undefined;
   const artifacts = dedupeArtifacts([
     ...(input.session.artifacts || []),
-    ...(input.trackedState?.currentRun?.artifacts || []),
-    ...(input.trackedState?.lastRun?.artifacts || []),
+    ...(currentRun?.artifacts || []),
+    ...(lastRun?.artifacts || []),
   ]);
   const services = dedupeServices([
     ...(input.session.providerState?.agentSession?.services || []),
-    ...(input.trackedState?.currentRun?.services || []),
-    ...(input.trackedState?.lastRun?.services || []),
+    ...(currentRun?.services || []),
+    ...(lastRun?.services || []),
   ]);
   const previewSurfaces = [
     ...artifacts.map((artifact) => createArtifactPreviewSurface(artifact, input.session)),
@@ -60,11 +66,11 @@ export function buildSessionInspection(
     attached: input.view.attached,
     busy,
     wake: input.trackedState?.wake
-      || input.trackedState?.currentRun?.wake
-      || input.trackedState?.lastRun?.wake
+      || currentRun?.wake
+      || lastRun?.wake
       || extractWakeReason(input.session.context),
-    ...(input.trackedState?.currentRun ? { currentRun: input.trackedState.currentRun } : {}),
-    ...(input.trackedState?.lastRun ? { lastRun: input.trackedState.lastRun } : {}),
+    ...(currentRun ? { currentRun } : {}),
+    ...(lastRun ? { lastRun } : {}),
     ...(input.trackedState?.progress ? { progress: input.trackedState.progress } : {}),
     recentEvents: input.trackedState?.recentEvents || [],
     metering: input.metering,
@@ -86,6 +92,25 @@ export function buildSessionInspection(
       canRetry: Boolean(input.trackedState?.lastRun)
         && (input.view.controls.canSend || input.view.controls.canResume),
     },
+  };
+}
+
+function enrichRunInspection(
+  run: RuntimeSessionInspection['currentRun'],
+  session: SessionInfo,
+) {
+  if (!run) {
+    return undefined;
+  }
+
+  const previewSurfaces = dedupePreviewSurfaces([
+    ...(run.artifacts || []).map((artifact) => createArtifactPreviewSurface(artifact, session)),
+    ...(run.services || []).map((service) => createServicePreviewSurface(service, session)),
+  ]);
+
+  return {
+    ...run,
+    previewSurfaces,
   };
 }
 
@@ -131,6 +156,25 @@ function dedupeServices(services: AgentRuntimeService[]): AgentRuntimeService[] 
     deduped.set(service.id, {
       ...service,
       ...(service.metadata ? { metadata: { ...service.metadata } } : {}),
+    });
+  }
+  return Array.from(deduped.values());
+}
+
+function dedupePreviewSurfaces(
+  previewSurfaces: RuntimePreviewSurface[],
+): RuntimePreviewSurface[] {
+  const deduped = new Map<string, RuntimePreviewSurface>();
+  for (const previewSurface of previewSurfaces) {
+    if (!previewSurface.id || deduped.has(previewSurface.id)) {
+      continue;
+    }
+    deduped.set(previewSurface.id, {
+      ...previewSurface,
+      ...(previewSurface.metadata ? { metadata: { ...previewSurface.metadata } } : {}),
+      ...(previewSurface.provenance
+        ? { provenance: { ...previewSurface.provenance } }
+        : {}),
     });
   }
   return Array.from(deduped.values());

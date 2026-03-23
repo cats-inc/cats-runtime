@@ -175,7 +175,13 @@ describe('session close route', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ status: 'closed' });
+    await expect(res.json()).resolves.toEqual(expect.objectContaining({
+      action: 'close',
+      status: 'closed',
+      inspection: expect.objectContaining({
+        state: 'closed',
+      }),
+    }));
     expect(registry.get(session.id)?.status).toBe('closed');
     expect(vi.mocked(pool.kill)).not.toHaveBeenCalled();
   });
@@ -194,8 +200,15 @@ describe('session close route', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ status: 'closing' });
-    expect(registry.get(session.id)?.status).toBe('closing');
+    await expect(res.json()).resolves.toEqual(expect.objectContaining({
+      action: 'close',
+      status: 'closed',
+      attached: false,
+      inspection: expect.objectContaining({
+        state: 'closed',
+      }),
+    }));
+    expect(registry.get(session.id)?.status).toBe('closed');
     expect(vi.mocked(pool.kill)).toHaveBeenCalledWith(session.id);
   });
 
@@ -213,10 +226,14 @@ describe('session close route', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
-      status: 'canceling',
+    await expect(res.json()).resolves.toEqual(expect.objectContaining({
+      action: 'cancel',
+      status: 'ready',
       attached: true,
-    });
+      inspection: expect.objectContaining({
+        state: 'canceling',
+      }),
+    }));
     expect(vi.mocked(pool.cancel)).toHaveBeenCalledWith(session.id);
     expect(attachedWorkers.get(session.id)?.busy).toBe(false);
   });
@@ -247,6 +264,7 @@ describe('session close route', () => {
     expect(res.status).toBe(200);
 
     const body = await res.json() as {
+      action: string;
       providerSessionId?: string;
       providerState?: unknown;
       status: string;
@@ -255,6 +273,7 @@ describe('session close route', () => {
         services: Array<{ id: string }>;
       };
     };
+    expect(body.action).toBe('reset');
     expect(body.status).toBe('closed');
     expect(body.providerSessionId).toBeUndefined();
     expect(body.providerState).toBeUndefined();
@@ -381,6 +400,14 @@ describe('session close route', () => {
             source: 'assignment',
             reason: 'follow up',
             taskId: 'task-9',
+          },
+          currentRun: {
+            status: 'running',
+            wake: {
+              source: 'assignment',
+              reason: 'follow up',
+              taskId: 'task-9',
+            },
           },
           progress: {
             eventType: 'progress',

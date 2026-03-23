@@ -319,6 +319,11 @@ describe('agent backend integration', () => {
       const historyResponse = await runtime.app.request(`/sessions/${created.id}/history`);
       expect(historyResponse.status).toBe(200);
       expect(await historyResponse.json()).toMatchObject({
+        transcript: {
+          ownership: 'runtime',
+          source: 'jsonl',
+          parser: 'generic_jsonl',
+        },
         sessionKey: 'task-123',
         outputDir: '/tmp/out',
         context: {
@@ -329,6 +334,21 @@ describe('agent backend integration', () => {
           id: 'run-1-artifact',
           path: '/tmp/run-1.md',
         }],
+        inspection: {
+          lastRun: {
+            status: 'succeeded',
+            previewSurfaces: expect.arrayContaining([
+              expect.objectContaining({
+                kind: 'artifact',
+                artifactId: 'run-1-artifact',
+              }),
+              expect.objectContaining({
+                kind: 'service',
+                url: 'https://preview.test/run-1',
+              }),
+            ]),
+          },
+        },
       });
 
       const closeResponse = await runtime.app.request(`/sessions/${created.id}/close`, {
@@ -901,7 +921,14 @@ describe('agent backend integration', () => {
         method: 'POST',
       });
       expect(closeResponse.status).toBe(200);
-      expect(await closeResponse.json()).toEqual({ status: 'closing' });
+      await expect(closeResponse.json()).resolves.toEqual(expect.objectContaining({
+        action: 'close',
+        status: 'closed',
+        attached: false,
+        inspection: expect.objectContaining({
+          state: 'closed',
+        }),
+      }));
       expect(runtime.context.registry.get(created.id)?.status).toBe('closed');
       expect(runtime.context.runtime?.isAttached(created.id)).toBe(false);
       expect(fetchCalls).toContainEqual(expect.objectContaining({

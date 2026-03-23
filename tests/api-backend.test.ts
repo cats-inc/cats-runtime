@@ -368,6 +368,7 @@ describe('API backend integration', () => {
         lastRun: {
           status: 'succeeded',
           providerSessionId: 'resp_2',
+          previewSurfaces: [],
         },
       });
 
