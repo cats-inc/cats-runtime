@@ -1,98 +1,156 @@
-# Agent Skills
+# Runtime Skill Library
 
-> Structured, reusable agent instructions following the [Agent Skills](https://agentskills.io) open standard.
+> Runtime-owned skill content catalog for `cats-runtime`.
 
-## Overview
+## Purpose
 
-Agent Skills provide progressive disclosure of complex instructions. Instead of embedding long procedures inline in `AGENTS.md` or agent-specific files, each skill is a standalone `SKILL.md` with YAML frontmatter that agents discover automatically.
+`cats-runtime/skills/` is the canonical library of execution-ready `SKILL.md`
+packages that the runtime can validate, resolve, materialize, and report in
+session metadata.
 
-## How It Works
+This directory is:
 
-1. **Canonical source**: All skills live in `skills/` (version-controlled)
-2. **Sync to agents**: Run `Sync-AgentSkills.ps1` to copy skills to each agent's discovery path
-3. **Agent discovery**: Each agent finds skills in its own directory
+- runtime-owned content
+- family-organized for authoring and review
+- compatible with the existing runtime skill validator
 
-Skill directories may include supporting files (for example `scripts/`, `references/`, or `assets/`). Sync copies the entire skill directory so agents can access all referenced files.
+This directory is not:
 
-### Discovery Paths
+- a second product-side skill catalog
+- the runtime injection/materialization engine
+- a runtime dependency on any sibling or submodule role library
 
-| Agent | Discovery Path |
-|-------|---------------|
-| Claude Code | `.claude/skills/<name>/SKILL.md` |
-| Codex | `.agents/skills/<name>/SKILL.md` |
-| Gemini CLI | `.gemini/skills/<name>/SKILL.md` |
+## Authoring Reference Boundary
 
-### Syncing Skills
+`agency-agents/` may exist at the monorepo root as an authoring/reference
+source, but shipped `cats-runtime` skills must remain local packages owned by
+this repo. Do not import from `agency-agents` at runtime.
 
-```powershell
-# Sync all skills to all agents
-.\scripts\windows\Sync-AgentSkills.ps1
-
-# Sync to a specific agent only
-.\scripts\windows\Sync-AgentSkills.ps1 -Agent claude
-
-# Clean target directories before syncing
-.\scripts\windows\Sync-AgentSkills.ps1 -Clean
-```
-
-## SKILL.md Format
-
-Each skill is a directory containing a `SKILL.md` file:
+## Layout
 
 ```text
 skills/
-  ├── skill-name/
-  │   └── SKILL.md
-  └── family/
-      └── skill-name/
-          └── SKILL.md
+  orchestration/
+    coordinator/
+      SKILL.md
+  work/
+    product-manager/
+      SKILL.md
+  chat/
+    companion/
+      SKILL.md
+  code/
+    advanced-programmer-runtime/
+      SKILL.md
 ```
 
-The `SKILL.md` file uses YAML frontmatter:
+Requested runtime skill ids remain the leaf package names such as
+`coordinator`, `product-manager`, or `advanced-programmer-runtime`.
+
+## Frontmatter Contract
+
+All shipped runtime-owned skills should declare this richer metadata:
 
 ```yaml
 ---
-name: skill-name          # Required: 1-64 chars, lowercase, hyphens, no leading/trailing hyphen, no consecutive hyphens, must match directory
-description: What and when # Required: 1-1024 chars
-title: Human Friendly Title # Optional
-family: work               # Optional but recommended for family-grouped skills
-version: 2026.03           # Optional
-aliases:                   # Optional
-  - short-name
-allowed-tools: Read Bash   # Optional (experimental; support varies by agent implementation)
+name: product-manager
+description: Product management skill for scope control and requirements framing.
+family: work
+slug: product-manager
+role: product_manager
+packageKind: role
+version: 1.0.0
+capabilityTags:
+  - scope-control
+  - requirements-framing
+productTags:
+  - product
+  - planning
+deliveryHints:
+  - filesystem
+  - instructions
+recommendedCompanions:
+  - companion-mentor
 ---
-Markdown instructions...
 ```
 
-Note: `allowed-tools` is experimental and may be ignored by some agents.
+Field notes:
 
-### Runtime Library Notes
+- `name`: required skill id and directory name
+- `family`: taxonomy grouping used by the runtime catalog
+- `slug`: stable role/library slug
+- `role`: machine-readable role identifier
+- `packageKind`: `base`, `role`, or `bundle`
+- `version`: content package version
+- `capabilityTags`: what the skill is good at
+- `productTags`: contexts/products likely to consume it
+- `deliveryHints`: preferred runtime delivery shapes
+- `recommendedCompanions`: optional pairing hints for higher-level products
 
-- Runtime resolution accepts either flat slugs like `companion` or canonical
-  family-qualified ids like `work/product-manager`.
-- Family-grouped packages should keep `name:` equal to the leaf directory
-  (`product-manager`), not the canonical id.
-- Runtime-managed filesystem delivery may flatten packages to agent discovery
-  paths, so role-library authors should prefer globally unique slugs for
-  execution-critical skills unless instruction-only delivery is acceptable.
+Custom local skills may omit the richer metadata and still pass the baseline
+runtime-managed skills validator, but runtime-owned library packages should not.
 
-## Available Skills
+## Families
 
-<!-- Add your project-specific skills here -->
+### `orchestration`
 
-| Skill | Description |
-|-------|-------------|
-| `companion` | Companion behavior for memory continuity, emotional awareness, and daily presence. |
-| `repo-maintainer` | Safe repository maintenance, narrow-scope edits, and test/doc discipline. |
-| `delivery-auditor` | Delivery-focused review of repo state, artifacts, previews, and release readiness. |
+| Skill | Package Kind | Focus |
+|-------|--------------|-------|
+| `orchestrator` | `role` | high-level decomposition and delegation |
+| `coordinator` | `role` | sequencing and dependency management |
+| `dispatcher` | `role` | work routing and capability matching |
+| `incident-commander` | `role` | degraded-state stabilization and evidence-first triage |
+| `delivery-auditor` | `base` | delivery/readiness verification |
 
-## Adding a New Skill
+### `work`
 
-1. Create a directory under `skills/` with the skill name (lowercase, hyphens)
-2. Add a `SKILL.md` file with proper frontmatter
-3. Run `Sync-AgentSkills.ps1` to deploy
-4. Update this README with the new skill
+| Skill | Package Kind | Focus |
+|-------|--------------|-------|
+| `ceo` | `role` | executive direction and tradeoffs |
+| `sales` | `role` | qualification and next-step control |
+| `product-manager` | `role` | scope and requirements |
+| `project-manager-agile` | `role` | iterative delivery hygiene |
+| `project-manager-waterfall` | `role` | milestone sequencing |
+| `ux` | `role` | interaction and flow clarity |
+| `art-designer` | `role` | visual direction |
+| `architect` | `role` | system boundaries and long-lived design |
+| `coder` | `role` | implementation and debugging |
+| `automation-tester` | `role` | regression automation |
+| `code-reviewer` | `role` | bug/risk review |
+| `qa` | `role` | acceptance and release risk |
+| `marketer` | `role` | positioning and messaging |
+| `hr` | `role` | people/policy communication |
+| `secretary` | `role` | administrative follow-through |
+| `intern` | `role` | bounded support work |
+
+### `chat`
+
+| Skill | Package Kind | Focus |
+|-------|--------------|-------|
+| `companion` | `base` | memory continuity and daily presence |
+| `companion-gentle` | `role` | calm, low-pressure support |
+| `companion-playful` | `role` | lightness and energy |
+| `companion-guardian` | `role` | boundaries and protective support |
+| `companion-mentor` | `role` | reflective growth-oriented guidance |
+
+### `code`
+
+| Skill | Package Kind | Focus |
+|-------|--------------|-------|
+| `repo-maintainer` | `base` | safe narrow-scope code changes |
+| `advanced-programmer-backend` | `role` | backend contracts and production safety |
+| `advanced-programmer-frontend` | `role` | UI/state implementation integrity |
+| `advanced-programmer-systems` | `role` | hosts, packaging, and process supervision |
+| `advanced-programmer-runtime` | `role` | runtime seams and lifecycle integrity |
+
+## Syncing Skills
+
+If agent-discovery mirrors need refresh after editing library content:
+
+```powershell
+.\scripts\windows\Sync-AgentSkills.ps1
+```
 
 ---
 
-*This directory follows the [Agent Skills](https://agentskills.io) standard.*
+*This directory follows the [Agent Skills](https://agentskills.io) standard while adding runtime-owned library metadata for `cats-runtime`.*

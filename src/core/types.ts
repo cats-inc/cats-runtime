@@ -829,6 +829,22 @@ export interface RuntimeSkillManifest {
   strict?: boolean;
 }
 
+export type RuntimeSkillFamily = 'base' | 'orchestration' | 'work' | 'chat' | 'code';
+
+export type RuntimeSkillPackageKind = 'base' | 'role' | 'bundle';
+
+export interface RuntimeSkillLibraryMetadata {
+  family: RuntimeSkillFamily;
+  slug: string;
+  role: string;
+  packageKind: RuntimeSkillPackageKind;
+  version: string;
+  capabilityTags: string[];
+  productTags: string[];
+  deliveryHints: RuntimeSkillDeliveryMode[];
+  recommendedCompanions: string[];
+}
+
 export interface ResolvedRuntimeSkill {
   id: string;
   slug: string;
@@ -841,7 +857,10 @@ export interface ResolvedRuntimeSkill {
   sourcePath: string;
   entryFile: string;
   fingerprint: string;
+  library: RuntimeSkillLibraryMetadata;
 }
+
+export type RuntimeSkillCatalogEntry = ResolvedRuntimeSkill;
 
 export interface RuntimeSkillFilesystemMaterialization {
   rootPath: string;

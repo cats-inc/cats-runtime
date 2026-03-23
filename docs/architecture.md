@@ -31,7 +31,7 @@ The architectural split is:
 Runtime-managed skills now sit at the shared runtime layer rather than inside
 product shells or ad-hoc prompt helpers. The runtime:
 
-- validates execution-ready `skills/<name>/SKILL.md` packages
+- validates execution-ready family-organized `skills/**/SKILL.md` packages
 - resolves requested runtime skill ids into session-owned metadata
 - chooses a backend-aware delivery mode (`filesystem`, `instructions`, `none`)
 - persists requested/resolved/applied skill state into session inspection and
@@ -75,6 +75,10 @@ src/
     providerActiveConfig.ts
     provider-install/
     skills/
+      orchestration/
+      work/
+      chat/
+      code/
     dotenv.ts
     providerCatalog.ts
     progress.ts
@@ -309,7 +313,11 @@ src/
 
 - Discovers runtime-owned skill packages from `skills/`
 - Validates `SKILL.md` frontmatter and instruction bodies before runtime use
+- Derives stable library metadata (`family`, `slug`, `role`, `packageKind`,
+  `capabilityTags`, `deliveryHints`) for runtime-owned packages
 - Resolves session-level requested skill ids into runtime-visible metadata
+- Exposes `listRuntimeSkillCatalog()` as the runtime-internal contract Team 6
+  can consume without coupling to execution/materialization internals
 - Supports explicit clearing of persisted skill state on create/message/fork
 - Chooses adapter-aware delivery modes per provider/backend
 - Materializes filesystem or instruction-file resources where the target needs

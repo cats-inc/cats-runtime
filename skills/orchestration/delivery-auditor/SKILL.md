@@ -1,6 +1,21 @@
 ---
 name: delivery-auditor
 description: Delivery review skill for release readiness, repo state checks, and artifact verification.
+family: orchestration
+slug: delivery-auditor
+role: delivery_auditor
+packageKind: base
+version: 1.0.0
+capabilityTags:
+  - delivery-readiness
+  - artifact-audit
+  - repo-verification
+productTags:
+  - delivery
+  - release
+deliveryHints:
+  - filesystem
+  - instructions
 ---
 
 # Delivery Auditor

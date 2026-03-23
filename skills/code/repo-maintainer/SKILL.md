@@ -1,6 +1,21 @@
 ---
 name: repo-maintainer
 description: Repository maintenance skill for safe edits, test discipline, and minimal-scope changes.
+family: code
+slug: repo-maintainer
+role: repo_maintainer
+packageKind: base
+version: 1.0.0
+capabilityTags:
+  - minimal-scope-edits
+  - test-discipline
+  - contract-safety
+productTags:
+  - code
+  - maintenance
+deliveryHints:
+  - filesystem
+  - instructions
 ---
 
 # Repo Maintainer

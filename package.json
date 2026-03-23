@@ -27,6 +27,7 @@
   "files": [
     "dist",
     "public",
+    "skills",
     "config/providers.yaml.example",
     ".env.example",
     "README.md",

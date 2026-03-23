@@ -2,8 +2,12 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { SessionSkillState } from '../types.js';
-import { mergeRuntimeSkillInstructions, resolveRuntimeSkillManifest } from './catalog.js';
+import {
+  buildRuntimeSkillInstructionOverlay,
+  listRuntimeSkillCatalog,
+  mergeRuntimeSkillInstructions,
+  resolveRuntimeSkillManifest,
+} from './catalog.js';
 
 describe('runtime skill catalog', () => {
   const cleanupPaths: string[] = [];
@@ -19,39 +23,56 @@ describe('runtime skill catalog', () => {
 
   function writeSkillPackage(
     skillsRoot: string,
-    skillPath: string,
+    skillId: string,
     options: {
+      family?: string;
       body?: string;
       name?: string;
       description?: string;
-      family?: string;
-      title?: string;
+      slug?: string;
+      role?: string;
+      packageKind?: string;
       version?: string;
-      aliases?: string[];
+      capabilityTags?: string[];
+      productTags?: string[];
+      deliveryHints?: string[];
+      recommendedCompanions?: string[];
     } = {},
   ) {
-    const pathSegments = skillPath.split('/').filter(Boolean);
-    const slug = pathSegments.at(-1)!;
-    const skillDir = join(skillsRoot, ...pathSegments);
+    const skillDir = options.family
+      ? join(skillsRoot, options.family, skillId)
+      : join(skillsRoot, skillId);
     mkdirSync(skillDir, { recursive: true });
-    writeFileSync(join(skillDir, 'SKILL.md'), [
+    const lines = [
       '---',
-      `name: ${options.name ?? slug}`,
-      ...(options.title ? [`title: ${options.title}`] : []),
-      `description: ${options.description ?? `${slug} description.`}`,
+      `name: ${options.name ?? skillId}`,
+      `description: ${options.description ?? `${skillId} description.`}`,
       ...(options.family ? [`family: ${options.family}`] : []),
+      ...(options.slug ? [`slug: ${options.slug}`] : []),
+      ...(options.role ? [`role: ${options.role}`] : []),
+      ...(options.packageKind ? [`packageKind: ${options.packageKind}`] : []),
       ...(options.version ? [`version: ${options.version}`] : []),
-      ...(options.aliases?.length
+      ...(options.capabilityTags
+        ? ['capabilityTags:', ...options.capabilityTags.map((tag) => `  - ${tag}`)]
+        : []),
+      ...(options.productTags
+        ? ['productTags:', ...options.productTags.map((tag) => `  - ${tag}`)]
+        : []),
+      ...(options.deliveryHints
+        ? ['deliveryHints:', ...options.deliveryHints.map((hint) => `  - ${hint}`)]
+        : []),
+      ...(options.recommendedCompanions
         ? [
-            'aliases:',
-            ...options.aliases.map((alias) => `  - ${alias}`),
+            'recommendedCompanions:',
+            ...options.recommendedCompanions.map((companion) => `  - ${companion}`),
           ]
         : []),
       '---',
       '',
-      options.body ?? `Use the ${slug} workflow.`,
+      options.body ?? `Use the ${skillId} workflow.`,
       '',
-    ].join('\n'), 'utf8');
+    ];
+    writeFileSync(join(skillDir, 'SKILL.md'), lines.join('\n'), 'utf8');
     return skillDir;
   }
 
@@ -186,115 +207,6 @@ describe('runtime skill catalog', () => {
     }));
   });
 
-  it('resolves family-aware library skills and preserves requested refs', () => {
-    const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
-    cleanupPaths.push(sessionBaseDir);
-    const skillsRoot = join(sessionBaseDir, 'skills');
-    const cwd = join(sessionBaseDir, 'repo');
-    mkdirSync(cwd, { recursive: true });
-    writeSkillPackage(skillsRoot, 'work/product-manager', {
-      family: 'work',
-      title: 'Product Manager',
-      version: '2026.03',
-      aliases: ['pm'],
-      body: 'Shape product outcomes.',
-    });
-
-    const skillState = resolveRuntimeSkillManifest({
-      requestedSkills: [{
-        family: 'work',
-        slug: 'product-manager',
-        version: '2026.03',
-      }],
-    }, {
-      sessionId: 'session-work-role',
-      providerName: 'claude',
-      providerBackend: 'api',
-      cwd,
-      workspaceMode: 'shared',
-      sessionBaseDir,
-      skillsRoot,
-    });
-
-    expect(skillState).toEqual(expect.objectContaining({
-      requestedSkills: ['work/product-manager'],
-      requestedSkillRefs: [{
-        id: 'work/product-manager',
-        family: 'work',
-        slug: 'product-manager',
-        version: '2026.03',
-        requestedAs: 'work/product-manager',
-      }],
-      appliedSkillIds: ['work/product-manager'],
-      resolvedSkills: [expect.objectContaining({
-        id: 'work/product-manager',
-        family: 'work',
-        slug: 'product-manager',
-        version: '2026.03',
-        title: 'Product Manager',
-      })],
-    }));
-  });
-
-  it('rejects ambiguous slug-only requests when multiple families share the same slug', () => {
-    const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
-    cleanupPaths.push(sessionBaseDir);
-    const skillsRoot = join(sessionBaseDir, 'skills');
-    writeSkillPackage(skillsRoot, 'work/architect', {
-      family: 'work',
-    });
-    writeSkillPackage(skillsRoot, 'code/architect', {
-      family: 'code',
-    });
-
-    expect(() => resolveRuntimeSkillManifest({
-      requestedSkills: ['architect'],
-    }, {
-      sessionId: 'session-ambiguous',
-      providerName: 'claude',
-      providerBackend: 'api',
-      cwd: join(sessionBaseDir, 'repo'),
-      workspaceMode: 'shared',
-      sessionBaseDir,
-      skillsRoot,
-    })).toThrowError("Runtime skill 'architect' is ambiguous. Request it as family/slug instead.");
-  });
-
-  it('downgrades Codex filesystem delivery when selected skills collide on materialized slug', () => {
-    const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
-    cleanupPaths.push(sessionBaseDir);
-    const skillsRoot = join(sessionBaseDir, 'skills');
-    const cwd = join(sessionBaseDir, 'repo');
-    mkdirSync(cwd, { recursive: true });
-    writeSkillPackage(skillsRoot, 'work/architect', {
-      family: 'work',
-    });
-    writeSkillPackage(skillsRoot, 'code/architect', {
-      family: 'code',
-    });
-
-    const skillState = resolveRuntimeSkillManifest({
-      requestedSkills: ['work/architect', 'code/architect'],
-    }, {
-      sessionId: 'session-collision',
-      providerName: 'codex',
-      providerBackend: 'cli',
-      cwd,
-      workspaceMode: 'isolated',
-      sessionBaseDir,
-      skillsRoot,
-    });
-
-    expect(skillState?.delivery).toEqual(expect.objectContaining({
-      preferredMode: 'filesystem',
-      mode: 'instructions',
-      status: 'degraded',
-    }));
-    expect(skillState?.warnings).toEqual(expect.arrayContaining([
-      expect.stringContaining("slug 'architect'"),
-    ]));
-  });
-
   it('reuses the resolved skill package when building later instruction overlays', () => {
     const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
     cleanupPaths.push(sessionBaseDir);
@@ -324,70 +236,75 @@ describe('runtime skill catalog', () => {
     expect(mergedInstructions).not.toContain('Mutated instructions');
   });
 
-  it('refreshes the catalog cache when a skill package changes on disk between resolves', async () => {
+  it('lists a family-aware runtime skill catalog with normalized metadata', () => {
     const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
     cleanupPaths.push(sessionBaseDir);
     const skillsRoot = join(sessionBaseDir, 'skills');
-    const cwd = join(sessionBaseDir, 'repo');
-    mkdirSync(cwd, { recursive: true });
-    writeSkillPackage(skillsRoot, 'work/product-manager', {
-      family: 'work',
-      body: 'Catalog cache version one.',
+    writeSkillPackage(skillsRoot, 'coordinator', {
+      family: 'orchestration',
+      role: 'coordinator',
+      capabilityTags: ['sequencing', 'dependency-tracking'],
+      productTags: ['orchestration'],
+      deliveryHints: ['filesystem', 'instructions'],
+      recommendedCompanions: ['companion-guardian'],
+    });
+    writeSkillPackage(skillsRoot, 'companion', {
+      family: 'chat',
+      packageKind: 'base',
+      role: 'companion_core',
+      capabilityTags: ['memory-continuity'],
     });
 
-    const firstSkillState = resolveRuntimeSkillManifest({
-      requestedSkills: ['work/product-manager'],
-    }, {
-      sessionId: 'session-cache-refresh-1',
-      providerName: 'claude',
-      providerBackend: 'api',
-      cwd,
-      workspaceMode: 'shared',
-      sessionBaseDir,
-      skillsRoot,
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    writeSkillPackage(skillsRoot, 'work/product-manager', {
-      family: 'work',
-      body: 'Catalog cache version two with updated content.',
-    });
-
-    const secondSkillState = resolveRuntimeSkillManifest({
-      requestedSkills: ['work/product-manager'],
-    }, {
-      sessionId: 'session-cache-refresh-2',
-      providerName: 'claude',
-      providerBackend: 'api',
-      cwd,
-      workspaceMode: 'shared',
-      sessionBaseDir,
-      skillsRoot,
-    });
-
-    expect(firstSkillState?.resolvedSkills[0]?.fingerprint).not.toBe(
-      secondSkillState?.resolvedSkills[0]?.fingerprint,
-    );
-    expect(mergeRuntimeSkillInstructions(undefined, secondSkillState)).toContain(
-      'Catalog cache version two with updated content.',
-    );
+    const catalog = listRuntimeSkillCatalog(skillsRoot);
+    expect(catalog).toEqual([
+      expect.objectContaining({
+        id: 'companion',
+        library: {
+          family: 'chat',
+          slug: 'companion',
+          role: 'companion_core',
+          packageKind: 'base',
+          version: '1.0.0',
+          capabilityTags: ['memory-continuity'],
+          productTags: [],
+          deliveryHints: [],
+          recommendedCompanions: [],
+        },
+      }),
+      expect.objectContaining({
+        id: 'coordinator',
+        library: {
+          family: 'orchestration',
+          slug: 'coordinator',
+          role: 'coordinator',
+          packageKind: 'role',
+          version: '1.0.0',
+          capabilityTags: ['sequencing', 'dependency-tracking'],
+          productTags: ['orchestration'],
+          deliveryHints: ['filesystem', 'instructions'],
+          recommendedCompanions: ['companion-guardian'],
+        },
+      }),
+    ]);
   });
 
-  it('rebuilds instruction overlays for legacy persisted skill state without slug metadata', () => {
+  it('resolves nested family packages by requested skill id', () => {
     const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
     cleanupPaths.push(sessionBaseDir);
     const skillsRoot = join(sessionBaseDir, 'skills');
     const cwd = join(sessionBaseDir, 'repo');
     mkdirSync(cwd, { recursive: true });
-    writeSkillPackage(skillsRoot, 'work/product-manager', {
-      family: 'work',
-      body: 'Legacy persisted skill body.',
+    writeSkillPackage(skillsRoot, 'advanced-programmer-runtime', {
+      family: 'code',
+      role: 'advanced_programmer_runtime',
+      deliveryHints: ['filesystem', 'instructions'],
+      body: 'Protect runtime seams and lifecycle contracts.',
     });
 
     const skillState = resolveRuntimeSkillManifest({
-      requestedSkills: ['work/product-manager'],
+      requestedSkills: ['advanced-programmer-runtime'],
     }, {
-      sessionId: 'session-legacy-skill-state',
+      sessionId: 'session-runtime',
       providerName: 'claude',
       providerBackend: 'api',
       cwd,
@@ -396,17 +313,94 @@ describe('runtime skill catalog', () => {
       skillsRoot,
     });
 
-    const legacyState: SessionSkillState = {
-      ...skillState!,
-      resolvedSkills: skillState!.resolvedSkills.map((skill) => {
-        const legacySkill = { ...skill } as Partial<typeof skill>;
-        delete legacySkill.slug;
-        return legacySkill as typeof skill;
+    expect(skillState?.resolvedSkills).toEqual([
+      expect.objectContaining({
+        id: 'advanced-programmer-runtime',
+        entryFile: join(
+          skillsRoot,
+          'code',
+          'advanced-programmer-runtime',
+          'SKILL.md',
+        ),
+        library: expect.objectContaining({
+          family: 'code',
+          role: 'advanced_programmer_runtime',
+          deliveryHints: ['filesystem', 'instructions'],
+        }),
       }),
+    ]);
+  });
+
+  it('rejects duplicate skill ids declared in multiple family directories', () => {
+    const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
+    cleanupPaths.push(sessionBaseDir);
+    const skillsRoot = join(sessionBaseDir, 'skills');
+    writeSkillPackage(skillsRoot, 'coordinator', { family: 'orchestration' });
+    writeSkillPackage(skillsRoot, 'coordinator', { family: 'work' });
+
+    expect(() => listRuntimeSkillCatalog(skillsRoot)).toThrowError(
+      "Runtime skill 'coordinator' is declared more than once",
+    );
+  });
+
+  it('fails clearly when a persisted instruction-delivery skill sits outside a recognizable skills root', () => {
+    const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
+    cleanupPaths.push(sessionBaseDir);
+    const detachedEntryDir = join(sessionBaseDir, 'detached', 'detached-skill');
+    mkdirSync(detachedEntryDir, { recursive: true });
+    writeFileSync(join(detachedEntryDir, 'SKILL.md'), [
+      '---',
+      'name: detached-skill',
+      'description: Detached skill for tests.',
+      'family: code',
+      '---',
+      '',
+      'Detached instructions.',
+      '',
+    ].join('\n'), 'utf8');
+
+    const skillState = {
+      requestedSkills: ['detached-skill'],
+      resolvedSkills: [{
+        id: 'detached-skill',
+        title: 'Detached Skill',
+        description: 'Detached skill for tests.',
+        status: 'resolved' as const,
+        source: 'runtime_catalog' as const,
+        sourcePath: detachedEntryDir,
+        entryFile: join(detachedEntryDir, 'SKILL.md'),
+        fingerprint: 'detached-skill-fingerprint',
+        library: {
+          family: 'code' as const,
+          slug: 'detached-skill',
+          role: 'detached_skill',
+          packageKind: 'role' as const,
+          version: '1.0.0',
+          capabilityTags: [],
+          productTags: [],
+          deliveryHints: ['instructions' as const],
+          recommendedCompanions: [],
+        },
+      }],
+      strict: false,
+      delivery: {
+        provider: 'claude',
+        backend: 'api' as const,
+        preferredMode: 'instructions' as const,
+        mode: 'instructions' as const,
+        status: 'applied' as const,
+        warnings: [],
+        instructions: {
+          byteLength: 1,
+        },
+      },
+      warnings: [],
+      appliedSkillIds: ['detached-skill'],
+      updatedAt: '2026-03-24T00:00:00.000Z',
     };
 
-    const mergedInstructions = mergeRuntimeSkillInstructions(undefined, legacyState);
-    expect(mergedInstructions).toContain('Legacy persisted skill body.');
-    expect(mergedInstructions).toContain('Runtime Skill: Product Manager');
+    expect(() => buildRuntimeSkillInstructionOverlay(skillState)).toThrowError(
+      "Runtime skill 'detached-skill' is stored outside a recognizable skills root.",
+    );
   });
 });

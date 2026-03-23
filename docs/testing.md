@@ -13,9 +13,9 @@ locally in the same service that ships them.
 
 ### Unit Tests
 
-- **Location**: `src/backends/cli/**/*.test.ts`, `src/core/tools/**/*.test.ts`
+- **Location**: `src/backends/cli/**/*.test.ts`, `src/core/tools/**/*.test.ts`, `src/core/skills/catalog.test.ts`
 - **Framework**: Vitest
-- **Scope**: provider parsers, runtime adapters, worker helpers, discovery, session registry, native services, and local tool contracts including alias-safety guards for symlink/junction and hardlink edge cases
+- **Scope**: provider parsers, runtime adapters, worker helpers, discovery, session registry, family-aware skill catalog metadata/validation, native services, and local tool contracts including alias-safety guards for symlink/junction and hardlink edge cases
 
 ### Integration Tests
 
@@ -66,6 +66,7 @@ describe('ComponentName', () => {
 - Cover the read-only `audit-workspace` boundary separately from mutable `init-workspace` / `update-workspace` flows
 - Cover child-process startup failure and shutdown lifecycle paths when changing `src/index.ts`, `src/server.ts`, or `src/startup.ts`
 - Cover path alias rejection separately from plain `..` traversal so symlink/junction and hardlink regressions stay caught
+- Cover skill-library metadata normalization and duplicate-id rejection when changing `src/core/skills/catalog.ts` or `skills/`
 
 ## CI/CD Integration
 
@@ -77,4 +78,4 @@ describe('ComponentName', () => {
 
 ---
 
-*Last updated: 2026-03-22*
+*Last updated: 2026-03-24*

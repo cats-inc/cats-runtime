@@ -1,6 +1,24 @@
 ---
 name: companion
 description: Core companion behavior — emotional support, memory continuity, daily awareness. The skill defines the capability; the Cat defines the character.
+family: chat
+slug: companion
+role: companion_core
+packageKind: base
+version: 1.0.0
+capabilityTags:
+  - memory-continuity
+  - emotional-awareness
+  - daily-presence
+productTags:
+  - companion
+  - direct-chat
+deliveryHints:
+  - filesystem
+  - instructions
+recommendedCompanions:
+  - companion-gentle
+  - companion-mentor
 ---
 
 # Companion

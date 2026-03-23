@@ -27,7 +27,7 @@ Current capabilities:
 - embedded multi-agent playground sample at `/playground`
 - runtime-owned MCP facade over `POST /mcp` and the `cats-runtime-mcp` stdio binary for orchestrator-style agents
 - curated MCP mutation tools for `create_session`, `send_message`, `fork_session`, `init_workspace`, and `commit_changes`
-- runtime-managed skills with session-level requested/resolved/applied metadata
+- runtime-managed skills with session-level requested/resolved/applied metadata plus a family-aware internal skill library
 - additive workspace/skill hydration metadata that distinguishes runtime cwd from the authoritative workspace source
 - explicit `skills: null` clearing for create/message/fork session flows
 - backend-aware skill delivery modes (`filesystem`, `instructions`, `none`)
@@ -49,6 +49,7 @@ Current capabilities:
 - [x] Resolve accepted review follow-ups for provider-instance hardening
 - [x] Add `backends/api` for pay-as-you-go API keys and Ollama
 - [x] Land runtime-managed skills v0 session and delivery contract
+- [x] Freeze the first runtime-owned internal skill library taxonomy and metadata contract
 - [x] Stabilize workspace hydration and runtime skill re-entry across create/resume/fork
 - [x] Add worktree-backed session isolation and cleanup discipline across create/resume/reset/delete/fork
 - [x] Add first-slice runtime usage metering, rate-limit/quota incident surfacing, and provider-agnostic progress contracts
@@ -93,6 +94,10 @@ Embedded UIs:
 The executable package starts the same runtime entrypoint as `npm start` and
 still expects `.env` plus `config/providers.yaml` or equivalent environment
 overrides.
+
+Published package contents now also include the runtime-owned `skills/`
+library so validated skill packages ship with the executable boundary instead
+of only existing in the source checkout.
 
 Supported process startup modes:
 

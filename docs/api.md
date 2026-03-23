@@ -699,7 +699,8 @@ When runtime-managed skills are requested, session payloads also include a
 - `requestedSkillRefs`: normalized request refs, including family/slug/version
   or fingerprint constraints when the caller supplied them
 - `resolvedSkills`: validated runtime catalog entries with source/fingerprint
-  metadata plus family/slug/version identity
+  metadata plus normalized library metadata (`family`, `slug`, `role`,
+  `packageKind`, capability tags, and delivery hints)
 - `delivery`: the runtime-selected delivery contract
   (`filesystem`, `instructions`, or `none`) plus downgrade/unsupported warnings
 - `appliedSkillIds`: the subset the runtime actually attached to the session
@@ -725,9 +726,20 @@ Example shape:
         "description": "Core companion behavior...",
         "status": "resolved",
         "source": "runtime_catalog",
-        "sourcePath": "/repo/cats-runtime/skills/companion",
-        "entryFile": "/repo/cats-runtime/skills/companion/SKILL.md",
-        "fingerprint": "sha256..."
+        "sourcePath": "/repo/cats-runtime/skills/chat/companion",
+        "entryFile": "/repo/cats-runtime/skills/chat/companion/SKILL.md",
+        "fingerprint": "sha256...",
+        "library": {
+          "family": "chat",
+          "slug": "companion",
+          "role": "companion_core",
+          "packageKind": "base",
+          "version": "1.0.0",
+          "capabilityTags": ["memory-continuity", "emotional-awareness", "daily-presence"],
+          "productTags": ["companion", "direct-chat"],
+          "deliveryHints": ["filesystem", "instructions"],
+          "recommendedCompanions": ["companion-gentle", "companion-mentor"]
+        }
       }
     ],
     "delivery": {

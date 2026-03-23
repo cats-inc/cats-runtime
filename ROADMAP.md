@@ -426,4 +426,79 @@ skill execution contract.
 - `docs/specs/SPEC-013-internal-skill-library-and-role-taxonomy.md`
 
 ---
+### OPT-7: Internal Skill Library Publishing and Catalog Follow-through
+
+**Priority**: P1
+**Status**: Planned
+
+#### Problem
+
+`cats-runtime` now has the first real internal skill-library slice:
+
+- family-organized `skills/**/SKILL.md` packages
+- runtime-owned `family` / `slug` / `role` / `packageKind` / capability metadata
+- `resolvedSkills[].library` in session state
+- `listRuntimeSkillCatalog()` as the runtime-internal consume seam
+- `agency-agents/` as an authoring-only reference submodule
+
+That freezes the content taxonomy, but the follow-through is still incomplete.
+
+Current gaps:
+
+- there is still no standalone runtime-owned skill catalog route or equivalent
+  read surface for hosts that should not import internal modules directly
+- the runtime catalog contract is stable enough for Team 6, but there is no
+  dedicated publish/lint workflow that proves every shipped skill package keeps
+  the richer metadata complete and internally consistent
+- `agency-agents/` is present only as reference material; there is no explicit
+  authoring sync/review process for comparing external inspiration against the
+  runtime-owned library without accidentally creating runtime coupling
+- runtime-managed skills still resolve only explicit leaf ids; bundle
+  composition and richer library grouping remain outside the contract even
+  though the first taxonomy is now broad enough to need them
+
+#### Direction
+
+Deepen the runtime-owned library surface without collapsing it into the
+execution/materialization engine.
+
+- Add a runtime-owned catalog read surface for the internal skill library
+  without forcing upper layers to import `src/core/skills/catalog.ts`
+- Add a stricter library lint/verification step for shipped runtime-owned skill
+  packages so missing family metadata, duplicate ids, and malformed tags fail
+  before publish
+- Add an explicit authoring workflow for `agency-agents/` reference usage
+  that keeps the boundary clear:
+  - reference-only comparison
+  - no runtime import path
+  - no automatic shadow sync into `skills/`
+- Add bundle/composition metadata once Team 6 is ready to consume grouped role
+  packages without pushing product-specific profile logic into runtime
+- Keep requested skill ids stable while improving library discovery,
+  observability, and publish discipline
+
+#### Why This Is Required
+
+- Team 6 should not be forced to depend forever on internal module imports for
+  skill-library reads.
+- The richer library metadata is now part of the runtime contract and needs
+  stronger verification than the original minimal v0 validator.
+- A reference submodule without a documented authoring workflow will drift into
+  either neglect or accidental dependency.
+- The current taxonomy is broad enough that bundle/composition follow-through
+  will eventually be required for practical skill selection.
+
+#### Affected Areas
+
+- `src/core/skills/*`
+- possible future runtime-owned skill catalog route surface
+- `skills/*`
+- `skills/README.md`
+- `.gitmodules`
+- `agency-agents/`
+- `docs/specs/SPEC-013-internal-skill-library-and-role-taxonomy.md`
+- `docs/specs/SPEC-005-runtime-managed-skills-v0.md`
+- `docs/decisions/018-separate-skill-library-content-from-runtime-execution-engine.md`
+
+---
 *Last updated: 2026-03-24*
