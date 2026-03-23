@@ -606,6 +606,46 @@ describe('ProviderCompatibilityService', () => {
     }));
   });
 
+  it('prefers a fresh live cached summary over a newer light cached summary', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-cache-live-'));
+    tempDirs.push(root);
+    let now = Date.parse('2026-03-23T00:01:05.000Z');
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      cacheTtlMs: 60_000,
+      runner: {
+        run: vi.fn(async (_providerName, _commandConfig, args: string[]) => ({
+          exitCode: 0,
+          stdout: args[0] === '--version'
+            ? 'pi 1.4.0\n'
+            : 'Usage: pi --mode rpc --session <path>\n',
+          stderr: '',
+          timedOut: false,
+          durationMs: 2,
+        })),
+      },
+      installCheckRunner: createInstallCheckRunner(),
+      now: () => now,
+    });
+
+    await service.assessCliTarget(createCliTarget('pi'), { probeMode: 'live' });
+    now += 5_000;
+    await service.assessCliTarget(createCliTarget('pi'), { probeMode: 'light' });
+
+    const summary = service.getCachedSummary('pi', 'default');
+    expect(summary).toEqual(expect.objectContaining({
+      probe: expect.objectContaining({
+        mode: 'live',
+        liveValidated: true,
+      }),
+      cache: expect.objectContaining({
+        stale: false,
+      }),
+    }));
+  });
+
   it('turns otherwise-ready assessments into probe_failed when the live runtime probe fails', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-live-fail-'));
     tempDirs.push(root);
@@ -652,6 +692,7 @@ describe('ProviderCompatibilityService', () => {
       probeMode: 'live',
     });
     expect(assessment.classification).toBe('probe_failed');
+    expect(assessment.profile.confidence).toBe('weak');
     expect(assessment.probe.liveValidated).toBe(false);
     expect(assessment.evidence?.relativePath).toMatch(/^gemini\//);
     expect(assessment.checks).toEqual(expect.arrayContaining([

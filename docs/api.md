@@ -171,6 +171,8 @@ surface for hosts and dashboards. The response includes:
 - per-target `availability.status` (`ok`, `degraded`, `unavailable`)
 - per-target `availability.attentionCodes` for machine-readable degraded/failure
   routing
+  - these are route-level diagnostics codes across the full target health view,
+    so they may include setup/runtime checks beyond the compatibility engine
 - per-target CLI `setup` summaries with machine-readable:
   - install metadata (`installerId`, method, platform, command, docs/hints)
   - install prerequisites (`bash`, `curl`, `node`, `npm`) for the target
@@ -1070,6 +1072,8 @@ mirrors the diagnostics summary view:
 - selected compatibility `profile`
 - version/runtime `fingerprint`
 - machine-readable `attentionCodes`
+- these compatibility codes are scoped to the compatibility engine summary and
+  may therefore be narrower than `availability.attentionCodes`
 - probe metadata (`mode`, `supportsLive`, `liveValidated`)
 - cache metadata (`stale`, `ttlMs`, `ageMs`, `freshUntil`)
 - additive `warnings`

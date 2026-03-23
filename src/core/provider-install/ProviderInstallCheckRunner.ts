@@ -3,8 +3,9 @@ import { access, readFile } from 'node:fs/promises';
 import { isAbsolute, resolve as resolvePath } from 'node:path';
 import type { ProviderRuntimeConfig } from '../../backends/cli/config.js';
 import { createRuntimeAdapter, quoteForBash } from '../../backends/cli/runtime/runtime.js';
+import { expandNativeEnvPath } from './pathUtils.js';
 
-const DEFAULT_CHECK_TIMEOUT_MS = 1_500;
+const DEFAULT_CHECK_TIMEOUT_MS = 3_000;
 
 export interface RuntimeCheckCommandResult {
   exitCode: number | null;
@@ -68,12 +69,6 @@ function hasPathSeparator(value: string): boolean {
 
 function isHomeRelativePath(pathValue: string): boolean {
   return pathValue.startsWith('~/') || pathValue.startsWith('~\\');
-}
-
-function expandNativeEnvPath(pathValue: string): string {
-  return pathValue.replace(/%([^%]+)%/g, (_match, envName: string) => (
-    process.env[envName] || `%${envName}%`
-  ));
 }
 
 function resolveHomePath(pathValue: string): string {

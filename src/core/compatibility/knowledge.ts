@@ -59,6 +59,10 @@ function buildLiveHelpArgs(args: string[]): string[] {
   return [...args, '--help'];
 }
 
+function buildSubcommandHelpArgs(command: string): string[] {
+  return ['help', command];
+}
+
 function buildGenericFallbackProfile(provider: ProviderName): ProviderCompatibilityProfile {
   return {
     id: `${provider}-cli-runtime-default`,
@@ -219,6 +223,8 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       minVersionMajor: 1,
       allowUnknownVersion: true,
       helpTokens: ['--output-format', '--stream-partial-output', '--resume'],
+      // Cursor's `-p` flag expects an inline prompt payload, so the live probe
+      // intentionally validates the stream-json flags without carrying `-p`.
       liveProbeArgs: buildLiveHelpArgs(CURSOR_STREAM_JSON_ARGS),
       liveProbeTokens: ['--output-format', '--stream-partial-output'],
     },
@@ -234,6 +240,8 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       ],
       allowUnknownVersion: true,
       helpTokens: ['--output-format', '--stream-partial-output'],
+      // Cursor's `-p` flag expects an inline prompt payload, so the live probe
+      // intentionally validates the stream-json flags without carrying `-p`.
       liveProbeArgs: buildLiveHelpArgs(CURSOR_STREAM_JSON_ARGS),
       liveProbeTokens: ['--output-format', '--stream-partial-output'],
     },
@@ -251,12 +259,9 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       minVersionMajor: 1,
       allowUnknownVersion: true,
       helpTokens: ['run', '--output-format', '--max-turns'],
-      liveProbeArgs: buildLiveHelpArgs([
-        'run',
-        '--output-format', 'stream-json',
-        '--quiet',
-        '--max-turns', '1',
-      ]),
+      // Prefer `help run` over `run ... --help` so diagnostics do not risk
+      // starting a session while still validating the run-subcommand flags.
+      liveProbeArgs: buildSubcommandHelpArgs('run'),
       liveProbeTokens: ['--output-format', '--max-turns'],
     },
     {
@@ -268,16 +273,13 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       spawnBaseArgs: [...GOOSE_STREAM_JSON_ARGS],
       allowUnknownVersion: true,
       helpTokens: ['run', '--output-format'],
-      liveProbeArgs: buildLiveHelpArgs([
-        'run',
-        '--output-format', 'stream-json',
-        '--quiet',
-        '--max-turns', '1',
-      ]),
+      // Prefer `help run` over `run ... --help` so diagnostics do not risk
+      // starting a session while still validating the run-subcommand flags.
+      liveProbeArgs: buildSubcommandHelpArgs('run'),
       liveProbeTokens: ['--output-format'],
     },
     {
-      helpArgs: ['run', '--help'],
+      helpArgs: buildSubcommandHelpArgs('run'),
     },
   ),
   junie: buildKnowledge(
@@ -408,6 +410,7 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       provider: 'opencode',
       protocolFamily: 'native-session-service',
       parserId: 'opencode-native',
+      spawnBaseArgs: [],
       minVersionMajor: 1,
       allowUnknownVersion: true,
       helpTokens: ['serve'],
@@ -419,6 +422,7 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       provider: 'opencode',
       protocolFamily: 'native-session-service',
       parserId: 'opencode-native',
+      spawnBaseArgs: [],
       allowUnknownVersion: true,
       liveProbeArgs: ['--help'],
     },

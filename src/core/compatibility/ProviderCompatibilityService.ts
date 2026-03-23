@@ -17,6 +17,7 @@ import {
   type RuntimePathCheckResult,
   type RuntimeValueCheckResult,
 } from '../provider-install/ProviderInstallCheckRunner.js';
+import { expandNativeEnvPath } from '../provider-install/pathUtils.js';
 import {
   buildProviderInstallCatalogView,
   GENERIC_AUTH_ERROR_PATTERNS,
@@ -37,6 +38,7 @@ import type {
   CompatibilityAssessmentOptions,
   CompatibilityCheck,
   CompatibilityClassification,
+  CompatibilityConfidence,
   CompatibilityEvidenceArtifact,
   CompatibilityProbeMode,
   CompatibilityProbeRecord,
@@ -46,7 +48,7 @@ import type {
 } from './types.js';
 
 const DEFAULT_CACHE_TTL_MS = 5 * 60_000;
-const DEFAULT_PROBE_TIMEOUT_MS = 1_500;
+const DEFAULT_PROBE_TIMEOUT_MS = 3_000;
 const DEFAULT_SAMPLE_LIMIT = 2_048;
 const EVIDENCE_SCHEMA_VERSION = 3;
 interface ProbeResult {
@@ -121,6 +123,13 @@ export class ProviderCompatibilityService {
     }
 
     const freshEntries = entries.filter((entry) => !this.buildCacheState(entry.cachedAtMs).stale);
+    const freshLiveEntries = freshEntries.filter((entry) => entry.assessment.probe.mode === 'live');
+    if (freshLiveEntries.length > 0) {
+      return freshLiveEntries.reduce((latest, entry) => (
+        entry.cachedAtMs > latest.cachedAtMs ? entry : latest
+      ));
+    }
+
     const candidates = freshEntries.length > 0 ? freshEntries : entries;
     return candidates.reduce((latest, entry) => (
       entry.cachedAtMs > latest.cachedAtMs ? entry : latest
@@ -504,6 +513,12 @@ export class ProviderCompatibilityService {
     classification = liveProbeEvaluation.classification;
     summary = liveProbeEvaluation.summary || summary;
     warnings = dedupeStrings([...warnings, ...liveProbeEvaluation.warnings]);
+    if (liveProbeEvaluation.profileConfidenceOverride) {
+      profile = {
+        ...profile,
+        confidence: liveProbeEvaluation.profileConfidenceOverride,
+      };
+    }
     if (liveProbeEvaluation.check) {
       checks.push(liveProbeEvaluation.check);
     }
@@ -1164,10 +1179,7 @@ function buildRemediationSteps(input: {
 }
 
 function matchesExpectedPrefix(expectedPrefix: string, detectedPrefix: string): boolean {
-  const expandedExpectedPrefix = expectedPrefix.replace(
-    /%APPDATA%/giu,
-    process.env.APPDATA || '%APPDATA%',
-  );
+  const expandedExpectedPrefix = expandNativeEnvPath(expectedPrefix);
   const normalizedExpected = expandedExpectedPrefix.replace(/\\/gu, '/').replace(/^~\//u, '/');
   const normalizedDetected = detectedPrefix.replace(/\\/gu, '/');
   return normalizedDetected === normalizedExpected || normalizedDetected.endsWith(normalizedExpected);
@@ -1391,6 +1403,7 @@ function evaluateLiveProbe(input: {
   summary?: string;
   warnings: string[];
   validated: boolean;
+  profileConfidenceOverride?: CompatibilityConfidence;
   check?: CompatibilityCheck;
 } {
   if (!input.profile.liveProbeArgs?.length) {
@@ -1417,6 +1430,7 @@ function evaluateLiveProbe(input: {
       summary: `Live runtime-flag probe failed for ${input.familyLabel}.`,
       warnings: ['The runtime could not validate the provider-specific execution flags with a live probe.'],
       validated: false,
+      profileConfidenceOverride: input.classification === 'ready' ? 'weak' : undefined,
       check: createCheck(
         'live_probe_failed',
         'unavailable',
@@ -1445,6 +1459,7 @@ function evaluateLiveProbe(input: {
         `Live probe did not observe all expected execution markers: ${missingTokens.join(', ')}`,
       ],
       validated: false,
+      profileConfidenceOverride: input.classification === 'ready' ? 'weak' : undefined,
       check: createCheck(
         'live_probe_signature_partial',
         'degraded',
