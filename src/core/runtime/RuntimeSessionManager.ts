@@ -4,6 +4,7 @@ import type {
   ExecutionHandle,
   RuntimeEventExcerpt,
   RuntimeGuardrailResult,
+  RuntimeSessionMaintenanceRequest,
   RuntimeSessionLifecycleAction,
   RuntimeSessionLifecycleCleanupSummary,
   RuntimeSessionLifecycleContract,
@@ -340,6 +341,27 @@ export class RuntimeSessionManager {
   markClosed(sessionId: string): void {
     const tracked = this.ensureTrackedState(sessionId);
     tracked.state = 'closed';
+  }
+
+  recordMaintenanceRequest(
+    request: RuntimeSessionMaintenanceRequest,
+  ): RuntimeSessionMaintenanceRequest {
+    const tracked = this.ensureTrackedState(request.sessionId);
+    tracked.maintenance.lastRequest = cloneMaintenanceRequest(request);
+    this.pushMaintenanceMarker(tracked, {
+      code: `${request.action}_requested`,
+      observedAt: request.requestedAt,
+      status: 'observed',
+      details: {
+        isolationMode: request.isolationMode,
+        ...(request.worktreeDisposition
+          ? { worktreeDisposition: request.worktreeDisposition }
+          : {}),
+        ...(request.reason ? { reason: request.reason } : {}),
+        hookPayloadKinds: request.hookPayloads.map((payload) => payload.kind),
+      },
+    });
+    return cloneMaintenanceRequest(request);
   }
 
   clearProviderState(sessionId: string): void {
@@ -698,6 +720,7 @@ function cloneMaintenanceState(
   maintenance: RuntimeTrackedSessionMaintenanceState,
 ): RuntimeTrackedSessionMaintenanceState {
   return {
+    ...(maintenance.lastRequest ? { lastRequest: cloneMaintenanceRequest(maintenance.lastRequest) } : {}),
     ...(maintenance.lastResetAt ? { lastResetAt: maintenance.lastResetAt } : {}),
     ...(maintenance.lastLifecycle ? { lastLifecycle: cloneLifecycle(maintenance.lastLifecycle) } : {}),
     markers: maintenance.markers.map((marker) => ({
@@ -714,6 +737,20 @@ function cloneLifecycle(
     ...lifecycle,
     reasonCodes: [...lifecycle.reasonCodes],
     cleanup: { ...lifecycle.cleanup },
+  };
+}
+
+function cloneMaintenanceRequest(
+  request: RuntimeSessionMaintenanceRequest,
+): RuntimeSessionMaintenanceRequest {
+  return {
+    ...request,
+    hookPayloads: request.hookPayloads.map((payload) => ({
+      ...payload,
+      ...(Object.prototype.hasOwnProperty.call(payload, 'payload')
+        ? { payload: structuredClone(payload.payload) }
+        : {}),
+    })),
   };
 }
 

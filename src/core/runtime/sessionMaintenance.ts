@@ -6,6 +6,7 @@ import type {
   RuntimeSessionLifecycleContract,
   RuntimeSessionMaintenance,
   RuntimeSessionMaintenanceMarker,
+  RuntimeSessionMaintenanceState,
   SessionInfo,
   SessionView,
 } from '../types.js';
@@ -13,11 +14,7 @@ import type {
 const COMPACTION_MESSAGE_THRESHOLD = 25;
 const COMPACTION_TOKEN_THRESHOLD = 12_000;
 
-export interface RuntimeTrackedSessionMaintenanceState {
-  lastResetAt?: string;
-  lastLifecycle?: RuntimeSessionLifecycleContract;
-  markers: RuntimeSessionMaintenanceMarker[];
-}
+export type RuntimeTrackedSessionMaintenanceState = RuntimeSessionMaintenanceState;
 
 export interface BuildSessionMaintenanceInput {
   session: SessionInfo;
@@ -82,6 +79,9 @@ export function buildSessionMaintenance(
     },
     cleanup,
     markers: (input.trackedMaintenance?.markers || []).map(cloneMarker),
+    ...(input.trackedMaintenance?.lastRequest
+      ? { lastRequest: cloneMaintenanceRequest(input.trackedMaintenance.lastRequest) }
+      : {}),
     ...(lastLifecycle ? { lastLifecycle } : {}),
   };
 }
@@ -139,7 +139,11 @@ function buildCleanupContract(
     reasonCodes.push('isolated_workspace_retained');
   }
   if (session.workspaceIsolation?.mode === 'worktree' && session.workspaceIsolation.worktree) {
-    reasonCodes.push('worktree_retained');
+    if (session.workspaceIsolation.worktree.lastCleanup?.policy === 'preserve') {
+      reasonCodes.push('worktree_preserved');
+    } else {
+      reasonCodes.push('worktree_retained');
+    }
   }
   if (session.providerSessionId) {
     reasonCodes.push('provider_resume_state_retained');
@@ -167,7 +171,9 @@ function buildCleanupContract(
     session.status === 'closed'
     && !view.attached
     && reasonCodes.every((reason) =>
-      reason === 'isolated_workspace_retained' || reason === 'worktree_retained',
+      reason === 'isolated_workspace_retained'
+        || reason === 'worktree_retained'
+        || reason === 'worktree_preserved',
     )
   ) {
     return {
@@ -251,5 +257,19 @@ function cloneHook(
 ): RuntimeSessionHookContract {
   return {
     ...hook,
+  };
+}
+
+function cloneMaintenanceRequest(
+  request: NonNullable<RuntimeSessionMaintenanceState['lastRequest']>,
+): NonNullable<RuntimeSessionMaintenanceState['lastRequest']> {
+  return {
+    ...request,
+    hookPayloads: request.hookPayloads.map((payload) => ({
+      ...payload,
+      ...(Object.prototype.hasOwnProperty.call(payload, 'payload')
+        ? { payload: structuredClone(payload.payload) }
+        : {}),
+    })),
   };
 }

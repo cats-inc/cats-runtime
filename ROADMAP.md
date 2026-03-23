@@ -252,6 +252,9 @@ Current gaps:
 
 - abandoned worktrees are not swept in the background if a host crashes or a
   session is never explicitly reset/deleted
+- intentionally retained `worktreeCleanupPolicy: "preserve"` worktrees can now
+  survive across resets/deletes, but there is still no background GC/sweeper
+  or retention policy for preserved/orphaned worktrees
 - `worktreeCleanupPolicy: "merge"` intentionally stops and returns
   `status: "retained"` when the source repo is already dirty, because runtime
   does not yet own conflict-resolution policy
@@ -269,6 +272,9 @@ cleanup discipline while keeping product approval/policy above runtime.
 
 - Add a runtime-owned abandoned-worktree sweeper for sessions that no longer
   exist or have already reached terminal lifecycle states
+- Extend that sweeper into a retained-worktree GC policy so intentionally
+  preserved worktrees can be expired, surfaced, or cleaned up deterministically
+  instead of accumulating forever
 - Add more explicit retained-cleanup diagnostics so hosts can distinguish
   "source repo dirty", "detach failed", and "merge apply failed" without
   scraping generic error text
@@ -317,8 +323,13 @@ Current gaps:
   reconciliation protocol
 - retained workspace/worktree cleanup can advertise `pre_flush`, but nothing in
   runtime yet coordinates durable memory/export flush before cleanup proceeds
+- `POST /sessions/{id}/compact` now exposes a public external-only seam, but
+  runtime still does not execute compaction or drive hook follow-through itself
 - Team 3's future memory pipeline seam exists in contracts only; runtime still
   lacks the hook execution/retry envelope around lifecycle flush boundaries
+- persisted maintenance trigger payloads are stored verbatim; there are no
+  redaction rules, payload size caps, or retention guardrails yet if future
+  products attach larger or more sensitive hook payloads
 - non-shared fork copy still clones the whole workspace opportunistically in
   the request path; runtime does not yet have bounded snapshot planning,
   progress reporting, or large-workspace safeguards
@@ -334,6 +345,11 @@ schemas.
 - Add explicit lifecycle-flush orchestration around `pre_reset`,
   `pre_compaction`, and `pre_flush` so products can plug in export pipelines
   without patching session routes directly
+- Add follow-through around the public `/sessions/{id}/compact` seam so Team 4
+  style flush payloads and eventual external compaction workers can acknowledge,
+  retry, and report completion without inventing a second maintenance contract
+- Add redaction/size guardrails for persisted maintenance trigger payloads
+  before products start attaching larger or more sensitive flush metadata
 - Add bounded snapshot/sync orchestration for large workspaces so fork/reset
   flows can avoid unstructured full-tree copies when the workspace is too large
   or needs resumable/progressive sync behavior

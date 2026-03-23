@@ -278,7 +278,7 @@ async function cleanupWorktreeWorkspace(
         mergedPathCount: 0,
         policy,
         reasonCodes: ['source_workspace_dirty'],
-        nextCwd: sourceCwd,
+        nextCwd: worktree.worktreePath,
         nextWorkspaceIsolation: {
           ...isolation,
           worktree: {
@@ -316,7 +316,7 @@ async function cleanupWorktreeWorkspace(
           'worktree_merge_failed',
           error instanceof Error ? error.message : String(error),
         ],
-        nextCwd: sourceCwd,
+        nextCwd: worktree.worktreePath,
         nextWorkspaceIsolation: {
           ...isolation,
           worktree: {
@@ -335,6 +335,29 @@ async function cleanupWorktreeWorkspace(
         },
       };
     }
+  } else if (policy === 'preserve') {
+    return {
+      status: 'retained',
+      workspaceCleaned: false,
+      worktreeDetached: false,
+      mergedPathCount: 0,
+      policy,
+      reasonCodes: ['worktree_preserved'],
+      nextCwd: worktree.worktreePath,
+      nextWorkspaceIsolation: {
+        ...isolation,
+        worktree: {
+          ...worktree,
+          lastCleanup: {
+            policy,
+            status: 'retained',
+            observedAt,
+            reasonCodes: ['worktree_preserved'],
+            mergedPathCount: 0,
+          },
+        },
+      },
+    };
   } else {
     reasonCodes.push('worktree_changes_discarded');
   }
@@ -348,7 +371,7 @@ async function cleanupWorktreeWorkspace(
       mergedPathCount: 0,
       policy,
       reasonCodes: [...reasonCodes, 'worktree_detach_failed'],
-      nextCwd: sourceCwd,
+      nextCwd: worktree.worktreePath,
       nextWorkspaceIsolation: {
         ...isolation,
         worktree: {

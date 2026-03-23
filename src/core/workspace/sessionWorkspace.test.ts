@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -182,5 +182,53 @@ describe('sessionWorkspace', () => {
     expect(runGit(repoDir, ['status', '--porcelain'])).toContain('tracked.txt');
     expect(runGit(repoDir, ['status', '--porcelain'])).toContain('new-file.txt');
     expect(runGit(repoDir, ['status', '--porcelain'])).toContain('delete-me.txt');
+  });
+
+  it('preserves a prepared worktree for manual handling without changing the runtime cwd', async () => {
+    const { repoDir, sessionBaseDir } = createGitWorkspace();
+    const prepared = await prepareSessionWorkspace({
+      sessionId: 'session-preserve',
+      sessionBaseDir,
+      cwd: repoDir,
+      workspaceMode: 'shared',
+      workspaceIsolationMode: 'worktree',
+    });
+
+    writeFileSync(join(prepared.cwd, 'tracked.txt'), 'preserved change\n', 'utf8');
+
+    const cleanup = await cleanupSessionWorkspace({
+      sessionId: 'session-preserve',
+      sessionBaseDir,
+      workspaceMode: prepared.workspaceMode,
+      workspaceIsolation: prepared.workspaceIsolation,
+      worktreeCleanupPolicy: 'preserve',
+      now: new Date('2026-03-23T03:00:00.000Z'),
+    });
+
+    expect(cleanup).toEqual(expect.objectContaining({
+      status: 'retained',
+      workspaceCleaned: false,
+      worktreeDetached: false,
+      mergedPathCount: 0,
+      policy: 'preserve',
+      reasonCodes: ['worktree_preserved'],
+      nextCwd: prepared.workspaceIsolation.worktree!.worktreePath,
+      nextWorkspaceIsolation: expect.objectContaining({
+        mode: 'worktree',
+        sourceCwd: repoDir,
+        worktree: expect.objectContaining({
+          worktreePath: prepared.workspaceIsolation.worktree!.worktreePath,
+          lastCleanup: expect.objectContaining({
+            policy: 'preserve',
+            status: 'retained',
+            observedAt: '2026-03-23T03:00:00.000Z',
+            reasonCodes: ['worktree_preserved'],
+            mergedPathCount: 0,
+          }),
+        }),
+      }),
+    }));
+    expect(existsSync(prepared.workspaceIsolation.worktree!.worktreePath)).toBe(true);
+    expect(readFileSync(join(prepared.cwd, 'tracked.txt'), 'utf8')).toBe('preserved change\n');
   });
 });

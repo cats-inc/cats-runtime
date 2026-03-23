@@ -898,6 +898,26 @@ intended for host/dashboard run inspectors:
         "status": "recommended",
         "reasonCodes": ["provider_resume_state_retained"]
       },
+      "lastRequest": {
+        "action": "reset",
+        "sessionId": "session-123",
+        "requestedAt": "2026-03-24T00:10:00.000Z",
+        "workspaceMode": "shared",
+        "isolationMode": "worktree",
+        "runtimeCwd": "C:/Users/example/.cats-runtime/sessions/worktrees/repo-deadbeef/session-123",
+        "sourceCwd": "C:/Users/example/src/repo",
+        "worktreePath": "C:/Users/example/.cats-runtime/sessions/worktrees/repo-deadbeef/session-123",
+        "reason": "owner_requested_reset",
+        "worktreeDisposition": "preserve",
+        "hookPayloads": [
+          {
+            "kind": "memory_flush",
+            "payload": {
+              "scope": "summary"
+            }
+          }
+        ]
+      },
       "markers": []
     },
     "artifacts": [],
@@ -921,10 +941,12 @@ additive: existing session fields remain stable.
 machine-readable place to read:
 
 - whether the session is nearing compaction territory
-- whether Team 6 style `memory_flush` hooks should run before reset,
+- whether Team 4 / product-owned `memory_flush` hooks should run before reset,
   compaction, or lifecycle flush/cleanup
 - whether a hard reset boundary was applied already
 - whether cleanup is merely recommended or is ready to run now
+- the most recent maintenance trigger request, including additive hook payloads,
+  workspace isolation context, and requested worktree disposition
 - the latest close/reset/delete lifecycle marker
 
 `inspection.maintenance.status` is intentionally conservative. Active sessions
@@ -932,6 +954,10 @@ can report `compaction.status: "recommended"` without escalating the overall
 maintenance status to `attention`; `attention` is reserved for retained
 lifecycle boundaries, cleanup that needs operator action, or compaction that is
 ready to run on an inactive session.
+
+`inspection.maintenance.lastRequest` is the runtime-owned trigger seam for
+future Team 4 flush/compaction coordination. The runtime records the request
+shape, but it does not interpret product-owned payloads.
 
 `POST /sessions` also accepts these optional fields:
 
@@ -1410,22 +1436,69 @@ run/progress snapshots, and records a hard-reset lifecycle boundary so stale
 wake requests and stale inspector state do not survive after provider resume
 state is discarded.
 
-`POST /sessions/{id}/reset` also accepts an optional body field:
+`POST /sessions/{id}/reset` also accepts optional body fields:
 
-- `worktreeCleanupPolicy`: `discard` or `merge`
+- `worktreeCleanupPolicy`: `discard`, `merge`, or `preserve`
+- `maintenance`: additive trigger metadata with:
+  - `reason?: string`
+  - `hookPayloads?: Array<{ kind: string; payload?: unknown }>`
 
 For worktree-backed sessions, `discard` removes the worktree and keeps the
 source workspace untouched, while `merge` attempts to copy the worktree diff
-back into the authoritative source repository before detaching the worktree. If
-cleanup cannot finish safely, reset returns `status: "retained"` with the
-session snapshot still present so a host can retry or resolve the source
-workspace first.
+back into the authoritative source repository before detaching the worktree.
+`preserve` keeps the worktree attached to the closed session intentionally and
+returns `status: "retained"` so a host/operator can handle the workspace
+manually. If cleanup cannot finish safely, reset also returns
+`status: "retained"` with the session snapshot still present so a host can
+retry or resolve the source workspace first.
+
+When `maintenance` is provided, the runtime records that request under
+`inspection.maintenance.lastRequest` and persists it on the logical session so
+later `GET /sessions/{id}`, `GET /sessions/{id}/observe`, and
+`GET /sessions/{id}/history` reads can explain what maintenance trigger was
+requested even after the live run state has been cleared.
 
 `POST /sessions/{id}/close`, `POST /sessions/{id}/cancel`, and
 `POST /sessions/{id}/reset` now all return the same additive session snapshot
 shape used by `GET /sessions/{id}`, plus an `action` field (`close`, `cancel`,
 or `reset`) so hosts can update run-inspector state without an immediate
 follow-up fetch.
+
+`POST /sessions/{id}/close` accepts the same optional `maintenance` body field
+so hosts can record additive pre-maintenance trigger context even when the
+operation is only a soft close.
+
+`POST /sessions/{id}/compact` exposes the same runtime-owned maintenance
+contract as a public compaction-preparation seam without making
+`cats-runtime` the compaction engine itself. It accepts:
+
+- `acknowledgeHooks?: boolean`
+- `maintenance?: { reason?: string; hookPayloads?: Array<{ kind: string; payload?: unknown }> }`
+
+The runtime always returns a machine-readable coordination result:
+
+- `status: "not_ready"` when the session has no compaction evidence yet or has
+  not crossed the message/token thresholds
+- `status: "deferred"` when compaction is recommended but the session is still
+  active
+- `status: "pending_hooks"` when the session is inactive and ready for external
+  compaction, but additive `pre_compaction` hooks have not been acknowledged yet
+- `status: "ready_for_external_compaction"` when the session is inactive and any
+  additive `pre_compaction` hooks are either absent or explicitly acknowledged
+
+Responses also include:
+
+- `execution: "external_only"`
+- `runtimeCompactionExecuted: false`
+- `hookStatus: "none" | "pending" | "acknowledged"`
+- `reasonCodes`: machine-readable readiness reasons copied from
+  `inspection.maintenance.compaction`
+- `maintenance`: the latest runtime-owned maintenance contract snapshot
+- `session`: the same additive session payload returned by `GET /sessions/{id}`
+
+Like reset/close/delete, any provided `maintenance` request is persisted under
+`inspection.maintenance.lastRequest` so later session/observe/history reads can
+explain which compaction-preparation trigger was accepted most recently.
 
 `DELETE /sessions/{id}` also clears any persisted wakeups targeting that
 session before the runtime unregisters it. Delete responses now also include
@@ -1439,11 +1512,12 @@ Delete responses also include:
 - `maintenance`: the terminal lifecycle marker for the delete attempt, with
   `status: "completed"` or `status: "retained"`
 
-`DELETE /sessions/{id}` accepts the same optional
-`worktreeCleanupPolicy: "discard" | "merge"` body field. For worktree-backed
+`DELETE /sessions/{id}` accepts the same optional `maintenance` body plus
+`worktreeCleanupPolicy: "discard" | "merge" | "preserve"`. For worktree-backed
 sessions, the runtime closes any attached worker first, then either detaches the
 worktree and removes the session or returns `status: "retained"` with
-machine-readable cleanup metadata when merge/discard cannot be completed.
+machine-readable cleanup metadata when merge/discard cannot be completed or
+when `preserve` intentionally keeps the worktree for manual handling.
 
 For delete responses, top-level `cleanup` is a flat alias of
 `maintenance.cleanup` so transport-facing consumers can read terminal cleanup

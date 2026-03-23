@@ -17,7 +17,7 @@ export type SessionReusePolicy = 'create_new' | 'prefer_existing' | 'require_exi
 
 export type WorkspaceMode = 'isolated' | 'shared' | 'read_only';
 export type WorkspaceIsolationMode = 'shared' | 'isolated' | 'worktree';
-export type WorktreeCleanupPolicy = 'discard' | 'merge';
+export type WorktreeCleanupPolicy = 'discard' | 'merge' | 'preserve';
 export type WorktreeCleanupStatus = 'completed' | 'retained';
 export type WorkspaceSubstrateOperation =
   | 'init-workspace'
@@ -1079,6 +1079,10 @@ export type RuntimeSessionCleanupStatus =
 export type RuntimeSessionLifecycleAction = 'close' | 'reset' | 'delete';
 export type RuntimeSessionLifecycleBoundary = 'soft_close' | 'hard_reset' | 'permanent_delete';
 export type RuntimeSessionLifecycleStatus = 'completed' | 'retained';
+export type RuntimeSessionMaintenanceAction =
+  | RuntimeSessionLifecycleAction
+  | 'prepare_compaction'
+  | 'compact';
 
 export interface RuntimeWakeReason {
   source?: SessionInvocationContext['source'];
@@ -1148,6 +1152,25 @@ export interface RuntimeSessionLifecycleContract {
   cleanup: RuntimeSessionLifecycleCleanupSummary;
 }
 
+export interface RuntimeSessionMaintenanceHookPayload {
+  kind: string;
+  payload?: unknown;
+}
+
+export interface RuntimeSessionMaintenanceRequest {
+  action: RuntimeSessionMaintenanceAction;
+  sessionId: string;
+  requestedAt: string;
+  workspaceMode: WorkspaceMode;
+  isolationMode: WorkspaceIsolationMode;
+  runtimeCwd: string;
+  sourceCwd?: string;
+  worktreePath?: string;
+  reason?: string;
+  worktreeDisposition?: WorktreeCleanupPolicy;
+  hookPayloads: RuntimeSessionMaintenanceHookPayload[];
+}
+
 export type RuntimeSessionHookId = 'memory_flush' | (string & {});
 export type RuntimeSessionHookOwner = 'product_memory' | (string & {});
 
@@ -1162,6 +1185,13 @@ export interface RuntimeSessionHookContract {
 export interface RuntimeSessionHookGroup {
   available: boolean;
   pending: RuntimeSessionHookContract[];
+}
+
+export interface RuntimeSessionMaintenanceState {
+  lastRequest?: RuntimeSessionMaintenanceRequest;
+  lastResetAt?: string;
+  lastLifecycle?: RuntimeSessionLifecycleContract;
+  markers: RuntimeSessionMaintenanceMarker[];
 }
 
 export interface RuntimeSessionCompactionContract {
@@ -1193,6 +1223,7 @@ export interface RuntimeSessionMaintenance {
   resetBoundary: RuntimeSessionResetBoundary;
   cleanup: RuntimeSessionCleanupContract;
   markers: RuntimeSessionMaintenanceMarker[];
+  lastRequest?: RuntimeSessionMaintenanceRequest;
   lastLifecycle?: RuntimeSessionLifecycleContract;
 }
 
@@ -1272,6 +1303,7 @@ export interface SessionInfo {
   instructions?: string;
   skills?: SessionSkillState;
   hydration?: SessionHydrationState;
+  maintenanceState?: RuntimeSessionMaintenanceState;
   context?: SessionInvocationContext;
   outputDir?: string;
   artifacts?: SessionArtifact[];

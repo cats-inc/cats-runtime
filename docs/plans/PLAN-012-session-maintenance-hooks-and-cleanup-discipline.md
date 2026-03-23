@@ -30,7 +30,8 @@ had gaps:
 - reset boundaries were not explicit beyond clearing provider resume state
 - close/delete semantics did not leave a stable machine-readable lifecycle mark
 - compaction readiness existed only as an implied future concern
-- Team 6 had no runtime-owned seam for pre-reset or pre-compaction memory flush
+- Team 4/product memory work had no runtime-owned seam for pre-reset or
+  pre-compaction memory flush
 - stale run/progress state could survive a reset and blur the next session
   boundary
 
@@ -88,10 +89,11 @@ a full memory pipeline or a scheduler.
 ## Technical Decisions
 
 - Keep the memory-flush seam declarative: runtime advertises pending
-  `memory_flush` hooks before reset/compaction, but Team 6 remains responsible
-  for the eventual memory export pipeline.
-- Treat compaction readiness as metadata, not as a command. Hosts can read the
-  readiness contract without implying a new public `/compact` route.
+  `memory_flush` hooks before reset/compaction, but Team 4/product memory
+  remains responsible for the eventual memory export pipeline.
+- Treat compaction execution as external. Runtime may expose a public
+  `/sessions/{id}/compact` preparation route for readiness and hook
+  coordination, but it still does not execute compaction itself.
 - Preserve evidence transcripts; reset clears live runtime boundary state
   (provider resume state, wakeups, hydration, run/progress snapshots) without
   deleting historical evidence.
@@ -103,6 +105,8 @@ a full memory pipeline or a scheduler.
 | Date | Update |
 |------|--------|
 | 2026-03-23 | Plan created and implemented in the same Team 4 lifecycle pass |
+| 2026-03-24 | Follow-up hardening added persisted `inspection.maintenance.lastRequest` metadata plus additive route-level maintenance trigger payloads for close/reset/delete |
+| 2026-03-24 | Added public `POST /sessions/{id}/compact` as an external-only compaction-preparation seam backed by the same maintenance contract |
 
 ---
 

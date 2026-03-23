@@ -255,6 +255,12 @@ src/
   readiness, pending pre-reset/pre-compaction memory-flush hooks, and
   machine-readable cleanup guidance without implementing the product memory
   pipeline itself
+- Exposes `POST /sessions/{id}/compact` as an external-only coordination seam
+  that records compaction trigger intent and readiness but does not execute the
+  compaction step inside runtime
+- Persists the last accepted maintenance trigger request on the logical session
+  so Team 4 style flush/compaction payloads can survive past the immediate
+  reset/delete response without making runtime the memory owner
 - Enriches current/last-run inspection with per-run preview surfaces derived
   from agent services and artifacts so hosts can render the output of one run
   without diffing whole-session state
@@ -282,9 +288,12 @@ src/
   moving product orchestration policy into runtime
 - Uses deterministic worktree ids and paths rooted under the runtime session
   base dir so resume/reset/delete can recreate or clean up the same worktree
-- Supports explicit worktree cleanup policies (`discard` or `merge`) and
-  returns retained/completed cleanup summaries instead of assuming cleanup
-  always succeeds
+- Supports explicit worktree cleanup policies (`discard`, `merge`, or
+  `preserve`) and returns retained/completed cleanup summaries instead of
+  assuming cleanup always succeeds
+- Keeps retained worktree sessions pointed at the still-live worktree path so
+  later observe/reset/delete flows stay consistent when cleanup is intentionally
+  preserved or cannot finish safely
 - Provides a conservative snapshot-copy helper for non-shared fork flows
 
 ### `src/core/wakeup`
@@ -405,7 +414,11 @@ src/
 18. Session reset/delete lifecycle now routes worktree cleanup through the same
     runtime-owned workspace layer, returning retained cleanup metadata when the
     source repo is dirty or detachment fails
-19. Stream events are returned directly to the caller
+19. `POST /sessions/{id}/compact` reuses the same runtime-owned maintenance
+    read model as a public compaction-preparation route, returning
+    machine-readable readiness plus opaque hook payload persistence while
+    leaving the actual compaction engine external
+20. Stream events are returned directly to the caller
 
 For WSL-backed Cursor/Kiro discovery:
 

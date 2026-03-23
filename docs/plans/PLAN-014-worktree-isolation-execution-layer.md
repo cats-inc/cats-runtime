@@ -29,7 +29,8 @@ shared-only or sandbox-only.
 3. `src/http/routes/sessions.ts` now prepares or recreates worktrees during
    create/resume/fork and routes reset/delete through the same cleanup layer.
 4. Session maintenance now exposes additive `pre_flush` hooks alongside the
-   earlier `pre_reset` / `pre_compaction` seams.
+   earlier `pre_reset` / `pre_compaction` seams, and reset/delete now accept
+   explicit `preserve` worktree disposition for manual handling.
 5. Vitest coverage now exercises direct helper behavior plus route-level
    worktree flows.
 
@@ -49,4 +50,4 @@ shared-only or sandbox-only.
 
 ---
 
-*Last updated: 2026-03-23*
+*Last updated: 2026-03-24*

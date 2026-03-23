@@ -144,6 +144,24 @@ describe('buildSessionMaintenance', () => {
 
   it('surfaces reset boundary and retained lifecycle markers from tracked maintenance state', () => {
     const trackedMaintenance: RuntimeTrackedSessionMaintenanceState = {
+      lastRequest: {
+        action: 'reset',
+        sessionId: 'session-1',
+        requestedAt: '2026-03-23T00:09:30.000Z',
+        workspaceMode: 'shared',
+        isolationMode: 'worktree',
+        runtimeCwd: '/sessions/worktrees/repo/session-1',
+        sourceCwd: '/repo',
+        worktreePath: '/sessions/worktrees/repo/session-1',
+        reason: 'owner_requested_reset',
+        worktreeDisposition: 'preserve',
+        hookPayloads: [{
+          kind: 'memory_flush',
+          payload: {
+            scope: 'summary',
+          },
+        }],
+      },
       lastResetAt: '2026-03-23T00:10:00.000Z',
       lastLifecycle: {
         action: 'delete',
@@ -178,6 +196,7 @@ describe('buildSessionMaintenance', () => {
     });
 
     expect(maintenance.status).toBe('attention');
+    expect(maintenance.lastRequest).toEqual(trackedMaintenance.lastRequest);
     expect(maintenance.resetBoundary).toEqual({
       status: 'cleared',
       lastResetAt: '2026-03-23T00:10:00.000Z',

@@ -356,6 +356,101 @@ describe('session worktree routes', () => {
     }));
   });
 
+  it('retains a worktree-backed session when reset requests preserve semantics', async () => {
+    const repoDir = createGitWorkspace(rootDir, 'repo-reset-preserve');
+    const prepared = await prepareSessionWorkspace({
+      sessionId: 'worktree-reset-preserve',
+      sessionBaseDir,
+      cwd: repoDir,
+      workspaceMode: 'shared',
+      workspaceIsolationMode: 'worktree',
+    });
+
+    const session = registry.create({
+      id: 'worktree-reset-preserve',
+      providerName: 'codex',
+      cwd: prepared.cwd,
+      workspaceMode: prepared.workspaceMode,
+      workspaceIsolation: prepared.workspaceIsolation,
+      hydration: buildHydration(prepared.cwd, repoDir),
+    });
+    registry.setProviderSessionId(session.id, 'thread-reset-preserve');
+    registry.updateStatus(session.id, 'closed');
+
+    writeFileSync(join(prepared.cwd, 'tracked.txt'), 'preserve me\n', 'utf8');
+
+    const response = await app.request(`/sessions/${session.id}/reset`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        worktreeCleanupPolicy: 'preserve',
+        maintenance: {
+          reason: 'owner_requested_preserve',
+          hookPayloads: [{
+            kind: 'memory_flush',
+            payload: {
+              scope: 'summary',
+            },
+          }],
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      action: string;
+      status: string;
+      reason: string;
+      session: {
+        cwd: string;
+        inspection: {
+          maintenance: {
+            lastRequest: {
+              action: string;
+              worktreeDisposition?: string;
+              reason?: string;
+            };
+            lastLifecycle: {
+              status: string;
+              cleanup: {
+                workspaceCleaned: boolean;
+                worktreeDetached: boolean;
+                worktreeCleanupPolicy: string;
+              };
+            };
+          };
+        };
+      };
+    };
+    expect(body.action).toBe('reset');
+    expect(body.status).toBe('retained');
+    expect(body.reason).toContain('intentionally preserved');
+    expect(body.session.cwd).toBe(prepared.workspaceIsolation.worktree!.worktreePath);
+    expect(body.session.inspection.maintenance.lastRequest).toEqual(expect.objectContaining({
+      action: 'reset',
+      worktreeDisposition: 'preserve',
+      reason: 'owner_requested_preserve',
+    }));
+    expect(body.session.inspection.maintenance.lastLifecycle).toEqual(expect.objectContaining({
+      status: 'retained',
+      cleanup: expect.objectContaining({
+        workspaceCleaned: false,
+        worktreeDetached: false,
+        worktreeCleanupPolicy: 'preserve',
+      }),
+    }));
+    expect(existsSync(prepared.workspaceIsolation.worktree!.worktreePath)).toBe(true);
+    expect(readFileSync(join(prepared.cwd, 'tracked.txt'), 'utf8')).toBe('preserve me\n');
+
+    const stored = registry.get(session.id);
+    expect(stored?.cwd).toBe(prepared.workspaceIsolation.worktree!.worktreePath);
+    expect(stored?.workspaceIsolation?.worktree?.lastCleanup).toEqual(expect.objectContaining({
+      policy: 'preserve',
+      status: 'retained',
+      reasonCodes: ['worktree_preserved'],
+    }));
+  });
+
   it('re-prepares a missing worktree before resuming a closed session', async () => {
     const repoDir = createGitWorkspace(rootDir, 'repo-resume');
     const prepared = await prepareSessionWorkspace({

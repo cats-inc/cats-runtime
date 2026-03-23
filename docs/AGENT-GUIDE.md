@@ -43,6 +43,7 @@
 - `POST /sessions`
 - `POST /sessions/:id/messages`
 - `POST /sessions/:id/close`
+- `POST /sessions/:id/compact`
 - `POST /sessions/:id/resume`
 - `POST /sessions/:id/fork`
 - `DELETE /sessions/:id`

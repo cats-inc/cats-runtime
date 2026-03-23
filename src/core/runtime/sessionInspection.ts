@@ -84,7 +84,7 @@ export function buildSessionInspection(
       session: input.session,
       view: input.view,
       wakeupPending: input.wakeupPending,
-      trackedMaintenance: input.trackedState?.maintenance,
+      trackedMaintenance: input.trackedState?.maintenance ?? input.session.maintenanceState,
     }),
     ...(input.session.skills ? { skills: cloneSkillState(input.session.skills) } : {}),
     artifacts,

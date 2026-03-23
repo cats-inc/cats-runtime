@@ -172,6 +172,18 @@ describe('session close route', () => {
 
     const res = await app.request(`/sessions/${session.id}/close`, {
       method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        maintenance: {
+          reason: 'owner_requested_close',
+          hookPayloads: [{
+            kind: 'memory_flush',
+            payload: {
+              scope: 'summary',
+            },
+          }],
+        },
+      }),
     });
 
     expect(res.status).toBe(200);
@@ -180,6 +192,18 @@ describe('session close route', () => {
       status: 'closed',
       inspection: expect.objectContaining({
         state: 'closed',
+        maintenance: expect.objectContaining({
+          lastRequest: expect.objectContaining({
+            action: 'close',
+            reason: 'owner_requested_close',
+            hookPayloads: [{
+              kind: 'memory_flush',
+              payload: {
+                scope: 'summary',
+              },
+            }],
+          }),
+        }),
       }),
     }));
     expect(registry.get(session.id)?.status).toBe('closed');
@@ -286,6 +310,19 @@ describe('session close route', () => {
 
     const res = await app.request(`/sessions/${session.id}/reset`, {
       method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        maintenance: {
+          reason: 'owner_requested_reset',
+          hookPayloads: [{
+            kind: 'memory_flush',
+            payload: {
+              scope: 'summary',
+              includeArtifacts: true,
+            },
+          }],
+        },
+      }),
     });
     expect(res.status).toBe(200);
 
@@ -300,6 +337,12 @@ describe('session close route', () => {
         progress?: unknown;
         recentEvents?: unknown[];
         maintenance: {
+          lastRequest: {
+            action: string;
+            worktreeDisposition?: string;
+            reason?: string;
+            hookPayloads: Array<{ kind: string; payload?: Record<string, unknown> }>;
+          };
           resetBoundary: {
             status: string;
             lastResetAt?: string;
@@ -322,6 +365,17 @@ describe('session close route', () => {
     expect(body.inspection.lastRun).toBeUndefined();
     expect(body.inspection.progress).toBeUndefined();
     expect(body.inspection.recentEvents).toEqual([]);
+    expect(body.inspection.maintenance.lastRequest).toEqual(expect.objectContaining({
+      action: 'reset',
+      reason: 'owner_requested_reset',
+      hookPayloads: [{
+        kind: 'memory_flush',
+        payload: {
+          scope: 'summary',
+          includeArtifacts: true,
+        },
+      }],
+    }));
     expect(body.inspection.maintenance.resetBoundary).toEqual(expect.objectContaining({
       status: 'cleared',
       lastResetAt: expect.any(String),
@@ -341,17 +395,26 @@ describe('session close route', () => {
     expect(body.inspection.actions.canReset).toBe(false);
     expect(body.inspection.services).toEqual([]);
 
+    runtime.dropSession(session.id);
     const historyResponse = await app.request(`/sessions/${session.id}/history`);
     expect(historyResponse.status).toBe(200);
     const historyBody = await historyResponse.json() as {
       inspection: {
         maintenance: {
+          lastRequest: {
+            action: string;
+            reason?: string;
+          };
           resetBoundary: {
             status: string;
           };
         };
       };
     };
+    expect(historyBody.inspection.maintenance.lastRequest).toEqual(expect.objectContaining({
+      action: 'reset',
+      reason: 'owner_requested_reset',
+    }));
     expect(historyBody.inspection.maintenance.resetBoundary.status).toBe('cleared');
   });
 
@@ -394,6 +457,220 @@ describe('session close route', () => {
     const wakeupListResponse = await app.request(`/wakeups?sessionId=${session.id}`);
     expect(wakeupListResponse.status).toBe(200);
     await expect(wakeupListResponse.json()).resolves.toEqual({ wakeups: [] });
+  });
+
+  it('exposes a public compaction-preparation route and persists the last compaction request', async () => {
+    const session = registry.create({
+      id: 'session-compact',
+      providerName: 'claude',
+      cwd: 'C:/repo',
+    });
+    session.messageCount = 40;
+    session.totalInputTokens = 9000;
+    session.totalOutputTokens = 5000;
+    registry.updateStatus(session.id, 'closed');
+
+    const pendingResponse = await app.request(`/sessions/${session.id}/compact`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        maintenance: {
+          reason: 'owner_requested_compaction',
+          hookPayloads: [{
+            kind: 'memory_flush',
+            payload: {
+              scope: 'summary',
+            },
+          }],
+        },
+      }),
+    });
+    expect(pendingResponse.status).toBe(200);
+    const pendingBody = await pendingResponse.json() as {
+      action: string;
+      status: string;
+      execution: string;
+      runtimeCompactionExecuted: boolean;
+      hookStatus: string;
+      reasonCodes: string[];
+      maintenance: {
+        lastRequest: {
+          action: string;
+          reason?: string;
+        };
+      };
+    };
+    expect(pendingBody).toEqual(expect.objectContaining({
+      action: 'compact',
+      status: 'pending_hooks',
+      execution: 'external_only',
+      runtimeCompactionExecuted: false,
+      hookStatus: 'pending',
+      reasonCodes: expect.arrayContaining(['pre_compaction_hooks_pending', 'session_inactive']),
+      maintenance: expect.objectContaining({
+        lastRequest: expect.objectContaining({
+          action: 'compact',
+          reason: 'owner_requested_compaction',
+        }),
+      }),
+    }));
+
+    const readyResponse = await app.request(`/sessions/${session.id}/compact`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        acknowledgeHooks: true,
+        maintenance: {
+          reason: 'hooks_acknowledged',
+          hookPayloads: [{
+            kind: 'memory_flush',
+            payload: {
+              scope: 'summary',
+              flushed: true,
+            },
+          }],
+        },
+      }),
+    });
+    expect(readyResponse.status).toBe(200);
+    const readyBody = await readyResponse.json() as {
+      status: string;
+      hookStatus: string;
+      session: {
+        inspection: {
+          maintenance: {
+            lastRequest: {
+              action: string;
+              reason?: string;
+              hookPayloads: Array<{ kind: string; payload?: Record<string, unknown> }>;
+            };
+          };
+        };
+      };
+    };
+    expect(readyBody).toEqual(expect.objectContaining({
+      status: 'ready_for_external_compaction',
+      hookStatus: 'acknowledged',
+      session: expect.objectContaining({
+        inspection: expect.objectContaining({
+          maintenance: expect.objectContaining({
+            lastRequest: expect.objectContaining({
+              action: 'compact',
+              reason: 'hooks_acknowledged',
+              hookPayloads: [{
+                kind: 'memory_flush',
+                payload: {
+                  scope: 'summary',
+                  flushed: true,
+                },
+              }],
+            }),
+          }),
+        }),
+      }),
+    }));
+
+    getRuntimeSessionManager(ctx).dropSession(session.id);
+    const persistedResponse = await app.request(`/sessions/${session.id}`);
+    expect(persistedResponse.status).toBe(200);
+    const persistedBody = await persistedResponse.json() as {
+      inspection: {
+        maintenance: {
+          lastRequest: {
+            action: string;
+            reason?: string;
+          };
+        };
+      };
+    };
+    expect(persistedBody.inspection.maintenance.lastRequest).toEqual(expect.objectContaining({
+      action: 'compact',
+      reason: 'hooks_acknowledged',
+    }));
+  });
+
+  it('returns deferred compaction status while the session is still active', async () => {
+    const session = registry.create({
+      id: 'session-compact-active',
+      providerName: 'claude',
+      cwd: 'C:/repo',
+    });
+    session.messageCount = 40;
+    session.totalInputTokens = 9000;
+    session.totalOutputTokens = 5000;
+    registry.updateStatus(session.id, 'ready');
+    attachedWorkers.set(session.id, { alive: true });
+
+    const response = await app.request(`/sessions/${session.id}/compact`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        maintenance: {
+          reason: 'owner_requested_compaction',
+        },
+      }),
+    });
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      status: string;
+      hookStatus: string;
+      reasonCodes: string[];
+    };
+    expect(body).toEqual(expect.objectContaining({
+      status: 'deferred',
+      hookStatus: 'pending',
+      reasonCodes: expect.arrayContaining(['message_count_threshold', 'token_threshold', 'session_active']),
+    }));
+  });
+
+  it('returns not_ready when compaction thresholds have not been reached yet', async () => {
+    const session = registry.create({
+      id: 'session-compact-not-ready',
+      providerName: 'claude',
+      cwd: 'C:/repo',
+    });
+    session.messageCount = 2;
+    session.totalInputTokens = 200;
+    session.totalOutputTokens = 100;
+    registry.updateStatus(session.id, 'closed');
+
+    const response = await app.request(`/sessions/${session.id}/compact`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        acknowledgeHooks: true,
+        maintenance: {
+          reason: 'owner_checked_compaction',
+        },
+      }),
+    });
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      status: string;
+      execution: string;
+      runtimeCompactionExecuted: boolean;
+      hookStatus: string;
+      reasonCodes: string[];
+      maintenance: {
+        lastRequest: {
+          action: string;
+          reason?: string;
+        };
+      };
+    };
+    expect(body).toEqual(expect.objectContaining({
+      status: 'not_ready',
+      execution: 'external_only',
+      runtimeCompactionExecuted: false,
+      hookStatus: 'none',
+      reasonCodes: ['below_compaction_threshold'],
+      maintenance: expect.objectContaining({
+        lastRequest: expect.objectContaining({
+          action: 'compact',
+          reason: 'owner_checked_compaction',
+        }),
+      }),
+    }));
   });
 
   it('clears runtime-owned browser sessions when resetting a session', async () => {

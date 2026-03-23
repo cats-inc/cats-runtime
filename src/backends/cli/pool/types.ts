@@ -10,6 +10,7 @@ export type {
   SessionControls,
   SessionHydrationState,
   SessionInfo,
+  RuntimeSessionMaintenanceState,
   SessionOrigin,
   SessionOwnership,
   SessionProviderState,

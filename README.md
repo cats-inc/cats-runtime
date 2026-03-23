@@ -13,10 +13,11 @@ Current capabilities:
 - session lifecycle management for CLI-backed runtimes
 - session lifecycle management for API-backed Claude, Codex, and Gemini families plus local Ollama
 - additive `cancel` / `reset` lifecycle primitives plus stronger remote-agent close/delete cleanup
-- worktree-backed session isolation with deterministic prepare/recreate/cleanup semantics and merge-or-discard reset/delete policies
+- worktree-backed session isolation with deterministic prepare/recreate/cleanup semantics and explicit discard/merge/preserve reset/delete policies
 - streamed turns over SSE or NDJSON
 - machine-readable session/run inspection payloads over `/sessions`, `/sessions/{id}/history`, and `/sessions/{id}/observe`
-- runtime-owned maintenance metadata for reset boundaries, compaction readiness, pending memory-flush hooks, additive `pre_flush` seams, and delete cleanup summaries
+- runtime-owned maintenance metadata for reset boundaries, compaction readiness, pending memory-flush hooks, additive `pre_flush` seams, persisted maintenance trigger requests, and delete cleanup summaries
+- public external-only compaction-preparation coordination over `POST /sessions/{id}/compact`
 - a lightweight browser/preview substrate with runtime-owned browser sessions/pages, a pluggable driver seam, and manual browser-page preview registration
 - provider-agnostic `progress` events across Junie, Pi, Goose, Copilot, and API/local transports
 - runtime-hosted local tools for API/local sessions (`list_files`, `read_file`, `write_file`, `grep`, `run_shell`)

@@ -21,6 +21,9 @@ import type {
   SessionInvocationContext,
 } from '../../backends/cli/pool/types.js';
 import type {
+  RuntimeSessionMaintenanceAction,
+  RuntimeSessionMaintenanceHookPayload,
+  RuntimeSessionMaintenanceRequest,
   RuntimeSessionLifecycleCleanupSummary,
   SessionArtifact,
   SessionBranchCapabilityTruth,
@@ -96,6 +99,11 @@ const REUSE_POLICIES = new Set<SessionReusePolicy>([
 
 type NativeCleanupResult = boolean | 'stale_config';
 
+interface ParsedMaintenanceRequestBody {
+  reason?: string;
+  hookPayloads: RuntimeSessionMaintenanceHookPayload[];
+}
+
 function buildUnavailableBranchCapabilityTruth(
   reason: string,
 ): SessionBranchCapabilityTruth {
@@ -167,8 +175,9 @@ function serializeSession(ctx: AppContext, session: SessionInfo) {
     wakeupPending: Boolean(wakeup?.pending),
     browserSessions,
   });
+  const { maintenanceState: _maintenanceState, ...publicView } = view;
   return {
-    ...view,
+    ...publicView,
     inspection,
     branching,
     ...(wakeup ? { wakeup } : {}),
@@ -209,8 +218,9 @@ function serializeSessions(
       includeCapabilities: options.includeBranchCapabilities,
     });
     const wakeup = ctx.wakeup?.getSessionWakeState(sessions[index].id);
+    const { maintenanceState: _maintenanceState, ...publicView } = view;
     return {
-      ...view,
+      ...publicView,
       inspection: buildSessionInspection({
         session: sessions[index],
         view,
@@ -315,9 +325,55 @@ function parseWorkspaceIsolationMode(value: unknown): WorkspaceIsolationMode | u
 }
 
 function parseWorktreeCleanupPolicy(value: unknown): WorktreeCleanupPolicy | undefined {
-  return value === 'discard' || value === 'merge'
+  return value === 'discard' || value === 'merge' || value === 'preserve'
     ? value
     : undefined;
+}
+
+function parseMaintenanceHookPayloads(value: unknown): RuntimeSessionMaintenanceHookPayload[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const payloads: RuntimeSessionMaintenanceHookPayload[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      continue;
+    }
+
+    const record = entry as Record<string, unknown>;
+    const kind = parseOptionalString(record.kind);
+    if (!kind) {
+      continue;
+    }
+
+    payloads.push({
+      kind,
+      ...(Object.prototype.hasOwnProperty.call(record, 'payload')
+        ? { payload: record.payload }
+        : {}),
+    });
+  }
+
+  return payloads;
+}
+
+function parseMaintenanceRequestBody(value: unknown): ParsedMaintenanceRequestBody | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  const reason = parseOptionalString(record.reason);
+  const hookPayloads = parseMaintenanceHookPayloads(record.hookPayloads);
+  if (!reason && hookPayloads.length === 0) {
+    return undefined;
+  }
+
+  return {
+    ...(reason ? { reason } : {}),
+    hookPayloads,
+  };
 }
 
 function parseSessionArtifactArray(value: unknown): SessionArtifact[] | undefined {
@@ -492,6 +548,72 @@ function resolveForkWorkspaceSourceCwd(
   return requestedCwd ?? getSessionWorkspaceSourceCwd(session) ?? forkCwd;
 }
 
+function buildMaintenanceRequest(
+  session: Pick<SessionInfo, 'id' | 'cwd' | 'workspaceMode' | 'workspaceIsolation' | 'hydration'>,
+  action: RuntimeSessionMaintenanceAction,
+  requestBody?: ParsedMaintenanceRequestBody,
+  worktreeDisposition?: WorktreeCleanupPolicy,
+): RuntimeSessionMaintenanceRequest {
+  const isolationMode = resolveSessionWorkspaceIsolationMode(session);
+  const sourceCwd = getSessionWorkspaceSourceCwd(session);
+  const worktreePath = session.workspaceIsolation?.mode === 'worktree'
+    ? session.workspaceIsolation.worktree?.worktreePath
+    : undefined;
+
+  return {
+    action,
+    sessionId: session.id,
+    requestedAt: new Date().toISOString(),
+    workspaceMode: session.workspaceMode ?? 'shared',
+    isolationMode,
+    runtimeCwd: session.cwd,
+    ...(sourceCwd ? { sourceCwd } : {}),
+    ...(worktreePath ? { worktreePath } : {}),
+    ...(requestBody?.reason ? { reason: requestBody.reason } : {}),
+    ...(worktreeDisposition ? { worktreeDisposition } : {}),
+    hookPayloads: requestBody?.hookPayloads.map((payload) => ({
+      ...payload,
+      ...(Object.prototype.hasOwnProperty.call(payload, 'payload')
+        ? { payload: structuredClone(payload.payload) }
+        : {}),
+    })) || [],
+  };
+}
+
+function persistTrackedMaintenanceState(ctx: AppContext, sessionId: string): void {
+  const maintenanceState = getRuntimeSessionManager(ctx).getTrackedState(sessionId)?.maintenance;
+  if (!maintenanceState) {
+    return;
+  }
+
+  ctx.registry.updateSessionMetadata(sessionId, {
+    maintenanceState,
+  });
+}
+
+function recordSessionMaintenanceRequest(
+  ctx: AppContext,
+  session: Pick<SessionInfo, 'id' | 'cwd' | 'workspaceMode' | 'workspaceIsolation' | 'hydration'>,
+  action: RuntimeSessionMaintenanceAction,
+  requestBody?: ParsedMaintenanceRequestBody,
+  worktreeDisposition?: WorktreeCleanupPolicy,
+): RuntimeSessionMaintenanceRequest {
+  const request = buildMaintenanceRequest(session, action, requestBody, worktreeDisposition);
+  const recorded = getRuntimeSessionManager(ctx).recordMaintenanceRequest(request);
+  persistTrackedMaintenanceState(ctx, session.id);
+  return recorded;
+}
+
+function recordSessionLifecycle(
+  ctx: AppContext,
+  sessionId: string,
+  input: Parameters<ReturnType<typeof getRuntimeSessionManager>['recordLifecycle']>[1],
+) {
+  const lifecycle = getRuntimeSessionManager(ctx).recordLifecycle(sessionId, input);
+  persistTrackedMaintenanceState(ctx, sessionId);
+  return lifecycle;
+}
+
 async function hydrateSessionForTarget(
   ctx: AppContext,
   options: {
@@ -579,6 +701,55 @@ function persistWorkspaceCleanupState(
     return undefined;
   }
   return ctx.registry.get(sessionId);
+}
+
+function describeRetainedWorktreeCleanup(
+  cleanup: Awaited<ReturnType<typeof cleanupSessionWorkspace>>,
+): string {
+  if (cleanup.reasonCodes.includes('worktree_preserved')) {
+    return 'Worktree cleanup was intentionally preserved for manual handling. Session state was kept for retry.';
+  }
+
+  return 'Worktree cleanup could not be completed. Session state was kept for retry.';
+}
+
+function resolveCompactionRequestStatus(
+  maintenance: ReturnType<typeof buildSessionInspection>['maintenance'],
+  acknowledgeHooks: boolean,
+): {
+  status: 'not_ready' | 'deferred' | 'pending_hooks' | 'ready_for_external_compaction';
+  reasonCodes: string[];
+  hookStatus: 'none' | 'pending' | 'acknowledged';
+} {
+  if (maintenance.compaction.status === 'not_ready') {
+    return {
+      status: 'not_ready',
+      reasonCodes: [...maintenance.compaction.reasonCodes],
+      hookStatus: 'none',
+    };
+  }
+
+  if (maintenance.compaction.status === 'recommended') {
+    return {
+      status: 'deferred',
+      reasonCodes: [...maintenance.compaction.reasonCodes],
+      hookStatus: maintenance.hooks.preCompaction.pending.length > 0 ? 'pending' : 'none',
+    };
+  }
+
+  if (maintenance.hooks.preCompaction.pending.length > 0 && !acknowledgeHooks) {
+    return {
+      status: 'pending_hooks',
+      reasonCodes: ['pre_compaction_hooks_pending', ...maintenance.compaction.reasonCodes],
+      hookStatus: 'pending',
+    };
+  }
+
+  return {
+    status: 'ready_for_external_compaction',
+    reasonCodes: [...maintenance.compaction.reasonCodes],
+    hookStatus: acknowledgeHooks ? 'acknowledged' : 'none',
+  };
 }
 
 function applyPreparedWorkspace(
@@ -1526,6 +1697,18 @@ sessionRoutes.post('/sessions/:id/close', async (c) => {
   const runtime = getRuntimeSessionManager(ctx);
   const id = c.req.param('id');
   const session = ctx.registry.get(id);
+  const body = await c.req.json<{
+    maintenance?: {
+      reason?: string;
+      hookPayloads?: RuntimeSessionMaintenanceHookPayload[];
+    };
+  }>().catch(() => ({}) as {
+    maintenance?: {
+      reason?: string;
+      hookPayloads?: RuntimeSessionMaintenanceHookPayload[];
+    };
+  });
+  const maintenanceRequest = parseMaintenanceRequestBody(body.maintenance);
 
   if (!session) {
     return c.json({ error: 'Session not found' }, 404);
@@ -1538,11 +1721,13 @@ sessionRoutes.post('/sessions/:id/close', async (c) => {
     }, 409);
   }
 
+  recordSessionMaintenanceRequest(ctx, session, 'close', maintenanceRequest);
+
   const worker = runtime.get(id);
   if (!worker?.active) {
     ctx.registry.updateStatus(id, 'closed');
     runtime.markClosed(id);
-    runtime.recordLifecycle(id, {
+    recordSessionLifecycle(ctx, id, {
       action: 'close',
       boundary: 'soft_close',
       status: 'completed',
@@ -1560,7 +1745,7 @@ sessionRoutes.post('/sessions/:id/close', async (c) => {
   if (workerDetached) {
     ctx.registry.updateStatus(id, 'closed');
   }
-  runtime.recordLifecycle(id, {
+  recordSessionLifecycle(ctx, id, {
     action: 'close',
     boundary: 'soft_close',
     status: 'completed',
@@ -1619,10 +1804,19 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
   const session = ctx.registry.get(id);
   const body = await c.req.json<{
     worktreeCleanupPolicy?: WorktreeCleanupPolicy;
+    maintenance?: {
+      reason?: string;
+      hookPayloads?: RuntimeSessionMaintenanceHookPayload[];
+    };
   }>().catch(() => ({}) as {
     worktreeCleanupPolicy?: WorktreeCleanupPolicy;
+    maintenance?: {
+      reason?: string;
+      hookPayloads?: RuntimeSessionMaintenanceHookPayload[];
+    };
   });
   const worktreeCleanupPolicy = parseWorktreeCleanupPolicy(body.worktreeCleanupPolicy);
+  const maintenanceRequest = parseMaintenanceRequestBody(body.maintenance);
 
   if (!session) {
     return c.json({ error: 'Session not found' }, 404);
@@ -1634,6 +1828,14 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
       error: 'This session appears to be active outside cats-runtime and can only be observed right now.',
     }, 409);
   }
+
+  recordSessionMaintenanceRequest(
+    ctx,
+    session,
+    'reset',
+    maintenanceRequest,
+    worktreeCleanupPolicy,
+  );
 
   const worker = runtime.get(id);
   let workerDetached = !runtime.isAttached(id);
@@ -1665,7 +1867,7 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
 
     if (cleanup.status === 'retained') {
       runtime.markClosed(id);
-      const maintenance = runtime.recordLifecycle(id, {
+      const maintenance = recordSessionLifecycle(ctx, id, {
         action: 'reset',
         boundary: 'hard_reset',
         status: 'retained',
@@ -1681,7 +1883,7 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
       return c.json({
         action: 'reset',
         status: 'retained',
-        reason: 'Worktree cleanup could not be completed. Session state was kept for retry.',
+        reason: describeRetainedWorktreeCleanup(cleanup),
         cleanup: maintenance.cleanup,
         maintenance,
         session: serializeSession(ctx, sessionAfterCleanup),
@@ -1701,7 +1903,7 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
   runtime.clearProviderState(id);
   runtime.markClosed(id);
   const wakeupResult = ctx.wakeup?.clearSession(id);
-  runtime.recordLifecycle(id, {
+  recordSessionLifecycle(ctx, id, {
     action: 'reset',
     boundary: 'hard_reset',
     status: 'completed',
@@ -1722,6 +1924,49 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
   return c.json(serializeLifecycleSession(ctx, ctx.registry.get(id) ?? sessionAfterCleanup, 'reset'));
 });
 
+/** POST /sessions/:id/compact — expose a public compaction-preparation seam */
+sessionRoutes.post('/sessions/:id/compact', async (c) => {
+  const ctx = c.get('ctx');
+  const id = c.req.param('id');
+  const session = ctx.registry.get(id);
+  const body = await c.req.json<{
+    acknowledgeHooks?: boolean;
+    maintenance?: {
+      reason?: string;
+      hookPayloads?: RuntimeSessionMaintenanceHookPayload[];
+    };
+  }>().catch(() => ({}) as {
+    acknowledgeHooks?: boolean;
+    maintenance?: {
+      reason?: string;
+      hookPayloads?: RuntimeSessionMaintenanceHookPayload[];
+    };
+  });
+  const maintenanceRequest = parseMaintenanceRequestBody(body.maintenance);
+
+  if (!session) {
+    return c.json({ error: 'Session not found' }, 404);
+  }
+
+  recordSessionMaintenanceRequest(ctx, session, 'compact', maintenanceRequest);
+  const serialized = serializeSession(ctx, ctx.registry.get(id) ?? session);
+  const compaction = resolveCompactionRequestStatus(
+    serialized.inspection.maintenance,
+    body.acknowledgeHooks === true,
+  );
+
+  return c.json({
+    action: 'compact',
+    status: compaction.status,
+    execution: 'external_only',
+    runtimeCompactionExecuted: false,
+    hookStatus: compaction.hookStatus,
+    reasonCodes: compaction.reasonCodes,
+    maintenance: serialized.inspection.maintenance,
+    session: serialized,
+  });
+});
+
 /** DELETE /sessions/:id — permanently remove session and delete .jsonl */
 sessionRoutes.delete('/sessions/:id', async (c) => {
   const ctx = c.get('ctx');
@@ -1730,10 +1975,19 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
   const runtime = getRuntimeSessionManager(ctx);
   const body = await c.req.json<{
     worktreeCleanupPolicy?: WorktreeCleanupPolicy;
+    maintenance?: {
+      reason?: string;
+      hookPayloads?: RuntimeSessionMaintenanceHookPayload[];
+    };
   }>().catch(() => ({}) as {
     worktreeCleanupPolicy?: WorktreeCleanupPolicy;
+    maintenance?: {
+      reason?: string;
+      hookPayloads?: RuntimeSessionMaintenanceHookPayload[];
+    };
   });
   const worktreeCleanupPolicy = parseWorktreeCleanupPolicy(body.worktreeCleanupPolicy);
+  const maintenanceRequest = parseMaintenanceRequestBody(body.maintenance);
 
   if (!session) {
     return c.json({ error: 'Session not found' }, 404);
@@ -1745,6 +1999,14 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
       error: 'This session is still active outside cats-runtime or is already closing. Wait before deleting it.',
     }, 409);
   }
+
+  recordSessionMaintenanceRequest(
+    ctx,
+    session,
+    'delete',
+    maintenanceRequest,
+    worktreeCleanupPolicy,
+  );
 
   const hasNativeSessionState = tracksNativeSessionState(session);
   const hasProviderDiscoveryState = tracksProviderDiscoveryState(session);
@@ -1774,7 +2036,7 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
 
     if (cleanup.status === 'retained') {
       const sessionAfterCleanup = persistWorkspaceCleanupState(ctx, id, cleanup) ?? session;
-      const maintenance = runtime.recordLifecycle(id, {
+      const maintenance = recordSessionLifecycle(ctx, id, {
         action: 'delete',
         boundary: 'permanent_delete',
         status: 'retained',
@@ -1805,7 +2067,9 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
         nativeDeleted: false,
         workspaceCleaned,
         cleanup: maintenance.cleanup,
-        reason: 'Worktree cleanup could not be completed. Session files were kept for retry.',
+        reason: cleanup.reasonCodes.includes('worktree_preserved')
+          ? 'Worktree cleanup was intentionally preserved for manual handling. Session files were kept for retry.'
+          : 'Worktree cleanup could not be completed. Session files were kept for retry.',
         maintenance,
         session: serializeSession(ctx, sessionAfterCleanup),
       });
@@ -1829,7 +2093,7 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
   if (!preparedManagedTranscripts.ready || !preparedProviderDiscovery.ready) {
     preparedManagedTranscripts.rollback();
     preparedProviderDiscovery.rollback();
-    const maintenance = runtime.recordLifecycle(id, {
+    const maintenance = recordSessionLifecycle(ctx, id, {
       action: 'delete',
       boundary: 'permanent_delete',
       status: 'retained',
@@ -1883,7 +2147,7 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
   if (!nativeCleanupSucceeded || !providerDiscoveryCleanupSucceeded) {
     preparedManagedTranscripts.rollback();
     preparedProviderDiscovery.rollback();
-    const maintenance = runtime.recordLifecycle(id, {
+    const maintenance = recordSessionLifecycle(ctx, id, {
       action: 'delete',
       boundary: 'permanent_delete',
       status: 'retained',
@@ -1929,7 +2193,7 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
   const managedDeletion = preparedManagedTranscripts.finalize();
   const providerDeletion = preparedProviderDiscovery.finalize();
   const wakeupResult = ctx.wakeup?.clearSession(id);
-  const maintenance = runtime.recordLifecycle(id, {
+  const maintenance = recordSessionLifecycle(ctx, id, {
     action: 'delete',
     boundary: 'permanent_delete',
     status: 'completed',

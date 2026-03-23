@@ -7,6 +7,7 @@ import type {
   SessionHydrationState,
   SessionInfo,
   SessionInvocationContext,
+  RuntimeSessionMaintenanceState,
   SessionProviderState,
   SessionReusePolicy,
   SessionSkillState,
@@ -348,6 +349,7 @@ export class SessionRegistry {
       instructions?: string;
       skills?: SessionSkillState;
       hydration?: SessionHydrationState;
+      maintenanceState?: RuntimeSessionMaintenanceState;
       context?: SessionInvocationContext;
       outputDir?: string;
       artifacts?: SessionArtifact[];
@@ -371,6 +373,9 @@ export class SessionRegistry {
     }
     if (Object.prototype.hasOwnProperty.call(patch, 'hydration')) {
       session.hydration = cloneHydrationState(patch.hydration);
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'maintenanceState')) {
+      session.maintenanceState = cloneMaintenanceState(patch.maintenanceState);
     }
     if (patch.context !== undefined) {
       session.context = cloneInvocationContext(patch.context);
@@ -964,6 +969,9 @@ export class SessionRegistry {
     if (!target.hydration && incoming.hydration) {
       target.hydration = cloneHydrationState(incoming.hydration);
     }
+    if (!target.maintenanceState && incoming.maintenanceState) {
+      target.maintenanceState = cloneMaintenanceState(incoming.maintenanceState);
+    }
     if (!target.context && incoming.context) target.context = cloneInvocationContext(incoming.context);
     if (!target.outputDir && incoming.outputDir) target.outputDir = incoming.outputDir;
     if ((!target.artifacts || target.artifacts.length === 0) && incoming.artifacts) {
@@ -1019,6 +1027,12 @@ function cloneHydrationState(
   hydration?: SessionHydrationState,
 ): SessionHydrationState | undefined {
   return hydration ? structuredClone(hydration) : undefined;
+}
+
+function cloneMaintenanceState(
+  maintenanceState?: RuntimeSessionMaintenanceState,
+): RuntimeSessionMaintenanceState | undefined {
+  return maintenanceState ? structuredClone(maintenanceState) : undefined;
 }
 
 function cloneSkillState(

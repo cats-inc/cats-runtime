@@ -6,11 +6,11 @@
 
 | Component | Status | Description |
 |-----------|--------|-------------|
-| Core | Completed | Embedded CLI runtime, shared session contracts, discovery, worker pool, runtime-owned shared/isolated/worktree workspace lifecycle helpers, first-slice runtime-owned usage/incident/guardrail contracts, and additive session-maintenance/reset-boundary hooks are in-repo |
+| Core | Completed | Embedded CLI runtime, shared session contracts, discovery, worker pool, runtime-owned shared/isolated/worktree workspace lifecycle helpers, first-slice runtime-owned usage/incident/guardrail contracts, additive session-maintenance/reset-boundary hooks, and persisted maintenance trigger metadata are in-repo |
 | API Backends | In Progress | `src/backends/api` now runs Claude, Codex/OpenAI, Gemini, and Ollama with runtime-managed sessions, provider-native continuation/caching optimizations, additive incident hints plus provider-agnostic `progress` events, a shared local tool loop with patch/file/search/shell support, and runtime-owned health/diagnostics summaries; deeper live probes and broader tool/model discovery remain |
 | Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, an Agent SDK bridge as the second validation target, and first-slice remote cleanup hooks for close/cancel/delete/reset semantics |
-| HTTP API | Completed | Health, sessions, delivery audit/export/repo routes, messages, history, observe, wakeups, provider management, session branch-lineage inspection, metering/guardrail diagnostics, additive run-inspector/session-discipline contracts, machine-readable session-maintenance/delete-cleanup payloads, worktree-backed session lifecycle cleanup semantics, and the runtime MCP facade over HTTP plus stdio are served directly from `cats-runtime` |
-| Runtime Skills | Completed | `skills/` is now a runtime-owned execution catalog with validation, session-level requested/resolved/applied metadata, explicit `skills: null` clearing, library-aware family/slug/fingerprint resolution, backend-aware delivery modes, inspection-level applied-skill reporting, and shared re-entry hydration across create/resume/fork/provider-switch |
+| HTTP API | Completed | Health, sessions, delivery audit/export/repo routes, messages, history, observe, wakeups, provider management, session branch-lineage inspection, metering/guardrail diagnostics, additive run-inspector/session-discipline contracts, machine-readable session-maintenance/delete-cleanup payloads, worktree-backed session lifecycle cleanup semantics including `preserve`, and the runtime MCP facade over HTTP plus stdio are served directly from `cats-runtime` |
+| Runtime Skills | Completed | `skills/` is now a runtime-owned execution catalog with validation, session-level requested/resolved/applied metadata, explicit `skills: null` clearing, library-aware family/slug/fingerprint resolution, backend-aware delivery modes, inspection-level applied-skill reporting, first-slice Codex/Pi verification, and shared re-entry hydration across create/resume/fork/provider-switch |
 | Wakeup Substrate | Completed | Runtime-owned scheduled wakeup requests now support create/list/cancel/trigger, restart-safe persistence, bounded timer processing, coalescing, and additive session/history wakeup metadata without introducing full scheduler semantics |
 | Provider Compatibility | In Progress | Shared CLI compatibility probing now classifies `ready` / `degraded` / `unsupported_version` / `unrecognized_protocol` / `probe_failed`, validates `light` vs `live` runtime-flag probes across expanded CLI family profiles, captures redacted replay-friendly evidence bundles, tracks stale cache/reprobe metadata, and exposes runtime-owned install/prerequisite/PATH/npm-prefix/auth/version/remediation hints for CLI targets |
 | Dashboard | Completed | The embedded dashboard UI is served from `GET /` and now surfaces runtime/provider health from runtime-owned diagnostics contracts |
@@ -18,7 +18,7 @@
 | Delivery Primitives | Completed | Runtime-owned delivery audit, artifact publish/export, repo status, commit, push, and normalized preview-surface metadata are now available over both HTTP routes and local tools |
 | Browser Preview Substrate | Completed | Runtime-owned browser driver/session/page contracts, `browser_page` preview surfaces, manual driver validation, and additive `/browser/*` routes now exist without depending on sibling browser projects |
 | Tests | Completed | Vitest covers provider, discovery, pool, HTTP, delivery, server bootstrap, API/local tool-loop behavior, and first-slice metering/guardrail/progress normalization |
-| Docs | In Progress | Core docs now cover startup/diagnostics, provider compatibility/evidence flows, model catalog, session branching, worktree-backed session isolation and cleanup, workspace substrate, runtime hydration/re-entry metadata, delivery primitives, the browser preview substrate, runtime-managed skills and explicit clearing, the scheduled wakeup substrate, first-slice metering/progress contracts, additive session inspection/run-state/maintenance payloads, and the runtime MCP facade over HTTP plus stdio; later PLAN-003/PLAN-005 follow-on items still need ongoing updates |
+| Docs | In Progress | Core docs now cover startup/diagnostics, provider compatibility/evidence flows, model catalog, session branching, worktree-backed session isolation and cleanup, workspace substrate, runtime hydration/re-entry metadata, delivery primitives, the browser preview substrate, runtime-managed skills and explicit clearing, the scheduled wakeup substrate, first-slice metering/progress contracts, additive session inspection/run-state/maintenance payloads including persisted maintenance requests, and the runtime MCP facade over HTTP plus stdio; later PLAN-003/PLAN-005 follow-on items still need ongoing updates |
 | Follow-ups | Completed | Accepted post-review findings for provider-instance rollout were implemented and recorded in `docs/plans/PLAN-002-provider-instance-review-followups.md` |
 
 **Legend**: Not Started | In Progress | Completed | Blocked
@@ -527,16 +527,17 @@ without moving memory extraction or product policy into `cats-runtime`.
 | Task | Status | Notes |
 |------|--------|-------|
 | Add implementation plan for maintenance-hook work | [x] | `docs/plans/PLAN-012-session-maintenance-hooks-and-cleanup-discipline.md` records scope and boundaries |
-| Add runtime-owned session maintenance contract | [x] | `inspection.maintenance` now exposes compaction readiness, pending hook groups, reset boundaries, cleanup guidance, and lifecycle markers |
+| Add runtime-owned session maintenance contract | [x] | `inspection.maintenance` now exposes compaction readiness, pending hook groups, reset boundaries, cleanup guidance, lifecycle markers, and the last accepted maintenance trigger request |
 | Track close/reset/delete lifecycle markers in runtime state | [x] | `RuntimeSessionManager` now records machine-readable lifecycle boundaries instead of leaving close/reset semantics implicit |
 | Clear stale run/progress state on hard reset | [x] | Reset now drops current/last run snapshots, progress, recent events, and stale hydration metadata before the next lifecycle begins |
 | Add machine-readable delete cleanup summary | [x] | Delete responses now expose normalized cleanup booleans plus terminal lifecycle metadata for `completed` vs `retained` deletes |
-| Leave additive Team 6 memory-flush seam without implementing the pipeline | [x] | Runtime now advertises pending `memory_flush` hooks before reset/compaction while keeping durable-memory exports product-owned |
+| Expose public compaction-preparation route without moving compaction into runtime | [x] | `POST /sessions/{id}/compact` now returns machine-readable readiness/hook state plus persisted maintenance trigger metadata while remaining `external_only` |
+| Leave additive Team 4/product memory-flush seam without implementing the pipeline | [x] | Runtime now advertises pending `memory_flush` hooks before reset/compaction, accepts additive maintenance trigger payloads, and keeps durable-memory exports product-owned |
 | Cover maintenance and lifecycle-boundary behavior with tests | [x] | Vitest now covers session-maintenance derivation, close/reset lifecycle markers, history reset boundaries, and delete cleanup payloads |
 
 #### Deferred Boundaries
 
-- [ ] No public `/compact` route yet; compaction readiness remains metadata only
+- [ ] No runtime-owned compaction engine yet; `/sessions/{id}/compact` is an external-only coordination seam
 - [ ] No memory extraction / summarization pipeline in runtime; the hook seam is declarative only
 - [ ] No product-side policy for when a host must honor `memory_flush`
 
@@ -621,7 +622,7 @@ into `cats-runtime`.
 | Add shared worktree lifecycle helpers under `src/core/workspace` | [x] | `prepareSessionWorkspace()` and `cleanupSessionWorkspace()` now own shared/isolated/worktree preparation plus merge-or-discard cleanup |
 | Freeze additive workspace isolation metadata in runtime session contracts | [x] | Session payloads, hydration metadata, registry persistence, and workspace grouping now retain `workspaceIsolation` and `hydration.workspace.isolationMode` |
 | Wire worktree preparation into create/resume/fork | [x] | `POST /sessions`, `POST /sessions/{id}/resume`, and `POST /sessions/{id}/fork` now prepare or recreate worktree-backed runtime cwd state before spawn |
-| Wire worktree cleanup into reset/delete | [x] | `POST /sessions/{id}/reset` and `DELETE /sessions/{id}` now support `worktreeCleanupPolicy: "discard" | "merge"` plus retained cleanup responses |
+| Wire worktree cleanup into reset/delete | [x] | `POST /sessions/{id}/reset` and `DELETE /sessions/{id}` now support `worktreeCleanupPolicy: "discard" | "merge" | "preserve"` plus retained cleanup responses |
 | Leave additive pre-reset / pre-compaction / pre-flush hook seams | [x] | Session maintenance now advertises `pre_flush` alongside the existing Team 3 memory-flush seam instead of hard-coding a product memory pipeline |
 | Cover lifecycle behavior with automated tests | [x] | Vitest now covers worktree preparation, merge/discard cleanup, resume re-prepare, registry persistence, and route-level worktree flows |
 | Update docs/progress/plan tracking | [x] | `README.md`, `docs/api.md`, `docs/architecture.md`, `docs/plans/PLAN-014-worktree-isolation-execution-layer.md`, and `PROGRESS.md` now describe the slice |
@@ -639,4 +640,4 @@ into `cats-runtime`.
 
 ---
 
-*Last updated: 2026-03-23*
+*Last updated: 2026-03-24*
