@@ -44,6 +44,10 @@ Current tools:
 This is intentionally a read-mostly and preview-first slice. Session mutation
 tools can land later if downstream orchestrators actually need them.
 
+`POST /mcp` uses the same runtime auth policy as the direct HTTP API. If
+`cats-runtime` is configured with an API key, MCP clients must send the same
+Bearer token.
+
 ## HTTP Usage
 
 When `CATS_RUNTIME_API_KEY` is enabled, send the same bearer auth used by the
@@ -128,6 +132,10 @@ tool surface here. The first shared tool names are:
 - `observe_session`
 - `audit_workspace`
 - `audit_delivery_target`
+
+`list_sessions.arguments.status` accepts the same runtime session states exposed
+by the direct API: `initializing`, `ready`, `busy`, `closed`,
+`closing`. Invalid values return MCP `-32602`.
 
 This keeps the product/runtime ownership split explicit:
 

@@ -266,4 +266,34 @@ describe('runtime MCP facade', () => {
     expect(deliveryAudit.result.structuredContent.action).toBe('audit-delivery-target');
     expect(deliveryAudit.result.structuredContent.contract.mode).toBe('preview');
   });
+
+  it('rejects invalid list_sessions status filters with a machine-readable params error', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 7,
+        method: 'tools/call',
+        params: {
+          name: 'list_sessions',
+          arguments: {
+            status: 'sleeping',
+          },
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: null,
+      error: {
+        code: -32602,
+        message: 'status must be a valid session status',
+      },
+    });
+  });
 });

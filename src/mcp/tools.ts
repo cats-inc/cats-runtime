@@ -1,8 +1,9 @@
-import { WorkspaceSubstrateService } from '../core/runtime/WorkspaceSubstrateService.js';
+import type { SessionStatus } from '../backends/cli/pool/types.js';
 import { RUNTIME_VERSION } from '../startup.js';
 import {
   getRuntimeDeliveryService,
   getRuntimeSessionManager,
+  getWorkspaceSubstrateService,
   type AppContext,
 } from '../http/app.js';
 import { buildMcpObserveSessionPayload, buildMcpSessionSummary } from './readModels.js';
@@ -36,6 +37,27 @@ function readOptionalString(record: Record<string, unknown>, key: string): strin
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function readOptionalSessionStatus(
+  record: Record<string, unknown>,
+  key: string,
+): SessionStatus | undefined {
+  const value = readOptionalString(record, key);
+  if (!value) {
+    return undefined;
+  }
+
+  switch (value) {
+    case 'initializing':
+    case 'ready':
+    case 'busy':
+    case 'closed':
+    case 'closing':
+      return value;
+    default:
+      throw new McpToolError(-32602, `${key} must be a valid session status`);
+  }
 }
 
 function readRequiredString(record: Record<string, unknown>, key: string): string {
@@ -113,9 +135,7 @@ async function listSessions(
 ): Promise<McpToolCallResult> {
   const sessions = ctx.registry.list({
     provider: readOptionalString(args, 'provider'),
-    status: readOptionalString(args, 'status') as typeof ctx.registry.list extends (filters?: infer F) => unknown
-      ? F extends { status?: infer S } ? S : never
-      : never,
+    status: readOptionalSessionStatus(args, 'status'),
   });
   const includeInspection = readOptionalBoolean(args, 'includeInspection') === true;
 
@@ -146,10 +166,10 @@ async function observeSession(
 }
 
 async function auditWorkspace(
-  _ctx: AppContext,
+  ctx: AppContext,
   args: Record<string, unknown>,
 ): Promise<McpToolCallResult> {
-  const service = new WorkspaceSubstrateService();
+  const service = getWorkspaceSubstrateService(ctx);
   const workspacePath = readRequiredString(args, 'workspacePath');
   const result = await service.execute({
     operation: 'audit-workspace',

@@ -18,6 +18,7 @@ import type { WslDiscoveryStatusStore } from '../backends/cli/discovery/wslDisco
 import type { ProviderModelCatalogService } from '../core/models/providerModelCatalog.js';
 import { ProviderCompatibilityService } from '../core/compatibility/ProviderCompatibilityService.js';
 import { RuntimeDeliveryService } from '../core/runtime/RuntimeDeliveryService.js';
+import { WorkspaceSubstrateService } from '../core/runtime/WorkspaceSubstrateService.js';
 import { RuntimeMeteringService } from '../core/usage/RuntimeMeteringService.js';
 import type { RuntimeWakeupService } from '../core/wakeup/RuntimeWakeupService.js';
 import { bearerAuth } from './auth.js';
@@ -59,6 +60,7 @@ export interface AppContext {
   providerModelCatalog: ProviderModelCatalogService;
   compatibility?: ProviderCompatibilityService;
   delivery?: RuntimeDeliveryService;
+  workspaceSubstrate?: WorkspaceSubstrateService;
   metering?: RuntimeMeteringService;
   wakeup?: RuntimeWakeupService;
   resolveCursorNative?: (instanceId?: string) => CursorNativeSessionService;
@@ -134,6 +136,13 @@ export function getRuntimeDeliveryService(ctx: AppContext): RuntimeDeliveryServi
     });
   }
   return ctx.delivery;
+}
+
+export function getWorkspaceSubstrateService(ctx: AppContext): WorkspaceSubstrateService {
+  if (!ctx.workspaceSubstrate) {
+    ctx.workspaceSubstrate = new WorkspaceSubstrateService();
+  }
+  return ctx.workspaceSubstrate;
 }
 
 export function createRuntimeApp(ctx: AppContext) {

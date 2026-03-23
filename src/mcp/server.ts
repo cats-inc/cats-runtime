@@ -11,6 +11,8 @@ import type {
   McpJsonRpcSuccess,
 } from './types.js';
 
+const MCP_PROTOCOL_VERSION = '2024-11-05';
+
 function successResponse(
   id: string | number | null,
   result: unknown,
@@ -86,7 +88,7 @@ export async function handleMcpJsonRpc(
         return id === null ? null : successResponse(id, {});
       case 'initialize':
         return successResponse(id, {
-          protocolVersion: '2024-11-05',
+          protocolVersion: MCP_PROTOCOL_VERSION,
           serverInfo: {
             name: 'cats-runtime-mcp',
             version: RUNTIME_VERSION,
