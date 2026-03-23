@@ -10,6 +10,7 @@ import type {
   SessionView,
 } from '../types.js';
 import type { RuntimeTrackedSessionStateSnapshot } from './RuntimeSessionManager.js';
+import { buildSessionMaintenance } from './sessionMaintenance.js';
 import { extractWakeReason } from './wakeReason.js';
 
 const HTML_EXTENSIONS = new Set(['.htm', '.html']);
@@ -32,6 +33,7 @@ export interface BuildSessionInspectionInput {
   view: SessionView;
   trackedState?: RuntimeTrackedSessionStateSnapshot;
   metering: RuntimeSessionMeteringSnapshot;
+  wakeupPending?: boolean;
 }
 
 export function buildSessionInspection(
@@ -74,6 +76,12 @@ export function buildSessionInspection(
     ...(input.trackedState?.progress ? { progress: input.trackedState.progress } : {}),
     recentEvents: input.trackedState?.recentEvents || [],
     metering: input.metering,
+    maintenance: buildSessionMaintenance({
+      session: input.session,
+      view: input.view,
+      wakeupPending: input.wakeupPending,
+      trackedMaintenance: input.trackedState?.maintenance,
+    }),
     artifacts,
     services,
     previewSurfaces,

@@ -16,8 +16,8 @@ These important documents live in the project root:
 | Document | Status | Description |
 |----------|--------|-------------|
 | [requirements.md](./requirements.md) | Template | Requirements specification |
-| [architecture.md](./architecture.md) | Complete | Embedded runtime architecture, backend layering, and runtime-owned skill / compatibility / metering seams |
-| [api.md](./api.md) | Complete | Supported public HTTP contract, including skills, diagnostics, progress, guardrails, and compatibility summaries |
+| [architecture.md](./architecture.md) | Complete | Embedded runtime architecture, backend layering, and runtime-owned skill / compatibility / metering / session-maintenance seams |
+| [api.md](./api.md) | Complete | Supported public HTTP contract, including skills, diagnostics, progress, guardrails, compatibility summaries, and session maintenance metadata |
 
 ## Development Guides
 

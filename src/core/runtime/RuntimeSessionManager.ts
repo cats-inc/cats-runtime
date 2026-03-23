@@ -4,6 +4,10 @@ import type {
   ExecutionHandle,
   RuntimeEventExcerpt,
   RuntimeGuardrailResult,
+  RuntimeSessionLifecycleAction,
+  RuntimeSessionLifecycleCleanupSummary,
+  RuntimeSessionLifecycleContract,
+  RuntimeSessionMaintenanceMarker,
   RuntimeProgressSnapshot,
   ProviderCapabilities,
   ProviderSpawnOptions,
@@ -26,10 +30,12 @@ import type { BackendKind } from '../../backends/cli/config.js';
 import { ApiBackendManager } from '../../backends/api/runtime/ApiBackendManager.js';
 import { AgentBackendManager } from '../../backends/agent/runtime/AgentBackendManager.js';
 import { extractWakeReason } from './wakeReason.js';
+import type { RuntimeTrackedSessionMaintenanceState } from './sessionMaintenance.js';
 
 type ExecutionEventName = 'event' | 'exit' | 'error';
 type ExecutionListener = (...args: unknown[]) => void;
 const MAX_RECENT_EVENTS = 12;
+const MAX_MAINTENANCE_MARKERS = 12;
 
 interface PoolExecutionLike {
   alive?: boolean;
@@ -42,6 +48,7 @@ interface PoolExecutionLike {
 export interface RuntimeTrackedSessionStateSnapshot {
   state: RuntimeSessionExecutionState;
   wake: RuntimeWakeReason | null;
+  maintenance: RuntimeTrackedSessionMaintenanceState;
   currentRun?: RuntimeRunInspection;
   lastRun?: RuntimeRunInspection;
   progress?: RuntimeProgressSnapshot;
@@ -340,6 +347,66 @@ export class RuntimeSessionManager {
     tracked.state = this.isAttached(sessionId) ? 'idle' : 'closed';
   }
 
+  recordLifecycle(
+    sessionId: string,
+    input: {
+      action: RuntimeSessionLifecycleAction;
+      boundary: RuntimeSessionLifecycleContract['boundary'];
+      status: RuntimeSessionLifecycleContract['status'];
+      observedAt?: string;
+      reasonCodes?: string[];
+      cleanup?: RuntimeSessionLifecycleCleanupSummary;
+      clearExecutionState?: boolean;
+    },
+  ): RuntimeSessionLifecycleContract {
+    const tracked = this.ensureTrackedState(sessionId);
+    const observedAt = input.observedAt || new Date().toISOString();
+
+    if (tracked.currentRun) {
+      this.finalizeCurrentRun(sessionId, tracked, 'canceled', observedAt, {
+        resultSummary: buildLifecycleRunSummary(input.action),
+      });
+    }
+
+    if (input.clearExecutionState) {
+      tracked.currentRun = undefined;
+      tracked.lastRun = undefined;
+      tracked.progress = undefined;
+      tracked.recentEvents = [];
+      tracked.wake = null;
+      tracked.state = this.isAttached(sessionId) ? 'idle' : 'closed';
+    }
+
+    const lifecycle: RuntimeSessionLifecycleContract = {
+      action: input.action,
+      boundary: input.boundary,
+      status: input.status,
+      observedAt,
+      reasonCodes: [...(input.reasonCodes || [])],
+      cleanup: {
+        ...(input.cleanup || {}),
+        ...(input.clearExecutionState ? { runStateCleared: true } : {}),
+      },
+    };
+
+    tracked.maintenance.lastLifecycle = lifecycle;
+    if (input.action === 'reset' && input.status === 'completed') {
+      tracked.maintenance.lastResetAt = observedAt;
+    }
+
+    this.pushMaintenanceMarker(tracked, {
+      code: `${input.action}_${input.status}`,
+      observedAt,
+      status: input.status === 'completed' ? 'completed' : 'observed',
+      details: {
+        boundary: input.boundary,
+        reasonCodes: lifecycle.reasonCodes,
+      },
+    });
+
+    return cloneLifecycle(lifecycle);
+  }
+
   dropSession(sessionId: string): void {
     this.sessionStates.delete(sessionId);
   }
@@ -442,6 +509,9 @@ export class RuntimeSessionManager {
       tracked = {
         state: 'idle',
         wake: null,
+        maintenance: {
+          markers: [],
+        },
         recentEvents: [],
       };
       this.sessionStates.set(sessionId, tracked);
@@ -482,6 +552,19 @@ export class RuntimeSessionManager {
     tracked.recentEvents.push(excerpt);
     if (tracked.recentEvents.length > MAX_RECENT_EVENTS) {
       tracked.recentEvents.splice(0, tracked.recentEvents.length - MAX_RECENT_EVENTS);
+    }
+  }
+
+  private pushMaintenanceMarker(
+    tracked: RuntimeTrackedSessionStateSnapshot,
+    marker: RuntimeSessionMaintenanceMarker,
+  ): void {
+    tracked.maintenance.markers.push(marker);
+    if (tracked.maintenance.markers.length > MAX_MAINTENANCE_MARKERS) {
+      tracked.maintenance.markers.splice(
+        0,
+        tracked.maintenance.markers.length - MAX_MAINTENANCE_MARKERS,
+      );
     }
   }
 }
@@ -572,6 +655,7 @@ function cloneTrackedState(
   return {
     state: tracked.state,
     wake: tracked.wake ? { ...tracked.wake, ...(tracked.wake.labels ? { labels: [...tracked.wake.labels] } : {}) } : null,
+    maintenance: cloneMaintenanceState(tracked.maintenance),
     ...(tracked.currentRun ? { currentRun: cloneRun(tracked.currentRun) } : {}),
     ...(tracked.lastRun ? { lastRun: cloneRun(tracked.lastRun) } : {}),
     ...(tracked.progress ? { progress: { ...tracked.progress, ...(tracked.progress.metadata ? { metadata: { ...tracked.progress.metadata } } : {}) } } : {}),
@@ -608,6 +692,41 @@ function cloneServices(
     ...service,
     ...(service.metadata ? { metadata: { ...service.metadata } } : {}),
   }));
+}
+
+function cloneMaintenanceState(
+  maintenance: RuntimeTrackedSessionMaintenanceState,
+): RuntimeTrackedSessionMaintenanceState {
+  return {
+    ...(maintenance.lastResetAt ? { lastResetAt: maintenance.lastResetAt } : {}),
+    ...(maintenance.lastLifecycle ? { lastLifecycle: cloneLifecycle(maintenance.lastLifecycle) } : {}),
+    markers: maintenance.markers.map((marker) => ({
+      ...marker,
+      ...(marker.details ? { details: { ...marker.details } } : {}),
+    })),
+  };
+}
+
+function cloneLifecycle(
+  lifecycle: RuntimeSessionLifecycleContract,
+): RuntimeSessionLifecycleContract {
+  return {
+    ...lifecycle,
+    reasonCodes: [...lifecycle.reasonCodes],
+    cleanup: { ...lifecycle.cleanup },
+  };
+}
+
+function buildLifecycleRunSummary(action: RuntimeSessionLifecycleAction): string {
+  switch (action) {
+    case 'reset':
+      return 'Session reset cleared the current execution boundary.';
+    case 'delete':
+      return 'Session delete terminated the current execution boundary.';
+    case 'close':
+    default:
+      return 'Session close terminated the current execution boundary.';
+  }
 }
 
 function extractRuntimeUsageSignal(

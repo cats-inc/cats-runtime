@@ -15,6 +15,7 @@ Current capabilities:
 - additive `cancel` / `reset` lifecycle primitives plus stronger remote-agent close/delete cleanup
 - streamed turns over SSE or NDJSON
 - machine-readable session/run inspection payloads over `/sessions`, `/sessions/{id}/history`, and `/sessions/{id}/observe`
+- runtime-owned maintenance metadata for reset boundaries, compaction readiness, pending memory-flush hooks, and delete cleanup summaries
 - provider-agnostic `progress` events across Junie, Pi, Goose, Copilot, and API/local transports
 - runtime-hosted local tools for API/local sessions (`list_files`, `read_file`, `write_file`, `grep`, `run_shell`)
 - external session discovery for supported local tools
@@ -47,6 +48,7 @@ Current capabilities:
 - [x] Add first-slice runtime usage metering, rate-limit/quota incident surfacing, and provider-agnostic progress contracts
 - [x] Add the first provider compatibility/evidence engine slice for CLI-backed providers
 - [x] Add provider-agnostic run-inspector/session-discipline contracts across CLI, API, and agent backends
+- [x] Add session maintenance hooks and cleanup discipline for long-running lifecycle boundaries
 
 ## Design Rules
 

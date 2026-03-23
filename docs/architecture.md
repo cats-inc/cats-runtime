@@ -215,6 +215,10 @@ src/
   run, last run, wake reason, recent normalized events, and lifecycle state so
   session/history/observe routes can expose a provider-agnostic run inspector
   contract
+- Adds runtime-owned maintenance metadata for reset boundaries, compaction
+  readiness, pending pre-reset/pre-compaction memory-flush hooks, and
+  machine-readable cleanup guidance without implementing the product memory
+  pipeline itself
 - Enriches current/last-run inspection with per-run preview surfaces derived
   from agent services and artifacts so hosts can render the output of one run
   without diffing whole-session state
@@ -381,6 +385,9 @@ higher-level product memory.
 - **Archive/RAG retrieval** should consume explicit exports or projections, not
   reach directly into provider-native transcript stores as the only source of
   truth.
+- **Maintenance hooks** such as pending `memory_flush` before reset or
+  compaction are runtime-owned signals only; upstream products remain
+  responsible for the actual durable-memory export/write path.
 
 This keeps agent-native transcripts useful for continuity without making them
 the only durable memory surface for the Cats suite.

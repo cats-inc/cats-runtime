@@ -932,6 +932,25 @@ export type RuntimeRunStatus =
   | 'blocked'
   | 'cooldown';
 
+export type RuntimeSessionMaintenanceStatus =
+  | 'clean'
+  | 'attention'
+  | 'cleanup_ready';
+
+export type RuntimeSessionCompactionStatus =
+  | 'not_ready'
+  | 'ready'
+  | 'recommended';
+
+export type RuntimeSessionCleanupStatus =
+  | 'clean'
+  | 'recommended'
+  | 'ready';
+
+export type RuntimeSessionLifecycleAction = 'close' | 'reset' | 'delete';
+export type RuntimeSessionLifecycleBoundary = 'soft_close' | 'hard_reset' | 'permanent_delete';
+export type RuntimeSessionLifecycleStatus = 'completed' | 'retained';
+
 export interface RuntimeWakeReason {
   source?: SessionInvocationContext['source'];
   reason?: string;
@@ -966,6 +985,78 @@ export interface RuntimeEventExcerpt {
   isError?: boolean;
   kind?: RuntimeProgressKind;
   status?: RuntimeProgressStatus;
+}
+
+export interface RuntimeSessionMaintenanceMarker {
+  code: string;
+  observedAt: string;
+  status: 'observed' | 'completed';
+  details?: Record<string, unknown>;
+}
+
+export interface RuntimeSessionLifecycleCleanupSummary {
+  workerDetached?: boolean;
+  providerResumeCleared?: boolean;
+  providerStateCleared?: boolean;
+  wakeupsCleared?: boolean;
+  workspaceCleaned?: boolean;
+  managedTranscriptDeleted?: boolean;
+  providerDiscoveryCleared?: boolean;
+  registryDropped?: boolean;
+  runStateCleared?: boolean;
+}
+
+export interface RuntimeSessionLifecycleContract {
+  action: RuntimeSessionLifecycleAction;
+  boundary: RuntimeSessionLifecycleBoundary;
+  status: RuntimeSessionLifecycleStatus;
+  observedAt: string;
+  reasonCodes: string[];
+  cleanup: RuntimeSessionLifecycleCleanupSummary;
+}
+
+export interface RuntimeSessionHookContract {
+  id: 'memory_flush';
+  phase: 'pre_reset' | 'pre_compaction';
+  status: 'pending';
+  owner: 'product_memory';
+  reason: string;
+}
+
+export interface RuntimeSessionHookGroup {
+  available: boolean;
+  pending: RuntimeSessionHookContract[];
+}
+
+export interface RuntimeSessionCompactionContract {
+  status: RuntimeSessionCompactionStatus;
+  reasonCodes: string[];
+  messageCount: number;
+  totalTokens: number;
+}
+
+export interface RuntimeSessionResetBoundary {
+  status: 'none' | 'cleared';
+  lastResetAt?: string;
+  reasonCodes: string[];
+}
+
+export interface RuntimeSessionCleanupContract {
+  status: RuntimeSessionCleanupStatus;
+  reasonCodes: string[];
+}
+
+export interface RuntimeSessionMaintenance {
+  status: RuntimeSessionMaintenanceStatus;
+  compaction: RuntimeSessionCompactionContract;
+  hooks: {
+    preReset: RuntimeSessionHookGroup;
+    preCompaction: RuntimeSessionHookGroup;
+  };
+  resetBoundary: RuntimeSessionResetBoundary;
+  cleanup: RuntimeSessionCleanupContract;
+  markers: RuntimeSessionMaintenanceMarker[];
+  lastLifecycle?: RuntimeSessionLifecycleContract;
 }
 
 export interface RuntimeRunInspection {
@@ -1014,6 +1105,7 @@ export interface RuntimeSessionInspection {
   progress?: RuntimeProgressSnapshot;
   recentEvents: RuntimeEventExcerpt[];
   metering: RuntimeSessionMeteringSnapshot;
+  maintenance: RuntimeSessionMaintenance;
   artifacts: SessionArtifact[];
   services: AgentRuntimeService[];
   previewSurfaces: RuntimePreviewSurface[];

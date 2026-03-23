@@ -20,6 +20,7 @@ import type {
   SessionInvocationContext,
 } from '../../backends/cli/pool/types.js';
 import type {
+  RuntimeSessionLifecycleCleanupSummary,
   SessionArtifact,
   SessionBranchCapabilityTruth,
   SessionBranchRequest,
@@ -155,6 +156,7 @@ function serializeSession(ctx: AppContext, session: SessionInfo) {
     view,
     trackedState: runtime.getTrackedState(session.id),
     metering: getRuntimeMeteringService(ctx).buildSessionSnapshot(session),
+    wakeupPending: Boolean(wakeup?.pending),
   });
   return {
     ...view,
@@ -202,6 +204,7 @@ function serializeSessions(
         view,
         trackedState: runtime.getTrackedState(sessions[index].id),
         metering: metering.buildSessionSnapshot(sessions[index]),
+        wakeupPending: Boolean(wakeup?.pending),
       }),
       branching,
       ...(wakeup ? { wakeup } : {}),
@@ -228,6 +231,25 @@ function resolveCliProviderTarget(
     providerName,
     instanceId ? `cli/${instanceId}` : undefined,
   );
+}
+
+function buildDeleteCleanupSummary(input: {
+  workerDetached: boolean;
+  wakeupsCleared: boolean;
+  workspaceCleaned: boolean;
+  managedTranscriptDeleted: boolean;
+  providerDiscoveryCleared: boolean;
+  registryDropped: boolean;
+}): RuntimeSessionLifecycleCleanupSummary {
+  return {
+    workerDetached: input.workerDetached,
+    wakeupsCleared: input.wakeupsCleared,
+    workspaceCleaned: input.workspaceCleaned,
+    managedTranscriptDeleted: input.managedTranscriptDeleted,
+    providerDiscoveryCleared: input.providerDiscoveryCleared,
+    registryDropped: input.registryDropped,
+    runStateCleared: true,
+  };
 }
 
 async function primeCliCompatibility(
@@ -1326,14 +1348,33 @@ sessionRoutes.post('/sessions/:id/close', async (c) => {
   if (!worker?.active) {
     ctx.registry.updateStatus(id, 'closed');
     runtime.markClosed(id);
+    runtime.recordLifecycle(id, {
+      action: 'close',
+      boundary: 'soft_close',
+      status: 'completed',
+      reasonCodes: ['already_detached'],
+      cleanup: {
+        workerDetached: true,
+      },
+    });
     return c.json(serializeLifecycleSession(ctx, ctx.registry.get(id) ?? session, 'close'));
   }
 
   ctx.registry.updateStatus(id, 'closing');
   await runtime.close(session, 'close');
+  const workerDetached = !runtime.isAttached(id);
   if (!runtime.isAttached(id)) {
     ctx.registry.updateStatus(id, 'closed');
   }
+  runtime.recordLifecycle(id, {
+    action: 'close',
+    boundary: 'soft_close',
+    status: 'completed',
+    reasonCodes: ['session_closed'],
+    cleanup: {
+      workerDetached,
+    },
+  });
   return c.json(serializeLifecycleSession(ctx, ctx.registry.get(id) ?? session, 'close'));
 });
 
@@ -1395,17 +1436,33 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
   }
 
   const worker = runtime.get(id);
+  let workerDetached = !runtime.isAttached(id);
   if (worker?.active) {
     ctx.registry.updateStatus(id, 'closing');
     await runtime.close(session, 'reset');
+    workerDetached = !runtime.isAttached(id);
   }
 
   ctx.registry.clearProviderResumeState(id);
   ctx.registry.setProviderState(id, undefined);
+  ctx.registry.updateSessionMetadata(id, { hydration: undefined });
   ctx.registry.updateStatus(id, 'closed');
   runtime.clearProviderState(id);
   runtime.markClosed(id);
-  ctx.wakeup?.clearSession(id);
+  const wakeupResult = ctx.wakeup?.clearSession(id);
+  runtime.recordLifecycle(id, {
+    action: 'reset',
+    boundary: 'hard_reset',
+    status: 'completed',
+    reasonCodes: ['manual_reset'],
+    cleanup: {
+      workerDetached,
+      providerResumeCleared: true,
+      providerStateCleared: true,
+      wakeupsCleared: true,
+    },
+    clearExecutionState: true,
+  });
   return c.json(serializeLifecycleSession(ctx, ctx.registry.get(id) ?? session, 'reset'));
 });
 
@@ -1414,6 +1471,7 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
   const ctx = c.get('ctx');
   const id = c.req.param('id');
   const session = ctx.registry.get(id);
+  const runtime = getRuntimeSessionManager(ctx);
 
   if (!session) {
     return c.json({ error: 'Session not found' }, 404);
@@ -1438,12 +1496,22 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
   if (!preparedManagedTranscripts.ready || !preparedProviderDiscovery.ready) {
     preparedManagedTranscripts.rollback();
     preparedProviderDiscovery.rollback();
+    const maintenance = runtime.recordLifecycle(id, {
+      action: 'delete',
+      boundary: 'permanent_delete',
+      status: 'retained',
+      reasonCodes: ['cleanup_staging_failed'],
+      cleanup: {
+        workerDetached: !runtime.isAttached(id),
+      },
+    });
     return c.json({
       status: 'retained',
       hadTranscript,
       fileDeleted: false,
       nativeDeleted: false,
       reason: 'Session files are locked or in use. Nothing was removed.',
+      maintenance,
     });
   }
 
@@ -1478,16 +1546,25 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
   if (!nativeCleanupSucceeded || !providerDiscoveryCleanupSucceeded) {
     preparedManagedTranscripts.rollback();
     preparedProviderDiscovery.rollback();
+    const maintenance = runtime.recordLifecycle(id, {
+      action: 'delete',
+      boundary: 'permanent_delete',
+      status: 'retained',
+      reasonCodes: ['cleanup_verification_failed'],
+      cleanup: {
+        workerDetached: !runtime.isAttached(id),
+      },
+    });
     return c.json({
       status: 'retained',
       hadTranscript,
       fileDeleted: false,
       nativeDeleted: false,
       reason: 'Session cleanup could not be verified. Nothing was removed.',
+      maintenance,
     });
   }
 
-  const runtime = getRuntimeSessionManager(ctx);
   const worker = runtime.get(id);
   if (worker?.active) {
     try {
@@ -1506,7 +1583,22 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
   if (session.workspaceMode === 'isolated') {
     workspaceCleaned = cleanupIsolatedWorkspace(ctx.config.sessionBaseDir, id);
   }
-  ctx.wakeup?.clearSession(id);
+  const wakeupResult = ctx.wakeup?.clearSession(id);
+  const maintenance = runtime.recordLifecycle(id, {
+    action: 'delete',
+    boundary: 'permanent_delete',
+    status: 'completed',
+    reasonCodes: ['session_deleted'],
+    cleanup: buildDeleteCleanupSummary({
+      workerDetached: !runtime.isAttached(id),
+      wakeupsCleared: true,
+      workspaceCleaned,
+      managedTranscriptDeleted: managedDeletion.fileDeleted,
+      providerDiscoveryCleared: providerDeletion.fileDeleted || providerDiscoveryDeleted,
+      registryDropped: true,
+    }),
+    clearExecutionState: true,
+  });
   ctx.registry.unregister(id);
   runtime.dropSession(id);
   ctx.registry.flush();
@@ -1518,6 +1610,8 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
     fileDeleted: managedDeletion.fileDeleted || providerDeletion.fileDeleted,
     nativeDeleted: hasNativeSessionState ? nativeDeleted === true : false,
     workspaceCleaned,
+    cleanup: maintenance.cleanup,
+    maintenance,
   });
 });
 

@@ -659,6 +659,50 @@ intended for host/dashboard run inspectors:
       "activeGuardrails": [],
       "recentIncidents": []
     },
+    "maintenance": {
+      "status": "attention",
+      "compaction": {
+        "status": "recommended",
+        "reasonCodes": ["message_count_threshold", "session_active"],
+        "messageCount": 32,
+        "totalTokens": 14500
+      },
+      "hooks": {
+        "preReset": {
+          "available": true,
+          "pending": [
+            {
+              "id": "memory_flush",
+              "phase": "pre_reset",
+              "status": "pending",
+              "owner": "product_memory",
+              "reason": "Export or flush durable memory before a hard reset clears the live session boundary."
+            }
+          ]
+        },
+        "preCompaction": {
+          "available": true,
+          "pending": [
+            {
+              "id": "memory_flush",
+              "phase": "pre_compaction",
+              "status": "pending",
+              "owner": "product_memory",
+              "reason": "Export or flush durable memory before compaction trims working context."
+            }
+          ]
+        }
+      },
+      "resetBoundary": {
+        "status": "none",
+        "reasonCodes": []
+      },
+      "cleanup": {
+        "status": "recommended",
+        "reasonCodes": ["provider_resume_state_retained"]
+      },
+      "markers": []
+    },
     "artifacts": [],
     "services": [],
     "previewSurfaces": [],
@@ -675,6 +719,15 @@ intended for host/dashboard run inspectors:
 `inspection.state` is runtime-owned and can differ from the persisted session
 status when the runtime is actively canceling or closing a run. The block is
 additive: existing session fields remain stable.
+
+`inspection.maintenance` is also runtime-owned and additive. It gives hosts one
+machine-readable place to read:
+
+- whether the session is nearing compaction territory
+- whether Team 6 style `memory_flush` hooks should run before reset/compaction
+- whether a hard reset boundary was applied already
+- whether cleanup is merely recommended or is ready to run now
+- the latest close/reset/delete lifecycle marker
 
 `POST /sessions` also accepts these optional fields:
 
@@ -1125,8 +1178,10 @@ the same additive `wakeup` block returned by `GET /sessions/{id}` and
 without deleting the logical session. `POST /sessions/{id}/reset` clears
 provider resume/session state so the next `resume` starts from a fresh backend
 attachment while keeping the runtime-owned session record and history. Reset
-also clears any scheduled wakeups targeting that session so stale wake requests
-do not survive after provider resume state is discarded.
+also clears hydration and scheduled wakeups targeting that session, clears
+stale run/progress snapshots, and records a hard-reset lifecycle boundary so
+stale wake requests and stale inspector state do not survive after provider
+resume state is discarded.
 
 `POST /sessions/{id}/close`, `POST /sessions/{id}/cancel`, and
 `POST /sessions/{id}/reset` now all return the same additive session snapshot
@@ -1138,6 +1193,13 @@ follow-up fetch.
 session before the runtime unregisters it. Delete responses now also include
 `action: "delete"` plus `sessionId` so lifecycle consumers can treat delete as
 the same control family even though the session snapshot is gone afterward.
+Delete responses also include:
+
+- `cleanup`: machine-readable cleanup results (`workerDetached`,
+  `managedTranscriptDeleted`, `providerDiscoveryCleared`, `workspaceCleaned`,
+  `registryDropped`, etc.)
+- `maintenance`: the terminal lifecycle marker for the delete attempt, with
+  `status: "completed"` or `status: "retained"`
 
 `GET /providers/config` returns the configured provider topology for dashboards
 or other clients that need to offer provider-instance selection. Each instance

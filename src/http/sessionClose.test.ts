@@ -194,6 +194,8 @@ describe('session close route', () => {
     });
     registry.updateStatus(session.id, 'ready');
     attachedWorkers.set(session.id, { alive: true });
+    const runtime = getRuntimeSessionManager(ctx);
+    runtime.beginRun(session, { message: 'Finish the task.' });
 
     const res = await app.request(`/sessions/${session.id}/close`, {
       method: 'POST',
@@ -206,6 +208,20 @@ describe('session close route', () => {
       attached: false,
       inspection: expect.objectContaining({
         state: 'closed',
+        lastRun: expect.objectContaining({
+          status: 'canceled',
+          resultSummary: 'Session close terminated the current execution boundary.',
+        }),
+        maintenance: expect.objectContaining({
+          lastLifecycle: expect.objectContaining({
+            action: 'close',
+            boundary: 'soft_close',
+            status: 'completed',
+            cleanup: expect.objectContaining({
+              workerDetached: true,
+            }),
+          }),
+        }),
       }),
     }));
     expect(registry.get(session.id)?.status).toBe('closed');
@@ -257,6 +273,16 @@ describe('session close route', () => {
         }],
       },
     });
+    const runtime = getRuntimeSessionManager(ctx);
+    runtime.beginRun(session, { message: 'Continue the task.' });
+    runtime.observeEvent(session.id, {
+      type: 'progress',
+      text: 'Collecting stale context',
+      metadata: {
+        kind: 'status',
+        status: 'running',
+      },
+    });
 
     const res = await app.request(`/sessions/${session.id}/reset`, {
       method: 'POST',
@@ -269,6 +295,21 @@ describe('session close route', () => {
       providerState?: unknown;
       status: string;
       inspection: {
+        currentRun?: unknown;
+        lastRun?: unknown;
+        progress?: unknown;
+        recentEvents?: unknown[];
+        maintenance: {
+          resetBoundary: {
+            status: string;
+            lastResetAt?: string;
+          };
+          lastLifecycle: {
+            action: string;
+            boundary: string;
+            cleanup: Record<string, unknown>;
+          };
+        };
         actions: { canResume: boolean; canReset: boolean };
         services: Array<{ id: string }>;
       };
@@ -277,9 +318,40 @@ describe('session close route', () => {
     expect(body.status).toBe('closed');
     expect(body.providerSessionId).toBeUndefined();
     expect(body.providerState).toBeUndefined();
+    expect(body.inspection.currentRun).toBeUndefined();
+    expect(body.inspection.lastRun).toBeUndefined();
+    expect(body.inspection.progress).toBeUndefined();
+    expect(body.inspection.recentEvents).toEqual([]);
+    expect(body.inspection.maintenance.resetBoundary).toEqual(expect.objectContaining({
+      status: 'cleared',
+      lastResetAt: expect.any(String),
+      reasonCodes: ['manual_reset'],
+    }));
+    expect(body.inspection.maintenance.lastLifecycle).toEqual(expect.objectContaining({
+      action: 'reset',
+      boundary: 'hard_reset',
+      cleanup: expect.objectContaining({
+        providerResumeCleared: true,
+        providerStateCleared: true,
+        runStateCleared: true,
+      }),
+    }));
     expect(body.inspection.actions.canResume).toBe(true);
     expect(body.inspection.actions.canReset).toBe(false);
     expect(body.inspection.services).toEqual([]);
+
+    const historyResponse = await app.request(`/sessions/${session.id}/history`);
+    expect(historyResponse.status).toBe(200);
+    const historyBody = await historyResponse.json() as {
+      inspection: {
+        maintenance: {
+          resetBoundary: {
+            status: string;
+          };
+        };
+      };
+    };
+    expect(historyBody.inspection.maintenance.resetBoundary.status).toBe('cleared');
   });
 
   it('clears scheduled wakeups when resetting a session', async () => {
@@ -334,6 +406,16 @@ describe('session close route', () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual(expect.objectContaining({
       status: 'deleted',
+      cleanup: expect.objectContaining({
+        workerDetached: true,
+        wakeupsCleared: true,
+        registryDropped: true,
+      }),
+      maintenance: expect.objectContaining({
+        action: 'delete',
+        boundary: 'permanent_delete',
+        status: 'completed',
+      }),
     }));
 
     const wakeupListResponse = await app.request(`/wakeups?sessionId=${session.id}`);

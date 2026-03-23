@@ -77,6 +77,7 @@ function buildHistoryMetadata(ctx: AppContext, session: SessionInfo) {
       view,
       trackedState: runtime.getTrackedState(session.id),
       metering: getRuntimeMeteringService(ctx).buildSessionSnapshot(session),
+      wakeupPending: Boolean(wakeup?.pending),
     }),
   };
 }
