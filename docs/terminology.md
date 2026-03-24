@@ -15,6 +15,13 @@
 | Skill Package | A repo-local `skills/<name>/SKILL.md` package plus supporting resources used for reusable procedural know-how. |
 | Agent Skill | Capability metadata advertised through an A2A Agent Card. It is related to, but not identical with, a repo-local `SKILL.md` package. |
 
+## Runtime Architecture
+
+| Term | Meaning |
+|------|---------|
+| Session Provider | A turn-oriented execution backend such as a CLI, API, local-model, or agent runtime that owns session lifecycle, message execution, and often `resume` / `fork` semantics. |
+| Control-Plane Adapter | A runtime-owned adapter for non-session operational systems such as forge, deployment, review, or release tooling. It exposes machine-readable actions without pretending to be a conversational runtime. |
+
 ## Template Architecture
 
 If your project does not use layered templates, you can remove this section.
@@ -44,4 +51,4 @@ If your project does not use layered templates, you can remove this section.
 
 ---
 
-Last updated: 2026-03-19
+Last updated: 2026-03-25

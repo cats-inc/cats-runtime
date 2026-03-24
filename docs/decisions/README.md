@@ -38,6 +38,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
+| [023-treat-management-clis-as-runtime-owned-control-plane-adapters-not-session-providers](./023-treat-management-clis-as-runtime-owned-control-plane-adapters-not-session-providers.md) | Treat management CLIs as runtime-owned control-plane adapters, not session providers | Proposed | 2026-03-25 |
 | [022-model-advanced-selection-as-entries-presets-and-provider-specific-controls](./022-model-advanced-selection-as-entries-presets-and-provider-specific-controls.md) | Model advanced selection as entries, presets, and provider-specific controls | Accepted | 2026-03-25 |
 | [021-treat-providers-yaml-as-generated-config-and-bootstrap-without-it](./021-treat-providers-yaml-as-generated-config-and-bootstrap-without-it.md) | Treat `providers.yaml` as generated config and bootstrap without it | Accepted | 2026-03-25 |
 | [020-keep-setup-diagnostic-reports-config-derived-and-separate-from-compatibility-evidence](./020-keep-setup-diagnostic-reports-config-derived-and-separate-from-compatibility-evidence.md) | Keep setup diagnostic reports config-derived and separate from compatibility evidence | Accepted | 2026-03-25 |

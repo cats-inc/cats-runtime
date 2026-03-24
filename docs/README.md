@@ -49,11 +49,11 @@ Add your project-specific automation scripts here.
 | Document | Status | Description |
 |----------|--------|-------------|
 | [AGENT-GUIDE.md](./AGENT-GUIDE.md) | Complete | Project-specific agent notes |
-| [terminology.md](./terminology.md) | Complete | AAIF, A2A, skills, compatibility, evidence, and runtime-project-memory terminology |
+| [terminology.md](./terminology.md) | Complete | AAIF, A2A, skills, compatibility, evidence, control-plane adapter, and runtime-project-memory terminology |
 | [a2a/](./a2a/) | Template | A2A protocol examples and templates; some current examples still need A2A v1 alignment |
-| [specs/](./specs/) | Complete | Feature specifications for WSL discovery, agent backend work, runtime-managed skills, scheduled wakeup substrate, provider compatibility/evidence, workspace substrate, executable delivery, session fork/context-transplant, usage metering/guardrails, setup diagnostic reporting, standalone provider bootstrap/generated-config direction, and advanced model catalog/selection contracts |
+| [specs/](./specs/) | Complete | Feature specifications for WSL discovery, agent backend work, runtime-managed skills, scheduled wakeup substrate, provider compatibility/evidence, workspace substrate, executable delivery, session fork/context-transplant, usage metering/guardrails, setup diagnostic reporting, standalone provider bootstrap/generated-config direction, advanced model catalog/selection contracts, and runtime-owned management-adapter direction |
 | [plans/](./plans/) | Complete | Implementation plans for WSL discovery, API/backend expansion, startup contract, runtime-managed skills, browser-preview substrate, provider compatibility/evidence, and metering/progress/guardrails |
-| [decisions/](./decisions/) | Complete | Architecture Decision Records for packaging, install/check metadata, diagnostics, workspace substrate, delivery policy boundaries, runtime-owned metering/guardrails, LAN peer-sharing scope, standalone bootstrap/config boundaries, and advanced model-selection ownership |
+| [decisions/](./decisions/) | Complete | Architecture Decision Records for packaging, install/check metadata, diagnostics, workspace substrate, delivery policy boundaries, runtime-owned metering/guardrails, LAN peer-sharing scope, standalone bootstrap/config boundaries, advanced model-selection ownership, and management-adapter boundaries |
 
 **Legend**: Complete | Partial | Template
 
