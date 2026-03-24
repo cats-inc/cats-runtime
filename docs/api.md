@@ -71,6 +71,7 @@ Current curated tools:
 - `reset_session`
 - `delete_session`
 - `cleanup_session_workspace`
+- `compact_session`
 - `report_session_maintenance_follow_through`
 - `report_compaction_follow_through`
 - `list_browser_drivers`
@@ -1166,6 +1167,7 @@ machine-readable place to read:
   compaction, or lifecycle flush/cleanup
 - whether a hard reset boundary was applied already
 - whether cleanup is merely recommended or is ready to run now
+- which bounded cleanup retry path to call when worktree cleanup is ready
 - the most recent maintenance trigger request, including additive hook payloads,
   workspace isolation context, and requested worktree disposition
 - the most recent maintenance follow-through outcome when an external host has
@@ -1752,6 +1754,7 @@ retained policy. Responses always include:
   `worktreeDetached`, `worktreeCleanupPolicy`, `worktreeMergedPaths`)
 - `maintenance`: the latest persisted maintenance inspection snapshot
 - `session`: the updated session payload after the retry
+- `cleanupPath`: the stable retry route path so hosts do not have to rebuild it
 
 Unlike replaying `reset` or `delete`, this route only retries workspace
 cleanup. It does not clear provider resume state, clear browser sessions, or
@@ -1759,6 +1762,11 @@ delete the logical session record for you. When cleanup changes the runtime cwd
 or worktree metadata, the runtime also refreshes persisted hydration/skill
 delivery state so `cwd`, `workspaceIsolation`, and `hydration.workspace`
 continue to agree afterward.
+
+When `POST /sessions/{id}/reset` or `DELETE /sessions/{id}` returns
+`status: "retained"` because a worktree cleanup could not finish safely, the
+response also includes `retryCleanupPath` pointing at the same bounded retry
+route.
 
 For `POST /sessions/{id}/reset`, `POST /sessions/{id}/workspace/cleanup`, and
 `DELETE /sessions/{id}`, invalid `worktreeCleanupPolicy` values now return

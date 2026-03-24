@@ -802,6 +802,51 @@ async function cleanupSessionWorkspace(
   };
 }
 
+async function compactSession(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const sessionId = readRequiredString(args, 'sessionId');
+  const body: Record<string, unknown> = {};
+  const acknowledgeHooks = readOptionalBoolean(args, 'acknowledgeHooks');
+  if (acknowledgeHooks !== undefined) {
+    body.acknowledgeHooks = acknowledgeHooks;
+  }
+
+  const maintenance = readOptionalObject(args, 'maintenance');
+  if (maintenance) {
+    body.maintenance = maintenance;
+  }
+
+  const compactPath = `/sessions/${encodeURIComponent(sessionId)}/compact`;
+  const result = await requestRuntimeJson(ctx, compactPath, {
+    body,
+  });
+  ensureRouteSuccess('compact_session', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'compact_session result');
+  const status = readOptionalString(payload, 'status');
+  return {
+    summary: status === 'compacted'
+      ? `Compacted runtime-managed transcript for session ${sessionId}.`
+      : status === 'pending_hooks'
+        ? `Compaction for session ${sessionId} is waiting on maintenance hooks.`
+        : status === 'ready_for_external_compaction'
+          ? `Compaction for session ${sessionId} is ready for external compaction.`
+        : status === 'deferred'
+          ? `Compaction for session ${sessionId} is deferred until the session is inactive.`
+          : status === 'not_ready'
+            ? `Compaction for session ${sessionId} is not ready yet.`
+            : `Prepared compaction coordination for session ${sessionId}.`,
+    structuredContent: {
+      responseStatus: result.status,
+      ...payload,
+      compactPath,
+      ...buildSessionPaths(sessionId),
+    },
+  };
+}
+
 async function reportSessionMaintenanceFollowThrough(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -1513,6 +1558,42 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: cleanupSessionWorkspace,
+  },
+  {
+    definition: {
+      name: 'compact_session',
+      title: 'Compact Session',
+      description: 'Prepare or execute session compaction using the same contract as POST /sessions/{id}/compact.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sessionId: { type: 'string' },
+          acknowledgeHooks: { type: 'boolean' },
+          maintenance: {
+            type: 'object',
+            properties: {
+              reason: { type: 'string' },
+              hookPayloads: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    kind: { type: 'string' },
+                    payload: {},
+                  },
+                  required: ['kind'],
+                  additionalProperties: false,
+                },
+              },
+            },
+            additionalProperties: false,
+          },
+        },
+        required: ['sessionId'],
+        additionalProperties: false,
+      },
+    },
+    execute: compactSession,
   },
   {
     definition: {

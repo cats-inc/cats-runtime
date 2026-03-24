@@ -49,6 +49,7 @@ Current tools:
 - `fork_session`
 - `delete_session`
 - `cleanup_session_workspace`
+- `compact_session`
 - `report_session_maintenance_follow_through`
 - `report_compaction_follow_through`
 - `list_browser_drivers`
@@ -106,6 +107,17 @@ optional `requireAcknowledgedHooks`, `worktreeCleanupPolicy`, additive
 retry. Like the direct route, it does not auto-replay reset/delete
 follow-through; it only retries workspace cleanup and refreshes persisted
 workspace hydration/skill delivery state.
+
+When `reset_session` or `delete_session` returns `status: "retained"` because
+worktree cleanup could not finish safely, the MCP payload now also includes
+`retryCleanupPath` so orchestrators can hand off directly to
+`cleanup_session_workspace` without rebuilding the retry route path.
+
+`compact_session` is the curated MCP wrapper over `POST /sessions/{id}/compact`.
+It preserves the same runtime-owned compaction contract, including additive
+maintenance trigger metadata, the compatibility `acknowledgeHooks` shorthand,
+and machine-readable readiness states such as `pending_hooks`,
+`ready_for_external_compaction`, `deferred`, `not_ready`, or `compacted`.
 
 `report_session_maintenance_follow_through` is the generic MCP wrapper over
 `POST /sessions/{id}/maintenance/follow-through`. It lets orchestrators report
@@ -243,6 +255,7 @@ tool surface here. The first shared tool names are:
 - `fork_session`
 - `delete_session`
 - `cleanup_session_workspace`
+- `compact_session`
 - `report_session_maintenance_follow_through`
 - `report_compaction_follow_through`
 - `list_browser_drivers`

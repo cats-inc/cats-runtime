@@ -323,6 +323,10 @@ describe('session worktree routes', () => {
       hydration?: unknown;
       inspection: {
         maintenance: {
+          cleanup: {
+            status: string;
+            retryCleanupPath?: string;
+          };
           lastLifecycle: {
             cleanup: {
               workspaceCleaned: boolean;
@@ -401,6 +405,7 @@ describe('session worktree routes', () => {
       action: string;
       status: string;
       reason: string;
+      retryCleanupPath?: string;
       session: {
         cwd: string;
         inspection: {
@@ -425,6 +430,11 @@ describe('session worktree routes', () => {
     expect(body.action).toBe('reset');
     expect(body.status).toBe('retained');
     expect(body.reason).toContain('intentionally preserved');
+    expect(body.retryCleanupPath).toBe(`/sessions/${session.id}/workspace/cleanup`);
+    expect(body.session.inspection.maintenance.cleanup).toEqual(expect.objectContaining({
+      status: 'recommended',
+      reasonCodes: expect.arrayContaining(['worktree_preserved']),
+    }));
     expect(body.session.cwd).toBe(prepared.workspaceIsolation.worktree!.worktreePath);
     expect(body.session.inspection.maintenance.lastRequest).toEqual(expect.objectContaining({
       action: 'reset',
@@ -449,6 +459,47 @@ describe('session worktree routes', () => {
       status: 'retained',
       reasonCodes: ['worktree_preserved'],
     }));
+  });
+
+  it('surfaces retry cleanup path in inspection when a closed worktree session is ready for cleanup', async () => {
+    const repoDir = createGitWorkspace(rootDir, 'repo-inspect-worktree-ready');
+    const prepared = await prepareSessionWorkspace({
+      sessionId: 'worktree-inspect-ready',
+      sessionBaseDir,
+      cwd: repoDir,
+      workspaceMode: 'shared',
+      workspaceIsolationMode: 'worktree',
+    });
+
+    const session = registry.create({
+      id: 'worktree-inspect-ready',
+      providerName: 'codex',
+      cwd: prepared.cwd,
+      workspaceMode: prepared.workspaceMode,
+      workspaceIsolation: prepared.workspaceIsolation,
+    });
+    session.providerSessionId = undefined;
+    session.providerState = undefined;
+    registry.updateStatus(session.id, 'closed');
+
+    const response = await app.request(`/sessions/${session.id}`);
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      inspection: {
+        maintenance: {
+          cleanup: {
+            status: string;
+            reasonCodes: string[];
+            retryCleanupPath?: string;
+          };
+        };
+      };
+    };
+    expect(body.inspection.maintenance.cleanup).toEqual({
+      status: 'ready',
+      reasonCodes: ['worktree_retained'],
+      retryCleanupPath: `/sessions/${session.id}/workspace/cleanup`,
+    });
   });
 
   it('rejects invalid worktree cleanup policies for reset, delete, and retry routes', async () => {
@@ -1020,5 +1071,57 @@ describe('session worktree routes', () => {
     expect(existsSync(prepared.workspaceIsolation.worktree!.worktreePath)).toBe(false);
     expect(readFileSync(join(repoDir, 'tracked.txt'), 'utf8')).toBe('merged from delete\n');
     expect(readFileSync(join(repoDir, 'new-delete.txt'), 'utf8')).toBe('new file\n');
+  });
+
+  it('returns a retry cleanup path when DELETE retains a worktree for manual handling', async () => {
+    const repoDir = createGitWorkspace(rootDir, 'repo-delete-preserve');
+    const prepared = await prepareSessionWorkspace({
+      sessionId: 'worktree-delete-preserve',
+      sessionBaseDir,
+      cwd: repoDir,
+      workspaceMode: 'shared',
+      workspaceIsolationMode: 'worktree',
+    });
+
+    const session = registry.create({
+      id: 'worktree-delete-preserve',
+      providerName: 'codex',
+      cwd: prepared.cwd,
+      workspaceMode: prepared.workspaceMode,
+      workspaceIsolation: prepared.workspaceIsolation,
+    });
+    registry.updateStatus(session.id, 'closed');
+
+    writeFileSync(join(prepared.cwd, 'tracked.txt'), 'preserve delete worktree\n', 'utf8');
+
+    const response = await app.request(`/sessions/${session.id}`, {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        worktreeCleanupPolicy: 'preserve',
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      action: string;
+      status: string;
+      retryCleanupPath?: string;
+      reason: string;
+      cleanup: {
+        worktreeDetached: boolean;
+        worktreeCleanupPolicy: string;
+      };
+    };
+    expect(body.action).toBe('delete');
+    expect(body.status).toBe('retained');
+    expect(body.retryCleanupPath).toBe(`/sessions/${session.id}/workspace/cleanup`);
+    expect(body.reason).toContain('intentionally preserved');
+    expect(body.cleanup).toEqual(expect.objectContaining({
+      worktreeDetached: false,
+      worktreeCleanupPolicy: 'preserve',
+    }));
+    expect(registry.get(session.id)).toBeDefined();
+    expect(existsSync(prepared.workspaceIsolation.worktree!.worktreePath)).toBe(true);
   });
 });

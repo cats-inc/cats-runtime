@@ -130,6 +130,7 @@ describe('buildSessionMaintenance', () => {
     expect(maintenance.cleanup).toEqual({
       status: 'ready',
       reasonCodes: ['worktree_retained'],
+      retryCleanupPath: '/sessions/session-1/workspace/cleanup',
     });
     expect(maintenance.hooks.preFlush).toEqual({
       available: true,

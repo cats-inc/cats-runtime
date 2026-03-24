@@ -168,6 +168,9 @@ function buildCleanupContract(
   view: Pick<SessionView, 'attached' | 'activity'>,
   wakeupPending: boolean,
 ): RuntimeSessionCleanupContract {
+  const retryCleanupPath = session.workspaceIsolation?.mode === 'worktree' && session.workspaceIsolation.worktree
+    ? `/sessions/${encodeURIComponent(session.id)}/workspace/cleanup`
+    : undefined;
   const reasonCodes: string[] = [];
   if (session.workspaceMode === 'isolated') {
     reasonCodes.push('isolated_workspace_retained');
@@ -213,6 +216,7 @@ function buildCleanupContract(
     return {
       status: 'ready',
       reasonCodes,
+      ...(retryCleanupPath ? { retryCleanupPath } : {}),
     };
   }
 

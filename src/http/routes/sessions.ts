@@ -817,6 +817,10 @@ function describeRetainedWorktreeCleanup(
   return 'Worktree cleanup could not be completed. Session state was kept for retry.';
 }
 
+function buildWorkspaceCleanupPath(sessionId: string): string {
+  return `/sessions/${encodeURIComponent(sessionId)}/workspace/cleanup`;
+}
+
 function resolveCompactionRequestStatus(
   maintenance: ReturnType<typeof buildSessionInspection>['maintenance'],
   acknowledgeHooks: boolean,
@@ -2126,6 +2130,9 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
         action: 'reset',
         status: 'retained',
         reason: describeRetainedWorktreeCleanup(cleanup),
+        ...(resolveSessionWorkspaceIsolationMode(sessionAfterCleanup) === 'worktree'
+          ? { retryCleanupPath: buildWorkspaceCleanupPath(id) }
+          : {}),
         cleanup: maintenance.cleanup,
         maintenance,
         session: serializeSession(ctx, sessionAfterCleanup),
@@ -2273,6 +2280,7 @@ sessionRoutes.post('/sessions/:id/workspace/cleanup', async (c) => {
     ...(cleanup.status === 'retained'
       ? { reason: describeRetainedWorktreeCleanup(cleanup) }
       : {}),
+    cleanupPath: buildWorkspaceCleanupPath(id),
     reasonCodes: [...cleanup.reasonCodes],
     cleanup: {
       workspaceCleaned: cleanup.workspaceCleaned,
@@ -2648,6 +2656,7 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
         fileDeleted: false,
         nativeDeleted: false,
         workspaceCleaned,
+        retryCleanupPath: buildWorkspaceCleanupPath(id),
         cleanup: maintenance.cleanup,
         reason: cleanup.reasonCodes.includes('worktree_preserved')
           ? 'Worktree cleanup was intentionally preserved for manual handling. Session files were kept for retry.'

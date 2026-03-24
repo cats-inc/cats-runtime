@@ -311,6 +311,10 @@ cleanup discipline while keeping product approval/policy above runtime.
 - retained cleanup metadata plus `POST /sessions/{id}/workspace/cleanup` are
   surfaced over session/session-lifecycle routes, the MCP tool plane, and
   session maintenance state
+- retained worktree-backed `reset`/`delete` responses now also expose
+  `retryCleanupPath` so hosts can jump straight to the bounded retry seam
+- `inspection.maintenance.cleanup` now preserves that same retry path when a
+  closed worktree session is actually ready for bounded cleanup retry
 - background sweeping, retained-worktree GC, and broader retained-lifecycle
   follow-through still remain deferred
 
@@ -379,6 +383,8 @@ schemas.
   existing memory-flush hook groups
 - runtime-managed transcripts now repair/archive older JSONL history and record
   `lastCompaction` metadata when the public compaction seam can execute safely
+- the same compaction preparation/readiness contract now surfaces through MCP
+  via `compact_session`, alongside the existing follow-through tools
 - maintenance trigger payload snapshots are now truncated/redacted/size-capped
   before persistence, with additive status/warning metadata surfaced through
   session inspection

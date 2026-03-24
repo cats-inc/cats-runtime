@@ -242,6 +242,7 @@ describe('runtime MCP facade', () => {
       'fork_session',
       'delete_session',
       'cleanup_session_workspace',
+      'compact_session',
       'report_session_maintenance_follow_through',
       'report_compaction_follow_through',
       'list_browser_drivers',
@@ -969,6 +970,7 @@ describe('runtime MCP facade', () => {
           action: string;
           status: string;
           resetPath: string;
+          retryCleanupPath?: string;
           session: {
             cwd: string;
           };
@@ -980,6 +982,9 @@ describe('runtime MCP facade', () => {
     expect(reset.result.structuredContent.status).toBe('retained');
     expect(reset.result.structuredContent.resetPath).toBe(
       `/sessions/${createdWorktree.id}/reset`,
+    );
+    expect(reset.result.structuredContent.retryCleanupPath).toBe(
+      `/sessions/${createdWorktree.id}/workspace/cleanup`,
     );
     expect(reset.result.structuredContent.session.cwd).toBe(createdWorktree.cwd);
 
@@ -1305,12 +1310,64 @@ describe('runtime MCP facade', () => {
     compactionSession.totalOutputTokens = 5_000;
     registry.updateStatus(compactionSession.id, 'closed');
 
-    const compactionFollowThroughResponse = await app.request('/mcp', {
+    const compactResponse = await app.request('/mcp', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
         id: 151,
+        method: 'tools/call',
+        params: {
+          name: 'compact_session',
+          arguments: {
+            sessionId: compactionSession.id,
+            maintenance: {
+              reason: 'owner_requested_compaction',
+            },
+          },
+        },
+      }),
+    });
+    expect(compactResponse.status).toBe(200);
+    const compacted = await compactResponse.json() as {
+      result: {
+        structuredContent: {
+          responseStatus: number;
+          action: string;
+          status: string;
+          hookStatus: string;
+          compactPath: string;
+          runtimeCompactionExecuted: boolean;
+          maintenance: {
+            lastRequest: {
+              action: string;
+              reason?: string;
+            };
+          };
+        };
+      };
+    };
+    expect(compacted.result.structuredContent).toEqual(expect.objectContaining({
+      responseStatus: 200,
+      action: 'compact',
+      status: 'pending_hooks',
+      hookStatus: 'pending',
+      compactPath: `/sessions/${compactionSession.id}/compact`,
+      runtimeCompactionExecuted: false,
+      maintenance: expect.objectContaining({
+        lastRequest: expect.objectContaining({
+          action: 'compact',
+          reason: 'owner_requested_compaction',
+        }),
+      }),
+    }));
+
+    const compactionFollowThroughResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 152,
         method: 'tools/call',
         params: {
           name: 'report_compaction_follow_through',
@@ -1356,6 +1413,53 @@ describe('runtime MCP facade', () => {
       status: 'ready_for_external_compaction',
       hookStatus: 'acknowledged',
       followThroughPath: `/sessions/${compactionSession.id}/compact/follow-through`,
+      maintenance: expect.objectContaining({
+        lastFollowThrough: expect.objectContaining({
+          outcome: 'acknowledged',
+          reason: 'memory_flush_completed',
+        }),
+      }),
+    }));
+
+    const readyCompactionResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 153,
+        method: 'tools/call',
+        params: {
+          name: 'compact_session',
+          arguments: {
+            sessionId: compactionSession.id,
+          },
+        },
+      }),
+    });
+    expect(readyCompactionResponse.status).toBe(200);
+    const readyCompaction = await readyCompactionResponse.json() as {
+      result: {
+        structuredContent: {
+          responseStatus: number;
+          action: string;
+          status: string;
+          hookStatus: string;
+          compactPath: string;
+          maintenance: {
+            lastFollowThrough: {
+              outcome: string;
+              reason?: string;
+            };
+          };
+        };
+      };
+    };
+    expect(readyCompaction.result.structuredContent).toEqual(expect.objectContaining({
+      responseStatus: 200,
+      action: 'compact',
+      status: 'ready_for_external_compaction',
+      hookStatus: 'acknowledged',
+      compactPath: `/sessions/${compactionSession.id}/compact`,
       maintenance: expect.objectContaining({
         lastFollowThrough: expect.objectContaining({
           outcome: 'acknowledged',

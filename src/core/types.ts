@@ -1274,6 +1274,7 @@ export interface RuntimeSessionResetBoundary {
 export interface RuntimeSessionCleanupContract {
   status: RuntimeSessionCleanupStatus;
   reasonCodes: string[];
+  retryCleanupPath?: string;
 }
 
 export interface RuntimeSessionMaintenance {
