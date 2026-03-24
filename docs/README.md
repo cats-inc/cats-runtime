@@ -51,9 +51,9 @@ Add your project-specific automation scripts here.
 | [AGENT-GUIDE.md](./AGENT-GUIDE.md) | Complete | Project-specific agent notes |
 | [terminology.md](./terminology.md) | Complete | AAIF, A2A, skills, compatibility, evidence, and runtime-project-memory terminology |
 | [a2a/](./a2a/) | Template | A2A protocol examples and templates; some current examples still need A2A v1 alignment |
-| [specs/](./specs/) | Complete | Feature specifications for WSL discovery, agent backend work, runtime-managed skills, scheduled wakeup substrate, provider compatibility/evidence, workspace substrate, executable delivery, session fork/context-transplant, and usage metering/guardrails |
+| [specs/](./specs/) | Complete | Feature specifications for WSL discovery, agent backend work, runtime-managed skills, scheduled wakeup substrate, provider compatibility/evidence, workspace substrate, executable delivery, session fork/context-transplant, usage metering/guardrails, and setup diagnostic reporting |
 | [plans/](./plans/) | Complete | Implementation plans for WSL discovery, API/backend expansion, startup contract, runtime-managed skills, browser-preview substrate, provider compatibility/evidence, and metering/progress/guardrails |
-| [decisions/](./decisions/) | Complete | Architecture Decision Records for packaging, install/check metadata, diagnostics, workspace substrate, delivery policy boundaries, and runtime-owned metering/guardrails |
+| [decisions/](./decisions/) | Complete | Architecture Decision Records for packaging, install/check metadata, diagnostics, workspace substrate, delivery policy boundaries, runtime-owned metering/guardrails, and LAN peer-sharing scope |
 
 **Legend**: Complete | Partial | Template
 
@@ -61,7 +61,7 @@ Add your project-specific automation scripts here.
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| [research/](./research/) | Partial | Research notes and external sources, including Paperclip alignment notes, a current maturity-gap assessment, and AAIF/A2A layering guidance |
+| [research/](./research/) | Partial | Research notes and external sources, including Paperclip alignment notes, setup-diagnostic/report research, LAN peer-sharing exploration, a current maturity-gap assessment, and AAIF/A2A layering guidance |
 
 ## Context-Driven Development
 
@@ -101,4 +101,4 @@ later passes:
 
 ---
 
-*Last updated: 2026-03-23*
+*Last updated: 2026-03-25*

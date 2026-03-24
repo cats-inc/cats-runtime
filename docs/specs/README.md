@@ -48,6 +48,8 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 
 | Spec | Title | Status | Related Plan |
 |------|-------|--------|--------------|
+| [SPEC-016](./SPEC-016-lan-peer-discovery-and-execution-routing-v0.md) | LAN Peer Discovery and Execution Routing v0 | Draft | TBD |
+| [SPEC-015](./SPEC-015-runtime-setup-diagnostic-report.md) | Runtime Setup Diagnostic Report | Draft | TBD |
 | [SPEC-014](./SPEC-014-session-maintenance-worktree-isolation-and-compaction-hooks.md) | Session Maintenance, Worktree Isolation, and Compaction Hooks | Draft (Pending Review) | TBD |
 | [SPEC-013](./SPEC-013-internal-skill-library-and-role-taxonomy.md) | Internal Skill Library and Role Taxonomy | Draft (Pending Review) | TBD |
 | [SPEC-012](./SPEC-012-scheduled-wakeup-substrate.md) | Scheduled Wakeup Substrate | In Progress (First Slice Landed) | TBD |
@@ -74,4 +76,4 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 ---
 
 *See also: [plans/](../plans/) for implementation plans*
-*Last updated: 2026-03-24*
+*Last updated: 2026-03-25*

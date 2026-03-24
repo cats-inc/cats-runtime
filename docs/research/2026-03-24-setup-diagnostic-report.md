@@ -2,6 +2,7 @@
 
 Date: 2026-03-24
 Topic: Dedicated logging mechanism for first-time installation and environment debugging
+Last updated: 2026-03-25
 
 ## Sources
 
@@ -10,232 +11,218 @@ Topic: Dedicated logging mechanism for first-time installation and environment d
 - Internal discovery: `src/backends/cli/discovery/wslDiscovery.ts`, `dockerDiscovery.ts`
 - Internal config: `src/core/config.ts`, `src/backends/cli/config.ts`
 - Internal diagnostics: `src/http/routes/diagnostics.ts`
-- Evidence storage: `~/.cats-runtime/data/compatibility/`
+- Existing diagnostics ADR/spec context:
+  - `docs/decisions/014-keep-lightweight-provider-setup-and-diagnostics-in-cats-runtime.md`
+  - `docs/specs/SPEC-007-provider-compatibility-and-evidence-engine.md`
 
 ## Problem Statement
 
-When users install `cats-runtime` (npm module) or `cats` (Electron app) for
-the first time, they often encounter environment issues — CLI tools not in
-PATH, WSL distros not running, Docker daemon offline, wrong Node.js version,
-misconfigured `providers.yaml`, port conflicts, etc.
+When users install `cats-runtime` directly, or consume it from a host such as
+`cats`, they can hit environment failures before the HTTP server is usable:
 
-The current diagnostics are HTTP-based (`GET /diagnostics/providers`), which
-creates a catch-22: if the server fails to start, the diagnostics endpoint is
-unreachable. The compatibility evidence cache (`~/.cats-runtime/data/compatibility/`)
-stores signed probe artifacts but is not designed for human-readable debugging.
+- provider CLIs missing from `PATH`
+- WSL distros stopped or inaccessible
+- Docker unavailable
+- wrong Node.js version
+- malformed provider config
+- unwritable data/session paths
+- port conflicts
 
-There is no persistent, shareable diagnostic report that captures the full
-environment state at setup time.
+The current diagnostics are mostly HTTP-facing, so they are not enough when the
+server fails to start. The runtime does already persist compatibility evidence,
+but those bundles are runtime-maintenance artifacts, not a dedicated shareable
+setup report.
 
 ## Current State
 
-- **No logging library** — all output is `console.log` with prefixed
-  categories (`[discovery]`, `[pool]`, `[registry]`). This is intentional
-  to keep dependencies minimal.
-- **ProviderCompatibilityService** performs extensive probes (version, help
-  token scanning, auth status, PATH persistence, npm prefix drift) but
-  results live in memory cache (5 min TTL) and HTTP responses only.
-- **Startup lifecycle** emits structured events (`runtime.ready`,
-  `runtime.startup_error`) but these are transient — they go to stdout/stderr
-  and are lost once the process exits.
-- **Evidence directory** stores probe results as signed artifacts with schema
-  versioning, but the format is machine-internal, not user-facing.
+- **No logging library**: the project still intentionally uses direct
+  stdout/stderr and lightweight structured runtime events.
+- **Compatibility probing already exists**: `ProviderCompatibilityService`
+  probes provider executables, versions, help tokens, auth state, and related
+  readiness facts.
+- **Evidence is already persisted**: compatibility evidence is written as
+  redacted JSON bundles under a config-derived evidence directory, not a fixed
+  home-directory path.
+- **Evidence is not signed today**: the current implementation writes JSON
+  payloads for review and replay; there is no artifact-signing contract yet.
+- **No human-oriented setup snapshot exists**: there is still no one-shot report
+  that combines platform facts, dependency probes, and config validation into a
+  single shareable document.
+
+## Reality Check Against Current Repo
+
+### Storage Must Follow Runtime Config, Not `~/.cats-runtime`
+
+The compatibility evidence directory is derived from runtime config:
+
+- `options.evidenceDir`, if explicitly provided
+- otherwise `config.dataDir`
+- otherwise a fallback derived from `sessionBaseDir`
+
+The setup report should follow the same rule and resolve its output under the
+runtime's data directory, not under a hardcoded `~/.cats-runtime/...` path.
+
+### Evidence Bundles and Setup Reports Are Different Artifacts
+
+Compatibility evidence bundles are for runtime maintenance and regression
+replay. A setup diagnostic report should be:
+
+- more human-readable
+- explicitly redacted for sharing
+- broader than provider probes alone
+- generated on demand or on first-run conditions
+
+The report may reference compatibility evidence, but it should not pretend that
+the evidence bundle itself is already the final operator-facing artifact.
+
+### First-Run Detection Needs a Runtime-Owned Marker
+
+Detecting first run via "absence of `~/.cats-runtime/`" is too brittle because
+the runtime data path is configurable. First-run or onboarding detection should
+instead use:
+
+- a marker/report state under the resolved runtime data directory, or
+- an explicit host-managed signal
 
 ## Proposed Design: Setup Diagnostic Report
 
-A one-shot environment scan that produces a shareable, human-readable +
-machine-parseable report. Not a streaming runtime log — a point-in-time
-snapshot.
+A one-shot environment scan that produces a shareable, machine-parseable JSON
+report. This is not a streaming log. It is a bounded snapshot designed for
+setup and troubleshooting.
 
 ### Trigger Mechanisms
 
-- **Auto on first run**: detect via absence of `~/.cats-runtime/` or a
-  `setup-complete` marker file
-- **Manual CLI**: `cats-runtime --diagnose` or `npx cats-runtime diagnose`
-  — runs the scan without starting the HTTP server
-- **Electron**: cats app setup wizard calls the same `SetupDiagnosticService`
-  internally and renders results in UI
-- **HTTP endpoint**: `GET /diagnostics/setup-report` for post-startup
-  on-demand re-scans
+- **Auto on first run**: based on a runtime-owned marker or missing setup report
+  state under the resolved runtime data directory
+- **Manual CLI**: `cats-runtime diagnose` or equivalent entrypoint that can run
+  without starting the HTTP server
+- **Host-managed invocation**: `cats` or another consumer may call the same
+  service during onboarding
+- **Explicit HTTP action**: if exposed over HTTP after startup, use an explicit
+  action endpoint that is allowed to write a report artifact
 
 ### Report Content — Three Layers
 
-**Layer 1 — Platform Snapshot (zero-dependency, always succeeds)**
+**Layer 1 — Platform Snapshot**
 
 - Node.js version, `process.arch`, `process.platform`
-- npm version, global prefix, PATH entries
-- OS version, shell environment
-- Available disk space on data directory partition
-- Network interfaces (LAN presence, proxy settings)
+- npm version and global prefix
+- selected environment/path facts
+- resolved runtime data/session paths
+- basic disk/path writability facts
 
 **Layer 2 — Runtime Dependency Probes**
 
-Reuses existing `ProviderCompatibilityService` probe logic (light mode):
+Reuses existing compatibility and discovery logic where possible:
 
-- Each configured CLI provider: command found? version? auth status?
-- WSL: distro list, running state, path mapping accessibility
-- Docker: daemon status, `docker info` summary
-- git: version, global config
-- Per-provider auth state (token presence, basic call test)
+- configured provider readiness
+- command presence and version facts
+- auth/readiness summary
+- WSL discovery summary
+- Docker availability summary
+- git availability summary
 
 **Layer 3 — Configuration Validation**
 
-- `.env` file: exists? key variables set?
-- `providers.yaml`: parseable? how many instances configured?
-- Port availability (bind check without starting server)
-- File permissions (data dir writable? session dir creatable?)
+- parseability of runtime config files
+- provider instance count and obvious config errors
+- port availability checks
+- writability of runtime-owned directories
 
-### Output Format
+### Output Location
 
+```text
+<resolved runtime dataDir>/diagnostics/
+  setup-report-YYYY-MM-DDTHH-mm-ss.json
 ```
-~/.cats-runtime/data/diagnostics/
-  └── setup-report-2026-03-24T14-30-00.json
-```
 
-Schema:
+If `dataDir` is not explicitly configured, the report path should use the same
+fallback resolution pattern as other runtime-owned artifacts.
 
-```jsonc
-{
-  "version": "1.0.0",
-  "generated": "2026-03-24T14:30:00Z",
-  "runtime": "cats-runtime@0.x.x",
-  "platform": {
-    "os": "win32",
-    "arch": "x64",
-    "nodeVersion": "v22.5.0",
-    "npmVersion": "10.8.1",
-    "shell": "bash"
-  },
-  "probes": [
-    {
-      "target": "claude-cli",
-      "status": "ready",
-      "version": "2.1.0",
-      "auth": "authenticated",
-      "latency_ms": 420,
-      "notes": []
-    },
-    {
-      "target": "wsl",
-      "status": "degraded",
-      "distros": [
-        { "name": "Ubuntu-24.04", "running": false }
-      ],
-      "notes": [
-        "WSL distro found but not running; discovery policy is 'if_running'"
-      ]
-    }
-  ],
-  "config": {
-    "envFile": "found",
-    "providersYaml": "found",
-    "instanceCount": 3,
-    "portAvailable": true,
-    "dataDirWritable": true
-  },
-  "issues": [
-    {
-      "severity": "error",
-      "code": "NODE_VERSION_LOW",
-      "message": "Node.js 18 found, >=22 required"
-    },
-    {
-      "severity": "warn",
-      "code": "WSL_NOT_RUNNING",
-      "message": "Ubuntu-24.04 is stopped"
-    }
-  ]
-}
-```
+### Output Model
+
+The report should include:
+
+- generation metadata
+- runtime version and resolved path context
+- layered probe/config results
+- a normalized issues list with severity and code
+- redacted references to any related compatibility evidence bundles
 
 ### Sensitive Data Redaction
 
-Reports are designed to be shareable. Automatic redaction rules:
+Reports are intended to be shareable:
 
-- API keys → `sk-...***` (show prefix only)
-- File paths → replace username with `~`
-- Environment variable values → show `set` / `unset`, never the value
-- Auth tokens → `present` / `absent`, never the token
+- API keys and auth tokens are never written verbatim
+- environment variable values are reduced to presence/absence or safe summaries
+- user-specific path segments should be normalized where practical
+- provider evidence references should point to artifacts without copying secret
+  contents back into the report
 
-### Implementation Location
+### Separation from Compatibility Evidence
 
-```
+- setup reports are operator-facing diagnostic artifacts
+- compatibility evidence bundles remain runtime-maintenance artifacts
+- both artifact types may live under the runtime data directory
+- both remain unsigned JSON artifacts for now
+- any future artifact signing would require a separate ADR and implementation
+
+### Implementation Direction
+
+```text
 src/core/diagnostics/
-  ├── SetupDiagnosticService.ts    # Orchestrator — runs three layers
-  ├── platformSnapshot.ts          # Layer 1: process.*, exec('npm --version'), etc.
-  ├── dependencyProbes.ts          # Layer 2: wraps ProviderCompatibilityService + WSL/Docker/git
-  ├── configValidation.ts          # Layer 3: file checks, port check, parse validation
-  └── reportWriter.ts              # JSON serialization + redaction filters
+  SetupDiagnosticService.ts
+  platformSnapshot.ts
+  dependencyProbes.ts
+  configValidation.ts
+  reportWriter.ts
 ```
 
 ### Integration Points
 
-- **Reuses** `ProviderCompatibilityService` probe logic — no duplication
-- **Reuses** WSL/Docker detection functions (`isWslDistroRunning`,
-  `isDockerContainerRunning`)
-- **New** `--diagnose` CLI flag in `index.ts` — takes a separate code path
-  that skips server startup entirely
-- **New** `GET /diagnostics/setup-report` route for Electron/dashboard
-  on-demand scanning
-- **No new dependencies** — maintains zero-logging-library principle; the
-  report is a one-shot JSON file, not a streaming log
+- reuse `ProviderCompatibilityService`
+- reuse WSL and Docker discovery helpers where appropriate
+- add a manual CLI/entrypoint path that does not require server startup
+- optionally expose an explicit HTTP action for on-demand regeneration after
+  startup
 
-### User Experience
+## Design Decisions
 
-```bash
-# npm module user
-npx cats-runtime diagnose
-# → ✓ Platform snapshot collected
-# → ✓ Probing 5 providers...
-# → ✗ claude-cli: not found in PATH
-# → ✓ codex: ready (v0.1.2)
-# → ✓ wsl: Ubuntu-24.04 (stopped)
-# → ✓ docker: daemon running
-# → Report saved to ~/.cats-runtime/data/diagnostics/setup-report-2026-03-24.json
-# → Share this file when reporting issues.
-
-# Electron user
-# Setup wizard runs diagnostic automatically in background
-# Results rendered in UI with status indicators
-# "Export diagnostic report" button saves/copies the JSON
-```
-
-### Design Decisions
-
-- **Snapshot, not streaming log** — setup issues are diagnosed once, not
-  monitored continuously. A JSON file is easier to share, parse, and attach
-  to issue reports than a growing log file.
-- **Three-layer separation** — Layer 1 always succeeds (pure Node.js APIs),
-  Layer 2 may partially fail (CLI not installed), Layer 3 may partially fail
-  (no config file). Each layer completes independently; partial reports are
-  still useful.
-- **Separate code path for `--diagnose`** — the diagnostic must work even
-  when the server cannot start. Running it outside the server lifecycle
-  ensures it captures the exact state the user is stuck on.
-- **Redaction by default** — users should be able to paste the report in a
-  GitHub issue without leaking secrets.
+- **Snapshot, not streaming log**: setup failures are easier to share and reason
+  about as a point-in-time report
+- **Config-derived storage**: artifact locations must follow runtime config
+- **Redaction by default**: reports should be safe to attach to issue reports
+- **Separate artifact roles**: do not collapse compatibility evidence bundles
+  and setup reports into one artifact type
+- **Unsigned JSON for now**: keep the first slice simple and aligned with the
+  current evidence engine
 
 ## Effort Estimate
 
-- `platformSnapshot.ts` — small (process APIs + a few `child_process.exec`)
-- `dependencyProbes.ts` — medium (wrap compatibility service, add WSL/Docker/git)
-- `configValidation.ts` — small (file existence, YAML parse, port check)
-- `reportWriter.ts` — small (JSON serialize + regex-based redaction)
-- CLI integration (`--diagnose`) — small (one new branch in `index.ts`)
-- HTTP endpoint — small (one new route)
-- Total: ~3-4 days
+- platform snapshot: small
+- dependency probes wrapper: medium
+- config validation: small
+- report writer and redaction: small
+- CLI integration: small
+- optional HTTP action: small
+- total first slice: roughly 3-4 days
+
+## Follow-Through Documents
+
+- [SPEC-015](../specs/SPEC-015-runtime-setup-diagnostic-report.md)
+- [ADR-020](../decisions/020-keep-setup-diagnostic-reports-config-derived-and-separate-from-compatibility-evidence.md)
 
 ## Action Items
 
-- [ ] Decide whether `--diagnose` should also print a human-readable summary
-      to stdout or only write the JSON file
-- [ ] Determine report retention policy (keep last N reports? auto-cleanup?)
-- [ ] Evaluate if Electron app needs a separate report format or can reuse
-      the same JSON
-- [ ] Check if `ProviderCompatibilityService` can run standalone without full
-      server bootstrap (it currently takes config as constructor param)
-- [ ] Draft ADR if approved for implementation
+- [x] Replace hardcoded `~/.cats-runtime` assumptions with config-derived
+      runtime paths
+- [x] Replace "signed artifacts" wording with current unsigned JSON reality
+- [x] Draft SPEC-015 for the feature boundary
+- [ ] Decide whether the CLI path should also print a concise human summary
+- [ ] Decide retention/cleanup policy for generated reports
+- [ ] Decide the exact HTTP action shape if an on-demand route is added
 
 ---
 
 Logged by: Claude
+Reality-checked and updated by: Codex

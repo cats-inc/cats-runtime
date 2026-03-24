@@ -38,6 +38,8 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
+| [020-keep-setup-diagnostic-reports-config-derived-and-separate-from-compatibility-evidence](./020-keep-setup-diagnostic-reports-config-derived-and-separate-from-compatibility-evidence.md) | Keep setup diagnostic reports config-derived and separate from compatibility evidence | Accepted | 2026-03-25 |
+| [019-scope-first-lan-peer-sharing-to-execution-only](./019-scope-first-lan-peer-sharing-to-execution-only.md) | Scope first LAN peer sharing to execution-only | Accepted | 2026-03-25 |
 | [018-separate-skill-library-content-from-runtime-execution-engine](./018-separate-skill-library-content-from-runtime-execution-engine.md) | Separate skill-library content from runtime execution engine | Draft (Pending Review) | 2026-03-24 |
 | [017-own-usage-metering-rate-limit-detection-and-execution-guardrails](./017-own-usage-metering-rate-limit-detection-and-execution-guardrails.md) | Own usage metering, rate-limit detection, and execution guardrails | Accepted | 2026-03-20 |
 | [016-own-executable-delivery-primitives-not-delivery-policy](./016-own-executable-delivery-primitives-not-delivery-policy.md) | Own executable delivery primitives, not delivery policy | Accepted | 2026-03-20 |
@@ -68,6 +70,6 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 ---
 
-*Last updated: 2026-03-24*
+*Last updated: 2026-03-25*
 
 *See also: [AGENTS.md](../../../AGENTS.md) for decision-making protocols*
