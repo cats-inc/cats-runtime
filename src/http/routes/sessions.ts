@@ -101,6 +101,8 @@ const REUSE_POLICIES = new Set<SessionReusePolicy>([
   'prefer_existing',
   'require_existing',
 ]);
+const LARGE_WORKSPACE_SNAPSHOT_FILE_WARNING_THRESHOLD = 2_000;
+const LARGE_WORKSPACE_SNAPSHOT_BYTE_WARNING_THRESHOLD = 50 * 1024 * 1024;
 
 type NativeCleanupResult = boolean | 'stale_config';
 
@@ -612,6 +614,60 @@ function buildMaintenanceRequest(
   };
 }
 
+function mergeStructuredMetadata(
+  left: Record<string, unknown> | undefined,
+  right: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!left && !right) {
+    return undefined;
+  }
+  return {
+    ...(left ? structuredClone(left) : {}),
+    ...(right ? structuredClone(right) : {}),
+  };
+}
+
+function buildWorkspaceSnapshotMetadata(
+  snapshot: Awaited<ReturnType<typeof copyWorkspaceSnapshot>>,
+): Record<string, unknown> {
+  const warningCodes: string[] = [];
+  if (snapshot.copiedFileCount >= LARGE_WORKSPACE_SNAPSHOT_FILE_WARNING_THRESHOLD) {
+    warningCodes.push('large_file_count');
+  }
+  if (snapshot.copiedByteCount >= LARGE_WORKSPACE_SNAPSHOT_BYTE_WARNING_THRESHOLD) {
+    warningCodes.push('large_byte_count');
+  }
+
+  return {
+    workspaceSnapshot: {
+      copiedFileCount: snapshot.copiedFileCount,
+      copiedByteCount: snapshot.copiedByteCount,
+      skippedGitMetadata: snapshot.skippedGitMetadata,
+      status: warningCodes.length > 0 ? 'large' : 'captured',
+      ...(warningCodes.length > 0 ? { warningCodes } : {}),
+    },
+  };
+}
+
+function describeWorkspaceSnapshotWarning(
+  snapshot: Awaited<ReturnType<typeof copyWorkspaceSnapshot>>,
+): string | undefined {
+  const warningCodes: string[] = [];
+  if (snapshot.copiedFileCount >= LARGE_WORKSPACE_SNAPSHOT_FILE_WARNING_THRESHOLD) {
+    warningCodes.push(`${snapshot.copiedFileCount} files`);
+  }
+  if (snapshot.copiedByteCount >= LARGE_WORKSPACE_SNAPSHOT_BYTE_WARNING_THRESHOLD) {
+    const sizeMb = Math.round((snapshot.copiedByteCount / (1024 * 1024)) * 10) / 10;
+    warningCodes.push(`${sizeMb} MB`);
+  }
+  if (warningCodes.length === 0) {
+    return undefined;
+  }
+
+  return `Fork workspace snapshot copied a large workspace (${warningCodes.join(', ')}). `
+    + 'Use shared/worktree isolation or a future bounded sync path for very large repos.';
+}
+
 function buildMaintenanceFollowThrough(
   session: Pick<SessionInfo, 'id'>,
   action: RuntimeSessionMaintenanceAction,
@@ -805,6 +861,55 @@ function persistWorkspaceCleanupState(
     return undefined;
   }
   return ctx.registry.get(sessionId);
+}
+
+async function settleRetainedResetAfterCleanup(
+  ctx: AppContext,
+  session: SessionInfo,
+  cleanup: Awaited<ReturnType<typeof cleanupSessionWorkspace>>,
+): Promise<{
+    lifecycle: ReturnType<typeof recordSessionLifecycle>;
+    maintenance: ReturnType<typeof serializeSession>['inspection']['maintenance'];
+    session: ReturnType<typeof serializeSession>;
+  } | undefined> {
+  const lastLifecycle = session.maintenanceState?.lastLifecycle;
+  if (!lastLifecycle || lastLifecycle.action !== 'reset' || lastLifecycle.status !== 'retained') {
+    return undefined;
+  }
+
+  const runtime = getRuntimeSessionManager(ctx);
+  const id = session.id;
+  const browserSessionsCleared = await clearBrowserSessionsForRuntimeSession(ctx, id);
+  ctx.registry.clearProviderResumeState(id);
+  ctx.registry.setProviderState(id, undefined);
+  ctx.registry.updateSessionMetadata(id, { hydration: undefined });
+  runtime.clearProviderState(id);
+  runtime.markClosed(id);
+  const wakeupResult = ctx.wakeup?.clearSession(id);
+  const lifecycle = recordSessionLifecycle(ctx, id, {
+    action: 'reset',
+    boundary: 'hard_reset',
+    status: 'completed',
+    reasonCodes: ['manual_reset', 'retained_cleanup_completed'],
+    cleanup: {
+      workerDetached: !runtime.isAttached(id),
+      providerResumeCleared: true,
+      providerStateCleared: true,
+      wakeupsCleared: (wakeupResult?.removedCount ?? 0) > 0,
+      browserSessionsCleared,
+      workspaceCleaned: cleanup.workspaceCleaned,
+      ...(cleanup.worktreeDetached !== undefined ? { worktreeDetached: cleanup.worktreeDetached } : {}),
+      ...(cleanup.policy ? { worktreeCleanupPolicy: cleanup.policy } : {}),
+      worktreeMergedPaths: cleanup.mergedPathCount,
+    },
+    clearExecutionState: true,
+  });
+  const serialized = serializeSession(ctx, ctx.registry.get(id) ?? session);
+  return {
+    lifecycle,
+    maintenance: serialized.inspection.maintenance,
+    session: serialized,
+  };
 }
 
 function describeRetainedWorktreeCleanup(
@@ -2272,7 +2377,10 @@ sessionRoutes.post('/sessions/:id/workspace/cleanup', async (c) => {
       }, 500);
     }
   }
-  const serialized = serializeSession(ctx, sessionAfterCleanup);
+  const settledReset = cleanup.status === 'completed'
+    ? await settleRetainedResetAfterCleanup(ctx, sessionAfterCleanup, cleanup)
+    : undefined;
+  const serialized = settledReset?.session ?? serializeSession(ctx, sessionAfterCleanup);
 
   return c.json({
     action: 'cleanup_workspace',
@@ -2288,7 +2396,16 @@ sessionRoutes.post('/sessions/:id/workspace/cleanup', async (c) => {
       ...(cleanup.policy ? { worktreeCleanupPolicy: cleanup.policy } : {}),
       worktreeMergedPaths: cleanup.mergedPathCount,
     },
-    maintenance: serialized.inspection.maintenance,
+    ...(settledReset
+      ? {
+          settledLifecycle: {
+            action: 'reset',
+            status: 'completed',
+            cleanup: settledReset.lifecycle.cleanup,
+          },
+        }
+      : {}),
+    maintenance: settledReset?.maintenance ?? serialized.inspection.maintenance,
     session: serialized,
   });
 });
@@ -3163,7 +3280,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     transplant: parseContextTransplant(rawBody.transplant),
   };
   const requestedWorkspaceIsolationMode = body.workspaceIsolation;
-  const requestedHydrationMetadata = extractHydrationMetadata(
+  let requestedHydrationMetadata = extractHydrationMetadata(
     body.context,
     parsedSkills.clear ? undefined : body.skills,
   );
@@ -3259,7 +3376,15 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
   }
 
   if (forkPrepared.workspaceIsolation.mode !== 'shared' && session.cwd !== forkCwd) {
-    await copyWorkspaceSnapshot(session.cwd, forkCwd, { skipGitMetadata: true });
+    const snapshot = await copyWorkspaceSnapshot(session.cwd, forkCwd, { skipGitMetadata: true });
+    requestedHydrationMetadata = mergeStructuredMetadata(
+      requestedHydrationMetadata,
+      buildWorkspaceSnapshotMetadata(snapshot),
+    );
+    const snapshotWarning = describeWorkspaceSnapshotWarning(snapshot);
+    if (snapshotWarning) {
+      warnings.push(snapshotWarning);
+    }
   }
 
   const childLineage = buildChildLineage({

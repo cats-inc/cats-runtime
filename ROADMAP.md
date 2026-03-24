@@ -186,11 +186,13 @@ That is enough to freeze the substrate, but not enough for production-grade
 browser-backed preview and test workflows. The current gaps are:
 
 - no real Playwright/CDP/browser-service driver yet
-- reset/delete cleanup and closed-session pruning exist, but there is still no
-  automatic background browser-session expiry or retained-session GC policy
+- reset/delete cleanup and explicit closed-session pruning exist, and
+  background closed-session expiry now runs under runtime maintenance, but
+  there is still no richer retained-session GC policy
 - browser state already contributes additive session/history/observe inspection
   previews, and the runtime now exposes an explicit aggregate summary plus
-  manual closed-session cleanup seam, but restart recovery is still absent
+  restart-safe persisted state, but richer driver-level recovery and retained
+  browser-session policy are still absent
 
 Without a second slice, the browser subsystem remains structurally correct but
 operationally shallow.
@@ -224,10 +226,11 @@ Deepen the runtime-owned browser subsystem without coupling it to any monorepo
 - Browser sessions already surface through session, history, and observe
   inspection payloads, and reset/delete cleanup clears browser sessions bound
   to the affected runtime session
-- `GET /browser/summary`, `POST /browser/sessions/cleanup`, and matching MCP
-  tools now provide a host-facing aggregate read/maintenance seam for closed
-  session cleanup without waiting for capacity-pressure pruning
-- Real drivers and automatic background cleanup/expiry remain deferred
+- `GET /browser/summary`, `POST /browser/sessions/cleanup`, matching MCP
+  tools, and runtime background maintenance now provide a host-facing
+  aggregate read/maintenance seam for closed browser-session cleanup
+- Real drivers and richer retained-session/browser recovery policy remain
+  deferred
 
 #### Why This Is Required
 
@@ -266,17 +269,17 @@ depends on explicit lifecycle actions only.
 
 Current gaps:
 
-- abandoned worktrees are not swept in the background if a host crashes or a
-  session is never explicitly reset/deleted
-- intentionally retained `worktreeCleanupPolicy: "preserve"` worktrees can now
-  survive across resets/deletes, but there is still no background GC/sweeper
-  or retention policy for preserved/orphaned worktrees
+- abandoned worktrees are now swept in the background if a host crashes or a
+  session is never explicitly reset/deleted, but intentionally retained
+  `worktreeCleanupPolicy: "preserve"` worktrees still do not have automatic GC
+- retained worktree sessions can now surface TTL-style expiry diagnostics, but
+  preserved/orphaned worktrees still need broader retained-worktree GC policy
 - `worktreeCleanupPolicy: "merge"` intentionally stops and returns
   `status: "retained"` when the source repo is already dirty, because runtime
   does not yet own conflict-resolution policy
 - reset/delete can now hand operators retained cleanup metadata plus a bounded
-  retry route, but runtime still does not auto-complete the rest of the
-  retained reset/delete follow-through after cleanup succeeds
+  retry route, and retained resets now auto-complete once cleanup succeeds,
+  but retained delete follow-through still does not auto-complete
 - worktree prepare/merge/discard still runs inline with the HTTP lifecycle; the
   runtime no longer blocks the event loop with sync I/O, but it still lacks a
   queued/background execution envelope, backpressure, and concurrency guards
@@ -315,8 +318,12 @@ cleanup discipline while keeping product approval/policy above runtime.
   `retryCleanupPath` so hosts can jump straight to the bounded retry seam
 - `inspection.maintenance.cleanup` now preserves that same retry path when a
   closed worktree session is actually ready for bounded cleanup retry
-- background sweeping, retained-worktree GC, and broader retained-lifecycle
-  follow-through still remain deferred
+- orphaned worktrees are now swept in the background, and retained worktree
+  sessions surface TTL-style expiry diagnostics through runtime maintenance
+- retained reset cleanup now auto-settles the rest of the reset lifecycle once
+  bounded cleanup succeeds
+- retained-worktree GC and retained delete follow-through still remain
+  deferred
 
 #### Affected Files
 
@@ -354,8 +361,9 @@ Current gaps:
 - Team 3's future memory pipeline seam exists in contracts only; runtime still
   lacks the hook execution/retry envelope around lifecycle flush boundaries
 - non-shared fork copy still clones the whole workspace opportunistically in
-  the request path; runtime does not yet have bounded snapshot planning,
-  progress reporting, or large-workspace safeguards
+  the request path; runtime now records snapshot counts/bytes and large-copy
+  warnings, but still does not have bounded snapshot planning, resumable sync,
+  or progress reporting
 
 #### Direction
 
@@ -379,6 +387,8 @@ schemas.
 
 - hydration now records authoritative source workspace vs runtime cwd
 - non-shared child forks can copy a workspace snapshot once at fork time
+- non-shared fork snapshot metadata now records copied file/byte counts plus
+  additive `large_*` warning codes when the snapshot is large
 - session maintenance now advertises additive `pre_flush` alongside the
   existing memory-flush hook groups
 - runtime-managed transcripts now repair/archive older JSONL history and record
@@ -395,8 +405,8 @@ schemas.
 - reset/delete/workspace cleanup now support opt-in
   `requireAcknowledgedHooks` gating so destructive lifecycle routes can refuse
   to proceed while their action-scoped hooks are still pending
-- generalized workspace sync and broader hook execution plumbing remain
-  deferred
+- generalized workspace sync, resumable large-workspace planning, and broader
+  hook execution plumbing remain deferred
 
 #### Affected Files
 

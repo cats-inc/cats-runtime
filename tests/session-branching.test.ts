@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -165,6 +165,72 @@ describe('session branching route', () => {
       cleanup();
     }
   });
+
+  it('records large fork snapshot metadata and warnings for isolated child workspaces', async () => {
+    const { config, cleanup } = createTestConfig();
+    const registry = new SessionRegistry();
+    const pool = createMockPool();
+    const app = createRuntimeApp({
+      config,
+      registry,
+      pool,
+      cursorNative: {} as never,
+      gooseNative: {} as never,
+      kiroNative: {} as never,
+      auggieSessions: {} as never,
+      opencodeNative: {} as never,
+    } as never);
+
+    try {
+      const repoDir = join(config.sessionBaseDir, 'large-parent');
+      mkdirSync(repoDir, { recursive: true });
+      for (let index = 0; index < 2000; index += 1) {
+        writeFileSync(join(repoDir, `file-${index}.txt`), `${index}\n`, 'utf8');
+      }
+
+      const parent = registry.create({
+        id: 'parent-large-snapshot',
+        providerName: 'codex',
+        cwd: repoDir,
+        workspaceMode: 'shared',
+        model: 'gpt-5.4',
+      });
+      registry.setProviderSessionId(parent.id, 'thread-parent-large');
+      registry.updateStatus(parent.id, 'closed');
+
+      const response = await app.request(`/sessions/${parent.id}/fork`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          workspaceMode: 'isolated',
+        }),
+      });
+
+      expect(response.status).toBe(201);
+      const body = await response.json() as {
+        warnings?: string[];
+        hydration?: {
+          metadata?: {
+            workspaceSnapshot?: {
+              copiedFileCount: number;
+              status: string;
+              warningCodes?: string[];
+            };
+          };
+        };
+      };
+      expect(body.warnings).toEqual(expect.arrayContaining([
+        expect.stringContaining('Fork workspace snapshot copied a large workspace'),
+      ]));
+      expect(body.hydration?.metadata?.workspaceSnapshot).toEqual(expect.objectContaining({
+        copiedFileCount: 2000,
+        status: 'large',
+        warningCodes: ['large_file_count'],
+      }));
+    } finally {
+      cleanup();
+    }
+  }, 15000);
 
   it('falls back to context_transplant for incompatible child targets and records lineage', async () => {
     const { config, cleanup } = createTestConfig();

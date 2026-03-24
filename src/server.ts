@@ -42,6 +42,9 @@ import { ensureSessionAwake } from './core/runtime/sessionWakeup.js';
 import { ProviderModelCatalogService } from './core/models/providerModelCatalog.js';
 import { ProviderCompatibilityService } from './core/compatibility/ProviderCompatibilityService.js';
 import { RuntimeWakeupService } from './core/wakeup/RuntimeWakeupService.js';
+import { RuntimeBrowserService } from './core/browser/RuntimeBrowserService.js';
+import { RuntimeBrowserMaintenanceService } from './core/browser/RuntimeBrowserMaintenanceService.js';
+import { RuntimeWorktreeMaintenanceService } from './core/workspace/RuntimeWorktreeMaintenanceService.js';
 import { createRuntimeApp, type AppContext } from './http/app.js';
 import type { ProviderName } from './backends/cli/providers/types.js';
 import type { ApiBackendOptions } from './backends/api/types.js';
@@ -59,6 +62,7 @@ import {
   resolveFileBackedProviderPath,
   supportsHostFileBackedProviderDiscovery,
 } from './backends/cli/providerPaths.js';
+import { ManualBrowserDriver } from './backends/browser/manualDriver.js';
 
 interface DiscoveryController {
   start(): void;
@@ -786,6 +790,21 @@ export function createRuntimeServer(
     fetch: options.apiBackend?.fetch,
     env: options.apiBackend?.env,
   });
+  const browser = new RuntimeBrowserService({
+    drivers: [
+      new ManualBrowserDriver(),
+    ],
+    sessionExists: (sessionId) => registry.get(sessionId) !== undefined,
+    storageFile: join(dataDir, 'browser', 'sessions.json'),
+  });
+  const browserMaintenance = new RuntimeBrowserMaintenanceService({
+    browser,
+  });
+  const worktreeMaintenance = new RuntimeWorktreeMaintenanceService({
+    sessionBaseDir: config.sessionBaseDir,
+    registry,
+    runtime,
+  });
   const context: AppContext = {
     config,
     startup,
@@ -803,6 +822,9 @@ export function createRuntimeServer(
     providerModelCatalog,
     compatibility,
     wakeup,
+    browser,
+    browserMaintenance,
+    worktreeMaintenance,
     resolveCursorNative,
     resolveGooseNative,
     resolveKiroNative,
@@ -831,6 +853,8 @@ export function createRuntimeServer(
       startPromise = (async () => {
         discovery.start();
         wakeup.start();
+        browserMaintenance.start();
+        worktreeMaintenance.start();
 
         try {
           if (startup.phase !== 'starting') {
@@ -863,6 +887,8 @@ export function createRuntimeServer(
 
           return { host: address.address, port: address.port };
         } catch (error) {
+          worktreeMaintenance.close();
+          browserMaintenance.close();
           wakeup.close();
           discovery.stop();
           throw error;
@@ -882,6 +908,8 @@ export function createRuntimeServer(
         if (pendingStart) {
           await pendingStart.catch(() => undefined);
         }
+        worktreeMaintenance.close();
+        browserMaintenance.close();
         wakeup.close();
         discovery.stop();
         agentBackend.killAll();

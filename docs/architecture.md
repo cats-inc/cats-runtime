@@ -133,7 +133,8 @@ src/
 - Exposes aggregate runtime + provider health at `GET /diagnostics/health`
 - Exposes runtime/host diagnostics at `GET /diagnostics/runtime`
 - Exposes provider availability plus CLI compatibility diagnostics at
-  `GET /diagnostics/providers`
+  `GET /diagnostics/providers`, including live API/local endpoint reachability
+  probes when `probe=live`
 - Exposes runtime-owned browser session/page routes with pluggable driver
   metadata, normalized `browser_page` preview surfaces, aggregate browser
   summary reads, and explicit closed-session cleanup
@@ -227,6 +228,8 @@ src/
 - Defines runtime-owned browser session/page lifecycle helpers
 - Persists runtime-owned browser session/page state under the runtime data dir
   so browser inspection/read models survive restart for the current driver set
+- Runs runtime-owned closed-session maintenance sweeps so stale browser records
+  can expire on a bounded TTL without waiting for explicit cleanup routes
 - Defines browser-page preview-surface normalization aligned with existing
   service/artifact preview contracts
 - Keeps browser-driver integration replaceable so future Playwright/CDP or
@@ -316,7 +319,10 @@ src/
 - Keeps retained worktree sessions pointed at the still-live worktree path so
   later observe/reset/delete flows stay consistent when cleanup is intentionally
   preserved or cannot finish safely
-- Provides a conservative snapshot-copy helper for non-shared fork flows
+- Provides a conservative snapshot-copy helper for non-shared fork flows,
+  including copied file/byte counts for additive large-workspace warnings
+- Provides shared orphan-worktree cleanup helpers plus background maintenance
+  sweeps for abandoned worktrees
 
 ### `src/core/wakeup`
 
@@ -434,7 +440,8 @@ src/
 13. Startup/readiness state is exposed over `GET /health`, while
    `GET /diagnostics/health`, `GET /diagnostics/runtime`, and
    `GET /diagnostics/providers` expose the runtime-owned host integration
-   surface
+   surface, including runtime maintenance snapshots plus live endpoint
+   reachability for API/local targets when requested
 14. `POST /mcp` reuses those same runtime-owned services as an additive
     orchestrator/tool surface
 15. Optional machine-readable process output emits startup and shutdown
@@ -448,8 +455,9 @@ src/
     runtime-owned workspace layer, returning retained cleanup metadata when the
     source repo is dirty or detachment fails, while
     `POST /sessions/{id}/workspace/cleanup` provides a bounded retry seam that
-    rehydrates persisted workspace/skill state without auto-replaying the rest
-    of reset/delete follow-through
+    rehydrates persisted workspace/skill state and auto-settles retained reset
+    follow-through once cleanup succeeds, without auto-replaying retained
+    delete follow-through
 19. `POST /sessions/{id}/compact` reuses the same runtime-owned maintenance
     read model as a public compaction route, returning machine-readable
     readiness plus sanitized hook-payload persistence and compacting managed

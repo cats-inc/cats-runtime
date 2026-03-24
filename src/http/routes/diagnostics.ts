@@ -35,6 +35,7 @@ import {
 type DiagnosticStatus = HealthStatus['status'];
 type DiagnosticsProbeMode = 'light' | 'live';
 const DIAGNOSTIC_BACKENDS: readonly BackendKind[] = ['cli', 'api', 'local', 'agent'];
+const DEFAULT_REMOTE_ENDPOINT_PROBE_TIMEOUT_MS = 5_000;
 
 interface DiagnosticCheck {
   code: string;
@@ -405,10 +406,11 @@ async function diagnoseAgentTarget(
   return { checks, config };
 }
 
-function diagnoseRemoteConfigOnly(
+async function diagnoseRemoteConfigOnly(
   target: ProviderTargetDescriptor,
+  probeMode: DiagnosticsProbeMode,
   env: Readonly<NodeJS.ProcessEnv>,
-): { checks: DiagnosticCheck[]; config: Record<string, unknown>; compatibility?: CompatibilitySummaryView } {
+): Promise<{ checks: DiagnosticCheck[]; config: Record<string, unknown>; compatibility?: CompatibilitySummaryView }> {
   const instance = target.remoteInstance;
   if (!instance) {
     return {
@@ -424,11 +426,21 @@ function diagnoseRemoteConfigOnly(
   }
 
   const checks: DiagnosticCheck[] = [];
+  const endpoint = getRemoteEndpoint(instance);
   const requiresApiKey = instance.transport === 'anthropic'
     || instance.transport === 'openai'
     || instance.transport === 'google'
     || instance.transport === 'gemini';
   const apiKey = buildEnvDescriptor(env, instance.apiKeyEnv, requiresApiKey);
+  const config: Record<string, unknown> = {
+    transport: instance.transport,
+    model: instance.model || null,
+    endpoint,
+    credentials: {
+      apiKeyEnv: apiKey,
+      authTokenEnv: buildEnvDescriptor(env, instance.authTokenEnv, false),
+    },
+  };
 
   if (requiresApiKey) {
     checks.push(
@@ -442,7 +454,32 @@ function diagnoseRemoteConfigOnly(
     );
   }
 
-  if (instance.transport === 'ollama' || !requiresApiKey || (apiKey.name && apiKey.present)) {
+  if (probeMode === 'live' && endpoint) {
+    const liveProbe = await probeRemoteEndpoint(endpoint, instance.transport);
+    config.liveProbe = {
+      url: liveProbe.url,
+      method: 'GET',
+      reachable: liveProbe.reachable,
+      ...(liveProbe.statusCode !== undefined ? { statusCode: liveProbe.statusCode } : {}),
+      latencyMs: liveProbe.latencyMs,
+      ...(liveProbe.timedOut ? { timedOut: true } : {}),
+    };
+    checks.push(
+      createCheck(
+        liveProbe.reachable ? 'endpoint_reachable' : 'endpoint_probe_failed',
+        liveProbe.reachable ? 'ok' : 'unavailable',
+        liveProbe.reachable
+          ? `Live probe reached ${target.providerName}/${target.instanceId} endpoint`
+          : liveProbe.message,
+        {
+          url: liveProbe.url,
+          ...(liveProbe.statusCode !== undefined ? { statusCode: liveProbe.statusCode } : {}),
+          latencyMs: liveProbe.latencyMs,
+          ...(liveProbe.timedOut ? { timedOut: true } : {}),
+        },
+      ),
+    );
+  } else if (instance.transport === 'ollama' || !requiresApiKey || (apiKey.name && apiKey.present)) {
     checks.push(
       createCheck(
         'live_probe_unimplemented',
@@ -454,15 +491,7 @@ function diagnoseRemoteConfigOnly(
 
   return {
     checks,
-    config: {
-      transport: instance.transport,
-      model: instance.model || null,
-      endpoint: getRemoteEndpoint(instance),
-      credentials: {
-        apiKeyEnv: apiKey,
-        authTokenEnv: buildEnvDescriptor(env, instance.authTokenEnv, false),
-      },
-    },
+    config,
   };
 }
 
@@ -484,7 +513,7 @@ async function diagnoseTarget(
   } else if (target.backend === 'agent') {
     result = await diagnoseAgentTarget(target, probeMode, env);
   } else {
-    result = diagnoseRemoteConfigOnly(target, env);
+    result = await diagnoseRemoteConfigOnly(target, probeMode, env);
   }
 
   const attentionCodes = result.checks
@@ -514,7 +543,8 @@ async function diagnoseTarget(
       forceSupported: target.backend === 'cli',
       liveSupported: target.backend === 'cli'
         ? Boolean(result.compatibility?.probe.supportsLive)
-        : target.backend === 'agent',
+        : target.backend === 'agent'
+          || Boolean(target.remoteInstance && getRemoteEndpoint(target.remoteInstance)),
     },
   };
 }
@@ -660,6 +690,10 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
       shutdown: getRuntimeShutdownContract(ctx.startup),
       listener,
       paths,
+      maintenance: {
+        ...(ctx.worktreeMaintenance ? { worktrees: ctx.worktreeMaintenance.snapshot() } : {}),
+        ...(ctx.browserMaintenance ? { browser: ctx.browserMaintenance.snapshot() } : {}),
+      },
       process: {
         pid: process.pid,
         ppid: process.ppid,
@@ -873,4 +907,61 @@ function filterProviderDiagnosticsCatalog(
     },
     {},
   );
+}
+
+async function probeRemoteEndpoint(
+  endpoint: string,
+  transport: string | undefined,
+): Promise<{
+    url: string;
+    reachable: boolean;
+    statusCode?: number;
+    latencyMs: number;
+    timedOut: boolean;
+    message: string;
+  }> {
+  const url = resolveRemoteProbeUrl(endpoint, transport);
+  const startedAt = Date.now();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), DEFAULT_REMOTE_ENDPOINT_PROBE_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      signal: controller.signal,
+    });
+    const latencyMs = Date.now() - startedAt;
+    return {
+      url,
+      reachable: true,
+      statusCode: response.status,
+      latencyMs,
+      timedOut: false,
+      message: `Live probe reached '${url}' (HTTP ${response.status}).`,
+    };
+  } catch (error) {
+    const timedOut = error instanceof Error && error.name === 'AbortError';
+    const latencyMs = Date.now() - startedAt;
+    return {
+      url,
+      reachable: false,
+      latencyMs,
+      timedOut,
+      message: timedOut
+        ? `Timed out while probing '${url}'.`
+        : error instanceof Error
+          ? error.message
+          : String(error),
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function resolveRemoteProbeUrl(endpoint: string, transport: string | undefined): string {
+  const url = new URL(endpoint);
+  if (transport === 'ollama') {
+    url.pathname = url.pathname.replace(/\/$/, '') + '/api/tags';
+  }
+  return url.toString();
 }

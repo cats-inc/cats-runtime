@@ -568,7 +568,7 @@ describe('session worktree routes', () => {
     });
   });
 
-  it('retries retained worktree cleanup without replaying reset follow-through', async () => {
+  it('settles retained reset state after cleanup succeeds', async () => {
     const repoDir = createGitWorkspace(rootDir, 'repo-cleanup-retry');
     const prepared = await prepareSessionWorkspace({
       sessionId: 'worktree-cleanup-retry',
@@ -616,6 +616,14 @@ describe('session worktree routes', () => {
     const body = await response.json() as {
       action: string;
       status: string;
+      settledLifecycle?: {
+        action: string;
+        status: string;
+        cleanup: {
+          providerResumeCleared: boolean;
+          providerStateCleared: boolean;
+        };
+      };
       reasonCodes: string[];
       cleanup: {
         workspaceCleaned: boolean;
@@ -632,17 +640,30 @@ describe('session worktree routes', () => {
       };
       session: {
         cwd: string;
-        hydration: {
-          workspace: {
-            runtimeCwd: string;
-            sourceCwd: string;
-            sourceOfTruth: string;
+        providerSessionId?: string;
+        inspection: {
+          maintenance: {
+            lastLifecycle?: {
+              status: string;
+              cleanup: {
+                providerResumeCleared: boolean;
+                providerStateCleared: boolean;
+              };
+            };
           };
         };
       };
     };
     expect(body.action).toBe('cleanup_workspace');
     expect(body.status).toBe('completed');
+    expect(body.settledLifecycle).toEqual(expect.objectContaining({
+      action: 'reset',
+      status: 'completed',
+      cleanup: expect.objectContaining({
+        providerResumeCleared: true,
+        providerStateCleared: true,
+      }),
+    }));
     expect(body.reasonCodes).toContain('worktree_changes_discarded');
     expect(body.cleanup).toEqual(expect.objectContaining({
       workspaceCleaned: true,
@@ -656,25 +677,24 @@ describe('session worktree routes', () => {
       worktreeDisposition: 'discard',
     }));
     expect(body.session.cwd).toBe(repoDir);
-    expect(body.session.hydration.workspace).toEqual(expect.objectContaining({
-      runtimeCwd: repoDir,
-      sourceCwd: repoDir,
-      sourceOfTruth: 'runtime_cwd',
+    expect(body.session.providerSessionId).toBeUndefined();
+    expect(body.session.inspection.maintenance.lastLifecycle).toEqual(expect.objectContaining({
+      status: 'completed',
+      cleanup: expect.objectContaining({
+        providerResumeCleared: true,
+        providerStateCleared: true,
+      }),
     }));
     expect(existsSync(prepared.workspaceIsolation.worktree!.worktreePath)).toBe(false);
 
     const stored = registry.get(session.id);
     expect(stored?.cwd).toBe(repoDir);
-    expect(stored?.providerSessionId).toBe('thread-cleanup-retry');
+    expect(stored?.providerSessionId).toBeUndefined();
     expect(stored?.workspaceIsolation?.worktree?.lastCleanup).toEqual(expect.objectContaining({
       policy: 'discard',
       status: 'completed',
     }));
-    expect(stored?.hydration?.workspace).toEqual(expect.objectContaining({
-      runtimeCwd: repoDir,
-      sourceCwd: repoDir,
-      sourceOfTruth: 'runtime_cwd',
-    }));
+    expect(stored?.hydration).toBeUndefined();
   });
 
   it('gates retained worktree cleanup behind acknowledged pre-flush hooks when requested', async () => {

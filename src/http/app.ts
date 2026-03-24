@@ -6,6 +6,7 @@ import { logger } from 'hono/logger';
 import type { RuntimeConfig } from '../core/config.js';
 import { RuntimeSessionManager } from '../core/runtime/RuntimeSessionManager.js';
 import { RuntimeBrowserService } from '../core/browser/RuntimeBrowserService.js';
+import { RuntimeBrowserMaintenanceService } from '../core/browser/RuntimeBrowserMaintenanceService.js';
 import type { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
 import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
 import type { ApiBackendManager } from '../backends/api/runtime/ApiBackendManager.js';
@@ -21,6 +22,7 @@ import { ProviderCompatibilityService } from '../core/compatibility/ProviderComp
 import { RuntimeDeliveryService } from '../core/runtime/RuntimeDeliveryService.js';
 import { WorkspaceSubstrateService } from '../core/runtime/WorkspaceSubstrateService.js';
 import { RuntimeMeteringService } from '../core/usage/RuntimeMeteringService.js';
+import { RuntimeWorktreeMaintenanceService } from '../core/workspace/RuntimeWorktreeMaintenanceService.js';
 import type { RuntimeWakeupService } from '../core/wakeup/RuntimeWakeupService.js';
 import { ManualBrowserDriver } from '../backends/browser/manualDriver.js';
 import { bearerAuth } from './auth.js';
@@ -68,6 +70,8 @@ export interface AppContext {
   metering?: RuntimeMeteringService;
   wakeup?: RuntimeWakeupService;
   browser?: RuntimeBrowserService;
+  browserMaintenance?: RuntimeBrowserMaintenanceService;
+  worktreeMaintenance?: RuntimeWorktreeMaintenanceService;
   resolveCursorNative?: (instanceId?: string) => CursorNativeSessionService;
   resolveGooseNative?: (instanceId?: string) => GooseNativeSessionService;
   resolveKiroNative?: (instanceId?: string) => KiroNativeSessionService;

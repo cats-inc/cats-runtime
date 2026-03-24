@@ -419,6 +419,20 @@ describe('runtime server', () => {
             sessionBaseDir: expect.stringContaining('runtime-sessions'),
             compatibilityEvidenceDir: expect.stringContaining('runtime-data'),
           },
+          maintenance: {
+            worktrees: {
+              policy: {
+                sweepIntervalMs: 60000,
+                retainedTtlMs: 86400000,
+              },
+            },
+            browser: {
+              policy: {
+                sweepIntervalMs: 60000,
+                closedSessionTtlMs: 1800000,
+              },
+            },
+          },
           process: {
             pid: process.pid,
             ppid: process.ppid,

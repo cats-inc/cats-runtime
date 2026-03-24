@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   cleanupSessionWorkspace,
+  cleanupOrphanedWorktree,
+  copyWorkspaceSnapshot,
   prepareSessionWorkspace,
 } from './sessionWorkspace.js';
 
@@ -230,5 +232,50 @@ describe('sessionWorkspace', () => {
     }));
     expect(existsSync(prepared.workspaceIsolation.worktree!.worktreePath)).toBe(true);
     expect(readFileSync(join(prepared.cwd, 'tracked.txt'), 'utf8')).toBe('preserved change\n');
+  });
+
+  it('captures workspace snapshot copy stats while skipping git metadata', async () => {
+    const rootDir = mkdtempSync(join(tmpdir(), 'cats-runtime-workspace-copy-'));
+    cleanupPaths.push(rootDir);
+    const sourceDir = join(rootDir, 'source');
+    const targetDir = join(rootDir, 'target');
+    mkdirSync(join(sourceDir, '.git'), { recursive: true });
+    mkdirSync(join(sourceDir, 'nested'), { recursive: true });
+    writeFileSync(join(sourceDir, 'alpha.txt'), 'alpha\n', 'utf8');
+    writeFileSync(join(sourceDir, 'nested', 'beta.txt'), 'beta\n', 'utf8');
+    writeFileSync(join(sourceDir, '.git', 'HEAD'), 'ref: refs/heads/main\n', 'utf8');
+
+    const result = await copyWorkspaceSnapshot(sourceDir, targetDir, {
+      skipGitMetadata: true,
+    });
+
+    expect(result).toEqual({
+      copiedFileCount: 2,
+      copiedByteCount: Buffer.byteLength('alpha\n', 'utf8') + Buffer.byteLength('beta\n', 'utf8'),
+      skippedGitMetadata: true,
+    });
+    expect(existsSync(join(targetDir, 'alpha.txt'))).toBe(true);
+    expect(existsSync(join(targetDir, 'nested', 'beta.txt'))).toBe(true);
+    expect(existsSync(join(targetDir, '.git'))).toBe(false);
+  });
+
+  it('removes orphaned worktree directories without a registered session', async () => {
+    const { repoDir, sessionBaseDir } = createGitWorkspace();
+    const prepared = await prepareSessionWorkspace({
+      sessionId: 'orphaned-session',
+      sessionBaseDir,
+      cwd: repoDir,
+      workspaceMode: 'shared',
+      workspaceIsolationMode: 'worktree',
+    });
+
+    const result = await cleanupOrphanedWorktree(prepared.workspaceIsolation.worktree!.worktreePath);
+
+    expect(result).toEqual(expect.objectContaining({
+      removed: true,
+      reasonCodes: expect.arrayContaining(['orphaned_worktree_detached']),
+      sourceRepoRoot: repoDir,
+    }));
+    expect(existsSync(prepared.workspaceIsolation.worktree!.worktreePath)).toBe(false);
   });
 });

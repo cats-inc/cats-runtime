@@ -1081,15 +1081,30 @@ describe('runtime MCP facade', () => {
           action: string;
           status: string;
           cleanupPath: string;
+          settledLifecycle?: {
+            action: string;
+            status: string;
+            cleanup: {
+              providerResumeCleared: boolean;
+              providerStateCleared: boolean;
+            };
+          };
           cleanup: {
             workspaceCleaned: boolean;
             worktreeCleanupPolicy: string;
           };
           session: {
             cwd: string;
-            hydration: {
-              workspace: {
-                runtimeCwd: string;
+            hydration?: unknown;
+            inspection: {
+              maintenance: {
+                lastLifecycle?: {
+                  status: string;
+                  cleanup: {
+                    providerResumeCleared: boolean;
+                    providerStateCleared: boolean;
+                  };
+                };
               };
             };
           };
@@ -1106,8 +1121,25 @@ describe('runtime MCP facade', () => {
       workspaceCleaned: true,
       worktreeCleanupPolicy: 'discard',
     }));
+    expect(cleaned.result.structuredContent.settledLifecycle).toEqual(expect.objectContaining({
+      action: 'reset',
+      status: 'completed',
+      cleanup: expect.objectContaining({
+        providerResumeCleared: true,
+        providerStateCleared: true,
+      }),
+    }));
     expect(cleaned.result.structuredContent.session.cwd).toBe(repoDir);
-    expect(cleaned.result.structuredContent.session.hydration.workspace.runtimeCwd).toBe(repoDir);
+    expect(cleaned.result.structuredContent.session.hydration).toBeUndefined();
+    expect(
+      cleaned.result.structuredContent.session.inspection.maintenance.lastLifecycle,
+    ).toEqual(expect.objectContaining({
+      status: 'completed',
+      cleanup: expect.objectContaining({
+        providerResumeCleared: true,
+        providerStateCleared: true,
+      }),
+    }));
 
     const resetFollowThroughSession = registry.create({
       id: 'session-maintenance-mcp',

@@ -7,16 +7,16 @@
 | Component | Status | Description |
 |-----------|--------|-------------|
 | Core | Completed | Embedded CLI runtime, shared session contracts, discovery, worker pool, runtime-owned shared/isolated/worktree workspace lifecycle helpers, first-slice runtime-owned usage/incident/guardrail contracts, additive session-maintenance/reset-boundary hooks, and persisted maintenance trigger metadata are in-repo |
-| API Backends | In Progress | `src/backends/api` now runs Claude, Codex/OpenAI, Gemini, and Ollama with runtime-managed sessions, provider-native continuation/caching optimizations, additive incident hints plus provider-agnostic `progress` events, a shared local tool loop with patch/file/search/shell support, and runtime-owned health/diagnostics summaries; deeper live probes and broader tool/model discovery remain |
+| API Backends | In Progress | `src/backends/api` now runs Claude, Codex/OpenAI, Gemini, and Ollama with runtime-managed sessions, provider-native continuation/caching optimizations, additive incident hints plus provider-agnostic `progress` events, a shared local tool loop with patch/file/search/shell support, and runtime-owned health/diagnostics summaries including live endpoint reachability probes for API/local targets; deeper semantic probes and broader tool/model discovery remain |
 | Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, an Agent SDK bridge as the second validation target, and first-slice remote cleanup hooks for close/cancel/delete/reset semantics |
-| HTTP API | Completed | Health, sessions, delivery audit/export/repo routes, messages, history, observe, wakeups, provider management, session branch-lineage inspection, metering/guardrail diagnostics, additive run-inspector/session-discipline contracts, machine-readable session-maintenance/delete-cleanup payloads, worktree-backed session lifecycle cleanup semantics including `preserve`, and the runtime MCP facade over HTTP plus stdio are served directly from `cats-runtime` |
+| HTTP API | Completed | Health, sessions, delivery audit/export/repo routes, messages, history, observe, wakeups, provider management, session branch-lineage inspection, metering/guardrail diagnostics, additive run-inspector/session-discipline contracts, machine-readable session-maintenance/delete-cleanup payloads, worktree-backed session lifecycle cleanup semantics including `preserve`, runtime maintenance snapshots under `/diagnostics/runtime`, and the runtime MCP facade over HTTP plus stdio are served directly from `cats-runtime` |
 | Runtime Skills | Completed | `skills/` is now a runtime-owned execution catalog and family-aware internal library with validation, session-level requested/resolved/applied metadata, richer slug/family/capability metadata, explicit `skills: null` clearing, backend-aware delivery modes, prompt/instruction execution injection across prompt-driven CLI plus Pi/API/agent targets, inspection-level applied-skill reporting, a standalone versioned filterable/paged/sortable `GET /skills/catalog` read surface plus matching `list_runtime_skills` MCP read tool, a dedicated `npm run verify:skills` gate, shared re-entry hydration across create/resume/fork/provider-switch, and shared discovery/content-fingerprint catalog cache hardening |
 | Wakeup Substrate | Completed | Runtime-owned scheduled wakeup requests now support create/list/cancel/trigger, restart-safe persistence, bounded timer processing, coalescing, UTC cron-like recurring schedules with automatic re-arming, and additive session/history wakeup metadata without turning the runtime into a full workflow scheduler |
 | Provider Compatibility | In Progress | Shared CLI compatibility probing now classifies `ready` / `degraded` / `unsupported_version` / `unrecognized_protocol` / `probe_failed`, validates `light` vs `live` runtime-flag probes across expanded CLI family profiles, captures redacted replay-friendly evidence bundles, tracks stale cache/reprobe metadata, exposes runtime-owned install/prerequisite/PATH/npm-prefix/auth/version/remediation hints for CLI targets, and supports target-scoped `provider` / `backend` / `instance` / `defaultOnly` filtering over `/diagnostics/providers` plus the matching MCP seam |
 | Dashboard | Completed | The embedded dashboard UI is served from `GET /` and now surfaces runtime/provider health from runtime-owned diagnostics contracts |
 | Workspace Substrate | Completed | `audit-workspace`, `init-workspace`, and `update-workspace` now return explicit preview/apply contracts, machine-readable action plans/diff stats, approval-friendly payloads, and `*.bootstrap` review-copy behavior without owning product policy |
 | Delivery Primitives | Completed | Runtime-owned delivery audit, artifact publish/export, repo status, commit, push, and normalized preview-surface metadata are now available over both HTTP routes and local tools |
-| Browser Preview Substrate | Completed | Runtime-owned browser driver/session/page contracts, `browser_page` preview surfaces, manual driver validation, restart-safe browser state persistence, additive `/browser/*` routes, session/history/observe inspection integration, aggregate browser summary/cleanup seams, and reset/delete cleanup for runtime-bound browser sessions now exist without depending on sibling browser projects |
+| Browser Preview Substrate | Completed | Runtime-owned browser driver/session/page contracts, `browser_page` preview surfaces, manual driver validation, restart-safe browser state persistence, additive `/browser/*` routes, session/history/observe inspection integration, aggregate browser summary/cleanup seams, background closed-session maintenance, and reset/delete cleanup for runtime-bound browser sessions now exist without depending on sibling browser projects |
 | Tests | Completed | Vitest covers provider, discovery, pool, HTTP, delivery, server bootstrap, API/local tool-loop behavior, and first-slice metering/guardrail/progress normalization |
 | Docs | In Progress | Core docs now cover startup/diagnostics, provider compatibility/evidence flows, model catalog, session branching, worktree-backed session isolation and cleanup, workspace substrate, runtime hydration/re-entry metadata, delivery primitives, the browser preview substrate, runtime-managed skills plus the internal skill-library taxonomy/metadata contract, the scheduled wakeup substrate, first-slice metering/progress contracts, additive session inspection/run-state/maintenance payloads including sanitized persisted maintenance requests plus generic maintenance follow-through outcomes, and the runtime MCP facade over HTTP plus stdio; browser-driver follow-through and later PLAN-003 or PLAN-005 follow-on items still need ongoing updates |
 | Follow-ups | Completed | Accepted post-review findings for provider-instance rollout were implemented and recorded in `docs/plans/PLAN-002-provider-instance-review-followups.md` |
@@ -62,7 +62,7 @@
 
 #### Remaining Items
 
-- [ ] Deepen provider health probes beyond the current readiness summary/light checks, especially for API/local transports and Ollama model discovery
+- [ ] Deepen provider health probes beyond the current readiness summary and endpoint reachability probes, especially richer API/local auth/model semantics and Ollama model discovery
 - [ ] Harden shared local tool runtime safety beyond the current symlink/junction/hardlink alias guards, especially more atomic multi-file mutation behavior
 - [ ] Expand the shared local tool runtime beyond the current filesystem/shell set into richer navigation/materialization helpers
 - [ ] Refine capability partitioning and policy surfacing beyond the current `standard` / `extended` / `read_only` tool-profile split
@@ -125,7 +125,7 @@ dashboard integration intact.
 | Support API/local session create, message, close, resume, and fork | [x] | Session lifecycle is runtime-managed across CLI and API backends |
 | Add shared local tool runtime for API/local sessions | [x] | `list_files`, `read_file`, `write_file`, `edit_file`, `apply_patch`, `grep`, `glob`, and `run_shell` are enforced centrally, with extended `delete_file` / `rename_file` / `copy_file` support behind the opt-in profile |
 | Cover API/local behavior with automated tests | [x] | Transport, tool runtime, and end-to-end HTTP flows are under Vitest |
-| Add provider health probes and dashboard health surfacing | [x] | First slice now exposes `/diagnostics/health`, richer `/health`/`/diagnostics/runtime` contracts, and dashboard header health polling; deeper transport-native live probes remain |
+| Add provider health probes and dashboard health surfacing | [x] | First slice now exposes `/diagnostics/health`, richer `/health`/`/diagnostics/runtime` contracts, dashboard header health polling, and bounded live endpoint probes for API/local targets; deeper transport-native semantic probes remain |
 | Add provider-specific caching/continuation optimizations | [x] | OpenAI `previous_response_id`, Anthropic prompt caching, and Gemini context caching are in place |
 | Stabilize provider model catalog/discovery contract | [x] | `GET /providers/{provider}/models` now documents and tests cache, fallback, error-code, and Ollama running-model semantics |
 | Normalize first provider-agnostic API/local progress events | [x] | API/local sessions now emit additive `progress` events for continuation/cache lifecycle and Ollama warm-state hints |
@@ -325,7 +325,7 @@ product policy.
 #### Deferred Boundaries
 
 - [ ] No full packaged onboarding or provider installation wizard in runtime
-- [ ] No broad live health probes for every API/local transport yet; the first slice is still mostly light checks plus adapter-supported live probes
+- [ ] No deep semantic live health probes for every API/local transport yet; the first slice adds endpoint reachability but does not validate auth/model behavior for every remote target
 - [ ] No atomic multi-file rollback for shared local-tool writes or patch application yet
 
 ### WP-9: Runtime-Managed Skills v0
@@ -608,8 +608,8 @@ full BrowserOS product or depending on sibling browser projects.
 #### Deferred Boundaries
 
 - [ ] No real Playwright/CDP/BrowserOS driver yet; the first slice validates contracts with a manual driver only
-- [ ] No automatic background expiry/GC yet; persistence currently relies on explicit cleanup routes plus capacity-pressure pruning
-- [ ] No automatic background expiry/GC yet; cleanup is explicit plus capacity-pressure pruning only
+- [ ] No real Playwright/CDP/BrowserOS driver yet; the first slice still validates contracts with a manual driver only
+- [ ] No richer retained-session/browser-page GC policy yet beyond closed-session TTL sweeps plus explicit cleanup routes
 - [ ] No product-side preview UI or browser takeover workflow yet
 
 ### WP-17: Worktree Isolation Execution Layer
@@ -633,9 +633,11 @@ into `cats-runtime`.
 | Freeze additive workspace isolation metadata in runtime session contracts | [x] | Session payloads, hydration metadata, registry persistence, and workspace grouping now retain `workspaceIsolation` and `hydration.workspace.isolationMode` |
 | Wire worktree preparation into create/resume/fork | [x] | `POST /sessions`, `POST /sessions/{id}/resume`, and `POST /sessions/{id}/fork` now prepare or recreate worktree-backed runtime cwd state before spawn |
 | Wire worktree cleanup into reset/delete | [x] | `POST /sessions/{id}/reset` and `DELETE /sessions/{id}` now support `worktreeCleanupPolicy: "discard" | "merge" | "preserve"` plus retained cleanup responses |
-| Add bounded retained cleanup retry route | [x] | `POST /sessions/{id}/workspace/cleanup` plus MCP `cleanup_session_workspace` now retry retained worktree cleanup and refresh persisted hydration/skill delivery state without replaying reset/delete side effects |
+| Add bounded retained cleanup retry route | [x] | `POST /sessions/{id}/workspace/cleanup` plus MCP `cleanup_session_workspace` now retry retained worktree cleanup, refresh persisted hydration/skill delivery state, and auto-settle retained reset follow-through when cleanup finally succeeds |
 | Return explicit retry cleanup path for retained lifecycle responses | [x] | Retained worktree-backed `reset`/`delete` responses now include `retryCleanupPath`, and the same next-hop path propagates through MCP payloads so orchestrators can call the bounded cleanup retry seam directly |
 | Surface cleanup retry path through session inspection | [x] | `inspection.maintenance.cleanup` now advertises `retryCleanupPath` when a closed worktree session is actually ready for bounded cleanup retry, so later `GET /sessions` reads preserve the same next hop |
+| Sweep orphaned worktrees and surface retained TTL diagnostics | [x] | Runtime worktree maintenance now removes orphaned worktrees in the background and reports retained-session expiry candidates through `/diagnostics/runtime` |
+| Surface large fork snapshot warnings | [x] | Non-shared fork copies now record copied file/byte counts plus additive large-workspace warning codes under hydration metadata |
 | Extend MCP session lifecycle controls for recovery flows | [x] | MCP now exposes `close_session`, `reset_session`, `delete_session`, and `cleanup_session_workspace`, so orchestrators can drive close/reset/delete/retry cleanup flows without dropping back to bespoke HTTP calls |
 | Leave additive pre-reset / pre-compaction / pre-flush hook seams | [x] | Session maintenance now advertises `pre_flush` alongside the existing Team 3 memory-flush seam instead of hard-coding a product memory pipeline |
 | Cover lifecycle behavior with automated tests | [x] | Vitest now covers worktree preparation, merge/discard cleanup, resume re-prepare, registry persistence, and route-level worktree flows |
@@ -643,9 +645,10 @@ into `cats-runtime`.
 
 #### Deferred Boundaries
 
-- [ ] No background garbage collector for abandoned worktrees yet; cleanup still runs at explicit reset/delete or operator-invoked retry boundaries
+- [ ] No automatic retained-worktree GC yet; background maintenance now sweeps orphans and reports TTL-expired retained sessions, but preserved worktrees are not deleted automatically
 - [ ] No automatic dirty-source merge resolution; `merge` intentionally retains the session/worktree when the source repo is already dirty
-- [ ] No generalized two-way workspace sync beyond the current fork-time snapshot copy for non-shared child workspaces
+- [ ] No retained delete auto-settlement yet after bounded cleanup succeeds
+- [ ] No generalized two-way workspace sync beyond the current fork-time snapshot copy plus additive large-workspace warnings for non-shared child workspaces
 
 #### Verification
 

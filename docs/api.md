@@ -243,6 +243,9 @@ integrate against:
 - supported shutdown signals/reasons
 - listener and local-state path resolution, including the compatibility
   evidence directory
+- runtime maintenance snapshots under `runtime.maintenance`, including:
+  - `worktrees`: orphan-sweep results plus retained-session TTL diagnostics
+  - `browser`: closed-session browser cleanup policy plus the last sweep result
 - full `metering` state:
   - `summary`: aggregate status/counts
   - `usage`: totals plus `byProviderInstance` / `bySession`
@@ -292,7 +295,11 @@ surface for hosts and dashboards. The response includes:
 `GET /diagnostics/providers?probe=live` enables live probes where the current
 runtime backend supports them. For CLI targets this now validates the runtime
 execution flags that `cats-runtime` actually uses when a family profile defines
-a safe live probe; API/local targets still report light diagnostics only.
+a safe live probe; API/local targets with configured endpoints now also perform
+bounded GET reachability probes and expose additive `config.liveProbe`
+metadata. Ollama probes use `/api/tags` against the configured base URL.
+Successful HTTP reachability yields `endpoint_reachable`; network/timeout
+failures yield `endpoint_probe_failed`.
 `force=1|true|refresh` can be combined with either probe mode to bypass the CLI
 compatibility cache after a provider install or upgrade.
 
@@ -352,6 +359,8 @@ first slice is intentionally lightweight:
   the contract for future Playwright/CDP/BrowserOS-style drivers
 - browser session/page state now persists under the runtime data dir so browser
   inspection and cleanup routes survive process restart for the current driver
+- background runtime maintenance now expires closed browser sessions on a TTL
+  instead of relying only on explicit operator cleanup
 - page bindings may be direct (`url`/`path`) or may bind to an existing runtime
   session `service` / `artifact`
 
@@ -397,6 +406,10 @@ Browser session responses include:
   cleanup candidates
 - `POST /browser/sessions/cleanup`: explicit maintenance route for deleting
   closed browser sessions without waiting for capacity-pressure pruning
+
+Browser maintenance state is also visible under `GET /diagnostics/runtime` as
+`runtime.maintenance.browser`, so hosts can inspect the active TTL policy and
+last sweep result without calling the browser routes directly.
 
 `GET /browser/sessions` now also accepts optional `status=ready|closed`.
 
@@ -1324,6 +1337,12 @@ When the parent session is already worktree-backed, child forks default to
 `workspaceIsolation: "worktree"` unless the caller explicitly requests a
 different isolation mode such as `isolated`.
 
+When a non-shared child fork copies a workspace snapshot, the runtime now also
+records additive `hydration.metadata.workspaceSnapshot` facts such as
+`copiedFileCount`, `copiedByteCount`, `skippedGitMetadata`, `status`, and
+optional `warningCodes` (for example `large_file_count` or `large_byte_count`)
+so hosts can tell when fork-time copying touched a large repo.
+
 `mode: "auto"` prefers `native_fork` when the child target is compatible with
 the parent provider/backend/instance/workspace and the underlying provider
 supports native fork semantics. Otherwise it falls back to
@@ -1757,11 +1776,18 @@ retained policy. Responses always include:
 - `cleanupPath`: the stable retry route path so hosts do not have to rebuild it
 
 Unlike replaying `reset` or `delete`, this route only retries workspace
-cleanup. It does not clear provider resume state, clear browser sessions, or
-delete the logical session record for you. When cleanup changes the runtime cwd
-or worktree metadata, the runtime also refreshes persisted hydration/skill
-delivery state so `cwd`, `workspaceIsolation`, and `hydration.workspace`
-continue to agree afterward.
+cleanup. For retained deletes, it still does not delete the logical session
+record for you. When cleanup changes the runtime cwd or worktree metadata, the
+runtime also refreshes persisted hydration/skill delivery state so `cwd`,
+`workspaceIsolation`, and `hydration.workspace` continue to agree afterward.
+If the most recent retained lifecycle was a `reset`, a successful cleanup retry
+also auto-settles the rest of that reset follow-through, including provider
+resume/provider-state clearing, hydration clearing, wakeup clearing, and
+runtime-bound browser-session cleanup. Those responses include:
+
+- `settledLifecycle.action: "reset"`
+- `settledLifecycle.status: "completed"`
+- `settledLifecycle.cleanup`
 
 When `POST /sessions/{id}/reset` or `DELETE /sessions/{id}` returns
 `status: "retained"` because a worktree cleanup could not finish safely, the

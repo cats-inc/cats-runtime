@@ -329,6 +329,141 @@ describe('provider diagnostics HTTP contract', () => {
     }));
   });
 
+  it('runs live endpoint probes for API and local targets when requested', async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+      if (url === 'https://api.anthropic.test/v1') {
+        return new Response('', { status: 401 });
+      }
+      if (url === 'http://127.0.0.1:11434/api/tags') {
+        return new Response(JSON.stringify({ models: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`Unexpected live probe URL: ${url}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const app = createTestApp(makeConfig({
+        providerDefaultTargets: {
+          claude: { backend: 'api', instance: 'sonnet' },
+          ollama: { backend: 'local', instance: 'local' },
+        },
+        remoteProviderCatalog: {
+          api: {
+            claude: {
+              sonnet: {
+                id: 'sonnet',
+                providerName: 'claude',
+                backend: 'api',
+                transport: 'anthropic',
+                baseUrl: 'https://api.anthropic.test/v1',
+                apiKeyEnv: 'ANTHROPIC_API_KEY',
+                model: 'claude-sonnet-4-5',
+              },
+            },
+          },
+          local: {
+            ollama: {
+              local: {
+                id: 'local',
+                providerName: 'ollama',
+                backend: 'local',
+                transport: 'ollama',
+                baseUrl: 'http://127.0.0.1:11434',
+                model: 'qwen2.5-coder:7b',
+              },
+            },
+          },
+          agent: {},
+        },
+      }));
+
+      const apiResponse = await app.request(
+        '/diagnostics/providers?probe=live&provider=claude&backend=api&instance=sonnet',
+      );
+      expect(apiResponse.status).toBe(200);
+      await expect(apiResponse.json()).resolves.toEqual(expect.objectContaining({
+        providers: [
+          expect.objectContaining({
+            provider: 'claude',
+            backend: 'api',
+            instance: 'sonnet',
+            availability: expect.objectContaining({
+              probe: 'live',
+            }),
+            checks: expect.arrayContaining([
+              expect.objectContaining({
+                code: 'api_key_present',
+                status: 'unavailable',
+              }),
+              expect.objectContaining({
+                code: 'endpoint_reachable',
+                status: 'ok',
+                details: expect.objectContaining({
+                  url: 'https://api.anthropic.test/v1',
+                  statusCode: 401,
+                }),
+              }),
+            ]),
+            config: expect.objectContaining({
+              liveProbe: expect.objectContaining({
+                url: 'https://api.anthropic.test/v1',
+                reachable: true,
+                statusCode: 401,
+              }),
+            }),
+            reprobe: expect.objectContaining({
+              liveSupported: true,
+            }),
+          }),
+        ],
+      }));
+
+      const localResponse = await app.request(
+        '/diagnostics/providers?probe=live&provider=ollama&backend=local&instance=local',
+      );
+      expect(localResponse.status).toBe(200);
+      await expect(localResponse.json()).resolves.toEqual(expect.objectContaining({
+        providers: [
+          expect.objectContaining({
+            provider: 'ollama',
+            backend: 'local',
+            instance: 'local',
+            checks: expect.arrayContaining([
+              expect.objectContaining({
+                code: 'endpoint_reachable',
+                status: 'ok',
+                details: expect.objectContaining({
+                  url: 'http://127.0.0.1:11434/api/tags',
+                  statusCode: 200,
+                }),
+              }),
+            ]),
+            config: expect.objectContaining({
+              liveProbe: expect.objectContaining({
+                url: 'http://127.0.0.1:11434/api/tags',
+                reachable: true,
+                statusCode: 200,
+              }),
+            }),
+            reprobe: expect.objectContaining({
+              liveSupported: true,
+            }),
+          }),
+        ],
+      }));
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('returns 400 for invalid provider diagnostics query filters', async () => {
     const app = createTestApp();
 

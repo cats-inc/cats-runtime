@@ -5,6 +5,7 @@ import {
   copyFile,
   mkdir,
   readdir,
+  readFile,
   rename,
   rm,
   stat,
@@ -76,6 +77,18 @@ export interface CleanupSessionWorkspaceResult {
   policy?: WorktreeCleanupPolicy;
   nextCwd?: string;
   nextWorkspaceIsolation?: SessionWorkspaceIsolationState;
+}
+
+export interface CopyWorkspaceSnapshotResult {
+  copiedFileCount: number;
+  copiedByteCount: number;
+  skippedGitMetadata: boolean;
+}
+
+export interface CleanupOrphanedWorktreeResult {
+  removed: boolean;
+  reasonCodes: string[];
+  sourceRepoRoot?: string;
 }
 
 export async function prepareSessionWorkspace(
@@ -215,14 +228,20 @@ export async function copyWorkspaceSnapshot(
   options: {
     skipGitMetadata?: boolean;
   } = {},
-): Promise<void> {
+): Promise<CopyWorkspaceSnapshotResult> {
   if (!(await pathExists(sourceCwd))) {
-    return;
+    return {
+      copiedFileCount: 0,
+      copiedByteCount: 0,
+      skippedGitMetadata: Boolean(options.skipGitMetadata),
+    };
   }
 
   const queue: Array<{ source: string; target: string }> = [
     { source: sourceCwd, target: targetCwd },
   ];
+  let copiedFileCount = 0;
+  let copiedByteCount = 0;
 
   while (queue.length > 0) {
     const current = queue.pop()!;
@@ -245,7 +264,58 @@ export async function copyWorkspaceSnapshot(
 
       await mkdir(dirname(targetPath), { recursive: true });
       await copyFile(sourcePath, targetPath);
+      const sourceStats = await stat(sourcePath);
+      copiedFileCount += 1;
+      copiedByteCount += sourceStats.size;
     }
+  }
+
+  return {
+    copiedFileCount,
+    copiedByteCount,
+    skippedGitMetadata: Boolean(options.skipGitMetadata),
+  };
+}
+
+export async function cleanupOrphanedWorktree(
+  worktreePath: string,
+): Promise<CleanupOrphanedWorktreeResult> {
+  if (!(await pathExists(worktreePath))) {
+    return {
+      removed: true,
+      reasonCodes: ['worktree_missing'],
+    };
+  }
+
+  const sourceRepoRoot = await resolveWorktreeSourceRepoRoot(worktreePath);
+  if (sourceRepoRoot) {
+    const detached = await detachWorktree(sourceRepoRoot, worktreePath);
+    if (detached) {
+      return {
+        removed: true,
+        reasonCodes: ['orphaned_worktree_detached'],
+        sourceRepoRoot,
+      };
+    }
+  }
+
+  try {
+    await rm(worktreePath, { recursive: true, force: true });
+    return {
+      removed: true,
+      reasonCodes: sourceRepoRoot
+        ? ['orphaned_worktree_removed_after_detach_failed']
+        : ['orphaned_worktree_removed_without_repo_metadata'],
+      ...(sourceRepoRoot ? { sourceRepoRoot } : {}),
+    };
+  } catch {
+    return {
+      removed: false,
+      reasonCodes: sourceRepoRoot
+        ? ['orphaned_worktree_cleanup_failed']
+        : ['orphaned_worktree_cleanup_failed_without_repo_metadata'],
+      ...(sourceRepoRoot ? { sourceRepoRoot } : {}),
+    };
   }
 }
 
@@ -470,6 +540,40 @@ async function readGitValue(cwd: string, args: string[]): Promise<string | undef
   }
   const value = result.stdout.trim();
   return value.length > 0 ? value : undefined;
+}
+
+async function resolveWorktreeSourceRepoRoot(
+  worktreePath: string,
+): Promise<string | undefined> {
+  const commonDir = await readGitValue(worktreePath, ['rev-parse', '--git-common-dir']);
+  if (commonDir) {
+    const resolvedCommonDir = resolve(worktreePath, commonDir);
+    if (basename(resolvedCommonDir).toLowerCase() === '.git') {
+      return dirname(resolvedCommonDir);
+    }
+  }
+
+  const gitFilePath = join(worktreePath, '.git');
+  if (!(await pathExists(gitFilePath))) {
+    return undefined;
+  }
+
+  try {
+    const raw = await readFile(gitFilePath, 'utf8');
+    const match = raw.match(/gitdir:\s*(.+)\s*$/i);
+    if (!match?.[1]) {
+      return undefined;
+    }
+    const resolvedGitDir = resolve(worktreePath, match[1].trim());
+    const normalizedGitDir = resolvedGitDir.replace(/\\/g, '/');
+    const worktreesMarker = normalizedGitDir.lastIndexOf('/.git/worktrees/');
+    if (worktreesMarker < 0) {
+      return undefined;
+    }
+    return resolvedGitDir.slice(0, worktreesMarker);
+  } catch {
+    return undefined;
+  }
 }
 
 async function sourceRepoIsClean(sourceRepoRoot: string): Promise<boolean> {
