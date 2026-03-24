@@ -644,6 +644,16 @@ function buildWorkspaceSnapshotMetadata(
       copiedByteCount: snapshot.copiedByteCount,
       skippedGitMetadata: snapshot.skippedGitMetadata,
       status: warningCodes.length > 0 ? 'large' : 'captured',
+      plan: {
+        strategy: 'one_shot_snapshot',
+        boundedSyncAvailable: false,
+        readiness: warningCodes.length > 0 ? 'follow_up_required' : 'snapshot_ok',
+        nextAction: warningCodes.length > 0 ? 'prefer_shared_or_worktree' : 'none',
+        thresholds: {
+          fileWarningCount: LARGE_WORKSPACE_SNAPSHOT_FILE_WARNING_THRESHOLD,
+          byteWarningCount: LARGE_WORKSPACE_SNAPSHOT_BYTE_WARNING_THRESHOLD,
+        },
+      },
       ...(warningCodes.length > 0 ? { warningCodes } : {}),
     },
   };
@@ -829,6 +839,64 @@ async function prepareWorkspaceCleanupState(
   });
 }
 
+class RetainedWorktreeCleanupHydrationError extends Error {
+  constructor(
+    message: string,
+    readonly cleanup: Awaited<ReturnType<typeof cleanupSessionWorkspace>>,
+  ) {
+    super(message);
+    this.name = 'RetainedWorktreeCleanupHydrationError';
+  }
+}
+
+export async function executeRetainedWorktreeCleanup(
+  ctx: AppContext,
+  session: SessionInfo,
+  options: {
+    worktreeCleanupPolicy?: WorktreeCleanupPolicy;
+    rehydratePersistedState?: boolean;
+  } = {},
+): Promise<{
+    cleanup: Awaited<ReturnType<typeof cleanupSessionWorkspace>>;
+    sessionAfterCleanup: SessionInfo;
+    settledReset?: Awaited<ReturnType<typeof settleRetainedResetAfterCleanup>>;
+    settledDelete?: Awaited<ReturnType<typeof settleRetainedDeleteAfterCleanup>>;
+  }> {
+  const cleanup = await prepareWorkspaceCleanupState(
+    session,
+    options.worktreeCleanupPolicy,
+    ctx,
+  );
+  let sessionAfterCleanup = persistWorkspaceCleanupState(ctx, session.id, cleanup) ?? session;
+  if (
+    options.rehydratePersistedState !== false
+    && (cleanup.nextCwd !== undefined || cleanup.nextWorkspaceIsolation !== undefined)
+  ) {
+    try {
+      sessionAfterCleanup = await rehydratePersistedSessionState(ctx, sessionAfterCleanup);
+    } catch (error) {
+      throw new RetainedWorktreeCleanupHydrationError(
+        `Retained worktree cleanup changed workspace state but failed to refresh hydration: ${error}`,
+        cleanup,
+      );
+    }
+  }
+
+  const settledReset = cleanup.status === 'completed'
+    ? await settleRetainedResetAfterCleanup(ctx, sessionAfterCleanup, cleanup)
+    : undefined;
+  const settledDelete = cleanup.status === 'completed'
+    ? await settleRetainedDeleteAfterCleanup(ctx, sessionAfterCleanup, cleanup)
+    : undefined;
+
+  return {
+    cleanup,
+    sessionAfterCleanup,
+    ...(settledReset ? { settledReset } : {}),
+    ...(settledDelete ? { settledDelete } : {}),
+  };
+}
+
 async function discardPreparedWorkspace(
   ctx: AppContext,
   session: Pick<SessionInfo, 'id' | 'workspaceMode' | 'workspaceIsolation'>,
@@ -910,6 +978,203 @@ async function settleRetainedResetAfterCleanup(
     maintenance: serialized.inspection.maintenance,
     session: serialized,
   };
+}
+
+async function finalizeDeleteAfterWorkspaceCleanup(
+  ctx: AppContext,
+  session: SessionInfo,
+  input: {
+    workspaceCleaned: boolean;
+    worktreeDetached?: boolean;
+    resolvedCleanupPolicy?: WorktreeCleanupPolicy;
+    worktreeMergedPaths?: number;
+  },
+): Promise<{
+    status: 'deleted' | 'retained';
+    hadTranscript: boolean;
+    fileDeleted: boolean;
+    nativeDeleted: boolean;
+    maintenance: ReturnType<typeof recordSessionLifecycle>;
+    session?: ReturnType<typeof serializeSession>;
+    reason?: string;
+  }> {
+  const runtime = getRuntimeSessionManager(ctx);
+  const id = session.id;
+  const hasNativeSessionState = tracksNativeSessionState(session);
+  const hasProviderDiscoveryState = tracksProviderDiscoveryState(session);
+  const workerDetached = !runtime.isAttached(id);
+
+  const preparedManagedTranscripts = ctx.registry.prepareManagedTranscriptDeletion(id);
+  const preparedProviderDiscovery = prepareProviderDiscoveryDeletion(ctx, session);
+  const hadTranscript = preparedManagedTranscripts.hadFiles
+    || preparedProviderDiscovery.hadFiles
+    || hasNativeSessionState
+    || hasProviderDiscoveryState;
+
+  if (!preparedManagedTranscripts.ready || !preparedProviderDiscovery.ready) {
+    preparedManagedTranscripts.rollback();
+    preparedProviderDiscovery.rollback();
+    const maintenance = recordSessionLifecycle(ctx, id, {
+      action: 'delete',
+      boundary: 'permanent_delete',
+      status: 'retained',
+      reasonCodes: ['cleanup_staging_failed'],
+      cleanup: {
+        workerDetached,
+        workspaceCleaned: input.workspaceCleaned,
+        ...(input.worktreeDetached !== undefined ? { worktreeDetached: input.worktreeDetached } : {}),
+        ...(input.resolvedCleanupPolicy
+          ? { worktreeCleanupPolicy: input.resolvedCleanupPolicy }
+          : {}),
+        ...(input.worktreeMergedPaths !== undefined
+          ? { worktreeMergedPaths: input.worktreeMergedPaths }
+          : {}),
+      },
+    });
+    return {
+      status: 'retained',
+      hadTranscript,
+      fileDeleted: false,
+      nativeDeleted: false,
+      reason: 'Session files are locked or in use. Nothing was removed.',
+      maintenance,
+      session: serializeSession(ctx, ctx.registry.get(id) ?? session),
+    };
+  }
+
+  let nativeDeleted: NativeCleanupResult = false;
+  try {
+    if (hasNativeSessionState) {
+      nativeDeleted = await deleteNativeSessionState(ctx, session);
+    }
+  } catch (error) {
+    preparedManagedTranscripts.rollback();
+    preparedProviderDiscovery.rollback();
+    throw new Error(`Failed to delete native ${session.providerName} session: ${error}`);
+  }
+
+  let providerDiscoveryDeleted = false;
+  try {
+    if (hasProviderDiscoveryState) {
+      providerDiscoveryDeleted = await verifyProviderDiscoveryStateDeleted(ctx, session);
+    }
+  } catch (error) {
+    preparedManagedTranscripts.rollback();
+    preparedProviderDiscovery.rollback();
+    throw new Error(`Failed to verify ${session.providerName} discovery cleanup: ${error}`);
+  }
+
+  const nativeCleanupSucceeded = !hasNativeSessionState
+    || nativeDeleted === true
+    || nativeDeleted === 'stale_config';
+  const providerDiscoveryCleanupSucceeded = !hasProviderDiscoveryState || providerDiscoveryDeleted;
+  if (!nativeCleanupSucceeded || !providerDiscoveryCleanupSucceeded) {
+    preparedManagedTranscripts.rollback();
+    preparedProviderDiscovery.rollback();
+    const maintenance = recordSessionLifecycle(ctx, id, {
+      action: 'delete',
+      boundary: 'permanent_delete',
+      status: 'retained',
+      reasonCodes: ['cleanup_verification_failed'],
+      cleanup: {
+        workerDetached,
+        workspaceCleaned: input.workspaceCleaned,
+        ...(input.worktreeDetached !== undefined ? { worktreeDetached: input.worktreeDetached } : {}),
+        ...(input.resolvedCleanupPolicy
+          ? { worktreeCleanupPolicy: input.resolvedCleanupPolicy }
+          : {}),
+        ...(input.worktreeMergedPaths !== undefined
+          ? { worktreeMergedPaths: input.worktreeMergedPaths }
+          : {}),
+      },
+    });
+    return {
+      status: 'retained',
+      hadTranscript,
+      fileDeleted: false,
+      nativeDeleted: false,
+      reason: 'Session cleanup could not be verified. Nothing was removed.',
+      maintenance,
+      session: serializeSession(ctx, ctx.registry.get(id) ?? session),
+    };
+  }
+
+  const worker = runtime.get(id);
+  if (worker?.active) {
+    try {
+      await runtime.close(session, 'delete');
+      ctx.registry.updateStatus(id, 'closed');
+    } catch (error) {
+      preparedManagedTranscripts.rollback();
+      preparedProviderDiscovery.rollback();
+      throw new Error(`Failed to close session before delete: ${error}`);
+    }
+  }
+
+  let browserSessionsCleared = 0;
+  try {
+    browserSessionsCleared = await clearBrowserSessionsForRuntimeSession(ctx, id);
+  } catch (error) {
+    preparedManagedTranscripts.rollback();
+    preparedProviderDiscovery.rollback();
+    throw new Error(`Failed to clear browser sessions before delete: ${error}`);
+  }
+
+  const managedDeletion = preparedManagedTranscripts.finalize();
+  const providerDeletion = preparedProviderDiscovery.finalize();
+  const wakeupResult = ctx.wakeup?.clearSession(id);
+  const maintenance = recordSessionLifecycle(ctx, id, {
+    action: 'delete',
+    boundary: 'permanent_delete',
+    status: 'completed',
+    reasonCodes: ['session_deleted'],
+    cleanup: buildDeleteCleanupSummary({
+      workerDetached: !runtime.isAttached(id),
+      wakeupsCleared: (wakeupResult?.removedCount ?? 0) > 0,
+      browserSessionsCleared,
+      workspaceCleaned: input.workspaceCleaned,
+      ...(input.worktreeDetached !== undefined ? { worktreeDetached: input.worktreeDetached } : {}),
+      ...(input.resolvedCleanupPolicy
+        ? { worktreeCleanupPolicy: input.resolvedCleanupPolicy }
+        : {}),
+      ...(input.worktreeMergedPaths !== undefined
+        ? { worktreeMergedPaths: input.worktreeMergedPaths }
+        : {}),
+      managedTranscriptDeleted: managedDeletion.fileDeleted,
+      providerDiscoveryCleared: providerDeletion.fileDeleted || providerDiscoveryDeleted,
+      registryDropped: true,
+    }),
+    clearExecutionState: true,
+  });
+  ctx.registry.unregister(id);
+  runtime.dropSession(id);
+  ctx.registry.flush();
+
+  return {
+    status: 'deleted',
+    hadTranscript,
+    fileDeleted: managedDeletion.fileDeleted || providerDeletion.fileDeleted,
+    nativeDeleted: hasNativeSessionState ? nativeDeleted === true : false,
+    maintenance,
+  };
+}
+
+async function settleRetainedDeleteAfterCleanup(
+  ctx: AppContext,
+  session: SessionInfo,
+  cleanup: Awaited<ReturnType<typeof cleanupSessionWorkspace>>,
+): Promise<Awaited<ReturnType<typeof finalizeDeleteAfterWorkspaceCleanup>> | undefined> {
+  const lastLifecycle = session.maintenanceState?.lastLifecycle;
+  if (!lastLifecycle || lastLifecycle.action !== 'delete' || lastLifecycle.status !== 'retained') {
+    return undefined;
+  }
+
+  return finalizeDeleteAfterWorkspaceCleanup(ctx, session, {
+    workspaceCleaned: cleanup.workspaceCleaned,
+    worktreeDetached: cleanup.worktreeDetached,
+    resolvedCleanupPolicy: cleanup.policy,
+    worktreeMergedPaths: cleanup.mergedPathCount,
+  });
 }
 
 function describeRetainedWorktreeCleanup(
@@ -2353,34 +2618,39 @@ sessionRoutes.post('/sessions/:id/workspace/cleanup', async (c) => {
     );
   }
 
-  const cleanup = await prepareWorkspaceCleanupState(
-    session,
-    worktreeCleanupPolicy,
-    ctx,
-  );
-  let sessionAfterCleanup = persistWorkspaceCleanupState(ctx, id, cleanup) ?? session;
-  if (cleanup.nextCwd !== undefined || cleanup.nextWorkspaceIsolation !== undefined) {
-    try {
-      sessionAfterCleanup = await rehydratePersistedSessionState(ctx, sessionAfterCleanup);
-    } catch (error) {
+  let cleanupResult: Awaited<ReturnType<typeof executeRetainedWorktreeCleanup>>;
+  try {
+    cleanupResult = await executeRetainedWorktreeCleanup(ctx, session, {
+      worktreeCleanupPolicy,
+    });
+  } catch (error) {
+    if (error instanceof RetainedWorktreeCleanupHydrationError) {
       return c.json({
-        error: `Retained worktree cleanup changed workspace state but failed to refresh hydration: ${error}`,
+        error: error.message,
         action: 'cleanup_workspace',
-        status: cleanup.status,
-        reasonCodes: [...cleanup.reasonCodes],
+        status: error.cleanup.status,
+        reasonCodes: [...error.cleanup.reasonCodes],
         cleanup: {
-          workspaceCleaned: cleanup.workspaceCleaned,
-          worktreeDetached: cleanup.worktreeDetached,
-          ...(cleanup.policy ? { worktreeCleanupPolicy: cleanup.policy } : {}),
-          worktreeMergedPaths: cleanup.mergedPathCount,
+          workspaceCleaned: error.cleanup.workspaceCleaned,
+          worktreeDetached: error.cleanup.worktreeDetached,
+          ...(error.cleanup.policy ? { worktreeCleanupPolicy: error.cleanup.policy } : {}),
+          worktreeMergedPaths: error.cleanup.mergedPathCount,
         },
       }, 500);
     }
+    throw error;
   }
-  const settledReset = cleanup.status === 'completed'
-    ? await settleRetainedResetAfterCleanup(ctx, sessionAfterCleanup, cleanup)
-    : undefined;
-  const serialized = settledReset?.session ?? serializeSession(ctx, sessionAfterCleanup);
+  const { cleanup, sessionAfterCleanup, settledReset, settledDelete } = cleanupResult;
+  const serialized = settledReset?.session
+    ?? settledDelete?.session
+    ?? serializeSession(ctx, sessionAfterCleanup);
+  const maintenance = settledReset?.maintenance
+    ?? (settledDelete
+      ? {
+          cleanup: settledDelete.maintenance.cleanup,
+          lastLifecycle: settledDelete.maintenance,
+        }
+      : serialized.inspection.maintenance);
 
   return c.json({
     action: 'cleanup_workspace',
@@ -2405,8 +2675,24 @@ sessionRoutes.post('/sessions/:id/workspace/cleanup', async (c) => {
           },
         }
       : {}),
-    maintenance: settledReset?.maintenance ?? serialized.inspection.maintenance,
-    session: serialized,
+    ...(!settledReset && settledDelete
+      ? {
+          settledLifecycle: {
+            action: 'delete',
+            status: settledDelete.status === 'deleted' ? 'completed' : 'retained',
+            cleanup: settledDelete.maintenance.cleanup,
+          },
+          deleteSettlement: {
+            status: settledDelete.status,
+            hadTranscript: settledDelete.hadTranscript,
+            fileDeleted: settledDelete.fileDeleted,
+            nativeDeleted: settledDelete.nativeDeleted,
+            ...(settledDelete.reason ? { reason: settledDelete.reason } : {}),
+          },
+        }
+      : {}),
+    maintenance,
+    ...(settledDelete?.status === 'deleted' ? {} : { session: serialized }),
   });
 });
 
@@ -2715,14 +3001,10 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
     );
   }
 
-  const hasNativeSessionState = tracksNativeSessionState(session);
-  const hasProviderDiscoveryState = tracksProviderDiscoveryState(session);
-
   let workspaceCleaned = false;
   let worktreeDetached: boolean | undefined;
   let worktreeMergedPaths: number | undefined;
   let resolvedCleanupPolicy: WorktreeCleanupPolicy | undefined;
-  let browserSessionsCleared = 0;
 
   if (session.workspaceIsolation?.mode === 'worktree') {
     const worker = runtime.get(id);
@@ -2764,12 +3046,7 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
         action: 'delete',
         sessionId: id,
         status: 'retained',
-        hadTranscript: Boolean(
-          session.sourcePath
-          || session.providerSourcePath
-          || hasNativeSessionState
-          || hasProviderDiscoveryState
-        ),
+        hadTranscript: Boolean(session.sourcePath || session.providerSourcePath),
         fileDeleted: false,
         nativeDeleted: false,
         workspaceCleaned,
@@ -2783,7 +3060,7 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
       });
     }
   } else if (session.workspaceMode === 'isolated') {
-    workspaceCleaned = (await cleanupSessionWorkspace({
+      workspaceCleaned = (await cleanupSessionWorkspace({
       sessionId: id,
       sessionBaseDir: ctx.config.sessionBaseDir,
       workspaceMode: session.workspaceMode,
@@ -2791,148 +3068,45 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
     })).workspaceCleaned;
   }
 
-  const preparedManagedTranscripts = ctx.registry.prepareManagedTranscriptDeletion(id);
-  const preparedProviderDiscovery = prepareProviderDiscoveryDeletion(ctx, session);
-  const hadTranscript = preparedManagedTranscripts.hadFiles
-    || preparedProviderDiscovery.hadFiles
-    || hasNativeSessionState
-    || hasProviderDiscoveryState;
 
-  if (!preparedManagedTranscripts.ready || !preparedProviderDiscovery.ready) {
-    preparedManagedTranscripts.rollback();
-    preparedProviderDiscovery.rollback();
-    const maintenance = recordSessionLifecycle(ctx, id, {
-      action: 'delete',
-      boundary: 'permanent_delete',
-      status: 'retained',
-      reasonCodes: ['cleanup_staging_failed'],
-      cleanup: {
-        workerDetached: !runtime.isAttached(id),
-        workspaceCleaned,
-        ...(worktreeDetached !== undefined ? { worktreeDetached } : {}),
-        ...(resolvedCleanupPolicy ? { worktreeCleanupPolicy: resolvedCleanupPolicy } : {}),
-        ...(worktreeMergedPaths !== undefined ? { worktreeMergedPaths } : {}),
-      },
-    });
-    return c.json({
-      status: 'retained',
-      hadTranscript,
-      fileDeleted: false,
-      nativeDeleted: false,
-      reason: 'Session files are locked or in use. Nothing was removed.',
-      maintenance,
-    });
-  }
-
-  let nativeDeleted: NativeCleanupResult = false;
+  let finalizedDelete: Awaited<ReturnType<typeof finalizeDeleteAfterWorkspaceCleanup>>;
   try {
-    if (hasNativeSessionState) {
-      nativeDeleted = await deleteNativeSessionState(ctx, session);
-    }
-  } catch (err) {
-    preparedManagedTranscripts.rollback();
-    preparedProviderDiscovery.rollback();
-    return c.json({ error: `Failed to delete native ${session.providerName} session: ${err}` }, 500);
-  }
-
-  let providerDiscoveryDeleted = false;
-  try {
-    if (hasProviderDiscoveryState) {
-      providerDiscoveryDeleted = await verifyProviderDiscoveryStateDeleted(ctx, session);
-    }
-  } catch (err) {
-    preparedManagedTranscripts.rollback();
-    preparedProviderDiscovery.rollback();
-    return c.json({
-      error: `Failed to verify ${session.providerName} discovery cleanup: ${err}`,
-    }, 500);
-  }
-
-  const nativeCleanupSucceeded = !hasNativeSessionState
-    || nativeDeleted === true
-    || nativeDeleted === 'stale_config';
-  const providerDiscoveryCleanupSucceeded = !hasProviderDiscoveryState || providerDiscoveryDeleted;
-  if (!nativeCleanupSucceeded || !providerDiscoveryCleanupSucceeded) {
-    preparedManagedTranscripts.rollback();
-    preparedProviderDiscovery.rollback();
-    const maintenance = recordSessionLifecycle(ctx, id, {
-      action: 'delete',
-      boundary: 'permanent_delete',
-      status: 'retained',
-      reasonCodes: ['cleanup_verification_failed'],
-      cleanup: {
-        workerDetached: !runtime.isAttached(id),
-        workspaceCleaned,
-        ...(worktreeDetached !== undefined ? { worktreeDetached } : {}),
-        ...(resolvedCleanupPolicy ? { worktreeCleanupPolicy: resolvedCleanupPolicy } : {}),
-        ...(worktreeMergedPaths !== undefined ? { worktreeMergedPaths } : {}),
-      },
-    });
-    return c.json({
-      status: 'retained',
-      hadTranscript,
-      fileDeleted: false,
-      nativeDeleted: false,
-      reason: 'Session cleanup could not be verified. Nothing was removed.',
-      maintenance,
-    });
-  }
-
-  const worker = runtime.get(id);
-  if (worker?.active) {
-    try {
-      await runtime.close(session, 'delete');
-      ctx.registry.updateStatus(id, 'closed');
-    } catch (err) {
-      preparedManagedTranscripts.rollback();
-      preparedProviderDiscovery.rollback();
-      return c.json({ error: `Failed to close session before delete: ${err}` }, 500);
-    }
-  }
-
-  try {
-    browserSessionsCleared = await clearBrowserSessionsForRuntimeSession(ctx, id);
-  } catch (err) {
-    preparedManagedTranscripts.rollback();
-    preparedProviderDiscovery.rollback();
-    return c.json({ error: `Failed to clear browser sessions before delete: ${err}` }, 500);
-  }
-
-  const managedDeletion = preparedManagedTranscripts.finalize();
-  const providerDeletion = preparedProviderDiscovery.finalize();
-  const wakeupResult = ctx.wakeup?.clearSession(id);
-  const maintenance = recordSessionLifecycle(ctx, id, {
-    action: 'delete',
-    boundary: 'permanent_delete',
-    status: 'completed',
-    reasonCodes: ['session_deleted'],
-    cleanup: buildDeleteCleanupSummary({
-      workerDetached: !runtime.isAttached(id),
-      wakeupsCleared: (wakeupResult?.removedCount ?? 0) > 0,
-      browserSessionsCleared,
+    finalizedDelete = await finalizeDeleteAfterWorkspaceCleanup(ctx, session, {
       workspaceCleaned,
-      ...(worktreeDetached !== undefined ? { worktreeDetached } : {}),
-      ...(resolvedCleanupPolicy ? { worktreeCleanupPolicy: resolvedCleanupPolicy } : {}),
-      ...(worktreeMergedPaths !== undefined ? { worktreeMergedPaths } : {}),
-      managedTranscriptDeleted: managedDeletion.fileDeleted,
-      providerDiscoveryCleared: providerDeletion.fileDeleted || providerDiscoveryDeleted,
-      registryDropped: true,
-    }),
-    clearExecutionState: true,
-  });
-  ctx.registry.unregister(id);
-  runtime.dropSession(id);
-  ctx.registry.flush();
+      worktreeDetached,
+      resolvedCleanupPolicy,
+      worktreeMergedPaths,
+    });
+  } catch (error) {
+    return c.json({ error: `${error}` }, 500);
+  }
+
+  if (finalizedDelete.status === 'retained') {
+    return c.json({
+      action: 'delete',
+      sessionId: id,
+      status: 'retained',
+      hadTranscript: finalizedDelete.hadTranscript,
+      fileDeleted: false,
+      nativeDeleted: false,
+      workspaceCleaned,
+      cleanup: finalizedDelete.maintenance.cleanup,
+      reason: finalizedDelete.reason,
+      maintenance: finalizedDelete.maintenance,
+      ...(finalizedDelete.session ? { session: finalizedDelete.session } : {}),
+    });
+  }
+
   return c.json({
     action: 'delete',
     sessionId: id,
     status: 'deleted',
-    hadTranscript,
-    fileDeleted: managedDeletion.fileDeleted || providerDeletion.fileDeleted,
-    nativeDeleted: hasNativeSessionState ? nativeDeleted === true : false,
+    hadTranscript: finalizedDelete.hadTranscript,
+    fileDeleted: finalizedDelete.fileDeleted,
+    nativeDeleted: finalizedDelete.nativeDeleted,
     workspaceCleaned,
-    cleanup: maintenance.cleanup,
-    maintenance,
+    cleanup: finalizedDelete.maintenance.cleanup,
+    maintenance: finalizedDelete.maintenance,
   });
 });
 

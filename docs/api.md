@@ -290,6 +290,8 @@ surface for hosts and dashboards. The response includes:
   `invalid`) plus the inferred provider/model pair
 - lightweight config/command/path checks
 - sanitized env-variable presence metadata
+- additive `config.modelCatalog` summaries (`source`, `defaultModel`,
+  `modelCount`, cache metadata when applicable, and warnings)
 - target-level diagnostics details for CLI, API/local, and agent backends
 
 `GET /diagnostics/providers?probe=live` enables live probes where the current
@@ -299,7 +301,13 @@ a safe live probe; API/local targets with configured endpoints now also perform
 bounded GET reachability probes and expose additive `config.liveProbe`
 metadata. Ollama probes use `/api/tags` against the configured base URL.
 Successful HTTP reachability yields `endpoint_reachable`; network/timeout
-failures yield `endpoint_probe_failed`.
+failures yield `endpoint_probe_failed`. Live remote/agent/local diagnostics now
+also try to load the runtime-owned model catalog for that target, surfacing
+machine-readable checks such as `model_catalog_loaded`,
+`model_catalog_warning`, `configured_model_present`,
+`configured_model_missing`, or `configured_model_fallback_only` when a target
+only appears usable because runtime had to inject the configured model as a
+fallback.
 `force=1|true|refresh` can be combined with either probe mode to bypass the CLI
 compatibility cache after a provider install or upgrade.
 
@@ -1341,7 +1349,16 @@ When a non-shared child fork copies a workspace snapshot, the runtime now also
 records additive `hydration.metadata.workspaceSnapshot` facts such as
 `copiedFileCount`, `copiedByteCount`, `skippedGitMetadata`, `status`, and
 optional `warningCodes` (for example `large_file_count` or `large_byte_count`)
-so hosts can tell when fork-time copying touched a large repo.
+so hosts can tell when fork-time copying touched a large repo. The same
+metadata now also includes `plan`, which freezes the current one-shot snapshot
+contract machine-readably:
+
+- `strategy: "one_shot_snapshot"`
+- `boundedSyncAvailable: false`
+- `readiness: "snapshot_ok" | "follow_up_required"`
+- `nextAction: "none" | "prefer_shared_or_worktree"`
+- `thresholds.fileWarningCount`
+- `thresholds.byteWarningCount`
 
 `mode: "auto"` prefers `native_fork` when the child target is compatible with
 the parent provider/backend/instance/workspace and the underlying provider
@@ -1772,13 +1789,30 @@ retained policy. Responses always include:
 - `cleanup`: flat cleanup booleans/counts (`workspaceCleaned`,
   `worktreeDetached`, `worktreeCleanupPolicy`, `worktreeMergedPaths`)
 - `maintenance`: the latest persisted maintenance inspection snapshot
-- `session`: the updated session payload after the retry
 - `cleanupPath`: the stable retry route path so hosts do not have to rebuild it
 
+When the retried cleanup still leaves the logical session in place, responses
+also include:
+
+- `session`: the updated session payload after the retry
+
+Successful cleanup retries can now auto-settle both retained resets and
+retained deletes. Retained delete settlement uses the same bounded cleanup seam
+instead of forcing the caller to replay `DELETE /sessions/{id}` manually. Those
+responses include:
+
+- `settledLifecycle.action: "delete"`
+- `settledLifecycle.status: "completed" | "retained"`
+- `settledLifecycle.cleanup`
+- `deleteSettlement.status: "deleted" | "retained"`
+- `deleteSettlement.hadTranscript`
+- `deleteSettlement.fileDeleted`
+- `deleteSettlement.nativeDeleted`
+- optional `deleteSettlement.reason`
+
 Unlike replaying `reset` or `delete`, this route only retries workspace
-cleanup. For retained deletes, it still does not delete the logical session
-record for you. When cleanup changes the runtime cwd or worktree metadata, the
-runtime also refreshes persisted hydration/skill delivery state so `cwd`,
+cleanup. When cleanup changes the runtime cwd or worktree metadata, the runtime
+also refreshes persisted hydration/skill delivery state so `cwd`,
 `workspaceIsolation`, and `hydration.workspace` continue to agree afterward.
 If the most recent retained lifecycle was a `reset`, a successful cleanup retry
 also auto-settles the rest of that reset follow-through, including provider
@@ -1889,6 +1923,17 @@ Successful responses always include:
 - `outcome`
 - `maintenance`
 - `session`
+
+The returned `maintenance` snapshot now also carries additive
+`maintenance.flush` state for `pre_flush` orchestration, including:
+
+- `status: "idle" | "pending" | "acknowledged" | "retry_requested" | "completed"`
+- `phase: "pre_flush"`
+- `hookCount`
+- `reasonCodes`
+- optional `action: "delete" | "cleanup_workspace"`
+- optional `lastRequestedAt`
+- optional `lastFollowThrough`
 
 For `action: "compact"`, responses also include:
 

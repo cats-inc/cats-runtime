@@ -891,6 +891,13 @@ describe('session close route', () => {
       phase: 'pre_flush',
       outcome: 'retry_requested',
       maintenance: expect.objectContaining({
+        flush: expect.objectContaining({
+          status: 'retry_requested',
+          phase: 'pre_flush',
+          hookCount: 1,
+          action: 'delete',
+          reasonCodes: ['follow_through_retry_requested'],
+        }),
         lastFollowThrough: expect.objectContaining({
           action: 'delete',
           phase: 'pre_flush',
@@ -906,6 +913,13 @@ describe('session close route', () => {
     await expect(persistedFlushResponse.json()).resolves.toEqual(expect.objectContaining({
       inspection: expect.objectContaining({
         maintenance: expect.objectContaining({
+          flush: expect.objectContaining({
+            status: 'retry_requested',
+            phase: 'pre_flush',
+            hookCount: 1,
+            action: 'delete',
+            reasonCodes: ['follow_through_retry_requested'],
+          }),
           lastFollowThrough: expect.objectContaining({
             action: 'delete',
             phase: 'pre_flush',

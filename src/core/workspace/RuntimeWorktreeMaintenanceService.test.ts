@@ -135,6 +135,66 @@ describe('RuntimeWorktreeMaintenanceService', () => {
       retainedSessionCount: 1,
       expiredRetainedSessionCount: 1,
       expiredRetainedSessionIds: ['retained-session'],
+      autoCleanedRetainedSessionCount: 0,
+      failedAutoCleanedRetainedSessionCount: 0,
+    }));
+  });
+
+  it('auto-cleans expired preserved retained worktrees when a cleanup callback is configured', async () => {
+    const { repoDir, sessionBaseDir } = createGitWorkspace();
+    const registry = new SessionRegistry();
+    const prepared = await prepareSessionWorkspace({
+      sessionId: 'retained-session-auto-clean',
+      sessionBaseDir,
+      cwd: repoDir,
+      workspaceMode: 'shared',
+      workspaceIsolationMode: 'worktree',
+      now: new Date('2026-03-22T00:00:00.000Z'),
+    });
+
+    registry.create({
+      id: 'retained-session-auto-clean',
+      providerName: 'codex',
+      cwd: prepared.cwd,
+      workspaceMode: prepared.workspaceMode,
+      workspaceIsolation: {
+        ...prepared.workspaceIsolation,
+        worktree: {
+          ...prepared.workspaceIsolation.worktree!,
+          lastCleanup: {
+            policy: 'preserve',
+            status: 'retained',
+            observedAt: '2026-03-22T00:00:00.000Z',
+            reasonCodes: ['worktree_preserved'],
+            mergedPathCount: 0,
+          },
+        },
+      },
+    });
+    registry.updateStatus('retained-session-auto-clean', 'closed');
+    const cleanupExpiredRetainedSession = vi.fn(async () => ({ status: 'deleted' as const }));
+    const service = new RuntimeWorktreeMaintenanceService({
+      sessionBaseDir,
+      registry,
+      runtime: {
+        isAttached: vi.fn(() => false),
+      } as never,
+      cleanupExpiredRetainedSession,
+      retainedTtlMs: 60 * 60 * 1000,
+      now: () => new Date('2026-03-24T00:00:00.000Z'),
+    });
+
+    const result = await service.sweep();
+
+    expect(cleanupExpiredRetainedSession).toHaveBeenCalledWith('retained-session-auto-clean');
+    expect(result).toEqual(expect.objectContaining({
+      retainedSessionCount: 1,
+      expiredRetainedSessionCount: 1,
+      expiredRetainedSessionIds: ['retained-session-auto-clean'],
+      autoCleanedRetainedSessionCount: 1,
+      failedAutoCleanedRetainedSessionCount: 0,
+      autoCleanedRetainedSessionIds: ['retained-session-auto-clean'],
+      failedAutoCleanedRetainedSessionIds: [],
     }));
   });
 });

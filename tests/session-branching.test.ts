@@ -215,6 +215,15 @@ describe('session branching route', () => {
               copiedFileCount: number;
               status: string;
               warningCodes?: string[];
+              plan?: {
+                strategy: string;
+                boundedSyncAvailable: boolean;
+                readiness: string;
+                nextAction: string;
+                thresholds: {
+                  fileWarningCount: number;
+                };
+              };
             };
           };
         };
@@ -226,6 +235,15 @@ describe('session branching route', () => {
         copiedFileCount: 2000,
         status: 'large',
         warningCodes: ['large_file_count'],
+        plan: expect.objectContaining({
+          strategy: 'one_shot_snapshot',
+          boundedSyncAvailable: false,
+          readiness: 'follow_up_required',
+          nextAction: 'prefer_shared_or_worktree',
+          thresholds: expect.objectContaining({
+            fileWarningCount: 2000,
+          }),
+        }),
       }));
     } finally {
       cleanup();

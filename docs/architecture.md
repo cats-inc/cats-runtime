@@ -320,9 +320,11 @@ src/
   later observe/reset/delete flows stay consistent when cleanup is intentionally
   preserved or cannot finish safely
 - Provides a conservative snapshot-copy helper for non-shared fork flows,
-  including copied file/byte counts for additive large-workspace warnings
+  including copied file/byte counts plus additive one-shot snapshot planning
+  metadata for large-workspace warnings
 - Provides shared orphan-worktree cleanup helpers plus background maintenance
-  sweeps for abandoned worktrees
+  sweeps for abandoned worktrees and conservative TTL cleanup of expired
+  preserved retained worktrees
 
 ### `src/core/wakeup`
 
@@ -441,7 +443,8 @@ src/
    `GET /diagnostics/health`, `GET /diagnostics/runtime`, and
    `GET /diagnostics/providers` expose the runtime-owned host integration
    surface, including runtime maintenance snapshots plus live endpoint
-   reachability for API/local targets when requested
+   reachability and additive model-catalog/configured-model readiness checks
+   for API/local/agent targets when requested
 14. `POST /mcp` reuses those same runtime-owned services as an additive
     orchestrator/tool surface
 15. Optional machine-readable process output emits startup and shutdown
@@ -455,9 +458,10 @@ src/
     runtime-owned workspace layer, returning retained cleanup metadata when the
     source repo is dirty or detachment fails, while
     `POST /sessions/{id}/workspace/cleanup` provides a bounded retry seam that
-    rehydrates persisted workspace/skill state and auto-settles retained reset
-    follow-through once cleanup succeeds, without auto-replaying retained
-    delete follow-through
+    rehydrates persisted workspace/skill state and auto-settles retained
+    reset/delete follow-through once cleanup succeeds; background worktree
+    maintenance reuses the same cleanup path for conservative TTL expiry of
+    preserved retained sessions
 19. `POST /sessions/{id}/compact` reuses the same runtime-owned maintenance
     read model as a public compaction route, returning machine-readable
     readiness plus sanitized hook-payload persistence and compacting managed
@@ -466,6 +470,8 @@ src/
     acknowledgement/retry/completion outcomes for reset/delete/cleanup/compact
     hooks, feeds the same session inspection read model, and now lets
     reset/delete/workspace-cleanup opt into `requireAcknowledgedHooks` gating
+    while exposing additive `maintenance.flush` state for pre-flush lifecycle
+    orchestration
 21. `POST /sessions/{id}/compact/follow-through` remains the compaction-specific
     shortcut over that same follow-through contract
 22. Stream events are returned directly to the caller

@@ -1144,4 +1144,117 @@ describe('session worktree routes', () => {
     expect(registry.get(session.id)).toBeDefined();
     expect(existsSync(prepared.workspaceIsolation.worktree!.worktreePath)).toBe(true);
   });
+
+  it('settles retained delete state after cleanup succeeds', async () => {
+    const repoDir = createGitWorkspace(rootDir, 'repo-delete-cleanup-retry');
+    const prepared = await prepareSessionWorkspace({
+      sessionId: 'worktree-delete-cleanup-retry',
+      sessionBaseDir,
+      cwd: repoDir,
+      workspaceMode: 'shared',
+      workspaceIsolationMode: 'worktree',
+    });
+
+    const session = registry.create({
+      id: 'worktree-delete-cleanup-retry',
+      providerName: 'codex',
+      cwd: prepared.cwd,
+      workspaceMode: prepared.workspaceMode,
+      workspaceIsolation: prepared.workspaceIsolation,
+    });
+    registry.updateStatus(session.id, 'closed');
+
+    writeFileSync(join(prepared.cwd, 'tracked.txt'), 'delete after cleanup retry\n', 'utf8');
+
+    const retainedDelete = await app.request(`/sessions/${session.id}`, {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        worktreeCleanupPolicy: 'preserve',
+      }),
+    });
+
+    expect(retainedDelete.status).toBe(200);
+
+    const cleanupResponse = await app.request(`/sessions/${session.id}/workspace/cleanup`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        worktreeCleanupPolicy: 'discard',
+        maintenance: {
+          reason: 'operator_retry_delete_cleanup',
+        },
+      }),
+    });
+
+    expect(cleanupResponse.status).toBe(200);
+    const body = await cleanupResponse.json() as {
+      action: string;
+      status: string;
+      settledLifecycle?: {
+        action: string;
+        status: string;
+        cleanup: {
+          worktreeDetached: boolean;
+          worktreeCleanupPolicy: string;
+          registryDropped: boolean;
+        };
+      };
+      deleteSettlement?: {
+        status: string;
+        hadTranscript: boolean;
+        fileDeleted: boolean;
+        nativeDeleted: boolean;
+      };
+      cleanup: {
+        workspaceCleaned: boolean;
+        worktreeDetached: boolean;
+        worktreeCleanupPolicy: string;
+      };
+      maintenance: {
+        cleanup: {
+          registryDropped: boolean;
+          worktreeCleanupPolicy: string;
+        };
+        lastLifecycle: {
+          action: string;
+          status: string;
+        };
+      };
+      session?: unknown;
+    };
+    expect(body.action).toBe('cleanup_workspace');
+    expect(body.status).toBe('completed');
+    expect(body.settledLifecycle).toEqual(expect.objectContaining({
+      action: 'delete',
+      status: 'completed',
+      cleanup: expect.objectContaining({
+        worktreeDetached: true,
+        worktreeCleanupPolicy: 'discard',
+        registryDropped: true,
+      }),
+    }));
+    expect(body.deleteSettlement).toEqual({
+      status: 'deleted',
+      hadTranscript: false,
+      fileDeleted: false,
+      nativeDeleted: false,
+    });
+    expect(body.cleanup).toEqual(expect.objectContaining({
+      workspaceCleaned: true,
+      worktreeDetached: true,
+      worktreeCleanupPolicy: 'discard',
+    }));
+    expect(body.maintenance.lastLifecycle).toEqual(expect.objectContaining({
+      action: 'delete',
+      status: 'completed',
+    }));
+    expect(body.maintenance.cleanup).toEqual(expect.objectContaining({
+      registryDropped: true,
+      worktreeCleanupPolicy: 'discard',
+    }));
+    expect(body.session).toBeUndefined();
+    expect(registry.get(session.id)).toBeUndefined();
+    expect(existsSync(prepared.workspaceIsolation.worktree!.worktreePath)).toBe(false);
+  });
 });

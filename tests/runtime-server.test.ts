@@ -1,11 +1,13 @@
+import { spawnSync } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import { loadConfig } from '../src/core/config.js';
+import { prepareSessionWorkspace } from '../src/core/workspace/sessionWorkspace.js';
 import { createDiscoveryController, createRuntimeServer } from '../src/server.js';
 import {
   RUNTIME_DIAGNOSTICS_CONTRACT_VERSION,
@@ -50,6 +52,34 @@ function nativeExecutionPlatform(): 'windows' | 'macos' | 'linux' {
     return 'macos';
   }
   return 'linux';
+}
+
+function runGit(cwd: string, args: string[]): string {
+  const result = spawnSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    windowsHide: true,
+  });
+
+  if (result.status !== 0) {
+    throw new Error(result.stderr || result.stdout || `git ${args.join(' ')} failed`);
+  }
+
+  return result.stdout.trim();
+}
+
+function createGitWorkspace(root: string, repoName: string): string {
+  const repoDir = join(root, repoName);
+  mkdirSync(repoDir, { recursive: true });
+  writeFileSync(join(repoDir, 'tracked.txt'), 'initial\n', 'utf8');
+
+  runGit(repoDir, ['init']);
+  runGit(repoDir, ['config', 'user.email', 'cats-runtime@example.test']);
+  runGit(repoDir, ['config', 'user.name', 'Cats Runtime Test']);
+  runGit(repoDir, ['add', '.']);
+  runGit(repoDir, ['commit', '-m', 'initial']);
+
+  return repoDir;
 }
 
 function createTestConfig(overrides = {}) {
@@ -484,6 +514,58 @@ describe('runtime server', () => {
           },
         },
       });
+    });
+  });
+
+  it('background worktree maintenance auto-cleans expired preserved delete sessions', async () => {
+    await withRuntime({}, {}, async (runtime) => {
+      const repoDir = createGitWorkspace(
+        runtime.context.config.dataDir || tmpdir(),
+        'runtime-server-worktree-gc',
+      );
+      const prepared = await prepareSessionWorkspace({
+        sessionId: 'runtime-server-worktree-gc',
+        sessionBaseDir: runtime.context.config.sessionBaseDir,
+        cwd: repoDir,
+        workspaceMode: 'shared',
+        workspaceIsolationMode: 'worktree',
+        now: new Date('2026-03-20T00:00:00.000Z'),
+      });
+      const session = runtime.context.registry.create({
+        id: 'runtime-server-worktree-gc',
+        providerName: 'codex',
+        cwd: prepared.cwd,
+        workspaceMode: prepared.workspaceMode,
+        workspaceIsolation: prepared.workspaceIsolation,
+      });
+      runtime.context.registry.updateStatus(session.id, 'closed');
+      writeFileSync(join(prepared.cwd, 'tracked.txt'), 'preserve then gc\n', 'utf8');
+
+      const retainedDelete = await runtime.app.request(`/sessions/${session.id}`, {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          worktreeCleanupPolicy: 'preserve',
+        }),
+      });
+      expect(retainedDelete.status).toBe(200);
+      const retainedSession = runtime.context.registry.get(session.id);
+      if (!retainedSession?.workspaceIsolation?.worktree?.lastCleanup) {
+        throw new Error('expected retained worktree cleanup state');
+      }
+      retainedSession.workspaceIsolation.worktree.lastCleanup.observedAt = '2026-03-20T00:00:00.000Z';
+      runtime.context.registry.flush();
+      expect(runtime.context.registry.get(session.id)).toBeDefined();
+      expect(existsSync(prepared.workspaceIsolation.worktree!.worktreePath)).toBe(true);
+
+      const sweep = await runtime.context.worktreeMaintenance?.sweep();
+      expect(sweep).toEqual(expect.objectContaining({
+        expiredRetainedSessionIds: ['runtime-server-worktree-gc'],
+        autoCleanedRetainedSessionIds: ['runtime-server-worktree-gc'],
+        failedAutoCleanedRetainedSessionIds: [],
+      }));
+      expect(runtime.context.registry.get(session.id)).toBeUndefined();
+      expect(existsSync(prepared.workspaceIsolation.worktree!.worktreePath)).toBe(false);
     });
   });
 

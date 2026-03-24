@@ -270,16 +270,19 @@ depends on explicit lifecycle actions only.
 Current gaps:
 
 - abandoned worktrees are now swept in the background if a host crashes or a
-  session is never explicitly reset/deleted, but intentionally retained
-  `worktreeCleanupPolicy: "preserve"` worktrees still do not have automatic GC
-- retained worktree sessions can now surface TTL-style expiry diagnostics, but
-  preserved/orphaned worktrees still need broader retained-worktree GC policy
+  session is never explicitly reset/deleted, and TTL-expired preserved
+  worktrees can now be auto-cleaned, but the GC policy is still conservative
+  and does not yet cover every retained-worktree shape
+- retained worktree sessions now surface TTL-style expiry diagnostics plus
+  background auto-clean results, but preserved/orphaned worktrees still need a
+  broader retained-worktree GC policy
 - `worktreeCleanupPolicy: "merge"` intentionally stops and returns
   `status: "retained"` when the source repo is already dirty, because runtime
   does not yet own conflict-resolution policy
 - reset/delete can now hand operators retained cleanup metadata plus a bounded
-  retry route, and retained resets now auto-complete once cleanup succeeds,
-  but retained delete follow-through still does not auto-complete
+  retry route, and retained resets/deletes now auto-complete once cleanup
+  succeeds, but the background policy still only auto-cleans conservative
+  preserved cases
 - worktree prepare/merge/discard still runs inline with the HTTP lifecycle; the
   runtime no longer blocks the event loop with sync I/O, but it still lacks a
   queued/background execution envelope, backpressure, and concurrency guards
@@ -319,11 +322,13 @@ cleanup discipline while keeping product approval/policy above runtime.
 - `inspection.maintenance.cleanup` now preserves that same retry path when a
   closed worktree session is actually ready for bounded cleanup retry
 - orphaned worktrees are now swept in the background, and retained worktree
-  sessions surface TTL-style expiry diagnostics through runtime maintenance
-- retained reset cleanup now auto-settles the rest of the reset lifecycle once
-  bounded cleanup succeeds
-- retained-worktree GC and retained delete follow-through still remain
-  deferred
+  sessions surface TTL-style expiry diagnostics plus background auto-clean
+  results through runtime maintenance
+- retained reset/delete cleanup now auto-settles the rest of the lifecycle
+  once bounded cleanup succeeds, and the background sweeper auto-cleans
+  expired preserved retained worktrees conservatively
+- broader retained-worktree GC policy and queued/background worktree
+  scheduling still remain deferred
 
 #### Affected Files
 
@@ -352,8 +357,9 @@ Current gaps:
 
 - fork-time workspace copying is a one-shot snapshot, not a generalized sync or
   reconciliation protocol
-- retained workspace/worktree cleanup can advertise `pre_flush`, but nothing in
-  runtime yet coordinates durable memory/export flush before cleanup proceeds
+- retained workspace/worktree cleanup can advertise `pre_flush`, and runtime
+  now exposes an additive lifecycle-flush read model, but it still does not
+  coordinate durable memory/export execution before cleanup proceeds
 - runtime-managed transcripts now compact in place through
   `POST /sessions/{id}/compact`, but provider-owned/external sessions still
   rely on the coordination seam and runtime still does not execute the hook
@@ -361,9 +367,9 @@ Current gaps:
 - Team 3's future memory pipeline seam exists in contracts only; runtime still
   lacks the hook execution/retry envelope around lifecycle flush boundaries
 - non-shared fork copy still clones the whole workspace opportunistically in
-  the request path; runtime now records snapshot counts/bytes and large-copy
-  warnings, but still does not have bounded snapshot planning, resumable sync,
-  or progress reporting
+  the request path; runtime now records snapshot counts/bytes, large-copy
+  warnings, and additive one-shot snapshot planning metadata, but still does
+  not have bounded snapshot execution, resumable sync, or progress reporting
 
 #### Direction
 

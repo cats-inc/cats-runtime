@@ -1277,6 +1277,16 @@ export interface RuntimeSessionCleanupContract {
   retryCleanupPath?: string;
 }
 
+export interface RuntimeSessionFlushContract {
+  status: 'idle' | 'pending' | 'acknowledged' | 'retry_requested' | 'completed';
+  phase: 'pre_flush';
+  hookCount: number;
+  reasonCodes: string[];
+  action?: Extract<RuntimeSessionMaintenanceAction, 'delete' | 'cleanup_workspace'>;
+  lastRequestedAt?: string;
+  lastFollowThrough?: RuntimeSessionMaintenanceFollowThrough;
+}
+
 export interface RuntimeSessionMaintenance {
   status: RuntimeSessionMaintenanceStatus;
   compaction: RuntimeSessionCompactionContract;
@@ -1287,6 +1297,7 @@ export interface RuntimeSessionMaintenance {
   };
   resetBoundary: RuntimeSessionResetBoundary;
   cleanup: RuntimeSessionCleanupContract;
+  flush: RuntimeSessionFlushContract;
   markers: RuntimeSessionMaintenanceMarker[];
   lastRequest?: RuntimeSessionMaintenanceRequest;
   lastFollowThrough?: RuntimeSessionMaintenanceFollowThrough;

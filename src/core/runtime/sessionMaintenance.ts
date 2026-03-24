@@ -74,11 +74,17 @@ export function buildSessionMaintenance(
       ]
     : [];
   const cleanup = buildCleanupContract(input.session, input.view, Boolean(input.wakeupPending));
-  const lastLifecycle = input.trackedMaintenance?.lastLifecycle
-    ? cloneLifecycle(input.trackedMaintenance.lastLifecycle)
-    : undefined;
   const lastFollowThrough = input.trackedMaintenance?.lastFollowThrough
     ? cloneMaintenanceFollowThrough(input.trackedMaintenance.lastFollowThrough)
+    : undefined;
+  const flush = buildFlushContract(
+    cleanup,
+    preFlushHooks,
+    input.trackedMaintenance?.lastRequest,
+    lastFollowThrough,
+  );
+  const lastLifecycle = input.trackedMaintenance?.lastLifecycle
+    ? cloneLifecycle(input.trackedMaintenance.lastLifecycle)
     : undefined;
 
   return {
@@ -99,6 +105,7 @@ export function buildSessionMaintenance(
         : [],
     },
     cleanup,
+    flush,
     markers: (input.trackedMaintenance?.markers || []).map(cloneMarker),
     ...(input.trackedMaintenance?.lastRequest
       ? { lastRequest: cloneMaintenanceRequest(input.trackedMaintenance.lastRequest) }
@@ -223,6 +230,56 @@ function buildCleanupContract(
   return {
     status: 'recommended',
     reasonCodes,
+  };
+}
+
+function buildFlushContract(
+  cleanup: RuntimeSessionCleanupContract,
+  preFlushHooks: RuntimeSessionHookContract[],
+  lastRequest: RuntimeSessionMaintenanceState['lastRequest'],
+  lastFollowThrough?: RuntimeSessionMaintenanceState['lastFollowThrough'],
+) {
+  const hookCount = preFlushHooks.length;
+  const flushAction = lastFollowThrough?.phase === 'pre_flush'
+    ? lastFollowThrough.action
+    : lastRequest?.action;
+  const action = flushAction === 'delete' || flushAction === 'cleanup_workspace'
+    ? flushAction
+    : undefined;
+
+  if (hookCount === 0 || (!action && cleanup.status === 'clean')) {
+    return {
+      status: 'idle' as const,
+      phase: 'pre_flush' as const,
+      hookCount,
+      reasonCodes: [],
+      ...(action ? { action } : {}),
+      ...(lastRequest?.requestedAt ? { lastRequestedAt: lastRequest.requestedAt } : {}),
+      ...(lastFollowThrough?.phase === 'pre_flush'
+        ? { lastFollowThrough: cloneMaintenanceFollowThrough(lastFollowThrough) }
+        : {}),
+    };
+  }
+
+  if (lastFollowThrough?.phase === 'pre_flush') {
+    return {
+      status: lastFollowThrough.outcome,
+      phase: 'pre_flush' as const,
+      hookCount,
+      reasonCodes: [`follow_through_${lastFollowThrough.outcome}`],
+      ...(action ? { action } : {}),
+      ...(lastRequest?.requestedAt ? { lastRequestedAt: lastRequest.requestedAt } : {}),
+      lastFollowThrough: cloneMaintenanceFollowThrough(lastFollowThrough),
+    };
+  }
+
+  return {
+    status: 'pending' as const,
+    phase: 'pre_flush' as const,
+    hookCount,
+    reasonCodes: ['pre_flush_hooks_pending'],
+    ...(action ? { action } : {}),
+    ...(lastRequest?.requestedAt ? { lastRequestedAt: lastRequest.requestedAt } : {}),
   };
 }
 

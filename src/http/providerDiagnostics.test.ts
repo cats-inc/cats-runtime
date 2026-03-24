@@ -8,6 +8,7 @@ import type { CliRuntimeConfig } from '../backends/cli/config.js';
 import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
 import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
 import { ProviderCompatibilityService } from '../core/compatibility/ProviderCompatibilityService.js';
+import { ProviderModelCatalogService } from '../core/models/providerModelCatalog.js';
 import type { ProviderInstallCheckRunner } from '../core/provider-install/ProviderInstallCheckRunner.js';
 
 describe('provider diagnostics HTTP contract', () => {
@@ -143,6 +144,10 @@ describe('provider diagnostics HTTP contract', () => {
       installCheckRunner: createInstallCheckRunner(),
       now: () => Date.parse('2026-03-23T00:02:00.000Z'),
     });
+    const providerModelCatalog = new ProviderModelCatalogService(config, {
+      fetch: globalThis.fetch,
+      env: process.env,
+    });
 
     return createApp({
       config,
@@ -155,7 +160,7 @@ describe('provider diagnostics HTTP contract', () => {
       kiroNative: {} as never,
       auggieSessions: {} as never,
       opencodeNative: {} as never,
-      providerModelCatalog: {} as never,
+      providerModelCatalog,
     });
   }
 
@@ -345,6 +350,12 @@ describe('provider diagnostics HTTP contract', () => {
           headers: { 'content-type': 'application/json' },
         });
       }
+      if (url === 'http://127.0.0.1:11434/api/ps') {
+        return new Response(JSON.stringify({ models: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
       throw new Error(`Unexpected live probe URL: ${url}`);
     });
 
@@ -418,6 +429,12 @@ describe('provider diagnostics HTTP contract', () => {
                 reachable: true,
                 statusCode: 401,
               }),
+              modelCatalog: expect.objectContaining({
+                source: 'config',
+                defaultModel: 'claude-sonnet-4-5',
+                modelCount: 1,
+                warnings: [],
+              }),
             }),
             reprobe: expect.objectContaining({
               liveSupported: true,
@@ -436,6 +453,13 @@ describe('provider diagnostics HTTP contract', () => {
             provider: 'ollama',
             backend: 'local',
             instance: 'local',
+            availability: expect.objectContaining({
+              status: 'degraded',
+              attentionCodes: expect.arrayContaining([
+                'model_catalog_warning',
+                'configured_model_fallback_only',
+              ]),
+            }),
             checks: expect.arrayContaining([
               expect.objectContaining({
                 code: 'endpoint_reachable',
@@ -445,12 +469,41 @@ describe('provider diagnostics HTTP contract', () => {
                   statusCode: 200,
                 }),
               }),
+              expect.objectContaining({
+                code: 'model_catalog_loaded',
+                status: 'ok',
+                details: expect.objectContaining({
+                  source: 'dynamic',
+                  modelCount: 1,
+                  defaultModel: 'qwen2.5-coder:7b',
+                }),
+              }),
+              expect.objectContaining({
+                code: 'model_catalog_warning',
+                status: 'degraded',
+              }),
+              expect.objectContaining({
+                code: 'configured_model_fallback_only',
+                status: 'degraded',
+                details: expect.objectContaining({
+                  model: 'qwen2.5-coder:7b',
+                  source: 'dynamic',
+                }),
+              }),
             ]),
             config: expect.objectContaining({
               liveProbe: expect.objectContaining({
                 url: 'http://127.0.0.1:11434/api/tags',
                 reachable: true,
                 statusCode: 200,
+              }),
+              modelCatalog: expect.objectContaining({
+                source: 'dynamic',
+                defaultModel: 'qwen2.5-coder:7b',
+                modelCount: 1,
+                warnings: expect.arrayContaining([
+                  expect.stringContaining("Configured default model 'qwen2.5-coder:7b'"),
+                ]),
               }),
             }),
             reprobe: expect.objectContaining({

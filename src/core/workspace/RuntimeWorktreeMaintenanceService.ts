@@ -17,6 +17,10 @@ export interface RuntimeWorktreeMaintenanceSweepResult {
   retainedSessionCount: number;
   expiredRetainedSessionCount: number;
   expiredRetainedSessionIds: string[];
+  autoCleanedRetainedSessionCount: number;
+  failedAutoCleanedRetainedSessionCount: number;
+  autoCleanedRetainedSessionIds: string[];
+  failedAutoCleanedRetainedSessionIds: string[];
 }
 
 export interface RuntimeWorktreeMaintenanceSnapshot {
@@ -31,6 +35,7 @@ export interface RuntimeWorktreeMaintenanceServiceOptions {
   sessionBaseDir: string;
   registry: Pick<SessionRegistry, 'get' | 'list'>;
   runtime: Pick<RuntimeSessionManager, 'isAttached'>;
+  cleanupExpiredRetainedSession?: (sessionId: string) => Promise<{ status: 'completed' | 'deleted' | 'retained' }>;
   now?: () => Date;
   sweepIntervalMs?: number;
   retainedTtlMs?: number;
@@ -98,6 +103,35 @@ export class RuntimeWorktreeMaintenanceService {
       })
       .map((session) => session.id)
       .sort();
+    const autoCleanedRetainedSessionIds: string[] = [];
+    const failedAutoCleanedRetainedSessionIds: string[] = [];
+
+    if (this.options.cleanupExpiredRetainedSession) {
+      const expiredPreservedSessions = retainedSessions
+        .filter((session) => {
+          const lastCleanup = session.workspaceIsolation?.worktree?.lastCleanup;
+          if (lastCleanup?.policy !== 'preserve') {
+            return false;
+          }
+          const observedAtMs = Date.parse(lastCleanup.observedAt);
+          return Number.isFinite(observedAtMs)
+            && this.now().getTime() - observedAtMs >= this.retainedTtlMs;
+        })
+        .sort((left, right) => left.id.localeCompare(right.id));
+
+      for (const session of expiredPreservedSessions) {
+        try {
+          const result = await this.options.cleanupExpiredRetainedSession(session.id);
+          if (result.status === 'retained') {
+            failedAutoCleanedRetainedSessionIds.push(session.id);
+            continue;
+          }
+          autoCleanedRetainedSessionIds.push(session.id);
+        } catch {
+          failedAutoCleanedRetainedSessionIds.push(session.id);
+        }
+      }
+    }
 
     const trackedWorktrees = new Map<string, string>();
     for (const session of sessions) {
@@ -133,6 +167,10 @@ export class RuntimeWorktreeMaintenanceService {
       retainedSessionCount: retainedSessions.length,
       expiredRetainedSessionCount: expiredRetainedSessionIds.length,
       expiredRetainedSessionIds,
+      autoCleanedRetainedSessionCount: autoCleanedRetainedSessionIds.length,
+      failedAutoCleanedRetainedSessionCount: failedAutoCleanedRetainedSessionIds.length,
+      autoCleanedRetainedSessionIds,
+      failedAutoCleanedRetainedSessionIds,
     };
     this.lastSweep = sweep;
     return cloneSweepResult(sweep);
@@ -202,6 +240,8 @@ function cloneSweepResult(
     orphanedWorktreePaths: [...sweep.orphanedWorktreePaths],
     failedOrphanedWorktreePaths: [...sweep.failedOrphanedWorktreePaths],
     expiredRetainedSessionIds: [...sweep.expiredRetainedSessionIds],
+    autoCleanedRetainedSessionIds: [...sweep.autoCleanedRetainedSessionIds],
+    failedAutoCleanedRetainedSessionIds: [...sweep.failedAutoCleanedRetainedSessionIds],
   };
 }
 

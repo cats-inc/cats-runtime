@@ -132,6 +132,12 @@ describe('buildSessionMaintenance', () => {
       reasonCodes: ['worktree_retained'],
       retryCleanupPath: '/sessions/session-1/workspace/cleanup',
     });
+    expect(maintenance.flush).toEqual({
+      status: 'pending',
+      phase: 'pre_flush',
+      hookCount: 1,
+      reasonCodes: ['pre_flush_hooks_pending'],
+    });
     expect(maintenance.hooks.preFlush).toEqual({
       available: true,
       pending: [
@@ -269,6 +275,87 @@ describe('buildSessionMaintenance', () => {
           }),
         }),
       ],
+    }));
+    expect(maintenance.flush).toEqual({
+      status: 'idle',
+      phase: 'pre_flush',
+      hookCount: 1,
+      reasonCodes: [],
+    });
+  });
+
+  it('summarizes pre-flush follow-through state for delete and cleanup orchestration', () => {
+    const maintenance = buildSessionMaintenance({
+      session: createSession({
+        status: 'closed',
+        messageCount: 3,
+        totalInputTokens: 300,
+        totalOutputTokens: 100,
+        workspaceIsolation: {
+          mode: 'worktree',
+          sourceCwd: '/repo',
+          worktree: {
+            id: 'repo-session-1',
+            sourceRepoRoot: '/repo',
+            worktreePath: '/sessions/worktrees/repo/session-1',
+            preparedAt: '2026-03-23T00:00:00.000Z',
+            lastCleanup: {
+              policy: 'preserve',
+              status: 'retained',
+              observedAt: '2026-03-24T00:00:00.000Z',
+              reasonCodes: ['worktree_preserved'],
+              mergedPathCount: 0,
+            },
+          },
+        },
+      }),
+      view: createView({
+        attached: false,
+        activity: 'inactive',
+      }),
+      trackedMaintenance: {
+        lastRequest: {
+          action: 'delete',
+          sessionId: 'session-1',
+          requestedAt: '2026-03-24T04:00:00.000Z',
+          workspaceMode: 'shared',
+          isolationMode: 'worktree',
+          runtimeCwd: '/sessions/worktrees/repo/session-1',
+          sourceCwd: '/repo',
+          worktreePath: '/sessions/worktrees/repo/session-1',
+          hookPayloads: [],
+        },
+        lastFollowThrough: {
+          action: 'delete',
+          phase: 'pre_flush',
+          sessionId: 'session-1',
+          observedAt: '2026-03-24T04:02:00.000Z',
+          outcome: 'retry_requested',
+          reason: 'memory_flush_needs_retry',
+          hookPayloads: [{
+            kind: 'memory_flush',
+            payload: {
+              scope: 'summary',
+            },
+          }],
+        },
+        markers: [],
+      },
+    });
+
+    expect(maintenance.flush).toEqual(expect.objectContaining({
+      status: 'retry_requested',
+      phase: 'pre_flush',
+      hookCount: 1,
+      action: 'delete',
+      lastRequestedAt: '2026-03-24T04:00:00.000Z',
+      reasonCodes: ['follow_through_retry_requested'],
+      lastFollowThrough: expect.objectContaining({
+        action: 'delete',
+        phase: 'pre_flush',
+        outcome: 'retry_requested',
+        reason: 'memory_flush_needs_retry',
+      }),
     }));
   });
 

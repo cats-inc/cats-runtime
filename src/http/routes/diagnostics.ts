@@ -160,6 +160,110 @@ function createCheck(
   return { code, status, message, details };
 }
 
+async function appendModelCatalogDiagnostics(
+  ctx: AppContext,
+  target: ProviderTargetDescriptor,
+  checks: DiagnosticCheck[],
+  config: Record<string, unknown>,
+): Promise<void> {
+  try {
+    const catalog = await ctx.providerModelCatalog.getCatalog(
+      target.providerName,
+      `${target.backend}/${target.instanceId}`,
+    );
+    config.modelCatalog = {
+      source: catalog.source,
+      defaultModel: catalog.defaultModel,
+      modelCount: catalog.models.length,
+      warnings: [...catalog.warnings],
+      ...(catalog.cache ? { cache: catalog.cache } : {}),
+    };
+
+    checks.push(
+      createCheck(
+        'model_catalog_loaded',
+        catalog.models.length > 0 ? 'ok' : 'degraded',
+        catalog.models.length > 0
+          ? `Loaded ${catalog.models.length} model(s) for ${target.providerName}/${target.instanceId}`
+          : `Model catalog is empty for ${target.providerName}/${target.instanceId}`,
+        {
+          source: catalog.source,
+          modelCount: catalog.models.length,
+          ...(catalog.defaultModel ? { defaultModel: catalog.defaultModel } : {}),
+        },
+      ),
+    );
+
+    if (catalog.warnings.length > 0) {
+      checks.push(
+        createCheck(
+          'model_catalog_warning',
+          'degraded',
+          catalog.warnings[0] || `Model catalog warnings were reported for ${target.providerName}/${target.instanceId}`,
+          {
+            warnings: [...catalog.warnings],
+          },
+        ),
+      );
+    }
+
+    const configuredModel = target.remoteInstance?.model;
+    const shouldValidateConfiguredModel = Boolean(
+      configuredModel
+      && (
+        target.backend === 'agent'
+        || target.remoteInstance?.transport === 'ollama'
+        || catalog.source === 'dynamic'
+      ),
+    );
+    if (!configuredModel || !shouldValidateConfiguredModel) {
+      return;
+    }
+
+    const configuredModelWarning = catalog.warnings.find((warning) =>
+      warning.includes(configuredModel) && warning.includes('added as configured fallback'),
+    );
+    if (configuredModelWarning) {
+      checks.push(
+        createCheck(
+          'configured_model_fallback_only',
+          'degraded',
+          configuredModelWarning,
+          {
+            model: configuredModel,
+            source: catalog.source,
+          },
+        ),
+      );
+      return;
+    }
+
+    const configuredModelEntry = catalog.models.find((entry) => entry.id === configuredModel);
+    checks.push(
+      createCheck(
+        configuredModelEntry ? 'configured_model_present' : 'configured_model_missing',
+        configuredModelEntry ? 'ok' : 'degraded',
+        configuredModelEntry
+          ? `Configured model '${configuredModel}' is present in the ${catalog.source} catalog`
+          : `Configured model '${configuredModel}' is missing from the ${catalog.source} catalog`,
+        {
+          model: configuredModel,
+          source: catalog.source,
+          ...(configuredModelEntry?.status ? { status: configuredModelEntry.status } : {}),
+        },
+      ),
+    );
+  } catch (error) {
+    checks.push(
+      createCheck(
+        'model_catalog_probe_failed',
+        'degraded',
+        error instanceof Error ? error.message : String(error),
+      ),
+    );
+  }
+}
+
 async function diagnoseCliTarget(
   ctx: AppContext,
   target: ProviderTargetDescriptor,
@@ -318,6 +422,7 @@ async function diagnoseCliTarget(
 }
 
 async function diagnoseAgentTarget(
+  ctx: AppContext,
   target: ProviderTargetDescriptor,
   probeMode: DiagnosticsProbeMode,
   env: Readonly<NodeJS.ProcessEnv>,
@@ -403,10 +508,15 @@ async function diagnoseAgentTarget(
     );
   }
 
+  if (probeMode === 'live') {
+    await appendModelCatalogDiagnostics(ctx, target, checks, config);
+  }
+
   return { checks, config };
 }
 
 async function diagnoseRemoteConfigOnly(
+  ctx: AppContext,
   target: ProviderTargetDescriptor,
   probeMode: DiagnosticsProbeMode,
   env: Readonly<NodeJS.ProcessEnv>,
@@ -489,6 +599,10 @@ async function diagnoseRemoteConfigOnly(
     );
   }
 
+  if (probeMode === 'live') {
+    await appendModelCatalogDiagnostics(ctx, target, checks, config);
+  }
+
   return {
     checks,
     config,
@@ -511,9 +625,9 @@ async function diagnoseTarget(
   if (target.backend === 'cli') {
     result = await diagnoseCliTarget(ctx, target, probeMode, forceRefresh);
   } else if (target.backend === 'agent') {
-    result = await diagnoseAgentTarget(target, probeMode, env);
+    result = await diagnoseAgentTarget(ctx, target, probeMode, env);
   } else {
-    result = await diagnoseRemoteConfigOnly(target, probeMode, env);
+    result = await diagnoseRemoteConfigOnly(ctx, target, probeMode, env);
   }
 
   const attentionCodes = result.checks

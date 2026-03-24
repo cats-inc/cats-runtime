@@ -46,6 +46,7 @@ import { RuntimeBrowserService } from './core/browser/RuntimeBrowserService.js';
 import { RuntimeBrowserMaintenanceService } from './core/browser/RuntimeBrowserMaintenanceService.js';
 import { RuntimeWorktreeMaintenanceService } from './core/workspace/RuntimeWorktreeMaintenanceService.js';
 import { createRuntimeApp, type AppContext } from './http/app.js';
+import { executeRetainedWorktreeCleanup } from './http/routes/sessions.js';
 import type { ProviderName } from './backends/cli/providers/types.js';
 import type { ApiBackendOptions } from './backends/api/types.js';
 import type { AgentBackendOptions } from './backends/agent/types.js';
@@ -800,11 +801,6 @@ export function createRuntimeServer(
   const browserMaintenance = new RuntimeBrowserMaintenanceService({
     browser,
   });
-  const worktreeMaintenance = new RuntimeWorktreeMaintenanceService({
-    sessionBaseDir: config.sessionBaseDir,
-    registry,
-    runtime,
-  });
   const context: AppContext = {
     config,
     startup,
@@ -824,13 +820,32 @@ export function createRuntimeServer(
     wakeup,
     browser,
     browserMaintenance,
-    worktreeMaintenance,
     resolveCursorNative,
     resolveGooseNative,
     resolveKiroNative,
     resolveAuggieSessions,
     resolveOpencodeNative,
   };
+  const worktreeMaintenance = new RuntimeWorktreeMaintenanceService({
+    sessionBaseDir: config.sessionBaseDir,
+    registry,
+    runtime,
+    cleanupExpiredRetainedSession: async (sessionId) => {
+      const session = registry.get(sessionId);
+      if (!session) {
+        return { status: 'deleted' as const };
+      }
+      const result = await executeRetainedWorktreeCleanup(context, session, {
+        worktreeCleanupPolicy: 'discard',
+        rehydratePersistedState: false,
+      });
+      if (result.settledDelete?.status === 'deleted') {
+        return { status: 'deleted' as const };
+      }
+      return { status: result.cleanup.status === 'completed' ? 'completed' as const : 'retained' as const };
+    },
+  });
+  context.worktreeMaintenance = worktreeMaintenance;
   const app = createRuntimeApp(context);
   const server = createAdaptorServer({ fetch: app.fetch }) as Server;
   const discovery = createDiscoveryController(context, options);
