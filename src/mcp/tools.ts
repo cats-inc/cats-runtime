@@ -35,6 +35,17 @@ const SESSION_STATUSES: SessionStatus[] = [
 const WORKSPACE_MODES = ['isolated', 'shared', 'read_only'] as const;
 const WORKSPACE_ISOLATION_MODES = ['shared', 'isolated', 'worktree'] as const;
 const WORKTREE_CLEANUP_POLICIES = ['discard', 'merge', 'preserve'] as const;
+const MAINTENANCE_FOLLOW_THROUGH_ACTIONS = [
+  'reset',
+  'delete',
+  'cleanup_workspace',
+  'compact',
+] as const;
+const MAINTENANCE_FOLLOW_THROUGH_PHASES = [
+  'pre_reset',
+  'pre_compaction',
+  'pre_flush',
+] as const;
 const COMPACTION_FOLLOW_THROUGH_OUTCOMES = [
   'acknowledged',
   'retry_requested',
@@ -634,6 +645,10 @@ async function resetSession(
 ): Promise<McpToolCallResult> {
   const sessionId = readRequiredString(args, 'sessionId');
   const body: Record<string, unknown> = {};
+  const requireAcknowledgedHooks = readOptionalBoolean(args, 'requireAcknowledgedHooks');
+  if (requireAcknowledgedHooks !== undefined) {
+    body.requireAcknowledgedHooks = requireAcknowledgedHooks;
+  }
   const worktreeCleanupPolicy = readOptionalEnumString(
     args,
     'worktreeCleanupPolicy',
@@ -670,6 +685,52 @@ async function resetSession(
   };
 }
 
+async function deleteSession(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const sessionId = readRequiredString(args, 'sessionId');
+  const body: Record<string, unknown> = {};
+  const requireAcknowledgedHooks = readOptionalBoolean(args, 'requireAcknowledgedHooks');
+  if (requireAcknowledgedHooks !== undefined) {
+    body.requireAcknowledgedHooks = requireAcknowledgedHooks;
+  }
+  const worktreeCleanupPolicy = readOptionalEnumString(
+    args,
+    'worktreeCleanupPolicy',
+    WORKTREE_CLEANUP_POLICIES,
+    'worktreeCleanupPolicy must be a valid worktree cleanup policy',
+  );
+  if (worktreeCleanupPolicy) {
+    body.worktreeCleanupPolicy = worktreeCleanupPolicy;
+  }
+
+  const maintenance = readOptionalObject(args, 'maintenance');
+  if (maintenance) {
+    body.maintenance = maintenance;
+  }
+
+  const deletePath = `/sessions/${encodeURIComponent(sessionId)}`;
+  const result = await requestRuntimeJson(ctx, deletePath, {
+    method: 'DELETE',
+    body,
+  });
+  ensureRouteSuccess('delete_session', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'delete_session result');
+  const status = readOptionalString(payload, 'status');
+  return {
+    summary: status === 'retained'
+      ? `Delete for session ${sessionId} is retained until cleanup finishes safely.`
+      : `Deleted session ${sessionId}.`,
+    structuredContent: {
+      responseStatus: result.status,
+      ...payload,
+      deletePath,
+    },
+  };
+}
+
 async function forkSession(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -701,6 +762,10 @@ async function cleanupSessionWorkspace(
 ): Promise<McpToolCallResult> {
   const sessionId = readRequiredString(args, 'sessionId');
   const body: Record<string, unknown> = {};
+  const requireAcknowledgedHooks = readOptionalBoolean(args, 'requireAcknowledgedHooks');
+  if (requireAcknowledgedHooks !== undefined) {
+    body.requireAcknowledgedHooks = requireAcknowledgedHooks;
+  }
   const worktreeCleanupPolicy = readOptionalEnumString(
     args,
     'worktreeCleanupPolicy',
@@ -732,6 +797,73 @@ async function cleanupSessionWorkspace(
       responseStatus: result.status,
       ...payload,
       cleanupPath,
+      ...buildSessionPaths(sessionId),
+    },
+  };
+}
+
+async function reportSessionMaintenanceFollowThrough(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const sessionId = readRequiredString(args, 'sessionId');
+  const action = readOptionalEnumString(
+    args,
+    'action',
+    MAINTENANCE_FOLLOW_THROUGH_ACTIONS,
+    'action must be one of: reset, delete, cleanup_workspace, compact',
+  );
+  if (!action) {
+    throw new McpToolError(-32602, 'action is required');
+  }
+
+  const phase = readOptionalEnumString(
+    args,
+    'phase',
+    MAINTENANCE_FOLLOW_THROUGH_PHASES,
+    'phase must be one of: pre_reset, pre_compaction, pre_flush',
+  );
+  if (!phase) {
+    throw new McpToolError(-32602, 'phase is required');
+  }
+
+  const outcome = readOptionalEnumString(
+    args,
+    'outcome',
+    COMPACTION_FOLLOW_THROUGH_OUTCOMES,
+    'outcome must be one of: acknowledged, retry_requested, completed',
+  );
+  if (!outcome) {
+    throw new McpToolError(-32602, 'outcome is required');
+  }
+
+  const body: Record<string, unknown> = {
+    action,
+    phase,
+    outcome,
+  };
+  const maintenance = readOptionalObject(args, 'maintenance');
+  if (maintenance) {
+    body.maintenance = maintenance;
+  }
+
+  const followThroughPath = `/sessions/${encodeURIComponent(sessionId)}/maintenance/follow-through`;
+  const result = await requestRuntimeJson(ctx, followThroughPath, {
+    body,
+  });
+  ensureRouteSuccess('report_session_maintenance_follow_through', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'report_session_maintenance_follow_through result');
+  return {
+    summary: outcome === 'retry_requested'
+      ? `Requested ${phase} retry for ${action} on session ${sessionId}.`
+      : outcome === 'completed'
+        ? `Reported ${phase} completion for ${action} on session ${sessionId}.`
+        : `Acknowledged ${phase} hooks for ${action} on session ${sessionId}.`,
+    structuredContent: {
+      responseStatus: result.status,
+      ...payload,
+      followThroughPath,
       ...buildSessionPaths(sessionId),
     },
   };
@@ -1249,6 +1381,7 @@ const TOOL_HANDLERS: McpToolHandler[] = [
         type: 'object',
         properties: {
           sessionId: { type: 'string' },
+          requireAcknowledgedHooks: { type: 'boolean' },
           worktreeCleanupPolicy: { type: 'string', enum: WORKTREE_CLEANUP_POLICIES },
           maintenance: {
             type: 'object',
@@ -1309,6 +1442,43 @@ const TOOL_HANDLERS: McpToolHandler[] = [
   },
   {
     definition: {
+      name: 'delete_session',
+      title: 'Delete Session',
+      description: 'Delete a runtime session using the same contract as DELETE /sessions/{id}.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sessionId: { type: 'string' },
+          requireAcknowledgedHooks: { type: 'boolean' },
+          worktreeCleanupPolicy: { type: 'string', enum: WORKTREE_CLEANUP_POLICIES },
+          maintenance: {
+            type: 'object',
+            properties: {
+              reason: { type: 'string' },
+              hookPayloads: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    kind: { type: 'string' },
+                    payload: {},
+                  },
+                  required: ['kind'],
+                  additionalProperties: false,
+                },
+              },
+            },
+            additionalProperties: false,
+          },
+        },
+        required: ['sessionId'],
+        additionalProperties: false,
+      },
+    },
+    execute: deleteSession,
+  },
+  {
+    definition: {
       name: 'cleanup_session_workspace',
       title: 'Cleanup Session Workspace',
       description: 'Retry retained worktree cleanup for a closed worktree-backed runtime session.',
@@ -1316,6 +1486,7 @@ const TOOL_HANDLERS: McpToolHandler[] = [
         type: 'object',
         properties: {
           sessionId: { type: 'string' },
+          requireAcknowledgedHooks: { type: 'boolean' },
           worktreeCleanupPolicy: { type: 'string', enum: WORKTREE_CLEANUP_POLICIES },
           maintenance: {
             type: 'object',
@@ -1342,6 +1513,44 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: cleanupSessionWorkspace,
+  },
+  {
+    definition: {
+      name: 'report_session_maintenance_follow_through',
+      title: 'Report Session Maintenance Follow-through',
+      description: 'Persist hook acknowledgement, retry, or completion for reset/delete/cleanup/compact maintenance phases.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sessionId: { type: 'string' },
+          action: { type: 'string', enum: MAINTENANCE_FOLLOW_THROUGH_ACTIONS },
+          phase: { type: 'string', enum: MAINTENANCE_FOLLOW_THROUGH_PHASES },
+          outcome: { type: 'string', enum: COMPACTION_FOLLOW_THROUGH_OUTCOMES },
+          maintenance: {
+            type: 'object',
+            properties: {
+              reason: { type: 'string' },
+              hookPayloads: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    kind: { type: 'string' },
+                    payload: {},
+                  },
+                  required: ['kind'],
+                  additionalProperties: false,
+                },
+              },
+            },
+            additionalProperties: false,
+          },
+        },
+        required: ['sessionId', 'action', 'phase', 'outcome'],
+        additionalProperties: false,
+      },
+    },
+    execute: reportSessionMaintenanceFollowThrough,
   },
   {
     definition: {

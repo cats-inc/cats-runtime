@@ -615,7 +615,7 @@ function buildMaintenanceRequest(
 function buildMaintenanceFollowThrough(
   session: Pick<SessionInfo, 'id'>,
   action: RuntimeSessionMaintenanceAction,
-  phase: 'pre_compaction',
+  phase: 'pre_reset' | 'pre_compaction' | 'pre_flush',
   outcome: RuntimeSessionMaintenanceFollowThroughOutcome,
   requestBody?: ParsedMaintenanceRequestBody,
 ): Parameters<ReturnType<typeof getRuntimeSessionManager>['recordMaintenanceFollowThrough']>[0] {
@@ -658,7 +658,7 @@ function recordSessionMaintenanceFollowThrough(
   ctx: AppContext,
   session: Pick<SessionInfo, 'id'>,
   action: RuntimeSessionMaintenanceAction,
-  phase: 'pre_compaction',
+  phase: 'pre_reset' | 'pre_compaction' | 'pre_flush',
   outcome: RuntimeSessionMaintenanceFollowThroughOutcome,
   requestBody?: ParsedMaintenanceRequestBody,
 ) {
@@ -825,21 +825,12 @@ function resolveCompactionRequestStatus(
   reasonCodes: string[];
   hookStatus: 'none' | 'pending' | 'acknowledged' | 'completed';
 } {
-  const compactionFollowThrough = maintenance.lastFollowThrough?.action === 'compact'
-    && maintenance.lastFollowThrough.phase === 'pre_compaction'
-    ? maintenance.lastFollowThrough
-    : undefined;
-  const hooksPending = maintenance.hooks.preCompaction.pending.length > 0;
-  const hooksAcknowledged = acknowledgeHooks
-    || compactionFollowThrough?.outcome === 'acknowledged'
-    || compactionFollowThrough?.outcome === 'completed';
-  const resolvedHookStatus: 'none' | 'pending' | 'acknowledged' | 'completed' = !hooksPending
-    ? 'none'
-    : compactionFollowThrough?.outcome === 'completed'
-      ? 'completed'
-      : hooksAcknowledged
-        ? 'acknowledged'
-        : 'pending';
+  const hookGate = resolveMaintenanceHookGate(
+    maintenance,
+    'compact',
+    'pre_compaction',
+    acknowledgeHooks,
+  );
 
   if (maintenance.compaction.status === 'not_ready') {
     return {
@@ -853,22 +844,22 @@ function resolveCompactionRequestStatus(
     return {
       status: 'deferred',
       reasonCodes: [...maintenance.compaction.reasonCodes],
-      hookStatus: resolvedHookStatus,
+      hookStatus: hookGate.hookStatus,
     };
   }
 
-  if (hooksPending && !hooksAcknowledged) {
+  if (hookGate.hooksPending && !hookGate.hooksAcknowledged) {
     return {
       status: 'pending_hooks',
-      reasonCodes: ['pre_compaction_hooks_pending', ...maintenance.compaction.reasonCodes],
-      hookStatus: 'pending',
+      reasonCodes: [...hookGate.reasonCodes, ...maintenance.compaction.reasonCodes],
+      hookStatus: hookGate.hookStatus,
     };
   }
 
   return {
     status: 'ready_for_external_compaction',
     reasonCodes: [...maintenance.compaction.reasonCodes],
-    hookStatus: resolvedHookStatus,
+    hookStatus: hookGate.hookStatus,
   };
 }
 
@@ -878,6 +869,118 @@ function parseCompactionFollowThroughOutcome(
   return value === 'acknowledged' || value === 'retry_requested' || value === 'completed'
     ? value
     : undefined;
+}
+
+function parseMaintenanceFollowThroughAction(
+  value: unknown,
+): 'reset' | 'delete' | 'cleanup_workspace' | 'compact' | undefined {
+  return value === 'reset'
+    || value === 'delete'
+    || value === 'cleanup_workspace'
+    || value === 'compact'
+    ? value
+    : undefined;
+}
+
+function parseMaintenanceFollowThroughPhase(
+  value: unknown,
+): 'pre_reset' | 'pre_compaction' | 'pre_flush' | undefined {
+  return value === 'pre_reset' || value === 'pre_compaction' || value === 'pre_flush'
+    ? value
+    : undefined;
+}
+
+function supportsMaintenanceFollowThrough(
+  action: 'reset' | 'delete' | 'cleanup_workspace' | 'compact',
+  phase: 'pre_reset' | 'pre_compaction' | 'pre_flush',
+): boolean {
+  switch (action) {
+    case 'reset':
+      return phase === 'pre_reset';
+    case 'delete':
+    case 'cleanup_workspace':
+      return phase === 'pre_flush';
+    case 'compact':
+      return phase === 'pre_compaction';
+    default:
+      return false;
+  }
+}
+
+function getPendingMaintenanceHooks(
+  maintenance: ReturnType<typeof buildSessionInspection>['maintenance'],
+  phase: 'pre_reset' | 'pre_compaction' | 'pre_flush',
+) {
+  switch (phase) {
+    case 'pre_reset':
+      return maintenance.hooks.preReset.pending;
+    case 'pre_flush':
+      return maintenance.hooks.preFlush.pending;
+    case 'pre_compaction':
+    default:
+      return maintenance.hooks.preCompaction.pending;
+  }
+}
+
+function getMaintenanceFollowThrough(
+  maintenance: ReturnType<typeof buildSessionInspection>['maintenance'],
+  action: 'reset' | 'delete' | 'cleanup_workspace' | 'compact',
+  phase: 'pre_reset' | 'pre_compaction' | 'pre_flush',
+) {
+  return maintenance.lastFollowThrough?.action === action
+    && maintenance.lastFollowThrough.phase === phase
+    ? maintenance.lastFollowThrough
+    : undefined;
+}
+
+function resolveMaintenanceHookGate(
+  maintenance: ReturnType<typeof buildSessionInspection>['maintenance'],
+  action: 'reset' | 'delete' | 'cleanup_workspace' | 'compact',
+  phase: 'pre_reset' | 'pre_compaction' | 'pre_flush',
+  acknowledgeHooks = false,
+): {
+  hooksPending: boolean;
+  hooksAcknowledged: boolean;
+  hookStatus: 'none' | 'pending' | 'acknowledged' | 'completed';
+  reasonCodes: string[];
+} {
+  const followThrough = getMaintenanceFollowThrough(maintenance, action, phase);
+  const hooksPending = getPendingMaintenanceHooks(maintenance, phase).length > 0;
+  const hooksAcknowledged = acknowledgeHooks
+    || followThrough?.outcome === 'acknowledged'
+    || followThrough?.outcome === 'completed';
+  const hookStatus: 'none' | 'pending' | 'acknowledged' | 'completed' = !hooksPending
+    ? 'none'
+    : followThrough?.outcome === 'completed'
+      ? 'completed'
+      : hooksAcknowledged
+        ? 'acknowledged'
+        : 'pending';
+
+  return {
+    hooksPending,
+    hooksAcknowledged,
+    hookStatus,
+    reasonCodes: hooksPending && !hooksAcknowledged ? [`${phase}_hooks_pending`] : [],
+  };
+}
+
+function buildMaintenanceHookConflict(
+  action: 'reset' | 'delete' | 'cleanup_workspace' | 'compact',
+  phase: 'pre_reset' | 'pre_compaction' | 'pre_flush',
+  serialized: ReturnType<typeof serializeSession>,
+  hookGate: ReturnType<typeof resolveMaintenanceHookGate>,
+) {
+  return {
+    error: `This session still has pending ${phase} hooks for action '${action}'.`,
+    action,
+    phase,
+    status: 'pending_hooks' as const,
+    hookStatus: hookGate.hookStatus,
+    reasonCodes: [...hookGate.reasonCodes],
+    maintenance: serialized.inspection.maintenance,
+    session: serialized,
+  };
 }
 
 function applyPreparedWorkspace(
@@ -1931,6 +2034,7 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
   const id = c.req.param('id');
   const session = ctx.registry.get(id);
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
+  const requireAcknowledgedHooks = body.requireAcknowledgedHooks === true;
   let worktreeCleanupPolicy: WorktreeCleanupPolicy | undefined;
   try {
     worktreeCleanupPolicy = readOptionalWorktreeCleanupPolicy(body);
@@ -1957,6 +2061,23 @@ sessionRoutes.post('/sessions/:id/reset', async (c) => {
     maintenanceRequest,
     worktreeCleanupPolicy,
   );
+  const serializedBeforeReset = serializeSession(ctx, ctx.registry.get(id) ?? session);
+  const resetHookGate = resolveMaintenanceHookGate(
+    serializedBeforeReset.inspection.maintenance,
+    'reset',
+    'pre_reset',
+  );
+  if (requireAcknowledgedHooks && resetHookGate.hooksPending && !resetHookGate.hooksAcknowledged) {
+    return c.json(
+      buildMaintenanceHookConflict(
+        'reset',
+        'pre_reset',
+        serializedBeforeReset,
+        resetHookGate,
+      ),
+      409,
+    );
+  }
 
   const worker = runtime.get(id);
   let workerDetached = !runtime.isAttached(id);
@@ -2055,6 +2176,7 @@ sessionRoutes.post('/sessions/:id/workspace/cleanup', async (c) => {
   const id = c.req.param('id');
   const session = ctx.registry.get(id);
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
+  const requireAcknowledgedHooks = body.requireAcknowledgedHooks === true;
   let requestedCleanupPolicy: WorktreeCleanupPolicy | undefined;
   try {
     requestedCleanupPolicy = readOptionalWorktreeCleanupPolicy(body);
@@ -2101,6 +2223,23 @@ sessionRoutes.post('/sessions/:id/workspace/cleanup', async (c) => {
     maintenanceRequest,
     worktreeCleanupPolicy,
   );
+  const serializedBeforeCleanup = serializeSession(ctx, ctx.registry.get(id) ?? session);
+  const cleanupHookGate = resolveMaintenanceHookGate(
+    serializedBeforeCleanup.inspection.maintenance,
+    'cleanup_workspace',
+    'pre_flush',
+  );
+  if (requireAcknowledgedHooks && cleanupHookGate.hooksPending && !cleanupHookGate.hooksAcknowledged) {
+    return c.json(
+      buildMaintenanceHookConflict(
+        'cleanup_workspace',
+        'pre_flush',
+        serializedBeforeCleanup,
+        cleanupHookGate,
+      ),
+      409,
+    );
+  }
 
   const cleanup = await prepareWorkspaceCleanupState(
     session,
@@ -2250,6 +2389,102 @@ sessionRoutes.post('/sessions/:id/compact', async (c) => {
   });
 });
 
+/** POST /sessions/:id/maintenance/follow-through — persist maintenance hook outcomes */
+sessionRoutes.post('/sessions/:id/maintenance/follow-through', async (c) => {
+  const ctx = c.get('ctx');
+  const id = c.req.param('id');
+  const session = ctx.registry.get(id);
+  const body = await c.req.json<{
+    action?: 'reset' | 'delete' | 'cleanup_workspace' | 'compact';
+    phase?: 'pre_reset' | 'pre_compaction' | 'pre_flush';
+    outcome?: RuntimeSessionMaintenanceFollowThroughOutcome;
+    maintenance?: {
+      reason?: string;
+      hookPayloads?: RuntimeSessionMaintenanceHookPayload[];
+    };
+  }>().catch(() => ({}) as {
+    action?: 'reset' | 'delete' | 'cleanup_workspace' | 'compact';
+    phase?: 'pre_reset' | 'pre_compaction' | 'pre_flush';
+    outcome?: RuntimeSessionMaintenanceFollowThroughOutcome;
+    maintenance?: {
+      reason?: string;
+      hookPayloads?: RuntimeSessionMaintenanceHookPayload[];
+    };
+  });
+  const action = parseMaintenanceFollowThroughAction(body.action);
+  const phase = parseMaintenanceFollowThroughPhase(body.phase);
+  const outcome = parseCompactionFollowThroughOutcome(body.outcome);
+  const maintenanceRequest = parseMaintenanceRequestBody(body.maintenance);
+
+  if (!session) {
+    return c.json({ error: 'Session not found' }, 404);
+  }
+
+  if (!action) {
+    return c.json({
+      error: 'action must be one of: reset, delete, cleanup_workspace, compact',
+    }, 400);
+  }
+
+  if (!phase) {
+    return c.json({
+      error: 'phase must be one of: pre_reset, pre_compaction, pre_flush',
+    }, 400);
+  }
+
+  if (!outcome) {
+    return c.json({
+      error: 'outcome must be one of: acknowledged, retry_requested, completed',
+    }, 400);
+  }
+
+  if (!supportsMaintenanceFollowThrough(action, phase)) {
+    return c.json({
+      error: `action '${action}' does not support follow-through phase '${phase}'`,
+    }, 400);
+  }
+
+  const currentSession = ctx.registry.get(id) ?? session;
+  const serializedBefore = serializeSession(ctx, currentSession);
+  if (getPendingMaintenanceHooks(serializedBefore.inspection.maintenance, phase).length === 0) {
+    return c.json({
+      error: `This session does not currently advertise pending ${phase} hooks for action '${action}'.`,
+    }, 409);
+  }
+
+  recordSessionMaintenanceFollowThrough(
+    ctx,
+    currentSession,
+    action,
+    phase,
+    outcome,
+    maintenanceRequest,
+  );
+  const serialized = serializeSession(ctx, ctx.registry.get(id) ?? currentSession);
+
+  if (action === 'compact') {
+    const compaction = resolveCompactionRequestStatus(serialized.inspection.maintenance, false);
+    return c.json({
+      action,
+      phase,
+      outcome,
+      status: compaction.status,
+      hookStatus: compaction.hookStatus,
+      reasonCodes: compaction.reasonCodes,
+      maintenance: serialized.inspection.maintenance,
+      session: serialized,
+    });
+  }
+
+  return c.json({
+    action,
+    phase,
+    outcome,
+    maintenance: serialized.inspection.maintenance,
+    session: serialized,
+  });
+});
+
 /** POST /sessions/:id/compact/follow-through — persist external compaction hook outcomes */
 sessionRoutes.post('/sessions/:id/compact/follow-through', async (c) => {
   const ctx = c.get('ctx');
@@ -2310,6 +2545,7 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
   const session = ctx.registry.get(id);
   const runtime = getRuntimeSessionManager(ctx);
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
+  const requireAcknowledgedHooks = body.requireAcknowledgedHooks === true;
   let worktreeCleanupPolicy: WorktreeCleanupPolicy | undefined;
   try {
     worktreeCleanupPolicy = readOptionalWorktreeCleanupPolicy(body);
@@ -2336,6 +2572,23 @@ sessionRoutes.delete('/sessions/:id', async (c) => {
     maintenanceRequest,
     worktreeCleanupPolicy,
   );
+  const serializedBeforeDelete = serializeSession(ctx, ctx.registry.get(id) ?? session);
+  const deleteHookGate = resolveMaintenanceHookGate(
+    serializedBeforeDelete.inspection.maintenance,
+    'delete',
+    'pre_flush',
+  );
+  if (requireAcknowledgedHooks && deleteHookGate.hooksPending && !deleteHookGate.hooksAcknowledged) {
+    return c.json(
+      buildMaintenanceHookConflict(
+        'delete',
+        'pre_flush',
+        serializedBeforeDelete,
+        deleteHookGate,
+      ),
+      409,
+    );
+  }
 
   const hasNativeSessionState = tracksNativeSessionState(session);
   const hasProviderDiscoveryState = tracksProviderDiscoveryState(session);

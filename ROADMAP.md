@@ -361,12 +361,10 @@ schemas.
 
 - Add a stronger runtime-owned workspace sync primitive for fork/reset flows
   where snapshot copy is no longer sufficient
-- Add explicit lifecycle-flush orchestration around `pre_reset`,
-  `pre_compaction`, and `pre_flush` so products can plug in export pipelines
-  without patching session routes directly
-- Add follow-through around the public `/sessions/{id}/compact` seam so Team 4
-  style flush payloads and eventual external compaction workers can acknowledge,
-  retry, and report completion without inventing a second maintenance contract
+- Extend the existing follow-through/gating seam around `pre_reset`,
+  `pre_compaction`, and `pre_flush` into richer lifecycle-flush orchestration
+  so products can plug in export pipelines without patching session routes
+  directly
 - Add bounded snapshot/sync orchestration for large workspaces so fork/reset
   flows can avoid unstructured full-tree copies when the workspace is too large
   or needs resumable/progressive sync behavior
@@ -384,9 +382,13 @@ schemas.
 - maintenance trigger payload snapshots are now truncated/redacted/size-capped
   before persistence, with additive status/warning metadata surfaced through
   session inspection
-- the public compaction seam now has a persisted follow-through envelope over
-  HTTP and MCP so hosts can acknowledge, retry, and report completion through
+- maintenance hooks now have a persisted follow-through envelope over HTTP and
+  MCP so hosts can acknowledge, retry, and report completion for
+  `pre_reset`, `pre_compaction`, and `pre_flush` through
   `inspection.maintenance.lastFollowThrough`
+- reset/delete/workspace cleanup now support opt-in
+  `requireAcknowledgedHooks` gating so destructive lifecycle routes can refuse
+  to proceed while their action-scoped hooks are still pending
 - generalized workspace sync and broader hook execution plumbing remain
   deferred
 

@@ -69,7 +69,9 @@ Current curated tools:
 - `fork_session`
 - `close_session`
 - `reset_session`
+- `delete_session`
 - `cleanup_session_workspace`
+- `report_session_maintenance_follow_through`
 - `report_compaction_follow_through`
 - `list_browser_drivers`
 - `list_browser_sessions`
@@ -1166,8 +1168,9 @@ machine-readable place to read:
 - whether cleanup is merely recommended or is ready to run now
 - the most recent maintenance trigger request, including additive hook payloads,
   workspace isolation context, and requested worktree disposition
-- the most recent compaction follow-through outcome when an external host has
-  acknowledged hooks, asked for a retry, or reported external completion
+- the most recent maintenance follow-through outcome when an external host has
+  acknowledged hooks, asked for a retry, or reported completion for reset,
+  cleanup, delete, or compaction boundaries
 - the latest close/reset/delete lifecycle marker
 
 `inspection.maintenance.status` is intentionally conservative. Active sessions
@@ -1193,10 +1196,11 @@ decisions for the caller. The persisted snapshot is also guardrailed:
   original blob verbatim
 
 `inspection.maintenance.lastFollowThrough` is the adjacent runtime-owned
-follow-through seam for the public compaction route. It persists the latest
+follow-through seam for maintenance hooks. It persists the latest
 `acknowledged`, `retry_requested`, or `completed` outcome reported through
-`POST /sessions/{id}/compact/follow-through`, using the same truncation,
-redaction, and size-cap guardrails as `lastRequest`.
+`POST /sessions/{id}/maintenance/follow-through` or the compaction-specific
+shortcut route, using the same truncation, redaction, and size-cap guardrails
+as `lastRequest`.
 
 `POST /sessions` also accepts these optional fields:
 
@@ -1692,6 +1696,7 @@ state is discarded.
 
 `POST /sessions/{id}/reset` also accepts optional body fields:
 
+- `requireAcknowledgedHooks?: boolean`
 - `worktreeCleanupPolicy`: `discard`, `merge`, or `preserve`
 - `maintenance`: additive trigger metadata with:
   - `reason?: string`
@@ -1732,7 +1737,10 @@ operation is only a soft close.
 `POST /sessions/{id}/workspace/cleanup` is a bounded retained-worktree recovery
 primitive for closed worktree-backed sessions whose most recent cleanup attempt
 ended with `status: "retained"`. It accepts the same optional `maintenance`
-body plus `worktreeCleanupPolicy: "discard" | "merge" | "preserve"`.
+body plus:
+
+- `requireAcknowledgedHooks?: boolean`
+- `worktreeCleanupPolicy: "discard" | "merge" | "preserve"`
 
 If `worktreeCleanupPolicy` is omitted, the runtime retries the most recent
 retained policy. Responses always include:
@@ -1755,6 +1763,26 @@ continue to agree afterward.
 For `POST /sessions/{id}/reset`, `POST /sessions/{id}/workspace/cleanup`, and
 `DELETE /sessions/{id}`, invalid `worktreeCleanupPolicy` values now return
 `400` instead of silently falling back to the default cleanup behavior.
+
+Those same destructive lifecycle routes also accept
+`requireAcknowledgedHooks: true`. When the route still advertises pending hooks
+for its maintenance phase and the latest action-scoped follow-through has not
+been reported as `acknowledged` or `completed`, the runtime returns `409`
+instead of proceeding:
+
+- `reset -> pre_reset`
+- `delete -> pre_flush`
+- `cleanup_workspace -> pre_flush`
+
+Conflict responses include:
+
+- `action`
+- `phase`
+- `status: "pending_hooks"`
+- `hookStatus`
+- `reasonCodes`
+- `maintenance`
+- `session`
 
 `POST /sessions/{id}/compact` exposes the same runtime-owned maintenance
 contract as a public compaction seam. It still accepts additive hook
@@ -1801,7 +1829,40 @@ stored maintenance snapshot uses the same truncation/redaction/size-cap
 guardrails described above rather than persisting arbitrary hook payloads
 verbatim.
 
-`POST /sessions/{id}/compact/follow-through` is the bounded follow-up seam for
+`POST /sessions/{id}/maintenance/follow-through` is the generic bounded
+follow-up seam for maintenance hooks. It accepts:
+
+- `action: "reset" | "delete" | "cleanup_workspace" | "compact"`
+- `phase: "pre_reset" | "pre_compaction" | "pre_flush"`
+- `outcome: "acknowledged" | "retry_requested" | "completed"`
+- `maintenance?: { reason?: string; hookPayloads?: Array<{ kind: string; payload?: unknown }> }`
+
+The runtime validates the action/phase pair against the current maintenance
+contract:
+
+- `reset -> pre_reset`
+- `delete -> pre_flush`
+- `cleanup_workspace -> pre_flush`
+- `compact -> pre_compaction`
+
+When the current session does not advertise pending hooks for the requested
+phase, the route returns `409` instead of pretending follow-through happened.
+
+Successful responses always include:
+
+- `action`
+- `phase`
+- `outcome`
+- `maintenance`
+- `session`
+
+For `action: "compact"`, responses also include:
+
+- `status`
+- `hookStatus`
+- `reasonCodes`
+
+`POST /sessions/{id}/compact/follow-through` remains as the bounded shortcut for
 external compaction coordination. It accepts:
 
 - `outcome: "acknowledged" | "retry_requested" | "completed"`
@@ -1819,9 +1880,10 @@ maintenance marker, and returns:
 - `maintenance`
 - `session`
 
-`"completed"` does not rewrite runtime compaction baselines for provider-owned
-or externally compacted transcripts by itself; it is an explicit coordination
-fact, not a synthetic `lastCompaction` record.
+`"completed"` does not rewrite runtime compaction baselines for provider-owned,
+externally compacted, or externally cleaned-up transcripts by itself; it is an
+explicit coordination fact, not a synthetic runtime lifecycle or
+`lastCompaction` record.
 
 When the runtime owns the transcript locally, the compaction step now repairs
 malformed JSONL lines, archives the repaired pre-compaction baseline, rewrites
@@ -1841,12 +1903,16 @@ Delete responses also include:
 - `maintenance`: the terminal lifecycle marker for the delete attempt, with
   `status: "completed"` or `status: "retained"`
 
-`DELETE /sessions/{id}` accepts the same optional `maintenance` body plus
-`worktreeCleanupPolicy: "discard" | "merge" | "preserve"`. For worktree-backed
-sessions, the runtime closes any attached worker first, then either detaches the
-worktree and removes the session or returns `status: "retained"` with
-machine-readable cleanup metadata when merge/discard cannot be completed or
-when `preserve` intentionally keeps the worktree for manual handling.
+`DELETE /sessions/{id}` accepts the same optional `maintenance` body plus:
+
+- `requireAcknowledgedHooks?: boolean`
+- `worktreeCleanupPolicy: "discard" | "merge" | "preserve"`
+
+For worktree-backed sessions, the runtime closes any attached worker first,
+then either detaches the worktree and removes the session or returns
+`status: "retained"` with machine-readable cleanup metadata when merge/discard
+cannot be completed or when `preserve` intentionally keeps the worktree for
+manual handling.
 
 For delete responses, top-level `cleanup` is a flat alias of
 `maintenance.cleanup` so transport-facing consumers can read terminal cleanup

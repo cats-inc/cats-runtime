@@ -107,6 +107,8 @@ a full memory pipeline or a scheduler.
 | 2026-03-23 | Plan created and implemented in the same Team 4 lifecycle pass |
 | 2026-03-24 | Follow-up hardening added persisted `inspection.maintenance.lastRequest` metadata plus additive route-level maintenance trigger payloads for close/reset/delete |
 | 2026-03-24 | Added public `POST /sessions/{id}/compact` as an external-only compaction-preparation seam backed by the same maintenance contract |
+| 2026-03-24 | Generalized persisted maintenance follow-through over `POST /sessions/{id}/maintenance/follow-through`, with compaction-specific HTTP/MCP shortcuts retained for compatibility |
+| 2026-03-24 | Added opt-in `requireAcknowledgedHooks` gating for reset/delete/workspace cleanup so destructive lifecycle routes can stop on pending action-scoped hooks before mutating session state |
 
 ---
 

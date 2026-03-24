@@ -240,7 +240,9 @@ describe('runtime MCP facade', () => {
       'close_session',
       'reset_session',
       'fork_session',
+      'delete_session',
       'cleanup_session_workspace',
+      'report_session_maintenance_follow_through',
       'report_compaction_follow_through',
       'list_browser_drivers',
       'list_browser_sessions',
@@ -981,7 +983,7 @@ describe('runtime MCP facade', () => {
     );
     expect(reset.result.structuredContent.session.cwd).toBe(createdWorktree.cwd);
 
-    const cleanupResponse = await app.request('/mcp', {
+    const blockedCleanupResponse = await app.request('/mcp', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -992,6 +994,72 @@ describe('runtime MCP facade', () => {
           name: 'cleanup_session_workspace',
           arguments: {
             sessionId: createdWorktree.id,
+            requireAcknowledgedHooks: true,
+            worktreeCleanupPolicy: 'discard',
+            maintenance: {
+              reason: 'operator_retry_cleanup',
+            },
+          },
+        },
+      }),
+    });
+    expect(blockedCleanupResponse.status).toBe(200);
+    await expect(blockedCleanupResponse.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 15,
+      error: {
+        code: -32000,
+        message: "This session still has pending pre_flush hooks for action 'cleanup_workspace'.",
+        data: expect.objectContaining({
+          httpStatus: 409,
+        }),
+      },
+    });
+
+    const cleanupFollowThroughResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 16,
+        method: 'tools/call',
+        params: {
+          name: 'report_session_maintenance_follow_through',
+          arguments: {
+            sessionId: createdWorktree.id,
+            action: 'cleanup_workspace',
+            phase: 'pre_flush',
+            outcome: 'acknowledged',
+            maintenance: {
+              reason: 'memory_flush_completed',
+            },
+          },
+        },
+      }),
+    });
+    expect(cleanupFollowThroughResponse.status).toBe(200);
+    await expect(cleanupFollowThroughResponse.json()).resolves.toEqual(expect.objectContaining({
+      result: expect.objectContaining({
+        structuredContent: expect.objectContaining({
+          action: 'cleanup_workspace',
+          phase: 'pre_flush',
+          outcome: 'acknowledged',
+        }),
+      }),
+    }));
+
+    const cleanupResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 17,
+        method: 'tools/call',
+        params: {
+          name: 'cleanup_session_workspace',
+          arguments: {
+            sessionId: createdWorktree.id,
+            requireAcknowledgedHooks: true,
             worktreeCleanupPolicy: 'discard',
             maintenance: {
               reason: 'operator_retry_cleanup',
@@ -1035,6 +1103,194 @@ describe('runtime MCP facade', () => {
     }));
     expect(cleaned.result.structuredContent.session.cwd).toBe(repoDir);
     expect(cleaned.result.structuredContent.session.hydration.workspace.runtimeCwd).toBe(repoDir);
+
+    const resetFollowThroughSession = registry.create({
+      id: 'session-maintenance-mcp',
+      providerName: 'claude',
+      providerInstanceId: 'default',
+      cwd: join(rootDir, 'workspace-maintenance'),
+      workspaceMode: 'shared',
+      permissionMode: 'skip',
+    });
+    resetFollowThroughSession.messageCount = 4;
+    resetFollowThroughSession.totalInputTokens = 400;
+    resetFollowThroughSession.totalOutputTokens = 200;
+    registry.updateStatus(resetFollowThroughSession.id, 'closed');
+
+    const maintenanceFollowThroughResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 150,
+        method: 'tools/call',
+        params: {
+          name: 'report_session_maintenance_follow_through',
+          arguments: {
+            sessionId: resetFollowThroughSession.id,
+            action: 'reset',
+            phase: 'pre_reset',
+            outcome: 'acknowledged',
+            maintenance: {
+              reason: 'memory_flush_completed',
+            },
+          },
+        },
+      }),
+    });
+    expect(maintenanceFollowThroughResponse.status).toBe(200);
+    const maintenanceFollowThrough = await maintenanceFollowThroughResponse.json() as {
+      result: {
+        structuredContent: {
+          responseStatus: number;
+          action: string;
+          phase: string;
+          outcome: string;
+          followThroughPath: string;
+          maintenance: {
+            lastFollowThrough: {
+              action: string;
+              phase: string;
+              outcome: string;
+              reason?: string;
+            };
+          };
+        };
+      };
+    };
+    expect(maintenanceFollowThrough.result.structuredContent).toEqual(expect.objectContaining({
+      responseStatus: 200,
+      action: 'reset',
+      phase: 'pre_reset',
+      outcome: 'acknowledged',
+      followThroughPath: `/sessions/${resetFollowThroughSession.id}/maintenance/follow-through`,
+      maintenance: expect.objectContaining({
+        lastFollowThrough: expect.objectContaining({
+          action: 'reset',
+          phase: 'pre_reset',
+          outcome: 'acknowledged',
+          reason: 'memory_flush_completed',
+        }),
+      }),
+    }));
+
+    const deleteToolSession = registry.create({
+      id: 'session-delete-mcp',
+      providerName: 'claude',
+      providerInstanceId: 'default',
+      cwd: join(rootDir, 'workspace-delete'),
+      workspaceMode: 'shared',
+      permissionMode: 'skip',
+    });
+    deleteToolSession.messageCount = 4;
+    deleteToolSession.totalInputTokens = 400;
+    deleteToolSession.totalOutputTokens = 200;
+    registry.updateStatus(deleteToolSession.id, 'closed');
+
+    const blockedDeleteResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 152,
+        method: 'tools/call',
+        params: {
+          name: 'delete_session',
+          arguments: {
+            sessionId: deleteToolSession.id,
+            requireAcknowledgedHooks: true,
+            maintenance: {
+              reason: 'owner_requested_delete',
+            },
+          },
+        },
+      }),
+    });
+    expect(blockedDeleteResponse.status).toBe(200);
+    await expect(blockedDeleteResponse.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 152,
+      error: {
+        code: -32000,
+        message: "This session still has pending pre_flush hooks for action 'delete'.",
+        data: expect.objectContaining({
+          httpStatus: 409,
+        }),
+      },
+    });
+    expect(registry.get(deleteToolSession.id)).toBeTruthy();
+
+    const deleteFollowThroughResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 153,
+        method: 'tools/call',
+        params: {
+          name: 'report_session_maintenance_follow_through',
+          arguments: {
+            sessionId: deleteToolSession.id,
+            action: 'delete',
+            phase: 'pre_flush',
+            outcome: 'acknowledged',
+            maintenance: {
+              reason: 'memory_flush_completed',
+            },
+          },
+        },
+      }),
+    });
+    expect(deleteFollowThroughResponse.status).toBe(200);
+
+    const deleteResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 154,
+        method: 'tools/call',
+        params: {
+          name: 'delete_session',
+          arguments: {
+            sessionId: deleteToolSession.id,
+            requireAcknowledgedHooks: true,
+          },
+        },
+      }),
+    });
+    expect(deleteResponse.status).toBe(200);
+    const deleted = await deleteResponse.json() as {
+      result: {
+        structuredContent: {
+          responseStatus: number;
+          action: string;
+          status: string;
+          deletePath: string;
+          cleanup: {
+            registryDropped: boolean;
+          };
+          maintenance: {
+            action: string;
+            status: string;
+          };
+        };
+      };
+    };
+    expect(deleted.result.structuredContent).toEqual(expect.objectContaining({
+      responseStatus: 200,
+      action: 'delete',
+      status: 'deleted',
+      deletePath: `/sessions/${deleteToolSession.id}`,
+      cleanup: expect.objectContaining({
+        registryDropped: true,
+      }),
+      maintenance: expect.objectContaining({
+        action: 'delete',
+        status: 'completed',
+      }),
+    }));
+    expect(registry.get(deleteToolSession.id)).toBeUndefined();
 
     const compactionSession = registry.create({
       id: 'session-compact-mcp',
@@ -1113,7 +1369,7 @@ describe('runtime MCP facade', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 16,
+        id: 18,
         method: 'tools/call',
         params: {
           name: 'init_workspace',

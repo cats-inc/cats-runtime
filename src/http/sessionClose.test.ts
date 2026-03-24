@@ -804,6 +804,320 @@ describe('session close route', () => {
     }));
   });
 
+  it('records generic maintenance follow-through for pre-reset and pre-flush hooks', async () => {
+    const resetSession = registry.create({
+      id: 'session-maintenance-follow-through-reset',
+      providerName: 'claude',
+      cwd: 'C:/repo-reset-follow-through',
+    });
+    resetSession.messageCount = 4;
+    resetSession.totalInputTokens = 400;
+    resetSession.totalOutputTokens = 200;
+    registry.updateStatus(resetSession.id, 'closed');
+
+    const resetFollowThroughResponse = await app.request(
+      `/sessions/${resetSession.id}/maintenance/follow-through`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'reset',
+          phase: 'pre_reset',
+          outcome: 'acknowledged',
+          maintenance: {
+            reason: 'memory_flush_completed',
+            hookPayloads: [{
+              kind: 'memory_flush',
+              payload: {
+                flushed: true,
+                scope: 'summary',
+              },
+            }],
+          },
+        }),
+      },
+    );
+    expect(resetFollowThroughResponse.status).toBe(200);
+    await expect(resetFollowThroughResponse.json()).resolves.toEqual(expect.objectContaining({
+      action: 'reset',
+      phase: 'pre_reset',
+      outcome: 'acknowledged',
+      maintenance: expect.objectContaining({
+        lastFollowThrough: expect.objectContaining({
+          action: 'reset',
+          phase: 'pre_reset',
+          outcome: 'acknowledged',
+          reason: 'memory_flush_completed',
+          hookPayloads: [
+            expect.objectContaining({
+              kind: 'memory_flush',
+              payloadStatus: 'stored',
+              payload: {
+                flushed: true,
+                scope: 'summary',
+              },
+            }),
+          ],
+        }),
+      }),
+    }));
+
+    const flushSession = registry.create({
+      id: 'session-maintenance-follow-through-flush',
+      providerName: 'claude',
+      cwd: 'C:/repo-flush-follow-through',
+      workspaceMode: 'isolated',
+    });
+    registry.updateStatus(flushSession.id, 'closed');
+
+    const flushFollowThroughResponse = await app.request(
+      `/sessions/${flushSession.id}/maintenance/follow-through`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete',
+          phase: 'pre_flush',
+          outcome: 'retry_requested',
+          maintenance: {
+            reason: 'memory_flush_needs_retry',
+          },
+        }),
+      },
+    );
+    expect(flushFollowThroughResponse.status).toBe(200);
+    await expect(flushFollowThroughResponse.json()).resolves.toEqual(expect.objectContaining({
+      action: 'delete',
+      phase: 'pre_flush',
+      outcome: 'retry_requested',
+      maintenance: expect.objectContaining({
+        lastFollowThrough: expect.objectContaining({
+          action: 'delete',
+          phase: 'pre_flush',
+          outcome: 'retry_requested',
+          reason: 'memory_flush_needs_retry',
+        }),
+      }),
+    }));
+
+    getRuntimeSessionManager(ctx).dropSession(flushSession.id);
+    const persistedFlushResponse = await app.request(`/sessions/${flushSession.id}`);
+    expect(persistedFlushResponse.status).toBe(200);
+    await expect(persistedFlushResponse.json()).resolves.toEqual(expect.objectContaining({
+      inspection: expect.objectContaining({
+        maintenance: expect.objectContaining({
+          lastFollowThrough: expect.objectContaining({
+            action: 'delete',
+            phase: 'pre_flush',
+            outcome: 'retry_requested',
+            reason: 'memory_flush_needs_retry',
+          }),
+        }),
+      }),
+    }));
+  });
+
+  it('rejects invalid maintenance follow-through action and phase combinations', async () => {
+    const session = registry.create({
+      id: 'session-maintenance-follow-through-invalid',
+      providerName: 'claude',
+      cwd: 'C:/repo-invalid-follow-through',
+    });
+    session.messageCount = 4;
+    session.totalInputTokens = 400;
+    session.totalOutputTokens = 200;
+    registry.updateStatus(session.id, 'closed');
+
+    const response = await app.request(`/sessions/${session.id}/maintenance/follow-through`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        action: 'reset',
+        phase: 'pre_flush',
+        outcome: 'acknowledged',
+      }),
+    });
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "action 'reset' does not support follow-through phase 'pre_flush'",
+    });
+  });
+
+  it('gates reset behind acknowledged pre-reset hooks when requested', async () => {
+    const session = registry.create({
+      id: 'session-reset-hook-gated',
+      providerName: 'claude',
+      cwd: 'C:/repo-reset-gated',
+    });
+    session.messageCount = 4;
+    session.totalInputTokens = 400;
+    session.totalOutputTokens = 200;
+    registry.setProviderSessionId(session.id, 'provider-session-reset-gated');
+    registry.setProviderState(session.id, {
+      resumeToken: 'keep-me',
+    });
+    registry.updateStatus(session.id, 'closed');
+
+    const blockedReset = await app.request(`/sessions/${session.id}/reset`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        requireAcknowledgedHooks: true,
+        maintenance: {
+          reason: 'owner_requested_reset',
+        },
+      }),
+    });
+    expect(blockedReset.status).toBe(409);
+    await expect(blockedReset.json()).resolves.toEqual(expect.objectContaining({
+      error: "This session still has pending pre_reset hooks for action 'reset'.",
+      action: 'reset',
+      phase: 'pre_reset',
+      status: 'pending_hooks',
+      hookStatus: 'pending',
+      reasonCodes: ['pre_reset_hooks_pending'],
+      maintenance: expect.objectContaining({
+        lastRequest: expect.objectContaining({
+          action: 'reset',
+          reason: 'owner_requested_reset',
+        }),
+      }),
+      session: expect.objectContaining({
+        providerSessionId: 'provider-session-reset-gated',
+      }),
+    }));
+    expect(registry.get(session.id)?.providerSessionId).toBe('provider-session-reset-gated');
+    expect(registry.get(session.id)?.providerState).toEqual({ resumeToken: 'keep-me' });
+
+    const acknowledgeReset = await app.request(`/sessions/${session.id}/maintenance/follow-through`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        action: 'reset',
+        phase: 'pre_reset',
+        outcome: 'acknowledged',
+        maintenance: {
+          reason: 'memory_flush_completed',
+        },
+      }),
+    });
+    expect(acknowledgeReset.status).toBe(200);
+
+    const resetResponse = await app.request(`/sessions/${session.id}/reset`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        requireAcknowledgedHooks: true,
+      }),
+    });
+    expect(resetResponse.status).toBe(200);
+    const resetBody = await resetResponse.json() as {
+      action: string;
+      status: string;
+      providerSessionId?: string;
+      providerState?: unknown;
+      inspection: {
+        maintenance: {
+          lastFollowThrough?: {
+            action: string;
+            phase: string;
+            outcome: string;
+          };
+          lastLifecycle: {
+            action: string;
+            status: string;
+          };
+        };
+      };
+    };
+    expect(resetBody.action).toBe('reset');
+    expect(resetBody.status).toBe('closed');
+    expect(resetBody.providerSessionId).toBeUndefined();
+    expect(resetBody.providerState).toBeUndefined();
+    expect(resetBody.inspection.maintenance.lastFollowThrough).toEqual(expect.objectContaining({
+      action: 'reset',
+      phase: 'pre_reset',
+      outcome: 'acknowledged',
+    }));
+    expect(resetBody.inspection.maintenance.lastLifecycle).toEqual(expect.objectContaining({
+      action: 'reset',
+      status: 'completed',
+    }));
+    expect(registry.get(session.id)?.providerSessionId).toBeUndefined();
+    expect(registry.get(session.id)?.providerState).toBeUndefined();
+  });
+
+  it('gates delete behind acknowledged pre-flush hooks when requested', async () => {
+    const session = registry.create({
+      id: 'session-delete-hook-gated',
+      providerName: 'claude',
+      cwd: 'C:/repo-delete-gated',
+    });
+    session.messageCount = 4;
+    session.totalInputTokens = 400;
+    session.totalOutputTokens = 200;
+    registry.updateStatus(session.id, 'closed');
+
+    const blockedDelete = await app.request(`/sessions/${session.id}`, {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        requireAcknowledgedHooks: true,
+        maintenance: {
+          reason: 'owner_requested_delete',
+        },
+      }),
+    });
+    expect(blockedDelete.status).toBe(409);
+    await expect(blockedDelete.json()).resolves.toEqual(expect.objectContaining({
+      error: "This session still has pending pre_flush hooks for action 'delete'.",
+      action: 'delete',
+      phase: 'pre_flush',
+      status: 'pending_hooks',
+      hookStatus: 'pending',
+      reasonCodes: ['pre_flush_hooks_pending'],
+      maintenance: expect.objectContaining({
+        lastRequest: expect.objectContaining({
+          action: 'delete',
+          reason: 'owner_requested_delete',
+        }),
+      }),
+    }));
+    expect(registry.get(session.id)).toBeTruthy();
+
+    const acknowledgeDelete = await app.request(`/sessions/${session.id}/maintenance/follow-through`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        action: 'delete',
+        phase: 'pre_flush',
+        outcome: 'acknowledged',
+        maintenance: {
+          reason: 'memory_flush_completed',
+        },
+      }),
+    });
+    expect(acknowledgeDelete.status).toBe(200);
+
+    const deleteResponse = await app.request(`/sessions/${session.id}`, {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        requireAcknowledgedHooks: true,
+      }),
+    });
+    expect(deleteResponse.status).toBe(200);
+    await expect(deleteResponse.json()).resolves.toEqual(expect.objectContaining({
+      action: 'delete',
+      status: 'deleted',
+      maintenance: expect.objectContaining({
+        action: 'delete',
+        status: 'completed',
+      }),
+    }));
+    expect(registry.get(session.id)).toBeUndefined();
+  });
+
   it('runtime-compacts managed transcripts, repairs malformed lines, and persists the compaction baseline', async () => {
     const session = registry.create({
       id: 'session-runtime-compact',

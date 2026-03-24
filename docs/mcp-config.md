@@ -47,7 +47,10 @@ Current tools:
 - `close_session`
 - `reset_session`
 - `fork_session`
+- `delete_session`
 - `cleanup_session_workspace`
+- `report_session_maintenance_follow_through`
+- `report_compaction_follow_through`
 - `list_browser_drivers`
 - `list_browser_sessions`
 - `browser_summary`
@@ -85,16 +88,34 @@ shape as the HTTP lifecycle route.
 
 `reset_session` is the curated MCP wrapper over `POST /sessions/{id}/reset`.
 It preserves the direct runtime reset contract, including optional
-`worktreeCleanupPolicy`, additive `maintenance` metadata, and retained cleanup
-responses when worktree cleanup cannot finish safely.
+`requireAcknowledgedHooks`, `worktreeCleanupPolicy`, additive `maintenance`
+metadata, and retained cleanup responses when worktree cleanup cannot finish
+safely.
+
+`delete_session` is the curated MCP wrapper over `DELETE /sessions/{id}`. It
+preserves the direct runtime delete contract, including optional
+`requireAcknowledgedHooks`, `worktreeCleanupPolicy`, additive `maintenance`
+metadata, and retained cleanup responses when terminal cleanup cannot finish
+safely.
 
 `cleanup_session_workspace` is the curated MCP wrapper over
 `POST /sessions/{id}/workspace/cleanup`. It gives orchestrators the same
 bounded retained-worktree cleanup retry seam as the direct HTTP API, including
-optional `worktreeCleanupPolicy`, additive `maintenance` metadata, and the
-updated session/maintenance snapshot after the retry. Like the direct route, it
-does not auto-replay reset/delete follow-through; it only retries workspace
-cleanup and refreshes persisted workspace hydration/skill delivery state.
+optional `requireAcknowledgedHooks`, `worktreeCleanupPolicy`, additive
+`maintenance` metadata, and the updated session/maintenance snapshot after the
+retry. Like the direct route, it does not auto-replay reset/delete
+follow-through; it only retries workspace cleanup and refreshes persisted
+workspace hydration/skill delivery state.
+
+`report_session_maintenance_follow_through` is the generic MCP wrapper over
+`POST /sessions/{id}/maintenance/follow-through`. It lets orchestrators report
+`acknowledged`, `retry_requested`, or `completed` outcomes for validated
+`reset`, `delete`, `cleanup_workspace`, or `compact` maintenance phases without
+leaving the MCP tool plane.
+
+`report_compaction_follow_through` remains the narrower MCP shortcut over
+`POST /sessions/{id}/compact/follow-through` for compaction-only flows that do
+not need to pass `action` and `phase` explicitly.
 
 `POST /mcp` uses the same runtime auth policy as the direct HTTP API. If
 `cats-runtime` is configured with an API key, MCP clients must send the same
@@ -220,7 +241,10 @@ tool surface here. The first shared tool names are:
 - `close_session`
 - `reset_session`
 - `fork_session`
+- `delete_session`
 - `cleanup_session_workspace`
+- `report_session_maintenance_follow_through`
+- `report_compaction_follow_through`
 - `list_browser_drivers`
 - `list_browser_sessions`
 - `browser_summary`
@@ -270,4 +294,4 @@ This keeps the product/runtime ownership split explicit:
 
 ---
 
-*Last updated: 2026-03-23*
+*Last updated: 2026-03-24*

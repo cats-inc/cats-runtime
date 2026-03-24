@@ -277,9 +277,9 @@ src/
 - Persists the last accepted maintenance trigger request on the logical session
   so Team 4 style flush/compaction payloads can survive past the immediate
   reset/delete response without making runtime the memory owner
-- Persists the latest public compaction follow-through outcome so external
-  workers can acknowledge, retry, or report completion without inventing a
-  second maintenance contract outside runtime inspection
+- Persists the latest maintenance follow-through outcome so external hosts can
+  acknowledge, retry, or report completion for reset/cleanup/delete/compaction
+  hooks without inventing a second contract outside runtime inspection
 - Sanitizes persisted maintenance trigger snapshots with bounded
   truncation/redaction/size-cap guardrails so sensitive or unbounded product
   payloads do not become verbatim runtime history
@@ -454,10 +454,13 @@ src/
     read model as a public compaction route, returning machine-readable
     readiness plus sanitized hook-payload persistence and compacting managed
     transcripts directly when the runtime owns the transcript safely
-20. `POST /sessions/{id}/compact/follow-through` persists additive
-    acknowledgement/retry/completion outcomes for external compaction
-    coordination and feeds the same session inspection read model
-21. Stream events are returned directly to the caller
+20. `POST /sessions/{id}/maintenance/follow-through` persists additive
+    acknowledgement/retry/completion outcomes for reset/delete/cleanup/compact
+    hooks, feeds the same session inspection read model, and now lets
+    reset/delete/workspace-cleanup opt into `requireAcknowledgedHooks` gating
+21. `POST /sessions/{id}/compact/follow-through` remains the compaction-specific
+    shortcut over that same follow-through contract
+22. Stream events are returned directly to the caller
 
 For WSL-backed Cursor/Kiro discovery:
 

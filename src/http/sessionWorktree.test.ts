@@ -626,6 +626,115 @@ describe('session worktree routes', () => {
     }));
   });
 
+  it('gates retained worktree cleanup behind acknowledged pre-flush hooks when requested', async () => {
+    const repoDir = createGitWorkspace(rootDir, 'repo-cleanup-gated');
+    const prepared = await prepareSessionWorkspace({
+      sessionId: 'worktree-cleanup-gated',
+      sessionBaseDir,
+      cwd: repoDir,
+      workspaceMode: 'shared',
+      workspaceIsolationMode: 'worktree',
+    });
+
+    const session = registry.create({
+      id: 'worktree-cleanup-gated',
+      providerName: 'codex',
+      cwd: prepared.cwd,
+      workspaceMode: prepared.workspaceMode,
+      workspaceIsolation: prepared.workspaceIsolation,
+      hydration: buildHydration(prepared.cwd, repoDir),
+    });
+    registry.updateStatus(session.id, 'closed');
+
+    writeFileSync(join(prepared.cwd, 'tracked.txt'), 'gate this cleanup first\n', 'utf8');
+
+    const retainedResponse = await app.request(`/sessions/${session.id}/reset`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        worktreeCleanupPolicy: 'preserve',
+      }),
+    });
+    expect(retainedResponse.status).toBe(200);
+
+    const blockedCleanup = await app.request(`/sessions/${session.id}/workspace/cleanup`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        requireAcknowledgedHooks: true,
+        worktreeCleanupPolicy: 'discard',
+        maintenance: {
+          reason: 'operator_retry_cleanup',
+        },
+      }),
+    });
+    expect(blockedCleanup.status).toBe(409);
+    await expect(blockedCleanup.json()).resolves.toEqual(expect.objectContaining({
+      error: "This session still has pending pre_flush hooks for action 'cleanup_workspace'.",
+      action: 'cleanup_workspace',
+      phase: 'pre_flush',
+      status: 'pending_hooks',
+      hookStatus: 'pending',
+      reasonCodes: ['pre_flush_hooks_pending'],
+      maintenance: expect.objectContaining({
+        lastRequest: expect.objectContaining({
+          action: 'cleanup_workspace',
+          reason: 'operator_retry_cleanup',
+          worktreeDisposition: 'discard',
+        }),
+      }),
+    }));
+    expect(registry.get(session.id)?.cwd).toBe(prepared.workspaceIsolation.worktree!.worktreePath);
+    expect(existsSync(prepared.workspaceIsolation.worktree!.worktreePath)).toBe(true);
+
+    const acknowledgeCleanup = await app.request(`/sessions/${session.id}/maintenance/follow-through`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        action: 'cleanup_workspace',
+        phase: 'pre_flush',
+        outcome: 'acknowledged',
+        maintenance: {
+          reason: 'memory_flush_completed',
+        },
+      }),
+    });
+    expect(acknowledgeCleanup.status).toBe(200);
+
+    const cleanupResponse = await app.request(`/sessions/${session.id}/workspace/cleanup`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        requireAcknowledgedHooks: true,
+        worktreeCleanupPolicy: 'discard',
+      }),
+    });
+    expect(cleanupResponse.status).toBe(200);
+    const cleanupBody = await cleanupResponse.json() as {
+      action: string;
+      status: string;
+      maintenance: {
+        lastFollowThrough?: {
+          action: string;
+          phase: string;
+          outcome: string;
+        };
+      };
+      session: {
+        cwd: string;
+      };
+    };
+    expect(cleanupBody.action).toBe('cleanup_workspace');
+    expect(cleanupBody.status).toBe('completed');
+    expect(cleanupBody.maintenance.lastFollowThrough).toEqual(expect.objectContaining({
+      action: 'cleanup_workspace',
+      phase: 'pre_flush',
+      outcome: 'acknowledged',
+    }));
+    expect(cleanupBody.session.cwd).toBe(repoDir);
+    expect(existsSync(prepared.workspaceIsolation.worktree!.worktreePath)).toBe(false);
+  });
+
   it('keeps retained worktree cleanup retry bounded when merge still sees a dirty source repo', async () => {
     const repoDir = createGitWorkspace(rootDir, 'repo-cleanup-retry-dirty');
     const prepared = await prepareSessionWorkspace({
