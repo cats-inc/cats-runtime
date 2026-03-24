@@ -98,43 +98,73 @@ This spec defines a hybrid contract:
 8. Presets shall be optional per target. Unsupported presets shall be omitted
    or explicitly marked unavailable; the runtime shall not pretend every
    provider supports the same intent layer.
-9. `cats-runtime` shall expose provider-specific advanced controls through a
-   schema-driven contract rather than raw vendor payload templates.
-10. Advanced control identifiers shall be runtime-owned stable keys. When a
+9. Presets may affect either:
+   - control defaults only
+   - control defaults plus concrete-entry resolution
+   when a provider expresses an intent such as `long_context` or
+   `deep_reasoning` through a different executable entry rather than only a
+   parameter tweak.
+10. When a preset can imply a different concrete entry, the advanced catalog
+    shall describe that relationship explicitly through preset-to-entry
+    applicability and preferred-resolution metadata.
+11. `cats-runtime` shall expose provider-specific advanced controls through a
+    schema-driven contract rather than raw vendor payload templates.
+12. Advanced control identifiers shall be runtime-owned stable keys. When a
     control is provider-specific, its key should be provider-namespaced rather
     than pretending to be universal.
-11. Advanced control definitions shall describe at least:
+13. Advanced control definitions shall describe at least:
     - key
     - label
     - description when useful
     - value kind (`enum`, `boolean`, `number`, `string`)
     - allowed values or bounds when applicable
     - scope (`session_default`, `request`, or `both`)
+    - applicability to one or more concrete entries
     - optional semantic tags when the runtime can safely expose them
-12. `cats-runtime` shall introduce a structured selection contract for advanced
+14. The advanced catalog shall define precedence rules:
+    - preset values are default bundles
+    - explicit control values override preset-supplied control defaults
+    - request-scoped overrides override session defaults for that request only
+15. `scope: both` shall mean a control may be persisted as a session default and
+    may also be overridden per request. When both are present, the request value
+    wins for that turn while the session default remains the baseline.
+16. `cats-runtime` shall introduce a structured selection contract for advanced
     model choice. The selection contract shall be able to represent:
     - the chosen concrete entry
+    - whether the concrete entry is explicitly pinned or may be resolved by the
+      runtime
     - an optional preset
     - zero or more advanced control values
-13. Session creation shall be able to persist a session-level advanced model
+17. When a structured selection does not explicitly pin an entry, the runtime
+    may resolve or switch entries to satisfy the chosen preset or provider
+    defaults.
+18. When a structured selection explicitly pins an entry, the runtime shall not
+    silently replace that entry with a different one just because a preset would
+    prefer it. Incompatible combinations shall be rejected or surfaced as
+    unavailable, rather than silently rewritten.
+19. Session creation shall be able to persist a session-level advanced model
     selection, rather than only a single `model` string.
-14. Turn/message execution may later support additive per-turn advanced
+20. Turn/message execution may later support additive per-turn advanced
     selection overrides, but the session-level structured selection is the first
     requirement.
-15. The existing `model` string may remain in session views and compatibility
+21. The existing `model` string may remain in session views and compatibility
     APIs as a resolved snapshot during migration, but it shall no longer be the
     only authoritative representation once the structured selection contract is
     introduced.
-16. The runtime shall own resolution from:
+22. The runtime shall own resolution from:
     - concrete entry
     - optional preset
     - provider-specific control values
     into backend-specific spawn args, request payload fields, or other runtime
     execution details.
-17. `cats` and other upper-layer hosts shall consume the advanced catalog
+23. Advanced controls and presets shall primarily come from runtime-owned
+    provider knowledge shipped with `cats-runtime`. Dynamic discovery may
+    augment availability, defaults, limits, or supported entries when the
+    backend can expose such facts safely.
+24. `cats` and other upper-layer hosts shall consume the advanced catalog
     through server-side product APIs. Renderers shall not be required to learn
     provider-specific runtime mappings.
-18. The advanced catalog contract shall support additive migration from the
+25. The advanced catalog contract shall support additive migration from the
     current v1 model catalog. Existing lightweight consumers shall continue to
     work until upgraded.
 
@@ -162,12 +192,15 @@ Advanced model selection should be split into three layers:
      different model ids or materially different runtime modes
 2. **Normalized presets**
    - a deliberately small intent vocabulary such as `fast` or
-     `deep_reasoning`
+   `deep_reasoning`
    - optional per provider target
+   - may optionally resolve to a preferred concrete entry when the provider
+     expresses that intent through a different executable entry
 3. **Provider-specific controls**
    - schema-driven advanced knobs
    - runtime-owned and provider-aware
    - renderer-readable without becoming vendor-specific logic
+   - explicitly scoped to applicable entries when not provider-wide
 
 ### Illustrative Advanced Catalog Shape
 
@@ -191,12 +224,19 @@ Advanced model selection should be split into three layers:
     {
       "id": "balanced",
       "label": "Balanced",
-      "availability": "supported"
+      "availability": "supported",
+      "applicableEntryIds": ["gpt-5.4"],
+      "preferredEntryId": "gpt-5.4"
     },
     {
       "id": "deep_reasoning",
       "label": "Deep reasoning",
-      "availability": "supported"
+      "availability": "supported",
+      "applicableEntryIds": ["gpt-5.4"],
+      "preferredEntryId": "gpt-5.4",
+      "controlDefaults": {
+        "openai.reasoning_effort": "high"
+      }
     }
   ],
   "controls": [
@@ -204,13 +244,15 @@ Advanced model selection should be split into three layers:
       "key": "openai.reasoning_effort",
       "label": "Reasoning effort",
       "kind": "enum",
-      "scope": "session_default",
+      "scope": "both",
       "values": ["low", "medium", "high"],
-      "semanticTags": ["reasoning_intensity"]
+      "semanticTags": ["reasoning_intensity"],
+      "applicableEntryIds": ["gpt-5.4"]
     }
   ],
   "defaultSelection": {
     "entryId": "gpt-5.4",
+    "entryMode": "auto",
     "presetId": "balanced",
     "controls": {
       "openai.reasoning_effort": "medium"
@@ -225,10 +267,58 @@ Advanced model selection should be split into three layers:
 ```json
 {
   "entryId": "gpt-5.4",
+  "entryMode": "explicit",
   "presetId": "deep_reasoning",
   "controls": {
     "openai.reasoning_effort": "high"
   }
+}
+```
+
+### Illustrative Claude Shape
+
+This example shows why presets cannot be treated as parameter-only bundles.
+Some intents may legitimately map to different concrete entries.
+
+```json
+{
+  "provider": "claude",
+  "backend": "cli",
+  "instance": "default",
+  "entries": [
+    {
+      "id": "claude-opus-4-6",
+      "label": "Opus 4.6",
+      "default": true,
+      "capabilityTags": ["reasoning", "tool_use"]
+    },
+    {
+      "id": "claude-opus-4-6[1m]",
+      "label": "Opus 4.6 1M context",
+      "capabilityTags": ["reasoning", "tool_use", "long_context"]
+    }
+  ],
+  "presets": [
+    {
+      "id": "long_context",
+      "label": "Long context",
+      "availability": "supported",
+      "applicableEntryIds": ["claude-opus-4-6", "claude-opus-4-6[1m]"],
+      "preferredEntryId": "claude-opus-4-6[1m]"
+    }
+  ],
+  "controls": [
+    {
+      "key": "anthropic.thinking_budget_tokens",
+      "label": "Thinking budget",
+      "kind": "number",
+      "scope": "both",
+      "min": 0,
+      "max": 32000,
+      "semanticTags": ["reasoning_budget"],
+      "applicableEntryIds": ["claude-opus-4-6", "claude-opus-4-6[1m]"]
+    }
+  ]
 }
 ```
 
@@ -239,11 +329,63 @@ Advanced model selection should be split into three layers:
   sub-variant should surface as its own concrete entry rather than being
   re-expressed as a fake universal control.
 - Presets are intent shortcuts, not provider wire formats.
+- A preset may resolve to:
+  - control defaults only
+  - or control defaults plus a preferred concrete entry
+- Explicit control values override preset control defaults.
+- When a selection does not explicitly pin an entry, the runtime may switch to
+  a preset-preferred entry during resolution.
+- When a selection explicitly pins an entry, the runtime must not silently
+  replace it with a different entry just because a preset prefers one.
 - Controls carry runtime-owned schema keys. They may map to:
   - request payload fields
   - CLI flags
   - environment-bound runtime choices
   - or entry-selection adjustments
+
+### Precedence Rules
+
+The intended resolution order is:
+
+1. entry defaults
+2. preset-supplied defaults
+3. session-level explicit control values
+4. per-request explicit overrides
+
+This means:
+
+- presets behave like default bundles, not atomic immutable modes
+- explicit controls always win over preset defaults
+- request overrides win over session defaults for that request only
+
+### Applicability Rules
+
+- Controls may be provider-wide, but when a control is not valid for every
+  entry the catalog must expose applicability explicitly.
+- The first preferred shape is `applicableEntryIds` on controls and presets.
+- UIs should use that applicability data to disable or hide unsupported
+  combinations instead of guessing from provider names.
+
+### Knowledge Source Rules
+
+- Advanced entries, presets, and controls belong primarily to the runtime's
+  shipped provider knowledge layer.
+- Dynamic discovery may augment:
+  - entry availability
+  - limit facts
+  - default selections
+  - supported preset/control applicability
+- Dynamic discovery should not be required in order for the runtime to know the
+  stable schema keys of provider-specific controls.
+
+### Tag Vocabulary Guidance
+
+- `capabilityTags` describe concrete-entry traits or execution facts such as
+  `long_context`, `reasoning`, or `tool_use`.
+- `semanticTags` describe the meaning of a control, such as
+  `reasoning_intensity` or `reasoning_budget`.
+- The two tag families may share related vocabulary, but they are not the same
+  namespace and should not be treated as interchangeable.
 
 ### `cats` Consumption Direction
 
