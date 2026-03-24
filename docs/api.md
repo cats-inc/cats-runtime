@@ -67,6 +67,10 @@ Current curated tools:
 - `create_session`
 - `send_message`
 - `fork_session`
+- `close_session`
+- `reset_session`
+- `cleanup_session_workspace`
+- `report_compaction_follow_through`
 - `list_browser_drivers`
 - `list_browser_sessions`
 - `browser_summary`
@@ -1162,6 +1166,8 @@ machine-readable place to read:
 - whether cleanup is merely recommended or is ready to run now
 - the most recent maintenance trigger request, including additive hook payloads,
   workspace isolation context, and requested worktree disposition
+- the most recent compaction follow-through outcome when an external host has
+  acknowledged hooks, asked for a retry, or reported external completion
 - the latest close/reset/delete lifecycle marker
 
 `inspection.maintenance.status` is intentionally conservative. Active sessions
@@ -1185,6 +1191,12 @@ decisions for the caller. The persisted snapshot is also guardrailed:
 - if the sanitized payload still exceeds the runtime byte cap, the runtime
   omits `payload` and records `payloadStatus: "omitted"` instead of storing the
   original blob verbatim
+
+`inspection.maintenance.lastFollowThrough` is the adjacent runtime-owned
+follow-through seam for the public compaction route. It persists the latest
+`acknowledged`, `retry_requested`, or `completed` outcome reported through
+`POST /sessions/{id}/compact/follow-through`, using the same truncation,
+redaction, and size-cap guardrails as `lastRequest`.
 
 `POST /sessions` also accepts these optional fields:
 
@@ -1751,6 +1763,11 @@ coordination input:
 - `acknowledgeHooks?: boolean`
 - `maintenance?: { reason?: string; hookPayloads?: Array<{ kind: string; payload?: unknown }> }`
 
+`acknowledgeHooks: true` remains the compatibility shorthand for older clients.
+When it is used against pending `pre_compaction` hooks, the runtime now also
+persists an `inspection.maintenance.lastFollowThrough` outcome of
+`"acknowledged"` so later reads do not lose that state immediately.
+
 The runtime always returns a machine-readable coordination result:
 
 - `status: "not_ready"` when the session has no compaction evidence yet or has
@@ -1768,7 +1785,7 @@ Responses also include:
 
 - `execution: "external_only" | "runtime"`
 - `runtimeCompactionExecuted: boolean`
-- `hookStatus: "none" | "pending" | "acknowledged"`
+- `hookStatus: "none" | "pending" | "acknowledged" | "completed"`
 - `reasonCodes`: machine-readable readiness reasons copied from
   `inspection.maintenance.compaction`
 - optional `runtimeCompaction`: the persisted
@@ -1783,6 +1800,28 @@ explain which compaction-preparation trigger was accepted most recently. The
 stored maintenance snapshot uses the same truncation/redaction/size-cap
 guardrails described above rather than persisting arbitrary hook payloads
 verbatim.
+
+`POST /sessions/{id}/compact/follow-through` is the bounded follow-up seam for
+external compaction coordination. It accepts:
+
+- `outcome: "acknowledged" | "retry_requested" | "completed"`
+- `maintenance?: { reason?: string; hookPayloads?: Array<{ kind: string; payload?: unknown }> }`
+
+The route persists the outcome under
+`inspection.maintenance.lastFollowThrough`, records a machine-readable
+maintenance marker, and returns:
+
+- `action: "compact"`
+- `outcome`
+- `status`: the current compaction readiness after applying the follow-through
+- `hookStatus`
+- `reasonCodes`
+- `maintenance`
+- `session`
+
+`"completed"` does not rewrite runtime compaction baselines for provider-owned
+or externally compacted transcripts by itself; it is an explicit coordination
+fact, not a synthetic `lastCompaction` record.
 
 When the runtime owns the transcript locally, the compaction step now repairs
 malformed JSONL lines, archives the repaired pre-compaction baseline, rewrites
@@ -2012,4 +2051,4 @@ Errors use this format:
 
 ---
 
-*Last updated: 2026-03-23*
+*Last updated: 2026-03-24*

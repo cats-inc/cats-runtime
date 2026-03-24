@@ -219,6 +219,58 @@ describe('buildSessionMaintenance', () => {
     expect(maintenance.markers).toEqual(trackedMaintenance.markers);
   });
 
+  it('surfaces persisted maintenance follow-through outcomes alongside pending hooks', () => {
+    const maintenance = buildSessionMaintenance({
+      session: createSession({
+        status: 'closed',
+        messageCount: 32,
+        totalInputTokens: 8_000,
+        totalOutputTokens: 6_500,
+      }),
+      view: createView({
+        attached: false,
+        activity: 'inactive',
+      }),
+      trackedMaintenance: {
+        lastFollowThrough: {
+          action: 'compact',
+          phase: 'pre_compaction',
+          sessionId: 'session-1',
+          observedAt: '2026-03-24T04:00:00.000Z',
+          outcome: 'completed',
+          reason: 'external_compaction_completed',
+          hookPayloads: [{
+            kind: 'memory_flush',
+            payload: {
+              authorization: 'Bearer secret-token',
+              summary: 'flush complete',
+            },
+          }],
+        },
+        markers: [],
+      },
+    });
+
+    expect(maintenance.hooks.preCompaction.pending).toHaveLength(1);
+    expect(maintenance.lastFollowThrough).toEqual(expect.objectContaining({
+      action: 'compact',
+      phase: 'pre_compaction',
+      outcome: 'completed',
+      reason: 'external_compaction_completed',
+      hookPayloads: [
+        expect.objectContaining({
+          kind: 'memory_flush',
+          payloadStatus: 'redacted',
+          payloadWarnings: expect.arrayContaining(['sensitive_keys_redacted']),
+          payload: expect.objectContaining({
+            authorization: '[redacted]',
+            summary: 'flush complete',
+          }),
+        }),
+      ],
+    }));
+  });
+
   it('uses the last compaction baseline to evaluate only post-compaction live context', () => {
     const maintenance = buildSessionMaintenance({
       session: createSession({

@@ -5,6 +5,7 @@ import type {
   RuntimeEventExcerpt,
   RuntimeGuardrailResult,
   RuntimeSessionCompactionRecord,
+  RuntimeSessionMaintenanceFollowThrough,
   RuntimeSessionMaintenanceRequest,
   RuntimeSessionLifecycleAction,
   RuntimeSessionLifecycleCleanupSummary,
@@ -33,6 +34,7 @@ import { ApiBackendManager } from '../../backends/api/runtime/ApiBackendManager.
 import { AgentBackendManager } from '../../backends/agent/runtime/AgentBackendManager.js';
 import { extractWakeReason } from './wakeReason.js';
 import {
+  cloneMaintenanceFollowThrough,
   cloneMaintenanceRequest,
   type RuntimeTrackedSessionMaintenanceState,
 } from './sessionMaintenance.js';
@@ -368,6 +370,26 @@ export class RuntimeSessionManager {
       },
     });
     return cloneMaintenanceRequest(sanitizedRequest);
+  }
+
+  recordMaintenanceFollowThrough(
+    followThrough: RuntimeSessionMaintenanceFollowThrough,
+  ): RuntimeSessionMaintenanceFollowThrough {
+    const tracked = this.ensureTrackedState(followThrough.sessionId);
+    const sanitizedFollowThrough = cloneMaintenanceFollowThrough(followThrough);
+    tracked.maintenance.lastFollowThrough = sanitizedFollowThrough;
+    this.pushMaintenanceMarker(tracked, {
+      code: `${followThrough.action}_follow_through_${followThrough.outcome}`,
+      observedAt: followThrough.observedAt,
+      status: followThrough.outcome === 'completed' ? 'completed' : 'observed',
+      details: {
+        phase: followThrough.phase,
+        ...(sanitizedFollowThrough.reason ? { reason: sanitizedFollowThrough.reason } : {}),
+        ...(sanitizedFollowThrough.reasonTruncated ? { reasonTruncated: true } : {}),
+        hookPayloadKinds: sanitizedFollowThrough.hookPayloads.map((payload) => payload.kind),
+      },
+    });
+    return cloneMaintenanceFollowThrough(sanitizedFollowThrough);
   }
 
   clearProviderState(sessionId: string): void {
@@ -749,6 +771,9 @@ function cloneMaintenanceState(
 ): RuntimeTrackedSessionMaintenanceState {
   return {
     ...(maintenance.lastRequest ? { lastRequest: cloneMaintenanceRequest(maintenance.lastRequest) } : {}),
+    ...(maintenance.lastFollowThrough
+      ? { lastFollowThrough: cloneMaintenanceFollowThrough(maintenance.lastFollowThrough) }
+      : {}),
     ...(maintenance.lastResetAt ? { lastResetAt: maintenance.lastResetAt } : {}),
     ...(maintenance.lastLifecycle ? { lastLifecycle: cloneLifecycle(maintenance.lastLifecycle) } : {}),
     ...(maintenance.lastCompaction

@@ -1204,6 +1204,22 @@ export interface RuntimeSessionMaintenanceRequest {
   hookPayloads: RuntimeSessionMaintenanceHookPayload[];
 }
 
+export type RuntimeSessionMaintenanceFollowThroughOutcome =
+  | 'acknowledged'
+  | 'retry_requested'
+  | 'completed';
+
+export interface RuntimeSessionMaintenanceFollowThrough {
+  action: RuntimeSessionMaintenanceAction;
+  phase: RuntimeSessionHookContract['phase'];
+  sessionId: string;
+  observedAt: string;
+  outcome: RuntimeSessionMaintenanceFollowThroughOutcome;
+  reason?: string;
+  reasonTruncated?: boolean;
+  hookPayloads: RuntimeSessionMaintenanceHookPayload[];
+}
+
 export type RuntimeSessionHookId = 'memory_flush' | (string & {});
 export type RuntimeSessionHookOwner = 'product_memory' | (string & {});
 
@@ -1222,6 +1238,7 @@ export interface RuntimeSessionHookGroup {
 
 export interface RuntimeSessionMaintenanceState {
   lastRequest?: RuntimeSessionMaintenanceRequest;
+  lastFollowThrough?: RuntimeSessionMaintenanceFollowThrough;
   lastResetAt?: string;
   lastLifecycle?: RuntimeSessionLifecycleContract;
   lastCompaction?: RuntimeSessionCompactionRecord;
@@ -1271,6 +1288,7 @@ export interface RuntimeSessionMaintenance {
   cleanup: RuntimeSessionCleanupContract;
   markers: RuntimeSessionMaintenanceMarker[];
   lastRequest?: RuntimeSessionMaintenanceRequest;
+  lastFollowThrough?: RuntimeSessionMaintenanceFollowThrough;
   lastLifecycle?: RuntimeSessionLifecycleContract;
 }
 

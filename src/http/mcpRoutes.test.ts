@@ -241,6 +241,7 @@ describe('runtime MCP facade', () => {
       'reset_session',
       'fork_session',
       'cleanup_session_workspace',
+      'report_compaction_follow_through',
       'list_browser_drivers',
       'list_browser_sessions',
       'browser_summary',
@@ -1034,6 +1035,78 @@ describe('runtime MCP facade', () => {
     }));
     expect(cleaned.result.structuredContent.session.cwd).toBe(repoDir);
     expect(cleaned.result.structuredContent.session.hydration.workspace.runtimeCwd).toBe(repoDir);
+
+    const compactionSession = registry.create({
+      id: 'session-compact-mcp',
+      providerName: 'claude',
+      providerInstanceId: 'default',
+      cwd: join(rootDir, 'workspace-compact'),
+      workspaceMode: 'shared',
+      permissionMode: 'skip',
+    });
+    compactionSession.messageCount = 40;
+    compactionSession.totalInputTokens = 9_000;
+    compactionSession.totalOutputTokens = 5_000;
+    registry.updateStatus(compactionSession.id, 'closed');
+
+    const compactionFollowThroughResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 151,
+        method: 'tools/call',
+        params: {
+          name: 'report_compaction_follow_through',
+          arguments: {
+            sessionId: compactionSession.id,
+            outcome: 'acknowledged',
+            maintenance: {
+              reason: 'memory_flush_completed',
+              hookPayloads: [{
+                kind: 'memory_flush',
+                payload: {
+                  flushed: true,
+                },
+              }],
+            },
+          },
+        },
+      }),
+    });
+    expect(compactionFollowThroughResponse.status).toBe(200);
+    const compactionFollowThrough = await compactionFollowThroughResponse.json() as {
+      result: {
+        structuredContent: {
+          responseStatus: number;
+          action: string;
+          outcome: string;
+          status: string;
+          hookStatus: string;
+          followThroughPath: string;
+          maintenance: {
+            lastFollowThrough: {
+              outcome: string;
+              reason?: string;
+            };
+          };
+        };
+      };
+    };
+    expect(compactionFollowThrough.result.structuredContent).toEqual(expect.objectContaining({
+      responseStatus: 200,
+      action: 'compact',
+      outcome: 'acknowledged',
+      status: 'ready_for_external_compaction',
+      hookStatus: 'acknowledged',
+      followThroughPath: `/sessions/${compactionSession.id}/compact/follow-through`,
+      maintenance: expect.objectContaining({
+        lastFollowThrough: expect.objectContaining({
+          outcome: 'acknowledged',
+          reason: 'memory_flush_completed',
+        }),
+      }),
+    }));
 
     const initWorkspaceResponse = await app.request('/mcp', {
       method: 'POST',

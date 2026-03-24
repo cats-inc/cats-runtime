@@ -77,6 +77,9 @@ export function buildSessionMaintenance(
   const lastLifecycle = input.trackedMaintenance?.lastLifecycle
     ? cloneLifecycle(input.trackedMaintenance.lastLifecycle)
     : undefined;
+  const lastFollowThrough = input.trackedMaintenance?.lastFollowThrough
+    ? cloneMaintenanceFollowThrough(input.trackedMaintenance.lastFollowThrough)
+    : undefined;
 
   return {
     status: resolveMaintenanceStatus(compaction, cleanup, lastLifecycle),
@@ -100,6 +103,7 @@ export function buildSessionMaintenance(
     ...(input.trackedMaintenance?.lastRequest
       ? { lastRequest: cloneMaintenanceRequest(input.trackedMaintenance.lastRequest) }
       : {}),
+    ...(lastFollowThrough ? { lastFollowThrough } : {}),
     ...(lastLifecycle ? { lastLifecycle } : {}),
   };
 }
@@ -470,16 +474,45 @@ function cloneMaintenanceHookPayload(
 export function cloneMaintenanceRequest(
   request: NonNullable<RuntimeSessionMaintenanceState['lastRequest']>,
 ): NonNullable<RuntimeSessionMaintenanceState['lastRequest']> {
-  const reason = request.reason
-    ? request.reason.length > MAX_MAINTENANCE_REASON_LENGTH
-      ? `${request.reason.slice(0, MAX_MAINTENANCE_REASON_LENGTH - 1)}\u2026`
-      : request.reason
-    : undefined;
-  const reasonTruncated = Boolean(request.reasonTruncated || (request.reason && reason !== request.reason));
+  const { reason, reasonTruncated } = cloneMaintenanceReason(request.reason, request.reasonTruncated);
   return {
     ...request,
     ...(reason ? { reason } : {}),
     ...(reasonTruncated ? { reasonTruncated: true } : {}),
     hookPayloads: request.hookPayloads.map((payload) => cloneMaintenanceHookPayload(payload)),
+  };
+}
+
+export function cloneMaintenanceFollowThrough(
+  followThrough: NonNullable<RuntimeSessionMaintenanceState['lastFollowThrough']>,
+): NonNullable<RuntimeSessionMaintenanceState['lastFollowThrough']> {
+  const { reason, reasonTruncated } = cloneMaintenanceReason(
+    followThrough.reason,
+    followThrough.reasonTruncated,
+  );
+  return {
+    ...followThrough,
+    ...(reason ? { reason } : {}),
+    ...(reasonTruncated ? { reasonTruncated: true } : {}),
+    hookPayloads: followThrough.hookPayloads.map((payload) => cloneMaintenanceHookPayload(payload)),
+  };
+}
+
+function cloneMaintenanceReason(
+  reason: string | undefined,
+  truncated: boolean | undefined,
+): {
+  reason?: string;
+  reasonTruncated?: boolean;
+} {
+  const clonedReason = reason
+    ? reason.length > MAX_MAINTENANCE_REASON_LENGTH
+      ? `${reason.slice(0, MAX_MAINTENANCE_REASON_LENGTH - 1)}\u2026`
+      : reason
+    : undefined;
+  const reasonTruncated = Boolean(truncated || (reason && clonedReason !== reason));
+  return {
+    ...(clonedReason ? { reason: clonedReason } : {}),
+    ...(reasonTruncated ? { reasonTruncated: true } : {}),
   };
 }

@@ -35,6 +35,11 @@ const SESSION_STATUSES: SessionStatus[] = [
 const WORKSPACE_MODES = ['isolated', 'shared', 'read_only'] as const;
 const WORKSPACE_ISOLATION_MODES = ['shared', 'isolated', 'worktree'] as const;
 const WORKTREE_CLEANUP_POLICIES = ['discard', 'merge', 'preserve'] as const;
+const COMPACTION_FOLLOW_THROUGH_OUTCOMES = [
+  'acknowledged',
+  'retry_requested',
+  'completed',
+] as const;
 const PERMISSION_MODES = ['skip', 'whitelist', 'default'] as const;
 const REUSE_POLICIES = ['create_new', 'prefer_existing', 'require_existing'] as const;
 const FORK_MODES = ['auto', 'native_fork', 'context_transplant'] as const;
@@ -732,6 +737,49 @@ async function cleanupSessionWorkspace(
   };
 }
 
+async function reportCompactionFollowThrough(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const sessionId = readRequiredString(args, 'sessionId');
+  const outcome = readOptionalEnumString(
+    args,
+    'outcome',
+    COMPACTION_FOLLOW_THROUGH_OUTCOMES,
+    'outcome must be one of: acknowledged, retry_requested, completed',
+  );
+  if (!outcome) {
+    throw new McpToolError(-32602, 'outcome is required');
+  }
+
+  const body: Record<string, unknown> = { outcome };
+  const maintenance = readOptionalObject(args, 'maintenance');
+  if (maintenance) {
+    body.maintenance = maintenance;
+  }
+
+  const followThroughPath = `/sessions/${encodeURIComponent(sessionId)}/compact/follow-through`;
+  const result = await requestRuntimeJson(ctx, followThroughPath, {
+    body,
+  });
+  ensureRouteSuccess('report_compaction_follow_through', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'report_compaction_follow_through result');
+  return {
+    summary: outcome === 'retry_requested'
+      ? `Requested compaction hook retry for session ${sessionId}.`
+      : outcome === 'completed'
+        ? `Reported external compaction completion for session ${sessionId}.`
+        : `Acknowledged compaction hooks for session ${sessionId}.`,
+    structuredContent: {
+      responseStatus: result.status,
+      ...payload,
+      followThroughPath,
+      ...buildSessionPaths(sessionId),
+    },
+  };
+}
+
 async function listBrowserDrivers(
   ctx: AppContext,
   _args: Record<string, unknown>,
@@ -1294,6 +1342,42 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: cleanupSessionWorkspace,
+  },
+  {
+    definition: {
+      name: 'report_compaction_follow_through',
+      title: 'Report Compaction Follow-through',
+      description: 'Persist compaction hook acknowledgement, retry, or completion outcomes through the runtime maintenance seam.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sessionId: { type: 'string' },
+          outcome: { type: 'string', enum: COMPACTION_FOLLOW_THROUGH_OUTCOMES },
+          maintenance: {
+            type: 'object',
+            properties: {
+              reason: { type: 'string' },
+              hookPayloads: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    kind: { type: 'string' },
+                    payload: {},
+                  },
+                  required: ['kind'],
+                  additionalProperties: false,
+                },
+              },
+            },
+            additionalProperties: false,
+          },
+        },
+        required: ['sessionId', 'outcome'],
+        additionalProperties: false,
+      },
+    },
+    execute: reportCompactionFollowThrough,
   },
   {
     definition: {

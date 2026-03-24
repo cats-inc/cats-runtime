@@ -606,6 +606,204 @@ describe('session close route', () => {
     }));
   });
 
+  it('records compaction follow-through outcomes and reopens pending hooks on retry requests', async () => {
+    const session = registry.create({
+      id: 'session-compact-follow-through',
+      providerName: 'claude',
+      cwd: 'C:/repo',
+    });
+    session.messageCount = 40;
+    session.totalInputTokens = 9_000;
+    session.totalOutputTokens = 5_000;
+    registry.updateStatus(session.id, 'closed');
+
+    const pendingResponse = await app.request(`/sessions/${session.id}/compact`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        maintenance: {
+          reason: 'owner_requested_compaction',
+        },
+      }),
+    });
+    expect(pendingResponse.status).toBe(200);
+    await expect(pendingResponse.json()).resolves.toEqual(expect.objectContaining({
+      status: 'pending_hooks',
+      hookStatus: 'pending',
+    }));
+
+    const acknowledgedResponse = await app.request(`/sessions/${session.id}/compact/follow-through`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        outcome: 'acknowledged',
+        maintenance: {
+          reason: 'memory_flush_completed',
+          hookPayloads: [{
+            kind: 'memory_flush',
+            payload: {
+              flushed: true,
+              scope: 'summary',
+            },
+          }],
+        },
+      }),
+    });
+    expect(acknowledgedResponse.status).toBe(200);
+    const acknowledgedBody = await acknowledgedResponse.json() as {
+      outcome: string;
+      status: string;
+      hookStatus: string;
+      maintenance: {
+        lastFollowThrough: {
+          outcome: string;
+          reason?: string;
+          hookPayloads: Array<{
+            kind: string;
+            payload?: Record<string, unknown>;
+            payloadStatus?: string;
+          }>;
+        };
+      };
+    };
+    expect(acknowledgedBody).toEqual(expect.objectContaining({
+      outcome: 'acknowledged',
+      status: 'ready_for_external_compaction',
+      hookStatus: 'acknowledged',
+      maintenance: expect.objectContaining({
+        lastFollowThrough: expect.objectContaining({
+          outcome: 'acknowledged',
+          reason: 'memory_flush_completed',
+          hookPayloads: [
+            expect.objectContaining({
+              kind: 'memory_flush',
+              payloadStatus: 'stored',
+              payload: {
+                flushed: true,
+                scope: 'summary',
+              },
+            }),
+          ],
+        }),
+      }),
+    }));
+
+    const retryResponse = await app.request(`/sessions/${session.id}/compact/follow-through`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        outcome: 'retry_requested',
+        maintenance: {
+          reason: 'memory_flush_needs_retry',
+          hookPayloads: [{
+            kind: 'memory_flush',
+            payload: {
+              flushed: false,
+              error: 'transient export failure',
+            },
+          }],
+        },
+      }),
+    });
+    expect(retryResponse.status).toBe(200);
+    const retryBody = await retryResponse.json() as {
+      outcome: string;
+      status: string;
+      hookStatus: string;
+      maintenance: {
+        lastFollowThrough: {
+          outcome: string;
+          reason?: string;
+        };
+      };
+    };
+    expect(retryBody).toEqual(expect.objectContaining({
+      outcome: 'retry_requested',
+      status: 'pending_hooks',
+      hookStatus: 'pending',
+      maintenance: expect.objectContaining({
+        lastFollowThrough: expect.objectContaining({
+          outcome: 'retry_requested',
+          reason: 'memory_flush_needs_retry',
+        }),
+      }),
+    }));
+
+    getRuntimeSessionManager(ctx).dropSession(session.id);
+    const persistedResponse = await app.request(`/sessions/${session.id}`);
+    expect(persistedResponse.status).toBe(200);
+    const persistedBody = await persistedResponse.json() as {
+      inspection: {
+        maintenance: {
+          lastFollowThrough: {
+            outcome: string;
+            reason?: string;
+          };
+        };
+      };
+    };
+    expect(persistedBody.inspection.maintenance.lastFollowThrough).toEqual(expect.objectContaining({
+      outcome: 'retry_requested',
+      reason: 'memory_flush_needs_retry',
+    }));
+  });
+
+  it('uses persisted completion follow-through to keep the public compaction seam acknowledged', async () => {
+    const session = registry.create({
+      id: 'session-compact-follow-through-completed',
+      providerName: 'claude',
+      cwd: 'C:/repo',
+    });
+    session.messageCount = 40;
+    session.totalInputTokens = 9_000;
+    session.totalOutputTokens = 5_000;
+    registry.updateStatus(session.id, 'closed');
+
+    const followThroughResponse = await app.request(`/sessions/${session.id}/compact/follow-through`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        outcome: 'completed',
+        maintenance: {
+          reason: 'external_compaction_completed',
+        },
+      }),
+    });
+    expect(followThroughResponse.status).toBe(200);
+    await expect(followThroughResponse.json()).resolves.toEqual(expect.objectContaining({
+      outcome: 'completed',
+      status: 'ready_for_external_compaction',
+      hookStatus: 'completed',
+      maintenance: expect.objectContaining({
+        lastFollowThrough: expect.objectContaining({
+          outcome: 'completed',
+          reason: 'external_compaction_completed',
+        }),
+      }),
+    }));
+
+    const compactResponse = await app.request(`/sessions/${session.id}/compact`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        maintenance: {
+          reason: 'owner_checked_compaction_status',
+        },
+      }),
+    });
+    expect(compactResponse.status).toBe(200);
+    await expect(compactResponse.json()).resolves.toEqual(expect.objectContaining({
+      status: 'ready_for_external_compaction',
+      hookStatus: 'completed',
+      maintenance: expect.objectContaining({
+        lastFollowThrough: expect.objectContaining({
+          outcome: 'completed',
+          reason: 'external_compaction_completed',
+        }),
+      }),
+    }));
+  });
+
   it('runtime-compacts managed transcripts, repairs malformed lines, and persists the compaction baseline', async () => {
     const session = registry.create({
       id: 'session-runtime-compact',

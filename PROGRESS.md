@@ -18,7 +18,7 @@
 | Delivery Primitives | Completed | Runtime-owned delivery audit, artifact publish/export, repo status, commit, push, and normalized preview-surface metadata are now available over both HTTP routes and local tools |
 | Browser Preview Substrate | Completed | Runtime-owned browser driver/session/page contracts, `browser_page` preview surfaces, manual driver validation, restart-safe browser state persistence, additive `/browser/*` routes, session/history/observe inspection integration, aggregate browser summary/cleanup seams, and reset/delete cleanup for runtime-bound browser sessions now exist without depending on sibling browser projects |
 | Tests | Completed | Vitest covers provider, discovery, pool, HTTP, delivery, server bootstrap, API/local tool-loop behavior, and first-slice metering/guardrail/progress normalization |
-| Docs | In Progress | Core docs now cover startup/diagnostics, provider compatibility/evidence flows, model catalog, session branching, worktree-backed session isolation and cleanup, workspace substrate, runtime hydration/re-entry metadata, delivery primitives, the browser preview substrate, runtime-managed skills plus the internal skill-library taxonomy/metadata contract, the scheduled wakeup substrate, first-slice metering/progress contracts, additive session inspection/run-state/maintenance payloads including sanitized persisted maintenance requests, and the runtime MCP facade over HTTP plus stdio; browser-driver follow-through and later PLAN-003 or PLAN-005 follow-on items still need ongoing updates |
+| Docs | In Progress | Core docs now cover startup/diagnostics, provider compatibility/evidence flows, model catalog, session branching, worktree-backed session isolation and cleanup, workspace substrate, runtime hydration/re-entry metadata, delivery primitives, the browser preview substrate, runtime-managed skills plus the internal skill-library taxonomy/metadata contract, the scheduled wakeup substrate, first-slice metering/progress contracts, additive session inspection/run-state/maintenance payloads including sanitized persisted maintenance requests plus compaction follow-through outcomes, and the runtime MCP facade over HTTP plus stdio; browser-driver follow-through and later PLAN-003 or PLAN-005 follow-on items still need ongoing updates |
 | Follow-ups | Completed | Accepted post-review findings for provider-instance rollout were implemented and recorded in `docs/plans/PLAN-002-provider-instance-review-followups.md` |
 
 **Legend**: Not Started | In Progress | Completed | Blocked
@@ -538,6 +538,7 @@ without moving memory extraction or product policy into `cats-runtime`.
 | Clear stale run/progress state on hard reset | [x] | Reset now drops current/last run snapshots, progress, recent events, and stale hydration metadata before the next lifecycle begins |
 | Add machine-readable delete cleanup summary | [x] | Delete responses now expose normalized cleanup booleans plus terminal lifecycle metadata for `completed` vs `retained` deletes |
 | Expose public compaction-preparation route without moving product compaction policy into runtime | [x] | `POST /sessions/{id}/compact` now returns machine-readable readiness/hook state plus persisted maintenance trigger metadata, and runtime-managed transcripts compact in place when the session is locally ownable |
+| Add persisted compaction follow-through envelope | [x] | `POST /sessions/{id}/compact/follow-through` plus the matching MCP tool now let hosts acknowledge, retry, and report external completion through `inspection.maintenance.lastFollowThrough` without creating a second contract |
 | Add runtime-owned compaction for managed transcripts | [x] | Runtime-managed JSONL transcripts now repair malformed lines, archive the repaired baseline, compact aggressively toward the threshold, and persist `lastCompaction` metadata plus `compaction_summary` history entries |
 | Leave additive Team 4/product memory-flush seam without implementing the pipeline | [x] | Runtime now advertises pending `memory_flush` hooks before reset/compaction, accepts additive maintenance trigger payloads, and keeps durable-memory exports product-owned |
 | Cover maintenance and lifecycle-boundary behavior with tests | [x] | Vitest now covers session-maintenance derivation, close/reset lifecycle markers, history reset boundaries, and delete cleanup payloads |
@@ -547,7 +548,7 @@ without moving memory extraction or product policy into `cats-runtime`.
 - [ ] No provider-agnostic compaction worker yet beyond runtime-managed transcript repair/summary for locally owned transcripts
 - [ ] No memory extraction / summarization pipeline in runtime; the hook seam is declarative only
 - [ ] No product-side policy for when a host must honor `memory_flush`
-- [ ] No hook-acknowledgement/retry/completion envelope yet beyond persisted maintenance trigger snapshots and readiness reporting
+- [ ] No generalized pre-reset / pre-flush hook execution envelope yet beyond the compaction follow-through seam and persisted maintenance metadata
 
 #### Verification
 

@@ -22,6 +22,7 @@ import type {
 } from '../../backends/cli/pool/types.js';
 import type {
   RuntimeSessionMaintenanceAction,
+  RuntimeSessionMaintenanceFollowThroughOutcome,
   RuntimeSessionMaintenanceHookPayload,
   RuntimeSessionMaintenanceRequest,
   RuntimeSessionLifecycleCleanupSummary,
@@ -383,6 +384,17 @@ function parseMaintenanceHookPayloads(value: unknown): RuntimeSessionMaintenance
   return payloads;
 }
 
+function cloneMaintenanceHookPayloads(
+  hookPayloads: RuntimeSessionMaintenanceHookPayload[] | undefined,
+): RuntimeSessionMaintenanceHookPayload[] {
+  return hookPayloads?.map((payload) => ({
+    ...payload,
+    ...(Object.prototype.hasOwnProperty.call(payload, 'payload')
+      ? { payload: structuredClone(payload.payload) }
+      : {}),
+  })) || [];
+}
+
 function parseMaintenanceRequestBody(value: unknown): ParsedMaintenanceRequestBody | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return undefined;
@@ -596,12 +608,25 @@ function buildMaintenanceRequest(
     ...(worktreePath ? { worktreePath } : {}),
     ...(requestBody?.reason ? { reason: requestBody.reason } : {}),
     ...(worktreeDisposition ? { worktreeDisposition } : {}),
-    hookPayloads: requestBody?.hookPayloads.map((payload) => ({
-      ...payload,
-      ...(Object.prototype.hasOwnProperty.call(payload, 'payload')
-        ? { payload: structuredClone(payload.payload) }
-        : {}),
-    })) || [],
+    hookPayloads: cloneMaintenanceHookPayloads(requestBody?.hookPayloads),
+  };
+}
+
+function buildMaintenanceFollowThrough(
+  session: Pick<SessionInfo, 'id'>,
+  action: RuntimeSessionMaintenanceAction,
+  phase: 'pre_compaction',
+  outcome: RuntimeSessionMaintenanceFollowThroughOutcome,
+  requestBody?: ParsedMaintenanceRequestBody,
+): Parameters<ReturnType<typeof getRuntimeSessionManager>['recordMaintenanceFollowThrough']>[0] {
+  return {
+    action,
+    phase,
+    sessionId: session.id,
+    observedAt: new Date().toISOString(),
+    outcome,
+    ...(requestBody?.reason ? { reason: requestBody.reason } : {}),
+    hookPayloads: cloneMaintenanceHookPayloads(requestBody?.hookPayloads),
   };
 }
 
@@ -625,6 +650,26 @@ function recordSessionMaintenanceRequest(
 ): RuntimeSessionMaintenanceRequest {
   const request = buildMaintenanceRequest(session, action, requestBody, worktreeDisposition);
   const recorded = getRuntimeSessionManager(ctx).recordMaintenanceRequest(request);
+  persistTrackedMaintenanceState(ctx, session.id);
+  return recorded;
+}
+
+function recordSessionMaintenanceFollowThrough(
+  ctx: AppContext,
+  session: Pick<SessionInfo, 'id'>,
+  action: RuntimeSessionMaintenanceAction,
+  phase: 'pre_compaction',
+  outcome: RuntimeSessionMaintenanceFollowThroughOutcome,
+  requestBody?: ParsedMaintenanceRequestBody,
+) {
+  const followThrough = buildMaintenanceFollowThrough(
+    session,
+    action,
+    phase,
+    outcome,
+    requestBody,
+  );
+  const recorded = getRuntimeSessionManager(ctx).recordMaintenanceFollowThrough(followThrough);
   persistTrackedMaintenanceState(ctx, session.id);
   return recorded;
 }
@@ -778,8 +823,24 @@ function resolveCompactionRequestStatus(
 ): {
   status: 'not_ready' | 'deferred' | 'pending_hooks' | 'ready_for_external_compaction';
   reasonCodes: string[];
-  hookStatus: 'none' | 'pending' | 'acknowledged';
+  hookStatus: 'none' | 'pending' | 'acknowledged' | 'completed';
 } {
+  const compactionFollowThrough = maintenance.lastFollowThrough?.action === 'compact'
+    && maintenance.lastFollowThrough.phase === 'pre_compaction'
+    ? maintenance.lastFollowThrough
+    : undefined;
+  const hooksPending = maintenance.hooks.preCompaction.pending.length > 0;
+  const hooksAcknowledged = acknowledgeHooks
+    || compactionFollowThrough?.outcome === 'acknowledged'
+    || compactionFollowThrough?.outcome === 'completed';
+  const resolvedHookStatus: 'none' | 'pending' | 'acknowledged' | 'completed' = !hooksPending
+    ? 'none'
+    : compactionFollowThrough?.outcome === 'completed'
+      ? 'completed'
+      : hooksAcknowledged
+        ? 'acknowledged'
+        : 'pending';
+
   if (maintenance.compaction.status === 'not_ready') {
     return {
       status: 'not_ready',
@@ -792,11 +853,11 @@ function resolveCompactionRequestStatus(
     return {
       status: 'deferred',
       reasonCodes: [...maintenance.compaction.reasonCodes],
-      hookStatus: maintenance.hooks.preCompaction.pending.length > 0 ? 'pending' : 'none',
+      hookStatus: resolvedHookStatus,
     };
   }
 
-  if (maintenance.hooks.preCompaction.pending.length > 0 && !acknowledgeHooks) {
+  if (hooksPending && !hooksAcknowledged) {
     return {
       status: 'pending_hooks',
       reasonCodes: ['pre_compaction_hooks_pending', ...maintenance.compaction.reasonCodes],
@@ -807,8 +868,16 @@ function resolveCompactionRequestStatus(
   return {
     status: 'ready_for_external_compaction',
     reasonCodes: [...maintenance.compaction.reasonCodes],
-    hookStatus: acknowledgeHooks ? 'acknowledged' : 'none',
+    hookStatus: resolvedHookStatus,
   };
+}
+
+function parseCompactionFollowThroughOutcome(
+  value: unknown,
+): RuntimeSessionMaintenanceFollowThroughOutcome | undefined {
+  return value === 'acknowledged' || value === 'retry_requested' || value === 'completed'
+    ? value
+    : undefined;
 }
 
 function applyPreparedWorkspace(
@@ -2102,7 +2171,18 @@ sessionRoutes.post('/sessions/:id/compact', async (c) => {
   }
 
   recordSessionMaintenanceRequest(ctx, session, 'compact', maintenanceRequest);
-  const serialized = serializeSession(ctx, ctx.registry.get(id) ?? session);
+  let serialized = serializeSession(ctx, ctx.registry.get(id) ?? session);
+  if (body.acknowledgeHooks === true && serialized.inspection.maintenance.hooks.preCompaction.pending.length > 0) {
+    recordSessionMaintenanceFollowThrough(
+      ctx,
+      session,
+      'compact',
+      'pre_compaction',
+      'acknowledged',
+      maintenanceRequest,
+    );
+    serialized = serializeSession(ctx, ctx.registry.get(id) ?? session);
+  }
   const compaction = resolveCompactionRequestStatus(
     serialized.inspection.maintenance,
     body.acknowledgeHooks === true,
@@ -2167,6 +2247,59 @@ sessionRoutes.post('/sessions/:id/compact', async (c) => {
     runtimeCompaction: serializedCompactedSession.inspection.maintenance.compaction.lastCompaction,
     maintenance: serializedCompactedSession.inspection.maintenance,
     session: serializedCompactedSession,
+  });
+});
+
+/** POST /sessions/:id/compact/follow-through — persist external compaction hook outcomes */
+sessionRoutes.post('/sessions/:id/compact/follow-through', async (c) => {
+  const ctx = c.get('ctx');
+  const id = c.req.param('id');
+  const session = ctx.registry.get(id);
+  const body = await c.req.json<{
+    outcome?: RuntimeSessionMaintenanceFollowThroughOutcome;
+    maintenance?: {
+      reason?: string;
+      hookPayloads?: RuntimeSessionMaintenanceHookPayload[];
+    };
+  }>().catch(() => ({}) as {
+    outcome?: RuntimeSessionMaintenanceFollowThroughOutcome;
+    maintenance?: {
+      reason?: string;
+      hookPayloads?: RuntimeSessionMaintenanceHookPayload[];
+    };
+  });
+  const outcome = parseCompactionFollowThroughOutcome(body.outcome);
+  const maintenanceRequest = parseMaintenanceRequestBody(body.maintenance);
+
+  if (!session) {
+    return c.json({ error: 'Session not found' }, 404);
+  }
+
+  if (!outcome) {
+    return c.json({
+      error: 'outcome must be one of: acknowledged, retry_requested, completed',
+    }, 400);
+  }
+
+  recordSessionMaintenanceFollowThrough(
+    ctx,
+    session,
+    'compact',
+    'pre_compaction',
+    outcome,
+    maintenanceRequest,
+  );
+  const serialized = serializeSession(ctx, ctx.registry.get(id) ?? session);
+  const compaction = resolveCompactionRequestStatus(serialized.inspection.maintenance, false);
+
+  return c.json({
+    action: 'compact',
+    outcome,
+    status: compaction.status,
+    hookStatus: compaction.hookStatus,
+    reasonCodes: compaction.reasonCodes,
+    maintenance: serialized.inspection.maintenance,
+    session: serialized,
   });
 });
 

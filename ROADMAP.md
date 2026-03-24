@@ -345,8 +345,8 @@ Current gaps:
   runtime yet coordinates durable memory/export flush before cleanup proceeds
 - runtime-managed transcripts now compact in place through
   `POST /sessions/{id}/compact`, but provider-owned/external sessions still
-  rely on the coordination seam and runtime still does not drive hook
-  follow-through itself
+  rely on the coordination seam and runtime still does not execute the hook
+  or external compaction worker itself
 - Team 3's future memory pipeline seam exists in contracts only; runtime still
   lacks the hook execution/retry envelope around lifecycle flush boundaries
 - non-shared fork copy still clones the whole workspace opportunistically in
@@ -384,7 +384,11 @@ schemas.
 - maintenance trigger payload snapshots are now truncated/redacted/size-capped
   before persistence, with additive status/warning metadata surfaced through
   session inspection
-- generalized workspace sync and hook execution plumbing remain deferred
+- the public compaction seam now has a persisted follow-through envelope over
+  HTTP and MCP so hosts can acknowledge, retry, and report completion through
+  `inspection.maintenance.lastFollowThrough`
+- generalized workspace sync and broader hook execution plumbing remain
+  deferred
 
 #### Affected Files
 
