@@ -27,6 +27,23 @@ The result is a chicken-and-egg problem:
 - the operator wants the runtime to tell them what is already installed and
   usable before writing that topology
 
+That problem only becomes tractable when standalone setup keeps three layers
+separate:
+
+1. **Provider universe**
+   - runtime-owned knowledge such as provider families, probe logic, install
+     metadata, and model-catalog capability boundaries
+   - does not depend on config
+2. **Machine detection**
+   - runtime-owned detection of what is present or reachable on this machine
+   - does not depend on config
+3. **Enabled config**
+   - operator intent about what should actually be enabled
+   - persisted in `providers.yaml`
+
+The first two layers must remain usable before `providers.yaml` exists, or the
+runtime simply recreates the same first-run deadlock under a different name.
+
 Discussion across `cats-runtime`, `cats`, and the packaged host also clarified
 three distinct first-launch layers:
 
@@ -65,35 +82,40 @@ This decision includes:
    respect runtime discovery policies.
 9. The preferred first-run discovery posture is `if_running` for both WSL and
    Docker so bootstrap does not wake heavy environments unnecessarily.
-10. `manual_only` must remain meaningful; if auto-scan is disabled, the runtime
+10. The current runtime default for WSL discovery is still too aggressive and
+    should be corrected to align with the intended `if_running` posture.
+11. `manual_only` must remain meaningful; if auto-scan is disabled, the runtime
     should rely on explicit operator-triggered scans instead of silently
     overriding the policy.
-11. The latest bootstrap scan summary and latest explicit manual scan summary
+12. The latest bootstrap scan summary and latest explicit manual scan summary
     should persist under `data/setup/` so the setup page and dashboard can
     surface the same runtime-owned discovery snapshot.
-12. The standalone runtime setup surface is separate from the session-centric
+13. The standalone runtime setup surface is separate from the session-centric
     dashboard and playground.
-13. The dashboard should still expose a secondary manual scan entry point after
+14. The current dashboard lacks that secondary manual scan entry point; this is
+    a concrete product gap to close, not a nice-to-have future polish item.
+15. The dashboard should still expose a secondary manual scan entry point after
     normal startup so `manual_only` and repair flows remain available outside
     bootstrap.
-14. If embedded runtime UI grows beyond the current three embedded pages, the
+16. If embedded runtime UI grows beyond the current three embedded pages, the
     runtime should move to a lightweight shared build that still outputs static
     HTML rather than immediately adopting a heavy SPA rewrite.
-15. The first shared-build scope is the runtime's three embedded setup/operator
+17. The first shared-build scope is the runtime's three embedded setup/operator
     pages:
     - dashboard
     - playground
     - provider setup
-16. That shared build should centralize CSS tokens, runtime fetch/error
+18. That shared build should centralize CSS tokens, runtime fetch/error
     helpers, and provider-status presentation logic while still shipping static
     artifacts.
-17. Standalone runtime setup should also expose a thin CLI surface for
-    headless/expert flows rather than forcing the embedded setup page for every
-    operator.
-18. The first CLI surface should stay minimal and include:
-    - `cats-runtime bootstrap`
-    - `cats-runtime init-config`
-    - `cats-runtime diagnose setup`
+19. Bootstrap should be implemented on top of shared runtime-owned services for
+    provider-universe knowledge, machine detection, setup-state persistence,
+    and generated-config writing.
+20. The standalone provider setup page is the first thin adapter over those
+    services.
+21. A future CLI setup surface may be added later as another thin adapter over
+    the same services, but defining its command surface is not part of this
+    decision.
 
 ## Consequences
 
@@ -107,7 +129,8 @@ This decision includes:
 - keeps heavy WSL/Docker startup under operator-visible policy control
 - gives setup and dashboard a shared persisted scan snapshot instead of
   duplicating discovery state
-- gives standalone/headless operators a small non-UI bootstrap path
+- keeps future headless/CLI work cheap by centering the shared bootstrap
+  services first
 - gives the runtime a clear path to reduce duplicated embedded-page CSS and JS
 
 ### Negative
@@ -119,8 +142,8 @@ This decision includes:
   addition to its session-centric role
 - the embedded runtime UI surface needs some shared substrate work to avoid
   duplicated CSS and helper logic as pages grow
-- a minimal CLI surface becomes another operator contract to keep coherent with
-  the setup page
+- a future CLI adapter still needs to be added later if headless bootstrap
+  becomes a concrete requirement
 
 ### Neutral
 
