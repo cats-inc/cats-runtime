@@ -318,7 +318,15 @@ Some intents may legitimately map to different concrete entries.
       "semanticTags": ["reasoning_budget"],
       "applicableEntryIds": ["claude-opus-4-6", "claude-opus-4-6[1m]"]
     }
-  ]
+  ],
+  "defaultSelection": {
+    "entryId": "claude-opus-4-6",
+    "entryMode": "auto",
+    "presetId": null,
+    "controls": {
+      "anthropic.thinking_budget_tokens": 8000
+    }
+  }
 }
 ```
 
@@ -434,6 +442,8 @@ aligned once this direction is ratified or implemented:
       `fast`, `balanced`, `deep_reasoning`, and `long_context`?
 - [ ] Should per-turn structured overrides land in the first implementation, or
       only session-level structured selection plus resolved-session snapshots?
+- [ ] What is the migration strategy for persisting structured selection next to
+      or instead of legacy `model` strings in existing session state?
 - [ ] Which limit facts can the runtime expose with enough confidence to be UI
       guidance rather than misleading hints?
 
