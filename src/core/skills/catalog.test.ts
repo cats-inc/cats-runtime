@@ -262,6 +262,53 @@ describe('runtime skill catalog', () => {
     expect(mergedInstructions).not.toContain('Mutated instructions');
   });
 
+  it('invalidates the catalog cache when a skill is rewritten with the same byte length', () => {
+    const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
+    cleanupPaths.push(sessionBaseDir);
+    const skillsRoot = join(sessionBaseDir, 'skills');
+    const cwd = join(sessionBaseDir, 'repo');
+    mkdirSync(cwd, { recursive: true });
+
+    const originalBody = 'Alpha cache body.';
+    const updatedBody = 'Bravo cache body.';
+    expect(Buffer.byteLength(updatedBody, 'utf8')).toBe(Buffer.byteLength(originalBody, 'utf8'));
+
+    const skillDir = writeSkillPackage(skillsRoot, 'cache-equal-bytes', {
+      body: originalBody,
+    });
+    const entryFile = join(skillDir, 'SKILL.md');
+    const originalBytes = Buffer.byteLength(readFileSync(entryFile, 'utf8'), 'utf8');
+
+    const initialCatalog = listRuntimeSkillCatalog(skillsRoot);
+    expect(initialCatalog).toHaveLength(1);
+
+    writeSkillPackage(skillsRoot, 'cache-equal-bytes', {
+      body: updatedBody,
+    });
+    const rewrittenBytes = Buffer.byteLength(readFileSync(entryFile, 'utf8'), 'utf8');
+    expect(rewrittenBytes).toBe(originalBytes);
+
+    const updatedCatalog = listRuntimeSkillCatalog(skillsRoot);
+    expect(updatedCatalog).toHaveLength(1);
+    expect(updatedCatalog[0]?.fingerprint).not.toBe(initialCatalog[0]?.fingerprint);
+
+    const rewrittenSkillState = resolveRuntimeSkillManifest({
+      requestedSkills: ['cache-equal-bytes'],
+    }, {
+      sessionId: 'session-cache-equal-bytes',
+      providerName: 'claude',
+      providerBackend: 'api',
+      cwd,
+      workspaceMode: 'shared',
+      sessionBaseDir,
+      skillsRoot,
+    });
+
+    const overlay = mergeRuntimeSkillInstructions(undefined, rewrittenSkillState);
+    expect(overlay).toContain(updatedBody);
+    expect(overlay).not.toContain(originalBody);
+  });
+
   it('lists a family-aware runtime skill catalog with normalized metadata', () => {
     const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
     cleanupPaths.push(sessionBaseDir);

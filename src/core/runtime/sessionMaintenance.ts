@@ -3,6 +3,7 @@ import type {
   RuntimeSessionCompactionContract,
   RuntimeSessionCompactionRecord,
   RuntimeSessionHookContract,
+  RuntimeSessionMaintenanceHookPayload,
   RuntimeSessionHookGroup,
   RuntimeSessionLifecycleContract,
   RuntimeSessionMaintenance,
@@ -14,6 +15,16 @@ import type {
 
 const COMPACTION_MESSAGE_THRESHOLD = 25;
 const COMPACTION_TOKEN_THRESHOLD = 12_000;
+const MAX_MAINTENANCE_REASON_LENGTH = 512;
+const MAX_MAINTENANCE_PAYLOAD_STRING_LENGTH = 512;
+const MAX_MAINTENANCE_PAYLOAD_ARRAY_ITEMS = 20;
+const MAX_MAINTENANCE_PAYLOAD_OBJECT_KEYS = 20;
+const MAX_MAINTENANCE_PAYLOAD_DEPTH = 4;
+const MAX_MAINTENANCE_PAYLOAD_BYTES = 4 * 1024;
+const REDACTED_VALUE = '[redacted]';
+const TRUNCATED_VALUE = '[truncated]';
+const SENSITIVE_MAINTENANCE_KEY_PATTERN =
+  /(api[-_]?key|access[-_]?token|refresh[-_]?token|token|secret|password|authorization|cookie|session)/i;
 
 export type RuntimeTrackedSessionMaintenanceState = RuntimeSessionMaintenanceState;
 
@@ -288,16 +299,187 @@ function cloneHook(
   };
 }
 
+interface MaintenancePayloadSanitizationFlags {
+  redacted: boolean;
+  truncated: boolean;
+  warnings: Set<string>;
+}
+
+function sanitizeMaintenanceString(
+  value: string,
+  limit: number,
+  flags: MaintenancePayloadSanitizationFlags,
+): string {
+  if (value.length <= limit) {
+    return value;
+  }
+
+  flags.truncated = true;
+  flags.warnings.add('string_truncated');
+  return `${value.slice(0, Math.max(0, limit - 1))}\u2026`;
+}
+
+function sanitizeMaintenancePayloadValue(
+  value: unknown,
+  depth: number,
+  flags: MaintenancePayloadSanitizationFlags,
+): unknown {
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    return sanitizeMaintenanceString(value, MAX_MAINTENANCE_PAYLOAD_STRING_LENGTH, flags);
+  }
+
+  if (typeof value === 'number') {
+    if (Number.isFinite(value)) {
+      return value;
+    }
+    flags.truncated = true;
+    flags.warnings.add('non_finite_number_stringified');
+    return String(value);
+  }
+
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'bigint') {
+    flags.truncated = true;
+    flags.warnings.add('bigint_stringified');
+    return value.toString();
+  }
+
+  if (typeof value === 'undefined') {
+    flags.truncated = true;
+    flags.warnings.add('undefined_value_dropped');
+    return undefined;
+  }
+
+  if (typeof value !== 'object') {
+    flags.truncated = true;
+    flags.warnings.add('unsupported_value_dropped');
+    return undefined;
+  }
+
+  if (depth >= MAX_MAINTENANCE_PAYLOAD_DEPTH) {
+    flags.truncated = true;
+    flags.warnings.add('max_depth_reached');
+    return TRUNCATED_VALUE;
+  }
+
+  if (Array.isArray(value)) {
+    const limited = value.slice(0, MAX_MAINTENANCE_PAYLOAD_ARRAY_ITEMS);
+    if (limited.length !== value.length) {
+      flags.truncated = true;
+      flags.warnings.add('array_items_truncated');
+    }
+
+    const sanitizedItems: unknown[] = [];
+    for (const item of limited) {
+      const sanitized = sanitizeMaintenancePayloadValue(item, depth + 1, flags);
+      if (sanitized !== undefined) {
+        sanitizedItems.push(sanitized);
+      }
+    }
+    return sanitizedItems;
+  }
+
+  const entries = Object.entries(value as Record<string, unknown>);
+  const limitedEntries = entries.slice(0, MAX_MAINTENANCE_PAYLOAD_OBJECT_KEYS);
+  if (limitedEntries.length !== entries.length) {
+    flags.truncated = true;
+    flags.warnings.add('object_keys_truncated');
+  }
+
+  const sanitizedRecord: Record<string, unknown> = {};
+  for (const [key, item] of limitedEntries) {
+    if (SENSITIVE_MAINTENANCE_KEY_PATTERN.test(key)) {
+      flags.redacted = true;
+      flags.warnings.add('sensitive_keys_redacted');
+      sanitizedRecord[key] = REDACTED_VALUE;
+      continue;
+    }
+
+    const sanitized = sanitizeMaintenancePayloadValue(item, depth + 1, flags);
+    if (sanitized !== undefined) {
+      sanitizedRecord[key] = sanitized;
+    }
+  }
+
+  return sanitizedRecord;
+}
+
+function buildMaintenancePayloadStatus(
+  flags: MaintenancePayloadSanitizationFlags,
+  omitted: boolean,
+): NonNullable<RuntimeSessionMaintenanceHookPayload['payloadStatus']> {
+  if (omitted) {
+    return 'omitted';
+  }
+  if (flags.redacted && flags.truncated) {
+    return 'redacted_and_truncated';
+  }
+  if (flags.redacted) {
+    return 'redacted';
+  }
+  if (flags.truncated) {
+    return 'truncated';
+  }
+  return 'stored';
+}
+
+function cloneMaintenanceHookPayload(
+  payload: RuntimeSessionMaintenanceHookPayload,
+): RuntimeSessionMaintenanceHookPayload {
+  if (!Object.prototype.hasOwnProperty.call(payload, 'payload')) {
+    return {
+      kind: payload.kind,
+      ...(payload.payloadStatus ? { payloadStatus: payload.payloadStatus } : {}),
+      ...(payload.payloadWarnings ? { payloadWarnings: [...payload.payloadWarnings] } : {}),
+      ...(typeof payload.payloadBytes === 'number' ? { payloadBytes: payload.payloadBytes } : {}),
+    };
+  }
+
+  const flags: MaintenancePayloadSanitizationFlags = {
+    redacted: payload.payloadStatus === 'redacted' || payload.payloadStatus === 'redacted_and_truncated',
+    truncated: payload.payloadStatus === 'truncated' || payload.payloadStatus === 'redacted_and_truncated',
+    warnings: new Set<string>(payload.payloadWarnings ?? []),
+  };
+  const sanitizedPayload = sanitizeMaintenancePayloadValue(payload.payload, 0, flags);
+  const payloadJson = sanitizedPayload === undefined ? '' : JSON.stringify(sanitizedPayload);
+  const payloadBytes = payloadJson.length > 0 ? Buffer.byteLength(payloadJson, 'utf8') : 0;
+  const omitted = sanitizedPayload === undefined || payloadBytes > MAX_MAINTENANCE_PAYLOAD_BYTES;
+
+  if (payloadBytes > MAX_MAINTENANCE_PAYLOAD_BYTES) {
+    flags.truncated = true;
+    flags.warnings.add('payload_bytes_exceeded');
+  }
+
+  const payloadWarnings = Array.from(flags.warnings.values());
+  return {
+    kind: payload.kind,
+    ...(!omitted ? { payload: structuredClone(sanitizedPayload) } : {}),
+    payloadStatus: buildMaintenancePayloadStatus(flags, omitted),
+    ...(payloadWarnings.length > 0 ? { payloadWarnings } : {}),
+    ...(payloadBytes > 0 ? { payloadBytes } : {}),
+  };
+}
+
 export function cloneMaintenanceRequest(
   request: NonNullable<RuntimeSessionMaintenanceState['lastRequest']>,
 ): NonNullable<RuntimeSessionMaintenanceState['lastRequest']> {
+  const reason = request.reason
+    ? request.reason.length > MAX_MAINTENANCE_REASON_LENGTH
+      ? `${request.reason.slice(0, MAX_MAINTENANCE_REASON_LENGTH - 1)}\u2026`
+      : request.reason
+    : undefined;
+  const reasonTruncated = Boolean(request.reasonTruncated || (request.reason && reason !== request.reason));
   return {
     ...request,
-    hookPayloads: request.hookPayloads.map((payload) => ({
-      ...payload,
-      ...(Object.prototype.hasOwnProperty.call(payload, 'payload')
-        ? { payload: structuredClone(payload.payload) }
-        : {}),
-    })),
+    ...(reason ? { reason } : {}),
+    ...(reasonTruncated ? { reasonTruncated: true } : {}),
+    hookPayloads: request.hookPayloads.map((payload) => cloneMaintenanceHookPayload(payload)),
   };
 }

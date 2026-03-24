@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { SessionInfo, SessionView } from '../types.js';
 import {
   buildSessionMaintenance,
+  cloneMaintenanceRequest,
   type RuntimeTrackedSessionMaintenanceState,
 } from './sessionMaintenance.js';
 
@@ -196,7 +197,19 @@ describe('buildSessionMaintenance', () => {
     });
 
     expect(maintenance.status).toBe('attention');
-    expect(maintenance.lastRequest).toEqual(trackedMaintenance.lastRequest);
+    expect(maintenance.lastRequest).toEqual(expect.objectContaining({
+      ...trackedMaintenance.lastRequest,
+      hookPayloads: [
+        expect.objectContaining({
+          kind: 'memory_flush',
+          payload: {
+            scope: 'summary',
+          },
+          payloadStatus: 'stored',
+          payloadBytes: expect.any(Number),
+        }),
+      ],
+    }));
     expect(maintenance.resetBoundary).toEqual({
       status: 'cleared',
       lastResetAt: '2026-03-23T00:10:00.000Z',
@@ -243,5 +256,55 @@ describe('buildSessionMaintenance', () => {
         aggressivePassCount: 2,
       }),
     }));
+  });
+
+  it('sanitizes persisted maintenance requests with reason truncation and payload redaction or truncation', () => {
+    const request = cloneMaintenanceRequest({
+      action: 'compact',
+      sessionId: 'session-1',
+      requestedAt: '2026-03-24T02:00:00.000Z',
+      workspaceMode: 'shared',
+      isolationMode: 'shared',
+      runtimeCwd: '/repo',
+      reason: 'x'.repeat(700),
+      hookPayloads: [
+        {
+          kind: 'memory_flush',
+          payload: {
+            authorization: 'Bearer secret-token',
+            summary: 'y'.repeat(700),
+            nested: {
+              tooDeep: {
+                stillDeep: {
+                  final: 'trim me',
+                },
+              },
+            },
+          },
+        },
+        {
+          kind: 'large_payload',
+          payload: {
+            entries: Array.from({ length: 80 }, (_, index) => `entry-${index}-${'z'.repeat(120)}`),
+          },
+        },
+      ],
+    });
+
+    expect(request.reason?.length).toBeLessThanOrEqual(512);
+    expect(request.reasonTruncated).toBe(true);
+    expect(request.hookPayloads[0]).toEqual(expect.objectContaining({
+      payloadStatus: 'redacted_and_truncated',
+      payloadWarnings: expect.arrayContaining(['sensitive_keys_redacted', 'string_truncated']),
+      payload: expect.objectContaining({
+        authorization: '[redacted]',
+      }),
+    }));
+    expect(request.hookPayloads[1]).toEqual(expect.objectContaining({
+      payloadStatus: 'truncated',
+      payloadWarnings: expect.arrayContaining(['array_items_truncated']),
+      payloadBytes: expect.any(Number),
+    }));
+    expect(request.hookPayloads[1]).toHaveProperty('payload');
   });
 });

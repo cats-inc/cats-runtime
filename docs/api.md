@@ -1127,7 +1127,9 @@ intended for host/dashboard run inspectors:
             "kind": "memory_flush",
             "payload": {
               "scope": "summary"
-            }
+            },
+            "payloadStatus": "stored",
+            "payloadBytes": 19
           }
         ]
       },
@@ -1170,7 +1172,19 @@ ready to run on an inactive session.
 
 `inspection.maintenance.lastRequest` is the runtime-owned trigger seam for
 future Team 4 flush/compaction coordination. The runtime records the request
-shape, but it does not interpret product-owned payloads.
+shape, but it does not interpret product-owned payloads or make product memory
+decisions for the caller. The persisted snapshot is also guardrailed:
+
+- overlong `reason` strings are truncated and flagged with
+  `reasonTruncated: true`
+- sensitive hook-payload keys such as `token`, `secret`, `authorization`,
+  `cookie`, or `password` are redacted before persistence
+- oversized/deep payloads are truncated to bounded depth/item/key limits and
+  record additive `payloadStatus`, `payloadWarnings`, and `payloadBytes`
+  metadata
+- if the sanitized payload still exceeds the runtime byte cap, the runtime
+  omits `payload` and records `payloadStatus: "omitted"` instead of storing the
+  original blob verbatim
 
 `POST /sessions` also accepts these optional fields:
 
@@ -1684,7 +1698,14 @@ When `maintenance` is provided, the runtime records that request under
 `inspection.maintenance.lastRequest` and persists it on the logical session so
 later `GET /sessions/{id}`, `GET /sessions/{id}/observe`, and
 `GET /sessions/{id}/history` reads can explain what maintenance trigger was
-requested even after the live run state has been cleared.
+requested even after the live run state has been cleared. Persisted maintenance
+snapshots are sanitized first, so later reads may also include:
+
+- `reasonTruncated?: boolean`
+- `hookPayloads[].payloadStatus?: "stored" | "redacted" | "truncated" |
+  "redacted_and_truncated" | "omitted"`
+- `hookPayloads[].payloadWarnings?: string[]`
+- `hookPayloads[].payloadBytes?: number`
 
 `POST /sessions/{id}/close`, `POST /sessions/{id}/cancel`, and
 `POST /sessions/{id}/reset` now all return the same additive session snapshot
@@ -1758,7 +1779,10 @@ Responses also include:
 
 Like reset/close/delete, any provided `maintenance` request is persisted under
 `inspection.maintenance.lastRequest` so later session/observe/history reads can
-explain which compaction-preparation trigger was accepted most recently.
+explain which compaction-preparation trigger was accepted most recently. The
+stored maintenance snapshot uses the same truncation/redaction/size-cap
+guardrails described above rather than persisting arbitrary hook payloads
+verbatim.
 
 When the runtime owns the transcript locally, the compaction step now repairs
 malformed JSONL lines, archives the repaired pre-compaction baseline, rewrites

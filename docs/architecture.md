@@ -277,6 +277,9 @@ src/
 - Persists the last accepted maintenance trigger request on the logical session
   so Team 4 style flush/compaction payloads can survive past the immediate
   reset/delete response without making runtime the memory owner
+- Sanitizes persisted maintenance trigger snapshots with bounded
+  truncation/redaction/size-cap guardrails so sensitive or unbounded product
+  payloads do not become verbatim runtime history
 - Enriches current/last-run inspection with per-run preview surfaces derived
   from agent services and artifacts so hosts can render the output of one run
   without diffing whole-session state
@@ -446,7 +449,7 @@ src/
     of reset/delete follow-through
 19. `POST /sessions/{id}/compact` reuses the same runtime-owned maintenance
     read model as a public compaction route, returning machine-readable
-    readiness plus opaque hook payload persistence and compacting managed
+    readiness plus sanitized hook-payload persistence and compacting managed
     transcripts directly when the runtime owns the transcript safely
 20. Stream events are returned directly to the caller
 

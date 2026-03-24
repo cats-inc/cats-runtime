@@ -196,12 +196,16 @@ describe('session close route', () => {
           lastRequest: expect.objectContaining({
             action: 'close',
             reason: 'owner_requested_close',
-            hookPayloads: [{
-              kind: 'memory_flush',
-              payload: {
-                scope: 'summary',
-              },
-            }],
+            hookPayloads: [
+              expect.objectContaining({
+                kind: 'memory_flush',
+                payload: {
+                  scope: 'summary',
+                },
+                payloadStatus: 'stored',
+                payloadBytes: expect.any(Number),
+              }),
+            ],
           }),
         }),
       }),
@@ -368,13 +372,17 @@ describe('session close route', () => {
     expect(body.inspection.maintenance.lastRequest).toEqual(expect.objectContaining({
       action: 'reset',
       reason: 'owner_requested_reset',
-      hookPayloads: [{
-        kind: 'memory_flush',
-        payload: {
-          scope: 'summary',
-          includeArtifacts: true,
-        },
-      }],
+      hookPayloads: [
+        expect.objectContaining({
+          kind: 'memory_flush',
+          payload: {
+            scope: 'summary',
+            includeArtifacts: true,
+          },
+          payloadStatus: 'stored',
+          payloadBytes: expect.any(Number),
+        }),
+      ],
     }));
     expect(body.inspection.maintenance.resetBoundary).toEqual(expect.objectContaining({
       status: 'cleared',
@@ -542,7 +550,12 @@ describe('session close route', () => {
             lastRequest: {
               action: string;
               reason?: string;
-              hookPayloads: Array<{ kind: string; payload?: Record<string, unknown> }>;
+              hookPayloads: Array<{
+                kind: string;
+                payload?: Record<string, unknown>;
+                payloadStatus?: string;
+                payloadBytes?: number;
+              }>;
             };
           };
         };
@@ -557,13 +570,17 @@ describe('session close route', () => {
             lastRequest: expect.objectContaining({
               action: 'compact',
               reason: 'hooks_acknowledged',
-              hookPayloads: [{
-                kind: 'memory_flush',
-                payload: {
-                  scope: 'summary',
-                  flushed: true,
-                },
-              }],
+              hookPayloads: [
+                expect.objectContaining({
+                  kind: 'memory_flush',
+                  payload: {
+                    scope: 'summary',
+                    flushed: true,
+                  },
+                  payloadStatus: 'stored',
+                  payloadBytes: expect.any(Number),
+                }),
+              ],
             }),
           }),
         }),
@@ -824,6 +841,113 @@ describe('session close route', () => {
         }),
       }),
     }));
+  });
+
+  it('sanitizes persisted maintenance request payloads before surfacing them through session inspection', async () => {
+    const session = registry.create({
+      id: 'session-compact-guardrails',
+      providerName: 'claude',
+      cwd: 'C:/repo',
+    });
+    session.messageCount = 2;
+    session.totalInputTokens = 20;
+    session.totalOutputTokens = 10;
+    registry.updateStatus(session.id, 'closed');
+
+    const response = await app.request(`/sessions/${session.id}/compact`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        maintenance: {
+          reason: 'r'.repeat(700),
+          hookPayloads: [{
+            kind: 'memory_flush',
+            payload: {
+              apiKey: 'super-secret',
+              summary: 's'.repeat(700),
+            },
+          }],
+        },
+      }),
+    });
+    expect(response.status).toBe(200);
+
+    const body = await response.json() as {
+      maintenance: {
+        lastRequest: {
+          reason?: string;
+          reasonTruncated?: boolean;
+          hookPayloads: Array<{
+            kind: string;
+            payload?: Record<string, unknown>;
+            payloadStatus?: string;
+            payloadWarnings?: string[];
+          }>;
+        };
+        markers: Array<{
+          code: string;
+          details?: Record<string, unknown>;
+        }>;
+      };
+    };
+    expect(body.maintenance.lastRequest.reason?.length).toBeLessThanOrEqual(512);
+    expect(body.maintenance.lastRequest.reasonTruncated).toBe(true);
+    expect(body.maintenance.lastRequest.hookPayloads[0]).toEqual(expect.objectContaining({
+      kind: 'memory_flush',
+      payloadStatus: 'redacted_and_truncated',
+      payloadWarnings: expect.arrayContaining(['sensitive_keys_redacted', 'string_truncated']),
+      payload: expect.objectContaining({
+        apiKey: '[redacted]',
+      }),
+    }));
+    const compactMarker = body.maintenance.markers.find((marker) => marker.code === 'compact_requested');
+    expect(compactMarker).toEqual(expect.objectContaining({
+      code: 'compact_requested',
+      details: expect.objectContaining({
+        reasonTruncated: true,
+      }),
+    }));
+    expect(String(compactMarker?.details?.reason ?? '')).toHaveLength(512);
+
+    getRuntimeSessionManager(ctx).dropSession(session.id);
+    const persistedResponse = await app.request(`/sessions/${session.id}`);
+    expect(persistedResponse.status).toBe(200);
+    const persistedBody = await persistedResponse.json() as {
+      inspection: {
+        maintenance: {
+          lastRequest: {
+            reasonTruncated?: boolean;
+            hookPayloads: Array<{
+              payloadStatus?: string;
+              payload?: Record<string, unknown>;
+            }>;
+          };
+          markers: Array<{
+            code: string;
+            details?: Record<string, unknown>;
+          }>;
+        };
+      };
+    };
+    expect(persistedBody.inspection.maintenance.lastRequest.reasonTruncated).toBe(true);
+    expect(persistedBody.inspection.maintenance.lastRequest.hookPayloads[0]).toEqual(
+      expect.objectContaining({
+        payloadStatus: 'redacted_and_truncated',
+        payload: expect.objectContaining({
+          apiKey: '[redacted]',
+        }),
+      }),
+    );
+    const persistedCompactMarker = persistedBody.inspection.maintenance.markers.find(
+      (marker) => marker.code === 'compact_requested',
+    );
+    expect(persistedCompactMarker).toEqual(expect.objectContaining({
+      code: 'compact_requested',
+      details: expect.objectContaining({
+        reasonTruncated: true,
+      }),
+    }));
+    expect(String(persistedCompactMarker?.details?.reason ?? '')).toHaveLength(512);
   });
 
   it('clears runtime-owned browser sessions when resetting a session', async () => {

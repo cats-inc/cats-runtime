@@ -1,6 +1,9 @@
 # Roadmap
 
 > Long-term project planning and milestones.
+>
+> This roadmap treats runtime-managed transcript compaction, recurring wakeup
+> scheduling, and runtime skill execution delivery as shipped baseline slices.
 
 ## Optimizations
 
@@ -81,7 +84,7 @@ Python readers.
 ### OPT-2: Provider-Agnostic Progress Events
 
 **Priority**: P2
-**Status**: In Progress
+**Status**: Completed
 
 #### Problem
 
@@ -346,9 +349,6 @@ Current gaps:
   follow-through itself
 - Team 3's future memory pipeline seam exists in contracts only; runtime still
   lacks the hook execution/retry envelope around lifecycle flush boundaries
-- persisted maintenance trigger payloads are stored verbatim; there are no
-  redaction rules, payload size caps, or retention guardrails yet if future
-  products attach larger or more sensitive hook payloads
 - non-shared fork copy still clones the whole workspace opportunistically in
   the request path; runtime does not yet have bounded snapshot planning,
   progress reporting, or large-workspace safeguards
@@ -367,8 +367,6 @@ schemas.
 - Add follow-through around the public `/sessions/{id}/compact` seam so Team 4
   style flush payloads and eventual external compaction workers can acknowledge,
   retry, and report completion without inventing a second maintenance contract
-- Add redaction/size guardrails for persisted maintenance trigger payloads
-  before products start attaching larger or more sensitive flush metadata
 - Add bounded snapshot/sync orchestration for large workspaces so fork/reset
   flows can avoid unstructured full-tree copies when the workspace is too large
   or needs resumable/progressive sync behavior
@@ -383,6 +381,9 @@ schemas.
   existing memory-flush hook groups
 - runtime-managed transcripts now repair/archive older JSONL history and record
   `lastCompaction` metadata when the public compaction seam can execute safely
+- maintenance trigger payload snapshots are now truncated/redacted/size-capped
+  before persistence, with additive status/warning metadata surfaced through
+  session inspection
 - generalized workspace sync and hook execution plumbing remain deferred
 
 #### Affected Files
@@ -403,8 +404,8 @@ schemas.
 #### Problem
 
 `cats-runtime` now has a family-aware runtime skill library, persisted
-skill-state re-entry compatibility, and a per-root catalog cache. That closes
-the immediate correctness gaps, but two small hardening items remain:
+skill-state re-entry compatibility, and a per-root catalog cache. The final
+small cache/discovery hardening gaps were:
 
 - the current watch-key builder duplicates the same two-level discovery shape
   used by runtime skill entry discovery, so future nesting/layout changes would
@@ -424,8 +425,6 @@ skill execution contract.
 - Collapse watch-key generation and catalog discovery onto one shared
   enumeration path so future library layout changes do not duplicate traversal
   rules
-- Revisit cache invalidation precision if field evidence shows same-second
-  rewrites on low-resolution filesystems are a practical issue
 - Keep this follow-up internal to `cats-runtime`; do not change the public
   requested/resolved/applied skill contract just to service cache maintenance
 
@@ -436,8 +435,10 @@ skill execution contract.
 - persisted session-state rebuild intentionally drops historical
   `version`/`fingerprint` pinning on re-entry
 - per-root catalog cache with file-content invalidation heuristics is landed
-- shared discovery/cache enumeration and higher-precision invalidation remain
-  deferred
+- shared discovery/cache enumeration is now landed through one entry-source
+  traversal path
+- per-root cache invalidation now keys from entry content fingerprints instead
+  of truncated mtimes
 
 #### Affected Files
 

@@ -6,7 +6,6 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
-  statSync,
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
@@ -61,6 +60,12 @@ interface RuntimeSkillPackage {
   body: string;
   fingerprint: string;
   library: RuntimeSkillLibraryMetadata;
+}
+
+interface RuntimeSkillEntrySource {
+  entryFile: string;
+  raw: string;
+  fingerprint: string;
 }
 
 interface RuntimeSkillFrontmatter {
@@ -498,22 +503,43 @@ function parseSkillMarkdown(
   };
 }
 
-function loadRuntimeSkillPackage(
+function readRuntimeSkillEntrySource(entryFile: string): RuntimeSkillEntrySource {
+  const raw = readFileSync(entryFile, 'utf-8');
+  return {
+    entryFile,
+    raw,
+    fingerprint: computeFingerprint(raw),
+  };
+}
+
+function loadRuntimeSkillPackageFromSource(
   skillId: string,
-  entryFile: string,
+  source: RuntimeSkillEntrySource,
   skillsRoot: string,
 ): RuntimeSkillPackage {
-  const raw = readFileSync(entryFile, 'utf-8');
-  const fingerprint = computeFingerprint(raw);
   const cached = getCachedRuntimeSkillPackage({
-    entryFile,
-    fingerprint,
+    entryFile: source.entryFile,
+    fingerprint: source.fingerprint,
   });
   if (cached) {
     return cached;
   }
 
-  return cacheRuntimeSkillPackage(parseSkillMarkdown(skillId, entryFile, skillsRoot, raw));
+  return cacheRuntimeSkillPackage(
+    parseSkillMarkdown(skillId, source.entryFile, skillsRoot, source.raw),
+  );
+}
+
+function loadRuntimeSkillPackage(
+  skillId: string,
+  entryFile: string,
+  skillsRoot: string,
+): RuntimeSkillPackage {
+  return loadRuntimeSkillPackageFromSource(
+    skillId,
+    readRuntimeSkillEntrySource(entryFile),
+    skillsRoot,
+  );
 }
 
 function discoverRuntimeSkillEntryFiles(
@@ -539,6 +565,14 @@ function discoverRuntimeSkillEntryFiles(
   return discovered;
 }
 
+function discoverRuntimeSkillEntrySources(
+  skillsRoot: string,
+): RuntimeSkillEntrySource[] {
+  return discoverRuntimeSkillEntryFiles(skillsRoot)
+    .sort()
+    .map((entryFile) => readRuntimeSkillEntrySource(entryFile));
+}
+
 function inferSkillsRootFromEntryFile(entryFile: string): string | undefined {
   let currentDir = path.dirname(entryFile);
   while (true) {
@@ -556,19 +590,17 @@ function inferSkillsRootFromEntryFile(entryFile: string): string | undefined {
 
 function buildSkillsRootWatchKey(
   skillsRoot: string,
+  entrySources: RuntimeSkillEntrySource[],
 ): string {
-  const entryFiles = discoverRuntimeSkillEntryFiles(skillsRoot).sort();
-  if (entryFiles.length === 0) {
+  if (entrySources.length === 0) {
     return existsSync(skillsRoot) ? 'empty' : 'missing';
   }
 
-  return entryFiles
-    .map((entryFile) => {
-      const stat = statSync(entryFile);
+  return entrySources
+    .map((entrySource) => {
       return [
-        path.relative(skillsRoot, entryFile).replace(/\\/g, '/'),
-        stat.size,
-        Math.trunc(stat.mtimeMs),
+        path.relative(skillsRoot, entrySource.entryFile).replace(/\\/g, '/'),
+        entrySource.fingerprint,
       ].join(':');
     })
     .join('|');
@@ -577,7 +609,8 @@ function buildSkillsRootWatchKey(
 function buildRuntimeSkillCatalogPackages(
   skillsRoot: string = SKILLS_ROOT,
 ): RuntimeSkillPackage[] {
-  const watchKey = buildSkillsRootWatchKey(skillsRoot);
+  const entrySources = discoverRuntimeSkillEntrySources(skillsRoot);
+  const watchKey = buildSkillsRootWatchKey(skillsRoot, entrySources);
   const cachedCatalog = runtimeSkillCatalogCache.get(skillsRoot);
   if (cachedCatalog?.watchKey === watchKey) {
     return cachedCatalog.packages;
@@ -594,17 +627,21 @@ function buildRuntimeSkillCatalogPackages(
   const packages: RuntimeSkillPackage[] = [];
   const seenSkillIds = new Map<string, string>();
 
-  for (const entryFile of discoverRuntimeSkillEntryFiles(skillsRoot).sort()) {
-    const skillId = path.basename(path.dirname(entryFile));
-    const skillPackage = loadRuntimeSkillPackage(skillId, entryFile, skillsRoot);
+  for (const entrySource of entrySources) {
+    const skillId = path.basename(path.dirname(entrySource.entryFile));
+    const skillPackage = loadRuntimeSkillPackageFromSource(
+      skillId,
+      entrySource,
+      skillsRoot,
+    );
     const duplicateEntry = seenSkillIds.get(skillId);
     if (duplicateEntry) {
       throw new RuntimeSkillError(
-        `Runtime skill '${skillId}' is declared more than once: '${duplicateEntry}' and '${entryFile}'.`,
+        `Runtime skill '${skillId}' is declared more than once: '${duplicateEntry}' and '${entrySource.entryFile}'.`,
         'invalid_skill_manifest',
       );
     }
-    seenSkillIds.set(skillId, entryFile);
+    seenSkillIds.set(skillId, entrySource.entryFile);
     packages.push(skillPackage);
   }
 

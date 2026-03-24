@@ -351,7 +351,8 @@ export class RuntimeSessionManager {
     request: RuntimeSessionMaintenanceRequest,
   ): RuntimeSessionMaintenanceRequest {
     const tracked = this.ensureTrackedState(request.sessionId);
-    tracked.maintenance.lastRequest = cloneMaintenanceRequest(request);
+    const sanitizedRequest = cloneMaintenanceRequest(request);
+    tracked.maintenance.lastRequest = sanitizedRequest;
     this.pushMaintenanceMarker(tracked, {
       code: `${request.action}_requested`,
       observedAt: request.requestedAt,
@@ -361,11 +362,12 @@ export class RuntimeSessionManager {
         ...(request.worktreeDisposition
           ? { worktreeDisposition: request.worktreeDisposition }
           : {}),
-        ...(request.reason ? { reason: request.reason } : {}),
+        ...(sanitizedRequest.reason ? { reason: sanitizedRequest.reason } : {}),
+        ...(sanitizedRequest.reasonTruncated ? { reasonTruncated: true } : {}),
         hookPayloadKinds: request.hookPayloads.map((payload) => payload.kind),
       },
     });
-    return cloneMaintenanceRequest(request);
+    return cloneMaintenanceRequest(sanitizedRequest);
   }
 
   clearProviderState(sessionId: string): void {

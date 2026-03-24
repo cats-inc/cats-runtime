@@ -1184,6 +1184,9 @@ export interface RuntimeSessionLifecycleContract {
 export interface RuntimeSessionMaintenanceHookPayload {
   kind: string;
   payload?: unknown;
+  payloadStatus?: 'stored' | 'redacted' | 'truncated' | 'redacted_and_truncated' | 'omitted';
+  payloadWarnings?: string[];
+  payloadBytes?: number;
 }
 
 export interface RuntimeSessionMaintenanceRequest {
@@ -1196,6 +1199,7 @@ export interface RuntimeSessionMaintenanceRequest {
   sourceCwd?: string;
   worktreePath?: string;
   reason?: string;
+  reasonTruncated?: boolean;
   worktreeDisposition?: WorktreeCleanupPolicy;
   hookPayloads: RuntimeSessionMaintenanceHookPayload[];
 }
