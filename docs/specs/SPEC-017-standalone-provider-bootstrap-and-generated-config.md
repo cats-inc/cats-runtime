@@ -256,7 +256,13 @@ The intended architecture is:
   - generated-config write path
 - thin adapters on top
   - standalone provider setup page now
+  - dashboard manual re-scan / repair entry
+  - setup diagnostic report generation
   - future CLI subcommands later, if they are justified
+
+`SetupDiagnosticService` is not itself one of the bootstrap core services. It is
+an upper-layer consumer that reads from those services and projects their state
+into an operator-facing diagnostic artifact.
 
 That keeps the first slice focused on three-layer separation and bootstrap mode
 while making a later CLI cheap to add.

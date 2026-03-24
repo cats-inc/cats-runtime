@@ -17,6 +17,8 @@ report that works even when the HTTP server cannot start.
 This spec defines a runtime-owned setup diagnostic report feature that:
 
 - runs without requiring the normal server startup path
+- integrates with standalone bootstrap and repair flows instead of creating a
+  separate first-run stack
 - resolves artifact paths from runtime config rather than a hardcoded home dir
 - reuses the existing compatibility and discovery engine where possible
 - emits a redacted operator-facing report distinct from compatibility evidence
@@ -28,6 +30,8 @@ This spec defines a runtime-owned setup diagnostic report feature that:
 - let product hosts trigger the same diagnostic capability during onboarding
 - reuse runtime-owned compatibility and discovery logic instead of duplicating
   probe code
+- keep the report aligned with the standalone bootstrap service layer and
+  provider-setup direction
 - keep report storage and retention aligned with runtime-owned `dataDir`
 - make reports safe to share by default through redaction
 
@@ -48,55 +52,109 @@ This spec defines a runtime-owned setup diagnostic report feature that:
 - As a maintainer, I want setup reports to reference compatibility evidence
   without conflating the two artifact types.
 
+## Relationship to Bootstrap
+
+This feature is part of the broader standalone setup story defined later in
+bootstrap work. The setup diagnostic report is a bounded setup-time debug
+artifact, not a separate onboarding system and not a general streaming log.
+
+It should align with the same three-layer model:
+
+1. **Provider universe**
+   - runtime-owned knowledge about supported providers and checks
+2. **Machine detection**
+   - runtime-owned scan/probe results for the current machine
+3. **Enabled config**
+   - operator intent persisted in `providers.yaml`
+
+The diagnostic report primarily aggregates the first two layers and then adds
+config validation facts when enabled config exists or fails to parse. It must
+remain usable even when enabled config is missing or invalid.
+
+## Service Role Split
+
+To avoid a parallel first-run stack, the service roles are:
+
+- **bootstrap core services**
+  - provider-universe read model
+  - machine-detection/probe orchestration
+  - setup-state persistence
+  - enabled-config generation
+- **`SetupDiagnosticService`**
+  - consumes bootstrap core services
+  - adds platform snapshot and config validation
+  - applies redaction and report formatting
+  - writes operator-facing setup reports under `data/diagnostics/`
+
+`SetupDiagnosticService` may request a refresh through the shared
+machine-detection service when needed, but it does not own the raw detection
+subsystem or the canonical setup scan snapshot format.
+
 ## Requirements
 
 ### Functional Requirements
 
 1. `cats-runtime` shall support an explicit diagnostic entry path that can run
    without starting the normal HTTP server.
-2. The runtime may also expose an explicit post-startup action for regenerating
+2. The report generator shall be implemented as a shared runtime-owned setup
+   aggregation/output service that can be reused by bootstrap/setup flows,
+   future headless adapters, host-managed setup, and optional post-startup
+   actions.
+3. `SetupDiagnosticService` shall consume shared bootstrap/setup services for
+   provider-universe knowledge, machine detection, and setup-state access; it
+   shall not define a parallel machine-detection core.
+4. The runtime may also expose an explicit post-startup action for regenerating
    the same report after the server is running.
-3. The report output directory shall be resolved from runtime configuration:
+5. The report output directory shall be resolved from runtime configuration:
    - use a configured `dataDir` when present
    - otherwise use the same fallback pattern as other runtime-owned artifacts
-4. The setup report shall be written under:
+6. The setup report shall be written under:
    - `<resolved dataDir>/diagnostics/`
-5. The runtime shall support a first-run detection mechanism that is based on:
-   - runtime-owned marker/report state under the resolved data directory, or
-   - an explicit host-managed signal
-   The feature shall not rely on absence of `~/.cats-runtime/`.
-6. The report shall include a platform snapshot layer with:
+7. Bootstrap/setup flows may choose to trigger report generation based on
+   runtime-owned setup state under the resolved data directory or an explicit
+   host-managed signal. The report feature itself shall not rely on absence of
+   `~/.cats-runtime/` and shall not become the sole owner of first-run
+   detection.
+8. The report shall include a platform snapshot layer with:
    - runtime version
    - process/platform architecture facts
    - resolved runtime path facts
    - basic writability or filesystem checks
-7. The report shall include a dependency probe layer that reuses runtime-owned
+9. The report shall include a dependency probe layer that reuses runtime-owned
    compatibility and discovery logic where practical, including:
-   - configured provider readiness summaries
+   - provider-universe and machine-detection-based readiness summaries
+   - configured-target readiness summaries when enabled config exists
    - command presence/version facts
    - WSL discovery summary where supported
    - Docker summary where supported
    - git summary where supported
-8. The report shall include a configuration validation layer with:
+10. The dependency probe layer shall remain usable when enabled config is
+   missing, partial, or invalid.
+11. The report shall include a configuration validation layer with:
    - config parse status
    - provider instance counts or obvious config errors
    - port availability checks
    - runtime-owned path validation
-9. The report shall emit a normalized issues list with stable codes and
+12. When a current runtime-owned scan snapshot is already available under
+    `data/setup/`, the report generator should reuse or reference that snapshot
+    instead of maintaining a separate raw detection artifact under
+    `data/diagnostics/`.
+13. The report shall emit a normalized issues list with stable codes and
    severities.
-10. The report shall be explicitly redacted for sharing.
-11. The feature shall keep setup reports separate from compatibility evidence
+14. The report shall be explicitly redacted for sharing.
+15. The feature shall keep setup reports separate from compatibility evidence
     bundles.
-12. The report may include references to related compatibility evidence bundles,
+16. The report may include references to related compatibility evidence bundles,
     but shall not duplicate sensitive evidence content into the report.
-13. Setup report artifacts shall be JSON and unsigned in the first slice.
-14. The runtime shall tolerate partial success:
+17. Setup report artifacts shall be JSON and unsigned in the first slice.
+18. The runtime shall tolerate partial success:
     - one failed probe shall not prevent writing the overall report
     - failed sections shall still produce structured issue entries
-15. The CLI-triggered or startup-triggered path should print a concise summary
-    to stdout/stderr while still writing the full report artifact.
-16. The feature should support bounded retention or cleanup of older setup
+19. The feature should support bounded retention or cleanup of older setup
     reports under the diagnostics directory.
+20. The setup report artifact shall remain distinct from bootstrap scan
+    snapshots under `data/setup/`; reports are operator-facing summary artifacts
+    while setup snapshots remain runtime-owned discovery state.
 
 ### Non-Functional Requirements
 
@@ -104,35 +162,37 @@ This spec defines a runtime-owned setup diagnostic report feature that:
 - **Portability**: report generation must work with the same runtime config
   model used for standalone and host-managed startup
 - **Maintainability**: probe logic should primarily reuse existing runtime-owned
-  compatibility/discovery helpers
+  compatibility/discovery helpers and shared bootstrap/setup services
 - **Operability**: report artifacts should be easy to locate and share
 
 ## Design Overview
 
 ```text
-manual CLI / first-run hook / host action / HTTP action
-                        |
-                        v
-              SetupDiagnosticService
-                        |
-      +-----------------+-----------------+
-      |                 |                 |
-      v                 v                 v
-platform snapshot   dependency probes   config validation
-      \                 |                 /
-       \                |                /
-        +---------------+---------------+
-                        |
-                        v
-             redacted JSON report writer
-                        |
-                        v
+bootstrap flow / host action / optional CLI / HTTP action
+                          |
+                          v
+         shared bootstrap/setup services
+   (provider universe + machine detection + setup state)
+                          |
+                          v
+                SetupDiagnosticService
+      (aggregation + redaction + report writing)
+                          |
+      +-------------------+-------------------+
+      |                   |                   |
+      v                   v                   v
+platform snapshot   scan snapshot reuse   config validation
+   / env facts       or probe refresh      and issues model
+                          |
+                          v
         <resolved dataDir>/diagnostics/setup-report-*.json
 ```
 
 The runtime should reuse `ProviderCompatibilityService` and related discovery
-helpers for provider/dependency facts. The setup report is an operator-facing
-aggregation layer above those lower-level signals.
+helpers for provider/dependency facts. `SetupDiagnosticService` is an
+operator-facing aggregation/output layer above those lower-level signals and
+should plug into the same shared setup/bootstrap service layer used by
+standalone bootstrap instead of becoming a parallel detection system.
 
 ## Artifact Model
 
@@ -140,27 +200,34 @@ The setup report and compatibility evidence bundles are related but distinct:
 
 - compatibility evidence bundles support runtime maintenance and replay
 - setup reports support operator troubleshooting and host onboarding
+- setup scan snapshots under `data/setup/` support bootstrap resumption and
+  shared runtime discovery state
 
 The setup report may contain:
 
 - stable issue codes
 - summarized readiness state
 - references to supporting compatibility evidence artifact paths or IDs
+- references to the scan snapshot used or refreshed for this report, when
+  applicable
 
 The setup report should not become the new canonical evidence fixture format.
 
 ## Dependencies
 
 - [ADR-014](../decisions/014-keep-lightweight-provider-setup-and-diagnostics-in-cats-runtime.md)
+- [ADR-020](../decisions/020-keep-setup-diagnostic-reports-config-derived-and-separate-from-compatibility-evidence.md)
+- [ADR-021](../decisions/021-treat-providers-yaml-as-generated-config-and-bootstrap-without-it.md)
 - [SPEC-007](./SPEC-007-provider-compatibility-and-evidence-engine.md)
+- [SPEC-017](./SPEC-017-standalone-provider-bootstrap-and-generated-config.md)
 - [Research: First-Run Setup Diagnostic Report](../research/2026-03-24-setup-diagnostic-report.md)
 
 ## Open Questions
 
-- [ ] Should the HTTP-triggered rescan be `POST /diagnostics/setup-report` or a
-      different explicit action path?
-- [ ] Should the CLI path emit a short text summary, a JSON summary, or both to
-      stdout?
+- [ ] Should the HTTP-triggered regeneration be `POST /diagnostics/setup-report`
+      or a different explicit action path?
+- [ ] If a future CLI adapter is added, should it emit a short text summary, a
+      JSON summary, or both to stdout?
 - [ ] What retention policy should apply to older setup reports?
 - [ ] Should setup reports reference compatibility evidence by absolute path,
       relative path, or generated artifact ID?
