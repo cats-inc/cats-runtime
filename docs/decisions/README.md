@@ -38,6 +38,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
+| [022-model-advanced-selection-as-entries-presets-and-provider-specific-controls](./022-model-advanced-selection-as-entries-presets-and-provider-specific-controls.md) | Model advanced selection as entries, presets, and provider-specific controls | Accepted | 2026-03-25 |
 | [021-treat-providers-yaml-as-generated-config-and-bootstrap-without-it](./021-treat-providers-yaml-as-generated-config-and-bootstrap-without-it.md) | Treat `providers.yaml` as generated config and bootstrap without it | Accepted | 2026-03-25 |
 | [020-keep-setup-diagnostic-reports-config-derived-and-separate-from-compatibility-evidence](./020-keep-setup-diagnostic-reports-config-derived-and-separate-from-compatibility-evidence.md) | Keep setup diagnostic reports config-derived and separate from compatibility evidence | Accepted | 2026-03-25 |
 | [019-scope-first-lan-peer-sharing-to-execution-only](./019-scope-first-lan-peer-sharing-to-execution-only.md) | Scope first LAN peer sharing to execution-only | Accepted | 2026-03-25 |

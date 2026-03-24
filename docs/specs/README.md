@@ -48,6 +48,7 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 
 | Spec | Title | Status | Related Plan |
 |------|-------|--------|--------------|
+| [SPEC-018](./SPEC-018-advanced-provider-model-catalog-and-selection-schema.md) | Advanced Provider Model Catalog and Selection Schema | Draft | TBD |
 | [SPEC-017](./SPEC-017-standalone-provider-bootstrap-and-generated-config.md) | Standalone Provider Bootstrap and Generated Config | Draft | TBD |
 | [SPEC-016](./SPEC-016-lan-peer-discovery-and-execution-routing-v0.md) | LAN Peer Discovery and Execution Routing v0 | Draft | TBD |
 | [SPEC-015](./SPEC-015-runtime-setup-diagnostic-report.md) | Runtime Setup Diagnostic Report | Draft | TBD |
