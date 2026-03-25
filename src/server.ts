@@ -51,6 +51,10 @@ import { loadPeerRuntimeConfig } from './core/peers/config.js';
 import { PeerRegistry as RuntimePeerRegistry } from './core/peers/PeerRegistry.js';
 import { PeerCapabilitySnapshotService } from './core/peers/PeerCapabilitySnapshotService.js';
 import { PeerDiscoveryController } from './core/peers/PeerDiscoveryController.js';
+import { PeerTrustService } from './core/peers/PeerTrustService.js';
+import { PeerRoutingService } from './core/peers/PeerRoutingService.js';
+import { PeerExecutionClient } from './core/peers/PeerExecutionClient.js';
+import { PeerExecutionService } from './core/peers/PeerExecutionService.js';
 import { createRuntimeApp, type AppContext } from './http/app.js';
 import { executeRetainedWorktreeCleanup } from './http/routes/sessions.js';
 import type { ProviderName } from './backends/cli/providers/types.js';
@@ -818,10 +822,25 @@ export function createRuntimeServer(
     registry,
     pool,
   });
+  const peerTrust = new PeerTrustService({
+    config: peerConfig,
+    localPeerId: peerCapabilities.getLocalPeerId(),
+  });
   const peerDiscovery = new PeerDiscoveryController({
     config: peerConfig,
     registry: peerRegistry,
     capabilitySnapshot: peerCapabilities,
+    trust: peerTrust,
+  });
+  const peerRouting = new PeerRoutingService({
+    config: peerConfig,
+    registry: peerRegistry,
+    trust: peerTrust,
+    localPeerId: peerCapabilities.getLocalPeerId(),
+  });
+  const peerExecutionClient = new PeerExecutionClient({
+    config: peerConfig,
+    localPeerId: peerCapabilities.getLocalPeerId(),
   });
   const context: AppContext = {
     config,
@@ -845,12 +864,21 @@ export function createRuntimeServer(
     peerRegistry,
     peerDiscovery,
     peerCapabilities,
+    peerTrust,
+    peerRouting,
+    peerExecutionClient,
     resolveCursorNative,
     resolveGooseNative,
     resolveKiroNative,
     resolveAuggieSessions,
     resolveOpencodeNative,
   };
+  context.peerExecutionService = new PeerExecutionService({
+    config,
+    registry,
+    runtime,
+    localPeerId: peerCapabilities.getLocalPeerId(),
+  });
   const worktreeMaintenance = new RuntimeWorktreeMaintenanceService({
     sessionBaseDir: config.sessionBaseDir,
     registry,

@@ -3,6 +3,11 @@ import type {
   ProviderModelSelection,
 } from './models/providerSelectionResolution.js';
 
+export type {
+  ProviderModelResolution,
+  ProviderModelSelection,
+} from './models/providerSelectionResolution.js';
+
 export type { CliRuntimeConfig as RuntimeConfig } from '../backends/cli/config.js';
 
 export type SessionStatus =

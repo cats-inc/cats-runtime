@@ -1,5 +1,6 @@
 import { PeerRegistry } from './PeerRegistry.js';
 import { PeerCapabilitySnapshotService } from './PeerCapabilitySnapshotService.js';
+import { PeerTrustService } from './PeerTrustService.js';
 import type {
   PeerAdvertisement,
   PeerDiscoveryAdapterSnapshot,
@@ -33,6 +34,7 @@ export interface PeerDiscoveryControllerOptions {
   config: PeerRuntimeConfig;
   registry: PeerRegistry;
   capabilitySnapshot: PeerCapabilitySnapshotService;
+  trust?: PeerTrustService;
   adapters?: PeerDiscoveryAdapter[];
   now?: () => number;
 }
@@ -68,7 +70,16 @@ export class PeerDiscoveryController {
     this.lastStartedAt = new Date(this.now()).toISOString();
     const runtime: PeerDiscoveryAdapterRuntime = {
       upsert: (advertisement, options) => {
-        this.options.registry.upsert(advertisement, options);
+        const trustedAdvertisement = this.options.trust
+          ? {
+              ...advertisement,
+              trust: this.options.trust.summarizeAdvertisement(
+                advertisement,
+                options.sourceKind,
+              ),
+            }
+          : advertisement;
+        this.options.registry.upsert(trustedAdvertisement, options);
       },
       removeSource: (sourceId) => {
         this.options.registry.removeSource(sourceId);

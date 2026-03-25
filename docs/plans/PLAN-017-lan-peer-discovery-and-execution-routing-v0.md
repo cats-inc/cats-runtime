@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | Completed |
 | **Owner** | runtime workstream |
 | **Assigned To** | Unassigned |
 | **Reviewer** | User / runtime workstream |
@@ -71,12 +71,13 @@ read-model relay so existing session observation surfaces continue to work.
 
 ### Phase 1: Peer Identity and Registry Contract
 
-- [ ] Task 1.1: Add bounded peer config and type definitions for identity,
+- [x] Task 1.1: Add bounded peer config and type definitions for identity,
       registry entries, capability summaries, load summaries, trust state, and
       routing decisions.
-- [ ] Task 1.2: Implement `PeerIdentityService`, `PeerRegistryService`, and
-      `PeerCapabilitySnapshotService` as a discovery-independent core seam.
-- [ ] Task 1.3: Add unit tests for identity stability, registry dedupe, stale
+- [x] Task 1.2: Implement bounded local peer identity derivation,
+      `PeerRegistry`, and `PeerCapabilitySnapshotService` as a
+      discovery-independent core seam.
+- [x] Task 1.3: Add unit tests for identity stability, registry dedupe, stale
       peer expiry, and default-off config behavior.
 
 **Deliverables**: new peer-core types and services exist under a dedicated
@@ -85,12 +86,12 @@ not expose secrets, workspace paths, or full machine inventory.
 
 ### Phase 2: Discovery Substrate
 
-- [ ] Task 2.1: Implement `PeerDiscoveryController` plus a discovery adapter
+- [x] Task 2.1: Implement `PeerDiscoveryController` plus a discovery adapter
       seam for LAN advertisement and listener behavior.
-- [ ] Task 2.2: Wire peer discovery startup and shutdown from `src/server.ts`
+- [x] Task 2.2: Wire peer discovery startup and shutdown from `src/server.ts`
       separately from existing native session discovery.
-- [ ] Task 2.3: Add additive LAN discovery state to `GET /discovery/status`.
-- [ ] Task 2.4: Add tests for discovery startup/shutdown, duplicate
+- [x] Task 2.3: Add additive LAN discovery state to `GET /discovery/status`.
+- [x] Task 2.4: Add tests for discovery startup/shutdown, duplicate
       advertisement collapse, heartbeat refresh, and TTL-based eviction.
 
 **Deliverables**: LAN discovery can advertise and observe peers behind a
@@ -99,11 +100,11 @@ execution routing.
 
 ### Phase 3: Diagnostics and Read Visibility
 
-- [ ] Task 3.1: Add peer read routes: `GET /peers`, `GET /peers/:peerId`, and
+- [x] Task 3.1: Add peer read routes: `GET /peers`, `GET /peers/:peerId`, and
       `GET /diagnostics/peers`.
-- [ ] Task 3.2: Add additive peer summaries to `GET /diagnostics/runtime` and
+- [x] Task 3.2: Add additive peer summaries to `GET /diagnostics/runtime` and
       `GET /diagnostics/health` without changing current readiness semantics.
-- [ ] Task 3.3: Add tests for peer registry reads, filtered/detail views,
+- [x] Task 3.3: Add tests for peer registry reads, filtered/detail views,
       diagnostics summaries, and redaction.
 
 **Deliverables**: operators can inspect peer identity, health, capability, and
@@ -112,18 +113,18 @@ remains unchanged in the first rollout.
 
 ### Phase 4: Bounded Execution Routing Contract
 
-- [ ] Task 4.1: Add a dedicated peer-only execution route,
+- [x] Task 4.1: Add a dedicated peer-only execution route,
       `POST /peer/executions`, with separate request/response types for
       execution target, trace, failure, and result metadata.
-- [ ] Task 4.2: Implement caller-side `PeerRoutingService` and
+- [x] Task 4.2: Implement caller-side `PeerRoutingService` and
       `PeerExecutionClient` without delegating caller-visible session ownership
       to peer `/sessions` routes.
-- [ ] Task 4.3: Extend `POST /sessions/:id/messages` with additive optional
+- [x] Task 4.3: Extend `POST /sessions/:id/messages` with additive optional
       `routing` input while keeping existing request bodies valid and local-only
       by default.
-- [ ] Task 4.4: Add runtime-owned relay/read state so peer-routed runs remain
+- [x] Task 4.4: Add runtime-owned relay/read state so peer-routed runs remain
       visible through `GET /sessions/:id/observe` and `GET /sessions/:id/stream`.
-- [ ] Task 4.5: Add routing tests for explicit peer selection, opt-in routing
+- [x] Task 4.5: Add routing tests for explicit peer selection, opt-in routing
       heuristics, legacy local fallback, and observe/stream relay behavior.
 
 **Deliverables**: one bounded peer turn can be routed through a dedicated
@@ -132,13 +133,13 @@ caller-visible session, history, and inspection state.
 
 ### Phase 5: Trust/Auth Gate and Failure Handling
 
-- [ ] Task 5.1: Implement `PeerTrustService` and peer-auth middleware for
+- [x] Task 5.1: Implement `PeerTrustService` and peer-auth middleware for
       peer-only routes.
-- [ ] Task 5.2: Add config-backed trust bootstrap plus explicit
+- [x] Task 5.2: Add config-backed trust bootstrap plus explicit
       trusted/untrusted/rejected registry state.
-- [ ] Task 5.3: Map pre-dispatch auth/health failures and mid-stream disconnects
+- [x] Task 5.3: Map pre-dispatch auth/health failures and mid-stream disconnects
       onto explicit runtime-visible failure semantics.
-- [ ] Task 5.4: Add auth rejection, unhealthy peer, timeout, disconnect, and
+- [x] Task 5.4: Add auth rejection, unhealthy peer, timeout, disconnect, and
       caller-owned state regression tests.
 
 **Deliverables**: peer execution fails closed when trust or auth checks fail,
@@ -147,11 +148,11 @@ or failover.
 
 ### Phase 6: Verification and Documentation Follow-Through
 
-- [ ] Task 6.1: Build a two-runtime integration harness for peer discovery,
+- [x] Task 6.1: Build a two-runtime integration harness for peer discovery,
       diagnostics, routing, and failure-path verification.
-- [ ] Task 6.2: Run compatibility regression coverage against current `cats`
+- [x] Task 6.2: Run compatibility regression coverage against current `cats`
       create/send/observe/stream flows.
-- [ ] Task 6.3: Update `docs/api.md`, `docs/architecture.md`,
+- [x] Task 6.3: Update `docs/api.md`, `docs/architecture.md`,
       `docs/testing.md`, `docs/setup-guide.md`, and `.env.example` after code
       lands.
 
@@ -308,6 +309,8 @@ Hard scope boundaries for v0:
 |------|--------|
 | 2026-03-25 | Plan created for SPEC-016 / ADR-019 with compatibility-first execution-only scope. |
 | 2026-03-25 | Reworked plan structure to align more closely with `docs/plans/000-template.md` and kept deferred follow-on reminders explicit. |
+| 2026-03-25 | Phase 1-3 landed with bounded peer identity, registry, discovery, and diagnostics/read visibility. |
+| 2026-03-25 | Phase 4-6 landed with dedicated `POST /peer/executions`, additive message routing, trust-gated execution, caller-owned observe/stream relay behavior, two-runtime integration coverage, and public doc/env updates. |
 
 ---
 

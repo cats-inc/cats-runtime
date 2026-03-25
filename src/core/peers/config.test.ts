@@ -30,6 +30,11 @@ describe('peer runtime config', () => {
       pruneIntervalMs: 10_000,
       advertiseIntervalMs: 15_000,
       maxAdvertisedTargets: 16,
+      requestTimeoutMs: 120_000,
+      allowHeuristicRouting: false,
+      sharedSecret: undefined,
+      trustedPeerIds: [],
+      rejectedPeerIds: [],
       staticPeers: [],
     });
   });
@@ -78,5 +83,25 @@ describe('peer runtime config', () => {
       },
     }]);
     expect(peerConfig.staticPeers[0]).not.toHaveProperty('secret');
+  });
+
+  it('parses routing and trust execution config additively', () => {
+    const config = loadConfig(createEnv({
+      CATS_RUNTIME_PEERS_ENABLED: 'true',
+      CATS_RUNTIME_PEER_REQUEST_TIMEOUT_MS: '45000',
+      CATS_RUNTIME_PEER_ALLOW_HEURISTIC_ROUTING: 'true',
+      CATS_RUNTIME_PEER_SHARED_SECRET: 'lan-secret',
+      CATS_RUNTIME_PEER_TRUSTED_IDS: 'peer-a, peer-b , peer-a',
+      CATS_RUNTIME_PEER_REJECTED_IDS: '["peer-c","peer-d"]',
+    }));
+
+    expect(loadPeerRuntimeConfig(config)).toEqual(expect.objectContaining({
+      enabled: true,
+      requestTimeoutMs: 45_000,
+      allowHeuristicRouting: true,
+      sharedSecret: 'lan-secret',
+      trustedPeerIds: ['peer-a', 'peer-b'],
+      rejectedPeerIds: ['peer-c', 'peer-d'],
+    }));
   });
 });

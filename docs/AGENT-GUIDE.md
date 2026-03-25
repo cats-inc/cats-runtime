@@ -22,8 +22,11 @@
 - `GET /playground`
 - `GET /health`
 - `GET /diagnostics/health`
+- `GET /diagnostics/peers`
 - `GET /diagnostics/runtime`
 - `GET /diagnostics/providers`
+- `GET /peers`
+- `GET /peers/:peerId`
 - `GET /providers/config`
 - `GET /providers/:provider/models`
 - `GET /browser/drivers`
@@ -43,6 +46,7 @@
 - `GET /sessions/:id/lineage`
 - `POST /sessions`
 - `POST /sessions/:id/messages`
+- `POST /peer/executions`
 - `POST /sessions/:id/close`
 - `POST /sessions/:id/compact`
 - `POST /sessions/:id/resume`
@@ -143,4 +147,4 @@ Before completing a task or handing off:
 
 ---
 
-*Last updated: 2026-03-23*
+*Last updated: 2026-03-25*

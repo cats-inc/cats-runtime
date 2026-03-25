@@ -107,6 +107,7 @@ src/
     config.ts
     models/
     browser/
+    peers/
     providerActiveConfig.ts
     provider-install/
     skills/
@@ -180,6 +181,11 @@ src/
 - Streams turn output as SSE or NDJSON
 - Applies additive metering observation and execution guardrail preflight on
   streamed message turns
+- Exposes additive peer registry and diagnostics reads at `GET /peers`,
+  `GET /peers/{peerId}`, and `GET /diagnostics/peers`
+- Exposes the dedicated runtime-to-runtime `POST /peer/executions` contract and
+  additive `routing` handling on `POST /sessions/{id}/messages` while keeping
+  caller-visible session ownership local
 - Exposes startup/readiness metadata at `GET /health`
 - Exposes aggregate runtime + provider health at `GET /diagnostics/health`
 - Exposes runtime/host diagnostics at `GET /diagnostics/runtime`
@@ -220,6 +226,21 @@ src/
 - Carries the frozen startup contract version, readiness path, and lifecycle
   phase state shared by HTTP and process outputs
 - Keeps standalone and app-managed process startup on one shared binary path
+
+### `src/core/peers`
+
+- Owns bounded peer identity, capability, load, and trust-summary types
+- Maintains the peer registry independently from LAN discovery, trust, and
+  execution routing policy
+- Separates peer discovery (`PeerDiscoveryController`), trust bootstrap
+  (`PeerTrustService`), routing (`PeerRoutingService`), caller-side transport
+  (`PeerExecutionClient`), and callee-side bounded execution
+  (`PeerExecutionService`)
+- Treats peer execution as an execution-only extension: the caller runtime
+  still owns host-visible session ids, history, observe snapshots, wakeups,
+  browser state, and worktree lifecycle
+- Preserves SSE and NDJSON as two distinct peer transport paths instead of
+  collapsing them into one merged wire format
 
 ### `src/backends/cli`
 

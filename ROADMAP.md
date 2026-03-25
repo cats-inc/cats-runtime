@@ -658,11 +658,31 @@ longer needed, revisit the public contract in a coordinated cleanup slice.
 ### OPT-9: LAN Peer Execution Routing Follow-through
 
 **Priority**: P1
-**Status**: In Progress
+**Status**: Completed
 
 #### Problem
 
-`cats-runtime` now has the safe parallel PLAN-017 discovery slice landed:
+`cats-runtime` needed to finish PLAN-017 after the safe parallel discovery
+slice landed, while preserving ADR-019's execution-only boundary and existing
+`cats` compatibility.
+
+- The first delivery had only Phase 1-3: discovery, registry, and diagnostics.
+- The remaining work needed a dedicated peer execution contract, trust/auth
+  separation, and caller-owned relay behavior instead of peer-owned sessions.
+
+#### Direction
+
+Ship the rest of PLAN-017 only through additive, compatibility-preserving
+changes that keep ADR-019's execution-only boundary intact.
+
+- Add a dedicated peer execution contract instead of tunneling ownership
+  through peer `/sessions` routes
+- Keep caller runtime ownership of host-visible sessions, observe state, and
+  lifecycle
+- Treat trust/auth as a separate workstream from discovery
+- Preserve existing `cats` compatibility until product-side follow-up is ready
+
+#### Landed
 
 - bounded peer identity, capability, load, and trust-summary models
 - default-off peer registry and discovery-controller substrate
@@ -672,47 +692,34 @@ longer needed, revisit the public contract in a coordinated cleanup slice.
   - `GET /peers/:peerId`
   - `GET /diagnostics/peers`
 - additive peer summaries on runtime/health diagnostics
+- `POST /peer/executions` as the dedicated peer-only execution seam
+- additive `routing` support on `POST /sessions/:id/messages`
+- caller-owned peer-routed observe and stream relay semantics
+- trust-gated runtime-to-runtime auth for peer-only execution routes
+- two-runtime integration coverage for peer routing and failure paths
 
-That is the intended Phase 1-3 slice only. The execution-routing half of
-PLAN-017 remains intentionally deferred so this work can merge cleanly without
-changing existing `cats` behavior or session/message/streaming contracts.
+#### Still Blocked For Later Work
 
-#### Direction
-
-Complete PLAN-017 only through additive, compatibility-preserving follow-up
-work that keeps ADR-019's execution-only boundary intact.
-
-- Add a dedicated peer execution contract instead of tunneling ownership through
-  peer `/sessions` routes
-- Keep caller runtime ownership of host-visible sessions, observe state, and
-  lifecycle
-- Treat trust/auth as a separate workstream from discovery
-- Preserve existing `cats` compatibility until product-side follow-up is ready
-
-#### Deferred Follow-up
-
-- Phase 4 execution routing contract is not implemented yet
-- Add `POST /peer/executions` as the dedicated peer-only execution seam
-- Add caller-owned peer-routed message/session flow only as additive follow-up,
-  not by changing existing `/sessions` ownership behavior
-- Do not add peer-routing hints to existing session/message contracts until the
-  coordinated compatibility slice is ready
-- Add runtime-owned SSE and NDJSON relay/read seams explicitly; do not assume a
-  single merged wire format
-- Add trust/auth execution gating separately from discovery/read visibility
-- Add a two-runtime integration harness for peer discovery, routing, and
-  failure-path verification
-
-#### Still Blocked For Later Phases
-
-These items must remain later work and must not be smuggled into the current
-discovery slice:
+These items remain intentionally out of scope even after PLAN-017 v0:
 
 - full remote session ownership
 - remote workspace mutation or sync semantics
 - remote browser ownership
 - wakeup ownership transfer
 - transparent failover / hidden ownership transfer
+
+#### Coordinated Product Follow-up Still Blocked
+
+PLAN-017 v0 itself is complete. The remaining items below are not unfinished
+Phase 4-6 work; they are separate later follow-up that stays blocked on
+coordinated `cats` changes or a new design slice:
+
+- default automatic peer routing for legacy clients
+- session-level peer routing defaults on `POST /sessions`
+- any breaking stream-envelope or wire-format change that removes or renames
+  current SSE / NDJSON shapes
+- any contract change that stops existing `cats` request bodies from remaining
+  valid during migration
 
 #### Constraints
 

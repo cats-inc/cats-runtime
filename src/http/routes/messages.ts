@@ -12,6 +12,9 @@ import type { SessionRegistry } from '../../backends/cli/pool/SessionRegistry.js
 import type { CliRuntimeConfig } from '../../backends/cli/config.js';
 import type { StreamEvent } from '../../core/types.js';
 import { hydrateSessionState } from '../../core/hydration/sessionHydration.js';
+import { ManagedExecutionHandle } from '../../core/runtime/ManagedExecutionHandle.js';
+import { parsePeerMessageRoutingInput } from '../../core/peers/PeerRoutingService.js';
+import { toPeerExecutionErrorEvent } from '../../core/peers/errors.js';
 import { resolveSessionProviderTarget } from '../providerTargets.js';
 import {
   extractHydrationMetadata,
@@ -230,6 +233,70 @@ function guardrailHttpStatus(
   return outcome === 'cooldown' ? 429 : 403;
 }
 
+async function closeManagedHandle(
+  handle: ManagedExecutionHandle | undefined,
+): Promise<void> {
+  if (!handle?.active) {
+    return;
+  }
+
+  await handle.close('close').catch(() => {});
+}
+
+async function* streamPeerExecutionWithFailures(
+  client: NonNullable<AppContext['peerExecutionClient']>,
+  peer: NonNullable<NonNullable<ReturnType<NonNullable<AppContext['peerRouting']>['decide']>['peer']>>,
+  request: Parameters<NonNullable<AppContext['peerExecutionClient']>['streamExecution']>[1],
+  trace: Parameters<NonNullable<AppContext['peerExecutionClient']>['streamExecution']>[2],
+  signal: AbortSignal,
+): AsyncGenerator<StreamEvent> {
+  try {
+    for await (const event of client.streamExecution(peer, request, trace, signal)) {
+      yield event;
+    }
+  } catch (error) {
+    yield toPeerExecutionErrorEvent(error, {
+      code: 'peer_http_error',
+      message: `Peer '${peer.identity.peerId}' execution failed.`,
+      retryable: true,
+      peerId: peer.identity.peerId,
+      status: 502,
+    });
+  }
+}
+
+function applyObservedEventToSession(
+  ctx: AppContext,
+  sessionId: string,
+  session: SessionInfo,
+  observedEvent: StreamEvent,
+  options: {
+    peerRouted: boolean;
+  },
+): void {
+  if (
+    !options.peerRouted
+    && (observedEvent.type === 'init' || observedEvent.type === 'result')
+    && (observedEvent.providerSessionId || observedEvent.sessionId)
+  ) {
+    ctx.registry.setProviderSessionId(
+      sessionId,
+      observedEvent.providerSessionId || observedEvent.sessionId!,
+    );
+  }
+
+  if (!options.peerRouted && observedEvent.providerState !== undefined) {
+    ctx.registry.setProviderState(sessionId, observedEvent.providerState);
+  }
+
+  if (observedEvent.artifacts !== undefined || observedEvent.summary !== undefined) {
+    ctx.registry.updateSessionMetadata(sessionId, {
+      artifacts: observedEvent.artifacts ?? session.artifacts,
+      summary: observedEvent.summary,
+    });
+  }
+}
+
 /** POST /sessions/:id/messages — send a message, stream response as SSE */
 messageRoutes.post('/sessions/:id/messages', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
@@ -250,6 +317,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     skills?: unknown;
     context?: SessionInvocationContext;
     outputDir?: string;
+    routing?: unknown;
   }>();
   const message = parseOptionalString(body.message);
   if (!message) {
@@ -330,38 +398,94 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     });
   }
 
+  let routingInput;
+  try {
+    routingInput = parsePeerMessageRoutingInput(body.routing);
+  } catch (error) {
+    const routingErrorEvent = toPeerExecutionErrorEvent(error, {
+      code: 'peer_not_routable',
+      message: 'Invalid peer routing input.',
+      retryable: false,
+      status: 400,
+    });
+    return c.json({
+      error: routingErrorEvent.text,
+      code: (routingErrorEvent.metadata as Record<string, unknown>)?.peerRoutingFailure
+        ? ((routingErrorEvent.metadata as Record<string, unknown>).peerRoutingFailure as Record<string, unknown>).code
+        : 'peer_not_routable',
+    }, 400);
+  }
+
   const runtime = getRuntimeSessionManager(ctx);
   let worker = runtime.get(id);
-  if (!worker) {
-    return c.json({ error: 'No active worker. Resume the session first.' }, 404);
-  }
-
-  if (!worker.active) {
-    ctx.registry.updateStatus(id, 'closed');
-    return c.json({ error: 'Worker process has exited' }, 410);
-  }
-
-  if (worker.busy) {
+  if (worker?.busy) {
     return c.json({ error: 'Session is busy processing another message' }, 409);
   }
 
-  if (shouldRespawnPi) {
+  const executionSession = ctx.registry.get(id) ?? session;
+  let routingDecision;
+  try {
+    if (routingInput?.mode === 'peer') {
+      if (!ctx.peerRouting) {
+        return c.json({
+          error: 'Peer routing service is not initialized.',
+          code: 'peer_route_disabled',
+        }, 503);
+      }
+      routingDecision = ctx.peerRouting.decide(executionSession, routingInput);
+    } else {
+      routingDecision = {
+        mode: 'local',
+        reason: 'Peer routing was not requested.',
+        localFallback: false,
+        target: {
+          provider: executionSession.providerName,
+          backend: executionSession.providerBackend || 'cli',
+          instance: executionSession.providerInstanceId || 'default',
+          model: executionSession.model,
+        },
+      };
+    }
+  } catch (error) {
+    const routingErrorEvent = toPeerExecutionErrorEvent(error, {
+      code: 'peer_not_routable',
+      message: 'Peer routing could not be resolved.',
+      retryable: false,
+      status: 409,
+    });
+    const failureMetadata = (routingErrorEvent.metadata || {}) as Record<string, unknown>;
+    const failure = failureMetadata.peerRoutingFailure as Record<string, unknown> | undefined;
+    return c.json({
+      error: routingErrorEvent.text,
+      code: typeof failure?.code === 'string' ? failure.code : 'peer_not_routable',
+    }, (typeof failure?.status === 'number' ? failure.status : 409) as 400 | 403 | 404 | 409 | 503);
+  }
+
+  const peerRouted = routingDecision.mode === 'peer';
+
+  if (peerRouted && (!ctx.peerExecutionClient || !routingInput || !routingDecision.peer)) {
+    return c.json({
+      error: 'Peer execution client is not initialized.',
+      code: 'peer_route_disabled',
+    }, 503);
+  }
+
+  if (!peerRouted && shouldRespawnPi) {
     const updatedSession = ctx.registry.get(id) ?? session;
     if (tryRespawnPiWorkerForSkillMutation(ctx, updatedSession)) {
       worker = runtime.get(id);
     }
   }
 
-  if (!worker) {
+  if (!peerRouted && !worker) {
     return c.json({ error: 'No active worker. Resume the session first.' }, 404);
   }
 
-  if (!worker.active) {
+  if (!peerRouted && worker && !worker.active) {
     ctx.registry.updateStatus(id, 'closed');
     return c.json({ error: 'Worker process has exited' }, 410);
   }
 
-  const executionSession = ctx.registry.get(id) ?? session;
   const metering = getRuntimeMeteringService(ctx);
   const preflight = metering.evaluatePreflight(executionSession);
   if (preflight.outcome === 'blocked' || preflight.outcome === 'cooldown') {
@@ -378,7 +502,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     ? metering.createWarningProgressEvent(executionSession, preflight)
     : undefined;
 
-  runtime.beginRun(
+  const startedRun = runtime.beginRun(
     executionSession,
     turnInput,
     preflight.outcome === 'warned' ? { guardrail: preflight } : {},
@@ -388,6 +512,35 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
   // Check Accept header for format preference
   const accept = c.req.header('Accept') || '';
   const wantsNDJSON = accept.includes('application/x-ndjson');
+  let peerHandle: ManagedExecutionHandle | undefined;
+
+  if (peerRouted) {
+    const peerExecutionClient = ctx.peerExecutionClient!;
+    const peerEntry = routingDecision.peer!;
+    const parsedRouting = routingInput!;
+    const { request, trace } = peerExecutionClient.buildRequest({
+      session: executionSession,
+      turn: turnInput,
+      peer: peerEntry,
+      routing: parsedRouting,
+      runId: startedRun.id,
+      transport: wantsNDJSON ? 'ndjson' : 'sse',
+    });
+    peerHandle = new ManagedExecutionHandle({
+      streamMessage: (_, signal) => streamPeerExecutionWithFailures(
+        peerExecutionClient,
+        peerEntry,
+        request,
+        trace,
+        signal,
+      ),
+      onClose: async () => {
+        runtime.detachExecutionHandle(id);
+      },
+    });
+    runtime.attachExecutionHandle(id, peerHandle);
+    worker = runtime.get(id);
+  }
 
   if (wantsNDJSON) {
     // Chunked NDJSON response
@@ -416,26 +569,20 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
             runtime.observeEvent(id, warningEvent);
             controller.enqueue(new TextEncoder().encode(JSON.stringify(warningEvent) + '\n'));
           }
-          for await (const event of streamTurnWithPiRecovery(ctx, id, turnInput, () => {
-            ensureRecoveredPiHistorySourcePath(ctx, id, turnInput, historyState);
-          })) {
+          const eventStream = peerRouted
+            ? worker!.streamMessage(turnInput)
+            : streamTurnWithPiRecovery(ctx, id, turnInput, () => {
+                ensureRecoveredPiHistorySourcePath(ctx, id, turnInput, historyState);
+              });
+          for await (const event of eventStream) {
             const observedEvent = metering.observeEvent(executionSession, event, { turnStartedAt });
             runtime.observeEvent(id, observedEvent);
             const line = JSON.stringify(observedEvent) + '\n';
             controller.enqueue(new TextEncoder().encode(line));
 
-            if ((observedEvent.type === 'init' || observedEvent.type === 'result') && (observedEvent.providerSessionId || observedEvent.sessionId)) {
-              ctx.registry.setProviderSessionId(id, observedEvent.providerSessionId || observedEvent.sessionId!);
-            }
-            if (observedEvent.providerState !== undefined) {
-              ctx.registry.setProviderState(id, observedEvent.providerState);
-            }
-            if (observedEvent.artifacts !== undefined || observedEvent.summary !== undefined) {
-              ctx.registry.updateSessionMetadata(id, {
-                artifacts: observedEvent.artifacts ?? session.artifacts,
-                summary: observedEvent.summary,
-              });
-            }
+            applyObservedEventToSession(ctx, id, session, observedEvent, {
+              peerRouted,
+            });
 
             if (observedEvent.type === 'text') {
               assistantText += observedEvent.text ?? '';
@@ -498,6 +645,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
           );
           restoreReadyIfSessionStillInteractive(ctx.registry, id);
         } finally {
+          await closeManagedHandle(peerHandle);
           controller.close();
         }
       },
@@ -534,9 +682,12 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
           event: warningEvent.type,
         });
       }
-      for await (const event of streamTurnWithPiRecovery(ctx, id, turnInput, () => {
-        ensureRecoveredPiHistorySourcePath(ctx, id, turnInput, sseHistoryState);
-      })) {
+      const eventStream = peerRouted
+        ? worker!.streamMessage(turnInput)
+        : streamTurnWithPiRecovery(ctx, id, turnInput, () => {
+            ensureRecoveredPiHistorySourcePath(ctx, id, turnInput, sseHistoryState);
+          });
+      for await (const event of eventStream) {
         const observedEvent = metering.observeEvent(executionSession, event, { turnStartedAt });
         runtime.observeEvent(id, observedEvent);
         await stream.writeSSE({
@@ -544,18 +695,9 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
           event: observedEvent.type,
         });
 
-        if ((observedEvent.type === 'init' || observedEvent.type === 'result') && (observedEvent.providerSessionId || observedEvent.sessionId)) {
-          ctx.registry.setProviderSessionId(id, observedEvent.providerSessionId || observedEvent.sessionId!);
-        }
-        if (observedEvent.providerState !== undefined) {
-          ctx.registry.setProviderState(id, observedEvent.providerState);
-        }
-        if (observedEvent.artifacts !== undefined || observedEvent.summary !== undefined) {
-          ctx.registry.updateSessionMetadata(id, {
-            artifacts: observedEvent.artifacts ?? session.artifacts,
-            summary: observedEvent.summary,
-          });
-        }
+        applyObservedEventToSession(ctx, id, session, observedEvent, {
+          peerRouted,
+        });
 
         if (observedEvent.type === 'text') {
           assistantText += observedEvent.text ?? '';
@@ -618,6 +760,8 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
         event: errorEvent.type,
       });
       restoreReadyIfSessionStillInteractive(ctx.registry, id);
+    } finally {
+      await closeManagedHandle(peerHandle);
     }
   });
 });

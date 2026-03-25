@@ -31,6 +31,10 @@ import type { RuntimeWakeupService } from '../core/wakeup/RuntimeWakeupService.j
 import type { PeerRegistry } from '../core/peers/PeerRegistry.js';
 import type { PeerDiscoveryController } from '../core/peers/PeerDiscoveryController.js';
 import type { PeerCapabilitySnapshotService } from '../core/peers/PeerCapabilitySnapshotService.js';
+import type { PeerTrustService } from '../core/peers/PeerTrustService.js';
+import type { PeerRoutingService } from '../core/peers/PeerRoutingService.js';
+import type { PeerExecutionClient } from '../core/peers/PeerExecutionClient.js';
+import type { PeerExecutionService } from '../core/peers/PeerExecutionService.js';
 import { ManualBrowserDriver } from '../backends/browser/manualDriver.js';
 import type { BootstrapService } from '../core/bootstrap/BootstrapService.js';
 import { bearerAuth } from './auth.js';
@@ -58,6 +62,7 @@ import { auggieRoutes } from './routes/auggie.js';
 import { opencodeRoutes } from './routes/opencode.js';
 import { providerRoutes } from './routes/providers.js';
 import { peerRoutes } from './routes/peers.js';
+import { peerExecutionRoutes } from './routes/peerExecutions.js';
 import { skillRoutes } from './routes/skills.js';
 import { wakeupRoutes } from './routes/wakeup.js';
 import { managementRoutes } from './routes/management.js';
@@ -90,6 +95,10 @@ export interface AppContext {
   peerRegistry?: PeerRegistry;
   peerDiscovery?: PeerDiscoveryController;
   peerCapabilities?: PeerCapabilitySnapshotService;
+  peerTrust?: PeerTrustService;
+  peerRouting?: PeerRoutingService;
+  peerExecutionClient?: PeerExecutionClient;
+  peerExecutionService?: PeerExecutionService;
   bootstrapService?: BootstrapService;
   completeBootstrap?: () => void;
   resolveCursorNative?: (instanceId?: string) => CursorNativeSessionService;
@@ -276,7 +285,19 @@ export function createRuntimeApp(ctx: AppContext) {
     }
     return logger()(c, next);
   });
-  app.use('*', bearerAuth(ctx.config));
+  app.use('*', async (c, next) => {
+    // In bootstrap mode, exempt provider setup routes from bearer auth.
+    // The setup page has no API key input and the operator may not have one
+    // yet — the whole point of bootstrap is first-run before full config.
+    // After bootstrap completes, normal auth applies to setup routes.
+    if (ctx.startup?.bootstrapRequired && c.req.path.startsWith('/providers/setup')) {
+      return await next();
+    }
+    if (c.req.path.startsWith('/peer/')) {
+      return await next();
+    }
+    return bearerAuth(ctx.config)(c, next);
+  });
 
   app.use('*', async (c, next) => {
     c.set('ctx', ctx);
@@ -300,6 +321,7 @@ export function createRuntimeApp(ctx: AppContext) {
   app.route('/', browseRoutes);
   app.route('/', observeRoutes);
   app.route('/', peerRoutes);
+  app.route('/', peerExecutionRoutes);
   app.route('/', codexRoutes);
   app.route('/', cursorRoutes);
   app.route('/', kiroRoutes);

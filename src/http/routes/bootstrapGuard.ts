@@ -15,6 +15,7 @@ const GUARDED_PREFIXES = [
   '/browse',
   '/delivery',
   '/wakeup',
+  '/peer',
 ];
 
 export function bootstrapGuard() {

@@ -58,6 +58,7 @@ Current capabilities:
 - [x] Add session maintenance hooks and cleanup discipline for long-running lifecycle boundaries
 - [x] Add the first browser/preview substrate with manual driver validation and normalized `browser_page` surfaces
 - [x] Add a usable runtime-owned MCP facade with stdio transport and curated mutation tools without replacing direct HTTP APIs
+- [x] Add LAN peer discovery, diagnostics, trust-gated execution routing, and caller-owned peer turn relay for PLAN-017 v0
 
 ## Design Rules
 

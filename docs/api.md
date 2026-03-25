@@ -24,6 +24,28 @@ Authorization: Bearer <cats-runtime-api-key>
 `GET /sessions/{id}/stream` also accepts `?token=<api-key>` for EventSource use
 cases where custom headers are awkward.
 
+Peer-to-peer execution uses a separate auth boundary. `POST /peer/executions`
+does not use `CATS_RUNTIME_API_KEY`; runtime peers authenticate with:
+
+```bash
+Authorization: Bearer <cats-runtime-peer-shared-secret>
+x-cats-peer-id: <caller-peer-id>
+```
+
+Peer auth/trust notes:
+
+- `CATS_RUNTIME_API_KEY` is for host-to-runtime calls and is not consulted by
+  `/peer/executions`
+- `CATS_RUNTIME_PEER_SHARED_SECRET` is the current runtime-to-runtime auth
+  credential
+- trust is directional via each runtime's `trustedPeerIds` / `rejectedPeerIds`
+- one-way traffic is supported, but it still needs configuration on both sides:
+  the caller must trust the callee for routing, and the callee must trust the
+  caller for inbound execution
+- for small LAN mesh deployments, the practical bootstrap today is usually one
+  shared secret reused across participating peers plus explicit peer-id trust
+  policy on each node
+
 ## Core Endpoints
 
 ### Dashboard
@@ -945,6 +967,19 @@ Extended message example:
 }
 ```
 
+Peer-routed message example:
+
+```json
+{
+  "message": "Draft the implementation plan.",
+  "routing": {
+    "mode": "peer",
+    "peerId": "lab-peer",
+    "shareWorkspace": false
+  }
+}
+```
+
 Branching example:
 
 ```json
@@ -1381,8 +1416,35 @@ authoritative source workspace so later resume/reset/delete flows can recreate
 or clean up the same worktree deterministically.
 
 `POST /sessions/{id}/messages` accepts optional `instructions`, `skills`,
-`context`, and `outputDir` fields. These are persisted onto the logical session
-so later history/resume flows can observe the same bootstrap metadata.
+`context`, `outputDir`, and additive `routing` fields. These are persisted onto
+the logical session where applicable so later history/resume flows can observe
+the same bootstrap metadata.
+
+`routing` is additive and optional. Existing request bodies remain valid and
+continue to execute locally by default. Supported routing shape:
+
+```json
+{
+  "routing": {
+    "mode": "peer",
+    "peerId": "lab-peer",
+    "strategy": "explicit",
+    "shareWorkspace": false
+  }
+}
+```
+
+Rules:
+
+- omit `routing`, or send `{"mode":"local"}`, to preserve the current local
+  execution path
+- use `peerId` for explicit peer selection
+- `strategy` may be `explicit`, `provider_affinity`, or `least_busy`, but
+  heuristic routing is honored only when explicitly enabled on the runtime
+- peer routing is only supported for runtime-owned sessions; it does not turn a
+  peer into the owner of the caller-visible `/sessions` lifecycle
+- peer-routed turns remain observable through `GET /sessions/{id}/observe` and
+  `GET /sessions/{id}/stream` via additive runtime-owned relay metadata
 
 For message turns, the runtime now preserves the session's previously persisted
 instructions as a separate base layer for the current execution. The current
@@ -1800,6 +1862,9 @@ without forcing hosts to infer transcript semantics from provider names alone.
 ### Runtime Inspection
 
 ```text
+GET /peers
+GET /peers/{peerId}
+GET /diagnostics/peers
 GET /pool/status
 GET /discovery/status
 GET /providers/config
@@ -2249,6 +2314,133 @@ runtime-backed discovery families. It currently reports:
 
 - `wsl`: WSL discovery policy/status for Cursor and Kiro
 - `docker`: Docker discovery policy/status for Docker-backed native discovery targets
+- `lan`: additive LAN peer discovery status, registry counts, and discovery-adapter state
+
+### LAN Peer Discovery and Execution Routing
+
+```text
+GET  /peers
+GET  /peers/{peerId}
+GET  /diagnostics/peers
+POST /peer/executions
+```
+
+`GET /peers` returns the bounded peer registry read model. By default it only
+returns live peers. `?includeStale=true` adds stale entries.
+
+Example response shape:
+
+```json
+{
+  "count": 2,
+  "query": {
+    "includeStale": false
+  },
+  "discovery": {
+    "enabled": true,
+    "status": "running",
+    "localPeerId": "desk-a",
+    "registry": {
+      "total": 2,
+      "self": 1,
+      "remote": 1,
+      "alive": 2,
+      "stale": 0,
+      "trusted": 1,
+      "unknown": 0,
+      "rejected": 0
+    }
+  },
+  "peers": [
+    {
+      "identity": {
+        "peerId": "desk-b",
+        "displayName": "desk-b",
+        "advertisedUrl": "http://10.0.0.9:3110"
+      },
+      "trust": {
+        "state": "trusted",
+        "reason": "configured_trust"
+      }
+    }
+  ]
+}
+```
+
+`GET /peers/{peerId}` returns one peer detail record. Unknown peer ids return
+`404`.
+
+`GET /diagnostics/peers` is the host-facing peer diagnostics summary. It
+combines the LAN discovery snapshot, registry summary counts, and the current
+bounded peer list without changing the semantics of `GET /health`.
+
+`POST /peer/executions` is the dedicated runtime-to-runtime execution contract.
+It is not a general host route and it does not replace the existing session
+ownership routes.
+
+Request shape:
+
+```json
+{
+  "caller": {
+    "peerId": "desk-a",
+    "sessionId": "session-123",
+    "runId": "run-123",
+    "traceId": "trace-123"
+  },
+  "target": {
+    "provider": "codex",
+    "backend": "api",
+    "instance": "main",
+    "model": "gpt-5.4"
+  },
+  "workspace": {
+    "mode": "none"
+  },
+  "turn": {
+    "message": "Draft the implementation plan."
+  }
+}
+```
+
+Route semantics:
+
+- supports both `Accept: application/x-ndjson` and `Accept: text/event-stream`
+- requires peer auth via `Authorization: Bearer <shared-secret>` plus
+  `x-cats-peer-id`
+- fails closed when peer auth/trust checks fail
+- returns normalized streamed events, with additive `metadata.peerExecution`
+  on the callee and additive `metadata.peerRouting` on the caller relay path
+- stays execution-only: the callee does not become owner of the caller-visible
+  session, wakeup, browser, or worktree lifecycle
+
+Topology notes:
+
+- the current slice supports a bounded small-LAN mesh shape where multiple
+  runtimes can discover one another and route directly peer-to-peer
+- there is no central coordinator requirement for direct peer execution
+- trust is not transitive, discovery does not imply trust, and there is no
+  gossip-based propagation of peer state
+- this is not a full cluster manager: no transparent failover, no cross-node
+  session ownership transfer, and no remote workspace/browser/wakeup ownership
+
+Peer-routing failure events are additive. Streamed `error` events may include:
+
+```json
+{
+  "type": "error",
+  "text": "Peer execution failed before completion.",
+  "metadata": {
+    "peerRoutingFailure": {
+      "code": "peer_execution_rejected",
+      "message": "Peer execution failed before completion.",
+      "retryable": false,
+      "peerId": "desk-b",
+      "status": 409
+    }
+  }
+}
+```
 
 ### Native Session Discovery
 
@@ -2324,4 +2516,4 @@ Errors use this format:
 
 ---
 
-*Last updated: 2026-03-24*
+*Last updated: 2026-03-25*

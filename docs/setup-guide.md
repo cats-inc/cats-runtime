@@ -97,6 +97,57 @@ WSL distributions that are not already running. Docker discovery also defaults
 to `if_running`. Use the "Manual Scan" button to trigger a full scan regardless
 of discovery policy.
 
+### LAN Peer Discovery and Execution Routing
+
+LAN peer support is default-off and intentionally bounded to the execution-only
+ADR-019 slice:
+
+- discovery/registry state is separate from trust/auth
+- the caller runtime keeps ownership of the host-visible session, history,
+  observe state, and stream state
+- peers may execute a bounded turn, but they do not become owners of the
+  caller-visible `/sessions` lifecycle
+
+Minimal peer env example:
+
+```powershell
+CATS_RUNTIME_PEERS_ENABLED=true
+CATS_RUNTIME_PEER_ID=desk-a
+CATS_RUNTIME_PEER_NAME=desk-a
+CATS_RUNTIME_PEER_SHARED_SECRET=lan-secret
+CATS_RUNTIME_PEER_TRUSTED_IDS=desk-b
+CATS_RUNTIME_PEER_STATIC_PEERS=[{"peerId":"desk-b","displayName":"desk-b","advertisedUrl":"http://10.0.0.9:3110","providers":["codex"]}]
+```
+
+Relevant runtime-owned peer routes:
+
+- `GET /peers`
+- `GET /peers/{peerId}`
+- `GET /diagnostics/peers`
+- `POST /peer/executions`
+
+`POST /peer/executions` is runtime-to-runtime only. It uses the peer shared
+secret, not the normal host-facing `CATS_RUNTIME_API_KEY`.
+
+Current auth/trust model:
+
+- host-facing `CATS_RUNTIME_API_KEY` and peer-facing
+  `CATS_RUNTIME_PEER_SHARED_SECRET` are separate
+- inbound peer execution checks both the bearer secret and the caller peer id
+- trust is directional and configured per runtime with
+  `CATS_RUNTIME_PEER_TRUSTED_IDS` / `CATS_RUNTIME_PEER_REJECTED_IDS`
+- one-way traffic is supported, but not from one-sided config alone:
+  for `A -> B`, runtime `A` must trust `B` for routing and runtime `B` must
+  trust `A` for inbound execution
+
+Current topology boundary:
+
+- yes, the current slice can operate as a small LAN mesh with multiple peers
+  discovering and routing directly to one another
+- no, it is not a full cluster/gossip mesh: there is no transitive trust,
+  no automatic enrollment, no transparent failover, and no remote session /
+  workspace / browser / wakeup ownership transfer
+
 ## Startup Contract
 
 `cats-runtime` now freezes one startup contract for both supported process
@@ -158,6 +209,22 @@ Keep `.env` for runtime-wide values and secrets:
 - `CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS=15000`
 - `CATS_RUNTIME_SPAWN_RETRIES=1`
 - `CATS_RUNTIME_SPAWN_TIMEOUT_MS=30000`
+- `CATS_RUNTIME_PEERS_ENABLED=false`
+- `CATS_RUNTIME_PEER_ID=`
+- `CATS_RUNTIME_PEER_NAME=`
+- `CATS_RUNTIME_PEER_ADVERTISE_URL=`
+- `CATS_RUNTIME_PEER_ADVERTISE_HOST=`
+- `CATS_RUNTIME_PEER_ADVERTISE_PORT=`
+- `CATS_RUNTIME_PEER_STALE_TTL_MS=30000`
+- `CATS_RUNTIME_PEER_PRUNE_INTERVAL_MS=10000`
+- `CATS_RUNTIME_PEER_ADVERTISE_INTERVAL_MS=15000`
+- `CATS_RUNTIME_PEER_MAX_TARGETS=16`
+- `CATS_RUNTIME_PEER_REQUEST_TIMEOUT_MS=120000`
+- `CATS_RUNTIME_PEER_ALLOW_HEURISTIC_ROUTING=false`
+- `CATS_RUNTIME_PEER_SHARED_SECRET=`
+- `CATS_RUNTIME_PEER_TRUSTED_IDS=`
+- `CATS_RUNTIME_PEER_REJECTED_IDS=`
+- `CATS_RUNTIME_PEER_STATIC_PEERS=`
 - `AUGGIE_MAX_TURNS=50`
 - `PWSH_PATH=...`
 - `OPENCLAW_URL=ws://127.0.0.1:8787/ws`
@@ -167,6 +234,19 @@ Keep `.env` for runtime-wide values and secrets:
 
 Legacy provider-specific env vars still work, but new installs should prefer
 `config/providers.yaml`.
+
+Peer-specific notes:
+
+- `CATS_RUNTIME_PEER_TRUSTED_IDS` and `CATS_RUNTIME_PEER_REJECTED_IDS` accept
+  either comma-separated values or a JSON array
+- `CATS_RUNTIME_PEER_STATIC_PEERS` accepts a JSON array of bounded peer seeds
+- `CATS_RUNTIME_PEER_ALLOW_HEURISTIC_ROUTING` only enables additive opt-in
+  routing heuristics; existing callers still stay local by default
+- the current peer auth model uses one configured shared secret per runtime;
+  full-mesh deployments usually standardize the same peer secret across all
+  participating nodes, then constrain actual connectivity with peer-id trust
+  lists
+- advertise values should point at a host/port reachable by other LAN runtimes
 
 ## Provider Instances (`config/providers.yaml`)
 
@@ -564,8 +644,10 @@ Available values:
 If you define multiple WSL-backed provider instances, `GET /discovery/status`
 will report them separately as `cursor@ubuntu`, `cursor@debian`, `kiro@ubuntu`,
 and so on. The same endpoint also reports Docker discovery policy/status for
-Docker-backed native discovery targets.
+Docker-backed native discovery targets. When peer discovery is enabled, the
+same route also exposes an additive `lan` block describing peer discovery
+status, registry counts, and discovery adapters.
 
 ---
 
-*Last updated: 2026-03-23*
+*Last updated: 2026-03-25*

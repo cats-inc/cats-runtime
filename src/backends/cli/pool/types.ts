@@ -5,6 +5,8 @@ export type {
   SessionInvocationContext,
   GeminiCachedContentState,
   PermissionMode,
+  ProviderModelResolution,
+  ProviderModelSelection,
   SessionActivity,
   SessionControlMode,
   SessionControls,

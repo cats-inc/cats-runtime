@@ -101,6 +101,8 @@ class CliExecutionHandle implements ExecutionHandle {
 export class RuntimeSessionManager {
   private readonly sessionStates = new Map<string, RuntimeTrackedSessionStateSnapshot>();
 
+  private readonly handleOverrides = new Map<string, ExecutionHandle>();
+
   constructor(
     private readonly config: RuntimeConfig,
     private readonly pool: WorkerPool,
@@ -109,12 +111,41 @@ export class RuntimeSessionManager {
   ) {}
 
   get(sessionId: string): ExecutionHandle | undefined {
+    const override = this.getOverride(sessionId);
+    if (override) {
+      return override;
+    }
+
     const worker = this.pool.get(sessionId) as WorkerProcess | undefined;
     if (worker) {
       return new CliExecutionHandle(worker, () => this.pool.kill(sessionId));
     }
 
     return this.apiBackend?.get(sessionId) || this.agentBackend?.get(sessionId);
+  }
+
+  attachExecutionHandle(
+    sessionId: string,
+    handle: ExecutionHandle,
+  ): ExecutionHandle {
+    this.handleOverrides.set(sessionId, handle);
+    return handle;
+  }
+
+  detachExecutionHandle(
+    sessionId: string,
+    handle?: ExecutionHandle,
+  ): void {
+    const existing = this.handleOverrides.get(sessionId);
+    if (!existing) {
+      return;
+    }
+
+    if (handle && existing !== handle) {
+      return;
+    }
+
+    this.handleOverrides.delete(sessionId);
   }
 
   spawn(
@@ -299,6 +330,16 @@ export class RuntimeSessionManager {
     const tracked = this.ensureTrackedState(session.id);
     tracked.state = 'canceling';
 
+    const override = this.getOverride(session.id);
+    if (override) {
+      await this.cancelExecutionHandle(override, 'cancel');
+      this.detachExecutionHandle(session.id, override);
+      tracked.state = this.isAttached(session.id) ? 'idle' : 'closed';
+      return {
+        attached: this.isAttached(session.id),
+      };
+    }
+
     switch (session.providerBackend) {
       case 'agent':
         await this.agentBackend?.cancel(session.id, 'cancel');
@@ -325,6 +366,12 @@ export class RuntimeSessionManager {
     const tracked = this.ensureTrackedState(session.id);
     tracked.state = 'closing';
 
+    const override = this.getOverride(session.id);
+    if (override) {
+      await this.closeExecutionHandle(override, reason);
+      this.detachExecutionHandle(session.id, override);
+    }
+
     switch (session.providerBackend) {
       case 'agent':
         await this.agentBackend?.close(session.id, reason);
@@ -345,6 +392,7 @@ export class RuntimeSessionManager {
   }
 
   markClosed(sessionId: string): void {
+    this.detachExecutionHandle(sessionId);
     const tracked = this.ensureTrackedState(sessionId);
     tracked.state = 'closed';
   }
@@ -480,6 +528,7 @@ export class RuntimeSessionManager {
   }
 
   dropSession(sessionId: string): void {
+    this.handleOverrides.delete(sessionId);
     this.sessionStates.delete(sessionId);
   }
 
@@ -515,6 +564,11 @@ export class RuntimeSessionManager {
   }
 
   isAttached(sessionId: string): boolean {
+    const override = this.getOverride(sessionId);
+    if (override) {
+      return true;
+    }
+
     if (this.agentBackend?.isAttached(sessionId)) {
       return true;
     }
@@ -529,6 +583,11 @@ export class RuntimeSessionManager {
   }
 
   kill(sessionId: string): void {
+    const override = this.getOverride(sessionId);
+    if (override) {
+      override.kill();
+      this.detachExecutionHandle(sessionId, override);
+    }
     this.agentBackend?.kill(sessionId);
     this.apiBackend?.kill(sessionId);
     this.pool.kill(sessionId);
@@ -536,6 +595,10 @@ export class RuntimeSessionManager {
   }
 
   killAll(): void {
+    for (const [sessionId, handle] of this.handleOverrides.entries()) {
+      handle.kill();
+      this.handleOverrides.delete(sessionId);
+    }
     this.agentBackend?.killAll();
     this.apiBackend?.killAll();
     this.pool.killAll();
@@ -638,6 +701,52 @@ export class RuntimeSessionManager {
         tracked.maintenance.markers.length - MAX_MAINTENANCE_MARKERS,
       );
     }
+  }
+
+  private getOverride(
+    sessionId: string,
+  ): ExecutionHandle | undefined {
+    const override = this.handleOverrides.get(sessionId);
+    if (!override) {
+      return undefined;
+    }
+
+    if (!override.active) {
+      this.handleOverrides.delete(sessionId);
+      return undefined;
+    }
+
+    return override;
+  }
+
+  private async cancelExecutionHandle(
+    handle: ExecutionHandle,
+    reason: 'cancel',
+  ): Promise<void> {
+    const candidate = handle as ExecutionHandle & {
+      cancel?: (reason?: string) => Promise<void> | void;
+    };
+    if (typeof candidate.cancel === 'function') {
+      await candidate.cancel(reason);
+      return;
+    }
+
+    handle.kill();
+  }
+
+  private async closeExecutionHandle(
+    handle: ExecutionHandle,
+    reason: 'close' | 'delete' | 'reset' | 'shutdown',
+  ): Promise<void> {
+    const candidate = handle as ExecutionHandle & {
+      close?: (reason?: string) => Promise<void> | void;
+    };
+    if (typeof candidate.close === 'function') {
+      await candidate.close(reason);
+      return;
+    }
+
+    handle.kill();
   }
 }
 

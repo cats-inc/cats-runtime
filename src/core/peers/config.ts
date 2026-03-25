@@ -12,6 +12,7 @@ import type {
 
 const DEFAULT_STALE_PEER_TTL_MS = 30_000;
 const DEFAULT_MAX_ADVERTISED_TARGETS = 16;
+const DEFAULT_PEER_REQUEST_TIMEOUT_MS = 120_000;
 
 export function loadPeerRuntimeConfig(config: RuntimeConfig): PeerRuntimeConfig {
   const env = getRuntimeConfigEnv(config);
@@ -32,6 +33,10 @@ export function loadPeerRuntimeConfig(config: RuntimeConfig): PeerRuntimeConfig 
     env.CATS_RUNTIME_PEER_MAX_TARGETS,
     DEFAULT_MAX_ADVERTISED_TARGETS,
   );
+  const requestTimeoutMs = parsePositiveInt(
+    env.CATS_RUNTIME_PEER_REQUEST_TIMEOUT_MS,
+    DEFAULT_PEER_REQUEST_TIMEOUT_MS,
+  );
 
   return {
     enabled,
@@ -44,6 +49,14 @@ export function loadPeerRuntimeConfig(config: RuntimeConfig): PeerRuntimeConfig 
     pruneIntervalMs,
     advertiseIntervalMs,
     maxAdvertisedTargets,
+    requestTimeoutMs,
+    allowHeuristicRouting: parseBoolean(
+      env.CATS_RUNTIME_PEER_ALLOW_HEURISTIC_ROUTING,
+      false,
+    ),
+    sharedSecret: sanitizeString(env.CATS_RUNTIME_PEER_SHARED_SECRET),
+    trustedPeerIds: parseStringList(env.CATS_RUNTIME_PEER_TRUSTED_IDS),
+    rejectedPeerIds: parseStringList(env.CATS_RUNTIME_PEER_REJECTED_IDS),
     staticPeers: enabled
       ? parseStaticPeers(env.CATS_RUNTIME_PEER_STATIC_PEERS, maxAdvertisedTargets)
       : [],
@@ -292,4 +305,35 @@ function sanitizeString(value: unknown): string | undefined {
   }
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function parseStringList(value: unknown): string[] {
+  const text = sanitizeString(value);
+  if (!text) {
+    return [];
+  }
+
+  const parsedJson = tryParseStringArrayJson(text);
+  const values = parsedJson
+    ?? text.split(',').map((entry) => entry.trim()).filter((entry) => entry.length > 0);
+
+  return Array.from(new Set(values)).sort((left, right) => left.localeCompare(right));
+}
+
+function tryParseStringArrayJson(value: string): string[] | undefined {
+  if (!value.startsWith('[')) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) {
+      return undefined;
+    }
+    return parsed
+      .map((entry) => sanitizeString(entry))
+      .filter((entry): entry is string => Boolean(entry));
+  } catch {
+    return undefined;
+  }
 }
