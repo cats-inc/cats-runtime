@@ -145,7 +145,10 @@ const SCAN_PANEL_SCRIPT = `
       if (!res.ok) throw new Error('HTTP ' + res.status);
       return res.json();
     }).then(function(data) {
-      var scan = data.manualScan || data.scan;
+      // Use data.scan — it is always the most recent snapshot because
+      // BootstrapService.scan() writes to provider-scan.json on every scan
+      // regardless of type.  manualScan is a historical subset, not fresher.
+      var scan = data.scan;
       if (scan && scan.providers) {
         renderProviders(scan.providers);
         renderMeta(scan);

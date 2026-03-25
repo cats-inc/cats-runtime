@@ -11,7 +11,13 @@ setupRoutes.get('/providers/setup/state', async (c) => {
 
   const state = await ctx.bootstrapService.getSetupState();
   const latestScan = await ctx.bootstrapService.getLatestScan();
-  const latestManualScan = await ctx.bootstrapService.getLatestManualScan();
+
+  // Full provider detail (command paths, versions, remediation) is only
+  // included when the runtime is in bootstrap mode.  Outside bootstrap the
+  // /providers/setup/* routes still bypass bearer auth, so we restrict the
+  // public surface to summary counts to avoid leaking local install details
+  // to unauthenticated callers.
+  const includeDetail = ctx.startup.bootstrapRequired;
 
   return c.json({
     bootstrapRequired: ctx.startup.bootstrapRequired,
@@ -22,10 +28,12 @@ setupRoutes.get('/providers/setup/state', async (c) => {
         scanType: latestScan.scanType,
         providerCount: latestScan.providers.length,
         availableCount: latestScan.providers.filter((p) => p.available).length,
-        providers: latestScan.providers,
+        ...(includeDetail ? { providers: latestScan.providers } : {}),
       }
       : null,
-    manualScan: latestManualScan ?? null,
+    ...(includeDetail
+      ? { manualScan: (await ctx.bootstrapService.getLatestManualScan()) ?? null }
+      : {}),
     universe: ctx.bootstrapService.getProviderUniverse().map((entry) => ({
       provider: entry.provider,
       familyLabel: entry.familyLabel,

@@ -617,6 +617,37 @@ describe('bootstrap mode server', () => {
     }
   });
 
+  it('GET /providers/setup/state omits provider detail outside bootstrap mode', async () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const env = createTestEnv(root);
+      ensureDirs(env);
+      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
+      // Non-bootstrap mode
+      const startup = createRuntimeStartupState({ bootstrapRequired: false });
+      const runtime = createRuntimeServer(config, { startup });
+      try {
+        const response = await runtime.app.request('/providers/setup/state');
+        expect(response.status).toBe(200);
+        const body = await response.json() as Record<string, unknown>;
+        expect(body.bootstrapRequired).toBe(false);
+        // Summary fields present
+        expect(body.state).toBeTruthy();
+        expect(body.universe).toBeTruthy();
+        // Full detail NOT exposed on unauthenticated route outside bootstrap
+        const scan = body.scan as Record<string, unknown> | null;
+        if (scan) {
+          expect(scan.providers).toBeUndefined();
+        }
+        expect(body.manualScan).toBeUndefined();
+      } finally {
+        await runtime.close();
+      }
+    } finally {
+      cleanup();
+    }
+  });
+
   it('GET / in bootstrap mode includes shared UI foundation', async () => {
     const { root, cleanup } = createTestRoot();
     try {

@@ -368,9 +368,11 @@ class RuntimeError extends Error {
 class RuntimeClient {
   constructor(baseUrl, apiKey) { this.baseUrl = baseUrl.replace(/\/+$/,''); this.apiKey = apiKey || ''; }
   _headers() {
-    if (window.CatsUI) return CatsUI.authHeaders();
+    // Honour the captured apiKey so in-flight sessions keep working even
+    // if the DOM input is cleared after chat start.
     const h = { 'Content-Type': 'application/json' };
-    if (this.apiKey) h['Authorization'] = `Bearer ${this.apiKey}`;
+    if (this.apiKey) { h['Authorization'] = `Bearer ${this.apiKey}`; return h; }
+    if (window.CatsUI) return CatsUI.authHeaders();
     return h;
   }
   async createSession({ provider, model, cwd, workspaceMode }) {

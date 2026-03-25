@@ -36,4 +36,12 @@ describe('injectDashboardScanPanel', () => {
     const result = injectDashboardScanPanel(MINIMAL_HTML);
     expect(result).toContain("{ manual: true }");
   });
+
+  it('uses data.scan as canonical snapshot, not manualScan', () => {
+    const result = injectDashboardScanPanel(MINIMAL_HTML);
+    // The scan panel should use data.scan (always the most recent) rather
+    // than data.manualScan || data.scan which can show stale data.
+    expect(result).toContain('var scan = data.scan;');
+    expect(result).not.toContain('data.manualScan || data.scan');
+  });
 });
