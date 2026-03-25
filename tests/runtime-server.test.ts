@@ -219,6 +219,24 @@ describe('runtime server', () => {
     });
   });
 
+  it('GET /providers/setup serves the embedded provider setup page without auth', async () => {
+    await withRuntime(
+      { apiKey: 'runtime-secret' },
+      { startup: createRuntimeStartupState({ bootstrapRequired: false }) },
+      async (runtime) => {
+        const response = await runtime.app.request('/providers/setup');
+        expect(response.status).toBe(200);
+        const html = await response.text();
+        expect(html).toContain('Provider Setup');
+        expect(html).toContain('data-cats-ui');
+        expect(html).toContain("var API_KEY_STORAGE_KEY = 'cats_runtime_api_key';");
+        expect(html).toContain("window.CatsUI && window.CatsUI.apiFetch");
+        expect(html).toContain("await fetchFn('/providers/setup/scan'");
+        expect(html).toContain("await fetchFn('/providers/setup/apply'");
+      },
+    );
+  });
+
   it('GET /health enforces optional inbound auth', async () => {
     await withRuntime({ apiKey: 'runtime-secret' }, {}, async (runtime) => {
       const unauthenticated = await runtime.app.request('/health');

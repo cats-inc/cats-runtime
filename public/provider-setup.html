@@ -186,6 +186,7 @@ async function fetchState() {
   try {
     const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
     const res = await fetchFn('/providers/setup/state');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     updateStatusBar(data);
     if (data.scan && data.scan.providers) {
@@ -281,11 +282,13 @@ async function runScan(manual) {
   hideResult();
 
   try {
-    const res = await fetch('/providers/setup/scan', {
+    const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
+    const res = await fetchFn('/providers/setup/scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ manual }),
     });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     if (data.scan) {
       renderScanResults(data.scan);
@@ -310,7 +313,8 @@ async function applyConfig() {
   hideResult();
 
   try {
-    const res = await fetch('/providers/setup/apply', {
+    const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
+    const res = await fetchFn('/providers/setup/apply', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ providers }),
@@ -324,7 +328,8 @@ async function applyConfig() {
         ' <a href="/dashboard">Go to Dashboard</a>'
       );
       // Refresh status
-      const stateRes = await fetch('/providers/setup/state');
+      const stateRes = await fetchFn('/providers/setup/state');
+      if (!stateRes.ok) throw new Error(`HTTP ${stateRes.status}`);
       const stateData = await stateRes.json();
       updateStatusBar(stateData);
     } else {
