@@ -216,6 +216,9 @@ describe('runtime server', () => {
       expect(html).toContain('Direct (same-origin API)');
       expect(html).toContain('class RuntimeClient');
       expect(html).toContain('/providers/config');
+      expect(html).toContain('Uses the runtime API key configured in');
+      expect(html).toContain('getRuntimeAuthHeaders');
+      expect(html).not.toContain('id="api-key"');
     });
   });
 

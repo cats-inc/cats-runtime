@@ -786,6 +786,8 @@ describe('bootstrap mode server', () => {
         expect(html).toContain('Playground');
         expect(html).toContain('data-cats-ui');
         expect(html).toContain('window.CatsUI');
+        expect(html).toContain('Uses the runtime API key configured in');
+        expect(html).not.toContain('id="api-key"');
       } finally {
         await runtime.close();
       }

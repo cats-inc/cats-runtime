@@ -65,10 +65,8 @@
           </div>
           <a href="/" class="text-xs text-slate-400 hover:text-slate-200 transition">&larr; Dashboard</a>
         </div>
-        <div class="mt-3">
-          <label class="block text-xs text-slate-400 mb-1">API Key <span class="text-slate-500">(optional)</span></label>
-          <input id="api-key" type="password" placeholder="Bearer token"
-                 class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500" />
+        <div class="mt-3 rounded border border-slate-700 bg-slate-900/50 px-3 py-2 text-xs text-slate-400">
+          Uses the runtime API key configured in <a href="/dashboard" class="text-slate-200 underline decoration-slate-600 underline-offset-2 hover:text-white">Dashboard</a>.
         </div>
       </div>
       <!-- Setup Mode -->
@@ -630,6 +628,10 @@ marked.setOptions({ breaks:true, gfm:true, highlight:(code,lang)=>{
 // ============================================================
 function escapeHtml(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 function safeId(n) { return n.replace(/[^a-zA-Z0-9_-]/g,'_'); }
+function getRuntimeApiKey() { return window.CatsUI&&typeof CatsUI.getApiKey==='function' ? CatsUI.getApiKey() : ''; }
+function getRuntimeAuthHeaders(extra) { return window.CatsUI&&typeof CatsUI.authHeaders==='function' ? CatsUI.authHeaders(extra) : (extra||{}); }
+function authSetupMessage() { return 'Playground uses the runtime API key configured in Dashboard. Open Dashboard to set it, then try again.'; }
+function authAwareMessage(err, fallback) { return err&&[401,403].includes(err.statusCode) ? authSetupMessage() : fallback; }
 function setAgentMetadata(agents) { agentMetaByName = {}; for (const a of agents||[]) if (a?.name) agentMetaByName[a.name]=a; }
 function getAgentMeta(n) { return agentMetaByName[n] || {provider:'',tags:[]}; }
 function getPrimaryRoleTag(tags) { return (tags||[])[0]||''; }
@@ -825,14 +827,14 @@ async function startChat() {
   document.getElementById('tokens-display').textContent='0';
   document.getElementById('agent-statuses').innerHTML='';
   pendingAgents=agentsList;
-  const apiKey=document.getElementById('api-key').value.trim();
+  const apiKey=getRuntimeApiKey();
   const workDir=document.getElementById('work-dir').value.trim();
   const responseLang=document.getElementById('response-lang').value;
   const client=new RuntimeClient(location.origin,apiKey);
   const agentDefs=agentsList.map(a=>({name:a.name,provider:a.provider,model:a.model,tags:a.tags,systemPrompt:'',sessionId:null}));
   chatRoom=new ChatRoom({client,agents:agentDefs,onEvent:handleEvent,workDir:workDir||undefined,responseLang});
   try{await chatRoom.start();switchToChatMode(agentsList);addSystemMessage('Chat room ready. Type a message to begin.');}
-  catch(err){addErrorMessage(err.message);resetStartButton();}
+  catch(err){addErrorMessage(authAwareMessage(err, err.message));resetStartButton();}
 }
 async function sendMessage() {
   const input=document.getElementById('chat-input');
@@ -870,8 +872,8 @@ async function loadBrowse(path){
   const el=document.getElementById('browse-list'),pathEl=document.getElementById('browse-path');
   el.innerHTML='<div class="text-slate-400 p-3 text-sm">Loading...</div>';
   try{const url=path?`/browse?path=${encodeURIComponent(path)}`:'/browse';
-    const res=await fetch(url,{headers:window.CatsUI?CatsUI.authHeaders():document.getElementById('api-key').value.trim()?{Authorization:`Bearer ${document.getElementById('api-key').value.trim()}`}:{}});
-    if(!res.ok){el.innerHTML='<div class="text-red-400 p-3 text-sm">Cannot read directory</div>';return;}
+    const res=await fetch(url,{headers:getRuntimeAuthHeaders()});
+    if(!res.ok){el.innerHTML=`<div class="text-red-400 p-3 text-sm">${escapeHtml(authAwareMessage({statusCode:res.status},'Cannot read directory'))}</div>`;return;}
     const d=await res.json();pathEl.value=d.current;
     let html=`<div class="px-3 py-1.5 text-sm cursor-pointer hover:bg-slate-700 rounded font-mono" onclick="loadBrowse('${d.parent.replace(/'/g,"\\'")}')">..</div>`;
     for(const e of d.entries) html+=`<div class="px-3 py-1.5 text-sm cursor-pointer hover:bg-slate-700 rounded font-mono" onclick="loadBrowse('${e.path.replace(/'/g,"\\'")}')">${escapeHtml(e.name)}/</div>`;
@@ -910,7 +912,7 @@ function closePromptsModal(){document.getElementById('promptsModal').classList.a
 // ============================================================
 async function loadProviderOptions() {
   try {
-    const headers = window.CatsUI ? CatsUI.authHeaders() : (function() { const k = document.getElementById('api-key').value.trim(); return k ? { Authorization: `Bearer ${k}` } : {}; })();
+    const headers = getRuntimeAuthHeaders();
     const res = await fetch('/providers/config', { headers });
     if (!res.ok) return;
     const data = await res.json();
