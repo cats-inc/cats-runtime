@@ -88,7 +88,9 @@ export function readRuntimeExecutionStrategyRequest(
       }
     : undefined);
 
-  return mergeRuntimeExecutionStrategyRequests(nestedRequest, legacyRequest);
+  // Nested runtime-owned strategy state is canonical; legacy flat fields only
+  // backfill missing request details during migration.
+  return mergeRuntimeExecutionStrategyRequests(legacyRequest, nestedRequest);
 }
 
 export function readRuntimeExecutionStrategyState(

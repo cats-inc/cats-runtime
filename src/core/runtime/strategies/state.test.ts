@@ -3,6 +3,8 @@ import type { RuntimeExecutionStrategyState } from '../../types.js';
 import {
   buildRuntimeExecutionStrategySessionPatch,
   normalizeRuntimeExecutionStrategyRequest,
+  readRuntimeExecutionStrategyRequest,
+  readRuntimeExecutionStrategyState,
   updateRuntimeExecutionStrategyState,
 } from './state.js';
 
@@ -146,6 +148,42 @@ describe('runtime execution strategy state helpers', () => {
         lastToolCallSignature: 'read_file:{"path":"answer.txt"}',
       },
       updatedAt: '2026-03-26T00:01:00.000Z',
+    });
+  });
+
+  it('prefers nested strategy state over legacy flat fields during migration reads', () => {
+    const migrated = {
+      strategy: {
+        request: {
+          requestedStrategy: 'react' as const,
+          acceptanceCriteria: 'nested acceptance criteria',
+          strategyContext: { maxSteps: 3 },
+          correlation: { traceId: 'nested-trace' },
+        },
+        effectiveStrategy: 'react' as const,
+        updatedAt: '2026-03-26T00:02:00.000Z',
+      },
+      requestedStrategy: 'simple_tool_call' as const,
+      acceptanceCriteria: 'legacy acceptance criteria',
+      strategyContext: { maxSteps: 1 },
+      correlation: { traceId: 'legacy-trace' },
+      effectiveStrategy: 'simple_tool_call' as const,
+    };
+
+    expect(readRuntimeExecutionStrategyRequest(migrated)).toEqual({
+      requestedStrategy: 'react',
+      acceptanceCriteria: 'nested acceptance criteria',
+      strategyContext: { maxSteps: 3 },
+      correlation: { traceId: 'nested-trace' },
+    });
+    expect(readRuntimeExecutionStrategyState(migrated)).toMatchObject({
+      request: {
+        requestedStrategy: 'react',
+        acceptanceCriteria: 'nested acceptance criteria',
+        strategyContext: { maxSteps: 3 },
+        correlation: { traceId: 'nested-trace' },
+      },
+      effectiveStrategy: 'react',
     });
   });
 });

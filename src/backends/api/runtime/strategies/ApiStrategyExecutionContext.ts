@@ -215,10 +215,11 @@ export class ApiStrategyExecutionContext {
   ): RuntimeExecutionStrategyState | undefined {
     const existing = this.options.registry.get(this.session.id) ?? this.session;
     const now = new Date().toISOString();
+    const existingStrategyState = readRuntimeExecutionStrategyState(existing);
     const summary: RuntimeExecutionStrategySummary = {
       ...(
-        readRuntimeExecutionStrategyState(existing)?.summary
-        ? structuredClone(readRuntimeExecutionStrategyState(existing)!.summary!)
+        existingStrategyState?.summary
+        ? structuredClone(existingStrategyState.summary)
         : {
             status: 'running',
             stepCount: 0,

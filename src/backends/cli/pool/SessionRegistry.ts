@@ -28,6 +28,7 @@ import {
   toLegacyWorkspaceMode,
 } from '../../../core/workspace/legacyWorkspace.js';
 import {
+  cloneRuntimeExecutionStrategyState,
   mergeRuntimeExecutionStrategyStates,
   readRuntimeExecutionStrategyState,
 } from '../../../core/runtime/strategies/state.js';
@@ -60,12 +61,6 @@ export interface CreateSessionInput {
   sessionKey?: string;
   reusePolicy?: SessionReusePolicy;
   strategy?: RuntimeExecutionStrategyState;
-  requestedStrategy?: RuntimeExecutionStrategyId;
-  acceptanceCriteria?: string;
-  strategyContext?: Record<string, unknown>;
-  correlation?: Record<string, unknown>;
-  effectiveStrategy?: RuntimeExecutionStrategyId;
-  strategyState?: RuntimeExecutionStrategyState;
   instructions?: string;
   skills?: SessionSkillState;
   hydration?: SessionHydrationState;
@@ -91,12 +86,6 @@ interface DiscoveredSessionData {
   sessionKey?: string;
   reusePolicy?: SessionReusePolicy;
   strategy?: RuntimeExecutionStrategyState;
-  requestedStrategy?: RuntimeExecutionStrategyId;
-  acceptanceCriteria?: string;
-  strategyContext?: Record<string, unknown>;
-  correlation?: Record<string, unknown>;
-  effectiveStrategy?: RuntimeExecutionStrategyId;
-  strategyState?: RuntimeExecutionStrategyState;
   instructions?: string;
   skills?: SessionSkillState;
   context?: SessionInvocationContext;
@@ -193,7 +182,7 @@ export class SessionRegistry {
             legacyWorkspaceMode: loaded.workspaceMode,
             legacyWorkspaceIsolation: loaded.workspaceIsolation,
           }),
-          strategy: coerceSessionStrategyState(loaded),
+          strategy: coercePersistedSessionStrategyState(loaded),
         };
         s.workspaceMode = toLegacyWorkspaceMode(s.workspace.kind, s.workspace.access);
         s.workspaceIsolation = toLegacyWorkspaceIsolationState(s.workspace);
@@ -425,12 +414,6 @@ export class SessionRegistry {
       sessionKey?: string;
       reusePolicy?: SessionReusePolicy;
       strategy?: RuntimeExecutionStrategyState;
-      requestedStrategy?: RuntimeExecutionStrategyId;
-      acceptanceCriteria?: string;
-      strategyContext?: Record<string, unknown>;
-      correlation?: Record<string, unknown>;
-      effectiveStrategy?: RuntimeExecutionStrategyId;
-      strategyState?: RuntimeExecutionStrategyState;
       instructions?: string;
       skills?: SessionSkillState;
       hydration?: SessionHydrationState;
@@ -875,8 +858,9 @@ export class SessionRegistry {
     if (data.model && !session.model) session.model = data.model;
     if (data.sessionKey && !session.sessionKey) session.sessionKey = data.sessionKey;
     if (data.reusePolicy && !session.reusePolicy) session.reusePolicy = data.reusePolicy;
+    // Runtime-owned session state stays authoritative over late discovered data.
     session.strategy = mergeRuntimeExecutionStrategyStates(
-      coerceSessionStrategyState(data),
+      cloneRuntimeExecutionStrategyState(data.strategy),
       session.strategy,
     );
     if (data.instructions && !session.instructions) session.instructions = data.instructions;
@@ -931,9 +915,10 @@ export class SessionRegistry {
       workspace: incoming.workspace ?? existing.workspace,
       sessionKey: incoming.sessionKey ?? existing.sessionKey,
       reusePolicy: incoming.reusePolicy ?? existing.reusePolicy,
+      // Newer discovered scan data overrides older pending discovered metadata.
       strategy: mergeRuntimeExecutionStrategyStates(
-        coerceSessionStrategyState(existing),
-        coerceSessionStrategyState(incoming),
+        cloneRuntimeExecutionStrategyState(existing.strategy),
+        cloneRuntimeExecutionStrategyState(incoming.strategy),
       ),
       instructions: incoming.instructions ?? existing.instructions,
       context: incoming.context ?? existing.context,
@@ -1083,8 +1068,9 @@ export class SessionRegistry {
     if (!target.summary && incoming.summary) target.summary = incoming.summary;
     if (!target.sessionKey && incoming.sessionKey) target.sessionKey = incoming.sessionKey;
     if (!target.reusePolicy && incoming.reusePolicy) target.reusePolicy = incoming.reusePolicy;
+    // Preserve the already-materialized session record when duplicate rows collide.
     target.strategy = mergeRuntimeExecutionStrategyStates(
-      coerceSessionStrategyState(incoming),
+      cloneRuntimeExecutionStrategyState(incoming.strategy),
       target.strategy,
     );
     if (!target.instructions && incoming.instructions) target.instructions = incoming.instructions;
@@ -1179,13 +1165,13 @@ function cloneMaintenanceState(
 function coerceSessionStrategyState(
   value: {
     strategy?: RuntimeExecutionStrategyState;
-    requestedStrategy?: RuntimeExecutionStrategyId;
-    acceptanceCriteria?: string;
-    strategyContext?: Record<string, unknown>;
-    correlation?: Record<string, unknown>;
-    effectiveStrategy?: RuntimeExecutionStrategyId;
-    strategyState?: RuntimeExecutionStrategyState;
   },
+): RuntimeExecutionStrategyState | undefined {
+  return cloneRuntimeExecutionStrategyState(value.strategy);
+}
+
+function coercePersistedSessionStrategyState(
+  value: PersistedSessionRecord,
 ): RuntimeExecutionStrategyState | undefined {
   return readRuntimeExecutionStrategyState(value);
 }
@@ -1193,21 +1179,9 @@ function coerceSessionStrategyState(
 function hasSessionStrategyPatch(
   patch: {
     strategy?: RuntimeExecutionStrategyState;
-    requestedStrategy?: RuntimeExecutionStrategyId;
-    acceptanceCriteria?: string;
-    strategyContext?: Record<string, unknown>;
-    correlation?: Record<string, unknown>;
-    effectiveStrategy?: RuntimeExecutionStrategyId;
-    strategyState?: RuntimeExecutionStrategyState;
   },
 ): boolean {
-  return Object.prototype.hasOwnProperty.call(patch, 'strategy')
-    || Object.prototype.hasOwnProperty.call(patch, 'requestedStrategy')
-    || Object.prototype.hasOwnProperty.call(patch, 'acceptanceCriteria')
-    || Object.prototype.hasOwnProperty.call(patch, 'strategyContext')
-    || Object.prototype.hasOwnProperty.call(patch, 'correlation')
-    || Object.prototype.hasOwnProperty.call(patch, 'effectiveStrategy')
-    || Object.prototype.hasOwnProperty.call(patch, 'strategyState');
+  return Object.prototype.hasOwnProperty.call(patch, 'strategy');
 }
 
 function cloneSkillState(
