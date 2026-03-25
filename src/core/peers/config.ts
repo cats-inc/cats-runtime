@@ -57,6 +57,10 @@ export function loadPeerRuntimeConfig(config: RuntimeConfig): PeerRuntimeConfig 
     env.CATS_RUNTIME_PEER_MAX_INBOUND_EXECUTIONS_PER_PEER,
     DEFAULT_MAX_INBOUND_PEER_EXECUTIONS_PER_PEER,
   );
+  const sharedSecrets = mergeSharedSecrets(
+    sanitizeString(env.CATS_RUNTIME_PEER_SHARED_SECRET),
+    parseStringList(env.CATS_RUNTIME_PEER_SHARED_SECRETS),
+  );
 
   return {
     enabled,
@@ -78,7 +82,8 @@ export function loadPeerRuntimeConfig(config: RuntimeConfig): PeerRuntimeConfig 
       env.CATS_RUNTIME_PEER_ALLOW_HEURISTIC_ROUTING,
       false,
     ),
-    sharedSecret: sanitizeString(env.CATS_RUNTIME_PEER_SHARED_SECRET),
+    sharedSecret: sharedSecrets[0],
+    sharedSecrets,
     trustedPeerIds: parseStringList(env.CATS_RUNTIME_PEER_TRUSTED_IDS),
     rejectedPeerIds: parseStringList(env.CATS_RUNTIME_PEER_REJECTED_IDS),
     staticPeers: enabled
@@ -204,6 +209,20 @@ function normalizeProviders(
 
   return Array.from(new Set(targets.map((target) => target.provider)))
     .sort((left, right) => left.localeCompare(right));
+}
+
+function mergeSharedSecrets(
+  primary: string | undefined,
+  rotationList: string[],
+): string[] {
+  return Array.from(new Set([
+    ...(
+      typeof primary === 'string' && primary.length > 0
+        ? [primary]
+        : []
+    ),
+    ...rotationList,
+  ]));
 }
 
 function normalizeLoad(value: unknown): Partial<PeerLoadSummary> | undefined {

@@ -89,6 +89,7 @@ function createApp(
   const trust = new PeerTrustService({
     config: {
       sharedSecret: 'lan-secret',
+      sharedSecrets: [],
       trustedPeerIds: options.trustedPeerIds || ['caller-peer'],
       rejectedPeerIds: [],
     },

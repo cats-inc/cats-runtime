@@ -9,7 +9,7 @@ import type {
 } from './types.js';
 
 interface PeerTrustServiceOptions {
-  config: Pick<PeerRuntimeConfig, 'sharedSecret' | 'trustedPeerIds' | 'rejectedPeerIds'>;
+  config: Pick<PeerRuntimeConfig, 'sharedSecret' | 'sharedSecrets' | 'trustedPeerIds' | 'rejectedPeerIds'>;
   localPeerId?: string | null;
 }
 
@@ -18,37 +18,38 @@ export class PeerTrustService {
 
   private readonly rejectedPeerIds: Set<string>;
 
-  private readonly sharedSecretBuffer?: Buffer;
+  private readonly sharedSecretBuffers: Buffer[];
 
   constructor(private readonly options: PeerTrustServiceOptions) {
     this.trustedPeerIds = new Set(options.config.trustedPeerIds);
     this.rejectedPeerIds = new Set(options.config.rejectedPeerIds);
-    this.sharedSecretBuffer = typeof options.config.sharedSecret === 'string'
-      && options.config.sharedSecret.length > 0
-      ? Buffer.from(options.config.sharedSecret)
-      : undefined;
+    this.sharedSecretBuffers = normalizeSharedSecrets(options.config).map((secret) => Buffer.from(secret));
   }
 
   get hasSharedSecret(): boolean {
-    return Boolean(this.sharedSecretBuffer && this.sharedSecretBuffer.length > 0);
+    return this.sharedSecretBuffers.length > 0;
   }
 
   validateSharedSecret(token: string | undefined): boolean {
-    if (!this.sharedSecretBuffer || typeof token !== 'string') {
+    if (this.sharedSecretBuffers.length === 0 || typeof token !== 'string') {
       return false;
     }
 
     const tokenBuffer = Buffer.from(token);
-    if (tokenBuffer.length !== this.sharedSecretBuffer.length) {
-      return false;
+    for (const sharedSecretBuffer of this.sharedSecretBuffers) {
+      if (tokenBuffer.length !== sharedSecretBuffer.length) {
+        continue;
+      }
+      if (timingSafeEqual(tokenBuffer, sharedSecretBuffer)) {
+        return true;
+      }
     }
-
-    return timingSafeEqual(tokenBuffer, this.sharedSecretBuffer);
+    return false;
   }
 
   validatePayloadSignature(payload: string, signature: string | undefined): boolean {
     return validatePeerPayloadSignature(
-      this.options.config.sharedSecret,
+      normalizeSharedSecrets(this.options.config),
       payload,
       signature,
     );
@@ -115,4 +116,13 @@ export class PeerTrustService {
     const trust = this.summarizePeerId(peerId, 'lan');
     return trust.state === 'self' || trust.state === 'trusted';
   }
+}
+
+function normalizeSharedSecrets(
+  config: Pick<PeerRuntimeConfig, 'sharedSecret' | 'sharedSecrets'>,
+): string[] {
+  return Array.from(new Set([
+    ...(typeof config.sharedSecret === 'string' && config.sharedSecret.length > 0 ? [config.sharedSecret] : []),
+    ...config.sharedSecrets,
+  ]));
 }

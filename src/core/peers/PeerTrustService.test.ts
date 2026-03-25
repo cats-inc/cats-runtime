@@ -43,6 +43,7 @@ describe('PeerTrustService', () => {
     const trust = new PeerTrustService({
       config: {
         sharedSecret: 'lan-secret',
+        sharedSecrets: [],
         trustedPeerIds: ['trusted-peer'],
         rejectedPeerIds: ['blocked-peer'],
       },
@@ -86,6 +87,7 @@ describe('PeerTrustService', () => {
     const trust = new PeerTrustService({
       config: {
         sharedSecret: 'lan-secret',
+        sharedSecrets: ['lan-secret-old'],
         trustedPeerIds: [],
         rejectedPeerIds: [],
       },
@@ -100,10 +102,15 @@ describe('PeerTrustService', () => {
       reason: 'configured_static_peer',
     });
     expect(trust.validateSharedSecret('lan-secret')).toBe(true);
+    expect(trust.validateSharedSecret('lan-secret-old')).toBe(true);
     expect(trust.validateSharedSecret('wrong-secret')).toBe(false);
     expect(trust.validatePayloadSignature(
       '{"turn":{"message":"hello"}}',
       createPeerPayloadSignature('lan-secret', '{"turn":{"message":"hello"}}'),
+    )).toBe(true);
+    expect(trust.validatePayloadSignature(
+      '{"turn":{"message":"hello"}}',
+      createPeerPayloadSignature('lan-secret-old', '{"turn":{"message":"hello"}}'),
     )).toBe(true);
     expect(trust.validatePayloadSignature(
       '{"turn":{"message":"tampered"}}',

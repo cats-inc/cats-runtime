@@ -75,6 +75,7 @@ describe('PeerRoutingService', () => {
     const trust = new PeerTrustService({
       config: {
         sharedSecret: 'lan-secret',
+        sharedSecrets: [],
         trustedPeerIds: ['peer-a'],
         rejectedPeerIds: [],
       },
@@ -122,6 +123,7 @@ describe('PeerRoutingService', () => {
     const trust = new PeerTrustService({
       config: {
         sharedSecret: 'lan-secret',
+        sharedSecrets: [],
         trustedPeerIds: ['peer-b'],
         rejectedPeerIds: [],
       },
@@ -161,6 +163,7 @@ describe('PeerRoutingService', () => {
     const trust = new PeerTrustService({
       config: {
         sharedSecret: 'lan-secret',
+        sharedSecrets: [],
         trustedPeerIds: ['peer-a'],
         rejectedPeerIds: [],
       },

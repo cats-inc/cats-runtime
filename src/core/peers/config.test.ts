@@ -37,6 +37,7 @@ describe('peer runtime config', () => {
       maxInboundExecutionsPerPeer: 2,
       allowHeuristicRouting: false,
       sharedSecret: undefined,
+      sharedSecrets: [],
       trustedPeerIds: [],
       rejectedPeerIds: [],
       staticPeers: [],
@@ -99,6 +100,7 @@ describe('peer runtime config', () => {
       CATS_RUNTIME_PEER_MAX_INBOUND_EXECUTIONS_PER_PEER: '3',
       CATS_RUNTIME_PEER_ALLOW_HEURISTIC_ROUTING: 'true',
       CATS_RUNTIME_PEER_SHARED_SECRET: 'lan-secret',
+      CATS_RUNTIME_PEER_SHARED_SECRETS: '["lan-secret-old","lan-secret-older"]',
       CATS_RUNTIME_PEER_TRUSTED_IDS: 'peer-a, peer-b , peer-a',
       CATS_RUNTIME_PEER_REJECTED_IDS: '["peer-c","peer-d"]',
     }));
@@ -112,6 +114,7 @@ describe('peer runtime config', () => {
       maxInboundExecutionsPerPeer: 3,
       allowHeuristicRouting: true,
       sharedSecret: 'lan-secret',
+      sharedSecrets: ['lan-secret', 'lan-secret-old', 'lan-secret-older'],
       trustedPeerIds: ['peer-a', 'peer-b'],
       rejectedPeerIds: ['peer-c', 'peer-d'],
     }));

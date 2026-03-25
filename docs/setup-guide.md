@@ -132,7 +132,8 @@ secret, not the normal host-facing `CATS_RUNTIME_API_KEY`.
 Current auth/trust model:
 
 - host-facing `CATS_RUNTIME_API_KEY` and peer-facing
-  `CATS_RUNTIME_PEER_SHARED_SECRET` are separate
+  `CATS_RUNTIME_PEER_SHARED_SECRET` / `CATS_RUNTIME_PEER_SHARED_SECRETS` are
+  separate
 - inbound peer execution checks the bearer secret, the caller peer id, and an
   HMAC signature over the raw JSON request body using
   `x-cats-peer-signature: sha256=<64-hex>`
@@ -233,6 +234,7 @@ Keep `.env` for runtime-wide values and secrets:
 - `CATS_RUNTIME_PEER_MAX_INBOUND_EXECUTIONS_PER_PEER=2`
 - `CATS_RUNTIME_PEER_ALLOW_HEURISTIC_ROUTING=false`
 - `CATS_RUNTIME_PEER_SHARED_SECRET=`
+- `CATS_RUNTIME_PEER_SHARED_SECRETS=`
 - `CATS_RUNTIME_PEER_TRUSTED_IDS=`
 - `CATS_RUNTIME_PEER_REJECTED_IDS=`
 - `CATS_RUNTIME_PEER_STATIC_PEERS=`
@@ -253,13 +255,12 @@ Peer-specific notes:
 - `CATS_RUNTIME_PEER_STATIC_PEERS` accepts a JSON array of bounded peer seeds
 - `CATS_RUNTIME_PEER_ALLOW_HEURISTIC_ROUTING` only enables additive opt-in
   routing heuristics; existing callers still stay local by default
-- the current peer auth model uses one configured shared secret per runtime;
-  full-mesh deployments usually standardize the same peer secret across all
-  participating nodes, then constrain actual connectivity with peer-id trust
-  lists
+- the runtime now supports secret overlap windows: keep the current outbound
+  secret in `CATS_RUNTIME_PEER_SHARED_SECRET` and list older inbound-only
+  secrets in `CATS_RUNTIME_PEER_SHARED_SECRETS` during mesh-wide rotation
 - auth failure throttling and inbound execution admission control now exist as
-  bounded hardening defaults, but replay resistance, secret rotation, per-peer
-  credentials, and stronger mutual auth are still later follow-up work
+  bounded hardening defaults, but replay resistance, per-peer credentials, and
+  stronger mutual auth are still later follow-up work
 - advertise values should point at a host/port reachable by other LAN runtimes
 
 ## Provider Instances (`config/providers.yaml`)

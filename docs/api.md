@@ -38,7 +38,9 @@ Peer auth/trust notes:
 - `CATS_RUNTIME_API_KEY` is for host-to-runtime calls and is not consulted by
   `/peer/executions`
 - `CATS_RUNTIME_PEER_SHARED_SECRET` is the current runtime-to-runtime auth
-  credential
+  credential used for outbound calls and the primary inbound credential
+- `CATS_RUNTIME_PEER_SHARED_SECRETS` can add overlap-window inbound secrets so
+  mesh-wide secret rotation does not require one coordinated cutover
 - use a strong random secret, preferably at least 32 characters
 - trust is directional via each runtime's `trustedPeerIds` / `rejectedPeerIds`
 - the current `/peer/executions` request body is HMAC-signed with
@@ -50,6 +52,9 @@ Peer auth/trust notes:
 - for small LAN mesh deployments, the practical bootstrap today is usually one
   shared secret reused across participating peers plus explicit peer-id trust
   policy on each node
+- the runtime now supports additive overlap windows for inbound peer auth: keep
+  the new primary secret in `CATS_RUNTIME_PEER_SHARED_SECRET` and list older
+  still-accepted secrets in `CATS_RUNTIME_PEER_SHARED_SECRETS`
 - v0 still does not add per-peer credentials, nonces, or replay protection;
   operators should treat this as a trusted-LAN or externally TLS-protected
   transport

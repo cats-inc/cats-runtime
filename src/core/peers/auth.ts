@@ -14,11 +14,12 @@ export function createPeerPayloadSignature(
 }
 
 export function validatePeerPayloadSignature(
-  sharedSecret: string | undefined,
+  sharedSecret: string | readonly string[] | undefined,
   payload: string,
   signature: string | undefined,
 ): boolean {
-  if (!sharedSecret || typeof signature !== 'string') {
+  const secrets = normalizeSharedSecrets(sharedSecret);
+  if (secrets.length === 0 || typeof signature !== 'string') {
     return false;
   }
 
@@ -27,17 +28,23 @@ export function validatePeerPayloadSignature(
     return false;
   }
 
-  const expectedSignature = Buffer.from(
-    createPeerPayloadSignature(sharedSecret, payload).slice(`${PEER_SIGNATURE_ALGORITHM}=`.length),
-    'hex',
-  );
   const actualSignature = Buffer.from(normalizedSignature, 'hex');
+  for (const secret of secrets) {
+    const expectedSignature = Buffer.from(
+      createPeerPayloadSignature(secret, payload).slice(`${PEER_SIGNATURE_ALGORITHM}=`.length),
+      'hex',
+    );
 
-  if (actualSignature.length !== expectedSignature.length) {
-    return false;
+    if (actualSignature.length !== expectedSignature.length) {
+      continue;
+    }
+
+    if (timingSafeEqual(actualSignature, expectedSignature)) {
+      return true;
+    }
   }
 
-  return timingSafeEqual(actualSignature, expectedSignature);
+  return false;
 }
 
 function normalizePeerPayloadSignature(
@@ -63,4 +70,16 @@ function isHexDigest(
 ): boolean {
   return value.length === PEER_SIGNATURE_HEX_LENGTH
     && /^[a-fA-F0-9]+$/.test(value);
+}
+
+function normalizeSharedSecrets(
+  value: string | readonly string[] | undefined,
+): string[] {
+  if (typeof value === 'string') {
+    return value.length > 0 ? [value] : [];
+  }
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((secret): secret is string => typeof secret === 'string' && secret.length > 0);
 }

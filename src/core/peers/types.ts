@@ -134,6 +134,7 @@ export interface PeerRuntimeConfig {
   maxInboundExecutionsPerPeer: number;
   allowHeuristicRouting: boolean;
   sharedSecret?: string;
+  sharedSecrets: string[];
   trustedPeerIds: string[];
   rejectedPeerIds: string[];
   staticPeers: StaticPeerSeed[];

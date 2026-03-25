@@ -737,8 +737,6 @@ intentionally deferred:
 
 - add nonce/timestamp or equivalent replay resistance; body signing alone does
   not stop replay
-- support peer secret rotation / overlap windows instead of a single static mesh
-  secret
 - document and optionally enforce a TLS-fronted posture for any deployment
   outside a tightly trusted LAN
 - deepen the current caller-key / per-peer limits into richer peer-specific
