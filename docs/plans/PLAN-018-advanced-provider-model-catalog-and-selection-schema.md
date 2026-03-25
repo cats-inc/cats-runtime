@@ -482,6 +482,52 @@ Blocked on coordinated `cats` changes.
 **Deliverables**: explicit cleanup work that is intentionally not part of the
 first additive runtime rollout.
 
+## Files to Create/Modify
+
+| File | Action | Description |
+|------|--------|-------------|
+| `src/core/models/providerAdvancedCatalog.ts` | Create | Shared advanced catalog types and read-model builders for entries, presets, controls, and default selections |
+| `src/core/models/providerAdvancedKnowledge.ts` | Create | Runtime-owned curated provider knowledge for advanced entries, presets, controls, and support tiers |
+| `src/core/models/providerSelectionResolution.ts` | Create | Runtime resolver from `modelSelection` to `modelResolution`, compatibility snapshot, and backend-private execution details |
+| `src/core/models/providerModelCatalog.ts` | Modify | Keep v1 catalog stable while sharing target resolution and augmentation inputs with the advanced layer |
+| `src/core/types.ts` | Modify | Add additive public `modelSelection` and `modelResolution` session contract types |
+| `src/backends/cli/pool/SessionRegistry.ts` | Modify | Persist authoritative `modelSelection` plus resolved `modelResolution` next to legacy `model` |
+| `src/backends/cli/pool/sessionView.ts` | Modify | Expose additive session selection fields without breaking existing session payloads |
+| `src/http/routes/providers.ts` | Modify | Add `GET /providers/{provider}/models/advanced` while keeping the v1 route unchanged |
+| `src/http/routes/sessions.ts` | Modify | Accept additive `modelSelection`, validate dual-write payloads, and serialize selection/resolution state |
+| `src/core/runtime/RuntimeSessionManager.ts` | Modify | Thread resolved selection output into create/resume/fork/message execution flows |
+| `src/backends/api/*` | Modify | Consume resolved backend-private execution details where API transports can support them honestly |
+| `src/backends/agent/*` | Modify | Support advanced read contract and keep execution on resolved `model` snapshot until adapter capability expansion lands |
+| `src/backends/cli/providers/*` | Modify | Roll out provider-by-provider control execution only where CLI surfaces expose stable semantics |
+| `src/core/models/*.test.ts` | Modify/Create | Add advanced catalog, knowledge, and resolution coverage |
+| `tests/runtime-server.test.ts` | Modify | Add route-level compatibility and advanced catalog regressions |
+| `src/http/*session*.test.ts`, `tests/*backend*.test.ts` | Modify | Add persistence, hydration, and backend support-tier coverage |
+| `docs/api.md` | Modify (follow-on) | Document additive advanced route and session contract after implementation lands |
+| `docs/architecture.md` | Modify (follow-on) | Document the advanced catalog / resolution layer after implementation lands |
+
+## Technical Decisions
+
+- Keep `GET /providers/{provider}/models` as the stable compatibility route and
+  introduce advanced schema only on
+  `GET /providers/{provider}/models/advanced`.
+- Make additive session `modelSelection` the authoritative persisted intent
+  object while keeping top-level `model` as the resolved compatibility
+  snapshot.
+- Persist authoritative selection and resolved snapshot side-by-side instead of
+  trying to infer one from the other on every read.
+- Treat advanced entries, presets, and controls as runtime-owned curated
+  knowledge that dynamic discovery may augment, but not redefine.
+- Enforce one precedence order everywhere:
+  entry defaults -> preset defaults -> explicit session controls ->
+  per-request overrides.
+- Enforce one entry-resolution rule everywhere:
+  `entryMode=auto` may switch to preset-preferred entries, while
+  `entryMode=explicit` must never be silently rewritten.
+- Roll out backend execution support by support tier, not by pretending every
+  backend reaches full advanced-control parity in the first slice.
+- Defer any cleanup that would tighten or remove current public contracts until
+  coordinated `cats` follow-up work is ready.
+
 ## Testing Strategy
 
 - **Advanced catalog route tests**:
@@ -506,6 +552,23 @@ first additive runtime rollout.
 - **Backend support-tier tests**:
   prove unsupported targets reject or mark unavailable controls instead of
   silently accepting them
+- **Manual Testing**:
+  - call `GET /providers/{provider}/models` for representative providers before
+    and after the change and confirm the v1 route shape remains unchanged
+  - call `GET /providers/{provider}/models/advanced` for representative `cli`,
+    `api`, `local`, and `agent` targets and verify entries/presets/controls are
+    surfaced through runtime schema rather than raw vendor payloads
+  - create a session with only legacy `model` and verify runtime synthesizes
+    `modelSelection`, returns additive `modelResolution`, and preserves the
+    existing top-level `model`
+  - create a session with only `modelSelection` and verify runtime resolves a
+    compatible top-level `model`
+  - send a dual-write create payload with mismatched `model` and
+    `modelSelection` and verify the runtime rejects it instead of silently
+    rewriting either field
+  - persist, reload, resume, and fork sessions that carry `modelSelection` to
+    verify authoritative selection survives registry round-trips and the
+    resolved compatibility snapshot stays stable
 
 ## Risks & Scope Guards
 
