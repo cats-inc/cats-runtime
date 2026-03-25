@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -42,13 +42,27 @@ const runtimeEntry = join(runtimeRoot, 'dist', 'index.js');
 
 function createRuntimeProcessEnv(port: number) {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-process-'));
+  // Write a minimal valid providers.yaml so the process starts in normal mode.
+  const configPath = join(root, 'providers.yaml');
+  writeFileSync(configPath, [
+    'version: 1',
+    'backends:',
+    '  cli:',
+    '    providers:',
+    '      claude:',
+    '        instances:',
+    '          default:',
+    '            command: claude',
+    '            runner: auto',
+    '',
+  ].join('\n'), 'utf8');
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     HOME: root,
     USERPROFILE: root,
     CATS_RUNTIME_HOST: '127.0.0.1',
     CATS_RUNTIME_PORT: String(port),
-    CATS_RUNTIME_CONFIG_PATH: join(root, 'providers.missing.yaml'),
+    CATS_RUNTIME_CONFIG_PATH: configPath,
     CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
     CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
     CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
@@ -372,6 +386,7 @@ describe('runtime process startup contract', () => {
           phase: 'ready',
           readySignal: 'http',
           ready: true,
+          bootstrapRequired: false,
           pid: ready.pid,
           startedAt: ready.startedAt,
           address: {

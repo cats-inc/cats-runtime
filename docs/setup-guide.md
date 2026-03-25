@@ -8,12 +8,23 @@
 - Installed local CLIs for the providers you want to use (`claude`, `codex`,
   `gemini`, `cursor-agent`, `kiro-cli`, `opencode`, etc.)
 
-## Installation
+## Quick Start (npx)
+
+```bash
+npx cats-runtime
+```
+
+If no `providers.yaml` exists, the runtime starts in **bootstrap mode** and
+opens a provider setup page at `http://127.0.0.1:3110/`. The setup page scans
+your machine for installed AI CLI tools and lets you select which to enable.
+Clicking "Apply" writes a minimal `providers.yaml` and the runtime transitions
+to normal mode in the same process.
+
+## Installation (Source)
 
 ```powershell
 cd cats-runtime
 copy .env.example .env
-copy config\providers.yaml.example config\providers.yaml
 npm install
 npm test
 ```
@@ -30,17 +41,59 @@ The package is now structured for executable npm distribution:
 - `npm install -g cats-runtime` then `cats-runtime`
 - `npx cats-runtime` once the package is published
 
-Those packaged flows still rely on the same config files or environment
-overrides as the source checkout.
+Advanced operators can skip bootstrap by providing a valid config upfront:
+
+```powershell
+copy config\providers.yaml.example config\providers.yaml
+# Edit providers.yaml to enable only the providers you need
+cats-runtime
+```
 
 Supported startup flags:
 
+- `--bootstrap` — force bootstrap/setup mode even with a valid config
 - `--startup-mode <standalone|app-managed>`
 - `--managed-by <host-name>`
 - `--ready-output <plain|json|silent>`
 - `--host <bind-host>`
 - `--port <bind-port>`
 - `--config <providers-config-path>`
+
+## Bootstrap Mode
+
+The runtime enters bootstrap mode when:
+
+- No valid `providers.yaml` exists at the resolved config path
+- The config file exists but cannot be parsed
+- The config is valid but contains no usable provider targets
+- The operator passes `--bootstrap`
+
+In bootstrap mode:
+
+- `GET /` serves the provider setup page
+- Session and execution routes return `409 Conflict`
+- `GET /health` reports `status: degraded` with `bootstrapRequired: true`
+- `GET /dashboard` and `GET /playground` remain accessible
+
+The bootstrap flow:
+
+1. Open `http://127.0.0.1:3110/` (or the configured host/port)
+2. Click "Auto Scan" or "Manual Scan" to detect installed providers
+3. Check the providers you want to enable
+4. Click "Apply" to generate `providers.yaml` and exit bootstrap mode
+
+Setup artifacts are persisted under `<dataDir>/setup/`:
+
+- `setup-state.json` — bootstrap workflow state
+- `provider-scan.json` — latest scan results
+- `provider-manual-scan.json` — latest manual scan results
+
+### Discovery Posture
+
+WSL discovery defaults to `if_running` — bootstrap auto-scan will not start
+WSL distributions that are not already running. Docker discovery also defaults
+to `if_running`. Use the "Manual Scan" button to trigger a full scan regardless
+of discovery policy.
 
 ## Startup Contract
 

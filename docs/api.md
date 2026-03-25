@@ -185,6 +185,7 @@ Example response:
     "phase": "ready",
     "readySignal": "http",
     "ready": true,
+    "bootstrapRequired": false,
     "pid": 12345,
     "startedAt": "2026-03-19T12:34:00.000Z",
     "address": {
@@ -215,6 +216,53 @@ safe. `status` is now phase-aware (`starting` / `stopping` => `degraded`;
 `stopped` => `unavailable`). Use `readiness.ready` as the authoritative
 machine-readable readiness bit, and use `startup.phase` when the caller needs
 lifecycle-aware supervision or UI state.
+
+`startup.bootstrapRequired` indicates whether the runtime is in bootstrap mode.
+When `true`, the runtime needs provider setup before normal operation. Session
+and execution routes return `409` with `{"error": "runtime_bootstrap_required"}`
+until bootstrap completes.
+
+### Bootstrap Mode
+
+The runtime enters bootstrap mode when:
+
+- No valid `providers.yaml` exists at the resolved config path
+- The config file exists but cannot be parsed
+- The config is valid but contains no usable provider targets
+- The operator passes `--bootstrap` on the command line
+
+In bootstrap mode:
+
+- `GET /` serves the provider setup page instead of the dashboard
+- `GET /dashboard` always serves the dashboard regardless of mode
+- `GET /playground` remains available
+- Session, message, and execution routes return `409 Conflict`
+
+### Provider Setup
+
+```text
+GET  /providers/setup/state
+POST /providers/setup/scan
+POST /providers/setup/apply
+```
+
+`GET /providers/setup/state` returns the current setup state, latest scan
+summary, and provider universe (known provider families).
+
+`POST /providers/setup/scan` triggers a provider scan. Pass `{"manual": true}`
+in the body for an explicit manual scan. Returns scan results with per-provider
+readiness, version, auth status, and remediation hints.
+
+`POST /providers/setup/apply` accepts `{"providers": ["claude", "codex", ...]}`
+and writes a minimal `providers.yaml` with only the selected providers. On
+success the runtime exits bootstrap mode in-process and session routes become
+available.
+
+Setup artifacts are persisted under `<dataDir>/setup/`:
+
+- `setup-state.json` — resumable setup workflow state
+- `provider-scan.json` — latest scan results
+- `provider-manual-scan.json` — latest explicit manual scan results
 
 ### Runtime Diagnostics
 

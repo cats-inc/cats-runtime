@@ -29,14 +29,17 @@ import { RuntimeMeteringService } from '../core/usage/RuntimeMeteringService.js'
 import { RuntimeWorktreeMaintenanceService } from '../core/workspace/RuntimeWorktreeMaintenanceService.js';
 import type { RuntimeWakeupService } from '../core/wakeup/RuntimeWakeupService.js';
 import { ManualBrowserDriver } from '../backends/browser/manualDriver.js';
+import type { BootstrapService } from '../core/bootstrap/BootstrapService.js';
 import { bearerAuth } from './auth.js';
 import { injectRuntimeDashboardHealthOverlay } from './dashboardHealthOverlay.js';
+import { bootstrapGuard } from './routes/bootstrapGuard.js';
 import { discoveryRoutes } from './routes/discovery.js';
 import { browserRoutes } from './routes/browser.js';
 import { deliveryRoutes } from './routes/delivery.js';
 import { diagnosticsRoutes } from './routes/diagnostics.js';
 import { healthRoutes } from './routes/health.js';
 import { sessionRoutes } from './routes/sessions.js';
+import { setupRoutes } from './routes/setup.js';
 import { messageRoutes } from './routes/messages.js';
 import { mcpRoutes } from './routes/mcp.js';
 import { poolRoutes } from './routes/pool.js';
@@ -78,6 +81,7 @@ export interface AppContext {
   browser?: RuntimeBrowserService;
   browserMaintenance?: RuntimeBrowserMaintenanceService;
   worktreeMaintenance?: RuntimeWorktreeMaintenanceService;
+  bootstrapService?: BootstrapService;
   resolveCursorNative?: (instanceId?: string) => CursorNativeSessionService;
   resolveGooseNative?: (instanceId?: string) => GooseNativeSessionService;
   resolveKiroNative?: (instanceId?: string) => KiroNativeSessionService;
@@ -200,8 +204,19 @@ export function createRuntimeApp(ctx: AppContext) {
   const app = new Hono<{ Variables: { ctx: AppContext } }>();
   const __dirname = dirname(fileURLToPath(import.meta.url));
 
-  // Serve the embedded dashboard UI without auth.
+  // Serve the root page: setup page in bootstrap mode, dashboard otherwise.
   app.get('/', (c) => {
+    if (ctx.startup?.bootstrapRequired) {
+      const htmlPath = resolve(__dirname, '../../public/provider-setup.html');
+      return c.html(readFileSync(htmlPath, 'utf-8'));
+    }
+    const htmlPath = resolve(__dirname, '../../public/index.html');
+    const html = injectRuntimeDashboardHealthOverlay(readFileSync(htmlPath, 'utf-8'));
+    return c.html(html);
+  });
+
+  // Dashboard always accessible regardless of bootstrap mode.
+  app.get('/dashboard', (c) => {
     const htmlPath = resolve(__dirname, '../../public/index.html');
     const html = injectRuntimeDashboardHealthOverlay(readFileSync(htmlPath, 'utf-8'));
     return c.html(html);
@@ -217,6 +232,7 @@ export function createRuntimeApp(ctx: AppContext) {
     const path = c.req.path;
     if (
       path === '/'
+      || path === '/dashboard'
       || path === '/playground'
       || path === '/sessions'
       || path === '/health'
@@ -226,6 +242,7 @@ export function createRuntimeApp(ctx: AppContext) {
       || path === '/pool/status'
       || path === '/discovery/status'
       || path === '/providers/config'
+      || path.startsWith('/providers/setup')
     ) {
       return await next();
     }
@@ -238,8 +255,12 @@ export function createRuntimeApp(ctx: AppContext) {
     await next();
   });
 
+  // Bootstrap guard: return 409 for session/execution routes when in bootstrap mode.
+  app.use('*', bootstrapGuard());
+
   app.route('/', healthRoutes);
   app.route('/', diagnosticsRoutes);
+  app.route('/', setupRoutes);
   app.route('/', discoveryRoutes);
   app.route('/', browserRoutes);
   app.route('/', deliveryRoutes);

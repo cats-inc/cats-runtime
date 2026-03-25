@@ -30,6 +30,7 @@ healthRoutes.get('/health', (c) => {
       phase: ctx.startup.phase,
       readySignal: ctx.startup.readySignal,
       ready: readiness.ready,
+      bootstrapRequired: ctx.startup.bootstrapRequired,
       pid: ctx.startup.pid,
       startedAt: ctx.startup.startedAt,
       address: ctx.startup.address,

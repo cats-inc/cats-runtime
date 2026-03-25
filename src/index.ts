@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 
 import { loadDotEnv } from './core/dotenv.js';
 import { loadConfig } from './core/config.js';
+import { inspectRuntimeConfig, shouldEnterBootstrapMode } from './core/configInspection.js';
 import { createRuntimeServer } from './server.js';
 import {
   applyRuntimeCliEnvOverrides,
@@ -36,6 +37,12 @@ async function main(): Promise<void> {
   applyRuntimeCliEnvOverrides(cliOptions, process.env);
 
   startup = resolveRuntimeStartupState(cliOptions, process.env);
+
+  const inspection = inspectRuntimeConfig(process.env);
+  if (shouldEnterBootstrapMode(inspection, cliOptions.bootstrap === true)) {
+    startup.bootstrapRequired = true;
+  }
+
   const config = loadConfig();
   const runtime = createRuntimeServer(config, { startup });
   let shutdownPromise: Promise<void> | null = null;
@@ -101,6 +108,12 @@ async function main(): Promise<void> {
     healthUrl: `http://${address.host}:${address.port}/health`,
   });
   writeLifecycle(readyMessage);
+
+  if (startup.bootstrapRequired) {
+    process.stdout.write(
+      `cats-runtime is in bootstrap mode. Open http://${address.host}:${address.port}/ to set up providers.\n`,
+    );
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

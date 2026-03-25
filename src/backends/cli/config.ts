@@ -283,7 +283,7 @@ export function defaultNativeDiscoveryIntervalMs(): number {
 }
 
 export function defaultWslDiscoveryPolicy(): WslDiscoveryPolicy {
-  return 'always';
+  return 'if_running';
 }
 
 export function defaultDockerDiscoveryPolicy(): DockerDiscoveryPolicy {
@@ -519,7 +519,7 @@ export function resolveProviderInstance(
   );
 }
 
-function resolveConfigPath(value: string | undefined): string {
+export function resolveConfigPath(value: string | undefined): string {
   if (!value) {
     return resolve(process.cwd(), CONFIG_FILE_DEFAULT);
   }

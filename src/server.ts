@@ -10,8 +10,9 @@ import {
   resolveProviderInstance,
 } from './backends/cli/config.js';
 import type { CliRuntimeConfig } from './backends/cli/config.js';
-import { loadConfig } from './core/config.js';
+import { loadConfig, getRuntimeResolvedPaths } from './core/config.js';
 import type { RuntimeConfig } from './core/types.js';
+import { resolveConfigPath } from './backends/cli/config.js';
 import { AuggieSessionScanner } from './backends/cli/discovery/AuggieSessionScanner.js';
 import { FileWatcher } from './backends/cli/discovery/FileWatcher.js';
 import { SessionScanner } from './backends/cli/discovery/SessionScanner.js';
@@ -40,6 +41,7 @@ import { WorkerPool } from './backends/cli/pool/WorkerPool.js';
 import { RuntimeSessionManager } from './core/runtime/RuntimeSessionManager.js';
 import { ensureSessionAwake } from './core/runtime/sessionWakeup.js';
 import { ProviderModelCatalogService } from './core/models/providerModelCatalog.js';
+import { BootstrapService } from './core/bootstrap/BootstrapService.js';
 import { ProviderCompatibilityService } from './core/compatibility/ProviderCompatibilityService.js';
 import { RuntimeWakeupService } from './core/wakeup/RuntimeWakeupService.js';
 import { RuntimeBrowserService } from './core/browser/RuntimeBrowserService.js';
@@ -846,9 +848,23 @@ export function createRuntimeServer(
     },
   });
   context.worktreeMaintenance = worktreeMaintenance;
+
+  // Bootstrap service is always created so setup routes can function.
+  const paths = getRuntimeResolvedPaths(config);
+  const configPathForBootstrap = config.configPath
+    || resolveConfigPath(process.env.CATS_RUNTIME_CONFIG_PATH);
+  context.bootstrapService = new BootstrapService({
+    dataDir: paths.dataDir,
+    configPath: configPathForBootstrap,
+    config,
+    compatibility,
+  });
+
   const app = createRuntimeApp(context);
   const server = createAdaptorServer({ fetch: app.fetch }) as Server;
-  const discovery = createDiscoveryController(context, options);
+  const discovery = startup.bootstrapRequired
+    ? null
+    : createDiscoveryController(context, options);
   let startPromise: Promise<{ host: string; port: number }> | null = null;
   let closePromise: Promise<void> | null = null;
 
@@ -866,10 +882,14 @@ export function createRuntimeServer(
       }
 
       startPromise = (async () => {
-        discovery.start();
-        wakeup.start();
-        browserMaintenance.start();
-        worktreeMaintenance.start();
+        if (discovery) {
+          discovery.start();
+        }
+        if (!startup.bootstrapRequired) {
+          wakeup.start();
+          browserMaintenance.start();
+          worktreeMaintenance.start();
+        }
 
         try {
           if (startup.phase !== 'starting') {
@@ -905,7 +925,9 @@ export function createRuntimeServer(
           worktreeMaintenance.close();
           browserMaintenance.close();
           wakeup.close();
-          discovery.stop();
+          if (discovery) {
+            discovery.stop();
+          }
           throw error;
         }
       })();
@@ -926,7 +948,9 @@ export function createRuntimeServer(
         worktreeMaintenance.close();
         browserMaintenance.close();
         wakeup.close();
-        discovery.stop();
+        if (discovery) {
+          discovery.stop();
+        }
         agentBackend.killAll();
         apiBackend.killAll();
         pool.killAll();

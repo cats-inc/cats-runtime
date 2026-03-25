@@ -62,6 +62,7 @@ export type RuntimeShutdownReason = typeof RUNTIME_SHUTDOWN_REASONS[number];
 
 export interface RuntimeCliOptions {
   help?: boolean;
+  bootstrap?: boolean;
   startupMode?: RuntimeStartupMode;
   managedBy?: string;
   readyOutput?: RuntimeReadyOutput;
@@ -87,6 +88,7 @@ export interface RuntimeStartupState {
   pid: number;
   startedAt: string;
   ready: boolean;
+  bootstrapRequired: boolean;
   address?: RuntimeListeningAddress;
   shutdownReason?: RuntimeShutdownReason;
   lastEvent?: RuntimeLifecycleEventName;
@@ -151,6 +153,11 @@ export function parseRuntimeCliOptions(argv: string[]): RuntimeCliOptions {
 
     if (arg === '--help' || arg === '-h') {
       options.help = true;
+      continue;
+    }
+
+    if (arg === '--bootstrap') {
+      options.bootstrap = true;
       continue;
     }
 
@@ -271,6 +278,7 @@ export function createRuntimeStartupState(
     pid: init.pid ?? process.pid,
     startedAt: init.startedAt ?? new Date().toISOString(),
     ready: init.ready ?? false,
+    bootstrapRequired: init.bootstrapRequired ?? false,
     address: init.address,
     shutdownReason: init.shutdownReason,
     lastEvent: init.lastEvent,
@@ -357,6 +365,13 @@ export function getRuntimeShutdownContract(
 export function getRuntimeOperationalStatus(
   startup: RuntimeStartupState,
 ): RuntimeOperationalStatus {
+  if (startup.bootstrapRequired && startup.phase === 'ready') {
+    return {
+      status: 'degraded',
+      summary: 'Runtime is in bootstrap mode. Provider setup is required before normal operation.',
+    };
+  }
+
   switch (startup.phase) {
     case 'ready':
       return {
@@ -520,6 +535,7 @@ export function getRuntimeHelpText(): string {
     'Usage: cats-runtime [options]',
     '',
     'Options:',
+    '  --bootstrap                            Force bootstrap/setup mode',
     '  --startup-mode <standalone|app-managed>',
     '  --managed-by <name>',
     '  --ready-output <plain|json|silent>',

@@ -261,6 +261,7 @@ describe('runtime server', () => {
           phase: 'starting',
           readySignal: 'http',
           ready: false,
+          bootstrapRequired: false,
           pid: expect.any(Number),
           startedAt: expect.any(String),
           address: undefined,
@@ -330,6 +331,7 @@ describe('runtime server', () => {
           phase: 'ready',
           readySignal: 'http',
           ready: true,
+          bootstrapRequired: false,
           pid: expect.any(Number),
           startedAt: expect.any(String),
           address: {

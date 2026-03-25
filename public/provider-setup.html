@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cats Runtime - Provider Setup</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #242836;
+    --border: #2e3345;
+    --text: #e1e4ed;
+    --text2: #8b90a0;
+    --accent: #6c8cff;
+    --accent-dim: #4a62b3;
+    --green: #4ade80;
+    --yellow: #facc15;
+    --red: #f87171;
+    --orange: #fb923c;
+    --radius: 8px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem;
+  }
+  .container { max-width: 800px; width: 100%; }
+  header {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+  header h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+  header p { color: var(--text2); font-size: 0.9rem; }
+  .status-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+  }
+  .status-bar .badge {
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .badge-bootstrap { background: var(--orange); color: #000; }
+  .badge-ready { background: var(--green); color: #000; }
+  .badge-ok { background: var(--green); color: #000; }
+  .badge-degraded { background: var(--yellow); color: #000; }
+  .badge-unavailable { background: var(--red); color: #fff; }
+  .badge-unknown { background: var(--text2); color: #000; }
+
+  .actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+  button {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+  button:hover { background: var(--accent-dim); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.secondary {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+  }
+  button.secondary:hover { background: var(--border); }
+
+  .provider-list {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+  .provider-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    gap: 0.75rem;
+  }
+  .provider-item:last-child { border-bottom: none; }
+  .provider-item input[type="checkbox"] {
+    width: 1rem; height: 1rem;
+    accent-color: var(--accent);
+  }
+  .provider-info { flex: 1; }
+  .provider-name { font-weight: 600; font-size: 0.9rem; }
+  .provider-detail {
+    font-size: 0.75rem;
+    color: var(--text2);
+    margin-top: 0.15rem;
+  }
+  .provider-status { text-align: right; min-width: 80px; }
+  .provider-remediation {
+    font-size: 0.75rem;
+    color: var(--orange);
+    margin-top: 0.15rem;
+  }
+  .provider-remediation code {
+    background: var(--surface2);
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    font-size: 0.7rem;
+  }
+
+  .result-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    display: none;
+  }
+  .result-panel.visible { display: block; }
+  .result-panel h3 { font-size: 0.95rem; margin-bottom: 0.5rem; }
+  .result-panel p { font-size: 0.85rem; color: var(--text2); }
+  .result-panel a { color: var(--accent); text-decoration: none; }
+  .result-panel a:hover { text-decoration: underline; }
+
+  .loading { color: var(--text2); font-size: 0.85rem; padding: 2rem; text-align: center; }
+  footer { margin-top: auto; padding-top: 2rem; color: var(--text2); font-size: 0.75rem; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Cats Runtime - Provider Setup</h1>
+    <p>Configure which AI providers are available for this runtime instance.</p>
+  </header>
+
+  <div class="status-bar">
+    <span id="statusText">Loading...</span>
+    <span id="statusBadge" class="badge badge-bootstrap">Bootstrap</span>
+  </div>
+
+  <div class="actions">
+    <button id="scanBtn" onclick="runScan(false)">Auto Scan</button>
+    <button id="manualScanBtn" class="secondary" onclick="runScan(true)">Manual Scan</button>
+    <button id="applyBtn" onclick="applyConfig()" disabled>Apply Selected</button>
+  </div>
+
+  <div id="providerList" class="provider-list">
+    <div class="loading">Scanning providers...</div>
+  </div>
+
+  <div id="resultPanel" class="result-panel">
+    <h3 id="resultTitle"></h3>
+    <p id="resultBody"></p>
+  </div>
+
+  <footer>
+    <a href="/dashboard" style="color: var(--accent);">Open Dashboard</a>
+    &nbsp;|&nbsp;
+    <a href="/playground" style="color: var(--accent);">Open Playground</a>
+  </footer>
+</div>
+
+<script>
+let scanData = null;
+
+async function fetchState() {
+  try {
+    const res = await fetch('/providers/setup/state');
+    const data = await res.json();
+    updateStatusBar(data);
+    if (data.scan) {
+      await loadScanResults();
+    } else {
+      renderUniverse(data.universe || []);
+    }
+  } catch (err) {
+    document.getElementById('statusText').textContent = 'Failed to load state: ' + err.message;
+  }
+}
+
+function updateStatusBar(data) {
+  const badge = document.getElementById('statusBadge');
+  const text = document.getElementById('statusText');
+  if (data.bootstrapRequired) {
+    badge.className = 'badge badge-bootstrap';
+    badge.textContent = 'Bootstrap';
+    text.textContent = 'Provider setup required before normal operation.';
+  } else {
+    badge.className = 'badge badge-ready';
+    badge.textContent = 'Ready';
+    text.textContent = 'Runtime is configured and ready.';
+  }
+}
+
+function renderUniverse(universe) {
+  const list = document.getElementById('providerList');
+  if (!universe.length) {
+    list.innerHTML = '<div class="loading">No providers found.</div>';
+    return;
+  }
+  list.innerHTML = universe.map(p => `
+    <div class="provider-item">
+      <input type="checkbox" value="${p.provider}" class="provider-check" />
+      <div class="provider-info">
+        <div class="provider-name">${p.familyLabel}</div>
+        <div class="provider-detail">${p.provider} &mdash; ${p.binaryName}</div>
+      </div>
+      <div class="provider-status">
+        <span class="badge badge-unknown">Not scanned</span>
+      </div>
+    </div>
+  `).join('');
+  bindCheckboxes();
+}
+
+function renderScanResults(scan) {
+  scanData = scan;
+  const list = document.getElementById('providerList');
+  list.innerHTML = scan.providers.map(p => {
+    const statusClass = p.available ? 'badge-ok' : p.commandStatus === 'probe_failed' ? 'badge-unavailable' : 'badge-degraded';
+    const statusText = p.available ? 'Ready' : p.commandStatus === 'missing_install' ? 'Not installed' : p.commandStatus;
+    const remediation = (p.remediation || []).map(r =>
+      `<div class="provider-remediation">${r.summary}${r.command ? ' <code>' + r.command + '</code>' : ''}</div>`
+    ).join('');
+    return `
+      <div class="provider-item">
+        <input type="checkbox" value="${p.provider}" class="provider-check" ${p.available ? 'checked' : ''} />
+        <div class="provider-info">
+          <div class="provider-name">${p.family}</div>
+          <div class="provider-detail">
+            ${p.provider}${p.version ? ' v' + p.version : ''}${p.commandPath ? ' &mdash; ' + p.commandPath : ''}
+          </div>
+          ${remediation}
+        </div>
+        <div class="provider-status">
+          <span class="badge ${statusClass}">${statusText}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+  bindCheckboxes();
+}
+
+function bindCheckboxes() {
+  const checks = document.querySelectorAll('.provider-check');
+  const applyBtn = document.getElementById('applyBtn');
+  const update = () => {
+    const anyChecked = Array.from(checks).some(c => c.checked);
+    applyBtn.disabled = !anyChecked;
+  };
+  checks.forEach(c => c.addEventListener('change', update));
+  update();
+}
+
+async function runScan(manual) {
+  const scanBtn = document.getElementById('scanBtn');
+  const manualScanBtn = document.getElementById('manualScanBtn');
+  scanBtn.disabled = true;
+  manualScanBtn.disabled = true;
+  document.getElementById('providerList').innerHTML = '<div class="loading">Scanning providers...</div>';
+  hideResult();
+
+  try {
+    const res = await fetch('/providers/setup/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ manual }),
+    });
+    const data = await res.json();
+    if (data.scan) {
+      renderScanResults(data.scan);
+    }
+  } catch (err) {
+    document.getElementById('providerList').innerHTML =
+      '<div class="loading" style="color:var(--red)">Scan failed: ' + err.message + '</div>';
+  } finally {
+    scanBtn.disabled = false;
+    manualScanBtn.disabled = false;
+  }
+}
+
+async function loadScanResults() {
+  try {
+    const res = await fetch('/providers/setup/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ manual: false }),
+    });
+    const data = await res.json();
+    if (data.scan) {
+      renderScanResults(data.scan);
+    }
+  } catch {
+    // Ignore, user can trigger manual scan
+  }
+}
+
+async function applyConfig() {
+  const checks = document.querySelectorAll('.provider-check:checked');
+  const providers = Array.from(checks).map(c => c.value);
+  if (!providers.length) return;
+
+  const applyBtn = document.getElementById('applyBtn');
+  applyBtn.disabled = true;
+  applyBtn.textContent = 'Applying...';
+  hideResult();
+
+  try {
+    const res = await fetch('/providers/setup/apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ providers }),
+    });
+    const data = await res.json();
+    if (res.ok && data.status === 'applied') {
+      showResult(
+        'Setup Complete',
+        `Configuration written to ${data.configPath}. ` +
+        (data.restart ? 'Please restart the runtime.' : 'Runtime is now active.') +
+        ' <a href="/dashboard">Go to Dashboard</a>'
+      );
+      // Refresh status
+      const stateRes = await fetch('/providers/setup/state');
+      const stateData = await stateRes.json();
+      updateStatusBar(stateData);
+    } else {
+      showResult('Error', data.error || 'Failed to apply configuration.', true);
+    }
+  } catch (err) {
+    showResult('Error', err.message, true);
+  } finally {
+    applyBtn.disabled = false;
+    applyBtn.textContent = 'Apply Selected';
+  }
+}
+
+function showResult(title, body, isError) {
+  const panel = document.getElementById('resultPanel');
+  document.getElementById('resultTitle').textContent = title;
+  document.getElementById('resultBody').innerHTML = body;
+  panel.className = 'result-panel visible';
+  if (isError) {
+    panel.style.borderColor = 'var(--red)';
+  } else {
+    panel.style.borderColor = 'var(--green)';
+  }
+}
+
+function hideResult() {
+  document.getElementById('resultPanel').className = 'result-panel';
+}
+
+fetchState();
+</script>
+</body>
+</html>

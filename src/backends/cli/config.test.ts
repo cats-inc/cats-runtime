@@ -94,8 +94,8 @@ describe('config platform defaults', () => {
     expect(defaultNativeDiscoveryIntervalMs()).toBe(5000);
   });
 
-  it('defaults WSL discovery policy to always', () => {
-    expect(defaultWslDiscoveryPolicy()).toBe('always');
+  it('defaults WSL discovery policy to if_running', () => {
+    expect(defaultWslDiscoveryPolicy()).toBe('if_running');
   });
 
   it('treats discovered sessions as externally live for 15 seconds after activity', () => {
