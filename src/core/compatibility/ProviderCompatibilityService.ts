@@ -50,6 +50,7 @@ import type {
 const DEFAULT_CACHE_TTL_MS = 5 * 60_000;
 const DEFAULT_PROBE_TIMEOUT_MS = 3_000;
 const DEFAULT_SAMPLE_LIMIT = 2_048;
+const FORCE_KILL_GRACE_MS = 500;
 const EVIDENCE_SCHEMA_VERSION = 3;
 interface ProbeResult {
   exitCode: number | null;
@@ -1717,6 +1718,8 @@ async function runCompatibilityProbe(
     let stderr = '';
     let settled = false;
     let timedOut = false;
+    let timeoutError: string | undefined;
+    let forceKillTimer: ReturnType<typeof setTimeout> | null = null;
 
     const finish = (result: Omit<ProbeResult, 'durationMs'>) => {
       if (settled) {
@@ -1724,6 +1727,10 @@ async function runCompatibilityProbe(
       }
       settled = true;
       clearTimeout(timer);
+      if (forceKillTimer) {
+        clearTimeout(forceKillTimer);
+        forceKillTimer = null;
+      }
       resolveProbe({
         ...result,
         durationMs: Date.now() - startedAt,
@@ -1732,18 +1739,19 @@ async function runCompatibilityProbe(
 
     const timer = setTimeout(() => {
       timedOut = true;
+      timeoutError = `Timed out after ${timeoutMs}ms`;
       try {
         child.kill();
       } catch {
-        // Ignore kill failures and report the timeout.
+        // Ignore kill failures and allow the close/error path to settle.
       }
-      finish({
-        exitCode: null,
-        stdout,
-        stderr,
-        timedOut: true,
-        error: `Timed out after ${timeoutMs}ms`,
-      });
+      forceKillTimer = setTimeout(() => {
+        try {
+          child.kill('SIGKILL');
+        } catch {
+          // Ignore force-kill failures and allow the close/error path to settle.
+        }
+      }, FORCE_KILL_GRACE_MS);
     }, timeoutMs);
 
     child.stdout?.on('data', (chunk: Buffer) => {
@@ -1767,6 +1775,7 @@ async function runCompatibilityProbe(
         stdout,
         stderr,
         timedOut,
+        ...(timedOut && timeoutError ? { error: timeoutError } : {}),
       });
     });
   });

@@ -459,12 +459,11 @@ describe('runtime peer routing integration', () => {
       });
 
       await waitFor(() => Boolean(caller.context.runtime?.get(session.id)?.busy));
-      const streamPromise = fetch(`http://${callerAddress.host}:${callerAddress.port}/sessions/${session.id}/stream`);
+      const streamResponse = await fetch(`http://${callerAddress.host}:${callerAddress.port}/sessions/${session.id}/stream`);
 
       releaseExecution?.();
 
       const messageResponse = await messagePromise;
-      const streamResponse = await streamPromise;
 
       expect(messageResponse.status).toBe(200);
       expect(streamResponse.status).toBe(200);

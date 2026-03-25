@@ -6,6 +6,7 @@ import { createRuntimeAdapter, quoteForBash } from '../../backends/cli/runtime/r
 import { expandNativeEnvPath } from './pathUtils.js';
 
 const DEFAULT_CHECK_TIMEOUT_MS = 3_000;
+const FORCE_KILL_GRACE_MS = 500;
 
 export interface RuntimeCheckCommandResult {
   exitCode: number | null;
@@ -108,6 +109,8 @@ async function runCommand(
     let stderr = '';
     let settled = false;
     let timedOut = false;
+    let timeoutError: string | undefined;
+    let forceKillTimer: ReturnType<typeof setTimeout> | null = null;
 
     const finish = (result: Omit<RuntimeCheckCommandResult, 'durationMs'>) => {
       if (settled) {
@@ -115,6 +118,10 @@ async function runCommand(
       }
       settled = true;
       clearTimeout(timer);
+      if (forceKillTimer) {
+        clearTimeout(forceKillTimer);
+        forceKillTimer = null;
+      }
       resolveCommand({
         ...result,
         durationMs: Date.now() - startedAt,
@@ -123,18 +130,19 @@ async function runCommand(
 
     const timer = setTimeout(() => {
       timedOut = true;
+      timeoutError = `Timed out after ${timeoutMs}ms`;
       try {
         child.kill();
       } catch {
-        // Ignore kill failures and surface the timeout result.
+        // Ignore kill failures and allow the close/error path to settle.
       }
-      finish({
-        exitCode: null,
-        stdout,
-        stderr,
-        timedOut: true,
-        error: `Timed out after ${timeoutMs}ms`,
-      });
+      forceKillTimer = setTimeout(() => {
+        try {
+          child.kill('SIGKILL');
+        } catch {
+          // Ignore force-kill failures and allow the close/error path to settle.
+        }
+      }, FORCE_KILL_GRACE_MS);
     }, timeoutMs);
 
     child.stdout?.on('data', (chunk: Buffer) => {
@@ -158,6 +166,7 @@ async function runCommand(
         stdout,
         stderr,
         timedOut,
+        ...(timedOut && timeoutError ? { error: timeoutError } : {}),
       });
     });
   });
