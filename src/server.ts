@@ -10,7 +10,7 @@ import {
   resolveProviderInstance,
 } from './backends/cli/config.js';
 import type { CliRuntimeConfig } from './backends/cli/config.js';
-import { loadConfig, getRuntimeResolvedPaths } from './core/config.js';
+import { loadConfig, getRuntimeResolvedPaths, copyRuntimeConfigEnv } from './core/config.js';
 import type { RuntimeConfig } from './core/types.js';
 import { resolveConfigPath } from './backends/cli/config.js';
 import { AuggieSessionScanner } from './backends/cli/discovery/AuggieSessionScanner.js';
@@ -47,6 +47,10 @@ import { RuntimeWakeupService } from './core/wakeup/RuntimeWakeupService.js';
 import { RuntimeBrowserService } from './core/browser/RuntimeBrowserService.js';
 import { RuntimeBrowserMaintenanceService } from './core/browser/RuntimeBrowserMaintenanceService.js';
 import { RuntimeWorktreeMaintenanceService } from './core/workspace/RuntimeWorktreeMaintenanceService.js';
+import { loadPeerRuntimeConfig } from './core/peers/config.js';
+import { PeerRegistry as RuntimePeerRegistry } from './core/peers/PeerRegistry.js';
+import { PeerCapabilitySnapshotService } from './core/peers/PeerCapabilitySnapshotService.js';
+import { PeerDiscoveryController } from './core/peers/PeerDiscoveryController.js';
 import { createRuntimeApp, type AppContext } from './http/app.js';
 import { executeRetainedWorktreeCleanup } from './http/routes/sessions.js';
 import type { ProviderName } from './backends/cli/providers/types.js';
@@ -644,6 +648,7 @@ export function createRuntimeServer(
   options: RuntimeServerOptions = {},
 ): RuntimeServer {
   const startup = options.startup ?? createRuntimeStartupState();
+  const peerConfig = loadPeerRuntimeConfig(config);
   const dataDir = config.dataDir || join(config.sessionBaseDir, '..', 'data');
   const registry = new SessionRegistry(
     dataDir,
@@ -803,6 +808,21 @@ export function createRuntimeServer(
   const browserMaintenance = new RuntimeBrowserMaintenanceService({
     browser,
   });
+  const peerRegistry = new RuntimePeerRegistry({
+    stalePeerTtlMs: peerConfig.stalePeerTtlMs,
+  });
+  const peerCapabilities = new PeerCapabilitySnapshotService({
+    config,
+    peerConfig,
+    startup,
+    registry,
+    pool,
+  });
+  const peerDiscovery = new PeerDiscoveryController({
+    config: peerConfig,
+    registry: peerRegistry,
+    capabilitySnapshot: peerCapabilities,
+  });
   const context: AppContext = {
     config,
     startup,
@@ -822,6 +842,9 @@ export function createRuntimeServer(
     wakeup,
     browser,
     browserMaintenance,
+    peerRegistry,
+    peerDiscovery,
+    peerCapabilities,
     resolveCursorNative,
     resolveGooseNative,
     resolveKiroNative,
@@ -867,15 +890,19 @@ export function createRuntimeServer(
     const reloadEnv = { ...process.env, CATS_RUNTIME_CONFIG_PATH: configPathForBootstrap };
     const reloaded = loadConfig(reloadEnv);
     Object.assign(config, reloaded);
+    copyRuntimeConfigEnv(config, reloaded);
     context.config = config;
 
     let startedDiscovery = false;
+    let startedPeerDiscovery = false;
     try {
       if (!activeDiscovery) {
         activeDiscovery = createDiscoveryController(context, options);
       }
       activeDiscovery.start();
       startedDiscovery = true;
+      peerDiscovery.start();
+      startedPeerDiscovery = true;
       wakeup.start();
       browserMaintenance.start();
       worktreeMaintenance.start();
@@ -885,6 +912,9 @@ export function createRuntimeServer(
       wakeup.close();
       if (startedDiscovery && activeDiscovery) {
         activeDiscovery.stop();
+      }
+      if (startedPeerDiscovery) {
+        peerDiscovery.stop();
       }
       throw error;
     }
@@ -918,6 +948,7 @@ export function createRuntimeServer(
           activeDiscovery.start();
         }
         if (!startup.bootstrapRequired) {
+          peerDiscovery.start();
           wakeup.start();
           browserMaintenance.start();
           worktreeMaintenance.start();
@@ -943,6 +974,7 @@ export function createRuntimeServer(
               ...fallback,
               healthUrl: `http://${fallback.host}:${fallback.port}/health`,
             });
+            peerDiscovery.refreshSelf();
             return fallback;
           }
 
@@ -951,12 +983,14 @@ export function createRuntimeServer(
             port: address.port,
             healthUrl: `http://${address.address}:${address.port}/health`,
           });
+          peerDiscovery.refreshSelf();
 
           return { host: address.address, port: address.port };
         } catch (error) {
           worktreeMaintenance.close();
           browserMaintenance.close();
           wakeup.close();
+          peerDiscovery.stop();
           if (activeDiscovery) {
             activeDiscovery.stop();
           }
@@ -980,6 +1014,7 @@ export function createRuntimeServer(
         worktreeMaintenance.close();
         browserMaintenance.close();
         wakeup.close();
+        peerDiscovery.stop();
         if (activeDiscovery) {
           activeDiscovery.stop();
         }

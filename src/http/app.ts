@@ -28,6 +28,9 @@ import { WorkspaceSubstrateService } from '../core/runtime/WorkspaceSubstrateSer
 import { RuntimeMeteringService } from '../core/usage/RuntimeMeteringService.js';
 import { RuntimeWorktreeMaintenanceService } from '../core/workspace/RuntimeWorktreeMaintenanceService.js';
 import type { RuntimeWakeupService } from '../core/wakeup/RuntimeWakeupService.js';
+import type { PeerRegistry } from '../core/peers/PeerRegistry.js';
+import type { PeerDiscoveryController } from '../core/peers/PeerDiscoveryController.js';
+import type { PeerCapabilitySnapshotService } from '../core/peers/PeerCapabilitySnapshotService.js';
 import { ManualBrowserDriver } from '../backends/browser/manualDriver.js';
 import type { BootstrapService } from '../core/bootstrap/BootstrapService.js';
 import { bearerAuth } from './auth.js';
@@ -54,6 +57,7 @@ import { kiroRoutes } from './routes/kiro.js';
 import { auggieRoutes } from './routes/auggie.js';
 import { opencodeRoutes } from './routes/opencode.js';
 import { providerRoutes } from './routes/providers.js';
+import { peerRoutes } from './routes/peers.js';
 import { skillRoutes } from './routes/skills.js';
 import { wakeupRoutes } from './routes/wakeup.js';
 import { managementRoutes } from './routes/management.js';
@@ -83,6 +87,9 @@ export interface AppContext {
   browser?: RuntimeBrowserService;
   browserMaintenance?: RuntimeBrowserMaintenanceService;
   worktreeMaintenance?: RuntimeWorktreeMaintenanceService;
+  peerRegistry?: PeerRegistry;
+  peerDiscovery?: PeerDiscoveryController;
+  peerCapabilities?: PeerCapabilitySnapshotService;
   bootstrapService?: BootstrapService;
   completeBootstrap?: () => void;
   resolveCursorNative?: (instanceId?: string) => CursorNativeSessionService;
@@ -291,6 +298,7 @@ export function createRuntimeApp(ctx: AppContext) {
   app.route('/', poolRoutes);
   app.route('/', browseRoutes);
   app.route('/', observeRoutes);
+  app.route('/', peerRoutes);
   app.route('/', codexRoutes);
   app.route('/', cursorRoutes);
   app.route('/', kiroRoutes);

@@ -4,6 +4,7 @@ import {
   getRuntimeListenerConfig,
   getRuntimeResolvedPaths,
 } from '../../core/config.js';
+import { createDisabledPeerDiscoverySnapshot } from '../../core/peers/PeerDiscoveryController.js';
 import {
   listProviderCatalog,
   type ProviderTargetDescriptor,
@@ -682,6 +683,14 @@ function getRuntimeStartupDetails(
   };
 }
 
+function getPeerDiscoverySnapshot(ctx: AppContext) {
+  return ctx.peerDiscovery?.snapshot()
+    || createDisabledPeerDiscoverySnapshot(
+      ctx.peerCapabilities?.getLocalPeerId() || null,
+      ctx.peerRegistry?.summary(),
+    );
+}
+
 async function collectProviderDiagnostics(
   ctx: AppContext,
   probeMode: DiagnosticsProbeMode,
@@ -790,6 +799,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
   const paths = getRuntimeResolvedPaths(ctx.config);
   const runtime = getRuntimeOperationalStatus(ctx.startup);
   const metering = getRuntimeMeteringService(ctx).buildSnapshot(ctx.registry.list());
+  const peers = getPeerDiscoverySnapshot(ctx);
 
   return c.json({
     service: RUNTIME_SERVICE_NAME,
@@ -814,9 +824,37 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
         platform: process.platform,
         nodeVersion: process.version,
       },
+      peers,
     },
     metering,
   });
+});
+
+diagnosticsRoutes.get('/diagnostics/peers', (c) => {
+  try {
+    const ctx = c.get('ctx');
+    const includeStale = parseOptionalBooleanQuery(c.req.query('includeStale')) === true;
+    const discovery = getPeerDiscoverySnapshot(ctx);
+    const peers = ctx.peerRegistry?.list({ includeStale }) || [];
+
+    return c.json({
+      service: RUNTIME_SERVICE_NAME,
+      version: RUNTIME_VERSION,
+      timestamp: new Date().toISOString(),
+      readiness: getRuntimeReadinessSnapshot(ctx.startup),
+      query: {
+        includeStale,
+      },
+      discovery,
+      summary: discovery.registry,
+      peers,
+    });
+  } catch (error) {
+    if (error instanceof DiagnosticsQueryError) {
+      return c.json({ error: error.message }, 400);
+    }
+    throw error;
+  }
 });
 
 diagnosticsRoutes.get('/diagnostics/providers', async (c) => {
@@ -869,6 +907,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
     env,
     forceRefresh,
   );
+  const peers = getPeerDiscoverySnapshot(ctx);
   const providerSummary = summarizeProviderDiagnostics(catalog, providers, {
     defaultTargetsOnly: true,
     useAttentionSummary: true,
@@ -908,6 +947,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
           summary: provider.availability.summary,
         })),
     },
+    peers,
     metering,
   });
 });

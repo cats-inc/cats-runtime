@@ -84,6 +84,10 @@ function createGitWorkspace(root: string, repoName: string): string {
 
 function createTestConfig(overrides = {}) {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-test-'));
+  const {
+    env: envOverrides,
+    ...configOverrides
+  } = overrides as Record<string, unknown>;
   const env = {
     HOME: root,
     USERPROFILE: root,
@@ -102,6 +106,13 @@ function createTestConfig(overrides = {}) {
     GEMINI_SESSIONS_DIR: join(root, '.gemini', 'tmp'),
     KIRO_DB_PATH: join(root, '.kiro', 'data.sqlite3'),
     PI_SESSIONS_DIR: join(root, '.pi', 'agent', 'sessions'),
+    ...(
+      envOverrides
+      && typeof envOverrides === 'object'
+      && !Array.isArray(envOverrides)
+        ? envOverrides as Record<string, string>
+        : {}
+    ),
   };
 
   for (const dir of [
@@ -124,10 +135,10 @@ function createTestConfig(overrides = {}) {
     ...loadConfig(env),
     host: '127.0.0.1',
     port: 0,
-    ...overrides,
+    ...configOverrides,
   };
 
-  const overrideRecord = overrides as Record<string, unknown>;
+  const overrideRecord = configOverrides as Record<string, unknown>;
   const overriddenProviderInstances = (
     overrideRecord.providerInstances
     && typeof overrideRecord.providerInstances === 'object'
@@ -471,6 +482,29 @@ describe('runtime server', () => {
             platform: process.platform,
             nodeVersion: process.version,
           },
+          peers: expect.objectContaining({
+            enabled: false,
+            status: 'disabled',
+            localPeerId: expect.any(String),
+            registry: {
+              total: 0,
+              self: 0,
+              remote: 0,
+              alive: 0,
+              stale: 0,
+              trusted: 0,
+              unknown: 0,
+              rejected: 0,
+            },
+            adapters: expect.arrayContaining([
+              expect.objectContaining({
+                id: 'self',
+                kind: 'self',
+                state: 'idle',
+                publishedPeers: 0,
+              }),
+            ]),
+          }),
         },
         metering: {
           summary: {
@@ -884,6 +918,29 @@ backends:
             }),
           ]),
         },
+        peers: expect.objectContaining({
+          enabled: false,
+          status: 'disabled',
+          localPeerId: expect.any(String),
+          registry: {
+            total: 0,
+            self: 0,
+            remote: 0,
+            alive: 0,
+            stale: 0,
+            trusted: 0,
+            unknown: 0,
+            rejected: 0,
+          },
+          adapters: expect.arrayContaining([
+            expect.objectContaining({
+              id: 'self',
+              kind: 'self',
+              state: 'idle',
+              publishedPeers: 0,
+            }),
+          ]),
+        }),
         metering: {
           status: 'ok',
           summary: 'No active metering incidents or guardrails.',
@@ -1141,6 +1198,29 @@ backends:
             }),
           ]),
         },
+        peers: expect.objectContaining({
+          enabled: false,
+          status: 'disabled',
+          localPeerId: expect.any(String),
+          registry: {
+            total: 0,
+            self: 0,
+            remote: 0,
+            alive: 0,
+            stale: 0,
+            trusted: 0,
+            unknown: 0,
+            rejected: 0,
+          },
+          adapters: expect.arrayContaining([
+            expect.objectContaining({
+              id: 'self',
+              kind: 'self',
+              state: 'idle',
+              publishedPeers: 0,
+            }),
+          ]),
+        }),
         metering: {
           status: 'ok',
           summary: 'No active metering incidents or guardrails.',
@@ -1637,6 +1717,14 @@ providers:
             message: string;
           }>;
         };
+        lan: {
+          enabled: boolean;
+          status: string;
+          registry: {
+            total: number;
+            alive: number;
+          };
+        };
       };
 
       expect(payload.wsl.policy).toBe('manual_only');
@@ -1654,7 +1742,135 @@ providers:
         runtimeMode: 'wsl',
         distro: 'Ubuntu',
       }));
+      expect(payload.lan).toEqual(expect.objectContaining({
+        enabled: false,
+        status: 'disabled',
+        registry: expect.objectContaining({
+          total: 0,
+          alive: 0,
+        }),
+      }));
     });
+  });
+
+  it('starts peer discovery with runtime lifecycle and exposes peer read surfaces', async () => {
+    const { config, cleanup } = createTestConfig({
+      env: {
+        CATS_RUNTIME_PEERS_ENABLED: 'true',
+        CATS_RUNTIME_PEER_NAME: 'local-runtime',
+        CATS_RUNTIME_PEER_STATIC_PEERS: JSON.stringify([{
+          displayName: 'lab-peer',
+          baseUrl: 'http://10.0.0.8:3110',
+          secret: 'discard-me',
+          targets: [{
+            provider: 'codex',
+            backend: 'cli',
+            instance: 'default',
+            default: true,
+          }],
+        }]),
+      },
+    });
+    const runtime = createRuntimeServer(config);
+
+    try {
+      expect(runtime.context.peerDiscovery?.snapshot().status).toBe('stopped');
+
+      const address = await runtime.start();
+      expect(runtime.context.peerDiscovery?.snapshot().status).toBe('running');
+
+      const peersResponse = await runtime.app.request('/peers');
+      expect(peersResponse.status).toBe(200);
+      const peersPayload = await peersResponse.json() as {
+        count: number;
+        discovery: { status: string };
+        peers: Array<Record<string, unknown>>;
+      };
+      expect(peersPayload.count).toBe(2);
+      expect(peersPayload.discovery.status).toBe('running');
+      expect(peersPayload.peers).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          identity: expect.objectContaining({
+            displayName: 'lab-peer',
+          }),
+        }),
+        expect.objectContaining({
+          identity: expect.objectContaining({
+            displayName: 'local-runtime',
+            advertisedUrl: `http://${address.host}:${address.port}`,
+          }),
+        }),
+      ]));
+      for (const peer of peersPayload.peers) {
+        expect(peer).not.toHaveProperty('secret');
+      }
+
+      const localPeerId = runtime.context.peerCapabilities?.getLocalPeerId();
+      if (!localPeerId) {
+        throw new Error('missing local peer id');
+      }
+
+      const peerDetail = await runtime.app.request(`/peers/${localPeerId}`);
+      expect(peerDetail.status).toBe(200);
+      expect(await peerDetail.json()).toEqual({
+        discovery: expect.objectContaining({
+          enabled: true,
+          status: 'running',
+        }),
+        peer: expect.objectContaining({
+          identity: expect.objectContaining({
+            peerId: localPeerId,
+            advertisedUrl: `http://${address.host}:${address.port}`,
+          }),
+          trust: {
+            state: 'self',
+            reason: 'local_runtime',
+          },
+        }),
+      });
+
+      const diagnosticsResponse = await runtime.app.request('/diagnostics/peers');
+      expect(diagnosticsResponse.status).toBe(200);
+      expect(await diagnosticsResponse.json()).toEqual(expect.objectContaining({
+        discovery: expect.objectContaining({
+          enabled: true,
+          status: 'running',
+          registry: expect.objectContaining({
+            total: 2,
+            alive: 2,
+          }),
+        }),
+        summary: expect.objectContaining({
+          total: 2,
+          self: 1,
+          remote: 1,
+        }),
+        peers: expect.arrayContaining([
+          expect.objectContaining({
+            identity: expect.objectContaining({
+              displayName: 'lab-peer',
+            }),
+          }),
+        ]),
+      }));
+
+      const discoveryResponse = await runtime.app.request('/discovery/status');
+      expect(discoveryResponse.status).toBe(200);
+      expect(await discoveryResponse.json()).toEqual(expect.objectContaining({
+        lan: expect.objectContaining({
+          enabled: true,
+          status: 'running',
+          registry: expect.objectContaining({
+            total: 2,
+            alive: 2,
+          }),
+        }),
+      }));
+    } finally {
+      await runtime.close();
+      expect(runtime.context.peerDiscovery?.snapshot().status).toBe('stopped');
+      cleanup();
+    }
   });
 
   it('boots with Docker-backed file providers without trying to host-resolve their container paths', async () => {

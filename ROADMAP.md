@@ -654,4 +654,79 @@ longer needed, revisit the public contract in a coordinated cleanup slice.
 - coordinated `cats` product follow-up work
 
 ---
+
+### OPT-9: LAN Peer Execution Routing Follow-through
+
+**Priority**: P1
+**Status**: In Progress
+
+#### Problem
+
+`cats-runtime` now has the safe parallel PLAN-017 discovery slice landed:
+
+- bounded peer identity, capability, load, and trust-summary models
+- default-off peer registry and discovery-controller substrate
+- additive LAN visibility on `GET /discovery/status`
+- read-only peer surfaces:
+  - `GET /peers`
+  - `GET /peers/:peerId`
+  - `GET /diagnostics/peers`
+- additive peer summaries on runtime/health diagnostics
+
+That is the intended Phase 1-3 slice only. The execution-routing half of
+PLAN-017 remains intentionally deferred so this work can merge cleanly without
+changing existing `cats` behavior or session/message/streaming contracts.
+
+#### Direction
+
+Complete PLAN-017 only through additive, compatibility-preserving follow-up
+work that keeps ADR-019's execution-only boundary intact.
+
+- Add a dedicated peer execution contract instead of tunneling ownership through
+  peer `/sessions` routes
+- Keep caller runtime ownership of host-visible sessions, observe state, and
+  lifecycle
+- Treat trust/auth as a separate workstream from discovery
+- Preserve existing `cats` compatibility until product-side follow-up is ready
+
+#### Deferred Follow-up
+
+- Phase 4 execution routing contract is not implemented yet
+- Add `POST /peer/executions` as the dedicated peer-only execution seam
+- Add caller-owned peer-routed message/session flow only as additive follow-up,
+  not by changing existing `/sessions` ownership behavior
+- Do not add peer-routing hints to existing session/message contracts until the
+  coordinated compatibility slice is ready
+- Add runtime-owned SSE and NDJSON relay/read seams explicitly; do not assume a
+  single merged wire format
+- Add trust/auth execution gating separately from discovery/read visibility
+- Add a two-runtime integration harness for peer discovery, routing, and
+  failure-path verification
+
+#### Still Blocked For Later Phases
+
+These items must remain later work and must not be smuggled into the current
+discovery slice:
+
+- full remote session ownership
+- remote workspace mutation or sync semantics
+- remote browser ownership
+- wakeup ownership transfer
+- transparent failover / hidden ownership transfer
+
+#### Constraints
+
+- Keep `cats` working unchanged against upgraded `cats-runtime`
+- Keep changes additive for existing host-facing contracts
+- Preserve current `/health`, `/sessions`, `/sessions/:id/messages`,
+  `/sessions/:id/observe`, and `/sessions/:id/stream` behavior during rollout
+- Keep discovery, registry, routing, and trust separable in implementation
+
+#### References
+
+- `docs/plans/PLAN-017-lan-peer-discovery-and-execution-routing-v0.md`
+- `docs/specs/SPEC-016-lan-peer-discovery-and-execution-routing-v0.md`
+- `docs/decisions/019-scope-first-lan-peer-sharing-to-execution-only.md`
+
+---
 *Last updated: 2026-03-25*
