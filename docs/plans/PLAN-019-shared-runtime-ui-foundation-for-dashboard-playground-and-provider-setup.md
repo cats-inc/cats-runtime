@@ -1,8 +1,20 @@
 # PLAN-019: Shared Runtime UI Foundation for Dashboard, Playground, and Provider Setup
 
-## Related
+## Metadata
 
-- `cats-runtime/docs/specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md`
+| Field | Value |
+|-------|-------|
+| **Status** | Draft |
+| **Owner** | Codex |
+| **Assigned To** | TBD |
+| **Reviewer** | User / runtime setup workstream |
+
+## Related Spec
+
+- [SPEC-017](../specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md)
+
+## Related Context
+
 - `cats-runtime/docs/architecture.md`
 - `cats-runtime/docs/api.md`
 
@@ -77,18 +89,16 @@
   - do not rely on deep-linking alone for the first slice, because the current provider-setup surface is bootstrap-rooted and a deep-link by itself does not close the post-bootstrap `manual_only` repair gap
   - a richer always-available provider-setup page route can remain an additive follow-up decision if the inline dashboard repair surface proves insufficient
 
-## Phased Rollout
+## Implementation Phases
 
 ### Phase 1: Shared UI Foundation Contract
 
-- Define the source-of-truth boundaries for:
-  - theme tokens
-  - runtime fetch/error helpers
-  - provider badge/status helpers
-  - bootstrap scan snapshot read model
-- Define the runtime-owned UI source layout, separate from emitted `public/*.html` artifacts.
-- Decide the shared bootstrap read seam shape so dashboard and provider-setup stop reading different slices of the same setup state.
-- Keep bootstrap logic in runtime-owned services and thin HTTP/UI adapters only.
+- [ ] Define the shared CSS/theme token contract for dashboard, playground, and provider-setup.
+- [ ] Define the shared runtime fetch/error helper contract for same-origin runtime APIs and optional bearer token use.
+- [ ] Define the shared provider badge and provider-status rendering helpers.
+- [ ] Define the shared bootstrap scan snapshot read model, centered on `GET /providers/setup/state`.
+- [ ] Define the runtime-owned UI source layout separately from emitted `public/*.html` artifacts.
+- [ ] Keep bootstrap logic in runtime-owned services and thin HTTP/UI adapters only.
 
 Deliverables:
 
@@ -100,10 +110,10 @@ Deliverables:
 
 ### Phase 2: Lightweight Static Build Substrate
 
-- Add a lightweight build pipeline, preferably `esbuild`, for runtime UI sources.
-- Bundle page-specific entry modules against the shared UI foundation without introducing a framework runtime or client router.
-- Emit static HTML artifacts that remain directly serveable by the runtime and packagable in npm/Electron flows.
-- Wire the packaging/build lifecycle so runtime UI artifacts are generated before release packaging.
+- [ ] Add a lightweight build pipeline, preferably `esbuild`, for runtime UI sources.
+- [ ] Bundle page-specific entry modules against the shared UI foundation without introducing a framework runtime or client router.
+- [ ] Emit static HTML artifacts that remain directly serveable by the runtime and packagable in npm/Electron flows.
+- [ ] Wire the packaging/build lifecycle so runtime UI artifacts are generated before release packaging.
 
 Deliverables:
 
@@ -116,12 +126,12 @@ Deliverables:
 
 ### Phase 3: Migrate Provider Setup onto the Shared Foundation
 
-- Migrate provider-setup first because it is the thinnest UI adapter over bootstrap services.
-- Replace page-local fetch logic with shared runtime fetch helpers.
-- Replace page-local badge/status rendering with shared provider-status helpers.
-- Stop forcing an auto-scan just to render existing scan results.
-- Render persisted auto-scan and manual-scan snapshots from the shared setup read model.
-- Keep bootstrap-mode availability and `POST /providers/setup/apply` behavior unchanged.
+- [ ] Migrate provider-setup first as the thinnest UI adapter over bootstrap services.
+- [ ] Replace page-local fetch logic with shared runtime fetch helpers.
+- [ ] Replace page-local badge/status rendering with shared provider-status helpers.
+- [ ] Stop forcing an auto-scan just to render existing scan results.
+- [ ] Render persisted auto-scan and manual-scan snapshots from the shared setup read model.
+- [ ] Keep bootstrap-mode availability and `POST /providers/setup/apply` behavior unchanged.
 
 Deliverables:
 
@@ -133,11 +143,11 @@ Deliverables:
 
 ### Phase 4: Migrate Dashboard and Add Manual Scan / Repair Entry
 
-- Move dashboard theme usage onto the shared token layer without rewriting the session UI into components.
-- Add a secondary manual scan and repair entry in the dashboard.
-- Use the shared setup read model so the dashboard can show latest scan state, latest manual scan state, and next repair action without owning bootstrap logic.
-- First slice should favor a direct manual scan trigger plus inline result rendering.
-- Keep `/dashboard` always available in both bootstrap and non-bootstrap modes.
+- [ ] Move dashboard theme usage onto the shared token layer without rewriting the session UI into components.
+- [ ] Add a secondary manual scan and repair entry in the dashboard.
+- [ ] Use the shared setup read model so the dashboard can show latest scan state, latest manual scan state, and next repair action without owning bootstrap logic.
+- [ ] Implement the first slice as a direct manual scan trigger plus inline result rendering.
+- [ ] Keep `/dashboard` always available in both bootstrap and non-bootstrap modes.
 
 Deliverables:
 
@@ -149,10 +159,10 @@ Deliverables:
 
 ### Phase 5: Migrate Playground onto the Same Foundation
 
-- Preserve playground behavior as a same-origin direct runtime API surface.
-- Keep the existing `RuntimeClient` and orchestration logic mostly intact; extract only the shared pieces that reduce duplication safely.
-- Replace duplicated provider badge styling and ad-hoc runtime fetch/auth seams with shared helpers where that does not destabilize streaming behavior.
-- Align playground visual tokens with the shared runtime UI foundation without collapsing it into the dashboard layout.
+- [ ] Preserve playground behavior as a same-origin direct runtime API surface.
+- [ ] Keep the existing `RuntimeClient` and orchestration logic mostly intact; extract only the shared pieces that reduce duplication safely.
+- [ ] Replace duplicated provider badge styling and ad-hoc runtime fetch/auth seams with shared helpers where that does not destabilize streaming behavior.
+- [ ] Align playground visual tokens with the shared runtime UI foundation without collapsing it into the dashboard layout.
 
 Deliverables:
 
@@ -164,9 +174,9 @@ Deliverables:
 
 ### Phase 6: Regression Tests and Docs Follow-Through
 
-- Add focused regression coverage for route behavior, setup flows, dashboard repair behavior, and shared helpers.
-- Add emitted HTML smoke checks so the runtime does not accidentally stop shipping static artifacts.
-- Update runtime docs affected by the implementation once the code change lands.
+- [ ] Add focused regression coverage for route behavior, setup flows, dashboard repair behavior, and shared helpers.
+- [ ] Add emitted HTML smoke checks so the runtime does not accidentally stop shipping static artifacts.
+- [ ] Update runtime docs affected by the implementation once the code change lands.
 
 Deliverables:
 
@@ -247,18 +257,14 @@ Deliverables:
 
 ## Risks / Mitigations
 
-- Risk: the shared UI foundation drifts into a full SPA rewrite.
-  - Mitigation: keep page-owned entry modules, no client router, no framework runtime, and no shared global app state beyond thin helpers.
-- Risk: playground behavior gets destabilized by an overly aggressive refactor.
-  - Mitigation: migrate playground last, extract only low-risk shared seams first, and preserve `RuntimeClient` plus existing streaming flow.
-- Risk: bootstrap-specific logic becomes scattered between page scripts, route handlers, and ad-hoc helpers.
-  - Mitigation: center the bootstrap read seam in runtime-owned services and keep pages as thin adapters.
-- Risk: dashboard repair UX depends on a provider-setup page route that is not yet stable outside bootstrap mode.
-  - Mitigation: first slice should use a direct dashboard manual scan action and inline repair snapshot, not deep-link-only behavior.
-- Risk: shared UI work leaks into `cats` product UI concerns.
-  - Mitigation: keep the source under `cats-runtime`, use runtime terminology only, and explicitly exclude product onboarding concerns from the plan.
-- Risk: moving to a build pipeline breaks static artifact packaging.
-  - Mitigation: treat emitted `public/*.html` artifacts as a hard compatibility requirement and wire generation into the release build path.
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| Shared UI foundation drifts into a full SPA rewrite | High | Keep page-owned entry modules, no client router, no framework runtime, and no shared global app state beyond thin helpers. |
+| Playground behavior gets destabilized by an overly aggressive refactor | High | Migrate playground last, extract only low-risk shared seams first, and preserve `RuntimeClient` plus existing streaming flow. |
+| Bootstrap-specific logic becomes scattered across page scripts and routes | High | Center the bootstrap read seam in runtime-owned services and keep pages as thin adapters. |
+| Dashboard repair UX depends on a provider-setup route that is not stable outside bootstrap mode | Medium | Use a direct dashboard manual scan action and inline repair snapshot for the first slice, not deep-link-only behavior. |
+| Shared runtime UI work leaks into `cats` product UI concerns | Medium | Keep the source under `cats-runtime`, use runtime terminology only, and exclude product onboarding concerns from scope. |
+| A lightweight build step breaks static artifact packaging | High | Treat emitted `public/*.html` artifacts as a hard compatibility requirement and wire generation into the release build path. |
 
 ## Decision Gates / Open Questions
 
@@ -281,9 +287,15 @@ Deliverables:
   - Recommendation: self-contained emitted HTML first.
   - Gate: only add a dedicated emitted asset directory if inline bundles materially hurt maintainability or payload size.
 
-## Checklist / Progress Log
+## Progress Log
 
-- [x] 2026-03-25: Planned the `SPEC-017` follow-through work as a runtime-owned UI foundation effort inside `cats-runtime`.
+| Date | Update |
+|------|--------|
+| 2026-03-25 | Plan created for the `SPEC-017` runtime UI foundation follow-through gap. |
+
+## Execution Checklist
+
+- [x] Plan created
 - [ ] Phase 1 complete: shared UI foundation contract agreed
 - [ ] Phase 2 complete: lightweight static build substrate in place
 - [ ] Phase 3 complete: provider-setup migrated to shared foundation
@@ -300,4 +312,4 @@ Deliverables:
 ---
 
 - Created: 2026-03-25
-- Author: Claude
+- Author: Codex
