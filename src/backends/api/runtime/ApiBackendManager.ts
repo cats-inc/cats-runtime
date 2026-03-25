@@ -2,6 +2,7 @@ import type {
   ExecutionHandle,
   RuntimeExecutionStrategyId,
   RuntimeExecutionStrategyRequest,
+  RuntimeExecutionStrategyState,
   StreamEvent,
   TurnInput,
 } from '../../../core/types.js';
@@ -215,11 +216,27 @@ function resolveRegisteredStrategyHint(
 }
 
 function readUnsupportedRequestedStrategy(
-  request: RuntimeExecutionStrategyRequest | undefined,
+  currentRequest: RuntimeExecutionStrategyRequest | undefined,
+  effectiveRequest: RuntimeExecutionStrategyRequest | undefined,
+  existingStrategyState: RuntimeExecutionStrategyState | undefined,
   resolvedStrategy: RuntimeExecutionStrategyId | undefined,
 ): string | undefined {
-  const requestedStrategy = request?.requestedStrategy?.trim();
+  const explicitRequestedStrategy = currentRequest?.requestedStrategy?.trim();
+  if (explicitRequestedStrategy) {
+    return resolvedStrategy ? undefined : explicitRequestedStrategy;
+  }
+
+  const requestedStrategy = effectiveRequest?.requestedStrategy?.trim();
   if (!requestedStrategy || resolvedStrategy) {
+    return undefined;
+  }
+
+  const alreadyRecordedFallback = Boolean(
+    existingStrategyState?.effectiveStrategy
+    || existingStrategyState?.resolutionSource
+    || existingStrategyState?.summary,
+  );
+  if (alreadyRecordedFallback) {
     return undefined;
   }
 
@@ -447,12 +464,13 @@ export class ApiBackendManager {
       persistedRequest,
       currentRequest,
     );
+    const existingStrategyState = readRuntimeExecutionStrategyState(initialSession);
     const requestedStrategy = resolveRegisteredStrategyHint(
       effectiveRequest?.requestedStrategy,
       this.strategyRegistry,
     );
     const preferredStrategy = resolveRegisteredStrategyHint(
-      readRuntimeExecutionStrategyState(initialSession)?.preferredStrategy,
+      existingStrategyState?.preferredStrategy,
       this.strategyRegistry,
     );
     const resolution = resolveRuntimeExecutionStrategy({
@@ -461,7 +479,9 @@ export class ApiBackendManager {
       fallbackStrategy: API_RUNTIME_COMPATIBILITY_STRATEGY,
     });
     const unsupportedRequestedStrategy = readUnsupportedRequestedStrategy(
+      currentRequest,
       effectiveRequest,
+      existingStrategyState,
       requestedStrategy,
     );
 

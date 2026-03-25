@@ -562,6 +562,69 @@ describe('ApiBackendManager', () => {
     expect(updated?.strategy?.preferredStrategy).toBeUndefined();
   });
 
+  it('does not repeat strategy_degraded events once an unsupported persisted strategy already resolved through compatibility fallback', async () => {
+    const registry = new SessionRegistry();
+    const session = registry.create({
+      id: 'api-session-persisted-unsupported-strategy',
+      providerName: 'codex',
+      providerBackend: 'api',
+      providerInstanceId: 'gateway',
+      cwd: '/repo',
+      strategy: {
+        request: {
+          requestedStrategy: 'pdca',
+        },
+        effectiveStrategy: 'simple_tool_call',
+        resolutionSource: 'compatibility_fallback',
+        summary: {
+          status: 'completed',
+          stepCount: 1,
+          resolutionSource: 'compatibility_fallback',
+          updatedAt: '2026-03-26T00:00:00.000Z',
+          lastEvent: 'strategy_completed',
+        },
+        updatedAt: '2026-03-26T00:00:00.000Z',
+      },
+    });
+
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      id: 'resp_persisted_unsupported_strategy',
+      output: [{
+        type: 'message',
+        content: [{ type: 'output_text', text: 'Compatibility fallback reply.' }],
+      }],
+      usage: {
+        input_tokens: 5,
+        output_tokens: 2,
+      },
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
+
+    const manager = new ApiBackendManager(
+      { sessionBaseDir: '/tmp/cats-runtime-tests' },
+      registry,
+      {
+        fetch: fetchMock as typeof fetch,
+        env: {
+          OPENAI_API_KEY: 'test-key',
+        },
+      },
+    );
+
+    const handle = manager.spawn(session.id, createTarget());
+    const events = await collectEvents(handle.streamMessage({
+      message: 'hello again',
+    }));
+
+    expect(events.some((event) =>
+      event.type === 'progress'
+      && event.metadata?.kind === 'strategy'
+      && event.metadata?.strategyEvent === 'strategy_degraded'
+    )).toBe(false);
+  });
+
   it('runs explicit react with additive stream events and runtime-owned inspection metadata', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-api-react-'));
     const repoDir = join(root, 'repo');
