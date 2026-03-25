@@ -43,6 +43,29 @@ function createAdvertisement(
 }
 
 describe('PeerRegistry', () => {
+  it('does not count self-trusted peers as unknown in registry summary', () => {
+    const registry = new PeerRegistry({
+      stalePeerTtlMs: 5_000,
+      now: () => Date.parse('2026-03-25T00:00:00.000Z'),
+    });
+
+    registry.upsert(
+      createAdvertisement('self', '2026-03-25T00:00:00.000Z', 5_000, ['codex']),
+      { sourceId: 'self', sourceKind: 'self' },
+    );
+
+    expect(registry.summary()).toEqual({
+      total: 1,
+      self: 1,
+      remote: 0,
+      alive: 1,
+      stale: 0,
+      trusted: 0,
+      unknown: 0,
+      rejected: 0,
+    });
+  });
+
   it('deduplicates peer advertisements by peerId and keeps the newest snapshot', () => {
     let now = Date.parse('2026-03-25T00:00:20.000Z');
     const registry = new PeerRegistry({

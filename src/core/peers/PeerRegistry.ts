@@ -122,7 +122,7 @@ export class PeerRegistry {
             summary.trusted += 1;
           } else if (entry.trust.state === 'rejected') {
             summary.rejected += 1;
-          } else {
+          } else if (entry.trust.state === 'unknown') {
             summary.unknown += 1;
           }
           return summary;

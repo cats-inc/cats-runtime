@@ -55,6 +55,7 @@ export class PeerDiscoveryController {
     this.adapters = options.adapters || createDefaultPeerDiscoveryAdapters(
       options.config,
       options.capabilitySnapshot,
+      this.now,
     );
   }
 
@@ -81,6 +82,7 @@ export class PeerDiscoveryController {
     this.pruneTimer = setInterval(() => {
       this.options.registry.pruneStale();
     }, this.options.config.pruneIntervalMs);
+    this.pruneTimer.unref?.();
   }
 
   stop(): void {
@@ -177,13 +179,14 @@ function buildPeerDiscoverySummary(
 function createDefaultPeerDiscoveryAdapters(
   config: PeerRuntimeConfig,
   capabilitySnapshot: PeerCapabilitySnapshotService,
+  now: () => number,
 ): PeerDiscoveryAdapter[] {
   const adapters: PeerDiscoveryAdapter[] = [
-    new LocalPeerDiscoveryAdapter(config, capabilitySnapshot),
+    new LocalPeerDiscoveryAdapter(config, capabilitySnapshot, now),
   ];
 
   if (config.staticPeers.length > 0) {
-    adapters.push(new StaticPeerDiscoveryAdapter(config, capabilitySnapshot));
+    adapters.push(new StaticPeerDiscoveryAdapter(config, capabilitySnapshot, now));
   }
 
   return adapters;
@@ -208,6 +211,7 @@ class LocalPeerDiscoveryAdapter implements PeerDiscoveryAdapter {
   constructor(
     private readonly config: PeerRuntimeConfig,
     private readonly capabilitySnapshot: PeerCapabilitySnapshotService,
+    private readonly now: () => number,
   ) {}
 
   start(runtime: PeerDiscoveryAdapterRuntime): void {
@@ -215,12 +219,13 @@ class LocalPeerDiscoveryAdapter implements PeerDiscoveryAdapter {
     this.state = {
       ...this.state,
       state: 'running',
-      lastStartedAt: new Date().toISOString(),
+      lastStartedAt: toIsoTimestamp(this.now),
     };
     this.publish();
     this.timer = setInterval(() => {
       this.publish();
     }, this.config.advertiseIntervalMs);
+    this.timer.unref?.();
   }
 
   stop(): void {
@@ -233,7 +238,7 @@ class LocalPeerDiscoveryAdapter implements PeerDiscoveryAdapter {
       ...this.state,
       state: 'stopped',
       publishedPeers: 0,
-      lastStoppedAt: new Date().toISOString(),
+      lastStoppedAt: toIsoTimestamp(this.now),
     };
   }
 
@@ -259,7 +264,7 @@ class LocalPeerDiscoveryAdapter implements PeerDiscoveryAdapter {
     this.state = {
       ...this.state,
       publishedPeers: 1,
-      lastPublishedAt: new Date().toISOString(),
+      lastPublishedAt: toIsoTimestamp(this.now),
     };
   }
 }
@@ -283,6 +288,7 @@ class StaticPeerDiscoveryAdapter implements PeerDiscoveryAdapter {
   constructor(
     private readonly config: PeerRuntimeConfig,
     private readonly capabilitySnapshot: PeerCapabilitySnapshotService,
+    private readonly now: () => number,
   ) {}
 
   start(runtime: PeerDiscoveryAdapterRuntime): void {
@@ -290,12 +296,13 @@ class StaticPeerDiscoveryAdapter implements PeerDiscoveryAdapter {
     this.state = {
       ...this.state,
       state: 'running',
-      lastStartedAt: new Date().toISOString(),
+      lastStartedAt: toIsoTimestamp(this.now),
     };
     this.publish();
     this.timer = setInterval(() => {
       this.publish();
     }, this.config.advertiseIntervalMs);
+    this.timer.unref?.();
   }
 
   stop(): void {
@@ -311,7 +318,7 @@ class StaticPeerDiscoveryAdapter implements PeerDiscoveryAdapter {
       ...this.state,
       state: 'stopped',
       publishedPeers: 0,
-      lastStoppedAt: new Date().toISOString(),
+      lastStoppedAt: toIsoTimestamp(this.now),
     };
   }
 
@@ -337,11 +344,15 @@ class StaticPeerDiscoveryAdapter implements PeerDiscoveryAdapter {
     this.state = {
       ...this.state,
       publishedPeers,
-      lastPublishedAt: new Date().toISOString(),
+      lastPublishedAt: toIsoTimestamp(this.now),
     };
   }
 
   private sourceId(peerId: string): string {
     return `${this.id}:${peerId}`;
   }
+}
+
+function toIsoTimestamp(now: () => number): string {
+  return new Date(now()).toISOString();
 }

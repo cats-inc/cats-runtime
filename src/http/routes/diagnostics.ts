@@ -4,7 +4,7 @@ import {
   getRuntimeListenerConfig,
   getRuntimeResolvedPaths,
 } from '../../core/config.js';
-import { createDisabledPeerDiscoverySnapshot } from '../../core/peers/PeerDiscoveryController.js';
+import { getPeerDiscoverySnapshot } from '../../core/peers/discoverySnapshot.js';
 import {
   listProviderCatalog,
   type ProviderTargetDescriptor,
@@ -681,14 +681,6 @@ function getRuntimeStartupDetails(
     shutdownReason: ctx.startup.shutdownReason,
     lastEvent: ctx.startup.lastEvent,
   };
-}
-
-function getPeerDiscoverySnapshot(ctx: AppContext) {
-  return ctx.peerDiscovery?.snapshot()
-    || createDisabledPeerDiscoverySnapshot(
-      ctx.peerCapabilities?.getLocalPeerId() || null,
-      ctx.peerRegistry?.summary(),
-    );
 }
 
 async function collectProviderDiagnostics(

@@ -6,7 +6,6 @@ import {
 } from '../backends/cli/config.js';
 
 const RUNTIME_CONFIG_ENV_SYMBOL = Symbol('cats-runtime-config-env');
-const RUNTIME_CONFIG_ENV = new WeakMap<CliRuntimeConfig, NodeJS.ProcessEnv>();
 
 export function loadConfig(
   env: NodeJS.ProcessEnv = process.env,
@@ -48,10 +47,9 @@ export function getRuntimeListenerConfig(
 export function getRuntimeConfigEnv(
   config: CliRuntimeConfig,
 ): Readonly<NodeJS.ProcessEnv> {
-  const attached = (
+  return (
     config as CliRuntimeConfig & { [RUNTIME_CONFIG_ENV_SYMBOL]?: NodeJS.ProcessEnv }
-  )[RUNTIME_CONFIG_ENV_SYMBOL];
-  return attached || RUNTIME_CONFIG_ENV.get(config) || process.env;
+  )[RUNTIME_CONFIG_ENV_SYMBOL] || process.env;
 }
 
 export function copyRuntimeConfigEnv(
@@ -76,13 +74,11 @@ function setRuntimeConfigEnv(
   target: CliRuntimeConfig,
   env: NodeJS.ProcessEnv,
 ): void {
-  const clonedEnv = {
-    ...env,
-  };
-  RUNTIME_CONFIG_ENV.set(target, clonedEnv);
   (
     target as CliRuntimeConfig & { [RUNTIME_CONFIG_ENV_SYMBOL]?: NodeJS.ProcessEnv }
-  )[RUNTIME_CONFIG_ENV_SYMBOL] = clonedEnv;
+  )[RUNTIME_CONFIG_ENV_SYMBOL] = {
+    ...env,
+  };
 }
 
 export type {

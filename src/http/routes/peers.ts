@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { createDisabledPeerDiscoverySnapshot } from '../../core/peers/PeerDiscoveryController.js';
+import { getPeerDiscoverySnapshot } from '../../core/peers/discoverySnapshot.js';
 import type { AppContext } from '../app.js';
 import type { RuntimeRouteEnv } from './diagnosticsSupport.js';
 
@@ -63,12 +63,4 @@ function parseBooleanQuery(value: string | undefined): boolean | undefined {
     return false;
   }
   throw new PeerRouteQueryError(`Invalid boolean query value '${value}'.`);
-}
-
-function getPeerDiscoverySnapshot(ctx: AppContext) {
-  return ctx.peerDiscovery?.snapshot()
-    || createDisabledPeerDiscoverySnapshot(
-      ctx.peerCapabilities?.getLocalPeerId() || null,
-      ctx.peerRegistry?.summary(),
-    );
 }
