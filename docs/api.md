@@ -42,7 +42,8 @@ Peer auth/trust notes:
 - use a strong random secret, preferably at least 32 characters
 - trust is directional via each runtime's `trustedPeerIds` / `rejectedPeerIds`
 - the current `/peer/executions` request body is HMAC-signed with
-  `x-cats-peer-signature`
+  `x-cats-peer-signature`, and the wire format is strictly
+  `sha256=<64-lowercase-hex>`
 - one-way traffic is supported, but it still needs configuration on both sides:
   the caller must trust the callee for routing, and the callee must trust the
   caller for inbound execution

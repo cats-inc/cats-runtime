@@ -134,7 +134,8 @@ Current auth/trust model:
 - host-facing `CATS_RUNTIME_API_KEY` and peer-facing
   `CATS_RUNTIME_PEER_SHARED_SECRET` are separate
 - inbound peer execution checks the bearer secret, the caller peer id, and an
-  HMAC signature over the raw JSON request body
+  HMAC signature over the raw JSON request body using
+  `x-cats-peer-signature: sha256=<64-hex>`
 - use a strong random peer shared secret, preferably at least 32 characters
 - trust is directional and configured per runtime with
   `CATS_RUNTIME_PEER_TRUSTED_IDS` / `CATS_RUNTIME_PEER_REJECTED_IDS`

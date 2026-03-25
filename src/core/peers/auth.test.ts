@@ -13,12 +13,12 @@ describe('peer auth helpers', () => {
     expect(validatePeerPayloadSignature('lan-secret', payload, signature)).toBe(true);
   });
 
-  it('accepts raw hex signatures and rejects tampered payloads', () => {
+  it('requires the algorithm prefix and rejects tampered payloads', () => {
     const payload = '{"turn":{"message":"hello"}}';
     const signature = createPeerPayloadSignature('lan-secret', payload);
     const rawDigest = signature.slice('sha256='.length);
 
-    expect(validatePeerPayloadSignature('lan-secret', payload, rawDigest)).toBe(true);
+    expect(validatePeerPayloadSignature('lan-secret', payload, rawDigest)).toBe(false);
     expect(validatePeerPayloadSignature('lan-secret', '{"turn":{"message":"bye"}}', signature))
       .toBe(false);
   });

@@ -49,9 +49,11 @@ function normalizePeerPayloadSignature(
   }
 
   const prefixed = `${PEER_SIGNATURE_ALGORITHM}=`;
-  const digest = trimmed.startsWith(prefixed)
-    ? trimmed.slice(prefixed.length)
-    : trimmed;
+  if (!trimmed.startsWith(prefixed)) {
+    return undefined;
+  }
+
+  const digest = trimmed.slice(prefixed.length);
 
   return isHexDigest(digest) ? digest.toLowerCase() : undefined;
 }

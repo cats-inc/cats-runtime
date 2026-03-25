@@ -241,4 +241,24 @@ describe('peer execution routes', () => {
     });
     expect(execute).not.toHaveBeenCalled();
   });
+
+  it('rejects peer execution requests without the signature algorithm prefix', async () => {
+    const { app, execute } = createApp();
+    const body = JSON.stringify(createRequestBody());
+
+    const response = await app.request('/peer/executions', {
+      method: 'POST',
+      headers: createSignedHeaders(body, {
+        'x-cats-peer-signature': createPeerPayloadSignature('lan-secret', body).slice('sha256='.length),
+      }),
+      body,
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: 'Peer execution auth failed.',
+      code: 'peer_auth_failed',
+    });
+    expect(execute).not.toHaveBeenCalled();
+  });
 });
