@@ -1545,10 +1545,21 @@ function getMaintenanceFollowThrough(
   action: 'reset' | 'delete' | 'cleanup_workspace' | 'compact',
   phase: 'pre_reset' | 'pre_compaction' | 'pre_flush',
 ) {
-  return maintenance.lastFollowThrough?.action === action
-    && maintenance.lastFollowThrough.phase === phase
-    ? maintenance.lastFollowThrough
-    : undefined;
+  const history = maintenance.followThroughHistory?.length
+    ? maintenance.followThroughHistory
+    : maintenance.lastFollowThrough
+      ? [maintenance.lastFollowThrough]
+      : [];
+  let latest: (typeof history)[number] | undefined;
+  for (const followThrough of history) {
+    if (followThrough.action !== action || followThrough.phase !== phase) {
+      continue;
+    }
+    if (!latest || followThrough.observedAt > latest.observedAt) {
+      latest = followThrough;
+    }
+  }
+  return latest;
 }
 
 function resolveMaintenanceHookGate(

@@ -1306,6 +1306,8 @@ export interface RuntimeSessionHookGroup {
 export interface RuntimeSessionMaintenanceState {
   lastRequest?: RuntimeSessionMaintenanceRequest;
   lastFollowThrough?: RuntimeSessionMaintenanceFollowThrough;
+  requestHistory?: RuntimeSessionMaintenanceRequest[];
+  followThroughHistory?: RuntimeSessionMaintenanceFollowThrough[];
   lastResetAt?: string;
   lastLifecycle?: RuntimeSessionLifecycleContract;
   lastCompaction?: RuntimeSessionCompactionRecord;
@@ -1368,6 +1370,8 @@ export interface RuntimeSessionMaintenance {
   markers: RuntimeSessionMaintenanceMarker[];
   lastRequest?: RuntimeSessionMaintenanceRequest;
   lastFollowThrough?: RuntimeSessionMaintenanceFollowThrough;
+  requestHistory?: RuntimeSessionMaintenanceRequest[];
+  followThroughHistory?: RuntimeSessionMaintenanceFollowThrough[];
   lastLifecycle?: RuntimeSessionLifecycleContract;
 }
 

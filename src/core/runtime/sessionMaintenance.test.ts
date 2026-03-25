@@ -359,6 +359,114 @@ describe('buildSessionMaintenance', () => {
     }));
   });
 
+  it('keeps action-scoped pre-flush history even when newer unrelated maintenance records exist', () => {
+    const maintenance = buildSessionMaintenance({
+      session: createSession({
+        status: 'closed',
+        messageCount: 3,
+        totalInputTokens: 300,
+        totalOutputTokens: 100,
+        workspaceIsolation: {
+          mode: 'worktree',
+          sourceCwd: '/repo',
+          worktree: {
+            id: 'repo-session-1',
+            sourceRepoRoot: '/repo',
+            worktreePath: '/sessions/worktrees/repo/session-1',
+            preparedAt: '2026-03-23T00:00:00.000Z',
+          },
+        },
+      }),
+      view: createView({
+        attached: false,
+        activity: 'inactive',
+      }),
+      trackedMaintenance: {
+        lastRequest: {
+          action: 'compact',
+          sessionId: 'session-1',
+          requestedAt: '2026-03-24T05:00:00.000Z',
+          workspaceMode: 'shared',
+          isolationMode: 'worktree',
+          runtimeCwd: '/sessions/worktrees/repo/session-1',
+          sourceCwd: '/repo',
+          worktreePath: '/sessions/worktrees/repo/session-1',
+          hookPayloads: [],
+        },
+        requestHistory: [
+          {
+            action: 'delete',
+            sessionId: 'session-1',
+            requestedAt: '2026-03-24T04:00:00.000Z',
+            workspaceMode: 'shared',
+            isolationMode: 'worktree',
+            runtimeCwd: '/sessions/worktrees/repo/session-1',
+            sourceCwd: '/repo',
+            worktreePath: '/sessions/worktrees/repo/session-1',
+            hookPayloads: [],
+          },
+          {
+            action: 'compact',
+            sessionId: 'session-1',
+            requestedAt: '2026-03-24T05:00:00.000Z',
+            workspaceMode: 'shared',
+            isolationMode: 'worktree',
+            runtimeCwd: '/sessions/worktrees/repo/session-1',
+            sourceCwd: '/repo',
+            worktreePath: '/sessions/worktrees/repo/session-1',
+            hookPayloads: [],
+          },
+        ],
+        lastFollowThrough: {
+          action: 'compact',
+          phase: 'pre_compaction',
+          sessionId: 'session-1',
+          observedAt: '2026-03-24T05:10:00.000Z',
+          outcome: 'completed',
+          reason: 'external_compaction_completed',
+          hookPayloads: [],
+        },
+        followThroughHistory: [
+          {
+            action: 'delete',
+            phase: 'pre_flush',
+            sessionId: 'session-1',
+            observedAt: '2026-03-24T04:02:00.000Z',
+            outcome: 'acknowledged',
+            reason: 'memory_flush_completed',
+            hookPayloads: [],
+          },
+          {
+            action: 'compact',
+            phase: 'pre_compaction',
+            sessionId: 'session-1',
+            observedAt: '2026-03-24T05:10:00.000Z',
+            outcome: 'completed',
+            reason: 'external_compaction_completed',
+            hookPayloads: [],
+          },
+        ],
+        markers: [],
+      },
+    });
+
+    expect(maintenance.flush).toEqual(expect.objectContaining({
+      status: 'acknowledged',
+      phase: 'pre_flush',
+      hookCount: 1,
+      action: 'delete',
+      lastRequestedAt: '2026-03-24T04:00:00.000Z',
+      reasonCodes: ['follow_through_acknowledged'],
+      lastFollowThrough: expect.objectContaining({
+        action: 'delete',
+        phase: 'pre_flush',
+        outcome: 'acknowledged',
+      }),
+    }));
+    expect(maintenance.requestHistory).toHaveLength(2);
+    expect(maintenance.followThroughHistory).toHaveLength(2);
+  });
+
   it('uses the last compaction baseline to evaluate only post-compaction live context', () => {
     const maintenance = buildSessionMaintenance({
       session: createSession({

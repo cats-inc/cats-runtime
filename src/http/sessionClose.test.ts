@@ -1132,6 +1132,109 @@ describe('session close route', () => {
     expect(registry.get(session.id)).toBeUndefined();
   });
 
+  it('keeps reset hook acknowledgements usable after later delete follow-through writes', async () => {
+    const session = registry.create({
+      id: 'session-reset-history-kept',
+      providerName: 'claude',
+      cwd: 'C:/repo-reset-history-kept',
+    });
+    session.messageCount = 4;
+    session.totalInputTokens = 400;
+    session.totalOutputTokens = 200;
+    registry.setProviderSessionId(session.id, 'provider-session-reset-history-kept');
+    registry.updateStatus(session.id, 'closed');
+
+    const blockedReset = await app.request(`/sessions/${session.id}/reset`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        requireAcknowledgedHooks: true,
+        maintenance: {
+          reason: 'owner_requested_reset',
+        },
+      }),
+    });
+    expect(blockedReset.status).toBe(409);
+
+    const acknowledgeReset = await app.request(`/sessions/${session.id}/maintenance/follow-through`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        action: 'reset',
+        phase: 'pre_reset',
+        outcome: 'acknowledged',
+        maintenance: {
+          reason: 'memory_flush_completed',
+        },
+      }),
+    });
+    expect(acknowledgeReset.status).toBe(200);
+
+    const blockedDelete = await app.request(`/sessions/${session.id}`, {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        requireAcknowledgedHooks: true,
+        maintenance: {
+          reason: 'owner_requested_delete',
+        },
+      }),
+    });
+    expect(blockedDelete.status).toBe(409);
+
+    const acknowledgeDelete = await app.request(`/sessions/${session.id}/maintenance/follow-through`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        action: 'delete',
+        phase: 'pre_flush',
+        outcome: 'acknowledged',
+        maintenance: {
+          reason: 'memory_flush_completed',
+        },
+      }),
+    });
+    expect(acknowledgeDelete.status).toBe(200);
+
+    const resetResponse = await app.request(`/sessions/${session.id}/reset`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        requireAcknowledgedHooks: true,
+      }),
+    });
+    expect(resetResponse.status).toBe(200);
+    await expect(resetResponse.json()).resolves.toEqual(expect.objectContaining({
+      action: 'reset',
+      status: 'closed',
+      inspection: expect.objectContaining({
+        maintenance: expect.objectContaining({
+          lastFollowThrough: expect.objectContaining({
+            action: 'delete',
+            phase: 'pre_flush',
+            outcome: 'acknowledged',
+          }),
+          followThroughHistory: expect.arrayContaining([
+            expect.objectContaining({
+              action: 'reset',
+              phase: 'pre_reset',
+              outcome: 'acknowledged',
+            }),
+            expect.objectContaining({
+              action: 'delete',
+              phase: 'pre_flush',
+              outcome: 'acknowledged',
+            }),
+          ]),
+          lastLifecycle: expect.objectContaining({
+            action: 'reset',
+            status: 'completed',
+          }),
+        }),
+      }),
+    }));
+  });
+
   it('runtime-compacts managed transcripts, repairs malformed lines, and persists the compaction baseline', async () => {
     const session = registry.create({
       id: 'session-runtime-compact',

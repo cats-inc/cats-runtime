@@ -1400,6 +1400,9 @@ machine-readable place to read:
 - the most recent maintenance follow-through outcome when an external host has
   acknowledged hooks, asked for a retry, or reported completion for reset,
   cleanup, delete, or compaction boundaries
+- bounded maintenance request/follow-through history so action-scoped
+  acknowledgements do not get lost when later lifecycle actions write their own
+  follow-through records
 - the latest close/reset/delete lifecycle marker
 
 `inspection.maintenance.status` is intentionally conservative. Active sessions
@@ -1430,6 +1433,12 @@ follow-through seam for maintenance hooks. It persists the latest
 `POST /sessions/{id}/maintenance/follow-through` or the compaction-specific
 shortcut route, using the same truncation, redaction, and size-cap guardrails
 as `lastRequest`.
+
+`inspection.maintenance.requestHistory` and
+`inspection.maintenance.followThroughHistory` are bounded additive histories of
+those same sanitized request/follow-through snapshots. They let hosts inspect
+action-scoped lifecycle coordination without relying on a single global
+`lastRequest` / `lastFollowThrough` slot.
 
 `POST /sessions` also accepts these optional fields:
 
@@ -2216,6 +2225,11 @@ The returned `maintenance` snapshot now also carries additive
 - optional `lastRequestedAt`
 - optional `lastFollowThrough`
 
+The same maintenance snapshot can now also carry additive bounded
+`requestHistory` / `followThroughHistory` arrays so later `reset`, `delete`,
+`cleanup_workspace`, and `compact` coordination does not overwrite previously
+acknowledged action-scoped hook state.
+
 For `action: "compact"`, responses also include:
 
 - `status`
@@ -2229,8 +2243,8 @@ external compaction coordination. It accepts:
 - `maintenance?: { reason?: string; hookPayloads?: Array<{ kind: string; payload?: unknown }> }`
 
 The route persists the outcome under
-`inspection.maintenance.lastFollowThrough`, records a machine-readable
-maintenance marker, and returns:
+`inspection.maintenance.lastFollowThrough`, appends it to bounded additive
+history, records a machine-readable maintenance marker, and returns:
 
 - `action: "compact"`
 - `outcome`

@@ -43,6 +43,7 @@ type ExecutionEventName = 'event' | 'exit' | 'error';
 type ExecutionListener = (...args: unknown[]) => void;
 const MAX_RECENT_EVENTS = 12;
 const MAX_MAINTENANCE_MARKERS = 12;
+const MAX_MAINTENANCE_HISTORY_ENTRIES = 12;
 
 interface PoolExecutionLike {
   alive?: boolean;
@@ -403,6 +404,11 @@ export class RuntimeSessionManager {
     const tracked = this.ensureTrackedState(request.sessionId);
     const sanitizedRequest = cloneMaintenanceRequest(request);
     tracked.maintenance.lastRequest = sanitizedRequest;
+    tracked.maintenance.requestHistory = appendMaintenanceHistory(
+      tracked.maintenance.requestHistory,
+      sanitizedRequest,
+      cloneMaintenanceRequest,
+    );
     this.pushMaintenanceMarker(tracked, {
       code: `${request.action}_requested`,
       observedAt: request.requestedAt,
@@ -426,6 +432,11 @@ export class RuntimeSessionManager {
     const tracked = this.ensureTrackedState(followThrough.sessionId);
     const sanitizedFollowThrough = cloneMaintenanceFollowThrough(followThrough);
     tracked.maintenance.lastFollowThrough = sanitizedFollowThrough;
+    tracked.maintenance.followThroughHistory = appendMaintenanceHistory(
+      tracked.maintenance.followThroughHistory,
+      sanitizedFollowThrough,
+      cloneMaintenanceFollowThrough,
+    );
     this.pushMaintenanceMarker(tracked, {
       code: `${followThrough.action}_follow_through_${followThrough.outcome}`,
       observedAt: followThrough.observedAt,
@@ -883,6 +894,12 @@ function cloneMaintenanceState(
     ...(maintenance.lastFollowThrough
       ? { lastFollowThrough: cloneMaintenanceFollowThrough(maintenance.lastFollowThrough) }
       : {}),
+    ...(maintenance.requestHistory
+      ? { requestHistory: maintenance.requestHistory.map(cloneMaintenanceRequest) }
+      : {}),
+    ...(maintenance.followThroughHistory
+      ? { followThroughHistory: maintenance.followThroughHistory.map(cloneMaintenanceFollowThrough) }
+      : {}),
     ...(maintenance.lastResetAt ? { lastResetAt: maintenance.lastResetAt } : {}),
     ...(maintenance.lastLifecycle ? { lastLifecycle: cloneLifecycle(maintenance.lastLifecycle) } : {}),
     ...(maintenance.lastCompaction
@@ -924,6 +941,18 @@ function buildLifecycleRunSummary(action: RuntimeSessionLifecycleAction): string
     default:
       return 'Session close terminated the current execution boundary.';
   }
+}
+
+function appendMaintenanceHistory<T>(
+  history: T[] | undefined,
+  value: T,
+  clone: (entry: T) => T,
+): T[] {
+  const next = [...(history?.map(clone) ?? []), clone(value)];
+  if (next.length <= MAX_MAINTENANCE_HISTORY_ENTRIES) {
+    return next;
+  }
+  return next.slice(next.length - MAX_MAINTENANCE_HISTORY_ENTRIES);
 }
 
 function extractRuntimeUsageSignal(

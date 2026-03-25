@@ -408,6 +408,9 @@ schemas.
   MCP so hosts can acknowledge, retry, and report completion for
   `pre_reset`, `pre_compaction`, and `pre_flush` through
   `inspection.maintenance.lastFollowThrough`
+- maintenance request/follow-through state now also keeps bounded action-scoped
+  history so later lifecycle actions do not overwrite previously acknowledged
+  reset/delete/cleanup/compaction hook outcomes
 - reset/delete/workspace cleanup now support opt-in
   `requireAcknowledgedHooks` gating so destructive lifecycle routes can refuse
   to proceed while their action-scoped hooks are still pending

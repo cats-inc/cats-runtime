@@ -5,6 +5,8 @@ import type {
   RuntimeSessionHookContract,
   RuntimeSessionMaintenanceHookPayload,
   RuntimeSessionHookGroup,
+  RuntimeSessionMaintenanceRequest,
+  RuntimeSessionMaintenanceFollowThrough,
   RuntimeSessionLifecycleContract,
   RuntimeSessionMaintenance,
   RuntimeSessionMaintenanceMarker,
@@ -77,11 +79,12 @@ export function buildSessionMaintenance(
   const lastFollowThrough = input.trackedMaintenance?.lastFollowThrough
     ? cloneMaintenanceFollowThrough(input.trackedMaintenance.lastFollowThrough)
     : undefined;
+  const requestHistory = getMaintenanceRequestHistory(input.trackedMaintenance);
+  const followThroughHistory = getMaintenanceFollowThroughHistory(input.trackedMaintenance);
   const flush = buildFlushContract(
     cleanup,
     preFlushHooks,
-    input.trackedMaintenance?.lastRequest,
-    lastFollowThrough,
+    input.trackedMaintenance,
   );
   const lastLifecycle = input.trackedMaintenance?.lastLifecycle
     ? cloneLifecycle(input.trackedMaintenance.lastLifecycle)
@@ -111,6 +114,8 @@ export function buildSessionMaintenance(
       ? { lastRequest: cloneMaintenanceRequest(input.trackedMaintenance.lastRequest) }
       : {}),
     ...(lastFollowThrough ? { lastFollowThrough } : {}),
+    ...(requestHistory.length > 0 ? { requestHistory } : {}),
+    ...(followThroughHistory.length > 0 ? { followThroughHistory } : {}),
     ...(lastLifecycle ? { lastLifecycle } : {}),
   };
 }
@@ -236,16 +241,23 @@ function buildCleanupContract(
 function buildFlushContract(
   cleanup: RuntimeSessionCleanupContract,
   preFlushHooks: RuntimeSessionHookContract[],
-  lastRequest: RuntimeSessionMaintenanceState['lastRequest'],
-  lastFollowThrough?: RuntimeSessionMaintenanceState['lastFollowThrough'],
+  trackedMaintenance?: RuntimeSessionMaintenanceState,
 ) {
   const hookCount = preFlushHooks.length;
-  const flushAction = lastFollowThrough?.phase === 'pre_flush'
+  const lastFollowThrough = resolveLatestMaintenanceFollowThrough(
+    trackedMaintenance,
+    ['delete', 'cleanup_workspace'],
+    'pre_flush',
+  );
+  const lastRequest = resolveLatestMaintenanceRequest(
+    trackedMaintenance,
+    lastFollowThrough ? [lastFollowThrough.action] : ['delete', 'cleanup_workspace'],
+  );
+  const action = lastFollowThrough?.action === 'delete' || lastFollowThrough?.action === 'cleanup_workspace'
     ? lastFollowThrough.action
-    : lastRequest?.action;
-  const action = flushAction === 'delete' || flushAction === 'cleanup_workspace'
-    ? flushAction
-    : undefined;
+    : lastRequest?.action === 'delete' || lastRequest?.action === 'cleanup_workspace'
+      ? lastRequest.action
+      : undefined;
 
   if (hookCount === 0 || (!action && cleanup.status === 'clean')) {
     return {
@@ -255,13 +267,11 @@ function buildFlushContract(
       reasonCodes: [],
       ...(action ? { action } : {}),
       ...(lastRequest?.requestedAt ? { lastRequestedAt: lastRequest.requestedAt } : {}),
-      ...(lastFollowThrough?.phase === 'pre_flush'
-        ? { lastFollowThrough: cloneMaintenanceFollowThrough(lastFollowThrough) }
-        : {}),
+      ...(lastFollowThrough ? { lastFollowThrough: cloneMaintenanceFollowThrough(lastFollowThrough) } : {}),
     };
   }
 
-  if (lastFollowThrough?.phase === 'pre_flush') {
+  if (lastFollowThrough) {
     return {
       status: lastFollowThrough.outcome,
       phase: 'pre_flush' as const,
@@ -281,6 +291,65 @@ function buildFlushContract(
     ...(action ? { action } : {}),
     ...(lastRequest?.requestedAt ? { lastRequestedAt: lastRequest.requestedAt } : {}),
   };
+}
+
+function getMaintenanceRequestHistory(
+  trackedMaintenance?: RuntimeSessionMaintenanceState,
+): RuntimeSessionMaintenanceRequest[] {
+  if (!trackedMaintenance) {
+    return [];
+  }
+  if (trackedMaintenance.requestHistory?.length) {
+    return trackedMaintenance.requestHistory.map(cloneMaintenanceRequest);
+  }
+  return trackedMaintenance.lastRequest ? [cloneMaintenanceRequest(trackedMaintenance.lastRequest)] : [];
+}
+
+function getMaintenanceFollowThroughHistory(
+  trackedMaintenance?: RuntimeSessionMaintenanceState,
+): RuntimeSessionMaintenanceFollowThrough[] {
+  if (!trackedMaintenance) {
+    return [];
+  }
+  if (trackedMaintenance.followThroughHistory?.length) {
+    return trackedMaintenance.followThroughHistory.map(cloneMaintenanceFollowThrough);
+  }
+  return trackedMaintenance.lastFollowThrough
+    ? [cloneMaintenanceFollowThrough(trackedMaintenance.lastFollowThrough)]
+    : [];
+}
+
+function resolveLatestMaintenanceRequest(
+  trackedMaintenance: RuntimeSessionMaintenanceState | undefined,
+  actions: RuntimeSessionMaintenanceRequest['action'][],
+): RuntimeSessionMaintenanceRequest | undefined {
+  let latest: RuntimeSessionMaintenanceRequest | undefined;
+  for (const request of getMaintenanceRequestHistory(trackedMaintenance)) {
+    if (!actions.includes(request.action)) {
+      continue;
+    }
+    if (!latest || request.requestedAt > latest.requestedAt) {
+      latest = request;
+    }
+  }
+  return latest;
+}
+
+function resolveLatestMaintenanceFollowThrough(
+  trackedMaintenance: RuntimeSessionMaintenanceState | undefined,
+  actions: RuntimeSessionMaintenanceFollowThrough['action'][],
+  phase: RuntimeSessionMaintenanceFollowThrough['phase'],
+): RuntimeSessionMaintenanceFollowThrough | undefined {
+  let latest: RuntimeSessionMaintenanceFollowThrough | undefined;
+  for (const followThrough of getMaintenanceFollowThroughHistory(trackedMaintenance)) {
+    if (!actions.includes(followThrough.action) || followThrough.phase !== phase) {
+      continue;
+    }
+    if (!latest || followThrough.observedAt > latest.observedAt) {
+      latest = followThrough;
+    }
+  }
+  return latest;
 }
 
 function sessionHasRetainedWorkspace(session: SessionInfo): boolean {

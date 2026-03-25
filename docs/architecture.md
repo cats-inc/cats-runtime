@@ -380,7 +380,8 @@ src/
 - Persists the last accepted maintenance trigger request on the logical session
   so Team 4 style flush/compaction payloads can survive past the immediate
   reset/delete response without making runtime the memory owner
-- Persists the latest maintenance follow-through outcome so external hosts can
+- Persists the latest maintenance follow-through outcome plus bounded
+  action-scoped request/follow-through history so external hosts can
   acknowledge, retry, or report completion for reset/cleanup/delete/compaction
   hooks without inventing a second contract outside runtime inspection
 - Sanitizes persisted maintenance trigger snapshots with bounded
