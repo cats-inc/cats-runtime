@@ -214,6 +214,18 @@ function resolveRegisteredStrategyHint(
   return strategyId && registry.has(strategyId) ? strategyId : undefined;
 }
 
+function readUnsupportedRequestedStrategy(
+  request: RuntimeExecutionStrategyRequest | undefined,
+  resolvedStrategy: RuntimeExecutionStrategyId | undefined,
+): string | undefined {
+  const requestedStrategy = request?.requestedStrategy?.trim();
+  if (!requestedStrategy || resolvedStrategy) {
+    return undefined;
+  }
+
+  return requestedStrategy;
+}
+
 function readStrategyPositiveInteger(
   record: Record<string, unknown> | undefined,
   key: string,
@@ -448,6 +460,10 @@ export class ApiBackendManager {
       preferredStrategy,
       fallbackStrategy: API_RUNTIME_COMPATIBILITY_STRATEGY,
     });
+    const unsupportedRequestedStrategy = readUnsupportedRequestedStrategy(
+      effectiveRequest,
+      requestedStrategy,
+    );
 
     const transcriptPath = initialSession.sourcePath || initialSession.providerSourcePath;
     const strategyInstructions = buildStrategyInstructionOverlay(
@@ -504,10 +520,24 @@ export class ApiBackendManager {
       signal,
       constraints,
       emitLifecycleEvents,
+      // Only strategies resolved through the runtime registry may become a
+      // session-level preference. Unsupported hints remain request metadata
+      // only and continue to degrade through compatibility fallback.
       rememberRequestedStrategyPreference: Boolean(requestedStrategy),
     });
 
     try {
+      if (unsupportedRequestedStrategy) {
+        yield context.createStrategyEvent(
+          'strategy_degraded',
+          'fallback',
+          `Requested strategy '${unsupportedRequestedStrategy}' is not supported by this runtime; falling back to '${resolution.effectiveStrategy}'.`,
+          {
+            degradedStrategy: unsupportedRequestedStrategy,
+            fallbackStrategy: resolution.effectiveStrategy,
+          },
+        );
+      }
       for await (const event of strategy.execute(context)) {
         yield event;
       }

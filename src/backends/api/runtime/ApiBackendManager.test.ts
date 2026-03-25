@@ -510,18 +510,37 @@ describe('ApiBackendManager', () => {
     }));
     const updated = registry.get(session.id);
 
-    expect(events).toEqual([
-      expect.objectContaining({ type: 'init', sessionId: 'resp_unsupported_strategy' }),
-      { type: 'text', text: 'Compatibility fallback reply.', raw: expect.any(Object) },
-      expect.objectContaining({
-        type: 'result',
-        sessionId: 'resp_unsupported_strategy',
-        usage: {
-          inputTokens: 5,
-          outputTokens: 2,
-        },
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'progress',
+      text: "Requested strategy 'pdca' is not supported by this runtime; falling back to 'simple_tool_call'.",
+      metadata: expect.objectContaining({
+        kind: 'strategy',
+        status: 'fallback',
+        strategyEvent: 'strategy_degraded',
+        requestedStrategy: 'pdca',
+        effectiveStrategy: 'simple_tool_call',
+        strategyResolutionSource: 'compatibility_fallback',
+        degradedStrategy: 'pdca',
+        fallbackStrategy: 'simple_tool_call',
       }),
-    ]);
+    }));
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'init',
+      sessionId: 'resp_unsupported_strategy',
+    }));
+    expect(events).toContainEqual({
+      type: 'text',
+      text: 'Compatibility fallback reply.',
+      raw: expect.any(Object),
+    });
+    expect(events).toContainEqual(expect.objectContaining({
+      type: 'result',
+      sessionId: 'resp_unsupported_strategy',
+      usage: {
+        inputTokens: 5,
+        outputTokens: 2,
+      },
+    }));
     expect(updated).toMatchObject({
       strategy: {
         request: {
