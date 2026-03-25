@@ -82,6 +82,7 @@ export interface AppContext {
   browserMaintenance?: RuntimeBrowserMaintenanceService;
   worktreeMaintenance?: RuntimeWorktreeMaintenanceService;
   bootstrapService?: BootstrapService;
+  completeBootstrap?: () => void;
   resolveCursorNative?: (instanceId?: string) => CursorNativeSessionService;
   resolveGooseNative?: (instanceId?: string) => GooseNativeSessionService;
   resolveKiroNative?: (instanceId?: string) => KiroNativeSessionService;

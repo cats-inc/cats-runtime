@@ -43,7 +43,25 @@ async function main(): Promise<void> {
     startup.bootstrapRequired = true;
   }
 
-  const config = loadConfig();
+  let config: ReturnType<typeof loadConfig>;
+  try {
+    config = loadConfig();
+  } catch (error) {
+    // Semantically invalid config (e.g. provider in multiple backends without
+    // disambiguation) — enter bootstrap mode instead of crashing.
+    if (!startup.bootstrapRequired) {
+      startup.bootstrapRequired = true;
+      process.stderr.write(
+        `Config error: ${error instanceof Error ? error.message : String(error)}\n`
+        + 'Entering bootstrap mode for provider setup.\n',
+      );
+    }
+    // Retry with the config path cleared so loadConfig falls back to
+    // env-derived defaults that always succeed.
+    const fallbackEnv = { ...process.env };
+    delete fallbackEnv.CATS_RUNTIME_CONFIG_PATH;
+    config = loadConfig(fallbackEnv);
+  }
   const runtime = createRuntimeServer(config, { startup });
   let shutdownPromise: Promise<void> | null = null;
 

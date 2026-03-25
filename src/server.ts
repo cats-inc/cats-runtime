@@ -860,9 +860,38 @@ export function createRuntimeServer(
     compatibility,
   });
 
+  // completeBootstrap reloads config and starts subsystems that were skipped.
+  let activeDiscovery: ReturnType<typeof createDiscoveryController> | null = null;
+  context.completeBootstrap = () => {
+    // Reload config from the newly written providers.yaml.
+    const reloadEnv = { ...process.env, CATS_RUNTIME_CONFIG_PATH: configPathForBootstrap };
+    try {
+      const reloaded = loadConfig(reloadEnv);
+      Object.assign(config, reloaded);
+      context.config = config;
+    } catch (error) {
+      console.warn(
+        '[bootstrap] Config reload failed after apply, '
+        + 'continuing with env-derived config:',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+
+    startup.bootstrapRequired = false;
+
+    // Rebuild and start discovery with the new config.
+    if (!activeDiscovery) {
+      activeDiscovery = createDiscoveryController(context, options);
+      activeDiscovery.start();
+    }
+    wakeup.start();
+    browserMaintenance.start();
+    worktreeMaintenance.start();
+  };
+
   const app = createRuntimeApp(context);
   const server = createAdaptorServer({ fetch: app.fetch }) as Server;
-  const discovery = startup.bootstrapRequired
+  activeDiscovery = startup.bootstrapRequired
     ? null
     : createDiscoveryController(context, options);
   let startPromise: Promise<{ host: string; port: number }> | null = null;
@@ -882,8 +911,8 @@ export function createRuntimeServer(
       }
 
       startPromise = (async () => {
-        if (discovery) {
-          discovery.start();
+        if (activeDiscovery) {
+          activeDiscovery.start();
         }
         if (!startup.bootstrapRequired) {
           wakeup.start();
@@ -925,8 +954,8 @@ export function createRuntimeServer(
           worktreeMaintenance.close();
           browserMaintenance.close();
           wakeup.close();
-          if (discovery) {
-            discovery.stop();
+          if (activeDiscovery) {
+            activeDiscovery.stop();
           }
           throw error;
         }
@@ -948,8 +977,8 @@ export function createRuntimeServer(
         worktreeMaintenance.close();
         browserMaintenance.close();
         wakeup.close();
-        if (discovery) {
-          discovery.stop();
+        if (activeDiscovery) {
+          activeDiscovery.stop();
         }
         agentBackend.killAll();
         apiBackend.killAll();

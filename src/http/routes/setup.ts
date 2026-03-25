@@ -65,12 +65,13 @@ setupRoutes.post('/providers/setup/apply', async (c) => {
   try {
     const result = await ctx.bootstrapService.applyConfig(providers as string[]);
 
-    // In-process transition: exit bootstrap mode so session routes become
-    // available.  The env-derived provider topology already covers the
-    // selected providers for the remainder of this process lifetime.
-    // A full config reload happens on next startup when the generated
-    // providers.yaml is read.
-    ctx.startup.bootstrapRequired = false;
+    // In-process transition: reload config from the new providers.yaml,
+    // clear bootstrap flag, and start subsystems that were skipped.
+    if (ctx.completeBootstrap) {
+      ctx.completeBootstrap();
+    } else {
+      ctx.startup.bootstrapRequired = false;
+    }
 
     return c.json({
       status: 'applied',

@@ -429,6 +429,14 @@ describe('bootstrap mode server', () => {
         // Session routes should now work (not 409)
         const sessionResponse = await runtime.app.request('/sessions', { method: 'GET' });
         expect(sessionResponse.status).not.toBe(409);
+
+        // /providers/config should reflect the reloaded topology (only claude)
+        const configResponse = await runtime.app.request('/providers/config');
+        expect(configResponse.status).toBe(200);
+        const configBody = await configResponse.json() as { providers: Record<string, unknown> };
+        expect(configBody.providers).toHaveProperty('claude');
+        // Providers NOT selected should not appear in the reloaded config
+        expect(configBody.providers).not.toHaveProperty('codex');
       } finally {
         await runtime.close();
       }
