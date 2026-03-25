@@ -256,7 +256,8 @@ readiness, version, auth status, and remediation hints.
 `POST /providers/setup/apply` accepts `{"providers": ["claude", "codex", ...]}`
 and writes a minimal `providers.yaml` with only the selected providers. On
 success the runtime exits bootstrap mode in-process and session routes become
-available.
+available. If config reload fails after writing the file, the route returns
+`500`, bootstrap mode stays active, and normal session routes remain blocked.
 
 Setup artifacts are persisted under `<dataDir>/setup/`:
 

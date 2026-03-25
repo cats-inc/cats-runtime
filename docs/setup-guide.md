@@ -81,6 +81,8 @@ The bootstrap flow:
 2. Click "Auto Scan" or "Manual Scan" to detect installed providers
 3. Check the providers you want to enable
 4. Click "Apply" to generate `providers.yaml` and exit bootstrap mode
+   If the generated config cannot be reloaded, setup stays in bootstrap mode
+   and the UI/API reports the reload error instead of partially enabling normal routes
 
 Setup artifacts are persisted under `<dataDir>/setup/`:
 

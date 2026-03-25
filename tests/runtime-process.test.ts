@@ -95,6 +95,7 @@ function createRuntimeProcessEnv(port: number) {
 
   return {
     env,
+    root,
     cleanup: () => rmSync(root, { recursive: true, force: true }),
   };
 }
@@ -125,6 +126,7 @@ async function reservePort(): Promise<number> {
 function spawnRuntime(
   port: number,
   env: NodeJS.ProcessEnv,
+  cwd = runtimeRoot,
 ): ChildProcessWithoutNullStreams {
   return spawn(
     process.execPath,
@@ -140,7 +142,7 @@ function spawnRuntime(
       String(port),
     ],
     {
-      cwd: runtimeRoot,
+      cwd,
       env,
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
@@ -401,6 +403,55 @@ describe('runtime process startup contract', () => {
           signals: [...RUNTIME_SHUTDOWN_SIGNALS],
           reasons: [...RUNTIME_SHUTDOWN_REASONS],
           stdinCloseEnabled: true,
+        },
+      });
+    } finally {
+      await stopRuntime(child);
+      cleanup();
+    }
+  }, 20000);
+
+  it('enters bootstrap mode instead of crashing on an invalid default providers file', async () => {
+    const port = await reservePort();
+    const { env, root, cleanup } = createRuntimeProcessEnv(port);
+    const invalidDefaultConfigPath = join(root, 'config', 'providers.yaml');
+    mkdirSync(dirname(invalidDefaultConfigPath), { recursive: true });
+    writeFileSync(invalidDefaultConfigPath, [
+      'version: 1',
+      'environments:',
+      '  native:',
+      '    kind: native',
+      'backends:',
+      '  cli:',
+      '    providers:',
+      '      claude:',
+      '        instances:',
+      '          default:',
+      '            environment: native',
+      '            command: claude',
+      '            runner: auto',
+      '            projects_dir: /native/claude/projects',
+      '  api:',
+      '    providers:',
+      '      claude:',
+      '        instances:',
+      '          sonnet:',
+      '            transport: anthropic',
+      '            api_key_env: ANTHROPIC_API_KEY',
+      '            model: claude-sonnet-4-6',
+      '',
+    ].join('\n'), 'utf8');
+    delete env.CATS_RUNTIME_CONFIG_PATH;
+    const child = spawnRuntime(port, env, root);
+
+    try {
+      const ready = await waitForLifecycleEvent(child, 'runtime.ready');
+      const response = await fetch(ready.healthUrl!);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        status: 'degraded',
+        startup: {
+          bootstrapRequired: true,
         },
       });
     } finally {

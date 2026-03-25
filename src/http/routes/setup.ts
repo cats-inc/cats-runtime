@@ -62,9 +62,16 @@ setupRoutes.post('/providers/setup/apply', async (c) => {
     return c.json({ error: 'providers must be a non-empty array of provider names' }, 400);
   }
 
+  let result: { configPath: string };
   try {
-    const result = await ctx.bootstrapService.applyConfig(providers as string[]);
+    result = await ctx.bootstrapService.applyConfig(providers as string[]);
+  } catch (error) {
+    return c.json({
+      error: error instanceof Error ? error.message : String(error),
+    }, 400);
+  }
 
+  try {
     // In-process transition: reload config from the new providers.yaml,
     // clear bootstrap flag, and start subsystems that were skipped.
     if (ctx.completeBootstrap) {
@@ -72,16 +79,16 @@ setupRoutes.post('/providers/setup/apply', async (c) => {
     } else {
       ctx.startup.bootstrapRequired = false;
     }
-
-    return c.json({
-      status: 'applied',
-      configPath: result.configPath,
-      bootstrapRequired: false,
-      restart: false,
-    });
   } catch (error) {
     return c.json({
       error: error instanceof Error ? error.message : String(error),
-    }, 400);
+    }, 500);
   }
+
+  return c.json({
+    status: 'applied',
+    configPath: result.configPath,
+    bootstrapRequired: false,
+    restart: false,
+  });
 });

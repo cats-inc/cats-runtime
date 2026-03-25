@@ -865,28 +865,31 @@ export function createRuntimeServer(
   context.completeBootstrap = () => {
     // Reload config from the newly written providers.yaml.
     const reloadEnv = { ...process.env, CATS_RUNTIME_CONFIG_PATH: configPathForBootstrap };
+    const reloaded = loadConfig(reloadEnv);
+    Object.assign(config, reloaded);
+    context.config = config;
+
+    let startedDiscovery = false;
     try {
-      const reloaded = loadConfig(reloadEnv);
-      Object.assign(config, reloaded);
-      context.config = config;
+      if (!activeDiscovery) {
+        activeDiscovery = createDiscoveryController(context, options);
+      }
+      activeDiscovery.start();
+      startedDiscovery = true;
+      wakeup.start();
+      browserMaintenance.start();
+      worktreeMaintenance.start();
     } catch (error) {
-      console.warn(
-        '[bootstrap] Config reload failed after apply, '
-        + 'continuing with env-derived config:',
-        error instanceof Error ? error.message : String(error),
-      );
+      worktreeMaintenance.close();
+      browserMaintenance.close();
+      wakeup.close();
+      if (startedDiscovery && activeDiscovery) {
+        activeDiscovery.stop();
+      }
+      throw error;
     }
 
     startup.bootstrapRequired = false;
-
-    // Rebuild and start discovery with the new config.
-    if (!activeDiscovery) {
-      activeDiscovery = createDiscoveryController(context, options);
-      activeDiscovery.start();
-    }
-    wakeup.start();
-    browserMaintenance.start();
-    worktreeMaintenance.start();
   };
 
   const app = createRuntimeApp(context);

@@ -445,6 +445,69 @@ describe('bootstrap mode server', () => {
     }
   });
 
+  it('POST /providers/setup/apply stays in bootstrap mode when config reload fails', async () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const env = createTestEnv(root);
+      ensureDirs(env);
+      const configPath = env.CATS_RUNTIME_CONFIG_PATH!;
+      mkdirSync(join(root, 'config'), { recursive: true });
+      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0, configPath };
+      const startup = createRuntimeStartupState({ bootstrapRequired: true });
+      const runtime = createRuntimeServer(config, { startup });
+      try {
+        if (!runtime.context.bootstrapService) {
+          throw new Error('Bootstrap service missing for test');
+        }
+        runtime.context.bootstrapService.applyConfig = async () => {
+          writeFileSync(configPath, [
+            'version: 1',
+            'environments:',
+            '  native:',
+            '    kind: native',
+            'backends:',
+            '  cli:',
+            '    providers:',
+            '      claude:',
+            '        instances:',
+            '          default:',
+            '            environment: native',
+            '            command: claude',
+            '            runner: auto',
+            '            projects_dir: /native/claude/projects',
+            '  api:',
+            '    providers:',
+            '      claude:',
+            '        instances:',
+            '          sonnet:',
+            '            transport: anthropic',
+            '            api_key_env: ANTHROPIC_API_KEY',
+            '            model: claude-sonnet-4-6',
+            '',
+          ].join('\n'), 'utf8');
+          return { configPath };
+        };
+
+        const response = await runtime.app.request('/providers/setup/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ providers: ['claude'] }),
+        });
+        expect(response.status).toBe(500);
+        const body = await response.json() as Record<string, unknown>;
+        expect(String(body.error)).toContain('configured in multiple backends');
+        expect(startup.bootstrapRequired).toBe(true);
+
+        const sessionResponse = await runtime.app.request('/sessions', { method: 'GET' });
+        expect(sessionResponse.status).toBe(409);
+      } finally {
+        await runtime.close();
+      }
+    } finally {
+      cleanup();
+    }
+  });
+
   it('GET /health reflects bootstrap mode', async () => {
     const { root, cleanup } = createTestRoot();
     try {

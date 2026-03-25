@@ -34,6 +34,10 @@ export type WslDiscoveryPolicy = typeof WSL_DISCOVERY_POLICIES[number];
 export type DockerDiscoveryPolicy = typeof DOCKER_DISCOVERY_POLICIES[number];
 export type BackendKind = 'cli' | 'api' | 'local' | 'agent';
 
+export interface LoadConfigOptions {
+  skipProviderFile?: boolean;
+}
+
 export interface ProviderRuntimeConfig {
   mode: RuntimeMode;
   distro?: string;
@@ -306,7 +310,10 @@ export function defaultRateLimitCooldownMs(): number {
   return 60000;
 }
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): CliRuntimeConfig {
+export function loadConfig(
+  env: NodeJS.ProcessEnv = process.env,
+  options: LoadConfigOptions = {},
+): CliRuntimeConfig {
   const home = env.HOME || env.USERPROFILE || '';
   const apiKey = env.CATS_RUNTIME_API_KEY || '';
   const host = env.CATS_RUNTIME_HOST || (apiKey ? '' : '127.0.0.1');
@@ -322,7 +329,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CliRuntimeConf
 
   const legacy = buildLegacyRuntimeShape(env, home);
   const configPath = resolveConfigPath(env.CATS_RUNTIME_CONFIG_PATH);
-  const configured = existsSync(configPath)
+  const hasProviderFile = !options.skipProviderFile && existsSync(configPath);
+  const configured = hasProviderFile
     ? applyFileBasedProviderConfig(configPath, legacy)
     : legacy;
 
@@ -331,7 +339,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CliRuntimeConf
     port,
     apiKey,
     dataDir,
-    configPath: existsSync(configPath) ? configPath : undefined,
+    configPath: hasProviderFile ? configPath : undefined,
     auggieMaxTurns: parsePositiveInt(
       env.AUGGIE_MAX_TURNS,
       defaultAuggieMaxTurns(),

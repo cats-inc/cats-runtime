@@ -56,11 +56,9 @@ async function main(): Promise<void> {
         + 'Entering bootstrap mode for provider setup.\n',
       );
     }
-    // Retry with the config path cleared so loadConfig falls back to
-    // env-derived defaults that always succeed.
-    const fallbackEnv = { ...process.env };
-    delete fallbackEnv.CATS_RUNTIME_CONFIG_PATH;
-    config = loadConfig(fallbackEnv);
+    // Retry in an explicit env-derived mode that ignores any providers.yaml,
+    // including the default config path in the current working directory.
+    config = loadConfig(process.env, { skipProviderFile: true });
   }
   const runtime = createRuntimeServer(config, { startup });
   let shutdownPromise: Promise<void> | null = null;

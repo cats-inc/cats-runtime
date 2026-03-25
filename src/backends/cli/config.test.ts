@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -34,6 +34,8 @@ function loadConfigWithoutProviderFile(env: NodeJS.ProcessEnv = {}) {
     ...process.env,
     ...env,
     CATS_RUNTIME_CONFIG_PATH: env.CATS_RUNTIME_CONFIG_PATH || MISSING_CONFIG_PATH,
+  }, {
+    skipProviderFile: true,
   });
 }
 
@@ -311,6 +313,56 @@ describe('config platform defaults', () => {
           process.env[key] = value;
         }
       }
+    }
+  });
+
+  it('can skip the default providers file when bootstrap fallback is needed', () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-config-invalid-default-'));
+    try {
+      const configDir = join(root, 'config');
+      mkdirSync(configDir, { recursive: true });
+      writeFileSync(join(configDir, 'providers.yaml'), [
+        'version: 1',
+        'environments:',
+        '  native:',
+        '    kind: native',
+        'backends:',
+        '  cli:',
+        '    providers:',
+        '      claude:',
+        '        instances:',
+        '          default:',
+        '            environment: native',
+        '            command: claude',
+        '            runner: auto',
+        '            projects_dir: /native/claude/projects',
+        '  api:',
+        '    providers:',
+        '      claude:',
+        '        instances:',
+        '          sonnet:',
+        '            transport: anthropic',
+        '            api_key_env: ANTHROPIC_API_KEY',
+        '            model: claude-sonnet-4-6',
+        '',
+      ].join('\n'), 'utf8');
+
+      const config = loadConfig({
+        ...process.env,
+        HOME: root,
+        USERPROFILE: root,
+      }, {
+        skipProviderFile: true,
+      });
+
+      expect(config.configPath).toBeUndefined();
+      expect(config.providerCommands.claude.path).toBeTruthy();
+      expect(config.providerDefaultTargets.claude).toEqual({
+        backend: 'cli',
+        instance: 'default',
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 

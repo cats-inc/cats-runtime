@@ -2,10 +2,14 @@ import { join } from 'node:path';
 import {
   loadConfig as loadCliConfig,
   type CliRuntimeConfig,
+  type LoadConfigOptions,
 } from '../backends/cli/config.js';
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): CliRuntimeConfig {
-  return loadCliConfig(env);
+export function loadConfig(
+  env: NodeJS.ProcessEnv = process.env,
+  options: LoadConfigOptions = {},
+): CliRuntimeConfig {
+  return loadCliConfig(env, options);
 }
 
 export interface RuntimeResolvedPaths {
@@ -37,6 +41,7 @@ export function getRuntimeListenerConfig(
 }
 
 export type {
+  LoadConfigOptions,
   CliRuntimeConfig as RuntimeConfig,
   ProviderRuntimeConfig,
   ProviderCommandConfig,
