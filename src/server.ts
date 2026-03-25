@@ -56,6 +56,7 @@ import { PeerRoutingService } from './core/peers/PeerRoutingService.js';
 import { PeerExecutionClient } from './core/peers/PeerExecutionClient.js';
 import { PeerExecutionService } from './core/peers/PeerExecutionService.js';
 import { PeerExecutionAdmissionService } from './core/peers/PeerExecutionAdmissionService.js';
+import { PeerExecutionReplayService } from './core/peers/PeerExecutionReplayService.js';
 import { createRuntimeApp, type AppContext } from './http/app.js';
 import { executeRetainedWorktreeCleanup } from './http/routes/sessions.js';
 import type { ProviderName } from './backends/cli/providers/types.js';
@@ -846,6 +847,9 @@ export function createRuntimeServer(
   const peerExecutionAdmission = new PeerExecutionAdmissionService({
     config: peerConfig,
   });
+  const peerExecutionReplay = new PeerExecutionReplayService({
+    config: peerConfig,
+  });
   const context: AppContext = {
     config,
     startup,
@@ -872,6 +876,7 @@ export function createRuntimeServer(
     peerRouting,
     peerExecutionClient,
     peerExecutionAdmission,
+    peerExecutionReplay,
     resolveCursorNative,
     resolveGooseNative,
     resolveKiroNative,

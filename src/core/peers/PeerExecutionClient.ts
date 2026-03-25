@@ -138,10 +138,18 @@ export class PeerExecutionClient {
       'x-cats-peer-id': this.options.localPeerId,
     };
     if (this.options.config.sharedSecret) {
+      const timestamp = String(this.now());
+      const nonce = randomUUID();
       headers.authorization = `Bearer ${this.options.config.sharedSecret}`;
+      headers['x-cats-peer-timestamp'] = timestamp;
+      headers['x-cats-peer-nonce'] = nonce;
       headers['x-cats-peer-signature'] = createPeerPayloadSignature(
         this.options.config.sharedSecret,
         body,
+        {
+          timestamp,
+          nonce,
+        },
       );
     }
 
@@ -242,6 +250,8 @@ async function buildHttpError(
   return createPeerExecutionError({
     code: code === 'peer_auth_required'
       || code === 'peer_auth_failed'
+      || code === 'peer_auth_stale'
+      || code === 'peer_auth_replayed'
       || code === 'peer_untrusted'
       || code === 'peer_rejected'
       || code === 'peer_execution_rejected'

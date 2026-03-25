@@ -3,12 +3,18 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 const PEER_SIGNATURE_ALGORITHM = 'sha256';
 const PEER_SIGNATURE_HEX_LENGTH = 64;
 
+export interface PeerPayloadSignatureContext {
+  timestamp: string;
+  nonce: string;
+}
+
 export function createPeerPayloadSignature(
   sharedSecret: string,
   payload: string,
+  context?: PeerPayloadSignatureContext,
 ): string {
   const digest = createHmac(PEER_SIGNATURE_ALGORITHM, sharedSecret)
-    .update(payload)
+    .update(buildPeerSignaturePayload(payload, context))
     .digest('hex');
   return `${PEER_SIGNATURE_ALGORITHM}=${digest}`;
 }
@@ -17,6 +23,7 @@ export function validatePeerPayloadSignature(
   sharedSecret: string | readonly string[] | undefined,
   payload: string,
   signature: string | undefined,
+  context?: PeerPayloadSignatureContext,
 ): boolean {
   const secrets = normalizeSharedSecrets(sharedSecret);
   if (secrets.length === 0 || typeof signature !== 'string') {
@@ -31,7 +38,7 @@ export function validatePeerPayloadSignature(
   const actualSignature = Buffer.from(normalizedSignature, 'hex');
   for (const secret of secrets) {
     const expectedSignature = Buffer.from(
-      createPeerPayloadSignature(secret, payload).slice(`${PEER_SIGNATURE_ALGORITHM}=`.length),
+      createPeerPayloadSignature(secret, payload, context).slice(`${PEER_SIGNATURE_ALGORITHM}=`.length),
       'hex',
     );
 
@@ -45,6 +52,17 @@ export function validatePeerPayloadSignature(
   }
 
   return false;
+}
+
+function buildPeerSignaturePayload(
+  payload: string,
+  context: PeerPayloadSignatureContext | undefined,
+): string {
+  if (!context) {
+    return payload;
+  }
+
+  return `${context.timestamp}\n${context.nonce}\n${payload}`;
 }
 
 function normalizePeerPayloadSignature(

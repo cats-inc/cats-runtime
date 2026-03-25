@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { AppContext } from '../app.js';
 import { peerExecutionAuth } from '../peerAuth.js';
@@ -16,24 +16,57 @@ peerExecutionRoutes.post('/peer/executions', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const callerPeerId = c.get('peerCallerId' as never) as string | undefined;
   const admission = ctx.peerExecutionAdmission;
+  const replay = ctx.peerExecutionReplay;
   const rawBody = await c.req.text().catch(() => '');
+  const peerAuthKey = `peer:${callerPeerId ?? 'unknown'}`;
+  const timestampHeader = parseOptionalString(c.req.header('x-cats-peer-timestamp'));
+  const nonceHeader = parseOptionalString(c.req.header('x-cats-peer-nonce'));
+  const usesReplayHeaders = Boolean(timestampHeader || nonceHeader);
+
+  if (usesReplayHeaders && (!timestampHeader || !nonceHeader)) {
+    return respondPeerAuthFailure(c, admission, peerAuthKey, {
+      status: 403,
+      error: 'Peer execution auth replay headers must include both timestamp and nonce.',
+      code: 'peer_auth_failed',
+    });
+  }
+
+  const timestampMs = timestampHeader ? parsePeerTimestamp(timestampHeader) : undefined;
+  if (timestampHeader && timestampMs === undefined) {
+    return respondPeerAuthFailure(c, admission, peerAuthKey, {
+      status: 403,
+      error: 'Invalid x-cats-peer-timestamp header.',
+      code: 'peer_auth_failed',
+    });
+  }
 
   if (!ctx.peerTrust?.validatePayloadSignature(
     rawBody,
     c.req.header('x-cats-peer-signature'),
+    timestampHeader && nonceHeader
+      ? {
+          timestamp: timestampHeader,
+          nonce: nonceHeader,
+        }
+      : undefined,
   )) {
-    const failure = admission?.recordAuthFailure(`peer:${callerPeerId ?? 'unknown'}`);
-    if (failure?.limited) {
-      return c.json({
-        error: 'Peer execution auth is temporarily rate limited for this caller.',
-        code: 'peer_auth_rate_limited',
-        retryAfterMs: failure.retryAfterMs,
-      }, 429);
-    }
-    return c.json({
+    return respondPeerAuthFailure(c, admission, peerAuthKey, {
+      status: 403,
       error: 'Peer execution auth failed.',
       code: 'peer_auth_failed',
-    }, 403);
+    });
+  }
+
+  if (timestampMs !== undefined && nonceHeader && replay) {
+    const replayDecision = replay.validate(peerAuthKey, timestampMs, nonceHeader);
+    if (!replayDecision.ok) {
+      return respondPeerAuthFailure(c, admission, peerAuthKey, {
+        status: replayDecision.reason === 'stale' ? 401 : 409,
+        error: replayDecision.message,
+        code: replayDecision.reason === 'stale' ? 'peer_auth_stale' : 'peer_auth_replayed',
+        details: replayDecision.details,
+      });
+    }
   }
 
   const request = parseJsonBody(rawBody);
@@ -47,18 +80,11 @@ peerExecutionRoutes.post('/peer/executions', async (c) => {
   }
 
   if (callerPeerId && parsed.value.caller.peerId !== callerPeerId) {
-    const failure = admission?.recordAuthFailure(`peer:${callerPeerId}`);
-    if (failure?.limited) {
-      return c.json({
-        error: 'Peer execution auth is temporarily rate limited for this caller.',
-        code: 'peer_auth_rate_limited',
-        retryAfterMs: failure.retryAfterMs,
-      }, 429);
-    }
-    return c.json({
+    return respondPeerAuthFailure(c, admission, `peer:${callerPeerId}`, {
+      status: 403,
       error: `Peer caller id '${parsed.value.caller.peerId}' does not match authenticated peer '${callerPeerId}'.`,
       code: 'peer_auth_failed',
-    }, 403);
+    });
   }
 
   if (!ctx.peerExecutionService) {
@@ -257,4 +283,40 @@ function parseContext(
   value: unknown,
 ): PeerExecutionRequest['turn']['context'] {
   return parseInvocationContext(value);
+}
+
+function parsePeerTimestamp(value: string): number | undefined {
+  if (!/^\d+$/.test(value)) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function respondPeerAuthFailure(
+  c: Context,
+  admission: AppContext['peerExecutionAdmission'],
+  callerKey: string,
+  response: {
+    status: 401 | 403 | 409;
+    error: string;
+    code: string;
+    details?: Record<string, unknown>;
+  },
+) {
+  const failure = admission?.recordAuthFailure(callerKey);
+  if (failure?.limited) {
+    return c.json({
+      error: 'Peer execution auth is temporarily rate limited for this caller.',
+      code: 'peer_auth_rate_limited',
+      retryAfterMs: failure.retryAfterMs,
+    }, 429);
+  }
+
+  return c.json({
+    error: response.error,
+    code: response.code,
+    ...(response.details ? { details: response.details } : {}),
+  }, response.status);
 }

@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { describe, expect, it, vi } from 'vitest';
 import { createPeerPayloadSignature } from '../core/peers/auth.js';
 import { PeerExecutionAdmissionService } from '../core/peers/PeerExecutionAdmissionService.js';
+import { PeerExecutionReplayService } from '../core/peers/PeerExecutionReplayService.js';
 import { createPeerExecutionError } from '../core/peers/errors.js';
 import { PeerTrustService } from '../core/peers/PeerTrustService.js';
 import type { StreamEvent } from '../core/types.js';
@@ -56,12 +57,36 @@ function parseSse(text: string): Array<Record<string, unknown>> {
 function createSignedHeaders(
   body: string,
   overrides: Record<string, string> = {},
+  options: {
+    legacy?: boolean;
+    timestamp?: string;
+    nonce?: string;
+  } = {},
 ): Record<string, string> {
+  const timestamp = options.timestamp ?? '1763510400000';
+  const nonce = options.nonce ?? 'nonce-1';
   return {
     authorization: 'Bearer lan-secret',
     'content-type': 'application/json',
     'x-cats-peer-id': 'caller-peer',
-    'x-cats-peer-signature': createPeerPayloadSignature('lan-secret', body),
+    ...(
+      options.legacy
+        ? {}
+        : {
+            'x-cats-peer-timestamp': timestamp,
+            'x-cats-peer-nonce': nonce,
+          }
+    ),
+    'x-cats-peer-signature': createPeerPayloadSignature(
+      'lan-secret',
+      body,
+      options.legacy
+        ? undefined
+        : {
+            timestamp,
+            nonce,
+          },
+    ),
     ...overrides,
   };
 }
@@ -71,6 +96,7 @@ function createApp(
     execute?: (request: unknown, signal?: AbortSignal) => AsyncGenerator<StreamEvent>;
     trustedPeerIds?: string[];
     admission?: PeerExecutionAdmissionService;
+    replay?: PeerExecutionReplayService;
   } = {},
 ): {
   app: Hono<{ Variables: { ctx: AppContext } }>;
@@ -105,6 +131,14 @@ function createApp(
         maxInboundExecutions: 8,
         maxInboundExecutionsPerPeer: 2,
       },
+    }),
+    peerExecutionReplay: options.replay ?? new PeerExecutionReplayService({
+      config: {
+        replayWindowMs: 60_000,
+        replayNonceTtlMs: 120_000,
+        maxReplayNoncesPerCaller: 32,
+      },
+      now: () => 1_763_510_400_000,
     }),
     peerExecutionService: {
       execute,
@@ -227,6 +261,34 @@ describe('peer execution routes', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it('accepts legacy payload-only signatures during migration', async () => {
+    const { app, execute } = createApp();
+    const body = JSON.stringify(createRequestBody());
+
+    const response = await app.request('/peer/executions', {
+      method: 'POST',
+      headers: createSignedHeaders(body, {
+        accept: 'application/x-ndjson',
+      }, {
+        legacy: true,
+      }),
+      body,
+    });
+
+    expect(response.status).toBe(200);
+    expect(parseNdjson(await response.text())).toEqual([
+      {
+        type: 'init',
+        sessionId: 'peer-exec-1',
+      },
+      {
+        type: 'result',
+        summary: 'Peer execution completed.',
+      },
+    ]);
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects inbound peer execution when the caller exceeds admission capacity', async () => {
     const admission = new PeerExecutionAdmissionService({
       config: {
@@ -330,6 +392,82 @@ describe('peer execution routes', () => {
       code: 'peer_auth_failed',
     });
     expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('rejects peer execution requests with stale replay headers', async () => {
+    const replay = new PeerExecutionReplayService({
+      config: {
+        replayWindowMs: 10_000,
+        replayNonceTtlMs: 60_000,
+        maxReplayNoncesPerCaller: 32,
+      },
+      now: () => 1_763_510_400_000,
+    });
+    const { app, execute } = createApp({ replay });
+    const body = JSON.stringify(createRequestBody());
+
+    const response = await app.request('/peer/executions', {
+      method: 'POST',
+      headers: createSignedHeaders(body, {}, {
+        timestamp: '1763510380000',
+        nonce: 'nonce-stale',
+      }),
+      body,
+    });
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({
+      error: 'Peer execution auth timestamp is outside the allowed replay window.',
+      code: 'peer_auth_stale',
+      details: {
+        callerKey: 'peer:caller-peer',
+        replayWindowMs: 10_000,
+        now: 1_763_510_400_000,
+        timestampMs: 1_763_510_380_000,
+      },
+    });
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('rejects replayed peer execution nonces inside the configured window', async () => {
+    const replay = new PeerExecutionReplayService({
+      config: {
+        replayWindowMs: 60_000,
+        replayNonceTtlMs: 60_000,
+        maxReplayNoncesPerCaller: 32,
+      },
+      now: () => 1_763_510_400_000,
+    });
+    const { app, execute } = createApp({ replay });
+    const body = JSON.stringify(createRequestBody());
+    const headers = createSignedHeaders(body, {}, {
+      timestamp: '1763510400000',
+      nonce: 'nonce-replay',
+    });
+
+    const first = await app.request('/peer/executions', {
+      method: 'POST',
+      headers,
+      body,
+    });
+    expect(first.status).toBe(200);
+
+    const second = await app.request('/peer/executions', {
+      method: 'POST',
+      headers,
+      body,
+    });
+    expect(second.status).toBe(409);
+    expect(await second.json()).toEqual({
+      error: 'Peer execution auth nonce has already been used inside the replay window.',
+      code: 'peer_auth_replayed',
+      details: {
+        callerKey: 'peer:caller-peer',
+        nonce: 'nonce-replay',
+        replayWindowMs: 60_000,
+      },
+    });
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 
   it('rejects peer execution requests without the signature algorithm prefix', async () => {

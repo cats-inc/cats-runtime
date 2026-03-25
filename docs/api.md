@@ -30,6 +30,8 @@ does not use `CATS_RUNTIME_API_KEY`; runtime peers authenticate with:
 ```bash
 Authorization: Bearer <cats-runtime-peer-shared-secret>
 x-cats-peer-id: <caller-peer-id>
+x-cats-peer-timestamp: <unix-ms>
+x-cats-peer-nonce: <uuid-or-random-token>
 x-cats-peer-signature: sha256=<hmac-of-raw-json-body>
 ```
 
@@ -44,7 +46,8 @@ Peer auth/trust notes:
 - use a strong random secret, preferably at least 32 characters
 - trust is directional via each runtime's `trustedPeerIds` / `rejectedPeerIds`
 - the current `/peer/executions` request body is HMAC-signed with
-  `x-cats-peer-signature`, and the wire format is strictly
+  `x-cats-peer-signature`, which now binds the raw JSON body plus
+  `x-cats-peer-timestamp` and `x-cats-peer-nonce`; the wire format is strictly
   `sha256=<64-lowercase-hex>`
 - one-way traffic is supported, but it still needs configuration on both sides:
   the caller must trust the callee for routing, and the callee must trust the
@@ -55,7 +58,8 @@ Peer auth/trust notes:
 - the runtime now supports additive overlap windows for inbound peer auth: keep
   the new primary secret in `CATS_RUNTIME_PEER_SHARED_SECRET` and list older
   still-accepted secrets in `CATS_RUNTIME_PEER_SHARED_SECRETS`
-- v0 still does not add per-peer credentials, nonces, or replay protection;
+- v0 now includes bounded nonce/timestamp replay resistance on
+  `POST /peer/executions`, but it still does not add per-peer credentials;
   operators should treat this as a trusted-LAN or externally TLS-protected
   transport
 
@@ -2521,8 +2525,11 @@ Route semantics:
 - supports both `Accept: application/x-ndjson` and `Accept: text/event-stream`
 - requires peer auth via `Authorization: Bearer <shared-secret>` plus
   `x-cats-peer-id`
-- requires `x-cats-peer-signature: sha256=<hmac>` over the raw JSON request body
+- accepts additive `x-cats-peer-timestamp` and `x-cats-peer-nonce` headers and
+  binds them into `x-cats-peer-signature: sha256=<hmac>`
 - fails closed when peer auth/trust checks fail
+- rejects stale timestamps with `401 peer_auth_stale`
+- rejects replayed nonces with `409 peer_auth_replayed`
 - rate-limits repeated auth failures per caller key and returns `429
   peer_auth_rate_limited` when the bounded failure window is exceeded
 - applies bounded inbound admission control and returns `429
@@ -2542,9 +2549,9 @@ Topology notes:
   gossip-based propagation of peer state
 - this is not a full cluster manager: no transparent failover, no cross-node
   session ownership transfer, and no remote workspace/browser/wakeup ownership
-- request-body integrity is protected with a shared-secret HMAC, but per-peer
-  credentials, replay resistance, and stronger network transport assumptions
-  are later follow-up, not solved by v0
+- request-body integrity and freshness are protected with a shared-secret HMAC
+  plus nonce/timestamp replay resistance, but per-peer credentials and
+  stronger network transport assumptions are later follow-up, not solved by v0
 
 Peer-routing failure events are additive. Streamed `error` events may include:
 

@@ -17,6 +17,9 @@ const DEFAULT_PEER_AUTH_FAILURE_WINDOW_MS = 60_000;
 const DEFAULT_PEER_AUTH_FAILURE_LIMIT = 5;
 const DEFAULT_MAX_INBOUND_PEER_EXECUTIONS = 8;
 const DEFAULT_MAX_INBOUND_PEER_EXECUTIONS_PER_PEER = 2;
+const DEFAULT_PEER_REPLAY_WINDOW_MS = 120_000;
+const DEFAULT_PEER_REPLAY_NONCE_TTL_MS = 120_000;
+const DEFAULT_MAX_REPLAY_NONCES_PER_CALLER = 64;
 
 export function loadPeerRuntimeConfig(config: RuntimeConfig): PeerRuntimeConfig {
   const env = getRuntimeConfigEnv(config);
@@ -57,6 +60,18 @@ export function loadPeerRuntimeConfig(config: RuntimeConfig): PeerRuntimeConfig 
     env.CATS_RUNTIME_PEER_MAX_INBOUND_EXECUTIONS_PER_PEER,
     DEFAULT_MAX_INBOUND_PEER_EXECUTIONS_PER_PEER,
   );
+  const replayWindowMs = parsePositiveInt(
+    env.CATS_RUNTIME_PEER_REPLAY_WINDOW_MS,
+    DEFAULT_PEER_REPLAY_WINDOW_MS,
+  );
+  const replayNonceTtlMs = parsePositiveInt(
+    env.CATS_RUNTIME_PEER_REPLAY_NONCE_TTL_MS,
+    Math.max(replayWindowMs, DEFAULT_PEER_REPLAY_NONCE_TTL_MS),
+  );
+  const maxReplayNoncesPerCaller = parsePositiveInt(
+    env.CATS_RUNTIME_PEER_MAX_REPLAY_NONCES_PER_CALLER,
+    DEFAULT_MAX_REPLAY_NONCES_PER_CALLER,
+  );
   const sharedSecrets = mergeSharedSecrets(
     sanitizeString(env.CATS_RUNTIME_PEER_SHARED_SECRET),
     parseStringList(env.CATS_RUNTIME_PEER_SHARED_SECRETS),
@@ -78,6 +93,9 @@ export function loadPeerRuntimeConfig(config: RuntimeConfig): PeerRuntimeConfig 
     maxAuthFailuresPerWindow,
     maxInboundExecutions,
     maxInboundExecutionsPerPeer,
+    replayWindowMs,
+    replayNonceTtlMs,
+    maxReplayNoncesPerCaller,
     allowHeuristicRouting: parseBoolean(
       env.CATS_RUNTIME_PEER_ALLOW_HEURISTIC_ROUTING,
       false,

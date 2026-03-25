@@ -110,6 +110,21 @@ describe('PeerTrustService', () => {
     )).toBe(true);
     expect(trust.validatePayloadSignature(
       '{"turn":{"message":"hello"}}',
+      createPeerPayloadSignature(
+        'lan-secret',
+        '{"turn":{"message":"hello"}}',
+        {
+          timestamp: '1763510400000',
+          nonce: 'nonce-1',
+        },
+      ),
+      {
+        timestamp: '1763510400000',
+        nonce: 'nonce-1',
+      },
+    )).toBe(true);
+    expect(trust.validatePayloadSignature(
+      '{"turn":{"message":"hello"}}',
       createPeerPayloadSignature('lan-secret-old', '{"turn":{"message":"hello"}}'),
     )).toBe(true);
     expect(trust.validatePayloadSignature(

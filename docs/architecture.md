@@ -239,7 +239,8 @@ src/
   execution routing policy
 - Separates peer discovery (`PeerDiscoveryController`), trust bootstrap
   (`PeerTrustService`), routing (`PeerRoutingService`), caller-side transport
-  (`PeerExecutionClient`), peer-only admission/throttling
+  (`PeerExecutionClient`), peer-only auth replay resistance
+  (`PeerExecutionReplayService`), peer-only admission/throttling
   (`PeerExecutionAdmissionService`), and callee-side bounded execution
   (`PeerExecutionService`)
 - Treats peer execution as an execution-only extension: the caller runtime

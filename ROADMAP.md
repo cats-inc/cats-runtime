@@ -736,11 +736,10 @@ coordinated `cats` changes or a new design slice:
 `POST /peer/executions` now has shared-secret bearer auth plus request-body
 HMAC signing. The next hardening slice also landed bounded auth failure
 rate-limiting per caller key and bounded inbound execution admission control so
-one caller cannot occupy unlimited peer capacity. The following work is still
-intentionally deferred:
+one caller cannot occupy unlimited peer capacity. The next slice also landed
+bounded nonce/timestamp replay resistance for peer execution requests. The
+following work is still intentionally deferred:
 
-- add nonce/timestamp or equivalent replay resistance; body signing alone does
-  not stop replay
 - document and optionally enforce a TLS-fronted posture for any deployment
   outside a tightly trusted LAN
 - deepen the current caller-key / per-peer limits into richer peer-specific

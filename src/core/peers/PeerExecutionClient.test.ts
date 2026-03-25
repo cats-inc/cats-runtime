@@ -161,8 +161,15 @@ describe('PeerExecutionClient', () => {
 
         expect(headers.authorization).toBe('Bearer lan-secret');
         expect(headers['x-cats-peer-id']).toBe('local-peer');
+        expect(headers['x-cats-peer-timestamp']).toBe('1763424000000');
+        expect(headers['x-cats-peer-nonce']).toMatch(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+        );
         expect(headers['x-cats-peer-signature']).toBe(
-          createPeerPayloadSignature('lan-secret', body),
+          createPeerPayloadSignature('lan-secret', body, {
+            timestamp: headers['x-cats-peer-timestamp']!,
+            nonce: headers['x-cats-peer-nonce']!,
+          }),
         );
 
         return new Response([
@@ -175,6 +182,7 @@ describe('PeerExecutionClient', () => {
           },
         });
       },
+      now: () => 1_763_424_000_000,
     });
 
     const peer = createPeerEntry();
@@ -219,6 +227,7 @@ describe('PeerExecutionClient', () => {
         sharedSecret: 'lan-secret',
       },
       localPeerId: 'local-peer',
+      now: () => 1_763_424_000_000,
       fetch: async () => new Response([
         'data: {"type":"text","text":"partial"}',
         '',
@@ -257,6 +266,7 @@ describe('PeerExecutionClient', () => {
         sharedSecret: 'lan-secret',
       },
       localPeerId: 'local-peer',
+      now: () => 1_763_424_000_000,
       fetch: async (_input, init) => new Promise((_resolve, reject) => {
         const signal = init?.signal;
         if (!signal) {

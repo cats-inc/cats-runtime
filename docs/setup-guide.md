@@ -135,7 +135,8 @@ Current auth/trust model:
   `CATS_RUNTIME_PEER_SHARED_SECRET` / `CATS_RUNTIME_PEER_SHARED_SECRETS` are
   separate
 - inbound peer execution checks the bearer secret, the caller peer id, and an
-  HMAC signature over the raw JSON request body using
+  HMAC signature over the raw JSON request body plus
+  `x-cats-peer-timestamp` / `x-cats-peer-nonce`, using
   `x-cats-peer-signature: sha256=<64-hex>`
 - use a strong random peer shared secret, preferably at least 32 characters
 - trust is directional and configured per runtime with
@@ -145,8 +146,8 @@ Current auth/trust model:
   trust `A` for inbound execution
 - current v0 auth is bearer-secret based; if you run outside a tightly trusted
   LAN, put the runtime behind TLS
-- current v0 includes HMAC body signing, but it still does not include
-  nonce/timestamp replay protection or per-peer credentials
+- current v0 includes HMAC body signing plus bounded nonce/timestamp replay
+  protection, but it still does not include per-peer credentials
 
 Current topology boundary:
 
@@ -232,6 +233,9 @@ Keep `.env` for runtime-wide values and secrets:
 - `CATS_RUNTIME_PEER_AUTH_FAILURE_LIMIT=5`
 - `CATS_RUNTIME_PEER_MAX_INBOUND_EXECUTIONS=8`
 - `CATS_RUNTIME_PEER_MAX_INBOUND_EXECUTIONS_PER_PEER=2`
+- `CATS_RUNTIME_PEER_REPLAY_WINDOW_MS=120000`
+- `CATS_RUNTIME_PEER_REPLAY_NONCE_TTL_MS=120000`
+- `CATS_RUNTIME_PEER_MAX_REPLAY_NONCES_PER_CALLER=64`
 - `CATS_RUNTIME_PEER_ALLOW_HEURISTIC_ROUTING=false`
 - `CATS_RUNTIME_PEER_SHARED_SECRET=`
 - `CATS_RUNTIME_PEER_SHARED_SECRETS=`

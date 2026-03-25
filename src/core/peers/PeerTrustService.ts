@@ -1,5 +1,8 @@
 import { timingSafeEqual } from 'node:crypto';
-import { validatePeerPayloadSignature } from './auth.js';
+import {
+  validatePeerPayloadSignature,
+  type PeerPayloadSignatureContext,
+} from './auth.js';
 import type {
   PeerAdvertisement,
   PeerRegistryEntry,
@@ -47,11 +50,16 @@ export class PeerTrustService {
     return false;
   }
 
-  validatePayloadSignature(payload: string, signature: string | undefined): boolean {
+  validatePayloadSignature(
+    payload: string,
+    signature: string | undefined,
+    context?: PeerPayloadSignatureContext,
+  ): boolean {
     return validatePeerPayloadSignature(
       normalizeSharedSecrets(this.options.config),
       payload,
       signature,
+      context,
     );
   }
 

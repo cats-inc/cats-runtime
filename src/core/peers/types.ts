@@ -22,6 +22,8 @@ export type PeerExecutionFailureCode =
   | 'peer_unhealthy'
   | 'peer_auth_required'
   | 'peer_auth_failed'
+  | 'peer_auth_stale'
+  | 'peer_auth_replayed'
   | 'peer_request_timeout'
   | 'peer_http_error'
   | 'peer_protocol_error'
@@ -132,6 +134,9 @@ export interface PeerRuntimeConfig {
   maxAuthFailuresPerWindow: number;
   maxInboundExecutions: number;
   maxInboundExecutionsPerPeer: number;
+  replayWindowMs: number;
+  replayNonceTtlMs: number;
+  maxReplayNoncesPerCaller: number;
   allowHeuristicRouting: boolean;
   sharedSecret?: string;
   sharedSecrets: string[];
