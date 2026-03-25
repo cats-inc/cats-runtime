@@ -17,6 +17,36 @@ export type PeerExecutionReplayDecision =
       details: Record<string, unknown>;
     };
 
+export interface PeerExecutionReplaySummary {
+  replayWindowMs: number;
+  nonceTtlMs: number;
+  maxNoncesPerCaller: number;
+  trackedCallers: number;
+  trackedNonces: number;
+}
+
+export interface PeerExecutionReplayCallerSummary {
+  callerKey: string;
+  trackedNonces: number;
+  maxNoncesPerCaller: number;
+}
+
+export interface PeerExecutionReplayCallerSnapshot {
+  callerKey: string;
+  trackedNonces: number;
+  newestNonceExpiresAt: string;
+}
+
+export interface PeerExecutionReplaySnapshot {
+  replayWindowMs: number;
+  nonceTtlMs: number;
+  maxNoncesPerCaller: number;
+  trackedCallers: number;
+  trackedNonces: number;
+  hiddenCallers: number;
+  callers: PeerExecutionReplayCallerSnapshot[];
+}
+
 export class PeerExecutionReplayService {
   private readonly seenByCaller = new Map<string, Map<string, number>>();
 
@@ -66,6 +96,55 @@ export class PeerExecutionReplayService {
     return { ok: true };
   }
 
+  getSummary(): PeerExecutionReplaySummary {
+    const callers = this.collectCallerEntries(this.now());
+
+    return {
+      replayWindowMs: this.options.config.replayWindowMs,
+      nonceTtlMs: this.options.config.replayNonceTtlMs,
+      maxNoncesPerCaller: this.options.config.maxReplayNoncesPerCaller,
+      trackedCallers: callers.length,
+      trackedNonces: callers.reduce((total, caller) => total + caller.trackedNonces, 0),
+    };
+  }
+
+  getCallerSummary(callerKey: string): PeerExecutionReplayCallerSummary {
+    const normalizedCallerKey = normalizeKey(callerKey);
+    const callers = this.collectCallerEntries(this.now());
+    const caller = callers.find((entry) => entry.callerKey === normalizedCallerKey);
+
+    return {
+      callerKey: normalizedCallerKey,
+      trackedNonces: caller?.trackedNonces ?? 0,
+      maxNoncesPerCaller: this.options.config.maxReplayNoncesPerCaller,
+    };
+  }
+
+  snapshot(options: { maxCallers?: number } = {}): PeerExecutionReplaySnapshot {
+    const maxCallers = Math.max(1, options.maxCallers ?? 10);
+    const callers = this.collectCallerEntries(this.now())
+      .sort((left, right) =>
+        right.trackedNonces - left.trackedNonces
+        || right.newestNonceExpiresAt - left.newestNonceExpiresAt
+        || left.callerKey.localeCompare(right.callerKey));
+
+    return {
+      replayWindowMs: this.options.config.replayWindowMs,
+      nonceTtlMs: this.options.config.replayNonceTtlMs,
+      maxNoncesPerCaller: this.options.config.maxReplayNoncesPerCaller,
+      trackedCallers: callers.length,
+      trackedNonces: callers.reduce((total, caller) => total + caller.trackedNonces, 0),
+      hiddenCallers: Math.max(0, callers.length - Math.min(callers.length, maxCallers)),
+      callers: callers
+        .slice(0, maxCallers)
+        .map((caller) => ({
+          callerKey: caller.callerKey,
+          trackedNonces: caller.trackedNonces,
+          newestNonceExpiresAt: new Date(caller.newestNonceExpiresAt).toISOString(),
+        })),
+    };
+  }
+
   private pruneCallerNonces(callerKey: string, now: number): Map<string, number> {
     const current = this.seenByCaller.get(callerKey);
     if (!current) {
@@ -98,6 +177,34 @@ export class PeerExecutionReplayService {
       return;
     }
     this.seenByCaller.set(callerKey, callerNonces);
+  }
+
+  private collectCallerEntries(now: number): Array<{
+    callerKey: string;
+    trackedNonces: number;
+    newestNonceExpiresAt: number;
+  }> {
+    const entries: Array<{
+      callerKey: string;
+      trackedNonces: number;
+      newestNonceExpiresAt: number;
+    }> = [];
+
+    for (const callerKey of this.seenByCaller.keys()) {
+      const callerNonces = this.pruneCallerNonces(callerKey, now);
+      this.persistOrDeleteCallerNonces(callerKey, callerNonces);
+      if (callerNonces.size === 0) {
+        continue;
+      }
+
+      entries.push({
+        callerKey,
+        trackedNonces: callerNonces.size,
+        newestNonceExpiresAt: Math.max(...callerNonces.values()),
+      });
+    }
+
+    return entries;
   }
 }
 

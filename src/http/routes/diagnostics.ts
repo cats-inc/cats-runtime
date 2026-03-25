@@ -839,9 +839,7 @@ diagnosticsRoutes.get('/diagnostics/peers', (c) => {
       },
       discovery,
       summary: discovery.registry,
-      ...(ctx.peerExecutionAdmission
-        ? { guardrails: ctx.peerExecutionAdmission.snapshot() }
-        : {}),
+      ...buildPeerGuardrailDiagnostics(ctx),
       peers,
     });
   } catch (error) {
@@ -1056,6 +1054,17 @@ function filterProviderDiagnosticsCatalog(
     },
     {},
   );
+}
+
+function buildPeerGuardrailDiagnostics(
+  ctx: AppContext,
+): { guardrails?: Record<string, unknown> } {
+  const guardrails = {
+    ...(ctx.peerExecutionAdmission ? ctx.peerExecutionAdmission.snapshot() : {}),
+    ...(ctx.peerExecutionReplay ? { replay: ctx.peerExecutionReplay.snapshot() } : {}),
+  };
+
+  return Object.keys(guardrails).length > 0 ? { guardrails } : {};
 }
 
 async function probeRemoteEndpoint(

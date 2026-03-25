@@ -17,7 +17,7 @@ peerRoutes.get('/peers', (c) => {
         includeStale,
       },
       discovery: getPeerDiscoverySnapshot(ctx),
-      ...(ctx.peerExecutionAdmission ? { guardrails: ctx.peerExecutionAdmission.getSummary() } : {}),
+      ...buildPeerGuardrailSummary(ctx),
       peers,
     });
   } catch (error) {
@@ -41,9 +41,7 @@ peerRoutes.get('/peers/:peerId', (c) => {
 
     return c.json({
       discovery: getPeerDiscoverySnapshot(ctx),
-      ...(ctx.peerExecutionAdmission
-        ? { guardrails: { inboundExecutions: ctx.peerExecutionAdmission.getInboundExecutionStatus(peerId) } }
-        : {}),
+      ...buildPeerGuardrailDetail(ctx, peerId),
       peer,
     });
   } catch (error) {
@@ -67,4 +65,29 @@ function parseBooleanQuery(value: string | undefined): boolean | undefined {
     return false;
   }
   throw new PeerRouteQueryError(`Invalid boolean query value '${value}'.`);
+}
+
+function buildPeerGuardrailSummary(ctx: AppContext): { guardrails?: Record<string, unknown> } {
+  const guardrails = {
+    ...(ctx.peerExecutionAdmission ? ctx.peerExecutionAdmission.getSummary() : {}),
+    ...(ctx.peerExecutionReplay ? { replay: ctx.peerExecutionReplay.getSummary() } : {}),
+  };
+
+  return Object.keys(guardrails).length > 0 ? { guardrails } : {};
+}
+
+function buildPeerGuardrailDetail(
+  ctx: AppContext,
+  peerId: string,
+): { guardrails?: Record<string, unknown> } {
+  const guardrails = {
+    ...(ctx.peerExecutionAdmission
+      ? { inboundExecutions: ctx.peerExecutionAdmission.getInboundExecutionStatus(peerId) }
+      : {}),
+    ...(ctx.peerExecutionReplay
+      ? { replay: ctx.peerExecutionReplay.getCallerSummary(`peer:${peerId}`) }
+      : {}),
+  };
+
+  return Object.keys(guardrails).length > 0 ? { guardrails } : {};
 }

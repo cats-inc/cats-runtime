@@ -696,8 +696,8 @@ changes that keep ADR-019's execution-only boundary intact.
   - `GET /diagnostics/peers`
 - additive peer guardrail read models:
   - `GET /peers` returns lightweight auth-throttle/inbound-capacity summaries
-  - `GET /peers/:peerId` returns per-peer inbound execution status
-  - `GET /diagnostics/peers` returns bounded auth-throttle and inbound-capacity details
+  - `GET /peers/:peerId` returns per-peer inbound execution status plus replay counters
+  - `GET /diagnostics/peers` returns bounded auth-throttle, inbound-capacity, and replay details
 - additive peer summaries on runtime/health diagnostics
 - `POST /peer/executions` as the dedicated peer-only execution seam
 - additive `routing` support on `POST /sessions/:id/messages`

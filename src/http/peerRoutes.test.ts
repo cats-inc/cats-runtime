@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { PeerRegistry } from '../core/peers/PeerRegistry.js';
 import { createDisabledPeerDiscoverySnapshot } from '../core/peers/PeerDiscoveryController.js';
 import { PeerExecutionAdmissionService } from '../core/peers/PeerExecutionAdmissionService.js';
+import { PeerExecutionReplayService } from '../core/peers/PeerExecutionReplayService.js';
 import type { PeerAdvertisement } from '../core/peers/types.js';
 import type { AppContext } from './app.js';
 import { diagnosticsRoutes } from './routes/diagnostics.js';
@@ -151,8 +152,18 @@ describe('peer routes', () => {
       },
       now: () => now,
     });
+    const replay = new PeerExecutionReplayService({
+      config: {
+        replayWindowMs: 60_000,
+        replayNonceTtlMs: 120_000,
+        maxReplayNoncesPerCaller: 16,
+      },
+      now: () => now,
+    });
     admission.recordAuthFailure('peer:lab');
     admission.recordAuthFailure('peer:lab');
+    replay.validate('peer:peer-live', now, 'nonce-1');
+    replay.validate('peer:peer-live', now, 'nonce-2');
     const inbound = admission.acquireInboundExecution('peer-live');
     if (!inbound.ok) {
       throw new Error('expected peer admission grant');
@@ -162,6 +173,7 @@ describe('peer routes', () => {
       startup: createRuntimeStartupState(),
       peerRegistry: registry,
       peerExecutionAdmission: admission,
+      peerExecutionReplay: replay,
       peerCapabilities: {
         getLocalPeerId: () => 'local-peer',
       } as never,
@@ -239,6 +251,20 @@ describe('peer routes', () => {
             },
           ],
         },
+        replay: {
+          replayWindowMs: 60_000,
+          nonceTtlMs: 120_000,
+          maxNoncesPerCaller: 16,
+          trackedCallers: 1,
+          trackedNonces: 2,
+          hiddenCallers: 0,
+          callers: [
+            expect.objectContaining({
+              callerKey: 'peer:peer-live',
+              trackedNonces: 2,
+            }),
+          ],
+        },
       },
       peers: [
         expect.objectContaining({
@@ -268,7 +294,16 @@ describe('peer routes', () => {
         maxInboundExecutionsPerPeer: 1,
       },
     });
+    const replay = new PeerExecutionReplayService({
+      config: {
+        replayWindowMs: 60_000,
+        replayNonceTtlMs: 120_000,
+        maxReplayNoncesPerCaller: 16,
+      },
+      now: () => now,
+    });
     admission.recordAuthFailure('peer:caller-a');
+    replay.validate('peer:peer-live', now, 'nonce-1');
     const inbound = admission.acquireInboundExecution('peer-live');
     if (!inbound.ok) {
       throw new Error('expected peer admission grant');
@@ -278,6 +313,7 @@ describe('peer routes', () => {
       startup: createRuntimeStartupState(),
       peerRegistry: registry,
       peerExecutionAdmission: admission,
+      peerExecutionReplay: replay,
       peerCapabilities: {
         getLocalPeerId: () => 'local-peer',
       } as never,
@@ -309,6 +345,13 @@ describe('peer routes', () => {
           activePeers: 1,
           saturated: false,
         },
+        replay: {
+          replayWindowMs: 60_000,
+          nonceTtlMs: 120_000,
+          maxNoncesPerCaller: 16,
+          trackedCallers: 1,
+          trackedNonces: 1,
+        },
       },
     }));
 
@@ -321,6 +364,11 @@ describe('peer routes', () => {
           activeExecutions: 1,
           maxPerPeer: 1,
           saturated: true,
+        },
+        replay: {
+          callerKey: 'peer:peer-live',
+          trackedNonces: 1,
+          maxNoncesPerCaller: 16,
         },
       },
     }));

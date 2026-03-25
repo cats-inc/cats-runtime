@@ -1843,6 +1843,10 @@ providers:
       if (!peerGuardrailSummary) {
         throw new Error('missing peer execution admission summary');
       }
+      const peerReplaySummary = runtime.context.peerExecutionReplay?.getSummary();
+      if (!peerReplaySummary) {
+        throw new Error('missing peer execution replay summary');
+      }
 
       const peerDetail = await runtime.app.request(`/peers/${localPeerId}`);
       expect(peerDetail.status).toBe(200);
@@ -1857,6 +1861,11 @@ providers:
             activeExecutions: 0,
             maxPerPeer: localPeerGuardrails.maxPerPeer,
             saturated: false,
+          },
+          replay: {
+            callerKey: `peer:${localPeerId}`,
+            trackedNonces: 0,
+            maxNoncesPerCaller: peerReplaySummary.maxNoncesPerCaller,
           },
         },
         peer: expect.objectContaining({
@@ -1890,6 +1899,11 @@ providers:
           inboundExecutions: expect.objectContaining({
             activeGlobal: 0,
             maxGlobal: peerGuardrailSummary.inboundExecutions.maxGlobal,
+          }),
+          replay: expect.objectContaining({
+            trackedCallers: 0,
+            trackedNonces: 0,
+            maxNoncesPerCaller: peerReplaySummary.maxNoncesPerCaller,
           }),
         }),
         summary: expect.objectContaining({

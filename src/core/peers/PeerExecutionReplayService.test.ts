@@ -80,4 +80,48 @@ describe('PeerExecutionReplayService', () => {
       },
     });
   });
+
+  it('builds bounded replay summaries and caller snapshots', () => {
+    const now = Date.parse('2026-03-26T00:00:10.000Z');
+    const service = new PeerExecutionReplayService({
+      config: {
+        replayWindowMs: 30_000,
+        replayNonceTtlMs: 10_000,
+        maxReplayNoncesPerCaller: 4,
+      },
+      now: () => now,
+    });
+
+    expect(service.validate('peer:b', now, 'nonce-b1')).toEqual({ ok: true });
+    expect(service.validate('peer:b', now, 'nonce-b2')).toEqual({ ok: true });
+    expect(service.validate('peer:a', now, 'nonce-a1')).toEqual({ ok: true });
+
+    expect(service.getSummary()).toEqual({
+      replayWindowMs: 30_000,
+      nonceTtlMs: 10_000,
+      maxNoncesPerCaller: 4,
+      trackedCallers: 2,
+      trackedNonces: 3,
+    });
+
+    expect(service.getCallerSummary('peer:b')).toEqual({
+      callerKey: 'peer:b',
+      trackedNonces: 2,
+      maxNoncesPerCaller: 4,
+    });
+
+    expect(service.snapshot({ maxCallers: 1 })).toEqual({
+      replayWindowMs: 30_000,
+      nonceTtlMs: 10_000,
+      maxNoncesPerCaller: 4,
+      trackedCallers: 2,
+      trackedNonces: 3,
+      hiddenCallers: 1,
+      callers: [{
+        callerKey: 'peer:b',
+        trackedNonces: 2,
+        newestNonceExpiresAt: '2026-03-26T00:00:20.000Z',
+      }],
+    });
+  });
 });
