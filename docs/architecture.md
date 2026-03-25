@@ -267,7 +267,8 @@ src/
   optimizations under the runtime-owned logical session
 - Hosts the first runtime-owned pluggable execution-strategy substrate for
   runtime-hosted API/local loops, including the compatibility
-  `simple_tool_call` wrapper and a bounded `react` loop
+  `simple_tool_call` wrapper, a bounded `react` loop, and a bounded `pdca`
+  loop
 - Emits normalized `progress` events plus additive incident hints for
   provider-native cache, continuation, rate-limit/quota, and local-model
   warm-state hints so upper layers do not need to consume provider-specific raw

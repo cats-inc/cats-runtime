@@ -502,7 +502,7 @@ describe('ApiBackendManager', () => {
     const handle = manager.spawn(session.id, createTarget());
     const events = await collectEvents(handle.streamMessage({
       message: 'hello',
-      requestedStrategy: 'pdca',
+      requestedStrategy: 'reflexion',
       correlation: {
         taskId: 'task-work-1',
         product: 'work',
@@ -512,15 +512,15 @@ describe('ApiBackendManager', () => {
 
     expect(events).toContainEqual(expect.objectContaining({
       type: 'progress',
-      text: "Requested strategy 'pdca' is not supported by this runtime; falling back to 'simple_tool_call'.",
+      text: "Requested strategy 'reflexion' is not supported by this runtime; falling back to 'simple_tool_call'.",
       metadata: expect.objectContaining({
         kind: 'strategy',
         status: 'fallback',
         strategyEvent: 'strategy_degraded',
-        requestedStrategy: 'pdca',
+        requestedStrategy: 'reflexion',
         effectiveStrategy: 'simple_tool_call',
         strategyResolutionSource: 'compatibility_fallback',
-        degradedStrategy: 'pdca',
+        degradedStrategy: 'reflexion',
         fallbackStrategy: 'simple_tool_call',
       }),
     }));
@@ -544,7 +544,7 @@ describe('ApiBackendManager', () => {
     expect(updated).toMatchObject({
       strategy: {
         request: {
-          requestedStrategy: 'pdca',
+          requestedStrategy: 'reflexion',
           correlation: {
             taskId: 'task-work-1',
             product: 'work',
@@ -572,7 +572,7 @@ describe('ApiBackendManager', () => {
       cwd: '/repo',
       strategy: {
         request: {
-          requestedStrategy: 'pdca',
+          requestedStrategy: 'reflexion',
         },
         effectiveStrategy: 'simple_tool_call',
         resolutionSource: 'compatibility_fallback',
@@ -847,3 +847,254 @@ describe('ApiBackendManager', () => {
     }
   });
 });
+  it('runs explicit pdca with additive phase events and runtime-owned inspection metadata', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-api-pdca-'));
+    const repoDir = join(root, 'repo');
+    mkdirSync(repoDir, { recursive: true });
+    writeFileSync(join(repoDir, 'answer.txt'), '42\n', 'utf-8');
+
+    try {
+      const registry = new SessionRegistry();
+      const session = registry.create({
+        id: 'api-session-pdca',
+        providerName: 'codex',
+        providerBackend: 'api',
+        providerInstanceId: 'gateway',
+        cwd: repoDir,
+      });
+
+      const requestBodies: Record<string, unknown>[] = [];
+      const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+        requestBodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        if (requestBodies.length === 1) {
+          return new Response(JSON.stringify({
+            id: 'resp_pdca_1',
+            output: [
+              {
+                type: 'message',
+                role: 'assistant',
+                content: [{ type: 'output_text', text: 'Planning the first inspection cycle.' }],
+              },
+              {
+                type: 'function_call',
+                call_id: 'call_read_answer_pdca',
+                name: 'read_file',
+                arguments: '{"path":"answer.txt"}',
+              },
+            ],
+            usage: {
+              input_tokens: 7,
+              output_tokens: 3,
+            },
+          }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+
+        return new Response(JSON.stringify({
+          id: 'resp_pdca_2',
+          output: [{
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: '42' }],
+          }],
+          usage: {
+            input_tokens: 4,
+            output_tokens: 1,
+          },
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      });
+
+      const manager = new ApiBackendManager(
+        { sessionBaseDir: root },
+        registry,
+        {
+          fetch: fetchMock as typeof fetch,
+          env: {
+            OPENAI_API_KEY: 'test-key',
+          },
+        },
+      );
+      const runtime = createRuntimeManager(root, manager);
+      const turn = {
+        message: 'Inspect answer.txt and return only the verified value.',
+        requestedStrategy: 'pdca' as const,
+        acceptanceCriteria: 'Return only the verified file value.',
+        strategyContext: {
+          maxCycles: 4,
+          timeoutMs: 1500,
+          stuckThreshold: 2,
+        },
+        correlation: {
+          taskId: 'task-work-1',
+          product: 'work',
+        },
+      };
+
+      runtime.beginRun(session, turn);
+
+      const handle = manager.spawn(session.id, createTarget());
+      const events = await collectEvents(handle.streamMessage(turn));
+      for (const event of events) {
+        runtime.observeEvent(session.id, event);
+      }
+
+      const updated = registry.get(session.id)!;
+      const inspection = buildSessionInspection({
+        session: updated,
+        view: toSessionView(updated, {
+          attached: manager.isAttached(session.id),
+          externalSessionLiveWindowMs: 15000,
+        }),
+        trackedState: runtime.getTrackedState(session.id),
+        metering: buildMeteringSnapshot(),
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(String(requestBodies[0]?.instructions)).toContain('Execution strategy: pdca.');
+      expect(String(requestBodies[0]?.instructions)).toContain(
+        'Acceptance criteria:\nReturn only the verified file value.',
+      );
+      expect(String(requestBodies[0]?.instructions)).toContain('maxCycles: 4');
+      expect(requestBodies[1]?.previous_response_id).toBe('resp_pdca_1');
+
+      expect(events).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            status: 'started',
+            strategyEvent: 'strategy_started',
+            effectiveStrategy: 'pdca',
+            strategyResolutionSource: 'explicit_request',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            strategyEvent: 'strategy_plan',
+            effectiveStrategy: 'pdca',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            strategyEvent: 'strategy_do',
+            effectiveStrategy: 'pdca',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            strategyEvent: 'strategy_check',
+            effectiveStrategy: 'pdca',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            strategyEvent: 'strategy_act',
+            effectiveStrategy: 'pdca',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            status: 'completed',
+            strategyEvent: 'strategy_completed',
+            effectiveStrategy: 'pdca',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'tool_use',
+          toolName: 'read_file',
+          toolId: 'call_read_answer_pdca',
+        }),
+        expect.objectContaining({
+          type: 'tool_result',
+          toolName: 'read_file',
+          toolId: 'call_read_answer_pdca',
+          text: expect.stringContaining('42'),
+        }),
+        expect.objectContaining({
+          type: 'result',
+          sessionId: 'resp_pdca_2',
+          usage: {
+            inputTokens: 11,
+            outputTokens: 4,
+          },
+        }),
+      ]));
+
+      expect(updated).toMatchObject({
+        strategy: {
+          preferredStrategy: 'pdca',
+          request: {
+            requestedStrategy: 'pdca',
+            acceptanceCriteria: 'Return only the verified file value.',
+            strategyContext: {
+              maxCycles: 4,
+              timeoutMs: 1500,
+              stuckThreshold: 2,
+            },
+            correlation: {
+              taskId: 'task-work-1',
+              product: 'work',
+            },
+          },
+          effectiveStrategy: 'pdca',
+          resolutionSource: 'explicit_request',
+          summary: {
+            status: 'completed',
+            stepCount: 2,
+            stepLimit: 4,
+            timeoutMs: 1500,
+            duplicateStepCount: 1,
+            lastStepSignature: 'read_file:{"path":"answer.txt"}',
+            lastEvent: 'strategy_completed',
+            resolutionSource: 'explicit_request',
+          },
+          localState: {
+            currentPhase: 'completed',
+            completedCycles: 2,
+            consecutiveDuplicateToolCalls: 1,
+            lastToolCallSignature: 'read_file:{"path":"answer.txt"}',
+            lastToolCallCount: 1,
+          },
+        },
+      });
+
+      expect(inspection.strategy).toMatchObject({
+        requestedStrategy: 'pdca',
+        effectiveStrategy: 'pdca',
+        acceptanceCriteria: 'Return only the verified file value.',
+        correlation: {
+          taskId: 'task-work-1',
+          product: 'work',
+        },
+        state: {
+          preferredStrategy: 'pdca',
+          effectiveStrategy: 'pdca',
+          summary: {
+            status: 'completed',
+            stepCount: 2,
+          },
+          localState: {
+            currentPhase: 'completed',
+            completedCycles: 2,
+          },
+        },
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });

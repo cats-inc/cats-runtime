@@ -8,7 +8,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | Completed |
 | **Owner** | Codex |
 | **Assigned To** | TBD |
 | **Reviewer** | User |
@@ -66,45 +66,44 @@ It must not:
 - public task event bus
 - product-default inference from Chat/Work/Code names
 - direct imports of `cats` task contracts
-- first-slice implementation of `pdca`, `reflexion`, `tree_of_thoughts`, or
-  `deps`
+- later-family implementation of `reflexion`, `tree_of_thoughts`, or `deps`
 - forced CLI migration onto the new substrate
 
 ## Implementation Phases
 
 ### Phase 1: Strategy Contract, Registry, and Additive Session Request Shape
 
-- [ ] Define runtime-owned strategy request and context types
-- [ ] Add a strategy registry seam for runtime-hosted execution loops
-- [ ] Add additive request fields such as:
+- [x] Define runtime-owned strategy request and context types
+- [x] Add a strategy registry seam for runtime-hosted execution loops
+- [x] Add additive request fields such as:
       `requestedStrategy`, `acceptanceCriteria`, `strategyContext`,
       `correlation`
-- [ ] Add additive session/observe metadata for:
+- [x] Add additive session/observe metadata for:
       `requestedStrategy`, `effectiveStrategy`, and strategy-state summary
-- [ ] Keep existing callers valid when they send none of the new fields
+- [x] Keep existing callers valid when they send none of the new fields
 
 **Deliverables**: a stable runtime-owned contract for strategy selection and
 inspection that preserves existing session behavior.
 
 ### Phase 2: Compatibility Wrapper for Existing Runtime Loop
 
-- [ ] Wrap the current runtime-hosted flat tool-call loop as
+- [x] Wrap the current runtime-hosted flat tool-call loop as
       `simple_tool_call`
-- [ ] Keep current execution behavior as the compatibility fallback
-- [ ] Ensure current API/local consumers produce the same final behavior when
+- [x] Keep current execution behavior as the compatibility fallback
+- [x] Ensure current API/local consumers produce the same final behavior when
       they do not send strategy hints
-- [ ] Add regression coverage proving the fallback path is behaviorally stable
+- [x] Add regression coverage proving the fallback path is behaviorally stable
 
 **Deliverables**: the current loop becomes an explicit strategy instead of an
 implicit code path.
 
 ### Phase 3: First Real Strategy Implementation (`react`)
 
-- [ ] Implement `react` as the first non-trivial strategy
-- [ ] Add step limit enforcement
-- [ ] Add stuck/duplicate detection
-- [ ] Add bounded timeout behavior and failure reporting
-- [ ] Keep tool execution and transcript integration inside the existing runtime
+- [x] Implement `react` as the first non-trivial strategy
+- [x] Add step limit enforcement
+- [x] Add stuck/duplicate detection
+- [x] Add bounded timeout behavior and failure reporting
+- [x] Keep tool execution and transcript integration inside the existing runtime
       boundaries
 
 **Deliverables**: `react` is usable as the first strategy that improves on the
@@ -112,13 +111,13 @@ current loop semantics.
 
 ### Phase 4: Strategy Resolution and Runtime-Owned State Persistence
 
-- [ ] Implement resolution order:
+- [x] Implement resolution order:
       explicit request -> runtime-owned preference -> compatibility fallback
-- [ ] Persist runtime-owned strategy-local state in session metadata or
+- [x] Persist runtime-owned strategy-local state in session metadata or
       equivalent runtime state
-- [ ] Support resume/re-entry for runtime-hosted loops without relying on
+- [x] Support resume/re-entry for runtime-hosted loops without relying on
       product task records
-- [ ] Ensure correlation metadata remains opaque and does not become a runtime
+- [x] Ensure correlation metadata remains opaque and does not become a runtime
       task schema
 
 **Deliverables**: strategy choice and strategy-local resume state survive normal
@@ -126,11 +125,11 @@ runtime session lifecycle.
 
 ### Phase 5: Streaming and Observe Integration
 
-- [ ] Add additive strategy events to existing stream surfaces
-- [ ] Add additive strategy summary/state fields to observe/session inspection
-- [ ] Reuse existing streaming infrastructure; do not invent a second runtime
+- [x] Add additive strategy events to existing stream surfaces
+- [x] Add additive strategy summary/state fields to observe/session inspection
+- [x] Reuse existing streaming infrastructure; do not invent a second runtime
       event bus
-- [ ] Make sure products can consume progress without understanding strategy
+- [x] Make sure products can consume progress without understanding strategy
       internals deeply
 
 **Deliverables**: runtime strategy progress is observable through current
@@ -138,22 +137,22 @@ stream/observe seams.
 
 ### Phase 6: Execution-Family Rollout and Guardrails
 
-- [ ] Land the substrate first on runtime-hosted API/local flows
-- [ ] Keep CLI-native loops out of scope unless a provider explicitly opts in
-- [ ] Audit agent-backend execution paths for future compatibility, but do not
+- [x] Land the substrate first on runtime-hosted API/local flows
+- [x] Keep CLI-native loops out of scope unless a provider explicitly opts in
+- [x] Audit agent-backend execution paths for future compatibility, but do not
       require full adoption in the first slice
-- [ ] Add configuration or internal capability flags where staged rollout helps
+- [x] Add configuration or internal capability flags where staged rollout helps
 
 **Deliverables**: one safe first rollout that improves runtime-hosted loops
 without destabilizing unrelated execution families.
 
 ### Phase 7: Verification and Documentation
 
-- [ ] Add unit tests for registry, resolution, and strategy-local state
-- [ ] Add integration tests for create/message/stream/observe with and without
+- [x] Add unit tests for registry, resolution, and strategy-local state
+- [x] Add integration tests for create/message/stream/observe with and without
       strategy hints
-- [ ] Add regressions proving current callers still work with fallback behavior
-- [ ] Update `docs/api.md` and `docs/architecture.md` after implementation
+- [x] Add regressions proving current callers still work with fallback behavior
+- [x] Update `docs/api.md` and `docs/architecture.md` after implementation
       lands
 
 **Deliverables**: tested, documented, additive rollout of the strategy
@@ -170,7 +169,7 @@ substrate.
 | `src/backends/api/**` | Modify | Route runtime-hosted API execution through the new strategy substrate |
 | `src/backends/local/**` or shared API/local manager paths | Modify | Adopt the substrate for local-model runtime-hosted loops where applicable |
 | `src/backends/cli/**` | Audit / minimal modify | Preserve CLI-native behavior unless an explicit integration is needed |
-| `tests/**/*.test.ts` | Modify/Create | Add registry, fallback, `react`, stream, and observe regression coverage |
+| `tests/**/*.test.ts` | Modify/Create | Add registry, fallback, `react`, `pdca`, stream, and observe regression coverage |
 | `docs/api.md` | Modify (follow-on) | Document additive strategy request/response fields |
 | `docs/architecture.md` | Modify (follow-on) | Document strategy registry and session-local execution ownership |
 
@@ -215,6 +214,7 @@ substrate.
 | Date | Update |
 |------|--------|
 | 2026-03-26 | Plan created for additive runtime-owned strategy registry, `simple_tool_call` compatibility wrapping, and first-slice `react` rollout |
+| 2026-03-26 | First-slice substrate is landed and verified; follow-through now continues under roadmap item OPT-10, with `pdca` already added as the next runtime-owned family |
 
 ---
 

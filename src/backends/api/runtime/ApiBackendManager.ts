@@ -163,12 +163,18 @@ function buildStrategyInstructionOverlay(
   strategyId: RuntimeExecutionStrategyId,
   request: RuntimeExecutionStrategyRequest | undefined,
 ): string | undefined {
-  if (strategyId !== 'react') {
+  let strategyPrompt: string | undefined;
+  if (strategyId === 'react') {
+    strategyPrompt = 'Execution strategy: react. Work in short reason-act-observe loops, avoid repeating the same tool calls, and stop once the user request is satisfied.';
+  } else if (strategyId === 'pdca') {
+    strategyPrompt = 'Execution strategy: pdca. Work in explicit plan-do-check-act cycles: plan the next bounded action set, execute only that batch, check the results against the acceptance criteria, and then adjust before another cycle.';
+  }
+  if (!strategyPrompt) {
     return undefined;
   }
 
   const sections = [
-    'Execution strategy: react. Work in short reason-act-observe loops, avoid repeating the same tool calls, and stop once the user request is satisfied.',
+    strategyPrompt,
     request?.acceptanceCriteria
       ? `Acceptance criteria:\n${request.acceptanceCriteria}`
       : undefined,
@@ -190,14 +196,18 @@ function resolveStrategyConstraints(
   stuckThreshold: number;
 } {
   const strategyContext = request?.strategyContext;
+  const usesManagedLoopGuards = strategyId === 'react' || strategyId === 'pdca';
   const stepLimit = readStrategyPositiveInteger(
+    strategyContext,
+    strategyId === 'pdca' ? 'maxCycles' : 'maxSteps',
+  ) || readStrategyPositiveInteger(
     strategyContext,
     'maxSteps',
   ) || instance.maxToolSteps || DEFAULT_MAX_TOOL_STEPS;
-  const timeoutMs = strategyId === 'react'
+  const timeoutMs = usesManagedLoopGuards
     ? readStrategyPositiveInteger(strategyContext, 'timeoutMs') || instance.timeoutMs
     : undefined;
-  const stuckThreshold = strategyId === 'react'
+  const stuckThreshold = usesManagedLoopGuards
     ? readStrategyPositiveInteger(strategyContext, 'stuckThreshold') || DEFAULT_REACT_STUCK_THRESHOLD
     : 0;
 
