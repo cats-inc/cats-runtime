@@ -10,7 +10,9 @@ Last updated: 2026-03-25
 - Internal API review: `docs/api.md`
 - Internal architecture review: `docs/architecture.md`
 - Internal MCP schema review: `src/mcp/tools.ts`
-- Internal workspace/session review: `src/core/runtime/RuntimeSessionManager.ts`, `src/core/runtime/sessionMaintenance.ts`
+- Internal workspace/session review: `src/core/workspace/sessionWorkspace.ts`, `src/core/runtime/RuntimeSessionManager.ts`, `src/core/runtime/sessionMaintenance.ts`
+- Internal CLI persistence/workspace review: `src/backends/cli/pool/SessionRegistry.ts`, `src/backends/cli/pool/workspace.ts`
+- Internal peer execution contract review: `src/core/peers/types.ts`
 - Product/runtime integration review: `cats/src/products/chat/state/runtime-session/`
 - Human review feedback from parallel agent discussion (Gemini, Claude, Codex)
 
@@ -74,6 +76,10 @@ bound to.
 - `worktree`
   - the session runs in a runtime-owned Git worktree derived from an
     authoritative source workspace
+  - this requires a caller-provided `cwd` inside a Git repo
+  - the runtime still performs normal local file I/O, but against a derived
+    worktree path rooted under the runtime session base directory rather than
+    directly against the source repo
 
 ### `workspaceAccess`
 
@@ -105,6 +111,10 @@ conceptual mapping is:
 
 The important point is that `read_only` should not live in the same conceptual
 enum as `source`/`sandbox`/`worktree`.
+
+For the `workspaceMode=shared` row above, the resolved kind depends on whether
+worktree isolation/override was requested. That ambiguity is part of why the
+current `shared` wording should be retired rather than preserved.
 
 ## Resolution Model
 
@@ -197,6 +207,7 @@ Recommended validation rules:
 
 - `workspaceKind=source` requires `cwd`
 - `workspaceKind=worktree` requires `cwd`
+- `workspaceKind=worktree` also requires that `cwd` resolve inside a Git repo
 - `workspaceKind=sandbox` does not require `cwd`
 - `workspaceAccess=read_only` must be enforced in runtime mutation paths
 - `workspaceAccess=read_only` must not be silently upgraded by uploads,
@@ -234,4 +245,7 @@ If the terminology direction is accepted, the next formal artifact should be:
 - an ADR that records the rename and semantic split
 - followed by a phased implementation plan that keeps `cats` and other
   consumers backward-compatible during migration
-
+- a follow-up alignment pass for peer-routing terminology, because the current
+  peer contract uses a separate `PeerExecutionWorkspaceMode = 'none' | 'read_only'`
+  vocabulary that should not drift further away from the main session/workspace
+  model
