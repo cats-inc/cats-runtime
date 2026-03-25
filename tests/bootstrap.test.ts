@@ -339,7 +339,7 @@ describe('bootstrap mode server', () => {
     }
   });
 
-  it('setup routes bypass auth in bootstrap mode even when apiKey is set', { timeout: 60_000 }, async () => {
+  it('setup routes require auth when apiKey is set, even in bootstrap mode', async () => {
     const { root, cleanup } = createTestRoot();
     try {
       const env = createTestEnv(root);
@@ -348,48 +348,7 @@ describe('bootstrap mode server', () => {
       const startup = createRuntimeStartupState({ bootstrapRequired: true });
       const runtime = createRuntimeServer(config, { startup });
       try {
-        // Unauthenticated request to setup state — should succeed in bootstrap mode
-        const stateRes = await runtime.app.request('/providers/setup/state');
-        expect(stateRes.status).toBe(200);
-        const body = await stateRes.json() as Record<string, unknown>;
-        expect(body.bootstrapRequired).toBe(true);
-
-        // Unauthenticated scan — should also succeed in bootstrap mode
-        const scanRes = await runtime.app.request('/providers/setup/scan', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ manual: false }),
-        });
-        expect(scanRes.status).toBe(200);
-
-        // Non-setup route should still require auth
-        const sessionRes = await runtime.app.request('/health');
-        // /health is not auth-exempt in the middleware, but bearerAuth checks
-        // config.apiKey — since it's set, unauthenticated calls get 401
-        // (unless the route is before the auth middleware, which /health is not)
-        // Actually /health is registered after auth middleware, so it needs auth.
-        // But /health might be publicly accessible in some configs — let's test
-        // a clearly protected route instead.
-        const protectedRes = await runtime.app.request('/providers/config');
-        expect(protectedRes.status).toBe(401);
-      } finally {
-        await runtime.close();
-      }
-    } finally {
-      cleanup();
-    }
-  });
-
-  it('setup routes require auth outside bootstrap mode when apiKey is set', async () => {
-    const { root, cleanup } = createTestRoot();
-    try {
-      const env = createTestEnv(root);
-      ensureDirs(env);
-      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0, apiKey: 'test-secret' };
-      const startup = createRuntimeStartupState({ bootstrapRequired: false });
-      const runtime = createRuntimeServer(config, { startup });
-      try {
-        // Unauthenticated — should get 401
+        // Unauthenticated — should get 401 even in bootstrap mode
         const unauthRes = await runtime.app.request('/providers/setup/state');
         expect(unauthRes.status).toBe(401);
 
@@ -398,6 +357,14 @@ describe('bootstrap mode server', () => {
           headers: { 'Authorization': 'Bearer test-secret' },
         });
         expect(authRes.status).toBe(200);
+        const body = await authRes.json() as Record<string, unknown>;
+        expect(body.bootstrapRequired).toBe(true);
+
+        // Setup page HTML is served before auth middleware, so it's always accessible
+        const pageRes = await runtime.app.request('/providers/setup');
+        expect(pageRes.status).toBe(200);
+        const html = await pageRes.text();
+        expect(html).toContain('apiKeyInput');
       } finally {
         await runtime.close();
       }

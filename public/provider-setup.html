@@ -152,6 +152,12 @@
     <p>Configure which AI providers are available for this runtime instance.</p>
   </header>
 
+  <div class="api-key-bar" style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;font-size:0.85rem;">
+    <label for="apiKeyInput" style="color:var(--text2);white-space:nowrap;">API Key</label>
+    <input type="password" id="apiKeyInput" placeholder="Bearer token (if configured)"
+           style="flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:0.4rem 0.75rem;border-radius:var(--radius);font-size:0.8rem;" />
+  </div>
+
   <div class="status-bar">
     <span id="statusText">Loading...</span>
     <span id="statusBadge" class="badge badge-bootstrap">Bootstrap</span>
@@ -181,6 +187,19 @@
 
 <script>
 let scanData = null;
+
+// Restore API key from localStorage (shared with dashboard)
+(function() {
+  var input = document.getElementById('apiKeyInput');
+  if (!input) return;
+  try {
+    var saved = localStorage.getItem('cats_runtime_api_key');
+    if (saved) input.value = saved;
+  } catch(_) {}
+  input.addEventListener('change', function() {
+    try { localStorage.setItem('cats_runtime_api_key', input.value); } catch(_) {}
+  });
+})();
 
 async function fetchState() {
   try {

@@ -262,9 +262,10 @@ Both `scan.providers` and `manualScan` expose the full persisted scan data so
 that UI consumers (dashboard, provider-setup) can render provider status without
 forcing a fresh scan on page load.
 
-In bootstrap mode, `/providers/setup/*` routes are exempt from bearer auth so
-the provider-setup page (which has no API key input) can complete first-run
-setup.  After bootstrap completes, normal bearer auth applies to these routes.
+`/providers/setup/*` API routes go through global bearer auth.  When
+`CATS_RUNTIME_API_KEY` is set, callers must provide a valid token even during
+bootstrap.  The provider-setup page includes an API key input and persists the
+key in `localStorage` (shared with the dashboard).
 
 `POST /providers/setup/scan` triggers a provider scan. Pass `{"manual": true}`
 in the body for an explicit manual scan. Returns scan results with per-provider
