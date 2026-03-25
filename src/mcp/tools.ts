@@ -3,6 +3,7 @@ import { RUNTIME_VERSION } from '../startup.js';
 import {
   getRuntimeBrowserService,
   getRuntimeDeliveryService,
+  getRuntimeManagementService,
   getRuntimeSessionManager,
   getWorkspaceSubstrateService,
   type AppContext,
@@ -73,6 +74,7 @@ const ACTOR_ROLES = [
   'product_host',
   'operator',
 ] as const;
+const MANAGEMENT_ACTOR_CLASSES = ['system', 'owner', 'operator', 'service'] as const;
 
 function ensureObject(value: unknown, label: string): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -1224,6 +1226,50 @@ async function commitChanges(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Management adapter MCP handler factory
+// ---------------------------------------------------------------------------
+
+function mcpManagementAction(
+  domain: 'review' | 'deployment',
+  action: string,
+): (ctx: AppContext, args: Record<string, unknown>) => Promise<McpToolCallResult> {
+  return async (ctx, args) => {
+    const service = getRuntimeManagementService(ctx);
+    const actorClass = readOptionalString(args, 'actorClass');
+    const approvalRef = readOptionalString(args, 'approvalRef');
+    const target = asRecord(args.target);
+
+    const result = await service.execute({
+      domain,
+      action: action as never,
+      adapter: readOptionalString(args, 'adapter'),
+      workspacePath: readOptionalString(args, 'workspacePath'),
+      sessionId: readOptionalString(args, 'sessionId'),
+      apply: args.apply === true,
+      authorization: actorClass || approvalRef
+        ? {
+            actorClass: actorClass as never,
+            approvalRef,
+          }
+        : undefined,
+      target,
+      context: asRecord(args.context),
+    });
+
+    const label = result.outputs && typeof (result.outputs as Record<string, unknown>).repository === 'object'
+      ? 'repository'
+      : result.outputs && typeof (result.outputs as Record<string, unknown>).url === 'string'
+        ? (result.outputs as Record<string, unknown>).url as string
+        : domain;
+
+    return {
+      summary: `Management ${domain}/${action} ${result.state} for ${label}.`,
+      structuredContent: result,
+    };
+  };
+}
+
 const TOOL_HANDLERS: McpToolHandler[] = [
   {
     definition: {
@@ -1898,6 +1944,172 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: commitChanges,
+  },
+
+  // -------------------------------------------------------------------------
+  // Management adapter tools
+  // -------------------------------------------------------------------------
+  {
+    definition: {
+      name: 'audit_review_target',
+      title: 'Audit Review Target',
+      description: 'Check GitHub CLI auth and repo readiness for pull request operations.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          workspacePath: { type: 'string' },
+          adapter: { type: 'string' },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: mcpManagementAction('review', 'audit_review_target'),
+  },
+  {
+    definition: {
+      name: 'open_pull_request',
+      title: 'Open Pull Request',
+      description: 'Preview or create a pull request via the runtime management adapter.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          workspacePath: { type: 'string' },
+          apply: { type: 'boolean' },
+          actorClass: { type: 'string', enum: MANAGEMENT_ACTOR_CLASSES },
+          approvalRef: { type: 'string' },
+          adapter: { type: 'string' },
+          target: {
+            type: 'object',
+            properties: {
+              title: { type: 'string' },
+              body: { type: 'string' },
+              base: { type: 'string' },
+            },
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: mcpManagementAction('review', 'open_pull_request'),
+  },
+  {
+    definition: {
+      name: 'inspect_pull_request',
+      title: 'Inspect Pull Request',
+      description: 'Inspect a pull request via the runtime management adapter.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          workspacePath: { type: 'string' },
+          adapter: { type: 'string' },
+          target: {
+            type: 'object',
+            properties: {
+              number: { type: ['number', 'string'] },
+            },
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: mcpManagementAction('review', 'inspect_pull_request'),
+  },
+  {
+    definition: {
+      name: 'wait_review_checks',
+      title: 'Wait Review Checks',
+      description: 'Poll PR checks with bounded long-poll. Returns operation ID for resumption if checks do not complete within timeout.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          workspacePath: { type: 'string' },
+          adapter: { type: 'string' },
+          target: {
+            type: 'object',
+            properties: {
+              number: { type: ['number', 'string'] },
+              timeoutMs: { type: 'number' },
+            },
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: mcpManagementAction('review', 'wait_review_checks'),
+  },
+  {
+    definition: {
+      name: 'audit_deployment_target',
+      title: 'Audit Deployment Target',
+      description: 'Check deployment CLI auth and project readiness.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          workspacePath: { type: 'string' },
+          adapter: { type: 'string' },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: mcpManagementAction('deployment', 'audit_deployment_target'),
+  },
+  {
+    definition: {
+      name: 'create_deployment',
+      title: 'Create Deployment',
+      description: 'Preview or trigger a deployment via the runtime management adapter.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          workspacePath: { type: 'string' },
+          apply: { type: 'boolean' },
+          actorClass: { type: 'string', enum: MANAGEMENT_ACTOR_CLASSES },
+          approvalRef: { type: 'string' },
+          adapter: { type: 'string' },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: mcpManagementAction('deployment', 'create_deployment'),
+  },
+  {
+    definition: {
+      name: 'inspect_deployment',
+      title: 'Inspect Deployment',
+      description: 'Inspect deployment or service status.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          workspacePath: { type: 'string' },
+          adapter: { type: 'string' },
+          target: { type: 'object' },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: mcpManagementAction('deployment', 'inspect_deployment'),
+  },
+  {
+    definition: {
+      name: 'read_deployment_logs',
+      title: 'Read Deployment Logs',
+      description: 'Read deployment logs from the runtime management adapter.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          workspacePath: { type: 'string' },
+          adapter: { type: 'string' },
+          target: {
+            type: 'object',
+            properties: {
+              serviceId: { type: 'string' },
+            },
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: mcpManagementAction('deployment', 'read_deployment_logs'),
   },
 ];
 

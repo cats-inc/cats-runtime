@@ -256,6 +256,14 @@ describe('runtime MCP facade', () => {
       'init_workspace',
       'audit_delivery_target',
       'commit_changes',
+      'audit_review_target',
+      'open_pull_request',
+      'inspect_pull_request',
+      'wait_review_checks',
+      'audit_deployment_target',
+      'create_deployment',
+      'inspect_deployment',
+      'read_deployment_logs',
     ]);
 
     const createSessionTool = listed.result.tools.find((tool) => tool.name === 'create_session') as {

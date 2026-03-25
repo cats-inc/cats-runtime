@@ -1,0 +1,18 @@
+version: 1
+
+adapters:
+  review:
+    default: github
+    instances:
+      github:
+        transport: cli
+        command: gh
+        timeout_ms: 15000
+
+  deployment:
+    default: zeabur
+    instances:
+      zeabur:
+        transport: cli
+        command: zeabur
+        timeout_ms: 30000

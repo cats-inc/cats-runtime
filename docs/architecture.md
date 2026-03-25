@@ -92,6 +92,17 @@ src/
     types.ts
     usage/
     wakeup/
+    management/
+      adapters/
+        github/
+        zeabur/
+        stub/
+      cli.ts
+      config.ts
+      diagnostics.ts
+      operations.ts
+      RuntimeManagementService.ts
+      types.ts
   backends/
     browser/
     agent/
@@ -235,6 +246,26 @@ src/
 - Keeps browser-driver integration replaceable so future Playwright/CDP or
   BrowserOS-style adapters can plug in without rewriting the public HTTP
   contract
+
+### `src/core/management`
+
+- Owns runtime-owned management adapters for non-session control-plane tools
+  such as forge/review CLIs (GitHub CLI) and deployment CLIs (Zeabur CLI)
+- Management adapters are architecturally distinct from session providers and
+  do not appear in `providers.yaml` or `src/backends/cli/providers`
+- Exposes a `RuntimeManagementService` with two domains (`review` and
+  `deployment`) and eight actions covering PR and deployment lifecycle
+- Authorization inputs are product-neutral (`actorClass` + opaque
+  `approvalRef`); the runtime validates metadata presence on mutating actions
+  but does not own approval policy
+- Deployment actions that yield preview/service URLs construct
+  `RuntimePreviewSurface` instances for reuse by existing preview contracts
+- Long-running actions such as `wait_review_checks` use bounded long-poll
+  with configurable timeout and a resumable operation ID
+- Management adapter configuration lives in `config/management.yaml`,
+  separate from model-provider routing
+- Adapter diagnostics are separate from provider-model diagnostics and
+  exposed at `GET /management/diagnostics`
 
 ### `src/core/tools`
 
@@ -556,4 +587,4 @@ the only durable memory surface for the Cats suite.
 
 ---
 
-*Last updated: 2026-03-24*
+*Last updated: 2026-03-25*

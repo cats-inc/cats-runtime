@@ -12,6 +12,8 @@ import {
 } from './pathSafety.js';
 import { WorkspaceSubstrateService } from '../runtime/WorkspaceSubstrateService.js';
 import { RuntimeDeliveryService } from '../runtime/RuntimeDeliveryService.js';
+import { RuntimeManagementService } from '../management/RuntimeManagementService.js';
+import type { RuntimeManagementDomain, RuntimeManagementAction } from '../management/types.js';
 
 // path.matchesGlob — Node 22+ built-in; @types/node@20 lacks the typedef
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -407,6 +409,109 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+
+  // Management adapter tools
+  {
+    name: 'audit-review-target',
+    description: 'Check forge/review readiness (GitHub CLI auth, repo context) and return a machine-readable JSON audit.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Relative workspace path. Defaults to ".".' },
+        adapter: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'open-pull-request',
+    description: 'Preview or create a pull request via the runtime management adapter.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string' },
+        title: { type: 'string' },
+        body: { type: 'string' },
+        base: { type: 'string' },
+        apply: { type: 'boolean' },
+        actor_class: { type: 'string', enum: ['system', 'owner', 'operator', 'service'] },
+        approval_ref: { type: 'string' },
+        adapter: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'inspect-pull-request',
+    description: 'Inspect a pull request via the runtime management adapter.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string' },
+        number: { type: ['number', 'string'] },
+        adapter: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'wait-review-checks',
+    description: 'Poll PR checks with bounded timeout. Returns operation ID for resumption if checks do not complete.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string' },
+        number: { type: ['number', 'string'] },
+        timeout_ms: { type: 'number' },
+        adapter: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'audit-deployment-target',
+    description: 'Check deployment CLI readiness (auth, project context) and return a machine-readable JSON audit.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string' },
+        adapter: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'create-deployment',
+    description: 'Preview or trigger a deployment via the runtime management adapter.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string' },
+        apply: { type: 'boolean' },
+        actor_class: { type: 'string', enum: ['system', 'owner', 'operator', 'service'] },
+        approval_ref: { type: 'string' },
+        adapter: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'inspect-deployment',
+    description: 'Inspect deployment or service status.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string' },
+        adapter: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'read-deployment-logs',
+    description: 'Read deployment logs from the runtime management adapter.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string' },
+        service_id: { type: 'string' },
+        adapter: { type: 'string' },
+      },
+    },
+  },
 ];
 
 const READ_ONLY_TOOLS = new Set([
@@ -417,6 +522,12 @@ const READ_ONLY_TOOLS = new Set([
   'audit-workspace',
   'audit-delivery-target',
   'inspect-repo-status',
+  'audit-review-target',
+  'inspect-pull-request',
+  'wait-review-checks',
+  'audit-deployment-target',
+  'inspect-deployment',
+  'read-deployment-logs',
 ]);
 const TOOL_ORDER = new Map(TOOL_DEFINITIONS.map((tool, index) => [tool.name, index]));
 
@@ -424,6 +535,8 @@ const STANDARD_TOOLS = new Set([
   'list_files', 'read_file', 'write_file', 'edit_file', 'apply_patch', 'grep', 'glob', 'run_shell',
   'audit-workspace', 'init-workspace', 'update-workspace',
   'audit-delivery-target', 'publish-artifacts', 'inspect-repo-status', 'create-commit', 'push-branch',
+  'audit-review-target', 'open-pull-request', 'inspect-pull-request', 'wait-review-checks',
+  'audit-deployment-target', 'create-deployment', 'inspect-deployment', 'read-deployment-logs',
 ]);
 const EXTENDED_TOOLS = new Set([
   ...STANDARD_TOOLS, 'delete_file', 'rename_file', 'copy_file',
@@ -744,6 +857,11 @@ async function executeShell(
 export class LocalToolRuntime {
   private readonly substrate = new WorkspaceSubstrateService();
   private readonly delivery = new RuntimeDeliveryService({});
+  private management?: RuntimeManagementService;
+
+  setManagementService(service: RuntimeManagementService): void {
+    this.management = service;
+  }
 
   listTools(profile?: string): ToolDefinition[] {
     const normalized = normalizeProfile(profile);
@@ -791,6 +909,22 @@ export class LocalToolRuntime {
         case 'create-commit':
         case 'push-branch':
           return await this.deliveryOperation(context, call.id, call.name, args);
+        case 'audit-review-target':
+          return await this.managementOperation(context, call.id, 'review', 'audit_review_target', args);
+        case 'open-pull-request':
+          return await this.managementOperation(context, call.id, 'review', 'open_pull_request', args);
+        case 'inspect-pull-request':
+          return await this.managementOperation(context, call.id, 'review', 'inspect_pull_request', args);
+        case 'wait-review-checks':
+          return await this.managementOperation(context, call.id, 'review', 'wait_review_checks', args);
+        case 'audit-deployment-target':
+          return await this.managementOperation(context, call.id, 'deployment', 'audit_deployment_target', args);
+        case 'create-deployment':
+          return await this.managementOperation(context, call.id, 'deployment', 'create_deployment', args);
+        case 'inspect-deployment':
+          return await this.managementOperation(context, call.id, 'deployment', 'inspect_deployment', args);
+        case 'read-deployment-logs':
+          return await this.managementOperation(context, call.id, 'deployment', 'read_deployment_logs', args);
         default:
           throw new Error(`Unknown tool '${call.name}'`);
       }
@@ -1332,6 +1466,66 @@ export class LocalToolRuntime {
     return {
       callId,
       name: operation,
+      output: JSON.stringify(result, null, 2),
+    };
+  }
+
+  private async managementOperation(
+    context: ToolExecutionContext,
+    callId: string,
+    domain: RuntimeManagementDomain,
+    action: RuntimeManagementAction,
+    args: Record<string, unknown>,
+  ): Promise<ToolResult> {
+    if (!this.management) {
+      return {
+        callId,
+        name: `${domain}-${action}`,
+        output: 'Management service not available.',
+        isError: true,
+      };
+    }
+
+    const workspacePath = (await resolveSafeWorkspacePath(
+      context.cwd,
+      String(args.path || '.'),
+    )).fullPath;
+
+    const actorClass = typeof args.actor_class === 'string'
+      && ['system', 'owner', 'operator', 'service'].includes(args.actor_class)
+      ? args.actor_class as 'system' | 'owner' | 'operator' | 'service'
+      : undefined;
+    const approvalRef = typeof args.approval_ref === 'string' && args.approval_ref.trim()
+      ? args.approval_ref.trim()
+      : undefined;
+
+    const target: Record<string, unknown> = {};
+    if (typeof args.title === 'string') target.title = args.title;
+    if (typeof args.body === 'string') target.body = args.body;
+    if (typeof args.base === 'string') target.base = args.base;
+    if (args.number !== undefined) target.number = args.number;
+    if (typeof args.timeout_ms === 'number') target.timeoutMs = args.timeout_ms;
+    if (typeof args.service_id === 'string') target.serviceId = args.service_id;
+    if (typeof args.format === 'string') target.format = args.format;
+
+    const result = await this.management.execute({
+      domain,
+      action,
+      adapter: typeof args.adapter === 'string' ? args.adapter : undefined,
+      workspacePath,
+      sessionId: typeof args.session_id === 'string' && args.session_id.trim()
+        ? args.session_id.trim()
+        : undefined,
+      apply: args.apply === true,
+      authorization: actorClass || approvalRef
+        ? { actorClass, approvalRef }
+        : undefined,
+      target: Object.keys(target).length > 0 ? target : undefined,
+    });
+
+    return {
+      callId,
+      name: `${domain}-${action}`,
       output: JSON.stringify(result, null, 2),
     };
   }

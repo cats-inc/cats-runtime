@@ -85,6 +85,14 @@ Current curated tools:
 - `init_workspace`
 - `audit_delivery_target`
 - `commit_changes`
+- `audit_review_target`
+- `open_pull_request`
+- `inspect_pull_request`
+- `wait_review_checks`
+- `audit_deployment_target`
+- `create_deployment`
+- `inspect_deployment`
+- `read_deployment_logs`
 
 `list_runtime_skills` reuses the same runtime-owned skill catalog contract as
 `GET /skills/catalog`, including lightweight filtering across stable metadata,
@@ -542,6 +550,58 @@ Push apply example:
   }
 }
 ```
+
+### Management
+
+```text
+POST /management/review/audit
+POST /management/review/open-pr
+POST /management/review/inspect
+POST /management/review/wait-checks
+POST /management/deployment/audit
+POST /management/deployment/create
+POST /management/deployment/inspect
+POST /management/deployment/logs
+POST /management/operations/:operationId/resume
+GET  /management/diagnostics
+```
+
+These routes are runtime-owned management adapter actions for non-session
+control-plane tools such as GitHub CLI and Zeabur CLI. They do not model
+management CLIs as session providers and are architecturally distinct from
+session backends and delivery primitives.
+
+Shared response fields:
+
+- `domain`: `review` or `deployment`
+- `action`: normalized management action id
+- `state`: `ready`, `blocked`, `unsupported`, `degraded`, or `completed`
+- `contract`: explicit `preview` / `apply` mode plus `applyDecision`
+- `authorization`: product-neutral `actorClass` / `approvalRef` metadata
+- `blockedReasons`: structured blocking reasons
+- `capabilityGaps`: missing adapter capabilities
+- `warnings`: non-blocking advisory information
+- `outputs`: action-specific structured output
+- `previewSurfaces`: reuses `RuntimePreviewSurface` for deployment URLs
+- `operation`: for long-running actions, includes `operationId` and `status`
+
+Authorization on mutating actions (`open_pull_request`, `create_deployment`)
+requires `actorClass` or `approvalRef`. Read-only actions never require
+authorization.
+
+`wait_review_checks` uses bounded long-poll: the client provides
+`target.timeoutMs` (max 120000, default 30000). If checks complete within the
+timeout, the result includes `state: 'completed'`. Otherwise, the response
+includes an `operation` with `status: 'polling'` and an `operationId` for
+resumption via `POST /management/operations/:operationId/resume`.
+
+`GET /management/diagnostics` returns adapter readiness and install/auth
+guidance. It is separate from `GET /diagnostics/providers` to avoid mixing
+management adapters with AI provider-model diagnostics. Optional query
+parameter `domain` filters by domain.
+
+Management adapter configuration lives in `config/management.yaml`, separate
+from `config/providers.yaml`.
 
 ### Skills
 

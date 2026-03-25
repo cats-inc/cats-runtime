@@ -851,17 +851,19 @@ describe('LocalToolRuntime', () => {
   });
 
   describe('profiles', () => {
-    it('standard profile lists 16 tools', () => {
+    it('standard profile lists 24 tools', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('standard');
       expect(tools.map((t) => t.name)).toEqual([
         'list_files', 'read_file', 'write_file', 'edit_file', 'apply_patch', 'grep', 'glob', 'run_shell',
         'audit-workspace', 'init-workspace', 'update-workspace',
         'audit-delivery-target', 'publish-artifacts', 'inspect-repo-status', 'create-commit', 'push-branch',
+        'audit-review-target', 'open-pull-request', 'inspect-pull-request', 'wait-review-checks',
+        'audit-deployment-target', 'create-deployment', 'inspect-deployment', 'read-deployment-logs',
       ]);
     });
 
-    it('extended profile lists 19 tools', () => {
+    it('extended profile lists 27 tools', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('extended');
       expect(tools.map((t) => t.name)).toEqual([
@@ -869,15 +871,19 @@ describe('LocalToolRuntime', () => {
         'delete_file', 'rename_file', 'copy_file',
         'audit-workspace', 'init-workspace', 'update-workspace',
         'audit-delivery-target', 'publish-artifacts', 'inspect-repo-status', 'create-commit', 'push-branch',
+        'audit-review-target', 'open-pull-request', 'inspect-pull-request', 'wait-review-checks',
+        'audit-deployment-target', 'create-deployment', 'inspect-deployment', 'read-deployment-logs',
       ]);
     });
 
-    it('read_only profile lists 7 tools', () => {
+    it('read_only profile lists 13 tools', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('read_only');
       expect(tools.map((t) => t.name)).toEqual([
         'list_files', 'read_file', 'grep', 'glob', 'audit-workspace',
         'audit-delivery-target', 'inspect-repo-status',
+        'audit-review-target', 'inspect-pull-request', 'wait-review-checks',
+        'audit-deployment-target', 'inspect-deployment', 'read-deployment-logs',
       ]);
     });
 
@@ -890,7 +896,7 @@ describe('LocalToolRuntime', () => {
     it('unknown profile falls back to standard', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('unknown_profile');
-      expect(tools.length).toBe(16);
+      expect(tools.length).toBe(24);
       expect(tools.map((t) => t.name)).toContain('apply_patch');
       expect(tools.map((t) => t.name)).toContain('edit_file');
       expect(tools.map((t) => t.name)).toContain('glob');
@@ -901,7 +907,7 @@ describe('LocalToolRuntime', () => {
     it('default profile (undefined) is standard', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools();
-      expect(tools.length).toBe(16);
+      expect(tools.length).toBe(24);
     });
   });
 

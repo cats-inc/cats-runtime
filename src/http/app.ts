@@ -20,6 +20,10 @@ import type { WslDiscoveryStatusStore } from '../backends/cli/discovery/wslDisco
 import type { ProviderModelCatalogService } from '../core/models/providerModelCatalog.js';
 import { ProviderCompatibilityService } from '../core/compatibility/ProviderCompatibilityService.js';
 import { RuntimeDeliveryService } from '../core/runtime/RuntimeDeliveryService.js';
+import { RuntimeManagementService } from '../core/management/RuntimeManagementService.js';
+import { loadManagementConfig } from '../core/management/config.js';
+import { GithubReviewAdapter } from '../core/management/adapters/github/GithubReviewAdapter.js';
+import { ZeaburDeploymentAdapter } from '../core/management/adapters/zeabur/ZeaburDeploymentAdapter.js';
 import { WorkspaceSubstrateService } from '../core/runtime/WorkspaceSubstrateService.js';
 import { RuntimeMeteringService } from '../core/usage/RuntimeMeteringService.js';
 import { RuntimeWorktreeMaintenanceService } from '../core/workspace/RuntimeWorktreeMaintenanceService.js';
@@ -47,6 +51,7 @@ import { opencodeRoutes } from './routes/opencode.js';
 import { providerRoutes } from './routes/providers.js';
 import { skillRoutes } from './routes/skills.js';
 import { wakeupRoutes } from './routes/wakeup.js';
+import { managementRoutes } from './routes/management.js';
 import type { RuntimeStartupState } from '../startup.js';
 
 export interface AppContext {
@@ -66,6 +71,7 @@ export interface AppContext {
   providerModelCatalog: ProviderModelCatalogService;
   compatibility?: ProviderCompatibilityService;
   delivery?: RuntimeDeliveryService;
+  management?: RuntimeManagementService;
   workspaceSubstrate?: WorkspaceSubstrateService;
   metering?: RuntimeMeteringService;
   wakeup?: RuntimeWakeupService;
@@ -145,6 +151,22 @@ export function getRuntimeDeliveryService(ctx: AppContext): RuntimeDeliveryServi
     });
   }
   return ctx.delivery;
+}
+
+export function getRuntimeManagementService(ctx: AppContext): RuntimeManagementService {
+  if (!ctx.management) {
+    const config = loadManagementConfig();
+    ctx.management = new RuntimeManagementService({ config });
+    ctx.management.registerAdapter(new GithubReviewAdapter({
+      command: config?.adapters.review?.instances.github?.command,
+      timeoutMs: config?.adapters.review?.instances.github?.timeout_ms,
+    }));
+    ctx.management.registerAdapter(new ZeaburDeploymentAdapter({
+      command: config?.adapters.deployment?.instances.zeabur?.command,
+      timeoutMs: config?.adapters.deployment?.instances.zeabur?.timeout_ms,
+    }));
+  }
+  return ctx.management;
 }
 
 export function getWorkspaceSubstrateService(ctx: AppContext): WorkspaceSubstrateService {
@@ -236,6 +258,7 @@ export function createRuntimeApp(ctx: AppContext) {
   app.route('/', providerRoutes);
   app.route('/', skillRoutes);
   app.route('/', wakeupRoutes);
+  app.route('/', managementRoutes);
 
   return app;
 }

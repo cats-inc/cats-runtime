@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | Implementing (Slice 1) |
 | **Owner** | Codex |
 | **Reviewer** | User |
 
@@ -265,22 +265,21 @@ Exact field names may evolve. The architectural point is:
 - [ADR-014: Keep lightweight provider setup and diagnostics in
   `cats-runtime`](../decisions/014-keep-lightweight-provider-setup-and-diagnostics-in-cats-runtime.md)
 
-## Open Questions
+## Resolved Questions (Slice 1)
 
-- [ ] Should the first public HTTP surface live under additive
-      `/delivery/review/*` and `/delivery/deploy/*` routes, or should it start
-      under a dedicated `/management/*` namespace?
-- [ ] Should management-adapter configuration live in a dedicated
-      `config/management.yaml`, or in a broader future generated runtime config
-      file that spans multiple control-plane subsystems?
-- [ ] How much install/auth diagnostic behavior should reuse the current
-      provider-install knowledge machinery versus a separate management-adapter
-      diagnostic subsystem?
-- [ ] Should `wait_review_checks` use a bounded long-poll request, a resumable
-      operation id, or both in the first slice?
-- [ ] If mutating management actions require approval metadata, should the
-      runtime expect only an opaque approval reference, or also a caller-asserted
-      approval flag for compatibility with existing delivery-style contracts?
+- [x] **HTTP namespace**: Dedicated `/management/{domain}/{action}` namespace.
+      Rationale: management adapters are architecturally distinct from delivery
+      primitives; mixing under `/delivery/` would blur the boundary.
+- [x] **Config**: `config/management.yaml` as a dedicated file, separate from
+      `providers.yaml`.
+- [x] **Diagnostics**: Separate `GET /management/diagnostics` endpoint, not
+      mixed into `GET /diagnostics/providers`.
+- [x] **`wait_review_checks`**: Both. Bounded long-poll with configurable
+      `timeoutMs` (max 120s, default 30s) plus resumable operation ID via
+      `POST /management/operations/:operationId/resume`.
+- [x] **Approval metadata**: `actorClass` (product-neutral: `system`, `owner`,
+      `operator`, `service`) plus opaque `approvalRef` string. Runtime validates
+      presence on mutating actions but does not enforce policy.
 
 ## References
 
