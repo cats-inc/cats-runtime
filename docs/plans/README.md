@@ -46,6 +46,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 
 | Plan | Title | Status | Related Spec |
 |------|-------|--------|--------------|
+| [PLAN-018](./PLAN-018-advanced-provider-model-catalog-and-selection-schema.md) | Advanced Provider Model Catalog and Selection Schema | Draft | [SPEC-018](../specs/SPEC-018-advanced-provider-model-catalog-and-selection-schema.md), [ADR-022](../decisions/022-model-advanced-selection-as-entries-presets-and-provider-specific-controls.md) |
 | [PLAN-013](./PLAN-013-browser-preview-substrate-v0.md) | Browser Preview Substrate v0 | Completed | [ADR-011](../decisions/011-runtime-owned-browser-and-preview-subsystem-with-pluggable-drivers.md), [cats SPEC-020](../../../cats/docs/specs/SPEC-020-embedded-preview-surfaces-for-runtime-artifacts-and-services.md) |
 | [PLAN-014](./PLAN-014-worktree-isolation-execution-layer.md) | Worktree Isolation Execution Layer | Completed | [SPEC-008](../specs/SPEC-008-workspace-substrate-init-audit-and-update.md), [SPEC-011](../specs/SPEC-011-session-fork-and-context-transplant-primitives.md) |
 | [PLAN-016](./PLAN-016-management-adapter-subsystem.md) | Management Adapter Subsystem | Completed | [SPEC-019](../specs/SPEC-019-runtime-owned-management-adapters-for-forge-and-deployment-control-planes.md), [ADR-023](../decisions/023-treat-management-clis-as-runtime-owned-control-plane-adapters-not-session-providers.md) |
@@ -75,4 +76,4 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 ---
 
 *See also: [specs/](../specs/) for feature specifications*
-*Last updated: 2026-03-23*
+*Last updated: 2026-03-25*
