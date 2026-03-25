@@ -177,7 +177,7 @@ export class AgentBackendManager {
     const instance = ensureAgentTarget(target);
     const adapter = this.buildAdapter(instance);
     const sessionKey = session.sessionKey || sessionId;
-    const model = session.model || instance.model;
+    const model = session.modelResolution?.model || session.model || instance.model;
     const composedInstructions = mergeRuntimeInstructionLayers(
       turn.skills ?? session.skills,
       turn.sessionInstructions ?? session.instructions,

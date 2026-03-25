@@ -14,6 +14,17 @@ import { ApiTransportError, readRetryAfterMs } from './error.js';
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
 
+function mergeRuntimePatch<T extends Record<string, unknown>>(
+  requestBody: T,
+  runtimePatch?: Record<string, unknown>,
+): T {
+  if (!runtimePatch) {
+    return requestBody;
+  }
+
+  return applyPayloadTemplate(runtimePatch as T, requestBody);
+}
+
 function requireApiKey(instance: RemoteProviderInstanceConfig, env: NodeJS.ProcessEnv): string {
   const apiKeyEnv = instance.apiKeyEnv;
   if (!apiKeyEnv) {
@@ -213,7 +224,7 @@ export class OpenAiTransport implements ApiTransportClient {
     const progress: ApiProgressEvent[] = [];
 
     const sendRequest = async (usePreviousResponseId: boolean): Promise<ApiCompletionResponse> => {
-      const requestBody = applyPayloadTemplate({
+      const runtimeBody = mergeRuntimePatch({
         model: input.model,
         instructions,
         input: usePreviousResponseId && incrementalInput
@@ -223,7 +234,8 @@ export class OpenAiTransport implements ApiTransportClient {
         tools: input.tools.length > 0 ? toOpenAiTools(input) : undefined,
         tool_choice: input.tools.length > 0 ? 'auto' : undefined,
         max_output_tokens: input.instance.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
-      }, input.instance.payloadTemplate);
+      }, input.requestBodyPatch);
+      const requestBody = applyPayloadTemplate(runtimeBody, input.instance.payloadTemplate);
       const response = await this.fetchImpl(endpoint, {
         method: 'POST',
         headers,

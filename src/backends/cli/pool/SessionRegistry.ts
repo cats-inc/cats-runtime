@@ -3,6 +3,8 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, w
 import { basename, dirname, join } from 'node:path';
 import type {
   PermissionMode,
+  ProviderModelResolution,
+  ProviderModelSelection,
   SessionArtifact,
   SessionHydrationState,
   SessionInfo,
@@ -39,6 +41,8 @@ export interface CreateSessionInput {
   permissionMode?: PermissionMode;
   allowedTools?: string[];
   model?: string;
+  modelSelection?: ProviderModelSelection;
+  modelResolution?: ProviderModelResolution;
   group?: string;
   sessionKey?: string;
   reusePolicy?: SessionReusePolicy;
@@ -242,6 +246,8 @@ export class SessionRegistry {
       permissionMode: input.permissionMode,
       allowedTools: input.allowedTools,
       model: input.model,
+      modelSelection: cloneModelSelection(input.modelSelection),
+      modelResolution: cloneModelResolution(input.modelResolution),
       group: input.group,
       sessionKey: input.sessionKey,
       reusePolicy: input.reusePolicy,
@@ -344,6 +350,9 @@ export class SessionRegistry {
   updateSessionMetadata(
     id: string,
     patch: {
+      model?: string;
+      modelSelection?: ProviderModelSelection;
+      modelResolution?: ProviderModelResolution;
       sessionKey?: string;
       reusePolicy?: SessionReusePolicy;
       instructions?: string;
@@ -361,6 +370,15 @@ export class SessionRegistry {
 
     if (patch.sessionKey !== undefined) {
       session.sessionKey = patch.sessionKey;
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'model')) {
+      session.model = patch.model;
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'modelSelection')) {
+      session.modelSelection = cloneModelSelection(patch.modelSelection);
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'modelResolution')) {
+      session.modelResolution = cloneModelResolution(patch.modelResolution);
     }
     if (patch.reusePolicy !== undefined) {
       session.reusePolicy = patch.reusePolicy;
@@ -960,6 +978,12 @@ export class SessionRegistry {
       workspaceIsolation: target.workspaceIsolation ?? incoming.workspaceIsolation,
     });
     if (!target.model && incoming.model) target.model = incoming.model;
+    if (!target.modelSelection && incoming.modelSelection) {
+      target.modelSelection = cloneModelSelection(incoming.modelSelection);
+    }
+    if (!target.modelResolution && incoming.modelResolution) {
+      target.modelResolution = cloneModelResolution(incoming.modelResolution);
+    }
     if (!target.group && incoming.group) target.group = incoming.group;
     if (!target.summary && incoming.summary) target.summary = incoming.summary;
     if (!target.sessionKey && incoming.sessionKey) target.sessionKey = incoming.sessionKey;
@@ -1015,6 +1039,18 @@ function cloneProviderState(
   }
 
   return structuredClone(providerState);
+}
+
+function cloneModelSelection(
+  selection?: ProviderModelSelection,
+): ProviderModelSelection | undefined {
+  return selection ? structuredClone(selection) : undefined;
+}
+
+function cloneModelResolution(
+  resolution?: ProviderModelResolution,
+): ProviderModelResolution | undefined {
+  return resolution ? structuredClone(resolution) : undefined;
 }
 
 function cloneInvocationContext(

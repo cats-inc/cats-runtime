@@ -319,6 +319,62 @@ describe('SessionRegistry', () => {
     }
   });
 
+  it('persists structured model selection and resolved snapshots across reloads', () => {
+    const persistDir = mkdtempSync(join(tmpdir(), 'session-registry-model-selection-test-'));
+
+    try {
+      registry = new SessionRegistry(persistDir);
+      const session = registry.create({
+        providerName: 'codex',
+        providerBackend: 'api',
+        providerInstanceId: 'main',
+        cwd: '/repo',
+        model: 'gpt-5.4',
+        modelSelection: {
+          entryMode: 'auto',
+          presetId: 'deep_reasoning',
+          controls: {
+            'openai.reasoning_effort': 'high',
+          },
+        },
+        modelResolution: {
+          entryId: 'gpt-5.4',
+          model: 'gpt-5.4',
+          entryMode: 'auto',
+          presetId: 'deep_reasoning',
+          controls: {
+            'openai.reasoning_effort': 'high',
+          },
+          supportTier: 'full',
+          warnings: [],
+        },
+      });
+      registry.flush();
+
+      const reloaded = new SessionRegistry(persistDir);
+      expect(reloaded.get(session.id)?.modelSelection).toEqual({
+        entryMode: 'auto',
+        presetId: 'deep_reasoning',
+        controls: {
+          'openai.reasoning_effort': 'high',
+        },
+      });
+      expect(reloaded.get(session.id)?.modelResolution).toEqual({
+        entryId: 'gpt-5.4',
+        model: 'gpt-5.4',
+        entryMode: 'auto',
+        presetId: 'deep_reasoning',
+        controls: {
+          'openai.reasoning_effort': 'high',
+        },
+        supportTier: 'full',
+        warnings: [],
+      });
+    } finally {
+      rmSync(persistDir, { recursive: true, force: true });
+    }
+  });
+
   it('removes a session', () => {
     const s = registry.create({ providerName: 'claude', cwd: '/a' });
     const result = registry.remove(s.id);

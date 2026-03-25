@@ -94,3 +94,26 @@ providerRoutes.get('/providers/:provider/models', async (c) => {
     );
   }
 });
+
+providerRoutes.get('/providers/:provider/models/advanced', async (c) => {
+  const ctx = c.get('ctx' as never) as AppContext;
+  const providerName = c.req.param('provider');
+  const instance = c.req.query('instance') || undefined;
+
+  try {
+    const catalog = await ctx.providerModelCatalog.getAdvancedCatalog(providerName, instance);
+    return c.json(catalog);
+  } catch (err) {
+    const payload: Record<string, unknown> = {
+      error: `Failed to inspect advanced provider models: ${err}`,
+    };
+    if (isProviderTargetResolutionError(err)) {
+      payload.code = err.code;
+    }
+
+    return c.json(
+      payload,
+      getRouteErrorStatus(err),
+    );
+  }
+});

@@ -1,3 +1,8 @@
+import type {
+  ProviderModelResolution,
+  ProviderModelSelection,
+} from './models/providerSelectionResolution.js';
+
 export type { CliRuntimeConfig as RuntimeConfig } from '../backends/cli/config.js';
 
 export type SessionStatus =
@@ -1376,6 +1381,8 @@ export interface SessionInfo {
   permissionMode?: PermissionMode;
   allowedTools?: string[];
   model?: string;
+  modelSelection?: ProviderModelSelection;
+  modelResolution?: ProviderModelResolution;
   group?: string;
   instructions?: string;
   skills?: SessionSkillState;

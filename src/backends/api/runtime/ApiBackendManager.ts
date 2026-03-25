@@ -2,6 +2,7 @@ import type { ExecutionHandle, StreamEvent, TurnInput } from '../../../core/type
 import { mergeRuntimeInstructionLayers } from '../../../core/skills/catalog.js';
 import { LocalToolRuntime } from '../../../core/tools/LocalToolRuntime.js';
 import { createRuntimeProgressEvent } from '../../../core/progress.js';
+import { buildProviderExecutionRequestPatch } from '../../../core/models/providerSelectionResolution.js';
 import type { SessionRegistry } from '../../cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig, RemoteProviderInstanceConfig } from '../../cli/config.js';
 import type { ProviderTargetDescriptor } from '../../../core/providerCatalog.js';
@@ -312,7 +313,7 @@ export class ApiBackendManager {
     }
 
     const remoteInstance = ensureRemoteTarget(target);
-    const model = initialSession.model || remoteInstance.model;
+    const model = initialSession.modelResolution?.model || initialSession.model || remoteInstance.model;
     if (!model) {
       throw new Error(
         `Provider '${target.providerName}' target '${target.backend}/${target.instanceId}' `
@@ -350,6 +351,10 @@ export class ApiBackendManager {
     let totalOutputTokens = 0;
 
     const maxToolSteps = remoteInstance.maxToolSteps ?? DEFAULT_MAX_TOOL_STEPS;
+    const requestBodyPatch = buildProviderExecutionRequestPatch(
+      target,
+      initialSession.modelResolution?.controls,
+    );
 
     for (let step = 0; step < maxToolSteps; step += 1) {
       let completion: ApiCompletionResponse;
@@ -359,6 +364,7 @@ export class ApiBackendManager {
           providerName: initialSession.providerName,
           instance: remoteInstance,
           model,
+          requestBodyPatch,
           messages: conversation,
           tools: toolDefinitions,
           previousResponseId: responseId,

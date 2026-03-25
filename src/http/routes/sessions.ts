@@ -71,6 +71,14 @@ import {
   canRuntimeCompactSessionTranscript,
   compactRuntimeManagedTranscript,
 } from '../../core/runtime/sessionCompaction.js';
+import type { ProviderModelSelection } from '../../core/models/providerSelectionResolution.js';
+import {
+  createLegacyModelSelection,
+  isLegacyCompatibleExplicitSelection,
+  parseProviderModelSelection,
+  resolveProviderSelection,
+  sameProviderModelSelection,
+} from '../../core/models/providerSelectionResolution.js';
 import { hydrateSessionState } from '../../core/hydration/sessionHydration.js';
 import {
   extractHydrationMetadata,
@@ -261,6 +269,125 @@ function resolveCliProviderTarget(
     providerName,
     instanceId ? `cli/${instanceId}` : undefined,
   );
+}
+
+interface ResolvedSessionModelState {
+  model?: string;
+  modelSelection?: ProviderModelSelection;
+  modelResolution?: SessionInfo['modelResolution'];
+  warnings: string[];
+}
+
+function qualifiedTargetInstance(
+  target: ProviderTargetDescriptor,
+): string {
+  return `${target.backend}/${target.instanceId}`;
+}
+
+function sessionMatchesTarget(
+  session: Pick<SessionInfo, 'providerName' | 'providerBackend' | 'providerInstanceId'>,
+  target: ProviderTargetDescriptor,
+): boolean {
+  return session.providerName === target.providerName
+    && (session.providerBackend || 'cli') === target.backend
+    && (session.providerInstanceId || 'default') === target.instanceId;
+}
+
+async function resolveRequestedSessionModelState(
+  ctx: AppContext,
+  target: ProviderTargetDescriptor,
+  input: {
+    legacyModel?: string;
+    selection?: ProviderModelSelection;
+    enforceLegacyMatch?: boolean;
+  },
+): Promise<ResolvedSessionModelState> {
+  const effectiveSelection = input.selection
+    ?? (input.legacyModel ? createLegacyModelSelection(input.legacyModel) : undefined);
+  if (!effectiveSelection) {
+    return { warnings: [] };
+  }
+
+  const knowledge = await ctx.providerModelCatalog.getAdvancedKnowledge(
+    target.providerName,
+    qualifiedTargetInstance(target),
+  );
+  let resolved;
+  try {
+    resolved = resolveProviderSelection(knowledge, effectiveSelection);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (
+      input.legacyModel
+      && (
+        !input.selection
+        || isLegacyCompatibleExplicitSelection(input.selection, input.legacyModel)
+      )
+      && /Unknown catalog entry/.test(message)
+    ) {
+      return {
+        model: input.legacyModel,
+        modelSelection: createLegacyModelSelection(input.legacyModel),
+        modelResolution: {
+          entryId: input.legacyModel,
+          model: input.legacyModel,
+          entryMode: 'explicit',
+          supportTier: knowledge.supportTier,
+          warnings: [
+            `Legacy model '${input.legacyModel}' is not present in the advanced catalog; `
+            + 'preserving it as a compatibility passthrough.',
+          ],
+        },
+        warnings: [
+          `Legacy model '${input.legacyModel}' is not present in the advanced catalog; `
+          + 'preserving it as a compatibility passthrough.',
+        ],
+      };
+    }
+    throw error;
+  }
+
+  if (
+    input.enforceLegacyMatch !== false
+    && input.legacyModel
+    && input.selection
+    && input.legacyModel !== resolved.resolution.model
+  ) {
+    throw new Error(
+      `Legacy model '${input.legacyModel}' does not match resolved structured selection `
+      + `'${resolved.resolution.model}'`,
+    );
+  }
+
+  return {
+    model: resolved.resolution.model,
+    modelSelection: resolved.selection,
+    modelResolution: resolved.resolution,
+    warnings: [...resolved.resolution.warnings],
+  };
+}
+
+async function refreshSessionModelStateForTarget(
+  ctx: AppContext,
+  target: ProviderTargetDescriptor,
+  session: SessionInfo,
+): Promise<SessionInfo> {
+  if (!session.modelSelection) {
+    return session;
+  }
+
+  const refreshed = await resolveRequestedSessionModelState(ctx, target, {
+    legacyModel: session.model,
+    selection: session.modelSelection,
+    enforceLegacyMatch: false,
+  });
+  ctx.registry.updateSessionMetadata(session.id, {
+    model: refreshed.model,
+    modelSelection: refreshed.modelSelection,
+    modelResolution: refreshed.modelResolution,
+  });
+
+  return ctx.registry.get(session.id) ?? session;
 }
 
 function buildDeleteCleanupSummary(input: {
@@ -1793,6 +1920,7 @@ sessionRoutes.post('/sessions', async (c) => {
     instance?: string;
     cwd?: string;
     model?: string;
+    modelSelection?: unknown;
     group?: string;
     workspaceMode?: WorkspaceMode;
     workspaceIsolation?: WorkspaceIsolationMode;
@@ -1827,6 +1955,20 @@ sessionRoutes.post('/sessions', async (c) => {
   const providerInstance = providerTarget.backend === 'cli'
     ? resolveCliProviderInstance(providerTarget)
     : undefined;
+  const requestedLegacyModel = parseOptionalString(body.model);
+  const parsedModelSelection = parseProviderModelSelection(body.modelSelection);
+  if (parsedModelSelection.error) {
+    return c.json({ error: parsedModelSelection.error }, 400);
+  }
+  let requestedModelState: ResolvedSessionModelState;
+  try {
+    requestedModelState = await resolveRequestedSessionModelState(ctx, providerTarget, {
+      legacyModel: requestedLegacyModel,
+      selection: parsedModelSelection.selection,
+    });
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 400);
+  }
 
   const requestedSessionKey = parseOptionalString(body.sessionKey);
   const reusePolicy = parseReusePolicy(body.reusePolicy) || 'create_new';
@@ -1865,7 +2007,24 @@ sessionRoutes.post('/sessions', async (c) => {
           workspaceIsolationMode
           && resolveSessionWorkspaceIsolationMode(existing) !== workspaceIsolationMode
         )
-        || (body.model && existing.model && body.model !== existing.model)
+        || (
+          requestedLegacyModel
+          && existing.model
+          && requestedLegacyModel !== existing.model
+        )
+        || (
+          parsedModelSelection.selection
+          && !(
+            sameProviderModelSelection(existing.modelSelection, requestedModelState.modelSelection)
+            || (
+              !existing.modelSelection
+              && isLegacyCompatibleExplicitSelection(
+                requestedModelState.modelSelection,
+                existing.model,
+              )
+            )
+          )
+        )
       ) {
         return c.json({
           error: 'Existing sessionKey matches a session with different cwd/model/workspace settings. '
@@ -1906,6 +2065,13 @@ sessionRoutes.post('/sessions', async (c) => {
       }
 
       ctx.registry.updateSessionMetadata(existing.id, {
+        ...(requestedModelState.model !== undefined ? { model: requestedModelState.model } : {}),
+        ...(requestedModelState.modelSelection
+          ? { modelSelection: requestedModelState.modelSelection }
+          : {}),
+        ...(requestedModelState.modelResolution
+          ? { modelResolution: requestedModelState.modelResolution }
+          : {}),
         sessionKey,
         reusePolicy,
         instructions: instructions ?? preparedExisting.instructions,
@@ -1915,9 +2081,10 @@ sessionRoutes.post('/sessions', async (c) => {
         outputDir: outputDir ?? preparedExisting.outputDir,
       });
 
+      const updatedExisting = ctx.registry.get(existing.id) ?? preparedExisting;
       const existingHandle = runtime.get(existing.id);
       if (!existingHandle?.active) {
-        if (preparedExisting.providerBackend === 'cli') {
+        if (updatedExisting.providerBackend === 'cli') {
           return c.json({
             error: 'Explicit sessionKey reuse currently supports api/local/agent sessions only. '
               + 'Use /sessions/:id/resume for CLI sessions.',
@@ -1925,14 +2092,14 @@ sessionRoutes.post('/sessions', async (c) => {
         }
 
         try {
-          runtime.spawn(preparedExisting.id, preparedExisting.providerName, {
-            cwd: preparedExisting.cwd,
-            workspaceMode: preparedExisting.workspaceMode,
-            model: preparedExisting.model,
-            instructionsFile: preparedExisting.skills?.delivery.instructions?.filePath,
-            permissionMode: preparedExisting.permissionMode,
-            allowedTools: preparedExisting.allowedTools,
-          }, preparedExisting.providerInstanceId, preparedExisting.providerBackend);
+          runtime.spawn(updatedExisting.id, updatedExisting.providerName, {
+            cwd: updatedExisting.cwd,
+            workspaceMode: updatedExisting.workspaceMode,
+            model: updatedExisting.model,
+            instructionsFile: updatedExisting.skills?.delivery.instructions?.filePath,
+            permissionMode: updatedExisting.permissionMode,
+            allowedTools: updatedExisting.allowedTools,
+          }, updatedExisting.providerInstanceId, updatedExisting.providerBackend);
           ctx.registry.updateStatus(existing.id, 'ready');
         } catch (err) {
           return c.json({ error: `Failed to reuse session: ${err}` }, 500);
@@ -2006,6 +2173,13 @@ sessionRoutes.post('/sessions', async (c) => {
     try {
       const native = await getCursorNative(ctx, providerInstance!.id).createSession(resolved.cwd);
       nativeProviderSessionId = native.providerSessionId;
+      const cursorModelState = requestedModelState.model
+        ? requestedModelState
+        : native.model
+          ? await resolveRequestedSessionModelState(ctx, providerTarget, {
+            legacyModel: native.model,
+          })
+          : requestedModelState;
       const session = ctx.registry.create({
         id: sessionId,
         providerName: 'cursor',
@@ -2016,7 +2190,9 @@ sessionRoutes.post('/sessions', async (c) => {
         workspaceIsolation: resolved.workspaceIsolation,
         permissionMode: resolved.permissionMode,
         allowedTools: body.allowedTools,
-        model: body.model || native.model,
+        model: cursorModelState.model ?? native.model,
+        modelSelection: cursorModelState.modelSelection,
+        modelResolution: cursorModelState.modelResolution,
         group: body.group,
         sessionKey,
         reusePolicy,
@@ -2037,7 +2213,7 @@ sessionRoutes.post('/sessions', async (c) => {
       runtime.spawn(session.id, providerName, {
         cwd: resolved.cwd,
         workspaceMode: resolved.workspaceMode,
-        model: body.model || native.model,
+        model: cursorModelState.model ?? native.model,
         resumeSessionId: native.providerSessionId,
         instructionsFile: skills?.delivery.instructions?.filePath,
         permissionMode: resolved.permissionMode,
@@ -2094,7 +2270,9 @@ sessionRoutes.post('/sessions', async (c) => {
         workspaceIsolation: resolved.workspaceIsolation,
         permissionMode: resolved.permissionMode,
         allowedTools: body.allowedTools,
-        model: body.model,
+        model: requestedModelState.model,
+        modelSelection: requestedModelState.modelSelection,
+        modelResolution: requestedModelState.modelResolution,
         group: body.group,
         sessionKey,
         reusePolicy,
@@ -2115,7 +2293,7 @@ sessionRoutes.post('/sessions', async (c) => {
       runtime.spawn(session.id, providerName, {
         cwd: resolved.cwd,
         workspaceMode: resolved.workspaceMode,
-        model: body.model,
+        model: requestedModelState.model,
         resumeSessionId: native.providerSessionId,
         instructionsFile: skills?.delivery.instructions?.filePath,
         permissionMode: resolved.permissionMode,
@@ -2163,6 +2341,9 @@ sessionRoutes.post('/sessions', async (c) => {
   }
 
   const warnings: string[] = [];
+  if (requestedModelState.warnings.length > 0) {
+    warnings.push(...requestedModelState.warnings);
+  }
   if (!caps.permissions && body.permissionMode && body.permissionMode !== 'skip') {
     warnings.push(`Provider '${providerName}' runs in full-auto mode; permissionMode '${body.permissionMode}' is ignored`);
   }
@@ -2177,7 +2358,9 @@ sessionRoutes.post('/sessions', async (c) => {
     workspaceIsolation: resolved.workspaceIsolation,
     permissionMode: resolved.permissionMode,
     allowedTools: body.allowedTools,
-    model: body.model,
+    model: requestedModelState.model,
+    modelSelection: requestedModelState.modelSelection,
+    modelResolution: requestedModelState.modelResolution,
     group: body.group,
     sessionKey,
     reusePolicy,
@@ -2193,7 +2376,7 @@ sessionRoutes.post('/sessions', async (c) => {
     runtime.spawn(session.id, providerName, {
       cwd: resolved.cwd,
       workspaceMode: resolved.workspaceMode,
-      model: body.model,
+      model: requestedModelState.model,
       instructionsFile: skills?.delivery.instructions?.filePath,
       permissionMode: resolved.permissionMode,
       allowedTools: body.allowedTools,
@@ -3161,6 +3344,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         hydration: hydrated.hydration,
       });
       hydratedSession = ctx.registry.get(id) ?? preparedSession;
+      hydratedSession = await refreshSessionModelStateForTarget(ctx, providerTarget, hydratedSession);
       runtime.spawn(id, hydratedSession.providerName, {
         cwd: hydratedSession.cwd,
         workspaceMode: hydratedSession.workspaceMode,
@@ -3201,6 +3385,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         hydration: hydrated.hydration,
       });
       hydratedSession = ctx.registry.get(id) ?? preparedSession;
+      hydratedSession = await refreshSessionModelStateForTarget(ctx, providerTarget, hydratedSession);
       await primeCliCompatibility(
         ctx,
         resolveCliProviderTarget(ctx, hydratedSession.providerName, hydratedSession.providerInstanceId),
@@ -3257,6 +3442,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         hydration: hydrated.hydration,
       });
       hydratedSession = ctx.registry.get(id) ?? preparedSession;
+      hydratedSession = await refreshSessionModelStateForTarget(ctx, providerTarget, hydratedSession);
       await primeCliCompatibility(
         ctx,
         resolveCliProviderTarget(ctx, hydratedSession.providerName, hydratedSession.providerInstanceId),
@@ -3318,6 +3504,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         hydration: hydrated.hydration,
       });
       hydratedSession = ctx.registry.get(id) ?? preparedSession;
+      hydratedSession = await refreshSessionModelStateForTarget(ctx, providerTarget, hydratedSession);
       await primeCliCompatibility(
         ctx,
         resolveCliProviderTarget(ctx, hydratedSession.providerName, hydratedSession.providerInstanceId),
@@ -3383,6 +3570,7 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
       hydration: hydrated.hydration,
     });
     hydratedSession = ctx.registry.get(id) ?? preparedSession;
+    hydratedSession = await refreshSessionModelStateForTarget(ctx, providerTarget, hydratedSession);
     await primeCliCompatibility(
       ctx,
       hydratedSession.providerBackend === 'cli'
@@ -3619,6 +3807,36 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     throw error;
   }
 
+  let childModelState: ResolvedSessionModelState = { warnings: [] };
+  try {
+    childModelState = body.model
+      ? await resolveRequestedSessionModelState(ctx, childTarget, {
+        legacyModel: body.model,
+      })
+      : session.modelSelection && sessionMatchesTarget(session, childTarget)
+        ? await resolveRequestedSessionModelState(ctx, childTarget, {
+          selection: session.modelSelection,
+        })
+        : { warnings: [] };
+  } catch (error) {
+    await discardPreparedWorkspace(ctx, {
+      id: forkId,
+      workspaceMode: forkWorkspaceMode,
+      workspaceIsolation: forkPrepared.workspaceIsolation,
+    });
+    return c.json({
+      error: error instanceof Error ? error.message : String(error),
+      branch: {
+        ...branchDecision,
+        warnings,
+        transplant: summarizeContextTransplant(body.transplant, usedContextTransplant),
+      },
+    }, 400);
+  }
+  if (childModelState.warnings.length > 0) {
+    warnings.push(...childModelState.warnings);
+  }
+
   const forked = ctx.registry.create({
     id: forkId,
     providerName: childTarget.providerName,
@@ -3629,7 +3847,9 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     workspaceIsolation: forkPrepared.workspaceIsolation,
     permissionMode: forkPermissionMode,
     allowedTools: body.allowedTools ?? session.allowedTools,
-    model: body.model ?? session.model,
+    model: childModelState.model ?? body.model ?? session.model,
+    modelSelection: childModelState.modelSelection,
+    modelResolution: childModelState.modelResolution,
     group: body.group ?? session.group,
     sessionKey: randomUUID(),
     reusePolicy: 'create_new',
@@ -3658,7 +3878,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     runtime.spawn(forked.id, childTarget.providerName, {
       cwd: forkCwd,
       workspaceMode: forkWorkspaceMode,
-      model: body.model ?? session.model,
+      model: childModelState.model ?? body.model ?? session.model,
       instructionsFile: childSkills?.delivery.instructions?.filePath,
       ...(branchMode === 'native_fork'
         ? {

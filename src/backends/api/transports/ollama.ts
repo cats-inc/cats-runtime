@@ -14,6 +14,17 @@ import { ApiTransportError, readRetryAfterMs } from './error.js';
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
 
+function mergeRuntimePatch<T extends Record<string, unknown>>(
+  requestBody: T,
+  runtimePatch?: Record<string, unknown>,
+): T {
+  if (!runtimePatch) {
+    return requestBody;
+  }
+
+  return applyPayloadTemplate(runtimePatch as T, requestBody);
+}
+
 function resolveBaseUrl(instance: RemoteProviderInstanceConfig, env: NodeJS.ProcessEnv): string {
   const fromEnv = instance.baseUrlEnv ? env[instance.baseUrlEnv] : undefined;
   return fromEnv || instance.baseUrl || 'http://127.0.0.1:11434';
@@ -150,7 +161,7 @@ export class OllamaTransport implements ApiTransportClient {
         },
       });
     }
-    const requestBody = applyPayloadTemplate({
+    const runtimeBody = mergeRuntimePatch({
       model: input.model,
       stream: false,
       messages: toOllamaMessages(input.messages),
@@ -158,7 +169,8 @@ export class OllamaTransport implements ApiTransportClient {
       options: {
         num_predict: input.instance.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
       },
-    }, input.instance.payloadTemplate);
+    }, input.requestBodyPatch);
+    const requestBody = applyPayloadTemplate(runtimeBody, input.instance.payloadTemplate);
     const response = await this.fetchImpl(`${baseUrl.replace(/\/$/, '')}/api/chat`, {
       method: 'POST',
       headers: {

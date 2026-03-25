@@ -42,6 +42,7 @@ export interface ApiCompletionInput {
   providerName: string;
   instance: RemoteProviderInstanceConfig;
   model: string;
+  requestBodyPatch?: Record<string, unknown>;
   messages: ApiConversationMessage[];
   tools: ToolDefinition[];
   previousResponseId?: string;

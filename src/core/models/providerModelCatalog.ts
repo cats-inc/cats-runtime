@@ -9,6 +9,10 @@ import {
   resolveProviderTarget,
   type ProviderTargetDescriptor,
 } from '../providerCatalog.js';
+import {
+  buildProviderAdvancedKnowledge,
+  type ProviderAdvancedKnowledgeContext,
+} from './providerAdvancedKnowledge.js';
 
 export interface ProviderModelCatalogEntry {
   id: string;
@@ -262,6 +266,29 @@ export class ProviderModelCatalogService {
     requestedInstance?: string,
   ): Promise<ProviderModelCatalogResult> {
     const target = resolveProviderTarget(this.config, providerName, requestedInstance);
+    return this.getCatalogForTarget(target);
+  }
+
+  async getAdvancedKnowledge(
+    providerName: string,
+    requestedInstance?: string,
+  ): Promise<ProviderAdvancedKnowledgeContext> {
+    const target = resolveProviderTarget(this.config, providerName, requestedInstance);
+    const catalog = await this.getCatalogForTarget(target);
+    return buildProviderAdvancedKnowledge(target, catalog);
+  }
+
+  async getAdvancedCatalog(
+    providerName: string,
+    requestedInstance?: string,
+  ) {
+    const knowledge = await this.getAdvancedKnowledge(providerName, requestedInstance);
+    return knowledge.catalog;
+  }
+
+  private async getCatalogForTarget(
+    target: ProviderTargetDescriptor,
+  ): Promise<ProviderModelCatalogResult> {
     const defaultModel = resolveDefaultModel(target, this.env);
     const warnings: string[] = [];
     const dynamic = await this.tryDynamicCatalog(target, defaultModel, warnings);

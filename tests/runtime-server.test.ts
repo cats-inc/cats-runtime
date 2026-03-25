@@ -1829,6 +1829,272 @@ providers:
     });
   });
 
+  it('GET /providers/:provider/models/advanced adds a runtime-owned advanced catalog without changing v1', async () => {
+    await withRuntime({}, {}, async (runtime) => {
+      const response = await runtime.app.request('/providers/codex/models/advanced');
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        provider: 'codex',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gpt-5.4',
+        source: 'static',
+        cache: null,
+        entries: [
+          {
+            id: 'gpt-5.4',
+            label: 'gpt-5.4',
+            default: true,
+            capabilityTags: ['tool_use', 'reasoning'],
+          },
+          {
+            id: 'gpt-5.3-codex',
+            label: 'gpt-5.3-codex',
+            default: false,
+            capabilityTags: ['tool_use'],
+          },
+          {
+            id: 'gpt-5.2-codex',
+            label: 'gpt-5.2-codex',
+            default: false,
+            capabilityTags: ['tool_use'],
+          },
+        ],
+        presets: [
+          {
+            id: 'balanced',
+            label: 'Balanced',
+            availability: 'supported',
+            applicableEntryIds: ['gpt-5.4'],
+            preferredEntryId: 'gpt-5.4',
+          },
+          {
+            id: 'fast',
+            label: 'Fast',
+            availability: 'supported',
+            applicableEntryIds: ['gpt-5.3-codex'],
+            preferredEntryId: 'gpt-5.3-codex',
+          },
+          {
+            id: 'deep_reasoning',
+            label: 'Deep reasoning',
+            availability: 'supported',
+            applicableEntryIds: ['gpt-5.4'],
+            preferredEntryId: 'gpt-5.4',
+          },
+        ],
+        controls: [],
+        defaultSelection: {
+          entryId: 'gpt-5.4',
+          entryMode: 'auto',
+          presetId: 'balanced',
+        },
+        support: {
+          tier: 'entry_only',
+        },
+        warnings: [],
+      });
+    });
+  });
+
+  it('POST /sessions accepts structured model selection additively and preserves legacy model snapshot', async () => {
+    await withRuntime({
+      providerDefaultTargets: {
+        codex: { backend: 'api', instance: 'main' },
+      },
+      remoteProviderCatalog: {
+        api: {
+          codex: {
+            main: {
+              id: 'main',
+              providerName: 'codex',
+              backend: 'api',
+              transport: 'openai',
+              apiKeyEnv: 'OPENAI_API_KEY',
+              baseUrl: 'https://example.test',
+              model: 'gpt-5.4',
+            },
+          },
+        },
+        local: {},
+        agent: {},
+      },
+    }, {}, async (runtime) => {
+      const createResponse = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider: 'codex',
+          cwd: '/tmp/cats-runtime-repo',
+          modelSelection: {
+            entryMode: 'auto',
+            presetId: 'deep_reasoning',
+            controls: {
+              'openai.reasoning_effort': 'high',
+            },
+          },
+        }),
+      });
+
+      expect(createResponse.status).toBe(201);
+      const created = await createResponse.json() as Record<string, unknown>;
+      expect(created.model).toBe('gpt-5.4');
+      expect(created.modelSelection).toEqual({
+        entryMode: 'auto',
+        presetId: 'deep_reasoning',
+        controls: {
+          'openai.reasoning_effort': 'high',
+        },
+      });
+      expect(created.modelResolution).toEqual({
+        entryId: 'gpt-5.4',
+        model: 'gpt-5.4',
+        entryMode: 'auto',
+        presetId: 'deep_reasoning',
+        controls: {
+          'openai.reasoning_effort': 'high',
+        },
+        supportTier: 'full',
+        warnings: [],
+      });
+
+      const detailResponse = await runtime.app.request(`/sessions/${created.id}`);
+      expect(detailResponse.status).toBe(200);
+      expect(await detailResponse.json()).toMatchObject({
+        model: 'gpt-5.4',
+        modelSelection: {
+          entryMode: 'auto',
+          presetId: 'deep_reasoning',
+          controls: {
+            'openai.reasoning_effort': 'high',
+          },
+        },
+        modelResolution: {
+          entryId: 'gpt-5.4',
+          model: 'gpt-5.4',
+          entryMode: 'auto',
+          presetId: 'deep_reasoning',
+          controls: {
+            'openai.reasoning_effort': 'high',
+          },
+          supportTier: 'full',
+        },
+      });
+    });
+  });
+
+  it('POST /sessions keeps legacy model-only requests accepted during migration', async () => {
+    await withRuntime({}, {}, async (runtime) => {
+      const response = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider: 'codex',
+          cwd: '/tmp',
+          model: 'custom-preview-model',
+        }),
+      });
+
+      expect(response.status).toBe(201);
+      expect(await response.json()).toMatchObject({
+        providerName: 'codex',
+        model: 'custom-preview-model',
+        modelSelection: {
+          entryId: 'custom-preview-model',
+          entryMode: 'explicit',
+        },
+        modelResolution: {
+          entryId: 'custom-preview-model',
+          model: 'custom-preview-model',
+          entryMode: 'explicit',
+          warnings: [
+            "Legacy model 'custom-preview-model' is not present in the advanced catalog; preserving it as a compatibility passthrough.",
+          ],
+        },
+      });
+    });
+  });
+
+  it('POST /sessions rejects conflicting legacy model and structured selection payloads', async () => {
+    await withRuntime({
+      providerDefaultTargets: {
+        codex: { backend: 'api', instance: 'main' },
+      },
+      remoteProviderCatalog: {
+        api: {
+          codex: {
+            main: {
+              id: 'main',
+              providerName: 'codex',
+              backend: 'api',
+              transport: 'openai',
+              apiKeyEnv: 'OPENAI_API_KEY',
+              baseUrl: 'https://example.test',
+              model: 'gpt-5.4',
+            },
+          },
+        },
+        local: {},
+        agent: {},
+      },
+    }, {}, async (runtime) => {
+      const response = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider: 'codex',
+          cwd: '/tmp/cats-runtime-repo',
+          model: 'gpt-5.3-codex',
+          modelSelection: {
+            entryMode: 'auto',
+            presetId: 'deep_reasoning',
+            controls: {
+              'openai.reasoning_effort': 'high',
+            },
+          },
+        }),
+      });
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: "Legacy model 'gpt-5.3-codex' does not match resolved structured selection 'gpt-5.4'",
+      });
+    });
+  });
+
+  it('POST /sessions rejects unsupported controls for entry-only targets', async () => {
+    await withRuntime({}, {}, async (runtime) => {
+      const response = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider: 'codex',
+          cwd: '/tmp/cats-runtime-repo',
+          modelSelection: {
+            entryMode: 'explicit',
+            entryId: 'gpt-5.4',
+            controls: {
+              'openai.reasoning_effort': 'high',
+            },
+          },
+        }),
+      });
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: "Control 'openai.reasoning_effort' is not supported for codex/cli/default",
+      });
+    });
+  });
+
   it('GET /providers/:provider/models returns dynamic Ollama catalog with cache metadata', async () => {
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
