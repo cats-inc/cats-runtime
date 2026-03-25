@@ -1,8 +1,18 @@
-import type { ExecutionHandle, StreamEvent, TurnInput } from '../../../core/types.js';
+import type {
+  ExecutionHandle,
+  RuntimeExecutionStrategyId,
+  RuntimeExecutionStrategyRequest,
+  StreamEvent,
+  TurnInput,
+} from '../../../core/types.js';
 import { mergeRuntimeInstructionLayers } from '../../../core/skills/catalog.js';
 import { LocalToolRuntime } from '../../../core/tools/LocalToolRuntime.js';
-import { createRuntimeProgressEvent } from '../../../core/progress.js';
 import { buildProviderExecutionRequestPatch } from '../../../core/models/providerSelectionResolution.js';
+import { resolveRuntimeExecutionStrategy } from '../../../core/runtime/strategies/resolution.js';
+import {
+  mergeRuntimeExecutionStrategyRequests,
+  normalizeRuntimeExecutionStrategyRequest,
+} from '../../../core/runtime/strategies/state.js';
 import type { SessionRegistry } from '../../cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig, RemoteProviderInstanceConfig } from '../../cli/config.js';
 import type { ProviderTargetDescriptor } from '../../../core/providerCatalog.js';
@@ -18,17 +28,19 @@ import {
 import type {
   ApiBackendOptions,
   ApiBackendStatus,
-  ApiCompletionResponse,
   ApiConversationMessage,
-  ApiConversationPart,
-  ApiProgressEvent,
-  ApiToolCallPart,
   ApiTransportClient,
 } from '../types.js';
 import { API_PROVIDER_CAPABILITIES } from '../types.js';
 import { ApiTransportError } from '../transports/error.js';
+import {
+  API_RUNTIME_COMPATIBILITY_STRATEGY,
+  createApiRuntimeExecutionStrategyRegistry,
+} from './strategies/registry.js';
+import { ApiStrategyExecutionContext } from './strategies/ApiStrategyExecutionContext.js';
 
 const DEFAULT_MAX_TOOL_STEPS = 20;
+const DEFAULT_REACT_STUCK_THRESHOLD = 2;
 
 function defaultFetch(): typeof fetch {
   return fetch;
@@ -69,13 +81,9 @@ function ensureRemoteTarget(target: ProviderTargetDescriptor): RemoteProviderIns
 
 function extractTextParts(message: ApiConversationMessage): string[] {
   return message.parts
-    .filter((part): part is Extract<ApiConversationPart, { type: 'text' }> => part.type === 'text')
+    .filter((part): part is Extract<ApiConversationMessage['parts'][number], { type: 'text' }> => part.type === 'text')
     .map((part) => part.text)
     .filter((text) => text.length > 0);
-}
-
-function extractToolCalls(message: ApiConversationMessage): ApiToolCallPart[] {
-  return message.parts.filter((part): part is ApiToolCallPart => part.type === 'tool_call');
 }
 
 function lastUserText(messages: ApiConversationMessage[]): string | undefined {
@@ -85,7 +93,7 @@ function lastUserText(messages: ApiConversationMessage[]): string | undefined {
   }
 
   return last.parts
-    .filter((part): part is Extract<ApiConversationPart, { type: 'text' }> => part.type === 'text')
+    .filter((part): part is Extract<ApiConversationMessage['parts'][number], { type: 'text' }> => part.type === 'text')
     .map((part) => part.text)
     .join('\n');
 }
@@ -118,27 +126,6 @@ function prependSystemPrompt(
     role: 'system',
     parts: [{ type: 'text', text: combinedPrompt }],
   }, ...messages];
-}
-
-function toProgressStreamEvent(
-  progress: ApiProgressEvent,
-  target: ProviderTargetDescriptor,
-  providerSessionId?: string,
-): StreamEvent {
-  return createRuntimeProgressEvent({
-    text: progress.message,
-    providerSessionId,
-    provider: target.providerName,
-    backend: target.backend,
-    instance: target.instanceId,
-    kind: progress.kind,
-    status: progress.status,
-    source: 'runtime',
-    details: {
-      transport: target.remoteInstance?.transport,
-      ...progress.metadata,
-    },
-  });
 }
 
 function toErrorStreamEvent(
@@ -176,11 +163,73 @@ function toErrorStreamEvent(
   };
 }
 
+function buildStrategyInstructionOverlay(
+  strategyId: RuntimeExecutionStrategyId,
+  request: RuntimeExecutionStrategyRequest | undefined,
+): string | undefined {
+  if (strategyId !== 'react') {
+    return undefined;
+  }
+
+  const sections = [
+    'Execution strategy: react. Work in short reason-act-observe loops, avoid repeating the same tool calls, and stop once the user request is satisfied.',
+    request?.acceptanceCriteria
+      ? `Acceptance criteria:\n${request.acceptanceCriteria}`
+      : undefined,
+    request?.strategyContext
+      ? `Strategy context:\n${JSON.stringify(request.strategyContext, null, 2)}`
+      : undefined,
+  ].filter((section): section is string => Boolean(section));
+
+  return sections.length > 0 ? sections.join('\n\n') : undefined;
+}
+
+function resolveStrategyConstraints(
+  instance: RemoteProviderInstanceConfig,
+  request: RuntimeExecutionStrategyRequest | undefined,
+  strategyId: RuntimeExecutionStrategyId,
+): {
+  stepLimit: number;
+  timeoutMs?: number;
+  stuckThreshold: number;
+} {
+  const strategyContext = request?.strategyContext;
+  const stepLimit = readStrategyPositiveNumber(
+    strategyContext,
+    'maxSteps',
+  ) || instance.maxToolSteps || DEFAULT_MAX_TOOL_STEPS;
+  const timeoutMs = strategyId === 'react'
+    ? readStrategyPositiveNumber(strategyContext, 'timeoutMs') || instance.timeoutMs
+    : undefined;
+  const stuckThreshold = strategyId === 'react'
+    ? readStrategyPositiveNumber(strategyContext, 'stuckThreshold') || DEFAULT_REACT_STUCK_THRESHOLD
+    : 0;
+
+  return {
+    stepLimit,
+    ...(timeoutMs ? { timeoutMs } : {}),
+    stuckThreshold,
+  };
+}
+
+function readStrategyPositiveNumber(
+  record: Record<string, unknown> | undefined,
+  key: string,
+): number | undefined {
+  if (!record || typeof record[key] !== 'number') {
+    return undefined;
+  }
+
+  const value = record[key] as number;
+  return Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
 export class ApiBackendManager {
   private readonly options: Required<ApiBackendOptions>;
   private readonly handles = new Map<string, ManagedExecutionHandle>();
   private readonly targets = new Map<string, ProviderTargetDescriptor>();
   private readonly tools = new LocalToolRuntime();
+  private readonly strategyRegistry = createApiRuntimeExecutionStrategyRegistry();
 
   constructor(
     private readonly config: Pick<CliRuntimeConfig, 'sessionBaseDir'>,
@@ -321,11 +370,38 @@ export class ApiBackendManager {
       );
     }
 
+    const currentRequest = normalizeRuntimeExecutionStrategyRequest({
+      requestedStrategy: turn.requestedStrategy,
+      acceptanceCriteria: turn.acceptanceCriteria,
+      strategyContext: turn.strategyContext,
+      correlation: turn.correlation,
+    });
+    const persistedRequest = normalizeRuntimeExecutionStrategyRequest({
+      requestedStrategy: initialSession.requestedStrategy,
+      acceptanceCriteria: initialSession.acceptanceCriteria,
+      strategyContext: initialSession.strategyContext,
+      correlation: initialSession.correlation,
+    });
+    const effectiveRequest = mergeRuntimeExecutionStrategyRequests(
+      persistedRequest,
+      currentRequest,
+    );
+    const resolution = resolveRuntimeExecutionStrategy({
+      requestedStrategy: currentRequest?.requestedStrategy,
+      preferredStrategy: initialSession.strategyState?.preferredStrategy,
+      fallbackStrategy: API_RUNTIME_COMPATIBILITY_STRATEGY,
+    });
+
     const transcriptPath = initialSession.sourcePath || initialSession.providerSourcePath;
+    const strategyInstructions = buildStrategyInstructionOverlay(
+      resolution.effectiveStrategy,
+      effectiveRequest,
+    );
     const composedInstructions = mergeRuntimeInstructionLayers(
       turn.skills ?? initialSession.skills,
       turn.sessionInstructions ?? initialSession.instructions,
       turn.instructions,
+      strategyInstructions,
     );
     const conversation = prependSystemPrompt(
       await loadTranscriptMessages(transcriptPath),
@@ -340,140 +416,61 @@ export class ApiBackendManager {
     }
 
     const transport = buildTransport(remoteInstance, this.options);
-    const toolDefinitions = this.tools.listTools(remoteInstance.toolProfile);
     const permissionMode = initialSession.permissionMode
       || (initialSession.workspaceMode === 'read_only' ? 'default' : 'skip');
-
-    let responseId = initialSession.providerSessionId;
-    let sessionState = initialSession.providerState;
-    let initialized = false;
-    let totalInputTokens = 0;
-    let totalOutputTokens = 0;
-
-    const maxToolSteps = remoteInstance.maxToolSteps ?? DEFAULT_MAX_TOOL_STEPS;
     const requestBodyPatch = buildProviderExecutionRequestPatch(
       target,
       initialSession.modelResolution?.controls,
     );
+    const strategy = this.strategyRegistry.resolve(resolution.effectiveStrategy);
+    const constraints = resolveStrategyConstraints(
+      remoteInstance,
+      effectiveRequest,
+      resolution.effectiveStrategy,
+    );
+    const emitLifecycleEvents = resolution.effectiveStrategy !== API_RUNTIME_COMPATIBILITY_STRATEGY
+      || resolution.source !== 'compatibility_fallback';
+    const context = new ApiStrategyExecutionContext({
+      session: initialSession,
+      registry: this.registry,
+      target,
+      remoteInstance,
+      transport,
+      tools: this.tools,
+      toolProfile: remoteInstance.toolProfile,
+      permissionMode,
+      request: effectiveRequest,
+      resolution,
+      requestBodyPatch,
+      model,
+      conversation,
+      signal,
+      constraints,
+      emitLifecycleEvents,
+    });
 
-    for (let step = 0; step < maxToolSteps; step += 1) {
-      let completion: ApiCompletionResponse;
-      try {
-        completion = await transport.completeTurn({
-          sessionId,
-          providerName: initialSession.providerName,
-          instance: remoteInstance,
-          model,
-          requestBodyPatch,
-          messages: conversation,
-          tools: toolDefinitions,
-          previousResponseId: responseId,
-          sessionState,
-          turnStep: step,
-          signal,
-        });
-      } catch (error) {
-        yield toErrorStreamEvent(error, target, responseId);
-        return;
+    try {
+      for await (const event of strategy.execute(context)) {
+        yield event;
       }
-
-      if (completion.responseId) {
-        responseId = completion.responseId;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      context.updateStrategy({
+        status: 'failed',
+        stepCount: context.session.strategyState?.summary?.stepCount || 0,
+        stepLimit: constraints.stepLimit,
+        timeoutMs: constraints.timeoutMs,
+        failureReason: message,
+        lastEvent: 'strategy_failed',
+      });
+      if (emitLifecycleEvents) {
+        yield context.createStrategyEvent(
+          'strategy_failed',
+          'failed',
+          message,
+        );
       }
-      if (completion.sessionState !== undefined) {
-        sessionState = completion.sessionState;
-        this.registry.setProviderState(sessionId, sessionState);
-      }
-
-      if (!initialized) {
-        initialized = true;
-        yield {
-          type: 'init',
-          sessionId: responseId,
-          raw: completion.raw,
-        };
-      }
-
-      for (const progress of completion.progress ?? []) {
-        yield toProgressStreamEvent(progress, target, responseId);
-      }
-
-      totalInputTokens += completion.usage?.inputTokens ?? 0;
-      totalOutputTokens += completion.usage?.outputTokens ?? 0;
-      conversation.push(completion.assistant);
-
-      for (const text of extractTextParts(completion.assistant)) {
-        yield {
-          type: 'text',
-          text,
-          raw: completion.raw,
-        };
-      }
-
-      const toolCalls = extractToolCalls(completion.assistant);
-      if (toolCalls.length === 0) {
-        yield {
-          type: 'result',
-          sessionId: responseId,
-          usage: {
-            inputTokens: totalInputTokens,
-            outputTokens: totalOutputTokens,
-          },
-          raw: completion.raw,
-        };
-        return;
-      }
-
-      const toolResultMessage: ApiConversationMessage = {
-        role: 'user',
-        parts: [],
-      };
-
-      for (const toolCall of toolCalls) {
-        yield {
-          type: 'tool_use',
-          toolName: toolCall.name,
-          toolId: toolCall.id,
-          text: JSON.stringify(toolCall.arguments),
-          toolArgs: toolCall.arguments,
-          raw: toolCall.raw,
-        };
-      }
-
-      for (const toolCall of toolCalls) {
-        const toolResult = await this.tools.execute({
-          sessionId,
-          cwd: initialSession.cwd,
-          workspaceMode: initialSession.workspaceMode,
-          permissionMode,
-          allowedTools: initialSession.allowedTools,
-          toolProfile: remoteInstance.toolProfile,
-        }, {
-          id: toolCall.id,
-          name: toolCall.name,
-          arguments: toolCall.arguments,
-        });
-
-        toolResultMessage.parts.push({
-          type: 'tool_result',
-          toolCallId: toolResult.callId,
-          name: toolResult.name,
-          output: toolResult.output,
-          isError: toolResult.isError,
-        });
-
-        yield {
-          type: 'tool_result',
-          toolName: toolResult.name,
-          toolId: toolResult.callId,
-          text: toolResult.output,
-          isError: toolResult.isError,
-        };
-      }
-
-      conversation.push(toolResultMessage);
+      yield toErrorStreamEvent(error, target, context.providerSessionId);
     }
-
-    throw new Error(`Exceeded tool loop limit of ${maxToolSteps} steps`);
   }
 }

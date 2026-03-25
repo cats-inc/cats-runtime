@@ -5,6 +5,8 @@ import type {
   PermissionMode,
   ProviderModelResolution,
   ProviderModelSelection,
+  RuntimeExecutionStrategyId,
+  RuntimeExecutionStrategyState,
   SessionWorkspaceState,
   SessionArtifact,
   SessionHydrationState,
@@ -53,6 +55,12 @@ export interface CreateSessionInput {
   group?: string;
   sessionKey?: string;
   reusePolicy?: SessionReusePolicy;
+  requestedStrategy?: RuntimeExecutionStrategyId;
+  acceptanceCriteria?: string;
+  strategyContext?: Record<string, unknown>;
+  correlation?: Record<string, unknown>;
+  effectiveStrategy?: RuntimeExecutionStrategyId;
+  strategyState?: RuntimeExecutionStrategyState;
   instructions?: string;
   skills?: SessionSkillState;
   hydration?: SessionHydrationState;
@@ -77,6 +85,12 @@ interface DiscoveredSessionData {
   allowedTools?: string[];
   sessionKey?: string;
   reusePolicy?: SessionReusePolicy;
+  requestedStrategy?: RuntimeExecutionStrategyId;
+  acceptanceCriteria?: string;
+  strategyContext?: Record<string, unknown>;
+  correlation?: Record<string, unknown>;
+  effectiveStrategy?: RuntimeExecutionStrategyId;
+  strategyState?: RuntimeExecutionStrategyState;
   instructions?: string;
   skills?: SessionSkillState;
   context?: SessionInvocationContext;
@@ -269,6 +283,12 @@ export class SessionRegistry {
       group: input.group,
       sessionKey: input.sessionKey,
       reusePolicy: input.reusePolicy,
+      requestedStrategy: input.requestedStrategy,
+      acceptanceCriteria: input.acceptanceCriteria,
+      strategyContext: cloneRecord(input.strategyContext),
+      correlation: cloneRecord(input.correlation),
+      effectiveStrategy: input.effectiveStrategy,
+      strategyState: cloneStrategyState(input.strategyState),
       instructions: input.instructions,
       skills: cloneSkillState(input.skills),
       hydration: cloneHydrationState(input.hydration),
@@ -375,6 +395,12 @@ export class SessionRegistry {
       modelResolution?: ProviderModelResolution;
       sessionKey?: string;
       reusePolicy?: SessionReusePolicy;
+      requestedStrategy?: RuntimeExecutionStrategyId;
+      acceptanceCriteria?: string;
+      strategyContext?: Record<string, unknown>;
+      correlation?: Record<string, unknown>;
+      effectiveStrategy?: RuntimeExecutionStrategyId;
+      strategyState?: RuntimeExecutionStrategyState;
       instructions?: string;
       skills?: SessionSkillState;
       hydration?: SessionHydrationState;
@@ -402,6 +428,24 @@ export class SessionRegistry {
     }
     if (patch.reusePolicy !== undefined) {
       session.reusePolicy = patch.reusePolicy;
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'requestedStrategy')) {
+      session.requestedStrategy = patch.requestedStrategy;
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'acceptanceCriteria')) {
+      session.acceptanceCriteria = patch.acceptanceCriteria;
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'strategyContext')) {
+      session.strategyContext = cloneRecord(patch.strategyContext);
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'correlation')) {
+      session.correlation = cloneRecord(patch.correlation);
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'effectiveStrategy')) {
+      session.effectiveStrategy = patch.effectiveStrategy;
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'strategyState')) {
+      session.strategyState = cloneStrategyState(patch.strategyState);
     }
     if (patch.instructions !== undefined) {
       session.instructions = patch.instructions;
@@ -730,6 +774,12 @@ export class SessionRegistry {
       group: mergedData.group,
       sessionKey: mergedData.sessionKey,
       reusePolicy: mergedData.reusePolicy,
+      requestedStrategy: mergedData.requestedStrategy,
+      acceptanceCriteria: mergedData.acceptanceCriteria,
+      strategyContext: cloneRecord(mergedData.strategyContext),
+      correlation: cloneRecord(mergedData.correlation),
+      effectiveStrategy: mergedData.effectiveStrategy,
+      strategyState: cloneStrategyState(mergedData.strategyState),
       instructions: mergedData.instructions,
       skills: cloneSkillState(mergedData.skills),
       context: cloneInvocationContext(mergedData.context),
@@ -815,6 +865,24 @@ export class SessionRegistry {
     if (data.model && !session.model) session.model = data.model;
     if (data.sessionKey && !session.sessionKey) session.sessionKey = data.sessionKey;
     if (data.reusePolicy && !session.reusePolicy) session.reusePolicy = data.reusePolicy;
+    if (data.requestedStrategy && !session.requestedStrategy) {
+      session.requestedStrategy = data.requestedStrategy;
+    }
+    if (data.acceptanceCriteria && !session.acceptanceCriteria) {
+      session.acceptanceCriteria = data.acceptanceCriteria;
+    }
+    if (data.strategyContext && !session.strategyContext) {
+      session.strategyContext = cloneRecord(data.strategyContext);
+    }
+    if (data.correlation && !session.correlation) {
+      session.correlation = cloneRecord(data.correlation);
+    }
+    if (data.effectiveStrategy && !session.effectiveStrategy) {
+      session.effectiveStrategy = data.effectiveStrategy;
+    }
+    if (data.strategyState && !session.strategyState) {
+      session.strategyState = cloneStrategyState(data.strategyState);
+    }
     if (data.instructions && !session.instructions) session.instructions = data.instructions;
     if (data.skills && !session.skills) session.skills = cloneSkillState(data.skills);
     if (data.context && !session.context) session.context = cloneInvocationContext(data.context);
@@ -867,6 +935,12 @@ export class SessionRegistry {
       workspace: incoming.workspace ?? existing.workspace,
       sessionKey: incoming.sessionKey ?? existing.sessionKey,
       reusePolicy: incoming.reusePolicy ?? existing.reusePolicy,
+      requestedStrategy: incoming.requestedStrategy ?? existing.requestedStrategy,
+      acceptanceCriteria: incoming.acceptanceCriteria ?? existing.acceptanceCriteria,
+      strategyContext: incoming.strategyContext ?? existing.strategyContext,
+      correlation: incoming.correlation ?? existing.correlation,
+      effectiveStrategy: incoming.effectiveStrategy ?? existing.effectiveStrategy,
+      strategyState: incoming.strategyState ?? existing.strategyState,
       instructions: incoming.instructions ?? existing.instructions,
       context: incoming.context ?? existing.context,
       outputDir: incoming.outputDir ?? existing.outputDir,
@@ -1015,6 +1089,24 @@ export class SessionRegistry {
     if (!target.summary && incoming.summary) target.summary = incoming.summary;
     if (!target.sessionKey && incoming.sessionKey) target.sessionKey = incoming.sessionKey;
     if (!target.reusePolicy && incoming.reusePolicy) target.reusePolicy = incoming.reusePolicy;
+    if (!target.requestedStrategy && incoming.requestedStrategy) {
+      target.requestedStrategy = incoming.requestedStrategy;
+    }
+    if (!target.acceptanceCriteria && incoming.acceptanceCriteria) {
+      target.acceptanceCriteria = incoming.acceptanceCriteria;
+    }
+    if (!target.strategyContext && incoming.strategyContext) {
+      target.strategyContext = cloneRecord(incoming.strategyContext);
+    }
+    if (!target.correlation && incoming.correlation) {
+      target.correlation = cloneRecord(incoming.correlation);
+    }
+    if (!target.effectiveStrategy && incoming.effectiveStrategy) {
+      target.effectiveStrategy = incoming.effectiveStrategy;
+    }
+    if (!target.strategyState && incoming.strategyState) {
+      target.strategyState = cloneStrategyState(incoming.strategyState);
+    }
     if (!target.instructions && incoming.instructions) target.instructions = incoming.instructions;
     if (!target.skills && incoming.skills) target.skills = cloneSkillState(incoming.skills);
     if (!target.hydration && incoming.hydration) {
@@ -1080,6 +1172,12 @@ function cloneModelResolution(
   return resolution ? structuredClone(resolution) : undefined;
 }
 
+function cloneRecord(
+  value?: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  return value ? structuredClone(value) : undefined;
+}
+
 function cloneInvocationContext(
   context?: SessionInvocationContext,
 ): SessionInvocationContext | undefined {
@@ -1096,6 +1194,12 @@ function cloneMaintenanceState(
   maintenanceState?: RuntimeSessionMaintenanceState,
 ): RuntimeSessionMaintenanceState | undefined {
   return maintenanceState ? structuredClone(maintenanceState) : undefined;
+}
+
+function cloneStrategyState(
+  strategyState?: RuntimeExecutionStrategyState,
+): RuntimeExecutionStrategyState | undefined {
+  return strategyState ? structuredClone(strategyState) : undefined;
 }
 
 function cloneSkillState(

@@ -24,6 +24,43 @@ export type SessionResumeStrategy = 'none' | 'provider_session' | 'latest_in_wor
 export type SessionControlMode = 'full' | 'resume_only' | 'observe_only';
 export type ProviderBackend = 'cli' | 'api' | 'local' | 'agent';
 export type SessionReusePolicy = 'create_new' | 'prefer_existing' | 'require_existing';
+export type RuntimeExecutionStrategyId = 'simple_tool_call' | 'react' | (string & {});
+export type RuntimeExecutionStrategyResolutionSource =
+  | 'explicit_request'
+  | 'runtime_preference'
+  | 'compatibility_fallback';
+export type RuntimeExecutionStrategyStatus = 'idle' | 'running' | 'completed' | 'failed';
+
+export interface RuntimeExecutionStrategyRequest {
+  requestedStrategy?: RuntimeExecutionStrategyId;
+  acceptanceCriteria?: string;
+  strategyContext?: Record<string, unknown>;
+  correlation?: Record<string, unknown>;
+}
+
+export interface RuntimeExecutionStrategySummary {
+  status: RuntimeExecutionStrategyStatus;
+  stepCount: number;
+  resolutionSource: RuntimeExecutionStrategyResolutionSource;
+  stepLimit?: number;
+  timeoutMs?: number;
+  duplicateStepCount?: number;
+  stuckDetected?: boolean;
+  failureReason?: string;
+  lastStepSignature?: string;
+  lastEvent?: string;
+  updatedAt: string;
+}
+
+export interface RuntimeExecutionStrategyState {
+  preferredStrategy?: RuntimeExecutionStrategyId;
+  request?: RuntimeExecutionStrategyRequest;
+  effectiveStrategy?: RuntimeExecutionStrategyId;
+  resolutionSource?: RuntimeExecutionStrategyResolutionSource;
+  summary?: RuntimeExecutionStrategySummary;
+  localState?: Record<string, unknown>;
+  updatedAt: string;
+}
 
 export type WorkspaceKind = 'source' | 'sandbox' | 'worktree';
 export type WorkspaceAccess = 'read_write' | 'read_only';
@@ -142,6 +179,7 @@ export type RuntimeProgressKind =
   | 'status'
   | 'plan'
   | 'reasoning'
+  | 'strategy'
   | 'tool'
   | 'command'
   | 'files'
@@ -150,12 +188,15 @@ export type RuntimeProgressKind =
   | 'guardrail'
   | 'session';
 export type RuntimeProgressStatus =
+  | 'started'
   | 'running'
   | 'updated'
   | 'created'
   | 'reused'
   | 'fallback'
   | 'hinted'
+  | 'completed'
+  | 'failed'
   | 'warned'
   | 'blocked'
   | 'cooldown';
@@ -1366,6 +1407,15 @@ export interface RuntimeSessionInspectionActions {
   canRetry: boolean;
 }
 
+export interface RuntimeExecutionStrategyInspection {
+  requestedStrategy?: RuntimeExecutionStrategyId;
+  effectiveStrategy?: RuntimeExecutionStrategyId;
+  acceptanceCriteria?: string;
+  strategyContext?: Record<string, unknown>;
+  correlation?: Record<string, unknown>;
+  state?: RuntimeExecutionStrategyState;
+}
+
 export interface RuntimeSessionInspection {
   state: RuntimeSessionExecutionState;
   attached: boolean;
@@ -1377,6 +1427,7 @@ export interface RuntimeSessionInspection {
   recentEvents: RuntimeEventExcerpt[];
   metering: RuntimeSessionMeteringSnapshot;
   maintenance: RuntimeSessionMaintenance;
+  strategy?: RuntimeExecutionStrategyInspection;
   skills?: SessionSkillState;
   artifacts: SessionArtifact[];
   services: AgentRuntimeService[];
@@ -1394,6 +1445,12 @@ export interface SessionInfo {
   providerState?: SessionProviderState;
   sessionKey?: string;
   reusePolicy?: SessionReusePolicy;
+  requestedStrategy?: RuntimeExecutionStrategyId;
+  acceptanceCriteria?: string;
+  strategyContext?: Record<string, unknown>;
+  correlation?: Record<string, unknown>;
+  effectiveStrategy?: RuntimeExecutionStrategyId;
+  strategyState?: RuntimeExecutionStrategyState;
   status: SessionStatus;
   origin: SessionOrigin;
   cwd: string;
@@ -1467,7 +1524,7 @@ export interface ProviderMessage {
   content: string;
 }
 
-export interface TurnInput {
+export interface TurnInput extends RuntimeExecutionStrategyRequest {
   message: string;
   sessionInstructions?: string;
   instructions?: string;

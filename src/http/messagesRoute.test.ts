@@ -321,6 +321,152 @@ describe('message route transcript persistence', () => {
     }
   });
 
+  it('persists additive strategy metadata into turn input, session inspection, and history metadata', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-message-route-'));
+    const sessionBaseDir = join(root, 'sessions');
+    mkdirSync(sessionBaseDir, { recursive: true });
+    const receivedInputs: TurnInput[] = [];
+
+    try {
+      const { app, registry, session } = makeApp(
+        sessionBaseDir,
+        async function* (turnInput: TurnInput) {
+          receivedInputs.push(structuredClone(turnInput));
+          yield { type: 'text', text: 'Strategy metadata stored.' };
+          yield { type: 'result' };
+        },
+      );
+
+      const response = await app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({
+          message: 'hello',
+          requestedStrategy: 'react',
+          acceptanceCriteria: 'Return a concise answer.',
+          strategyContext: {
+            maxSteps: 3,
+            timeoutMs: 1200,
+          },
+          correlation: {
+            traceId: 'trace-message-route-1',
+          },
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(parseNdjson(await response.text())).toEqual([
+        { type: 'text', text: 'Strategy metadata stored.' },
+        { type: 'result' },
+      ]);
+
+      expect(receivedInputs).toHaveLength(1);
+      expect(receivedInputs[0]).toEqual(expect.objectContaining({
+        message: 'hello',
+        requestedStrategy: 'react',
+        acceptanceCriteria: 'Return a concise answer.',
+        strategyContext: {
+          maxSteps: 3,
+          timeoutMs: 1200,
+        },
+        correlation: {
+          traceId: 'trace-message-route-1',
+        },
+      }));
+
+      expect(registry.get(session.id)).toMatchObject({
+        requestedStrategy: 'react',
+        acceptanceCriteria: 'Return a concise answer.',
+        strategyContext: {
+          maxSteps: 3,
+          timeoutMs: 1200,
+        },
+        correlation: {
+          traceId: 'trace-message-route-1',
+        },
+        strategyState: {
+          preferredStrategy: 'react',
+          request: {
+            requestedStrategy: 'react',
+            acceptanceCriteria: 'Return a concise answer.',
+            strategyContext: {
+              maxSteps: 3,
+              timeoutMs: 1200,
+            },
+            correlation: {
+              traceId: 'trace-message-route-1',
+            },
+          },
+        },
+      });
+
+      const sessionResponse = await app.request(`/sessions/${session.id}`);
+      expect(sessionResponse.status).toBe(200);
+      await expect(sessionResponse.json()).resolves.toEqual(expect.objectContaining({
+        requestedStrategy: 'react',
+        acceptanceCriteria: 'Return a concise answer.',
+        strategyContext: {
+          maxSteps: 3,
+          timeoutMs: 1200,
+        },
+        correlation: {
+          traceId: 'trace-message-route-1',
+        },
+        inspection: expect.objectContaining({
+          strategy: expect.objectContaining({
+            requestedStrategy: 'react',
+            acceptanceCriteria: 'Return a concise answer.',
+            strategyContext: {
+              maxSteps: 3,
+              timeoutMs: 1200,
+            },
+            correlation: {
+              traceId: 'trace-message-route-1',
+            },
+            state: expect.objectContaining({
+              preferredStrategy: 'react',
+              request: expect.objectContaining({
+                requestedStrategy: 'react',
+              }),
+            }),
+          }),
+        }),
+      }));
+
+      const historyResponse = await app.request(`/sessions/${session.id}/history`);
+      expect(historyResponse.status).toBe(200);
+      await expect(historyResponse.json()).resolves.toEqual(expect.objectContaining({
+        requestedStrategy: 'react',
+        acceptanceCriteria: 'Return a concise answer.',
+        strategyContext: {
+          maxSteps: 3,
+          timeoutMs: 1200,
+        },
+        correlation: {
+          traceId: 'trace-message-route-1',
+        },
+        inspection: expect.objectContaining({
+          strategy: expect.objectContaining({
+            requestedStrategy: 'react',
+            acceptanceCriteria: 'Return a concise answer.',
+            strategyContext: {
+              maxSteps: 3,
+              timeoutMs: 1200,
+            },
+            correlation: {
+              traceId: 'trace-message-route-1',
+            },
+          }),
+        }),
+      }));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('preserves previous session instructions separately from new turn instructions', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-message-route-'));
     const sessionBaseDir = join(root, 'sessions');

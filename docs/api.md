@@ -1378,6 +1378,14 @@ intended for host/dashboard run inspectors:
 status when the runtime is actively canceling or closing a run. The block is
 additive: existing session fields remain stable.
 
+`inspection.strategy` is also runtime-owned and additive. It reports the latest
+requested/effective strategy plus strategy request metadata such as
+`acceptanceCriteria`, `strategyContext`, and `correlation`. Its nested
+`inspection.strategy.state` payload captures runtime-local preference,
+resolution source, bounded step summaries, timeout/failure details, and
+duplicate/stuck detection without writing strategy state back into product task
+records.
+
 `inspection.maintenance` is also runtime-owned and additive. It gives hosts one
 machine-readable place to read:
 
@@ -1435,6 +1443,10 @@ as `lastRequest`.
     `{ "family": "work", "slug": "product-manager", "version": "2026.03" }`
 - `context`: structured invocation metadata such as task/workspace hints
 - `outputDir`: output hint for reports, documents, or generated artifacts
+- `requestedStrategy`: runtime-owned execution strategy hint such as `react`
+- `acceptanceCriteria`: additive success / done conditions for strategy loops
+- `strategyContext`: structured strategy-local inputs such as recovery hints
+- `correlation`: additive correlation ids / labels for upper-layer tracing
 - `workspaceKind`: one of `source`, `sandbox`, or `worktree`
 - `workspaceAccess`: one of `read_write` or `read_only`
 - legacy compatibility fields `workspaceMode` and `workspaceIsolation`
@@ -1465,9 +1477,17 @@ the migration window, but new callers should prefer `workspaceKind` /
 `workspaceAccess`.
 
 `POST /sessions/{id}/messages` accepts optional `instructions`, `skills`,
-`context`, `outputDir`, and additive `routing` fields. These are persisted onto
-the logical session where applicable so later history/resume flows can observe
-the same bootstrap metadata.
+`context`, `outputDir`, additive execution-strategy fields
+(`requestedStrategy`, `acceptanceCriteria`, `strategyContext`, `correlation`),
+and additive `routing` fields. These are persisted onto the logical session
+where applicable so later history/resume flows can observe the same bootstrap
+metadata.
+
+When no strategy hint is provided, runtime-hosted API/local loops continue to
+use the compatibility `simple_tool_call` path. Strategy resolution is additive
+and currently follows explicit request, then runtime-owned remembered
+preference, then the compatibility fallback. Existing callers that do not send
+strategy fields remain valid.
 
 `routing` is additive and optional. Existing request bodies remain valid and
 continue to execute locally by default. Supported routing shape:
@@ -1775,6 +1795,7 @@ Current normalized progress kinds:
 - `status`: generic session/status checkpoints
 - `plan`: planning/milestone checkpoints
 - `reasoning`: provider-reported reasoning or thinking updates
+- `strategy`: runtime-owned execution-strategy lifecycle checkpoints
 - `tool`: tool execution lifecycle
 - `command`: command execution lifecycle
 - `files`: file edit/read milestone
@@ -1785,6 +1806,11 @@ Current normalized progress kinds:
   requests
 - `guardrail`: runtime-owned warning/block/cooldown checkpoints
 - `session`: provider session lifecycle checkpoints
+
+Runtime-owned strategy loops emit additive `progress` events with
+`metadata.kind: "strategy"` and statuses such as `started`, `updated`,
+`completed`, or `failed`. This extends the existing stream/observe/session
+surfaces instead of introducing a separate task-status bus.
 
 Provider payload templates remain transport-specific, but the current additive
 keys that `cats-runtime` recognizes are:
@@ -1908,6 +1934,9 @@ such as:
 
 This makes Pi-native and other provider-native history reads easier to inspect
 without forcing hosts to infer transcript semantics from provider names alone.
+The same session/history/observe surfaces now also carry additive
+runtime-owned strategy resolution/state metadata, so hosts do not need a
+separate task-status event bus just to inspect execution-strategy state.
 
 ### Runtime Inspection
 
@@ -1964,6 +1993,11 @@ the same additive `wakeup` block returned by `GET /sessions/{id}` and
   }
 }
 ```
+
+The same `session.inspection.strategy` read-model is reused by
+`GET /sessions/{id}`, `GET /sessions/{id}/history`, and
+`GET /sessions/{id}/observe` so strategy-local state stays inspectable through
+existing surfaces.
 
 `POST /sessions/{id}/cancel` is additive and attempts to stop the current run
 without deleting the logical session. `POST /sessions/{id}/reset` clears

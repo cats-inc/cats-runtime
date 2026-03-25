@@ -13,6 +13,7 @@ import type { CliRuntimeConfig } from '../../backends/cli/config.js';
 import type { StreamEvent } from '../../core/types.js';
 import { hydrateSessionState } from '../../core/hydration/sessionHydration.js';
 import { ManagedExecutionHandle } from '../../core/runtime/ManagedExecutionHandle.js';
+import { buildRuntimeExecutionStrategySessionPatch } from '../../core/runtime/strategies/state.js';
 import { parsePeerMessageRoutingInput } from '../../core/peers/PeerRoutingService.js';
 import { toPeerExecutionErrorEvent } from '../../core/peers/errors.js';
 import { resolveSessionProviderTarget } from '../providerTargets.js';
@@ -20,6 +21,7 @@ import {
   extractHydrationMetadata,
   parseInvocationContext,
   parseOptionalString,
+  parseRuntimeExecutionStrategyRequest,
   parseRuntimeSkillManifest,
 } from '../parsing.js';
 import { isPiUnknownSessionError, resolvePiResumeTarget } from '../../backends/cli/pi/resume.js';
@@ -42,6 +44,10 @@ function appendUserTurnHistory(
     skills: turnInput.skills,
     context: turnInput.context,
     outputDir: turnInput.outputDir,
+    requestedStrategy: turnInput.requestedStrategy,
+    acceptanceCriteria: turnInput.acceptanceCriteria,
+    strategyContext: turnInput.strategyContext,
+    correlation: turnInput.correlation,
     timestamp: new Date().toISOString(),
   });
 }
@@ -317,6 +323,10 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     skills?: unknown;
     context?: SessionInvocationContext;
     outputDir?: string;
+    requestedStrategy?: string;
+    acceptanceCriteria?: string;
+    strategyContext?: Record<string, unknown>;
+    correlation?: Record<string, unknown>;
     routing?: unknown;
   }>();
   const message = parseOptionalString(body.message);
@@ -333,6 +343,9 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
   const requestedHydrationMetadata = extractHydrationMetadata(
     context,
     parsedSkills.clear ? undefined : parsedSkills.manifest,
+  );
+  const strategyRequest = parseRuntimeExecutionStrategyRequest(
+    body as unknown as Record<string, unknown>,
   );
   let skills = session.skills;
   let hydration = session.hydration;
@@ -375,6 +388,10 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     skills,
     context: context ?? session.context,
     outputDir: outputDir ?? session.outputDir,
+    requestedStrategy: strategyRequest?.requestedStrategy,
+    acceptanceCriteria: strategyRequest?.acceptanceCriteria,
+    strategyContext: strategyRequest?.strategyContext,
+    correlation: strategyRequest?.correlation,
   };
   const explicitSkillsMutation = body.skills !== undefined;
   const shouldRespawnPi = shouldRespawnPiWorkerForSkillMutation(
@@ -387,10 +404,15 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     || body.skills !== undefined
     || context !== undefined
     || outputDir !== undefined
+    || strategyRequest !== undefined
     || !session.hydration
   ) {
     ctx.registry.updateSessionMetadata(id, {
       instructions: instructions ?? session.instructions,
+      ...buildRuntimeExecutionStrategySessionPatch(session, {
+        request: strategyRequest,
+        rememberPreference: Boolean(strategyRequest?.requestedStrategy),
+      }),
       skills,
       hydration,
       context: turnInput.context,

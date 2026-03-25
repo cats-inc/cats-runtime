@@ -83,11 +83,13 @@ import {
   resolveProviderSelection,
   sameProviderModelSelection,
 } from '../../core/models/providerSelectionResolution.js';
+import { buildRuntimeExecutionStrategySessionPatch } from '../../core/runtime/strategies/state.js';
 import { hydrateSessionState } from '../../core/hydration/sessionHydration.js';
 import {
   extractHydrationMetadata,
   parseInvocationContext,
   parseOptionalString,
+  parseRuntimeExecutionStrategyRequest,
   parseRuntimeSkillManifest,
   parseStringArray,
 } from '../parsing.js';
@@ -2029,6 +2031,10 @@ sessionRoutes.post('/sessions', async (c) => {
     allowedTools?: string[];
     sessionKey?: string;
     reusePolicy?: SessionReusePolicy;
+    requestedStrategy?: string;
+    acceptanceCriteria?: string;
+    strategyContext?: Record<string, unknown>;
+    correlation?: Record<string, unknown>;
     instructions?: string;
     skills?: unknown;
     context?: SessionInvocationContext;
@@ -2088,6 +2094,13 @@ sessionRoutes.post('/sessions', async (c) => {
     parsedSkills.clear ? undefined : parsedSkills.manifest,
   );
   const outputDir = parseOptionalString(body.outputDir);
+  const strategyRequest = parseRuntimeExecutionStrategyRequest(
+    body as unknown as Record<string, unknown>,
+  );
+  const strategyPatch = buildRuntimeExecutionStrategySessionPatch(undefined, {
+    request: strategyRequest,
+    rememberPreference: Boolean(strategyRequest?.requestedStrategy),
+  });
   const workspaceKind = parseWorkspaceKind(body.workspaceKind);
   const workspaceAccess = parseWorkspaceAccess(body.workspaceAccess);
   const workspaceIsolationMode = parseWorkspaceIsolationMode(body.workspaceIsolation);
@@ -2179,6 +2192,10 @@ sessionRoutes.post('/sessions', async (c) => {
           : {}),
         sessionKey,
         reusePolicy,
+        ...buildRuntimeExecutionStrategySessionPatch(preparedExisting, {
+          request: strategyRequest,
+          rememberPreference: Boolean(strategyRequest?.requestedStrategy),
+        }),
         instructions: instructions ?? preparedExisting.instructions,
         skills,
         hydration,
@@ -2307,6 +2324,7 @@ sessionRoutes.post('/sessions', async (c) => {
         group: body.group,
         sessionKey,
         reusePolicy,
+        ...strategyPatch,
         instructions,
         skills,
         context,
@@ -2390,6 +2408,7 @@ sessionRoutes.post('/sessions', async (c) => {
         group: body.group,
         sessionKey,
         reusePolicy,
+        ...strategyPatch,
         instructions,
         skills,
         context,
@@ -2481,6 +2500,7 @@ sessionRoutes.post('/sessions', async (c) => {
     group: body.group,
     sessionKey,
     reusePolicy,
+    ...strategyPatch,
     instructions,
     skills,
     hydration,

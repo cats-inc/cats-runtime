@@ -7,6 +7,8 @@ export type {
   PermissionMode,
   ProviderModelResolution,
   ProviderModelSelection,
+  RuntimeExecutionStrategyId,
+  RuntimeExecutionStrategyState,
   SessionActivity,
   SessionControlMode,
   SessionControls,

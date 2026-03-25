@@ -2,6 +2,7 @@ import { extname, isAbsolute, resolve } from 'node:path';
 import type {
   AgentRuntimeService,
   RuntimeBrowserSessionView,
+  RuntimeExecutionStrategyInspection,
   RuntimePreviewSurface,
   RuntimePreviewSurfaceRenderHint,
   RuntimeSessionInspection,
@@ -63,6 +64,7 @@ export function buildSessionInspection(
     ...services.map((service) => createServicePreviewSurface(service, input.session)),
     ...browserSessions.flatMap((session) => session.inspection.previewSurfaces),
   ]);
+  const strategy = buildStrategyInspection(input.session);
   const busy = input.session.status === 'busy'
     || input.trackedState?.state === 'running'
     || input.trackedState?.state === 'canceling';
@@ -86,6 +88,7 @@ export function buildSessionInspection(
       wakeupPending: input.wakeupPending,
       trackedMaintenance: input.trackedState?.maintenance ?? input.session.maintenanceState,
     }),
+    ...(strategy ? { strategy } : {}),
     ...(input.session.skills ? { skills: cloneSkillState(input.session.skills) } : {}),
     artifacts,
     services,
@@ -274,6 +277,30 @@ function cloneSkillState(
     },
     warnings: [...skillState.warnings],
     appliedSkillIds: [...skillState.appliedSkillIds],
+  };
+}
+
+function buildStrategyInspection(
+  session: SessionInfo,
+): RuntimeExecutionStrategyInspection | undefined {
+  if (
+    !session.requestedStrategy
+    && !session.acceptanceCriteria
+    && !session.strategyContext
+    && !session.correlation
+    && !session.effectiveStrategy
+    && !session.strategyState
+  ) {
+    return undefined;
+  }
+
+  return {
+    requestedStrategy: session.requestedStrategy,
+    effectiveStrategy: session.effectiveStrategy,
+    acceptanceCriteria: session.acceptanceCriteria,
+    ...(session.strategyContext ? { strategyContext: structuredClone(session.strategyContext) } : {}),
+    ...(session.correlation ? { correlation: structuredClone(session.correlation) } : {}),
+    ...(session.strategyState ? { state: structuredClone(session.strategyState) } : {}),
   };
 }
 

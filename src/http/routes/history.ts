@@ -67,6 +67,12 @@ function buildHistoryMetadata(ctx: AppContext, session: SessionInfo) {
   });
   return {
     sessionKey: session.sessionKey,
+    requestedStrategy: session.requestedStrategy,
+    acceptanceCriteria: session.acceptanceCriteria,
+    strategyContext: session.strategyContext,
+    correlation: session.correlation,
+    effectiveStrategy: session.effectiveStrategy,
+    strategyState: session.strategyState,
     outputDir: session.outputDir,
     artifacts: session.artifacts || [],
     context: session.context,

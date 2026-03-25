@@ -1,4 +1,5 @@
 import type {
+  RuntimeExecutionStrategyRequest,
   RuntimeSkillManifest,
   RuntimeSkillManifestContext,
   RuntimeRequestedSkillRef,
@@ -24,6 +25,30 @@ export function parseStringArray(value: unknown): string[] | undefined {
     .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
     .map((entry) => entry.trim());
   return parsed.length > 0 ? parsed : undefined;
+}
+
+export function parseRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const record = structuredClone(value as Record<string, unknown>);
+  return Object.keys(record).length > 0 ? record : undefined;
+}
+
+export function parseRuntimeExecutionStrategyRequest(
+  value: Record<string, unknown>,
+): RuntimeExecutionStrategyRequest | undefined {
+  const request: RuntimeExecutionStrategyRequest = {
+    requestedStrategy: parseOptionalString(value.requestedStrategy),
+    acceptanceCriteria: parseOptionalString(value.acceptanceCriteria),
+    strategyContext: parseRecord(value.strategyContext),
+    correlation: parseRecord(value.correlation),
+  };
+
+  return Object.values(request).some((entry) => entry !== undefined)
+    ? request
+    : undefined;
 }
 
 export function parseInvocationContext(value: unknown): SessionInvocationContext | undefined {

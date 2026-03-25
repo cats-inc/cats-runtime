@@ -265,6 +265,9 @@ src/
 - Persists provider-native continuation metadata such as OpenAI response IDs,
   Anthropic prompt-caching hints, and Gemini cached-content state as
   optimizations under the runtime-owned logical session
+- Hosts the first runtime-owned pluggable execution-strategy substrate for
+  runtime-hosted API/local loops, including the compatibility
+  `simple_tool_call` wrapper and a bounded `react` loop
 - Emits normalized `progress` events plus additive incident hints for
   provider-native cache, continuation, rate-limit/quota, and local-model
   warm-state hints so upper layers do not need to consume provider-specific raw
@@ -362,6 +365,10 @@ src/
   run, last run, wake reason, recent normalized events, and lifecycle state so
   session/history/observe routes can expose a provider-agnostic run inspector
   contract
+- Defines backend-neutral execution-strategy request, resolution, and
+  strategy-local state contracts so runtime-hosted loops can resolve explicit
+  request -> runtime preference -> compatibility fallback without importing
+  product task records or task-graph contracts
 - Adds runtime-owned maintenance metadata for reset boundaries, compaction
   readiness, pending pre-reset/pre-compaction memory-flush hooks, and
   machine-readable cleanup guidance without implementing the product memory
