@@ -411,7 +411,6 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
       instructions: instructions ?? session.instructions,
       ...buildRuntimeExecutionStrategySessionPatch(session, {
         request: strategyRequest,
-        rememberPreference: Boolean(strategyRequest?.requestedStrategy),
       }),
       skills,
       hydration,

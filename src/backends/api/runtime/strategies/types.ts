@@ -34,6 +34,7 @@ export interface ApiStrategyExecutionContextOptions {
   signal: AbortSignal;
   constraints: ApiRuntimeStrategyConstraints;
   emitLifecycleEvents: boolean;
+  rememberRequestedStrategyPreference?: boolean;
 }
 
 export interface ApiCompletedModelStep {

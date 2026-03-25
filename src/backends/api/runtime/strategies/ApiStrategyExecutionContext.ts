@@ -236,7 +236,8 @@ export class ApiStrategyExecutionContext {
       resolution: this.resolution,
       summary,
       localState,
-      rememberPreference: Boolean(this.request?.requestedStrategy),
+      rememberPreference: this.options.rememberRequestedStrategyPreference
+        ?? Boolean(this.request?.requestedStrategy),
       now,
     });
     this.options.registry.updateSessionMetadata(this.session.id, patch);

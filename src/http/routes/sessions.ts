@@ -2120,7 +2120,6 @@ sessionRoutes.post('/sessions', async (c) => {
   );
   const strategyPatch = buildRuntimeExecutionStrategySessionPatch(undefined, {
     request: strategyRequest,
-    rememberPreference: Boolean(strategyRequest?.requestedStrategy),
   });
   const workspaceKind = parseWorkspaceKind(body.workspaceKind);
   const workspaceAccess = parseWorkspaceAccess(body.workspaceAccess);
@@ -2215,7 +2214,6 @@ sessionRoutes.post('/sessions', async (c) => {
         reusePolicy,
         ...buildRuntimeExecutionStrategySessionPatch(preparedExisting, {
           request: strategyRequest,
-          rememberPreference: Boolean(strategyRequest?.requestedStrategy),
         }),
         instructions: instructions ?? preparedExisting.instructions,
         skills,

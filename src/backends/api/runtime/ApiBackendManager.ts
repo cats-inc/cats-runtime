@@ -207,6 +207,13 @@ function resolveStrategyConstraints(
   };
 }
 
+function resolveRegisteredStrategyHint(
+  strategyId: RuntimeExecutionStrategyId | undefined,
+  registry: ReturnType<typeof createApiRuntimeExecutionStrategyRegistry>,
+): RuntimeExecutionStrategyId | undefined {
+  return strategyId && registry.has(strategyId) ? strategyId : undefined;
+}
+
 function readStrategyPositiveInteger(
   record: Record<string, unknown> | undefined,
   key: string,
@@ -428,9 +435,17 @@ export class ApiBackendManager {
       persistedRequest,
       currentRequest,
     );
+    const requestedStrategy = resolveRegisteredStrategyHint(
+      effectiveRequest?.requestedStrategy,
+      this.strategyRegistry,
+    );
+    const preferredStrategy = resolveRegisteredStrategyHint(
+      readRuntimeExecutionStrategyState(initialSession)?.preferredStrategy,
+      this.strategyRegistry,
+    );
     const resolution = resolveRuntimeExecutionStrategy({
-      requestedStrategy: currentRequest?.requestedStrategy,
-      preferredStrategy: readRuntimeExecutionStrategyState(initialSession)?.preferredStrategy,
+      requestedStrategy,
+      preferredStrategy,
       fallbackStrategy: API_RUNTIME_COMPATIBILITY_STRATEGY,
     });
 
@@ -489,6 +504,7 @@ export class ApiBackendManager {
       signal,
       constraints,
       emitLifecycleEvents,
+      rememberRequestedStrategyPreference: Boolean(requestedStrategy),
     });
 
     try {

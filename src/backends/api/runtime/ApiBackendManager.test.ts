@@ -382,6 +382,167 @@ describe('ApiBackendManager', () => {
     });
   });
 
+  it('honors a session-persisted strategy request when the turn omits a per-turn hint', async () => {
+    const registry = new SessionRegistry();
+    const session = registry.create({
+      id: 'api-session-persisted-react',
+      providerName: 'codex',
+      providerBackend: 'api',
+      providerInstanceId: 'gateway',
+      cwd: '/repo',
+      strategy: {
+        request: {
+          requestedStrategy: 'react',
+          acceptanceCriteria: 'Return a concise answer.',
+          strategyContext: {
+            maxSteps: 4,
+          },
+        },
+      },
+    });
+
+    let capturedBody: Record<string, unknown> | undefined;
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      capturedBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return new Response(JSON.stringify({
+        id: 'resp_persisted_react',
+        output: [{
+          type: 'message',
+          role: 'assistant',
+          content: [{ type: 'output_text', text: 'React session request reply.' }],
+        }],
+        usage: {
+          input_tokens: 6,
+          output_tokens: 2,
+        },
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    const manager = new ApiBackendManager(
+      { sessionBaseDir: '/tmp/cats-runtime-tests' },
+      registry,
+      {
+        fetch: fetchMock as typeof fetch,
+        env: {
+          OPENAI_API_KEY: 'test-key',
+        },
+      },
+    );
+
+    const handle = manager.spawn(session.id, createTarget());
+    const events = await collectEvents(handle.streamMessage({
+      message: 'hello',
+    }));
+    const updated = registry.get(session.id);
+
+    expect(String(capturedBody?.instructions ?? '')).toContain('Execution strategy: react.');
+    expect(String(capturedBody?.instructions ?? '')).toContain(
+      'Acceptance criteria:\nReturn a concise answer.',
+    );
+    expect(events.some((event) =>
+      event.type === 'progress'
+      && event.metadata?.kind === 'strategy'
+      && event.metadata?.status === 'completed'
+    )).toBe(true);
+    expect(updated).toMatchObject({
+      strategy: {
+        preferredStrategy: 'react',
+        request: {
+          requestedStrategy: 'react',
+          acceptanceCriteria: 'Return a concise answer.',
+          strategyContext: {
+            maxSteps: 4,
+          },
+        },
+        effectiveStrategy: 'react',
+        resolutionSource: 'explicit_request',
+      },
+    });
+  });
+
+  it('falls back to the compatibility strategy when cats sends an unsupported strategy hint', async () => {
+    const registry = new SessionRegistry();
+    const session = registry.create({
+      id: 'api-session-unsupported-strategy',
+      providerName: 'codex',
+      providerBackend: 'api',
+      providerInstanceId: 'gateway',
+      cwd: '/repo',
+    });
+
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      id: 'resp_unsupported_strategy',
+      output: [{
+        type: 'message',
+        content: [{ type: 'output_text', text: 'Compatibility fallback reply.' }],
+      }],
+      usage: {
+        input_tokens: 5,
+        output_tokens: 2,
+      },
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
+
+    const manager = new ApiBackendManager(
+      { sessionBaseDir: '/tmp/cats-runtime-tests' },
+      registry,
+      {
+        fetch: fetchMock as typeof fetch,
+        env: {
+          OPENAI_API_KEY: 'test-key',
+        },
+      },
+    );
+
+    const handle = manager.spawn(session.id, createTarget());
+    const events = await collectEvents(handle.streamMessage({
+      message: 'hello',
+      requestedStrategy: 'pdca',
+      correlation: {
+        taskId: 'task-work-1',
+        product: 'work',
+      },
+    }));
+    const updated = registry.get(session.id);
+
+    expect(events).toEqual([
+      expect.objectContaining({ type: 'init', sessionId: 'resp_unsupported_strategy' }),
+      { type: 'text', text: 'Compatibility fallback reply.', raw: expect.any(Object) },
+      expect.objectContaining({
+        type: 'result',
+        sessionId: 'resp_unsupported_strategy',
+        usage: {
+          inputTokens: 5,
+          outputTokens: 2,
+        },
+      }),
+    ]);
+    expect(updated).toMatchObject({
+      strategy: {
+        request: {
+          requestedStrategy: 'pdca',
+          correlation: {
+            taskId: 'task-work-1',
+            product: 'work',
+          },
+        },
+        effectiveStrategy: 'simple_tool_call',
+        resolutionSource: 'compatibility_fallback',
+        summary: {
+          status: 'completed',
+          stepCount: 1,
+          lastEvent: 'strategy_completed',
+        },
+      },
+    });
+    expect(updated?.strategy?.preferredStrategy).toBeUndefined();
+  });
+
   it('runs explicit react with additive stream events and runtime-owned inspection metadata', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-api-react-'));
     const repoDir = join(root, 'repo');

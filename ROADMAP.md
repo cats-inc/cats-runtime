@@ -767,4 +767,80 @@ of the shipped peer diagnostics/read surfaces:
 - `docs/decisions/019-scope-first-lan-peer-sharing-to-execution-only.md`
 
 ---
-*Last updated: 2026-03-25*
+### OPT-10: Runtime Strategy Family Expansion Follow-through
+
+**Priority**: P1
+**Status**: Planned
+
+#### Problem
+
+`PLAN-020` landed the first runtime-owned execution-strategy substrate slice:
+
+- additive request fields for `requestedStrategy`, `acceptanceCriteria`,
+  `strategyContext`, and `correlation`
+- additive session/observe metadata for `effectiveStrategy` and strategy-local
+  state
+- a compatibility-owned `simple_tool_call` fallback path
+- the first real runtime-hosted loop via `react`
+
+That substrate is intentionally incomplete. `cats` can now bridge product-owned
+defaults such as Chat -> `react`, Work -> `pdca`, and Code -> `reflexion`, but
+the runtime still only owns `simple_tool_call` and `react`.
+
+Until the next slice lands, unsupported strategy requests must remain honest:
+preserve additive request metadata, resolve through the registry, and degrade to
+`simple_tool_call` rather than pretending `pdca` or `reflexion` semantics
+already exist.
+
+#### Current Implementation Status
+
+- runtime-owned strategy registry and resolution order are landed
+- no-hint callers remain compatible through `simple_tool_call`
+- explicit `react` requests execute through the new bounded runtime-owned loop
+- unsupported hints such as `pdca` and `reflexion` remain visible in request
+  metadata but compatibility-fallback to `simple_tool_call`
+- runtime session state owns strategy-local summaries; product task records stay
+  outside the runtime boundary
+
+#### Follow-through Direction
+
+- add the next real runtime-owned strategy families behind the existing
+  registry and execution seam
+- prioritize strategies that upper-layer products already point at through
+  product-owned defaults, starting with `pdca` and `reflexion`
+- keep the rollout additive for existing session/message callers and stream or
+  observe consumers
+- keep no-hint compatibility behavior intact while new families land
+- continue rejecting any design that would make `cats-runtime` import
+  `CoreTaskRecord` or own product task graph, approval, or cross-product
+  routing semantics
+
+#### Deferred Scope
+
+- do not fake `pdca` or `reflexion` by smuggling product task-planning logic
+  into prompt overlays
+- do not move product defaults into runtime-owned policy; `cats` remains
+  responsible for default selection
+- do not widen the first slice into a full strategy-family explosion such as
+  `tree_of_thoughts`, `reflexion`, `pdca`, and other families all at once
+- do not replace compatibility fallback until supported families are truly
+  runtime-hosted
+
+#### Affected Areas
+
+- `src/core/runtime/strategies/*`
+- `src/backends/api/runtime/strategies/*`
+- `src/http/routes/sessions.ts`
+- `src/http/routes/messages.ts`
+- additive stream and observe surfaces that already expose strategy metadata
+- `docs/plans/PLAN-020-pluggable-execution-strategy-substrate.md`
+- coordinated `cats` bridge follow-up for product-owned defaults
+
+#### References
+
+- `docs/decisions/024-own-pluggable-execution-strategies-as-runtime-session-local-substrate.md`
+- `docs/specs/SPEC-020-pluggable-execution-strategy-substrate.md`
+- `docs/plans/PLAN-020-pluggable-execution-strategy-substrate.md`
+
+---
+*Last updated: 2026-03-26*
