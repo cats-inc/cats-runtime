@@ -59,7 +59,7 @@ describe('resolveWorkspace', () => {
     expect(existsSync(result.cwd)).toBe(true);
   });
 
-  it('isolated mode forces permissionMode to skip regardless of input', () => {
+  it('isolated mode keeps read_write permissionMode at skip', () => {
     const result = resolveWorkspace({
       sessionId: randomUUID(),
       sessionBaseDir: testBaseDir,
@@ -68,6 +68,22 @@ describe('resolveWorkspace', () => {
     });
 
     expect(result.permissionMode).toBe('skip');
+  });
+
+  it('sandbox + read_only forces permissionMode to default', () => {
+    const sessionId = randomUUID();
+    const result = resolveWorkspace({
+      sessionId,
+      sessionBaseDir: testBaseDir,
+      workspaceKind: 'sandbox',
+      workspaceAccess: 'read_only',
+      permissionMode: 'skip',
+    });
+
+    expect(result.workspaceMode).toBe('isolated');
+    expect(result.workspaceAccess).toBe('read_only');
+    expect(result.permissionMode).toBe('default');
+    expect(result.cwd).toBe(join(testBaseDir, sessionId));
   });
 
   it('shared mode requires cwd', () => {

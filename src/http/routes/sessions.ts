@@ -3961,12 +3961,12 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
         })
         : { warnings: [] };
   } catch (error) {
-      await discardPreparedWorkspace(ctx, {
-        id: forkId,
-        workspace: forkPrepared.workspace,
-        workspaceMode: forkWorkspaceMode,
-        workspaceIsolation: forkPrepared.workspaceIsolation,
-      });
+    await discardPreparedWorkspace(ctx, {
+      id: forkId,
+      workspace: forkPrepared.workspace,
+      workspaceMode: forkWorkspaceMode,
+      workspaceIsolation: forkPrepared.workspaceIsolation,
+    });
     return c.json({
       error: error instanceof Error ? error.message : String(error),
       branch: {

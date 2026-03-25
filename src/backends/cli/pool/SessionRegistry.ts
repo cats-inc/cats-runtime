@@ -21,6 +21,10 @@ import type {
 } from './types.js';
 import type { ProviderDefaultTarget } from '../config.js';
 import { normalizeSessionOrigin } from './sessionView.js';
+import {
+  toLegacyWorkspaceIsolationState,
+  toLegacyWorkspaceMode,
+} from '../../../core/workspace/legacyWorkspace.js';
 
 function isMissingPersistencePathError(error: unknown): boolean {
   return typeof error === 'object'
@@ -153,7 +157,7 @@ export class SessionRegistry {
             legacyWorkspaceIsolation: loaded.workspaceIsolation,
           }),
         };
-        s.workspaceMode = toLegacyWorkspaceMode(s.workspace);
+        s.workspaceMode = toLegacyWorkspaceMode(s.workspace.kind, s.workspace.access);
         s.workspaceIsolation = toLegacyWorkspaceIsolationState(s.workspace);
         if (
           s.providerInstanceId !== loaded.providerInstanceId
@@ -277,7 +281,7 @@ export class SessionRegistry {
       createdAt: now,
       updatedAt: now,
     };
-    session.workspaceMode = toLegacyWorkspaceMode(session.workspace);
+    session.workspaceMode = toLegacyWorkspaceMode(session.workspace.kind, session.workspace.access);
     session.workspaceIsolation = toLegacyWorkspaceIsolationState(session.workspace);
 
     this.sessions.set(id, session);
@@ -460,7 +464,7 @@ export class SessionRegistry {
         workspace: session.workspace,
       });
     }
-    session.workspaceMode = toLegacyWorkspaceMode(session.workspace);
+    session.workspaceMode = toLegacyWorkspaceMode(session.workspace.kind, session.workspace.access);
     session.workspaceIsolation = toLegacyWorkspaceIsolationState(session.workspace);
     if (patch.permissionMode !== undefined) {
       session.permissionMode = patch.permissionMode;
@@ -741,7 +745,7 @@ export class SessionRegistry {
       updatedAt: now,
       lastActivity: mergedData.lastActivity,
     };
-    session.workspaceMode = toLegacyWorkspaceMode(session.workspace);
+    session.workspaceMode = toLegacyWorkspaceMode(session.workspace.kind, session.workspace.access);
     session.workspaceIsolation = toLegacyWorkspaceIsolationState(session.workspace);
 
     this.sessions.set(id, session);
@@ -806,7 +810,7 @@ export class SessionRegistry {
       cwd: session.cwd,
       workspace: data.workspace ?? session.workspace,
     });
-    session.workspaceMode = toLegacyWorkspaceMode(session.workspace);
+    session.workspaceMode = toLegacyWorkspaceMode(session.workspace.kind, session.workspace.access);
     session.workspaceIsolation = toLegacyWorkspaceIsolationState(session.workspace);
     if (data.model && !session.model) session.model = data.model;
     if (data.sessionKey && !session.sessionKey) session.sessionKey = data.sessionKey;
@@ -998,7 +1002,7 @@ export class SessionRegistry {
       cwd: target.cwd,
       workspace: target.workspace ?? incoming.workspace,
     });
-    target.workspaceMode = toLegacyWorkspaceMode(target.workspace);
+    target.workspaceMode = toLegacyWorkspaceMode(target.workspace.kind, target.workspace.access);
     target.workspaceIsolation = toLegacyWorkspaceIsolationState(target.workspace);
     if (!target.model && incoming.model) target.model = incoming.model;
     if (!target.modelSelection && incoming.modelSelection) {
@@ -1148,24 +1152,5 @@ function normalizeWorkspaceState(input: {
     access: input.legacyWorkspaceMode === 'read_only' ? 'read_only' : 'read_write',
     runtimeCwd: input.cwd,
     sourceCwd: input.cwd,
-  };
-}
-
-function toLegacyWorkspaceMode(workspace: SessionWorkspaceState): LegacyWorkspaceMode {
-  if (workspace.kind === 'sandbox') {
-    return 'isolated';
-  }
-  return workspace.access === 'read_only' ? 'read_only' : 'shared';
-}
-
-function toLegacyWorkspaceIsolationState(workspace: SessionWorkspaceState): SessionWorkspaceIsolationState {
-  return {
-    mode: workspace.kind === 'sandbox'
-      ? 'isolated'
-      : workspace.kind === 'worktree'
-        ? 'worktree'
-        : 'shared',
-    ...(workspace.sourceCwd ? { sourceCwd: workspace.sourceCwd } : {}),
-    ...(workspace.worktree ? { worktree: structuredClone(workspace.worktree) } : {}),
   };
 }

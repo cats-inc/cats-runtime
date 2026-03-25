@@ -7,6 +7,10 @@ import type {
   WorkspaceMode,
 } from './types.js';
 import type { PermissionMode } from '../providers/types.js';
+import {
+  resolveLegacyWorkspaceRequest,
+  toLegacyWorkspaceMode,
+} from '../../../core/workspace/legacyWorkspace.js';
 
 export interface ResolveWorkspaceInput {
   sessionId: string;
@@ -69,45 +73,12 @@ export function resolveWorkspace(input: ResolveWorkspaceInput): ResolveWorkspace
   }
 }
 
-function resolveLegacyWorkspaceRequest(
-  workspaceMode: WorkspaceMode | undefined,
-  workspaceIsolation: WorkspaceIsolationMode | undefined,
-): {
-  workspaceKind?: WorkspaceKind;
-  workspaceAccess?: WorkspaceAccess;
-} {
-  if (!workspaceMode && !workspaceIsolation) {
-    return {};
-  }
-
-  const resolvedIsolation = workspaceIsolation
-    ?? (workspaceMode === 'isolated' ? 'isolated' : 'shared');
-  return {
-    workspaceKind: resolvedIsolation === 'isolated'
-      ? 'sandbox'
-      : resolvedIsolation === 'worktree'
-        ? 'worktree'
-        : 'source',
-    workspaceAccess: workspaceMode === 'read_only' ? 'read_only' : 'read_write',
-  };
-}
-
-function toLegacyWorkspaceMode(
-  workspaceKind: WorkspaceKind,
-  workspaceAccess: WorkspaceAccess,
-): WorkspaceMode {
-  if (workspaceKind === 'sandbox') {
-    return 'isolated';
-  }
-  return workspaceAccess === 'read_only' ? 'read_only' : 'shared';
-}
-
 function resolvePermissionMode(
   workspaceKind: WorkspaceKind,
   workspaceAccess: WorkspaceAccess,
   permissionMode?: PermissionMode,
 ): PermissionMode {
-  if (workspaceKind === 'sandbox') {
+  if (workspaceKind === 'sandbox' && workspaceAccess !== 'read_only') {
     return 'skip';
   }
   return workspaceAccess === 'read_only' ? 'default' : permissionMode ?? 'skip';

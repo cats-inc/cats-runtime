@@ -23,6 +23,13 @@ import type {
   WorkspaceIsolationMode,
   WorkspaceMode,
 } from '../types.js';
+import {
+  deriveWorkspaceIsolationMode,
+  resolveLegacyWorkspaceRequest,
+  toLegacyWorkspaceIsolationState,
+  toLegacyWorkspaceMode,
+} from './legacyWorkspace.js';
+export { deriveWorkspaceIsolationMode } from './legacyWorkspace.js';
 
 const GIT_TIMEOUT_MS = 15_000;
 
@@ -112,7 +119,7 @@ export async function prepareSessionWorkspace(
   const requestedAccess = input.workspaceAccess
     ?? resolvedLegacy.workspaceAccess
     ?? 'read_write';
-  const permissionMode = resolvePermissionMode(requestedAccess, input.permissionMode);
+  const permissionMode = resolvePermissionMode(requestedKind, requestedAccess, input.permissionMode);
   const now = (input.now ?? new Date()).toISOString();
 
   if (requestedKind === 'sandbox') {
@@ -577,35 +584,6 @@ async function cleanupWorktreeWorkspace(
   };
 }
 
-export function deriveWorkspaceIsolationMode(
-  workspaceMode: WorkspaceMode | undefined,
-): WorkspaceIsolationMode {
-  return workspaceMode === 'isolated' ? 'isolated' : 'shared';
-}
-
-function resolveLegacyWorkspaceRequest(
-  workspaceMode: WorkspaceMode | undefined,
-  workspaceIsolationMode: WorkspaceIsolationMode | undefined,
-): {
-  workspaceKind?: WorkspaceKind;
-  workspaceAccess?: WorkspaceAccess;
-} {
-  if (!workspaceMode && !workspaceIsolationMode) {
-    return {};
-  }
-  const requestedIsolation = workspaceIsolationMode ?? deriveWorkspaceIsolationMode(workspaceMode);
-  return {
-    workspaceKind: requestedIsolation === 'isolated'
-      ? 'sandbox'
-      : requestedIsolation === 'worktree'
-        ? 'worktree'
-        : 'source',
-    workspaceAccess: workspaceMode
-      ? (workspaceMode === 'read_only' ? 'read_only' : 'read_write')
-      : undefined,
-  };
-}
-
 function normalizeLegacyWorkspaceState(
   input: CleanupSessionWorkspaceInput,
 ): SessionWorkspaceState | undefined {
@@ -651,34 +629,14 @@ function normalizeLegacyWorkspaceState(
   };
 }
 
-function toLegacyWorkspaceMode(
-  workspaceKind: WorkspaceKind,
-  workspaceAccess: WorkspaceAccess,
-): WorkspaceMode {
-  if (workspaceKind === 'sandbox') {
-    return 'isolated';
-  }
-  return workspaceAccess === 'read_only' ? 'read_only' : 'shared';
-}
-
-function toLegacyWorkspaceIsolationState(
-  workspace: SessionWorkspaceState,
-): SessionWorkspaceIsolationState {
-  return {
-    mode: workspace.kind === 'sandbox'
-      ? 'isolated'
-      : workspace.kind === 'worktree'
-        ? 'worktree'
-        : 'shared',
-    ...(workspace.sourceCwd ? { sourceCwd: workspace.sourceCwd } : {}),
-    ...(workspace.worktree ? { worktree: structuredClone(workspace.worktree) } : {}),
-  };
-}
-
 function resolvePermissionMode(
+  workspaceKind: WorkspaceKind,
   workspaceAccess: WorkspaceAccess,
   permissionMode?: PermissionMode,
 ): PermissionMode {
+  if (workspaceKind === 'sandbox' && workspaceAccess !== 'read_only') {
+    return 'skip';
+  }
   return workspaceAccess === 'read_only'
     ? 'default'
     : permissionMode ?? 'skip';
