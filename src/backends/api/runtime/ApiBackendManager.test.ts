@@ -494,7 +494,11 @@ describe('ApiBackendManager', () => {
       expect(String(requestBodies[0]?.instructions)).toContain(
         'Acceptance criteria:\nReturn only the file value.',
       );
-      expect(String(requestBodies[0]?.instructions)).toContain('"maxSteps": 4');
+      expect(String(requestBodies[0]?.instructions)).toContain(
+        'Strategy context (condensed runtime summary):',
+      );
+      expect(String(requestBodies[0]?.instructions)).toContain('maxSteps: 4');
+      expect(String(requestBodies[0]?.instructions)).toContain('timeoutMs: 1500');
       expect(requestBodies[1]?.previous_response_id).toBe('resp_react_1');
 
       expect(events).toEqual(expect.arrayContaining([

@@ -8,6 +8,7 @@ import type {
 } from '../../../../core/types.js';
 import type { SessionProviderState } from '../../../../core/types.js';
 import type { ApiConversationMessage, ApiProgressEvent, ApiToolCallPart } from '../../types.js';
+import { extractTextParts, extractToolCalls } from '../messageParts.js';
 import type { ApiStrategyExecutionContextOptions, ApiCompletedModelStep, ApiExecutedToolBatch } from './types.js';
 
 interface MutableApiStrategyLoopState {
@@ -285,7 +286,10 @@ export class ApiStrategyExecutionContext {
     kind: ApiStrategyExecutionError['kind'],
     message: string,
     details: Record<string, unknown> = {},
-  ): StreamEvent[] {
+    options: {
+      emitStrategyEvent?: boolean;
+    } = {},
+  ): Iterable<StreamEvent> {
     const strategyState = this.updateStrategy({
       status: 'failed',
       stepCount: typeof details.stepCount === 'number'
@@ -304,8 +308,9 @@ export class ApiStrategyExecutionContext {
       lastEvent: kind === 'stuck' ? 'strategy_stuck' : 'strategy_failed',
     }, details.localState as Record<string, unknown> | undefined);
 
-    return [
-      this.createStrategyEvent(
+    const events: StreamEvent[] = [];
+    if (options.emitStrategyEvent !== false) {
+      events.push(this.createStrategyEvent(
         kind === 'stuck' ? 'strategy_stuck' : 'strategy_failed',
         'failed',
         message,
@@ -313,25 +318,26 @@ export class ApiStrategyExecutionContext {
           failureKind: kind,
           ...details,
         },
-      ),
-      {
-        type: 'error',
-        providerSessionId: this.providerSessionId,
-        text: message,
-        metadata: {
-          requestedStrategy: this.request?.requestedStrategy,
-          effectiveStrategy: this.resolution.effectiveStrategy,
-          strategyResolutionSource: this.resolution.source,
-          strategyFailure: {
-            kind,
-            ...details,
-          },
-          ...(strategyState?.summary
-            ? { strategySummary: structuredClone(strategyState.summary) }
-            : {}),
+      ));
+    }
+    events.push({
+      type: 'error',
+      providerSessionId: this.providerSessionId,
+      text: message,
+      metadata: {
+        requestedStrategy: this.request?.requestedStrategy,
+        effectiveStrategy: this.resolution.effectiveStrategy,
+        strategyResolutionSource: this.resolution.source,
+        strategyFailure: {
+          kind,
+          ...details,
         },
+        ...(strategyState?.summary
+          ? { strategySummary: structuredClone(strategyState.summary) }
+          : {}),
       },
-    ];
+    });
+    return events;
   }
 
   isTimeoutError(error: unknown): boolean {
@@ -406,19 +412,4 @@ export class ApiStrategyExecutionContext {
       },
     });
   }
-}
-
-function extractTextParts(
-  message: ApiConversationMessage,
-): string[] {
-  return message.parts
-    .filter((part): part is Extract<ApiConversationMessage['parts'][number], { type: 'text' }> => part.type === 'text')
-    .map((part) => part.text)
-    .filter((text) => text.length > 0);
-}
-
-function extractToolCalls(
-  message: ApiConversationMessage,
-): ApiToolCallPart[] {
-  return message.parts.filter((part): part is ApiToolCallPart => part.type === 'tool_call');
 }

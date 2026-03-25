@@ -33,6 +33,7 @@ import type {
 } from '../types.js';
 import { API_PROVIDER_CAPABILITIES } from '../types.js';
 import { ApiTransportError } from '../transports/error.js';
+import { extractTextParts } from './messageParts.js';
 import {
   API_RUNTIME_COMPATIBILITY_STRATEGY,
   createApiRuntimeExecutionStrategyRegistry,
@@ -41,6 +42,8 @@ import { ApiStrategyExecutionContext } from './strategies/ApiStrategyExecutionCo
 
 const DEFAULT_MAX_TOOL_STEPS = 20;
 const DEFAULT_REACT_STUCK_THRESHOLD = 2;
+const MAX_STRATEGY_CONTEXT_PROMPT_ENTRIES = 8;
+const MAX_STRATEGY_CONTEXT_PROMPT_VALUE_LENGTH = 240;
 
 function defaultFetch(): typeof fetch {
   return fetch;
@@ -79,23 +82,13 @@ function ensureRemoteTarget(target: ProviderTargetDescriptor): RemoteProviderIns
   return target.remoteInstance;
 }
 
-function extractTextParts(message: ApiConversationMessage): string[] {
-  return message.parts
-    .filter((part): part is Extract<ApiConversationMessage['parts'][number], { type: 'text' }> => part.type === 'text')
-    .map((part) => part.text)
-    .filter((text) => text.length > 0);
-}
-
 function lastUserText(messages: ApiConversationMessage[]): string | undefined {
   const last = messages.at(-1);
   if (!last || last.role !== 'user') {
     return undefined;
   }
 
-  return last.parts
-    .filter((part): part is Extract<ApiConversationMessage['parts'][number], { type: 'text' }> => part.type === 'text')
-    .map((part) => part.text)
-    .join('\n');
+  return extractTextParts(last).join('\n');
 }
 
 function prependSystemPrompt(
@@ -177,7 +170,7 @@ function buildStrategyInstructionOverlay(
       ? `Acceptance criteria:\n${request.acceptanceCriteria}`
       : undefined,
     request?.strategyContext
-      ? `Strategy context:\n${JSON.stringify(request.strategyContext, null, 2)}`
+      ? formatStrategyContextForInstruction(request.strategyContext)
       : undefined,
   ].filter((section): section is string => Boolean(section));
 
@@ -194,15 +187,15 @@ function resolveStrategyConstraints(
   stuckThreshold: number;
 } {
   const strategyContext = request?.strategyContext;
-  const stepLimit = readStrategyPositiveNumber(
+  const stepLimit = readStrategyPositiveInteger(
     strategyContext,
     'maxSteps',
   ) || instance.maxToolSteps || DEFAULT_MAX_TOOL_STEPS;
   const timeoutMs = strategyId === 'react'
-    ? readStrategyPositiveNumber(strategyContext, 'timeoutMs') || instance.timeoutMs
+    ? readStrategyPositiveInteger(strategyContext, 'timeoutMs') || instance.timeoutMs
     : undefined;
   const stuckThreshold = strategyId === 'react'
-    ? readStrategyPositiveNumber(strategyContext, 'stuckThreshold') || DEFAULT_REACT_STUCK_THRESHOLD
+    ? readStrategyPositiveInteger(strategyContext, 'stuckThreshold') || DEFAULT_REACT_STUCK_THRESHOLD
     : 0;
 
   return {
@@ -212,7 +205,7 @@ function resolveStrategyConstraints(
   };
 }
 
-function readStrategyPositiveNumber(
+function readStrategyPositiveInteger(
   record: Record<string, unknown> | undefined,
   key: string,
 ): number | undefined {
@@ -221,7 +214,59 @@ function readStrategyPositiveNumber(
   }
 
   const value = record[key] as number;
-  return Number.isFinite(value) && value > 0 ? value : undefined;
+  return Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
+function formatStrategyContextForInstruction(
+  strategyContext: Record<string, unknown>,
+): string | undefined {
+  const entries = Object.entries(strategyContext).slice(0, MAX_STRATEGY_CONTEXT_PROMPT_ENTRIES);
+  if (entries.length === 0) {
+    return undefined;
+  }
+  const lines = entries.map(([key, value]) => `${key}: ${summarizeStrategyContextValue(value)}`);
+  const remainingEntries = Object.keys(strategyContext).length - entries.length;
+
+  if (remainingEntries > 0) {
+    lines.push(`... ${remainingEntries} more entr${remainingEntries === 1 ? 'y' : 'ies'} omitted by runtime.`);
+  }
+
+  return [
+    'Strategy context (condensed runtime summary):',
+    ...lines,
+  ].join('\n');
+}
+
+function summarizeStrategyContextValue(value: unknown): string {
+  if (typeof value === 'string') {
+    return JSON.stringify(truncateStrategyContextValue(value));
+  }
+
+  if (
+    typeof value === 'number'
+    || typeof value === 'boolean'
+    || value === null
+  ) {
+    return JSON.stringify(value);
+  }
+
+  if (Array.isArray(value)) {
+    return `[array(${value.length})]`;
+  }
+
+  if (value && typeof value === 'object') {
+    const keys = Object.keys(value as Record<string, unknown>);
+    return `[object keys: ${keys.slice(0, 6).join(', ')}${keys.length > 6 ? ', ...' : ''}]`;
+  }
+
+  return JSON.stringify(value);
+}
+
+function truncateStrategyContextValue(value: string): string {
+  const trimmed = value.trim();
+  return trimmed.length > MAX_STRATEGY_CONTEXT_PROMPT_VALUE_LENGTH
+    ? `${trimmed.slice(0, MAX_STRATEGY_CONTEXT_PROMPT_VALUE_LENGTH)}...`
+    : trimmed;
 }
 
 export class ApiBackendManager {
