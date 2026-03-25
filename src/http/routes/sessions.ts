@@ -307,15 +307,16 @@ async function resolveRequestedSessionModelState(
 
   const knowledge = await ctx.providerModelCatalog.getAdvancedKnowledgeForTarget(target);
   const buildCompatibilityFallback = (
+    legacyModel: string,
     warning: string,
   ): ResolvedSessionModelState => ({
-    model: input.legacyModel,
+    model: legacyModel,
     modelSelection: input.preserveSelectionOnFallback
       ? canonicalizeProviderModelSelection(input.selection ?? effectiveSelection)
-      : createLegacyModelSelection(input.legacyModel!),
+      : createLegacyModelSelection(legacyModel),
     modelResolution: {
-      entryId: input.legacyModel!,
-      model: input.legacyModel!,
+      entryId: legacyModel,
+      model: legacyModel,
       entryMode: 'explicit',
       supportTier: knowledge.supportTier,
       warnings: [warning],
@@ -336,12 +337,14 @@ async function resolveRequestedSessionModelState(
       && /Unknown catalog entry/.test(message)
     ) {
       return buildCompatibilityFallback(
+        input.legacyModel,
         `Legacy model '${input.legacyModel}' is not present in the advanced catalog; `
         + 'preserving it as a compatibility passthrough.',
       );
     }
     if (input.legacyModel && input.fallbackToLegacyModelOnResolutionError) {
       return buildCompatibilityFallback(
+        input.legacyModel,
         `Structured model selection could not be resolved; preserving legacy model `
         + `'${input.legacyModel}' as a compatibility fallback (${message}).`,
       );

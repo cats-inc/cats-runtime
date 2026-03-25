@@ -587,6 +587,7 @@ execution/materialization engine.
 - `docs/decisions/018-separate-skill-library-content-from-runtime-execution-engine.md`
 
 ---
+
 ### OPT-8: Advanced Provider Model Catalog Migration Cleanup
 
 **Priority**: P1
