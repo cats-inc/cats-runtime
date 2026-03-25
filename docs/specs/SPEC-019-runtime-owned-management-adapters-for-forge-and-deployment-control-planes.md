@@ -51,7 +51,7 @@ machine-readable, and vendor-replaceable.
 
 - As a product host, I want runtime-owned PR and check actions so I do not need
   to shell out to `gh` directly.
-- As a Boss Cat or runtime-managed skill, I want to request deployment and
+- As a product host or runtime-managed skill, I want to request deployment and
   preview actions through stable runtime contracts instead of vendor-specific
   command strings.
 - As a runtime maintainer, I want to swap CLI-based and API-based management
@@ -96,41 +96,59 @@ machine-readable, and vendor-replaceable.
 11. Mutating management actions shall be approval-aware and shall follow the
     same general preview/apply discipline already used by workspace substrate
     and delivery primitives where that discipline fits the action.
-12. Management results shall return machine-readable state using the same
+12. Runtime authorization inputs for management actions shall remain
+    product-neutral.
+    - the runtime may accept generic actor or caller classification
+    - the runtime may accept an opaque approval reference or attestation token
+    - the runtime shall not require product-specific role names such as Cats
+      personas in the public contract
+13. Product governance remains outside runtime.
+    - product hosts decide when approval is required
+    - runtime requests may carry caller-asserted approval metadata
+    - the runtime may validate that required authorization metadata is present,
+      but it shall not become the owner of higher-level approval policy
+14. Management results shall return machine-readable state using the same
     readiness vocabulary already familiar in runtime delivery flows:
     - `ready`
     - `blocked`
     - `unsupported`
     - `degraded`
     - `completed`
-13. Management results shall also report structured warnings, blocked reasons,
+15. Management results shall also report structured warnings, blocked reasons,
     and capability gaps such as:
     - missing authentication
     - missing repository metadata
     - missing linked deployment project
     - unsupported branch protection or review state
     - unsupported adapter capability
-14. Management actions shall be able to correlate outputs back to runtime
+16. Management actions shall be able to correlate outputs back to runtime
     workspace, session, artifact, service, and preview context when such
     context exists.
-15. Management actions shall not require fake session transcripts or fake
+17. Management actions shall not require fake session transcripts or fake
     provider session ids. Long-running actions may use operation ids, polling
     metadata, or resumable status handles instead.
-16. `cats-runtime` shall expose management-adapter readiness diagnostics and
+18. `cats-runtime` shall expose management-adapter readiness diagnostics and
     install/auth guidance without mixing those adapters into AI provider-model
     catalogs.
-17. If `cats-runtime` exposes install or check metadata for management
+19. If `cats-runtime` exposes install or check metadata for management
     adapters, that metadata shall live in a management-adapter catalog or
     diagnostics namespace separate from model-provider install truth.
-18. Management adapter implementations may use local CLI execution, remote API
+20. Management adapter implementations may use local CLI execution, remote API
     calls, or a hybrid of both. The public runtime contract shall remain stable
     across transport changes.
-19. Management adapter configuration shall live in a dedicated runtime-managed
+21. Management adapter configuration shall live in a dedicated runtime-managed
     config/catalog surface rather than piggybacking on model-provider routing.
-20. The management-adapter layer shall remain adapter-friendly so future
+22. The management-adapter layer shall remain adapter-friendly so future
     GitLab, Vercel, Cloudflare, or other control-plane integrations can plug in
     without redefining the contract around `gh` or `zeabur`.
-21. Product governance remains outside runtime. `cats-runtime` executes the
+23. Review-oriented long-running actions such as `wait_review_checks` shall
+    expose explicit execution semantics rather than pretending to be normal
+    short request/response reads.
+    - the contract should describe timeout behavior
+    - the contract should describe polling or resumable operation semantics
+    - webhook-only assumptions shall remain out of scope unless the runtime
+      explicitly adopts them later
+24. Product governance remains outside runtime. `cats-runtime` executes the
     requested management action, reports capability gaps and blocked states, and
     does not infer whether a workspace must use GitHub or a specific deployment
     host.
@@ -202,8 +220,8 @@ interface RuntimeManagementRequest {
   sessionId?: string;
   apply?: boolean;
   authorization?: {
-    actorRole?: 'boss_cat' | 'specialist_cat' | 'system' | 'owner' | 'product_host' | 'operator';
-    approved?: boolean;
+    actorClass?: 'system' | 'owner' | 'operator' | 'service';
+    approvalRef?: string;
   };
   target?: Record<string, unknown>;
   context?: Record<string, unknown>;
@@ -234,6 +252,8 @@ Exact field names may evolve. The architectural point is:
 - adapters own vendor execution details
 - skills and MCP reuse the same runtime capability instead of inventing a
   second shell-command layer
+- approval metadata stays product-neutral even when the runtime needs
+  authorization context for mutating operations
 
 ## Dependencies
 
@@ -254,6 +274,11 @@ Exact field names may evolve. The architectural point is:
 - [ ] How much install/auth diagnostic behavior should reuse the current
       provider-install knowledge machinery versus a separate management-adapter
       diagnostic subsystem?
+- [ ] Should `wait_review_checks` use a bounded long-poll request, a resumable
+      operation id, or both in the first slice?
+- [ ] If mutating management actions require approval metadata, should the
+      runtime expect only an opaque approval reference, or also a caller-asserted
+      approval flag for compatibility with existing delivery-style contracts?
 
 ## References
 
