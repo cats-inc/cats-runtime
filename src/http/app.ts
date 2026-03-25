@@ -259,7 +259,16 @@ export function createRuntimeApp(ctx: AppContext) {
     }
     return logger()(c, next);
   });
-  app.use('*', bearerAuth(ctx.config));
+  app.use('*', async (c, next) => {
+    // In bootstrap mode, exempt provider setup routes from bearer auth.
+    // The setup page has no API key input and the operator may not have one
+    // yet — the whole point of bootstrap is first-run before full config.
+    // After bootstrap completes, normal auth applies to setup routes.
+    if (ctx.startup?.bootstrapRequired && c.req.path.startsWith('/providers/setup')) {
+      return await next();
+    }
+    return bearerAuth(ctx.config)(c, next);
+  });
 
   app.use('*', async (c, next) => {
     c.set('ctx', ctx);
