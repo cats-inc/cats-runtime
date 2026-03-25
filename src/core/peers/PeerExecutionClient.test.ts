@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SessionInfo, StreamEvent, TurnInput } from '../types.js';
+import { createPeerPayloadSignature } from './auth.js';
 import { PeerExecutionClient } from './PeerExecutionClient.js';
 import type { PeerRegistryEntry } from './types.js';
 
@@ -154,15 +155,26 @@ describe('PeerExecutionClient', () => {
         sharedSecret: 'lan-secret',
       },
       localPeerId: 'local-peer',
-      fetch: async () => new Response([
-        JSON.stringify({ type: 'text', text: 'peer hello' }),
-        JSON.stringify({ type: 'result' }),
-      ].join('\n') + '\n', {
-        status: 200,
-        headers: {
-          'content-type': 'application/x-ndjson',
-        },
-      }),
+      fetch: async (_input, init) => {
+        const headers = init?.headers as Record<string, string>;
+        const body = String(init?.body || '');
+
+        expect(headers.authorization).toBe('Bearer lan-secret');
+        expect(headers['x-cats-peer-id']).toBe('local-peer');
+        expect(headers['x-cats-peer-signature']).toBe(
+          createPeerPayloadSignature('lan-secret', body),
+        );
+
+        return new Response([
+          JSON.stringify({ type: 'text', text: 'peer hello' }),
+          JSON.stringify({ type: 'result' }),
+        ].join('\n') + '\n', {
+          status: 200,
+          headers: {
+            'content-type': 'application/x-ndjson',
+          },
+        });
+      },
     });
 
     const peer = createPeerEntry();
@@ -289,6 +301,7 @@ describe('PeerExecutionClient', () => {
         const headers = init?.headers as Record<string, string>;
         expect(headers.authorization).toBeUndefined();
         expect(headers['x-cats-peer-id']).toBe('local-peer');
+        expect(headers['x-cats-peer-signature']).toBeUndefined();
         return new Response([
           JSON.stringify({ type: 'result' }),
         ].join('\n') + '\n', {

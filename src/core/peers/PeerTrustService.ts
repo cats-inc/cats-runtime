@@ -1,4 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
+import { validatePeerPayloadSignature } from './auth.js';
 import type {
   PeerAdvertisement,
   PeerRegistryEntry,
@@ -43,6 +44,14 @@ export class PeerTrustService {
     }
 
     return timingSafeEqual(tokenBuffer, this.sharedSecretBuffer);
+  }
+
+  validatePayloadSignature(payload: string, signature: string | undefined): boolean {
+    return validatePeerPayloadSignature(
+      this.options.config.sharedSecret,
+      payload,
+      signature,
+    );
   }
 
   summarizeAdvertisement(

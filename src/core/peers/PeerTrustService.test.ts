@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createPeerPayloadSignature } from './auth.js';
 import { PeerTrustService } from './PeerTrustService.js';
 import type { PeerAdvertisement } from './types.js';
 
@@ -100,6 +101,14 @@ describe('PeerTrustService', () => {
     });
     expect(trust.validateSharedSecret('lan-secret')).toBe(true);
     expect(trust.validateSharedSecret('wrong-secret')).toBe(false);
+    expect(trust.validatePayloadSignature(
+      '{"turn":{"message":"hello"}}',
+      createPeerPayloadSignature('lan-secret', '{"turn":{"message":"hello"}}'),
+    )).toBe(true);
+    expect(trust.validatePayloadSignature(
+      '{"turn":{"message":"tampered"}}',
+      createPeerPayloadSignature('lan-secret', '{"turn":{"message":"hello"}}'),
+    )).toBe(false);
     expect(trust.canAcceptInboundExecution('seed-peer')).toBe(false);
   });
 });

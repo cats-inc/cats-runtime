@@ -30,6 +30,7 @@ does not use `CATS_RUNTIME_API_KEY`; runtime peers authenticate with:
 ```bash
 Authorization: Bearer <cats-runtime-peer-shared-secret>
 x-cats-peer-id: <caller-peer-id>
+x-cats-peer-signature: sha256=<hmac-of-raw-json-body>
 ```
 
 Peer auth/trust notes:
@@ -40,14 +41,17 @@ Peer auth/trust notes:
   credential
 - use a strong random secret, preferably at least 32 characters
 - trust is directional via each runtime's `trustedPeerIds` / `rejectedPeerIds`
+- the current `/peer/executions` request body is HMAC-signed with
+  `x-cats-peer-signature`
 - one-way traffic is supported, but it still needs configuration on both sides:
   the caller must trust the callee for routing, and the callee must trust the
   caller for inbound execution
 - for small LAN mesh deployments, the practical bootstrap today is usually one
   shared secret reused across participating peers plus explicit peer-id trust
   policy on each node
-- v0 does not add per-peer signatures, nonces, or replay protection; operators
-  should treat this as a trusted-LAN or externally TLS-protected transport
+- v0 still does not add per-peer credentials, nonces, or replay protection;
+  operators should treat this as a trusted-LAN or externally TLS-protected
+  transport
 
 ## Core Endpoints
 
@@ -2411,6 +2415,7 @@ Route semantics:
 - supports both `Accept: application/x-ndjson` and `Accept: text/event-stream`
 - requires peer auth via `Authorization: Bearer <shared-secret>` plus
   `x-cats-peer-id`
+- requires `x-cats-peer-signature: sha256=<hmac>` over the raw JSON request body
 - fails closed when peer auth/trust checks fail
 - returns normalized streamed events, with additive `metadata.peerExecution`
   on the callee and additive `metadata.peerRouting` on the caller relay path
@@ -2426,8 +2431,9 @@ Topology notes:
   gossip-based propagation of peer state
 - this is not a full cluster manager: no transparent failover, no cross-node
   session ownership transfer, and no remote workspace/browser/wakeup ownership
-- per-peer credentials, signed requests, replay resistance, and stronger
-  network transport assumptions are later follow-up, not solved by v0
+- request-body integrity is protected with a shared-secret HMAC, but per-peer
+  credentials, replay resistance, rate limiting, and stronger network transport
+  assumptions are later follow-up, not solved by v0
 
 Peer-routing failure events are additive. Streamed `error` events may include:
 

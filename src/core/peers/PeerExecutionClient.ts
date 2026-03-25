@@ -9,6 +9,7 @@ import {
   createPeerExecutionError,
   isPeerExecutionError,
 } from './errors.js';
+import { createPeerPayloadSignature } from './auth.js';
 import type {
   ParsedPeerMessageRoutingInput,
   PeerExecutionRequest,
@@ -128,6 +129,7 @@ export class PeerExecutionClient {
 
     const timeoutSignal = AbortSignal.timeout(this.options.config.requestTimeoutMs);
     const combinedSignal = AbortSignal.any([signal, timeoutSignal]);
+    const body = JSON.stringify(request);
     const headers: Record<string, string> = {
       'content-type': 'application/json',
       accept: trace.transport === 'ndjson'
@@ -137,6 +139,10 @@ export class PeerExecutionClient {
     };
     if (this.options.config.sharedSecret) {
       headers.authorization = `Bearer ${this.options.config.sharedSecret}`;
+      headers['x-cats-peer-signature'] = createPeerPayloadSignature(
+        this.options.config.sharedSecret,
+        body,
+      );
     }
 
     let response: Response;
@@ -144,7 +150,7 @@ export class PeerExecutionClient {
       response = await this.fetchImpl(`${baseUrl}/peer/executions`, {
         method: 'POST',
         headers,
-        body: JSON.stringify(request),
+        body,
         signal: combinedSignal,
       });
     } catch (error) {

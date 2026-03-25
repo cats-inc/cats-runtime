@@ -133,7 +133,8 @@ Current auth/trust model:
 
 - host-facing `CATS_RUNTIME_API_KEY` and peer-facing
   `CATS_RUNTIME_PEER_SHARED_SECRET` are separate
-- inbound peer execution checks both the bearer secret and the caller peer id
+- inbound peer execution checks the bearer secret, the caller peer id, and an
+  HMAC signature over the raw JSON request body
 - use a strong random peer shared secret, preferably at least 32 characters
 - trust is directional and configured per runtime with
   `CATS_RUNTIME_PEER_TRUSTED_IDS` / `CATS_RUNTIME_PEER_REJECTED_IDS`
@@ -142,8 +143,8 @@ Current auth/trust model:
   trust `A` for inbound execution
 - current v0 auth is bearer-secret based; if you run outside a tightly trusted
   LAN, put the runtime behind TLS
-- current v0 does not include nonce/HMAC replay protection or per-peer
-  credentials
+- current v0 includes HMAC body signing, but it still does not include
+  nonce/timestamp replay protection or per-peer credentials
 
 Current topology boundary:
 
@@ -251,8 +252,9 @@ Peer-specific notes:
   full-mesh deployments usually standardize the same peer secret across all
   participating nodes, then constrain actual connectivity with peer-id trust
   lists
-- replay resistance, per-peer credentials, and stronger mutual auth are later
-  hardening work, not part of PLAN-017 v0
+- replay resistance, auth failure rate limiting, secret rotation, per-peer
+  credentials, and stronger mutual auth are later hardening work, not part of
+  PLAN-017 v0
 - advertise values should point at a host/port reachable by other LAN runtimes
 
 ## Provider Instances (`config/providers.yaml`)

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { describe, expect, it, vi } from 'vitest';
+import { createPeerPayloadSignature } from '../core/peers/auth.js';
 import { createPeerExecutionError } from '../core/peers/errors.js';
 import { PeerTrustService } from '../core/peers/PeerTrustService.js';
 import type { StreamEvent } from '../core/types.js';
@@ -49,6 +50,19 @@ function parseSse(text: string): Array<Record<string, unknown>> {
       .find((line) => line.startsWith('data: ')))
     .filter((line): line is string => Boolean(line))
     .map((line) => JSON.parse(line.slice(6)));
+}
+
+function createSignedHeaders(
+  body: string,
+  overrides: Record<string, string> = {},
+): Record<string, string> {
+  return {
+    authorization: 'Bearer lan-secret',
+    'content-type': 'application/json',
+    'x-cats-peer-id': 'caller-peer',
+    'x-cats-peer-signature': createPeerPayloadSignature('lan-secret', body),
+    ...overrides,
+  };
 }
 
 function createApp(
@@ -116,16 +130,14 @@ describe('peer execution routes', () => {
 
   it('streams authenticated peer execution requests over NDJSON', async () => {
     const { app, execute } = createApp();
+    const body = JSON.stringify(createRequestBody());
 
     const response = await app.request('/peer/executions', {
       method: 'POST',
-      headers: {
-        authorization: 'Bearer lan-secret',
-        'content-type': 'application/json',
+      headers: createSignedHeaders(body, {
         accept: 'application/x-ndjson',
-        'x-cats-peer-id': 'caller-peer',
-      },
-      body: JSON.stringify(createRequestBody()),
+      }),
+      body,
     });
 
     expect(response.status).toBe(200);
@@ -145,22 +157,19 @@ describe('peer execution routes', () => {
 
   it('rejects mismatched authenticated caller ids', async () => {
     const { app, execute } = createApp();
+    const body = JSON.stringify(createRequestBody({
+      caller: {
+        peerId: 'other-peer',
+        sessionId: 'session-1',
+        runId: 'run-1',
+        traceId: 'trace-1',
+      },
+    }));
 
     const response = await app.request('/peer/executions', {
       method: 'POST',
-      headers: {
-        authorization: 'Bearer lan-secret',
-        'content-type': 'application/json',
-        'x-cats-peer-id': 'caller-peer',
-      },
-      body: JSON.stringify(createRequestBody({
-        caller: {
-          peerId: 'other-peer',
-          sessionId: 'session-1',
-          runId: 'run-1',
-          traceId: 'trace-1',
-        },
-      })),
+      headers: createSignedHeaders(body),
+      body,
     });
 
     expect(response.status).toBe(403);
@@ -183,16 +192,14 @@ describe('peer execution routes', () => {
         });
       },
     });
+    const body = JSON.stringify(createRequestBody());
 
     const response = await app.request('/peer/executions', {
       method: 'POST',
-      headers: {
-        authorization: 'Bearer lan-secret',
-        'content-type': 'application/json',
+      headers: createSignedHeaders(body, {
         accept: 'text/event-stream',
-        'x-cats-peer-id': 'caller-peer',
-      },
-      body: JSON.stringify(createRequestBody()),
+      }),
+      body,
     });
 
     expect(response.status).toBe(200);
@@ -213,5 +220,25 @@ describe('peer execution routes', () => {
       },
     ]);
     expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects peer execution requests with an invalid payload signature', async () => {
+    const { app, execute } = createApp();
+    const body = JSON.stringify(createRequestBody());
+
+    const response = await app.request('/peer/executions', {
+      method: 'POST',
+      headers: createSignedHeaders(body, {
+        'x-cats-peer-signature': createPeerPayloadSignature('wrong-secret', body),
+      }),
+      body,
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: 'Peer execution auth failed.',
+      code: 'peer_auth_failed',
+    });
+    expect(execute).not.toHaveBeenCalled();
   });
 });

@@ -720,10 +720,25 @@ coordinated `cats` changes or a new design slice:
   current SSE / NDJSON shapes
 - any contract change that stops existing `cats` request bodies from remaining
   valid during migration
-- stronger peer auth such as per-peer credentials, signed requests, or replay
-  protection
+- stronger peer auth such as per-peer credentials or replay protection
 - stricter network posture assumptions such as required TLS for non-trusted LAN
   deployments
+
+#### Security Hardening Follow-up
+
+`POST /peer/executions` now has shared-secret bearer auth plus request-body
+HMAC signing, but the following hardening work is still intentionally deferred:
+
+- add nonce/timestamp or equivalent replay resistance; body signing alone does
+  not stop replay
+- add auth failure rate limiting on peer-only routes, ideally at least per IP
+  or per caller peer id
+- support peer secret rotation / overlap windows instead of a single static mesh
+  secret
+- document and optionally enforce a TLS-fronted posture for any deployment
+  outside a tightly trusted LAN
+- add peer-specific admission control or quotas so a leaked secret cannot be
+  used to flood `/peer/executions` and starve local capacity
 
 #### Runtime Dashboard / Operator Follow-up
 

@@ -15,7 +15,19 @@ peerExecutionRoutes.use('/peer/executions', peerExecutionAuth());
 peerExecutionRoutes.post('/peer/executions', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const callerPeerId = c.get('peerCallerId' as never) as string | undefined;
-  const request = await c.req.json<unknown>().catch(() => undefined);
+  const rawBody = await c.req.text().catch(() => '');
+
+  if (!ctx.peerTrust?.validatePayloadSignature(
+    rawBody,
+    c.req.header('x-cats-peer-signature'),
+  )) {
+    return c.json({
+      error: 'Peer execution auth failed.',
+      code: 'peer_auth_failed',
+    }, 403);
+  }
+
+  const request = parseJsonBody(rawBody);
   const parsed = parsePeerExecutionRequest(request);
 
   if (!parsed.ok) {
@@ -95,6 +107,18 @@ peerExecutionRoutes.post('/peer/executions', async (c) => {
     }
   });
 });
+
+function parseJsonBody(value: string): unknown {
+  if (value.trim().length === 0) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return undefined;
+  }
+}
 
 function parsePeerExecutionRequest(
   value: unknown,
