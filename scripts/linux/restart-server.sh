@@ -103,9 +103,9 @@ health_check() {
   api_key="$(read_env_value CATS_RUNTIME_API_KEY)"
 
   if [[ -n "$api_key" ]]; then
-    curl -fsS -H "Authorization: Bearer $api_key" "http://127.0.0.1:${port}/health" >/dev/null
+    curl -fsS -H "Authorization: Bearer $api_key" "http://127.0.0.1:${port}/health"
   else
-    curl -fsS "http://127.0.0.1:${port}/health" >/dev/null
+    curl -fsS "http://127.0.0.1:${port}/health"
   fi
 }
 
@@ -146,9 +146,12 @@ disown "$CATS_RUNTIME_PID" 2>/dev/null || true
 echo "Waiting for health check..."
 sleep 3
 
-if health_check "$PORT"; then
+if HEALTH_JSON="$(health_check "$PORT")"; then
   echo "  Healthy (port $PORT)"
   echo "  Dashboard: http://localhost:$PORT"
+  if printf '%s' "$HEALTH_JSON" | grep -q '"bootstrapRequired"[[:space:]]*:[[:space:]]*true'; then
+    echo "  Setup: bootstrap mode active, open http://localhost:$PORT/ to configure providers"
+  fi
   echo "  PID: $CATS_RUNTIME_PID"
   echo "  Logs: $STDOUT_LOG / $STDERR_LOG"
 else

@@ -226,6 +226,13 @@ try {
         $status = if ($health -and $health.status) { $health.status } else { "unknown" }
         Write-Host "  Health endpoint responding ($status)" -ForegroundColor Green
         Write-Host "  Runtime:  $runtimeBaseUrl" -ForegroundColor White
+        $bootstrapRequired = $false
+        if ($health -and $health.startup -and $null -ne $health.startup.bootstrapRequired) {
+            $bootstrapRequired = [bool]$health.startup.bootstrapRequired
+        }
+        if ($bootstrapRequired) {
+            Write-Host "  Setup:    bootstrap mode active, open $runtimeBaseUrl/ to configure providers" -ForegroundColor Yellow
+        }
         if ($health -and $health.backend) {
             $backendReachable = [bool]$health.backend.reachable
             $backendBaseUrl = [string]$health.backend.baseUrl

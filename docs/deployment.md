@@ -18,10 +18,12 @@
 
 ```powershell
 copy .env.example .env
-copy config\providers.yaml.example config\providers.yaml
 npm install
 npm run dev
 ```
+
+If no valid `providers.yaml` exists, the runtime enters bootstrap mode and
+lets the operator generate one from the setup page.
 
 ### 2. Built standalone run
 
@@ -45,8 +47,9 @@ or:
 npx cats-runtime
 ```
 
-The executable package uses the same runtime entrypoint and still expects
-config via `.env`, `config/providers.yaml`, or explicit environment variables.
+The executable package uses the same runtime entrypoint and supports either
+bootstrap-first startup with no preexisting config, or config supplied through
+`.env`, `config/providers.yaml`, or explicit environment variables.
 
 Supported startup flags:
 
@@ -96,8 +99,8 @@ Expected behavior:
 
 - Node.js 22+
 - `.env` or equivalent environment variables
-- `config/providers.yaml` or `CATS_RUNTIME_CONFIG_PATH` pointing to an
-  equivalent provider-topology file
+- either a valid `config/providers.yaml` / `CATS_RUNTIME_CONFIG_PATH`, or
+  bootstrap mode to generate one on first launch
 - any provider-specific credentials or local CLI installs needed by the chosen
   targets
 

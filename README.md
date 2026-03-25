@@ -72,12 +72,14 @@ Current capabilities:
 ```powershell
 cd cats-runtime
 copy .env.example .env
-copy config\providers.yaml.example config\providers.yaml
 npm install
 npm run dev
 ```
 
 Default URL: `http://127.0.0.1:3110`
+
+If no valid `providers.yaml` exists, the runtime starts in bootstrap mode and
+lets you generate a minimal config from the setup page at `GET /`.
 
 Embedded UIs:
 
@@ -92,8 +94,8 @@ Embedded UIs:
 - `npx cats-runtime` once the package is published
 
 The executable package starts the same runtime entrypoint as `npm start` and
-still expects `.env` plus `config/providers.yaml` or equivalent environment
-overrides.
+supports either bootstrap-first startup with no preexisting `providers.yaml`,
+or a preseeded valid config / equivalent environment overrides.
 
 Published package contents now also include the runtime-owned `skills/`
 library so validated skill packages ship with the executable boundary instead
@@ -148,7 +150,7 @@ Runtime state defaults under the user's home directory:
 - `src/core/usage/` - runtime-owned metering, incident, and guardrail helpers
 - `src/backends/cli/` - embedded CLI runtime modules
 - `src/backends/api/` - API-key and local-model runtime modules
-- `config/providers.yaml.example` - file-based provider instance topology
+- `config/providers.yaml.example` - reference topology for manual/preseeded config
 - `docs/api.md` - public HTTP surface
 - `docs/architecture.md` - internal layout and data flow
 

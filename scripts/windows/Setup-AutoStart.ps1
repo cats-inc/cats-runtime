@@ -112,6 +112,13 @@ if ($Verify) {
         if ($response.StatusCode -eq 200 -or $response.StatusCode -eq 503) {
             $status = if ($health -and $health.status) { $health.status } else { "unknown" }
             Write-Host "   OK ($status)" -ForegroundColor Green
+            $bootstrapRequired = $false
+            if ($health -and $health.startup -and $null -ne $health.startup.bootstrapRequired) {
+                $bootstrapRequired = [bool]$health.startup.bootstrapRequired
+            }
+            if ($bootstrapRequired) {
+                Write-Host "   Setup required: bootstrap mode active at http://localhost:$port/" -ForegroundColor Yellow
+            }
             if ($health -and $health.backend) {
                 $backendBaseUrl = [string]$health.backend.baseUrl
                 if ([bool]$health.backend.reachable) {
@@ -296,6 +303,7 @@ Add-Content -Path `$logFile -Value "=== Startup complete ==="
     Write-Host "Setup complete!" -ForegroundColor Green
     Write-Host ""
     Write-Host "  Runtime:   http://localhost:$port" -ForegroundColor White
+    Write-Host "  Setup:     if first launch enters bootstrap mode, open / to configure providers" -ForegroundColor Yellow
     Write-Host "  Runner:    $runnerScript" -ForegroundColor Gray
     Write-Host "  Log:       $logFile" -ForegroundColor Gray
     Write-Host ""
