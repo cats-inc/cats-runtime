@@ -64,7 +64,12 @@ observeRoutes.get('/sessions/:id/stream', async (c) => {
 
   const worker = getRuntimeSessionManager(ctx).get(id);
   if (!worker || !worker.active) {
-    return c.json({ error: 'No active worker for this session' }, 404);
+    return streamSSE(c, async (stream) => {
+      await stream.writeSSE({
+        data: JSON.stringify({ type: 'session_closed' }),
+        event: 'session_closed',
+      });
+    });
   }
 
   return streamSSE(c, async (stream) => {

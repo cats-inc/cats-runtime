@@ -5,6 +5,7 @@ import type {
   PermissionMode,
   ProviderModelResolution,
   ProviderModelSelection,
+  SessionWorkspaceState,
   SessionArtifact,
   SessionHydrationState,
   SessionInfo,
@@ -15,7 +16,8 @@ import type {
   SessionSkillState,
   SessionStatus,
   SessionWorkspaceIsolationState,
-  WorkspaceMode,
+  WorkspaceAccess,
+  WorkspaceKind,
 } from './types.js';
 import type { ProviderDefaultTarget } from '../config.js';
 import { normalizeSessionOrigin } from './sessionView.js';
@@ -36,8 +38,9 @@ export interface CreateSessionInput {
   providerBackend?: 'cli' | 'api' | 'local' | 'agent';
   providerInstanceId?: string;
   cwd: string;
-  workspaceMode?: WorkspaceMode;
-  workspaceIsolation?: SessionWorkspaceIsolationState;
+  workspace?: SessionWorkspaceState;
+  workspaceMode?: LegacyWorkspaceMode;
+  workspaceIsolation?: LegacyWorkspaceIsolationState;
   permissionMode?: PermissionMode;
   allowedTools?: string[];
   model?: string;
@@ -65,8 +68,7 @@ interface DiscoveredSessionData {
   model?: string;
   sourcePath?: string;
   group?: string;
-  workspaceMode?: WorkspaceMode;
-  workspaceIsolation?: SessionWorkspaceIsolationState;
+  workspace?: SessionWorkspaceState;
   permissionMode?: PermissionMode;
   allowedTools?: string[];
   sessionKey?: string;
@@ -89,6 +91,15 @@ interface StagedTranscriptArtifact {
   originalPath: string;
   stagedPath: string;
   cleanupDir: string;
+}
+
+type LegacyWorkspaceMode = 'isolated' | 'shared' | 'read_only';
+type LegacyWorkspaceIsolationMode = 'shared' | 'isolated' | 'worktree';
+
+interface LegacyWorkspaceIsolationState {
+  mode: LegacyWorkspaceIsolationMode;
+  sourceCwd?: string;
+  worktree?: SessionWorkspaceState['worktree'];
 }
 
 export class SessionRegistry {
@@ -114,7 +125,10 @@ export class SessionRegistry {
     if (!this.persistPath) return;
     try {
       const raw = readFileSync(this.persistPath, 'utf-8');
-      const arr: SessionInfo[] = JSON.parse(raw);
+      const arr = JSON.parse(raw) as Array<SessionInfo & {
+        workspaceMode?: LegacyWorkspaceMode;
+        workspaceIsolation?: LegacyWorkspaceIsolationState;
+      }>;
       const loadedByProviderSession = new Map<string, SessionInfo>();
       let migrated = false;
 
@@ -132,21 +146,15 @@ export class SessionRegistry {
             loaded.providerName,
             loaded.providerInstanceId,
           ),
+          workspace: normalizeWorkspaceState({
+            cwd: loaded.cwd,
+            workspace: loaded.workspace,
+            legacyWorkspaceMode: loaded.workspaceMode,
+            legacyWorkspaceIsolation: loaded.workspaceIsolation,
+          }),
         };
-        // Default missing workspaceMode for backward compat
-        if (!s.workspaceMode) s.workspaceMode = 'shared';
-        const normalizedWorkspaceIsolation = normalizeWorkspaceIsolationState({
-          cwd: s.cwd,
-          workspaceMode: s.workspaceMode,
-          workspaceIsolation: s.workspaceIsolation,
-        });
-        if (
-          JSON.stringify(normalizedWorkspaceIsolation)
-          !== JSON.stringify(s.workspaceIsolation)
-        ) {
-          s.workspaceIsolation = normalizedWorkspaceIsolation;
-          migrated = true;
-        }
+        s.workspaceMode = toLegacyWorkspaceMode(s.workspace);
+        s.workspaceIsolation = toLegacyWorkspaceIsolationState(s.workspace);
         if (
           s.providerInstanceId !== loaded.providerInstanceId
           || s.providerBackend !== loaded.providerBackend
@@ -154,7 +162,11 @@ export class SessionRegistry {
         ) {
           migrated = true;
         }
-        if (loaded.workspaceMode !== s.workspaceMode) {
+        if (
+          loaded.workspaceMode !== undefined
+          || loaded.workspaceIsolation !== undefined
+          || JSON.stringify(loaded.workspace) !== JSON.stringify(s.workspace)
+        ) {
           migrated = true;
         }
 
@@ -237,12 +249,14 @@ export class SessionRegistry {
       status: 'initializing',
       origin: 'runtime',
       cwd: input.cwd,
-      workspaceMode: input.workspaceMode,
-      workspaceIsolation: normalizeWorkspaceIsolationState({
+      workspace: normalizeWorkspaceState({
         cwd: input.cwd,
-        workspaceMode: input.workspaceMode,
-        workspaceIsolation: input.workspaceIsolation,
+        workspace: input.workspace,
+        legacyWorkspaceMode: input.workspaceMode,
+        legacyWorkspaceIsolation: input.workspaceIsolation,
       }),
+      workspaceMode: undefined,
+      workspaceIsolation: undefined,
       permissionMode: input.permissionMode,
       allowedTools: input.allowedTools,
       model: input.model,
@@ -263,6 +277,8 @@ export class SessionRegistry {
       createdAt: now,
       updatedAt: now,
     };
+    session.workspaceMode = toLegacyWorkspaceMode(session.workspace);
+    session.workspaceIsolation = toLegacyWorkspaceIsolationState(session.workspace);
 
     this.sessions.set(id, session);
     this.scheduleSave();
@@ -417,8 +433,9 @@ export class SessionRegistry {
     id: string,
     patch: {
       cwd?: string;
-      workspaceMode?: WorkspaceMode;
-      workspaceIsolation?: SessionWorkspaceIsolationState;
+      workspace?: SessionWorkspaceState;
+      workspaceMode?: LegacyWorkspaceMode;
+      workspaceIsolation?: LegacyWorkspaceIsolationState;
       permissionMode?: PermissionMode;
     },
   ): boolean {
@@ -428,18 +445,23 @@ export class SessionRegistry {
     if (patch.cwd !== undefined) {
       session.cwd = patch.cwd;
     }
-    if (patch.workspaceMode !== undefined) {
-      session.workspaceMode = patch.workspaceMode;
-    }
-    if (patch.workspaceIsolation !== undefined) {
-      session.workspaceIsolation = cloneWorkspaceIsolationState(patch.workspaceIsolation);
-    } else if (patch.cwd !== undefined || patch.workspaceMode !== undefined) {
-      session.workspaceIsolation = normalizeWorkspaceIsolationState({
+    if (patch.workspace !== undefined) {
+      session.workspace = cloneWorkspaceState(patch.workspace)!;
+    } else if (patch.workspaceMode !== undefined || patch.workspaceIsolation !== undefined) {
+      session.workspace = normalizeWorkspaceState({
         cwd: session.cwd,
-        workspaceMode: session.workspaceMode,
-        workspaceIsolation: session.workspaceIsolation,
+        workspace: session.workspace,
+        legacyWorkspaceMode: patch.workspaceMode,
+        legacyWorkspaceIsolation: patch.workspaceIsolation,
+      });
+    } else if (patch.cwd !== undefined) {
+      session.workspace = normalizeWorkspaceState({
+        cwd: session.cwd,
+        workspace: session.workspace,
       });
     }
+    session.workspaceMode = toLegacyWorkspaceMode(session.workspace);
+    session.workspaceIsolation = toLegacyWorkspaceIsolationState(session.workspace);
     if (patch.permissionMode !== undefined) {
       session.permissionMode = patch.permissionMode;
     }
@@ -694,12 +716,12 @@ export class SessionRegistry {
       status: 'closed',
       origin: 'discovered',
       cwd: mergedData.cwd,
-      workspaceMode: mergedData.workspaceMode || 'shared',
-      workspaceIsolation: normalizeWorkspaceIsolationState({
+      workspace: normalizeWorkspaceState({
         cwd: mergedData.cwd,
-        workspaceMode: mergedData.workspaceMode || 'shared',
-        workspaceIsolation: mergedData.workspaceIsolation,
+        workspace: mergedData.workspace,
       }),
+      workspaceMode: undefined,
+      workspaceIsolation: undefined,
       model: mergedData.model,
       group: mergedData.group,
       sessionKey: mergedData.sessionKey,
@@ -719,6 +741,8 @@ export class SessionRegistry {
       updatedAt: now,
       lastActivity: mergedData.lastActivity,
     };
+    session.workspaceMode = toLegacyWorkspaceMode(session.workspace);
+    session.workspaceIsolation = toLegacyWorkspaceIsolationState(session.workspace);
 
     this.sessions.set(id, session);
     this.scheduleSave();
@@ -778,12 +802,12 @@ export class SessionRegistry {
     }
     if (data.summary) session.summary = data.summary;
     if (data.group && !session.group) session.group = data.group;
-    if (data.workspaceMode) session.workspaceMode = data.workspaceMode;
-    session.workspaceIsolation = normalizeWorkspaceIsolationState({
+    session.workspace = normalizeWorkspaceState({
       cwd: session.cwd,
-      workspaceMode: session.workspaceMode,
-      workspaceIsolation: data.workspaceIsolation ?? session.workspaceIsolation,
+      workspace: data.workspace ?? session.workspace,
     });
+    session.workspaceMode = toLegacyWorkspaceMode(session.workspace);
+    session.workspaceIsolation = toLegacyWorkspaceIsolationState(session.workspace);
     if (data.model && !session.model) session.model = data.model;
     if (data.sessionKey && !session.sessionKey) session.sessionKey = data.sessionKey;
     if (data.reusePolicy && !session.reusePolicy) session.reusePolicy = data.reusePolicy;
@@ -836,8 +860,7 @@ export class SessionRegistry {
       model: incoming.model ?? existing.model,
       sourcePath: incoming.sourcePath ?? existing.sourcePath,
       group: incoming.group ?? existing.group,
-      workspaceMode: incoming.workspaceMode ?? existing.workspaceMode,
-      workspaceIsolation: incoming.workspaceIsolation ?? existing.workspaceIsolation,
+      workspace: incoming.workspace ?? existing.workspace,
       sessionKey: incoming.sessionKey ?? existing.sessionKey,
       reusePolicy: incoming.reusePolicy ?? existing.reusePolicy,
       instructions: incoming.instructions ?? existing.instructions,
@@ -971,12 +994,12 @@ export class SessionRegistry {
       target.providerSessionId = incoming.providerSessionId;
     }
     if (!target.cwd && incoming.cwd) target.cwd = incoming.cwd;
-    if (!target.workspaceMode && incoming.workspaceMode) target.workspaceMode = incoming.workspaceMode;
-    target.workspaceIsolation = normalizeWorkspaceIsolationState({
+    target.workspace = normalizeWorkspaceState({
       cwd: target.cwd,
-      workspaceMode: target.workspaceMode,
-      workspaceIsolation: target.workspaceIsolation ?? incoming.workspaceIsolation,
+      workspace: target.workspace ?? incoming.workspace,
     });
+    target.workspaceMode = toLegacyWorkspaceMode(target.workspace);
+    target.workspaceIsolation = toLegacyWorkspaceIsolationState(target.workspace);
     if (!target.model && incoming.model) target.model = incoming.model;
     if (!target.modelSelection && incoming.modelSelection) {
       target.modelSelection = cloneModelSelection(incoming.modelSelection);
@@ -1083,29 +1106,66 @@ function cloneArtifacts(
   return artifacts ? structuredClone(artifacts) : undefined;
 }
 
-function cloneWorkspaceIsolationState(
-  workspaceIsolation?: SessionWorkspaceIsolationState,
-): SessionWorkspaceIsolationState | undefined {
-  return workspaceIsolation ? structuredClone(workspaceIsolation) : undefined;
+function cloneWorkspaceState(
+  workspace?: SessionWorkspaceState,
+): SessionWorkspaceState | undefined {
+  return workspace ? structuredClone(workspace) : undefined;
 }
 
-function normalizeWorkspaceIsolationState(input: {
+function normalizeWorkspaceState(input: {
   cwd: string;
-  workspaceMode?: WorkspaceMode;
-  workspaceIsolation?: SessionWorkspaceIsolationState;
-}): SessionWorkspaceIsolationState {
-  if (input.workspaceIsolation) {
-    return cloneWorkspaceIsolationState(input.workspaceIsolation)!;
+  workspace?: SessionWorkspaceState;
+  legacyWorkspaceMode?: LegacyWorkspaceMode;
+  legacyWorkspaceIsolation?: LegacyWorkspaceIsolationState;
+}): SessionWorkspaceState {
+  if (input.workspace) {
+    return cloneWorkspaceState(input.workspace)!;
   }
 
-  if (input.workspaceMode === 'isolated') {
+  if (input.legacyWorkspaceIsolation?.mode === 'worktree' && input.legacyWorkspaceIsolation.worktree) {
     return {
-      mode: 'isolated',
+      kind: 'worktree',
+      access: input.legacyWorkspaceMode === 'read_only' ? 'read_only' : 'read_write',
+      runtimeCwd: input.cwd,
+      ...(input.legacyWorkspaceIsolation.sourceCwd ? { sourceCwd: input.legacyWorkspaceIsolation.sourceCwd } : {}),
+      worktree: structuredClone(input.legacyWorkspaceIsolation.worktree),
+    };
+  }
+
+  if (input.legacyWorkspaceMode === 'isolated' || input.legacyWorkspaceIsolation?.mode === 'isolated') {
+    return {
+      kind: 'sandbox',
+      access: input.legacyWorkspaceMode === 'read_only' ? 'read_only' : 'read_write',
+      runtimeCwd: input.cwd,
+      ...(input.legacyWorkspaceIsolation?.sourceCwd
+        ? { sourceCwd: input.legacyWorkspaceIsolation.sourceCwd }
+        : {}),
     };
   }
 
   return {
-    mode: 'shared',
+    kind: 'source',
+    access: input.legacyWorkspaceMode === 'read_only' ? 'read_only' : 'read_write',
+    runtimeCwd: input.cwd,
     sourceCwd: input.cwd,
+  };
+}
+
+function toLegacyWorkspaceMode(workspace: SessionWorkspaceState): LegacyWorkspaceMode {
+  if (workspace.kind === 'sandbox') {
+    return 'isolated';
+  }
+  return workspace.access === 'read_only' ? 'read_only' : 'shared';
+}
+
+function toLegacyWorkspaceIsolationState(workspace: SessionWorkspaceState): SessionWorkspaceIsolationState {
+  return {
+    mode: workspace.kind === 'sandbox'
+      ? 'isolated'
+      : workspace.kind === 'worktree'
+        ? 'worktree'
+        : 'shared',
+    ...(workspace.sourceCwd ? { sourceCwd: workspace.sourceCwd } : {}),
+    ...(workspace.worktree ? { worktree: structuredClone(workspace.worktree) } : {}),
   };
 }

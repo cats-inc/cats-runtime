@@ -4,6 +4,9 @@ import type {
   SessionHydrationSkillSource,
   SessionHydrationState,
   SessionSkillState,
+  SessionWorkspaceState,
+  WorkspaceAccess,
+  WorkspaceKind,
   WorkspaceIsolationMode,
   WorkspaceMode,
   WorkspaceSubstrateFindingStatus,
@@ -26,6 +29,7 @@ export interface HydrateSessionStateInput {
   providerName: string;
   providerBackend: ProviderBackend;
   runtimeCwd: string;
+  workspace?: SessionWorkspaceState;
   workspaceMode?: WorkspaceMode;
   workspaceIsolationMode?: WorkspaceIsolationMode;
   sessionBaseDir: string;
@@ -216,6 +220,8 @@ async function hydrateWorkspace(
   );
 
   return {
+    kind: resolveWorkspaceKind(input),
+    access: resolveWorkspaceAccess(input),
     isolationMode: input.workspaceIsolationMode ?? deriveWorkspaceIsolationMode(input.workspaceMode),
     runtimeCwd: input.runtimeCwd,
     ...(sourceCwd ? { sourceCwd } : {}),
@@ -229,11 +235,32 @@ function resolveWorkspaceSourceCwd(
   input: HydrateSessionStateInput,
 ): string | undefined {
   const requested = normalizeOptionalPath(input.requestedWorkspaceSourceCwd);
-  if (input.workspaceMode === 'isolated') {
+  if ((input.workspace?.kind ?? resolveWorkspaceKind(input)) === 'sandbox') {
     return requested ?? normalizeOptionalPath(input.existingHydration?.workspace.sourceCwd);
   }
 
   return requested ?? input.runtimeCwd;
+}
+
+function resolveWorkspaceKind(
+  input: HydrateSessionStateInput,
+): WorkspaceKind {
+  if (input.workspace?.kind) {
+    return input.workspace.kind;
+  }
+  if (input.workspaceIsolationMode === 'worktree') {
+    return 'worktree';
+  }
+  if (input.workspaceMode === 'isolated') {
+    return 'sandbox';
+  }
+  return 'source';
+}
+
+function resolveWorkspaceAccess(
+  input: HydrateSessionStateInput,
+): WorkspaceAccess {
+  return input.workspace?.access ?? (input.workspaceMode === 'read_only' ? 'read_only' : 'read_write');
 }
 
 function normalizeOptionalPath(value: string | undefined): string | undefined {

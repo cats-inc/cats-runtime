@@ -32,7 +32,10 @@ import type {
   SessionContextTransplant,
   SessionReusePolicy,
   SessionStatus,
+  SessionWorkspaceState,
   WorktreeCleanupPolicy,
+  WorkspaceAccess,
+  WorkspaceKind,
   WorkspaceIsolationMode,
   WorkspaceMode,
 } from '../../core/types.js';
@@ -465,6 +468,45 @@ function parseWorkspaceIsolationMode(value: unknown): WorkspaceIsolationMode | u
     : undefined;
 }
 
+function parseWorkspaceKind(value: unknown): WorkspaceKind | undefined {
+  return value === 'source' || value === 'sandbox' || value === 'worktree'
+    ? value
+    : undefined;
+}
+
+function parseWorkspaceAccess(value: unknown): WorkspaceAccess | undefined {
+  return value === 'read_write' || value === 'read_only'
+    ? value
+    : undefined;
+}
+
+function resolveRequestedWorkspaceContract(input: {
+  workspaceKind?: WorkspaceKind;
+  workspaceAccess?: WorkspaceAccess;
+  workspaceMode?: WorkspaceMode;
+  workspaceIsolation?: WorkspaceIsolationMode;
+}): {
+  workspaceKind?: WorkspaceKind;
+  workspaceAccess?: WorkspaceAccess;
+  workspaceIsolationMode?: WorkspaceIsolationMode;
+} {
+  const workspaceIsolationMode = input.workspaceIsolation
+    ?? (input.workspaceMode ? deriveWorkspaceIsolationMode(input.workspaceMode) : undefined);
+  return {
+    workspaceKind: input.workspaceKind
+      ?? (workspaceIsolationMode === 'isolated'
+        ? 'sandbox'
+        : workspaceIsolationMode === 'worktree'
+          ? 'worktree'
+          : workspaceIsolationMode === 'shared'
+            ? 'source'
+            : undefined),
+    workspaceAccess: input.workspaceAccess
+      ?? (input.workspaceMode === 'read_only' ? 'read_only' : input.workspaceMode ? 'read_write' : undefined),
+    workspaceIsolationMode,
+  };
+}
+
 function parseWorktreeCleanupPolicy(value: unknown): WorktreeCleanupPolicy | undefined {
   return value === 'discard' || value === 'merge' || value === 'preserve'
     ? value
@@ -701,20 +743,24 @@ function resolveCliProviderInstance(target: ProviderTargetDescriptor): ProviderI
 }
 
 function getSessionWorkspaceSourceCwd(
-  session: Pick<SessionInfo, 'cwd' | 'workspaceMode' | 'workspaceIsolation' | 'hydration'>,
+  session: Pick<SessionInfo, 'cwd' | 'hydration'>
+    & Partial<Pick<SessionInfo, 'workspace' | 'workspaceMode' | 'workspaceIsolation'>>,
 ): string | undefined {
-  return session.workspaceIsolation?.sourceCwd
+  const workspaceKind = resolveSessionWorkspaceKind(session);
+  return session.workspace?.sourceCwd
+    ?? session.workspaceIsolation?.sourceCwd
     ?? session.hydration?.workspace.sourceCwd
-    ?? (session.workspaceMode === 'isolated' ? undefined : session.cwd);
+    ?? (workspaceKind === 'sandbox' ? undefined : session.cwd);
 }
 
 function resolveForkWorkspaceSourceCwd(
-  session: Pick<SessionInfo, 'cwd' | 'workspaceMode' | 'workspaceIsolation' | 'hydration'>,
+  session: Pick<SessionInfo, 'cwd' | 'hydration'>
+    & Partial<Pick<SessionInfo, 'workspace' | 'workspaceMode' | 'workspaceIsolation'>>,
   requestedCwd: string | undefined,
   forkCwd: string,
-  forkWorkspaceMode: WorkspaceMode | undefined,
+  forkWorkspaceKind: WorkspaceKind | undefined,
 ): string | undefined {
-  if (forkWorkspaceMode === 'isolated') {
+  if (forkWorkspaceKind === 'sandbox') {
     return requestedCwd ?? getSessionWorkspaceSourceCwd(session);
   }
 
@@ -722,24 +768,31 @@ function resolveForkWorkspaceSourceCwd(
 }
 
 function buildMaintenanceRequest(
-  session: Pick<SessionInfo, 'id' | 'cwd' | 'workspaceMode' | 'workspaceIsolation' | 'hydration'>,
+  session: Pick<SessionInfo, 'id' | 'cwd' | 'hydration'>
+    & Partial<Pick<SessionInfo, 'workspace' | 'workspaceMode' | 'workspaceIsolation'>>,
   action: RuntimeSessionMaintenanceAction,
   requestBody?: ParsedMaintenanceRequestBody,
   worktreeDisposition?: WorktreeCleanupPolicy,
 ): RuntimeSessionMaintenanceRequest {
   const isolationMode = resolveSessionWorkspaceIsolationMode(session);
   const sourceCwd = getSessionWorkspaceSourceCwd(session);
-  const worktreePath = session.workspaceIsolation?.mode === 'worktree'
-    ? session.workspaceIsolation.worktree?.worktreePath
-    : undefined;
+  const worktreePath = session.workspace?.kind === 'worktree'
+    ? session.workspace.worktree?.worktreePath
+    : session.workspaceIsolation?.mode === 'worktree'
+      ? session.workspaceIsolation.worktree?.worktreePath
+      : undefined;
+  const workspaceKind = resolveSessionWorkspaceKind(session);
+  const workspaceAccess = resolveSessionWorkspaceAccess(session);
 
   return {
     action,
     sessionId: session.id,
     requestedAt: new Date().toISOString(),
+    workspaceKind,
+    workspaceAccess,
     workspaceMode: session.workspaceMode ?? 'shared',
     isolationMode,
-    runtimeCwd: session.cwd,
+    runtimeCwd: session.workspace?.runtimeCwd ?? session.cwd,
     ...(sourceCwd ? { sourceCwd } : {}),
     ...(worktreePath ? { worktreePath } : {}),
     ...(requestBody?.reason ? { reason: requestBody.reason } : {}),
@@ -901,6 +954,7 @@ async function hydrateSessionForTarget(
     sessionId: string;
     providerTarget: ProviderTargetDescriptor;
     cwd: string;
+    workspace?: SessionWorkspaceState;
     workspaceMode?: WorkspaceMode;
     workspaceIsolationMode?: WorkspaceIsolationMode;
     requestedSkills?: ReturnType<typeof parseRuntimeSkillManifest>['manifest'];
@@ -916,6 +970,7 @@ async function hydrateSessionForTarget(
     providerName: options.providerTarget.providerName,
     providerBackend: options.providerTarget.backend,
     runtimeCwd: options.cwd,
+    workspace: options.workspace,
     workspaceMode: options.workspaceMode,
     workspaceIsolationMode: options.workspaceIsolationMode,
     sessionBaseDir: ctx.config.sessionBaseDir,
@@ -938,6 +993,7 @@ async function rehydratePersistedSessionState(
     sessionId: session.id,
     providerTarget,
     cwd: session.cwd,
+    workspace: session.workspace,
     workspaceMode: session.workspaceMode,
     workspaceIsolationMode: resolveSessionWorkspaceIsolationMode(session),
     existingSkills: session.skills,
@@ -953,20 +1009,45 @@ async function rehydratePersistedSessionState(
 }
 
 function resolveSessionWorkspaceIsolationMode(
-  session: Pick<SessionInfo, 'workspaceIsolation' | 'workspaceMode'>,
+  session: Partial<Pick<SessionInfo, 'workspace' | 'workspaceIsolation' | 'workspaceMode'>>,
 ): WorkspaceIsolationMode {
   return session.workspaceIsolation?.mode
-    ?? deriveWorkspaceIsolationMode(session.workspaceMode);
+    ?? (session.workspace?.kind === 'sandbox'
+      ? 'isolated'
+      : session.workspace?.kind === 'worktree'
+        ? 'worktree'
+        : session.workspace?.kind === 'source'
+          ? 'shared'
+          : deriveWorkspaceIsolationMode(session.workspaceMode));
+}
+
+function resolveSessionWorkspaceKind(
+  session: Partial<Pick<SessionInfo, 'workspace' | 'workspaceIsolation' | 'workspaceMode'>>,
+): WorkspaceKind {
+  return session.workspace?.kind
+    ?? (resolveSessionWorkspaceIsolationMode(session) === 'isolated'
+      ? 'sandbox'
+      : resolveSessionWorkspaceIsolationMode(session) === 'worktree'
+        ? 'worktree'
+        : 'source');
+}
+
+function resolveSessionWorkspaceAccess(
+  session: Partial<Pick<SessionInfo, 'workspace' | 'workspaceMode'>>,
+): WorkspaceAccess {
+  return session.workspace?.access
+    ?? ((session.workspaceMode ?? 'shared') === 'read_only' ? 'read_only' : 'read_write');
 }
 
 async function prepareWorkspaceCleanupState(
-  session: Pick<SessionInfo, 'id' | 'workspaceMode' | 'workspaceIsolation'>,
+  session: Pick<SessionInfo, 'id' | 'workspace' | 'workspaceMode' | 'workspaceIsolation'>,
   worktreeCleanupPolicy: WorktreeCleanupPolicy | undefined,
   ctx: AppContext,
 ) {
   return cleanupSessionWorkspace({
     sessionId: session.id,
     sessionBaseDir: ctx.config.sessionBaseDir,
+    workspace: session.workspace,
     workspaceMode: session.workspaceMode,
     workspaceIsolation: session.workspaceIsolation,
     worktreeCleanupPolicy,
@@ -1033,11 +1114,12 @@ export async function executeRetainedWorktreeCleanup(
 
 async function discardPreparedWorkspace(
   ctx: AppContext,
-  session: Pick<SessionInfo, 'id' | 'workspaceMode' | 'workspaceIsolation'>,
+  session: Pick<SessionInfo, 'id' | 'workspace' | 'workspaceMode' | 'workspaceIsolation'>,
 ): Promise<void> {
   await cleanupSessionWorkspace({
     sessionId: session.id,
     sessionBaseDir: ctx.config.sessionBaseDir,
+    workspace: session.workspace,
     workspaceMode: session.workspaceMode,
     workspaceIsolation: session.workspaceIsolation,
     worktreeCleanupPolicy: 'discard',
@@ -1049,12 +1131,17 @@ function persistWorkspaceCleanupState(
   sessionId: string,
   cleanup: Awaited<ReturnType<typeof cleanupSessionWorkspace>>,
 ): SessionInfo | undefined {
-  if (cleanup.nextCwd === undefined && cleanup.nextWorkspaceIsolation === undefined) {
+  if (
+    cleanup.nextCwd === undefined
+    && cleanup.nextWorkspace === undefined
+    && cleanup.nextWorkspaceIsolation === undefined
+  ) {
     return ctx.registry.get(sessionId);
   }
 
   const updated = ctx.registry.updateWorkspace(sessionId, {
     ...(cleanup.nextCwd !== undefined ? { cwd: cleanup.nextCwd } : {}),
+    ...(cleanup.nextWorkspace !== undefined ? { workspace: cleanup.nextWorkspace } : {}),
     ...(cleanup.nextWorkspaceIsolation !== undefined
       ? { workspaceIsolation: cleanup.nextWorkspaceIsolation }
       : {}),
@@ -1498,6 +1585,7 @@ function applyPreparedWorkspace(
 ): SessionInfo | undefined {
   const updated = ctx.registry.updateWorkspace(sessionId, {
     cwd: prepared.cwd,
+    workspace: prepared.workspace,
     workspaceMode: prepared.workspaceMode,
     workspaceIsolation: prepared.workspaceIsolation,
     permissionMode: prepared.permissionMode,
@@ -1526,6 +1614,8 @@ async function ensureSessionWorkspacePrepared(
     sessionId: session.id,
     sessionBaseDir: ctx.config.sessionBaseDir,
     cwd: getSessionWorkspaceSourceCwd(session),
+    workspaceKind: 'worktree',
+    workspaceAccess: resolveSessionWorkspaceAccess(session),
     workspaceMode: session.workspaceMode,
     workspaceIsolationMode: 'worktree',
     permissionMode: session.permissionMode,
@@ -1537,6 +1627,7 @@ async function ensureSessionWorkspacePrepared(
 
   await discardPreparedWorkspace(ctx, {
     id: session.id,
+    workspace: prepared.workspace,
     workspaceMode: prepared.workspaceMode,
     workspaceIsolation: prepared.workspaceIsolation,
   });
@@ -1929,6 +2020,8 @@ sessionRoutes.post('/sessions', async (c) => {
     model?: string;
     modelSelection?: unknown;
     group?: string;
+    workspaceKind?: WorkspaceKind;
+    workspaceAccess?: WorkspaceAccess;
     workspaceMode?: WorkspaceMode;
     workspaceIsolation?: WorkspaceIsolationMode;
     managed?: boolean;
@@ -1995,6 +2088,8 @@ sessionRoutes.post('/sessions', async (c) => {
     parsedSkills.clear ? undefined : parsedSkills.manifest,
   );
   const outputDir = parseOptionalString(body.outputDir);
+  const workspaceKind = parseWorkspaceKind(body.workspaceKind);
+  const workspaceAccess = parseWorkspaceAccess(body.workspaceAccess);
   const workspaceIsolationMode = parseWorkspaceIsolationMode(body.workspaceIsolation);
 
   if (reusePolicy !== 'create_new' && requestedSessionKey) {
@@ -2009,6 +2104,8 @@ sessionRoutes.post('/sessions', async (c) => {
       const existingSourceCwd = getSessionWorkspaceSourceCwd(existing) ?? existing.cwd;
       if (
         (body.cwd && existingSourceCwd !== body.cwd)
+        || (workspaceKind && resolveSessionWorkspaceKind(existing) !== workspaceKind)
+        || (workspaceAccess && resolveSessionWorkspaceAccess(existing) !== workspaceAccess)
         || (body.workspaceMode && existing.workspaceMode !== body.workspaceMode)
         || (
           workspaceIsolationMode
@@ -2053,6 +2150,7 @@ sessionRoutes.post('/sessions', async (c) => {
           sessionId: preparedExisting.id,
           providerTarget,
           cwd: preparedExisting.cwd,
+          workspace: preparedExisting.workspace,
           workspaceMode: preparedExisting.workspaceMode,
           workspaceIsolationMode: resolveSessionWorkspaceIsolationMode(preparedExisting),
           requestedSkills: parsedSkills.clear ? undefined : parsedSkills.manifest,
@@ -2125,6 +2223,8 @@ sessionRoutes.post('/sessions', async (c) => {
       sessionId,
       sessionBaseDir: ctx.config.sessionBaseDir,
       cwd: body.cwd || undefined,
+      workspaceKind,
+      workspaceAccess,
       workspaceMode: body.workspaceMode,
       workspaceIsolationMode,
       permissionMode: body.permissionMode,
@@ -2141,6 +2241,7 @@ sessionRoutes.post('/sessions', async (c) => {
       sessionId,
       providerTarget,
       cwd: resolved.cwd,
+      workspace: resolved.workspace,
       workspaceMode: resolved.workspaceMode,
       workspaceIsolationMode: resolved.workspaceIsolation.mode,
       requestedSkills: parsedSkills.clear ? undefined : parsedSkills.manifest,
@@ -2155,6 +2256,7 @@ sessionRoutes.post('/sessions', async (c) => {
     if (runtimeSkillError) {
       await discardPreparedWorkspace(ctx, {
         id: sessionId,
+        workspace: resolved.workspace,
         workspaceMode: resolved.workspaceMode,
         workspaceIsolation: resolved.workspaceIsolation,
       });
@@ -2168,6 +2270,7 @@ sessionRoutes.post('/sessions', async (c) => {
     if (!caps.permissions && resolved.workspaceMode === 'read_only') {
       await discardPreparedWorkspace(ctx, {
         id: sessionId,
+        workspace: resolved.workspace,
         workspaceMode: resolved.workspaceMode,
         workspaceIsolation: resolved.workspaceIsolation,
       });
@@ -2193,6 +2296,7 @@ sessionRoutes.post('/sessions', async (c) => {
         providerBackend: 'cli',
         providerInstanceId: providerInstance!.id,
         cwd: resolved.cwd,
+        workspace: resolved.workspace,
         workspaceMode: resolved.workspaceMode,
         workspaceIsolation: resolved.workspaceIsolation,
         permissionMode: resolved.permissionMode,
@@ -2243,6 +2347,7 @@ sessionRoutes.post('/sessions', async (c) => {
       }
       await discardPreparedWorkspace(ctx, {
         id: sessionId,
+        workspace: resolved.workspace,
         workspaceMode: resolved.workspaceMode,
         workspaceIsolation: resolved.workspaceIsolation,
       });
@@ -2255,6 +2360,7 @@ sessionRoutes.post('/sessions', async (c) => {
     if (!caps.permissions && resolved.workspaceMode === 'read_only') {
       await discardPreparedWorkspace(ctx, {
         id: sessionId,
+        workspace: resolved.workspace,
         workspaceMode: resolved.workspaceMode,
         workspaceIsolation: resolved.workspaceIsolation,
       });
@@ -2273,6 +2379,7 @@ sessionRoutes.post('/sessions', async (c) => {
         providerBackend: 'cli',
         providerInstanceId: providerInstance!.id,
         cwd: resolved.cwd,
+        workspace: resolved.workspace,
         workspaceMode: resolved.workspaceMode,
         workspaceIsolation: resolved.workspaceIsolation,
         permissionMode: resolved.permissionMode,
@@ -2323,6 +2430,7 @@ sessionRoutes.post('/sessions', async (c) => {
       }
       await discardPreparedWorkspace(ctx, {
         id: sessionId,
+        workspace: resolved.workspace,
         workspaceMode: resolved.workspaceMode,
         workspaceIsolation: resolved.workspaceIsolation,
       });
@@ -2339,6 +2447,7 @@ sessionRoutes.post('/sessions', async (c) => {
   if (!caps.permissions && resolved.workspaceMode === 'read_only') {
     await discardPreparedWorkspace(ctx, {
       id: sessionId,
+      workspace: resolved.workspace,
       workspaceMode: resolved.workspaceMode,
       workspaceIsolation: resolved.workspaceIsolation,
     });
@@ -2361,6 +2470,7 @@ sessionRoutes.post('/sessions', async (c) => {
     providerBackend: providerTarget.backend,
     providerInstanceId: providerTarget.instanceId,
     cwd: resolved.cwd,
+    workspace: resolved.workspace,
     workspaceMode: resolved.workspaceMode,
     workspaceIsolation: resolved.workspaceIsolation,
     permissionMode: resolved.permissionMode,
@@ -2391,6 +2501,7 @@ sessionRoutes.post('/sessions', async (c) => {
   } catch (err) {
     await discardPreparedWorkspace(ctx, {
       id: sessionId,
+      workspace: resolved.workspace,
       workspaceMode: resolved.workspaceMode,
       workspaceIsolation: resolved.workspaceIsolation,
     });
@@ -3627,6 +3738,8 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     instance: parseOptionalString(rawBody.instance),
     model: parseOptionalString(rawBody.model),
     cwd: parseOptionalString(rawBody.cwd),
+    workspaceKind: parseWorkspaceKind(rawBody.workspaceKind),
+    workspaceAccess: parseWorkspaceAccess(rawBody.workspaceAccess),
     workspaceMode: rawBody.workspaceMode === 'isolated'
       || rawBody.workspaceMode === 'shared'
       || rawBody.workspaceMode === 'read_only'
@@ -3694,11 +3807,26 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
 
   const forkId = randomUUID();
   const parentIsolationMode = resolveSessionWorkspaceIsolationMode(session);
+  const requestedWorkspaceContract = resolveRequestedWorkspaceContract({
+    workspaceKind: body.workspaceKind,
+    workspaceAccess: body.workspaceAccess,
+    workspaceMode: body.workspaceMode,
+    workspaceIsolation: body.workspaceIsolation,
+  });
+  const explicitWorkspaceTopologyRequested = body.workspaceKind !== undefined
+    || body.workspaceMode !== undefined
+    || body.workspaceIsolation !== undefined;
   let forkCwd = session.cwd;
+  let forkWorkspaceKind = requestedWorkspaceContract.workspaceKind
+    ?? (parentIsolationMode === 'worktree' && !explicitWorkspaceTopologyRequested
+      ? 'worktree'
+      : resolveSessionWorkspaceKind(session));
+  let forkWorkspaceAccess = requestedWorkspaceContract.workspaceAccess
+    ?? resolveSessionWorkspaceAccess(session);
   let forkWorkspaceMode = body.workspaceMode ?? session.workspaceMode;
   let forkPermissionMode = body.permissionMode ?? session.permissionMode ?? 'skip';
-  let forkWorkspaceIsolationMode = requestedWorkspaceIsolationMode
-    ?? (parentIsolationMode === 'worktree' && body.workspaceMode !== 'isolated'
+  let forkWorkspaceIsolationMode = requestedWorkspaceContract.workspaceIsolationMode
+    ?? (parentIsolationMode === 'worktree' && !explicitWorkspaceTopologyRequested
       ? 'worktree'
       : undefined);
   let forkPrepared: PrepareSessionWorkspaceResult;
@@ -3732,11 +3860,15 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
       sessionId: forkId,
       sessionBaseDir: ctx.config.sessionBaseDir,
       cwd: body.cwd ?? getSessionWorkspaceSourceCwd(session) ?? session.cwd,
+      workspaceKind: forkWorkspaceKind,
+      workspaceAccess: forkWorkspaceAccess,
       workspaceMode: forkWorkspaceMode,
       workspaceIsolationMode: forkWorkspaceIsolationMode,
       permissionMode: forkPermissionMode,
     });
     forkCwd = forkPrepared.cwd;
+    forkWorkspaceKind = forkPrepared.workspace.kind;
+    forkWorkspaceAccess = forkPrepared.workspace.access;
     forkWorkspaceMode = forkPrepared.workspaceMode;
     forkPermissionMode = forkPrepared.permissionMode;
     forkWorkspaceIsolationMode = forkPrepared.workspaceIsolation.mode;
@@ -3744,7 +3876,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     return c.json({ error: `${error}` }, 400);
   }
 
-  if (forkPrepared.workspaceIsolation.mode !== 'shared' && session.cwd !== forkCwd) {
+  if (forkPrepared.workspace.kind !== 'source' && session.cwd !== forkCwd) {
     const snapshot = await copyWorkspaceSnapshot(session.cwd, forkCwd, { skipGitMetadata: true });
     requestedHydrationMetadata = mergeStructuredMetadata(
       requestedHydrationMetadata,
@@ -3786,6 +3918,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
       sessionId: forkId,
       providerTarget: childTarget,
       cwd: forkCwd,
+      workspace: forkPrepared.workspace,
       workspaceMode: forkWorkspaceMode,
       workspaceIsolationMode: forkWorkspaceIsolationMode,
       requestedSkills: parsedSkills.clear ? undefined : body.skills,
@@ -3795,7 +3928,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
         session,
         body.cwd,
         forkCwd,
-        forkWorkspaceMode,
+        forkWorkspaceKind,
       ),
       metadata: requestedHydrationMetadata,
     });
@@ -3806,6 +3939,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     if (runtimeSkillError) {
       await discardPreparedWorkspace(ctx, {
         id: forkId,
+        workspace: forkPrepared.workspace,
         workspaceMode: forkWorkspaceMode,
         workspaceIsolation: forkPrepared.workspaceIsolation,
       });
@@ -3827,11 +3961,12 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
         })
         : { warnings: [] };
   } catch (error) {
-    await discardPreparedWorkspace(ctx, {
-      id: forkId,
-      workspaceMode: forkWorkspaceMode,
-      workspaceIsolation: forkPrepared.workspaceIsolation,
-    });
+      await discardPreparedWorkspace(ctx, {
+        id: forkId,
+        workspace: forkPrepared.workspace,
+        workspaceMode: forkWorkspaceMode,
+        workspaceIsolation: forkPrepared.workspaceIsolation,
+      });
     return c.json({
       error: error instanceof Error ? error.message : String(error),
       branch: {
@@ -3851,6 +3986,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
     providerBackend: childTarget.backend,
     providerInstanceId: childTarget.instanceId,
     cwd: forkCwd,
+    workspace: forkPrepared.workspace,
     workspaceMode: forkWorkspaceMode,
     workspaceIsolation: forkPrepared.workspaceIsolation,
     permissionMode: forkPermissionMode,
@@ -3903,6 +4039,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
   } catch (err) {
     await discardPreparedWorkspace(ctx, {
       id: forkId,
+      workspace: forkPrepared.workspace,
       workspaceMode: forkWorkspaceMode,
       workspaceIsolation: forkPrepared.workspaceIsolation,
     });

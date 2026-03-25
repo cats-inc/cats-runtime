@@ -401,8 +401,9 @@ src/
 
 - Owns the runtime-side workspace execution layer used by session lifecycle
   routes
-- Prepares shared, isolated, and worktree-backed runtime cwd state without
-  moving product orchestration policy into runtime
+- Prepares source, sandbox, and worktree-backed runtime cwd state plus
+  `workspaceAccess` (`read_write` / `read_only`) without moving product
+  orchestration policy into runtime
 - Uses deterministic worktree ids and paths rooted under the runtime session
   base dir so resume/reset/delete can recreate or clean up the same worktree
 - Supports explicit worktree cleanup policies (`discard`, `merge`, or
@@ -458,10 +459,10 @@ src/
 
 - Owns the shared session hydration seam used by create/resume/fork/message
   paths
-- Distinguishes runtime cwd from the authoritative workspace source when an
-  isolated sandbox is only a temporary execution surface
-- Records runtime-owned `workspace.isolationMode` so hosts can distinguish
-  shared, isolated, and worktree-backed execution surfaces machine-readably
+- Distinguishes runtime cwd from the authoritative workspace source when a
+  sandbox is only a temporary execution surface
+- Records runtime-owned `workspace.kind` / `workspace.access`, with
+  `workspace.isolationMode` retained only as a legacy compatibility snapshot
 - Reuses read-only workspace substrate audit output for additive hydration
   metadata without auto-applying substrate changes
 - Re-derives runtime-managed skill delivery per target/backend so session state
@@ -509,7 +510,7 @@ src/
 2. `src/http` authenticates and routes the request
 3. `RuntimeSessionManager` resolves the configured backend target for the chosen provider instance
 4. `src/core/workspace` prepares the runtime execution surface for the chosen
-   isolation mode (`shared`, `isolated`, or `worktree`)
+   workspace kind (`source`, `sandbox`, or `worktree`) plus access mode
 5. `src/core/hydration` resolves workspace provenance and skill re-entry state
    for the target backend
 6. `src/core/skills` validates requested runtime skill ids and resolves a

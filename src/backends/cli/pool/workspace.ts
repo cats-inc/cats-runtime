@@ -1,68 +1,116 @@
 import { mkdirSync, rmSync, cpSync } from 'node:fs';
 import { join } from 'node:path';
-import type { WorkspaceMode } from './types.js';
+import type {
+  WorkspaceAccess,
+  WorkspaceIsolationMode,
+  WorkspaceKind,
+  WorkspaceMode,
+} from './types.js';
 import type { PermissionMode } from '../providers/types.js';
 
 export interface ResolveWorkspaceInput {
   sessionId: string;
   sessionBaseDir: string;
   cwd?: string;
+  workspaceKind?: WorkspaceKind;
+  workspaceAccess?: WorkspaceAccess;
   workspaceMode?: WorkspaceMode;
+  workspaceIsolation?: WorkspaceIsolationMode;
   permissionMode?: PermissionMode;
 }
 
 export interface ResolveWorkspaceResult {
   cwd: string;
   sourceCwd?: string;
+  workspaceKind: WorkspaceKind;
+  workspaceAccess: WorkspaceAccess;
   workspaceMode: WorkspaceMode;
   permissionMode: PermissionMode;
 }
 
 export function resolveWorkspace(input: ResolveWorkspaceInput): ResolveWorkspaceResult {
-  let { workspaceMode, permissionMode } = input;
+  const legacy = resolveLegacyWorkspaceRequest(input.workspaceMode, input.workspaceIsolation);
+  const workspaceKind = input.workspaceKind ?? legacy.workspaceKind ?? (input.cwd ? 'source' : 'sandbox');
+  const workspaceAccess = input.workspaceAccess ?? legacy.workspaceAccess ?? 'read_write';
+  const workspaceMode = toLegacyWorkspaceMode(workspaceKind, workspaceAccess);
+  const permissionMode = resolvePermissionMode(workspaceKind, workspaceAccess, input.permissionMode);
   const { sessionId, sessionBaseDir, cwd } = input;
 
-  // Infer workspace mode if not specified
-  if (!workspaceMode) {
-    workspaceMode = cwd ? 'shared' : 'isolated';
-  }
-
-  switch (workspaceMode) {
-    case 'isolated': {
+  switch (workspaceKind) {
+    case 'sandbox': {
       const sandboxDir = join(sessionBaseDir, sessionId);
       mkdirSync(sandboxDir, { recursive: true });
       return {
         cwd: sandboxDir,
         ...(cwd ? { sourceCwd: cwd } : {}),
-        workspaceMode: 'isolated',
-        permissionMode: 'skip',
+        workspaceKind: 'sandbox',
+        workspaceAccess,
+        workspaceMode,
+        permissionMode,
       };
     }
 
-    case 'shared': {
+    case 'source': {
       if (!cwd) {
-        throw new Error('cwd is required for shared workspace mode');
+        throw new Error(`cwd is required for ${workspaceMode} workspace mode`);
       }
       return {
         cwd,
         sourceCwd: cwd,
-        workspaceMode: 'shared',
-        permissionMode: permissionMode ?? 'skip',
+        workspaceKind: 'source',
+        workspaceAccess,
+        workspaceMode,
+        permissionMode,
       };
     }
 
-    case 'read_only': {
-      if (!cwd) {
-        throw new Error('cwd is required for read_only workspace mode');
-      }
-      return {
-        cwd,
-        sourceCwd: cwd,
-        workspaceMode: 'read_only',
-        permissionMode: 'default',
-      };
-    }
+    case 'worktree':
+      throw new Error('CLI pool workspace resolver does not support workspaceKind=worktree');
   }
+}
+
+function resolveLegacyWorkspaceRequest(
+  workspaceMode: WorkspaceMode | undefined,
+  workspaceIsolation: WorkspaceIsolationMode | undefined,
+): {
+  workspaceKind?: WorkspaceKind;
+  workspaceAccess?: WorkspaceAccess;
+} {
+  if (!workspaceMode && !workspaceIsolation) {
+    return {};
+  }
+
+  const resolvedIsolation = workspaceIsolation
+    ?? (workspaceMode === 'isolated' ? 'isolated' : 'shared');
+  return {
+    workspaceKind: resolvedIsolation === 'isolated'
+      ? 'sandbox'
+      : resolvedIsolation === 'worktree'
+        ? 'worktree'
+        : 'source',
+    workspaceAccess: workspaceMode === 'read_only' ? 'read_only' : 'read_write',
+  };
+}
+
+function toLegacyWorkspaceMode(
+  workspaceKind: WorkspaceKind,
+  workspaceAccess: WorkspaceAccess,
+): WorkspaceMode {
+  if (workspaceKind === 'sandbox') {
+    return 'isolated';
+  }
+  return workspaceAccess === 'read_only' ? 'read_only' : 'shared';
+}
+
+function resolvePermissionMode(
+  workspaceKind: WorkspaceKind,
+  workspaceAccess: WorkspaceAccess,
+  permissionMode?: PermissionMode,
+): PermissionMode {
+  if (workspaceKind === 'sandbox') {
+    return 'skip';
+  }
+  return workspaceAccess === 'read_only' ? 'default' : permissionMode ?? 'skip';
 }
 
 /**

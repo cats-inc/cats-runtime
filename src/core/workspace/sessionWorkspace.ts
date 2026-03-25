@@ -15,8 +15,11 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import type {
   PermissionMode,
   SessionWorkspaceIsolationState,
+  SessionWorkspaceState,
   WorktreeCleanupPolicy,
   WorktreeCleanupStatus,
+  WorkspaceAccess,
+  WorkspaceKind,
   WorkspaceIsolationMode,
   WorkspaceMode,
 } from '../types.js';
@@ -45,6 +48,8 @@ export interface PrepareSessionWorkspaceInput {
   sessionId: string;
   sessionBaseDir: string;
   cwd?: string;
+  workspaceKind?: WorkspaceKind;
+  workspaceAccess?: WorkspaceAccess;
   workspaceMode?: WorkspaceMode;
   workspaceIsolationMode?: WorkspaceIsolationMode;
   permissionMode?: PermissionMode;
@@ -54,14 +59,16 @@ export interface PrepareSessionWorkspaceInput {
 export interface PrepareSessionWorkspaceResult {
   cwd: string;
   sourceCwd?: string;
-  workspaceMode: WorkspaceMode;
   permissionMode: PermissionMode;
+  workspace: SessionWorkspaceState;
+  workspaceMode: WorkspaceMode;
   workspaceIsolation: SessionWorkspaceIsolationState;
 }
 
 export interface CleanupSessionWorkspaceInput {
   sessionId: string;
   sessionBaseDir: string;
+  workspace?: SessionWorkspaceState;
   workspaceMode?: WorkspaceMode;
   workspaceIsolation?: SessionWorkspaceIsolationState;
   worktreeCleanupPolicy?: WorktreeCleanupPolicy;
@@ -76,6 +83,7 @@ export interface CleanupSessionWorkspaceResult {
   reasonCodes: string[];
   policy?: WorktreeCleanupPolicy;
   nextCwd?: string;
+  nextWorkspace?: SessionWorkspaceState;
   nextWorkspaceIsolation?: SessionWorkspaceIsolationState;
 }
 
@@ -94,47 +102,65 @@ export interface CleanupOrphanedWorktreeResult {
 export async function prepareSessionWorkspace(
   input: PrepareSessionWorkspaceInput,
 ): Promise<PrepareSessionWorkspaceResult> {
-  const requestedIsolation = input.workspaceIsolationMode
-    ?? deriveWorkspaceIsolationMode(input.workspaceMode);
-  const requestedMode = input.workspaceMode;
+  const resolvedLegacy = resolveLegacyWorkspaceRequest(
+    input.workspaceMode,
+    input.workspaceIsolationMode,
+  );
+  const requestedKind = input.workspaceKind
+    ?? resolvedLegacy.workspaceKind
+    ?? (input.cwd ? 'source' : 'sandbox');
+  const requestedAccess = input.workspaceAccess
+    ?? resolvedLegacy.workspaceAccess
+    ?? 'read_write';
+  const permissionMode = resolvePermissionMode(requestedAccess, input.permissionMode);
   const now = (input.now ?? new Date()).toISOString();
 
-  if (requestedIsolation === 'isolated') {
+  if (requestedKind === 'sandbox') {
     const sandboxDir = join(input.sessionBaseDir, input.sessionId);
     await mkdir(sandboxDir, { recursive: true });
     return {
       cwd: sandboxDir,
       ...(input.cwd ? { sourceCwd: input.cwd } : {}),
-      workspaceMode: 'isolated',
-      permissionMode: 'skip',
-      workspaceIsolation: {
-        mode: 'isolated',
+      permissionMode,
+      workspaceMode: toLegacyWorkspaceMode('sandbox', requestedAccess),
+      workspaceIsolation: toLegacyWorkspaceIsolationState({
+        kind: 'sandbox',
+        access: requestedAccess,
+        runtimeCwd: sandboxDir,
+        ...(input.cwd ? { sourceCwd: input.cwd } : {}),
+      }),
+      workspace: {
+        kind: 'sandbox',
+        access: requestedAccess,
+        runtimeCwd: sandboxDir,
         ...(input.cwd ? { sourceCwd: input.cwd } : {}),
       },
     };
   }
 
   if (!input.cwd) {
-    throw new Error(`cwd is required for ${requestedIsolation} workspace isolation`);
+    throw new Error(`cwd is required for workspaceKind=${requestedKind}`);
   }
 
-  if (requestedIsolation === 'shared') {
+  if (requestedKind === 'source') {
     return {
       cwd: input.cwd,
       sourceCwd: input.cwd,
-      workspaceMode: requestedMode === 'read_only' ? 'read_only' : 'shared',
-      permissionMode: requestedMode === 'read_only'
-        ? 'default'
-        : input.permissionMode ?? 'skip',
-      workspaceIsolation: {
-        mode: 'shared',
+      permissionMode,
+      workspaceMode: toLegacyWorkspaceMode('source', requestedAccess),
+      workspaceIsolation: toLegacyWorkspaceIsolationState({
+        kind: 'source',
+        access: requestedAccess,
+        runtimeCwd: input.cwd,
+        sourceCwd: input.cwd,
+      }),
+      workspace: {
+        kind: 'source',
+        access: requestedAccess,
+        runtimeCwd: input.cwd,
         sourceCwd: input.cwd,
       },
     };
-  }
-
-  if (requestedMode === 'isolated') {
-    throw new Error('workspaceMode=isolated cannot be combined with worktree isolation');
   }
 
   const sourceCwd = input.cwd;
@@ -154,44 +180,47 @@ export async function prepareSessionWorkspace(
   const sourceHeadRef = await readGitValue(sourceRepoRoot, ['symbolic-ref', '-q', '--short', 'HEAD']);
   const sourceHeadOid = await readGitValue(sourceRepoRoot, ['rev-parse', 'HEAD']);
 
+  const workspace: SessionWorkspaceState = {
+    kind: 'worktree',
+    access: requestedAccess,
+    runtimeCwd,
+    sourceCwd,
+    worktree: {
+      id: buildWorktreeId(sourceRepoRoot, input.sessionId),
+      sourceRepoRoot,
+      ...(sourceHeadOid ? { sourceHeadOid } : {}),
+      sourceHeadRef,
+      ...(relativeCwd ? { relativeCwd } : {}),
+      worktreePath,
+      preparedAt: now,
+    },
+  };
+
   return {
     cwd: runtimeCwd,
     sourceCwd,
-    workspaceMode: requestedMode === 'read_only' ? 'read_only' : 'shared',
-    permissionMode: requestedMode === 'read_only'
-      ? 'default'
-      : input.permissionMode ?? 'skip',
-    workspaceIsolation: {
-      mode: 'worktree',
-      sourceCwd,
-      worktree: {
-        id: buildWorktreeId(sourceRepoRoot, input.sessionId),
-        sourceRepoRoot,
-        ...(sourceHeadOid ? { sourceHeadOid } : {}),
-        sourceHeadRef,
-        ...(relativeCwd ? { relativeCwd } : {}),
-        worktreePath,
-        preparedAt: now,
-      },
-    },
+    permissionMode,
+    workspaceMode: toLegacyWorkspaceMode('worktree', requestedAccess),
+    workspaceIsolation: toLegacyWorkspaceIsolationState(workspace),
+    workspace,
   };
 }
 
 export async function cleanupSessionWorkspace(
   input: CleanupSessionWorkspaceInput,
 ): Promise<CleanupSessionWorkspaceResult> {
-  const isolation = input.workspaceIsolation;
-  if (isolation?.mode === 'worktree' && isolation.worktree) {
+  const workspace = input.workspace ?? normalizeLegacyWorkspaceState(input);
+  if (workspace?.kind === 'worktree' && workspace.worktree) {
     return cleanupWorktreeWorkspace(
       input,
-      isolation as SessionWorkspaceIsolationState & {
-        mode: 'worktree';
-        worktree: NonNullable<SessionWorkspaceIsolationState['worktree']>;
+      workspace as SessionWorkspaceState & {
+        kind: 'worktree';
+        worktree: NonNullable<SessionWorkspaceState['worktree']>;
       },
     );
   }
 
-  if ((isolation?.mode ?? deriveWorkspaceIsolationMode(input.workspaceMode)) === 'isolated') {
+  if (workspace?.kind === 'sandbox') {
     const sandboxDir = join(input.sessionBaseDir, input.sessionId);
     try {
       await rm(sandboxDir, { recursive: true, force: true });
@@ -200,7 +229,8 @@ export async function cleanupSessionWorkspace(
         workspaceCleaned: true,
         worktreeDetached: false,
         mergedPathCount: 0,
-        reasonCodes: ['isolated_workspace_removed'],
+        reasonCodes: ['sandbox_workspace_removed'],
+        nextWorkspaceIsolation: undefined,
       };
     } catch {
       return {
@@ -208,7 +238,8 @@ export async function cleanupSessionWorkspace(
         workspaceCleaned: false,
         worktreeDetached: false,
         mergedPathCount: 0,
-        reasonCodes: ['isolated_workspace_cleanup_failed'],
+        reasonCodes: ['sandbox_workspace_cleanup_failed'],
+        nextWorkspaceIsolation: undefined,
       };
     }
   }
@@ -218,7 +249,8 @@ export async function cleanupSessionWorkspace(
     workspaceCleaned: false,
     worktreeDetached: false,
     mergedPathCount: 0,
-    reasonCodes: ['shared_workspace_retained'],
+    reasonCodes: ['source_workspace_retained'],
+    nextWorkspaceIsolation: undefined,
   };
 }
 
@@ -319,24 +351,18 @@ export async function cleanupOrphanedWorktree(
   }
 }
 
-export function deriveWorkspaceIsolationMode(
-  workspaceMode: WorkspaceMode | undefined,
-): WorkspaceIsolationMode {
-  return workspaceMode === 'isolated' ? 'isolated' : 'shared';
-}
-
 async function cleanupWorktreeWorkspace(
   input: CleanupSessionWorkspaceInput,
-  isolation: SessionWorkspaceIsolationState & {
-    mode: 'worktree';
-    worktree: NonNullable<SessionWorkspaceIsolationState['worktree']>;
+  workspace: SessionWorkspaceState & {
+    kind: 'worktree';
+    worktree: NonNullable<SessionWorkspaceState['worktree']>;
   },
 ): Promise<CleanupSessionWorkspaceResult> {
   const policy = input.worktreeCleanupPolicy ?? 'discard';
   const observedAt = (input.now ?? new Date()).toISOString();
   const reasonCodes: string[] = [];
-  const worktree = isolation.worktree;
-  const sourceCwd = isolation.sourceCwd ?? worktree.sourceRepoRoot;
+  const worktree = workspace.worktree;
+  const sourceCwd = workspace.sourceCwd ?? worktree.sourceRepoRoot;
   let mergedPathCount = 0;
 
   if (policy === 'merge') {
@@ -349,8 +375,9 @@ async function cleanupWorktreeWorkspace(
         policy,
         reasonCodes: ['source_workspace_dirty'],
         nextCwd: worktree.worktreePath,
-        nextWorkspaceIsolation: {
-          ...isolation,
+        nextWorkspace: {
+          ...workspace,
+          runtimeCwd: worktree.worktreePath,
           worktree: {
             ...worktree,
             lastCleanup: {
@@ -362,6 +389,20 @@ async function cleanupWorktreeWorkspace(
             },
           },
         },
+        nextWorkspaceIsolation: toLegacyWorkspaceIsolationState({
+          ...workspace,
+          runtimeCwd: worktree.worktreePath,
+          worktree: {
+            ...worktree,
+            lastCleanup: {
+              policy,
+              status: 'retained',
+              observedAt,
+              reasonCodes: ['source_workspace_dirty'],
+              mergedPathCount: 0,
+            },
+          },
+        }),
       };
     }
 
@@ -387,8 +428,9 @@ async function cleanupWorktreeWorkspace(
           error instanceof Error ? error.message : String(error),
         ],
         nextCwd: worktree.worktreePath,
-        nextWorkspaceIsolation: {
-          ...isolation,
+        nextWorkspace: {
+          ...workspace,
+          runtimeCwd: worktree.worktreePath,
           worktree: {
             ...worktree,
             lastCleanup: {
@@ -403,6 +445,23 @@ async function cleanupWorktreeWorkspace(
             },
           },
         },
+        nextWorkspaceIsolation: toLegacyWorkspaceIsolationState({
+          ...workspace,
+          runtimeCwd: worktree.worktreePath,
+          worktree: {
+            ...worktree,
+            lastCleanup: {
+              policy,
+              status: 'retained',
+              observedAt,
+              reasonCodes: [
+                'worktree_merge_failed',
+                error instanceof Error ? error.message : String(error),
+              ],
+              mergedPathCount: 0,
+            },
+          },
+        }),
       };
     }
   } else if (policy === 'preserve') {
@@ -414,8 +473,9 @@ async function cleanupWorktreeWorkspace(
       policy,
       reasonCodes: ['worktree_preserved'],
       nextCwd: worktree.worktreePath,
-      nextWorkspaceIsolation: {
-        ...isolation,
+      nextWorkspace: {
+        ...workspace,
+        runtimeCwd: worktree.worktreePath,
         worktree: {
           ...worktree,
           lastCleanup: {
@@ -427,6 +487,20 @@ async function cleanupWorktreeWorkspace(
           },
         },
       },
+      nextWorkspaceIsolation: toLegacyWorkspaceIsolationState({
+        ...workspace,
+        runtimeCwd: worktree.worktreePath,
+        worktree: {
+          ...worktree,
+          lastCleanup: {
+            policy,
+            status: 'retained',
+            observedAt,
+            reasonCodes: ['worktree_preserved'],
+            mergedPathCount: 0,
+          },
+        },
+      }),
     };
   } else {
     reasonCodes.push('worktree_changes_discarded');
@@ -442,8 +516,9 @@ async function cleanupWorktreeWorkspace(
       policy,
       reasonCodes: [...reasonCodes, 'worktree_detach_failed'],
       nextCwd: worktree.worktreePath,
-      nextWorkspaceIsolation: {
-        ...isolation,
+      nextWorkspace: {
+        ...workspace,
+        runtimeCwd: worktree.worktreePath,
         worktree: {
           ...worktree,
           lastCleanup: {
@@ -455,8 +530,39 @@ async function cleanupWorktreeWorkspace(
           },
         },
       },
+      nextWorkspaceIsolation: toLegacyWorkspaceIsolationState({
+        ...workspace,
+        runtimeCwd: worktree.worktreePath,
+        worktree: {
+          ...worktree,
+          lastCleanup: {
+            policy,
+            status: 'retained',
+            observedAt,
+            reasonCodes: [...reasonCodes, 'worktree_detach_failed'],
+            mergedPathCount: 0,
+          },
+        },
+      }),
     };
   }
+
+  const nextWorkspace: SessionWorkspaceState = {
+    kind: 'worktree',
+    access: workspace.access,
+    runtimeCwd: sourceCwd,
+    sourceCwd,
+    worktree: {
+      ...worktree,
+      lastCleanup: {
+        policy,
+        status: 'completed',
+        observedAt,
+        reasonCodes,
+        mergedPathCount,
+      },
+    },
+  };
 
   return {
     status: 'completed',
@@ -466,21 +572,116 @@ async function cleanupWorktreeWorkspace(
     policy,
     reasonCodes,
     nextCwd: sourceCwd,
-    nextWorkspaceIsolation: {
-      mode: 'worktree',
-      sourceCwd,
-      worktree: {
-        ...worktree,
-        lastCleanup: {
-          policy,
-          status: 'completed',
-          observedAt,
-          reasonCodes,
-          mergedPathCount,
-        },
-      },
-    },
+    nextWorkspace,
+    nextWorkspaceIsolation: toLegacyWorkspaceIsolationState(nextWorkspace),
   };
+}
+
+export function deriveWorkspaceIsolationMode(
+  workspaceMode: WorkspaceMode | undefined,
+): WorkspaceIsolationMode {
+  return workspaceMode === 'isolated' ? 'isolated' : 'shared';
+}
+
+function resolveLegacyWorkspaceRequest(
+  workspaceMode: WorkspaceMode | undefined,
+  workspaceIsolationMode: WorkspaceIsolationMode | undefined,
+): {
+  workspaceKind?: WorkspaceKind;
+  workspaceAccess?: WorkspaceAccess;
+} {
+  if (!workspaceMode && !workspaceIsolationMode) {
+    return {};
+  }
+  const requestedIsolation = workspaceIsolationMode ?? deriveWorkspaceIsolationMode(workspaceMode);
+  return {
+    workspaceKind: requestedIsolation === 'isolated'
+      ? 'sandbox'
+      : requestedIsolation === 'worktree'
+        ? 'worktree'
+        : 'source',
+    workspaceAccess: workspaceMode
+      ? (workspaceMode === 'read_only' ? 'read_only' : 'read_write')
+      : undefined,
+  };
+}
+
+function normalizeLegacyWorkspaceState(
+  input: CleanupSessionWorkspaceInput,
+): SessionWorkspaceState | undefined {
+  const resolvedLegacy = resolveLegacyWorkspaceRequest(
+    input.workspaceMode,
+    input.workspaceIsolation?.mode,
+  );
+  if (!resolvedLegacy.workspaceKind) {
+    return undefined;
+  }
+
+  const sourceCwd = input.workspaceIsolation?.sourceCwd;
+  if (resolvedLegacy.workspaceKind === 'sandbox') {
+    return {
+      kind: 'sandbox',
+      access: resolvedLegacy.workspaceAccess ?? 'read_write',
+      runtimeCwd: join(input.sessionBaseDir, input.sessionId),
+      ...(sourceCwd ? { sourceCwd } : {}),
+    };
+  }
+
+  if (resolvedLegacy.workspaceKind === 'worktree') {
+    const worktree = input.workspaceIsolation?.worktree;
+    const runtimeCwd = worktree
+      ? worktree.relativeCwd
+        ? join(worktree.worktreePath, worktree.relativeCwd)
+        : worktree.worktreePath
+      : sourceCwd ?? join(input.sessionBaseDir, input.sessionId);
+    return {
+      kind: 'worktree',
+      access: resolvedLegacy.workspaceAccess ?? 'read_write',
+      runtimeCwd,
+      ...(sourceCwd ? { sourceCwd } : {}),
+      ...(worktree ? { worktree: structuredClone(worktree) } : {}),
+    };
+  }
+
+  return {
+    kind: 'source',
+    access: resolvedLegacy.workspaceAccess ?? 'read_write',
+    runtimeCwd: sourceCwd ?? join(input.sessionBaseDir, input.sessionId),
+    ...(sourceCwd ? { sourceCwd } : {}),
+  };
+}
+
+function toLegacyWorkspaceMode(
+  workspaceKind: WorkspaceKind,
+  workspaceAccess: WorkspaceAccess,
+): WorkspaceMode {
+  if (workspaceKind === 'sandbox') {
+    return 'isolated';
+  }
+  return workspaceAccess === 'read_only' ? 'read_only' : 'shared';
+}
+
+function toLegacyWorkspaceIsolationState(
+  workspace: SessionWorkspaceState,
+): SessionWorkspaceIsolationState {
+  return {
+    mode: workspace.kind === 'sandbox'
+      ? 'isolated'
+      : workspace.kind === 'worktree'
+        ? 'worktree'
+        : 'shared',
+    ...(workspace.sourceCwd ? { sourceCwd: workspace.sourceCwd } : {}),
+    ...(workspace.worktree ? { worktree: structuredClone(workspace.worktree) } : {}),
+  };
+}
+
+function resolvePermissionMode(
+  workspaceAccess: WorkspaceAccess,
+  permissionMode?: PermissionMode,
+): PermissionMode {
+  return workspaceAccess === 'read_only'
+    ? 'default'
+    : permissionMode ?? 'skip';
 }
 
 function buildWorktreeId(sourceRepoRoot: string, sessionId: string): string {

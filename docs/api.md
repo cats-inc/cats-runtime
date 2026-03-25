@@ -937,7 +937,7 @@ Skill-enabled create example:
 ```json
 {
   "provider": "codex",
-  "workspaceMode": "isolated",
+  "workspaceKind": "sandbox",
   "skills": {
     "profileId": "boss_web_room",
     "requestedSkills": ["companion", "repo-maintainer"],
@@ -956,8 +956,8 @@ Worktree-backed create example:
 {
   "provider": "codex",
   "cwd": "C:/repo",
-  "workspaceMode": "shared",
-  "workspaceIsolation": "worktree"
+  "workspaceKind": "worktree",
+  "workspaceAccess": "read_write"
 }
 ```
 
@@ -1017,9 +1017,32 @@ case-folded in `workspaceKey` while `cwd` remains the original display path.
 For worktree-backed sessions, `workspaceKey` resolves from the authoritative
 source workspace instead of the transient worktree path. API-backed and
 local-model sessions also include `providerBackend`. Session payloads now also
-carry additive `workspaceIsolation` metadata when the runtime is tracking a
-shared, isolated, or worktree-backed workspace surface. Branch-aware session
-payloads now also include a `branching` block:
+carry a canonical `workspace` block plus additive legacy `workspaceIsolation`
+metadata when the runtime is tracking a source, sandbox, or worktree-backed
+workspace surface. Branch-aware session payloads now also include a
+`branching` block:
+
+Example `workspace` shape:
+
+```json
+{
+  "workspace": {
+    "kind": "worktree",
+    "access": "read_write",
+    "runtimeCwd": "C:/Users/example/.cats-runtime/sessions/worktrees/repo-deadbeef/session-123/packages/app",
+    "sourceCwd": "C:/repo/packages/app",
+    "worktree": {
+      "id": "repo-session-123",
+      "sourceRepoRoot": "C:/repo",
+      "sourceHeadOid": "abc123",
+      "sourceHeadRef": "main",
+      "relativeCwd": "packages/app",
+      "worktreePath": "C:/Users/example/.cats-runtime/sessions/worktrees/repo-deadbeef/session-123",
+      "preparedAt": "2026-03-23T12:00:00.000Z"
+    }
+  }
+}
+```
 
 Example `workspaceIsolation` shape:
 
@@ -1159,8 +1182,12 @@ runtime-owned `hydration` block. This records how the runtime re-entered the
 workspace/skill context for the current target:
 
 - `workspace.runtimeCwd`: the actual cwd used for execution
-- `workspace.isolationMode`: the runtime-owned isolation mode (`shared`,
-  `isolated`, or `worktree`) used for the current session lifecycle
+- `workspace.kind`: the runtime-owned workspace surface (`source`, `sandbox`,
+  or `worktree`)
+- `workspace.access`: the agent/runtime access mode (`read_write` or
+  `read_only`)
+- `workspace.isolationMode`: legacy compatibility snapshot for callers still
+  consuming the older isolation terminology
 - `workspace.sourceCwd`: the authoritative source workspace when it differs
   from the runtime cwd
 - `workspace.sourceOfTruth`: whether the runtime should treat the source
@@ -1408,7 +1435,9 @@ as `lastRequest`.
     `{ "family": "work", "slug": "product-manager", "version": "2026.03" }`
 - `context`: structured invocation metadata such as task/workspace hints
 - `outputDir`: output hint for reports, documents, or generated artifacts
-- `workspaceIsolation`: one of `shared`, `isolated`, or `worktree`
+- `workspaceKind`: one of `source`, `sandbox`, or `worktree`
+- `workspaceAccess`: one of `read_write` or `read_only`
+- legacy compatibility fields `workspaceMode` and `workspaceIsolation`
 
 When `reusePolicy` is `prefer_existing` or `require_existing`, the runtime will
 try to attach to an existing session with the same provider target and
@@ -1416,12 +1445,24 @@ try to attach to an existing session with the same provider target and
 and `agent` sessions. Matching `cli` sessions still use the existing
 `/sessions/{id}/resume` flow.
 
-`workspaceIsolation: "worktree"` tells the runtime to execute in a Git
-worktree rooted under the runtime session base dir instead of using the source
-workspace path directly. This requires `cwd` to point at a Git-controlled
-workspace. The runtime persists both the transient worktree path and the
+Workspace defaults now resolve as:
+
+- no `cwd` and no explicit workspace override: `workspaceKind: "sandbox"` plus
+  `workspaceAccess: "read_write"`
+- `cwd` present and no explicit workspace override:
+  `workspaceKind: "source"` plus `workspaceAccess: "read_write"`
+- `workspaceKind: "worktree"` requires `cwd` to point at a Git-controlled
+  workspace
+
+`workspaceKind: "worktree"` tells the runtime to execute in a Git worktree
+rooted under the runtime session base dir instead of using the source workspace
+path directly. The runtime persists both the transient worktree path and the
 authoritative source workspace so later resume/reset/delete flows can recreate
 or clean up the same worktree deterministically.
+
+The older `workspaceMode` / `workspaceIsolation` pair is still accepted during
+the migration window, but new callers should prefer `workspaceKind` /
+`workspaceAccess`.
 
 `POST /sessions/{id}/messages` accepts optional `instructions`, `skills`,
 `context`, `outputDir`, and additive `routing` fields. These are persisted onto
@@ -1535,15 +1576,16 @@ Example cooldown response:
 
 - `mode`: `auto`, `native_fork`, or `context_transplant`
 - `provider` / `instance`: child provider target override
-- `model`, `cwd`, `workspaceMode`, `workspaceIsolation`, `permissionMode`, `allowedTools`
+- `model`, `cwd`, `workspaceKind`, `workspaceAccess`, `permissionMode`, `allowedTools`
 - `instructions`, `skills`, `context`, `outputDir`
 - `transplant`: curated handoff bundle for `context_transplant`
+- legacy compatibility fields `workspaceMode` and `workspaceIsolation`
 
 When the parent session is already worktree-backed, child forks default to
-`workspaceIsolation: "worktree"` unless the caller explicitly requests a
-different isolation mode such as `isolated`.
+`workspaceKind: "worktree"` unless the caller explicitly requests a different
+workspace kind such as `sandbox`.
 
-When a non-shared child fork copies a workspace snapshot, the runtime now also
+When a non-source child fork copies a workspace snapshot, the runtime now also
 records additive `hydration.metadata.workspaceSnapshot` facts such as
 `copiedFileCount`, `copiedByteCount`, `skippedGitMetadata`, `status`, and
 optional `warningCodes` (for example `large_file_count` or `large_byte_count`)

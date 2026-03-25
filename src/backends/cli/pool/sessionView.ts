@@ -193,7 +193,7 @@ export function toSessionView(
   options: SessionViewOptions = {},
 ): SessionView {
   const attached = options.attached === true;
-  const workspaceKeyPath = session.workspaceIsolation?.sourceCwd
+  const workspaceKeyPath = session.workspace?.sourceCwd
     ?? session.hydration?.workspace.sourceCwd
     ?? session.cwd;
   return {

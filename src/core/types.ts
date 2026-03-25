@@ -25,6 +25,8 @@ export type SessionControlMode = 'full' | 'resume_only' | 'observe_only';
 export type ProviderBackend = 'cli' | 'api' | 'local' | 'agent';
 export type SessionReusePolicy = 'create_new' | 'prefer_existing' | 'require_existing';
 
+export type WorkspaceKind = 'source' | 'sandbox' | 'worktree';
+export type WorkspaceAccess = 'read_write' | 'read_only';
 export type WorkspaceMode = 'isolated' | 'shared' | 'read_only';
 export type WorkspaceIsolationMode = 'shared' | 'isolated' | 'worktree';
 export type WorktreeCleanupPolicy = 'discard' | 'merge' | 'preserve';
@@ -653,6 +655,8 @@ export interface SessionBranchRequest {
   instance?: string;
   model?: string;
   cwd?: string;
+  workspaceKind?: WorkspaceKind;
+  workspaceAccess?: WorkspaceAccess;
   workspaceMode?: WorkspaceMode;
   workspaceIsolation?: WorkspaceIsolationMode;
   permissionMode?: PermissionMode;
@@ -767,6 +771,14 @@ export interface SessionWorktreeState {
   lastCleanup?: SessionWorktreeCleanupState;
 }
 
+export interface SessionWorkspaceState {
+  kind: WorkspaceKind;
+  access: WorkspaceAccess;
+  runtimeCwd: string;
+  sourceCwd?: string;
+  worktree?: SessionWorktreeState;
+}
+
 export interface SessionWorkspaceIsolationState {
   mode: WorkspaceIsolationMode;
   sourceCwd?: string;
@@ -784,7 +796,9 @@ export interface SessionWorkspaceHydrationSubstrateState {
 }
 
 export interface SessionWorkspaceHydrationState {
-  isolationMode: WorkspaceIsolationMode;
+  kind: WorkspaceKind;
+  access: WorkspaceAccess;
+  isolationMode?: WorkspaceIsolationMode;
   runtimeCwd: string;
   sourceCwd?: string;
   sourceOfTruth: SessionHydrationWorkspaceSource;
@@ -1203,8 +1217,10 @@ export interface RuntimeSessionMaintenanceRequest {
   action: RuntimeSessionMaintenanceAction;
   sessionId: string;
   requestedAt: string;
-  workspaceMode: WorkspaceMode;
-  isolationMode: WorkspaceIsolationMode;
+  workspaceKind: WorkspaceKind;
+  workspaceAccess: WorkspaceAccess;
+  workspaceMode?: WorkspaceMode;
+  isolationMode?: WorkspaceIsolationMode;
   runtimeCwd: string;
   sourceCwd?: string;
   worktreePath?: string;
@@ -1381,6 +1397,7 @@ export interface SessionInfo {
   status: SessionStatus;
   origin: SessionOrigin;
   cwd: string;
+  workspace: SessionWorkspaceState;
   workspaceMode?: WorkspaceMode;
   workspaceIsolation?: SessionWorkspaceIsolationState;
   permissionMode?: PermissionMode;
@@ -1429,6 +1446,8 @@ export type PermissionMode = 'skip' | 'whitelist' | 'default';
 
 export interface ProviderSpawnOptions {
   cwd: string;
+  workspaceKind?: WorkspaceKind;
+  workspaceAccess?: WorkspaceAccess;
   workspaceMode?: WorkspaceMode;
   model?: string;
   resumeSessionId?: string;

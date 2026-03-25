@@ -1,6 +1,34 @@
 import { spawn } from 'node:child_process';
 
 const DEFAULT_TIMEOUT_MS = 15_000;
+const WINDOWS_SHELL_BUILTINS = new Set([
+  'assoc',
+  'break',
+  'call',
+  'cd',
+  'chdir',
+  'cls',
+  'copy',
+  'date',
+  'del',
+  'dir',
+  'echo',
+  'erase',
+  'md',
+  'mkdir',
+  'mklink',
+  'move',
+  'path',
+  'rd',
+  'ren',
+  'rename',
+  'rmdir',
+  'set',
+  'time',
+  'type',
+  'ver',
+  'vol',
+]);
 
 // ---------------------------------------------------------------------------
 // CLI command result
@@ -29,6 +57,7 @@ export async function runCliCommand(
 ): Promise<CliCommandResult> {
   const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const start = Date.now();
+  const useShell = shouldUseShell(command);
 
   return new Promise<CliCommandResult>((resolve) => {
     let stdout = '';
@@ -40,7 +69,7 @@ export async function runCliCommand(
       cwd: options?.cwd,
       env: options?.env ? { ...process.env, ...options.env } : undefined,
       stdio: ['ignore', 'pipe', 'pipe'],
-      shell: process.platform === 'win32',
+      shell: useShell,
     });
 
     const timer = setTimeout(() => {
@@ -72,6 +101,14 @@ export async function runCliCommand(
     child.on('close', (code) => settle(code));
     child.on('error', () => settle(null));
   });
+}
+
+function shouldUseShell(command: string): boolean {
+  if (process.platform !== 'win32') {
+    return false;
+  }
+
+  return WINDOWS_SHELL_BUILTINS.has(command.trim().toLowerCase());
 }
 
 // ---------------------------------------------------------------------------

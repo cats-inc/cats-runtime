@@ -33,6 +33,8 @@ const SESSION_STATUSES: SessionStatus[] = [
   'closed',
   'closing',
 ];
+const WORKSPACE_KINDS = ['source', 'sandbox', 'worktree'] as const;
+const WORKSPACE_ACCESS_MODES = ['read_write', 'read_only'] as const;
 const WORKSPACE_MODES = ['isolated', 'shared', 'read_only'] as const;
 const WORKSPACE_ISOLATION_MODES = ['shared', 'isolated', 'worktree'] as const;
 const WORKTREE_CLEANUP_POLICIES = ['discard', 'merge', 'preserve'] as const;
@@ -1391,6 +1393,8 @@ const TOOL_HANDLERS: McpToolHandler[] = [
           cwd: { type: 'string' },
           model: { type: 'string' },
           group: { type: 'string' },
+          workspaceKind: { type: 'string', enum: WORKSPACE_KINDS },
+          workspaceAccess: { type: 'string', enum: WORKSPACE_ACCESS_MODES },
           workspaceMode: { type: 'string', enum: WORKSPACE_MODES },
           workspaceIsolation: { type: 'string', enum: WORKSPACE_ISOLATION_MODES },
           permissionMode: { type: 'string', enum: PERMISSION_MODES },
@@ -1514,6 +1518,8 @@ const TOOL_HANDLERS: McpToolHandler[] = [
           instance: { type: 'string' },
           model: { type: 'string' },
           cwd: { type: 'string' },
+          workspaceKind: { type: 'string', enum: WORKSPACE_KINDS },
+          workspaceAccess: { type: 'string', enum: WORKSPACE_ACCESS_MODES },
           workspaceMode: { type: 'string', enum: WORKSPACE_MODES },
           workspaceIsolation: { type: 'string', enum: WORKSPACE_ISOLATION_MODES },
           permissionMode: { type: 'string', enum: PERMISSION_MODES },

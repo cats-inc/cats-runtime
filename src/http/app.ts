@@ -17,7 +17,7 @@ import type { AuggieSessionService } from '../backends/cli/auggie/AuggieSessionS
 import type { GooseNativeSessionService } from '../backends/cli/goose/GooseNativeSessionService.js';
 import type { OpencodeNativeSessionService } from '../backends/cli/opencode/OpencodeNativeSessionService.js';
 import type { WslDiscoveryStatusStore } from '../backends/cli/discovery/wslDiscovery.js';
-import type { ProviderModelCatalogService } from '../core/models/providerModelCatalog.js';
+import { ProviderModelCatalogService } from '../core/models/providerModelCatalog.js';
 import { ProviderCompatibilityService } from '../core/compatibility/ProviderCompatibilityService.js';
 import { RuntimeDeliveryService } from '../core/runtime/RuntimeDeliveryService.js';
 import { RuntimeManagementService } from '../core/management/RuntimeManagementService.js';
@@ -220,6 +220,9 @@ export function createRuntimeApp(ctx: AppContext) {
   ctx.metering ??= new RuntimeMeteringService(ctx.config.metering);
   ctx.compatibility = getProviderCompatibilityService(ctx);
   ctx.browser = getRuntimeBrowserService(ctx);
+  ctx.providerModelCatalog ??= new ProviderModelCatalogService(ctx.config, {
+    ...(ctx.agentBackend ? { agentBackend: ctx.agentBackend } : {}),
+  });
   const app = new Hono<{ Variables: { ctx: AppContext } }>();
   const __dirname = dirname(fileURLToPath(import.meta.url));
 
