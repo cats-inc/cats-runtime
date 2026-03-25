@@ -59,7 +59,7 @@
   - provider-setup uses raw `fetch` calls with page-local error handling
 - There is no shared lightweight build substrate today; `src/http/app.ts` serves handwritten static HTML files directly from `public/`.
 - `BootstrapService` already persists both `provider-scan.json` and `provider-manual-scan.json`, but the UI layer does not expose one shared runtime-owned read model over those snapshots.
-- `GET /providers/setup/state` returns only a summary of the latest scan, so `public/provider-setup.html` currently re-triggers `POST /providers/setup/scan` on load to obtain full scan data instead of reusing persisted scan snapshots.
+- `GET /setup-state` returns only a summary of the latest scan, so `public/provider-setup.html` currently re-triggers `POST /setup-scan` on load to obtain full scan data instead of reusing persisted scan snapshots.
 - Dashboard currently lacks the secondary manual scan and repair entry called out by `SPEC-017`.
 - There is no runtime-owned repair affordance after bootstrap other than editing config or re-entering setup manually.
 
@@ -80,11 +80,11 @@
   - prefer self-contained emitted HTML in the first slice so the runtime can keep serving static artifacts without needing a broad new static asset router
   - allow a narrowly scoped emitted asset directory only if bundle size or maintainability makes inline output too costly
 - Use the existing setup surface as the canonical read seam rather than inventing a second runtime bootstrap API.
-  - recommended first slice: evolve `GET /providers/setup/state` into the shared runtime-owned read model for setup state, latest auto-scan snapshot, latest manual-scan snapshot, and operator-facing action metadata
+  - recommended first slice: evolve `GET /setup-state` into the shared runtime-owned read model for setup state, latest auto-scan snapshot, latest manual-scan snapshot, and operator-facing action metadata
   - the provider-setup page and dashboard should consume the same shape
 - Dashboard manual scan and repair first-slice recommendation:
   - add a dashboard repair card or secondary operator panel
-  - trigger `POST /providers/setup/scan` with `{"manual": true}` directly from the dashboard
+  - trigger `POST /setup-scan` with `{"manual": true}` directly from the dashboard
   - render the resulting shared snapshot inline on the dashboard
   - do not rely on deep-linking alone for the first slice, because the current provider-setup surface is bootstrap-rooted and a deep-link by itself does not close the post-bootstrap `manual_only` repair gap
   - a richer always-available provider-setup page route can remain an additive follow-up decision if the inline dashboard repair surface proves insufficient
@@ -96,7 +96,7 @@
 - [ ] Define the shared CSS/theme token contract for dashboard, playground, and provider-setup.
 - [ ] Define the shared runtime fetch/error helper contract for same-origin runtime APIs and optional bearer token use.
 - [ ] Define the shared provider badge and provider-status rendering helpers.
-- [ ] Define the shared bootstrap scan snapshot read model, centered on `GET /providers/setup/state`.
+- [ ] Define the shared bootstrap scan snapshot read model, centered on `GET /setup-state`.
 - [ ] Define the runtime-owned UI source layout separately from emitted `public/*.html` artifacts.
 - [ ] Keep bootstrap logic in runtime-owned services and thin HTTP/UI adapters only.
 
@@ -105,7 +105,7 @@ Deliverables:
 - A shared CSS/theme contract for runtime-owned pages
 - A shared JS helper contract for runtime API access and error normalization
 - A shared provider badge/provider-status rendering contract
-- A canonical setup read-model contract centered on `GET /providers/setup/state`
+- A canonical setup read-model contract centered on `GET /setup-state`
 - Clear page-entry ownership boundaries for dashboard, playground, and provider-setup
 
 ### Phase 2: Lightweight Static Build Substrate
@@ -131,7 +131,7 @@ Deliverables:
 - [ ] Replace page-local badge/status rendering with shared provider-status helpers.
 - [ ] Stop forcing an auto-scan just to render existing scan results.
 - [ ] Render persisted auto-scan and manual-scan snapshots from the shared setup read model.
-- [ ] Keep bootstrap-mode availability and `POST /providers/setup/apply` behavior unchanged.
+- [ ] Keep bootstrap-mode availability and `POST /setup-apply` behavior unchanged.
 
 Deliverables:
 
@@ -153,7 +153,7 @@ Deliverables:
 
 - Dashboard usage of the shared CSS/theme layer
 - Dashboard usage of shared provider badge/status helpers where applicable
-- Dashboard manual scan entry that calls `POST /providers/setup/scan` with `manual: true`
+- Dashboard manual scan entry that calls `POST /setup-scan` with `manual: true`
 - Dashboard repair snapshot panel based on the shared setup read model
 - A clear dashboard CTA for repair follow-through without requiring manual YAML edits
 
@@ -218,9 +218,9 @@ Deliverables:
   - `GET /`
   - `GET /dashboard`
   - `GET /playground`
-  - `GET /providers/setup/state`
-  - `POST /providers/setup/scan`
-  - `POST /providers/setup/apply`
+  - `GET /setup-state`
+  - `POST /setup-scan`
+  - `POST /setup-apply`
 - Root behavior must remain mode-sensitive:
   - bootstrap mode serves provider-setup at `/`
   - non-bootstrap mode serves dashboard at `/`
@@ -237,10 +237,10 @@ Deliverables:
   - verify `GET /dashboard` remains accessible in bootstrap mode
   - verify `GET /playground` remains accessible and unchanged in bootstrap mode
 - Provider-setup flow coverage:
-  - verify `GET /providers/setup/state` exposes the shared snapshot fields needed for UI rendering
+  - verify `GET /setup-state` exposes the shared snapshot fields needed for UI rendering
   - verify persisted auto-scan and manual-scan snapshots can be rendered without forcing a new scan
-  - verify `POST /providers/setup/scan` still supports explicit manual scans
-  - verify `POST /providers/setup/apply` still writes config and exits bootstrap mode only when reload succeeds
+  - verify `POST /setup-scan` still supports explicit manual scans
+  - verify `POST /setup-apply` still writes config and exits bootstrap mode only when reload succeeds
 - Dashboard repair coverage:
   - verify the dashboard exposes a secondary manual scan and repair affordance
   - verify the dashboard manual scan action triggers the intended request path
@@ -281,7 +281,7 @@ Deliverables:
   - Recommendation: direct dashboard manual scan trigger plus inline shared repair snapshot.
   - Gate: decide later whether to also add an always-available provider-setup page route for richer repair workflows.
 - Shared scan snapshot seam:
-  - Recommendation: evolve `GET /providers/setup/state` into the shared read model consumed by provider-setup and dashboard.
+  - Recommendation: evolve `GET /setup-state` into the shared read model consumed by provider-setup and dashboard.
   - Gate: if that route becomes too broad, extract an internal read-model service first before inventing a second public endpoint.
 - Static artifact emission strategy:
   - Recommendation: self-contained emitted HTML first.

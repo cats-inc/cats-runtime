@@ -234,6 +234,7 @@ The runtime enters bootstrap mode when:
 In bootstrap mode:
 
 - `GET /` serves the provider setup page instead of the dashboard
+- `GET /setup` always serves the provider setup page regardless of mode
 - `GET /dashboard` always serves the dashboard regardless of mode
 - `GET /playground` remains available
 - Session, message, and execution routes return `409 Conflict`
@@ -241,12 +242,12 @@ In bootstrap mode:
 ### Provider Setup
 
 ```text
-GET  /providers/setup/state
-POST /providers/setup/scan
-POST /providers/setup/apply
+GET  /setup-state
+POST /setup-scan
+POST /setup-apply
 ```
 
-`GET /providers/setup/state` returns the current setup state, latest scan
+`GET /setup-state` returns the current setup state, latest scan
 snapshot, provider universe (known provider families), and latest manual scan
 snapshot. Response shape:
 
@@ -262,16 +263,16 @@ Both `scan.providers` and `manualScan` expose the full persisted scan data so
 that UI consumers (dashboard, provider-setup) can render provider status without
 forcing a fresh scan on page load.
 
-`/providers/setup/*` API routes go through global bearer auth.  When
+`/setup-*` API routes go through global bearer auth.  When
 `CATS_RUNTIME_API_KEY` is set, callers must provide a valid token even during
-bootstrap.  The provider-setup page includes an API key input and persists the
-key in `localStorage` (shared with the dashboard).
+bootstrap.  The dashboard, playground, and provider-setup page each expose
+their own API key input and do not persist the key across pages.
 
-`POST /providers/setup/scan` triggers a provider scan. Pass `{"manual": true}`
+`POST /setup-scan` triggers a provider scan. Pass `{"manual": true}`
 in the body for an explicit manual scan. Returns scan results with per-provider
 readiness, version, auth status, and remediation hints.
 
-`POST /providers/setup/apply` accepts `{"providers": ["claude", "codex", ...]}`
+`POST /setup-apply` accepts `{"providers": ["claude", "codex", ...]}`
 and writes a minimal `providers.yaml` with only the selected providers. On
 success the runtime exits bootstrap mode in-process and session routes become
 available. If config reload fails after writing the file, the route returns

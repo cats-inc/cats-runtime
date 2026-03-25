@@ -208,7 +208,7 @@ async function fetchState() {
   if (!validateApiKeyInput(document.getElementById('apiKeyInput').value)) return;
   try {
     const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
-    const res = await fetchFn('/providers/setup/state');
+    const res = await fetchFn('/setup-state');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     updateStatusBar(data);
@@ -307,7 +307,7 @@ async function runScan(manual) {
 
   try {
     const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
-    const res = await fetchFn('/providers/setup/scan', {
+    const res = await fetchFn('/setup-scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ manual }),
@@ -339,7 +339,7 @@ async function applyConfig() {
 
   try {
     const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
-    const res = await fetchFn('/providers/setup/apply', {
+    const res = await fetchFn('/setup-apply', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ providers }),
@@ -355,7 +355,7 @@ async function applyConfig() {
         true
       );
       // Refresh status
-      const stateRes = await fetchFn('/providers/setup/state');
+      const stateRes = await fetchFn('/setup-state');
       if (!stateRes.ok) throw new Error(`HTTP ${stateRes.status}`);
       const stateData = await stateRes.json();
       updateStatusBar(stateData);

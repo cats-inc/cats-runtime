@@ -3,7 +3,7 @@ import type { AppContext } from '../app.js';
 
 export const setupRoutes = new Hono();
 
-setupRoutes.get('/providers/setup/state', async (c) => {
+setupRoutes.get('/setup-state', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   if (!ctx.bootstrapService) {
     return c.json({ error: 'Bootstrap service is not available' }, 503);
@@ -13,7 +13,7 @@ setupRoutes.get('/providers/setup/state', async (c) => {
   const latestScan = await ctx.bootstrapService.getLatestScan();
   const latestManualScan = await ctx.bootstrapService.getLatestManualScan();
 
-  // Full provider detail is always included.  The /providers/setup/* routes
+  // Full provider detail is always included.  The /setup-* routes
   // go through the global bearerAuth middleware (the path check in the
   // logger middleware only skips request logging, not auth), so callers
   // must already be authenticated when an API key is configured.
@@ -38,7 +38,7 @@ setupRoutes.get('/providers/setup/state', async (c) => {
   });
 });
 
-setupRoutes.post('/providers/setup/scan', async (c) => {
+setupRoutes.post('/setup-scan', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   if (!ctx.bootstrapService) {
     return c.json({ error: 'Bootstrap service is not available' }, 503);
@@ -57,7 +57,7 @@ setupRoutes.post('/providers/setup/scan', async (c) => {
   });
 });
 
-setupRoutes.post('/providers/setup/apply', async (c) => {
+setupRoutes.post('/setup-apply', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   if (!ctx.bootstrapService) {
     return c.json({ error: 'Bootstrap service is not available' }, 503);

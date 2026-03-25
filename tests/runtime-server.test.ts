@@ -222,12 +222,12 @@ describe('runtime server', () => {
     });
   });
 
-  it('GET /providers/setup serves the embedded provider setup page without auth', async () => {
+  it('GET /setup serves the embedded provider setup page without auth', async () => {
     await withRuntime(
       { apiKey: 'runtime-secret' },
       { startup: createRuntimeStartupState({ bootstrapRequired: false }) },
       async (runtime) => {
-        const response = await runtime.app.request('/providers/setup');
+        const response = await runtime.app.request('/setup');
         expect(response.status).toBe(200);
         const html = await response.text();
         expect(html).toContain('Provider Setup');
@@ -239,8 +239,8 @@ describe('runtime server', () => {
         expect(html).toContain('escapeHtml(r.summary)');
         expect(html).toContain('escapeHtml(p.commandPath)');
         expect(html).not.toContain('localStorage');
-        expect(html).toContain("await fetchFn('/providers/setup/scan'");
-        expect(html).toContain("await fetchFn('/providers/setup/apply'");
+        expect(html).toContain("await fetchFn('/setup-scan'");
+        expect(html).toContain("await fetchFn('/setup-apply'");
       },
     );
   });

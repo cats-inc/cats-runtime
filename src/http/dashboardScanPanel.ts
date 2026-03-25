@@ -171,7 +171,7 @@ const SCAN_PANEL_SCRIPT = `
   // --- Load persisted scan state ---
   function loadScanState() {
     var fetchFn = CUI.apiFetch || fetch;
-    fetchFn('/providers/setup/state').then(function(res) {
+    fetchFn('/setup-state').then(function(res) {
       if (!res.ok) throw new Error('HTTP ' + res.status);
       return res.json();
     }).then(function(data) {
@@ -197,7 +197,7 @@ const SCAN_PANEL_SCRIPT = `
     resultsEl.innerHTML = '<div class="scan-panel-empty">Scanning providers...</div>';
 
     var fetchFn = CUI.apiFetch || fetch;
-    fetchFn('/providers/setup/scan', {
+    fetchFn('/setup-scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ manual: true }),

@@ -18,8 +18,8 @@ describe('injectDashboardScanPanel', () => {
   it('injects scan panel JS before </body>', () => {
     const result = injectDashboardScanPanel(MINIMAL_HTML);
     expect(result).toContain('scanPanelManualBtn');
-    expect(result).toContain('/providers/setup/scan');
-    expect(result).toContain('/providers/setup/state');
+    expect(result).toContain('/setup-scan');
+    expect(result).toContain('/setup-state');
 
     const jsIndex = result.indexOf('scanPanelManualBtn');
     const bodyClose = result.indexOf('</body>');

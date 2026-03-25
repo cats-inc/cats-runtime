@@ -240,7 +240,7 @@ export function createRuntimeApp(ctx: AppContext) {
   });
 
   // Provider setup page — always accessible regardless of bootstrap mode.
-  app.get('/providers/setup', (c) => {
+  app.get('/setup', (c) => {
     const htmlPath = resolve(__dirname, '../../public/provider-setup.html');
     const html = injectSharedUI(readFileSync(htmlPath, 'utf-8'));
     return c.html(html);
@@ -267,7 +267,10 @@ export function createRuntimeApp(ctx: AppContext) {
       || path === '/pool/status'
       || path === '/discovery/status'
       || path === '/providers/config'
-      || path.startsWith('/providers/setup')
+      || path === '/setup'
+      || path === '/setup-state'
+      || path === '/setup-scan'
+      || path === '/setup-apply'
     ) {
       return await next();
     }

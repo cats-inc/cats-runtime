@@ -316,7 +316,7 @@ describe('bootstrap mode server', () => {
     }
   });
 
-  it('GET /providers/setup/state returns bootstrap state', async () => {
+  it('GET /setup-state returns bootstrap state', async () => {
     const { root, cleanup } = createTestRoot();
     try {
       const env = createTestEnv(root);
@@ -325,7 +325,7 @@ describe('bootstrap mode server', () => {
       const startup = createRuntimeStartupState({ bootstrapRequired: true });
       const runtime = createRuntimeServer(config, { startup });
       try {
-        const response = await runtime.app.request('/providers/setup/state');
+        const response = await runtime.app.request('/setup-state');
         expect(response.status).toBe(200);
         const body = await response.json() as Record<string, unknown>;
         expect(body.bootstrapRequired).toBe(true);
@@ -349,11 +349,11 @@ describe('bootstrap mode server', () => {
       const runtime = createRuntimeServer(config, { startup });
       try {
         // Unauthenticated — should get 401 even in bootstrap mode
-        const unauthRes = await runtime.app.request('/providers/setup/state');
+        const unauthRes = await runtime.app.request('/setup-state');
         expect(unauthRes.status).toBe(401);
 
         // Authenticated — should get 200
-        const authRes = await runtime.app.request('/providers/setup/state', {
+        const authRes = await runtime.app.request('/setup-state', {
           headers: { 'Authorization': 'Bearer test-secret' },
         });
         expect(authRes.status).toBe(200);
@@ -361,7 +361,7 @@ describe('bootstrap mode server', () => {
         expect(body.bootstrapRequired).toBe(true);
 
         // Setup page HTML is served before auth middleware, so it's always accessible
-        const pageRes = await runtime.app.request('/providers/setup');
+        const pageRes = await runtime.app.request('/setup');
         expect(pageRes.status).toBe(200);
         const html = await pageRes.text();
         expect(html).toContain('apiKeyInput');
@@ -430,7 +430,7 @@ describe('bootstrap mode server', () => {
     }
   });
 
-  it('POST /providers/setup/apply writes config and exits bootstrap mode', async () => {
+  it('POST /setup-apply writes config and exits bootstrap mode', async () => {
     const { root, cleanup } = createTestRoot();
     try {
       const env = createTestEnv(root);
@@ -442,7 +442,7 @@ describe('bootstrap mode server', () => {
       const runtime = createRuntimeServer(config, { startup });
       try {
         // Apply with claude selected
-        const response = await runtime.app.request('/providers/setup/apply', {
+        const response = await runtime.app.request('/setup-apply', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ providers: ['claude'] }),
@@ -480,7 +480,7 @@ describe('bootstrap mode server', () => {
     }
   });
 
-  it('POST /providers/setup/apply stays in bootstrap mode when config reload fails', async () => {
+  it('POST /setup-apply stays in bootstrap mode when config reload fails', async () => {
     const { root, cleanup } = createTestRoot();
     try {
       const env = createTestEnv(root);
@@ -523,7 +523,7 @@ describe('bootstrap mode server', () => {
           return { configPath };
         };
 
-        const response = await runtime.app.request('/providers/setup/apply', {
+        const response = await runtime.app.request('/setup-apply', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ providers: ['claude'] }),
@@ -565,7 +565,7 @@ describe('bootstrap mode server', () => {
     }
   });
 
-  it('GET /providers/setup/state includes full scan.providers after a scan', { timeout: 60_000 }, async () => {
+  it('GET /setup-state includes full scan.providers after a scan', { timeout: 60_000 }, async () => {
     const { root, cleanup } = createTestRoot();
     try {
       const env = createTestEnv(root);
@@ -575,14 +575,14 @@ describe('bootstrap mode server', () => {
       const runtime = createRuntimeServer(config, { startup });
       try {
         // Run a scan first
-        await runtime.app.request('/providers/setup/scan', {
+        await runtime.app.request('/setup-scan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ manual: false }),
         });
 
         // Now check state
-        const response = await runtime.app.request('/providers/setup/state');
+        const response = await runtime.app.request('/setup-state');
         expect(response.status).toBe(200);
         const body = await response.json() as Record<string, unknown>;
         const scan = body.scan as Record<string, unknown>;
@@ -600,7 +600,7 @@ describe('bootstrap mode server', () => {
     }
   });
 
-  it('GET /providers/setup/state includes manualScan after manual scan', { timeout: 60_000 }, async () => {
+  it('GET /setup-state includes manualScan after manual scan', { timeout: 60_000 }, async () => {
     const { root, cleanup } = createTestRoot();
     try {
       const env = createTestEnv(root);
@@ -610,13 +610,13 @@ describe('bootstrap mode server', () => {
       const runtime = createRuntimeServer(config, { startup });
       try {
         // Run a manual scan
-        await runtime.app.request('/providers/setup/scan', {
+        await runtime.app.request('/setup-scan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ manual: true }),
         });
 
-        const response = await runtime.app.request('/providers/setup/state');
+        const response = await runtime.app.request('/setup-state');
         expect(response.status).toBe(200);
         const body = await response.json() as Record<string, unknown>;
         const manualScan = body.manualScan as Record<string, unknown>;
@@ -631,7 +631,7 @@ describe('bootstrap mode server', () => {
     }
   });
 
-  it('GET /providers/setup/state returns manualScan null when no manual scan run', async () => {
+  it('GET /setup-state returns manualScan null when no manual scan run', async () => {
     const { root, cleanup } = createTestRoot();
     try {
       const env = createTestEnv(root);
@@ -640,7 +640,7 @@ describe('bootstrap mode server', () => {
       const startup = createRuntimeStartupState({ bootstrapRequired: true });
       const runtime = createRuntimeServer(config, { startup });
       try {
-        const response = await runtime.app.request('/providers/setup/state');
+        const response = await runtime.app.request('/setup-state');
         expect(response.status).toBe(200);
         const body = await response.json() as Record<string, unknown>;
         expect(body.manualScan).toBeNull();
@@ -652,7 +652,7 @@ describe('bootstrap mode server', () => {
     }
   });
 
-  it('GET /providers/setup/state includes full detail in non-bootstrap mode after a scan', { timeout: 60_000 }, async () => {
+  it('GET /setup-state includes full detail in non-bootstrap mode after a scan', { timeout: 60_000 }, async () => {
     const { root, cleanup } = createTestRoot();
     try {
       const env = createTestEnv(root);
@@ -663,7 +663,7 @@ describe('bootstrap mode server', () => {
       const runtime = createRuntimeServer(config, { startup });
       try {
         // Run a scan while still in bootstrap
-        await runtime.app.request('/providers/setup/scan', {
+        await runtime.app.request('/setup-scan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ manual: true }),
@@ -674,7 +674,7 @@ describe('bootstrap mode server', () => {
 
         // GET state in non-bootstrap — full detail should still be present
         // because setup routes go through bearer auth like any other route
-        const response = await runtime.app.request('/providers/setup/state');
+        const response = await runtime.app.request('/setup-state');
         expect(response.status).toBe(200);
         const body = await response.json() as Record<string, unknown>;
         expect(body.bootstrapRequired).toBe(false);
