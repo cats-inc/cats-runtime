@@ -107,6 +107,9 @@ machine-readable, and vendor-replaceable.
     - runtime requests may carry caller-asserted approval metadata
     - the runtime may validate that required authorization metadata is present,
       but it shall not become the owner of higher-level approval policy
+    - `cats-runtime` executes the requested management action, reports
+      capability gaps and blocked states, and does not infer whether a
+      workspace must use GitHub or a specific deployment host
 14. Management results shall return machine-readable state using the same
     readiness vocabulary already familiar in runtime delivery flows:
     - `ready`
@@ -148,10 +151,6 @@ machine-readable, and vendor-replaceable.
     - the contract should describe polling or resumable operation semantics
     - webhook-only assumptions shall remain out of scope unless the runtime
       explicitly adopts them later
-24. Product governance remains outside runtime. `cats-runtime` executes the
-    requested management action, reports capability gaps and blocked states, and
-    does not infer whether a workspace must use GitHub or a specific deployment
-    host.
 
 ### Non-Functional Requirements
 
@@ -254,6 +253,9 @@ Exact field names may evolve. The architectural point is:
   second shell-command layer
 - approval metadata stays product-neutral even when the runtime needs
   authorization context for mutating operations
+- `actorClass: 'service'` is intended for non-human callers such as
+  automation pipelines, host-managed background workers, or other runtime
+  supervisors acting without a user-shaped operator role
 
 ## Dependencies
 

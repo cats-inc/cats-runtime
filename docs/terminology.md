@@ -21,6 +21,7 @@
 |------|---------|
 | Session Provider | A turn-oriented execution backend such as a CLI, API, local-model, or agent runtime that owns session lifecycle, message execution, and often `resume` / `fork` semantics. |
 | Control-Plane Adapter | A runtime-owned adapter for non-session operational systems such as forge, deployment, review, or release tooling. It exposes machine-readable actions without pretending to be a conversational runtime. |
+| Service Caller | A non-human caller classification for automation pipelines, host-managed background workers, MCP-connected supervisors, or similar system-to-system runtime invocations. |
 
 ## Template Architecture
 

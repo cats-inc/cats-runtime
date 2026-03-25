@@ -78,6 +78,13 @@ This decision includes:
    management actions and reports blocked or degraded states; it does not infer
    whether GitHub, Zeabur, or any other control-plane vendor is required for a
    given workspace.
+9. Authorization inputs for management actions must remain product-neutral.
+   - the runtime may accept generic caller classification or opaque approval
+     references
+   - the runtime should not require product-specific persona or role names in
+     its public contract
+   - higher-level approval policy remains product-owned even when runtime
+     mutations require authorization metadata
 
 ## Consequences
 
