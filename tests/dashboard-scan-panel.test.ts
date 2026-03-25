@@ -7,7 +7,7 @@ describe('injectDashboardScanPanel', () => {
   it('injects scan panel CSS before </head>', () => {
     const result = injectDashboardScanPanel(MINIMAL_HTML);
     expect(result).toContain('data-cats-scan-panel');
-    expect(result).toContain('.scan-panel-toggle');
+    expect(result).toContain('.scan-panel-btn');
     expect(result).toContain('.scan-panel-drawer');
 
     const cssIndex = result.indexOf('data-cats-scan-panel');

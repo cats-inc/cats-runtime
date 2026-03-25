@@ -25,3 +25,8 @@ export type {
   WorkspaceMode,
   WorktreeCleanupPolicy,
 } from '../../../core/types.js';
+
+export type {
+  ProviderModelResolution,
+  ProviderModelSelection,
+} from '../../../core/models/providerSelectionResolution.js';

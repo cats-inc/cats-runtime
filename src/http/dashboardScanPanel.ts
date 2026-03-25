@@ -10,20 +10,25 @@ const SCAN_PANEL_MARKER = 'data-cats-scan-panel';
 
 const SCAN_PANEL_CSS = `
 <style ${SCAN_PANEL_MARKER}>
-.scan-panel-toggle {
-  background: transparent;
+.scan-panel-btn {
+  background: var(--surface2, #242836);
   border: 1px solid var(--border, #2e3345);
-  color: var(--text2, #8b90a0);
-  padding: 4px 10px;
+  color: var(--text, #e1e4ed);
+  padding: 6px 12px;
   border-radius: var(--radius, 8px);
   cursor: pointer;
   font-size: 12px;
   font-weight: 500;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
 }
-.scan-panel-toggle:hover {
-  background: var(--surface2, #242836);
-  color: var(--text, #e1e4ed);
+.scan-panel-btn:hover {
+  background: var(--accent-dim, #4a62b3);
+  border-color: var(--accent, #6c8cff);
+}
+.scan-panel-btn.active {
+  background: var(--accent-dim, #4a62b3);
+  border-color: var(--accent, #6c8cff);
 }
 .scan-panel-drawer {
   display: none;
@@ -31,19 +36,24 @@ const SCAN_PANEL_CSS = `
   border-bottom: 1px solid var(--border, #2e3345);
   padding: 12px 20px;
   font-size: 13px;
-  max-height: 360px;
+  max-height: 400px;
   overflow-y: auto;
 }
 .scan-panel-drawer.open { display: block; }
-.scan-panel-drawer h3 {
+.scan-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.scan-panel-header h3 {
   font-size: 14px;
   font-weight: 600;
-  margin-bottom: 8px;
+  margin: 0;
 }
 .scan-panel-actions {
   display: flex;
   gap: 8px;
-  margin-bottom: 10px;
 }
 .scan-panel-actions button {
   padding: 5px 12px;
@@ -53,12 +63,18 @@ const SCAN_PANEL_CSS = `
   font-size: 12px;
   font-weight: 500;
 }
-.scan-panel-actions .scan-btn-manual {
+.scan-btn-manual {
   background: var(--accent, #6c8cff);
   color: #fff;
 }
-.scan-panel-actions .scan-btn-manual:hover { background: var(--accent-dim, #4a62b3); }
-.scan-panel-actions .scan-btn-manual:disabled { opacity: 0.5; cursor: not-allowed; }
+.scan-btn-manual:hover { background: var(--accent-dim, #4a62b3); }
+.scan-btn-manual:disabled { opacity: 0.5; cursor: not-allowed; }
+.scan-btn-close {
+  background: transparent;
+  color: var(--text2, #8b90a0);
+  border: 1px solid var(--border, #2e3345) !important;
+}
+.scan-btn-close:hover { background: var(--surface2, #242836); color: var(--text, #e1e4ed); }
 .scan-panel-provider {
   display: flex;
   align-items: center;
@@ -107,35 +123,49 @@ const SCAN_PANEL_SCRIPT = `
   var header = document.querySelector('header');
   if (!header) return;
 
-  // Toggle button in header
-  var toggle = document.createElement('button');
-  toggle.className = 'scan-panel-toggle';
-  toggle.textContent = 'Provider Scan';
-  toggle.title = 'Open provider scan & repair panel';
+  // "Scan Providers" button in header — visible and prominent
+  var scanBtn = document.createElement('button');
+  scanBtn.className = 'scan-panel-btn';
+  scanBtn.textContent = '\\u21bb Scan Providers';
+  scanBtn.title = 'Open provider scan & repair panel';
 
-  // Insert before the api-key group if present, else append
-  var apiKeyGroup = header.querySelector('.api-key-group');
-  if (apiKeyGroup) {
-    header.insertBefore(toggle, apiKeyGroup);
+  // Insert into the nav link group if present, else before api-key group
+  var navGroup = header.querySelector('[style*="margin-left:auto"]');
+  if (navGroup) {
+    navGroup.insertBefore(scanBtn, navGroup.firstChild);
   } else {
-    header.appendChild(toggle);
+    var apiKeyGroup = header.querySelector('.api-key-group');
+    if (apiKeyGroup) {
+      header.insertBefore(scanBtn, apiKeyGroup);
+    } else {
+      header.appendChild(scanBtn);
+    }
   }
 
-  // Drawer
+  // Drawer below header
   var drawer = document.createElement('div');
   drawer.className = 'scan-panel-drawer';
-  drawer.innerHTML = '<h3>Provider Scan & Repair</h3>'
+  drawer.innerHTML = '<div class="scan-panel-header">'
+    + '<h3>Provider Scan & Repair</h3>'
     + '<div class="scan-panel-actions">'
-    + '<button class="scan-btn-manual" id="scanPanelManualBtn">Run Manual Scan</button>'
+    + '<button class="scan-btn-manual" id="scanPanelManualBtn">\\u21bb Run Manual Scan</button>'
+    + '<button class="scan-btn-close" id="scanPanelCloseBtn">Close</button>'
     + '</div>'
-    + '<div id="scanPanelResults" class="scan-panel-empty">Click "Run Manual Scan" to check provider availability.</div>'
+    + '</div>'
+    + '<div id="scanPanelResults" class="scan-panel-empty">No scan results yet. Click "Run Manual Scan" to check provider availability.</div>'
     + '<div id="scanPanelMeta" class="scan-panel-meta"></div>';
   header.parentNode.insertBefore(drawer, header.nextSibling);
 
   // --- Toggle ---
-  toggle.addEventListener('click', function() {
+  scanBtn.addEventListener('click', function() {
     var isOpen = drawer.classList.toggle('open');
+    scanBtn.classList.toggle('active', isOpen);
     if (isOpen) loadScanState();
+  });
+
+  document.getElementById('scanPanelCloseBtn').addEventListener('click', function() {
+    drawer.classList.remove('open');
+    scanBtn.classList.remove('active');
   });
 
   // --- Load persisted scan state ---
@@ -183,7 +213,7 @@ const SCAN_PANEL_SCRIPT = `
       resultsEl.innerHTML = '<div class="scan-panel-empty" style="color:var(--red)">Scan failed: ' + escapeHtml(err.message) + '</div>';
     }).finally(function() {
       manualBtn.disabled = false;
-      manualBtn.textContent = 'Run Manual Scan';
+      manualBtn.textContent = '\\u21bb Run Manual Scan';
     });
   });
 

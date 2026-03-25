@@ -239,6 +239,13 @@ export function createRuntimeApp(ctx: AppContext) {
     return c.html(html);
   });
 
+  // Provider setup page — always accessible regardless of bootstrap mode.
+  app.get('/providers/setup', (c) => {
+    const htmlPath = resolve(__dirname, '../../public/provider-setup.html');
+    const html = injectSharedUI(readFileSync(htmlPath, 'utf-8'));
+    return c.html(html);
+  });
+
   // Serve the playground (multi-agent chat) without auth.
   app.get('/playground', (c) => {
     const htmlPath = resolve(__dirname, '../../public/playground.html');
