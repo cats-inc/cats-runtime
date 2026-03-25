@@ -186,6 +186,8 @@ src/
 - Exposes the dedicated runtime-to-runtime `POST /peer/executions` contract and
   additive `routing` handling on `POST /sessions/{id}/messages` while keeping
   caller-visible session ownership local
+- Applies bounded peer-only auth throttling and inbound execution admission
+  control before handing work to the callee-side execution seam
 - Exposes startup/readiness metadata at `GET /health`
 - Exposes aggregate runtime + provider health at `GET /diagnostics/health`
 - Exposes runtime/host diagnostics at `GET /diagnostics/runtime`
@@ -234,7 +236,8 @@ src/
   execution routing policy
 - Separates peer discovery (`PeerDiscoveryController`), trust bootstrap
   (`PeerTrustService`), routing (`PeerRoutingService`), caller-side transport
-  (`PeerExecutionClient`), and callee-side bounded execution
+  (`PeerExecutionClient`), peer-only admission/throttling
+  (`PeerExecutionAdmissionService`), and callee-side bounded execution
   (`PeerExecutionService`)
 - Treats peer execution as an execution-only extension: the caller runtime
   still owns host-visible session ids, history, observe snapshots, wakeups,

@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { describe, expect, it, vi } from 'vitest';
 import { createPeerPayloadSignature } from '../core/peers/auth.js';
+import { PeerExecutionAdmissionService } from '../core/peers/PeerExecutionAdmissionService.js';
 import { createPeerExecutionError } from '../core/peers/errors.js';
 import { PeerTrustService } from '../core/peers/PeerTrustService.js';
 import type { StreamEvent } from '../core/types.js';
@@ -69,6 +70,7 @@ function createApp(
   options: {
     execute?: (request: unknown, signal?: AbortSignal) => AsyncGenerator<StreamEvent>;
     trustedPeerIds?: string[];
+    admission?: PeerExecutionAdmissionService;
   } = {},
 ): {
   app: Hono<{ Variables: { ctx: AppContext } }>;
@@ -95,6 +97,14 @@ function createApp(
   const ctx = {
     startup: createRuntimeStartupState(),
     peerTrust: trust,
+    peerExecutionAdmission: options.admission ?? new PeerExecutionAdmissionService({
+      config: {
+        authFailureWindowMs: 60_000,
+        maxAuthFailuresPerWindow: 5,
+        maxInboundExecutions: 8,
+        maxInboundExecutionsPerPeer: 2,
+      },
+    }),
     peerExecutionService: {
       execute,
     },
@@ -124,6 +134,42 @@ describe('peer execution routes', () => {
     expect(await response.json()).toEqual({
       error: 'Missing peer Authorization bearer token.',
       code: 'peer_auth_required',
+    });
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('rate-limits repeated peer auth failures for the same caller', async () => {
+    const admission = new PeerExecutionAdmissionService({
+      config: {
+        authFailureWindowMs: 60_000,
+        maxAuthFailuresPerWindow: 2,
+        maxInboundExecutions: 8,
+        maxInboundExecutionsPerPeer: 2,
+      },
+    });
+    const { app, execute } = createApp({ admission });
+    const headers = {
+      'content-type': 'application/json',
+      'x-cats-peer-id': 'caller-peer',
+    };
+
+    const first = await app.request('/peer/executions', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(createRequestBody()),
+    });
+    expect(first.status).toBe(401);
+
+    const second = await app.request('/peer/executions', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(createRequestBody()),
+    });
+    expect(second.status).toBe(429);
+    expect(await second.json()).toEqual({
+      error: 'Peer execution auth is temporarily rate limited for this caller.',
+      code: 'peer_auth_rate_limited',
+      retryAfterMs: expect.any(Number),
     });
     expect(execute).not.toHaveBeenCalled();
   });
@@ -178,6 +224,49 @@ describe('peer execution routes', () => {
       code: 'peer_auth_failed',
     });
     expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('rejects inbound peer execution when the caller exceeds admission capacity', async () => {
+    const admission = new PeerExecutionAdmissionService({
+      config: {
+        authFailureWindowMs: 60_000,
+        maxAuthFailuresPerWindow: 5,
+        maxInboundExecutions: 8,
+        maxInboundExecutionsPerPeer: 1,
+      },
+    });
+    const held = admission.acquireInboundExecution('caller-peer');
+    expect(held.ok).toBe(true);
+    if (!held.ok) {
+      throw new Error('Expected to hold one inbound execution slot.');
+    }
+
+    try {
+      const { app, execute } = createApp({ admission });
+      const body = JSON.stringify(createRequestBody());
+
+      const response = await app.request('/peer/executions', {
+        method: 'POST',
+        headers: createSignedHeaders(body),
+        body,
+      });
+
+      expect(response.status).toBe(429);
+      expect(await response.json()).toEqual({
+        error: 'Peer execution caller exceeded inbound execution capacity.',
+        code: 'peer_execution_rate_limited',
+        details: {
+          reason: 'peer_limit',
+          activeGlobal: 1,
+          activeForPeer: 1,
+          maxGlobal: 8,
+          maxPerPeer: 1,
+        },
+      });
+      expect(execute).not.toHaveBeenCalled();
+    } finally {
+      held.release();
+    }
   });
 
   it('streams peer execution failures over SSE with routing failure metadata', async () => {

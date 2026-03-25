@@ -128,6 +128,10 @@ export interface PeerRuntimeConfig {
   advertiseIntervalMs: number;
   maxAdvertisedTargets: number;
   requestTimeoutMs: number;
+  authFailureWindowMs: number;
+  maxAuthFailuresPerWindow: number;
+  maxInboundExecutions: number;
+  maxInboundExecutionsPerPeer: number;
   allowHeuristicRouting: boolean;
   sharedSecret?: string;
   trustedPeerIds: string[];

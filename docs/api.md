@@ -2513,6 +2513,11 @@ Route semantics:
   `x-cats-peer-id`
 - requires `x-cats-peer-signature: sha256=<hmac>` over the raw JSON request body
 - fails closed when peer auth/trust checks fail
+- rate-limits repeated auth failures per caller key and returns `429
+  peer_auth_rate_limited` when the bounded failure window is exceeded
+- applies bounded inbound admission control and returns `429
+  peer_execution_rate_limited` when a caller exceeds configured peer-execution
+  concurrency
 - returns normalized streamed events, with additive `metadata.peerExecution`
   on the callee and additive `metadata.peerRouting` on the caller relay path
 - stays execution-only: the callee does not become owner of the caller-visible
@@ -2528,8 +2533,8 @@ Topology notes:
 - this is not a full cluster manager: no transparent failover, no cross-node
   session ownership transfer, and no remote workspace/browser/wakeup ownership
 - request-body integrity is protected with a shared-secret HMAC, but per-peer
-  credentials, replay resistance, rate limiting, and stronger network transport
-  assumptions are later follow-up, not solved by v0
+  credentials, replay resistance, and stronger network transport assumptions
+  are later follow-up, not solved by v0
 
 Peer-routing failure events are additive. Streamed `error` events may include:
 

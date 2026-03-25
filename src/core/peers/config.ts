@@ -13,6 +13,10 @@ import type {
 const DEFAULT_STALE_PEER_TTL_MS = 30_000;
 const DEFAULT_MAX_ADVERTISED_TARGETS = 16;
 const DEFAULT_PEER_REQUEST_TIMEOUT_MS = 120_000;
+const DEFAULT_PEER_AUTH_FAILURE_WINDOW_MS = 60_000;
+const DEFAULT_PEER_AUTH_FAILURE_LIMIT = 5;
+const DEFAULT_MAX_INBOUND_PEER_EXECUTIONS = 8;
+const DEFAULT_MAX_INBOUND_PEER_EXECUTIONS_PER_PEER = 2;
 
 export function loadPeerRuntimeConfig(config: RuntimeConfig): PeerRuntimeConfig {
   const env = getRuntimeConfigEnv(config);
@@ -37,6 +41,22 @@ export function loadPeerRuntimeConfig(config: RuntimeConfig): PeerRuntimeConfig 
     env.CATS_RUNTIME_PEER_REQUEST_TIMEOUT_MS,
     DEFAULT_PEER_REQUEST_TIMEOUT_MS,
   );
+  const authFailureWindowMs = parsePositiveInt(
+    env.CATS_RUNTIME_PEER_AUTH_FAILURE_WINDOW_MS,
+    DEFAULT_PEER_AUTH_FAILURE_WINDOW_MS,
+  );
+  const maxAuthFailuresPerWindow = parsePositiveInt(
+    env.CATS_RUNTIME_PEER_AUTH_FAILURE_LIMIT,
+    DEFAULT_PEER_AUTH_FAILURE_LIMIT,
+  );
+  const maxInboundExecutions = parsePositiveInt(
+    env.CATS_RUNTIME_PEER_MAX_INBOUND_EXECUTIONS,
+    DEFAULT_MAX_INBOUND_PEER_EXECUTIONS,
+  );
+  const maxInboundExecutionsPerPeer = parsePositiveInt(
+    env.CATS_RUNTIME_PEER_MAX_INBOUND_EXECUTIONS_PER_PEER,
+    DEFAULT_MAX_INBOUND_PEER_EXECUTIONS_PER_PEER,
+  );
 
   return {
     enabled,
@@ -50,6 +70,10 @@ export function loadPeerRuntimeConfig(config: RuntimeConfig): PeerRuntimeConfig 
     advertiseIntervalMs,
     maxAdvertisedTargets,
     requestTimeoutMs,
+    authFailureWindowMs,
+    maxAuthFailuresPerWindow,
+    maxInboundExecutions,
+    maxInboundExecutionsPerPeer,
     allowHeuristicRouting: parseBoolean(
       env.CATS_RUNTIME_PEER_ALLOW_HEURISTIC_ROUTING,
       false,

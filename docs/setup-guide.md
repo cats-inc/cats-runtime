@@ -227,6 +227,10 @@ Keep `.env` for runtime-wide values and secrets:
 - `CATS_RUNTIME_PEER_ADVERTISE_INTERVAL_MS=15000`
 - `CATS_RUNTIME_PEER_MAX_TARGETS=16`
 - `CATS_RUNTIME_PEER_REQUEST_TIMEOUT_MS=120000`
+- `CATS_RUNTIME_PEER_AUTH_FAILURE_WINDOW_MS=60000`
+- `CATS_RUNTIME_PEER_AUTH_FAILURE_LIMIT=5`
+- `CATS_RUNTIME_PEER_MAX_INBOUND_EXECUTIONS=8`
+- `CATS_RUNTIME_PEER_MAX_INBOUND_EXECUTIONS_PER_PEER=2`
 - `CATS_RUNTIME_PEER_ALLOW_HEURISTIC_ROUTING=false`
 - `CATS_RUNTIME_PEER_SHARED_SECRET=`
 - `CATS_RUNTIME_PEER_TRUSTED_IDS=`
@@ -253,9 +257,9 @@ Peer-specific notes:
   full-mesh deployments usually standardize the same peer secret across all
   participating nodes, then constrain actual connectivity with peer-id trust
   lists
-- replay resistance, auth failure rate limiting, secret rotation, per-peer
-  credentials, and stronger mutual auth are later hardening work, not part of
-  PLAN-017 v0
+- auth failure throttling and inbound execution admission control now exist as
+  bounded hardening defaults, but replay resistance, secret rotation, per-peer
+  credentials, and stronger mutual auth are still later follow-up work
 - advertise values should point at a host/port reachable by other LAN runtimes
 
 ## Provider Instances (`config/providers.yaml`)

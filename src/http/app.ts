@@ -35,6 +35,7 @@ import type { PeerTrustService } from '../core/peers/PeerTrustService.js';
 import type { PeerRoutingService } from '../core/peers/PeerRoutingService.js';
 import type { PeerExecutionClient } from '../core/peers/PeerExecutionClient.js';
 import type { PeerExecutionService } from '../core/peers/PeerExecutionService.js';
+import type { PeerExecutionAdmissionService } from '../core/peers/PeerExecutionAdmissionService.js';
 import { ManualBrowserDriver } from '../backends/browser/manualDriver.js';
 import type { BootstrapService } from '../core/bootstrap/BootstrapService.js';
 import { bearerAuth } from './auth.js';
@@ -99,6 +100,7 @@ export interface AppContext {
   peerRouting?: PeerRoutingService;
   peerExecutionClient?: PeerExecutionClient;
   peerExecutionService?: PeerExecutionService;
+  peerExecutionAdmission?: PeerExecutionAdmissionService;
   bootstrapService?: BootstrapService;
   completeBootstrap?: () => void;
   resolveCursorNative?: (instanceId?: string) => CursorNativeSessionService;

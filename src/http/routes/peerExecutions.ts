@@ -15,12 +15,21 @@ peerExecutionRoutes.use('/peer/executions', peerExecutionAuth());
 peerExecutionRoutes.post('/peer/executions', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const callerPeerId = c.get('peerCallerId' as never) as string | undefined;
+  const admission = ctx.peerExecutionAdmission;
   const rawBody = await c.req.text().catch(() => '');
 
   if (!ctx.peerTrust?.validatePayloadSignature(
     rawBody,
     c.req.header('x-cats-peer-signature'),
   )) {
+    const failure = admission?.recordAuthFailure(`peer:${callerPeerId ?? 'unknown'}`);
+    if (failure?.limited) {
+      return c.json({
+        error: 'Peer execution auth is temporarily rate limited for this caller.',
+        code: 'peer_auth_rate_limited',
+        retryAfterMs: failure.retryAfterMs,
+      }, 429);
+    }
     return c.json({
       error: 'Peer execution auth failed.',
       code: 'peer_auth_failed',
@@ -38,6 +47,14 @@ peerExecutionRoutes.post('/peer/executions', async (c) => {
   }
 
   if (callerPeerId && parsed.value.caller.peerId !== callerPeerId) {
+    const failure = admission?.recordAuthFailure(`peer:${callerPeerId}`);
+    if (failure?.limited) {
+      return c.json({
+        error: 'Peer execution auth is temporarily rate limited for this caller.',
+        code: 'peer_auth_rate_limited',
+        retryAfterMs: failure.retryAfterMs,
+      }, 429);
+    }
     return c.json({
       error: `Peer caller id '${parsed.value.caller.peerId}' does not match authenticated peer '${callerPeerId}'.`,
       code: 'peer_auth_failed',
@@ -51,9 +68,29 @@ peerExecutionRoutes.post('/peer/executions', async (c) => {
     }, 503);
   }
 
+  if (callerPeerId) {
+    admission?.clearAuthFailures(`peer:${callerPeerId}`);
+  }
+
+  const executionAdmission = admission?.acquireInboundExecution(parsed.value.caller.peerId);
+  if (executionAdmission && !executionAdmission.ok) {
+    return c.json({
+      error: 'Peer execution caller exceeded inbound execution capacity.',
+      code: 'peer_execution_rate_limited',
+      details: {
+        reason: executionAdmission.reason,
+        activeGlobal: executionAdmission.activeGlobal,
+        activeForPeer: executionAdmission.activeForPeer,
+        maxGlobal: executionAdmission.maxGlobal,
+        maxPerPeer: executionAdmission.maxPerPeer,
+      },
+    }, 429);
+  }
+
   const accept = c.req.header('Accept') || '';
   const wantsNdjson = accept.includes('application/x-ndjson');
   const signal = c.req.raw.signal;
+  const releaseAdmission = executionAdmission?.ok ? executionAdmission.release : undefined;
 
   if (wantsNdjson) {
     const stream = new ReadableStream({
@@ -71,6 +108,7 @@ peerExecutionRoutes.post('/peer/executions', async (c) => {
           });
           controller.enqueue(new TextEncoder().encode(JSON.stringify(errorEvent) + '\n'));
         } finally {
+          releaseAdmission?.();
           controller.close();
         }
       },
@@ -104,6 +142,8 @@ peerExecutionRoutes.post('/peer/executions', async (c) => {
         data: JSON.stringify(errorEvent),
         event: errorEvent.type,
       });
+    } finally {
+      releaseAdmission?.();
     }
   });
 });

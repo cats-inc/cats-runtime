@@ -730,18 +730,20 @@ coordinated `cats` changes or a new design slice:
 #### Security Hardening Follow-up
 
 `POST /peer/executions` now has shared-secret bearer auth plus request-body
-HMAC signing, but the following hardening work is still intentionally deferred:
+HMAC signing. The next hardening slice also landed bounded auth failure
+rate-limiting per caller key and bounded inbound execution admission control so
+one caller cannot occupy unlimited peer capacity. The following work is still
+intentionally deferred:
 
 - add nonce/timestamp or equivalent replay resistance; body signing alone does
   not stop replay
-- add auth failure rate limiting on peer-only routes, ideally at least per IP
-  or per caller peer id
 - support peer secret rotation / overlap windows instead of a single static mesh
   secret
 - document and optionally enforce a TLS-fronted posture for any deployment
   outside a tightly trusted LAN
-- add peer-specific admission control or quotas so a leaked secret cannot be
-  used to flood `/peer/executions` and starve local capacity
+- deepen the current caller-key / per-peer limits into richer peer-specific
+  admission control or quotas if one node still needs stronger multi-tenant
+  protection
 
 #### Runtime Dashboard / Operator Follow-up
 
