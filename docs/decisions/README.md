@@ -38,6 +38,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
+| [024-own-pluggable-execution-strategies-as-runtime-session-local-substrate](./024-own-pluggable-execution-strategies-as-runtime-session-local-substrate.md) | Own pluggable execution strategies as a runtime session-local substrate | Proposed | 2026-03-26 |
 | [023-treat-management-clis-as-runtime-owned-control-plane-adapters-not-session-providers](./023-treat-management-clis-as-runtime-owned-control-plane-adapters-not-session-providers.md) | Treat management CLIs as runtime-owned control-plane adapters, not session providers | Accepted | 2026-03-25 |
 | [022-model-advanced-selection-as-entries-presets-and-provider-specific-controls](./022-model-advanced-selection-as-entries-presets-and-provider-specific-controls.md) | Model advanced selection as entries, presets, and provider-specific controls | Accepted | 2026-03-25 |
 | [021-treat-providers-yaml-as-generated-config-and-bootstrap-without-it](./021-treat-providers-yaml-as-generated-config-and-bootstrap-without-it.md) | Treat `providers.yaml` as generated config and bootstrap without it | Accepted | 2026-03-25 |
@@ -73,6 +74,6 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 ---
 
-*Last updated: 2026-03-25*
+*Last updated: 2026-03-26*
 
 *See also: [AGENTS.md](../../../AGENTS.md) for decision-making protocols*

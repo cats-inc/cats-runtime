@@ -48,6 +48,7 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 
 | Spec | Title | Status | Related Plan |
 |------|-------|--------|--------------|
+| [SPEC-020](./SPEC-020-pluggable-execution-strategy-substrate.md) | Pluggable Execution Strategy Substrate | Draft | TBD |
 | [SPEC-019](./SPEC-019-runtime-owned-management-adapters-for-forge-and-deployment-control-planes.md) | Runtime-Owned Management Adapters for Forge and Deployment Control Planes | Draft | TBD |
 | [SPEC-018](./SPEC-018-advanced-provider-model-catalog-and-selection-schema.md) | Advanced Provider Model Catalog and Selection Schema | Draft | TBD |
 | [SPEC-017](./SPEC-017-standalone-provider-bootstrap-and-generated-config.md) | Standalone Provider Bootstrap and Generated Config | Draft | TBD |
@@ -79,4 +80,4 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 ---
 
 *See also: [plans/](../plans/) for implementation plans*
-*Last updated: 2026-03-25*
+*Last updated: 2026-03-26*
