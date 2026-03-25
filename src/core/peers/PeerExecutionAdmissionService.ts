@@ -17,6 +17,62 @@ export interface PeerAuthFailureStatus {
   failureCount: number;
 }
 
+export interface PeerExecutionAdmissionSummary {
+  authFailures: {
+    windowMs: number;
+    maxFailuresPerWindow: number;
+    trackedCallers: number;
+    limitedCallers: number;
+  };
+  inboundExecutions: {
+    activeGlobal: number;
+    maxGlobal: number;
+    maxPerPeer: number;
+    activePeers: number;
+    saturated: boolean;
+  };
+}
+
+export interface PeerExecutionAdmissionPeerStatus {
+  peerId: string;
+  activeExecutions: number;
+  maxPerPeer: number;
+  saturated: boolean;
+}
+
+export interface PeerExecutionAdmissionAuthFailureSnapshot {
+  callerKey: string;
+  failureCount: number;
+  limited: boolean;
+  retryAfterMs: number;
+  oldestFailureAt: string;
+  newestFailureAt: string;
+}
+
+export interface PeerExecutionAdmissionInboundPeerSnapshot {
+  peerId: string;
+  activeExecutions: number;
+}
+
+export interface PeerExecutionAdmissionSnapshot {
+  authFailures: {
+    windowMs: number;
+    maxFailuresPerWindow: number;
+    trackedCallers: number;
+    limitedCallers: number;
+    hiddenCallers: number;
+    callers: PeerExecutionAdmissionAuthFailureSnapshot[];
+  };
+  inboundExecutions: {
+    activeGlobal: number;
+    maxGlobal: number;
+    maxPerPeer: number;
+    activePeers: number;
+    hiddenPeers: number;
+    peers: PeerExecutionAdmissionInboundPeerSnapshot[];
+  };
+}
+
 export interface PeerExecutionAdmissionGranted {
   ok: true;
   release: () => void;
@@ -89,6 +145,92 @@ export class PeerExecutionAdmissionService {
     this.authFailures.delete(normalizeKey(key));
   }
 
+  getSummary(): PeerExecutionAdmissionSummary {
+    const now = this.now();
+    const authFailures = this.collectAuthFailureEntries(now);
+
+    return {
+      authFailures: {
+        windowMs: this.options.config.authFailureWindowMs,
+        maxFailuresPerWindow: this.options.config.maxAuthFailuresPerWindow,
+        trackedCallers: authFailures.length,
+        limitedCallers: authFailures.filter((entry) => entry.limited).length,
+      },
+      inboundExecutions: {
+        activeGlobal: this.activeGlobal,
+        maxGlobal: this.options.config.maxInboundExecutions,
+        maxPerPeer: this.options.config.maxInboundExecutionsPerPeer,
+        activePeers: this.activeByPeer.size,
+        saturated: this.activeGlobal >= this.options.config.maxInboundExecutions,
+      },
+    };
+  }
+
+  getInboundExecutionStatus(peerId: string): PeerExecutionAdmissionPeerStatus {
+    const normalizedPeerId = normalizeKey(peerId);
+    const activeExecutions = this.activeByPeer.get(normalizedPeerId) ?? 0;
+
+    return {
+      peerId: normalizedPeerId,
+      activeExecutions,
+      maxPerPeer: this.options.config.maxInboundExecutionsPerPeer,
+      saturated: activeExecutions >= this.options.config.maxInboundExecutionsPerPeer,
+    };
+  }
+
+  snapshot(
+    options: {
+      maxCallers?: number;
+      maxPeers?: number;
+    } = {},
+  ): PeerExecutionAdmissionSnapshot {
+    const maxCallers = Math.max(1, options.maxCallers ?? 10);
+    const maxPeers = Math.max(1, options.maxPeers ?? 10);
+    const now = this.now();
+    const authFailureEntries = this.collectAuthFailureEntries(now);
+    const limitedCallers = authFailureEntries.filter((entry) => entry.limited).length;
+    const visibleAuthFailureEntries = authFailureEntries
+      .sort((left, right) =>
+        Number(right.limited) - Number(left.limited)
+        || right.failureCount - left.failureCount
+        || right.retryAfterMs - left.retryAfterMs
+        || right.callerKey.localeCompare(left.callerKey))
+      .slice(0, maxCallers);
+    const inboundPeers = Array.from(this.activeByPeer.entries())
+      .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]));
+
+    return {
+      authFailures: {
+        windowMs: this.options.config.authFailureWindowMs,
+        maxFailuresPerWindow: this.options.config.maxAuthFailuresPerWindow,
+        trackedCallers: this.authFailures.size,
+        limitedCallers,
+        hiddenCallers: Math.max(0, this.authFailures.size - visibleAuthFailureEntries.length),
+        callers: visibleAuthFailureEntries.map((entry) => ({
+          callerKey: entry.callerKey,
+          failureCount: entry.failureCount,
+          limited: entry.limited,
+          retryAfterMs: entry.retryAfterMs,
+          oldestFailureAt: new Date(entry.oldestFailureAt).toISOString(),
+          newestFailureAt: new Date(entry.newestFailureAt).toISOString(),
+        })),
+      },
+      inboundExecutions: {
+        activeGlobal: this.activeGlobal,
+        maxGlobal: this.options.config.maxInboundExecutions,
+        maxPerPeer: this.options.config.maxInboundExecutionsPerPeer,
+        activePeers: this.activeByPeer.size,
+        hiddenPeers: Math.max(0, this.activeByPeer.size - Math.min(this.activeByPeer.size, maxPeers)),
+        peers: inboundPeers
+          .slice(0, maxPeers)
+          .map(([peerId, activeExecutions]) => ({
+            peerId,
+            activeExecutions,
+          })),
+      },
+    };
+  }
+
   acquireInboundExecution(peerId: string): PeerExecutionAdmissionDecision {
     const normalizedPeerId = normalizeKey(peerId);
     const activeForPeer = this.activeByPeer.get(normalizedPeerId) ?? 0;
@@ -152,6 +294,47 @@ export class PeerExecutionAdmissionService {
       return;
     }
     this.authFailures.set(key, failures);
+  }
+
+  private collectAuthFailureEntries(now: number): Array<{
+    callerKey: string;
+    failureCount: number;
+    limited: boolean;
+    retryAfterMs: number;
+    oldestFailureAt: number;
+    newestFailureAt: number;
+  }> {
+    const entries: Array<{
+      callerKey: string;
+      failureCount: number;
+      limited: boolean;
+      retryAfterMs: number;
+      oldestFailureAt: number;
+      newestFailureAt: number;
+    }> = [];
+
+    for (const key of this.authFailures.keys()) {
+      const failures = this.pruneAuthFailures(key, now);
+      this.persistOrDeleteFailures(key, failures);
+      if (failures.length === 0) {
+        continue;
+      }
+
+      const retryAfterMs = failures.length >= this.options.config.maxAuthFailuresPerWindow
+        ? Math.max(0, failures[0]! + this.options.config.authFailureWindowMs - now)
+        : 0;
+
+      entries.push({
+        callerKey: key,
+        failureCount: failures.length,
+        limited: retryAfterMs > 0,
+        retryAfterMs,
+        oldestFailureAt: failures[0]!,
+        newestFailureAt: failures[failures.length - 1]!,
+      });
+    }
+
+    return entries;
   }
 }
 

@@ -2434,7 +2434,9 @@ POST /peer/executions
 ```
 
 `GET /peers` returns the bounded peer registry read model. By default it only
-returns live peers. `?includeStale=true` adds stale entries.
+returns live peers. `?includeStale=true` adds stale entries. When peer
+execution admission control is enabled, the response also includes an additive
+`guardrails` summary with current auth-throttling and inbound-capacity totals.
 
 Example response shape:
 
@@ -2476,11 +2478,14 @@ Example response shape:
 ```
 
 `GET /peers/{peerId}` returns one peer detail record. Unknown peer ids return
-`404`.
+`404`. When peer execution admission control is enabled, the detail response
+also includes additive `guardrails.inboundExecutions` state for that peer.
 
 `GET /diagnostics/peers` is the host-facing peer diagnostics summary. It
-combines the LAN discovery snapshot, registry summary counts, and the current
-bounded peer list without changing the semantics of `GET /health`.
+combines the LAN discovery snapshot, registry summary counts, the current
+bounded peer list, and a bounded `guardrails` diagnostics snapshot for peer
+auth throttling plus inbound execution admission without changing the semantics
+of `GET /health`.
 
 `POST /peer/executions` is the dedicated runtime-to-runtime execution contract.
 It is not a general host route and it does not replace the existing session

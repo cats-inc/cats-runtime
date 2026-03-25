@@ -183,6 +183,9 @@ src/
   streamed message turns
 - Exposes additive peer registry and diagnostics reads at `GET /peers`,
   `GET /peers/{peerId}`, and `GET /diagnostics/peers`
+- Keeps peer guardrail visibility additive: lightweight admission summaries on
+  peer read routes and bounded auth-throttle/inbound-capacity detail on
+  diagnostics routes
 - Exposes the dedicated runtime-to-runtime `POST /peer/executions` contract and
   additive `routing` handling on `POST /sessions/{id}/messages` while keeping
   caller-visible session ownership local

@@ -694,6 +694,10 @@ changes that keep ADR-019's execution-only boundary intact.
   - `GET /peers`
   - `GET /peers/:peerId`
   - `GET /diagnostics/peers`
+- additive peer guardrail read models:
+  - `GET /peers` returns lightweight auth-throttle/inbound-capacity summaries
+  - `GET /peers/:peerId` returns per-peer inbound execution status
+  - `GET /diagnostics/peers` returns bounded auth-throttle and inbound-capacity details
 - additive peer summaries on runtime/health diagnostics
 - `POST /peer/executions` as the dedicated peer-only execution seam
 - additive `routing` support on `POST /sessions/:id/messages`
@@ -749,7 +753,7 @@ The runtime-owned dashboard should add clearer peer operator visibility on top
 of the shipped peer diagnostics/read surfaces:
 
 - show current connected / discoverable peers directly in the dashboard without
-  requiring manual `/peers` inspection
+  requiring manual `/peers` or `/diagnostics/peers` inspection
 - show inbound peer activity such as "peer connected" / "被連入" style status
   or recent inbound peer execution visibility
 - keep this additive and diagnostics-oriented only; do not imply remote session

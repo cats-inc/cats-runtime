@@ -1835,6 +1835,14 @@ providers:
       if (!localPeerId) {
         throw new Error('missing local peer id');
       }
+      const localPeerGuardrails = runtime.context.peerExecutionAdmission?.getInboundExecutionStatus(localPeerId);
+      if (!localPeerGuardrails) {
+        throw new Error('missing peer execution admission service');
+      }
+      const peerGuardrailSummary = runtime.context.peerExecutionAdmission?.getSummary();
+      if (!peerGuardrailSummary) {
+        throw new Error('missing peer execution admission summary');
+      }
 
       const peerDetail = await runtime.app.request(`/peers/${localPeerId}`);
       expect(peerDetail.status).toBe(200);
@@ -1843,6 +1851,14 @@ providers:
           enabled: true,
           status: 'running',
         }),
+        guardrails: {
+          inboundExecutions: {
+            peerId: localPeerId,
+            activeExecutions: 0,
+            maxPerPeer: localPeerGuardrails.maxPerPeer,
+            saturated: false,
+          },
+        },
         peer: expect.objectContaining({
           identity: expect.objectContaining({
             peerId: localPeerId,
@@ -1864,6 +1880,16 @@ providers:
           registry: expect.objectContaining({
             total: 2,
             alive: 2,
+          }),
+        }),
+        guardrails: expect.objectContaining({
+          authFailures: expect.objectContaining({
+            trackedCallers: 0,
+            limitedCallers: 0,
+          }),
+          inboundExecutions: expect.objectContaining({
+            activeGlobal: 0,
+            maxGlobal: peerGuardrailSummary.inboundExecutions.maxGlobal,
           }),
         }),
         summary: expect.objectContaining({

@@ -17,6 +17,7 @@ peerRoutes.get('/peers', (c) => {
         includeStale,
       },
       discovery: getPeerDiscoverySnapshot(ctx),
+      ...(ctx.peerExecutionAdmission ? { guardrails: ctx.peerExecutionAdmission.getSummary() } : {}),
       peers,
     });
   } catch (error) {
@@ -40,6 +41,9 @@ peerRoutes.get('/peers/:peerId', (c) => {
 
     return c.json({
       discovery: getPeerDiscoverySnapshot(ctx),
+      ...(ctx.peerExecutionAdmission
+        ? { guardrails: { inboundExecutions: ctx.peerExecutionAdmission.getInboundExecutionStatus(peerId) } }
+        : {}),
       peer,
     });
   } catch (error) {

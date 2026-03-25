@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { PeerRegistry } from '../core/peers/PeerRegistry.js';
 import { createDisabledPeerDiscoverySnapshot } from '../core/peers/PeerDiscoveryController.js';
+import { PeerExecutionAdmissionService } from '../core/peers/PeerExecutionAdmissionService.js';
 import type { PeerAdvertisement } from '../core/peers/types.js';
 import type { AppContext } from './app.js';
 import { diagnosticsRoutes } from './routes/diagnostics.js';
@@ -141,10 +142,26 @@ describe('peer routes', () => {
       createAdvertisement('peer-live', '2026-03-25T00:00:03.000Z', 5_000),
       { sourceId: 'lan:live', sourceKind: 'lan' },
     );
+    const admission = new PeerExecutionAdmissionService({
+      config: {
+        authFailureWindowMs: 1_000,
+        maxAuthFailuresPerWindow: 2,
+        maxInboundExecutions: 4,
+        maxInboundExecutionsPerPeer: 2,
+      },
+      now: () => now,
+    });
+    admission.recordAuthFailure('peer:lab');
+    admission.recordAuthFailure('peer:lab');
+    const inbound = admission.acquireInboundExecution('peer-live');
+    if (!inbound.ok) {
+      throw new Error('expected peer admission grant');
+    }
 
     const ctx: AppContext = {
       startup: createRuntimeStartupState(),
       peerRegistry: registry,
+      peerExecutionAdmission: admission,
       peerCapabilities: {
         getLocalPeerId: () => 'local-peer',
       } as never,
@@ -194,6 +211,35 @@ describe('peer routes', () => {
         unknown: 1,
         rejected: 0,
       },
+      guardrails: {
+        authFailures: {
+          windowMs: 1_000,
+          maxFailuresPerWindow: 2,
+          trackedCallers: 1,
+          limitedCallers: 1,
+          hiddenCallers: 0,
+          callers: [
+            expect.objectContaining({
+              callerKey: 'peer:lab',
+              failureCount: 2,
+              limited: true,
+            }),
+          ],
+        },
+        inboundExecutions: {
+          activeGlobal: 1,
+          maxGlobal: 4,
+          maxPerPeer: 2,
+          activePeers: 1,
+          hiddenPeers: 0,
+          peers: [
+            {
+              peerId: 'peer-live',
+              activeExecutions: 1,
+            },
+          ],
+        },
+      },
       peers: [
         expect.objectContaining({
           identity: expect.objectContaining({
@@ -202,5 +248,81 @@ describe('peer routes', () => {
         }),
       ],
     });
+  });
+
+  it('adds guardrail summaries to peer read surfaces when admission control is enabled', async () => {
+    const now = Date.parse('2026-03-25T00:00:04.000Z');
+    const registry = new PeerRegistry({
+      stalePeerTtlMs: 5_000,
+      now: () => now,
+    });
+    registry.upsert(
+      createAdvertisement('peer-live', '2026-03-25T00:00:03.000Z', 5_000),
+      { sourceId: 'lan:live', sourceKind: 'lan' },
+    );
+    const admission = new PeerExecutionAdmissionService({
+      config: {
+        authFailureWindowMs: 1_000,
+        maxAuthFailuresPerWindow: 3,
+        maxInboundExecutions: 2,
+        maxInboundExecutionsPerPeer: 1,
+      },
+    });
+    admission.recordAuthFailure('peer:caller-a');
+    const inbound = admission.acquireInboundExecution('peer-live');
+    if (!inbound.ok) {
+      throw new Error('expected peer admission grant');
+    }
+
+    const ctx: AppContext = {
+      startup: createRuntimeStartupState(),
+      peerRegistry: registry,
+      peerExecutionAdmission: admission,
+      peerCapabilities: {
+        getLocalPeerId: () => 'local-peer',
+      } as never,
+      peerDiscovery: {
+        snapshot: () => createDisabledPeerDiscoverySnapshot('local-peer', registry.summary(now)),
+      } as never,
+    } as AppContext;
+    const app = new Hono<{ Variables: { ctx: AppContext } }>();
+    app.use('*', async (c, next) => {
+      c.set('ctx', ctx);
+      await next();
+    });
+    app.route('/', peerRoutes);
+
+    const peersResponse = await app.request('/peers');
+    expect(peersResponse.status).toBe(200);
+    expect(await peersResponse.json()).toEqual(expect.objectContaining({
+      guardrails: {
+        authFailures: {
+          windowMs: 1_000,
+          maxFailuresPerWindow: 3,
+          trackedCallers: 1,
+          limitedCallers: 0,
+        },
+        inboundExecutions: {
+          activeGlobal: 1,
+          maxGlobal: 2,
+          maxPerPeer: 1,
+          activePeers: 1,
+          saturated: false,
+        },
+      },
+    }));
+
+    const peerResponse = await app.request('/peers/peer-live');
+    expect(peerResponse.status).toBe(200);
+    expect(await peerResponse.json()).toEqual(expect.objectContaining({
+      guardrails: {
+        inboundExecutions: {
+          peerId: 'peer-live',
+          activeExecutions: 1,
+          maxPerPeer: 1,
+          saturated: true,
+        },
+      },
+    }));
   });
 });

@@ -839,6 +839,9 @@ diagnosticsRoutes.get('/diagnostics/peers', (c) => {
       },
       discovery,
       summary: discovery.registry,
+      ...(ctx.peerExecutionAdmission
+        ? { guardrails: ctx.peerExecutionAdmission.snapshot() }
+        : {}),
       peers,
     });
   } catch (error) {
