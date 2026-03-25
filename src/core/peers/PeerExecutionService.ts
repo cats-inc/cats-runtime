@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { isAbsolute, relative, resolve } from 'node:path';
 import type { SessionRegistry } from '../../backends/cli/pool/SessionRegistry.js';
 import type { RuntimeConfig } from '../config.js';
 import type { RuntimeSessionManager } from '../runtime/RuntimeSessionManager.js';
@@ -50,7 +51,7 @@ export class PeerExecutionService {
       providerName: target.providerName,
       providerBackend: target.backend,
       providerInstanceId: target.instanceId,
-      cwd: request.workspace.cwd || this.options.config.sessionBaseDir,
+      cwd: resolveExecutionCwd(request, this.options.config.sessionBaseDir),
       workspaceMode: 'read_only',
       permissionMode: 'default',
       model: request.target.model,
@@ -106,6 +107,29 @@ export class PeerExecutionService {
       this.options.registry.remove(session.id);
     }
   }
+}
+
+function resolveExecutionCwd(
+  request: PeerExecutionRequest,
+  sessionBaseDir: string,
+): string {
+  const baseDir = resolve(sessionBaseDir);
+  const requestedCwd = request.workspace.mode === 'read_only'
+    ? request.workspace.cwd
+    : undefined;
+  if (typeof requestedCwd !== 'string' || requestedCwd.trim().length === 0) {
+    return baseDir;
+  }
+  if (!isAbsolute(requestedCwd)) {
+    return baseDir;
+  }
+
+  const resolvedRequestedCwd = resolve(requestedCwd);
+  const rel = relative(baseDir, resolvedRequestedCwd);
+  const withinSessionBaseDir = rel === ''
+    || (!rel.startsWith('..') && !isAbsolute(rel));
+
+  return withinSessionBaseDir ? resolvedRequestedCwd : baseDir;
 }
 
 function mergeContext(

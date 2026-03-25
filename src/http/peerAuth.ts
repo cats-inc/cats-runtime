@@ -39,7 +39,7 @@ export function peerExecutionAuth() {
 
     if (!trust.canAcceptInboundExecution(callerPeerId)) {
       return c.json({
-        error: `Peer '${callerPeerId}' is not trusted for inbound execution.`,
+        error: 'Peer execution caller is not allowed.',
         code: 'peer_untrusted',
       }, 403);
     }

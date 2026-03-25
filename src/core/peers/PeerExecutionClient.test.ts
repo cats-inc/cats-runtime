@@ -277,4 +277,50 @@ describe('PeerExecutionClient', () => {
       client.streamExecution(peer, request, trace, new AbortController().signal),
     )).rejects.toThrow('did not respond before the routing timeout');
   });
+
+  it('omits the authorization header when no peer shared secret is configured', async () => {
+    const client = new PeerExecutionClient({
+      config: {
+        requestTimeoutMs: 30_000,
+        sharedSecret: undefined,
+      },
+      localPeerId: 'local-peer',
+      fetch: async (_input, init) => {
+        const headers = init?.headers as Record<string, string>;
+        expect(headers.authorization).toBeUndefined();
+        expect(headers['x-cats-peer-id']).toBe('local-peer');
+        return new Response([
+          JSON.stringify({ type: 'result' }),
+        ].join('\n') + '\n', {
+          status: 200,
+          headers: {
+            'content-type': 'application/x-ndjson',
+          },
+        });
+      },
+    });
+
+    const peer = createPeerEntry();
+    const { request, trace } = client.buildRequest({
+      session: createSession(),
+      turn: { message: 'hello' },
+      peer,
+      routing: {
+        mode: 'peer',
+        peerId: peer.identity.peerId,
+        strategy: 'explicit',
+        shareWorkspace: false,
+      },
+      runId: 'run-1',
+      transport: 'ndjson',
+    });
+
+    await expect(collectEvents(
+      client.streamExecution(peer, request, trace, new AbortController().signal),
+    )).resolves.toEqual([
+      expect.objectContaining({
+        type: 'result',
+      }),
+    ]);
+  });
 });

@@ -3,6 +3,7 @@ import { streamSSE } from 'hono/streaming';
 import type { AppContext } from '../app.js';
 import { peerExecutionAuth } from '../peerAuth.js';
 import { toPeerExecutionErrorEvent } from '../../core/peers/errors.js';
+import { parseInvocationContext } from '../parsing.js';
 import type {
   PeerExecutionRequest,
 } from '../../core/peers/types.js';
@@ -191,9 +192,5 @@ function parseWorkspaceMode(
 function parseContext(
   value: unknown,
 ): PeerExecutionRequest['turn']['context'] {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return undefined;
-  }
-
-  return structuredClone(value) as PeerExecutionRequest['turn']['context'];
+  return parseInvocationContext(value);
 }

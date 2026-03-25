@@ -38,6 +38,7 @@ Peer auth/trust notes:
   `/peer/executions`
 - `CATS_RUNTIME_PEER_SHARED_SECRET` is the current runtime-to-runtime auth
   credential
+- use a strong random secret, preferably at least 32 characters
 - trust is directional via each runtime's `trustedPeerIds` / `rejectedPeerIds`
 - one-way traffic is supported, but it still needs configuration on both sides:
   the caller must trust the callee for routing, and the callee must trust the
@@ -45,6 +46,8 @@ Peer auth/trust notes:
 - for small LAN mesh deployments, the practical bootstrap today is usually one
   shared secret reused across participating peers plus explicit peer-id trust
   policy on each node
+- v0 does not add per-peer signatures, nonces, or replay protection; operators
+  should treat this as a trusted-LAN or externally TLS-protected transport
 
 ## Core Endpoints
 
@@ -2423,6 +2426,8 @@ Topology notes:
   gossip-based propagation of peer state
 - this is not a full cluster manager: no transparent failover, no cross-node
   session ownership transfer, and no remote workspace/browser/wakeup ownership
+- per-peer credentials, signed requests, replay resistance, and stronger
+  network transport assumptions are later follow-up, not solved by v0
 
 Peer-routing failure events are additive. Streamed `error` events may include:
 

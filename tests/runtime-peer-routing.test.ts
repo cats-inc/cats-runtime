@@ -344,7 +344,7 @@ describe('runtime peer routing integration', () => {
       expect(parseNdjson(await response.text())).toEqual([
         expect.objectContaining({
           type: 'error',
-          text: "Peer 'caller-peer' is not trusted for inbound execution.",
+          text: 'Peer execution caller is not allowed.',
           metadata: expect.objectContaining({
             peerRoutingFailure: expect.objectContaining({
               code: 'peer_untrusted',

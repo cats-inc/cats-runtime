@@ -720,6 +720,22 @@ coordinated `cats` changes or a new design slice:
   current SSE / NDJSON shapes
 - any contract change that stops existing `cats` request bodies from remaining
   valid during migration
+- stronger peer auth such as per-peer credentials, signed requests, or replay
+  protection
+- stricter network posture assumptions such as required TLS for non-trusted LAN
+  deployments
+
+#### Runtime Dashboard / Operator Follow-up
+
+The runtime-owned dashboard should add clearer peer operator visibility on top
+of the shipped peer diagnostics/read surfaces:
+
+- show current connected / discoverable peers directly in the dashboard without
+  requiring manual `/peers` inspection
+- show inbound peer activity such as "peer connected" / "被連入" style status
+  or recent inbound peer execution visibility
+- keep this additive and diagnostics-oriented only; do not imply remote session
+  ownership transfer or hidden peer failover
 
 #### Constraints
 

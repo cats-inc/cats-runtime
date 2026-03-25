@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import type {
   PeerAdvertisement,
   PeerRegistryEntry,
@@ -16,19 +17,32 @@ export class PeerTrustService {
 
   private readonly rejectedPeerIds: Set<string>;
 
+  private readonly sharedSecretBuffer?: Buffer;
+
   constructor(private readonly options: PeerTrustServiceOptions) {
     this.trustedPeerIds = new Set(options.config.trustedPeerIds);
     this.rejectedPeerIds = new Set(options.config.rejectedPeerIds);
+    this.sharedSecretBuffer = typeof options.config.sharedSecret === 'string'
+      && options.config.sharedSecret.length > 0
+      ? Buffer.from(options.config.sharedSecret)
+      : undefined;
   }
 
   get hasSharedSecret(): boolean {
-    return typeof this.options.config.sharedSecret === 'string'
-      && this.options.config.sharedSecret.length > 0;
+    return Boolean(this.sharedSecretBuffer && this.sharedSecretBuffer.length > 0);
   }
 
   validateSharedSecret(token: string | undefined): boolean {
-    return this.hasSharedSecret
-      && token === this.options.config.sharedSecret;
+    if (!this.sharedSecretBuffer || typeof token !== 'string') {
+      return false;
+    }
+
+    const tokenBuffer = Buffer.from(token);
+    if (tokenBuffer.length !== this.sharedSecretBuffer.length) {
+      return false;
+    }
+
+    return timingSafeEqual(tokenBuffer, this.sharedSecretBuffer);
   }
 
   summarizeAdvertisement(

@@ -128,21 +128,22 @@ export class PeerExecutionClient {
 
     const timeoutSignal = AbortSignal.timeout(this.options.config.requestTimeoutMs);
     const combinedSignal = AbortSignal.any([signal, timeoutSignal]);
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+      accept: trace.transport === 'ndjson'
+        ? 'application/x-ndjson'
+        : 'text/event-stream',
+      'x-cats-peer-id': this.options.localPeerId,
+    };
+    if (this.options.config.sharedSecret) {
+      headers.authorization = `Bearer ${this.options.config.sharedSecret}`;
+    }
 
     let response: Response;
     try {
       response = await this.fetchImpl(`${baseUrl}/peer/executions`, {
         method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          accept: trace.transport === 'ndjson'
-            ? 'application/x-ndjson'
-            : 'text/event-stream',
-          authorization: this.options.config.sharedSecret
-            ? `Bearer ${this.options.config.sharedSecret}`
-            : '',
-          'x-cats-peer-id': this.options.localPeerId,
-        },
+        headers,
         body: JSON.stringify(request),
         signal: combinedSignal,
       });
