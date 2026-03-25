@@ -5,7 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cats Runtime - Provider Setup</title>
 <style>
-  /* Design tokens injected by shared runtime UI foundation (uiInjector.ts) */
+  /* Canonical tokens live in src/http/ui/shared.ts and are injected at
+     serve-time by uiInjector.ts.  This inline copy is the static fallback
+     so the HTML file remains usable when opened outside the runtime. */
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #242836;
+    --border: #2e3345;
+    --text: #e1e4ed;
+    --text2: #8b90a0;
+    --accent: #6c8cff;
+    --accent-dim: #4a62b3;
+    --green: #4ade80;
+    --yellow: #facc15;
+    --red: #f87171;
+    --orange: #fb923c;
+    --radius: 8px;
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
