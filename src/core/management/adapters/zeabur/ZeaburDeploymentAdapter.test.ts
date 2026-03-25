@@ -173,12 +173,18 @@ describe('ZeaburDeploymentAdapter', () => {
   // -----------------------------------------------------------------------
 
   describe('read_deployment_logs', () => {
-    it('returns logs', async () => {
+    it('returns logs using zeabur deployment log', async () => {
       mockRun.mockResolvedValue(ok('log line 1\nlog line 2'));
 
       const result = await adapter.execute(request({ action: 'read_deployment_logs' }));
       expect(result.state).toBe('completed');
       expect(result.outputs).toEqual(expect.objectContaining({ logs: 'log line 1\nlog line 2' }));
+
+      // Verify the correct command is used
+      const call = mockRun.mock.calls[0];
+      expect(call[0]).toBe('zeabur');
+      expect(call[1]).toContain('deployment');
+      expect(call[1]).toContain('log');
     });
 
     it('truncates oversized logs', async () => {

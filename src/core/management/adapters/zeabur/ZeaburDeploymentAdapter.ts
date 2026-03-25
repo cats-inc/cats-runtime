@@ -191,7 +191,7 @@ export class ZeaburDeploymentAdapter implements ManagementAdapter {
     const target = (request.target ?? {}) as Record<string, unknown>;
     const serviceId = typeof target.serviceId === 'string' ? target.serviceId : undefined;
 
-    const args = ['logs'];
+    const args = ['deployment', 'log'];
     if (serviceId) args.push('--service', serviceId);
 
     const result = await runCliCommand(this.command, args, { cwd, timeoutMs: this.timeoutMs });

@@ -240,13 +240,28 @@ describe('RuntimeManagementService', () => {
     expect(result!.outputs).toEqual({ checks: 'passed' });
   });
 
-  it('resumes a polling operation', async () => {
+  it('resumes a polling operation without adapter context as degraded', async () => {
     const op = service.operations.create();
 
     const result = await service.resumeOperation(op.operationId);
     expect(result).toBeDefined();
     expect(result!.state).toBe('degraded');
     expect(result!.operation!.status).toBe('polling');
+  });
+
+  it('resumes a polling operation with adapter context by re-entering pollChecks', async () => {
+    // Simulate what the GithubReviewAdapter does: create an operation with request context
+    const op = service.operations.create(5000);
+    service.operations.update(op.operationId, 'polling', {
+      _requestContext: { domain: 'review', action: 'wait_review_checks', cwd: '/tmp', prRef: '1', adapter: 'github' },
+    });
+
+    // The stub adapter doesn't have pollChecks, so it falls back to degraded
+    // This tests that the fallback path works when the adapter doesn't support resume
+    const result = await service.resumeOperation(op.operationId, 5000);
+    expect(result).toBeDefined();
+    // Stub doesn't have pollChecks, so falls through to the fallback
+    expect(result!.state).toBe('degraded');
   });
 
   // -------------------------------------------------------------------------

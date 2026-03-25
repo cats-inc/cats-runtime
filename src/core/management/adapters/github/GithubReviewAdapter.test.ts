@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { GithubReviewAdapter } from './GithubReviewAdapter.js';
+import { ManagementOperationStore } from '../../operations.js';
 import type { RuntimeManagementRequest } from '../../types.js';
 
 // Mock the cli module
@@ -35,10 +36,12 @@ function request(overrides: Partial<RuntimeManagementRequest> = {}): RuntimeMana
 
 describe('GithubReviewAdapter', () => {
   let adapter: GithubReviewAdapter;
+  let operations: ManagementOperationStore;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    adapter = new GithubReviewAdapter({ command: 'gh' });
+    operations = new ManagementOperationStore();
+    adapter = new GithubReviewAdapter({ command: 'gh', operations });
   });
 
   // -----------------------------------------------------------------------
@@ -118,7 +121,7 @@ describe('GithubReviewAdapter', () => {
   });
 
   // -----------------------------------------------------------------------
-  // open_pull_request
+  // open_pull_request (gh pr create does NOT support --json)
   // -----------------------------------------------------------------------
 
   describe('open_pull_request', () => {
@@ -143,8 +146,9 @@ describe('GithubReviewAdapter', () => {
       );
     });
 
-    it('creates PR on apply', async () => {
-      mockRun.mockResolvedValue(ok('{"url":"https://github.com/me/repo/pull/1","number":1}'));
+    it('creates PR on apply and parses URL from stdout', async () => {
+      // gh pr create prints the URL to stdout (no --json)
+      mockRun.mockResolvedValue(ok('https://github.com/me/repo/pull/1\n'));
 
       const result = await adapter.execute(request({
         action: 'open_pull_request',
@@ -153,7 +157,27 @@ describe('GithubReviewAdapter', () => {
         authorization: { actorClass: 'owner' },
       }));
       expect(result.state).toBe('completed');
-      expect(result.outputs).toEqual(expect.objectContaining({ url: 'https://github.com/me/repo/pull/1' }));
+      expect(result.outputs).toEqual(expect.objectContaining({
+        url: 'https://github.com/me/repo/pull/1',
+        number: 1,
+      }));
+    });
+
+    it('verifies gh pr create args do not include --json', async () => {
+      mockRun.mockResolvedValue(ok('https://github.com/me/repo/pull/2\n'));
+
+      await adapter.execute(request({
+        action: 'open_pull_request',
+        apply: true,
+        target: { title: 'fix: bug', body: '', base: 'develop' },
+        authorization: { actorClass: 'owner' },
+      }));
+
+      const call = mockRun.mock.calls[0];
+      expect(call[0]).toBe('gh');
+      expect(call[1]).not.toContain('--json');
+      expect(call[1]).toContain('--base');
+      expect(call[1]).toContain('develop');
     });
 
     it('returns blocked when gh pr create fails', async () => {
@@ -194,12 +218,13 @@ describe('GithubReviewAdapter', () => {
   });
 
   // -----------------------------------------------------------------------
-  // wait_review_checks (mocked to avoid real polling)
+  // wait_review_checks (uses gh pr view --json statusCheckRollup)
   // -----------------------------------------------------------------------
 
   describe('wait_review_checks', () => {
     it('returns completed when all checks pass immediately', async () => {
-      mockRun.mockResolvedValue(ok('[{"name":"ci","state":"completed","conclusion":"success"}]'));
+      // gh pr view --json statusCheckRollup returns nested object
+      mockRun.mockResolvedValue(ok('{"statusCheckRollup":[{"name":"ci","status":"COMPLETED","conclusion":"SUCCESS"}]}'));
 
       const result = await adapter.execute(request({
         action: 'wait_review_checks',
@@ -208,6 +233,21 @@ describe('GithubReviewAdapter', () => {
       expect(result.state).toBe('completed');
       expect(result.operation).toBeDefined();
       expect(result.operation!.status).toBe('completed');
+    });
+
+    it('stores operation in the shared store', async () => {
+      mockRun.mockResolvedValue(ok('{"statusCheckRollup":[{"name":"ci","status":"COMPLETED"}]}'));
+
+      const result = await adapter.execute(request({
+        action: 'wait_review_checks',
+        target: { number: 1, timeoutMs: 500 },
+      }));
+      expect(operations.size).toBeGreaterThan(0);
+      expect(result.operation?.operationId).toBeDefined();
+      // The operation should be findable in the shared store
+      const stored = operations.get(result.operation!.operationId);
+      expect(stored).toBeDefined();
+      expect(stored!.status).toBe('completed');
     });
 
     it('returns blocked when checks query fails', async () => {
@@ -220,6 +260,25 @@ describe('GithubReviewAdapter', () => {
       expect(result.state).toBe('blocked');
       expect(result.operation).toBeDefined();
     });
+
+    it('verifies gh args use pr view --json statusCheckRollup, not pr checks --json', async () => {
+      mockRun.mockResolvedValue(ok('{"statusCheckRollup":[{"name":"ci","status":"COMPLETED"}]}'));
+
+      await adapter.execute(request({
+        action: 'wait_review_checks',
+        target: { number: 5, timeoutMs: 500 },
+      }));
+
+      // First call is the check poll
+      const call = mockRun.mock.calls[0];
+      expect(call[0]).toBe('gh');
+      expect(call[1]).toContain('pr');
+      expect(call[1]).toContain('view');
+      expect(call[1]).toContain('--json');
+      expect(call[1]).toContain('statusCheckRollup');
+      // Should NOT contain 'checks' as a subcommand
+      expect(call[1]).not.toContain('checks');
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -229,5 +288,30 @@ describe('GithubReviewAdapter', () => {
   it('returns unsupported for unknown action', async () => {
     const result = await adapter.execute(request({ action: 'create_deployment' as never }));
     expect(result.state).toBe('unsupported');
+  });
+
+  // -----------------------------------------------------------------------
+  // resume via pollChecks
+  // -----------------------------------------------------------------------
+
+  describe('pollChecks (resume path)', () => {
+    it('can be called directly for resume and completes', async () => {
+      mockRun.mockResolvedValue(ok('{"statusCheckRollup":[{"name":"ci","status":"COMPLETED"}]}'));
+
+      const op = operations.create(5000);
+      operations.update(op.operationId, 'polling', {
+        _requestContext: { domain: 'review', action: 'wait_review_checks', cwd: '/tmp', prRef: '1', adapter: 'github' },
+      });
+
+      const result = await adapter.pollChecks(
+        { domain: 'review', action: 'wait_review_checks' },
+        op.operationId,
+        '/tmp',
+        '1',
+        5000,
+      );
+      expect(result.state).toBe('completed');
+      expect(result.operation?.status).toBe('completed');
+    });
   });
 });

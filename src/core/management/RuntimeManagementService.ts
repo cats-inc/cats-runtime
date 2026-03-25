@@ -1,16 +1,14 @@
 import type { ManagementAdapter } from './adapters/types.js';
+import type { GithubReviewAdapter } from './adapters/github/GithubReviewAdapter.js';
 import type { ManagementConfig } from './config.js';
 import { ManagementOperationStore } from './operations.js';
 import {
   MUTATING_MANAGEMENT_ACTIONS,
   createManagementIssue,
-  type RuntimeManagementAction,
   type RuntimeManagementAuthorization,
   type RuntimeManagementContract,
-  type RuntimeManagementDomain,
   type RuntimeManagementRequest,
   type RuntimeManagementResult,
-  type RuntimeManagementState,
 } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -38,6 +36,11 @@ export class RuntimeManagementService {
 
   registerAdapter(adapter: ManagementAdapter): void {
     this.adapters.set(adapter.descriptor.id, adapter);
+    // Share the service's operation store with adapters that support it
+    const withStore = adapter as unknown as { setOperationStore?: (store: ManagementOperationStore) => void };
+    if (typeof withStore.setOperationStore === 'function') {
+      withStore.setOperationStore(this.operations);
+    }
   }
 
   getRegisteredAdapters(): ManagementAdapter[] {
@@ -58,7 +61,6 @@ export class RuntimeManagementService {
     const authorization = this.buildAuthorization(request, isMutating);
     const contract = this.buildContract(request, authorization, isMutating);
 
-    // Block mutating apply if authorization says no
     if (isMutating && request.apply && !authorization.canApply) {
       return {
         domain: request.domain,
@@ -79,10 +81,8 @@ export class RuntimeManagementService {
       };
     }
 
-    // Delegate to the adapter
     const result = await adapter.execute(request);
 
-    // Overlay contract and authorization (adapter may not set them correctly)
     return {
       ...result,
       adapter: adapter.descriptor.id,
@@ -102,6 +102,7 @@ export class RuntimeManagementService {
     const op = this.operations.get(operationId);
     if (!op) return undefined;
 
+    // Already terminal — return final result
     if (op.status === 'completed' || op.status === 'failed') {
       return {
         domain: 'review',
@@ -127,11 +128,31 @@ export class RuntimeManagementService {
       };
     }
 
-    // Still polling — update timeout if provided
-    if (timeoutMs !== undefined) {
-      this.operations.update(operationId, 'polling');
+    // Still polling — try to re-enter the adapter's poll loop using
+    // the request context stored by the adapter when the operation was created
+    const ctx = op.result?._requestContext as {
+      domain?: string;
+      action?: string;
+      cwd?: string;
+      prRef?: string;
+      adapter?: string;
+    } | undefined;
+
+    if (ctx?.adapter) {
+      const adapter = this.adapters.get(ctx.adapter);
+      if (adapter && typeof (adapter as GithubReviewAdapter).pollChecks === 'function') {
+        const pollTimeout = timeoutMs ?? op.timeoutMs ?? 30_000;
+        return (adapter as GithubReviewAdapter).pollChecks(
+          { domain: (ctx.domain ?? 'review') as 'review', action: (ctx.action ?? 'wait_review_checks') as 'wait_review_checks' },
+          operationId,
+          ctx.cwd,
+          ctx.prRef,
+          pollTimeout,
+        );
+      }
     }
 
+    // Fallback: no adapter context available, return current state
     return {
       domain: 'review',
       action: 'wait_review_checks',
@@ -160,19 +181,16 @@ export class RuntimeManagementService {
   // -----------------------------------------------------------------------
 
   private resolveAdapter(request: RuntimeManagementRequest): ManagementAdapter | undefined {
-    // 1. Explicit adapter override
     if (request.adapter) {
       return this.adapters.get(request.adapter);
     }
 
-    // 2. Config default for the domain
     const domainConfig = this.config?.adapters[request.domain];
     if (domainConfig?.default) {
       const adapter = this.adapters.get(domainConfig.default);
       if (adapter) return adapter;
     }
 
-    // 3. Find any adapter that supports this domain
     for (const adapter of this.adapters.values()) {
       for (const cap of adapter.descriptor.capabilities) {
         if (cap.domain === request.domain && cap.actions.includes(request.action)) {
