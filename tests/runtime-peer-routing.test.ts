@@ -459,6 +459,9 @@ describe('runtime peer routing integration', () => {
       });
 
       await waitFor(() => Boolean(caller.context.runtime?.get(session.id)?.busy));
+      // Wait for the observer connection to be established before letting the
+      // peer execution finish, otherwise the test can race and only observe the
+      // final session_closed frame in full-suite runs.
       const streamResponse = await fetch(`http://${callerAddress.host}:${callerAddress.port}/sessions/${session.id}/stream`);
 
       releaseExecution?.();

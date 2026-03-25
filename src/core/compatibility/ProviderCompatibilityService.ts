@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { spawn } from 'node:child_process';
 import type {
   CliRuntimeConfig,
   ProviderCommandConfig,
@@ -16,6 +15,7 @@ import {
   type RuntimeCommandLookupResult,
   type RuntimePathCheckResult,
   type RuntimeValueCheckResult,
+  runSpawnedCommand,
 } from '../provider-install/ProviderInstallCheckRunner.js';
 import { expandNativeEnvPath } from '../provider-install/pathUtils.js';
 import {
@@ -50,7 +50,6 @@ import type {
 const DEFAULT_CACHE_TTL_MS = 5 * 60_000;
 const DEFAULT_PROBE_TIMEOUT_MS = 3_000;
 const DEFAULT_SAMPLE_LIMIT = 2_048;
-const FORCE_KILL_GRACE_MS = 500;
 const EVIDENCE_SCHEMA_VERSION = 3;
 interface ProbeResult {
   exitCode: number | null;
@@ -1705,78 +1704,25 @@ async function runCompatibilityProbe(
     Object.assign(env, spawnConfig.env);
   }
 
-  return new Promise((resolveProbe) => {
-    const startedAt = Date.now();
-    const child = spawn(spawnConfig.command, spawnConfig.args, {
+  const result = await runSpawnedCommand(
+    spawnConfig.command,
+    spawnConfig.args,
+    {
       cwd: spawnConfig.cwd ?? cwd,
       shell: spawnConfig.shell,
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
-    });
-    let stdout = '';
-    let stderr = '';
-    let settled = false;
-    let timedOut = false;
-    let timeoutError: string | undefined;
-    let forceKillTimer: ReturnType<typeof setTimeout> | null = null;
+      timeoutMs,
+    },
+  );
 
-    const finish = (result: Omit<ProbeResult, 'durationMs'>) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      clearTimeout(timer);
-      if (forceKillTimer) {
-        clearTimeout(forceKillTimer);
-        forceKillTimer = null;
-      }
-      resolveProbe({
-        ...result,
-        durationMs: Date.now() - startedAt,
-      });
-    };
-
-    const timer = setTimeout(() => {
-      timedOut = true;
-      timeoutError = `Timed out after ${timeoutMs}ms`;
-      try {
-        child.kill();
-      } catch {
-        // Ignore kill failures and allow the close/error path to settle.
-      }
-      forceKillTimer = setTimeout(() => {
-        try {
-          child.kill('SIGKILL');
-        } catch {
-          // Ignore force-kill failures and allow the close/error path to settle.
-        }
-      }, FORCE_KILL_GRACE_MS);
-    }, timeoutMs);
-
-    child.stdout?.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString('utf8');
-    });
-    child.stderr?.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString('utf8');
-    });
-    child.once('error', (error) => {
-      finish({
-        exitCode: null,
-        stdout,
-        stderr,
-        timedOut,
-        error: error.message,
-      });
-    });
-    child.once('close', (exitCode) => {
-      finish({
-        exitCode,
-        stdout,
-        stderr,
-        timedOut,
-        ...(timedOut && timeoutError ? { error: timeoutError } : {}),
-      });
-    });
-  });
+  return {
+    exitCode: result.exitCode,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    timedOut: result.timedOut,
+    durationMs: result.durationMs,
+    ...(result.error ? { error: result.error } : {}),
+  };
 }

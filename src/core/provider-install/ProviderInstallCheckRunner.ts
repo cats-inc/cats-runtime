@@ -17,6 +17,15 @@ export interface RuntimeCheckCommandResult {
   error?: string;
 }
 
+export interface SpawnedCommandOptions {
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+  shell?: boolean | string;
+  windowsHide?: boolean;
+  stdio?: ['ignore', 'pipe', 'pipe'];
+  timeoutMs: number;
+}
+
 export interface RuntimeCommandLookupResult {
   available: boolean;
   resolvedPath?: string;
@@ -98,12 +107,23 @@ async function runCommand(
   args: string[],
   timeoutMs: number,
 ): Promise<RuntimeCheckCommandResult> {
+  return runSpawnedCommand(command, args, {
+    timeoutMs,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
+    shell: false,
+  });
+}
+
+export async function runSpawnedCommand(
+  command: string,
+  args: string[],
+  options: SpawnedCommandOptions,
+): Promise<RuntimeCheckCommandResult> {
   return new Promise((resolveCommand) => {
     const startedAt = Date.now();
     const child = spawn(command, args, {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      windowsHide: true,
-      shell: false,
+      ...options,
     });
     let stdout = '';
     let stderr = '';
@@ -130,7 +150,7 @@ async function runCommand(
 
     const timer = setTimeout(() => {
       timedOut = true;
-      timeoutError = `Timed out after ${timeoutMs}ms`;
+      timeoutError = `Timed out after ${options.timeoutMs}ms`;
       try {
         child.kill();
       } catch {
@@ -143,7 +163,7 @@ async function runCommand(
           // Ignore force-kill failures and allow the close/error path to settle.
         }
       }, FORCE_KILL_GRACE_MS);
-    }, timeoutMs);
+    }, options.timeoutMs);
 
     child.stdout?.on('data', (chunk: Buffer) => {
       stdout += chunk.toString('utf8');
