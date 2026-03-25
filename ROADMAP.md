@@ -740,11 +740,11 @@ one caller cannot occupy unlimited peer capacity. The next slice also landed
 bounded nonce/timestamp replay resistance for peer execution requests. The
 following work is still intentionally deferred:
 
+- additive per-peer quota overrides for auth-failure throttling, inbound
+  execution concurrency, and replay nonce ceilings are now available for
+  trusted peer ids via `CATS_RUNTIME_PEER_LIMIT_OVERRIDES`
 - document and optionally enforce a TLS-fronted posture for any deployment
   outside a tightly trusted LAN
-- deepen the current caller-key / per-peer limits into richer peer-specific
-  admission control or quotas if one node still needs stronger multi-tenant
-  protection
 
 #### Runtime Dashboard / Operator Follow-up
 

@@ -130,6 +130,7 @@ function createApp(
         maxAuthFailuresPerWindow: 5,
         maxInboundExecutions: 8,
         maxInboundExecutionsPerPeer: 2,
+        limitOverrides: [],
       },
     }),
     peerExecutionReplay: options.replay ?? new PeerExecutionReplayService({
@@ -137,6 +138,7 @@ function createApp(
         replayWindowMs: 60_000,
         replayNonceTtlMs: 120_000,
         maxReplayNoncesPerCaller: 32,
+        limitOverrides: [],
       },
       now: () => 1_763_510_400_000,
     }),
@@ -180,6 +182,7 @@ describe('peer execution routes', () => {
         maxAuthFailuresPerWindow: 2,
         maxInboundExecutions: 8,
         maxInboundExecutionsPerPeer: 2,
+        limitOverrides: [],
       },
     });
     const { app, execute } = createApp({ admission });
@@ -296,6 +299,7 @@ describe('peer execution routes', () => {
         maxAuthFailuresPerWindow: 5,
         maxInboundExecutions: 8,
         maxInboundExecutionsPerPeer: 1,
+        limitOverrides: [],
       },
     });
     const held = admission.acquireInboundExecution('caller-peer');
@@ -324,6 +328,7 @@ describe('peer execution routes', () => {
           activeForPeer: 1,
           maxGlobal: 8,
           maxPerPeer: 1,
+          overrideApplied: false,
         },
       });
       expect(execute).not.toHaveBeenCalled();
@@ -400,6 +405,7 @@ describe('peer execution routes', () => {
         replayWindowMs: 10_000,
         replayNonceTtlMs: 60_000,
         maxReplayNoncesPerCaller: 32,
+        limitOverrides: [],
       },
       now: () => 1_763_510_400_000,
     });
@@ -435,6 +441,7 @@ describe('peer execution routes', () => {
         replayWindowMs: 60_000,
         replayNonceTtlMs: 60_000,
         maxReplayNoncesPerCaller: 32,
+        limitOverrides: [],
       },
       now: () => 1_763_510_400_000,
     });
@@ -488,5 +495,51 @@ describe('peer execution routes', () => {
       code: 'peer_auth_failed',
     });
     expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('surfaces per-peer inbound quota overrides in admission failures', async () => {
+    const admission = new PeerExecutionAdmissionService({
+      config: {
+        authFailureWindowMs: 60_000,
+        maxAuthFailuresPerWindow: 5,
+        maxInboundExecutions: 8,
+        maxInboundExecutionsPerPeer: 3,
+        limitOverrides: [{
+          peerId: 'caller-peer',
+          maxInboundExecutions: 1,
+        }],
+      },
+    });
+    const held = admission.acquireInboundExecution('caller-peer');
+    expect(held.ok).toBe(true);
+    if (!held.ok) {
+      throw new Error('Expected to hold the overridden inbound execution slot.');
+    }
+
+    try {
+      const { app } = createApp({ admission });
+      const body = JSON.stringify(createRequestBody());
+      const response = await app.request('/peer/executions', {
+        method: 'POST',
+        headers: createSignedHeaders(body),
+        body,
+      });
+
+      expect(response.status).toBe(429);
+      expect(await response.json()).toEqual({
+        error: 'Peer execution caller exceeded inbound execution capacity.',
+        code: 'peer_execution_rate_limited',
+        details: {
+          reason: 'peer_limit',
+          activeGlobal: 1,
+          activeForPeer: 1,
+          maxGlobal: 8,
+          maxPerPeer: 1,
+          overrideApplied: true,
+        },
+      });
+    } finally {
+      held.release();
+    }
   });
 });

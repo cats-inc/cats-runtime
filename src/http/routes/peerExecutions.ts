@@ -109,6 +109,7 @@ peerExecutionRoutes.post('/peer/executions', async (c) => {
         activeForPeer: executionAdmission.activeForPeer,
         maxGlobal: executionAdmission.maxGlobal,
         maxPerPeer: executionAdmission.maxPerPeer,
+        overrideApplied: executionAdmission.overrideApplied,
       },
     }, 429);
   }

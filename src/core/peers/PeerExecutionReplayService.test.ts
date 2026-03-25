@@ -9,6 +9,7 @@ describe('PeerExecutionReplayService', () => {
         replayWindowMs: 5_000,
         replayNonceTtlMs: 10_000,
         maxReplayNoncesPerCaller: 4,
+        limitOverrides: [],
       },
       now: () => now,
     });
@@ -33,6 +34,7 @@ describe('PeerExecutionReplayService', () => {
         replayWindowMs: 30_000,
         replayNonceTtlMs: 10_000,
         maxReplayNoncesPerCaller: 4,
+        limitOverrides: [],
       },
       now: () => now,
     });
@@ -60,6 +62,7 @@ describe('PeerExecutionReplayService', () => {
         replayWindowMs: 30_000,
         replayNonceTtlMs: 30_000,
         maxReplayNoncesPerCaller: 2,
+        limitOverrides: [],
       },
       now: () => now,
     });
@@ -88,6 +91,7 @@ describe('PeerExecutionReplayService', () => {
         replayWindowMs: 30_000,
         replayNonceTtlMs: 10_000,
         maxReplayNoncesPerCaller: 4,
+        limitOverrides: [],
       },
       now: () => now,
     });
@@ -100,6 +104,7 @@ describe('PeerExecutionReplayService', () => {
       replayWindowMs: 30_000,
       nonceTtlMs: 10_000,
       maxNoncesPerCaller: 4,
+      peersWithOverrides: 0,
       trackedCallers: 2,
       trackedNonces: 3,
     });
@@ -108,20 +113,59 @@ describe('PeerExecutionReplayService', () => {
       callerKey: 'peer:b',
       trackedNonces: 2,
       maxNoncesPerCaller: 4,
+      overrideApplied: false,
     });
 
     expect(service.snapshot({ maxCallers: 1 })).toEqual({
       replayWindowMs: 30_000,
       nonceTtlMs: 10_000,
       maxNoncesPerCaller: 4,
+      peersWithOverrides: 0,
       trackedCallers: 2,
       trackedNonces: 3,
       hiddenCallers: 1,
       callers: [{
         callerKey: 'peer:b',
         trackedNonces: 2,
+        maxNoncesPerCaller: 4,
+        overrideApplied: false,
         newestNonceExpiresAt: '2026-03-26T00:00:20.000Z',
       }],
+    });
+  });
+
+  it('applies per-peer replay nonce overrides additively', () => {
+    const now = Date.parse('2026-03-26T00:00:10.000Z');
+    const service = new PeerExecutionReplayService({
+      config: {
+        replayWindowMs: 30_000,
+        replayNonceTtlMs: 30_000,
+        maxReplayNoncesPerCaller: 4,
+        limitOverrides: [{
+          peerId: 'a',
+          maxReplayNoncesPerCaller: 1,
+        }],
+      },
+      now: () => now,
+    });
+
+    expect(service.validate('peer:a', now, 'nonce-1')).toEqual({ ok: true });
+    expect(service.validate('peer:a', now, 'nonce-2')).toEqual({ ok: true });
+
+    expect(service.getCallerSummary('peer:a')).toEqual({
+      callerKey: 'peer:a',
+      trackedNonces: 1,
+      maxNoncesPerCaller: 1,
+      overrideApplied: true,
+    });
+
+    expect(service.getSummary()).toEqual({
+      replayWindowMs: 30_000,
+      nonceTtlMs: 30_000,
+      maxNoncesPerCaller: 4,
+      peersWithOverrides: 1,
+      trackedCallers: 1,
+      trackedNonces: 1,
     });
   });
 });

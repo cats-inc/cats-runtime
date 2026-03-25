@@ -149,6 +149,7 @@ describe('peer routes', () => {
         maxAuthFailuresPerWindow: 2,
         maxInboundExecutions: 4,
         maxInboundExecutionsPerPeer: 2,
+        limitOverrides: [],
       },
       now: () => now,
     });
@@ -157,6 +158,7 @@ describe('peer routes', () => {
         replayWindowMs: 60_000,
         replayNonceTtlMs: 120_000,
         maxReplayNoncesPerCaller: 16,
+        limitOverrides: [],
       },
       now: () => now,
     });
@@ -227,6 +229,7 @@ describe('peer routes', () => {
         authFailures: {
           windowMs: 1_000,
           maxFailuresPerWindow: 2,
+          peersWithOverrides: 0,
           trackedCallers: 1,
           limitedCallers: 1,
           hiddenCallers: 0,
@@ -242,12 +245,15 @@ describe('peer routes', () => {
           activeGlobal: 1,
           maxGlobal: 4,
           maxPerPeer: 2,
+          peersWithOverrides: 0,
           activePeers: 1,
           hiddenPeers: 0,
           peers: [
             {
               peerId: 'peer-live',
               activeExecutions: 1,
+              maxPerPeer: 2,
+              overrideApplied: false,
             },
           ],
         },
@@ -255,6 +261,7 @@ describe('peer routes', () => {
           replayWindowMs: 60_000,
           nonceTtlMs: 120_000,
           maxNoncesPerCaller: 16,
+          peersWithOverrides: 0,
           trackedCallers: 1,
           trackedNonces: 2,
           hiddenCallers: 0,
@@ -262,6 +269,8 @@ describe('peer routes', () => {
             expect.objectContaining({
               callerKey: 'peer:peer-live',
               trackedNonces: 2,
+              maxNoncesPerCaller: 16,
+              overrideApplied: false,
             }),
           ],
         },
@@ -292,6 +301,7 @@ describe('peer routes', () => {
         maxAuthFailuresPerWindow: 3,
         maxInboundExecutions: 2,
         maxInboundExecutionsPerPeer: 1,
+        limitOverrides: [],
       },
     });
     const replay = new PeerExecutionReplayService({
@@ -299,6 +309,7 @@ describe('peer routes', () => {
         replayWindowMs: 60_000,
         replayNonceTtlMs: 120_000,
         maxReplayNoncesPerCaller: 16,
+        limitOverrides: [],
       },
       now: () => now,
     });
@@ -335,6 +346,7 @@ describe('peer routes', () => {
         authFailures: {
           windowMs: 1_000,
           maxFailuresPerWindow: 3,
+          peersWithOverrides: 0,
           trackedCallers: 1,
           limitedCallers: 0,
         },
@@ -342,6 +354,7 @@ describe('peer routes', () => {
           activeGlobal: 1,
           maxGlobal: 2,
           maxPerPeer: 1,
+          peersWithOverrides: 0,
           activePeers: 1,
           saturated: false,
         },
@@ -349,6 +362,7 @@ describe('peer routes', () => {
           replayWindowMs: 60_000,
           nonceTtlMs: 120_000,
           maxNoncesPerCaller: 16,
+          peersWithOverrides: 0,
           trackedCallers: 1,
           trackedNonces: 1,
         },
@@ -363,12 +377,96 @@ describe('peer routes', () => {
           peerId: 'peer-live',
           activeExecutions: 1,
           maxPerPeer: 1,
+          overrideApplied: false,
           saturated: true,
         },
         replay: {
           callerKey: 'peer:peer-live',
           trackedNonces: 1,
           maxNoncesPerCaller: 16,
+          overrideApplied: false,
+        },
+      },
+    }));
+  });
+
+  it('surfaces per-peer quota overrides on read-only peer diagnostics', async () => {
+    const now = Date.parse('2026-03-25T00:00:04.000Z');
+    const registry = new PeerRegistry({
+      stalePeerTtlMs: 5_000,
+      now: () => now,
+    });
+    registry.upsert(
+      createAdvertisement('peer-live', '2026-03-25T00:00:03.000Z', 5_000),
+      { sourceId: 'lan:live', sourceKind: 'lan' },
+    );
+    const admission = new PeerExecutionAdmissionService({
+      config: {
+        authFailureWindowMs: 1_000,
+        maxAuthFailuresPerWindow: 3,
+        maxInboundExecutions: 4,
+        maxInboundExecutionsPerPeer: 2,
+        limitOverrides: [{
+          peerId: 'peer-live',
+          maxInboundExecutions: 1,
+        }, {
+          peerId: 'caller-a',
+          maxAuthFailuresPerWindow: 1,
+        }],
+      },
+      now: () => now,
+    });
+    const replay = new PeerExecutionReplayService({
+      config: {
+        replayWindowMs: 60_000,
+        replayNonceTtlMs: 120_000,
+        maxReplayNoncesPerCaller: 16,
+        limitOverrides: [{
+          peerId: 'peer-live',
+          maxReplayNoncesPerCaller: 2,
+        }],
+      },
+      now: () => now,
+    });
+    admission.recordAuthFailure('peer:caller-a');
+    admission.acquireInboundExecution('peer-live');
+    replay.validate('peer:peer-live', now, 'nonce-1');
+
+    const ctx: AppContext = {
+      startup: createRuntimeStartupState(),
+      peerRegistry: registry,
+      peerExecutionAdmission: admission,
+      peerExecutionReplay: replay,
+      peerCapabilities: {
+        getLocalPeerId: () => 'local-peer',
+      } as never,
+      peerDiscovery: {
+        snapshot: () => createDisabledPeerDiscoverySnapshot('local-peer', registry.summary(now)),
+      } as never,
+    } as AppContext;
+    const app = new Hono<{ Variables: { ctx: AppContext } }>();
+    app.use('*', async (c, next) => {
+      c.set('ctx', ctx);
+      await next();
+    });
+    app.route('/', peerRoutes);
+
+    const response = await app.request('/peers/peer-live');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(expect.objectContaining({
+      guardrails: {
+        inboundExecutions: {
+          peerId: 'peer-live',
+          activeExecutions: 1,
+          maxPerPeer: 1,
+          overrideApplied: true,
+          saturated: true,
+        },
+        replay: {
+          callerKey: 'peer:peer-live',
+          trackedNonces: 1,
+          maxNoncesPerCaller: 2,
+          overrideApplied: true,
         },
       },
     }));

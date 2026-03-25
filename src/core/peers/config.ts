@@ -4,6 +4,7 @@ import type { RuntimeConfig } from '../config.js';
 import { getRuntimeConfigEnv } from '../config.js';
 import type {
   PeerCapabilityTarget,
+  PeerLimitOverride,
   PeerLoadSummary,
   PeerRuntimeConfig,
   PeerTrustSummary,
@@ -72,6 +73,7 @@ export function loadPeerRuntimeConfig(config: RuntimeConfig): PeerRuntimeConfig 
     env.CATS_RUNTIME_PEER_MAX_REPLAY_NONCES_PER_CALLER,
     DEFAULT_MAX_REPLAY_NONCES_PER_CALLER,
   );
+  const limitOverrides = parsePeerLimitOverrides(env.CATS_RUNTIME_PEER_LIMIT_OVERRIDES);
   const sharedSecrets = mergeSharedSecrets(
     sanitizeString(env.CATS_RUNTIME_PEER_SHARED_SECRET),
     parseStringList(env.CATS_RUNTIME_PEER_SHARED_SECRETS),
@@ -107,6 +109,7 @@ export function loadPeerRuntimeConfig(config: RuntimeConfig): PeerRuntimeConfig 
     staticPeers: enabled
       ? parseStaticPeers(env.CATS_RUNTIME_PEER_STATIC_PEERS, maxAdvertisedTargets)
       : [],
+    limitOverrides,
   };
 }
 
@@ -243,6 +246,70 @@ function mergeSharedSecrets(
   ]));
 }
 
+function parsePeerLimitOverrides(raw: string | undefined): PeerLimitOverride[] {
+  const trimmed = sanitizeString(raw);
+  if (!trimmed) {
+    return [];
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch (error) {
+    throw new Error(
+      `Invalid CATS_RUNTIME_PEER_LIMIT_OVERRIDES JSON: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+
+  const items = Array.isArray(parsed)
+    ? parsed
+    : parsed && typeof parsed === 'object'
+      ? Object.entries(parsed as Record<string, unknown>).map(([peerId, value]) => ({
+          peerId,
+          ...(value && typeof value === 'object' && !Array.isArray(value)
+            ? value as Record<string, unknown>
+            : {}),
+        }))
+      : [];
+
+  return items
+    .flatMap((item) => normalizePeerLimitOverride(item))
+    .sort((left, right) => left.peerId.localeCompare(right.peerId));
+}
+
+function normalizePeerLimitOverride(value: unknown): PeerLimitOverride[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return [];
+  }
+
+  const record = value as Record<string, unknown>;
+  const peerId = sanitizeString(record.peerId);
+  if (!peerId) {
+    return [];
+  }
+
+  const maxAuthFailuresPerWindow = parsePositiveIntLike(record.maxAuthFailuresPerWindow);
+  const maxInboundExecutions = parsePositiveIntLike(record.maxInboundExecutions);
+  const maxReplayNoncesPerCaller = parsePositiveIntLike(record.maxReplayNoncesPerCaller);
+
+  if (
+    maxAuthFailuresPerWindow === undefined
+    && maxInboundExecutions === undefined
+    && maxReplayNoncesPerCaller === undefined
+  ) {
+    return [];
+  }
+
+  return [{
+    peerId: peerId.toLowerCase(),
+    ...(maxAuthFailuresPerWindow !== undefined ? { maxAuthFailuresPerWindow } : {}),
+    ...(maxInboundExecutions !== undefined ? { maxInboundExecutions } : {}),
+    ...(maxReplayNoncesPerCaller !== undefined ? { maxReplayNoncesPerCaller } : {}),
+  }];
+}
+
 function normalizeLoad(value: unknown): Partial<PeerLoadSummary> | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return undefined;
@@ -338,6 +405,13 @@ function parsePositiveIntOrUndefined(value: unknown): number | undefined {
     return undefined;
   }
   return parsed;
+}
+
+function parsePositiveIntLike(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return Math.trunc(value);
+  }
+  return parsePositiveIntOrUndefined(value);
 }
 
 function parseNonNegativeInt(value: unknown): number | undefined {

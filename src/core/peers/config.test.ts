@@ -44,6 +44,7 @@ describe('peer runtime config', () => {
       trustedPeerIds: [],
       rejectedPeerIds: [],
       staticPeers: [],
+      limitOverrides: [],
     });
   });
 
@@ -109,6 +110,15 @@ describe('peer runtime config', () => {
       CATS_RUNTIME_PEER_SHARED_SECRETS: '["lan-secret-old","lan-secret-older"]',
       CATS_RUNTIME_PEER_TRUSTED_IDS: 'peer-a, peer-b , peer-a',
       CATS_RUNTIME_PEER_REJECTED_IDS: '["peer-c","peer-d"]',
+      CATS_RUNTIME_PEER_LIMIT_OVERRIDES: JSON.stringify({
+        'peer-a': {
+          maxAuthFailuresPerWindow: 3,
+          maxInboundExecutions: 1,
+        },
+        'peer-b': {
+          maxReplayNoncesPerCaller: 12,
+        },
+      }),
     }));
 
     expect(loadPeerRuntimeConfig(config)).toEqual(expect.objectContaining({
@@ -126,6 +136,14 @@ describe('peer runtime config', () => {
       sharedSecrets: ['lan-secret', 'lan-secret-old', 'lan-secret-older'],
       trustedPeerIds: ['peer-a', 'peer-b'],
       rejectedPeerIds: ['peer-c', 'peer-d'],
+      limitOverrides: [{
+        peerId: 'peer-a',
+        maxAuthFailuresPerWindow: 3,
+        maxInboundExecutions: 1,
+      }, {
+        peerId: 'peer-b',
+        maxReplayNoncesPerCaller: 12,
+      }],
     }));
   });
 });

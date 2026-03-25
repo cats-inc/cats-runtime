@@ -2485,7 +2485,8 @@ Example response shape:
 `GET /peers/{peerId}` returns one peer detail record. Unknown peer ids return
 `404`. When peer execution admission control is enabled, the detail response
 also includes additive `guardrails.inboundExecutions` plus
-`guardrails.replay` state for that peer.
+`guardrails.replay` state for that peer, including whether a peer-specific
+quota override is active.
 
 `GET /diagnostics/peers` is the host-facing peer diagnostics summary. It
 combines the LAN discovery snapshot, registry summary counts, the current
@@ -2536,7 +2537,8 @@ Route semantics:
   peer_auth_rate_limited` when the bounded failure window is exceeded
 - applies bounded inbound admission control and returns `429
   peer_execution_rate_limited` when a caller exceeds configured peer-execution
-  concurrency
+  concurrency; rejection details now include `overrideApplied` when a
+  peer-specific quota override was responsible for the tighter limit
 - returns normalized streamed events, with additive `metadata.peerExecution`
   on the callee and additive `metadata.peerRouting` on the caller relay path
 - stays execution-only: the callee does not become owner of the caller-visible
@@ -2554,6 +2556,9 @@ Topology notes:
 - request-body integrity and freshness are protected with a shared-secret HMAC
   plus nonce/timestamp replay resistance, but per-peer credentials and
   stronger network transport assumptions are later follow-up, not solved by v0
+- operators may also configure additive `CATS_RUNTIME_PEER_LIMIT_OVERRIDES`
+  per trusted peer id for tighter auth-failure, inbound-concurrency, or replay
+  nonce ceilings without changing the global defaults
 
 Peer-routing failure events are additive. Streamed `error` events may include:
 

@@ -138,6 +138,10 @@ Current auth/trust model:
   HMAC signature over the raw JSON request body plus
   `x-cats-peer-timestamp` / `x-cats-peer-nonce`, using
   `x-cats-peer-signature: sha256=<64-hex>`
+- `CATS_RUNTIME_PEER_LIMIT_OVERRIDES` can tighten quotas for specific trusted
+  peer ids without changing the global defaults; supported override keys are
+  `maxAuthFailuresPerWindow`, `maxInboundExecutions`, and
+  `maxReplayNoncesPerCaller`
 - use a strong random peer shared secret, preferably at least 32 characters
 - trust is directional and configured per runtime with
   `CATS_RUNTIME_PEER_TRUSTED_IDS` / `CATS_RUNTIME_PEER_REJECTED_IDS`
@@ -236,6 +240,7 @@ Keep `.env` for runtime-wide values and secrets:
 - `CATS_RUNTIME_PEER_REPLAY_WINDOW_MS=120000`
 - `CATS_RUNTIME_PEER_REPLAY_NONCE_TTL_MS=120000`
 - `CATS_RUNTIME_PEER_MAX_REPLAY_NONCES_PER_CALLER=64`
+- `CATS_RUNTIME_PEER_LIMIT_OVERRIDES=[{"peerId":"desk-b","maxInboundExecutions":1,"maxAuthFailuresPerWindow":3,"maxReplayNoncesPerCaller":16}]`
 - `CATS_RUNTIME_PEER_ALLOW_HEURISTIC_ROUTING=false`
 - `CATS_RUNTIME_PEER_SHARED_SECRET=`
 - `CATS_RUNTIME_PEER_SHARED_SECRETS=`

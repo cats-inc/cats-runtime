@@ -1860,12 +1860,14 @@ providers:
             peerId: localPeerId,
             activeExecutions: 0,
             maxPerPeer: localPeerGuardrails.maxPerPeer,
+            overrideApplied: localPeerGuardrails.overrideApplied,
             saturated: false,
           },
           replay: {
             callerKey: `peer:${localPeerId}`,
             trackedNonces: 0,
             maxNoncesPerCaller: peerReplaySummary.maxNoncesPerCaller,
+            overrideApplied: false,
           },
         },
         peer: expect.objectContaining({

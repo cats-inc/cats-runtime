@@ -10,6 +10,7 @@ describe('PeerExecutionAdmissionService', () => {
         maxAuthFailuresPerWindow: 3,
         maxInboundExecutions: 4,
         maxInboundExecutionsPerPeer: 2,
+        limitOverrides: [],
       },
       now: () => now,
     });
@@ -46,6 +47,7 @@ describe('PeerExecutionAdmissionService', () => {
         maxAuthFailuresPerWindow: 2,
         maxInboundExecutions: 4,
         maxInboundExecutionsPerPeer: 2,
+        limitOverrides: [],
       },
     });
 
@@ -66,6 +68,7 @@ describe('PeerExecutionAdmissionService', () => {
         maxAuthFailuresPerWindow: 3,
         maxInboundExecutions: 2,
         maxInboundExecutionsPerPeer: 1,
+        limitOverrides: [],
       },
     });
 
@@ -115,6 +118,7 @@ describe('PeerExecutionAdmissionService', () => {
         maxAuthFailuresPerWindow: 2,
         maxInboundExecutions: 3,
         maxInboundExecutionsPerPeer: 2,
+        limitOverrides: [],
       },
       now: () => now,
     });
@@ -129,6 +133,7 @@ describe('PeerExecutionAdmissionService', () => {
       authFailures: {
         windowMs: 1_000,
         maxFailuresPerWindow: 2,
+        peersWithOverrides: 0,
         trackedCallers: 2,
         limitedCallers: 1,
       },
@@ -136,6 +141,7 @@ describe('PeerExecutionAdmissionService', () => {
         activeGlobal: 2,
         maxGlobal: 3,
         maxPerPeer: 2,
+        peersWithOverrides: 0,
         activePeers: 2,
         saturated: false,
       },
@@ -145,6 +151,7 @@ describe('PeerExecutionAdmissionService', () => {
       peerId: 'peer-zeta',
       activeExecutions: 1,
       maxPerPeer: 2,
+      overrideApplied: false,
       saturated: false,
     });
 
@@ -152,12 +159,15 @@ describe('PeerExecutionAdmissionService', () => {
       authFailures: {
         windowMs: 1_000,
         maxFailuresPerWindow: 2,
+        peersWithOverrides: 0,
         trackedCallers: 2,
         limitedCallers: 1,
         hiddenCallers: 1,
         callers: [{
           callerKey: 'peer:zeta',
           failureCount: 2,
+          maxFailuresPerWindow: 2,
+          overrideApplied: false,
           limited: true,
           retryAfterMs: 1_000,
           oldestFailureAt: '2026-03-26T00:00:00.000Z',
@@ -168,11 +178,14 @@ describe('PeerExecutionAdmissionService', () => {
         activeGlobal: 2,
         maxGlobal: 3,
         maxPerPeer: 2,
+        peersWithOverrides: 0,
         activePeers: 2,
         hiddenPeers: 1,
         peers: [{
           peerId: 'peer-alpha',
           activeExecutions: 1,
+          maxPerPeer: 2,
+          overrideApplied: false,
         }],
       },
     });
@@ -185,6 +198,7 @@ describe('PeerExecutionAdmissionService', () => {
       authFailures: {
         windowMs: 1_000,
         maxFailuresPerWindow: 2,
+        peersWithOverrides: 0,
         trackedCallers: 0,
         limitedCallers: 0,
         hiddenCallers: 0,
@@ -194,10 +208,74 @@ describe('PeerExecutionAdmissionService', () => {
         activeGlobal: 0,
         maxGlobal: 3,
         maxPerPeer: 2,
+        peersWithOverrides: 0,
         activePeers: 0,
         hiddenPeers: 0,
         peers: [],
       },
+    });
+  });
+
+  it('applies per-peer auth and inbound execution overrides additively', () => {
+    let now = 10_000;
+    const service = new PeerExecutionAdmissionService({
+      config: {
+        authFailureWindowMs: 1_000,
+        maxAuthFailuresPerWindow: 3,
+        maxInboundExecutions: 4,
+        maxInboundExecutionsPerPeer: 2,
+        limitOverrides: [{
+          peerId: 'peer-a',
+          maxAuthFailuresPerWindow: 2,
+          maxInboundExecutions: 1,
+        }],
+      },
+      now: () => now,
+    });
+
+    service.recordAuthFailure('peer:peer-a');
+    const limited = service.recordAuthFailure('peer:peer-a');
+    expect(limited).toEqual({
+      limited: true,
+      retryAfterMs: 1_000,
+      failureCount: 2,
+    });
+
+    expect(service.getSummary()).toEqual({
+      authFailures: {
+        windowMs: 1_000,
+        maxFailuresPerWindow: 3,
+        peersWithOverrides: 1,
+        trackedCallers: 1,
+        limitedCallers: 1,
+      },
+      inboundExecutions: {
+        activeGlobal: 0,
+        maxGlobal: 4,
+        maxPerPeer: 2,
+        peersWithOverrides: 1,
+        activePeers: 0,
+        saturated: false,
+      },
+    });
+
+    const first = service.acquireInboundExecution('peer-a');
+    expect(first).toMatchObject({
+      ok: true,
+      activeGlobal: 1,
+      activeForPeer: 1,
+      overrideApplied: true,
+    });
+
+    const second = service.acquireInboundExecution('peer-a');
+    expect(second).toMatchObject({
+      ok: false,
+      reason: 'peer_limit',
+      activeGlobal: 1,
+      activeForPeer: 1,
+      maxGlobal: 4,
+      maxPerPeer: 1,
+      overrideApplied: true,
     });
   });
 });

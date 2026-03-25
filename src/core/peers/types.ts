@@ -118,6 +118,13 @@ export interface StaticPeerSeed {
   ttlMs?: number;
 }
 
+export interface PeerLimitOverride {
+  peerId: string;
+  maxAuthFailuresPerWindow?: number;
+  maxInboundExecutions?: number;
+  maxReplayNoncesPerCaller?: number;
+}
+
 export interface PeerRuntimeConfig {
   enabled: boolean;
   peerId?: string;
@@ -143,6 +150,7 @@ export interface PeerRuntimeConfig {
   trustedPeerIds: string[];
   rejectedPeerIds: string[];
   staticPeers: StaticPeerSeed[];
+  limitOverrides: PeerLimitOverride[];
 }
 
 export interface PeerDiscoveryAdapterSnapshot {

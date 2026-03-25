@@ -185,7 +185,8 @@ src/
   `GET /peers/{peerId}`, and `GET /diagnostics/peers`
 - Keeps peer guardrail visibility additive: lightweight admission summaries on
   peer read routes and bounded auth-throttle/inbound-capacity/replay detail on
-  diagnostics routes
+  diagnostics routes, including whether a tighter per-peer quota override is
+  active
 - Exposes the dedicated runtime-to-runtime `POST /peer/executions` contract and
   additive `routing` handling on `POST /sessions/{id}/messages` while keeping
   caller-visible session ownership local
@@ -243,6 +244,10 @@ src/
   (`PeerExecutionReplayService`), peer-only admission/throttling
   (`PeerExecutionAdmissionService`), and callee-side bounded execution
   (`PeerExecutionService`)
+- Supports additive per-peer quota overrides on top of the global peer
+  guardrails so operators can tighten auth-failure, inbound-concurrency, and
+  replay ceilings for specific trusted peers without changing the shared LAN
+  defaults
 - Treats peer execution as an execution-only extension: the caller runtime
   still owns host-visible session ids, history, observe snapshots, wakeups,
   browser state, and worktree lifecycle
