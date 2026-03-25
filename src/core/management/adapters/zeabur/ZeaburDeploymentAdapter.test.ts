@@ -187,6 +187,20 @@ describe('ZeaburDeploymentAdapter', () => {
       expect(call[1]).toContain('log');
     });
 
+    it('uses --service-id when a serviceId target is provided', async () => {
+      mockRun.mockResolvedValue(ok('log line 1\nlog line 2'));
+
+      await adapter.execute(request({
+        action: 'read_deployment_logs',
+        target: { serviceId: 'svc-123' },
+      }));
+
+      const call = mockRun.mock.calls[0];
+      expect(call[1]).toContain('--service-id');
+      expect(call[1]).toContain('svc-123');
+      expect(call[1]).not.toContain('--service');
+    });
+
     it('truncates oversized logs', async () => {
       const huge = 'x'.repeat(15_000);
       mockRun.mockResolvedValue(ok(huge));

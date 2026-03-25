@@ -5,7 +5,13 @@ describe('ManagementOperationStore', () => {
   let store: ManagementOperationStore;
 
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
     store = new ManagementOperationStore();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('creates an operation with a unique id', () => {
@@ -65,12 +71,7 @@ describe('ManagementOperationStore', () => {
 
   it('cleans up expired operations', () => {
     const op = store.create();
-
-    // Mock the startedAt to 11 minutes ago
-    const raw = store.get(op.operationId);
-    if (raw) {
-      (raw as { startedAt: string }).startedAt = new Date(Date.now() - 11 * 60_000).toISOString();
-    }
+    vi.advanceTimersByTime(11 * 60_000);
 
     store.cleanup();
     expect(store.get(op.operationId)).toBeUndefined();
@@ -79,5 +80,16 @@ describe('ManagementOperationStore', () => {
   it('stores optional timeoutMs', () => {
     const op = store.create(30_000);
     expect(op.timeoutMs).toBe(30_000);
+  });
+
+  it('keeps active operations alive based on updatedAt activity', () => {
+    const op = store.create();
+
+    vi.advanceTimersByTime(9 * 60_000);
+    const touched = store.touch(op.operationId);
+    expect(touched).toBeDefined();
+
+    vi.advanceTimersByTime(2 * 60_000);
+    expect(store.get(op.operationId)).toBeDefined();
   });
 });

@@ -53,6 +53,13 @@ export class ManagementOperationStore {
     return op;
   }
 
+  touch(operationId: string): RuntimeManagementOperation | undefined {
+    const op = this.operations.get(operationId);
+    if (!op) return undefined;
+    op.updatedAt = new Date().toISOString();
+    return op;
+  }
+
   complete(
     operationId: string,
     result: Record<string, unknown>,
@@ -80,7 +87,7 @@ export class ManagementOperationStore {
   }
 
   private isExpired(op: RuntimeManagementOperation): boolean {
-    const age = Date.now() - new Date(op.startedAt).getTime();
+    const age = Date.now() - new Date(op.updatedAt).getTime();
     return age > DEFAULT_TTL_MS;
   }
 }

@@ -249,6 +249,16 @@ describe('RuntimeManagementService', () => {
     expect(result!.operation!.status).toBe('polling');
   });
 
+  it('touches polling operations on resume so active waits do not expire while being resumed', async () => {
+    const op = service.operations.create();
+    const staleTimestamp = new Date(Date.now() - 9 * 60_000).toISOString();
+    (op as { updatedAt: string }).updatedAt = staleTimestamp;
+
+    const result = await service.resumeOperation(op.operationId);
+    expect(result).toBeDefined();
+    expect(result!.operation!.updatedAt).not.toBe(staleTimestamp);
+  });
+
   it('resumes a polling operation with adapter context by re-entering pollChecks', async () => {
     // Simulate what the GithubReviewAdapter does: create an operation with request context
     const op = service.operations.create(5000);

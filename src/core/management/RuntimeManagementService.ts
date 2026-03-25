@@ -128,9 +128,11 @@ export class RuntimeManagementService {
       };
     }
 
+    const activeOp = this.operations.touch(operationId) ?? op;
+
     // Still polling — try to re-enter the adapter's poll loop using
     // the request context stored by the adapter when the operation was created
-    const ctx = op.result?._requestContext as {
+    const ctx = activeOp.result?._requestContext as {
       domain?: string;
       action?: string;
       cwd?: string;
@@ -141,7 +143,7 @@ export class RuntimeManagementService {
     if (ctx?.adapter) {
       const adapter = this.adapters.get(ctx.adapter);
       if (adapter && typeof (adapter as GithubReviewAdapter).pollChecks === 'function') {
-        const pollTimeout = timeoutMs ?? op.timeoutMs ?? 30_000;
+        const pollTimeout = timeoutMs ?? activeOp.timeoutMs ?? 30_000;
         return (adapter as GithubReviewAdapter).pollChecks(
           { domain: (ctx.domain ?? 'review') as 'review', action: (ctx.action ?? 'wait_review_checks') as 'wait_review_checks' },
           operationId,
@@ -172,7 +174,7 @@ export class RuntimeManagementService {
       warnings: [],
       blockedReasons: [],
       capabilityGaps: [],
-      operation: op,
+      operation: activeOp,
     };
   }
 
