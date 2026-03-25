@@ -617,29 +617,38 @@ describe('bootstrap mode server', () => {
     }
   });
 
-  it('GET /providers/setup/state omits provider detail outside bootstrap mode', async () => {
+  it('GET /providers/setup/state includes full detail in non-bootstrap mode after a scan', { timeout: 30_000 }, async () => {
     const { root, cleanup } = createTestRoot();
     try {
       const env = createTestEnv(root);
       ensureDirs(env);
       const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
-      // Non-bootstrap mode
-      const startup = createRuntimeStartupState({ bootstrapRequired: false });
+      // Start in bootstrap, scan, then exit bootstrap to verify detail persists
+      const startup = createRuntimeStartupState({ bootstrapRequired: true });
       const runtime = createRuntimeServer(config, { startup });
       try {
+        // Run a scan while still in bootstrap
+        await runtime.app.request('/providers/setup/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ manual: true }),
+        });
+
+        // Exit bootstrap mode
+        startup.bootstrapRequired = false;
+
+        // GET state in non-bootstrap — full detail should still be present
+        // because setup routes go through bearer auth like any other route
         const response = await runtime.app.request('/providers/setup/state');
         expect(response.status).toBe(200);
         const body = await response.json() as Record<string, unknown>;
         expect(body.bootstrapRequired).toBe(false);
-        // Summary fields present
-        expect(body.state).toBeTruthy();
-        expect(body.universe).toBeTruthy();
-        // Full detail NOT exposed on unauthenticated route outside bootstrap
-        const scan = body.scan as Record<string, unknown> | null;
-        if (scan) {
-          expect(scan.providers).toBeUndefined();
-        }
-        expect(body.manualScan).toBeUndefined();
+        const scan = body.scan as Record<string, unknown>;
+        expect(scan).toBeTruthy();
+        expect(Array.isArray(scan.providers)).toBe(true);
+        expect((scan.providers as unknown[]).length).toBeGreaterThan(0);
+        expect(typeof scan.providerCount).toBe('number');
+        expect(body.manualScan).toBeTruthy();
       } finally {
         await runtime.close();
       }

@@ -260,7 +260,9 @@ snapshot. Response shape:
 
 Both `scan.providers` and `manualScan` expose the full persisted scan data so
 that UI consumers (dashboard, provider-setup) can render provider status without
-forcing a fresh scan on page load.
+forcing a fresh scan on page load.  The route goes through global bearer auth
+like other `/providers/setup/*` endpoints (the path check in the logger
+middleware only skips request logging, not authentication).
 
 `POST /providers/setup/scan` triggers a provider scan. Pass `{"manual": true}`
 in the body for an explicit manual scan. Returns scan results with per-provider
