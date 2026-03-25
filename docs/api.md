@@ -1452,8 +1452,8 @@ action-scoped lifecycle coordination without relying on a single global
     `{ "family": "work", "slug": "product-manager", "version": "2026.03" }`
 - `context`: structured invocation metadata such as task/workspace hints
 - `outputDir`: output hint for reports, documents, or generated artifacts
-- `requestedStrategy`: runtime-owned execution strategy hint such as `react` or
-  `pdca`
+- `requestedStrategy`: runtime-owned execution strategy hint such as `react`,
+  `pdca`, or `reflexion`
 - `acceptanceCriteria`: additive success / done conditions for strategy loops
 - `strategyContext`: structured strategy-local inputs such as recovery hints
 - `correlation`: additive correlation ids / labels for upper-layer tracing
@@ -1494,10 +1494,11 @@ where applicable so later history/resume flows can observe the same bootstrap
 metadata.
 
 When no strategy hint is provided, runtime-hosted API/local loops continue to
-use the compatibility `simple_tool_call` path. Explicit `react` and `pdca`
-requests resolve through runtime-hosted loops. Unsupported hints such as
-`reflexion` remain additive request metadata but compatibility-fallback to
-`simple_tool_call`. Strategy resolution is additive and currently follows
+use the compatibility `simple_tool_call` path. Explicit `react`, `pdca`, and
+`reflexion` requests resolve through runtime-hosted loops. Unsupported hints
+such as `tree_of_thoughts` remain additive request metadata but
+compatibility-fallback to `simple_tool_call`. Strategy resolution is additive
+and currently follows
 explicit request, then runtime-owned remembered preference, then the
 compatibility fallback. Existing callers that do not send strategy fields
 remain valid.

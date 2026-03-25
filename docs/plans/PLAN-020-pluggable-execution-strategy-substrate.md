@@ -215,6 +215,7 @@ substrate.
 |------|--------|
 | 2026-03-26 | Plan created for additive runtime-owned strategy registry, `simple_tool_call` compatibility wrapping, and first-slice `react` rollout |
 | 2026-03-26 | First-slice substrate is landed and verified; follow-through now continues under roadmap item OPT-10, with `pdca` already added as the next runtime-owned family |
+| 2026-03-26 | The next follow-through slice is landed and verified; `reflexion` now runs as a bounded runtime-owned critique/revision loop with additive reflection events and strategy-local state |
 
 ---
 

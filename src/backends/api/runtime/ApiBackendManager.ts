@@ -168,6 +168,8 @@ function buildStrategyInstructionOverlay(
     strategyPrompt = 'Execution strategy: react. Work in short reason-act-observe loops, avoid repeating the same tool calls, and stop once the user request is satisfied.';
   } else if (strategyId === 'pdca') {
     strategyPrompt = 'Execution strategy: pdca. Work in explicit plan-do-check-act cycles: plan the next bounded action set, execute only that batch, check the results against the acceptance criteria, and then adjust before another cycle.';
+  } else if (strategyId === 'reflexion') {
+    strategyPrompt = 'Execution strategy: reflexion. Produce a bounded draft, critique it explicitly against the acceptance criteria, and revise before finalizing; use tools only when the critique reveals a concrete gap.';
   }
   if (!strategyPrompt) {
     return undefined;
@@ -196,7 +198,9 @@ function resolveStrategyConstraints(
   stuckThreshold: number;
 } {
   const strategyContext = request?.strategyContext;
-  const usesManagedLoopGuards = strategyId === 'react' || strategyId === 'pdca';
+  const usesManagedLoopGuards = strategyId === 'react'
+    || strategyId === 'pdca'
+    || strategyId === 'reflexion';
   const stepLimit = readStrategyPositiveInteger(
     strategyContext,
     strategyId === 'pdca' ? 'maxCycles' : 'maxSteps',

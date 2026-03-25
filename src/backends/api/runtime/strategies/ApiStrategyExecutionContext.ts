@@ -197,6 +197,13 @@ export class ApiStrategyExecutionContext {
     };
   }
 
+  appendRuntimeGuidance(text: string): void {
+    this.options.conversation.push({
+      role: 'user',
+      parts: [{ type: 'text', text }],
+    });
+  }
+
   createResultEvent(): StreamEvent {
     return {
       type: 'result',

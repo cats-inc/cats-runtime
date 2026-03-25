@@ -786,19 +786,21 @@ of the shipped peer diagnostics/read surfaces:
 - a compatibility-owned `simple_tool_call` fallback path
 - the first real runtime-hosted loop via `react`
 
-The next follow-through slice is now partially landed. The runtime also owns a
-real `pdca` loop with runtime-local plan/do/check/act phase events, bounded
-step/cycle/timeout guards, and strategy-local state persisted onto the runtime
-session. `reflexion` and later families remain deferred.
+The next follow-through slices are now partially landed. The runtime now owns a
+real `pdca` loop with runtime-local plan/do/check/act phase events, plus a
+bounded `reflexion` loop with runtime-owned critique/revision passes,
+reflection-local state, and additive reflection events persisted onto the
+runtime session. `tree_of_thoughts` and later families remain deferred.
 
 That substrate is still intentionally incomplete. `cats` can now bridge
 product-owned defaults such as Chat -> `react`, Work -> `pdca`, and Code ->
-`reflexion`, and the runtime now owns `simple_tool_call`, `react`, and `pdca`.
+`reflexion`, and the runtime now owns `simple_tool_call`, `react`, `pdca`, and
+`reflexion`.
 
 Until the next slice lands, unsupported strategy requests must remain honest:
 preserve additive request metadata, resolve through the registry, and degrade to
-`simple_tool_call` rather than pretending `reflexion` or later-family semantics
-already exist.
+`simple_tool_call` rather than pretending `tree_of_thoughts` or later-family
+semantics already exist.
 
 #### Current Implementation Status
 
@@ -807,8 +809,11 @@ already exist.
 - explicit `react` requests execute through the new bounded runtime-owned loop
 - explicit `pdca` requests now execute through a real runtime-owned phase loop
   with additive plan/do/check/act events and strategy-local state
-- unsupported hints such as `reflexion` remain visible in request metadata but
-  compatibility-fallback to `simple_tool_call`
+- explicit `reflexion` requests now execute through a bounded runtime-owned
+  critique/revision loop with additive reflection events and strategy-local
+  state
+- unsupported hints such as `tree_of_thoughts` remain visible in request
+  metadata but compatibility-fallback to `simple_tool_call`
 - runtime session state owns strategy-local summaries; product task records stay
   outside the runtime boundary
 
@@ -817,8 +822,8 @@ already exist.
 - add the next real runtime-owned strategy families behind the existing
   registry and execution seam
 - prioritize strategies that upper-layer products already point at through
-  product-owned defaults, continuing with `reflexion` after the landed `pdca`
-  slice
+  product-owned defaults, continuing with `tree_of_thoughts` or other deferred
+  families after the landed `reflexion` slice
 - keep the rollout additive for existing session/message callers and stream or
   observe consumers
 - keep no-hint compatibility behavior intact while new families land
@@ -828,12 +833,12 @@ already exist.
 
 #### Deferred Scope
 
-- do not fake `reflexion` or later families by smuggling product task-planning
-  logic into prompt overlays
+- do not fake `tree_of_thoughts` or later families by smuggling product
+  task-planning logic into prompt overlays
 - do not move product defaults into runtime-owned policy; `cats` remains
   responsible for default selection
 - do not widen the first slice into a full strategy-family explosion such as
-  `tree_of_thoughts`, `reflexion`, and other families all at once
+  `tree_of_thoughts` and other families all at once
 - do not replace compatibility fallback until supported families are truly
   runtime-hosted
 

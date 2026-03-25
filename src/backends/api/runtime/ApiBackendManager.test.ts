@@ -502,7 +502,7 @@ describe('ApiBackendManager', () => {
     const handle = manager.spawn(session.id, createTarget());
     const events = await collectEvents(handle.streamMessage({
       message: 'hello',
-      requestedStrategy: 'reflexion',
+      requestedStrategy: 'tree_of_thoughts',
       correlation: {
         taskId: 'task-work-1',
         product: 'work',
@@ -512,15 +512,15 @@ describe('ApiBackendManager', () => {
 
     expect(events).toContainEqual(expect.objectContaining({
       type: 'progress',
-      text: "Requested strategy 'reflexion' is not supported by this runtime; falling back to 'simple_tool_call'.",
+      text: "Requested strategy 'tree_of_thoughts' is not supported by this runtime; falling back to 'simple_tool_call'.",
       metadata: expect.objectContaining({
         kind: 'strategy',
         status: 'fallback',
         strategyEvent: 'strategy_degraded',
-        requestedStrategy: 'reflexion',
+        requestedStrategy: 'tree_of_thoughts',
         effectiveStrategy: 'simple_tool_call',
         strategyResolutionSource: 'compatibility_fallback',
-        degradedStrategy: 'reflexion',
+        degradedStrategy: 'tree_of_thoughts',
         fallbackStrategy: 'simple_tool_call',
       }),
     }));
@@ -544,7 +544,7 @@ describe('ApiBackendManager', () => {
     expect(updated).toMatchObject({
       strategy: {
         request: {
-          requestedStrategy: 'reflexion',
+          requestedStrategy: 'tree_of_thoughts',
           correlation: {
             taskId: 'task-work-1',
             product: 'work',
@@ -572,7 +572,7 @@ describe('ApiBackendManager', () => {
       cwd: '/repo',
       strategy: {
         request: {
-          requestedStrategy: 'reflexion',
+          requestedStrategy: 'tree_of_thoughts',
         },
         effectiveStrategy: 'simple_tool_call',
         resolutionSource: 'compatibility_fallback',
@@ -1098,3 +1098,209 @@ describe('ApiBackendManager', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+it('runs explicit reflexion with additive reflection events and runtime-owned inspection metadata', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'cats-runtime-api-reflexion-'));
+  const repoDir = join(root, 'repo');
+  mkdirSync(repoDir, { recursive: true });
+  writeFileSync(join(repoDir, 'answer.txt'), '42\n', 'utf-8');
+
+  try {
+    const registry = new SessionRegistry();
+    const session = registry.create({
+      id: 'api-session-reflexion',
+      providerName: 'codex',
+      providerBackend: 'api',
+      providerInstanceId: 'gateway',
+      cwd: repoDir,
+    });
+
+    const requestBodies: Record<string, unknown>[] = [];
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      requestBodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      if (requestBodies.length === 1) {
+        return new Response(JSON.stringify({
+          id: 'resp_reflexion_1',
+          output: [{
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: 'The answer might be 42.' }],
+          }],
+          usage: {
+            input_tokens: 7,
+            output_tokens: 3,
+          },
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
+      return new Response(JSON.stringify({
+        id: 'resp_reflexion_2',
+        output: [{
+          type: 'message',
+          role: 'assistant',
+          content: [{ type: 'output_text', text: '42' }],
+        }],
+        usage: {
+          input_tokens: 4,
+          output_tokens: 1,
+        },
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    const manager = new ApiBackendManager(
+      { sessionBaseDir: root },
+      registry,
+      {
+        fetch: fetchMock as typeof fetch,
+        env: {
+          OPENAI_API_KEY: 'test-key',
+        },
+      },
+    );
+    const runtime = createRuntimeManager(root, manager);
+    const turn = {
+      message: 'Inspect answer.txt and return only the verified value.',
+      requestedStrategy: 'reflexion' as const,
+      acceptanceCriteria: 'Return only the verified file value.',
+      strategyContext: {
+        maxSteps: 4,
+        timeoutMs: 1500,
+        stuckThreshold: 2,
+      },
+      correlation: {
+        taskId: 'task-code-1',
+        product: 'code',
+      },
+    };
+
+    runtime.beginRun(session, turn);
+
+    const handle = manager.spawn(session.id, createTarget());
+    const events = await collectEvents(handle.streamMessage(turn));
+    for (const event of events) {
+      runtime.observeEvent(session.id, event);
+    }
+
+    const updated = registry.get(session.id)!;
+    const inspection = buildSessionInspection({
+      session: updated,
+      view: toSessionView(updated, {
+        attached: manager.isAttached(session.id),
+        externalSessionLiveWindowMs: 15000,
+      }),
+      trackedState: runtime.getTrackedState(session.id),
+      metering: buildMeteringSnapshot(),
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(requestBodies[0]?.instructions)).toContain('Execution strategy: reflexion.');
+    expect(String(requestBodies[0]?.instructions)).toContain(
+      'Acceptance criteria:\nReturn only the verified file value.',
+    );
+    expect(String(JSON.stringify(requestBodies[1]?.input))).toContain(
+      'Runtime reflexion guidance',
+    );
+    expect(requestBodies[1]?.previous_response_id).toBe('resp_reflexion_1');
+
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'progress',
+        metadata: expect.objectContaining({
+          kind: 'strategy',
+          status: 'started',
+          strategyEvent: 'strategy_started',
+          effectiveStrategy: 'reflexion',
+          strategyResolutionSource: 'explicit_request',
+        }),
+      }),
+      expect.objectContaining({
+        type: 'progress',
+        metadata: expect.objectContaining({
+          kind: 'strategy',
+          strategyEvent: 'strategy_reflection',
+          effectiveStrategy: 'reflexion',
+        }),
+      }),
+      expect.objectContaining({
+        type: 'progress',
+        metadata: expect.objectContaining({
+          kind: 'strategy',
+          status: 'completed',
+          strategyEvent: 'strategy_completed',
+          effectiveStrategy: 'reflexion',
+        }),
+      }),
+      expect.objectContaining({
+        type: 'result',
+        sessionId: 'resp_reflexion_2',
+        usage: {
+          inputTokens: 11,
+          outputTokens: 4,
+        },
+      }),
+    ]));
+
+    expect(updated).toMatchObject({
+      strategy: {
+        preferredStrategy: 'reflexion',
+        request: {
+          requestedStrategy: 'reflexion',
+          acceptanceCriteria: 'Return only the verified file value.',
+          strategyContext: {
+            maxSteps: 4,
+            timeoutMs: 1500,
+            stuckThreshold: 2,
+          },
+          correlation: {
+            taskId: 'task-code-1',
+            product: 'code',
+          },
+        },
+        effectiveStrategy: 'reflexion',
+        resolutionSource: 'explicit_request',
+        summary: {
+          status: 'completed',
+          stepCount: 2,
+          stepLimit: 4,
+          timeoutMs: 1500,
+          lastEvent: 'strategy_completed',
+          resolutionSource: 'explicit_request',
+        },
+        localState: {
+          reflectionCount: 1,
+          awaitingReflection: false,
+        },
+      },
+    });
+
+    expect(inspection.strategy).toMatchObject({
+      requestedStrategy: 'reflexion',
+      effectiveStrategy: 'reflexion',
+      acceptanceCriteria: 'Return only the verified file value.',
+      correlation: {
+        taskId: 'task-code-1',
+        product: 'code',
+      },
+      state: {
+        preferredStrategy: 'reflexion',
+        effectiveStrategy: 'reflexion',
+        summary: {
+          status: 'completed',
+          stepCount: 2,
+        },
+        localState: {
+          reflectionCount: 1,
+          awaitingReflection: false,
+        },
+      },
+    });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

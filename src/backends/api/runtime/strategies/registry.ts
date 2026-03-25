@@ -1,6 +1,7 @@
 import { RuntimeExecutionStrategyRegistry } from '../../../../core/runtime/strategies/registry.js';
 import { pdcaStrategy } from './pdcaStrategy.js';
 import { reactStrategy } from './reactStrategy.js';
+import { reflexionStrategy } from './reflexionStrategy.js';
 import { simpleToolCallStrategy } from './simpleToolCallStrategy.js';
 import type { ApiStrategyExecutionContext } from './ApiStrategyExecutionContext.js';
 
@@ -9,6 +10,7 @@ export const API_RUNTIME_EXECUTION_STRATEGY_IDS = [
   'simple_tool_call',
   'react',
   'pdca',
+  'reflexion',
 ] as const;
 
 export function createApiRuntimeExecutionStrategyRegistry(): RuntimeExecutionStrategyRegistry<ApiStrategyExecutionContext> {
@@ -16,5 +18,6 @@ export function createApiRuntimeExecutionStrategyRegistry(): RuntimeExecutionStr
     simpleToolCallStrategy,
     reactStrategy,
     pdcaStrategy,
+    reflexionStrategy,
   ]);
 }
