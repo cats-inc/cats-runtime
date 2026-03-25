@@ -46,6 +46,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 
 | Plan | Title | Status | Related Spec |
 |------|-------|--------|--------------|
+| [PLAN-020](./PLAN-020-pluggable-execution-strategy-substrate.md) | Pluggable Execution Strategy Substrate | Draft | [SPEC-020](../specs/SPEC-020-pluggable-execution-strategy-substrate.md), [ADR-024](../decisions/024-own-pluggable-execution-strategies-as-runtime-session-local-substrate.md) |
 | [PLAN-019](./PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md) | Shared Runtime UI Foundation for Dashboard, Playground, and Provider Setup | Draft | [SPEC-017](../specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md) |
 | [PLAN-018](./PLAN-018-advanced-provider-model-catalog-and-selection-schema.md) | Advanced Provider Model Catalog and Selection Schema | Draft | [SPEC-018](../specs/SPEC-018-advanced-provider-model-catalog-and-selection-schema.md), [ADR-022](../decisions/022-model-advanced-selection-as-entries-presets-and-provider-specific-controls.md) |
 | [PLAN-017](./PLAN-017-lan-peer-discovery-and-execution-routing-v0.md) | LAN Peer Discovery and Execution Routing v0 | Draft | [SPEC-016](../specs/SPEC-016-lan-peer-discovery-and-execution-routing-v0.md), [ADR-019](../decisions/019-scope-first-lan-peer-sharing-to-execution-only.md) |
@@ -78,4 +79,4 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 ---
 
 *See also: [specs/](../specs/) for feature specifications*
-*Last updated: 2026-03-25*
+*Last updated: 2026-03-26*
