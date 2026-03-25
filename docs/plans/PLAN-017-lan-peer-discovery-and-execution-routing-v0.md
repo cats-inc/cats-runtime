@@ -5,11 +5,11 @@
 | Field | Value |
 |-------|-------|
 | **Status** | Draft |
-| **Owner** | Codex |
-| **Assigned To** | runtime workstream |
+| **Owner** | runtime workstream |
+| **Assigned To** | Unassigned |
 | **Reviewer** | User / runtime workstream |
 
-## Related Spec / Decision
+## Related Spec
 
 - [SPEC-016: LAN Peer Discovery and Execution Routing v0](../specs/SPEC-016-lan-peer-discovery-and-execution-routing-v0.md)
 - [ADR-019: Scope First LAN Peer Sharing to Execution-Only](../decisions/019-scope-first-lan-peer-sharing-to-execution-only.md)
@@ -67,234 +67,139 @@ read-model relay so existing session observation surfaces continue to work.
 - Silent default automatic routing for existing clients.
 - Replacing the current `/sessions` lifecycle contract with a peer-owned one.
 
-## Phased Rollout
+## Implementation Phases
 
 ### Phase 1: Peer Identity and Registry Contract
 
-Focus: establish bounded peer types and registry behavior before any network
-transport or routing.
+- [ ] Task 1.1: Add bounded peer config and type definitions for identity,
+      registry entries, capability summaries, load summaries, trust state, and
+      routing decisions.
+- [ ] Task 1.2: Implement `PeerIdentityService`, `PeerRegistryService`, and
+      `PeerCapabilitySnapshotService` as a discovery-independent core seam.
+- [ ] Task 1.3: Add unit tests for identity stability, registry dedupe, stale
+      peer expiry, and default-off config behavior.
 
-Deliverables:
-
-- Types:
-  - `PeerIdentity`
-  - `PeerRegistryEntry`
-  - `PeerCapabilitySummary`
-  - `PeerLoadSummary`
-  - `PeerTrustState`
-  - `PeerRoutingMode`
-  - `PeerDispatchDecision`
-- Services:
-  - `PeerIdentityService`
-  - `PeerRegistryService`
-  - `PeerCapabilitySnapshotService`
-- Config surface:
-  - feature flag defaulting to off
-  - advertise/listen address metadata
-  - registry TTL / heartbeat timing
-  - peer-execution enablement separate from discovery enablement
-- Tests:
-  - identity stability
-  - registry upsert/dedupe
-  - expiry and stale-peer eviction
-  - default-off config behavior
-
-Implementation notes:
-
-- Capability advertisements must stay bounded to routing facts only: provider
-  reachability, supported stream formats, read-only/chat-only support, simple
-  load summary, and trust requirement summary.
-- Do not include secrets, full machine inventory, or workspace paths.
+**Deliverables**: new peer-core types and services exist under a dedicated
+peer module; capability advertisements are bounded to routing facts only and do
+not expose secrets, workspace paths, or full machine inventory.
 
 ### Phase 2: Discovery Substrate
 
-Focus: add LAN discovery and advertisement without coupling it to execution or
-trust acceptance.
+- [ ] Task 2.1: Implement `PeerDiscoveryController` plus a discovery adapter
+      seam for LAN advertisement and listener behavior.
+- [ ] Task 2.2: Wire peer discovery startup and shutdown from `src/server.ts`
+      separately from existing native session discovery.
+- [ ] Task 2.3: Add additive LAN discovery state to `GET /discovery/status`.
+- [ ] Task 2.4: Add tests for discovery startup/shutdown, duplicate
+      advertisement collapse, heartbeat refresh, and TTL-based eviction.
 
-Deliverables:
-
-- Services:
-  - `PeerDiscoveryController`
-  - discovery adapter abstraction under a new peer/discovery layer
-  - heartbeat refresh into `PeerRegistryService`
-- Startup wiring:
-  - start/stop peer discovery from `src/server.ts`
-  - keep it separate from existing native session discovery
-- Routes:
-  - additive `lan` block on `GET /discovery/status` for discovery process state
-- Tests:
-  - discovery startup/shutdown
-  - duplicate advertisement collapse
-  - heartbeat refresh
-  - TTL expiry after missed heartbeats
-
-Implementation notes:
-
-- Discovery must not imply trust.
-- Discovery library choice is a decision gate; keep the implementation behind an
-  adapter seam so the library can change without rewriting registry or routing.
+**Deliverables**: LAN discovery can advertise and observe peers behind a
+feature flag, while discovery remains separate from trust acceptance and
+execution routing.
 
 ### Phase 3: Diagnostics and Read Visibility
 
-Focus: expose peer state for operators and hosts before peer execution is used.
+- [ ] Task 3.1: Add peer read routes: `GET /peers`, `GET /peers/:peerId`, and
+      `GET /diagnostics/peers`.
+- [ ] Task 3.2: Add additive peer summaries to `GET /diagnostics/runtime` and
+      `GET /diagnostics/health` without changing current readiness semantics.
+- [ ] Task 3.3: Add tests for peer registry reads, filtered/detail views,
+      diagnostics summaries, and redaction.
 
-Deliverables:
-
-- Routes:
-  - `GET /peers`
-  - `GET /peers/:peerId`
-  - `GET /diagnostics/peers`
-  - additive `peers` summary on `GET /diagnostics/runtime`
-  - additive `peers` summary on `GET /diagnostics/health`
-- Types:
-  - `PeerDiagnosticsView`
-  - `PeerRegistrySummary`
-  - `PeerHealthView`
-- Tests:
-  - registry read route tests
-  - diagnostics route tests
-  - filtered/detail view tests
-  - secret-redaction tests
-
-Implementation notes:
-
-- Keep `GET /health` unchanged in the first rollout.
-- `GET /diagnostics/health` may include only additive peer summary metadata; it
-  must not change the existing readiness contract used by packaged hosts.
+**Deliverables**: operators can inspect peer identity, health, capability, and
+trust summaries through dedicated diagnostics/read routes; `GET /health`
+remains unchanged in the first rollout.
 
 ### Phase 4: Bounded Execution Routing Contract
 
-Focus: add the peer turn contract and caller-side routing seam without changing
-session ownership.
+- [ ] Task 4.1: Add a dedicated peer-only execution route,
+      `POST /peer/executions`, with separate request/response types for
+      execution target, trace, failure, and result metadata.
+- [ ] Task 4.2: Implement caller-side `PeerRoutingService` and
+      `PeerExecutionClient` without delegating caller-visible session ownership
+      to peer `/sessions` routes.
+- [ ] Task 4.3: Extend `POST /sessions/:id/messages` with additive optional
+      `routing` input while keeping existing request bodies valid and local-only
+      by default.
+- [ ] Task 4.4: Add runtime-owned relay/read state so peer-routed runs remain
+      visible through `GET /sessions/:id/observe` and `GET /sessions/:id/stream`.
+- [ ] Task 4.5: Add routing tests for explicit peer selection, opt-in routing
+      heuristics, legacy local fallback, and observe/stream relay behavior.
 
-Deliverables:
-
-- New peer-only execution route:
-  - `POST /peer/executions`
-- Request/response contract types:
-  - `PeerExecutionRequest`
-  - `PeerExecutionTarget`
-  - `PeerExecutionTrace`
-  - `PeerExecutionFailure`
-  - `PeerExecutionResultMetadata`
-- Caller-side services:
-  - `PeerRoutingService`
-  - `PeerExecutionClient`
-  - local relay/read seam for peer-routed run events
-- Existing route changes:
-  - additive `routing` field accepted by `POST /sessions/:id/messages`
-  - no required changes to existing message body fields
-- Existing response/read changes:
-  - additive stream event metadata, for example `metadata.execution`
-  - additive `session.inspection.currentRun.execution`
-  - additive `session.inspection.lastRun.execution`
-  - additive observation visibility so `GET /sessions/:id/observe` and
-    `GET /sessions/:id/stream` still work during a peer-routed turn
-- Tests:
-  - legacy local path remains unchanged when `routing` is absent
-  - explicit peer selection
-  - provider-affinity routing behind opt-in
-  - least-busy routing behind opt-in
-  - observe/stream relay during peer-routed runs
-
-Implementation notes:
-
-- Do not make the caller runtime proxy its session lifecycle through peer
-  `/sessions` routes.
-- The peer route is execution-only. The peer may use an internal ephemeral
-  execution record, but it must not become the owner of the caller-visible
-  session.
-- `POST /sessions` should remain unchanged in v0. Session-level peer defaults
-  are later work, not part of this rollout.
-- Automatic routing must not become the default for legacy callers in this
-  phase. The safe first rollout is explicit per-turn opt-in, with other routing
-  heuristics guarded behind config or later product work.
+**Deliverables**: one bounded peer turn can be routed through a dedicated
+execution contract while the caller runtime remains the owner of the
+caller-visible session, history, and inspection state.
 
 ### Phase 5: Trust/Auth Gate and Failure Handling
 
-Focus: keep trust separate from discovery and harden the peer-execution path.
+- [ ] Task 5.1: Implement `PeerTrustService` and peer-auth middleware for
+      peer-only routes.
+- [ ] Task 5.2: Add config-backed trust bootstrap plus explicit
+      trusted/untrusted/rejected registry state.
+- [ ] Task 5.3: Map pre-dispatch auth/health failures and mid-stream disconnects
+      onto explicit runtime-visible failure semantics.
+- [ ] Task 5.4: Add auth rejection, unhealthy peer, timeout, disconnect, and
+      caller-owned state regression tests.
 
-Deliverables:
-
-- Services:
-  - `PeerTrustService`
-  - peer-auth validator/middleware for peer-only routes
-- Trust model:
-  - config-backed first bootstrap
-  - explicit trusted/untrusted/rejected state in registry views
-  - outbound credential injection for peer execution calls
-- Failure contract:
-  - pre-dispatch failures for untrusted, unhealthy, unreachable, or unsupported
-    peers
-  - mid-stream disconnect failure mapped to normalized `error` events
-  - no transparent retry or failover
-- Tests:
-  - auth rejection
-  - untrusted peer rejection
-  - unhealthy peer rejection before dispatch
-  - timeout/disconnect mid-turn
-  - session state remains caller-owned after peer failure
-
-Implementation notes:
-
-- Reuse existing bearer-token patterns if possible, but keep peer auth separate
-  from discovery.
-- Any richer enrollment workflow, rotating credentials, or mTLS-style identity
-  is later work unless separately decided.
+**Deliverables**: peer execution fails closed when trust or auth checks fail,
+and disconnect behavior is explicit rather than hidden behind transparent retry
+or failover.
 
 ### Phase 6: Verification and Documentation Follow-Through
 
-Focus: finish the rollout with implementation evidence and post-code docs.
+- [ ] Task 6.1: Build a two-runtime integration harness for peer discovery,
+      diagnostics, routing, and failure-path verification.
+- [ ] Task 6.2: Run compatibility regression coverage against current `cats`
+      create/send/observe/stream flows.
+- [ ] Task 6.3: Update `docs/api.md`, `docs/architecture.md`,
+      `docs/testing.md`, `docs/setup-guide.md`, and `.env.example` after code
+      lands.
 
-Deliverables:
+**Deliverables**: peer execution changes are covered by multi-runtime tests,
+legacy `cats` compatibility is verified, and public docs match the shipped
+behavior.
 
-- Integration harness with at least two runtime instances.
-- Compatibility regression coverage for existing `cats` flows.
-- Post-implementation doc updates:
-  - `docs/api.md`
-  - `docs/architecture.md`
-  - `docs/testing.md`
-  - `docs/setup-guide.md`
-  - `.env.example`
-- Operator notes for enabling discovery, trust bootstrap, and peer diagnostics.
+## Files to Create/Modify
 
-Implementation notes:
+| File | Action | Description |
+|------|--------|-------------|
+| `src/core/peers/*` | Create | Peer identity, registry, discovery, routing, and trust services. |
+| `src/core/config.ts` | Modify | Add peer discovery, registry, routing, and trust configuration. |
+| `src/core/types.ts` | Modify | Add peer routing, diagnostics, and additive execution metadata types. |
+| `src/core/runtime/RuntimeSessionManager.ts` | Modify | Add caller-owned relay/read seams for peer-routed run state. |
+| `src/server.ts` | Modify | Wire peer discovery lifecycle separately from native session discovery. |
+| `src/http/app.ts` | Modify | Register peer routes and any required auth/read middleware. |
+| `src/http/auth.ts` or `src/http/peerAuth.ts` | Modify / Create | Add peer-only auth enforcement without changing current host auth behavior. |
+| `src/http/streaming.ts` | Modify | Keep SSE and NDJSON transport handling distinct for peer execution support. |
+| `src/http/routes/discovery.ts` | Modify | Additive LAN discovery status surface. |
+| `src/http/routes/diagnostics.ts` | Modify | Add peer diagnostics summaries and dedicated peer diagnostics route. |
+| `src/http/routes/messages.ts` | Modify | Add additive optional routing input and caller-side peer dispatch path. |
+| `src/http/routes/observe.ts` | Modify | Keep observe/stream visibility working for peer-routed turns. |
+| `src/http/routes/peers.ts` | Create | Peer registry read routes. |
+| `src/http/routes/peerExecutions.ts` | Create | Dedicated execution-only peer route. |
+| `src/core/peers/*.test.ts` | Create | Peer-core unit tests. |
+| `src/http/peer*.test.ts` | Create | Peer route and relay tests. |
+| `src/http/messagesRoute.test.ts` | Modify | Compatibility coverage for legacy and peer-routed message paths. |
+| `tests/runtime-server.test.ts` | Modify | Startup and integration wiring coverage. |
+| `tests/*peer*.test.ts` | Create | Multi-runtime integration coverage. |
 
-- This planning task does not update those docs now.
-- The implementation PR should include the matching docs after code lands.
+## Technical Decisions
 
-## Recommended File Areas
-
-Expected module areas to touch during implementation:
-
-- `src/core/config.ts`
-- `src/core/types.ts`
-- `src/core/runtime/RuntimeSessionManager.ts`
-- `src/server.ts`
-- `src/http/app.ts`
-- `src/http/auth.ts` or a dedicated peer-auth helper
-- `src/http/streaming.ts`
-- `src/http/routes/discovery.ts`
-- `src/http/routes/diagnostics.ts`
-- `src/http/routes/messages.ts`
-- `src/http/routes/observe.ts`
-- `src/core/peers/*` (new)
-- `src/http/routes/peers.ts` (new)
-- `src/http/routes/peerExecutions.ts` (new)
-
-Expected test areas to touch during implementation:
-
-- `src/core/peers/*.test.ts` (new)
-- `src/http/peer*.test.ts` (new)
-- `src/http/messagesRoute.test.ts`
-- `tests/runtime-server.test.ts`
-- new multi-runtime integration tests under `tests/`
-
-Areas that should stay mostly untouched unless a small extraction is needed:
-
-- provider-specific CLI adapters under `src/backends/cli/providers/*`
-- existing session lifecycle semantics in `src/http/routes/sessions.ts`
-- browser and wakeup subsystems
+- Keep discovery, registry, routing, and trust as separate modules because
+  discovery must not imply execution trust or session ownership.
+- Use a dedicated `POST /peer/executions` route instead of peer reuse of
+  `/sessions` ownership routes because ADR-019 keeps the caller runtime as the
+  owner of the caller-visible session.
+- Keep `POST /sessions` unchanged in v0; peer-routing hints are additive on
+  `POST /sessions/:id/messages` only, and legacy requests remain local-only by
+  default.
+- Preserve SSE and NDJSON as separate transport contracts and test them
+  separately; do not assume a merged wire format.
+- Add runtime-owned relay/read state for peer-routed runs so existing observe
+  and stream routes remain viable before any `cats` follow-up lands.
+- Defer remote workspace mutation, remote browser ownership, wakeup ownership
+  transfer, full remote session ownership, and transparent failover to later
+  coordinated work.
 
 ## Streaming Contract Planning
 
@@ -321,62 +226,6 @@ Trust/auth is a distinct workstream, not part of discovery.
 - Peer execution must fail closed when trust/auth checks are not satisfied.
 - The first bootstrap should be config-backed and operator-explicit.
 - Dynamic peer enrollment UX is later work unless separately approved.
-
-## Boundaries and Risks
-
-Hard scope boundaries for v0:
-
-- No full remote session ownership.
-- No remote workspace mutation.
-- No remote browser ownership.
-- No wakeup ownership transfer.
-- No remote retained cleanup ownership.
-- No transparent failover.
-- No hidden session creation/resume/close delegation through peer `/sessions`
-  routes.
-
-Primary risks to manage:
-
-- Legacy behavior drift if automatic routing becomes implicit.
-- Observation regressions if peer-routed runs bypass the current local worker
-  event path.
-- Security drift if discovery is treated as trust.
-- Capability over-advertising that leaks machine details or creates unstable
-  routing decisions.
-- Scope creep into workspace sync, worktree cleanup, or browser ownership.
-
-## Testing Strategy
-
-- Registry tests:
-  - peer identity stability
-  - registry dedupe
-  - TTL expiry
-  - stale peer removal
-  - trust-state persistence rules
-- Routing tests:
-  - legacy `POST /sessions/:id/messages` remains local when `routing` is absent
-  - explicit peer selection
-  - routing refusal when peer cannot satisfy provider/backend constraints
-  - opt-in heuristic routing only when enabled
-- Stream relay tests:
-  - peer NDJSON end-to-end
-  - peer SSE end-to-end
-  - caller observe stream during peer-routed turn
-  - additive metadata only, existing event parsing still valid
-- Disconnect/auth failure tests:
-  - auth reject before dispatch
-  - unhealthy peer before dispatch
-  - disconnect or timeout mid-turn
-  - no transparent retry/failover
-- Diagnostics route tests:
-  - `GET /peers`
-  - `GET /peers/:peerId`
-  - `GET /diagnostics/peers`
-  - additive peer summaries on runtime/health diagnostics
-- Compatibility smoke tests:
-  - current `cats` client create/send/observe/stream flows still succeed
-  - `cats` NDJSON parser still sees the same `text`, `result`, and `error`
-    semantics
 
 ## Open Questions and Decision Gates
 
@@ -412,27 +261,53 @@ Blocked until coordinated `cats` follow-up or separate design work:
 - Full remote session ownership.
 - Transparent failover.
 
-## Progress Log / Checklist
+## Scope Boundaries
 
-- [ ] Confirm discovery library decision.
-- [ ] Confirm first trust bootstrap decision.
-- [ ] Add peer config, identity, capability, and registry types.
-- [ ] Add `PeerRegistryService` and capability snapshot service.
-- [ ] Add `PeerDiscoveryController` and default-off startup wiring.
-- [ ] Add additive `lan` discovery status reporting.
-- [ ] Add `GET /peers`, `GET /peers/:peerId`, and `GET /diagnostics/peers`.
-- [ ] Add additive peer summaries to runtime and health diagnostics.
-- [ ] Add dedicated `POST /peer/executions` execution-only contract.
-- [ ] Add caller-side `PeerRoutingService` and `PeerExecutionClient`.
-- [ ] Extend `POST /sessions/:id/messages` with additive optional `routing`.
-- [ ] Add runtime-owned relay/read seam so observe/stream continue to work for
-      peer-routed turns.
-- [ ] Add additive run/stream routing metadata.
-- [ ] Add trust/auth middleware and explicit failure mapping.
-- [ ] Add registry, routing, stream relay, disconnect/auth failure, and
-      diagnostics tests.
-- [ ] Run compatibility smoke tests against current `cats` runtime client flows.
-- [ ] Update API/architecture/setup/testing docs after implementation lands.
+Hard scope boundaries for v0:
+
+- No full remote session ownership.
+- No remote workspace mutation.
+- No remote browser ownership.
+- No wakeup ownership transfer.
+- No remote retained cleanup ownership.
+- No transparent failover.
+- No hidden session creation/resume/close delegation through peer `/sessions`
+  routes.
+
+## Testing Strategy
+
+- **Registry Tests**: identity stability, registry dedupe, TTL expiry, stale
+  peer removal, and trust-state persistence rules.
+- **Routing Tests**: legacy local behavior when `routing` is absent, explicit
+  peer selection, routing refusal on capability mismatch, and opt-in heuristic
+  routing.
+- **Stream Relay Tests**: peer NDJSON, peer SSE, caller observe stream during a
+  peer-routed turn, and additive metadata compatibility.
+- **Disconnect/Auth Failure Tests**: auth rejection, unhealthy peer rejection,
+  timeout/disconnect mid-turn, and no transparent retry/failover.
+- **Diagnostics Route Tests**: `GET /peers`, `GET /peers/:peerId`,
+  `GET /diagnostics/peers`, and additive peer summaries on runtime/health
+  diagnostics.
+- **Compatibility Smoke Tests**: current `cats` create/send/observe/stream
+  flows still succeed, and the current NDJSON parser still sees the same
+  `text`, `result`, and `error` semantics.
+
+## Risks & Mitigations
+
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| Automatic routing leaks into legacy paths and changes current `cats` behavior. | High | Keep peer routing opt-in and additive on `POST /sessions/:id/messages`; require explicit config gates for heuristics. |
+| Peer-routed runs break `GET /sessions/:id/observe` or `GET /sessions/:id/stream`. | High | Add runtime-owned relay/read state and cover both observe and SSE read paths with regression tests. |
+| Discovery is mistakenly treated as trust. | High | Keep trust/auth as a separate phase, expose trust state explicitly, and fail closed on peer execution. |
+| Capability advertisements leak too much host detail or create unstable routing. | Medium | Bound advertisements to routing facts only and add redaction tests for diagnostics surfaces. |
+| Scope expands into workspace sync, browser ownership, or wakeup ownership transfer. | High | Keep these items explicitly blocked in this plan and require separate coordinated follow-up work before implementation. |
+
+## Progress Log
+
+| Date | Update |
+|------|--------|
+| 2026-03-25 | Plan created for SPEC-016 / ADR-019 with compatibility-first execution-only scope. |
+| 2026-03-25 | Reworked plan structure to align more closely with `docs/plans/000-template.md` and kept deferred follow-on reminders explicit. |
 
 ---
 
