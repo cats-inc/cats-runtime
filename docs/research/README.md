@@ -12,6 +12,7 @@
 | [2026-03-24-lan-mesh-worker-sharing](./2026-03-24-lan-mesh-worker-sharing.md) | LAN mesh discovery and worker sharing | Feasibility of mDNS-based peer discovery, mesh interconnection, and remote CLI worker sharing across LAN nodes |
 | [2026-03-24-setup-diagnostic-report](./2026-03-24-setup-diagnostic-report.md) | First-run setup diagnostic report | One-shot environment scan for debugging CLI/WSL/Docker/Node.js issues during first-time installation |
 | [2026-03-25-workspace-contract-terminology-and-semantics](./2026-03-25-workspace-contract-terminology-and-semantics.md) | Workspace contract terminology and semantics | Proposed replacement for `workspaceMode`/`workspaceIsolation`, including `workspaceKind`, `workspaceAccess`, room-vs-session semantics, and read-only sandbox corner cases |
+| [2026-03-26-pluggable-execution-strategy-architecture](./2026-03-26-pluggable-execution-strategy-architecture.md) | Pluggable execution strategy architecture | ExecutionStrategy interface for swappable agent loops (ReAct, PDCA, ToT, DEPS, Reflexion), strategy resolution, and integration with streaming/tool contracts |
 
 ## Entry Template
 
@@ -26,4 +27,4 @@ Action Items:
 
 ---
 
-*Last updated: 2026-03-25*
+*Last updated: 2026-03-26*
