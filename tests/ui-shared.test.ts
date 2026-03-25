@@ -70,10 +70,10 @@ describe('shared UI script', () => {
     expect(SHARED_UI_SCRIPT).toContain('renderStatusBadge');
   });
 
-  it('falls back to stored API keys when the page has no API key input', () => {
-    expect(SHARED_UI_SCRIPT).toContain("localStorage.getItem(API_KEY_STORAGE_KEY)");
-    expect(SHARED_UI_SCRIPT).toContain("var API_KEY_STORAGE_KEY = 'cats_runtime_api_key';");
-    expect(SHARED_UI_SCRIPT).toContain('return readStoredApiKey();');
+  it('reads API keys only from the current page inputs', () => {
+    expect(SHARED_UI_SCRIPT).toContain("document.getElementById('apiKeyInput')");
+    expect(SHARED_UI_SCRIPT).toContain("document.getElementById('api-key')");
+    expect(SHARED_UI_SCRIPT).not.toContain('localStorage');
   });
 
   it('is an IIFE', () => {

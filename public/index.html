@@ -2116,28 +2116,16 @@ function autoResizeInput() {
 }
 
 // --- Init ---
-// Load API key from localStorage
-const savedKey = localStorage.getItem('cats_runtime_api_key');
-if (savedKey) {
-  if (/[^\x00-\xff]/.test(savedKey)) {
-    localStorage.removeItem('cats_runtime_api_key');
-    console.warn('Removed API key with non-ASCII characters from localStorage');
-  } else {
-    document.getElementById('apiKeyInput').value = savedKey;
-  }
-}
-
-function saveApiKey(value) {
+function validateApiKey(value) {
   if (/[^\x00-\xff]/.test(value)) {
     alert('API key contains non-ASCII characters which are not allowed in HTTP headers. Please use only ASCII characters.');
     return false;
   }
-  localStorage.setItem('cats_runtime_api_key', value);
   return true;
 }
 
 document.getElementById('apiKeyInput').addEventListener('change', (e) => {
-  if (saveApiKey(e.target.value)) {
+  if (validateApiKey(e.target.value)) {
     refreshProviderCatalog();
     refreshSessions();
   }
@@ -2145,7 +2133,7 @@ document.getElementById('apiKeyInput').addEventListener('change', (e) => {
 // Also refresh on Enter key for immediate feedback
 document.getElementById('apiKeyInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
-    if (saveApiKey(e.target.value)) {
+    if (validateApiKey(e.target.value)) {
       refreshProviderCatalog();
       refreshSessions();
     }

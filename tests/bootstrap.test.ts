@@ -365,6 +365,7 @@ describe('bootstrap mode server', () => {
         expect(pageRes.status).toBe(200);
         const html = await pageRes.text();
         expect(html).toContain('apiKeyInput');
+        expect(html).toContain('validateApiKeyInput');
       } finally {
         await runtime.close();
       }
@@ -753,8 +754,8 @@ describe('bootstrap mode server', () => {
         expect(html).toContain('Playground');
         expect(html).toContain('data-cats-ui');
         expect(html).toContain('window.CatsUI');
-        expect(html).toContain('Uses the runtime API key configured in');
-        expect(html).not.toContain('id="api-key"');
+        expect(html).toContain('id="api-key"');
+        expect(html).toContain('validateRuntimeApiKey');
       } finally {
         await runtime.close();
       }

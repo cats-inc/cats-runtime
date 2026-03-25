@@ -90,32 +90,13 @@ export const SHARED_UI_SCRIPT = `
 (function() {
   'use strict';
 
-  var API_KEY_STORAGE_KEY = 'cats_runtime_api_key';
-
-  function readStoredApiKey() {
-    try {
-      if (typeof localStorage === 'undefined') return '';
-      var key = (localStorage.getItem(API_KEY_STORAGE_KEY) || '').trim();
-      if (!key) return '';
-      if (/[^\\x00-\\xff]/.test(key)) {
-        localStorage.removeItem(API_KEY_STORAGE_KEY);
-        console.warn('Removed API key with non-ASCII characters from localStorage');
-        return '';
-      }
-      return key;
-    } catch (_) {
-      return '';
-    }
-  }
-
   function getApiKey() {
     var el = document.getElementById('apiKeyInput')
           || document.getElementById('api-key');
     if (el && typeof el.value === 'string') {
-      var value = el.value.trim();
-      if (value) return value;
+      return el.value.trim();
     }
-    return readStoredApiKey();
+    return '';
   }
 
   function authHeaders(extra) {

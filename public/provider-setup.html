@@ -188,20 +188,24 @@
 <script>
 let scanData = null;
 
-// Restore API key from localStorage (shared with dashboard)
-(function() {
-  var input = document.getElementById('apiKeyInput');
-  if (!input) return;
-  try {
-    var saved = localStorage.getItem('cats_runtime_api_key');
-    if (saved) input.value = saved;
-  } catch(_) {}
-  input.addEventListener('change', function() {
-    try { localStorage.setItem('cats_runtime_api_key', input.value); } catch(_) {}
-  });
-})();
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function validateApiKeyInput(value) {
+  if (/[^\x00-\xff]/.test(value)) {
+    alert('API key contains non-ASCII characters which are not allowed in HTTP headers. Please use only ASCII characters.');
+    return false;
+  }
+  return true;
+}
 
 async function fetchState() {
+  if (!validateApiKeyInput(document.getElementById('apiKeyInput').value)) return;
   try {
     const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
     const res = await fetchFn('/providers/setup/state');
@@ -240,10 +244,10 @@ function renderUniverse(universe) {
   }
   list.innerHTML = universe.map(p => `
     <div class="provider-item">
-      <input type="checkbox" value="${p.provider}" class="provider-check" />
+      <input type="checkbox" value="${escapeHtml(p.provider)}" class="provider-check" />
       <div class="provider-info">
-        <div class="provider-name">${p.familyLabel}</div>
-        <div class="provider-detail">${p.provider} &mdash; ${p.binaryName}</div>
+        <div class="provider-name">${escapeHtml(p.familyLabel)}</div>
+        <div class="provider-detail">${escapeHtml(p.provider)} &mdash; ${escapeHtml(p.binaryName)}</div>
       </div>
       <div class="provider-status">
         <span class="badge badge-unknown">Not scanned</span>
@@ -260,20 +264,20 @@ function renderScanResults(scan) {
     const statusClass = p.available ? 'badge-ok' : p.commandStatus === 'probe_failed' ? 'badge-unavailable' : 'badge-degraded';
     const statusText = p.available ? 'Ready' : p.commandStatus === 'missing_install' ? 'Not installed' : p.commandStatus;
     const remediation = (p.remediation || []).map(r =>
-      `<div class="provider-remediation">${r.summary}${r.command ? ' <code>' + r.command + '</code>' : ''}</div>`
+      `<div class="provider-remediation">${escapeHtml(r.summary)}${r.command ? ' <code>' + escapeHtml(r.command) + '</code>' : ''}</div>`
     ).join('');
     return `
       <div class="provider-item">
-        <input type="checkbox" value="${p.provider}" class="provider-check" ${p.available ? 'checked' : ''} />
+        <input type="checkbox" value="${escapeHtml(p.provider)}" class="provider-check" ${p.available ? 'checked' : ''} />
         <div class="provider-info">
-          <div class="provider-name">${p.family}</div>
+          <div class="provider-name">${escapeHtml(p.family)}</div>
           <div class="provider-detail">
-            ${p.provider}${p.version ? ' v' + p.version : ''}${p.commandPath ? ' &mdash; ' + p.commandPath : ''}
+            ${escapeHtml(p.provider)}${p.version ? ' v' + escapeHtml(p.version) : ''}${p.commandPath ? ' &mdash; ' + escapeHtml(p.commandPath) : ''}
           </div>
           ${remediation}
         </div>
         <div class="provider-status">
-          <span class="badge ${statusClass}">${statusText}</span>
+          <span class="badge ${statusClass}">${escapeHtml(statusText)}</span>
         </div>
       </div>
     `;
@@ -293,6 +297,7 @@ function bindCheckboxes() {
 }
 
 async function runScan(manual) {
+  if (!validateApiKeyInput(document.getElementById('apiKeyInput').value)) return;
   const scanBtn = document.getElementById('scanBtn');
   const manualScanBtn = document.getElementById('manualScanBtn');
   scanBtn.disabled = true;
@@ -314,7 +319,7 @@ async function runScan(manual) {
     }
   } catch (err) {
     document.getElementById('providerList').innerHTML =
-      '<div class="loading" style="color:var(--red)">Scan failed: ' + err.message + '</div>';
+      '<div class="loading" style="color:var(--red)">Scan failed: ' + escapeHtml(err.message) + '</div>';
   } finally {
     scanBtn.disabled = false;
     manualScanBtn.disabled = false;
@@ -322,6 +327,7 @@ async function runScan(manual) {
 }
 
 async function applyConfig() {
+  if (!validateApiKeyInput(document.getElementById('apiKeyInput').value)) return;
   const checks = document.querySelectorAll('.provider-check:checked');
   const providers = Array.from(checks).map(c => c.value);
   if (!providers.length) return;
@@ -344,7 +350,9 @@ async function applyConfig() {
         'Setup Complete',
         `Configuration written to ${data.configPath}. ` +
         (data.restart ? 'Please restart the runtime.' : 'Runtime is now active.') +
-        ' <a href="/dashboard">Go to Dashboard</a>'
+        ' <a href="/dashboard">Go to Dashboard</a>',
+        false,
+        true
       );
       // Refresh status
       const stateRes = await fetchFn('/providers/setup/state');
@@ -362,10 +370,14 @@ async function applyConfig() {
   }
 }
 
-function showResult(title, body, isError) {
+function showResult(title, body, isError, allowHtml) {
   const panel = document.getElementById('resultPanel');
   document.getElementById('resultTitle').textContent = title;
-  document.getElementById('resultBody').innerHTML = body;
+  if (allowHtml === true) {
+    document.getElementById('resultBody').innerHTML = body;
+  } else {
+    document.getElementById('resultBody').textContent = body;
+  }
   panel.className = 'result-panel visible';
   if (isError) {
     panel.style.borderColor = 'var(--red)';
@@ -378,7 +390,16 @@ function hideResult() {
   document.getElementById('resultPanel').className = 'result-panel';
 }
 
-fetchState();
+document.addEventListener('DOMContentLoaded', function() {
+  const apiKeyInput = document.getElementById('apiKeyInput');
+  apiKeyInput.addEventListener('change', function() {
+    void fetchState();
+  });
+  apiKeyInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') void fetchState();
+  });
+  fetchState();
+});
 </script>
 </body>
 </html>
