@@ -32,6 +32,8 @@ import { ManualBrowserDriver } from '../backends/browser/manualDriver.js';
 import type { BootstrapService } from '../core/bootstrap/BootstrapService.js';
 import { bearerAuth } from './auth.js';
 import { injectRuntimeDashboardHealthOverlay } from './dashboardHealthOverlay.js';
+import { injectSharedUI } from './uiInjector.js';
+import { injectDashboardScanPanel } from './dashboardScanPanel.js';
 import { bootstrapGuard } from './routes/bootstrapGuard.js';
 import { discoveryRoutes } from './routes/discovery.js';
 import { browserRoutes } from './routes/browser.js';
@@ -209,24 +211,32 @@ export function createRuntimeApp(ctx: AppContext) {
   app.get('/', (c) => {
     if (ctx.startup?.bootstrapRequired) {
       const htmlPath = resolve(__dirname, '../../public/provider-setup.html');
-      return c.html(readFileSync(htmlPath, 'utf-8'));
+      const html = injectSharedUI(readFileSync(htmlPath, 'utf-8'));
+      return c.html(html);
     }
     const htmlPath = resolve(__dirname, '../../public/index.html');
-    const html = injectRuntimeDashboardHealthOverlay(readFileSync(htmlPath, 'utf-8'));
+    let html = readFileSync(htmlPath, 'utf-8');
+    html = injectSharedUI(html);
+    html = injectRuntimeDashboardHealthOverlay(html);
+    html = injectDashboardScanPanel(html);
     return c.html(html);
   });
 
   // Dashboard always accessible regardless of bootstrap mode.
   app.get('/dashboard', (c) => {
     const htmlPath = resolve(__dirname, '../../public/index.html');
-    const html = injectRuntimeDashboardHealthOverlay(readFileSync(htmlPath, 'utf-8'));
+    let html = readFileSync(htmlPath, 'utf-8');
+    html = injectSharedUI(html);
+    html = injectRuntimeDashboardHealthOverlay(html);
+    html = injectDashboardScanPanel(html);
     return c.html(html);
   });
 
   // Serve the playground (multi-agent chat) without auth.
   app.get('/playground', (c) => {
     const htmlPath = resolve(__dirname, '../../public/playground.html');
-    return c.html(readFileSync(htmlPath, 'utf-8'));
+    const html = injectSharedUI(readFileSync(htmlPath, 'utf-8'));
+    return c.html(html);
   });
 
   app.use('*', async (c, next) => {

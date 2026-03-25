@@ -247,7 +247,20 @@ POST /providers/setup/apply
 ```
 
 `GET /providers/setup/state` returns the current setup state, latest scan
-summary, and provider universe (known provider families).
+snapshot, provider universe (known provider families), and latest manual scan
+snapshot. Response shape:
+
+- `bootstrapRequired` — whether the runtime is in bootstrap mode
+- `state` — setup workflow state (`status`, `lastScanAt`, `lastManualScanAt`, `appliedAt`, `appliedConfigPath`, `error`)
+- `scan` — latest scan snapshot (auto or manual), or `null` if no scan has been run
+  - `scannedAt`, `scanType`, `providerCount`, `availableCount` — summary fields
+  - `providers` — full `ProviderScanEntry[]` with per-provider `commandStatus`, `commandPath`, `version`, `authStatus`, `available`, `install`, and `remediation` details
+- `manualScan` — latest explicit manual scan snapshot (`BootstrapScanResult` with full provider detail), or `null` if no manual scan has been run
+- `universe` — known provider families with `provider`, `familyLabel`, and `binaryName`
+
+Both `scan.providers` and `manualScan` expose the full persisted scan data so
+that UI consumers (dashboard, provider-setup) can render provider status without
+forcing a fresh scan on page load.
 
 `POST /providers/setup/scan` triggers a provider scan. Pass `{"manual": true}`
 in the body for an explicit manual scan. Returns scan results with per-provider

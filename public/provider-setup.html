@@ -5,21 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cats Runtime - Provider Setup</title>
 <style>
-  :root {
-    --bg: #0f1117;
-    --surface: #1a1d27;
-    --surface2: #242836;
-    --border: #2e3345;
-    --text: #e1e4ed;
-    --text2: #8b90a0;
-    --accent: #6c8cff;
-    --accent-dim: #4a62b3;
-    --green: #4ade80;
-    --yellow: #facc15;
-    --red: #f87171;
-    --orange: #fb923c;
-    --radius: 8px;
-  }
+  /* Design tokens injected by shared runtime UI foundation (uiInjector.ts) */
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -181,11 +167,12 @@ let scanData = null;
 
 async function fetchState() {
   try {
-    const res = await fetch('/providers/setup/state');
+    const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
+    const res = await fetchFn('/providers/setup/state');
     const data = await res.json();
     updateStatusBar(data);
-    if (data.scan) {
-      await loadScanResults();
+    if (data.scan && data.scan.providers) {
+      renderScanResults(data.scan);
     } else {
       renderUniverse(data.universe || []);
     }
@@ -292,22 +279,6 @@ async function runScan(manual) {
   } finally {
     scanBtn.disabled = false;
     manualScanBtn.disabled = false;
-  }
-}
-
-async function loadScanResults() {
-  try {
-    const res = await fetch('/providers/setup/scan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ manual: false }),
-    });
-    const data = await res.json();
-    if (data.scan) {
-      renderScanResults(data.scan);
-    }
-  } catch {
-    // Ignore, user can trigger manual scan
   }
 }
 

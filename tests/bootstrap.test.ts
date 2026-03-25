@@ -530,6 +530,163 @@ describe('bootstrap mode server', () => {
     }
   });
 
+  it('GET /providers/setup/state includes full scan.providers after a scan', { timeout: 30_000 }, async () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const env = createTestEnv(root);
+      ensureDirs(env);
+      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
+      const startup = createRuntimeStartupState({ bootstrapRequired: true });
+      const runtime = createRuntimeServer(config, { startup });
+      try {
+        // Run a scan first
+        await runtime.app.request('/providers/setup/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ manual: false }),
+        });
+
+        // Now check state
+        const response = await runtime.app.request('/providers/setup/state');
+        expect(response.status).toBe(200);
+        const body = await response.json() as Record<string, unknown>;
+        const scan = body.scan as Record<string, unknown>;
+        expect(scan).toBeTruthy();
+        expect(Array.isArray(scan.providers)).toBe(true);
+        expect((scan.providers as unknown[]).length).toBeGreaterThan(0);
+        // Backward-compatible summary fields still present
+        expect(typeof scan.providerCount).toBe('number');
+        expect(typeof scan.availableCount).toBe('number');
+      } finally {
+        await runtime.close();
+      }
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('GET /providers/setup/state includes manualScan after manual scan', { timeout: 30_000 }, async () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const env = createTestEnv(root);
+      ensureDirs(env);
+      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
+      const startup = createRuntimeStartupState({ bootstrapRequired: true });
+      const runtime = createRuntimeServer(config, { startup });
+      try {
+        // Run a manual scan
+        await runtime.app.request('/providers/setup/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ manual: true }),
+        });
+
+        const response = await runtime.app.request('/providers/setup/state');
+        expect(response.status).toBe(200);
+        const body = await response.json() as Record<string, unknown>;
+        const manualScan = body.manualScan as Record<string, unknown>;
+        expect(manualScan).toBeTruthy();
+        expect(manualScan.scanType).toBe('manual');
+        expect(Array.isArray(manualScan.providers)).toBe(true);
+      } finally {
+        await runtime.close();
+      }
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('GET /providers/setup/state returns manualScan null when no manual scan run', async () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const env = createTestEnv(root);
+      ensureDirs(env);
+      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
+      const startup = createRuntimeStartupState({ bootstrapRequired: true });
+      const runtime = createRuntimeServer(config, { startup });
+      try {
+        const response = await runtime.app.request('/providers/setup/state');
+        expect(response.status).toBe(200);
+        const body = await response.json() as Record<string, unknown>;
+        expect(body.manualScan).toBeNull();
+      } finally {
+        await runtime.close();
+      }
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('GET / in bootstrap mode includes shared UI foundation', async () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const env = createTestEnv(root);
+      ensureDirs(env);
+      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
+      const startup = createRuntimeStartupState({ bootstrapRequired: true });
+      const runtime = createRuntimeServer(config, { startup });
+      try {
+        const response = await runtime.app.request('/');
+        expect(response.status).toBe(200);
+        const html = await response.text();
+        expect(html).toContain('Provider Setup');
+        expect(html).toContain('data-cats-ui');
+        expect(html).toContain('window.CatsUI');
+      } finally {
+        await runtime.close();
+      }
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('GET /dashboard includes shared UI and scan panel', async () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const env = createTestEnv(root);
+      ensureDirs(env);
+      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
+      const startup = createRuntimeStartupState({ bootstrapRequired: false });
+      const runtime = createRuntimeServer(config, { startup });
+      try {
+        const response = await runtime.app.request('/dashboard');
+        expect(response.status).toBe(200);
+        const html = await response.text();
+        expect(html).toContain('Cats Runtime Dashboard');
+        expect(html).toContain('data-cats-ui');
+        expect(html).toContain('data-cats-scan-panel');
+        expect(html).toContain('scanPanelManualBtn');
+      } finally {
+        await runtime.close();
+      }
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('GET /playground includes shared UI foundation', async () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const env = createTestEnv(root);
+      ensureDirs(env);
+      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
+      const startup = createRuntimeStartupState({ bootstrapRequired: false });
+      const runtime = createRuntimeServer(config, { startup });
+      try {
+        const response = await runtime.app.request('/playground');
+        expect(response.status).toBe(200);
+        const html = await response.text();
+        expect(html).toContain('Playground');
+        expect(html).toContain('data-cats-ui');
+        expect(html).toContain('window.CatsUI');
+      } finally {
+        await runtime.close();
+      }
+    } finally {
+      cleanup();
+    }
+  });
+
   it('valid config does not enter bootstrap mode', async () => {
     const { root, cleanup } = createTestRoot();
     try {

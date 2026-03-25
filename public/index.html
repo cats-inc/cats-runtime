@@ -9,32 +9,7 @@
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
 <style>
-  :root {
-    --bg: #0f1117;
-    --surface: #1a1d27;
-    --surface2: #242836;
-    --border: #2e3345;
-    --text: #e1e4ed;
-    --text2: #8b90a0;
-    --accent: #6c8cff;
-    --accent-dim: #4a62b3;
-    --green: #4ade80;
-    --yellow: #facc15;
-    --red: #f87171;
-    --orange: #fb923c;
-    --auggie: #06b6d4;
-    --claude: #e09145;
-    --codex: #22c55e;
-    --copilot: #a371f7;
-    --cursorp: #f97316;
-    --gemini: #4285f4;
-    --kiro: #14b8a6;
-    --opencode: #f472b6;
-    --pi: #a8a29e;
-    --goose: #8b5cf6;
-    --junie: #fc801d;
-    --radius: 8px;
-  }
+  /* Design tokens injected by shared runtime UI foundation (uiInjector.ts) */
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -265,25 +240,7 @@
       var(--junie)
     ) 1;
   }
-  .provider-badge {
-    font-size: 10px;
-    font-weight: 500;
-    padding: 1px 5px;
-    border-radius: 3px;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-  }
-  .provider-badge[data-p="claude"] { background: rgba(224,145,69,0.2); color: var(--claude); }
-  .provider-badge[data-p="codex"] { background: rgba(34,197,94,0.2); color: var(--codex); }
-  .provider-badge[data-p="copilot"] { background: rgba(163,113,247,0.2); color: var(--copilot); }
-  .provider-badge[data-p="cursor"] { background: rgba(249,115,22,0.2); color: var(--cursorp); }
-  .provider-badge[data-p="gemini"] { background: rgba(66,133,244,0.2); color: var(--gemini); }
-  .provider-badge[data-p="kiro"] { background: rgba(20,184,166,0.2); color: var(--kiro); }
-  .provider-badge[data-p="auggie"] { background: rgba(6,182,212,0.2); color: var(--auggie); }
-  .provider-badge[data-p="opencode"] { background: rgba(244,114,182,0.2); color: var(--opencode); }
-  .provider-badge[data-p="pi"] { background: rgba(168,162,158,0.2); color: var(--pi); }
-  .provider-badge[data-p="goose"] { background: rgba(139,92,246,0.2); color: var(--goose); }
-  .provider-badge[data-p="junie"] { background: rgba(252,128,29,0.2); color: var(--junie); }
+  /* .provider-badge styles injected by shared runtime UI foundation (uiInjector.ts) */
   .instance-badge {
     display: inline-flex;
     align-items: center;
@@ -868,6 +825,7 @@ function apiKey() {
   }
 
 function headers(extra = {}) {
+  if (window.CatsUI) return CatsUI.authHeaders(extra);
   const h = { 'Content-Type': 'application/json', ...extra };
   const key = apiKey();
   if (key) h['Authorization'] = `Bearer ${key}`;

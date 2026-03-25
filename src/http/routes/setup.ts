@@ -11,6 +11,7 @@ setupRoutes.get('/providers/setup/state', async (c) => {
 
   const state = await ctx.bootstrapService.getSetupState();
   const latestScan = await ctx.bootstrapService.getLatestScan();
+  const latestManualScan = await ctx.bootstrapService.getLatestManualScan();
 
   return c.json({
     bootstrapRequired: ctx.startup.bootstrapRequired,
@@ -21,8 +22,10 @@ setupRoutes.get('/providers/setup/state', async (c) => {
         scanType: latestScan.scanType,
         providerCount: latestScan.providers.length,
         availableCount: latestScan.providers.filter((p) => p.available).length,
+        providers: latestScan.providers,
       }
       : null,
+    manualScan: latestManualScan ?? null,
     universe: ctx.bootstrapService.getProviderUniverse().map((entry) => ({
       provider: entry.provider,
       familyLabel: entry.familyLabel,

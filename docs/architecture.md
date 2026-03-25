@@ -167,6 +167,15 @@ src/
 - Exposes the public `cats-runtime` HTTP API
 - Serves the embedded dashboard UI from `/`
 - Serves the embedded multi-agent playground sample from `/playground`
+- Injects the shared runtime UI foundation (`src/http/ui/shared.ts` via
+  `src/http/uiInjector.ts`) into all three runtime-owned pages (dashboard,
+  playground, provider-setup). The shared foundation provides canonical CSS
+  design tokens, provider badge styles, and a thin browser-side `CatsUI`
+  helper (auth headers, fetch wrapper, badge rendering) so the pages stop
+  duplicating theme variables, fetch logic, and provider color definitions.
+- Injects a manual scan & repair panel (`src/http/dashboardScanPanel.ts`)
+  into the dashboard, allowing operators to trigger `POST /providers/setup/scan`
+  with `manual: true` and view provider status inline without editing YAML
 - Applies optional bearer auth
 - Streams turn output as SSE or NDJSON
 - Applies additive metering observation and execution guardrail preflight on

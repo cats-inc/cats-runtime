@@ -36,19 +36,7 @@
     .msg-content th { background: #1e293b; }
     .tag-pill { display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 9999px; border: 1px solid; opacity: 0.8; }
     .role-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 9999px; border: 1px solid; letter-spacing: 0.25px; }
-    .provider-badge { font-size: 10px; font-weight: 500; padding: 1px 5px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.3px; }
-    .provider-badge[data-p="claude"] { background: rgba(224,145,69,0.2); color: #e09145; }
-    .provider-badge[data-p="codex"]  { background: rgba(34,197,94,0.2);  color: #22c55e; }
-    .provider-badge[data-p="copilot"] { background: rgba(163,113,247,0.2); color: #a371f7; }
-    .provider-badge[data-p="cursor"] { background: rgba(249,115,22,0.2); color: #f97316; }
-    .provider-badge[data-p="gemini"] { background: rgba(66,133,244,0.2); color: #4285f4; }
-    .provider-badge[data-p="kiro"] { background: rgba(20,184,166,0.2); color: #14b8a6; }
-    .provider-badge[data-p="auggie"] { background: rgba(6,182,212,0.2); color: #06b6d4; }
-    .provider-badge[data-p="opencode"] { background: rgba(244,114,182,0.2); color: #f472b6; }
-    .provider-badge[data-p="pi"]       { background: rgba(168,162,158,0.2); color: #a8a29e; }
-    .provider-badge[data-p="junie"]    { background: rgba(252,128,29,0.2);  color: #fc801d; }
-    .provider-badge[data-p="goose"]    { background: rgba(139,92,246,0.2);  color: #8b5cf6; }
-    .provider-badge[data-p="ollama"]   { background: rgba(100,116,139,0.2); color: #64748b; }
+    /* .provider-badge styles injected by shared runtime UI foundation (uiInjector.ts) */
   </style>
 </head>
 <body class="h-full bg-slate-900 text-slate-200 font-sans">
@@ -380,6 +368,7 @@ class RuntimeError extends Error {
 class RuntimeClient {
   constructor(baseUrl, apiKey) { this.baseUrl = baseUrl.replace(/\/+$/,''); this.apiKey = apiKey || ''; }
   _headers() {
+    if (window.CatsUI) return CatsUI.authHeaders();
     const h = { 'Content-Type': 'application/json' };
     if (this.apiKey) h['Authorization'] = `Bearer ${this.apiKey}`;
     return h;
@@ -865,7 +854,7 @@ async function loadBrowse(path){
   const el=document.getElementById('browse-list'),pathEl=document.getElementById('browse-path');
   el.innerHTML='<div class="text-slate-400 p-3 text-sm">Loading...</div>';
   try{const url=path?`/browse?path=${encodeURIComponent(path)}`:'/browse';
-    const res=await fetch(url,{headers:document.getElementById('api-key').value.trim()?{Authorization:`Bearer ${document.getElementById('api-key').value.trim()}`}:{}});
+    const res=await fetch(url,{headers:window.CatsUI?CatsUI.authHeaders():document.getElementById('api-key').value.trim()?{Authorization:`Bearer ${document.getElementById('api-key').value.trim()}`}:{}});
     if(!res.ok){el.innerHTML='<div class="text-red-400 p-3 text-sm">Cannot read directory</div>';return;}
     const d=await res.json();pathEl.value=d.current;
     let html=`<div class="px-3 py-1.5 text-sm cursor-pointer hover:bg-slate-700 rounded font-mono" onclick="loadBrowse('${d.parent.replace(/'/g,"\\'")}')">..</div>`;
@@ -905,8 +894,7 @@ function closePromptsModal(){document.getElementById('promptsModal').classList.a
 // ============================================================
 async function loadProviderOptions() {
   try {
-    const apiKey = document.getElementById('api-key').value.trim();
-    const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+    const headers = window.CatsUI ? CatsUI.authHeaders() : (function() { const k = document.getElementById('api-key').value.trim(); return k ? { Authorization: `Bearer ${k}` } : {}; })();
     const res = await fetch('/providers/config', { headers });
     if (!res.ok) return;
     const data = await res.json();
