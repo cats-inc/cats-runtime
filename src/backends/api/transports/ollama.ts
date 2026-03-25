@@ -9,21 +9,14 @@ import type {
 } from '../types.js';
 import { readErrorBody } from '../../../core/streamParsers.js';
 import type { RemoteProviderInstanceConfig } from '../../cli/config.js';
-import { applyPayloadTemplate, readPayloadTemplateString } from '../payloadTemplate.js';
+import {
+  applyPayloadTemplate,
+  mergeRuntimePayloadPatch,
+  readPayloadTemplateString,
+} from '../payloadTemplate.js';
 import { ApiTransportError, readRetryAfterMs } from './error.js';
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
-
-function mergeRuntimePatch<T extends Record<string, unknown>>(
-  requestBody: T,
-  runtimePatch?: Record<string, unknown>,
-): T {
-  if (!runtimePatch) {
-    return requestBody;
-  }
-
-  return applyPayloadTemplate(runtimePatch as T, requestBody);
-}
 
 function resolveBaseUrl(instance: RemoteProviderInstanceConfig, env: NodeJS.ProcessEnv): string {
   const fromEnv = instance.baseUrlEnv ? env[instance.baseUrlEnv] : undefined;
@@ -161,7 +154,7 @@ export class OllamaTransport implements ApiTransportClient {
         },
       });
     }
-    const runtimeBody = mergeRuntimePatch({
+    const runtimeBody = mergeRuntimePayloadPatch({
       model: input.model,
       stream: false,
       messages: toOllamaMessages(input.messages),

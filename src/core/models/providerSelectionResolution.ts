@@ -1,6 +1,7 @@
 import type { ProviderTargetDescriptor } from '../providerCatalog.js';
 import type { ProviderAdvancedKnowledgeContext } from './providerAdvancedKnowledge.js';
 import type { ProviderAdvancedControlValue } from './providerAdvancedCatalog.js';
+import { cloneProviderControls } from './providerControlUtils.js';
 
 export type ProviderModelSelectionEntryMode = 'auto' | 'explicit';
 
@@ -35,20 +36,6 @@ export interface ResolvedProviderSelection {
 interface ResolveProviderSelectionOptions {
   requestControls?: Record<string, ProviderAdvancedControlValue>;
   mode?: 'session' | 'request';
-}
-
-function cloneControls(
-  controls: Record<string, ProviderAdvancedControlValue> | undefined,
-): Record<string, ProviderAdvancedControlValue> | undefined {
-  if (!controls) {
-    return undefined;
-  }
-
-  return Object.fromEntries(
-    Object.entries(controls)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, value]) => [key, value]),
-  );
 }
 
 function mergeControls(
@@ -290,7 +277,7 @@ export function canonicalizeProviderModelSelection(
     ...(selection.entryId ? { entryId: selection.entryId } : {}),
     entryMode: selection.entryMode,
     ...(selection.presetId ? { presetId: selection.presetId } : {}),
-    ...(selection.controls ? { controls: cloneControls(selection.controls) } : {}),
+    ...(selection.controls ? { controls: cloneProviderControls(selection.controls) } : {}),
   };
 }
 
@@ -404,9 +391,9 @@ export function resolveProviderSelection(
 
   const mergedControls = mergeControls(
     knowledge.entryDefaults[entry.id],
-    cloneControls(preset?.controlDefaults),
-    cloneControls(normalizedSelection.controls),
-    cloneControls(options.requestControls),
+    cloneProviderControls(preset?.controlDefaults),
+    cloneProviderControls(normalizedSelection.controls),
+    cloneProviderControls(options.requestControls),
   );
   ensureControlApplicability(knowledge, entry.id, mergedControls);
 

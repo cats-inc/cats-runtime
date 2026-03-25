@@ -9,21 +9,10 @@ import type {
   ApiTransportClient,
 } from '../types.js';
 import { readErrorBody } from '../../../core/streamParsers.js';
-import { applyPayloadTemplate } from '../payloadTemplate.js';
+import { applyPayloadTemplate, mergeRuntimePayloadPatch } from '../payloadTemplate.js';
 import { ApiTransportError, readRetryAfterMs } from './error.js';
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
-
-function mergeRuntimePatch<T extends Record<string, unknown>>(
-  requestBody: T,
-  runtimePatch?: Record<string, unknown>,
-): T {
-  if (!runtimePatch) {
-    return requestBody;
-  }
-
-  return applyPayloadTemplate(runtimePatch as T, requestBody);
-}
 
 function requireApiKey(instance: RemoteProviderInstanceConfig, env: NodeJS.ProcessEnv): string {
   const apiKeyEnv = instance.apiKeyEnv;
@@ -224,7 +213,7 @@ export class OpenAiTransport implements ApiTransportClient {
     const progress: ApiProgressEvent[] = [];
 
     const sendRequest = async (usePreviousResponseId: boolean): Promise<ApiCompletionResponse> => {
-      const runtimeBody = mergeRuntimePatch({
+      const runtimeBody = mergeRuntimePayloadPatch({
         model: input.model,
         instructions,
         input: usePreviousResponseId && incrementalInput

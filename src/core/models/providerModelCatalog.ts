@@ -274,6 +274,12 @@ export class ProviderModelCatalogService {
     requestedInstance?: string,
   ): Promise<ProviderAdvancedKnowledgeContext> {
     const target = resolveProviderTarget(this.config, providerName, requestedInstance);
+    return this.getAdvancedKnowledgeForTarget(target);
+  }
+
+  async getAdvancedKnowledgeForTarget(
+    target: ProviderTargetDescriptor,
+  ): Promise<ProviderAdvancedKnowledgeContext> {
     const catalog = await this.getCatalogForTarget(target);
     return buildProviderAdvancedKnowledge(target, catalog);
   }

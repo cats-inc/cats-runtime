@@ -8,6 +8,7 @@ import type {
   ProviderAdvancedControlValue,
 } from './providerAdvancedCatalog.js';
 import type { ProviderModelCatalogResult } from './providerModelCatalog.js';
+import { cloneProviderControls } from './providerControlUtils.js';
 import type { ProviderModelSelection } from './providerSelectionResolution.js';
 
 export interface ProviderAdvancedKnowledgeContext {
@@ -18,22 +19,12 @@ export interface ProviderAdvancedKnowledgeContext {
   controlsByKey: Record<string, ProviderAdvancedCatalogControl>;
 }
 
-function cloneControls(
-  controls: Record<string, ProviderAdvancedControlValue> | undefined,
-): Record<string, ProviderAdvancedControlValue> | undefined {
-  if (!controls) {
-    return undefined;
-  }
-
-  return Object.fromEntries(
-    Object.entries(controls).map(([key, value]) => [key, value]),
-  );
-}
-
 function buildEntryCapabilityTags(
   target: ProviderTargetDescriptor,
   entryId: string,
 ): string[] | undefined {
+  // These are conservative runtime-owned heuristics until curated provider
+  // metadata grows explicit capability/tier annotations per entry.
   const tags = new Set<string>();
   if (
     target.backend === 'api'
@@ -211,6 +202,9 @@ function buildPresetCatalog(
   entries: ProviderAdvancedCatalogEntry[],
   controls: ProviderAdvancedCatalogControl[],
 ): ProviderAdvancedCatalogPreset[] {
+  // Preset selection stays runtime-owned. We intentionally infer a small
+  // normalized vocabulary from known model naming patterns instead of
+  // exposing raw vendor tiers directly.
   const presets: ProviderAdvancedCatalogPreset[] = [];
   const defaultEntry = entries.find((entry) => entry.default) ?? entries[0];
   const openAiReasoningControl = controls.find((control) => control.key === 'openai.reasoning_effort');
@@ -299,7 +293,7 @@ function buildDefaultSelection(
     entryMode: 'auto',
     ...(balancedPreset ? { presetId: balancedPreset.id } : {}),
     ...(balancedPreset?.controlDefaults
-      ? { controls: cloneControls(balancedPreset.controlDefaults) }
+      ? { controls: cloneProviderControls(balancedPreset.controlDefaults) }
       : {}),
   };
 }

@@ -2019,6 +2019,76 @@ providers:
     });
   });
 
+  it('POST /sessions/:id/resume falls back to the legacy model when stored structured selection goes stale', async () => {
+    await withRuntime({
+      providerDefaultTargets: {
+        codex: { backend: 'api', instance: 'main' },
+      },
+      remoteProviderCatalog: {
+        api: {
+          codex: {
+            main: {
+              id: 'main',
+              providerName: 'codex',
+              backend: 'api',
+              transport: 'openai',
+              apiKeyEnv: 'OPENAI_API_KEY',
+              baseUrl: 'https://example.test',
+              model: 'gpt-5.4',
+            },
+          },
+        },
+        local: {},
+        agent: {},
+      },
+    }, {}, async (runtime) => {
+      const session = runtime.context.registry.create({
+        id: 'stale-selection-session',
+        providerName: 'codex',
+        providerBackend: 'api',
+        providerInstanceId: 'main',
+        cwd: '/tmp/cats-runtime-stale-selection',
+        model: 'gpt-5.4',
+        modelSelection: {
+          entryMode: 'auto',
+          presetId: 'sunset_preview',
+        },
+        modelResolution: {
+          entryId: 'gpt-5.4',
+          model: 'gpt-5.4',
+          entryMode: 'auto',
+          presetId: 'sunset_preview',
+          supportTier: 'full',
+          warnings: [],
+        },
+      });
+      runtime.context.registry.updateStatus(session.id, 'closed');
+
+      const response = await runtime.app.request(`/sessions/${session.id}/resume`, {
+        method: 'POST',
+      });
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({
+        id: session.id,
+        model: 'gpt-5.4',
+        modelSelection: {
+          entryMode: 'auto',
+          presetId: 'sunset_preview',
+        },
+        modelResolution: {
+          entryId: 'gpt-5.4',
+          model: 'gpt-5.4',
+          entryMode: 'explicit',
+          supportTier: 'full',
+          warnings: [
+            "Structured model selection could not be resolved; preserving legacy model 'gpt-5.4' as a compatibility fallback (Unknown preset 'sunset_preview').",
+          ],
+        },
+      });
+    });
+  });
+
   it('POST /sessions rejects conflicting legacy model and structured selection payloads', async () => {
     await withRuntime({
       providerDefaultTargets: {

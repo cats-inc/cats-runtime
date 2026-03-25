@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { applyPayloadTemplate, readPayloadTemplateString } from './payloadTemplate.js';
+import {
+  applyPayloadTemplate,
+  mergeRuntimePayloadPatch,
+  readPayloadTemplateString,
+} from './payloadTemplate.js';
 
 describe('payloadTemplate helpers', () => {
   it('returns the runtime payload unchanged when the template is empty', () => {
@@ -70,6 +74,31 @@ describe('payloadTemplate helpers', () => {
     );
 
     expect(merged.stopSequences).toEqual(['FINAL']);
+  });
+
+  it('applies runtime request patches on top of the request body without inverting template semantics', () => {
+    const merged = mergeRuntimePayloadPatch(
+      {
+        model: 'gpt-5.4',
+        reasoning: {
+          effort: 'medium',
+          summary: 'auto',
+        },
+      },
+      {
+        reasoning: {
+          effort: 'high',
+        },
+      },
+    );
+
+    expect(merged).toEqual({
+      model: 'gpt-5.4',
+      reasoning: {
+        effort: 'high',
+        summary: 'auto',
+      },
+    });
   });
 
   it('reads the first non-empty string value from the requested keys', () => {

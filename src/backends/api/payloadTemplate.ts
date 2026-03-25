@@ -32,6 +32,17 @@ export function applyPayloadTemplate<T extends Record<string, unknown>>(
   return mergeObjects(template, runtimeBody) as T;
 }
 
+export function mergeRuntimePayloadPatch<T extends Record<string, unknown>>(
+  requestBody: T,
+  runtimePatch?: Record<string, unknown>,
+): T {
+  if (!runtimePatch || !isPlainObject(runtimePatch)) {
+    return requestBody;
+  }
+
+  return mergeObjects(requestBody, runtimePatch) as T;
+}
+
 export function readPayloadTemplateString(
   template: Record<string, unknown> | undefined,
   ...keys: string[]

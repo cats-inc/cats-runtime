@@ -73,6 +73,7 @@ import {
 } from '../../core/runtime/sessionCompaction.js';
 import type { ProviderModelSelection } from '../../core/models/providerSelectionResolution.js';
 import {
+  canonicalizeProviderModelSelection,
   createLegacyModelSelection,
   isLegacyCompatibleExplicitSelection,
   parseProviderModelSelection,
@@ -278,12 +279,6 @@ interface ResolvedSessionModelState {
   warnings: string[];
 }
 
-function qualifiedTargetInstance(
-  target: ProviderTargetDescriptor,
-): string {
-  return `${target.backend}/${target.instanceId}`;
-}
-
 function sessionMatchesTarget(
   session: Pick<SessionInfo, 'providerName' | 'providerBackend' | 'providerInstanceId'>,
   target: ProviderTargetDescriptor,
@@ -300,6 +295,8 @@ async function resolveRequestedSessionModelState(
     legacyModel?: string;
     selection?: ProviderModelSelection;
     enforceLegacyMatch?: boolean;
+    fallbackToLegacyModelOnResolutionError?: boolean;
+    preserveSelectionOnFallback?: boolean;
   },
 ): Promise<ResolvedSessionModelState> {
   const effectiveSelection = input.selection
@@ -308,10 +305,23 @@ async function resolveRequestedSessionModelState(
     return { warnings: [] };
   }
 
-  const knowledge = await ctx.providerModelCatalog.getAdvancedKnowledge(
-    target.providerName,
-    qualifiedTargetInstance(target),
-  );
+  const knowledge = await ctx.providerModelCatalog.getAdvancedKnowledgeForTarget(target);
+  const buildCompatibilityFallback = (
+    warning: string,
+  ): ResolvedSessionModelState => ({
+    model: input.legacyModel,
+    modelSelection: input.preserveSelectionOnFallback
+      ? canonicalizeProviderModelSelection(input.selection ?? effectiveSelection)
+      : createLegacyModelSelection(input.legacyModel!),
+    modelResolution: {
+      entryId: input.legacyModel!,
+      model: input.legacyModel!,
+      entryMode: 'explicit',
+      supportTier: knowledge.supportTier,
+      warnings: [warning],
+    },
+    warnings: [warning],
+  });
   let resolved;
   try {
     resolved = resolveProviderSelection(knowledge, effectiveSelection);
@@ -325,24 +335,16 @@ async function resolveRequestedSessionModelState(
       )
       && /Unknown catalog entry/.test(message)
     ) {
-      return {
-        model: input.legacyModel,
-        modelSelection: createLegacyModelSelection(input.legacyModel),
-        modelResolution: {
-          entryId: input.legacyModel,
-          model: input.legacyModel,
-          entryMode: 'explicit',
-          supportTier: knowledge.supportTier,
-          warnings: [
-            `Legacy model '${input.legacyModel}' is not present in the advanced catalog; `
-            + 'preserving it as a compatibility passthrough.',
-          ],
-        },
-        warnings: [
-          `Legacy model '${input.legacyModel}' is not present in the advanced catalog; `
-          + 'preserving it as a compatibility passthrough.',
-        ],
-      };
+      return buildCompatibilityFallback(
+        `Legacy model '${input.legacyModel}' is not present in the advanced catalog; `
+        + 'preserving it as a compatibility passthrough.',
+      );
+    }
+    if (input.legacyModel && input.fallbackToLegacyModelOnResolutionError) {
+      return buildCompatibilityFallback(
+        `Structured model selection could not be resolved; preserving legacy model `
+        + `'${input.legacyModel}' as a compatibility fallback (${message}).`,
+      );
     }
     throw error;
   }
@@ -380,6 +382,8 @@ async function refreshSessionModelStateForTarget(
     legacyModel: session.model,
     selection: session.modelSelection,
     enforceLegacyMatch: false,
+    fallbackToLegacyModelOnResolutionError: true,
+    preserveSelectionOnFallback: true,
   });
   ctx.registry.updateSessionMetadata(session.id, {
     model: refreshed.model,
@@ -3815,6 +3819,7 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
       })
       : session.modelSelection && sessionMatchesTarget(session, childTarget)
         ? await resolveRequestedSessionModelState(ctx, childTarget, {
+          legacyModel: session.model,
           selection: session.modelSelection,
         })
         : { warnings: [] };

@@ -519,73 +519,6 @@ Current gaps:
 Deepen the runtime-owned library surface without collapsing it into the
 execution/materialization engine.
 
----
-
-### OPT-8: Advanced Provider Model Catalog Migration Cleanup
-
-**Priority**: P1
-**Status**: Planned
-
-#### Problem
-
-`PLAN-018` Phase 1-6 intentionally shipped the advanced provider-model catalog,
-structured session selection, and runtime-owned resolution pipeline as an
-additive migration slice.
-
-That rollout is deliberately compatibility-first because `cats-runtime` must
-upgrade before `cats` product follow-up lands. As a result, several contract
-tightening and cleanup steps are intentionally deferred.
-
-#### Current Implementation Status
-
-- `GET /providers/:provider/models` remains the stable v1 compatibility surface
-- `GET /providers/:provider/models/advanced` exists as the additive advanced
-  catalog surface
-- session create/read contracts now support additive `modelSelection` and
-  `modelResolution`
-- top-level session `model` remains available as the resolved compatibility
-  snapshot
-- legacy session create payloads that only send `model` remain accepted
-- backend support is staged honestly rather than pretending universal advanced
-  control parity
-
-#### Deferred Cleanup Scope
-
-Blocked on coordinated `cats` changes:
-
-- do not remove or redefine top-level session `model` yet
-- do not remove or downgrade v1 `GET /providers/:provider/models` yet
-- do not make structured selection the mandatory write contract yet
-- do not add a public per-message structured override contract yet
-- do not perform the `cats`-coordinated cleanup/tightening phase yet
-- do not fake universal advanced-controls parity across all backends
-
-#### Direction
-
-Once `cats` follow-up work is shipped and dual-read/dual-write migration is no
-longer needed, revisit the public contract in a coordinated cleanup slice.
-
-- review whether top-level session `model` can become explicitly
-  compatibility-only or later be removed in a breaking phase
-- review whether v1 `GET /providers/:provider/models` should remain as a long
-  tail fallback or be formally deprecated
-- tighten write contracts only after `cats` reliably sends structured
-  selection
-- evaluate whether request-scoped public advanced overrides should be added
-  after product/API consumers are ready
-- keep backend support truthful; expand support only where runtime can map
-  controls honestly
-
-#### Affected Areas
-
-- `src/core/models/*`
-- `src/core/types.ts`
-- `src/http/routes/providers.ts`
-- `src/http/routes/sessions.ts`
-- relevant backend execution adapters under `src/backends/*`
-- `docs/plans/PLAN-018-advanced-provider-model-catalog-and-selection-schema.md`
-- coordinated `cats` product follow-up work
-
 - Keep the standalone runtime-owned versioned filterable catalog read surface
   minimal and stable so upper layers can consume the library without importing
   `src/core/skills/catalog.ts`
@@ -654,4 +587,70 @@ longer needed, revisit the public contract in a coordinated cleanup slice.
 - `docs/decisions/018-separate-skill-library-content-from-runtime-execution-engine.md`
 
 ---
-*Last updated: 2026-03-24*
+### OPT-8: Advanced Provider Model Catalog Migration Cleanup
+
+**Priority**: P1
+**Status**: Planned
+
+#### Problem
+
+`PLAN-018` Phase 1-6 intentionally shipped the advanced provider-model catalog,
+structured session selection, and runtime-owned resolution pipeline as an
+additive migration slice.
+
+That rollout is deliberately compatibility-first because `cats-runtime` must
+upgrade before `cats` product follow-up lands. As a result, several contract
+tightening and cleanup steps are intentionally deferred.
+
+#### Current Implementation Status
+
+- `GET /providers/:provider/models` remains the stable v1 compatibility surface
+- `GET /providers/:provider/models/advanced` exists as the additive advanced
+  catalog surface
+- session create/read contracts now support additive `modelSelection` and
+  `modelResolution`
+- top-level session `model` remains available as the resolved compatibility
+  snapshot
+- legacy session create payloads that only send `model` remain accepted
+- backend support is staged honestly rather than pretending universal advanced
+  control parity
+
+#### Deferred Cleanup Scope
+
+Blocked on coordinated `cats` changes:
+
+- do not remove or redefine top-level session `model` yet
+- do not remove or downgrade v1 `GET /providers/:provider/models` yet
+- do not make structured selection the mandatory write contract yet
+- do not add a public per-message structured override contract yet
+- do not perform the `cats`-coordinated cleanup/tightening phase yet
+- do not fake universal advanced-controls parity across all backends
+
+#### Direction
+
+Once `cats` follow-up work is shipped and dual-read/dual-write migration is no
+longer needed, revisit the public contract in a coordinated cleanup slice.
+
+- review whether top-level session `model` can become explicitly
+  compatibility-only or later be removed in a breaking phase
+- review whether v1 `GET /providers/:provider/models` should remain as a long
+  tail fallback or be formally deprecated
+- tighten write contracts only after `cats` reliably sends structured
+  selection
+- evaluate whether request-scoped public advanced overrides should be added
+  after product/API consumers are ready
+- keep backend support truthful; expand support only where runtime can map
+  controls honestly
+
+#### Affected Areas
+
+- `src/core/models/*`
+- `src/core/types.ts`
+- `src/http/routes/providers.ts`
+- `src/http/routes/sessions.ts`
+- relevant backend execution adapters under `src/backends/*`
+- `docs/plans/PLAN-018-advanced-provider-model-catalog-and-selection-schema.md`
+- coordinated `cats` product follow-up work
+
+---
+*Last updated: 2026-03-25*
