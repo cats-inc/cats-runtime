@@ -83,7 +83,12 @@ import {
   resolveProviderSelection,
   sameProviderModelSelection,
 } from '../../core/models/providerSelectionResolution.js';
-import { buildRuntimeExecutionStrategySessionPatch } from '../../core/runtime/strategies/state.js';
+import {
+  buildRuntimeExecutionStrategySessionPatch,
+  readRuntimeExecutionStrategyEffectiveStrategy,
+  readRuntimeExecutionStrategyRequest,
+  readRuntimeExecutionStrategyState,
+} from '../../core/runtime/strategies/state.js';
 import { hydrateSessionState } from '../../core/hydration/sessionHydration.js';
 import {
   extractHydrationMetadata,
@@ -196,9 +201,17 @@ function serializeSession(ctx: AppContext, session: SessionInfo) {
     wakeupPending: Boolean(wakeup?.pending),
     browserSessions,
   });
-  const { maintenanceState: _maintenanceState, ...publicView } = view;
+  const strategyRequest = readRuntimeExecutionStrategyRequest(session);
+  const strategyState = readRuntimeExecutionStrategyState(session);
+  const { maintenanceState: _maintenanceState, strategy: _strategy, ...publicView } = view;
   return {
     ...publicView,
+    requestedStrategy: strategyRequest?.requestedStrategy,
+    acceptanceCriteria: strategyRequest?.acceptanceCriteria,
+    strategyContext: strategyRequest?.strategyContext,
+    correlation: strategyRequest?.correlation,
+    effectiveStrategy: readRuntimeExecutionStrategyEffectiveStrategy(session),
+    strategyState,
     inspection,
     branching,
     ...(wakeup ? { wakeup } : {}),
@@ -239,9 +252,17 @@ function serializeSessions(
       includeCapabilities: options.includeBranchCapabilities,
     });
     const wakeup = ctx.wakeup?.getSessionWakeState(sessions[index].id);
-    const { maintenanceState: _maintenanceState, ...publicView } = view;
+    const strategyRequest = readRuntimeExecutionStrategyRequest(sessions[index]);
+    const strategyState = readRuntimeExecutionStrategyState(sessions[index]);
+    const { maintenanceState: _maintenanceState, strategy: _strategy, ...publicView } = view;
     return {
       ...publicView,
+      requestedStrategy: strategyRequest?.requestedStrategy,
+      acceptanceCriteria: strategyRequest?.acceptanceCriteria,
+      strategyContext: strategyRequest?.strategyContext,
+      correlation: strategyRequest?.correlation,
+      effectiveStrategy: readRuntimeExecutionStrategyEffectiveStrategy(sessions[index]),
+      strategyState,
       inspection: buildSessionInspection({
         session: sessions[index],
         view,

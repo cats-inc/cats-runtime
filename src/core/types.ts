@@ -1445,12 +1445,7 @@ export interface SessionInfo {
   providerState?: SessionProviderState;
   sessionKey?: string;
   reusePolicy?: SessionReusePolicy;
-  requestedStrategy?: RuntimeExecutionStrategyId;
-  acceptanceCriteria?: string;
-  strategyContext?: Record<string, unknown>;
-  correlation?: Record<string, unknown>;
-  effectiveStrategy?: RuntimeExecutionStrategyId;
-  strategyState?: RuntimeExecutionStrategyState;
+  strategy?: RuntimeExecutionStrategyState;
   status: SessionStatus;
   origin: SessionOrigin;
   cwd: string;

@@ -76,12 +76,7 @@ describe('runtime execution strategy state helpers', () => {
     });
 
     expect(patch).toEqual({
-      requestedStrategy: 'react',
-      acceptanceCriteria: 'keep prior acceptance criteria',
-      strategyContext: { maxSteps: 5 },
-      correlation: { traceId: 'trace-1' },
-      effectiveStrategy: 'react',
-      strategyState: {
+      strategy: {
         preferredStrategy: 'react',
         request: {
           requestedStrategy: 'react',

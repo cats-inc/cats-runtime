@@ -1,5 +1,8 @@
 import { createRuntimeProgressEvent } from '../../../../core/progress.js';
-import { buildRuntimeExecutionStrategySessionPatch } from '../../../../core/runtime/strategies/state.js';
+import {
+  buildRuntimeExecutionStrategySessionPatch,
+  readRuntimeExecutionStrategyState,
+} from '../../../../core/runtime/strategies/state.js';
 import type {
   RuntimeExecutionStrategyState,
   RuntimeExecutionStrategySummary,
@@ -214,8 +217,8 @@ export class ApiStrategyExecutionContext {
     const now = new Date().toISOString();
     const summary: RuntimeExecutionStrategySummary = {
       ...(
-        existing.strategyState?.summary
-        ? structuredClone(existing.strategyState.summary)
+        readRuntimeExecutionStrategyState(existing)?.summary
+        ? structuredClone(readRuntimeExecutionStrategyState(existing)!.summary!)
         : {
             status: 'running',
             stepCount: 0,
@@ -236,7 +239,7 @@ export class ApiStrategyExecutionContext {
       now,
     });
     this.options.registry.updateSessionMetadata(this.session.id, patch);
-    return this.options.registry.get(this.session.id)?.strategyState;
+    return this.options.registry.get(this.session.id)?.strategy;
   }
 
   createStrategyEvent(
@@ -245,7 +248,7 @@ export class ApiStrategyExecutionContext {
     text: string,
     details: Record<string, unknown> = {},
   ): StreamEvent {
-    const strategyState = this.options.registry.get(this.session.id)?.strategyState;
+    const strategyState = this.options.registry.get(this.session.id)?.strategy;
 
     return createRuntimeProgressEvent({
       text,
@@ -294,7 +297,7 @@ export class ApiStrategyExecutionContext {
       status: 'failed',
       stepCount: typeof details.stepCount === 'number'
         ? details.stepCount
-        : this.options.registry.get(this.session.id)?.strategyState?.summary?.stepCount || 0,
+        : this.options.registry.get(this.session.id)?.strategy?.summary?.stepCount || 0,
       stepLimit: this.constraints.stepLimit,
       timeoutMs: this.constraints.timeoutMs,
       duplicateStepCount: typeof details.duplicateStepCount === 'number'

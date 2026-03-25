@@ -369,8 +369,7 @@ describe('ApiBackendManager', () => {
     )).toBe(false);
     expect(String(capturedBody?.instructions ?? '')).not.toContain('Execution strategy: react');
     expect(updated).toMatchObject({
-      effectiveStrategy: 'simple_tool_call',
-      strategyState: {
+      strategy: {
         effectiveStrategy: 'simple_tool_call',
         resolutionSource: 'compatibility_fallback',
         summary: {
@@ -543,18 +542,7 @@ describe('ApiBackendManager', () => {
       ]));
 
       expect(updated).toMatchObject({
-        requestedStrategy: 'react',
-        acceptanceCriteria: 'Return only the file value.',
-        strategyContext: {
-          maxSteps: 4,
-          timeoutMs: 1500,
-          stuckThreshold: 2,
-        },
-        correlation: {
-          traceId: 'trace-react-1',
-        },
-        effectiveStrategy: 'react',
-        strategyState: {
+        strategy: {
           preferredStrategy: 'react',
           request: {
             requestedStrategy: 'react',

@@ -7,6 +7,7 @@ import type {
 import type { RuntimeExecutionStrategyResolution } from './resolution.js';
 
 export interface RuntimeExecutionStrategySessionStateLike {
+  strategy?: RuntimeExecutionStrategyState;
   requestedStrategy?: RuntimeExecutionStrategyId;
   acceptanceCriteria?: string;
   strategyContext?: Record<string, unknown>;
@@ -26,12 +27,13 @@ export interface RuntimeExecutionStrategyStateUpdate {
 }
 
 export interface RuntimeExecutionStrategySessionPatch {
-  requestedStrategy?: RuntimeExecutionStrategyId;
-  acceptanceCriteria?: string;
-  strategyContext?: Record<string, unknown>;
-  correlation?: Record<string, unknown>;
-  effectiveStrategy?: RuntimeExecutionStrategyId;
-  strategyState?: RuntimeExecutionStrategyState;
+  strategy?: RuntimeExecutionStrategyState;
+}
+
+export function cloneRuntimeExecutionStrategyState(
+  state: RuntimeExecutionStrategyState | undefined,
+): RuntimeExecutionStrategyState | undefined {
+  return state ? structuredClone(state) : undefined;
 }
 
 export function normalizeRuntimeExecutionStrategyRequest(
@@ -69,6 +71,90 @@ export function mergeRuntimeExecutionStrategyRequests(
     acceptanceCriteria: normalizedOverride.acceptanceCriteria ?? normalizedBase.acceptanceCriteria,
     strategyContext: normalizedOverride.strategyContext ?? normalizedBase.strategyContext,
     correlation: normalizedOverride.correlation ?? normalizedBase.correlation,
+  };
+}
+
+export function readRuntimeExecutionStrategyRequest(
+  source: RuntimeExecutionStrategySessionStateLike | undefined,
+): RuntimeExecutionStrategyRequest | undefined {
+  const nestedRequest = source?.strategy?.request
+    ?? source?.strategyState?.request;
+  const legacyRequest = normalizeRuntimeExecutionStrategyRequest(source
+    ? {
+        requestedStrategy: source.requestedStrategy,
+        acceptanceCriteria: source.acceptanceCriteria,
+        strategyContext: source.strategyContext,
+        correlation: source.correlation,
+      }
+    : undefined);
+
+  return mergeRuntimeExecutionStrategyRequests(nestedRequest, legacyRequest);
+}
+
+export function readRuntimeExecutionStrategyState(
+  source: RuntimeExecutionStrategySessionStateLike | undefined,
+): RuntimeExecutionStrategyState | undefined {
+  const nested = cloneRuntimeExecutionStrategyState(source?.strategy);
+  const legacy = cloneRuntimeExecutionStrategyState(source?.strategyState);
+  const base = nested ?? legacy;
+  const request = readRuntimeExecutionStrategyRequest(source);
+  const effectiveStrategy = source?.strategy?.effectiveStrategy
+    ?? source?.effectiveStrategy
+    ?? source?.strategyState?.effectiveStrategy;
+
+  if (!base && !request && !effectiveStrategy) {
+    return undefined;
+  }
+
+  return {
+    ...(base ?? {}),
+    ...(request ? { request } : {}),
+    ...(effectiveStrategy ? { effectiveStrategy } : {}),
+    updatedAt: base?.updatedAt ?? new Date().toISOString(),
+  };
+}
+
+export function readRuntimeExecutionStrategyEffectiveStrategy(
+  source: RuntimeExecutionStrategySessionStateLike | undefined,
+): RuntimeExecutionStrategyId | undefined {
+  return readRuntimeExecutionStrategyState(source)?.effectiveStrategy;
+}
+
+export function mergeRuntimeExecutionStrategyStates(
+  base: RuntimeExecutionStrategyState | undefined,
+  override: RuntimeExecutionStrategyState | undefined,
+): RuntimeExecutionStrategyState | undefined {
+  const normalizedBase = cloneRuntimeExecutionStrategyState(base);
+  const normalizedOverride = cloneRuntimeExecutionStrategyState(override);
+
+  if (!normalizedBase) {
+    return normalizedOverride;
+  }
+  if (!normalizedOverride) {
+    return normalizedBase;
+  }
+
+  const request = mergeRuntimeExecutionStrategyRequests(
+    normalizedBase.request,
+    normalizedOverride.request,
+  );
+  const summary = normalizedOverride.summary
+    ? cloneSummary(normalizedOverride.summary)
+    : normalizedBase.summary
+      ? cloneSummary(normalizedBase.summary)
+      : undefined;
+  const localState = mergeLocalState(
+    normalizedBase.localState,
+    normalizedOverride.localState,
+  );
+
+  return {
+    ...normalizedBase,
+    ...normalizedOverride,
+    ...(request ? { request } : {}),
+    ...(summary ? { summary } : {}),
+    ...(localState ? { localState } : {}),
+    updatedAt: normalizedOverride.updatedAt || normalizedBase.updatedAt || new Date().toISOString(),
   };
 }
 
@@ -121,29 +207,15 @@ export function buildRuntimeExecutionStrategySessionPatch(
   input: RuntimeExecutionStrategyStateUpdate,
 ): RuntimeExecutionStrategySessionPatch {
   const request = mergeRuntimeExecutionStrategyRequests(
-    existing
-      ? {
-          requestedStrategy: existing.requestedStrategy,
-          acceptanceCriteria: existing.acceptanceCriteria,
-          strategyContext: existing.strategyContext,
-          correlation: existing.correlation,
-        }
-      : undefined,
+    readRuntimeExecutionStrategyRequest(existing),
     input.request,
   );
-  const strategyState = updateRuntimeExecutionStrategyState(existing?.strategyState, {
+  const strategy = updateRuntimeExecutionStrategyState(readRuntimeExecutionStrategyState(existing), {
     ...input,
     request,
   });
 
-  return {
-    requestedStrategy: request?.requestedStrategy,
-    acceptanceCriteria: request?.acceptanceCriteria,
-    strategyContext: request?.strategyContext,
-    correlation: request?.correlation,
-    effectiveStrategy: input.resolution?.effectiveStrategy ?? existing?.effectiveStrategy,
-    strategyState,
-  };
+  return strategy ? { strategy } : {};
 }
 
 function normalizeNonEmptyString(value: string | undefined): string | undefined {

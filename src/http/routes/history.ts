@@ -11,6 +11,11 @@ import type { SessionInfo } from '../../backends/cli/pool/types.js';
 import { toSessionView } from '../../backends/cli/pool/sessionView.js';
 import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
 import {
+  readRuntimeExecutionStrategyEffectiveStrategy,
+  readRuntimeExecutionStrategyRequest,
+  readRuntimeExecutionStrategyState,
+} from '../../core/runtime/strategies/state.js';
+import {
   getAuggieSessions,
   getCursorNative,
   getKiroNative,
@@ -65,14 +70,16 @@ function buildHistoryMetadata(ctx: AppContext, session: SessionInfo) {
     attached: runtime.isAttached(session.id),
     externalSessionLiveWindowMs: ctx.config.externalSessionLiveWindowMs,
   });
+  const strategyRequest = readRuntimeExecutionStrategyRequest(session);
+  const strategyState = readRuntimeExecutionStrategyState(session);
   return {
     sessionKey: session.sessionKey,
-    requestedStrategy: session.requestedStrategy,
-    acceptanceCriteria: session.acceptanceCriteria,
-    strategyContext: session.strategyContext,
-    correlation: session.correlation,
-    effectiveStrategy: session.effectiveStrategy,
-    strategyState: session.strategyState,
+    requestedStrategy: strategyRequest?.requestedStrategy,
+    acceptanceCriteria: strategyRequest?.acceptanceCriteria,
+    strategyContext: strategyRequest?.strategyContext,
+    correlation: strategyRequest?.correlation,
+    effectiveStrategy: readRuntimeExecutionStrategyEffectiveStrategy(session),
+    strategyState,
     outputDir: session.outputDir,
     artifacts: session.artifacts || [],
     context: session.context,

@@ -13,6 +13,11 @@ import type {
 } from '../types.js';
 import type { RuntimeTrackedSessionStateSnapshot } from './RuntimeSessionManager.js';
 import { buildSessionMaintenance } from './sessionMaintenance.js';
+import {
+  readRuntimeExecutionStrategyEffectiveStrategy,
+  readRuntimeExecutionStrategyRequest,
+  readRuntimeExecutionStrategyState,
+} from './strategies/state.js';
 import { extractWakeReason } from './wakeReason.js';
 
 const HTML_EXTENSIONS = new Set(['.htm', '.html']);
@@ -283,24 +288,29 @@ function cloneSkillState(
 function buildStrategyInspection(
   session: SessionInfo,
 ): RuntimeExecutionStrategyInspection | undefined {
+  const strategyRequest = readRuntimeExecutionStrategyRequest(session);
+  const effectiveStrategy = readRuntimeExecutionStrategyEffectiveStrategy(session);
+  const strategyState = readRuntimeExecutionStrategyState(session);
+
   if (
-    !session.requestedStrategy
-    && !session.acceptanceCriteria
-    && !session.strategyContext
-    && !session.correlation
-    && !session.effectiveStrategy
-    && !session.strategyState
+    !strategyRequest
+    && !effectiveStrategy
+    && !strategyState
   ) {
     return undefined;
   }
 
   return {
-    requestedStrategy: session.requestedStrategy,
-    effectiveStrategy: session.effectiveStrategy,
-    acceptanceCriteria: session.acceptanceCriteria,
-    ...(session.strategyContext ? { strategyContext: structuredClone(session.strategyContext) } : {}),
-    ...(session.correlation ? { correlation: structuredClone(session.correlation) } : {}),
-    ...(session.strategyState ? { state: structuredClone(session.strategyState) } : {}),
+    requestedStrategy: strategyRequest?.requestedStrategy,
+    effectiveStrategy,
+    acceptanceCriteria: strategyRequest?.acceptanceCriteria,
+    ...(strategyRequest?.strategyContext
+      ? { strategyContext: structuredClone(strategyRequest.strategyContext) }
+      : {}),
+    ...(strategyRequest?.correlation
+      ? { correlation: structuredClone(strategyRequest.correlation) }
+      : {}),
+    ...(strategyState ? { state: structuredClone(strategyState) } : {}),
   };
 }
 

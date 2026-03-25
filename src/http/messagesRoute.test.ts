@@ -378,16 +378,7 @@ describe('message route transcript persistence', () => {
       }));
 
       expect(registry.get(session.id)).toMatchObject({
-        requestedStrategy: 'react',
-        acceptanceCriteria: 'Return a concise answer.',
-        strategyContext: {
-          maxSteps: 3,
-          timeoutMs: 1200,
-        },
-        correlation: {
-          traceId: 'trace-message-route-1',
-        },
-        strategyState: {
+        strategy: {
           preferredStrategy: 'react',
           request: {
             requestedStrategy: 'react',

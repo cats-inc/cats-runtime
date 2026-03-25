@@ -12,6 +12,8 @@ import { resolveRuntimeExecutionStrategy } from '../../../core/runtime/strategie
 import {
   mergeRuntimeExecutionStrategyRequests,
   normalizeRuntimeExecutionStrategyRequest,
+  readRuntimeExecutionStrategyRequest,
+  readRuntimeExecutionStrategyState,
 } from '../../../core/runtime/strategies/state.js';
 import type { SessionRegistry } from '../../cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig, RemoteProviderInstanceConfig } from '../../cli/config.js';
@@ -421,19 +423,14 @@ export class ApiBackendManager {
       strategyContext: turn.strategyContext,
       correlation: turn.correlation,
     });
-    const persistedRequest = normalizeRuntimeExecutionStrategyRequest({
-      requestedStrategy: initialSession.requestedStrategy,
-      acceptanceCriteria: initialSession.acceptanceCriteria,
-      strategyContext: initialSession.strategyContext,
-      correlation: initialSession.correlation,
-    });
+    const persistedRequest = readRuntimeExecutionStrategyRequest(initialSession);
     const effectiveRequest = mergeRuntimeExecutionStrategyRequests(
       persistedRequest,
       currentRequest,
     );
     const resolution = resolveRuntimeExecutionStrategy({
       requestedStrategy: currentRequest?.requestedStrategy,
-      preferredStrategy: initialSession.strategyState?.preferredStrategy,
+      preferredStrategy: readRuntimeExecutionStrategyState(initialSession)?.preferredStrategy,
       fallbackStrategy: API_RUNTIME_COMPATIBILITY_STRATEGY,
     });
 
@@ -502,7 +499,7 @@ export class ApiBackendManager {
       const message = error instanceof Error ? error.message : String(error);
       context.updateStrategy({
         status: 'failed',
-        stepCount: context.session.strategyState?.summary?.stepCount || 0,
+        stepCount: context.session.strategy?.summary?.stepCount || 0,
         stepLimit: constraints.stepLimit,
         timeoutMs: constraints.timeoutMs,
         failureReason: message,
