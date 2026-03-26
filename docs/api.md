@@ -1866,6 +1866,7 @@ The shared local tool runtime now also exposes headless workspace substrate
 operations for API/local sessions:
 
 - `inspect_path`
+- `diff_file`
 - `create_directory`
 
 - `audit-workspace`

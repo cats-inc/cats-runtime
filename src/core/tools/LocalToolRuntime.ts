@@ -7,6 +7,7 @@ import type {
   RuntimeToolPolicyInspection,
   WorkspaceMode,
 } from '../types.js';
+import { buildTextDiffPreview } from '../diff/textDiff.js';
 import { applyPatch as applyStructuredPatch } from './applyPatch.js';
 import {
   assertDistinctWorkspaceFiles,
@@ -59,6 +60,7 @@ interface ShellResult {
 }
 
 const MAX_TEXT_OUTPUT = 12_000;
+const MAX_DIFF_PREVIEW_OUTPUT = 8_000;
 const DEFAULT_READ_LINE_LIMIT = 400;
 const DEFAULT_LIST_ENTRIES = 200;
 const DEFAULT_GLOB_RESULTS = 200;
@@ -145,6 +147,18 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         limit_lines: { type: 'integer', minimum: 1, maximum: 2000 },
       },
       required: ['path'],
+    },
+  },
+  {
+    name: 'diff_file',
+    description: 'Compare a file against proposed UTF-8 text and return a machine-readable diff preview.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Relative path to the file.' },
+        content: { type: 'string', description: 'Proposed full file contents.' },
+      },
+      required: ['path', 'content'],
     },
   },
   {
@@ -552,6 +566,7 @@ const READ_ONLY_TOOLS = new Set([
   'list_files',
   'inspect_path',
   'read_file',
+  'diff_file',
   'grep',
   'glob',
   'audit-workspace',
@@ -574,7 +589,7 @@ const PREVIEW_ONLY_TOOLS = new Set([
 const TOOL_ORDER = new Map(TOOL_DEFINITIONS.map((tool, index) => [tool.name, index]));
 
 const STANDARD_TOOLS = new Set([
-  'list_files', 'inspect_path', 'read_file', 'write_file', 'create_directory', 'edit_file',
+  'list_files', 'inspect_path', 'read_file', 'diff_file', 'write_file', 'create_directory', 'edit_file',
   'apply_patch', 'grep', 'glob', 'run_shell',
   'audit-workspace', 'init-workspace', 'update-workspace',
   'audit-delivery-target', 'publish-artifacts', 'inspect-repo-status', 'create-commit', 'push-branch',
@@ -796,6 +811,25 @@ function truncate(text: string, limit = MAX_TEXT_OUTPUT): string {
   return `${text.slice(0, limit)}\n... [truncated ${text.length - limit} chars]`;
 }
 
+function truncateDiffPreview(text: string, limit = MAX_DIFF_PREVIEW_OUTPUT): {
+  text: string;
+  truncated: boolean;
+  omittedChars?: number;
+} {
+  if (text.length <= limit) {
+    return {
+      text,
+      truncated: false,
+    };
+  }
+
+  return {
+    text: `${text.slice(0, limit)}\n... [truncated ${text.length - limit} chars]`,
+    truncated: true,
+    omittedChars: text.length - limit,
+  };
+}
+
 async function walkFiles(
   root: string,
   currentPath: string,
@@ -988,6 +1022,8 @@ export class LocalToolRuntime {
           return await this.inspectPath(context, call.id, args);
         case 'read_file':
           return await this.readFile(context, call.id, args);
+        case 'diff_file':
+          return await this.diffFile(context, call.id, args);
         case 'write_file':
           return await this.writeFile(context, call.id, args);
         case 'create_directory':
@@ -1180,6 +1216,54 @@ export class LocalToolRuntime {
       callId,
       name: 'read_file',
       output: truncate(content),
+    };
+  }
+
+  private async diffFile(
+    context: ToolExecutionContext,
+    callId: string,
+    args: Record<string, unknown>,
+  ): Promise<ToolResult> {
+    const inputPath = requireString(args, 'path');
+    if (typeof args.content !== 'string') {
+      throw new Error(`Argument 'content' must be a string`);
+    }
+
+    const { fullPath, displayPath } = await resolveSafeWorkspacePath(context.cwd, inputPath);
+    if (looksBinaryFile(displayPath)) {
+      throw new Error(`diff_file only supports UTF-8 text paths: ${displayPath}`);
+    }
+
+    let before = '';
+    let exists = false;
+    try {
+      const info = await stat(fullPath);
+      if (info.isDirectory()) {
+        throw new Error(`Path is a directory, not a file: ${displayPath}`);
+      }
+      exists = true;
+      before = await readFile(fullPath, 'utf-8');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
+    }
+
+    const preview = buildTextDiffPreview(displayPath, before, args.content);
+    const boundedDiff = truncateDiffPreview(preview.text);
+
+    return {
+      callId,
+      name: 'diff_file',
+      output: JSON.stringify({
+        path: displayPath,
+        exists,
+        diff: boundedDiff.text,
+        diffStats: preview.stats,
+        beforeBytes: Buffer.byteLength(before, 'utf-8'),
+        afterBytes: Buffer.byteLength(args.content, 'utf-8'),
+        ...(boundedDiff.truncated ? { diffTruncated: true, omittedChars: boundedDiff.omittedChars } : {}),
+      }, null, 2),
     };
   }
 

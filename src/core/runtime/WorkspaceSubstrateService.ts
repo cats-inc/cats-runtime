@@ -14,7 +14,6 @@ import type {
   WorkspaceSubstrateAuditStatus,
   WorkspaceSubstrateAuthorization,
   WorkspaceSubstrateContract,
-  WorkspaceSubstrateDiffStats,
   WorkspaceSubstrateFinding,
   WorkspaceSubstrateFindingStatus,
   WorkspaceSubstrateHints,
@@ -22,6 +21,7 @@ import type {
   WorkspaceSubstrateRequest,
   WorkspaceSubstrateResult,
 } from '../types.js';
+import { buildTextDiffPreview } from '../diff/textDiff.js';
 
 const MANAGED_MARKER = 'cats-runtime:workspace-substrate';
 const REVIEW_COPY_SUFFIX = '.bootstrap';
@@ -32,11 +32,6 @@ type PrivilegedActorRole = (typeof PRIVILEGED_ACTOR_ROLES)[number];
 interface WorkspaceTemplateFile {
   path: string;
   content: string;
-}
-
-interface DiffPreview {
-  text: string;
-  stats: WorkspaceSubstrateDiffStats;
 }
 
 interface PlannedAction extends WorkspaceSubstrateAction {
@@ -343,65 +338,6 @@ function isManagedContent(content: string): boolean {
   return content.includes(MANAGED_MARKER);
 }
 
-function splitLinesForDiff(content: string): string[] {
-  return content === '' ? [] : content.split('\n');
-}
-
-function buildDiff(path: string, before: string, after: string): DiffPreview {
-  if (before === after) {
-    return {
-      text: `--- ${path}\n+++ ${path}\n@@ no changes @@`,
-      stats: {
-        changed: false,
-        addedLines: 0,
-        removedLines: 0,
-      },
-    };
-  }
-
-  const beforeLines = splitLinesForDiff(before);
-  const afterLines = splitLinesForDiff(after);
-  let start = 0;
-  while (
-    start < beforeLines.length
-    && start < afterLines.length
-    && beforeLines[start] === afterLines[start]
-  ) {
-    start += 1;
-  }
-
-  let beforeEnd = beforeLines.length - 1;
-  let afterEnd = afterLines.length - 1;
-  while (
-    beforeEnd >= start
-    && afterEnd >= start
-    && beforeLines[beforeEnd] === afterLines[afterEnd]
-  ) {
-    beforeEnd -= 1;
-    afterEnd -= 1;
-  }
-
-  const removed = beforeLines.slice(start, beforeEnd + 1).map((line) => `-${line}`);
-  const added = afterLines.slice(start, afterEnd + 1).map((line) => `+${line}`);
-  const beforeCount = Math.max(0, beforeEnd - start + 1);
-  const afterCount = Math.max(0, afterEnd - start + 1);
-
-  return {
-    text: [
-      `--- ${path}`,
-      `+++ ${path}`,
-      `@@ -${start + 1},${beforeCount} +${start + 1},${afterCount} @@`,
-      ...removed,
-      ...added,
-    ].join('\n'),
-    stats: {
-      changed: true,
-      addedLines: added.length,
-      removedLines: removed.length,
-    },
-  };
-}
-
 function isReadOnlyOperation(operation: WorkspaceSubstrateRequest['operation']): boolean {
   return operation === 'audit-workspace';
 }
@@ -583,7 +519,7 @@ export class WorkspaceSubstrateService {
       const desiredHash = hashContent(template.content);
 
       if (existing === undefined) {
-        const diff = buildDiff(template.path, '', template.content);
+        const diff = buildTextDiffPreview(template.path, '', template.content);
         findings.push({
           path: template.path,
           status: 'missing',
@@ -637,7 +573,7 @@ export class WorkspaceSubstrateService {
       }
 
       if (isManagedContent(existing)) {
-        const diff = buildDiff(template.path, existing, template.content);
+        const diff = buildTextDiffPreview(template.path, existing, template.content);
         findings.push({
           path: template.path,
           status: 'drifted',
@@ -666,7 +602,7 @@ export class WorkspaceSubstrateService {
       }
 
       const reviewCopyPath = `${template.path}${REVIEW_COPY_SUFFIX}`;
-      const diff = buildDiff(template.path, existing, template.content);
+      const diff = buildTextDiffPreview(template.path, existing, template.content);
       findings.push({
         path: template.path,
         status: 'conflicting',
