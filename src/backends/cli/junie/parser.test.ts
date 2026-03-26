@@ -175,6 +175,97 @@ describe('parseJunieStreamLine', () => {
     });
   });
 
+  it('promotes structured Junie tool start updates into progress plus tool_use', () => {
+    const parsed = parseJunieSessionEventLine(JSON.stringify({
+      kind: 'SessionA2uxEvent',
+      event: {
+        state: 'IN_PROGRESS',
+        agentEvent: {
+          kind: 'ToolBlockUpdatedEvent',
+          status: 'IN_PROGRESS',
+          toolName: 'read_file',
+          toolId: 'tool-1',
+          text: 'Running read_file',
+        },
+      },
+    }), { sessionId: 'session-tool' });
+
+    expect(parsed).toEqual({
+      events: [
+        expect.objectContaining({
+          type: 'progress',
+          sessionId: 'session-tool',
+          text: 'Running read_file',
+          metadata: {
+            provider: 'junie',
+            backend: 'cli',
+            kind: 'tool',
+            status: 'running',
+            source: 'provider',
+            native: {
+              source: 'junie-progress',
+              progressKind: 'tool',
+              state: 'IN_PROGRESS',
+              toolName: 'read_file',
+              toolId: 'tool-1',
+            },
+          },
+        }),
+        {
+          type: 'tool_use',
+          toolName: 'read_file',
+          toolId: 'tool-1',
+        },
+      ],
+    });
+  });
+
+  it('promotes structured Junie tool completion updates into progress plus tool_result', () => {
+    const parsed = parseJunieSessionEventLine(JSON.stringify({
+      kind: 'SessionA2uxEvent',
+      event: {
+        state: 'IN_PROGRESS',
+        agentEvent: {
+          kind: 'ToolBlockUpdatedEvent',
+          status: 'COMPLETED',
+          toolName: 'read_file',
+          toolId: 'tool-1',
+          output: { ok: true },
+        },
+      },
+    }), { sessionId: 'session-tool' });
+
+    expect(parsed).toEqual({
+      events: [
+        expect.objectContaining({
+          type: 'progress',
+          sessionId: 'session-tool',
+          text: 'Junie completed tool: read_file',
+          metadata: {
+            provider: 'junie',
+            backend: 'cli',
+            kind: 'tool',
+            status: 'updated',
+            source: 'provider',
+            native: {
+              source: 'junie-progress',
+              progressKind: 'tool',
+              state: 'IN_PROGRESS',
+              toolName: 'read_file',
+              toolId: 'tool-1',
+            },
+          },
+        }),
+        {
+          type: 'tool_result',
+          toolName: 'read_file',
+          toolId: 'tool-1',
+          text: '{"ok":true}',
+        },
+      ],
+    });
+  });
+
   it('parses Junie result block into text and result events', () => {
     const parsed = parseJunieSessionEventLine(JSON.stringify({
       kind: 'SessionA2uxEvent',

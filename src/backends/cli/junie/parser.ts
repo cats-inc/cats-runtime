@@ -146,6 +146,12 @@ export function parseJunieSessionEventLine(
 
     case 'ToolBlockUpdatedEvent': {
       const text = readString(agentEvent.text);
+      const toolEvents = buildJunieToolLifecycleEvents(agentEvent, options.sessionId, state ?? undefined);
+      if (toolEvents.length > 0) {
+        return {
+          events: toolEvents,
+        };
+      }
       if (!text) return null;
       return {
         events: [buildJunieProgressEvent('tool', text, options.sessionId, state ?? undefined, agentEvent)],
@@ -230,6 +236,82 @@ function buildJunieProgressEvent(
     },
     raw: agentEvent,
   });
+}
+
+function buildJunieToolLifecycleEvents(
+  agentEvent: Record<string, unknown>,
+  sessionId: string | undefined,
+  state: string | undefined,
+): StreamEvent[] {
+  const toolName = readString(agentEvent.toolName) ?? readString(agentEvent.name);
+  const toolId = readString(agentEvent.toolId) ?? readString(agentEvent.id);
+  const status = normalizeJunieToolStatus(readString(agentEvent.status));
+  const text = readString(agentEvent.text);
+  const resultText = stringifyJunieToolValue(
+    agentEvent.result ?? agentEvent.output ?? agentEvent.response,
+  );
+  const isError = status === 'failed'
+    || agentEvent.isError === true
+    || agentEvent.error === true;
+
+  if (!toolName && !toolId) {
+    return [];
+  }
+
+  if (status === 'completed' || status === 'failed' || resultText) {
+    return [
+      createRuntimeProgressEvent({
+        text: text
+          || (toolName ? `Junie completed tool: ${toolName}` : 'Junie completed a tool call.'),
+        sessionId,
+        provider: 'junie',
+        backend: 'cli',
+        kind: 'tool',
+        status: isError ? 'failed' : 'updated',
+        source: 'provider',
+        native: {
+          source: 'junie-progress',
+          progressKind: 'tool',
+          state,
+          ...(toolName ? { toolName } : {}),
+          ...(toolId ? { toolId } : {}),
+        },
+        raw: agentEvent,
+      }),
+      {
+        type: 'tool_result',
+        ...(toolName ? { toolName } : {}),
+        ...(toolId ? { toolId } : {}),
+        ...(resultText ? { text: resultText } : {}),
+        ...(isError ? { isError: true } : {}),
+      },
+    ];
+  }
+
+  return [
+    createRuntimeProgressEvent({
+      text: text || (toolName ? `Running tool: ${toolName}` : 'Junie updated tool status.'),
+      sessionId,
+      provider: 'junie',
+      backend: 'cli',
+      kind: 'tool',
+      status: 'running',
+      source: 'provider',
+      native: {
+        source: 'junie-progress',
+        progressKind: 'tool',
+        state,
+        ...(toolName ? { toolName } : {}),
+        ...(toolId ? { toolId } : {}),
+      },
+      raw: agentEvent,
+    }),
+    {
+      type: 'tool_use',
+      ...(toolName ? { toolName } : {}),
+      ...(toolId ? { toolId } : {}),
+    },
+  ];
 }
 
 function readCurrentPlanStep(items: unknown): string | null {
@@ -325,4 +407,36 @@ function readString(value: unknown): string | null {
 
 function readNumber(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+function normalizeJunieToolStatus(status: string | null): 'running' | 'completed' | 'failed' | null {
+  switch (status) {
+    case 'IN_PROGRESS':
+    case 'STARTED':
+    case 'RUNNING':
+      return 'running';
+    case 'COMPLETED':
+    case 'DONE':
+    case 'SUCCESS':
+      return 'completed';
+    case 'FAILED':
+    case 'ERROR':
+      return 'failed';
+    default:
+      return null;
+  }
+}
+
+function stringifyJunieToolValue(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (value === undefined || value === null) {
+    return '';
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 }
