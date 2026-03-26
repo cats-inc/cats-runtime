@@ -115,9 +115,10 @@ node dist/index.js --diagnose-setup --refresh-setup-scan
 ```
 
 The CLI path writes the same redacted artifact under `<dataDir>/diagnostics/`
-and prints a JSON payload to stdout with `status`, `artifactPath`, and `report`.
-Use this path when port conflicts or other startup failures make the running
-HTTP action unavailable.
+and prints a concise operator summary to stderr plus the machine-readable JSON
+payload to stdout with `status`, `artifactPath`, and `report`. Use this path
+when port conflicts or other startup failures make the running HTTP action
+unavailable.
 
 `GET /setup-state` now also exposes a shared runtime-owned repair read model for
 post-bootstrap follow-through:

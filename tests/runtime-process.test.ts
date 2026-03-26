@@ -206,7 +206,7 @@ async function waitForProcessOutput(
       clearTimeout(timer);
       child.stdout.off('data', onStdout);
       child.stderr.off('data', onStderr);
-      child.off('exit', onExit);
+      child.off('close', onClose);
       child.off('error', onError);
     };
 
@@ -223,7 +223,7 @@ async function waitForProcessOutput(
       rejectOutput(error);
     };
 
-    const onExit = (code: number | null) => {
+    const onClose = (code: number | null) => {
       cleanup();
       resolveOutput({ code, stdout, stderr });
     };
@@ -237,7 +237,7 @@ async function waitForProcessOutput(
 
     child.stdout.on('data', onStdout);
     child.stderr.on('data', onStderr);
-    child.on('exit', onExit);
+    child.on('close', onClose);
     child.on('error', onError);
   });
 }
@@ -689,12 +689,14 @@ describe('runtime process startup contract', () => {
     try {
       const output = await waitForProcessOutput(child);
       expect(output.code).toBe(0);
-      expect(output.stderr.trim()).toBe('');
 
       const payload = JSON.parse(output.stdout.trim()) as SetupDiagnosticCliOutput;
       expect(payload.status).toBe('generated');
       expect(payload.report.config.port.status).toBe('in_use');
       expect(payload.report.summary.status).toBe('unavailable');
+      expect(output.stderr).toContain('Setup diagnostic report generated:');
+      expect(output.stderr).toContain(payload.report.summary.headline);
+      expect(output.stderr).toContain(`Artifact: ${payload.artifactPath}`);
     } finally {
       await new Promise<void>((resolveClose, rejectClose) => {
         occupiedServer.close((error) => {

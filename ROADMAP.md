@@ -964,7 +964,8 @@ evidence bundles and does not force hosts to invent their own report format.
   concise status without re-deriving it client-side
 - `cats-runtime --diagnose-setup` now generates the same report without starting
   the normal HTTP server, so port conflicts or other startup failures still
-  leave a redacted operator-facing artifact
+  leave a redacted operator-facing artifact; the entry path now also prints a
+  concise stderr summary while preserving stdout JSON for automation
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
   remediation previews, and latest-setup-report summary metadata including a

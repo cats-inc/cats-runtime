@@ -3,7 +3,10 @@
 import { pathToFileURL } from 'node:url';
 import { loadDotEnv } from '../core/dotenv.js';
 import { loadConfig } from '../core/config.js';
-import { generateSetupDiagnosticEntryArtifact } from '../core/diagnostics/setupDiagnosticEntry.js';
+import {
+  formatSetupDiagnosticEntrySummary,
+  generateSetupDiagnosticEntryArtifact,
+} from '../core/diagnostics/setupDiagnosticEntry.js';
 import { createRuntimeServer } from '../server.js';
 import {
   applyRuntimeCliEnvOverrides,
@@ -38,6 +41,7 @@ async function main(): Promise<void> {
   applyRuntimeCliEnvOverrides(cliOptions, process.env);
   if (cliOptions.diagnoseSetup) {
     const result = await generateSetupDiagnosticEntryArtifact(cliOptions, process.env);
+    process.stderr.write(formatSetupDiagnosticEntrySummary(result));
     process.stdout.write(`${JSON.stringify({
       status: 'generated',
       artifactPath: result.artifactPath,

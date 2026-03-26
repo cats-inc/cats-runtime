@@ -74,3 +74,14 @@ export async function generateSetupDiagnosticEntryArtifact(
     refreshScan: cliOptions.refreshSetupScan === true,
   });
 }
+
+export function formatSetupDiagnosticEntrySummary(
+  artifact: SetupDiagnosticArtifact,
+): string {
+  const lines = [
+    `Setup diagnostic report generated: ${artifact.report.summary.headline}`,
+    ...artifact.report.summary.highlights.map((highlight) => `- ${highlight}`),
+    `Artifact: ${artifact.artifactPath}`,
+  ];
+  return `${lines.join('\n')}\n`;
+}
