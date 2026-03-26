@@ -2515,6 +2515,11 @@ include bounded `observability` truth so hosts can distinguish provider-owned
 catalogs from runtime-enumerated ones and can see whether the runtime can
 observe remote tool-call events or runtime service updates.
 
+For agent targets, the standalone tooling route also includes the same additive
+`agentRuntime` inspection object used by `GET /providers/config` and
+`GET /diagnostics/providers`, so hosts can inspect remote tool-call/service
+observability without fetching a second provider read model.
+
 For CLI backends, instance entries also expose runtime-owned `install` metadata
 even before a probe has run. The `install` object includes:
 

@@ -790,6 +790,42 @@ describe('agent backend integration', () => {
         backend: 'agent',
         instance: 'gateway',
         target: 'agent/gateway',
+        agentRuntime: expect.objectContaining({
+          adapter: 'openclaw',
+          family: 'gateway',
+          summary: expect.stringContaining('OpenClaw gateway'),
+          endpoint: 'ws://gateway.test/ws',
+          transport: {
+            kind: 'websocket',
+            protocol: 'openclaw_gateway_v3',
+            liveProbe: 'rpc_health',
+            modelDiscovery: 'models_list',
+            streaming: 'agent_event_frames',
+          },
+          request: {
+            headerNames: ['authorization'],
+          },
+          auth: expect.objectContaining({
+            mechanisms: expect.arrayContaining(['connect_auth', 'handshake_header']),
+            credentials: expect.arrayContaining([
+              { kind: 'url', configured: true },
+              { kind: 'auth_token', configured: true },
+            ]),
+          }),
+          continuity: {
+            providerManagedSessions: true,
+            sessionKey: true,
+            providerSessionState: true,
+            cancel: false,
+          },
+          capabilities: {
+            probe: true,
+            modelDiscovery: true,
+            cancel: false,
+            runtimeServices: true,
+            toolCallEvents: false,
+          },
+        }),
         source: 'provider_managed',
         discoverable: false,
         sessionScopedOverrides: false,

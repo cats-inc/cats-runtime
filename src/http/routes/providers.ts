@@ -125,6 +125,7 @@ providerRoutes.get('/providers/:provider/tools', (c) => {
       backend: target.backend,
       instance: target.instanceId,
       target: `${target.backend}/${target.instanceId}`,
+      ...(agentRuntime ? { agentRuntime } : {}),
       ...buildProviderToolingSummary(target, { agentRuntime }),
     });
   } catch (err) {
