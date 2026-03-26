@@ -160,6 +160,7 @@ describe('SetupReadModelService', () => {
                   warnings: 1,
                   errors: 0,
                 },
+                headline: 'Setup report found 1 warning(s).',
               },
             } as never,
           }),
@@ -218,6 +219,7 @@ describe('SetupReadModelService', () => {
       expect(readModel.diagnostics.latestReport).toEqual(expect.objectContaining({
         artifactId: 'setup-report-test',
         status: 'degraded',
+        headline: 'Setup report found 1 warning(s).',
       }));
     } finally {
       cleanup();

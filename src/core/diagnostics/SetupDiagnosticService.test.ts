@@ -134,6 +134,11 @@ describe('SetupDiagnosticService', () => {
       expect(existsSync(result.artifactPath)).toBe(true);
       expect(result.report.setup.scan.source).toBe('existing');
       expect(result.report.summary.status).toBe('degraded');
+      expect(result.report.summary.headline).toBe('Setup report found 3 warning(s).');
+      expect(result.report.summary.highlights).toEqual(expect.arrayContaining([
+        'Runtime is in bootstrap mode and still requires provider setup before normal execution.',
+        'Runtime config file is missing.',
+      ]));
       expect(result.report.runtime.paths.dataDir).toContain('<home>');
       expect(result.report.references.compatibilityEvidenceDir).toContain('<home>');
       expect(result.report.setup.scan.latest?.providers[0]?.commandPath).toContain('<home>');
@@ -170,6 +175,7 @@ describe('SetupDiagnosticService', () => {
       const latest = service.readLatestReport();
       expect(latest?.artifactPath).toBe(second.artifactPath);
       expect(latest?.report.generatedAt).toBe('2026-03-26T01:05:00.000Z');
+      expect(latest?.report.summary.headline).toContain('Setup report found');
     } finally {
       cleanup();
     }
@@ -190,6 +196,9 @@ describe('SetupDiagnosticService', () => {
 
       expect(result.report.config.loadError).toContain('multiple backends');
       expect(result.report.summary.status).toBe('unavailable');
+      expect(result.report.summary.headline).toMatch(
+        /^Setup report found \d+ error\(s\) and \d+ warning\(s\)\.$/,
+      );
       expect(result.report.issues).toEqual(expect.arrayContaining([
         expect.objectContaining({
           code: 'config_load_error',

@@ -55,6 +55,8 @@ export interface SetupDiagnosticReport {
       warnings: number;
       errors: number;
     };
+    headline: string;
+    highlights: string[];
   };
   platform: {
     nodeVersion: string;
@@ -544,11 +546,35 @@ function summarizeIssues(
       errors: 0,
     },
   );
+  const status = counts.errors > 0 ? 'unavailable' : counts.warnings > 0 ? 'degraded' : 'ok';
+  const headline = status === 'ok'
+    ? 'No setup issues detected.'
+    : counts.errors > 0
+      ? `Setup report found ${counts.errors} error(s) and ${counts.warnings} warning(s).`
+      : `Setup report found ${counts.warnings} warning(s).`;
+  const highlights = issues
+    .filter((issue) => issue.severity !== 'info')
+    .sort((left, right) => severityRank(right.severity) - severityRank(left.severity))
+    .slice(0, 3)
+    .map((issue) => issue.message);
 
   return {
-    status: counts.errors > 0 ? 'unavailable' : counts.warnings > 0 ? 'degraded' : 'ok',
+    status,
     issueCounts: counts,
+    headline,
+    highlights,
   };
+}
+
+function severityRank(severity: SetupDiagnosticIssue['severity']): number {
+  switch (severity) {
+    case 'error':
+      return 3;
+    case 'warning':
+      return 2;
+    default:
+      return 1;
+  }
 }
 
 function summarizeConfiguredTargets(

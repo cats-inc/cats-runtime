@@ -959,13 +959,17 @@ evidence bundles and does not force hosts to invent their own report format.
 - `POST /diagnostics/setup-report` generates a fresh operator-facing report and
   can optionally refresh the shared setup scan first
 - `GET /diagnostics/setup-report/latest` returns the latest persisted report
+- setup reports now include additive operator-facing `summary.headline` and
+  bounded `summary.highlights` fields so HTTP and CLI consumers can surface a
+  concise status without re-deriving it client-side
 - `cats-runtime --diagnose-setup` now generates the same report without starting
   the normal HTTP server, so port conflicts or other startup failures still
   leave a redacted operator-facing artifact
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
-  remediation previews, and latest-setup-report summary metadata instead of
-  forcing later dashboard/setup follow-through to reconstruct that state
+  remediation previews, and latest-setup-report summary metadata including a
+  concise headline instead of forcing later dashboard/setup follow-through to
+  reconstruct that state
   client-side
 - reports now aggregate runtime path facts, config inspection, discovery
   posture, bootstrap setup snapshots, configured target counts, git presence,
