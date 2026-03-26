@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -6,9 +7,13 @@ import {
   getProviderDefaultInstanceId,
   resolveProviderInstance,
   type CliRuntimeConfig,
+  type RemoteProviderInstanceConfig,
 } from '../../backends/cli/config.js';
 import type { Provider, ProviderName } from '../../backends/cli/providers/types.js';
-import type { ProviderTargetDescriptor } from '../providerCatalog.js';
+import { buildAgentAdapter } from '../../backends/agent/adapters/registry.js';
+import type { AgentAdapter } from '../../backends/agent/types.js';
+import { observeNormalized } from './providerEvolution.js';
+import { resolveProviderTarget, type ProviderTargetDescriptor } from '../providerCatalog.js';
 import { ClaudeProvider } from '../../backends/cli/providers/claude.js';
 import { CodexProvider } from '../../backends/cli/providers/codex.js';
 import { CopilotProvider } from '../../backends/cli/providers/copilot.js';
@@ -37,7 +42,7 @@ import {
   type RuntimeCliOptions,
 } from '../../startup.js';
 
-const SUPPORTED_PROBE_PROVIDERS = new Set<ProviderName>([
+const SUPPORTED_CLI_PROBE_PROVIDERS = new Set<ProviderName>([
   'codex',
   'copilot',
   'pi',
@@ -52,56 +57,98 @@ export interface ProviderEvolutionEntryContext {
   probeService: ProviderEvolutionProbeService;
 }
 
+interface AgentProbeTargetDescriptor extends ProviderTargetDescriptor {
+  backend: 'agent';
+  remoteInstance: RemoteProviderInstanceConfig;
+}
+
 export async function generateProviderEvolutionProbeArtifact(
   cliOptions: RuntimeCliOptions,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<ProviderEvolutionProbeStoredArtifact> {
-  const providerName = parseProbeProviderName(cliOptions.probeProvider);
-  if (!SUPPORTED_PROBE_PROVIDERS.has(providerName)) {
-    throw new Error(
-      `Provider evolution probes currently support: ${Array.from(SUPPORTED_PROBE_PROVIDERS).join(', ')}`,
-    );
-  }
-
   const context = resolveProviderEvolutionEntryContext(env);
-  const instance = resolveProviderInstance(
+  const providerName = parseProbeProviderName(cliOptions.probeProvider);
+  const target = resolveProviderTarget(
     context.config,
     providerName,
-    cliOptions.probeInstance || getProviderDefaultInstanceId(context.config, providerName),
+    cliOptions.probeInstance,
   );
   const profile = getProviderEvolutionProbeProfile(cliOptions.probeProfile);
-  const assessment = await context.compatibility.assessCliTarget({
-    providerName,
-    backend: 'cli',
-    instanceId: instance.id,
-    defaultTarget: instance.id === getProviderDefaultInstanceId(context.config, providerName),
-    cliInstance: instance,
-  } satisfies ProviderTargetDescriptor, {
-    force: true,
-    purpose: 'diagnostics',
-    probeMode: 'light',
-  });
 
-  return context.probeService.run({
-    target: {
-      provider: providerName,
-      instance: instance.id,
-      parserId: assessment.profile.parserId,
-      probeProfile: profile.id,
-      transport: 'cli',
-      version: assessment.fingerprint.version.normalized || assessment.fingerprint.version.raw,
-    },
-    profile,
-    run: ({ profile: selectedProfile, observer }) => runCliProbeProfile({
-      config: context.config,
+  if (target.backend === 'cli') {
+    if (!SUPPORTED_CLI_PROBE_PROVIDERS.has(providerName as ProviderName)) {
+      throw new Error(
+        `CLI provider evolution probes currently support: ${Array.from(SUPPORTED_CLI_PROBE_PROVIDERS).join(', ')}`,
+      );
+    }
+
+    const instance = resolveProviderInstance(
+      context.config,
+      providerName as ProviderName,
+      cliOptions.probeInstance || getProviderDefaultInstanceId(context.config, providerName as ProviderName),
+    );
+    const assessment = await context.compatibility.assessCliTarget({
       providerName,
+      backend: 'cli',
       instanceId: instance.id,
-      model: cliOptions.probeModel,
-      profile: selectedProfile,
-      observer,
-      compatibilityProfile: assessment.profile,
-    }),
-  });
+      defaultTarget: instance.id === getProviderDefaultInstanceId(context.config, providerName as ProviderName),
+      cliInstance: instance,
+    } satisfies ProviderTargetDescriptor, {
+      force: true,
+      purpose: 'diagnostics',
+      probeMode: 'light',
+    });
+
+    return context.probeService.run({
+      target: {
+        provider: providerName,
+        instance: instance.id,
+        parserId: assessment.profile.parserId,
+        probeProfile: profile.id,
+        transport: 'cli',
+        version: assessment.fingerprint.version.normalized || assessment.fingerprint.version.raw,
+      },
+      profile,
+      run: ({ profile: selectedProfile, observer }) => runCliProbeProfile({
+        config: context.config,
+        providerName: providerName as ProviderName,
+        instanceId: instance.id,
+        model: cliOptions.probeModel,
+        profile: selectedProfile,
+        observer,
+        compatibilityProfile: assessment.profile,
+      }),
+    });
+  }
+
+  if (isAgentProbeTarget(target)) {
+    const adapter = buildAgentAdapter(target.remoteInstance, {
+      env,
+    });
+    const parserId = resolveAgentProbeParserId(adapter, target.remoteInstance);
+    return context.probeService.run({
+      target: {
+        provider: providerName,
+        instance: `${target.backend}/${target.remoteInstance.id}`,
+        parserId,
+        probeProfile: profile.id,
+        transport: 'agent',
+      },
+      profile,
+      run: ({ profile: selectedProfile, observer }) => runAgentProbeProfile({
+        adapter,
+        target,
+        model: cliOptions.probeModel,
+        profile: selectedProfile,
+        observer,
+      }),
+    });
+  }
+
+  throw new Error(
+    `Provider evolution probes currently support CLI and agent targets only; `
+    + `${providerName}/${cliOptions.probeInstance || 'default'} resolved to '${target.backend}'.`,
+  );
 }
 
 export async function listProviderEvolutionProbeArtifacts(
@@ -268,6 +315,85 @@ async function runCliProbeProfile(
   }
 }
 
+interface RunAgentProbeProfileOptions {
+  adapter: AgentAdapter;
+  target: AgentProbeTargetDescriptor;
+  model?: string;
+  profile: ProviderEvolutionProbeProfile;
+  observer: ProviderEvolutionEvidenceObserver;
+}
+
+async function runAgentProbeProfile(
+  options: RunAgentProbeProfileOptions,
+): Promise<{
+  status: 'completed' | 'failed';
+  turnsCompleted: number;
+  emittedEventCount: number;
+  error?: string;
+}> {
+  const workspaceRoot = await mkdtemp(join(tmpdir(), 'cats-runtime-provider-evolution-agent-'));
+  const sessionId = `provider-evolution-${randomUUID()}`;
+  const sessionKey = `provider-evolution-${randomUUID()}`;
+  let providerSessionId: string | undefined;
+  let turnsCompleted = 0;
+  let emittedEventCount = 0;
+
+  try {
+    await writeFile(
+      join(workspaceRoot, 'probe-note.txt'),
+      [
+        'This file exists for provider-evolution manual probes.',
+        'Agent-backed providers may or may not expose runtime-local workspace access.',
+      ].join('\n'),
+      'utf8',
+    );
+
+    for (const turn of options.profile.turns) {
+      for await (const event of options.adapter.invoke({
+        sessionId,
+        sessionKey,
+        providerName: options.target.providerName,
+        instance: options.target.remoteInstance,
+        model: options.model || options.target.remoteInstance.model,
+        providerSessionId,
+        signal: new AbortController().signal,
+        evolutionObserver: options.observer,
+        turn: {
+          message: turn.prompt,
+          outputDir: workspaceRoot,
+        },
+      })) {
+        emittedEventCount += 1;
+        providerSessionId = event.providerSessionId || providerSessionId;
+        observeNormalized(options.observer, {
+          rawEventType: event.type,
+          details: {
+            adapter: options.adapter.kind,
+            backend: options.target.backend,
+          },
+          rawSample: event.raw,
+        }, event);
+      }
+      turnsCompleted += 1;
+    }
+
+    return {
+      status: 'completed',
+      turnsCompleted,
+      emittedEventCount,
+    };
+  } catch (error) {
+    return {
+      status: 'failed',
+      turnsCompleted,
+      emittedEventCount,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  } finally {
+    await rm(workspaceRoot, { recursive: true, force: true });
+  }
+}
+
 function createProbeProvider(
   instance: ReturnType<typeof resolveProviderInstance>,
   providerName: ProviderName,
@@ -298,17 +424,12 @@ function createProbeProvider(
   }
 }
 
-function parseProbeProviderName(value: string | undefined): ProviderName {
+function parseProbeProviderName(value: string | undefined): string {
   if (!value) {
     throw new Error('Missing --probe-provider value');
   }
 
-  const normalized = value.trim().toLowerCase();
-  const provider = normalized as ProviderName;
-  if (!SUPPORTED_PROBE_PROVIDERS.has(provider)) {
-    throw new Error(`Unsupported --probe-provider '${value}'`);
-  }
-  return provider;
+  return value.trim().toLowerCase();
 }
 
 export function parseProviderEvolutionProbeCliOptions(argv: string[]): RuntimeCliOptions {
@@ -344,8 +465,20 @@ function parseOptionalProbeLimit(value: string | undefined): number | undefined 
   return parsed;
 }
 
-function parseOptionalProbeProviderName(value: string | undefined): ProviderName | undefined {
+function parseOptionalProbeProviderName(value: string | undefined): string | undefined {
   return value ? parseProbeProviderName(value) : undefined;
+}
+
+function resolveAgentProbeParserId(
+  adapter: AgentAdapter,
+  instance: RemoteProviderInstanceConfig,
+): string {
+  const inspection = adapter.inspect?.(instance);
+  return inspection?.transport.protocol || adapter.kind;
+}
+
+function isAgentProbeTarget(target: ProviderTargetDescriptor): target is AgentProbeTargetDescriptor {
+  return target.backend === 'agent' && Boolean(target.remoteInstance);
 }
 
 function describeProbeArtifactScope(cliOptions: RuntimeCliOptions): string {

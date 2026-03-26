@@ -4,6 +4,12 @@ import type {
   StreamEvent,
 } from '../../../../core/types.js';
 import { parseSseEvents, readErrorBody } from '../../../../core/streamParsers.js';
+import {
+  observeIgnored,
+  observeRawPassthrough,
+  observeSchemaFailure,
+  observeUnknown,
+} from '../../../../core/compatibility/providerEvolution.js';
 import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
 import type {
   AgentAdapter,
@@ -375,9 +381,15 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
     let usage: StreamEvent['usage'];
     let services: AgentRuntimeService[] | undefined;
     let upstreamProviderSessionId: string | undefined;
+    const observer = input.evolutionObserver;
 
     for await (const event of parseSseEvents(messageResponse.body)) {
       if (event.data === '[DONE]') {
+        observeIgnored(observer, {
+          rawEventType: '[DONE]',
+          reason: 'stream_completed',
+          rawSample: event.data,
+        }, null);
         break;
       }
 
@@ -385,18 +397,44 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
       try {
         payload = JSON.parse(event.data) as Record<string, unknown>;
       } catch {
+        observeRawPassthrough(observer, {
+          rawEventType: 'sse_data',
+          reason: 'non_json_payload',
+          rawSample: event.data,
+        }, null);
         continue;
       }
       const type = typeof payload.type === 'string' ? payload.type : undefined;
+      if (!type) {
+        observeSchemaFailure(observer, {
+          rawEventType: 'unknown',
+          reason: 'missing_type',
+          rawSample: payload,
+        }, null);
+        continue;
+      }
 
       if (type === 'session_created') {
         upstreamProviderSessionId = typeof payload.providerSessionId === 'string'
           ? payload.providerSessionId
           : upstreamProviderSessionId;
+        observeIgnored(observer, {
+          rawEventType: type,
+          reason: 'session_lifecycle',
+          rawSample: payload,
+        }, null);
         continue;
       }
 
-      if (type === 'content' && typeof payload.content === 'string') {
+      if (type === 'content') {
+        if (typeof payload.content !== 'string') {
+          observeSchemaFailure(observer, {
+            rawEventType: type,
+            reason: 'content_without_text',
+            rawSample: payload,
+          }, null);
+          continue;
+        }
         yield {
           type: 'text',
           providerSessionId: bridgeSessionId,
@@ -406,13 +444,60 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
       }
 
       if (type === 'tool_use') {
+        if (typeof payload.toolName !== 'string') {
+          observeSchemaFailure(observer, {
+            rawEventType: type,
+            reason: 'tool_use_without_name',
+            rawSample: payload,
+          }, null);
+          continue;
+        }
         yield {
           type: 'tool_use',
           providerSessionId: bridgeSessionId,
-          toolName: typeof payload.toolName === 'string' ? payload.toolName : 'tool',
+          toolName: payload.toolName,
           toolArgs: payload.toolInput && typeof payload.toolInput === 'object'
             ? payload.toolInput as Record<string, unknown>
             : {},
+        };
+        continue;
+      }
+
+      if (type === 'tool_result') {
+        const toolName = typeof payload.toolName === 'string'
+          ? payload.toolName
+          : typeof payload.name === 'string'
+            ? payload.name
+            : undefined;
+        const toolId = typeof payload.toolUseId === 'string'
+          ? payload.toolUseId
+          : typeof payload.toolId === 'string'
+            ? payload.toolId
+            : undefined;
+        const text = typeof payload.content === 'string'
+          ? payload.content
+          : typeof payload.result === 'string'
+            ? payload.result
+            : typeof payload.output === 'string'
+              ? payload.output
+              : typeof payload.message === 'string'
+                ? payload.message
+                : undefined;
+        if (!toolName && !toolId && !text) {
+          observeSchemaFailure(observer, {
+            rawEventType: type,
+            reason: 'tool_result_without_identity_or_content',
+            rawSample: payload,
+          }, null);
+          continue;
+        }
+        yield {
+          type: 'tool_result',
+          providerSessionId: bridgeSessionId,
+          ...(toolName ? { toolName } : {}),
+          ...(toolId ? { toolId } : {}),
+          ...(text ? { text } : {}),
+          ...(payload.isError === true ? { isError: true } : {}),
         };
         continue;
       }
@@ -425,11 +510,21 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
             ? rawUsage.completion_tokens
             : 0,
         };
+        observeIgnored(observer, {
+          rawEventType: type,
+          reason: 'usage_telemetry',
+          rawSample: payload,
+        }, null);
         continue;
       }
 
       if (type === 'service_update') {
         services = parseServices(payload.services) || services;
+        observeIgnored(observer, {
+          rawEventType: type,
+          reason: 'service_update',
+          rawSample: payload,
+        }, null);
         continue;
       }
 
@@ -444,6 +539,12 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
         };
         return;
       }
+
+      observeUnknown(observer, {
+        rawEventType: type,
+        reason: 'unhandled_bridge_event',
+        rawSample: payload,
+      }, null);
     }
 
     yield {

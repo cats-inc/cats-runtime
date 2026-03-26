@@ -1056,7 +1056,7 @@ always-on self-adapting parser system.
 
 #### Current Implementation Status
 
-- the first four `PLAN-021` slices are landed
+- the first five `PLAN-021` slices are landed
 - `src/core/compatibility/providerEvolution.ts` now owns a transport-neutral
   evidence collector and bundle shape
 - high-value CLI adapters now have optional instrumentation for:
@@ -1084,13 +1084,18 @@ always-on self-adapting parser system.
 - the CLI/manual-first flow can now also:
   - list retained provider-evolution artifacts newest-first
   - re-read a retained artifact by id without starting the HTTP server
+- the shared manual probe flow now also supports the first agent-backed targets
+  via `--probe-instance agent/<instance>`
+- Agent SDK bridge probes now preserve normalized `tool_result` output while
+  recording dropped/unknown/schema-failure/raw-passthrough bridge frames for
+  evidence review
 - normal runtime execution remains unchanged when evidence collection is not
   enabled
 
 #### Follow-through Direction
 
 - extend the manual probe flow beyond the first CLI-heavy providers when the
-  collector shape proves stable
+  collector shape proves stable, including broader agent/A2A adapter coverage
 - decide whether the new internal latest/list/read-model helpers deserve a
   bounded diagnostics read surface after the CLI/manual path has settled
 - decide whether the CLI/manual-first artifact list/read commands need richer
@@ -1114,7 +1119,7 @@ always-on self-adapting parser system.
 - `src/backends/cli/providers/*`
 - `src/backends/cli/goose/parser.ts`
 - `src/backends/cli/pi/parser.ts`
-- later follow-through may extend into `src/backends/agent/*`
+- `src/backends/agent/*`
 
 #### References
 

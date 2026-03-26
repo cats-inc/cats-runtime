@@ -133,14 +133,18 @@ public HTTP surface, use the provider-evolution probe entrypoint:
 ```powershell
 node dist/index.js --probe-provider-evolution --probe-provider codex
 node dist/index.js --probe-provider-evolution --probe-provider claude --probe-profile manual_text
+node dist/index.js --probe-provider-evolution --probe-provider claude --probe-instance agent/sdk
 node dist/index.js --probe-provider-evolution --probe-provider goose --probe-model anthropic/claude-sonnet-4
 node dist/index.js --list-provider-evolution-artifacts --probe-provider codex --probe-limit 5
+node dist/index.js --list-provider-evolution-artifacts --probe-provider claude --probe-instance agent/sdk
 node dist/index.js --read-provider-evolution-artifact artifact-id --probe-provider codex
 ```
 
 The probe path is intentionally manual-first and currently supports the
 highest-value CLI families first: `codex`, `copilot`, `pi`, `goose`,
-`gemini`, and `claude`.
+`gemini`, and `claude`. It now also supports the first agent-backed targets
+through the same retained-artifact flow when the selected provider resolves to
+an `agent/<instance>` target such as `claude` on `agent/sdk`.
 
 Each probe writes a machine-readable artifact under
 `<dataDir>/compatibility/provider-evolution/` and prints a concise stderr
@@ -160,6 +164,16 @@ opening any public HTTP surface:
   artifact and prints the full stored artifact JSON to stdout
 - `--probe-provider`, `--probe-instance`, and `--probe-profile` can scope the
   retained-artifact listing, and `--probe-limit <count>` caps list output
+
+The current agent-backed slice stays manual-first and transport-neutral:
+
+- it reuses the same capability snapshot / baseline-compare artifact contract
+  as CLI probes
+- it does not add a new public HTTP route
+- the first delivered adapter instrumentation is on Agent SDK bridge, which now
+  records ignored, unknown, schema-failure, and raw-passthrough bridge frames
+  alongside normalized shared runtime events such as `text`, `tool_use`,
+  `tool_result`, and `result`
 
 `GET /diagnostics/setup-report` lists the retained reports newest-first with
 their `artifactId`, `artifactPath`, `generatedAt`, and bounded summary fields.

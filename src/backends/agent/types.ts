@@ -5,6 +5,7 @@ import type {
   StreamEvent,
   TurnInput,
 } from '../../core/types.js';
+import type { ProviderEvolutionEvidenceObserver } from '../../core/compatibility/providerEvolution.js';
 import type { RemoteProviderInstanceConfig } from '../cli/config.js';
 
 export interface AgentInvokeInput {
@@ -16,6 +17,7 @@ export interface AgentInvokeInput {
   sessionKey: string;
   providerSessionId?: string;
   sessionState?: SessionProviderState;
+  evolutionObserver?: ProviderEvolutionEvidenceObserver;
   signal: AbortSignal;
 }
 
