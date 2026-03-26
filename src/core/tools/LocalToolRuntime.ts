@@ -116,6 +116,21 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'inspect_path',
+    description: 'Inspect a workspace path and return machine-readable metadata.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Relative path under the workspace. Defaults to ".".' },
+        include_children: {
+          type: 'boolean',
+          description: 'Include a bounded child listing for directories. Defaults to true.',
+        },
+        max_children: { type: 'integer', minimum: 1, maximum: 200 },
+      },
+    },
+  },
+  {
     name: 'read_file',
     description: 'Read a UTF-8 text file from the workspace.',
     inputSchema: {
@@ -138,6 +153,21 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         content: { type: 'string', description: 'Full file contents to write.' },
       },
       required: ['path', 'content'],
+    },
+  },
+  {
+    name: 'create_directory',
+    description: 'Create a directory inside the workspace, including parents by default.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Relative path to the directory.' },
+        recursive: {
+          type: 'boolean',
+          description: 'Create missing parents. Defaults to true.',
+        },
+      },
+      required: ['path'],
     },
   },
   {
@@ -516,6 +546,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
 
 const READ_ONLY_TOOLS = new Set([
   'list_files',
+  'inspect_path',
   'read_file',
   'grep',
   'glob',
@@ -532,7 +563,8 @@ const READ_ONLY_TOOLS = new Set([
 const TOOL_ORDER = new Map(TOOL_DEFINITIONS.map((tool, index) => [tool.name, index]));
 
 const STANDARD_TOOLS = new Set([
-  'list_files', 'read_file', 'write_file', 'edit_file', 'apply_patch', 'grep', 'glob', 'run_shell',
+  'list_files', 'inspect_path', 'read_file', 'write_file', 'create_directory', 'edit_file',
+  'apply_patch', 'grep', 'glob', 'run_shell',
   'audit-workspace', 'init-workspace', 'update-workspace',
   'audit-delivery-target', 'publish-artifacts', 'inspect-repo-status', 'create-commit', 'push-branch',
   'audit-review-target', 'open-pull-request', 'inspect-pull-request', 'wait-review-checks',
@@ -879,10 +911,14 @@ export class LocalToolRuntime {
       switch (call.name) {
         case 'list_files':
           return await this.listFiles(context, call.id, args);
+        case 'inspect_path':
+          return await this.inspectPath(context, call.id, args);
         case 'read_file':
           return await this.readFile(context, call.id, args);
         case 'write_file':
           return await this.writeFile(context, call.id, args);
+        case 'create_directory':
+          return await this.createDirectory(context, call.id, args);
         case 'edit_file':
           return await this.editFile(context, call.id, args);
         case 'apply_patch':
@@ -999,6 +1035,67 @@ export class LocalToolRuntime {
     };
   }
 
+  private async inspectPath(
+    context: ToolExecutionContext,
+    callId: string,
+    args: Record<string, unknown>,
+  ): Promise<ToolResult> {
+    const inputPath = typeof args.path === 'string' && args.path.trim() ? args.path : '.';
+    const { fullPath, displayPath } = await resolveSafeWorkspacePath(context.cwd, inputPath);
+    const includeChildren = readOptionalBoolean(args, 'include_children', true);
+    const maxChildren = readOptionalInteger(args, 'max_children', 50, 1, 200);
+
+    try {
+      const info = await stat(fullPath);
+      const payload: Record<string, unknown> = {
+        path: displayPath,
+        exists: true,
+        kind: info.isDirectory() ? 'directory' : info.isFile() ? 'file' : 'other',
+        sizeBytes: info.isFile() ? info.size : undefined,
+        modifiedAt: info.mtime.toISOString(),
+        extension: info.isFile() ? extname(displayPath) || undefined : undefined,
+      };
+
+      if (info.isDirectory() && includeChildren) {
+        const entries = await readdir(fullPath, { withFileTypes: true });
+        const sorted = [...entries].sort((left, right) => left.name.localeCompare(right.name));
+        const limited = sorted.slice(0, maxChildren);
+        payload.childCount = entries.length;
+        payload.childrenTruncated = entries.length > limited.length;
+        payload.children = limited.map((entry) => ({
+          name: entry.name,
+          path: toRelativeDisplay(context.cwd, resolve(fullPath, entry.name)),
+          kind: entry.isDirectory()
+            ? 'directory'
+            : entry.isFile()
+              ? 'file'
+              : entry.isSymbolicLink()
+                ? 'symlink'
+                : 'other',
+        }));
+      }
+
+      return {
+        callId,
+        name: 'inspect_path',
+        output: JSON.stringify(payload, null, 2),
+      };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
+
+      return {
+        callId,
+        name: 'inspect_path',
+        output: JSON.stringify({
+          path: displayPath,
+          exists: false,
+        }, null, 2),
+      };
+    }
+  }
+
   private async readFile(
     context: ToolExecutionContext,
     callId: string,
@@ -1037,6 +1134,39 @@ export class LocalToolRuntime {
       callId,
       name: 'write_file',
       output: `Wrote ${Buffer.byteLength(content, 'utf-8')} bytes to ${displayPath}`,
+    };
+  }
+
+  private async createDirectory(
+    context: ToolExecutionContext,
+    callId: string,
+    args: Record<string, unknown>,
+  ): Promise<ToolResult> {
+    const inputPath = requireString(args, 'path');
+    const recursive = readOptionalBoolean(args, 'recursive', true);
+    const { fullPath, displayPath } = await resolveSafeWorkspacePath(context.cwd, inputPath);
+
+    try {
+      const info = await stat(fullPath);
+      if (!info.isDirectory()) {
+        throw new Error(`Path exists and is not a directory: ${displayPath}`);
+      }
+      return {
+        callId,
+        name: 'create_directory',
+        output: `Directory already exists: ${displayPath}`,
+      };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
+    }
+
+    await mkdir(fullPath, { recursive });
+    return {
+      callId,
+      name: 'create_directory',
+      output: `Created directory ${displayPath}`,
     };
   }
 

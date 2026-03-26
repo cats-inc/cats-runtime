@@ -1852,6 +1852,9 @@ keys that `cats-runtime` recognizes are:
 The shared local tool runtime now also exposes headless workspace substrate
 operations for API/local sessions:
 
+- `inspect_path`
+- `create_directory`
+
 - `audit-workspace`
 - `init-workspace`
 - `update-workspace`

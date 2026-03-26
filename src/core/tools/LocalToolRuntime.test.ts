@@ -106,6 +106,128 @@ describe('LocalToolRuntime', () => {
     }
   });
 
+  describe('inspect_path', () => {
+    it('returns machine-readable metadata for directories', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const result = await runtime.execute(sharedCtx(cwd), {
+          id: 'inspect-1',
+          name: 'inspect_path',
+          arguments: { path: 'src', max_children: 2 },
+        });
+        expect(result.isError).toBeUndefined();
+        const payload = JSON.parse(result.output) as {
+          path: string;
+          exists: boolean;
+          kind: string;
+          childCount: number;
+          childrenTruncated: boolean;
+          children: Array<{ name: string; path: string; kind: string }>;
+        };
+        expect(payload.path).toBe('src');
+        expect(payload.exists).toBe(true);
+        expect(payload.kind).toBe('directory');
+        expect(payload.childCount).toBeGreaterThanOrEqual(2);
+        expect(payload.children.length).toBe(2);
+        expect(payload.children).toEqual(expect.arrayContaining([
+          expect.objectContaining({ name: 'app.ts', path: 'src/app.ts', kind: 'file' }),
+        ]));
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('returns machine-readable metadata for files and missing paths', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const fileResult = await runtime.execute(sharedCtx(cwd), {
+          id: 'inspect-2',
+          name: 'inspect_path',
+          arguments: { path: 'src/app.ts', include_children: false },
+        });
+        expect(fileResult.isError).toBeUndefined();
+        const filePayload = JSON.parse(fileResult.output) as {
+          path: string;
+          exists: boolean;
+          kind: string;
+          extension?: string;
+        };
+        expect(filePayload).toMatchObject({
+          path: 'src/app.ts',
+          exists: true,
+          kind: 'file',
+          extension: '.ts',
+        });
+
+        const missingResult = await runtime.execute(readOnlyCtx(cwd), {
+          id: 'inspect-3',
+          name: 'inspect_path',
+          arguments: { path: 'missing.txt' },
+        });
+        expect(missingResult.isError).toBeUndefined();
+        const missingPayload = JSON.parse(missingResult.output) as {
+          path: string;
+          exists: boolean;
+        };
+        expect(missingPayload).toEqual({
+          path: 'missing.txt',
+          exists: false,
+        });
+      } finally {
+        cleanup();
+      }
+    });
+  });
+
+  describe('create_directory', () => {
+    it('creates nested directories and reports existing ones', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const created = await runtime.execute(sharedCtx(cwd), {
+          id: 'mkdir-1',
+          name: 'create_directory',
+          arguments: { path: 'notes/drafts' },
+        });
+        expect(created.isError).toBeUndefined();
+        expect(created.output).toContain('Created directory notes/drafts');
+        expect(existsSync(join(cwd, 'notes', 'drafts'))).toBe(true);
+
+        const existing = await runtime.execute(sharedCtx(cwd), {
+          id: 'mkdir-2',
+          name: 'create_directory',
+          arguments: { path: 'notes/drafts' },
+        });
+        expect(existing.isError).toBeUndefined();
+        expect(existing.output).toContain('Directory already exists');
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('blocks mutations in read_only mode', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const result = await runtime.execute(readOnlyCtx(cwd), {
+          id: 'mkdir-3',
+          name: 'create_directory',
+          arguments: { path: 'notes' },
+        });
+        expect(result.isError).toBe(true);
+        expect(result.output).toContain('not allowed');
+      } finally {
+        cleanup();
+      }
+    });
+  });
+
   it('rejects symbolic-link and junction alias paths', async () => {
     const { cwd, cleanup } = createWorkspace();
     const outside = mkdtempSync(join(tmpdir(), 'cats-runtime-tools-outside-'));
@@ -851,11 +973,12 @@ describe('LocalToolRuntime', () => {
   });
 
   describe('profiles', () => {
-    it('standard profile lists 24 tools', () => {
+    it('standard profile lists 26 tools', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('standard');
       expect(tools.map((t) => t.name)).toEqual([
-        'list_files', 'read_file', 'write_file', 'edit_file', 'apply_patch', 'grep', 'glob', 'run_shell',
+        'list_files', 'inspect_path', 'read_file', 'write_file', 'create_directory', 'edit_file',
+        'apply_patch', 'grep', 'glob', 'run_shell',
         'audit-workspace', 'init-workspace', 'update-workspace',
         'audit-delivery-target', 'publish-artifacts', 'inspect-repo-status', 'create-commit', 'push-branch',
         'audit-review-target', 'open-pull-request', 'inspect-pull-request', 'wait-review-checks',
@@ -863,11 +986,12 @@ describe('LocalToolRuntime', () => {
       ]);
     });
 
-    it('extended profile lists 27 tools', () => {
+    it('extended profile lists 29 tools', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('extended');
       expect(tools.map((t) => t.name)).toEqual([
-        'list_files', 'read_file', 'write_file', 'edit_file', 'apply_patch', 'grep', 'glob', 'run_shell',
+        'list_files', 'inspect_path', 'read_file', 'write_file', 'create_directory', 'edit_file',
+        'apply_patch', 'grep', 'glob', 'run_shell',
         'delete_file', 'rename_file', 'copy_file',
         'audit-workspace', 'init-workspace', 'update-workspace',
         'audit-delivery-target', 'publish-artifacts', 'inspect-repo-status', 'create-commit', 'push-branch',
@@ -876,11 +1000,11 @@ describe('LocalToolRuntime', () => {
       ]);
     });
 
-    it('read_only profile lists 13 tools', () => {
+    it('read_only profile lists 14 tools', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('read_only');
       expect(tools.map((t) => t.name)).toEqual([
-        'list_files', 'read_file', 'grep', 'glob', 'audit-workspace',
+        'list_files', 'inspect_path', 'read_file', 'grep', 'glob', 'audit-workspace',
         'audit-delivery-target', 'inspect-repo-status',
         'audit-review-target', 'inspect-pull-request', 'wait-review-checks',
         'audit-deployment-target', 'inspect-deployment', 'read-deployment-logs',
@@ -896,8 +1020,9 @@ describe('LocalToolRuntime', () => {
     it('unknown profile falls back to standard', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('unknown_profile');
-      expect(tools.length).toBe(24);
+      expect(tools.length).toBe(26);
       expect(tools.map((t) => t.name)).toContain('apply_patch');
+      expect(tools.map((t) => t.name)).toContain('inspect_path');
       expect(tools.map((t) => t.name)).toContain('edit_file');
       expect(tools.map((t) => t.name)).toContain('glob');
       expect(tools.map((t) => t.name)).toContain('audit-workspace');
@@ -907,7 +1032,7 @@ describe('LocalToolRuntime', () => {
     it('default profile (undefined) is standard', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools();
-      expect(tools.length).toBe(24);
+      expect(tools.length).toBe(26);
     });
   });
 

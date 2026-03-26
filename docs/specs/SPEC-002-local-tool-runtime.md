@@ -14,7 +14,8 @@
 hybrid sessions can operate on workspaces with the same policy surface that
 users expect from coding agents. This runtime should not live under one backend;
 it should be a core facility that enforces workspace boundaries, permission
-policies, and transcripted tool execution across providers.
+policies, navigation/materialization helpers, and transcripted tool execution
+across providers.
 
 ## Goals
 
@@ -81,6 +82,9 @@ requests into calls into this shared runtime.
 - Workspace-relative path checks are now shared across direct tool handlers and
   structured patch application, so `apply_patch` cannot bypass the same
   boundary rules as `read_file` / `write_file`.
+- The shared tool surface now includes machine-readable path inspection and
+  explicit directory materialization helpers so hosts do not need ad hoc shell
+  fallbacks for common navigation/setup tasks.
 - Mutating flows now reject symbolic-link/junction alias paths and existing
   hardlinked mutation targets to reduce accidental writes through aliased
   filesystem paths.
