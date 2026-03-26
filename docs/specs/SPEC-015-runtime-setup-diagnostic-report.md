@@ -210,6 +210,9 @@ The setup report may contain:
 - references to supporting compatibility evidence artifact paths or IDs
 - references to the scan snapshot used or refreshed for this report, when
   applicable
+- additive runtime-owned read surfaces may list retained report summaries and
+  fetch a specific retained report by `artifactId` without changing the on-disk
+  report format
 
 The setup report should not become the new canonical evidence fixture format.
 
@@ -224,8 +227,6 @@ The setup report should not become the new canonical evidence fixture format.
 
 ## Open Questions
 
-- [ ] Should the HTTP-triggered regeneration be `POST /diagnostics/setup-report`
-      or a different explicit action path?
 - [ ] If a future CLI adapter is added, should it emit a short text summary, a
       JSON summary, or both to stdout?
 - [ ] What retention policy should apply to older setup reports?

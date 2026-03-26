@@ -338,7 +338,9 @@ Setup artifacts are persisted under `<dataDir>/setup/`:
 
 ```text
 POST /diagnostics/setup-report
+GET  /diagnostics/setup-report
 GET  /diagnostics/setup-report/latest
+GET  /diagnostics/setup-report/:artifactId
 ```
 
 These routes expose the first runtime-owned setup diagnostic report slice. They
@@ -385,6 +387,26 @@ The persisted artifact is redacted for sharing by default:
 `GET /diagnostics/setup-report/latest` returns the latest persisted report plus
 its `artifactPath`, or `404 {"error":"setup_diagnostic_report_not_found"}`
 when no setup report has been generated yet.
+
+`GET /diagnostics/setup-report` returns a bounded newest-first list of retained
+report summaries:
+
+- `artifacts[]`
+  - `artifactId`
+  - `artifactPath`
+  - `generatedAt`
+  - `summary.status`
+  - `summary.issueCounts`
+  - `summary.headline`
+  - `summary.highlights`
+
+Use `?limit=<n>` to narrow the bounded list without changing the retention
+policy on disk.
+
+`GET /diagnostics/setup-report/:artifactId` returns the retained report for a
+specific `artifactId` from the list or latest payloads, or the same
+`404 {"error":"setup_diagnostic_report_not_found"}` when that artifact is no
+longer retained.
 
 ### Runtime Diagnostics
 

@@ -967,6 +967,9 @@ evidence bundles and does not force hosts to invent their own report format.
   `<dataDir>/diagnostics/`
 - `POST /diagnostics/setup-report` generates a fresh operator-facing report and
   can optionally refresh the shared setup scan first
+- `GET /diagnostics/setup-report` now lists retained reports newest-first and
+  `GET /diagnostics/setup-report/:artifactId` re-reads a specific retained
+  artifact by id
 - `GET /diagnostics/setup-report/latest` returns the latest persisted report
 - setup reports now include additive operator-facing `summary.headline` and
   bounded `summary.highlights` fields so HTTP and CLI consumers can surface a

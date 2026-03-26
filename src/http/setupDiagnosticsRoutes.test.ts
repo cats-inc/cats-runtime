@@ -77,7 +77,7 @@ function createBootstrapStub(): SetupDiagnosticBootstrapService {
 }
 
 describe('setup diagnostics routes', () => {
-  it('generates and reads the latest setup diagnostic artifact', async () => {
+  it('generates, lists, and reads setup diagnostic artifacts', async () => {
     const { root, cleanup } = createTestRoot();
     try {
       const app = new Hono<{ Variables: { ctx: AppContext } }>();
@@ -116,11 +116,43 @@ describe('setup diagnostics routes', () => {
       const postBody = await postResponse.json() as {
         status: string;
         artifactPath: string;
-        report: { setup: { scan: { source: string } } };
+        report: { artifactId: string; setup: { scan: { source: string } } };
       };
       expect(postBody.status).toBe('generated');
       expect(postBody.report.setup.scan.source).toBe('refreshed');
       expect(existsSync(postBody.artifactPath)).toBe(true);
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      const secondPostResponse = await app.request('/diagnostics/setup-report', {
+        method: 'POST',
+      });
+      expect(secondPostResponse.status).toBe(200);
+      const secondPostBody = await secondPostResponse.json() as {
+        artifactPath: string;
+        report: { artifactId: string };
+      };
+      expect(secondPostBody.report.artifactId).not.toBe(postBody.report.artifactId);
+
+      const listResponse = await app.request('/diagnostics/setup-report?limit=1');
+      expect(listResponse.status).toBe(200);
+      const listBody = await listResponse.json() as {
+        artifacts: Array<{
+          artifactId: string;
+          artifactPath: string;
+          generatedAt: string;
+          summary: { headline: string };
+        }>;
+      };
+      expect(listBody.artifacts).toHaveLength(1);
+      expect(listBody.artifacts[0]).toEqual(expect.objectContaining({
+        artifactId: secondPostBody.report.artifactId,
+        artifactPath: secondPostBody.artifactPath,
+        generatedAt: expect.any(String),
+        summary: expect.objectContaining({
+          headline: expect.any(String),
+        }),
+      }));
 
       const latestResponse = await app.request('/diagnostics/setup-report/latest');
       expect(latestResponse.status).toBe(200);
@@ -128,8 +160,22 @@ describe('setup diagnostics routes', () => {
         artifactPath: string;
         report: { artifactId: string };
       };
-      expect(latestBody.artifactPath).toBe(postBody.artifactPath);
-      expect(latestBody.report.artifactId).toContain('setup-report-');
+      expect(latestBody.artifactPath).toBe(secondPostBody.artifactPath);
+      expect(latestBody.report.artifactId).toBe(secondPostBody.report.artifactId);
+
+      const artifactResponse = await app.request(
+        `/diagnostics/setup-report/${encodeURIComponent(postBody.report.artifactId)}`,
+      );
+      expect(artifactResponse.status).toBe(200);
+      const artifactBody = await artifactResponse.json() as {
+        artifactPath: string;
+        report: { artifactId: string };
+      };
+      expect(artifactBody.artifactPath).toBe(postBody.artifactPath);
+      expect(artifactBody.report.artifactId).toBe(postBody.report.artifactId);
+
+      const missingResponse = await app.request('/diagnostics/setup-report/setup-report-missing');
+      expect(missingResponse.status).toBe(404);
     } finally {
       cleanup();
     }

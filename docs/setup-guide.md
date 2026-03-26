@@ -97,7 +97,9 @@ now also supports a setup diagnostic report:
 
 ```text
 POST /diagnostics/setup-report
+GET  /diagnostics/setup-report
 GET  /diagnostics/setup-report/latest
+GET  /diagnostics/setup-report/:artifactId
 ```
 
 `POST /diagnostics/setup-report` writes a redacted JSON artifact under
@@ -119,6 +121,14 @@ and prints a concise operator summary to stderr plus the machine-readable JSON
 payload to stdout with `status`, `artifactPath`, and `report`. Use this path
 when port conflicts or other startup failures make the running HTTP action
 unavailable.
+
+`GET /diagnostics/setup-report` lists the retained reports newest-first with
+their `artifactId`, `artifactPath`, `generatedAt`, and bounded summary fields.
+Use `?limit=<n>` when you only want the latest few retained snapshots.
+
+`GET /diagnostics/setup-report/:artifactId` re-reads a specific retained report
+by `artifactId` so operators can compare an older setup snapshot with the
+current latest report without digging through the data directory manually.
 
 `GET /setup-state` now also exposes a shared runtime-owned repair read model for
 post-bootstrap follow-through:

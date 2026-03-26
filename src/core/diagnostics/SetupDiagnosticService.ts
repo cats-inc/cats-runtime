@@ -136,6 +136,13 @@ export interface SetupDiagnosticArtifact {
   report: SetupDiagnosticReport;
 }
 
+export interface SetupDiagnosticArtifactSummary {
+  artifactId: string;
+  artifactPath: string;
+  generatedAt: string;
+  summary: SetupDiagnosticReport['summary'];
+}
+
 export interface SetupDiagnosticServiceOptions {
   config: RuntimeConfig;
   startup?: RuntimeStartupState;
@@ -344,11 +351,25 @@ export class SetupDiagnosticService {
       return null;
     }
 
-    const report = JSON.parse(readFileSync(latestPath, 'utf8')) as SetupDiagnosticReport;
-    return {
-      artifactPath: latestPath,
-      report,
-    };
+    return readReportArtifact(latestPath);
+  }
+
+  readReport(artifactId: string): SetupDiagnosticArtifact | null {
+    const diagnosticsDir = join(getRuntimeResolvedPaths(this.config).dataDir, 'diagnostics');
+    const artifactPath = this.resolveReportPath(diagnosticsDir, artifactId);
+    if (!artifactPath) {
+      return null;
+    }
+
+    return readReportArtifact(artifactPath);
+  }
+
+  listReports(options: { limit?: number } = {}): SetupDiagnosticArtifactSummary[] {
+    const diagnosticsDir = join(getRuntimeResolvedPaths(this.config).dataDir, 'diagnostics');
+    const limit = normalizeReportListLimit(options.limit, this.retentionLimit);
+    return listReportPaths(diagnosticsDir)
+      .slice(0, limit)
+      .map((artifactPath) => summarizeReportArtifact(artifactPath));
   }
 
   private enforceRetention(diagnosticsDir: string): void {
@@ -360,6 +381,15 @@ export class SetupDiagnosticService {
 
   private resolveLatestReportPath(diagnosticsDir: string): string | null {
     return listReportPaths(diagnosticsDir)[0] || null;
+  }
+
+  private resolveReportPath(diagnosticsDir: string, artifactId: string): string | null {
+    if (!isValidReportArtifactId(artifactId)) {
+      return null;
+    }
+
+    const artifactPath = join(diagnosticsDir, `${artifactId}${REPORT_FILE_SUFFIX}`);
+    return existsSync(artifactPath) ? artifactPath : null;
   }
 }
 
@@ -823,6 +853,36 @@ function listReportPaths(diagnosticsDir: string): string[] {
     .filter((entry) => entry.startsWith(REPORT_FILE_PREFIX) && entry.endsWith(REPORT_FILE_SUFFIX))
     .map((entry) => join(diagnosticsDir, entry))
     .sort((left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs);
+}
+
+function readReportArtifact(artifactPath: string): SetupDiagnosticArtifact {
+  const report = JSON.parse(readFileSync(artifactPath, 'utf8')) as SetupDiagnosticReport;
+  return {
+    artifactPath,
+    report,
+  };
+}
+
+function summarizeReportArtifact(artifactPath: string): SetupDiagnosticArtifactSummary {
+  const artifact = readReportArtifact(artifactPath);
+  return {
+    artifactId: artifact.report.artifactId,
+    artifactPath,
+    generatedAt: artifact.report.generatedAt,
+    summary: artifact.report.summary,
+  };
+}
+
+function isValidReportArtifactId(value: string): boolean {
+  return /^setup-report-[A-Za-z0-9_-]+$/.test(value);
+}
+
+function normalizeReportListLimit(value: number | undefined, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.max(1, Math.min(20, Math.trunc(value)));
 }
 
 function toTimestampFileFragment(value: string): string {
