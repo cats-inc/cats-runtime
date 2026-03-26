@@ -21,6 +21,7 @@ import { inspectProviderActiveConfig } from '../../core/providerActiveConfig.js'
 import { toCompatibilitySummaryView } from '../../core/compatibility/ProviderCompatibilityService.js';
 import type { CompatibilitySummaryView } from '../../core/compatibility/types.js';
 import type { ProviderSetupSummary } from '../../core/provider-install/types.js';
+import { buildProviderToolingSummary } from '../../core/tools/providerTooling.js';
 import type { HealthStatus } from '../../core/types.js';
 import type { AppContext } from '../app.js';
 import { getProviderCompatibilityService, getRuntimeMeteringService } from '../app.js';
@@ -488,6 +489,7 @@ async function diagnoseCliTarget(
     command: instance.commandConfig.path,
     runner: instance.commandConfig.runner,
     runtime,
+    tooling: buildProviderToolingSummary(target),
     compatibility: toCompatibilitySummaryView(assessment),
   };
   const activeConfig = inspectProviderActiveConfig(target);
@@ -595,6 +597,7 @@ async function diagnoseAgentTarget(
     transport: instance.transport,
     model: instance.model || null,
     endpoint: resolveRemoteEndpoint(instance, env),
+    tooling: buildProviderToolingSummary(target),
     credentials: {
       urlEnv: buildEnvDescriptor(env, instance.urlEnv, false),
       baseUrlEnv: buildEnvDescriptor(env, instance.baseUrlEnv, false),
@@ -702,6 +705,7 @@ async function diagnoseRemoteConfigOnly(
     transport: instance.transport,
     model: instance.model || null,
     endpoint,
+    tooling: buildProviderToolingSummary(target),
     credentials: {
       apiKeyEnv: apiKey,
       ...(instance.baseUrlEnv

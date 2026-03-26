@@ -129,6 +129,18 @@ describe('API backend integration', () => {
                 runtime: undefined,
                 transport: 'anthropic',
                 model: 'claude-sonnet-4-6',
+                tooling: {
+                  source: 'runtime_local',
+                  discoverable: true,
+                  sessionScopedOverrides: true,
+                  summary: expect.stringContaining(`'standard' profile`),
+                  policy: expect.objectContaining({
+                    profile: 'standard',
+                    counts: expect.objectContaining({
+                      total: 28,
+                    }),
+                  }),
+                },
                 install: null,
                 compatibility: null,
               },
@@ -141,6 +153,18 @@ describe('API backend integration', () => {
                 runtime: undefined,
                 transport: 'anthropic',
                 model: 'claude-opus-4-6',
+                tooling: {
+                  source: 'runtime_local',
+                  discoverable: true,
+                  sessionScopedOverrides: true,
+                  summary: expect.stringContaining(`'standard' profile`),
+                  policy: expect.objectContaining({
+                    profile: 'standard',
+                    counts: expect.objectContaining({
+                      total: 28,
+                    }),
+                  }),
+                },
                 install: null,
                 compatibility: null,
               },
@@ -159,6 +183,18 @@ describe('API backend integration', () => {
                 runtime: undefined,
                 transport: 'openai',
                 model: 'gpt-5',
+                tooling: {
+                  source: 'runtime_local',
+                  discoverable: true,
+                  sessionScopedOverrides: true,
+                  summary: expect.stringContaining(`'standard' profile`),
+                  policy: expect.objectContaining({
+                    profile: 'standard',
+                    counts: expect.objectContaining({
+                      total: 28,
+                    }),
+                  }),
+                },
                 install: null,
                 compatibility: null,
               },
@@ -177,6 +213,18 @@ describe('API backend integration', () => {
                 runtime: undefined,
                 transport: 'google',
                 model: 'gemini-2.5-pro',
+                tooling: {
+                  source: 'runtime_local',
+                  discoverable: true,
+                  sessionScopedOverrides: true,
+                  summary: expect.stringContaining(`'standard' profile`),
+                  policy: expect.objectContaining({
+                    profile: 'standard',
+                    counts: expect.objectContaining({
+                      total: 28,
+                    }),
+                  }),
+                },
                 install: null,
                 compatibility: null,
               },
@@ -195,6 +243,18 @@ describe('API backend integration', () => {
                 runtime: undefined,
                 transport: 'ollama',
                 model: 'qwen3:latest',
+                tooling: {
+                  source: 'runtime_local',
+                  discoverable: true,
+                  sessionScopedOverrides: true,
+                  summary: expect.stringContaining(`'standard' profile`),
+                  policy: expect.objectContaining({
+                    profile: 'standard',
+                    counts: expect.objectContaining({
+                      total: 28,
+                    }),
+                  }),
+                },
                 install: null,
                 compatibility: null,
               },

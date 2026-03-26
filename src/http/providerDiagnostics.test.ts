@@ -458,6 +458,19 @@ describe('provider diagnostics HTTP contract', () => {
               }),
             ]),
             config: expect.objectContaining({
+              tooling: expect.objectContaining({
+                source: 'runtime_local',
+                discoverable: true,
+                sessionScopedOverrides: true,
+                summary: expect.stringContaining(`'standard' profile`),
+                policy: expect.objectContaining({
+                  profile: 'standard',
+                  counts: expect.objectContaining({
+                    total: 28,
+                    fullAccess: 28,
+                  }),
+                }),
+              }),
               liveProbe: expect.objectContaining({
                 url: 'https://api.anthropic.test/v1/models',
                 target: 'models',

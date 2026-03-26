@@ -1460,6 +1460,12 @@ backends:
                 command: 'cursor-agent',
                 runner: 'auto',
                 runtime: { mode: 'wsl', distro: 'Ubuntu', environmentId: 'ubuntu' },
+                tooling: {
+                  source: 'provider_native',
+                  discoverable: false,
+                  sessionScopedOverrides: false,
+                  summary: expect.stringContaining('provider-native tools'),
+                },
                 install: expect.objectContaining({
                   provider: 'cursor',
                   executionPlatform: 'linux',
@@ -1487,6 +1493,12 @@ backends:
                 command: 'cursor-agent',
                 runner: 'auto',
                 runtime: { mode: 'wsl', distro: 'Debian', environmentId: 'debian' },
+                tooling: {
+                  source: 'provider_native',
+                  discoverable: false,
+                  sessionScopedOverrides: false,
+                  summary: expect.stringContaining('provider-native tools'),
+                },
                 install: expect.objectContaining({
                   provider: 'cursor',
                   executionPlatform: 'linux',
@@ -1574,6 +1586,12 @@ backends:
           command: process.execPath,
           runner: 'direct',
           runtime: { mode: 'native', environmentId: 'native' },
+          tooling: {
+            source: 'provider_native',
+            discoverable: false,
+            sessionScopedOverrides: false,
+            summary: expect.stringContaining('provider-native tools'),
+          },
           activeConfig: {
             source: 'goose_config',
             state: 'detected',
@@ -1698,6 +1716,12 @@ providers:
                 command: 'claude',
                 runner: 'auto',
                 runtime: { mode: 'native', environmentId: 'native' },
+                tooling: {
+                  source: 'provider_native',
+                  discoverable: false,
+                  sessionScopedOverrides: false,
+                  summary: expect.stringContaining('provider-native tools'),
+                },
                 install: expect.objectContaining({
                   provider: 'claude',
                   executionPlatform: nativeExecutionPlatform(),

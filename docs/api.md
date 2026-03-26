@@ -466,6 +466,10 @@ surface for hosts and dashboards. The response includes:
   `invalid`) plus the inferred provider/model pair
 - lightweight config/command/path checks
 - sanitized env-variable presence metadata
+- additive `config.tooling` summaries describing whether the target uses
+  runtime-managed local tools, provider-native CLI tools, or provider-managed
+  agent tooling; API/local targets include the default runtime tool profile
+  before any per-session permission narrowing
 - additive `config.modelCatalog` summaries (`source`, `defaultModel`,
   `modelCount`, cache metadata when applicable, and warnings)
 - additive `config.liveProbe` request metadata for API/local targets, including
@@ -2416,6 +2420,18 @@ record itself has been removed.
 or other clients that need to offer provider-instance selection. Each instance
 entry includes its backend kind (`cli`, `api`, `local`, or `agent`) plus any
 transport or runtime metadata that applies to that backend.
+
+Each instance entry also exposes additive `tooling` metadata:
+
+- `source`: `runtime_local`, `provider_native`, or `provider_managed`
+- `discoverable`: whether `cats-runtime` can enumerate a bounded tool policy
+  for that target directly
+- `sessionScopedOverrides`: whether later per-session permission settings can
+  narrow the reported baseline
+- `summary`: operator-facing description of who owns tool execution
+- `policy`: for API/local targets only, the bounded runtime tool-profile
+  inspection (`profile`, counts, and per-tool access classification) before any
+  session-level permission narrowing
 
 For CLI backends, instance entries also expose runtime-owned `install` metadata
 even before a probe has run. The `install` object includes:
