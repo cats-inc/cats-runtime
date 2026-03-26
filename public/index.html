@@ -402,6 +402,85 @@
   }
   .chat-header-info { font-size: 13px; color: var(--text2); }
   .chat-header-actions { display: flex; gap: 8px; }
+  .chat-session-insights {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(36, 40, 54, 0.55);
+  }
+  .insight-card {
+    background: rgba(26, 29, 39, 0.88);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+  }
+  .insight-card h4 {
+    margin: 0;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text2);
+  }
+  .insight-summary {
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--text);
+  }
+  .insight-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .insight-tag {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.04);
+    padding: 3px 8px;
+    font-size: 11px;
+    color: var(--text2);
+    gap: 4px;
+  }
+  .insight-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .insight-list li {
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text2);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .insight-list strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .insight-secondary {
+    color: var(--text2);
+    font-size: 11px;
+  }
+  .insight-link {
+    color: var(--accent);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+  }
+  .insight-link:hover {
+    text-decoration: underline;
+  }
 
   .chat-messages {
     flex: 1;
@@ -617,6 +696,58 @@
     gap: 8px;
     margin-top: 20px;
   }
+  .provider-capability-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: rgba(26, 29, 39, 0.8);
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .provider-capability-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .provider-capability-card-title {
+    margin: 0;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text2);
+  }
+  .provider-capability-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px 12px;
+  }
+  .provider-capability-kv {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .provider-capability-kv dt {
+    margin: 0;
+    font-size: 11px;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .provider-capability-kv dd {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text);
+    overflow-wrap: anywhere;
+  }
+  .provider-capability-summary {
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--text);
+  }
 
   /* Scrollbar */
   ::-webkit-scrollbar { width: 6px; }
@@ -713,6 +844,7 @@
           <button class="btn btn-danger" id="btnClose" onclick="closeSession()">Close</button>
         </div>
       </div>
+      <div class="chat-session-insights" id="chatSessionInsights" style="display:none;"></div>
       <div class="chat-messages" id="chatMessages"></div>
       <div class="chat-input-area" id="chatInputArea">
         <textarea id="msgInput" placeholder="Send a message..." rows="1"
@@ -757,7 +889,19 @@
     </div>
     <div class="form-group" id="instanceGroup">
       <label>Provider Instance</label>
-      <select id="inputInstance"></select>
+      <select id="inputInstance" onchange="refreshProviderCapabilityPreview()"></select>
+    </div>
+    <div class="provider-capability-card" id="providerCapabilityPreview">
+      <div class="provider-capability-card-header">
+        <h4 class="provider-capability-card-title">Provider Capability Preview</h4>
+        <span class="badge" id="providerCapabilityBadge">Loading</span>
+      </div>
+      <div class="provider-capability-summary" id="providerCapabilitySummary">
+        Choose a provider target to inspect runtime/tool visibility.
+      </div>
+      <div class="provider-capability-grid" id="providerCapabilityGrid"></div>
+      <div class="insight-tags" id="providerCapabilityTags"></div>
+      <ul class="insight-list" id="providerCapabilityCatalog"></ul>
     </div>
     <div class="form-group">
       <label>Model (optional)</label>
@@ -824,6 +968,15 @@ function renderMd(text) {
   return DOMPurify.sanitize(raw, { ADD_ATTR: ['target'] });
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 const API_BASE = window.location.origin;
 const PROVIDER_ORDER = ['openclaw', 'claude', 'codex', 'gemini', 'pi', 'goose', 'junie', 'ollama', 'copilot', 'cursor', 'kiro', 'auggie', 'opencode'];
 const CLI_RUNTIME_ORDER = ['native', 'wsl', 'docker'];
@@ -834,6 +987,8 @@ let observeFullText = '';
 let observeAssistantEl = null;
 let providerCatalog = null;
 let discoveryStatusPayload = null;
+const providerToolingCache = new Map();
+const providerToolingInFlight = new Map();
 
 function apiKey() {
   return document.getElementById('apiKeyInput').value;
@@ -1029,6 +1184,335 @@ function formatRuntimeDescriptor(entry) {
   return bits.join(' ');
 }
 
+function providerToolingCacheKey(providerName, instanceTarget) {
+  return `${providerName || ''}::${instanceTarget || ''}`;
+}
+
+function toolingCatalogMethodLabel(method) {
+  switch (method) {
+    case 'tools_catalog':
+      return 'remote catalog';
+    case 'tools_effective':
+      return 'effective tools';
+    case 'providers_get':
+      return 'provider config';
+    default:
+      return method || 'unknown';
+  }
+}
+
+function renderInsightTags(tags) {
+  return (tags || [])
+    .filter(Boolean)
+    .map((tag) => `<span class="insight-tag">${escapeHtml(tag)}</span>`)
+    .join('');
+}
+
+async function fetchProviderTooling(providerName, instanceTarget) {
+  if (!providerName || !instanceTarget) {
+    return null;
+  }
+
+  const key = providerToolingCacheKey(providerName, instanceTarget);
+  if (providerToolingCache.has(key)) {
+    return providerToolingCache.get(key);
+  }
+  if (providerToolingInFlight.has(key)) {
+    return providerToolingInFlight.get(key);
+  }
+
+  const task = fetch(
+    `${API_BASE}/providers/${encodeURIComponent(providerName)}/tools?instance=${encodeURIComponent(instanceTarget)}`,
+    { headers: headers() },
+  )
+    .then(async (response) => {
+      if (!response.ok) {
+        const detail = await response.text().catch(() => '');
+        throw new Error(detail || `HTTP ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((payload) => {
+      providerToolingCache.set(key, payload);
+      providerToolingInFlight.delete(key);
+      return payload;
+    })
+    .catch((error) => {
+      providerToolingInFlight.delete(key);
+      throw error;
+    });
+
+  providerToolingInFlight.set(key, task);
+  return task;
+}
+
+function currentProviderSelection() {
+  const providerName = document.getElementById('inputProvider').value;
+  const instanceTarget = document.getElementById('inputInstance').value;
+  const provider = providerMeta(providerName);
+  const instance = (provider?.instances || []).find(
+    (entry) => (entry.target || entry.id) === instanceTarget,
+  ) || instanceMeta(providerName, instanceTarget, undefined);
+
+  return { providerName, instanceTarget, provider, instance };
+}
+
+function extractProviderTooling(payload, fallbackInstance) {
+  if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'summary')) {
+    return payload;
+  }
+  return fallbackInstance?.tooling || null;
+}
+
+function providerCapabilityGridRows({ providerName, instance, agentRuntime, tooling }) {
+  const rows = [
+    ['Target', `${providerName}/${instance?.id || 'default'}`],
+    ['Backend', instance?.backend || 'unknown'],
+  ];
+
+  if (instance?.transport) {
+    rows.push(['Transport', instance.transport]);
+  }
+
+  if (agentRuntime?.transport) {
+    rows.push(['Protocol', `${agentRuntime.transport.kind} · ${humanizeToken(agentRuntime.transport.protocol)}`]);
+    rows.push(['Continuity', agentRuntime.continuity?.providerManagedSessions ? 'provider-managed' : 'runtime-managed']);
+  }
+
+  if (tooling?.observability?.catalog) {
+    rows.push(['Tooling', humanizeToken(tooling.observability.catalog)]);
+  }
+
+  if (tooling?.policy?.profile) {
+    rows.push(['Tool profile', tooling.policy.profile]);
+  }
+
+  return rows
+    .map(([label, value]) => (
+      `<div class="provider-capability-kv"><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`
+    ))
+    .join('');
+}
+
+function providerCapabilityCatalogItems(tooling) {
+  const catalog = tooling?.catalog;
+  if (!catalog) {
+    return '';
+  }
+
+  if (catalog.status === 'unavailable') {
+    return `<li><strong>Remote tools unavailable</strong><span class="insight-secondary">${escapeHtml(catalog.error || catalog.summary)}</span></li>`;
+  }
+
+  const topTools = (catalog.tools || []).slice(0, 5);
+  const toolItems = topTools.map((tool) => {
+    const detailBits = [];
+    if (tool.title && tool.title !== tool.name) {
+      detailBits.push(tool.title);
+    }
+    if (tool.groupId) {
+      detailBits.push(`group:${tool.groupId}`);
+    }
+    if (tool.pluginId) {
+      detailBits.push(`plugin:${tool.pluginId}`);
+    }
+    detailBits.push(tool.source || 'unknown');
+    return `<li><strong>${escapeHtml(tool.name)}</strong><span class="insight-secondary">${escapeHtml(detailBits.join(' · '))}</span></li>`;
+  });
+  if ((catalog.toolCount || 0) > topTools.length) {
+    toolItems.push(
+      `<li><strong>${escapeHtml(String(catalog.toolCount - topTools.length))} more tool(s)</strong><span class="insight-secondary">${escapeHtml(toolingCatalogMethodLabel(catalog.method))}</span></li>`,
+    );
+  }
+  return toolItems.join('');
+}
+
+async function refreshProviderCapabilityPreview() {
+  const summaryEl = document.getElementById('providerCapabilitySummary');
+  const badgeEl = document.getElementById('providerCapabilityBadge');
+  const gridEl = document.getElementById('providerCapabilityGrid');
+  const tagsEl = document.getElementById('providerCapabilityTags');
+  const catalogEl = document.getElementById('providerCapabilityCatalog');
+  const { providerName, instanceTarget, instance } = currentProviderSelection();
+
+  if (!providerName || !instance) {
+    badgeEl.textContent = 'Unavailable';
+    summaryEl.textContent = 'Choose a configured provider target to inspect capabilities.';
+    gridEl.innerHTML = '';
+    tagsEl.innerHTML = '';
+    catalogEl.innerHTML = '';
+    return;
+  }
+
+  badgeEl.textContent = instance.backend || 'unknown';
+  summaryEl.textContent = 'Loading capability preview...';
+  gridEl.innerHTML = '';
+  tagsEl.innerHTML = '';
+  catalogEl.innerHTML = '';
+
+  let toolingPayload = null;
+  try {
+    toolingPayload = await fetchProviderTooling(providerName, instanceTarget);
+  } catch (error) {
+    const fallbackTooling = extractProviderTooling(null, instance) || {};
+    toolingPayload = {
+      ...fallbackTooling,
+      catalog: {
+        status: 'unavailable',
+        method: 'providers_get',
+        error: error instanceof Error ? error.message : String(error),
+        summary: 'Provider tool summary could not be loaded.',
+      },
+    };
+  }
+
+  const { providerName: currentProviderName, instanceTarget: currentInstanceTarget } = currentProviderSelection();
+  if (providerName !== currentProviderName || instanceTarget !== currentInstanceTarget) {
+    return;
+  }
+
+  const tooling = extractProviderTooling(toolingPayload, instance);
+  const agentRuntime = toolingPayload?.agentRuntime || instance?.agentRuntime;
+  const tags = [];
+  if (tooling?.source) {
+    tags.push(`tools: ${humanizeToken(tooling.source)}`);
+  }
+  if (tooling?.observability?.toolCallEvents) {
+    tags.push('tool events');
+  }
+  if (tooling?.observability?.runtimeServices) {
+    tags.push('runtime services');
+  }
+  if (tooling?.catalog?.status === 'ready') {
+    tags.push(`${tooling.catalog.toolCount} remote tools`);
+  }
+  if (agentRuntime?.capabilities?.modelDiscovery) {
+    tags.push('live models');
+  }
+
+  summaryEl.textContent = tooling?.summary
+    || 'No additional runtime capability summary is available for this target yet.';
+  gridEl.innerHTML = providerCapabilityGridRows({ providerName, instance, agentRuntime, tooling });
+  tagsEl.innerHTML = renderInsightTags(tags);
+  catalogEl.innerHTML = providerCapabilityCatalogItems(tooling);
+}
+
+function sessionInsightCard(title, summary, tags, items) {
+  return `
+    <div class="insight-card">
+      <h4>${escapeHtml(title)}</h4>
+      ${summary ? `<div class="insight-summary">${escapeHtml(summary)}</div>` : ''}
+      ${(tags || []).length > 0 ? `<div class="insight-tags">${renderInsightTags(tags)}</div>` : ''}
+      ${(items || []).length > 0 ? `<ul class="insight-list">${items.join('')}</ul>` : ''}
+    </div>
+  `;
+}
+
+function renderSessionInsights(session) {
+  const container = document.getElementById('chatSessionInsights');
+  if (!container) {
+    return;
+  }
+
+  const inspection = session?.inspection || {};
+  const strategy = inspection.strategy || {};
+  const cards = [];
+
+  const effectiveStrategy = session?.effectiveStrategy || strategy.effectiveStrategy || strategy.state?.effectiveStrategy;
+  if (effectiveStrategy || strategy.requestedStrategy || strategy.resolutionSource || strategy.acceptanceCriteria) {
+    const items = [];
+    if (strategy.acceptanceCriteria) {
+      items.push(`<li><strong>Acceptance</strong><span class="insight-secondary">${escapeHtml(strategy.acceptanceCriteria)}</span></li>`);
+    }
+    if (strategy.correlation && typeof strategy.correlation === 'object') {
+      const correlation = Object.entries(strategy.correlation)
+        .slice(0, 3)
+        .map(([key, value]) => `${key}:${value}`)
+        .join(' · ');
+      if (correlation) {
+        items.push(`<li><strong>Correlation</strong><span class="insight-secondary">${escapeHtml(correlation)}</span></li>`);
+      }
+    }
+    cards.push(sessionInsightCard(
+      'Execution Strategy',
+      strategy.state?.summary || strategy.summary || 'Runtime-owned execution strategy and plan-state visibility.',
+      [
+        effectiveStrategy ? `effective: ${effectiveStrategy}` : null,
+        strategy.requestedStrategy ? `requested: ${strategy.requestedStrategy}` : null,
+        strategy.resolutionSource ? `resolved via ${humanizeToken(strategy.resolutionSource)}` : null,
+      ],
+      items,
+    ));
+  }
+
+  if ((inspection.services || []).length > 0) {
+    const items = inspection.services.slice(0, 4).map((service) => {
+      const secondary = [service.status, service.url].filter(Boolean).join(' · ');
+      return `<li><strong>${escapeHtml(service.name || service.id)}</strong>${
+        secondary ? `<span class="insight-secondary">${
+          service.url
+            ? `<a class="insight-link" href="${escapeHtml(service.url)}" target="_blank" rel="noreferrer">${escapeHtml(secondary)}</a>`
+            : escapeHtml(secondary)
+        }</span>` : ''
+      }</li>`;
+    });
+    if (inspection.services.length > 4) {
+      items.push(`<li><strong>${escapeHtml(String(inspection.services.length - 4))} more service(s)</strong></li>`);
+    }
+    cards.push(sessionInsightCard(
+      'Runtime Services',
+      'Session-published services and remote runtime endpoints surfaced by the runtime.',
+      [`${inspection.services.length} service(s)`],
+      items,
+    ));
+  }
+
+  if ((inspection.artifacts || []).length > 0) {
+    const items = inspection.artifacts.slice(0, 4).map((artifact) => {
+      const secondary = [artifact.kind, artifact.path || artifact.uri, artifact.mediaType].filter(Boolean).join(' · ');
+      return `<li><strong>${escapeHtml(artifact.label || artifact.id)}</strong>${
+        secondary ? `<span class="insight-secondary">${escapeHtml(secondary)}</span>` : ''
+      }</li>`;
+    });
+    if (inspection.artifacts.length > 4) {
+      items.push(`<li><strong>${escapeHtml(String(inspection.artifacts.length - 4))} more artifact(s)</strong></li>`);
+    }
+    cards.push(sessionInsightCard(
+      'Artifacts',
+      'Runtime-visible artifacts emitted by the session or bound into the current run.',
+      [`${inspection.artifacts.length} artifact(s)`],
+      items,
+    ));
+  }
+
+  if ((inspection.previewSurfaces || []).length > 0) {
+    const items = inspection.previewSurfaces.slice(0, 4).map((surface) => {
+      const secondary = [surface.kind, surface.status, surface.renderHint, surface.url || surface.path].filter(Boolean).join(' · ');
+      return `<li><strong>${escapeHtml(surface.label || surface.id)}</strong>${
+        secondary ? `<span class="insight-secondary">${escapeHtml(secondary)}</span>` : ''
+      }</li>`;
+    });
+    if (inspection.previewSurfaces.length > 4) {
+      items.push(`<li><strong>${escapeHtml(String(inspection.previewSurfaces.length - 4))} more preview surface(s)</strong></li>`);
+    }
+    cards.push(sessionInsightCard(
+      'Preview Surfaces',
+      'Published previews, service surfaces, and browser-backed surfaces attached to this session.',
+      [`${inspection.previewSurfaces.length} surface(s)`],
+      items,
+    ));
+  }
+
+  if (cards.length === 0) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+
+  container.innerHTML = cards.join('');
+  container.style.display = '';
+}
+
 function setCreateModalEnabled(enabled) {
   document.getElementById('createSessionBtn').disabled = !enabled;
 }
@@ -1038,6 +1522,7 @@ function syncProviderSelect() {
   if (!providerCatalog?.providers) {
     providerSelect.disabled = true;
     setCreateModalEnabled(false);
+    refreshProviderCapabilityPreview();
     return;
   }
 
@@ -1049,6 +1534,7 @@ function syncProviderSelect() {
     providerSelect.value = '';
     providerSelect.disabled = true;
     setCreateModalEnabled(false);
+    refreshProviderCapabilityPreview();
     return;
   }
 
@@ -1076,6 +1562,7 @@ function onProviderChange() {
     instanceSelect.disabled = true;
     instanceGroup.style.display = 'none';
     setCreateModalEnabled(false);
+    refreshProviderCapabilityPreview();
     return;
   }
 
@@ -1090,6 +1577,7 @@ function onProviderChange() {
   instanceSelect.disabled = instances.length <= 1;
   instanceGroup.style.display = '';
   setCreateModalEnabled(true);
+  refreshProviderCapabilityPreview();
 }
 
 async function refreshProviderCatalog() {
@@ -1544,6 +2032,7 @@ async function refreshSession() {
       meta.push(`${(s.totalInputTokens||0).toLocaleString()} in / ${(s.totalOutputTokens||0).toLocaleString()} out tokens`);
     }
     document.getElementById('chatSessionMeta').textContent = meta.join(' | ');
+    renderSessionInsights(s);
 
     const canResume = controls.canResume;
     document.getElementById('btnClose').style.display = controls.canClose ? '' : 'none';
@@ -1565,7 +2054,9 @@ async function refreshSession() {
     } else {
       msgInput.placeholder = 'Resume session to send messages';
     }
-  } catch {}
+  } catch {
+    renderSessionInsights(null);
+  }
 }
 
 async function reloadCurrentSession() {
@@ -1638,6 +2129,7 @@ async function deleteSession(id) {
       currentSessionId = null;
       document.getElementById('chatContainer').style.display = 'none';
       document.getElementById('chatPlaceholder').style.display = '';
+      renderSessionInsights(null);
     }
     await refreshSessions();
   } catch (e) {
@@ -1727,6 +2219,7 @@ async function deleteGroup(workspaceKey, displayCwd) {
     currentSessionId = null;
     document.getElementById('chatContainer').style.display = 'none';
     document.getElementById('chatPlaceholder').style.display = '';
+    renderSessionInsights(null);
   }
 
   const warnings = [];
@@ -1815,6 +2308,7 @@ async function deleteAllSessions() {
     currentSessionId = null;
     document.getElementById('chatContainer').style.display = 'none';
     document.getElementById('chatPlaceholder').style.display = '';
+    renderSessionInsights(null);
   }
 
   const warnings = [];
@@ -2044,6 +2538,7 @@ async function openCreateModal() {
   onWorkspaceModeChange();
   document.getElementById('inputWorkspaceMode').focus();
   await refreshProviderCatalog();
+  await refreshProviderCapabilityPreview();
 }
 
 function closeCreateModal() {

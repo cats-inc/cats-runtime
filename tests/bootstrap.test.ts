@@ -327,6 +327,8 @@ describe('bootstrap mode server', () => {
         expect(response.status).toBe(200);
         const html = await response.text();
         expect(html).toContain('Cats Runtime Dashboard');
+        expect(html).toContain('id="providerCapabilityPreview"');
+        expect(html).toContain('id="chatSessionInsights"');
       } finally {
         await runtime.close();
       }
@@ -1012,6 +1014,8 @@ describe('bootstrap mode server', () => {
         expect(html).toContain('data-cats-ui');
         expect(html).toContain('data-cats-scan-panel');
         expect(html).toContain('scanPanelManualBtn');
+        expect(html).toContain('providerCapabilityPreview');
+        expect(html).toContain('chatSessionInsights');
       } finally {
         await runtime.close();
       }

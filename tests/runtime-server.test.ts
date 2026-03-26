@@ -202,6 +202,10 @@ describe('runtime server', () => {
       expect(openCreateModalBody.indexOf("classList.add('open')"))
         .toBeLessThan(openCreateModalBody.indexOf('await refreshProviderCatalog()'));
       expect(html).toContain('id="createSessionBtn"');
+      expect(html).toContain('id="providerCapabilityPreview"');
+      expect(html).toContain('id="chatSessionInsights"');
+      expect(html).toContain('refreshProviderCapabilityPreview');
+      expect(html).toContain('renderSessionInsights');
       expect(html).not.toContain("{ id: 'default', runtime: { mode: 'native' } }");
       expect(html).toContain(RUNTIME_DIAGNOSTICS_PATHS.health);
       expect(html).toContain('refreshRuntimeHealthStatus');
