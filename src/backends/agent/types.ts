@@ -19,11 +19,51 @@ export interface AgentInvokeInput {
   signal: AbortSignal;
 }
 
+export interface AgentAdapterInspectionCredential {
+  kind: 'url' | 'base_url' | 'auth_token' | 'password';
+  configured: boolean;
+}
+
+export interface AgentAdapterInspection {
+  adapter: string;
+  family: 'gateway' | 'bridge' | 'generic';
+  summary: string;
+  endpoint?: string;
+  transport: {
+    kind: 'websocket' | 'http';
+    protocol: 'openclaw_gateway_v3' | 'agent_sdk_http_v1' | 'generic';
+    liveProbe: 'rpc_health' | 'providers_get' | 'none';
+    modelDiscovery: 'models_list' | 'providers_get' | 'none';
+    streaming: 'agent_event_frames' | 'sse' | 'generic';
+  };
+  request: {
+    headerNames: string[];
+  };
+  auth: {
+    mechanisms: Array<'connect_auth' | 'handshake_header' | 'bearer_header'>;
+    credentials: AgentAdapterInspectionCredential[];
+  };
+  continuity: {
+    providerManagedSessions: true;
+    sessionKey: true;
+    providerSessionState: true;
+    cancel: boolean;
+  };
+  capabilities: {
+    probe: boolean;
+    modelDiscovery: boolean;
+    cancel: boolean;
+    runtimeServices: boolean;
+    toolCallEvents: boolean;
+  };
+}
+
 export interface AgentAdapter {
   readonly kind: string;
   invoke(input: AgentInvokeInput): AsyncGenerator<StreamEvent>;
   probe?(instance: RemoteProviderInstanceConfig): Promise<HealthStatus>;
   listModels?(instance: RemoteProviderInstanceConfig): Promise<Array<{ id: string; label: string }>>;
+  inspect?(instance: RemoteProviderInstanceConfig): AgentAdapterInspection;
   cancel?(
     sessionId: string,
     instance: RemoteProviderInstanceConfig,

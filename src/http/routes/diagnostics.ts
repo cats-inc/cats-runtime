@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { BackendKind, RemoteProviderInstanceConfig } from '../../backends/cli/config.js';
+import { inspectAgentTarget } from '../../backends/agent/inspection.js';
 import {
   getRuntimeListenerConfig,
   getRuntimeResolvedPaths,
@@ -593,11 +594,15 @@ async function diagnoseAgentTarget(
     };
   }
 
+  const agentRuntime = ctx.agentBackend
+    ? ctx.agentBackend.inspect(target)
+    : inspectAgentTarget(instance, { env });
   const config: Record<string, unknown> = {
     transport: instance.transport,
     model: instance.model || null,
     endpoint: resolveRemoteEndpoint(instance, env),
     tooling: buildProviderToolingSummary(target),
+    agentRuntime,
     credentials: {
       urlEnv: buildEnvDescriptor(env, instance.urlEnv, false),
       baseUrlEnv: buildEnvDescriptor(env, instance.baseUrlEnv, false),
@@ -605,11 +610,26 @@ async function diagnoseAgentTarget(
     },
   };
   const checks: DiagnosticCheck[] = [];
+  checks.push(
+    createCheck(
+      'agent_runtime_contract',
+      'ok',
+      agentRuntime.summary,
+      {
+        adapter: agentRuntime.adapter,
+        family: agentRuntime.family,
+        transport: agentRuntime.transport,
+        request: agentRuntime.request,
+        auth: agentRuntime.auth,
+        continuity: agentRuntime.continuity,
+        capabilities: agentRuntime.capabilities,
+      },
+    ),
+  );
 
   try {
     const shouldProbeLive = probeMode === 'live'
-      || instance.transport === 'openclaw'
-      || instance.transport === 'openclaw_gateway';
+      || agentRuntime.transport.liveProbe === 'rpc_health';
     const probe = ctx.agentBackend
       ? await ctx.agentBackend.probe(
           target,

@@ -8,10 +8,12 @@ import {
   type ManagedExecutionLifecycleReason,
 } from '../../../core/runtime/ManagedExecutionHandle.js';
 import { buildAgentAdapter } from '../adapters/registry.js';
+import { inspectAgentTarget } from '../inspection.js';
 import type {
   AgentBackendOptions,
   AgentBackendStatus,
   AgentAdapter,
+  AgentAdapterInspection,
 } from '../types.js';
 import { AGENT_PROVIDER_CAPABILITIES } from '../types.js';
 
@@ -222,6 +224,11 @@ export class AgentBackendManager {
         + `${target.providerName}/${target.instanceId}`,
       ),
     };
+  }
+
+  inspect(target: ProviderTargetDescriptor): AgentAdapterInspection {
+    const instance = ensureAgentTarget(target);
+    return inspectAgentTarget(instance, this.options);
   }
 
   private async *streamTurn(

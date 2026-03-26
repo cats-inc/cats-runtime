@@ -7,7 +7,12 @@ import type {
   StreamEvent,
 } from '../../../../core/types.js';
 import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
-import type { AgentAdapter, AgentBackendOptions, AgentInvokeInput } from '../../types.js';
+import type {
+  AgentAdapter,
+  AgentAdapterInspection,
+  AgentBackendOptions,
+  AgentInvokeInput,
+} from '../../types.js';
 import { parseRecord, parseServices, prependInstructions, readString } from '../../utils.js';
 
 const DEFAULT_CONNECT_TIMEOUT_MS = 10_000;
@@ -101,6 +106,75 @@ function resolveHeaders(
   }
 
   return Object.keys(headers).length > 0 ? headers : undefined;
+}
+
+function buildInspection(
+  instance: RemoteProviderInstanceConfig,
+  env: NodeJS.ProcessEnv,
+): AgentAdapterInspection {
+  const endpoint = (() => {
+    try {
+      return requireUrl(instance, env);
+    } catch {
+      return undefined;
+    }
+  })();
+  const headers = resolveHeaders(instance, env);
+  const auth = resolveAuth(instance, env);
+
+  return {
+    adapter: 'openclaw',
+    family: 'gateway',
+    summary: `OpenClaw gateway exposes provider-managed session continuity over websocket RPC, with runtime-visible health and model-catalog probes.`,
+    endpoint,
+    transport: {
+      kind: 'websocket',
+      protocol: 'openclaw_gateway_v3',
+      liveProbe: 'rpc_health',
+      modelDiscovery: 'models_list',
+      streaming: 'agent_event_frames',
+    },
+    request: {
+      headerNames: Object.keys(headers || {}).sort(),
+    },
+    auth: {
+      mechanisms: [
+        ...(auth ? ['connect_auth' as const] : []),
+        ...(headers && Object.keys(headers).length > 0 ? ['handshake_header' as const] : []),
+      ],
+      credentials: [
+        {
+          kind: 'url',
+          configured: Boolean(endpoint),
+        },
+        {
+          kind: 'auth_token',
+          configured: Boolean(
+            (instance.authTokenEnv && env[instance.authTokenEnv])
+            || headers?.authorization
+            || headers?.['x-openclaw-token'],
+          ),
+        },
+        {
+          kind: 'password',
+          configured: Boolean(instance.passwordEnv && env[instance.passwordEnv]),
+        },
+      ],
+    },
+    continuity: {
+      providerManagedSessions: true,
+      sessionKey: true,
+      providerSessionState: true,
+      cancel: false,
+    },
+    capabilities: {
+      probe: true,
+      modelDiscovery: true,
+      cancel: false,
+      runtimeServices: true,
+      toolCallEvents: false,
+    },
+  };
 }
 
 function resolveAuth(
@@ -712,5 +786,9 @@ export class OpenClawAdapter implements AgentAdapter {
       controller.abort();
       client.close();
     }
+  }
+
+  inspect(instance: RemoteProviderInstanceConfig): AgentAdapterInspection {
+    return buildInspection(instance, this.options.env || process.env);
   }
 }

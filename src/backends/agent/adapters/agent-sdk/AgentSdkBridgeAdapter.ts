@@ -6,7 +6,12 @@ import type {
 } from '../../../../core/types.js';
 import { parseSseEvents, readErrorBody } from '../../../../core/streamParsers.js';
 import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
-import type { AgentAdapter, AgentBackendOptions, AgentInvokeInput } from '../../types.js';
+import type {
+  AgentAdapter,
+  AgentAdapterInspection,
+  AgentBackendOptions,
+  AgentInvokeInput,
+} from '../../types.js';
 import { parseServices, prependInstructions } from '../../utils.js';
 
 const DEFAULT_AGENT_SDK_BASE_URL = 'http://127.0.0.1:8082';
@@ -55,6 +60,59 @@ function buildHeaders(
   }
 
   return headers;
+}
+
+function buildInspection(
+  instance: RemoteProviderInstanceConfig,
+  env: NodeJS.ProcessEnv,
+): AgentAdapterInspection {
+  const headers = buildHeaders(instance, env);
+  const headerNames = Object.keys(headers)
+    .filter((name) => name !== 'content-type' && name !== 'accept')
+    .sort();
+
+  return {
+    adapter: 'agent_sdk_bridge',
+    family: 'bridge',
+    summary: 'Agent SDK bridge uses runtime-owned HTTP session creation plus SSE message streaming against a provider-managed remote session.',
+    endpoint: resolveBaseUrl(instance, env),
+    transport: {
+      kind: 'http',
+      protocol: 'agent_sdk_http_v1',
+      liveProbe: 'providers_get',
+      modelDiscovery: 'providers_get',
+      streaming: 'sse',
+    },
+    request: {
+      headerNames,
+    },
+    auth: {
+      mechanisms: headerNames.includes('authorization') ? ['bearer_header'] : [],
+      credentials: [
+        {
+          kind: 'base_url',
+          configured: Boolean(resolveBaseUrl(instance, env)),
+        },
+        {
+          kind: 'auth_token',
+          configured: Boolean(resolveAuthToken(instance, env) || headers.authorization),
+        },
+      ],
+    },
+    continuity: {
+      providerManagedSessions: true,
+      sessionKey: true,
+      providerSessionState: true,
+      cancel: true,
+    },
+    capabilities: {
+      probe: true,
+      modelDiscovery: true,
+      cancel: true,
+      runtimeServices: true,
+      toolCallEvents: true,
+    },
+  };
 }
 
 function buildProviderState(
@@ -337,5 +395,9 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
       method: 'POST',
       headers: buildHeaders(instance, env),
     });
+  }
+
+  inspect(instance: RemoteProviderInstanceConfig): AgentAdapterInspection {
+    return buildInspection(instance, this.options.env || process.env);
   }
 }

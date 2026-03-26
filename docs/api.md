@@ -470,12 +470,20 @@ surface for hosts and dashboards. The response includes:
   runtime-managed local tools, provider-native CLI tools, or provider-managed
   agent tooling; API/local targets include the default runtime tool profile
   before any per-session permission narrowing
+- additive `config.agentRuntime` inspection metadata for agent targets,
+  including adapter family, probe/model-discovery transport shape, bounded auth
+  surface, provider-managed continuity, and runtime-visible capability flags
 - additive `config.modelCatalog` summaries (`source`, `defaultModel`,
   `modelCount`, cache metadata when applicable, and warnings)
 - additive `config.liveProbe` request metadata for API/local targets, including
   the semantic probe target, redacted request URL, auth application summary,
   and request header names
 - target-level diagnostics details for CLI, API/local, and agent backends
+
+Agent targets now also include an additive `agent_runtime_contract` check. It
+does not replace live health probes; it summarizes the static/runtime-owned
+semantic contract that the current adapter exposes so dashboards and operators
+can distinguish gateway-vs-bridge behavior even before a session is running.
 
 `GET /diagnostics/providers?probe=live` enables live probes where the current
 runtime backend supports them. For CLI targets this now validates the runtime
@@ -2433,6 +2441,21 @@ Each instance entry also exposes additive `tooling` metadata:
 - `policy`: for API/local targets only, the bounded runtime tool-profile
   inspection (`profile`, counts, and per-tool access classification) before any
   session-level permission narrowing
+
+Agent-backed instances now also expose additive `agentRuntime` inspection
+metadata. This is a bounded operator read model, not a new session contract.
+The object includes:
+
+- adapter identity (`adapter`, `family`)
+- operator-facing `summary`
+- resolved `endpoint`
+- `transport` semantics (`kind`, `protocol`, `liveProbe`, `modelDiscovery`,
+  `streaming`)
+- outbound `request.headerNames`
+- bounded `auth` inspection (`mechanisms`, configured credential slots)
+- `continuity` truth for provider-managed session state and remote cancel support
+- additive capability flags such as `probe`, `modelDiscovery`, `cancel`,
+  `runtimeServices`, and `toolCallEvents`
 
 `GET /providers/{provider}/tools` is the standalone runtime-owned tooling read
 surface for one resolved target. It accepts optional `?instance=<backend/id>`

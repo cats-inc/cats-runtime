@@ -7,6 +7,7 @@ import {
 } from '../../core/providerCatalog.js';
 import { inspectProviderActiveConfig } from '../../core/providerActiveConfig.js';
 import type { ProviderName } from '../../backends/cli/providers/types.js';
+import { inspectAgentTarget } from '../../backends/agent/inspection.js';
 import { buildProviderInstallCatalogView } from '../../core/provider-install/knowledge.js';
 import { buildProviderToolingSummary } from '../../core/tools/providerTooling.js';
 import type { AppContext } from '../app.js';
@@ -42,6 +43,13 @@ providerRoutes.get('/providers/config', (c) => {
         runtime: instance.cliInstance?.commandConfig.runtime,
         transport: instance.remoteInstance?.transport,
         model: instance.remoteInstance?.model,
+        ...(instance.backend === 'agent' && instance.remoteInstance
+          ? {
+              agentRuntime: ctx.agentBackend
+                ? ctx.agentBackend.inspect(instance)
+                : inspectAgentTarget(instance.remoteInstance, { env: process.env }),
+            }
+          : {}),
         tooling: buildProviderToolingSummary(instance),
         install: instance.backend === 'cli' && instance.cliInstance
           ? buildProviderInstallCatalogView(

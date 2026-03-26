@@ -201,6 +201,10 @@ src/
 - Reuses the same agent-backend runtime options for OpenClaw gateway
   `models.list` discovery, so provider model catalogs and diagnostics can
   expose canonical `provider/model` refs instead of config-only fallback data
+- Exposes additive agent-target inspection read models on `/providers/config`
+  and `/diagnostics/providers` so operators can read adapter family, transport
+  semantics, auth surface, provider-managed continuity, and bounded capability
+  truth without inferring them from provider names
 - Exposes runtime-owned browser session/page routes with pluggable driver
   metadata, normalized `browser_page` preview surfaces, aggregate browser
   summary reads, and explicit closed-session cleanup

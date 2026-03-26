@@ -318,15 +318,49 @@ describe('agent backend integration', () => {
           openclaw: {
             defaultInstance: 'gateway',
             defaultBackend: 'agent',
-            instances: [{
+            instances: [expect.objectContaining({
               id: 'gateway',
               target: 'agent/gateway',
               backend: 'agent',
-              command: undefined,
-              runner: undefined,
-              runtime: undefined,
               transport: 'openclaw_gateway',
               model: 'openclaw-coder',
+              agentRuntime: {
+                adapter: 'openclaw',
+                family: 'gateway',
+                summary: expect.stringContaining('OpenClaw gateway'),
+                endpoint: 'ws://gateway.test/ws',
+                transport: {
+                  kind: 'websocket',
+                  protocol: 'openclaw_gateway_v3',
+                  liveProbe: 'rpc_health',
+                  modelDiscovery: 'models_list',
+                  streaming: 'agent_event_frames',
+                },
+                request: {
+                  headerNames: ['authorization'],
+                },
+                auth: {
+                  mechanisms: ['connect_auth', 'handshake_header'],
+                  credentials: [
+                    { kind: 'url', configured: true },
+                    { kind: 'auth_token', configured: true },
+                    { kind: 'password', configured: false },
+                  ],
+                },
+                continuity: {
+                  providerManagedSessions: true,
+                  sessionKey: true,
+                  providerSessionState: true,
+                  cancel: false,
+                },
+                capabilities: {
+                  probe: true,
+                  modelDiscovery: true,
+                  cancel: false,
+                  runtimeServices: true,
+                  toolCallEvents: false,
+                },
+              },
               tooling: {
                 source: 'provider_managed',
                 discoverable: false,
@@ -335,7 +369,7 @@ describe('agent backend integration', () => {
               },
               install: null,
               compatibility: null,
-            }],
+            })],
           },
         },
       });
@@ -493,6 +527,22 @@ describe('agent backend integration', () => {
             }),
             checks: expect.arrayContaining([
               expect.objectContaining({
+                code: 'agent_runtime_contract',
+                status: 'ok',
+                message: expect.stringContaining('OpenClaw gateway'),
+                details: expect.objectContaining({
+                  adapter: 'openclaw',
+                  family: 'gateway',
+                  transport: expect.objectContaining({
+                    protocol: 'openclaw_gateway_v3',
+                    liveProbe: 'rpc_health',
+                  }),
+                  continuity: expect.objectContaining({
+                    cancel: false,
+                  }),
+                }),
+              }),
+              expect.objectContaining({
                 code: 'probe',
                 status: 'ok',
                 message: expect.stringContaining('Gateway health RPC succeeded'),
@@ -508,6 +558,17 @@ describe('agent backend integration', () => {
               }),
             ]),
             config: expect.objectContaining({
+              agentRuntime: expect.objectContaining({
+                adapter: 'openclaw',
+                family: 'gateway',
+                transport: expect.objectContaining({
+                  protocol: 'openclaw_gateway_v3',
+                  modelDiscovery: 'models_list',
+                }),
+                continuity: expect.objectContaining({
+                  providerManagedSessions: true,
+                }),
+              }),
               modelCatalog: expect.objectContaining({
                 source: 'dynamic',
                 defaultModel: 'openclaw-coder',
@@ -632,6 +693,10 @@ describe('agent backend integration', () => {
             instance: 'gateway',
             checks: expect.arrayContaining([
               expect.objectContaining({
+                code: 'agent_runtime_contract',
+                status: 'ok',
+              }),
+              expect.objectContaining({
                 code: 'probe',
                 status: 'ok',
               }),
@@ -655,6 +720,12 @@ describe('agent backend integration', () => {
               }),
             ]),
             config: expect.objectContaining({
+              agentRuntime: expect.objectContaining({
+                adapter: 'openclaw',
+                transport: expect.objectContaining({
+                  protocol: 'openclaw_gateway_v3',
+                }),
+              }),
               modelCatalog: expect.objectContaining({
                 source: 'dynamic',
                 defaultModel: 'anthropic/claude-test-a',
@@ -747,15 +818,48 @@ describe('agent backend integration', () => {
           claude: {
             defaultInstance: 'sdk',
             defaultBackend: 'agent',
-            instances: [{
+            instances: [expect.objectContaining({
               id: 'sdk',
               target: 'agent/sdk',
               backend: 'agent',
-              command: undefined,
-              runner: undefined,
-              runtime: undefined,
               transport: 'agent_sdk_bridge',
               model: 'sonnet',
+              agentRuntime: {
+                adapter: 'agent_sdk_bridge',
+                family: 'bridge',
+                summary: expect.stringContaining('Agent SDK bridge'),
+                endpoint: 'http://agent-sdk.test',
+                transport: {
+                  kind: 'http',
+                  protocol: 'agent_sdk_http_v1',
+                  liveProbe: 'providers_get',
+                  modelDiscovery: 'providers_get',
+                  streaming: 'sse',
+                },
+                request: {
+                  headerNames: ['authorization'],
+                },
+                auth: {
+                  mechanisms: ['bearer_header'],
+                  credentials: [
+                    { kind: 'base_url', configured: true },
+                    { kind: 'auth_token', configured: true },
+                  ],
+                },
+                continuity: {
+                  providerManagedSessions: true,
+                  sessionKey: true,
+                  providerSessionState: true,
+                  cancel: true,
+                },
+                capabilities: {
+                  probe: true,
+                  modelDiscovery: true,
+                  cancel: true,
+                  runtimeServices: true,
+                  toolCallEvents: true,
+                },
+              },
               tooling: {
                 source: 'provider_managed',
                 discoverable: false,
@@ -764,7 +868,7 @@ describe('agent backend integration', () => {
               },
               install: null,
               compatibility: null,
-            }],
+            })],
           },
         },
       });

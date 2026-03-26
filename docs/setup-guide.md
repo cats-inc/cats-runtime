@@ -243,6 +243,9 @@ Diagnostics rules:
   the runtime-wide wakeup snapshot under `runtime.wakeups`
 - `GET /diagnostics/providers` exposes runtime-owned provider availability
   checks plus cached CLI compatibility summaries for host UX and setup flows
+- agent targets now also expose additive `config.agentRuntime` metadata plus an
+  `agent_runtime_contract` check so operators can read gateway-vs-bridge
+  transport, auth, and continuity semantics without opening a session
 - `GET /diagnostics/health` includes polling-friendly wakeup aggregate counts
   under top-level `wakeups`
 - CLI targets now also expose a machine-readable `setup` block describing the
@@ -508,6 +511,10 @@ route may also expose additive `activeConfig` metadata. The first slice reads
 Goose's local config file and reports the inferred upstream provider/model so
 dashboards or playground samples can start from the runtime-owned default
 selection instead of a hardcoded guess.
+Agent-backed instances now also expose additive `agentRuntime` metadata so the
+selector and operator tooling can distinguish gateway-vs-bridge targets, read
+their resolved endpoint/probe shape, and see whether remote cancel is supported
+without learning adapter internals.
 
 ## Running the Project
 
