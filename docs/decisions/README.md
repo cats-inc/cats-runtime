@@ -38,6 +38,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
+| [026-model-a2a-as-an-agent-backend-adapter](./026-model-a2a-as-an-agent-backend-adapter.md) | Model A2A as an agent backend adapter | Proposed | 2026-03-27 |
 | [025-keep-provider-evolution-detection-manual-first-and-evidence-driven](./025-keep-provider-evolution-detection-manual-first-and-evidence-driven.md) | Keep provider evolution detection manual-first and evidence-driven | Proposed | 2026-03-27 |
 | [024-own-pluggable-execution-strategies-as-runtime-session-local-substrate](./024-own-pluggable-execution-strategies-as-runtime-session-local-substrate.md) | Own pluggable execution strategies as a runtime session-local substrate | Proposed | 2026-03-26 |
 | [023-treat-management-clis-as-runtime-owned-control-plane-adapters-not-session-providers](./023-treat-management-clis-as-runtime-owned-control-plane-adapters-not-session-providers.md) | Treat management CLIs as runtime-owned control-plane adapters, not session providers | Accepted | 2026-03-25 |
