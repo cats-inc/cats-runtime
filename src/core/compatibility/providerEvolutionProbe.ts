@@ -67,6 +67,20 @@ export interface ProviderEvolutionBaselineCompare {
   semanticDriftReasons: string[];
 }
 
+export type ProviderEvolutionReviewClassification =
+  | 'baseline'
+  | 'stable'
+  | 'upgrade'
+  | 'regression'
+  | 'schema_change'
+  | 'semantic_drift_suspected';
+
+export interface ProviderEvolutionProbeReviewSummary {
+  classifications: ProviderEvolutionReviewClassification[];
+  summary: string;
+  highlights: string[];
+}
+
 export interface ProviderEvolutionProbeExecutionSummary {
   status: 'completed' | 'failed';
   durationMs: number;
@@ -89,6 +103,7 @@ export interface ProviderEvolutionProbeArtifact {
   execution: ProviderEvolutionProbeExecutionSummary;
   capabilitySnapshot: ProviderEvolutionCapabilitySnapshot;
   compare?: ProviderEvolutionBaselineCompare;
+  review: ProviderEvolutionProbeReviewSummary;
   baseline?: {
     artifactId: string;
     capturedAt: string;
@@ -100,6 +115,40 @@ export interface ProviderEvolutionProbeStoredArtifact {
   artifact: ProviderEvolutionProbeArtifact;
   relativePath: string;
   artifactPath: string;
+}
+
+export interface ProviderEvolutionProbeArtifactSummary {
+  artifactId: string;
+  provider: string;
+  instance: string;
+  parserId: string;
+  probeProfile: string;
+  transport: ProviderEvolutionTransport;
+  version?: string;
+  capturedAt: string;
+  execution: ProviderEvolutionProbeExecutionSummary;
+  capabilitySnapshot: ProviderEvolutionCapabilitySnapshot;
+  compare?: {
+    baselineArtifactId: string;
+    baselineCapturedAt: string;
+    addedEventTypeCount: number;
+    removedEventTypeCount: number;
+    frequencyDropCount: number;
+    schemaChangeCount: number;
+    semanticDriftSuspected: boolean;
+  };
+  review: ProviderEvolutionProbeReviewSummary;
+  relativePath: string;
+  artifactPath: string;
+}
+
+export interface ProviderEvolutionProbeArtifactQuery {
+  provider?: string;
+  instance?: string;
+  parserId?: string;
+  probeProfile?: string;
+  transport?: ProviderEvolutionTransport;
+  limit?: number;
 }
 
 export interface ProviderEvolutionProbeRequest {
@@ -209,6 +258,7 @@ export class ProviderEvolutionProbeService {
           baselineCapturedAt: baseline.artifact.capturedAt,
         })
       : undefined;
+    const review = summarizeProviderEvolutionProbeReview(compare);
 
     const artifact: ProviderEvolutionProbeArtifact = {
       schemaVersion: PROVIDER_EVOLUTION_PROBE_ARTIFACT_SCHEMA_VERSION,
@@ -223,6 +273,7 @@ export class ProviderEvolutionProbeService {
       execution,
       capabilitySnapshot,
       compare,
+      review,
       baseline: baseline ? {
         artifactId: baseline.artifact.id,
         capturedAt: baseline.artifact.capturedAt,
@@ -247,47 +298,127 @@ export class ProviderEvolutionProbeService {
     };
   }
 
+  async readArtifactById(
+    artifactId: string,
+    provider?: string,
+  ): Promise<ProviderEvolutionProbeStoredArtifact | null> {
+    const relativePaths = await this.listArtifactRelativePaths(provider);
+    for (const relativePath of relativePaths) {
+      if (!relativePath.endsWith(`${artifactId}.json`)) {
+        continue;
+      }
+      const stored = await this.readStoredArtifact(relativePath);
+      if (stored) {
+        return stored;
+      }
+    }
+    return null;
+  }
+
+  async readLatestArtifact(
+    query: ProviderEvolutionProbeArtifactQuery = {},
+  ): Promise<ProviderEvolutionProbeArtifactSummary | null> {
+    const summaries = await this.listArtifacts({
+      ...query,
+      limit: 1,
+    });
+    return summaries[0] ?? null;
+  }
+
+  async listArtifacts(
+    query: ProviderEvolutionProbeArtifactQuery = {},
+  ): Promise<ProviderEvolutionProbeArtifactSummary[]> {
+    const relativePaths = await this.listArtifactRelativePaths(query.provider);
+    const artifacts: ProviderEvolutionProbeArtifactSummary[] = [];
+
+    for (const relativePath of relativePaths) {
+      const stored = await this.readStoredArtifact(relativePath);
+      if (!stored || !matchesProviderEvolutionArtifactQuery(stored.artifact, query)) {
+        continue;
+      }
+      artifacts.push(summarizeProviderEvolutionProbeArtifact(stored));
+    }
+
+    artifacts.sort((left, right) => Date.parse(right.capturedAt) - Date.parse(left.capturedAt));
+    const limit = Math.max(1, Math.trunc(query.limit ?? artifacts.length));
+    return artifacts.slice(0, limit);
+  }
+
   private async findLatestBaseline(
     target: ProviderEvolutionProbeRequest['target'],
     profileId: string,
   ): Promise<ProviderEvolutionProbeStoredArtifact | undefined> {
-    const providerDir = join(this.options.rootDir, sanitizePathSegment(target.provider));
-    let names: string[];
-    try {
-      names = await readdir(providerDir);
-    } catch {
-      return undefined;
-    }
-
     const artifacts: ProviderEvolutionProbeStoredArtifact[] = [];
-    for (const name of names) {
-      if (!name.endsWith('.json')) {
+    const relativePaths = await this.listArtifactRelativePaths(target.provider);
+    for (const relativePath of relativePaths) {
+      const stored = await this.readStoredArtifact(relativePath);
+      if (!stored) {
         continue;
       }
-
-      const relativePath = join(sanitizePathSegment(target.provider), name);
-      const artifactPath = join(this.options.rootDir, relativePath);
-      try {
-        const parsed = JSON.parse(await readFile(artifactPath, 'utf8')) as ProviderEvolutionProbeArtifact;
-        if (
-          parsed.provider === target.provider
-          && parsed.instance === target.instance
-          && parsed.parserId === target.parserId
-          && parsed.probeProfile === profileId
-        ) {
-          artifacts.push({
-            artifact: parsed,
-            relativePath,
-            artifactPath,
-          });
-        }
-      } catch {
-        // Ignore unreadable historical artifacts.
+      const parsed = stored.artifact;
+      if (
+        parsed.provider === target.provider
+        && parsed.instance === target.instance
+        && parsed.parserId === target.parserId
+        && parsed.probeProfile === profileId
+      ) {
+        artifacts.push(stored);
       }
     }
 
     return artifacts
       .sort((left, right) => Date.parse(right.artifact.capturedAt) - Date.parse(left.artifact.capturedAt))[0];
+  }
+
+  private async listArtifactRelativePaths(provider?: string): Promise<string[]> {
+    const providerSegments = provider
+      ? [sanitizePathSegment(provider)]
+      : await this.listProviderDirectories();
+    const relativePaths: string[] = [];
+
+    for (const providerSegment of providerSegments) {
+      const providerDir = join(this.options.rootDir, providerSegment);
+      let names: string[];
+      try {
+        names = await readdir(providerDir);
+      } catch {
+        continue;
+      }
+      for (const name of names) {
+        if (name.endsWith('.json')) {
+          relativePaths.push(join(providerSegment, name));
+        }
+      }
+    }
+
+    return relativePaths;
+  }
+
+  private async listProviderDirectories(): Promise<string[]> {
+    try {
+      const entries = await readdir(this.options.rootDir, { withFileTypes: true });
+      return entries
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name);
+    } catch {
+      return [];
+    }
+  }
+
+  private async readStoredArtifact(
+    relativePath: string,
+  ): Promise<ProviderEvolutionProbeStoredArtifact | null> {
+    const artifactPath = join(this.options.rootDir, relativePath);
+    try {
+      const parsed = JSON.parse(await readFile(artifactPath, 'utf8')) as ProviderEvolutionProbeArtifact;
+      return {
+        artifact: hydrateProviderEvolutionProbeArtifact(parsed),
+        relativePath,
+        artifactPath,
+      };
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -429,6 +560,7 @@ export function formatProviderEvolutionProbeEntrySummary(
   result: ProviderEvolutionProbeStoredArtifact,
 ): string {
   const snapshot = result.artifact.capabilitySnapshot;
+  const review = result.artifact.review;
   const lines = [
     `Provider evolution probe completed for ${result.artifact.provider}/${result.artifact.instance}.`,
     `Profile: ${result.artifact.probeProfile}`,
@@ -437,6 +569,7 @@ export function formatProviderEvolutionProbeEntrySummary(
       + `tool_result=${formatObserved(snapshot.toolResult)}, `
       + `progress=${formatObserved(snapshot.progress)}, `
       + `result=${formatObserved(snapshot.finalResult)}`,
+    `Review: ${review.summary}`,
   ];
 
   if (result.artifact.compare) {
@@ -445,15 +578,47 @@ export function formatProviderEvolutionProbeEntrySummary(
       + `${result.artifact.compare.removedEventTypes.length} removed, `
       + `${result.artifact.compare.schemaChanges.length} schema changes.`,
     );
-    if (result.artifact.compare.semanticDriftSuspected) {
-      lines.push('Semantic drift suspected; review the compare block in the artifact.');
-    }
   } else {
     lines.push('Baseline compare: none (no prior matching artifact).');
   }
 
+  for (const highlight of review.highlights) {
+    lines.push(`- ${highlight}`);
+  }
+
   lines.push(`Artifact: ${result.artifactPath}`);
   return `${lines.join('\n')}\n`;
+}
+
+export function summarizeProviderEvolutionProbeArtifact(
+  result: ProviderEvolutionProbeStoredArtifact,
+): ProviderEvolutionProbeArtifactSummary {
+  return {
+    artifactId: result.artifact.id,
+    provider: result.artifact.provider,
+    instance: result.artifact.instance,
+    parserId: result.artifact.parserId,
+    probeProfile: result.artifact.probeProfile,
+    transport: result.artifact.transport,
+    version: result.artifact.version,
+    capturedAt: result.artifact.capturedAt,
+    execution: result.artifact.execution,
+    capabilitySnapshot: result.artifact.capabilitySnapshot,
+    compare: result.artifact.compare
+      ? {
+          baselineArtifactId: result.artifact.compare.baselineArtifactId,
+          baselineCapturedAt: result.artifact.compare.baselineCapturedAt,
+          addedEventTypeCount: result.artifact.compare.addedEventTypes.length,
+          removedEventTypeCount: result.artifact.compare.removedEventTypes.length,
+          frequencyDropCount: result.artifact.compare.frequencyDrops.length,
+          schemaChangeCount: result.artifact.compare.schemaChanges.length,
+          semanticDriftSuspected: result.artifact.compare.semanticDriftSuspected,
+        }
+      : undefined,
+    review: result.artifact.review,
+    relativePath: result.relativePath,
+    artifactPath: result.artifactPath,
+  };
 }
 
 function buildCapabilitySignal(count: number | undefined): ProviderEvolutionCapabilitySignal {
@@ -493,4 +658,105 @@ function sanitizePathSegment(value: string): string {
 
 function formatObserved(signal: ProviderEvolutionCapabilitySignal): string {
   return signal.observed ? `yes(${signal.count})` : 'no';
+}
+
+function hydrateProviderEvolutionProbeArtifact(
+  artifact: ProviderEvolutionProbeArtifact,
+): ProviderEvolutionProbeArtifact {
+  return {
+    ...artifact,
+    review: artifact.review ?? summarizeProviderEvolutionProbeReview(artifact.compare),
+  };
+}
+
+function matchesProviderEvolutionArtifactQuery(
+  artifact: ProviderEvolutionProbeArtifact,
+  query: ProviderEvolutionProbeArtifactQuery,
+): boolean {
+  if (query.provider && artifact.provider !== query.provider) {
+    return false;
+  }
+  if (query.instance && artifact.instance !== query.instance) {
+    return false;
+  }
+  if (query.parserId && artifact.parserId !== query.parserId) {
+    return false;
+  }
+  if (query.probeProfile && artifact.probeProfile !== query.probeProfile) {
+    return false;
+  }
+  if (query.transport && artifact.transport !== query.transport) {
+    return false;
+  }
+  return true;
+}
+
+function summarizeProviderEvolutionProbeReview(
+  compare: ProviderEvolutionBaselineCompare | undefined,
+): ProviderEvolutionProbeReviewSummary {
+  if (!compare) {
+    return {
+      classifications: ['baseline'],
+      summary: 'No prior matching baseline artifact was available.',
+      highlights: [],
+    };
+  }
+
+  const classifications: ProviderEvolutionReviewClassification[] = [];
+  const highlights: string[] = [];
+
+  if (compare.addedEventTypes.length > 0) {
+    classifications.push('upgrade');
+    highlights.push(`Added event types: ${compare.addedEventTypes.join(', ')}`);
+  }
+  if (compare.removedEventTypes.length > 0 || compare.frequencyDrops.length > 0) {
+    classifications.push('regression');
+    if (compare.removedEventTypes.length > 0) {
+      highlights.push(`Removed event types: ${compare.removedEventTypes.join(', ')}`);
+    }
+    if (compare.frequencyDrops.length > 0) {
+      highlights.push(
+        `Frequency drops: ${compare.frequencyDrops
+          .map((drop) => `${drop.eventType} ${drop.previousCount}->${drop.currentCount}`)
+          .join(', ')}`,
+      );
+    }
+  }
+  if (compare.schemaChanges.length > 0) {
+    classifications.push('schema_change');
+    highlights.push(
+      `Schema changes: ${compare.schemaChanges
+        .map((change) => `${change.eventType} ${change.previousCount}->${change.currentCount}`)
+        .join(', ')}`,
+    );
+  }
+  if (compare.semanticDriftSuspected) {
+    classifications.push('semantic_drift_suspected');
+    highlights.push(...compare.semanticDriftReasons);
+  }
+
+  if (classifications.length === 0) {
+    return {
+      classifications: ['stable'],
+      summary: 'No material capability changes were detected relative to the latest baseline.',
+      highlights: [],
+    };
+  }
+
+  return {
+    classifications,
+    summary: `Detected ${classifications.map(formatReviewClassification).join(', ')} relative to the latest baseline.`,
+    highlights,
+  };
+}
+
+function formatReviewClassification(value: ProviderEvolutionReviewClassification): string {
+  switch (value) {
+    case 'schema_change':
+      return 'schema changes';
+    case 'semantic_drift_suspected':
+      return 'suspected semantic drift';
+    default:
+      return value.replace(/_/g, ' ');
+  }
 }

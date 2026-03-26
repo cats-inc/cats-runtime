@@ -1052,7 +1052,7 @@ always-on self-adapting parser system.
 
 #### Current Implementation Status
 
-- the first two `PLAN-021` slices are landed
+- the first three `PLAN-021` slices are landed
 - `src/core/compatibility/providerEvolution.ts` now owns a transport-neutral
   evidence collector and bundle shape
 - high-value CLI adapters now have optional instrumentation for:
@@ -1074,6 +1074,9 @@ always-on self-adapting parser system.
   - the collected evidence bundle
   - a derived capability snapshot
   - baseline compare output against the latest matching prior artifact
+  - persisted review classifications, summary text, and bounded highlights
+- the runtime now has internal latest/list/read-by-id probe-artifact summaries
+  for manual/operator follow-through without adding a public HTTP route yet
 - normal runtime execution remains unchanged when evidence collection is not
   enabled
 
@@ -1081,8 +1084,8 @@ always-on self-adapting parser system.
 
 - extend the manual probe flow beyond the first CLI-heavy providers when the
   collector shape proves stable
-- decide whether recent probe artifacts deserve a bounded diagnostics read
-  surface after the CLI/manual path has settled
+- decide whether the new internal latest/list/read-model helpers deserve a
+  bounded diagnostics read surface after the CLI/manual path has settled
 - keep provider-specific parsing inside adapters while reusing the shared
   collector across future agent/A2A transports
 - refine semantic-drift heuristics and attach external release-note context
