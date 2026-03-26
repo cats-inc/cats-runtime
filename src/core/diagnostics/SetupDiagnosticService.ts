@@ -88,6 +88,7 @@ export interface SetupDiagnosticReport {
   };
   config: {
     inspection: ConfigInspection;
+    loadError?: string;
     port: {
       status: 'available' | 'active_listener' | 'in_use' | 'ephemeral' | 'probe_failed';
       message: string;
@@ -137,6 +138,7 @@ export interface SetupDiagnosticServiceOptions {
   config: RuntimeConfig;
   startup?: RuntimeStartupState;
   bootstrapService?: SetupDiagnosticBootstrapService;
+  configLoadError?: string;
   retentionLimit?: number;
   now?: () => Date;
 }
@@ -169,6 +171,7 @@ export class SetupDiagnosticService {
   private readonly config: RuntimeConfig;
   private readonly startup?: RuntimeStartupState;
   private readonly bootstrapService?: SetupDiagnosticBootstrapService;
+  private readonly configLoadError?: string;
   private readonly retentionLimit: number;
   private readonly now: () => Date;
 
@@ -176,6 +179,7 @@ export class SetupDiagnosticService {
     this.config = options.config;
     this.startup = options.startup;
     this.bootstrapService = options.bootstrapService;
+    this.configLoadError = options.configLoadError;
     this.retentionLimit = Math.max(
       1,
       Math.trunc(options.retentionLimit ?? DEFAULT_REPORT_RETENTION_LIMIT),
@@ -228,6 +232,7 @@ export class SetupDiagnosticService {
     }
 
     appendPathIssues(issues, inspection, dataDirWritable, diagnosticsDirWritable, port, this.startup);
+    appendConfigLoadIssues(issues, this.configLoadError, inspection.configPath);
     appendDiscoveryIssues(issues, discovery);
     appendGitIssues(issues, git);
     appendScanIssues(issues, latestScan, scanSource, refreshError);
@@ -286,6 +291,7 @@ export class SetupDiagnosticService {
       },
       config: {
         inspection,
+        ...(this.configLoadError ? { loadError: this.configLoadError } : {}),
         port,
       },
       discovery,
@@ -353,6 +359,25 @@ export class SetupDiagnosticService {
   private resolveLatestReportPath(diagnosticsDir: string): string | null {
     return listReportPaths(diagnosticsDir)[0] || null;
   }
+}
+
+function appendConfigLoadIssues(
+  issues: SetupDiagnosticIssue[],
+  configLoadError: string | undefined,
+  configPath: string,
+): void {
+  if (!configLoadError) {
+    return;
+  }
+
+  issues.push({
+    code: 'config_load_error',
+    severity: 'error',
+    message: configLoadError,
+    details: {
+      configPath,
+    },
+  });
 }
 
 function appendPathIssues(

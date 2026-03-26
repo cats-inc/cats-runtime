@@ -52,6 +52,8 @@ cats-runtime
 Supported startup flags:
 
 - `--bootstrap` — force bootstrap/setup mode even with a valid config
+- `--diagnose-setup` — generate a setup diagnostic report and exit without starting the HTTP server
+- `--refresh-setup-scan` — refresh the shared setup scan before generating the setup diagnostic report
 - `--startup-mode <standalone|app-managed>`
 - `--managed-by <host-name>`
 - `--ready-output <plain|json|silent>`
@@ -104,8 +106,18 @@ the local `artifactPath`. Pass `{"refreshScan": true}` or `?refresh=1` when
 you want the runtime to refresh the shared setup scan before generating the
 report.
 
-The first slice keeps this as an authenticated HTTP action over the running
-runtime. A non-server/CLI entry path is still a later follow-up.
+When the HTTP server itself cannot start, you can generate the same artifact
+from the runtime entrypoint:
+
+```powershell
+node dist/index.js --diagnose-setup
+node dist/index.js --diagnose-setup --refresh-setup-scan
+```
+
+The CLI path writes the same redacted artifact under `<dataDir>/diagnostics/`
+and prints a JSON payload to stdout with `status`, `artifactPath`, and `report`.
+Use this path when port conflicts or other startup failures make the running
+HTTP action unavailable.
 
 ### Discovery Posture
 

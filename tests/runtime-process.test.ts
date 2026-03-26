@@ -36,6 +36,21 @@ interface RuntimeLifecycleEvent {
   error?: string;
 }
 
+interface SetupDiagnosticCliOutput {
+  status: 'generated';
+  artifactPath: string;
+  report: {
+    summary: {
+      status: 'ok' | 'degraded' | 'unavailable';
+    };
+    config: {
+      port: {
+        status: 'available' | 'active_listener' | 'in_use' | 'ephemeral' | 'probe_failed';
+      };
+    };
+  };
+}
+
 const testsDir = dirname(fileURLToPath(import.meta.url));
 const runtimeRoot = resolve(testsDir, '..');
 const runtimeEntry = join(runtimeRoot, 'dist', 'index.js');
@@ -150,6 +165,23 @@ function spawnRuntime(
   );
 }
 
+function spawnSetupDiagnostic(
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  cwd = runtimeRoot,
+): ChildProcessWithoutNullStreams {
+  return spawn(
+    process.execPath,
+    [runtimeEntry, ...args],
+    {
+      cwd,
+      env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    },
+  );
+}
+
 function tryParseLifecycleEvent(line: string): RuntimeLifecycleEvent | null {
   try {
     const parsed = JSON.parse(line) as RuntimeLifecycleEvent;
@@ -160,6 +192,54 @@ function tryParseLifecycleEvent(line: string): RuntimeLifecycleEvent | null {
     // Ignore non-JSON log lines.
   }
   return null;
+}
+
+async function waitForProcessOutput(
+  child: ChildProcessWithoutNullStreams,
+  timeoutMs = 15000,
+): Promise<{ code: number | null; stdout: string; stderr: string }> {
+  return new Promise((resolveOutput, rejectOutput) => {
+    let stdout = '';
+    let stderr = '';
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      child.stdout.off('data', onStdout);
+      child.stderr.off('data', onStderr);
+      child.off('exit', onExit);
+      child.off('error', onError);
+    };
+
+    const onStdout = (chunk: Buffer) => {
+      stdout += chunk.toString('utf8');
+    };
+
+    const onStderr = (chunk: Buffer) => {
+      stderr += chunk.toString('utf8');
+    };
+
+    const onError = (error: Error) => {
+      cleanup();
+      rejectOutput(error);
+    };
+
+    const onExit = (code: number | null) => {
+      cleanup();
+      resolveOutput({ code, stdout, stderr });
+    };
+
+    const timer = setTimeout(() => {
+      cleanup();
+      rejectOutput(new Error(
+        `Timed out waiting for process exit. stdout=${JSON.stringify(stdout)} stderr=${JSON.stringify(stderr)}`,
+      ));
+    }, timeoutMs);
+
+    child.stdout.on('data', onStdout);
+    child.stderr.on('data', onStderr);
+    child.on('exit', onExit);
+    child.on('error', onError);
+  });
 }
 
 async function waitForLifecycleEvent(
@@ -586,6 +666,45 @@ describe('runtime process startup contract', () => {
       if (child.exitCode === null) {
         await stopRuntime(child);
       }
+      cleanup();
+    }
+  }, 20000);
+
+  it('can generate a setup diagnostic report without starting the HTTP server', async () => {
+    const occupiedServer = createServer();
+    occupiedServer.listen(0, '127.0.0.1');
+    await once(occupiedServer, 'listening');
+    const occupiedAddress = occupiedServer.address();
+    if (!occupiedAddress || typeof occupiedAddress === 'string') {
+      throw new Error('Could not resolve occupied test port');
+    }
+
+    const { env, cleanup } = createRuntimeProcessEnv(occupiedAddress.port);
+    const child = spawnSetupDiagnostic([
+      '--diagnose-setup',
+      '--port',
+      String(occupiedAddress.port),
+    ], env);
+
+    try {
+      const output = await waitForProcessOutput(child);
+      expect(output.code).toBe(0);
+      expect(output.stderr.trim()).toBe('');
+
+      const payload = JSON.parse(output.stdout.trim()) as SetupDiagnosticCliOutput;
+      expect(payload.status).toBe('generated');
+      expect(payload.report.config.port.status).toBe('in_use');
+      expect(payload.report.summary.status).toBe('unavailable');
+    } finally {
+      await new Promise<void>((resolveClose, rejectClose) => {
+        occupiedServer.close((error) => {
+          if (error) {
+            rejectClose(error);
+            return;
+          }
+          resolveClose();
+        });
+      });
       cleanup();
     }
   }, 20000);

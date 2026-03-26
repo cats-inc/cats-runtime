@@ -29,6 +29,8 @@ import {
 describe('runtime startup helpers', () => {
   it('parses startup CLI options including inline values', () => {
     expect(parseRuntimeCliOptions([
+      '--diagnose-setup',
+      '--refresh-setup-scan',
       '--startup-mode=app-managed',
       '--managed-by',
       'cats-inc',
@@ -39,6 +41,8 @@ describe('runtime startup helpers', () => {
       '--config',
       'config/providers.yaml',
     ])).toEqual({
+      diagnoseSetup: true,
+      refreshSetupScan: true,
       startupMode: 'app-managed',
       managedBy: 'cats-inc',
       readyOutput: 'json',
@@ -245,6 +249,8 @@ describe('runtime startup helpers', () => {
   it('renders help text with supported flags', () => {
     const help = getRuntimeHelpText();
     expect(help).toContain('Usage: cats-runtime [options]');
+    expect(help).toContain('--diagnose-setup');
+    expect(help).toContain('--refresh-setup-scan');
     expect(help).toContain('--startup-mode <standalone|app-managed>');
     expect(help).toContain('--ready-output <plain|json|silent>');
   });

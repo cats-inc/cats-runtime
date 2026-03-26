@@ -63,6 +63,8 @@ export type RuntimeShutdownReason = typeof RUNTIME_SHUTDOWN_REASONS[number];
 export interface RuntimeCliOptions {
   help?: boolean;
   bootstrap?: boolean;
+  diagnoseSetup?: boolean;
+  refreshSetupScan?: boolean;
   startupMode?: RuntimeStartupMode;
   managedBy?: string;
   readyOutput?: RuntimeReadyOutput;
@@ -158,6 +160,16 @@ export function parseRuntimeCliOptions(argv: string[]): RuntimeCliOptions {
 
     if (arg === '--bootstrap') {
       options.bootstrap = true;
+      continue;
+    }
+
+    if (arg === '--diagnose-setup') {
+      options.diagnoseSetup = true;
+      continue;
+    }
+
+    if (arg === '--refresh-setup-scan') {
+      options.refreshSetupScan = true;
       continue;
     }
 
@@ -536,6 +548,8 @@ export function getRuntimeHelpText(): string {
     '',
     'Options:',
     '  --bootstrap                            Force bootstrap/setup mode',
+    '  --diagnose-setup                       Generate a setup diagnostic report and exit',
+    '  --refresh-setup-scan                   Refresh the shared setup scan before generating a diagnostic report',
     '  --startup-mode <standalone|app-managed>',
     '  --managed-by <name>',
     '  --ready-output <plain|json|silent>',

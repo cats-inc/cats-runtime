@@ -958,6 +958,9 @@ evidence bundles and does not force hosts to invent their own report format.
 - `POST /diagnostics/setup-report` generates a fresh operator-facing report and
   can optionally refresh the shared setup scan first
 - `GET /diagnostics/setup-report/latest` returns the latest persisted report
+- `cats-runtime --diagnose-setup` now generates the same report without starting
+  the normal HTTP server, so port conflicts or other startup failures still
+  leave a redacted operator-facing artifact
 - reports now aggregate runtime path facts, config inspection, discovery
   posture, bootstrap setup snapshots, configured target counts, git presence,
   and compatibility-evidence directory references without copying raw evidence
@@ -965,8 +968,6 @@ evidence bundles and does not force hosts to invent their own report format.
 
 #### Follow-through Direction
 
-- add a non-server diagnostic entry path so the same report can be generated
-  even when normal HTTP startup is not available
 - decide whether later host/CLI entry points should also emit a concise
   human-readable summary alongside the JSON artifact
 - extend the report only through shared bootstrap/setup services rather than

@@ -174,4 +174,30 @@ describe('SetupDiagnosticService', () => {
       cleanup();
     }
   });
+
+  it('records config load failures as additive report metadata', async () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const env = createTestEnv(root);
+      const config = loadConfig(env, { skipProviderFile: true });
+      const service = new SetupDiagnosticService({
+        config,
+        configLoadError: 'Provider claude is configured in multiple backends without an explicit selector.',
+        now: () => new Date('2026-03-26T02:00:00.000Z'),
+      });
+
+      const result = await service.generateReport();
+
+      expect(result.report.config.loadError).toContain('multiple backends');
+      expect(result.report.summary.status).toBe('unavailable');
+      expect(result.report.issues).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          code: 'config_load_error',
+          severity: 'error',
+        }),
+      ]));
+    } finally {
+      cleanup();
+    }
+  });
 });

@@ -3,6 +3,7 @@
 import { pathToFileURL } from 'node:url';
 import { loadDotEnv } from '../core/dotenv.js';
 import { loadConfig } from '../core/config.js';
+import { generateSetupDiagnosticEntryArtifact } from '../core/diagnostics/setupDiagnosticEntry.js';
 import { createRuntimeServer } from '../server.js';
 import {
   applyRuntimeCliEnvOverrides,
@@ -20,6 +21,8 @@ function getHelpText(): string {
     'Options:',
     '  --config <path>       Use an explicit providers config file',
     '  --managed-by <name>   Record the supervising host name',
+    '  --diagnose-setup      Generate a setup diagnostic report and exit',
+    '  --refresh-setup-scan  Refresh the shared setup scan before generating a diagnostic report',
     '  --help, -h            Show this help text',
   ].join('\n');
 }
@@ -33,6 +36,15 @@ async function main(): Promise<void> {
 
   loadDotEnv();
   applyRuntimeCliEnvOverrides(cliOptions, process.env);
+  if (cliOptions.diagnoseSetup) {
+    const result = await generateSetupDiagnosticEntryArtifact(cliOptions, process.env);
+    process.stdout.write(`${JSON.stringify({
+      status: 'generated',
+      artifactPath: result.artifactPath,
+      report: result.report,
+    })}\n`);
+    return;
+  }
   const config = loadConfig();
   const startup = createRuntimeStartupState({
     mode: 'app-managed',
