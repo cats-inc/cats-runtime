@@ -5,6 +5,7 @@ import type {
   StreamEvent,
   TurnInput,
 } from './types.js';
+import { createRuntimeProgressEvent } from '../../../core/progress.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 
 interface CursorStreamEvent {
@@ -102,7 +103,18 @@ export class CursorProvider implements Provider {
     }
 
     if (event.type === 'thinking') {
-      return null;
+      return createRuntimeProgressEvent({
+        text: event.text?.trim() || 'Cursor updated reasoning.',
+        provider: 'cursor',
+        backend: 'cli',
+        kind: 'reasoning',
+        status: 'running',
+        source: 'provider',
+        native: {
+          sourceEvent: 'thinking',
+          ...(typeof event.timestamp_ms === 'number' ? { timestampMs: event.timestamp_ms } : {}),
+        },
+      });
     }
 
     if (event.type === 'assistant') {

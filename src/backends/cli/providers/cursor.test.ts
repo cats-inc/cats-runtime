@@ -90,4 +90,50 @@ describe('CursorProvider', () => {
       text: 'Hello world',
     });
   });
+
+  it('promotes thinking events into shared progress updates', () => {
+    const provider = new CursorProvider();
+
+    expect(provider.parseStreamLine(JSON.stringify({
+      type: 'thinking',
+      text: 'Inspecting the repository before editing.',
+      timestamp_ms: 123,
+    }))).toEqual({
+      type: 'progress',
+      text: 'Inspecting the repository before editing.',
+      metadata: {
+        kind: 'reasoning',
+        status: 'running',
+        source: 'provider',
+        provider: 'cursor',
+        backend: 'cli',
+        native: {
+          sourceEvent: 'thinking',
+          timestampMs: 123,
+        },
+      },
+    });
+  });
+
+  it('uses a bounded fallback message for empty thinking updates', () => {
+    const provider = new CursorProvider();
+
+    expect(provider.parseStreamLine(JSON.stringify({
+      type: 'thinking',
+      text: '   ',
+    }))).toEqual({
+      type: 'progress',
+      text: 'Cursor updated reasoning.',
+      metadata: {
+        kind: 'reasoning',
+        status: 'running',
+        source: 'provider',
+        provider: 'cursor',
+        backend: 'cli',
+        native: {
+          sourceEvent: 'thinking',
+        },
+      },
+    });
+  });
 });
