@@ -371,6 +371,16 @@ describe('bootstrap mode server', () => {
         expect(body.bootstrapRequired).toBe(true);
         expect(body.state).toBeTruthy();
         expect(body.universe).toBeTruthy();
+        expect(body.repair).toEqual(expect.objectContaining({
+          status: 'scan_required',
+          nextAction: expect.objectContaining({
+            kind: 'run_manual_scan',
+            path: '/setup-scan',
+          }),
+        }));
+        expect(body.diagnostics).toEqual({
+          latestReport: null,
+        });
       } finally {
         await runtime.close();
       }
@@ -635,6 +645,16 @@ describe('bootstrap mode server', () => {
         // Backward-compatible summary fields still present
         expect(typeof scan.providerCount).toBe('number');
         expect(typeof scan.availableCount).toBe('number');
+        expect(body.repair).toEqual(expect.objectContaining({
+          preferredScan: expect.objectContaining({
+            source: 'scan',
+            providerCount: expect.any(Number),
+          }),
+          nextAction: expect.objectContaining({
+            kind: 'apply_config',
+            path: '/setup-apply',
+          }),
+        }));
       } finally {
         await runtime.close();
       }

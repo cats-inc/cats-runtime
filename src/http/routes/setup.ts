@@ -1,4 +1,6 @@
 import { Hono } from 'hono';
+import { SetupReadModelService } from '../../core/bootstrap/SetupReadModelService.js';
+import { SetupDiagnosticService } from '../../core/diagnostics/SetupDiagnosticService.js';
 import type { AppContext } from '../app.js';
 
 export const setupRoutes = new Hono();
@@ -9,33 +11,22 @@ setupRoutes.get('/setup-state', async (c) => {
     return c.json({ error: 'Bootstrap service is not available' }, 503);
   }
 
-  const state = await ctx.bootstrapService.getSetupState();
-  const latestScan = await ctx.bootstrapService.getLatestScan();
-  const latestManualScan = await ctx.bootstrapService.getLatestManualScan();
+  const diagnostics = new SetupDiagnosticService({
+    config: ctx.config,
+    startup: ctx.startup,
+    bootstrapService: ctx.bootstrapService,
+  });
+  const readModel = new SetupReadModelService({
+    bootstrapRequired: ctx.startup.bootstrapRequired,
+    bootstrapService: ctx.bootstrapService,
+    diagnostics,
+  });
 
-  // Full provider detail is always included.  The /setup-* routes
+  // Full provider detail is always included. The /setup-* routes
   // go through the global bearerAuth middleware (the path check in the
   // logger middleware only skips request logging, not auth), so callers
   // must already be authenticated when an API key is configured.
-  return c.json({
-    bootstrapRequired: ctx.startup.bootstrapRequired,
-    state,
-    scan: latestScan
-      ? {
-        scannedAt: latestScan.scannedAt,
-        scanType: latestScan.scanType,
-        providerCount: latestScan.providers.length,
-        availableCount: latestScan.providers.filter((p) => p.available).length,
-        providers: latestScan.providers,
-      }
-      : null,
-    manualScan: latestManualScan ?? null,
-    universe: ctx.bootstrapService.getProviderUniverse().map((entry) => ({
-      provider: entry.provider,
-      familyLabel: entry.familyLabel,
-      binaryName: entry.binaryName,
-    })),
-  });
+  return c.json(await readModel.read());
 });
 
 setupRoutes.post('/setup-scan', async (c) => {

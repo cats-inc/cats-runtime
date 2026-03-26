@@ -961,6 +961,9 @@ evidence bundles and does not force hosts to invent their own report format.
 - `cats-runtime --diagnose-setup` now generates the same report without starting
   the normal HTTP server, so port conflicts or other startup failures still
   leave a redacted operator-facing artifact
+- `GET /setup-state` now exposes a shared repair read model with preferred-scan,
+  next-action, and latest-setup-report summary metadata instead of forcing
+  later dashboard/setup follow-through to reconstruct that state client-side
 - reports now aggregate runtime path facts, config inspection, discovery
   posture, bootstrap setup snapshots, configured target counts, git presence,
   and compatibility-evidence directory references without copying raw evidence
@@ -972,6 +975,8 @@ evidence bundles and does not force hosts to invent their own report format.
   human-readable summary alongside the JSON artifact
 - extend the report only through shared bootstrap/setup services rather than
   creating a second standalone setup detection stack
+- keep broad repair flows additive and runtime-owned rather than scattering
+  setup heuristics across dashboard/setup page scripts
 
 #### Deferred Scope
 

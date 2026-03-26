@@ -297,6 +297,13 @@ snapshot. Response shape:
   - `providers` — full `ProviderScanEntry[]` with per-provider `commandStatus`, `commandPath`, `version`, `authStatus`, `available`, `install`, and `remediation` details
 - `manualScan` — latest explicit manual scan snapshot (`BootstrapScanResult` with full provider detail), or `null` if no manual scan has been run
 - `universe` — known provider families with `provider`, `familyLabel`, and `binaryName`
+- `repair` — shared runtime-owned repair summary for dashboard/provider-setup follow-through
+  - `status` — `ready`, `scan_required`, or `attention_required`
+  - `preferredScan` — which persisted snapshot currently drives repair guidance (`scan`, `manualScan`, or `none`)
+  - `providersNeedingAttention` — compact list of provider ids/families that still need repair
+  - `nextAction` — operator-facing runtime action metadata such as `run_manual_scan`, `apply_config`, or `review_remediation`
+- `diagnostics.latestReport` — latest persisted setup diagnostic report summary when a setup report artifact already exists
+  - includes `artifactId`, `artifactPath`, `generatedAt`, summary `status`, and `issueCounts`
 
 Both `scan.providers` and `manualScan` expose the full persisted scan data so
 that UI consumers (dashboard, provider-setup) can render provider status without

@@ -119,6 +119,14 @@ and prints a JSON payload to stdout with `status`, `artifactPath`, and `report`.
 Use this path when port conflicts or other startup failures make the running
 HTTP action unavailable.
 
+`GET /setup-state` now also exposes a shared runtime-owned repair read model for
+post-bootstrap follow-through:
+
+- `repair.status` / `repair.nextAction` tell operators whether the next step is
+  to run a manual scan, apply ready providers, or review remediation
+- `diagnostics.latestReport` points at the latest persisted setup report summary
+  when one already exists under `<dataDir>/diagnostics/`
+
 ### Discovery Posture
 
 WSL discovery defaults to `if_running` — bootstrap auto-scan will not start
