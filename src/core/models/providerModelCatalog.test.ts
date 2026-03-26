@@ -89,6 +89,12 @@ function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   });
 }
 
+function createAbortError(): Error {
+  const error = new Error('Aborted');
+  error.name = 'AbortError';
+  return error;
+}
+
 function createGooseConfigRoot(content: string) {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-goose-models-'));
   const gooseConfigPath = join(root, '.config', 'goose', 'config.yaml');
@@ -405,6 +411,72 @@ describe('ProviderModelCatalogService', () => {
       ttlSec: 60,
     });
     expect(second.models).toEqual(first.models);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to config when remote API model discovery times out', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (_input, init) => new Promise((_resolve, reject) => {
+      const signal = init?.signal;
+      if (signal?.aborted) {
+        reject(createAbortError());
+        return;
+      }
+      signal?.addEventListener('abort', () => reject(createAbortError()), { once: true });
+    }));
+
+    const config = {
+      ...createCatalogConfig(),
+      providerDefaultTargets: {
+        codex: { backend: 'api', instance: 'main' },
+      },
+      remoteProviderCatalog: {
+        api: {
+          codex: {
+            main: {
+              id: 'main',
+              providerName: 'codex',
+              backend: 'api',
+              transport: 'openai',
+              apiKeyEnv: 'OPENAI_API_KEY',
+              baseUrl: 'https://api.openai.test',
+              model: 'gpt-5.4',
+            },
+          },
+        },
+        local: createCatalogConfig().remoteProviderCatalog.local,
+        agent: createCatalogConfig().remoteProviderCatalog.agent,
+      },
+    } as const;
+
+    const service = new ProviderModelCatalogService(config as never, {
+      fetch: fetchMock,
+      env: {
+        OPENAI_API_KEY: 'test-openai-key',
+      },
+      remoteDiscoveryTimeoutMs: 25,
+      ttlMs: 60_000,
+    });
+
+    const catalog = await service.getCatalog('codex');
+    expect(catalog).toEqual({
+      provider: 'codex',
+      backend: 'api',
+      instance: 'main',
+      defaultModel: 'gpt-5.4',
+      source: 'config',
+      cache: null,
+      models: [
+        {
+          id: 'gpt-5.4',
+          label: 'gpt-5.4',
+          default: true,
+          status: 'configured',
+        },
+      ],
+      warnings: [
+        "Dynamic model discovery failed for codex/api/main: Timed out while listing models from 'https://api.openai.test/v1/models'",
+      ],
+    });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 

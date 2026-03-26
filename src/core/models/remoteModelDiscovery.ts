@@ -8,11 +8,14 @@ export type RemoteModelDiscoveryAuthMode =
 
 export type RemoteModelDiscoveryTarget = 'endpoint' | 'models' | 'model_tags';
 
-export interface RemoteModelDiscoveryRequest {
+export interface RemoteModelDiscoveryHttpRequest {
   url: string;
   displayUrl: string;
   method: 'GET';
   headers: Record<string, string>;
+}
+
+export interface RemoteModelDiscoveryRequest extends RemoteModelDiscoveryHttpRequest {
   headerNames: string[];
   target: RemoteModelDiscoveryTarget;
   auth: {
@@ -21,6 +24,53 @@ export interface RemoteModelDiscoveryRequest {
     applied: boolean;
     credentialEnv?: string;
   };
+}
+
+export interface RemoteModelDiscoveryFetchOptions {
+  fetch?: typeof fetch;
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}
+
+export interface RemoteModelDiscoveryFetchResult {
+  response: Response;
+  latencyMs: number;
+}
+
+export const DEFAULT_REMOTE_MODEL_DISCOVERY_TIMEOUT_MS = 5_000;
+
+abstract class RemoteModelDiscoveryFetchError extends Error {
+  constructor(
+    name: string,
+    message: string,
+    readonly displayUrl: string,
+    readonly latencyMs: number,
+  ) {
+    super(message);
+    this.name = name;
+  }
+}
+
+export class RemoteModelDiscoveryTimeoutError extends RemoteModelDiscoveryFetchError {
+  constructor(displayUrl: string, latencyMs: number) {
+    super(
+      'RemoteModelDiscoveryTimeoutError',
+      `Remote discovery request timed out for '${displayUrl}'`,
+      displayUrl,
+      latencyMs,
+    );
+  }
+}
+
+export class RemoteModelDiscoveryAbortError extends RemoteModelDiscoveryFetchError {
+  constructor(displayUrl: string, latencyMs: number) {
+    super(
+      'RemoteModelDiscoveryAbortError',
+      `Remote discovery request was aborted for '${displayUrl}'`,
+      displayUrl,
+      latencyMs,
+    );
+  }
 }
 
 export function resolveRemoteEndpoint(
@@ -180,4 +230,72 @@ export function buildRemoteModelDiscoveryRequest(
       ...(instance.apiKeyEnv ? { credentialEnv: instance.apiKeyEnv } : {}),
     },
   };
+}
+
+function defaultFetch(): typeof fetch {
+  return fetch;
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
+}
+
+export async function fetchRemoteModelDiscovery(
+  request: RemoteModelDiscoveryHttpRequest,
+  options: RemoteModelDiscoveryFetchOptions = {},
+): Promise<RemoteModelDiscoveryFetchResult> {
+  const fetchImpl = options.fetch || defaultFetch();
+  const timeoutMs = options.timeoutMs ?? DEFAULT_REMOTE_MODEL_DISCOVERY_TIMEOUT_MS;
+  const controller = new AbortController();
+  const startedAt = Date.now();
+  let timedOut = false;
+  let externallyAborted = false;
+  const onAbort = () => {
+    externallyAborted = true;
+    controller.abort();
+  };
+
+  if (options.signal) {
+    if (options.signal.aborted) {
+      externallyAborted = true;
+      controller.abort();
+    } else {
+      options.signal.addEventListener('abort', onAbort, { once: true });
+    }
+  }
+
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+  if (typeof timeout.unref === 'function') {
+    timeout.unref();
+  }
+
+  try {
+    const response = await fetchImpl(request.url, {
+      method: request.method,
+      ...(Object.keys(request.headers).length > 0 ? { headers: request.headers } : {}),
+      signal: controller.signal,
+    });
+
+    return {
+      response,
+      latencyMs: Date.now() - startedAt,
+    };
+  } catch (error) {
+    const latencyMs = Date.now() - startedAt;
+    if (timedOut && isAbortError(error)) {
+      throw new RemoteModelDiscoveryTimeoutError(request.displayUrl, latencyMs);
+    }
+    if (externallyAborted && isAbortError(error)) {
+      throw new RemoteModelDiscoveryAbortError(request.displayUrl, latencyMs);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+    if (options.signal) {
+      options.signal.removeEventListener('abort', onAbort);
+    }
+  }
 }

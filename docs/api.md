@@ -517,6 +517,8 @@ Successful HTTP reachability yields `endpoint_reachable`; network/timeout
 failures yield `endpoint_probe_failed`, while reachable non-2xx responses add
 semantic checks such as `endpoint_auth_required`, `endpoint_auth_rejected`,
 `endpoint_rate_limited`, `endpoint_not_found`, or `endpoint_upstream_error`.
+HTTP-backed live probes are bounded with a 5-second timeout so stalled remote
+targets degrade into diagnostics findings instead of hanging the entire route.
 Live remote/agent/local diagnostics now
 also try to load the runtime-owned model catalog for that target, surfacing
 machine-readable checks such as `model_catalog_loaded`,
@@ -2604,6 +2606,9 @@ Catalog semantics:
   return `source: dynamic` with warnings if a secondary probe such as Ollama's
   running-model check fails, while a full discovery failure falls back to
   `config` or `static` with a warning instead of returning an empty success.
+- HTTP-backed remote discovery is bounded with a 5-second timeout. Stalled
+  OpenAI/Anthropic/Gemini or Ollama endpoints now degrade into warnings plus
+  `config`/`static` fallback instead of hanging the request indefinitely.
 - `models[].status` is additive runtime metadata. Current values are:
   `running` for models that the runtime knows are already warm/loaded,
   `available` for dynamically discovered but not currently warm models, and

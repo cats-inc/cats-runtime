@@ -12,6 +12,10 @@ import {
 } from '../../core/providerCatalog.js';
 import {
   buildRemoteModelDiscoveryRequest,
+  DEFAULT_REMOTE_MODEL_DISCOVERY_TIMEOUT_MS,
+  fetchRemoteModelDiscovery,
+  RemoteModelDiscoveryAbortError,
+  RemoteModelDiscoveryTimeoutError,
   resolveRemoteEndpoint,
   sanitizeRemoteModelDiscoveryUrl,
   type RemoteModelDiscoveryAuthMode,
@@ -51,7 +55,7 @@ import {
 type DiagnosticStatus = HealthStatus['status'];
 type DiagnosticsProbeMode = 'light' | 'live';
 const DIAGNOSTIC_BACKENDS: readonly BackendKind[] = ['cli', 'api', 'local', 'agent'];
-const DEFAULT_REMOTE_ENDPOINT_PROBE_TIMEOUT_MS = 5_000;
+const DEFAULT_REMOTE_ENDPOINT_PROBE_TIMEOUT_MS = DEFAULT_REMOTE_MODEL_DISCOVERY_TIMEOUT_MS;
 
 interface DiagnosticCheck {
   code: string;
@@ -1360,17 +1364,10 @@ async function probeRemoteEndpoint(
     timedOut: boolean;
     message: string;
   }> {
-  const startedAt = Date.now();
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), DEFAULT_REMOTE_ENDPOINT_PROBE_TIMEOUT_MS);
-
   try {
-    const response = await fetch(request.url, {
-      method: request.method,
-      ...(request.headerNames.length > 0 ? { headers: request.headers } : {}),
-      signal: controller.signal,
+    const { response, latencyMs } = await fetchRemoteModelDiscovery(request, {
+      timeoutMs: DEFAULT_REMOTE_ENDPOINT_PROBE_TIMEOUT_MS,
     });
-    const latencyMs = Date.now() - startedAt;
     return {
       url: request.displayUrl,
       method: request.method,
@@ -1386,8 +1383,12 @@ async function probeRemoteEndpoint(
       message: `Live probe reached '${request.displayUrl}' (HTTP ${response.status}).`,
     };
   } catch (error) {
-    const timedOut = error instanceof Error && error.name === 'AbortError';
-    const latencyMs = Date.now() - startedAt;
+    const timedOut = error instanceof RemoteModelDiscoveryTimeoutError;
+    const aborted = error instanceof RemoteModelDiscoveryAbortError;
+    const latencyMs = error instanceof RemoteModelDiscoveryTimeoutError
+      || error instanceof RemoteModelDiscoveryAbortError
+      ? error.latencyMs
+      : 0;
     return {
       url: request.displayUrl,
       method: request.method,
@@ -1401,11 +1402,11 @@ async function probeRemoteEndpoint(
       timedOut,
       message: timedOut
         ? `Timed out while probing '${request.displayUrl}'.`
+        : aborted
+          ? `Probe aborted while probing '${request.displayUrl}'.`
         : error instanceof Error
           ? error.message
           : String(error),
     };
-  } finally {
-    clearTimeout(timeout);
   }
 }

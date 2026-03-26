@@ -19,7 +19,13 @@ import {
 } from '../../backends/cli/pi/models.js';
 import {
   buildRemoteModelDiscoveryRequest,
+  DEFAULT_REMOTE_MODEL_DISCOVERY_TIMEOUT_MS,
+  fetchRemoteModelDiscovery,
+  RemoteModelDiscoveryAbortError,
+  sanitizeRemoteModelDiscoveryUrl,
   type RemoteModelDiscoveryRequest,
+  type RemoteModelDiscoveryHttpRequest,
+  RemoteModelDiscoveryTimeoutError,
 } from './remoteModelDiscovery.js';
 
 export interface ProviderModelCatalogEntry {
@@ -52,6 +58,7 @@ interface ProviderModelCatalogServiceOptions {
   env?: NodeJS.ProcessEnv;
   ttlMs?: number;
   piModelDiscoveryRunner?: PiModelDiscoveryRunner;
+  remoteDiscoveryTimeoutMs?: number;
 }
 
 interface CachedDynamicModels {
@@ -66,7 +73,6 @@ interface DynamicCatalogLoadResult {
 }
 
 const DEFAULT_TTL_MS = 60_000;
-const DEFAULT_REMOTE_MODEL_DISCOVERY_TIMEOUT_MS = 5_000;
 const MAX_GEMINI_MODEL_LIST_PAGES = 5;
 
 const KIRO_NATIVE_MODELS: ProviderModelCatalogEntry[] = [
@@ -306,6 +312,7 @@ export class ProviderModelCatalogService {
   private readonly fetchImpl: typeof fetch;
   private readonly env: NodeJS.ProcessEnv;
   private readonly ttlMs: number;
+  private readonly remoteDiscoveryTimeoutMs: number;
   private readonly dynamicCache = new Map<string, CachedDynamicModels>();
 
   constructor(
@@ -315,6 +322,8 @@ export class ProviderModelCatalogService {
     this.fetchImpl = options.fetch || defaultFetch();
     this.env = options.env || process.env;
     this.ttlMs = options.ttlMs ?? DEFAULT_TTL_MS;
+    this.remoteDiscoveryTimeoutMs = options.remoteDiscoveryTimeoutMs
+      ?? DEFAULT_REMOTE_MODEL_DISCOVERY_TIMEOUT_MS;
   }
 
   async getCatalog(
@@ -497,23 +506,12 @@ export class ProviderModelCatalogService {
   }
 
   private async fetchRemoteDiscoveryPayload(
-    request: RemoteModelDiscoveryRequest,
-    url = request.url,
+    request: RemoteModelDiscoveryHttpRequest,
   ): Promise<Record<string, unknown>> {
-    const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      DEFAULT_REMOTE_MODEL_DISCOVERY_TIMEOUT_MS,
-    );
-    if (typeof timeout.unref === 'function') {
-      timeout.unref();
-    }
-
     try {
-      const response = await this.fetchImpl(url, {
-        method: request.method,
-        ...(request.headerNames.length > 0 ? { headers: request.headers } : {}),
-        signal: controller.signal,
+      const { response } = await fetchRemoteModelDiscovery(request, {
+        fetch: this.fetchImpl,
+        timeoutMs: this.remoteDiscoveryTimeoutMs,
       });
       if (!response.ok) {
         throw new Error(`Remote model list failed with status ${response.status}`);
@@ -526,12 +524,13 @@ export class ProviderModelCatalogService {
 
       return payload as Record<string, unknown>;
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
+      if (error instanceof RemoteModelDiscoveryTimeoutError) {
         throw new Error(`Timed out while listing models from '${request.displayUrl}'`);
       }
+      if (error instanceof RemoteModelDiscoveryAbortError) {
+        throw new Error(`Aborted while listing models from '${request.displayUrl}'`);
+      }
       throw error;
-    } finally {
-      clearTimeout(timeout);
     }
   }
 
@@ -600,7 +599,14 @@ export class ProviderModelCatalogService {
       if (nextPageToken) {
         pageUrl.searchParams.set('pageToken', nextPageToken);
       }
-      const payload = await this.fetchRemoteDiscoveryPayload(request, pageUrl.toString());
+      const pageRequest = pageUrl.toString() === request.url
+        ? request
+        : {
+            ...request,
+            url: pageUrl.toString(),
+            displayUrl: sanitizeRemoteModelDiscoveryUrl(pageUrl.toString()),
+          };
+      const payload = await this.fetchRemoteDiscoveryPayload(pageRequest);
       const models = Array.isArray(payload.models) ? payload.models : [];
       for (const entry of models) {
         if (!entry || typeof entry !== 'object') {
@@ -645,12 +651,15 @@ export class ProviderModelCatalogService {
   ): Promise<DynamicCatalogLoadResult> {
     const baseUrl = resolveBaseUrl(instance, this.env, 'http://127.0.0.1:11434').replace(/\/$/, '');
     const warnings: string[] = [];
-    const response = await this.fetchImpl(`${baseUrl}/api/tags`);
-    if (!response.ok) {
-      throw new Error(`Ollama model list failed with status ${response.status}`);
-    }
-
-    const payload = await response.json() as { models?: Array<{ name?: unknown; model?: unknown }> };
+    const tagsRequest = buildRemoteModelDiscoveryRequest(instance, this.env) || {
+      url: `${baseUrl}/api/tags`,
+      displayUrl: sanitizeRemoteModelDiscoveryUrl(`${baseUrl}/api/tags`),
+      method: 'GET' as const,
+      headers: {},
+    };
+    const payload = await this.fetchRemoteDiscoveryPayload(tagsRequest) as {
+      models?: Array<{ name?: unknown; model?: unknown }>;
+    };
     const entries = Array.isArray(payload.models) ? payload.models : [];
     const installedModels = entries
       .map((entry) => readNullableString(entry.name) ?? readNullableString(entry.model))
@@ -658,13 +667,16 @@ export class ProviderModelCatalogService {
 
     const runningModels = new Set<string>();
     try {
-      const runningResponse = await this.fetchImpl(`${baseUrl}/api/ps`);
-      if (!runningResponse.ok) {
-        warnings.push(`Ollama running-model probe failed with status ${runningResponse.status}`);
-      } else {
-        const runningPayload = await runningResponse.json() as {
-          models?: Array<{ name?: unknown; model?: unknown }>;
-        };
+      const runningRequest: RemoteModelDiscoveryHttpRequest = {
+        url: `${baseUrl}/api/ps`,
+        displayUrl: sanitizeRemoteModelDiscoveryUrl(`${baseUrl}/api/ps`),
+        method: 'GET',
+        headers: {},
+      };
+      const runningPayload = await this.fetchRemoteDiscoveryPayload(runningRequest) as {
+        models?: Array<{ name?: unknown; model?: unknown }>;
+      };
+      if (runningPayload) {
         const runningEntries = Array.isArray(runningPayload.models) ? runningPayload.models : [];
         for (const entry of runningEntries) {
           const name = readNullableString(entry.name) ?? readNullableString(entry.model);
@@ -674,10 +686,12 @@ export class ProviderModelCatalogService {
         }
       }
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const statusMatch = message.match(/^Remote model list failed with status (\d+)$/);
       warnings.push(
-        `Ollama running-model probe failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        statusMatch
+          ? `Ollama running-model probe failed with status ${statusMatch[1]}`
+          : `Ollama running-model probe failed: ${message}`,
       );
     }
 

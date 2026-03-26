@@ -11,6 +11,12 @@ import { ProviderCompatibilityService } from '../core/compatibility/ProviderComp
 import { ProviderModelCatalogService } from '../core/models/providerModelCatalog.js';
 import type { ProviderInstallCheckRunner } from '../core/provider-install/ProviderInstallCheckRunner.js';
 
+function createAbortError(): Error {
+  const error = new Error('Aborted');
+  error.name = 'AbortError';
+  return error;
+}
+
 describe('provider diagnostics HTTP contract', () => {
   let rootDir: string;
   let sessionBaseDir: string;
@@ -733,6 +739,125 @@ describe('provider diagnostics HTTP contract', () => {
         ],
       }));
     } finally {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('times out remote live probes and degrades model discovery into warnings', async () => {
+    vi.useFakeTimers();
+    vi.stubEnv('OPENAI_API_KEY', 'test-openai-secret');
+    const fetchMock = vi.fn(async (
+      _input: string | URL | Request,
+      init?: RequestInit,
+    ) => new Promise<Response>((_resolve, reject) => {
+      const signal = init?.signal;
+      if (signal?.aborted) {
+        reject(createAbortError());
+        return;
+      }
+      signal?.addEventListener('abort', () => reject(createAbortError()), { once: true });
+    }));
+
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const app = createTestApp(makeConfig({
+        providerDefaultTargets: {
+          codex: { backend: 'api', instance: 'default' },
+        },
+        remoteProviderCatalog: {
+          api: {
+            codex: {
+              default: {
+                id: 'default',
+                providerName: 'codex',
+                backend: 'api',
+                transport: 'openai',
+                baseUrl: 'https://api.openai.test/v1',
+                apiKeyEnv: 'OPENAI_API_KEY',
+                model: 'gpt-5.4',
+              },
+            },
+          },
+          local: {},
+          agent: {},
+        },
+      }));
+
+      const responsePromise = app.request(
+        '/diagnostics/providers?probe=live&provider=codex&backend=api&instance=default',
+      );
+      await vi.advanceTimersByTimeAsync(10_100);
+      const response = await responsePromise;
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual(expect.objectContaining({
+        providers: [
+          expect.objectContaining({
+            provider: 'codex',
+            backend: 'api',
+            instance: 'default',
+            availability: expect.objectContaining({
+              status: 'unavailable',
+              attentionCodes: expect.arrayContaining([
+                'endpoint_probe_failed',
+                'model_catalog_warning',
+              ]),
+            }),
+            checks: expect.arrayContaining([
+              expect.objectContaining({
+                code: 'api_key_present',
+                status: 'ok',
+              }),
+              expect.objectContaining({
+                code: 'live_probe_authenticated',
+                status: 'ok',
+              }),
+              expect.objectContaining({
+                code: 'endpoint_probe_failed',
+                status: 'unavailable',
+                message: "Timed out while probing 'https://api.openai.test/v1/models'.",
+                details: expect.objectContaining({
+                  url: 'https://api.openai.test/v1/models',
+                  target: 'models',
+                  authenticated: true,
+                  headerNames: ['authorization'],
+                  timedOut: true,
+                }),
+              }),
+              expect.objectContaining({
+                code: 'model_catalog_warning',
+                status: 'degraded',
+                details: expect.objectContaining({
+                  warnings: expect.arrayContaining([
+                    "Dynamic model discovery failed for codex/api/default: Timed out while listing models from 'https://api.openai.test/v1/models'",
+                  ]),
+                }),
+              }),
+            ]),
+            config: expect.objectContaining({
+              liveProbe: expect.objectContaining({
+                url: 'https://api.openai.test/v1/models',
+                target: 'models',
+                headerNames: ['authorization'],
+                reachable: false,
+                classification: 'timeout',
+                timedOut: true,
+              }),
+              modelCatalog: expect.objectContaining({
+                source: 'config',
+                defaultModel: 'gpt-5.4',
+                modelCount: 1,
+                warnings: expect.arrayContaining([
+                  "Dynamic model discovery failed for codex/api/default: Timed out while listing models from 'https://api.openai.test/v1/models'",
+                ]),
+              }),
+            }),
+          }),
+        ],
+      }));
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
       vi.unstubAllEnvs();
       vi.unstubAllGlobals();
     }
