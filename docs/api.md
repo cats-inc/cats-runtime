@@ -584,15 +584,33 @@ These routes expose the first runtime-owned browser/preview substrate. The
 first slice is intentionally lightweight:
 
 - browser sessions/pages are runtime-owned records
-- browser drivers are pluggable, but the first built-in driver is `manual`
+- browser drivers are pluggable; the runtime always ships a persistent
+  metadata-only `manual` driver and can optionally enable a real `playwright`
+  driver through env configuration
 - the `manual` driver does not launch or automate a real browser; it validates
-  the contract for future Playwright/CDP/BrowserOS-style drivers
+  the contract while richer automated drivers reuse the same route/payload shape
 - browser session/page state now persists under the runtime data dir so browser
   inspection and cleanup routes survive process restart for the current driver
 - background runtime maintenance now expires closed browser sessions on a TTL
   instead of relying only on explicit operator cleanup
 - page bindings may be direct (`url`/`path`) or may bind to an existing runtime
   session `service` / `artifact`
+
+Playwright driver enablement is opt-in and requires an accessible Chromium-family
+binary. Configure it with:
+
+- `CATS_RUNTIME_BROWSER_PLAYWRIGHT_ENABLED=true`
+- optional `CATS_RUNTIME_BROWSER_PLAYWRIGHT_EXECUTABLE_PATH`
+- optional `CATS_RUNTIME_BROWSER_PLAYWRIGHT_CHANNEL`
+- optional `CATS_RUNTIME_BROWSER_PLAYWRIGHT_HEADLESS`
+- optional `CATS_RUNTIME_BROWSER_PLAYWRIGHT_ARGS`
+- optional `CATS_RUNTIME_BROWSER_PLAYWRIGHT_NAVIGATION_TIMEOUT_MS`
+
+Driver persistence remains machine-readable through `/browser/drivers`.
+The built-in `manual` driver reports restart-persistent sessions, while
+non-persistent drivers such as Playwright are recovered as `closed` after
+runtime restart so the API does not pretend their remote browser process
+survived.
 
 Create browser session example:
 
@@ -2945,4 +2963,4 @@ Errors use this format:
 
 ---
 
-*Last updated: 2026-03-26*
+*Last updated: 2026-03-27*

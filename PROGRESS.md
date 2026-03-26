@@ -18,10 +18,10 @@
 | Workspace Substrate | Completed | `audit-workspace`, `init-workspace`, and `update-workspace` now return explicit preview/apply contracts, machine-readable action plans/diff stats, approval-friendly payloads, and `*.bootstrap` review-copy behavior without owning product policy |
 | Delivery Primitives | Completed | Runtime-owned delivery audit, artifact publish/export, repo status, commit, push, and normalized preview-surface metadata are now available over both HTTP routes and local tools |
 | Management Adapters | Completed | Runtime-owned management adapters for non-session control-plane tools (GitHub CLI review, Zeabur CLI deployment) with 8 actions across 2 domains, product-neutral authorization, bounded long-poll for review checks, `RuntimePreviewSurface` reuse for deployment URLs, dedicated HTTP/MCP/local-tool surfaces, adapter diagnostics, and `config/management.yaml` configuration |
-| Browser Preview Substrate | Completed | Runtime-owned browser driver/session/page contracts, `browser_page` preview surfaces, manual driver validation, restart-safe browser state persistence, additive `/browser/*` routes, session/history/observe inspection integration, aggregate browser summary/cleanup seams, background closed-session maintenance, and reset/delete cleanup for runtime-bound browser sessions now exist without depending on sibling browser projects |
+| Browser Preview Substrate | Completed | Runtime-owned browser driver/session/page contracts, `browser_page` preview surfaces, a persistent manual driver plus an opt-in Playwright driver, driver-aware restart recovery for non-persistent browser sessions, additive `/browser/*` routes, session/history/observe inspection integration, aggregate browser summary/cleanup seams, background closed-session maintenance, and reset/delete cleanup for runtime-bound browser sessions now exist without depending on sibling browser projects |
 | Peer Discovery & Routing | Completed | PLAN-017 v0 now includes bounded peer registry/discovery diagnostics, dedicated `POST /peer/executions`, additive `routing` on `POST /sessions/{id}/messages`, trust-gated runtime-to-runtime execution, shared-secret overlap windows for peer auth rotation, bounded auth-failure throttling plus inbound admission control on peer-only routes, additive peer-route guardrail summaries plus bounded peer diagnostics snapshots for those guardrails including replay-protection state, bounded nonce/timestamp replay resistance for peer execution auth, additive per-peer quota overrides for auth-failure/inbound/replay ceilings, additive network-posture diagnostics for TLS vs trusted-LAN plaintext peer endpoints, and caller-owned observe/stream relay semantics without changing existing `cats` contracts |
 | Tests | Completed | Vitest covers provider, discovery, peer registry/routing/trust/auth, peer execution relay, pool, HTTP, delivery, server bootstrap, API/local tool-loop behavior, and first-slice metering/guardrail/progress normalization |
-| Docs | In Progress | Core docs now cover startup/diagnostics, provider compatibility/evidence flows, model catalog, session branching, worktree-backed session isolation and cleanup, workspace substrate, runtime hydration/re-entry metadata, delivery primitives, the browser preview substrate, runtime-managed skills plus the internal skill-library taxonomy/metadata contract, the scheduled wakeup substrate, first-slice metering/progress contracts, additive session inspection/run-state/maintenance payloads including sanitized persisted maintenance requests plus generic maintenance follow-through outcomes, bounded maintenance request/follow-through history, additive `maintenance.flush` read-model state, the runtime MCP facade over HTTP plus stdio, and PLAN-017 LAN peer discovery/execution routing v0 including peer network-posture diagnostics; browser-driver follow-through and remaining PLAN-003 or PLAN-005 follow-on items still need ongoing updates |
+| Docs | In Progress | Core docs now cover startup/diagnostics, provider compatibility/evidence flows, model catalog, session branching, worktree-backed session isolation and cleanup, workspace substrate, runtime hydration/re-entry metadata, delivery primitives, the browser preview substrate including opt-in Playwright driver enablement plus non-persistent restart recovery, runtime-managed skills plus the internal skill-library taxonomy/metadata contract, the scheduled wakeup substrate, first-slice metering/progress contracts, additive session inspection/run-state/maintenance payloads including sanitized persisted maintenance requests plus generic maintenance follow-through outcomes, bounded maintenance request/follow-through history, additive `maintenance.flush` read-model state, the runtime MCP facade over HTTP plus stdio, and PLAN-017 LAN peer discovery/execution routing v0 including peer network-posture diagnostics; broader browser-driver follow-through and remaining PLAN-003 or PLAN-005 follow-on items still need ongoing updates |
 | Follow-ups | Completed | Accepted post-review findings for provider-instance rollout were implemented and recorded in `docs/plans/PLAN-002-provider-instance-review-followups.md` |
 
 **Legend**: Not Started | In Progress | Completed | Blocked
@@ -601,15 +601,16 @@ full BrowserOS product or depending on sibling browser projects.
 | Add browser driver/session/page contracts | [x] | `src/core/types.ts` now defines runtime-owned browser driver/session/page and `browser_page` preview-surface shapes |
 | Add `src/core/browser` substrate | [x] | `RuntimeBrowserService` now manages runtime-owned browser sessions/pages, preview-surface inspection, and restart-safe persisted browser state |
 | Add first pluggable browser driver | [x] | `src/backends/browser/manualDriver.ts` validates the contract without launching a managed browser |
+| Add first real opt-in browser driver | [x] | `src/backends/browser/playwrightDriver.ts` now provides Playwright-backed sessions behind env-gated runtime driver discovery |
 | Add browser HTTP routes | [x] | `/browser/drivers`, `/browser/summary`, `/browser/sessions`, `/browser/sessions/{id}`, `/browser/sessions/cleanup`, `/browser/sessions/{id}/pages`, and `/browser/sessions/{id}/close` now ship |
 | Align service/artifact/browser-page preview surfaces | [x] | Browser routes can bind to runtime session services/artifacts while preserving the existing preview-surface schema |
+| Add driver-aware restart recovery | [x] | Non-persistent driver sessions now recover as `closed` after restart instead of pretending the remote browser process survived |
 | Update docs and tests | [x] | `README.md`, `docs/api.md`, `docs/architecture.md`, `docs/AGENT-GUIDE.md`, `docs/plans/PLAN-013-*.md`, and browser tests now cover the slice |
 
 #### Deferred Boundaries
 
-- [ ] No real Playwright/CDP/BrowserOS driver yet; the first slice validates contracts with a manual driver only
-- [ ] No real Playwright/CDP/BrowserOS driver yet; the first slice still validates contracts with a manual driver only
-- [ ] No richer retained-session/browser-page GC policy yet beyond closed-session TTL sweeps plus explicit cleanup routes
+- [ ] No richer retained-session/browser-page GC policy yet beyond closed-session TTL sweeps plus explicit cleanup routes plus non-persistent-driver restart downgrade
+- [ ] No second real driver yet beyond the current opt-in Playwright implementation
 - [ ] No product-side preview UI or browser takeover workflow yet
 
 ### WP-17: Worktree Isolation Execution Layer
@@ -658,4 +659,4 @@ into `cats-runtime`.
 
 ---
 
-*Last updated: 2026-03-26*
+*Last updated: 2026-03-27*

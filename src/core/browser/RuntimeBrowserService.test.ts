@@ -306,4 +306,88 @@ describe('RuntimeBrowserService', () => {
       rmSync(rootDir, { recursive: true, force: true });
     }
   });
+
+  it('recovers ready sessions from non-persistent drivers as closed after restart', async () => {
+    const rootDir = mkdtempSync(join(tmpdir(), 'cats-runtime-browser-recovery-'));
+    const storageFile = join(rootDir, 'browser', 'sessions.json');
+
+    const transientDriver = {
+      descriptor: {
+        id: 'transient',
+        kind: 'noop',
+        status: 'ready',
+        title: 'Transient Driver',
+        summary: 'A non-persistent driver used for restart recovery tests.',
+        capabilities: {
+          persistentSessions: false,
+          manualUrlEntry: true,
+          serviceBindings: true,
+          artifactBindings: true,
+          liveAutomation: true,
+        },
+        warnings: [],
+      },
+      async createSession() {
+        return {
+          metadata: {
+            mode: 'transient',
+          },
+        };
+      },
+      async openPage() {
+        return {
+          metadata: {
+            mode: 'transient',
+          },
+        };
+      },
+      async closeSession() {
+        // no-op for the in-memory test driver
+      },
+    };
+
+    try {
+      const firstBrowser = new RuntimeBrowserService({
+        drivers: [transientDriver],
+        now: () => new Date('2026-03-23T00:00:00.000Z'),
+        storageFile,
+      });
+
+      const session = await firstBrowser.createSession({
+        driverId: 'transient',
+        label: 'Needs Recovery',
+      });
+      await firstBrowser.createPage(session.id, {
+        url: 'http://127.0.0.1:4173',
+        binding: {
+          kind: 'manual_url',
+        },
+      });
+
+      const secondBrowser = new RuntimeBrowserService({
+        drivers: [transientDriver],
+        now: () => new Date('2026-03-23T00:30:00.000Z'),
+        storageFile,
+      });
+
+      expect(secondBrowser.getSession(session.id)).toEqual(expect.objectContaining({
+        id: session.id,
+        status: 'closed',
+        closedAt: '2026-03-23T00:30:00.000Z',
+        pages: [
+          expect.objectContaining({
+            status: 'closed',
+          }),
+        ],
+        metadata: expect.objectContaining({
+          recovery: expect.objectContaining({
+            reason: 'driver_session_not_persistent',
+            driverId: 'transient',
+          }),
+        }),
+      }));
+    } finally {
+      rmSync(rootDir, { recursive: true, force: true });
+    }
+  });
 });

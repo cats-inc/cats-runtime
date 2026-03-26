@@ -12,7 +12,7 @@ export class ManualBrowserDriver implements RuntimeBrowserDriver {
     title: 'Manual Browser Driver',
     summary: 'Registers previewable pages and URLs without owning a real browser process.',
     capabilities: {
-      persistentSessions: false,
+      persistentSessions: true,
       manualUrlEntry: true,
       serviceBindings: true,
       artifactBindings: true,

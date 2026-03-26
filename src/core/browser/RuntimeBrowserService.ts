@@ -8,6 +8,10 @@ import {
 } from 'node:fs';
 import { dirname } from 'node:path';
 import type { RuntimeBrowserDriver, RuntimeBrowserPageTarget } from './driver.js';
+import {
+  RuntimeBrowserNotFoundError,
+  RuntimeBrowserValidationError,
+} from './errors.js';
 import { createBrowserPagePreviewSurface } from './previewSurfaces.js';
 import type {
   RuntimeBrowserDriverDescriptor,
@@ -140,19 +144,10 @@ export interface RuntimeBrowserServiceOptions {
   storageFile?: string;
 }
 
-export class RuntimeBrowserNotFoundError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'RuntimeBrowserNotFoundError';
-  }
-}
-
-export class RuntimeBrowserValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'RuntimeBrowserValidationError';
-  }
-}
+export {
+  RuntimeBrowserNotFoundError,
+  RuntimeBrowserValidationError,
+} from './errors.js';
 
 export class RuntimeBrowserService {
   private readonly now: () => Date;
@@ -523,6 +518,7 @@ export class RuntimeBrowserService {
       return;
     }
 
+    let recoveredNonPersistentSessions = false;
     try {
       const parsed = JSON.parse(readFileSync(storageFile, 'utf8')) as Partial<PersistedRuntimeBrowserState>;
       const sessions = Array.isArray(parsed.sessions) ? parsed.sessions : [];
@@ -548,9 +544,42 @@ export class RuntimeBrowserService {
           return Boolean(page && page.browserSessionId === session.id);
         });
       }
+
+      const recoveredAt = this.now().toISOString();
+      for (const session of this.sessions.values()) {
+        const driver = this.drivers.get(session.driverId);
+        if (!driver || session.status !== 'ready' || driver.descriptor.capabilities.persistentSessions) {
+          continue;
+        }
+        session.status = 'closed';
+        session.closedAt = recoveredAt;
+        session.updatedAt = recoveredAt;
+        session.metadata = mergeMetadata(session.metadata, {
+          recovery: {
+            recoveredAt,
+            reason: 'driver_session_not_persistent',
+            driverId: session.driverId,
+          },
+        });
+        for (const pageId of session.pageIds) {
+          const page = this.pages.get(pageId);
+          if (!page || page.status === 'closed') {
+            continue;
+          }
+          page.status = 'closed';
+          page.closedAt = recoveredAt;
+          page.updatedAt = recoveredAt;
+        }
+        recoveredNonPersistentSessions = true;
+      }
     } catch {
       this.sessions.clear();
       this.pages.clear();
+      return;
+    }
+
+    if (recoveredNonPersistentSessions) {
+      this.persistState();
     }
   }
 

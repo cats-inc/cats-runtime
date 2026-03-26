@@ -328,21 +328,27 @@ src/
 
 - Hosts pluggable browser drivers behind one runtime-owned contract
 - Keeps the first slice dependency-light and runtime-local
-- Starts with a `manual` driver that validates browser session/page lifecycle
-  and preview-surface registration without launching a managed browser process
+- Ships a persistent metadata-only `manual` driver that validates browser
+  session/page lifecycle and preview-surface registration without launching a
+  managed browser process
+- Now also supports an opt-in Playwright-backed driver, enabled through runtime
+  env vars, without changing the public browser HTTP contract
 
 ### `src/core/browser`
 
 - Defines runtime-owned browser session/page lifecycle helpers
 - Persists runtime-owned browser session/page state under the runtime data dir
   so browser inspection/read models survive restart for the current driver set
+- Applies driver-aware restart recovery so non-persistent browser sessions are
+  downgraded to `closed` after runtime restart instead of pretending a remote
+  browser process survived
 - Runs runtime-owned closed-session maintenance sweeps so stale browser records
   can expire on a bounded TTL without waiting for explicit cleanup routes
 - Defines browser-page preview-surface normalization aligned with existing
   service/artifact preview contracts
-- Keeps browser-driver integration replaceable so future Playwright/CDP or
-  BrowserOS-style adapters can plug in without rewriting the public HTTP
-  contract
+- Keeps browser-driver integration replaceable so additional CDP or
+  BrowserOS-style adapters can plug in beside Playwright without rewriting the
+  public HTTP contract
 
 ### `src/core/management`
 
@@ -699,4 +705,4 @@ the only durable memory surface for the Cats suite.
 
 ---
 
-*Last updated: 2026-03-26*
+*Last updated: 2026-03-27*

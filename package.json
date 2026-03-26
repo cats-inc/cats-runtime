@@ -57,6 +57,7 @@
   "dependencies": {
     "@hono/node-server": "^1.14.0",
     "hono": "^4.7.0",
+    "playwright-core": "^1.58.2",
     "yaml": "^2.8.2"
   },
   "devDependencies": {

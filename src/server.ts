@@ -75,7 +75,7 @@ import {
   resolveFileBackedProviderPath,
   supportsHostFileBackedProviderDiscovery,
 } from './backends/cli/providerPaths.js';
-import { ManualBrowserDriver } from './backends/browser/manualDriver.js';
+import { createRuntimeBrowserDrivers } from './backends/browser/createDrivers.js';
 
 interface DiscoveryController {
   start(): void;
@@ -806,9 +806,7 @@ export function createRuntimeServer(
     env: options.apiBackend?.env,
   });
   const browser = new RuntimeBrowserService({
-    drivers: [
-      new ManualBrowserDriver(),
-    ],
+    drivers: createRuntimeBrowserDrivers(config),
     sessionExists: (sessionId) => registry.get(sessionId) !== undefined,
     storageFile: join(dataDir, 'browser', 'sessions.json'),
   });

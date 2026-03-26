@@ -37,8 +37,8 @@ import type { PeerExecutionClient } from '../core/peers/PeerExecutionClient.js';
 import type { PeerExecutionService } from '../core/peers/PeerExecutionService.js';
 import type { PeerExecutionAdmissionService } from '../core/peers/PeerExecutionAdmissionService.js';
 import type { PeerExecutionReplayService } from '../core/peers/PeerExecutionReplayService.js';
-import { ManualBrowserDriver } from '../backends/browser/manualDriver.js';
 import type { BootstrapService } from '../core/bootstrap/BootstrapService.js';
+import { createRuntimeBrowserDrivers } from '../backends/browser/createDrivers.js';
 import { bearerAuth } from './auth.js';
 import { injectRuntimeDashboardHealthOverlay } from './dashboardHealthOverlay.js';
 import { injectSharedUI } from './uiInjector.js';
@@ -210,9 +210,7 @@ export function getRuntimeBrowserService(ctx: AppContext): RuntimeBrowserService
       ? join(ctx.config.dataDir, 'browser', 'sessions.json')
       : undefined;
     ctx.browser = new RuntimeBrowserService({
-      drivers: [
-        new ManualBrowserDriver(),
-      ],
+      drivers: createRuntimeBrowserDrivers(ctx.config),
       sessionExists: (sessionId) => Boolean(ctx.registry.get(sessionId)),
       ...(browserStorageFile ? { storageFile: browserStorageFile } : {}),
     });

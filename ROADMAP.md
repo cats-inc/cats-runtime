@@ -186,7 +186,8 @@ leaking backend-specific wire formats to consumers.
 That is enough to freeze the substrate, but not enough for production-grade
 browser-backed preview and test workflows. The current gaps are:
 
-- no real Playwright/CDP/browser-service driver yet
+- only one real opt-in Playwright driver exists so far; richer CDP/browser-service
+  drivers and broader retained-session policy remain absent
 - reset/delete cleanup and explicit closed-session pruning exist, and
   background closed-session expiry now runs under runtime maintenance, but
   there is still no richer retained-session GC policy
@@ -222,16 +223,22 @@ Deepen the runtime-owned browser subsystem without coupling it to any monorepo
 
 - The manual-driver browser substrate and normalized `browser_page` preview
   surfaces are landed
+- An opt-in Playwright-backed driver now exists behind the same
+  `RuntimeBrowserDriver` contract, configured entirely through runtime env vars
 - Browser session/page state now persists under the runtime data dir and can be
   reloaded on restart for the current runtime-owned browser contract
+- Drivers now advertise whether their sessions are restart-persistent, and the
+  runtime automatically downgrades restored sessions from non-persistent drivers
+  such as Playwright to `closed` after restart instead of pretending the remote
+  browser process survived
 - Browser sessions already surface through session, history, and observe
   inspection payloads, and reset/delete cleanup clears browser sessions bound
   to the affected runtime session
 - `GET /browser/summary`, `POST /browser/sessions/cleanup`, matching MCP
   tools, and runtime background maintenance now provide a host-facing
   aggregate read/maintenance seam for closed browser-session cleanup
-- Real drivers and richer retained-session/browser recovery policy remain
-  deferred
+- Richer retained-session/browser recovery policy plus additional real drivers
+  beyond Playwright remain deferred
 
 #### Why This Is Required
 
@@ -1008,4 +1015,4 @@ evidence bundles and does not force hosts to invent their own report format.
 - `docs/specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md`
 
 ---
-*Last updated: 2026-03-26*
+*Last updated: 2026-03-27*

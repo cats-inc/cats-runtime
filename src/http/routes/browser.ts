@@ -14,7 +14,7 @@ import {
 import {
   RuntimeBrowserNotFoundError,
   RuntimeBrowserValidationError,
-} from '../../core/browser/RuntimeBrowserService.js';
+} from '../../core/browser/errors.js';
 import {
   guessBrowserPreviewMediaType,
   resolveBrowserArtifactPath,
