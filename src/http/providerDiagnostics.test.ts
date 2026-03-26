@@ -422,12 +422,21 @@ describe('provider diagnostics HTTP contract', () => {
                   statusCode: 401,
                 }),
               }),
+              expect.objectContaining({
+                code: 'endpoint_auth_required',
+                status: 'unavailable',
+                details: expect.objectContaining({
+                  url: 'https://api.anthropic.test/v1',
+                  statusCode: 401,
+                }),
+              }),
             ]),
             config: expect.objectContaining({
               liveProbe: expect.objectContaining({
                 url: 'https://api.anthropic.test/v1',
                 reachable: true,
                 statusCode: 401,
+                classification: 'auth_required',
               }),
               modelCatalog: expect.objectContaining({
                 source: 'config',
@@ -496,6 +505,7 @@ describe('provider diagnostics HTTP contract', () => {
                 url: 'http://127.0.0.1:11434/api/tags',
                 reachable: true,
                 statusCode: 200,
+                classification: 'http_ok',
               }),
               modelCatalog: expect.objectContaining({
                 source: 'dynamic',
@@ -508,6 +518,95 @@ describe('provider diagnostics HTTP contract', () => {
             }),
             reprobe: expect.objectContaining({
               liveSupported: true,
+            }),
+          }),
+        ],
+      }));
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('classifies remote live probe HTTP semantics beyond basic reachability', async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+      if (url === 'https://api.openai.test/v1') {
+        return new Response('', { status: 429 });
+      }
+      throw new Error(`Unexpected live probe URL: ${url}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const app = createTestApp(makeConfig({
+        providerDefaultTargets: {
+          codex: { backend: 'api', instance: 'default' },
+        },
+        remoteProviderCatalog: {
+          api: {
+            codex: {
+              default: {
+                id: 'default',
+                providerName: 'codex',
+                backend: 'api',
+                transport: 'openai',
+                baseUrl: 'https://api.openai.test/v1',
+                apiKeyEnv: 'OPENAI_API_KEY',
+                model: 'gpt-5.4',
+              },
+            },
+          },
+          local: {},
+          agent: {},
+        },
+      }));
+
+      const response = await app.request(
+        '/diagnostics/providers?probe=live&provider=codex&backend=api&instance=default',
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual(expect.objectContaining({
+        providers: [
+          expect.objectContaining({
+            provider: 'codex',
+            backend: 'api',
+            instance: 'default',
+            availability: expect.objectContaining({
+              status: 'unavailable',
+              attentionCodes: expect.arrayContaining([
+                'api_key_present',
+                'endpoint_rate_limited',
+              ]),
+            }),
+            checks: expect.arrayContaining([
+              expect.objectContaining({
+                code: 'endpoint_reachable',
+                status: 'ok',
+                details: expect.objectContaining({
+                  url: 'https://api.openai.test/v1',
+                  statusCode: 429,
+                }),
+              }),
+              expect.objectContaining({
+                code: 'endpoint_rate_limited',
+                status: 'degraded',
+                details: expect.objectContaining({
+                  url: 'https://api.openai.test/v1',
+                  statusCode: 429,
+                }),
+              }),
+            ]),
+            config: expect.objectContaining({
+              liveProbe: expect.objectContaining({
+                url: 'https://api.openai.test/v1',
+                reachable: true,
+                statusCode: 429,
+                classification: 'rate_limited',
+              }),
             }),
           }),
         ],

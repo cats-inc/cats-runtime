@@ -572,8 +572,9 @@ src/
    `GET /diagnostics/health`, `GET /diagnostics/runtime`, and
    `GET /diagnostics/providers` expose the runtime-owned host integration
    surface, including runtime maintenance snapshots plus live endpoint
-   reachability and additive model-catalog/configured-model readiness checks
-   for API/local/agent targets when requested
+   reachability, additive HTTP semantic classifications, and additive
+   model-catalog/configured-model readiness checks for API/local/agent targets
+   when requested
 14. `POST /mcp` reuses those same runtime-owned services as an additive
     orchestrator/tool surface
 15. Optional machine-readable process output emits startup and shutdown

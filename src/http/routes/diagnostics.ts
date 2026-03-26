@@ -166,6 +166,123 @@ function createCheck(
   return { code, status, message, details };
 }
 
+function classifyRemoteLiveProbe(
+  target: ProviderTargetDescriptor,
+  probe: {
+    url: string;
+    reachable: boolean;
+    statusCode?: number;
+    latencyMs: number;
+    timedOut: boolean;
+    message: string;
+  },
+): {
+    classification: string;
+    check?: DiagnosticCheck;
+  } {
+  if (!probe.reachable) {
+    return {
+      classification: probe.timedOut ? 'timeout' : 'network_error',
+    };
+  }
+
+  const details = {
+    url: probe.url,
+    ...(probe.statusCode !== undefined ? { statusCode: probe.statusCode } : {}),
+    latencyMs: probe.latencyMs,
+  };
+  const targetLabel = `${target.providerName}/${target.instanceId}`;
+  const statusCode = probe.statusCode ?? 0;
+
+  if (statusCode >= 200 && statusCode < 300) {
+    return {
+      classification: 'http_ok',
+    };
+  }
+
+  if (statusCode >= 300 && statusCode < 400) {
+    return {
+      classification: 'redirected',
+      check: createCheck(
+        'endpoint_redirected',
+        'degraded',
+        `Live probe for ${targetLabel} was redirected (HTTP ${statusCode})`,
+        details,
+      ),
+    };
+  }
+
+  if (statusCode === 401) {
+    return {
+      classification: 'auth_required',
+      check: createCheck(
+        'endpoint_auth_required',
+        'unavailable',
+        `Live probe reached ${targetLabel} but the endpoint rejected the request as unauthenticated (HTTP 401)`,
+        details,
+      ),
+    };
+  }
+
+  if (statusCode === 403) {
+    return {
+      classification: 'auth_rejected',
+      check: createCheck(
+        'endpoint_auth_rejected',
+        'unavailable',
+        `Live probe reached ${targetLabel} but the endpoint rejected the request as unauthorized (HTTP 403)`,
+        details,
+      ),
+    };
+  }
+
+  if (statusCode === 404) {
+    return {
+      classification: 'endpoint_not_found',
+      check: createCheck(
+        'endpoint_not_found',
+        'unavailable',
+        `Live probe reached ${targetLabel} but the endpoint path returned HTTP 404`,
+        details,
+      ),
+    };
+  }
+
+  if (statusCode === 429) {
+    return {
+      classification: 'rate_limited',
+      check: createCheck(
+        'endpoint_rate_limited',
+        'degraded',
+        `Live probe reached ${targetLabel} but the endpoint is rate limited (HTTP 429)`,
+        details,
+      ),
+    };
+  }
+
+  if (statusCode >= 500) {
+    return {
+      classification: 'upstream_error',
+      check: createCheck(
+        'endpoint_upstream_error',
+        'degraded',
+        `Live probe reached ${targetLabel} but the upstream returned HTTP ${statusCode}`,
+        details,
+      ),
+    };
+  }
+
+  return {
+    classification: 'unexpected_status',
+    check: createCheck(
+      'endpoint_http_warning',
+      'degraded',
+      `Live probe reached ${targetLabel} with unexpected HTTP ${statusCode}`,
+      details,
+    ),
+  };
+}
+
 async function appendModelCatalogDiagnostics(
   ctx: AppContext,
   target: ProviderTargetDescriptor,
@@ -582,12 +699,14 @@ async function diagnoseRemoteConfigOnly(
 
   if (probeMode === 'live' && endpoint) {
     const liveProbe = await probeRemoteEndpoint(endpoint, instance.transport);
+    const classifiedLiveProbe = classifyRemoteLiveProbe(target, liveProbe);
     config.liveProbe = {
       url: liveProbe.url,
       method: 'GET',
       reachable: liveProbe.reachable,
       ...(liveProbe.statusCode !== undefined ? { statusCode: liveProbe.statusCode } : {}),
       latencyMs: liveProbe.latencyMs,
+      classification: classifiedLiveProbe.classification,
       ...(liveProbe.timedOut ? { timedOut: true } : {}),
     };
     checks.push(
@@ -605,6 +724,9 @@ async function diagnoseRemoteConfigOnly(
         },
       ),
     );
+    if (classifiedLiveProbe.check) {
+      checks.push(classifiedLiveProbe.check);
+    }
   } else if (instance.transport === 'ollama' || !requiresApiKey || (apiKey.name && apiKey.present)) {
     checks.push(
       createCheck(
