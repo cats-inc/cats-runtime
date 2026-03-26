@@ -1347,6 +1347,42 @@ describe('LocalToolRuntime', () => {
         'delete_file',
         'copy_file',
       ]));
+      expect(policy.counts).toEqual({
+        total: 31,
+        fullAccess: 16,
+        previewOnly: 5,
+        blocked: 10,
+      });
+      expect(policy.capabilities).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          name: 'read_files',
+          domain: 'filesystem',
+          access: 'full_access',
+          readOnlyCompatible: true,
+          mutating: false,
+        }),
+        expect.objectContaining({
+          name: 'init-workspace',
+          domain: 'workspace',
+          access: 'preview_only',
+          readOnlyCompatible: true,
+          mutating: true,
+        }),
+        expect.objectContaining({
+          name: 'push-branch',
+          domain: 'delivery',
+          access: 'preview_only',
+          readOnlyCompatible: true,
+          mutating: true,
+        }),
+        expect.objectContaining({
+          name: 'write_file',
+          domain: 'filesystem',
+          access: 'blocked',
+          readOnlyCompatible: false,
+          mutating: true,
+        }),
+      ]));
     });
 
     it('builds whitelist-based tool policy summaries', () => {
@@ -1366,6 +1402,35 @@ describe('LocalToolRuntime', () => {
       expect(policy.previewOnlyTools).toEqual([]);
       expect(policy.blockedTools).toContain('write_file');
       expect(policy.blockedTools).toContain('init-workspace');
+      expect(policy.counts).toEqual({
+        total: 31,
+        fullAccess: 2,
+        previewOnly: 0,
+        blocked: 29,
+      });
+      expect(policy.capabilities).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          name: 'grep',
+          domain: 'search',
+          access: 'full_access',
+          readOnlyCompatible: true,
+          mutating: false,
+        }),
+        expect.objectContaining({
+          name: 'copy_file',
+          domain: 'filesystem',
+          access: 'full_access',
+          readOnlyCompatible: false,
+          mutating: true,
+        }),
+        expect.objectContaining({
+          name: 'inspect-deployment',
+          domain: 'deployment',
+          access: 'blocked',
+          readOnlyCompatible: true,
+          mutating: false,
+        }),
+      ]));
     });
   });
 

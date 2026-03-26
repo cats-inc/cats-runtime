@@ -30,6 +30,11 @@ export interface ToolDefinition {
   inputSchema: Record<string, unknown>;
 }
 
+interface ToolCapabilityMetadata {
+  domain: 'filesystem' | 'search' | 'shell' | 'workspace' | 'delivery' | 'review' | 'deployment';
+  mutating: boolean;
+}
+
 export interface ToolCall {
   id: string;
   name: string;
@@ -628,6 +633,39 @@ const PROFILE_TOOLS: Record<string, Set<string>> = {
   none: new Set(),
   chat: new Set(),
 };
+const TOOL_CAPABILITY_METADATA: Record<string, ToolCapabilityMetadata> = {
+  list_files: { domain: 'filesystem', mutating: false },
+  inspect_path: { domain: 'filesystem', mutating: false },
+  read_file: { domain: 'filesystem', mutating: false },
+  read_files: { domain: 'filesystem', mutating: false },
+  diff_file: { domain: 'filesystem', mutating: false },
+  write_file: { domain: 'filesystem', mutating: true },
+  create_directory: { domain: 'filesystem', mutating: true },
+  edit_file: { domain: 'filesystem', mutating: true },
+  apply_patch: { domain: 'filesystem', mutating: true },
+  grep: { domain: 'search', mutating: false },
+  glob: { domain: 'search', mutating: false },
+  run_shell: { domain: 'shell', mutating: true },
+  delete_file: { domain: 'filesystem', mutating: true },
+  rename_file: { domain: 'filesystem', mutating: true },
+  copy_file: { domain: 'filesystem', mutating: true },
+  'audit-workspace': { domain: 'workspace', mutating: false },
+  'init-workspace': { domain: 'workspace', mutating: true },
+  'update-workspace': { domain: 'workspace', mutating: true },
+  'audit-delivery-target': { domain: 'delivery', mutating: false },
+  'publish-artifacts': { domain: 'delivery', mutating: true },
+  'inspect-repo-status': { domain: 'delivery', mutating: false },
+  'create-commit': { domain: 'delivery', mutating: true },
+  'push-branch': { domain: 'delivery', mutating: true },
+  'audit-review-target': { domain: 'review', mutating: false },
+  'open-pull-request': { domain: 'review', mutating: true },
+  'inspect-pull-request': { domain: 'review', mutating: false },
+  'wait-review-checks': { domain: 'review', mutating: false },
+  'audit-deployment-target': { domain: 'deployment', mutating: false },
+  'create-deployment': { domain: 'deployment', mutating: true },
+  'inspect-deployment': { domain: 'deployment', mutating: false },
+  'read-deployment-logs': { domain: 'deployment', mutating: false },
+};
 const DELIVERY_ACTOR_ROLES = new Set([
   'boss_cat',
   'specialist_cat',
@@ -700,6 +738,28 @@ export function buildToolPolicyInspection(input: {
     }
   }
 
+  const fullAccessToolSet = new Set(fullAccessTools);
+  const previewOnlyToolSet = new Set(previewOnlyTools);
+
+  const capabilities = profileTools.map((toolName) => {
+    const metadata = TOOL_CAPABILITY_METADATA[toolName] || {
+      domain: 'filesystem' as const,
+      mutating: !isReadOnlyCompatibleDefinition(toolName),
+    };
+    const access: RuntimeToolPolicyInspection['capabilities'][number]['access'] = fullAccessToolSet.has(toolName)
+      ? 'full_access'
+      : previewOnlyToolSet.has(toolName)
+        ? 'preview_only'
+        : 'blocked';
+    return {
+      name: toolName,
+      domain: metadata.domain,
+      access,
+      readOnlyCompatible: isReadOnlyCompatibleDefinition(toolName),
+      mutating: metadata.mutating,
+    };
+  });
+
   return {
     profile,
     permissionMode,
@@ -708,6 +768,13 @@ export function buildToolPolicyInspection(input: {
     fullAccessTools,
     previewOnlyTools,
     blockedTools,
+    counts: {
+      total: profileTools.length,
+      fullAccess: fullAccessTools.length,
+      previewOnly: previewOnlyTools.length,
+      blocked: blockedTools.length,
+    },
+    capabilities,
   };
 }
 

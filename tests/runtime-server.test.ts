@@ -2372,6 +2372,12 @@ providers:
           profile: 'extended',
           permissionMode: 'default',
           whitelistActive: false,
+          counts: {
+            total: 31,
+            fullAccess: 16,
+            previewOnly: 5,
+            blocked: 10,
+          },
           fullAccessTools: expect.arrayContaining([
             'list_files',
             'inspect_path',
@@ -2391,6 +2397,29 @@ providers:
             'delete_file',
             'copy_file',
           ]),
+          capabilities: expect.arrayContaining([
+            expect.objectContaining({
+              name: 'read_files',
+              domain: 'filesystem',
+              access: 'full_access',
+              readOnlyCompatible: true,
+              mutating: false,
+            }),
+            expect.objectContaining({
+              name: 'publish-artifacts',
+              domain: 'delivery',
+              access: 'preview_only',
+              readOnlyCompatible: true,
+              mutating: true,
+            }),
+            expect.objectContaining({
+              name: 'write_file',
+              domain: 'filesystem',
+              access: 'blocked',
+              readOnlyCompatible: false,
+              mutating: true,
+            }),
+          ]),
         }),
       }));
 
@@ -2402,6 +2431,12 @@ providers:
             profile: 'extended',
             permissionMode: 'default',
             previewOnlyTools: expect.arrayContaining(['push-branch']),
+            counts: {
+              total: 31,
+              fullAccess: 16,
+              previewOnly: 5,
+              blocked: 10,
+            },
           }),
         }),
       }));

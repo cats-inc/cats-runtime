@@ -1419,6 +1419,12 @@ It surfaces the resolved shared-local-tool policy for the current session:
   delivery/workspace operations with `apply: false`)
 - `blockedTools`: profile tools currently blocked by the effective permission
   policy
+- `counts`: bounded totals for the current profile split across full-access,
+  preview-only, and blocked buckets
+- `capabilities`: per-tool capability metadata including the tool domain
+  (`filesystem`, `search`, `shell`, `workspace`, `delivery`, `review`, or
+  `deployment`), its current access bucket, whether it remains read-only
+  compatible, and whether the tool is mutating by design
 
 `inspection.maintenance` is also runtime-owned and additive. It gives hosts one
 machine-readable place to read:

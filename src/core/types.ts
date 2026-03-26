@@ -1429,6 +1429,19 @@ export interface RuntimeToolPolicyInspection {
   fullAccessTools: string[];
   previewOnlyTools: string[];
   blockedTools: string[];
+  counts: {
+    total: number;
+    fullAccess: number;
+    previewOnly: number;
+    blocked: number;
+  };
+  capabilities: Array<{
+    name: string;
+    domain: 'filesystem' | 'search' | 'shell' | 'workspace' | 'delivery' | 'review' | 'deployment';
+    access: 'full_access' | 'preview_only' | 'blocked';
+    readOnlyCompatible: boolean;
+    mutating: boolean;
+  }>;
 }
 
 export interface RuntimeSessionInspection {
