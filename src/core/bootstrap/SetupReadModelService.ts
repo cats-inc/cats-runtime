@@ -76,6 +76,7 @@ export interface SetupLatestDiagnosticReportSummary {
   status: SetupDiagnosticReport['summary']['status'];
   issueCounts: SetupDiagnosticReport['summary']['issueCounts'];
   headline: string;
+  highlights: string[];
 }
 
 export interface SetupReadModelServiceOptions {
@@ -156,6 +157,7 @@ function summarizeLatestReport(
     status: artifact.report.summary.status,
     issueCounts: artifact.report.summary.issueCounts,
     headline: artifact.report.summary.headline,
+    highlights: [...artifact.report.summary.highlights],
   };
 }
 

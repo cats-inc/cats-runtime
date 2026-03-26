@@ -839,6 +839,76 @@ describe('bootstrap mode server', () => {
     }
   });
 
+  it('GET /setup-state surfaces latest setup-report highlights from persisted diagnostics artifacts', async () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const env = createTestEnv(root);
+      ensureDirs(env);
+      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
+      const startup = createRuntimeStartupState({ bootstrapRequired: true });
+      const runtime = createRuntimeServer(config, { startup });
+      try {
+        const generateResponse = await runtime.app.request('/diagnostics/setup-report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshScan: false }),
+        });
+        expect(generateResponse.status).toBe(200);
+        const generated = await generateResponse.json() as {
+          report: {
+            artifactId: string;
+            generatedAt: string;
+            summary: {
+              status: string;
+              issueCounts: {
+                info: number;
+                warnings: number;
+                errors: number;
+              };
+              headline: string;
+              highlights: string[];
+            };
+          };
+          artifactPath: string;
+        };
+
+        const setupStateResponse = await runtime.app.request('/setup-state');
+        expect(setupStateResponse.status).toBe(200);
+        const body = await setupStateResponse.json() as {
+          diagnostics: {
+            latestReport: {
+              artifactId: string;
+              artifactPath: string;
+              generatedAt: string;
+              status: string;
+              issueCounts: {
+                info: number;
+                warnings: number;
+                errors: number;
+              };
+              headline: string;
+              highlights: string[];
+            } | null;
+          };
+        };
+
+        expect(body.diagnostics.latestReport).toEqual({
+          artifactId: generated.report.artifactId,
+          artifactPath: generated.artifactPath,
+          generatedAt: generated.report.generatedAt,
+          status: generated.report.summary.status,
+          issueCounts: generated.report.summary.issueCounts,
+          headline: generated.report.summary.headline,
+          highlights: generated.report.summary.highlights,
+        });
+      } finally {
+        await runtime.close();
+      }
+    } finally {
+      cleanup();
+    }
+  });
+
   it('GET /setup-state returns manualScan null when no manual scan run', async () => {
     const { root, cleanup } = createTestRoot();
     try {

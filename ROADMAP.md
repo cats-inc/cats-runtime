@@ -968,7 +968,8 @@ evidence bundles and does not force hosts to invent their own report format.
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
   remediation previews, and latest-setup-report summary metadata including a
-  concise headline instead of forcing later dashboard/setup follow-through to
+  concise headline plus bounded highlights instead of forcing later
+  dashboard/setup follow-through to
   reconstruct that state
   client-side
 - reports now aggregate runtime path facts, config inspection, discovery

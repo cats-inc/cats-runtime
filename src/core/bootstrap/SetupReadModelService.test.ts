@@ -161,6 +161,9 @@ describe('SetupReadModelService', () => {
                   errors: 0,
                 },
                 headline: 'Setup report found 1 warning(s).',
+                highlights: [
+                  'Codex CLI is unavailable.',
+                ],
               },
             } as never,
           }),
@@ -220,6 +223,7 @@ describe('SetupReadModelService', () => {
         artifactId: 'setup-report-test',
         status: 'degraded',
         headline: 'Setup report found 1 warning(s).',
+        highlights: ['Codex CLI is unavailable.'],
       }));
     } finally {
       cleanup();

@@ -305,7 +305,7 @@ snapshot. Response shape:
   - `nextAction` — operator-facing runtime action metadata such as `run_manual_scan`, `apply_config`, or `review_remediation`
   - `actions` — ordered runtime-owned follow-up actions using the existing setup/diagnostics routes, including ready-to-send request bodies where the runtime can supply them honestly
 - `diagnostics.latestReport` — latest persisted setup diagnostic report summary when a setup report artifact already exists
-    - includes `artifactId`, `artifactPath`, `generatedAt`, summary `status`, `issueCounts`, and a short `headline`
+    - includes `artifactId`, `artifactPath`, `generatedAt`, summary `status`, `issueCounts`, a short `headline`, and bounded `highlights`
 
 Both `scan.providers` and `manualScan` expose the full persisted scan data so
 that UI consumers (dashboard, provider-setup) can render provider status without
