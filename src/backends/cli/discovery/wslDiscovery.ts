@@ -541,7 +541,7 @@ function errorMessage(error: unknown): string {
   return String(error);
 }
 
-function createDockerDiscoveryStatusSnapshot(
+export function createDockerDiscoveryStatusSnapshot(
   config: Pick<
     CliRuntimeConfig,
     | 'nativeDiscoveryIntervalMs'

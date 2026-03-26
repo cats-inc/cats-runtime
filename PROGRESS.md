@@ -68,7 +68,6 @@
 - [ ] Continue hardening shared local tool runtime mutation safety beyond the current bounded `apply_patch` rollback and symlink/junction/hardlink alias guards, especially write/edit transactionality
 - [ ] Continue broadening the shared local tool runtime beyond the current filesystem/shell/navigation/materialization set plus proposed-file diff and bounded batch-read inspection, especially richer planning helpers
 - [ ] Continue refining capability partitioning and policy surfacing beyond the current profile summary/read-model slice and `standard` / `extended` / `read_only` split
-- [ ] Split Docker discovery snapshot creation out of `createDiscoveryStatusPayload()` so `GET /discovery/status` can reuse the live WSL snapshot without recomputing an unused WSL status store
 
 ### WP-2: Provider Instance Review Follow-ups
 

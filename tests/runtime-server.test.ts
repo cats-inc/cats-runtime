@@ -1744,6 +1744,11 @@ providers:
             message: string;
           }>;
         };
+        docker: {
+          policy: string;
+          summary: { state: string; message: string };
+          configuredTargets: number;
+        };
         lan: {
           enabled: boolean;
           status: string;
@@ -1768,6 +1773,14 @@ providers:
         state: 'disabled',
         runtimeMode: 'wsl',
         distro: 'Ubuntu',
+      }));
+      expect(payload.docker).toEqual(expect.objectContaining({
+        policy: 'if_running',
+        configuredTargets: 0,
+        summary: {
+          state: 'not_applicable',
+          message: 'No Docker-backed native discovery targets configured',
+        },
       }));
       expect(payload.lan).toEqual(expect.objectContaining({
         enabled: false,

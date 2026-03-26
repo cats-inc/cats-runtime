@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { SessionRegistry } from '../pool/SessionRegistry.js';
 import {
   WslDiscoveryStatusStore,
+  createDockerDiscoveryStatusSnapshot,
   createDiscoveryStatusPayload,
   isWslDistroRunning,
   runWslAwareNativeDiscovery,
@@ -59,6 +60,40 @@ describe('WslDiscoveryStatusStore', () => {
     expect(payload.docker.summary).toEqual({
       state: 'active',
       message: 'Background Docker discovery scans when containers are running',
+    });
+  });
+
+  it('builds Docker discovery snapshots without creating a WSL status payload', () => {
+    const payload = createDockerDiscoveryStatusSnapshot({
+      nativeDiscoveryIntervalMs: 5000,
+      dockerDiscoveryPolicy: 'if_running',
+      providerInstances: {
+        opencode: {
+          'docker-dev': {
+            id: 'docker-dev',
+            providerName: 'opencode',
+            commandConfig: {
+              path: 'opencode',
+              runner: 'auto',
+              runtime: {
+                mode: 'docker',
+                container: 'cats-cli-test',
+              },
+            },
+          },
+        },
+      } as never,
+    });
+
+    expect(payload).toEqual({
+      backgroundEnabled: true,
+      nativeDiscoveryIntervalMs: 5000,
+      policy: 'if_running',
+      summary: {
+        state: 'active',
+        message: 'Background Docker discovery scans when containers are running',
+      },
+      configuredTargets: 1,
     });
   });
 
