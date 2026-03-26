@@ -129,11 +129,14 @@ leaking backend-specific wire formats to consumers.
 - Normalized Junie onto `type: "progress"` instead of runtime `raw` passthrough
 - Extended the same contract to Pi, Goose, Copilot, Codex, Cursor, Claude, and Gemini CLI integrations;
   Codex now emits additive plan/reasoning/command/files/session/model-state
-  checkpoints instead of silently dropping those JSON-RPC notifications, and
-  Cursor now promotes provider `thinking` frames onto the same shared runtime
-  reasoning contract; Claude now lifts tool-use frames into shared progress plus
-  `tool_use`, and Gemini now lifts tool completion into shared progress plus
-  `tool_result`
+  checkpoints instead of silently dropping those JSON-RPC notifications; Copilot
+  now preserves multiple tool requests plus structured tool completion, Cursor
+  now promotes provider `thinking` plus assistant tool/reasoning blocks onto the
+  same shared runtime contract, Claude now lifts tool-use, tool-result, and
+  reasoning blocks into shared progress plus normalized tool events, Gemini now
+  preserves multipart assistant tool blocks instead of flattening them into
+  plain text, and Junie can promote structured session-poll tool lifecycle hints
+  into `tool_use` / `tool_result` when upstream exposes them
 - Kept provider-native details additive under `metadata.native`
 - Reused the same event contract for API/local cache and warm-state hints
 - Added additive metering/guardrail metadata so progress and execution

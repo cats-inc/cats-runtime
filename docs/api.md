@@ -2017,10 +2017,13 @@ should not need to inspect provider-specific raw payloads just to surface
 runtime status. CLI providers with richer normalization now include Junie, Pi,
 Goose, Copilot, Codex, Cursor, Claude, and Gemini; Codex specifically surfaces
 additive planning, reasoning, command-output, file-change, session-status, and
-model-reroute checkpoints on this shared contract, Cursor promotes provider
-`thinking` frames as additive reasoning progress, Claude promotes CLI `tool_use`
-frames into shared tool-progress checkpoints, and Gemini promotes tool
-completion into shared progress plus `tool_result`. Example:
+model-reroute checkpoints on this shared contract; Copilot preserves multiple
+tool requests plus structured tool completion, Cursor promotes provider
+`thinking` plus assistant tool/reasoning blocks, Claude promotes CLI tool-use,
+tool-result, and reasoning blocks into shared checkpoints, Gemini preserves
+multipart assistant tool blocks instead of flattening them into plain text, and
+Junie can emit structured tool lifecycle events when its polled session records
+carry enough identity/result detail. Example:
 
 ```json
 {
