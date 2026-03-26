@@ -40,6 +40,11 @@ interface GatewayEventFrame {
   payload?: unknown;
 }
 
+interface GatewayModelCatalogEntry {
+  id: string;
+  label: string;
+}
+
 interface PendingRequest {
   resolve: (value: any) => void;
   reject: (error: Error) => void;
@@ -215,6 +220,49 @@ function summarizeHealthPayload(payload: unknown, url: string): string {
   ];
 
   return detailParts.join(' | ');
+}
+
+function canonicalGatewayModelRef(provider: string, modelId: string): string {
+  return modelId.toLowerCase().startsWith(`${provider.toLowerCase()}/`)
+    ? modelId
+    : `${provider}/${modelId}`;
+}
+
+function buildGatewayModelLabel(
+  provider: string,
+  modelId: string,
+  name?: string,
+): string {
+  const canonicalRef = canonicalGatewayModelRef(provider, modelId);
+  const trimmedName = name?.trim();
+  if (!trimmedName || trimmedName === modelId || trimmedName === canonicalRef) {
+    return canonicalRef;
+  }
+
+  return `${trimmedName} (${provider})`;
+}
+
+function parseGatewayModelCatalog(payload: unknown): GatewayModelCatalogEntry[] {
+  const record = parseRecord(payload);
+  const rawEntries = Array.isArray(record?.models) ? record.models : [];
+  const deduped = new Map<string, GatewayModelCatalogEntry>();
+
+  for (const entry of rawEntries) {
+    const entryRecord = parseRecord(entry);
+    const modelId = readString(entryRecord?.id)?.trim();
+    const provider = readString(entryRecord?.provider)?.trim();
+    if (!modelId || !provider) {
+      continue;
+    }
+
+    const canonicalId = canonicalGatewayModelRef(provider, modelId);
+    deduped.set(canonicalId, {
+      id: canonicalId,
+      label: buildGatewayModelLabel(provider, modelId, readString(entryRecord?.name)),
+    });
+  }
+
+  return [...deduped.values()];
 }
 
 class GatewayWsClient {
@@ -638,6 +686,31 @@ export class OpenClawAdapter implements AgentAdapter {
         checkedAt,
         details: error instanceof Error ? error.message : String(error),
       };
+    }
+  }
+
+  async listModels(
+    instance: RemoteProviderInstanceConfig,
+  ): Promise<Array<{ id: string; label: string }>> {
+    const env = this.options.env || process.env;
+    const factory = this.options.webSocketFactory
+      || ((url: string | URL, init?: WebSocketInit) => new WebSocket(url, init));
+    const url = requireUrl(instance, env);
+    const headers = resolveHeaders(instance, env);
+    const client = new GatewayWsClient(factory, url, headers, () => {});
+    const controller = new AbortController();
+
+    try {
+      await client.connect(buildConnectParams(instance, env), controller.signal);
+      const payload = await client.request(
+        'models.list',
+        {},
+        DEFAULT_CONNECT_TIMEOUT_MS,
+      );
+      return parseGatewayModelCatalog(payload);
+    } finally {
+      controller.abort();
+      client.close();
     }
   }
 }

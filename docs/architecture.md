@@ -198,6 +198,9 @@ src/
 - Exposes provider availability plus CLI compatibility diagnostics at
   `GET /diagnostics/providers`, including live API/local endpoint reachability
   probes and OpenClaw gateway `health` RPC probes when `probe=live`
+- Reuses the same agent-backend runtime options for OpenClaw gateway
+  `models.list` discovery, so provider model catalogs and diagnostics can
+  expose canonical `provider/model` refs instead of config-only fallback data
 - Exposes runtime-owned browser session/page routes with pluggable driver
   metadata, normalized `browser_page` preview surfaces, aggregate browser
   summary reads, and explicit closed-session cleanup
@@ -307,6 +310,9 @@ src/
   history, artifacts, and invocation metadata
 - Routes close/cancel/delete/reset through adapter-aware remote cleanup hooks
   instead of only dropping local runtime handles
+- Reuses the same adapter/runtime-option seam for diagnostics probes and
+  dynamic model discovery, including live OpenClaw gateway `health` and
+  `models.list` websocket RPCs
 
 ### `src/backends/browser`
 
@@ -543,7 +549,9 @@ src/
 7. CLI targets flow into `WorkerPool`; API/local targets flow into `ApiBackendManager`; agent targets flow into `AgentBackendManager`
 8. Provider model-catalog reads resolve through the shared provider target and
    model catalog services in `src/core`, including runtime-owned active-config
-   hints when a provider family exposes a readable local default selection
+   hints when a provider family exposes a readable local default selection and
+   agent-backed OpenClaw `models.list` normalization into canonical
+   `provider/model` refs
 9. CLI setup, diagnostics, and execution priming resolve through the shared
    compatibility service in `src/core/compatibility`, which consumes the
    runtime-owned metadata in `src/core/provider-install`, classifies targets,
@@ -674,4 +682,4 @@ the only durable memory surface for the Cats suite.
 
 ---
 
-*Last updated: 2026-03-25*
+*Last updated: 2026-03-26*

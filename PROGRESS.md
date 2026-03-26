@@ -8,7 +8,7 @@
 |-----------|--------|-------------|
 | Core | Completed | Embedded CLI runtime, shared session contracts, discovery, worker pool, runtime-owned shared/isolated/worktree workspace lifecycle helpers, first-slice runtime-owned usage/incident/guardrail contracts, additive session-maintenance/reset-boundary hooks, and persisted maintenance trigger metadata are in-repo |
 | API Backends | In Progress | `src/backends/api` now runs Claude, Codex/OpenAI, Gemini, and Ollama with runtime-managed sessions, provider-native continuation/caching optimizations, additive incident hints plus provider-agnostic `progress` events, a shared local tool loop with patch/file/search/shell support, runtime-owned health/diagnostics summaries including live endpoint reachability probes for API/local targets, and the first additive execution-strategy family expansion beyond compatibility fallback (`simple_tool_call`, bounded `react`, bounded `pdca`, bounded `reflexion`, and bounded `tree_of_thoughts` for runtime-hosted loops); deeper semantic probes, broader tool/model discovery, and later strategy families remain |
-| Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, an Agent SDK bridge as the second validation target, first-slice remote cleanup hooks for close/cancel/delete/reset semantics, and live OpenClaw gateway `health` probes wired into runtime diagnostics through the shared agent backend manager |
+| Agent Backend | In Progress | `src/backends/agent` now exists with shared session/bootstrap/output contracts, OpenClaw Gateway as the first adapter, an Agent SDK bridge as the second validation target, first-slice remote cleanup hooks for close/cancel/delete/reset semantics, live OpenClaw gateway `health` probes wired into runtime diagnostics through the shared agent backend manager, and OpenClaw `models.list`-backed dynamic provider catalog loading using canonical `provider/model` refs |
 | HTTP API | Completed | Health, sessions, delivery audit/export/repo routes, messages, history, observe, wakeups, provider management, session branch-lineage inspection, metering/guardrail diagnostics, additive run-inspector/session-discipline contracts, machine-readable session-maintenance/delete-cleanup payloads, worktree-backed session lifecycle cleanup semantics including `preserve`, runtime maintenance snapshots under `/diagnostics/runtime`, and the runtime MCP facade over HTTP plus stdio are served directly from `cats-runtime` |
 | Runtime Skills | Completed | `skills/` is now a runtime-owned execution catalog and family-aware internal library with validation, session-level requested/resolved/applied metadata, richer slug/family/capability metadata, explicit `skills: null` clearing, backend-aware delivery modes, prompt/instruction execution injection across prompt-driven CLI plus Pi/API/agent targets, inspection-level applied-skill reporting, a standalone versioned filterable/paged/sortable `GET /skills/catalog` read surface plus matching `list_runtime_skills` MCP read tool, a dedicated `npm run verify:skills` gate, shared re-entry hydration across create/resume/fork/provider-switch, and shared discovery/content-fingerprint catalog cache hardening |
 | Wakeup Substrate | Completed | Runtime-owned scheduled wakeup requests now support create/list/cancel/trigger, restart-safe persistence, bounded timer processing, coalescing, UTC cron-like recurring schedules with automatic re-arming, and additive session/history wakeup metadata without turning the runtime into a full workflow scheduler |
@@ -160,7 +160,7 @@ adapter end to end through the existing HTTP surface.
 | Record `ADR-006` for agent backend and shared runtime contracts | [x] | Decision now fixes `sessionKey` semantics, provider-session fallback, and non-Git output assumptions |
 | Land shared session affinity, bootstrap context, and artifact/output contract updates | [x] | `sessionKey`, `reusePolicy`, `instructions`, `context`, `outputDir`, and `artifacts` now flow through session routes, history, and registry state |
 | Extend runtime types/config/provider catalog to support `backend: agent` | [x] | Config parsing, provider catalog rendering, session manager dispatch, and pool status now include `agent` |
-| Build OpenClaw as the first `src/backends/agent` adapter | [x] | `AgentBackendManager` and `openclaw_gateway` adapter now create, stream, resume, reuse, and persist agent-backed sessions; diagnostics now reuse the same manager/runtime options for live gateway health probes |
+| Build OpenClaw as the first `src/backends/agent` adapter | [x] | `AgentBackendManager` and `openclaw_gateway` adapter now create, stream, resume, reuse, and persist agent-backed sessions; diagnostics now reuse the same manager/runtime options for live gateway health probes, and provider model catalog reads now use gateway `models.list` with canonical `provider/model` refs |
 | Validate the contract with a second target such as an Agent SDK adapter | [x] | `agent_sdk_bridge` now validates the same contract against an external Agent SDK gateway |
 | Cover agent backend flows with automated tests | [x] | Config, route, OpenClaw, and Agent SDK bridge integration behavior are covered by Vitest |
 | Land the first Pi session-depth/runtime-validation slice on the CLI track | [x] | Pi now resumes via discovered session-file paths, validates resume-path ownership/runtime reachability, retries stale `unknown session` turns once fresh, and supports per-instance `instructions_file` layering |
@@ -168,7 +168,7 @@ adapter end to end through the existing HTTP surface.
 #### Next Steps
 
 - [ ] Expand dashboard surfacing for agent-specific services/artifacts beyond the current generic session views
-- [ ] Add stronger model-list coverage where agent runtimes expose it; OpenClaw live gateway health probes are now landed through the shared agent backend diagnostics seam
+- [ ] Add stronger model-list coverage for later agent targets beyond the current OpenClaw gateway `models.list` and Agent SDK bridge coverage
 - [ ] Add `pi --list-models` helper/parsing and hand it off to the future provider model-catalog work
 - [ ] Deepen Pi-native transcript/history surfacing so resumed/fallback Pi sessions do not rely on generic JSONL heuristics alone
 
@@ -660,4 +660,4 @@ into `cats-runtime`.
 
 ---
 
-*Last updated: 2026-03-24*
+*Last updated: 2026-03-26*

@@ -417,6 +417,10 @@ bounded GET reachability probes and expose additive `config.liveProbe`
 metadata. Agent-backed OpenClaw targets now perform a real websocket
 handshake plus `health` RPC through the same `AgentBackendManager` runtime
 options used for live execution instead of reporting config-only validation.
+Those same runtime-managed websocket options now also back OpenClaw
+`models.list` catalog loading, so live diagnostics and `GET /providers/{provider}/models`
+can report canonical `provider/model` refs instead of a config-only fallback
+when the gateway exposes model discovery.
 Ollama probes use `/api/tags` against the configured base URL.
 Successful HTTP reachability yields `endpoint_reachable`; network/timeout
 failures yield `endpoint_probe_failed`. Live remote/agent/local diagnostics now
@@ -2418,6 +2422,8 @@ The first slice supports:
 - dynamic discovery for `ollama`
 - dynamic discovery for `agent_sdk_bridge` targets whose adapter exposes
   `listModels()`
+- dynamic discovery for `openclaw_gateway` targets via gateway `models.list`,
+  normalized into canonical `provider/model` refs
 - static compatibility for `kiro`
 - config or curated static fallback for the remaining configured providers
 
@@ -2683,4 +2689,4 @@ Errors use this format:
 
 ---
 
-*Last updated: 2026-03-25*
+*Last updated: 2026-03-26*

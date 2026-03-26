@@ -13,7 +13,8 @@ function parseNdjson(text: string): Array<Record<string, unknown>> {
     .map((line) => JSON.parse(line));
 }
 
-function createAgentConfigRoot() {
+function createAgentConfigRoot(options: { model?: string } = {}) {
+  const model = options.model || 'openclaw-coder';
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-agent-test-'));
   const configPath = join(root, 'providers.yaml');
   writeFileSync(configPath, `
@@ -37,7 +38,7 @@ backends:
           - operator.admin
         instances:
           gateway:
-            model: openclaw-coder
+            model: ${model}
 `.trimStart());
 
   const env = {
@@ -175,6 +176,29 @@ class FakeOpenClawSocket extends EventTarget {
             count: 1,
             recent: [],
           },
+        },
+      });
+      return;
+    }
+
+    if (method === 'models.list') {
+      this.emitFrame({
+        type: 'res',
+        id: frame.id,
+        ok: true,
+        payload: {
+          models: [
+            {
+              id: 'claude-test-a',
+              name: 'A-Model',
+              provider: 'anthropic',
+              contextWindow: 200_000,
+            },
+            {
+              id: 'gpt-test-z',
+              provider: 'openai',
+            },
+          ],
         },
       });
       return;
@@ -467,15 +491,149 @@ describe('agent backend integration', () => {
                 status: 'ok',
                 message: expect.stringContaining('Gateway health RPC succeeded'),
               }),
+              expect.objectContaining({
+                code: 'model_catalog_loaded',
+                status: 'ok',
+                details: expect.objectContaining({
+                  source: 'dynamic',
+                  modelCount: 3,
+                  defaultModel: 'openclaw-coder',
+                }),
+              }),
             ]),
+            config: expect.objectContaining({
+              modelCatalog: expect.objectContaining({
+                source: 'dynamic',
+                defaultModel: 'openclaw-coder',
+                modelCount: 3,
+              }),
+            }),
             reprobe: expect.objectContaining({
               liveSupported: true,
             }),
           }),
         ],
       }));
-      expect(sentFrames.filter((frame) => frame.method === 'connect')).toHaveLength(1);
+      expect(sentFrames.filter((frame) => frame.method === 'connect')).toHaveLength(2);
       expect(sentFrames.filter((frame) => frame.method === 'health')).toHaveLength(1);
+      expect(sentFrames.filter((frame) => frame.method === 'models.list')).toHaveLength(1);
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
+  it('loads a dynamic OpenClaw model catalog through the provider models route', async () => {
+    const { config, env, cleanup } = createAgentConfigRoot({
+      model: 'anthropic/claude-test-a',
+    });
+    const sentFrames: Array<Record<string, unknown>> = [];
+    const runtime = createRuntimeServer(config, {
+      agentBackend: {
+        env,
+        webSocketFactory: createFakeWebSocketFactory([], sentFrames),
+      },
+    });
+
+    try {
+      const response = await runtime.app.request('/providers/openclaw/models?instance=agent/gateway');
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        provider: 'openclaw',
+        backend: 'agent',
+        instance: 'gateway',
+        defaultModel: 'anthropic/claude-test-a',
+        source: 'dynamic',
+        cache: {
+          servedFromCache: false,
+          cachedAt: expect.any(String),
+          ttlSec: 60,
+        },
+        models: [
+          {
+            id: 'anthropic/claude-test-a',
+            label: 'A-Model (anthropic)',
+            default: true,
+            status: 'available',
+          },
+          {
+            id: 'openai/gpt-test-z',
+            label: 'openai/gpt-test-z',
+            default: false,
+            status: 'available',
+          },
+        ],
+        warnings: [],
+      });
+      expect(sentFrames.filter((frame) => frame.method === 'connect')).toHaveLength(1);
+      expect(sentFrames.filter((frame) => frame.method === 'models.list')).toHaveLength(1);
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
+  it('surfaces dynamic OpenClaw model catalog details in live provider diagnostics', async () => {
+    const { config, env, cleanup } = createAgentConfigRoot({
+      model: 'anthropic/claude-test-a',
+    });
+    const sentFrames: Array<Record<string, unknown>> = [];
+    const runtime = createRuntimeServer(config, {
+      agentBackend: {
+        env,
+        webSocketFactory: createFakeWebSocketFactory([], sentFrames),
+      },
+    });
+
+    try {
+      const response = await runtime.app.request(
+        '/diagnostics/providers?probe=live&provider=openclaw&backend=agent&instance=gateway',
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual(expect.objectContaining({
+        providers: [
+          expect.objectContaining({
+            provider: 'openclaw',
+            backend: 'agent',
+            instance: 'gateway',
+            checks: expect.arrayContaining([
+              expect.objectContaining({
+                code: 'probe',
+                status: 'ok',
+              }),
+              expect.objectContaining({
+                code: 'model_catalog_loaded',
+                status: 'ok',
+                details: expect.objectContaining({
+                  source: 'dynamic',
+                  defaultModel: 'anthropic/claude-test-a',
+                  modelCount: 2,
+                }),
+              }),
+              expect.objectContaining({
+                code: 'configured_model_present',
+                status: 'ok',
+                details: expect.objectContaining({
+                  model: 'anthropic/claude-test-a',
+                  source: 'dynamic',
+                  status: 'available',
+                }),
+              }),
+            ]),
+            config: expect.objectContaining({
+              modelCatalog: expect.objectContaining({
+                source: 'dynamic',
+                defaultModel: 'anthropic/claude-test-a',
+                modelCount: 2,
+                warnings: [],
+              }),
+            }),
+          }),
+        ],
+      }));
+      expect(sentFrames.filter((frame) => frame.method === 'connect')).toHaveLength(2);
+      expect(sentFrames.filter((frame) => frame.method === 'health')).toHaveLength(1);
+      expect(sentFrames.filter((frame) => frame.method === 'models.list')).toHaveLength(1);
     } finally {
       await runtime.close();
       cleanup();
