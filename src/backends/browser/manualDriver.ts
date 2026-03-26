@@ -1,5 +1,6 @@
 import type {
   RuntimeBrowserDriver,
+  RuntimeBrowserDriverClosePageInput,
   RuntimeBrowserDriverOpenPageInput,
 } from '../../core/browser/driver.js';
 import type { RuntimeBrowserDriverDescriptor } from '../../core/types.js';
@@ -46,5 +47,9 @@ export class ManualBrowserDriver implements RuntimeBrowserDriver {
 
   async closeSession(): Promise<void> {
     // Manual sessions do not own external resources yet.
+  }
+
+  async closePage(_input: RuntimeBrowserDriverClosePageInput): Promise<void> {
+    // Manual pages do not own external resources yet.
   }
 }

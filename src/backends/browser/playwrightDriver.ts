@@ -1,6 +1,7 @@
 import { pathToFileURL } from 'node:url';
 import type {
   RuntimeBrowserDriver,
+  RuntimeBrowserDriverClosePageInput,
   RuntimeBrowserDriverCreateSessionInput,
   RuntimeBrowserDriverOpenPageInput,
   RuntimeBrowserDriverCloseSessionInput,
@@ -37,6 +38,11 @@ interface PlaywrightBrowserDriverSession {
   context: PlaywrightBrowserContextLike;
 }
 
+interface PlaywrightBrowserDriverPage {
+  browserSessionId: string;
+  page: PlaywrightPageLike;
+}
+
 export interface PlaywrightBrowserDriverOptions {
   executablePath?: string;
   channel?: string;
@@ -52,6 +58,7 @@ export class PlaywrightBrowserDriver implements RuntimeBrowserDriver {
   readonly descriptor: RuntimeBrowserDriverDescriptor;
 
   private readonly sessions = new Map<string, PlaywrightBrowserDriverSession>();
+  private readonly pages = new Map<string, PlaywrightBrowserDriverPage>();
   private readonly headless: boolean;
   private readonly launchArgs: string[];
   private readonly navigationTimeoutMs: number;
@@ -147,6 +154,10 @@ export class PlaywrightBrowserDriver implements RuntimeBrowserDriver {
     let page: PlaywrightPageLike | undefined;
     try {
       page = await session.context.newPage();
+      this.pages.set(input.browserPageId, {
+        browserSessionId: input.browserSessionId,
+        page,
+      });
       await page.goto(pageUrl, {
         waitUntil: 'domcontentloaded',
         timeout: this.navigationTimeoutMs,
@@ -162,11 +173,21 @@ export class PlaywrightBrowserDriver implements RuntimeBrowserDriver {
         },
       };
     } catch (error) {
+      this.pages.delete(input.browserPageId);
       if (page?.close) {
         await page.close().catch(() => undefined);
       }
       throw toPlaywrightValidationError(`open '${pageUrl}'`, error);
     }
+  }
+
+  async closePage(input: RuntimeBrowserDriverClosePageInput): Promise<void> {
+    const tracked = this.pages.get(input.browserPageId);
+    if (!tracked || tracked.browserSessionId !== input.browserSessionId) {
+      return;
+    }
+    this.pages.delete(input.browserPageId);
+    await tracked.page.close?.().catch(() => undefined);
   }
 
   async closeSession(input: RuntimeBrowserDriverCloseSessionInput): Promise<void> {
@@ -175,6 +196,13 @@ export class PlaywrightBrowserDriver implements RuntimeBrowserDriver {
       return;
     }
     this.sessions.delete(input.browserSessionId);
+    for (const [browserPageId, tracked] of this.pages.entries()) {
+      if (tracked.browserSessionId !== input.browserSessionId) {
+        continue;
+      }
+      this.pages.delete(browserPageId);
+      await tracked.page.close?.().catch(() => undefined);
+    }
     await session.context.close().catch(() => undefined);
     await session.browser.close().catch(() => undefined);
   }

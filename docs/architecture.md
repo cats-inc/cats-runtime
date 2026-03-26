@@ -344,6 +344,9 @@ src/
   browser process survived
 - Runs runtime-owned closed-session maintenance sweeps so stale browser records
   can expire on a bounded TTL without waiting for explicit cleanup routes
+- Supports page-level close without tearing down the owning browser session,
+  while downgrading closed-page preview truth so hosts stop treating them as
+  live previews
 - Defines browser-page preview-surface normalization aligned with existing
   service/artifact preview contracts
 - Keeps browser-driver integration replaceable so additional CDP or

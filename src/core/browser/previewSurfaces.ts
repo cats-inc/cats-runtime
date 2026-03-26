@@ -70,7 +70,10 @@ export function createBrowserPagePreviewSurface(
 
   const mediaType = guessBrowserPreviewMediaType(page.path || page.url, page.mediaType);
   const extension = extname(page.path || '').toLowerCase();
-  if (!page.url && !page.path) {
+  if (page.status === 'closed') {
+    status = 'blocked';
+    renderHint = 'none';
+  } else if (!page.url && !page.path) {
     status = 'blocked';
   } else if (page.url) {
     if (HTTP_URL_PREFIX.test(page.url)) {

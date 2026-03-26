@@ -34,6 +34,11 @@ export interface RuntimeBrowserDriverOpenPageInput {
   target: RuntimeBrowserPageTarget;
 }
 
+export interface RuntimeBrowserDriverClosePageInput {
+  browserSessionId: string;
+  browserPageId: string;
+}
+
 export interface RuntimeBrowserDriverCloseSessionInput {
   browserSessionId: string;
 }
@@ -42,5 +47,6 @@ export interface RuntimeBrowserDriver {
   readonly descriptor: RuntimeBrowserDriverDescriptor;
   createSession(input: RuntimeBrowserDriverCreateSessionInput): Promise<RuntimeBrowserDriverSessionState>;
   openPage(input: RuntimeBrowserDriverOpenPageInput): Promise<RuntimeBrowserDriverPageState>;
+  closePage?(input: RuntimeBrowserDriverClosePageInput): Promise<void>;
   closeSession(input: RuntimeBrowserDriverCloseSessionInput): Promise<void>;
 }

@@ -241,6 +241,7 @@ function buildBrowserSessionPaths(browserSessionId: string) {
   return {
     browserSessionPath: `/browser/sessions/${browserSessionId}`,
     createBrowserPagePath: `/browser/sessions/${browserSessionId}/pages`,
+    closeBrowserPagePath: `/browser/sessions/${browserSessionId}/pages/:pageId/close`,
     closeBrowserSessionPath: `/browser/sessions/${browserSessionId}/close`,
   };
 }
@@ -1085,6 +1086,29 @@ async function createBrowserPage(
   };
 }
 
+async function closeBrowserPage(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const browserSessionId = readRequiredString(args, 'browserSessionId');
+  const browserPageId = readRequiredString(args, 'browserPageId');
+  const result = await requestRuntimeJson(
+    ctx,
+    `/browser/sessions/${encodeURIComponent(browserSessionId)}/pages/${encodeURIComponent(browserPageId)}/close`,
+  );
+  ensureRouteSuccess('close_browser_page', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'close_browser_page result');
+  return {
+    summary: `Closed browser page ${browserPageId} in session ${browserSessionId}.`,
+    structuredContent: {
+      responseStatus: result.status,
+      ...payload,
+      ...buildBrowserSessionPaths(browserSessionId),
+    },
+  };
+}
+
 async function closeBrowserSession(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -1818,6 +1842,23 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: createBrowserPage,
+  },
+  {
+    definition: {
+      name: 'close_browser_page',
+      title: 'Close Browser Page',
+      description: 'Close a single browser page while keeping the runtime-owned browser session alive.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          browserSessionId: { type: 'string' },
+          browserPageId: { type: 'string' },
+        },
+        required: ['browserSessionId', 'browserPageId'],
+        additionalProperties: false,
+      },
+    },
+    execute: closeBrowserPage,
   },
   {
     definition: {

@@ -192,6 +192,59 @@ describe('browser HTTP contract', () => {
     }));
   });
 
+  it('closes a single browser page without closing the browser session', async () => {
+    const app = createTestApp();
+
+    const createResponse = await app.request('/browser/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        label: 'Manual Preview Session',
+      }),
+    });
+    expect(createResponse.status).toBe(201);
+    const created = await createResponse.json() as {
+      session: { id: string };
+    };
+
+    const pageResponse = await app.request(`/browser/sessions/${created.session.id}/pages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        url: 'http://127.0.0.1:3000',
+        label: 'Manual Preview',
+      }),
+    });
+    expect(pageResponse.status).toBe(201);
+    const pagePayload = await pageResponse.json() as {
+      page: { id: string };
+    };
+
+    const closePageResponse = await app.request(
+      `/browser/sessions/${created.session.id}/pages/${pagePayload.page.id}/close`,
+      { method: 'POST' },
+    );
+    expect(closePageResponse.status).toBe(200);
+    await expect(closePageResponse.json()).resolves.toEqual(expect.objectContaining({
+      page: expect.objectContaining({
+        id: pagePayload.page.id,
+        status: 'closed',
+        previewSurface: expect.objectContaining({
+          status: 'blocked',
+          renderHint: 'none',
+        }),
+      }),
+      session: expect.objectContaining({
+        id: created.session.id,
+        status: 'ready',
+        inspection: expect.objectContaining({
+          openPageCount: 0,
+          closedPageCount: 1,
+        }),
+      }),
+    }));
+  });
+
   it('binds browser pages to runtime session services and artifacts without changing the preview-surface schema', async () => {
     const app = createTestApp();
 

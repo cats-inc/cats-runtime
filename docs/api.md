@@ -118,6 +118,7 @@ Current curated tools:
 - `browser_summary`
 - `create_browser_session`
 - `create_browser_page`
+- `close_browser_page`
 - `close_browser_session`
 - `cleanup_browser_sessions`
 - `audit_workspace`
@@ -612,6 +613,20 @@ non-persistent drivers such as Playwright are recovered as `closed` after
 runtime restart so the API does not pretend their remote browser process
 survived.
 
+Browser routes:
+
+```text
+GET  /browser/drivers
+GET  /browser/summary
+GET  /browser/sessions
+GET  /browser/sessions/{id}
+POST /browser/sessions
+POST /browser/sessions/{id}/pages
+POST /browser/sessions/{id}/pages/{pageId}/close
+POST /browser/sessions/{id}/close
+POST /browser/sessions/cleanup
+```
+
 Create browser session example:
 
 ```json
@@ -644,12 +659,20 @@ Create browser page from an artifact example:
 }
 ```
 
+Close a single browser page example:
+
+```bash
+curl -X POST http://127.0.0.1:3110/browser/sessions/<browser-session-id>/pages/<browser-page-id>/close
+```
+
 Browser session responses include:
 
 - `pages`: runtime-owned page records
 - `inspection.driver`: machine-readable driver capability summary
 - `inspection.previewSurfaces`: normalized `browser_page` surfaces aligned with
   existing session/delivery preview-surface contracts
+- closed pages remain in history but now truthfully degrade to
+  `previewSurface.status: "blocked"` plus `renderHint: "none"`
 - `GET /browser/summary`: aggregate session/page counts plus machine-readable
   cleanup candidates
 - `POST /browser/sessions/cleanup`: explicit maintenance route for deleting

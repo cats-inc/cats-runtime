@@ -368,6 +368,48 @@ export class RuntimeBrowserService {
     return this.buildSessionView(session);
   }
 
+  async closePage(
+    browserSessionId: string,
+    browserPageId: string,
+  ): Promise<{ session: RuntimeBrowserSessionView; page: RuntimeBrowserPage }> {
+    const session = this.sessions.get(browserSessionId);
+    if (!session) {
+      throw new RuntimeBrowserNotFoundError(
+        `Browser session '${browserSessionId}' was not found.`,
+      );
+    }
+    const page = this.pages.get(browserPageId);
+    if (!page || page.browserSessionId !== browserSessionId) {
+      throw new RuntimeBrowserNotFoundError(
+        `Browser page '${browserPageId}' was not found in session '${browserSessionId}'.`,
+      );
+    }
+    if (page.status === 'closed') {
+      return {
+        session: this.buildSessionView(session),
+        page: this.buildPageView(page),
+      };
+    }
+
+    const driver = this.requireDriver(session.driverId);
+    await driver.closePage?.({
+      browserSessionId,
+      browserPageId,
+    });
+
+    const now = this.now().toISOString();
+    page.status = 'closed';
+    page.closedAt = now;
+    page.updatedAt = now;
+    session.updatedAt = now;
+    this.persistState();
+
+    return {
+      session: this.buildSessionView(session),
+      page: this.buildPageView(page),
+    };
+  }
+
   private async createSessionInternal(
     input: CreateRuntimeBrowserSessionInput = {},
   ): Promise<RuntimeBrowserSessionView> {

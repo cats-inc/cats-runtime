@@ -94,9 +94,16 @@ describe('PlaywrightBrowserDriver', () => {
       }),
     );
 
+    await driver.closePage({
+      browserSessionId: 'browser-session-1',
+      browserPageId: 'browser-page-1',
+    });
+    expect(pageClose).toHaveBeenCalledTimes(1);
+
     await driver.closeSession({
       browserSessionId: 'browser-session-1',
     });
+    expect(pageClose).toHaveBeenCalledTimes(2);
     expect(contextClose).toHaveBeenCalledTimes(1);
     expect(browserClose).toHaveBeenCalledTimes(1);
   });

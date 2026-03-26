@@ -76,6 +76,35 @@ describe('RuntimeBrowserService', () => {
     expect(closed.inspection.closedPageCount).toBe(1);
   });
 
+  it('closes a single page without closing the browser session and downgrades the preview surface', async () => {
+    const browser = new RuntimeBrowserService({
+      drivers: [
+        new ManualBrowserDriver(),
+      ],
+      now: () => new Date('2026-03-23T00:00:00.000Z'),
+    });
+
+    const session = await browser.createSession();
+    const created = await browser.createPage(session.id, {
+      url: 'http://127.0.0.1:4173',
+      binding: {
+        kind: 'manual_url',
+      },
+    });
+
+    const closed = await browser.closePage(session.id, created.page.id);
+    expect(closed.session.status).toBe('ready');
+    expect(closed.session.inspection.openPageCount).toBe(0);
+    expect(closed.session.inspection.closedPageCount).toBe(1);
+    expect(closed.page).toEqual(expect.objectContaining({
+      status: 'closed',
+      previewSurface: expect.objectContaining({
+        status: 'blocked',
+        renderHint: 'none',
+      }),
+    }));
+  });
+
   it('prunes closed browser sessions before creating beyond the configured capacity', async () => {
     const browser = new RuntimeBrowserService({
       drivers: [

@@ -250,6 +250,7 @@ describe('runtime MCP facade', () => {
       'browser_summary',
       'create_browser_session',
       'create_browser_page',
+      'close_browser_page',
       'close_browser_session',
       'cleanup_browser_sessions',
       'audit_workspace',
@@ -1643,7 +1644,7 @@ describe('runtime MCP facade', () => {
     const browserPageResult = await createBrowserPageResponse.json() as {
       result: {
         structuredContent: {
-          page: { previewSurface: { kind: string; url?: string } };
+          page: { id: string; previewSurface: { kind: string; url?: string } };
         };
       };
     };
@@ -1653,6 +1654,7 @@ describe('runtime MCP facade', () => {
         url: 'http://127.0.0.1:3000',
       }),
     );
+    const browserPageId = browserPageResult.result.structuredContent.page.id;
 
     const listBrowserSessionsResponse = await app.request('/mcp', {
       method: 'POST',
@@ -1686,12 +1688,51 @@ describe('runtime MCP facade', () => {
       }),
     ]);
 
-    const closeBrowserSessionResponse = await app.request('/mcp', {
+    const closeBrowserPageResponse = await app.request('/mcp', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
         id: 19,
+        method: 'tools/call',
+        params: {
+          name: 'close_browser_page',
+          arguments: {
+            browserSessionId,
+            browserPageId,
+          },
+        },
+      }),
+    });
+    expect(closeBrowserPageResponse.status).toBe(200);
+    const closedPage = await closeBrowserPageResponse.json() as {
+      result: {
+        structuredContent: {
+          page: { status: string; previewSurface: { status: string } };
+          session: { status: string; inspection: { openPageCount: number; closedPageCount: number } };
+        };
+      };
+    };
+    expect(closedPage.result.structuredContent.page).toEqual(expect.objectContaining({
+      status: 'closed',
+      previewSurface: expect.objectContaining({
+        status: 'blocked',
+      }),
+    }));
+    expect(closedPage.result.structuredContent.session).toEqual(expect.objectContaining({
+      status: 'ready',
+      inspection: expect.objectContaining({
+        openPageCount: 0,
+        closedPageCount: 1,
+      }),
+    }));
+
+    const closeBrowserSessionResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 20,
         method: 'tools/call',
         params: {
           name: 'close_browser_session',

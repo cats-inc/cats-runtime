@@ -107,6 +107,19 @@ browserRoutes.post('/browser/sessions/:id/pages', async (c) => {
   }
 });
 
+browserRoutes.post('/browser/sessions/:id/pages/:pageId/close', async (c) => {
+  const ctx = c.get('ctx' as never) as AppContext;
+  try {
+    const result = await getRuntimeBrowserService(ctx).closePage(
+      c.req.param('id'),
+      c.req.param('pageId'),
+    );
+    return c.json(result);
+  } catch (error) {
+    return toBrowserErrorResponse(c, error);
+  }
+});
+
 browserRoutes.post('/browser/sessions/:id/close', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   try {
