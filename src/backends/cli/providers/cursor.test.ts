@@ -91,6 +91,118 @@ describe('CursorProvider', () => {
     });
   });
 
+  it('promotes assistant content tool_use blocks into progress plus tool_use', () => {
+    const provider = new CursorProvider();
+
+    expect(provider.parseStreamLine(JSON.stringify({
+      type: 'assistant',
+      message: {
+        role: 'assistant',
+        content: [{
+          type: 'tool_use',
+          name: 'read_file',
+          id: 'tool-1',
+          input: { path: 'README.md' },
+        }],
+      },
+    }))).toEqual([
+      expect.objectContaining({
+        type: 'progress',
+        text: 'Running tool: read_file',
+      }),
+      {
+        type: 'tool_use',
+        toolName: 'read_file',
+        toolId: 'tool-1',
+        toolArgs: { path: 'README.md' },
+      },
+    ]);
+  });
+
+  it('promotes assistant content tool_result blocks into progress plus tool_result', () => {
+    const provider = new CursorProvider();
+
+    expect(provider.parseStreamLine(JSON.stringify({
+      type: 'assistant',
+      message: {
+        role: 'assistant',
+        content: [{
+          type: 'tool_result',
+          tool_use_id: 'tool-1',
+          content: { ok: true },
+        }],
+      },
+    }))).toEqual([
+      expect.objectContaining({
+        type: 'progress',
+        text: 'Cursor completed a tool call.',
+      }),
+      {
+        type: 'tool_result',
+        toolId: 'tool-1',
+        text: '{"ok":true}',
+      },
+    ]);
+  });
+
+  it('promotes assistant reasoning blocks into shared progress updates', () => {
+    const provider = new CursorProvider();
+
+    expect(provider.parseStreamLine(JSON.stringify({
+      type: 'assistant',
+      message: {
+        role: 'assistant',
+        content: [{
+          type: 'thinking',
+          thinking: 'Checking the repo.',
+        }],
+      },
+    }))).toEqual(expect.objectContaining({
+      type: 'progress',
+      text: 'Checking the repo.',
+      metadata: expect.objectContaining({
+        kind: 'reasoning',
+        provider: 'cursor',
+      }),
+    }));
+  });
+
+  it('still suppresses duplicate final text after partial chunks while preserving non-text blocks', () => {
+    const provider = new CursorProvider();
+
+    expect(provider.parseStreamLine(JSON.stringify({
+      type: 'assistant',
+      timestamp_ms: 1,
+      message: {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Hello' }],
+      },
+    }))).toEqual({
+      type: 'text',
+      text: 'Hello',
+    });
+
+    expect(provider.parseStreamLine(JSON.stringify({
+      type: 'assistant',
+      message: {
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'Hello world' },
+          { type: 'tool_result', tool_use_id: 'tool-1', content: 'done' },
+        ],
+      },
+    }))).toEqual([
+      expect.objectContaining({
+        type: 'progress',
+      }),
+      {
+        type: 'tool_result',
+        toolId: 'tool-1',
+        text: 'done',
+      },
+    ]);
+  });
+
   it('promotes thinking events into shared progress updates', () => {
     const provider = new CursorProvider();
 

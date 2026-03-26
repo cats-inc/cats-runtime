@@ -8,6 +8,18 @@ import type {
 import { createRuntimeProgressEvent } from '../../../core/progress.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 
+type CursorMessageContent = Array<{
+  type?: string;
+  text?: string;
+  name?: string;
+  id?: string;
+  input?: Record<string, unknown>;
+  thinking?: string;
+  tool_use_id?: string;
+  content?: unknown;
+  is_error?: boolean;
+} | string>;
+
 interface CursorStreamEvent {
   type?: string;
   subtype?: string;
@@ -16,7 +28,7 @@ interface CursorStreamEvent {
   timestamp_ms?: number;
   message?: {
     role?: string;
-    content?: Array<{ type?: string; text?: string } | string>;
+    content?: CursorMessageContent;
   };
   usage?: {
     inputTokens?: number;
@@ -24,20 +36,7 @@ interface CursorStreamEvent {
   };
 }
 
-function extractText(
-  content: Array<{ type?: string; text?: string } | string> | undefined,
-): string {
-  if (!Array.isArray(content)) return '';
-
-  return content
-    .map((item) => {
-      if (typeof item === 'string') return item;
-      if (typeof item?.text === 'string') return item.text;
-      return '';
-    })
-    .filter(Boolean)
-    .join('');
-}
+type CursorContentItem = CursorMessageContent[number];
 
 export class CursorProvider implements Provider {
   name = 'cursor';
@@ -80,7 +79,7 @@ export class CursorProvider implements Provider {
     return '';
   }
 
-  parseStreamLine(line: string): StreamEvent | null {
+  parseStreamLine(line: string): StreamEvent | StreamEvent[] | null {
     const trimmed = line.trim();
     if (!trimmed) return null;
 
@@ -118,19 +117,23 @@ export class CursorProvider implements Provider {
     }
 
     if (event.type === 'assistant') {
-      const text = extractText(event.message?.content);
-      if (!text) return null;
+      const assistantEvents = extractCursorAssistantEvents(event.message?.content);
+      if (assistantEvents.length === 0) return null;
 
       if (event.timestamp_ms) {
         this.sawAssistantChunk = true;
-        return { type: 'text', text };
+        return assistantEvents.length === 1 ? assistantEvents[0]! : assistantEvents;
       }
 
       if (this.sawAssistantChunk) {
-        return null;
+        const nonTextEvents = assistantEvents.filter((item) => item.type !== 'text');
+        if (nonTextEvents.length === 0) {
+          return null;
+        }
+        return nonTextEvents.length === 1 ? nonTextEvents[0]! : nonTextEvents;
       }
 
-      return { type: 'text', text };
+      return assistantEvents.length === 1 ? assistantEvents[0]! : assistantEvents;
     }
 
     if (event.type === 'result') {
@@ -145,5 +148,120 @@ export class CursorProvider implements Provider {
     }
 
     return null;
+  }
+}
+
+function extractCursorAssistantEvents(
+  content: CursorMessageContent | undefined,
+): StreamEvent[] {
+  if (!Array.isArray(content)) {
+    return [];
+  }
+
+  const events: StreamEvent[] = [];
+  const textParts: string[] = [];
+
+  for (const item of content as CursorContentItem[]) {
+    if (typeof item === 'string') {
+      textParts.push(item);
+      continue;
+    }
+
+    if (!item || typeof item !== 'object') {
+      continue;
+    }
+
+    if (typeof item.text === 'string' && item.text) {
+      textParts.push(item.text);
+    }
+
+    if (item.type === 'thinking' || item.type === 'reasoning') {
+      events.push(createRuntimeProgressEvent({
+        text: item.thinking?.trim() || item.text?.trim() || 'Cursor updated reasoning.',
+        provider: 'cursor',
+        backend: 'cli',
+        kind: 'reasoning',
+        status: 'running',
+        source: 'provider',
+        native: {
+          sourceEvent: 'assistant',
+        },
+      }));
+      continue;
+    }
+
+    if (item.type === 'tool_use') {
+      const toolName = typeof item.name === 'string' && item.name ? item.name : 'unknown';
+      events.push(
+        createRuntimeProgressEvent({
+          text: `Running tool: ${toolName}`,
+          provider: 'cursor',
+          backend: 'cli',
+          kind: 'tool',
+          status: 'running',
+          source: 'provider',
+          native: {
+            sourceEvent: 'assistant',
+            toolName,
+          },
+        }),
+        {
+          type: 'tool_use',
+          toolName,
+          ...(typeof item.id === 'string' && item.id ? { toolId: item.id } : {}),
+          ...(item.input ? { toolArgs: item.input } : {}),
+        },
+      );
+      continue;
+    }
+
+    if (item.type === 'tool_result') {
+      const toolText = stringifyCursorContent(item.content);
+      events.push(
+        createRuntimeProgressEvent({
+          text: 'Cursor completed a tool call.',
+          provider: 'cursor',
+          backend: 'cli',
+          kind: 'tool',
+          status: item.is_error === true ? 'failed' : 'updated',
+          source: 'provider',
+          native: {
+            sourceEvent: 'assistant',
+            ...(typeof item.tool_use_id === 'string' && item.tool_use_id
+              ? { toolId: item.tool_use_id }
+              : {}),
+          },
+        }),
+        {
+          type: 'tool_result',
+          ...(typeof item.tool_use_id === 'string' && item.tool_use_id
+            ? { toolId: item.tool_use_id }
+            : {}),
+          ...(toolText ? { text: toolText } : {}),
+          ...(item.is_error === true ? { isError: true } : {}),
+        },
+      );
+    }
+  }
+
+  const text = textParts.join('');
+  if (text) {
+    events.unshift({ type: 'text', text });
+  }
+
+  return events;
+}
+
+function stringifyCursorContent(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    return value || undefined;
+  }
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
   }
 }
