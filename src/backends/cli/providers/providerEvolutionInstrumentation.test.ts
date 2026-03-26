@@ -191,6 +191,40 @@ describe('provider evolution instrumentation', () => {
     expect(bundle.summary.schemaFailureCounts['session.start']).toBe(1);
   });
 
+  it('records normalized Copilot tool results instead of treating them as opaque assistant messages', () => {
+    const collector = new ProviderEvolutionEvidenceCollector({
+      provider: 'copilot',
+      instance: 'default',
+      parserId: 'copilot-json-stream',
+      probeProfile: 'manual-smoke',
+      transport: 'cli',
+    });
+    const provider = new CopilotProvider(undefined, collector);
+
+    expect(provider.parseStreamLine(JSON.stringify({
+      type: 'assistant.message',
+      data: {
+        toolResults: [{
+          name: 'read_file',
+          id: 'tool-1',
+          output: { ok: true },
+        }],
+      },
+    }))).toEqual([
+      expect.objectContaining({
+        type: 'progress',
+      }),
+      expect.objectContaining({
+        type: 'tool_result',
+      }),
+    ]);
+
+    const bundle = collector.finalize();
+    expect(bundle.summary.normalizedCount).toBe(1);
+    expect(bundle.summary.normalizedEventTypes.progress).toBe(1);
+    expect(bundle.summary.normalizedEventTypes.tool_result).toBe(1);
+  });
+
   it('records ignored user echoes and unknown Gemini event types', () => {
     const collector = new ProviderEvolutionEvidenceCollector({
       provider: 'gemini',

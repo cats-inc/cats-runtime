@@ -189,6 +189,77 @@ describe('CopilotProvider', () => {
       ]);
     });
 
+    it('preserves full assistant text alongside multiple toolRequests', () => {
+      const event = provider.parseStreamLine(
+        JSON.stringify({
+          type: 'assistant.message',
+          data: {
+            content: 'Checking the workspace.',
+            toolRequests: [
+              { name: 'read_file', id: 'tool-1', arguments: { path: 'README.md' } },
+              { name: 'list_dir', id: 'tool-2', input: { path: 'src' } },
+            ],
+          },
+        }),
+      );
+
+      expect(event).toEqual([
+        { type: 'text', text: 'Checking the workspace.' },
+        expect.objectContaining({
+          type: 'progress',
+          text: 'Running tool: read_file',
+        }),
+        {
+          type: 'tool_use',
+          toolName: 'read_file',
+          toolId: 'tool-1',
+          toolArgs: { path: 'README.md' },
+        },
+        expect.objectContaining({
+          type: 'progress',
+          text: 'Running tool: list_dir',
+        }),
+        {
+          type: 'tool_use',
+          toolName: 'list_dir',
+          toolId: 'tool-2',
+          toolArgs: { path: 'src' },
+        },
+      ]);
+    });
+
+    it('promotes assistant.message toolResults into progress plus tool_result output', () => {
+      const event = provider.parseStreamLine(
+        JSON.stringify({
+          type: 'assistant.message',
+          data: {
+            toolResults: [{
+              name: 'read_file',
+              id: 'tool-123',
+              output: { ok: true },
+            }],
+          },
+        }),
+      );
+
+      expect(event).toEqual([
+        expect.objectContaining({
+          type: 'progress',
+          text: 'Copilot completed tool: read_file',
+          metadata: expect.objectContaining({
+            kind: 'tool',
+            status: 'updated',
+          }),
+        }),
+        {
+          type: 'tool_result',
+          toolName: 'read_file',
+          toolId: 'tool-123',
+          text: '{"ok":true}',
+        },
+      ]);
+    });
+
     it('parses assistant.message content as text when no deltas were streamed', () => {
       const event = provider.parseStreamLine(
         JSON.stringify({

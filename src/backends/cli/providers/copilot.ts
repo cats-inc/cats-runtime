@@ -177,44 +177,40 @@ export class CopilotProvider implements Provider {
         }
 
         const content = extractContent(inner?.content);
-        // Full message — check for tool requests
-        const toolRequests = inner?.toolRequests as Array<{ name?: string; id?: string }> | undefined;
-        if (toolRequests && toolRequests.length > 0) {
-          const tool = toolRequests[0];
-          return observeNormalized(this.evolutionObserver, {
-            rawEventType: 'assistant.message',
-            rawSample: parsed,
-            details: {
-              toolRequestCount: toolRequests.length,
-            },
-          }, [
-            createRuntimeProgressEvent({
-              text: `Running tool: ${tool.name ?? 'unknown'}`,
-              provider: 'copilot',
-              backend: 'cli',
-              kind: 'tool',
-              status: 'running',
-              source: 'provider',
-              native: {
-                sourceEvent: eventType,
-                toolName: tool.name,
-              },
-            }),
-            { type: 'tool_use', toolName: tool.name, toolId: tool.id },
-          ]);
-        }
+        const toolRequestEvents = extractCopilotToolRequests(inner?.toolRequests);
+        const toolResultEvents = extractCopilotToolResults(
+          inner?.toolResults ?? inner?.toolResponses,
+        );
+        const events: StreamEvent[] = [];
 
         // Copilot CLI 1.0.2 emits the final answer as a full assistant.message,
         // often without any assistant.message_delta chunks.
         if (content && !this._sawMessageDelta) {
-          return observeNormalized(this.evolutionObserver, {
-            rawEventType: 'assistant.message',
-            rawSample: parsed,
-          }, {
+          events.push({
             type: 'text',
             text: content,
           });
         }
+
+        if (toolRequestEvents.length > 0) {
+          events.push(...toolRequestEvents);
+        }
+
+        if (toolResultEvents.length > 0) {
+          events.push(...toolResultEvents);
+        }
+
+        if (events.length > 0) {
+          return observeNormalized(this.evolutionObserver, {
+            rawEventType: 'assistant.message',
+            rawSample: parsed,
+            details: {
+              ...(toolRequestEvents.length > 0 ? { toolRequestCount: toolRequestEvents.length / 2 } : {}),
+              ...(toolResultEvents.length > 0 ? { toolResultCount: toolResultEvents.length / 2 } : {}),
+            },
+          }, events.length === 1 ? events[0]! : events);
+        }
+
         return observeIgnored(this.evolutionObserver, {
           rawEventType: 'assistant.message',
           reason: this._sawMessageDelta
@@ -384,6 +380,133 @@ function extractContent(content: unknown): string {
     })
     .filter(Boolean)
     .join('');
+}
+
+function extractCopilotToolRequests(value: unknown): StreamEvent[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const events: StreamEvent[] = [];
+  for (const item of value) {
+    const record = asRecord(item);
+    if (!record) {
+      continue;
+    }
+    const toolName = readString(record.name) ?? readString(record.toolName);
+    const toolId = readString(record.id) ?? readString(record.toolId);
+    const toolArgs = asRecord(record.arguments) ?? asRecord(record.input);
+    if (!toolName && !toolId && !toolArgs) {
+      continue;
+    }
+
+    events.push(
+      createRuntimeProgressEvent({
+        text: `Running tool: ${toolName ?? 'unknown'}`,
+        provider: 'copilot',
+        backend: 'cli',
+        kind: 'tool',
+        status: 'running',
+        source: 'provider',
+        native: {
+          sourceEvent: 'assistant.message',
+          ...(toolName ? { toolName } : {}),
+          ...(toolId ? { toolId } : {}),
+        },
+      }),
+      {
+        type: 'tool_use',
+        ...(toolName ? { toolName } : {}),
+        ...(toolId ? { toolId } : {}),
+        ...(toolArgs ? { toolArgs } : {}),
+      },
+    );
+  }
+
+  return events;
+}
+
+function extractCopilotToolResults(value: unknown): StreamEvent[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const events: StreamEvent[] = [];
+  for (const item of value) {
+    const record = asRecord(item);
+    if (!record) {
+      continue;
+    }
+    const toolName = readString(record.name) ?? readString(record.toolName);
+    const toolId = readString(record.id) ?? readString(record.toolId) ?? readString(record.toolCallId);
+    const text = stringifyCopilotToolText(
+      record.content
+      ?? record.output
+      ?? record.result
+      ?? record.response
+      ?? record.message,
+    );
+    const isError = record.isError === true || record.error === true;
+    if (!toolName && !toolId && !text) {
+      continue;
+    }
+
+    events.push(
+      createRuntimeProgressEvent({
+        text: toolName
+          ? `Copilot completed tool: ${toolName}`
+          : 'Copilot completed a tool call.',
+        provider: 'copilot',
+        backend: 'cli',
+        kind: 'tool',
+        status: isError ? 'failed' : 'updated',
+        source: 'provider',
+        native: {
+          sourceEvent: 'assistant.message',
+          ...(toolName ? { toolName } : {}),
+          ...(toolId ? { toolId } : {}),
+        },
+      }),
+      {
+        type: 'tool_result',
+        ...(toolName ? { toolName } : {}),
+        ...(toolId ? { toolId } : {}),
+        ...(text ? { text } : {}),
+        ...(isError ? { isError: true } : {}),
+      },
+    );
+  }
+
+  return events;
+}
+
+function stringifyCopilotToolText(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (value === undefined || value === null) {
+    return '';
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Record<string, unknown>;
+}
+
+function readString(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
 }
 
 function extractUsageFromShutdown(
