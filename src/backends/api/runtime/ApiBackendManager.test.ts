@@ -70,6 +70,38 @@ function buildMeteringSnapshot() {
 }
 
 describe('ApiBackendManager', () => {
+  it('exposes a runtime-owned execution strategy catalog for diagnostics surfaces', () => {
+    const manager = new ApiBackendManager(
+      { sessionBaseDir: '/tmp/cats-runtime-tests' },
+      new SessionRegistry(),
+    );
+
+    expect(manager.inspectExecutionStrategies()).toEqual({
+      summary: {
+        totalFamilies: 7,
+        supportedFamilies: 6,
+        fallbackOnlyFamilies: 1,
+        compatibilityDefault: 'simple_tool_call',
+        runtimeHostedBackends: ['api', 'local'],
+        summary:
+          "6 runtime-hosted strategy families are available for api/local loops. "
+          + "1 known deferred hint family still falls back to 'simple_tool_call'.",
+      },
+      strategies: expect.arrayContaining([
+        expect.objectContaining({
+          id: 'react',
+          availability: 'supported',
+          runtimeOwnedExecution: true,
+        }),
+        expect.objectContaining({
+          id: 'deps',
+          availability: 'fallback_only',
+          fallbackStrategy: 'simple_tool_call',
+        }),
+      ]),
+    });
+  });
+
   it('keeps session-level instructions when a turn does not override them', async () => {
     const registry = new SessionRegistry();
     const session = registry.create({

@@ -597,6 +597,8 @@ src/
    surface, including runtime maintenance snapshots plus transport-native
    API/local auth/model probe requests, additive provider-tooling ownership /
    baseline-profile summaries plus bounded tooling observability truth,
+   additive runtime execution-strategy catalog/summary truth for implemented
+   versus compatibility-fallback-only families,
    additive HTTP semantic classifications, additive OpenClaw
    `tools.catalog`-backed remote tool discovery on
    `GET /providers/{provider}/tools` for agent targets that support it, and additive

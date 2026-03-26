@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { BackendKind, RemoteProviderInstanceConfig } from '../../backends/cli/config.js';
 import { inspectAgentTarget } from '../../backends/agent/inspection.js';
+import { buildApiRuntimeExecutionStrategyCatalog } from '../../backends/api/runtime/strategies/catalog.js';
 import {
   getRuntimeListenerConfig,
   getRuntimeResolvedPaths,
@@ -1099,6 +1100,8 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
   const metering = getRuntimeMeteringService(ctx).buildSnapshot(ctx.registry.list());
   const peers = getPeerDiscoverySnapshot(ctx);
   const wakeups = getRuntimeWakeupSnapshot(ctx);
+  const executionStrategies = ctx.apiBackend?.inspectExecutionStrategies()
+    ?? buildApiRuntimeExecutionStrategyCatalog();
 
   return c.json({
     service: RUNTIME_SERVICE_NAME,
@@ -1117,6 +1120,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
         ...(ctx.worktreeMaintenance ? { worktrees: ctx.worktreeMaintenance.snapshot() } : {}),
         ...(ctx.browserMaintenance ? { browser: ctx.browserMaintenance.snapshot() } : {}),
       },
+      executionStrategies,
       wakeups,
       process: {
         pid: process.pid,
@@ -1214,6 +1218,8 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
   );
   const peers = getPeerDiscoverySnapshot(ctx);
   const wakeups = getRuntimeWakeupSnapshot(ctx);
+  const executionStrategies = ctx.apiBackend?.inspectExecutionStrategies()
+    ?? buildApiRuntimeExecutionStrategyCatalog();
   const providerSummary = summarizeProviderDiagnostics(catalog, providers, {
     defaultTargetsOnly: true,
     useAttentionSummary: true,
@@ -1238,6 +1244,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
       summary: runtime.summary,
       startup: getRuntimeStartupDetails(ctx, readiness),
       shutdown: getRuntimeShutdownContract(ctx.startup),
+      executionStrategies: executionStrategies.summary,
     },
     providers: {
       probe: probeMode,

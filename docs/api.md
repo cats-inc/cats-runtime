@@ -420,6 +420,8 @@ GET /diagnostics/providers
 desktop shells, and the embedded dashboard. It combines:
 
 - runtime readiness and startup/shutdown contract metadata
+- compact runtime execution-strategy summary metadata so hosts can distinguish
+  implemented strategy families from compatibility-fallback-only hints
 - a light provider-health summary over each provider's default target, suitable
   for polling and compatibility-aware setup UX
 - per-provider default target highlights so hosts do not need to stitch
@@ -451,6 +453,13 @@ integrate against:
   - `summary`: aggregate wakeup counts/status for polling and dashboards
   - `timer`: whether the due-wakeup loop is active plus bounded processing limits
   - `retention`: retained terminal-history limits
+- runtime execution-strategy catalog metadata under `runtime.executionStrategies`
+  including:
+  - `summary`: supported-family counts, fallback-only counts, compatibility
+    default, and runtime-hosted backend scope
+  - `strategies`: per-family availability, execution model, bounded accepted
+    `strategyContext` keys, guardrail support, emitted strategy events, and
+    fallback truth for deferred hints such as `deps`
 - full `metering` state:
   - `summary`: aggregate status/counts
   - `usage`: totals plus `byProviderInstance` / `bySession`
@@ -582,7 +591,8 @@ Invalid `backend` values or malformed boolean filters such as
 summary so hosts can poll one route for both provider readiness and
 execution-guardrail state. It also includes a compact top-level `wakeups`
 summary so hosts can inspect runtime-wide wakeup counts/status without a
-separate `GET /wakeups` call.
+separate `GET /wakeups` call, plus `runtime.executionStrategies` summary
+metadata for runtime-hosted strategy-family readiness.
 
 ### App-Managed Lifecycle Events
 

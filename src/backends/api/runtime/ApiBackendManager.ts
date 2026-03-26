@@ -41,6 +41,10 @@ import {
   API_RUNTIME_COMPATIBILITY_STRATEGY,
   createApiRuntimeExecutionStrategyRegistry,
 } from './strategies/registry.js';
+import {
+  buildApiRuntimeExecutionStrategyCatalog,
+  type ApiRuntimeExecutionStrategyCatalog,
+} from './strategies/catalog.js';
 import { ApiStrategyExecutionContext } from './strategies/ApiStrategyExecutionContext.js';
 
 const DEFAULT_MAX_TOOL_STEPS = 20;
@@ -349,6 +353,10 @@ export class ApiBackendManager {
       fetch: options.fetch || defaultFetch(),
       env: options.env || process.env,
     };
+  }
+
+  inspectExecutionStrategies(): ApiRuntimeExecutionStrategyCatalog {
+    return buildApiRuntimeExecutionStrategyCatalog();
   }
 
   get(sessionId: string): ExecutionHandle | undefined {

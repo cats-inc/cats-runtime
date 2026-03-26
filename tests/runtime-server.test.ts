@@ -507,6 +507,37 @@ describe('runtime server', () => {
               },
             },
           },
+          executionStrategies: {
+            summary: {
+              totalFamilies: 7,
+              supportedFamilies: 6,
+              fallbackOnlyFamilies: 1,
+              compatibilityDefault: 'simple_tool_call',
+              runtimeHostedBackends: ['api', 'local'],
+              summary:
+                "6 runtime-hosted strategy families are available for api/local loops. "
+                + "1 known deferred hint family still falls back to 'simple_tool_call'.",
+            },
+            strategies: expect.arrayContaining([
+              expect.objectContaining({
+                id: 'simple_tool_call',
+                availability: 'supported',
+                executionModel: 'compatibility_loop',
+              }),
+              expect.objectContaining({
+                id: 'tree_of_thoughts',
+                availability: 'supported',
+                guardrails: expect.objectContaining({
+                  branchCount: true,
+                }),
+              }),
+              expect.objectContaining({
+                id: 'deps',
+                availability: 'fallback_only',
+                fallbackStrategy: 'simple_tool_call',
+              }),
+            ]),
+          },
           wakeups: {
             summary: {
               status: 'ok',
@@ -951,6 +982,16 @@ backends:
             reasons: [...RUNTIME_SHUTDOWN_REASONS],
             stdinCloseEnabled: false,
           },
+          executionStrategies: {
+            totalFamilies: 7,
+            supportedFamilies: 6,
+            fallbackOnlyFamilies: 1,
+            compatibilityDefault: 'simple_tool_call',
+            runtimeHostedBackends: ['api', 'local'],
+            summary:
+              "6 runtime-hosted strategy families are available for api/local loops. "
+              + "1 known deferred hint family still falls back to 'simple_tool_call'.",
+          },
         },
         providers: {
           probe: 'light',
@@ -1244,6 +1285,16 @@ backends:
             signals: [...RUNTIME_SHUTDOWN_SIGNALS],
             reasons: [...RUNTIME_SHUTDOWN_REASONS],
             stdinCloseEnabled: false,
+          },
+          executionStrategies: {
+            totalFamilies: 7,
+            supportedFamilies: 6,
+            fallbackOnlyFamilies: 1,
+            compatibilityDefault: 'simple_tool_call',
+            runtimeHostedBackends: ['api', 'local'],
+            summary:
+              "6 runtime-hosted strategy families are available for api/local loops. "
+              + "1 known deferred hint family still falls back to 'simple_tool_call'.",
           },
         },
         providers: {
