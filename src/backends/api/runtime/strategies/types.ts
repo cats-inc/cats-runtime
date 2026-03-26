@@ -5,6 +5,7 @@ import type { SessionRegistry } from '../../../cli/pool/SessionRegistry.js';
 import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
 import type {
   ApiConversationMessage,
+  ApiProgressEvent,
   ApiToolCallPart,
   ApiTransportClient,
 } from '../../types.js';
@@ -48,4 +49,16 @@ export interface ApiExecutedToolBatch {
   toolUseEvents: StreamEvent[];
   toolResultEvents: StreamEvent[];
   signatures: string[];
+}
+
+export interface ApiSampledStrategyCandidate {
+  assistant: ApiConversationMessage;
+  progressEvents: ApiProgressEvent[];
+  textParts: string[];
+  toolCalls: ApiToolCallPart[];
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+  };
+  raw?: unknown;
 }

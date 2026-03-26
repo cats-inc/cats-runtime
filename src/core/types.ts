@@ -25,7 +25,7 @@ export type SessionControlMode = 'full' | 'resume_only' | 'observe_only';
 export type ProviderBackend = 'cli' | 'api' | 'local' | 'agent';
 export type SessionReusePolicy = 'create_new' | 'prefer_existing' | 'require_existing';
 export type RuntimeExecutionStrategyId =
-  'simple_tool_call' | 'react' | 'pdca' | 'reflexion' | (string & {});
+  'simple_tool_call' | 'react' | 'pdca' | 'reflexion' | 'tree_of_thoughts' | (string & {});
 export type RuntimeExecutionStrategyResolutionSource =
   | 'explicit_request'
   | 'runtime_preference'

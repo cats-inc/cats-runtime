@@ -3,6 +3,7 @@ import { pdcaStrategy } from './pdcaStrategy.js';
 import { reactStrategy } from './reactStrategy.js';
 import { reflexionStrategy } from './reflexionStrategy.js';
 import { simpleToolCallStrategy } from './simpleToolCallStrategy.js';
+import { treeOfThoughtsStrategy } from './treeOfThoughtsStrategy.js';
 import type { ApiStrategyExecutionContext } from './ApiStrategyExecutionContext.js';
 
 export const API_RUNTIME_COMPATIBILITY_STRATEGY = 'simple_tool_call';
@@ -11,6 +12,7 @@ export const API_RUNTIME_EXECUTION_STRATEGY_IDS = [
   'react',
   'pdca',
   'reflexion',
+  'tree_of_thoughts',
 ] as const;
 
 export function createApiRuntimeExecutionStrategyRegistry(): RuntimeExecutionStrategyRegistry<ApiStrategyExecutionContext> {
@@ -19,5 +21,6 @@ export function createApiRuntimeExecutionStrategyRegistry(): RuntimeExecutionStr
     reactStrategy,
     pdcaStrategy,
     reflexionStrategy,
+    treeOfThoughtsStrategy,
   ]);
 }

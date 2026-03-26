@@ -12,7 +12,12 @@ import type {
 import type { SessionProviderState } from '../../../../core/types.js';
 import type { ApiConversationMessage, ApiProgressEvent, ApiToolCallPart } from '../../types.js';
 import { extractTextParts, extractToolCalls } from '../messageParts.js';
-import type { ApiStrategyExecutionContextOptions, ApiCompletedModelStep, ApiExecutedToolBatch } from './types.js';
+import type {
+  ApiStrategyExecutionContextOptions,
+  ApiCompletedModelStep,
+  ApiExecutedToolBatch,
+  ApiSampledStrategyCandidate,
+} from './types.js';
 
 interface MutableApiStrategyLoopState {
   responseId?: string;
@@ -87,31 +92,16 @@ export class ApiStrategyExecutionContext {
   ): Promise<ApiCompletedModelStep> {
     this.assertWithinTimeout('model_turn');
 
-    const completion = await this.options.transport.completeTurn({
-      sessionId: this.session.id,
-      providerName: this.session.providerName,
-      instance: this.options.remoteInstance,
-      model: this.options.model,
-      requestBodyPatch: this.options.requestBodyPatch,
-      messages: this.options.conversation,
-      tools: this.options.tools.listTools(this.options.toolProfile),
+    const completion = await this.completeTurn(this.options.conversation, step, {
       previousResponseId: this.state.responseId,
       sessionState: this.state.sessionState,
-      turnStep: step,
-      signal: this.buildStepSignal(),
+      persistProviderState: true,
+      updateLastRaw: true,
     });
 
     if (completion.responseId) {
       this.state.responseId = completion.responseId;
     }
-    if (completion.sessionState !== undefined) {
-      this.state.sessionState = completion.sessionState;
-      this.options.registry.setProviderState(this.session.id, completion.sessionState);
-    }
-
-    this.state.lastRaw = completion.raw;
-    this.state.totalInputTokens += completion.usage?.inputTokens ?? 0;
-    this.state.totalOutputTokens += completion.usage?.outputTokens ?? 0;
     this.options.conversation.push(completion.assistant);
 
     const initEvent = !this.state.initialized
@@ -134,6 +124,33 @@ export class ApiStrategyExecutionContext {
         raw: completion.raw,
       })),
       toolCalls: extractToolCalls(completion.assistant),
+    };
+  }
+
+  async sampleModelCandidate(
+    step: number,
+    guidance: string,
+  ): Promise<ApiSampledStrategyCandidate> {
+    this.assertWithinTimeout('model_turn');
+
+    const completion = await this.completeTurn([
+      ...structuredClone(this.options.conversation),
+      {
+        role: 'user',
+        parts: [{ type: 'text', text: guidance }],
+      } satisfies ApiConversationMessage,
+    ], step, {
+      persistProviderState: false,
+      updateLastRaw: false,
+    });
+
+    return {
+      assistant: completion.assistant,
+      progressEvents: completion.progress || [],
+      textParts: extractTextParts(completion.assistant),
+      toolCalls: extractToolCalls(completion.assistant),
+      usage: completion.usage,
+      raw: completion.raw,
     };
   }
 
@@ -381,6 +398,42 @@ export class ApiStrategyExecutionContext {
 
   private hasTimedOut(): boolean {
     return this.deadlineAt !== undefined && Date.now() >= this.deadlineAt;
+  }
+
+  private async completeTurn(
+    messages: ApiConversationMessage[],
+    step: number,
+    options: {
+      previousResponseId?: string;
+      sessionState?: SessionProviderState;
+      persistProviderState: boolean;
+      updateLastRaw: boolean;
+    },
+  ) {
+    const completion = await this.options.transport.completeTurn({
+      sessionId: this.session.id,
+      providerName: this.session.providerName,
+      instance: this.options.remoteInstance,
+      model: this.options.model,
+      requestBodyPatch: this.options.requestBodyPatch,
+      messages,
+      tools: this.options.tools.listTools(this.options.toolProfile),
+      previousResponseId: options.previousResponseId,
+      sessionState: options.sessionState,
+      turnStep: step,
+      signal: this.buildStepSignal(),
+    });
+
+    if (completion.sessionState !== undefined && options.persistProviderState) {
+      this.state.sessionState = completion.sessionState;
+      this.options.registry.setProviderState(this.session.id, completion.sessionState);
+    }
+    if (options.updateLastRaw) {
+      this.state.lastRaw = completion.raw;
+    }
+    this.state.totalInputTokens += completion.usage?.inputTokens ?? 0;
+    this.state.totalOutputTokens += completion.usage?.outputTokens ?? 0;
+    return completion;
   }
 
   private buildStepSignal(): AbortSignal {

@@ -502,7 +502,7 @@ describe('ApiBackendManager', () => {
     const handle = manager.spawn(session.id, createTarget());
     const events = await collectEvents(handle.streamMessage({
       message: 'hello',
-      requestedStrategy: 'tree_of_thoughts',
+      requestedStrategy: 'deps',
       correlation: {
         taskId: 'task-work-1',
         product: 'work',
@@ -512,15 +512,15 @@ describe('ApiBackendManager', () => {
 
     expect(events).toContainEqual(expect.objectContaining({
       type: 'progress',
-      text: "Requested strategy 'tree_of_thoughts' is not supported by this runtime; falling back to 'simple_tool_call'.",
+      text: "Requested strategy 'deps' is not supported by this runtime; falling back to 'simple_tool_call'.",
       metadata: expect.objectContaining({
         kind: 'strategy',
         status: 'fallback',
         strategyEvent: 'strategy_degraded',
-        requestedStrategy: 'tree_of_thoughts',
+        requestedStrategy: 'deps',
         effectiveStrategy: 'simple_tool_call',
         strategyResolutionSource: 'compatibility_fallback',
-        degradedStrategy: 'tree_of_thoughts',
+        degradedStrategy: 'deps',
         fallbackStrategy: 'simple_tool_call',
       }),
     }));
@@ -544,7 +544,7 @@ describe('ApiBackendManager', () => {
     expect(updated).toMatchObject({
       strategy: {
         request: {
-          requestedStrategy: 'tree_of_thoughts',
+          requestedStrategy: 'deps',
           correlation: {
             taskId: 'task-work-1',
             product: 'work',
@@ -572,7 +572,7 @@ describe('ApiBackendManager', () => {
       cwd: '/repo',
       strategy: {
         request: {
-          requestedStrategy: 'tree_of_thoughts',
+          requestedStrategy: 'deps',
         },
         effectiveStrategy: 'simple_tool_call',
         resolutionSource: 'compatibility_fallback',
@@ -623,6 +623,351 @@ describe('ApiBackendManager', () => {
       && event.metadata?.kind === 'strategy'
       && event.metadata?.strategyEvent === 'strategy_degraded'
     )).toBe(false);
+  });
+
+  it('runs explicit tree_of_thoughts with runtime-owned branching, pruning, and selection metadata', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-api-tot-'));
+    const repoDir = join(root, 'repo');
+    mkdirSync(repoDir, { recursive: true });
+    writeFileSync(join(repoDir, 'answer.txt'), '42\n', 'utf-8');
+
+    try {
+      const registry = new SessionRegistry();
+      const session = registry.create({
+        id: 'api-session-tree-of-thoughts',
+        providerName: 'codex',
+        providerBackend: 'api',
+        providerInstanceId: 'gateway',
+        cwd: repoDir,
+      });
+
+      const requestBodies: Record<string, unknown>[] = [];
+      const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+        requestBodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        switch (requestBodies.length) {
+          case 1:
+            return new Response(JSON.stringify({
+              id: 'resp_tot_branch_1a',
+              output: [
+                {
+                  type: 'message',
+                  role: 'assistant',
+                  content: [{ type: 'output_text', text: 'Candidate branch A would inspect the repo broadly first.' }],
+                },
+                {
+                  type: 'function_call',
+                  call_id: 'call_list_files_tot',
+                  name: 'list_files',
+                  arguments: '{"path":"."}',
+                },
+                {
+                  type: 'function_call',
+                  call_id: 'call_read_answer_tot_extra',
+                  name: 'read_file',
+                  arguments: '{"path":"answer.txt"}',
+                },
+              ],
+              usage: {
+                input_tokens: 3,
+                output_tokens: 1,
+              },
+            }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
+          case 2:
+            return new Response(JSON.stringify({
+              id: 'resp_tot_branch_1b',
+              output: [
+                {
+                  type: 'message',
+                  role: 'assistant',
+                  content: [{ type: 'output_text', text: 'Candidate branch B would verify answer.txt directly.' }],
+                },
+                {
+                  type: 'function_call',
+                  call_id: 'call_read_answer_tot_selected',
+                  name: 'read_file',
+                  arguments: '{"path":"answer.txt"}',
+                },
+              ],
+              usage: {
+                input_tokens: 3,
+                output_tokens: 1,
+              },
+            }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
+          case 3:
+            return new Response(JSON.stringify({
+              id: 'resp_tot_1',
+              output: [
+                {
+                  type: 'message',
+                  role: 'assistant',
+                  content: [{ type: 'output_text', text: 'Selecting the direct verification branch.' }],
+                },
+                {
+                  type: 'function_call',
+                  call_id: 'call_read_answer_tot_main',
+                  name: 'read_file',
+                  arguments: '{"path":"answer.txt"}',
+                },
+              ],
+              usage: {
+                input_tokens: 6,
+                output_tokens: 2,
+              },
+            }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
+          case 4:
+            return new Response(JSON.stringify({
+              id: 'resp_tot_branch_2a',
+              output: [{
+                type: 'message',
+                role: 'assistant',
+                content: [{ type: 'output_text', text: '42' }],
+              }],
+              usage: {
+                input_tokens: 2,
+                output_tokens: 1,
+              },
+            }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
+          case 5:
+            return new Response(JSON.stringify({
+              id: 'resp_tot_branch_2b',
+              output: [
+                {
+                  type: 'message',
+                  role: 'assistant',
+                  content: [{ type: 'output_text', text: 'Another branch would reopen the file for certainty.' }],
+                },
+                {
+                  type: 'function_call',
+                  call_id: 'call_read_answer_tot_repeat',
+                  name: 'read_file',
+                  arguments: '{"path":"answer.txt"}',
+                },
+              ],
+              usage: {
+                input_tokens: 2,
+                output_tokens: 1,
+              },
+            }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
+          default:
+            return new Response(JSON.stringify({
+              id: 'resp_tot_2',
+              output: [{
+                type: 'message',
+                role: 'assistant',
+                content: [{ type: 'output_text', text: '42' }],
+              }],
+              usage: {
+                input_tokens: 3,
+                output_tokens: 1,
+              },
+            }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
+        }
+      });
+
+      const manager = new ApiBackendManager(
+        { sessionBaseDir: root },
+        registry,
+        {
+          fetch: fetchMock as typeof fetch,
+          env: {
+            OPENAI_API_KEY: 'test-key',
+          },
+        },
+      );
+      const runtime = createRuntimeManager(root, manager);
+      const turn = {
+        message: 'Inspect answer.txt and return only the verified value.',
+        requestedStrategy: 'tree_of_thoughts' as const,
+        acceptanceCriteria: 'Return only the verified file value.',
+        strategyContext: {
+          maxDepth: 3,
+          branchCount: 2,
+          timeoutMs: 1500,
+          stuckThreshold: 2,
+        },
+        correlation: {
+          taskId: 'task-architecture-1',
+          product: 'work',
+        },
+      };
+
+      runtime.beginRun(session, turn);
+
+      const handle = manager.spawn(session.id, createTarget());
+      const events = await collectEvents(handle.streamMessage(turn));
+      for (const event of events) {
+        runtime.observeEvent(session.id, event);
+      }
+
+      const updated = registry.get(session.id)!;
+      const inspection = buildSessionInspection({
+        session: updated,
+        view: toSessionView(updated, {
+          attached: manager.isAttached(session.id),
+          externalSessionLiveWindowMs: 15000,
+        }),
+        trackedState: runtime.getTrackedState(session.id),
+        metering: buildMeteringSnapshot(),
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(6);
+      expect(String(requestBodies[0]?.instructions)).toContain('Execution strategy: tree_of_thoughts.');
+      expect(String(JSON.stringify(requestBodies[0]?.input))).toContain(
+        'Runtime tree-of-thoughts branch exploration for depth 1, candidate 1 of 2.',
+      );
+      expect(String(JSON.stringify(requestBodies[2]?.input))).toContain(
+        'Runtime tree-of-thoughts guidance for depth 1: commit to depth_1_branch_2',
+      );
+      expect(requestBodies[5]?.previous_response_id).toBe('resp_tot_1');
+
+      expect(events).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            status: 'started',
+            strategyEvent: 'strategy_started',
+            effectiveStrategy: 'tree_of_thoughts',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            strategyEvent: 'strategy_branch',
+            effectiveStrategy: 'tree_of_thoughts',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            strategyEvent: 'strategy_prune',
+            effectiveStrategy: 'tree_of_thoughts',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            strategyEvent: 'strategy_select',
+            effectiveStrategy: 'tree_of_thoughts',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'tool_use',
+          toolName: 'read_file',
+          toolId: 'call_read_answer_tot_main',
+        }),
+        expect.objectContaining({
+          type: 'tool_result',
+          toolName: 'read_file',
+          toolId: 'call_read_answer_tot_main',
+          text: expect.stringContaining('42'),
+        }),
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            status: 'completed',
+            strategyEvent: 'strategy_completed',
+            effectiveStrategy: 'tree_of_thoughts',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'result',
+          sessionId: 'resp_tot_2',
+          usage: {
+            inputTokens: 19,
+            outputTokens: 7,
+          },
+        }),
+      ]));
+
+      expect(updated).toMatchObject({
+        strategy: {
+          preferredStrategy: 'tree_of_thoughts',
+          request: {
+            requestedStrategy: 'tree_of_thoughts',
+            acceptanceCriteria: 'Return only the verified file value.',
+            strategyContext: {
+              maxDepth: 3,
+              branchCount: 2,
+              timeoutMs: 1500,
+              stuckThreshold: 2,
+            },
+            correlation: {
+              taskId: 'task-architecture-1',
+              product: 'work',
+            },
+          },
+          effectiveStrategy: 'tree_of_thoughts',
+          resolutionSource: 'explicit_request',
+          summary: {
+            status: 'completed',
+            stepCount: 2,
+            stepLimit: 3,
+            timeoutMs: 1500,
+            duplicateStepCount: 1,
+            lastStepSignature: 'read_file:{\"path\":\"answer.txt\"}',
+            lastEvent: 'strategy_completed',
+            resolutionSource: 'explicit_request',
+          },
+          localState: {
+            currentPhase: 'completed',
+            completedDepths: 2,
+            branchCount: 2,
+            exploredBranchCount: 2,
+            prunedBranchCount: 1,
+            lastSelectedBranchId: 'depth_2_branch_1',
+            lastSelectionReason: 'final_answer_candidate',
+          },
+        },
+      });
+
+      expect(inspection.strategy).toMatchObject({
+        requestedStrategy: 'tree_of_thoughts',
+        effectiveStrategy: 'tree_of_thoughts',
+        acceptanceCriteria: 'Return only the verified file value.',
+        correlation: {
+          taskId: 'task-architecture-1',
+          product: 'work',
+        },
+        state: {
+          preferredStrategy: 'tree_of_thoughts',
+          effectiveStrategy: 'tree_of_thoughts',
+          summary: {
+            status: 'completed',
+            stepCount: 2,
+          },
+          localState: {
+            currentPhase: 'completed',
+            completedDepths: 2,
+            branchCount: 2,
+          },
+        },
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('runs explicit react with additive stream events and runtime-owned inspection metadata', async () => {

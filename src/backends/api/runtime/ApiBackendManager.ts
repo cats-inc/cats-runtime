@@ -170,6 +170,8 @@ function buildStrategyInstructionOverlay(
     strategyPrompt = 'Execution strategy: pdca. Work in explicit plan-do-check-act cycles: plan the next bounded action set, execute only that batch, check the results against the acceptance criteria, and then adjust before another cycle.';
   } else if (strategyId === 'reflexion') {
     strategyPrompt = 'Execution strategy: reflexion. Produce a bounded draft, critique it explicitly against the acceptance criteria, and revise before finalizing; use tools only when the critique reveals a concrete gap.';
+  } else if (strategyId === 'tree_of_thoughts') {
+    strategyPrompt = 'Execution strategy: tree_of_thoughts. The runtime will explore multiple candidate branches, prune weaker paths, and ask you to commit to one bounded branch at a time. Keep each reply focused on a single selected path.';
   }
   if (!strategyPrompt) {
     return undefined;
@@ -200,10 +202,15 @@ function resolveStrategyConstraints(
   const strategyContext = request?.strategyContext;
   const usesManagedLoopGuards = strategyId === 'react'
     || strategyId === 'pdca'
-    || strategyId === 'reflexion';
+    || strategyId === 'reflexion'
+    || strategyId === 'tree_of_thoughts';
   const stepLimit = readStrategyPositiveInteger(
     strategyContext,
-    strategyId === 'pdca' ? 'maxCycles' : 'maxSteps',
+    strategyId === 'pdca'
+      ? 'maxCycles'
+      : strategyId === 'tree_of_thoughts'
+        ? 'maxDepth'
+        : 'maxSteps',
   ) || readStrategyPositiveInteger(
     strategyContext,
     'maxSteps',
