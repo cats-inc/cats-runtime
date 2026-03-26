@@ -32,6 +32,11 @@ describe('buildProviderToolingSummary', () => {
           blocked: 0,
         },
       }),
+      observability: {
+        catalog: 'runtime_enumerated',
+        toolCallEvents: true,
+        runtimeServices: false,
+      },
     });
   });
 
@@ -57,10 +62,15 @@ describe('buildProviderToolingSummary', () => {
       discoverable: false,
       sessionScopedOverrides: false,
       summary: expect.stringContaining('does not enumerate provider-native tools'),
+      observability: {
+        catalog: 'not_enumerated',
+        toolCallEvents: false,
+        runtimeServices: false,
+      },
     });
   });
 
-  it('keeps agent targets honest about provider-managed tooling', () => {
+  it('keeps agent targets honest about provider-managed tooling and remote observability', () => {
     const summary = buildProviderToolingSummary({
       providerName: 'openclaw',
       backend: 'agent',
@@ -72,13 +82,51 @@ describe('buildProviderToolingSummary', () => {
         backend: 'agent',
         transport: 'openclaw_gateway',
       },
-    } as ProviderTargetDescriptor);
+    } as ProviderTargetDescriptor, {
+      agentRuntime: {
+        adapter: 'openclaw',
+        family: 'gateway',
+        summary: 'OpenClaw gateway',
+        transport: {
+          kind: 'websocket',
+          protocol: 'openclaw_gateway_v3',
+          liveProbe: 'rpc_health',
+          modelDiscovery: 'models_list',
+          streaming: 'agent_event_frames',
+        },
+        request: {
+          headerNames: [],
+        },
+        auth: {
+          mechanisms: [],
+          credentials: [],
+        },
+        continuity: {
+          providerManagedSessions: true,
+          sessionKey: true,
+          providerSessionState: true,
+          cancel: false,
+        },
+        capabilities: {
+          probe: true,
+          modelDiscovery: true,
+          cancel: false,
+          runtimeServices: true,
+          toolCallEvents: false,
+        },
+      },
+    });
 
     expect(summary).toEqual({
       source: 'provider_managed',
       discoverable: false,
       sessionScopedOverrides: false,
-      summary: expect.stringContaining('external agent runtime'),
+      summary: expect.stringContaining('does not enumerate a remote tool catalog'),
+      observability: {
+        catalog: 'not_enumerated',
+        toolCallEvents: false,
+        runtimeServices: true,
+      },
     });
   });
 });

@@ -622,7 +622,7 @@ async function diagnoseAgentTarget(
     transport: instance.transport,
     model: instance.model || null,
     endpoint: resolveRemoteEndpoint(instance, env),
-    tooling: buildProviderToolingSummary(target),
+    tooling: buildProviderToolingSummary(target, { agentRuntime }),
     agentRuntime,
     credentials: {
       urlEnv: buildEnvDescriptor(env, instance.urlEnv, false),

@@ -140,6 +140,11 @@ describe('API backend integration', () => {
                       total: 28,
                     }),
                   }),
+                  observability: {
+                    catalog: 'runtime_enumerated',
+                    toolCallEvents: true,
+                    runtimeServices: false,
+                  },
                 },
                 install: null,
                 compatibility: null,
@@ -164,6 +169,11 @@ describe('API backend integration', () => {
                       total: 28,
                     }),
                   }),
+                  observability: {
+                    catalog: 'runtime_enumerated',
+                    toolCallEvents: true,
+                    runtimeServices: false,
+                  },
                 },
                 install: null,
                 compatibility: null,
@@ -194,6 +204,11 @@ describe('API backend integration', () => {
                       total: 28,
                     }),
                   }),
+                  observability: {
+                    catalog: 'runtime_enumerated',
+                    toolCallEvents: true,
+                    runtimeServices: false,
+                  },
                 },
                 install: null,
                 compatibility: null,
@@ -224,6 +239,11 @@ describe('API backend integration', () => {
                       total: 28,
                     }),
                   }),
+                  observability: {
+                    catalog: 'runtime_enumerated',
+                    toolCallEvents: true,
+                    runtimeServices: false,
+                  },
                 },
                 install: null,
                 compatibility: null,
@@ -254,6 +274,11 @@ describe('API backend integration', () => {
                       total: 28,
                     }),
                   }),
+                  observability: {
+                    catalog: 'runtime_enumerated',
+                    toolCallEvents: true,
+                    runtimeServices: false,
+                  },
                 },
                 install: null,
                 compatibility: null,
@@ -293,6 +318,11 @@ describe('API backend integration', () => {
             blocked: 0,
           },
         }),
+        observability: {
+          catalog: 'runtime_enumerated',
+          toolCallEvents: true,
+          runtimeServices: false,
+        },
       });
 
       const localResponse = await runtime.app.request('/providers/ollama/tools?instance=local/local');
@@ -305,6 +335,11 @@ describe('API backend integration', () => {
         source: 'runtime_local',
         discoverable: true,
         sessionScopedOverrides: true,
+        observability: {
+          catalog: 'runtime_enumerated',
+          toolCallEvents: true,
+          runtimeServices: false,
+        },
         policy: expect.objectContaining({
           profile: 'standard',
         }),

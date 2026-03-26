@@ -462,6 +462,11 @@ describe('provider diagnostics HTTP contract', () => {
                 source: 'runtime_local',
                 discoverable: true,
                 sessionScopedOverrides: true,
+                observability: {
+                  catalog: 'runtime_enumerated',
+                  toolCallEvents: true,
+                  runtimeServices: false,
+                },
                 summary: expect.stringContaining(`'standard' profile`),
                 policy: expect.objectContaining({
                   profile: 'standard',

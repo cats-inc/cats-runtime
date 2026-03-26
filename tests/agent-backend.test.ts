@@ -366,6 +366,11 @@ describe('agent backend integration', () => {
                 discoverable: false,
                 sessionScopedOverrides: false,
                 summary: expect.stringContaining('external agent runtime'),
+                observability: {
+                  catalog: 'not_enumerated',
+                  toolCallEvents: false,
+                  runtimeServices: true,
+                },
               },
               install: null,
               compatibility: null,
@@ -789,6 +794,11 @@ describe('agent backend integration', () => {
         discoverable: false,
         sessionScopedOverrides: false,
         summary: expect.stringContaining('external agent runtime'),
+        observability: {
+          catalog: 'not_enumerated',
+          toolCallEvents: false,
+          runtimeServices: true,
+        },
       });
     } finally {
       await runtime.close();
@@ -1043,6 +1053,11 @@ describe('agent backend integration', () => {
                 discoverable: false,
                 sessionScopedOverrides: false,
                 summary: expect.stringContaining('external agent runtime'),
+                observability: {
+                  catalog: 'not_enumerated',
+                  toolCallEvents: true,
+                  runtimeServices: true,
+                },
               },
               install: null,
               compatibility: null,

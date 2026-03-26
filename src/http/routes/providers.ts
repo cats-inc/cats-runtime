@@ -28,42 +28,44 @@ providerRoutes.get('/providers/config', (c) => {
         return [];
       }
 
-      const instances = provider.instances.map((instance) => ({
-        ...(instance.backend === 'cli' && instance.cliInstance
-          ? (() => {
-            const activeConfig = inspectProviderActiveConfig(instance);
-            return activeConfig ? { activeConfig } : {};
-          })()
-          : {}),
-        id: instance.instanceId,
-        target: `${instance.backend}/${instance.instanceId}`,
-        backend: instance.backend,
-        command: instance.cliInstance?.commandConfig.path,
-        runner: instance.cliInstance?.commandConfig.runner,
-        runtime: instance.cliInstance?.commandConfig.runtime,
-        transport: instance.remoteInstance?.transport,
-        model: instance.remoteInstance?.model,
-        ...(instance.backend === 'agent' && instance.remoteInstance
-          ? {
-              agentRuntime: ctx.agentBackend
-                ? ctx.agentBackend.inspect(instance)
-                : inspectAgentTarget(instance.remoteInstance, { env: process.env }),
-            }
-          : {}),
-        tooling: buildProviderToolingSummary(instance),
-        install: instance.backend === 'cli' && instance.cliInstance
-          ? buildProviderInstallCatalogView(
-            instance.providerName as ProviderName,
-            instance.cliInstance.commandConfig.runtime,
-          )
-          : null,
-        compatibility: instance.backend === 'cli'
-          ? compatibility.getCachedSummary(
-            instance.providerName as ProviderName,
-            instance.instanceId,
-          ) || null
-          : null,
-      }));
+      const instances = provider.instances.map((instance) => {
+        const agentRuntime = instance.backend === 'agent' && instance.remoteInstance
+          ? ctx.agentBackend
+            ? ctx.agentBackend.inspect(instance)
+            : inspectAgentTarget(instance.remoteInstance, { env: process.env })
+          : undefined;
+
+        return {
+          ...(instance.backend === 'cli' && instance.cliInstance
+            ? (() => {
+              const activeConfig = inspectProviderActiveConfig(instance);
+              return activeConfig ? { activeConfig } : {};
+            })()
+            : {}),
+          id: instance.instanceId,
+          target: `${instance.backend}/${instance.instanceId}`,
+          backend: instance.backend,
+          command: instance.cliInstance?.commandConfig.path,
+          runner: instance.cliInstance?.commandConfig.runner,
+          runtime: instance.cliInstance?.commandConfig.runtime,
+          transport: instance.remoteInstance?.transport,
+          model: instance.remoteInstance?.model,
+          ...(agentRuntime ? { agentRuntime } : {}),
+          tooling: buildProviderToolingSummary(instance, { agentRuntime }),
+          install: instance.backend === 'cli' && instance.cliInstance
+            ? buildProviderInstallCatalogView(
+              instance.providerName as ProviderName,
+              instance.cliInstance.commandConfig.runtime,
+            )
+            : null,
+          compatibility: instance.backend === 'cli'
+            ? compatibility.getCachedSummary(
+              instance.providerName as ProviderName,
+              instance.instanceId,
+            ) || null
+            : null,
+        };
+      });
 
       if (instances.length === 0) {
         return [];
@@ -113,12 +115,17 @@ providerRoutes.get('/providers/:provider/tools', (c) => {
 
   try {
     const target = resolveProviderTarget(ctx.config, providerName, instance);
+    const agentRuntime = target.backend === 'agent' && target.remoteInstance
+      ? ctx.agentBackend
+        ? ctx.agentBackend.inspect(target)
+        : inspectAgentTarget(target.remoteInstance, { env: process.env })
+      : undefined;
     return c.json({
       provider: target.providerName,
       backend: target.backend,
       instance: target.instanceId,
       target: `${target.backend}/${target.instanceId}`,
-      ...buildProviderToolingSummary(target),
+      ...buildProviderToolingSummary(target, { agentRuntime }),
     });
   } catch (err) {
     const payload: Record<string, unknown> = {

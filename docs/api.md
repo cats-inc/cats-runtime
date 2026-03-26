@@ -2448,6 +2448,9 @@ Each instance entry also exposes additive `tooling` metadata:
 - `sessionScopedOverrides`: whether later per-session permission settings can
   narrow the reported baseline
 - `summary`: operator-facing description of who owns tool execution
+- `observability`: bounded runtime truth about tool-catalog ownership plus
+  whether the runtime can still observe tool-call events or runtime service
+  updates for that target
 - `policy`: for API/local targets only, the bounded runtime tool-profile
   inspection (`profile`, counts, and per-tool access classification) before any
   session-level permission narrowing
@@ -2482,6 +2485,11 @@ full provider topology:
   "discoverable": true,
   "sessionScopedOverrides": true,
   "summary": "Runtime-managed local tools default to the 'standard' profile (28 tool(s)) before per-session permission narrowing.",
+  "observability": {
+    "catalog": "runtime_enumerated",
+    "toolCallEvents": true,
+    "runtimeServices": false
+  },
   "policy": {
     "profile": "standard",
     "permissionMode": "skip",
@@ -2498,7 +2506,10 @@ full provider topology:
 
 For CLI and agent targets the route stays honest: it still returns `200`, but
 `source` becomes `provider_native` or `provider_managed`, `discoverable` stays
-`false`, and no synthetic runtime tool catalog is invented.
+`false`, and no synthetic runtime tool catalog is invented. Those targets still
+include bounded `observability` truth so hosts can distinguish provider-owned
+catalogs from runtime-enumerated ones and can see whether the runtime can
+observe remote tool-call events or runtime service updates.
 
 For CLI backends, instance entries also expose runtime-owned `install` metadata
 even before a probe has run. The `install` object includes:

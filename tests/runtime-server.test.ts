@@ -1446,6 +1446,11 @@ backends:
         discoverable: false,
         sessionScopedOverrides: false,
         summary: expect.stringContaining('provider-native tools'),
+        observability: {
+          catalog: 'not_enumerated',
+          toolCallEvents: false,
+          runtimeServices: false,
+        },
       });
     });
   });
@@ -1510,6 +1515,11 @@ backends:
                   discoverable: false,
                   sessionScopedOverrides: false,
                   summary: expect.stringContaining('provider-native tools'),
+                  observability: {
+                    catalog: 'not_enumerated',
+                    toolCallEvents: false,
+                    runtimeServices: false,
+                  },
                 },
                 install: expect.objectContaining({
                   provider: 'cursor',
@@ -1543,6 +1553,11 @@ backends:
                   discoverable: false,
                   sessionScopedOverrides: false,
                   summary: expect.stringContaining('provider-native tools'),
+                  observability: {
+                    catalog: 'not_enumerated',
+                    toolCallEvents: false,
+                    runtimeServices: false,
+                  },
                 },
                 install: expect.objectContaining({
                   provider: 'cursor',
@@ -1636,6 +1651,11 @@ backends:
             discoverable: false,
             sessionScopedOverrides: false,
             summary: expect.stringContaining('provider-native tools'),
+            observability: {
+              catalog: 'not_enumerated',
+              toolCallEvents: false,
+              runtimeServices: false,
+            },
           },
           activeConfig: {
             source: 'goose_config',
@@ -1766,6 +1786,11 @@ providers:
                   discoverable: false,
                   sessionScopedOverrides: false,
                   summary: expect.stringContaining('provider-native tools'),
+                  observability: {
+                    catalog: 'not_enumerated',
+                    toolCallEvents: false,
+                    runtimeServices: false,
+                  },
                 },
                 install: expect.objectContaining({
                   provider: 'claude',

@@ -582,8 +582,9 @@ src/
    `GET /diagnostics/providers` expose the runtime-owned host integration
    surface, including runtime maintenance snapshots plus transport-native
    API/local auth/model probe requests, additive provider-tooling ownership /
-   baseline-profile summaries, additive HTTP semantic classifications, and
-   additive model-catalog/configured-model readiness checks for
+   baseline-profile summaries plus bounded tooling observability truth,
+   additive HTTP semantic classifications, and additive
+   model-catalog/configured-model readiness checks for
    API/local/agent targets when requested
 14. `POST /mcp` reuses those same runtime-owned services as an additive
     orchestrator/tool surface
