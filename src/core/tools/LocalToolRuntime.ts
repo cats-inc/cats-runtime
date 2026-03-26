@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { chmod, copyFile, readdir, readFile, rmdir, stat, mkdir, rename, unlink, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, readdir, readFile, rmdir, stat, mkdir, rename, unlink, utimes, writeFile } from 'node:fs/promises';
 import { dirname, extname, resolve } from 'node:path';
 import path from 'node:path';
 import type {
@@ -923,6 +923,19 @@ function looksBinaryFile(path: string): boolean {
 
 function ensureObject(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' ? value as Record<string, unknown> : {};
+}
+
+async function preserveCopiedFileMetadata(
+  sourceInfo: Awaited<ReturnType<typeof stat>>,
+  destinationPath: string,
+): Promise<void> {
+  if (process.platform !== 'win32') {
+    const mode = typeof sourceInfo.mode === 'bigint'
+      ? Number(sourceInfo.mode)
+      : sourceInfo.mode;
+    await chmod(destinationPath, mode).catch(() => undefined);
+  }
+  await utimes(destinationPath, sourceInfo.atime, sourceInfo.mtime).catch(() => undefined);
 }
 
 function requireString(args: Record<string, unknown>, key: string): string {
@@ -1967,6 +1980,7 @@ export class LocalToolRuntime {
 
     await mkdir(dirname(fullDest), { recursive: true });
     await copyFile(fullSource, fullDest);
+    await preserveCopiedFileMetadata(sourceInfo, fullDest);
 
     return {
       callId,

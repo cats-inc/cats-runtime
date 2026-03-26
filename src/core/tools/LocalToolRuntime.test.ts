@@ -1,4 +1,4 @@
-import { existsSync, linkSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, linkSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { chmod as chmodAsync, rename as renameAsync, stat as statAsync, unlink as unlinkAsync, writeFile as writeFileAsync } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -1330,6 +1330,31 @@ describe('LocalToolRuntime', () => {
         expect(readFileSync(join(cwd, 'backup', 'app.ts'), 'utf-8')).toBe(
           readFileSync(join(cwd, 'src', 'app.ts'), 'utf-8'),
         );
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('preserves source timestamps when copying a file', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+      const sourcePath = join(cwd, 'src', 'app.ts');
+      const destinationPath = join(cwd, 'backup', 'app.ts');
+      const preservedTime = new Date('2020-01-02T03:04:05.000Z');
+      utimesSync(sourcePath, preservedTime, preservedTime);
+
+      try {
+        const result = await runtime.execute(extendedCtx(cwd), {
+          id: 'cp-1b',
+          name: 'copy_file',
+          arguments: { source: 'src/app.ts', destination: 'backup/app.ts' },
+        });
+        expect(result.isError).toBeUndefined();
+
+        const sourceStat = statSync(sourcePath);
+        const destinationStat = statSync(destinationPath);
+        expect(destinationStat.mtime.toISOString()).toBe(sourceStat.mtime.toISOString());
+        expect(destinationStat.atime.toISOString()).toBe(sourceStat.atime.toISOString());
       } finally {
         cleanup();
       }

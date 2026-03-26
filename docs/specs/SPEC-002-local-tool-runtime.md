@@ -98,6 +98,10 @@ requests into calls into this shared runtime.
   file contents instead of leaving partially written text behind, preserve the
   previous file mode when replacing an existing file, and clean up newly
   created empty parent directories when a new-file commit path aborts.
+- Extended-profile `copy_file` now also preserves source timestamps on the
+  copied destination (and source mode where the host platform permits) so the
+  shared runtime does not silently drop basic file metadata on workspace-local
+  copy flows.
 - Provider-level read surfaces now expose a bounded tooling read model:
   `GET /providers/config`, `GET /providers/{provider}/tools`, and
   `GET /diagnostics/providers` report whether a target uses runtime-managed
@@ -105,8 +109,7 @@ requests into calls into this shared runtime.
   default runtime tool profile before any per-session permission narrowing.
 - The safety model still does **not** yet guarantee full transactional
   rollback for general `write_file` / `edit_file` operations or broader
-  metadata restoration such as timestamps, ownership, or other inode-level
-  attributes.
+  metadata restoration such as ownership or other inode-level attributes.
 
 ## Dependencies
 
