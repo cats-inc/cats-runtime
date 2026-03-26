@@ -874,4 +874,65 @@ already exist.
 - `docs/plans/PLAN-020-pluggable-execution-strategy-substrate.md`
 
 ---
+### OPT-11: Bootstrap Scan Latency and Setup Read Responsiveness
+
+**Priority**: P2
+**Status**: In Progress
+
+#### Problem
+
+Standalone bootstrap now works without a pre-seeded `providers.yaml`, but the
+provider scan path was still doing provider compatibility probes strictly
+serially.
+
+That makes first-run setup and later manual repair scans slower than necessary,
+especially when multiple providers are present and each probe has its own
+runtime/setup checks.
+
+The runtime should improve this operator-facing latency without changing the
+shape of setup-state or scan artifacts and without turning bootstrap into a
+different orchestration subsystem from the shared compatibility surface.
+
+#### Current Implementation Status
+
+- bootstrap mode, setup-state persistence, latest-scan/manual-scan snapshots,
+  and generated `providers.yaml` are landed
+- `BootstrapService.scan()` now probes providers with bounded concurrency while
+  preserving stable provider ordering in persisted/read-model scan results
+- direct service tests now cover out-of-order completion plus concurrency caps
+- bootstrap integration coverage keeps the existing `/setup-state` and
+  `/setup-scan` contract intact while avoiding unnecessary slow-path probes in
+  the verification suite
+
+#### Follow-through Direction
+
+- keep bootstrap scan results deterministic and additive for existing setup
+  read surfaces
+- continue improving setup/operator responsiveness through shared runtime-owned
+  bootstrap services rather than page-local logic
+- land the remaining shared UI/manual repair follow-through from `PLAN-019`
+  separately from this scan-orchestration slice
+
+#### Deferred Scope
+
+- do not change the persisted `provider-scan.json` / `provider-manual-scan.json`
+  shape in this optimization slice
+- do not move compatibility semantics out of the shared provider
+  compatibility service
+- do not couple scan orchestration to `cats` product setup or wizard behavior
+
+#### Affected Areas
+
+- `src/core/bootstrap/*`
+- `tests/bootstrap.test.ts`
+- `docs/specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md`
+- `docs/plans/PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md`
+
+#### References
+
+- `docs/specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md`
+- `docs/decisions/021-treat-providers-yaml-as-generated-config-and-bootstrap-without-it.md`
+- `docs/plans/PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md`
+
+---
 *Last updated: 2026-03-26*

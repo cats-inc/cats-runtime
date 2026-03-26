@@ -650,7 +650,10 @@ describe('bootstrap mode server', () => {
       ensureDirs(env);
       const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
       const startup = createRuntimeStartupState({ bootstrapRequired: true });
-      const runtime = createRuntimeServer(config, { startup });
+      const runtime = createRuntimeServer(config, {
+        startup,
+        compatibility: createFastCompatibility(env),
+      });
       try {
         // Run a manual scan
         await runtime.app.request('/setup-scan', {

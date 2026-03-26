@@ -22,6 +22,8 @@ import type { RuntimeConfig } from '../config.js';
 // Types
 // ---------------------------------------------------------------------------
 
+const DEFAULT_SCAN_CONCURRENCY = 3;
+
 export interface ProviderUniverseEntry {
   provider: ProviderName;
   familyLabel: string;
@@ -159,12 +161,14 @@ export class BootstrapService {
   private readonly configPath: string;
   private readonly config: RuntimeConfig;
   private readonly compatibility: ProviderCompatibilityService;
+  private readonly scanConcurrency: number;
 
   constructor(opts: {
     dataDir: string;
     configPath: string;
     config: RuntimeConfig;
     compatibility: ProviderCompatibilityService;
+    scanConcurrency?: number;
   }) {
     this.setupDir = join(opts.dataDir, 'setup');
     this.setupStatePath = join(this.setupDir, 'setup-state.json');
@@ -173,6 +177,7 @@ export class BootstrapService {
     this.configPath = opts.configPath;
     this.config = opts.config;
     this.compatibility = opts.compatibility;
+    this.scanConcurrency = normalizeScanConcurrency(opts.scanConcurrency);
   }
 
   // ---- Provider Universe (Layer 1) ----
@@ -199,11 +204,7 @@ export class BootstrapService {
     state.status = 'scanning';
     writeJsonAtomic(this.setupStatePath, state);
 
-    const entries: ProviderScanEntry[] = [];
-    for (const provider of KNOWN_PROVIDERS) {
-      const entry = await this.probeProvider(provider);
-      entries.push(entry);
-    }
+    const entries = await this.probeProviders();
 
     const result: BootstrapScanResult = {
       scannedAt: new Date().toISOString(),
@@ -267,6 +268,26 @@ export class BootstrapService {
 
   // ---- Internal ----
 
+  private async probeProviders(): Promise<ProviderScanEntry[]> {
+    const entries = new Array<ProviderScanEntry>(KNOWN_PROVIDERS.length);
+    const workerCount = Math.min(this.scanConcurrency, KNOWN_PROVIDERS.length);
+    let nextIndex = 0;
+
+    await Promise.all(Array.from({ length: workerCount }, async () => {
+      while (true) {
+        const currentIndex = nextIndex;
+        nextIndex += 1;
+        if (currentIndex >= KNOWN_PROVIDERS.length) {
+          return;
+        }
+
+        entries[currentIndex] = await this.probeProvider(KNOWN_PROVIDERS[currentIndex]!);
+      }
+    }));
+
+    return entries;
+  }
+
   private async probeProvider(provider: ProviderName): Promise<ProviderScanEntry> {
     const commandConfig = this.config.providerCommands[provider];
     const runtime = commandConfig?.runtime ?? { mode: 'native' as const };
@@ -308,4 +329,12 @@ export class BootstrapService {
       };
     }
   }
+}
+
+function normalizeScanConcurrency(value: number | undefined): number {
+  if (!Number.isFinite(value)) {
+    return DEFAULT_SCAN_CONCURRENCY;
+  }
+
+  return Math.max(1, Math.trunc(value as number));
 }
