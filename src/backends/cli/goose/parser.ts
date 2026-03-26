@@ -1,4 +1,12 @@
 import type { StreamEvent } from '../../../core/types.js';
+import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
+import {
+  observeIgnored,
+  observeNormalized,
+  observeRawPassthrough,
+  observeSchemaFailure,
+  observeUnknown,
+} from '../../../core/compatibility/providerEvolution.js';
 import { createRuntimeProgressEvent } from '../../../core/progress.js';
 
 /** Raw Goose stream-json event shape. */
@@ -39,7 +47,10 @@ export interface GooseStreamEvent {
  *  - {"type":"message","message":{"role":"user","content":[{"type":"toolResponse",...}]}}
  *  - {"type":"complete","total_tokens":N}
  */
-export function parseGooseStreamLine(line: string): StreamEvent | StreamEvent[] | null {
+export function parseGooseStreamLine(
+  line: string,
+  observer?: ProviderEvolutionEvidenceObserver,
+): StreamEvent | StreamEvent[] | null {
   const trimmed = line.trim();
   if (!trimmed) return null;
 
@@ -47,11 +58,20 @@ export function parseGooseStreamLine(line: string): StreamEvent | StreamEvent[] 
   try {
     event = JSON.parse(trimmed);
   } catch {
-    return { type: 'raw', text: trimmed };
+    return observeRawPassthrough(observer, {
+      reason: 'non_json_line',
+      rawSample: trimmed,
+    }, {
+      type: 'raw',
+      text: trimmed,
+    });
   }
 
   if (event.type === 'complete') {
-    return {
+    return observeNormalized(observer, {
+      rawEventType: 'complete',
+      rawSample: event,
+    }, {
       type: 'result',
       usage: event.total_tokens != null
         ? { inputTokens: 0, outputTokens: event.total_tokens }
@@ -64,24 +84,39 @@ export function parseGooseStreamLine(line: string): StreamEvent | StreamEvent[] 
             },
           }
         : undefined,
-    };
+    });
   }
 
   if (event.type === 'message' && event.message) {
     const { role, content } = event.message;
-    if (!Array.isArray(content) || content.length === 0) return null;
+    if (!Array.isArray(content) || content.length === 0) {
+      return observeSchemaFailure(observer, {
+        rawEventType: 'message',
+        reason: 'missing_content_blocks',
+        rawSample: event,
+      }, null);
+    }
 
     const block = content[0];
 
     // Assistant text
     if (role === 'assistant' && block.type === 'text' && block.text != null) {
-      return { type: 'text', text: block.text };
+      return observeNormalized(observer, {
+        rawEventType: 'message:assistant:text',
+        rawSample: event,
+      }, {
+        type: 'text',
+        text: block.text,
+      });
     }
 
     // Tool request
     if (role === 'assistant' && block.type === 'toolRequest') {
       const toolName = block.toolCall?.value?.name ?? 'unknown';
-      return [
+      return observeNormalized(observer, {
+        rawEventType: 'message:assistant:toolRequest',
+        rawSample: event,
+      }, [
         createRuntimeProgressEvent({
           text: `Running tool: ${toolName}`,
           provider: 'goose',
@@ -95,7 +130,7 @@ export function parseGooseStreamLine(line: string): StreamEvent | StreamEvent[] 
           },
         }),
         { type: 'tool_use', toolName, toolId: block.id },
-      ];
+      ]);
     }
 
     // Tool response
@@ -103,7 +138,10 @@ export function parseGooseStreamLine(line: string): StreamEvent | StreamEvent[] 
       const resultTexts = block.toolResult?.value?.content
         ?.filter((c) => c.type === 'text' && c.text)
         .map((c) => c.text!) ?? [];
-      return [
+      return observeNormalized(observer, {
+        rawEventType: 'message:user:toolResponse',
+        rawSample: event,
+      }, [
         createRuntimeProgressEvent({
           text: `Completed tool: ${block.id ?? 'unknown'}`,
           provider: 'goose',
@@ -121,13 +159,24 @@ export function parseGooseStreamLine(line: string): StreamEvent | StreamEvent[] 
           text: resultTexts.join(''),
           isError: block.toolResult?.value?.isError ?? false,
         },
-      ];
+      ]);
     }
 
-    return null;
+    return observeIgnored(observer, {
+      rawEventType: `message:${role || 'unknown'}:${block.type || 'unknown'}`,
+      reason: 'unsupported_message_block',
+      rawSample: event,
+    }, null);
   }
 
-  return { type: 'raw', raw: event };
+  return observeUnknown(observer, {
+    rawEventType: event.type || 'unknown',
+    reason: 'unknown_goose_event',
+    rawSample: event,
+  }, {
+    type: 'raw',
+    raw: event,
+  });
 }
 
 /**

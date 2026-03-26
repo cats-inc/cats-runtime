@@ -7,6 +7,11 @@ import type {
   ClaudeStreamEvent,
   TurnInput,
 } from './types.js';
+import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
+import {
+  observeNormalized,
+  observeRawPassthrough,
+} from '../../../core/compatibility/providerEvolution.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 
 export class ClaudeProvider implements Provider {
@@ -15,6 +20,7 @@ export class ClaudeProvider implements Provider {
 
   constructor(
     private readonly compatibilityProfile?: CompatibilityProfileSelection,
+    private readonly evolutionObserver?: ProviderEvolutionEvidenceObserver,
   ) {}
 
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
@@ -75,16 +81,25 @@ export class ClaudeProvider implements Provider {
       event = JSON.parse(trimmed);
     } catch {
       // Non-JSON line (startup messages, etc.)
-      return { type: 'raw', text: trimmed };
+      return observeRawPassthrough(this.evolutionObserver, {
+        reason: 'non_json_line',
+        rawSample: trimmed,
+      }, {
+        type: 'raw',
+        text: trimmed,
+      });
     }
 
     // system/init — session ID
     if (event.type === 'system' && event.subtype === 'init') {
-      return {
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: 'system:init',
+        rawSample: event,
+      }, {
         type: 'init',
         sessionId: event.session_id,
         raw: event,
-      };
+      });
     }
 
     // assistant message — accumulate text content
@@ -98,26 +113,35 @@ export class ClaudeProvider implements Provider {
         .filter(Boolean);
 
       if (texts.length > 0) {
-        return {
+        return observeNormalized(this.evolutionObserver, {
+          rawEventType: 'assistant',
+          rawSample: event,
+        }, {
           type: 'text',
           text: texts.join(''),
           raw: event,
-        };
+        });
       }
     }
 
     // content_block_delta — streaming text chunks
     if (event.type === 'content_block_delta' && event.content_block_delta?.text) {
-      return {
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: 'content_block_delta',
+        rawSample: event,
+      }, {
         type: 'text',
         text: event.content_block_delta.text,
         raw: event,
-      };
+      });
     }
 
     // result — done, with token usage
     if (event.type === 'result') {
-      return {
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: 'result',
+        rawSample: event,
+      }, {
         type: 'result',
         sessionId: event.session_id,
         usage: event.usage ? {
@@ -127,10 +151,17 @@ export class ClaudeProvider implements Provider {
           outputTokens: event.usage.output_tokens ?? 0,
         } : undefined,
         raw: event,
-      };
+      });
     }
 
     // Pass through anything else as raw
-    return { type: 'raw', raw: event };
+    return observeRawPassthrough(this.evolutionObserver, {
+      rawEventType: event.subtype ? `${event.type}:${event.subtype}` : event.type,
+      reason: 'unhandled_claude_event',
+      rawSample: event,
+    }, {
+      type: 'raw',
+      raw: event,
+    });
   }
 }

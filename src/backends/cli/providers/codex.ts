@@ -7,6 +7,14 @@ import type {
   StreamEvent,
   TurnInput,
 } from './types.js';
+import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
+import {
+  observeIgnored,
+  observeNormalized,
+  observeRawPassthrough,
+  observeSchemaFailure,
+  observeUnknown,
+} from '../../../core/compatibility/providerEvolution.js';
 import { mergeRuntimeInstructionLayers } from '../../../core/skills/catalog.js';
 
 interface JsonRpcRequest {
@@ -57,6 +65,7 @@ export class CodexProvider implements Provider {
 
   constructor(
     private readonly compatibilityProfile?: CompatibilityProfileSelection,
+    private readonly evolutionObserver?: ProviderEvolutionEvidenceObserver,
   ) {}
 
   private makeRequest(method: string, params?: Record<string, unknown>): string {
@@ -243,7 +252,13 @@ export class CodexProvider implements Provider {
     try {
       msg = JSON.parse(trimmed);
     } catch {
-      return { type: 'raw', text: trimmed };
+      return observeRawPassthrough(this.evolutionObserver, {
+        reason: 'non_json_line',
+        rawSample: trimmed,
+      }, {
+        type: 'raw',
+        text: trimmed,
+      });
     }
 
     // JSON-RPC response (has id, no method)
@@ -258,7 +273,12 @@ export class CodexProvider implements Provider {
       return this.handleNotification(msg);
     }
 
-    return { type: 'raw' };
+    return observeRawPassthrough(this.evolutionObserver, {
+      reason: 'unclassified_json_rpc_frame',
+      rawSample: msg,
+    }, {
+      type: 'raw',
+    });
   }
 
   private handleResponse(msg: JsonRpcResponse): StreamEvent | null {
@@ -269,10 +289,13 @@ export class CodexProvider implements Provider {
         this.threadId = null;
       }
 
-      return {
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: 'jsonrpc:error',
+        rawSample: msg,
+      }, {
         type: 'error',
         text: formatJsonRpcError(msg.error),
-      };
+      });
     }
 
     const result = msg.result ?? {};
@@ -284,14 +307,28 @@ export class CodexProvider implements Provider {
       if (tid) {
         this.threadId = tid;
         this.state = 'ready';
-        return { type: 'init', sessionId: tid };
+        return observeNormalized(this.evolutionObserver, {
+          rawEventType: 'thread/start',
+          rawSample: msg,
+        }, {
+          type: 'init',
+          sessionId: tid,
+        });
       }
       // No threadId — this is the initialize response, consume internally
-      return null;
+      return observeIgnored(this.evolutionObserver, {
+        rawEventType: 'initialize',
+        reason: 'bootstrap_initialize_response',
+        rawSample: msg,
+      }, null);
     }
 
     // turn/start response or other — consume
-    return null;
+    return observeIgnored(this.evolutionObserver, {
+      rawEventType: 'jsonrpc:response',
+      reason: 'response_consumed',
+      rawSample: msg,
+    }, null);
   }
 
   private handleNotification(msg: JsonRpcResponse): StreamEvent | null {
@@ -304,17 +341,37 @@ export class CodexProvider implements Provider {
       if (thread?.id && !this.threadId) {
         this.threadId = thread.id as string;
         this.state = 'ready';
-        return { type: 'init', sessionId: this.threadId };
+        return observeNormalized(this.evolutionObserver, {
+          rawEventType: method,
+          rawSample: msg,
+        }, {
+          type: 'init',
+          sessionId: this.threadId,
+        });
       }
-      return null;
+      return observeSchemaFailure(this.evolutionObserver, {
+        rawEventType: method,
+        reason: 'missing_thread_id',
+        rawSample: msg,
+      }, null);
     }
 
     // Streaming text delta
     if (method === 'item/agentMessage/delta') {
-      return {
+      if (typeof params.delta !== 'string') {
+        this.evolutionObserver?.recordSchemaFailure({
+          rawEventType: method,
+          reason: 'missing_delta',
+          rawSample: msg,
+        });
+      }
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: method,
+        rawSample: msg,
+      }, {
         type: 'text',
         text: (params.delta as string) ?? '',
-      };
+      });
     }
 
     // Item started — only emit tool_use for actual tool items
@@ -331,10 +388,21 @@ export class CodexProvider implements Provider {
           ?? (item?.tool as string)
           ?? (item?.name as string)
           ?? itemType;
-        return { type: 'tool_use', toolName, toolId: item?.id as string };
+        return observeNormalized(this.evolutionObserver, {
+          rawEventType: `${method}:${itemType}`,
+          rawSample: msg,
+        }, {
+          type: 'tool_use',
+          toolName,
+          toolId: item?.id as string,
+        });
       }
       // agentMessage, reasoning, plan, etc. — consume silently
-      return null;
+      return observeIgnored(this.evolutionObserver, {
+        rawEventType: `${method}:${itemType || 'unknown'}`,
+        reason: 'non_tool_item',
+        rawSample: msg,
+      }, null);
     }
 
     // Token usage arrives separately from turn/completed
@@ -347,19 +415,35 @@ export class CodexProvider implements Provider {
           outputTokens: (last.outputTokens as number) ?? 0,
         };
       }
-      return null;
+      return observeIgnored(this.evolutionObserver, {
+        rawEventType: method,
+        reason: 'token_usage_cache_update',
+        rawSample: msg,
+      }, null);
     }
 
     // Turn completed — attach cached usage if available
     if (method === 'turn/completed') {
       const usage = this._lastUsage ?? undefined;
       this._lastUsage = null;
-      return { type: 'result', usage };
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: method,
+        rawSample: msg,
+      }, {
+        type: 'result',
+        usage,
+      });
     }
 
     // Turn failed
     if (method === 'turn/failed') {
-      return { type: 'error', text: JSON.stringify(params) };
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: method,
+        rawSample: msg,
+      }, {
+        type: 'error',
+        text: JSON.stringify(params),
+      });
     }
 
     // Auto-approve requests are handled by buildAutoResponse
@@ -372,7 +456,11 @@ export class CodexProvider implements Provider {
       || method === 'applyPatchApproval'
       || method === 'execCommandApproval'
     ) {
-      return null;
+      return observeIgnored(this.evolutionObserver, {
+        rawEventType: method,
+        reason: 'auto_approved_request',
+        rawSample: msg,
+      }, null);
     }
 
     // Informational notifications — consume silently
@@ -392,11 +480,21 @@ export class CodexProvider implements Provider {
       || method === 'configWarning'
       || method === 'error'
     ) {
-      return null;
+      return observeIgnored(this.evolutionObserver, {
+        rawEventType: method,
+        reason: 'informational_notification',
+        rawSample: msg,
+      }, null);
     }
 
     // Unknown notification — pass through as raw
-    return { type: 'raw' };
+    return observeUnknown(this.evolutionObserver, {
+      rawEventType: method,
+      reason: 'unknown_codex_notification',
+      rawSample: msg,
+    }, {
+      type: 'raw',
+    });
   }
 
   private resolveThreadBootstrapMethod(opts: ProviderSpawnOptions): string {

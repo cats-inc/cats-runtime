@@ -7,6 +7,7 @@ import type {
   StreamEvent,
   TurnInput,
 } from './types.js';
+import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 
 export class GooseProvider implements Provider {
@@ -17,7 +18,10 @@ export class GooseProvider implements Provider {
   private pendingPrompt: string | null = null;
   private readonly native: GooseNativeSessionService;
 
-  constructor(native: GooseNativeSessionService) {
+  constructor(
+    native: GooseNativeSessionService,
+    private readonly evolutionObserver?: ProviderEvolutionEvidenceObserver,
+  ) {
     this.native = native;
   }
 
@@ -66,6 +70,6 @@ export class GooseProvider implements Provider {
   }
 
   parseStreamLine(line: string): StreamEvent | StreamEvent[] | null {
-    return parseGooseStreamLine(line);
+    return parseGooseStreamLine(line, this.evolutionObserver);
   }
 }

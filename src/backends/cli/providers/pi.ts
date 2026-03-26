@@ -7,9 +7,11 @@ import type {
   StreamEvent,
   TurnInput,
 } from './types.js';
+import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
 
 interface PiProviderOptions {
   instructionsFile?: string;
+  evolutionObserver?: ProviderEvolutionEvidenceObserver;
 }
 
 export class PiProvider implements Provider {
@@ -59,6 +61,6 @@ export class PiProvider implements Provider {
   }
 
   parseStreamLine(line: string): StreamEvent | StreamEvent[] | null {
-    return parsePiStreamLine(line);
+    return parsePiStreamLine(line, this.options.evolutionObserver);
   }
 }

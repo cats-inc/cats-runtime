@@ -6,6 +6,14 @@ import type {
   StreamEvent,
   TurnInput,
 } from './types.js';
+import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
+import {
+  observeIgnored,
+  observeNormalized,
+  observeRawPassthrough,
+  observeSchemaFailure,
+  observeUnknown,
+} from '../../../core/compatibility/providerEvolution.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 
 interface GeminiStreamEvent {
@@ -48,6 +56,7 @@ export class GeminiProvider implements Provider {
 
   constructor(
     private readonly compatibilityProfile?: CompatibilityProfileSelection,
+    private readonly evolutionObserver?: ProviderEvolutionEvidenceObserver,
   ) {}
 
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
@@ -78,60 +87,120 @@ export class GeminiProvider implements Provider {
     try {
       event = JSON.parse(trimmed);
     } catch {
-      return { type: 'raw', text: trimmed };
+      return observeRawPassthrough(this.evolutionObserver, {
+        reason: 'non_json_line',
+        rawSample: trimmed,
+      }, {
+        type: 'raw',
+        text: trimmed,
+      });
     }
 
     // init — session ID
     if (event.type === 'init') {
-      return {
+      const value: StreamEvent = {
         type: 'init',
         sessionId: event.session_id,
       };
+      if (!event.session_id) {
+        this.evolutionObserver?.recordSchemaFailure({
+          rawEventType: 'init',
+          reason: 'missing_session_id',
+          rawSample: event,
+        });
+      }
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: 'init',
+        rawSample: event,
+      }, value);
     }
 
     // message — assistant text content
     if (event.type === 'message') {
-      if (event.role === 'user') return null; // skip echo
+      if (event.role === 'user') {
+        return observeIgnored(this.evolutionObserver, {
+          rawEventType: 'message:user',
+          reason: 'user_echo',
+          rawSample: event,
+        }, null);
+      }
       if (event.role === 'assistant' && event.content) {
         const text = extractText(event.content);
-        if (text) return { type: 'text', text };
+        if (text) {
+          return observeNormalized(this.evolutionObserver, {
+            rawEventType: 'message:assistant',
+            rawSample: event,
+          }, {
+            type: 'text',
+            text,
+          });
+        }
+        return observeSchemaFailure(this.evolutionObserver, {
+          rawEventType: 'message:assistant',
+          reason: 'assistant_message_without_text',
+          rawSample: event,
+        }, null);
       }
-      return null;
+      return observeIgnored(this.evolutionObserver, {
+        rawEventType: `message:${event.role || 'unknown'}`,
+        reason: 'unsupported_message_role',
+        rawSample: event,
+      }, null);
     }
 
     // tool_use — Gemini CLI uses snake_case field names
     if (event.type === 'tool_use') {
-      return {
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: 'tool_use',
+        rawSample: event,
+      }, {
         type: 'tool_use',
         toolName: event.tool_name,
         toolId: event.tool_id,
-      };
+      });
     }
 
     // tool_result — skip
     if (event.type === 'tool_result') {
-      return null;
+      return observeIgnored(this.evolutionObserver, {
+        rawEventType: 'tool_result',
+        reason: 'tool_result_not_promoted',
+        rawSample: event,
+      }, null);
     }
 
     // error
     if (event.type === 'error') {
-      return {
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: 'error',
+        rawSample: event,
+      }, {
         type: 'error',
         text: event.message,
-      };
+      });
     }
 
     // result — final event with usage stats
     if (event.type === 'result') {
-      return {
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: 'result',
+        rawSample: event,
+      }, {
         type: 'result',
         usage: event.stats ? {
           inputTokens: event.stats.input_tokens ?? 0,
           outputTokens: event.stats.output_tokens ?? 0,
         } : undefined,
-      };
+      });
     }
 
-    return { type: 'raw', text: trimmed };
+    return observeUnknown(this.evolutionObserver, {
+      rawEventType: event.type || 'unknown',
+      reason: 'unknown_gemini_event',
+      rawSample: event,
+    }, {
+      type: 'raw',
+      text: trimmed,
+    });
   }
 }

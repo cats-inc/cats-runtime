@@ -1,4 +1,12 @@
 import type { StreamEvent } from '../../../core/types.js';
+import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
+import {
+  observeIgnored,
+  observeNormalized,
+  observeRawPassthrough,
+  observeSchemaFailure,
+  observeUnknown,
+} from '../../../core/compatibility/providerEvolution.js';
 import { createRuntimeProgressEvent } from '../../../core/progress.js';
 
 /** Parsed fields from a single Pi JSONL line. */
@@ -104,27 +112,47 @@ function buildPiUsageMetadata(
   };
 }
 
-function parseCurrentMessageEvent(event: PiStreamEvent): StreamEvent | StreamEvent[] | null {
+function parseCurrentMessageEvent(
+  event: PiStreamEvent,
+  observer?: ProviderEvolutionEvidenceObserver,
+): StreamEvent | StreamEvent[] | null {
   const message = event.message;
-  if (!message) return null;
+  if (!message) {
+    return observeSchemaFailure(observer, {
+      rawEventType: 'message',
+      reason: 'missing_message',
+      rawSample: event,
+    }, null);
+  }
 
   if (message.role === 'user') {
-    return null;
+    return observeIgnored(observer, {
+      rawEventType: 'message:user',
+      reason: 'user_echo',
+      rawSample: event,
+    }, null);
   }
 
   if (message.role === 'toolResult') {
     const text = extractTextContent(message.content);
-    return {
+    return observeNormalized(observer, {
+      rawEventType: 'message:toolResult',
+      rawSample: event,
+    }, {
       type: 'tool_result',
       toolId: message.toolCallId,
       toolName: message.toolName,
       text,
       isError: message.isError ?? false,
-    };
+    });
   }
 
   if (message.role !== 'assistant') {
-    return null;
+    return observeIgnored(observer, {
+      rawEventType: `message:${message.role || 'unknown'}`,
+      reason: 'unsupported_message_role',
+      rawSample: event,
+    }, null);
   }
 
   const events: StreamEvent[] = [];
@@ -170,9 +198,17 @@ function parseCurrentMessageEvent(event: PiStreamEvent): StreamEvent | StreamEve
   }
 
   if (events.length === 0) {
-    return null;
+    return observeSchemaFailure(observer, {
+      rawEventType: 'message:assistant',
+      reason: 'assistant_message_without_supported_parts',
+      rawSample: event,
+    }, null);
   }
-  return events.length === 1 ? events[0] : events;
+  const value = events.length === 1 ? events[0]! : events;
+  return observeNormalized(observer, {
+    rawEventType: 'message:assistant',
+    rawSample: event,
+  }, value);
 }
 
 /**
@@ -185,7 +221,10 @@ function parseCurrentMessageEvent(event: PiStreamEvent): StreamEvent | StreamEve
  *  - tool_execution_start/end — tool calls
  *  - response, extension_*    — internal RPC; skip
  */
-export function parsePiStreamLine(line: string): StreamEvent | StreamEvent[] | null {
+export function parsePiStreamLine(
+  line: string,
+  observer?: ProviderEvolutionEvidenceObserver,
+): StreamEvent | StreamEvent[] | null {
   const trimmed = line.trim();
   if (!trimmed) return null;
 
@@ -193,7 +232,13 @@ export function parsePiStreamLine(line: string): StreamEvent | StreamEvent[] | n
   try {
     event = JSON.parse(trimmed);
   } catch {
-    return { type: 'raw', text: trimmed };
+    return observeRawPassthrough(observer, {
+      reason: 'non_json_line',
+      rawSample: trimmed,
+    }, {
+      type: 'raw',
+      text: trimmed,
+    });
   }
 
   const eventType = event.type ?? '';
@@ -205,16 +250,26 @@ export function parsePiStreamLine(line: string): StreamEvent | StreamEvent[] | n
     || eventType === 'extension_ui_response'
     || eventType === 'extension_error'
   ) {
-    return null;
+    return observeIgnored(observer, {
+      rawEventType: eventType,
+      reason: 'internal_rpc_protocol',
+      rawSample: event,
+    }, null);
   }
 
   // Current Pi session/message log format
   if (eventType === 'message') {
-    return parseCurrentMessageEvent(event);
+    return parseCurrentMessageEvent(event, observer);
   }
 
   // Agent lifecycle — agent_end may carry final messages
-  if (eventType === 'agent_start') return null;
+  if (eventType === 'agent_start') {
+    return observeIgnored(observer, {
+      rawEventType: eventType,
+      reason: 'agent_lifecycle_start',
+      rawSample: event,
+    }, null);
+  }
 
   if (eventType === 'agent_end') {
     const messages = event.messages;
@@ -222,40 +277,87 @@ export function parsePiStreamLine(line: string): StreamEvent | StreamEvent[] | n
       const last = messages[messages.length - 1];
       if (last?.role === 'assistant') {
         const text = extractTextContent(last.content);
-        if (text) return { type: 'text', text };
+        if (text) {
+          return observeNormalized(observer, {
+            rawEventType: eventType,
+            rawSample: event,
+          }, {
+            type: 'text',
+            text,
+          });
+        }
       }
     }
-    return null;
+    return observeIgnored(observer, {
+      rawEventType: eventType,
+      reason: 'agent_end_without_assistant_text',
+      rawSample: event,
+    }, null);
   }
 
   // Turn lifecycle
-  if (eventType === 'turn_start') return null;
+  if (eventType === 'turn_start') {
+    return observeIgnored(observer, {
+      rawEventType: eventType,
+      reason: 'turn_boundary',
+      rawSample: event,
+    }, null);
+  }
 
   if (eventType === 'turn_end') {
     const msg = event.message;
-    if (!msg) return { type: 'result' };
-    if (msg.stopReason === 'toolUse') return null;
+    if (!msg) {
+      return observeNormalized(observer, {
+        rawEventType: eventType,
+        rawSample: event,
+      }, {
+        type: 'result',
+      });
+    }
+    if (msg.stopReason === 'toolUse') {
+      return observeIgnored(observer, {
+        rawEventType: eventType,
+        reason: 'tool_use_turn_boundary',
+        rawSample: event,
+      }, null);
+    }
 
     const usage = msg.usage;
-    return {
+    return observeNormalized(observer, {
+      rawEventType: eventType,
+      rawSample: event,
+    }, {
       type: 'result',
       usage: usage ? extractUsage(msg) : undefined,
       metadata: buildPiUsageMetadata(msg),
-    };
+    });
   }
 
   if (eventType === 'message_start' || eventType === 'message_end') {
-    return null;
+    return observeIgnored(observer, {
+      rawEventType: eventType,
+      reason: 'message_boundary',
+      rawSample: event,
+    }, null);
   }
 
   // Streaming text deltas
   if (eventType === 'message_update') {
     const assistantEvent = event.assistantMessageEvent;
     if (assistantEvent?.type === 'text_delta' && assistantEvent.delta) {
-      return { type: 'text', text: assistantEvent.delta };
+      return observeNormalized(observer, {
+        rawEventType: `${eventType}:text_delta`,
+        rawSample: event,
+      }, {
+        type: 'text',
+        text: assistantEvent.delta,
+      });
     }
     if (assistantEvent?.type === 'thinking' && assistantEvent.delta) {
-      return createRuntimeProgressEvent({
+      return observeNormalized(observer, {
+        rawEventType: `${eventType}:thinking`,
+        rawSample: event,
+      }, createRuntimeProgressEvent({
         text: assistantEvent.delta,
         provider: 'pi',
         backend: 'cli',
@@ -265,14 +367,21 @@ export function parsePiStreamLine(line: string): StreamEvent | StreamEvent[] | n
         native: {
           sourceEvent: eventType,
         },
-      });
+      }));
     }
-    return null;
+    return observeIgnored(observer, {
+      rawEventType: `${eventType}:${assistantEvent?.type || 'unknown'}`,
+      reason: 'unsupported_message_update_variant',
+      rawSample: event,
+    }, null);
   }
 
   // Tool execution
   if (eventType === 'tool_execution_start') {
-    return [
+    return observeNormalized(observer, {
+      rawEventType: eventType,
+      rawSample: event,
+    }, [
       createRuntimeProgressEvent({
         text: `Running tool: ${event.toolName ?? 'unknown'}`,
         provider: 'pi',
@@ -290,27 +399,41 @@ export function parsePiStreamLine(line: string): StreamEvent | StreamEvent[] | n
         toolName: event.toolName ?? 'unknown',
         toolId: event.toolCallId,
       },
-    ];
+    ]);
   }
 
   if (eventType === 'tool_execution_end') {
     const resultText = typeof event.result === 'string'
       ? event.result
       : JSON.stringify(event.result ?? '');
-    return {
+    return observeNormalized(observer, {
+      rawEventType: eventType,
+      rawSample: event,
+    }, {
       type: 'tool_result',
       toolId: event.toolCallId,
       text: resultText,
       isError: event.isError ?? false,
-    };
+    });
   }
 
   if (eventType === 'tool_execution_update') {
-    return null;
+    return observeIgnored(observer, {
+      rawEventType: eventType,
+      reason: 'tool_progress_not_promoted',
+      rawSample: event,
+    }, null);
   }
 
   // Unknown — pass through as raw
-  return { type: 'raw', raw: event };
+  return observeUnknown(observer, {
+    rawEventType: eventType || 'unknown',
+    reason: 'unknown_pi_event',
+    rawSample: event,
+  }, {
+    type: 'raw',
+    raw: event,
+  });
 }
 
 /**

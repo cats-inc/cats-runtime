@@ -11,6 +11,14 @@ import type {
   StreamEvent,
   TurnInput,
 } from './types.js';
+import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
+import {
+  observeIgnored,
+  observeNormalized,
+  observeRawPassthrough,
+  observeSchemaFailure,
+  observeUnknown,
+} from '../../../core/compatibility/providerEvolution.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 
 /** Regex to strip ANSI escape sequences from Copilot CLI output */
@@ -30,6 +38,7 @@ export class CopilotProvider implements Provider {
 
   constructor(
     private readonly compatibilityProfile?: CompatibilityProfileSelection,
+    private readonly evolutionObserver?: ProviderEvolutionEvidenceObserver,
   ) {}
 
   prepareEphemeralTurn(turn: TurnInput): void {
@@ -97,7 +106,13 @@ export class CopilotProvider implements Provider {
       // Non-JSON line — strip ANSI and emit as raw text
       const clean = trimmed.replace(ANSI_RE, '').trim();
       if (!clean) return null;
-      return { type: 'raw', text: clean };
+      return observeRawPassthrough(this.evolutionObserver, {
+        reason: 'non_json_line',
+        rawSample: clean,
+      }, {
+        type: 'raw',
+        text: clean,
+      });
     }
 
     const eventType = parsed.type as string | undefined;
@@ -107,16 +122,53 @@ export class CopilotProvider implements Provider {
     switch (eventType) {
       case 'session.start':
         this._sessionId = inner?.sessionId as string | undefined;
-        return this._sessionId
-          ? { type: 'init', sessionId: this._sessionId }
-          : null;
+        if (!this._sessionId) {
+          return observeSchemaFailure(this.evolutionObserver, {
+            rawEventType: 'session.start',
+            reason: 'missing_session_id',
+            rawSample: parsed,
+          }, null);
+        }
+        return observeNormalized(this.evolutionObserver, {
+          rawEventType: 'session.start',
+          rawSample: parsed,
+        }, {
+          type: 'init',
+          sessionId: this._sessionId,
+        });
 
       case 'assistant.turn_start':
-        return { type: 'init', sessionId: this._sessionId };
+        if (!this._sessionId) {
+          this.evolutionObserver?.recordSchemaFailure({
+            rawEventType: 'assistant.turn_start',
+            reason: 'missing_session_id',
+            rawSample: parsed,
+          });
+        }
+        return observeNormalized(this.evolutionObserver, {
+          rawEventType: 'assistant.turn_start',
+          rawSample: parsed,
+        }, {
+          type: 'init',
+          sessionId: this._sessionId,
+        });
 
       case 'assistant.message_delta':
         this._sawMessageDelta = true;
-        return { type: 'text', text: (inner?.deltaContent as string) ?? '' };
+        if (typeof inner?.deltaContent !== 'string') {
+          this.evolutionObserver?.recordSchemaFailure({
+            rawEventType: 'assistant.message_delta',
+            reason: 'missing_delta_content',
+            rawSample: parsed,
+          });
+        }
+        return observeNormalized(this.evolutionObserver, {
+          rawEventType: 'assistant.message_delta',
+          rawSample: parsed,
+        }, {
+          type: 'text',
+          text: (inner?.deltaContent as string) ?? '',
+        });
 
       case 'assistant.message': {
         // Capture outputTokens for usage tracking
@@ -129,7 +181,13 @@ export class CopilotProvider implements Provider {
         const toolRequests = inner?.toolRequests as Array<{ name?: string; id?: string }> | undefined;
         if (toolRequests && toolRequests.length > 0) {
           const tool = toolRequests[0];
-          return [
+          return observeNormalized(this.evolutionObserver, {
+            rawEventType: 'assistant.message',
+            rawSample: parsed,
+            details: {
+              toolRequestCount: toolRequests.length,
+            },
+          }, [
             createRuntimeProgressEvent({
               text: `Running tool: ${tool.name ?? 'unknown'}`,
               provider: 'copilot',
@@ -143,19 +201,34 @@ export class CopilotProvider implements Provider {
               },
             }),
             { type: 'tool_use', toolName: tool.name, toolId: tool.id },
-          ];
+          ]);
         }
 
         // Copilot CLI 1.0.2 emits the final answer as a full assistant.message,
         // often without any assistant.message_delta chunks.
         if (content && !this._sawMessageDelta) {
-          return { type: 'text', text: content };
+          return observeNormalized(this.evolutionObserver, {
+            rawEventType: 'assistant.message',
+            rawSample: parsed,
+          }, {
+            type: 'text',
+            text: content,
+          });
         }
-        return null;
+        return observeIgnored(this.evolutionObserver, {
+          rawEventType: 'assistant.message',
+          reason: this._sawMessageDelta
+            ? 'final_message_already_streamed'
+            : 'assistant_message_without_text_or_tool',
+          rawSample: parsed,
+        }, null);
       }
 
       case 'result':
-        return {
+        return observeNormalized(this.evolutionObserver, {
+          rawEventType: 'result',
+          rawSample: parsed,
+        }, {
           type: 'result',
           sessionId: (parsed.sessionId as string | undefined) ?? this._sessionId,
           usage: {
@@ -170,27 +243,37 @@ export class CopilotProvider implements Provider {
                 },
               }
             : undefined,
-        };
+        });
 
       case 'session.shutdown': {
         const usage = extractUsageFromShutdown(inner, this._lastOutputTokens);
         const runtimeUsage = extractRuntimeUsageFromShutdown(inner, usage);
-        return {
+        return observeNormalized(this.evolutionObserver, {
+          rawEventType: 'session.shutdown',
+          rawSample: parsed,
+        }, {
           type: 'result',
           sessionId: this._sessionId,
           usage,
           metadata: runtimeUsage ? { runtimeUsage } : undefined,
-        };
+        });
       }
 
       // Skip these event types
       case 'user.message':
       case 'session.model_change':
       case 'assistant.turn_end':
-        return null;
+        return observeIgnored(this.evolutionObserver, {
+          rawEventType: eventType,
+          reason: 'known_ignored_event',
+          rawSample: parsed,
+        }, null);
 
       case 'assistant.reasoning_delta':
-        return createRuntimeProgressEvent({
+        return observeNormalized(this.evolutionObserver, {
+          rawEventType: eventType,
+          rawSample: parsed,
+        }, createRuntimeProgressEvent({
           text: typeof inner?.deltaContent === 'string' ? inner.deltaContent : '',
           provider: 'copilot',
           backend: 'cli',
@@ -200,10 +283,13 @@ export class CopilotProvider implements Provider {
           native: {
             sourceEvent: eventType,
           },
-        });
+        }));
 
       case 'assistant.reasoning':
-        return createRuntimeProgressEvent({
+        return observeNormalized(this.evolutionObserver, {
+          rawEventType: eventType,
+          rawSample: parsed,
+        }, createRuntimeProgressEvent({
           text: extractContent(inner?.content) || 'Copilot updated reasoning state.',
           provider: 'copilot',
           backend: 'cli',
@@ -213,11 +299,14 @@ export class CopilotProvider implements Provider {
           native: {
             sourceEvent: eventType,
           },
-        });
+        }));
 
       default:
-        // Unknown event type — skip
-        return null;
+        return observeUnknown(this.evolutionObserver, {
+          rawEventType: eventType || 'unknown',
+          reason: 'unknown_copilot_event',
+          rawSample: parsed,
+        }, null);
     }
   }
 

@@ -1020,4 +1020,72 @@ evidence bundles and does not force hosts to invent their own report format.
 - `docs/specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md`
 
 ---
+### OPT-13: Provider Evolution Evidence and Capability Probe Follow-through
+
+**Priority**: P1
+**Status**: In Progress
+
+#### Problem
+
+`cats-runtime` can already fingerprint install/auth/version/model-catalog
+readiness, but it still needs a runtime-owned way to inspect upstream provider
+event drift before adapters break silently.
+
+`PLAN-021` exists to close that gap without turning the runtime into an
+always-on self-adapting parser system.
+
+#### Current Implementation Status
+
+- the first `PLAN-021` slice is landed
+- `src/core/compatibility/providerEvolution.ts` now owns a transport-neutral
+  evidence collector and bundle shape
+- high-value CLI adapters now have optional instrumentation for:
+  - `normalized`
+  - `ignored`
+  - `unknown`
+  - `schema_failure`
+  - `raw_passthrough`
+- the first rollout covers:
+  - `codex`
+  - `copilot`
+  - `pi`
+  - `goose`
+  - `gemini`
+  - `claude`
+- normal runtime execution remains unchanged when evidence collection is not
+  enabled
+
+#### Follow-through Direction
+
+- add a manual-first probe entrypoint that maintainers can run without opening
+  a new product/UI dependency
+- derive capability snapshots from collected evidence
+- compare current probe output to prior baselines
+- keep provider-specific parsing inside adapters while reusing the shared
+  collector across future agent/A2A transports
+
+#### Deferred Scope
+
+- do not add always-on background probing on user machines
+- do not auto-modify parsers based on collected evidence
+- do not force CLI-only assumptions into the shared collector
+- do not add a host-facing dashboard/public HTTP surface until the manual-first
+  CLI/internal flow is in place
+
+#### Affected Areas
+
+- `src/core/compatibility/*`
+- `src/backends/cli/providers/*`
+- `src/backends/cli/goose/parser.ts`
+- `src/backends/cli/pi/parser.ts`
+- later follow-through may extend into `src/backends/agent/*`
+
+#### References
+
+- `docs/specs/SPEC-021-provider-evolution-evidence-and-capability-probes.md`
+- `docs/plans/PLAN-021-provider-evolution-evidence-and-capability-probes.md`
+- `docs/decisions/025-keep-provider-evolution-detection-manual-first-and-evidence-driven.md`
+- `docs/decisions/026-model-a2a-as-an-agent-backend-adapter.md`
+
+---
 *Last updated: 2026-03-27*
