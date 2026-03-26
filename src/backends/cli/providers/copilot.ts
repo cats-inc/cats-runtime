@@ -259,9 +259,29 @@ export class CopilotProvider implements Provider {
         });
       }
 
+      case 'session.model_change':
+        return observeNormalized(this.evolutionObserver, {
+          rawEventType: eventType,
+          rawSample: parsed,
+        }, createRuntimeProgressEvent({
+          text: typeof inner?.newModel === 'string' && inner.newModel
+            ? `Copilot switched to model ${inner.newModel}.`
+            : 'Copilot switched models.',
+          provider: 'copilot',
+          backend: 'cli',
+          kind: 'model_state',
+          status: 'updated',
+          source: 'provider',
+          native: {
+            sourceEvent: eventType,
+            ...(typeof inner?.newModel === 'string' && inner.newModel
+              ? { newModel: inner.newModel }
+              : {}),
+          },
+        }));
+
       // Skip these event types
       case 'user.message':
-      case 'session.model_change':
       case 'assistant.turn_end':
         return observeIgnored(this.evolutionObserver, {
           rawEventType: eventType,

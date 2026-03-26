@@ -329,11 +329,24 @@ describe('CopilotProvider', () => {
       expect(event).toBeNull();
     });
 
-    it('skips session.model_change events', () => {
+    it('parses session.model_change events as model_state progress', () => {
       const event = provider.parseStreamLine(
         JSON.stringify({ type: 'session.model_change', data: { newModel: 'gpt-5.4' } }),
       );
-      expect(event).toBeNull();
+      expect(event).toEqual(expect.objectContaining({
+        type: 'progress',
+        text: 'Copilot switched to model gpt-5.4.',
+        metadata: expect.objectContaining({
+          provider: 'copilot',
+          backend: 'cli',
+          kind: 'model_state',
+          status: 'updated',
+          native: expect.objectContaining({
+            sourceEvent: 'session.model_change',
+            newModel: 'gpt-5.4',
+          }),
+        }),
+      }));
     });
 
     it('parses assistant.reasoning_delta events as progress', () => {
