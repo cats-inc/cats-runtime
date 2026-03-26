@@ -51,6 +51,7 @@ npx vitest run src/http/cursorManagement.test.ts
 npx vitest run src/http/peerExecutionRoutes.test.ts tests/runtime-peer-routing.test.ts --pool=threads --poolOptions.threads.singleThread
 npx vitest run tests/runtime-server.test.ts
 npx vitest run tests/runtime-process.test.ts --pool=threads --poolOptions.threads.singleThread
+npx vitest run src/core/compatibility/providerEvolution.test.ts src/core/compatibility/providerEvolutionProbe.test.ts src/backends/cli/providers/providerEvolutionInstrumentation.test.ts --pool=threads --poolOptions.threads.singleThread
 npx vitest run tests/workspace-substrate.test.ts src/core/tools/LocalToolRuntime.test.ts --pool=threads --poolOptions.threads.singleThread
 ```
 
@@ -68,6 +69,9 @@ describe('ComponentName', () => {
 
 - Mock provider-native services in HTTP route tests instead of shelling out to real CLIs
 - Keep provider parser tests deterministic with inline sample payloads
+- When changing provider-evolution probe logic, cover the shared collector,
+  snapshot/compare helpers, and provider-specific instrumentation separately so
+  manual probe behavior stays stable without requiring real provider binaries
 - Prefer temp directories for discovery/history tests so file layout stays realistic
 - For workspace substrate tests, assert machine-readable `contract`, `plan`, and `approval` payloads rather than only final file writes
 - Cover the read-only `audit-workspace` boundary separately from mutable `init-workspace` / `update-workspace` flows
@@ -89,4 +93,4 @@ describe('ComponentName', () => {
 
 ---
 
-*Last updated: 2026-03-25*
+*Last updated: 2026-03-27*

@@ -53,6 +53,11 @@ Supported startup flags:
 
 - `--bootstrap` — force bootstrap/setup mode even with a valid config
 - `--diagnose-setup` — generate a setup diagnostic report and exit without starting the HTTP server
+- `--probe-provider-evolution` — run a manual provider-evolution probe and exit without starting the HTTP server
+- `--probe-provider <provider>` — required with `--probe-provider-evolution`
+- `--probe-instance <instance>` — optional instance override for the selected provider
+- `--probe-profile <manual_smoke|manual_text>` — optional probe profile override
+- `--probe-model <model>` — optional model override for the probe run
 - `--refresh-setup-scan` — refresh the shared setup scan before generating the setup diagnostic report
 - `--startup-mode <standalone|app-managed>`
 - `--managed-by <host-name>`
@@ -121,6 +126,28 @@ and prints a concise operator summary to stderr plus the machine-readable JSON
 payload to stdout with `status`, `artifactPath`, and `report`. Use this path
 when port conflicts or other startup failures make the running HTTP action
 unavailable.
+
+When you want to inspect provider event drift manually without opening any
+public HTTP surface, use the provider-evolution probe entrypoint:
+
+```powershell
+node dist/index.js --probe-provider-evolution --probe-provider codex
+node dist/index.js --probe-provider-evolution --probe-provider claude --probe-profile manual_text
+node dist/index.js --probe-provider-evolution --probe-provider goose --probe-model anthropic/claude-sonnet-4
+```
+
+The probe path is intentionally manual-first and currently supports the
+highest-value CLI families first: `codex`, `copilot`, `pi`, `goose`,
+`gemini`, and `claude`.
+
+Each probe writes a machine-readable artifact under
+`<dataDir>/compatibility/provider-evolution/` and prints a concise stderr
+summary plus stdout JSON with:
+
+- the local `artifactPath`
+- the captured evidence bundle
+- a derived capability snapshot
+- baseline compare output against the latest matching prior artifact, when one exists
 
 `GET /diagnostics/setup-report` lists the retained reports newest-first with
 their `artifactId`, `artifactPath`, `generatedAt`, and bounded summary fields.

@@ -5,6 +5,10 @@ import { pathToFileURL } from 'node:url';
 import { loadDotEnv } from './core/dotenv.js';
 import { loadConfig } from './core/config.js';
 import {
+  formatProviderEvolutionProbeSummary,
+  generateProviderEvolutionProbeArtifact,
+} from './core/compatibility/providerEvolutionEntry.js';
+import {
   formatSetupDiagnosticEntrySummary,
   generateSetupDiagnosticEntryArtifact,
 } from './core/diagnostics/setupDiagnosticEntry.js';
@@ -47,6 +51,17 @@ async function main(): Promise<void> {
       status: 'generated',
       artifactPath: result.artifactPath,
       report: result.report,
+    })}\n`);
+    return;
+  }
+
+  if (cliOptions.probeProviderEvolution) {
+    const result = await generateProviderEvolutionProbeArtifact(cliOptions, process.env);
+    process.stderr.write(formatProviderEvolutionProbeSummary(result));
+    process.stdout.write(`${JSON.stringify({
+      status: 'generated',
+      artifactPath: result.artifactPath,
+      artifact: result.artifact,
     })}\n`);
     return;
   }

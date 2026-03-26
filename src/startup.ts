@@ -64,6 +64,11 @@ export interface RuntimeCliOptions {
   help?: boolean;
   bootstrap?: boolean;
   diagnoseSetup?: boolean;
+  probeProviderEvolution?: boolean;
+  probeProvider?: string;
+  probeInstance?: string;
+  probeProfile?: string;
+  probeModel?: string;
   refreshSetupScan?: boolean;
   startupMode?: RuntimeStartupMode;
   managedBy?: string;
@@ -165,6 +170,55 @@ export function parseRuntimeCliOptions(argv: string[]): RuntimeCliOptions {
 
     if (arg === '--diagnose-setup') {
       options.diagnoseSetup = true;
+      continue;
+    }
+
+    if (arg === '--probe-provider-evolution') {
+      options.probeProviderEvolution = true;
+      continue;
+    }
+
+    if (arg === '--probe-provider') {
+      options.probeProvider = readOptionValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--probe-provider=')) {
+      options.probeProvider = arg.slice('--probe-provider='.length);
+      continue;
+    }
+
+    if (arg === '--probe-instance') {
+      options.probeInstance = readOptionValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--probe-instance=')) {
+      options.probeInstance = arg.slice('--probe-instance='.length);
+      continue;
+    }
+
+    if (arg === '--probe-profile') {
+      options.probeProfile = readOptionValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--probe-profile=')) {
+      options.probeProfile = arg.slice('--probe-profile='.length);
+      continue;
+    }
+
+    if (arg === '--probe-model') {
+      options.probeModel = readOptionValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--probe-model=')) {
+      options.probeModel = arg.slice('--probe-model='.length);
       continue;
     }
 
@@ -549,6 +603,11 @@ export function getRuntimeHelpText(): string {
     'Options:',
     '  --bootstrap                            Force bootstrap/setup mode',
     '  --diagnose-setup                       Generate a setup diagnostic report and exit',
+    '  --probe-provider-evolution             Run a manual provider-evolution probe and exit',
+    '  --probe-provider <provider>',
+    '  --probe-instance <instance>',
+    '  --probe-profile <manual_smoke|manual_text>',
+    '  --probe-model <model>',
     '  --refresh-setup-scan                   Refresh the shared setup scan before generating a diagnostic report',
     '  --startup-mode <standalone|app-managed>',
     '  --managed-by <name>',

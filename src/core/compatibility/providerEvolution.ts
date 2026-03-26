@@ -319,7 +319,8 @@ function normalizeSample(value: unknown, depth = 0): unknown {
   }
 
   if (typeof value === 'string') {
-    return value.length > 500 ? `${value.slice(0, 500)}...` : value;
+    const redacted = redactProviderEvolutionText(value);
+    return redacted.length > 500 ? `${redacted.slice(0, 500)}...` : redacted;
   }
 
   if (depth >= 4) {
@@ -342,4 +343,28 @@ function normalizeSample(value: unknown, depth = 0): unknown {
   }
 
   return String(value);
+}
+
+function redactProviderEvolutionText(text: string): string {
+  const home = process.env.HOME || process.env.USERPROFILE;
+  const homeUnixSafe = home ? escapeRegExp(home.replace(/\\/g, '/')) : undefined;
+  const homeWindowsSafe = home ? escapeRegExp(home.replace(/\//g, '\\')) : undefined;
+  let output = text;
+  output = output.replace(/\b([A-Z0-9_]*(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD|AUTHORIZATION)[A-Z0-9_]*)\s*[:=]\s*([^\s,"']+)/gi, '$1=<redacted>');
+  output = output.replace(/\bBearer\s+[A-Za-z0-9._~+\-/=]+\b/gi, 'Bearer <redacted>');
+  output = output.replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|ghp_[A-Za-z0-9]{8,}|github_pat_[A-Za-z0-9_]{8,}|AIza[0-9A-Za-z\-_]{20,})\b/g, '<redacted>');
+  output = output.replace(/"[A-Za-z]:(?:\\[^"\r\n]+)+"/g, '"<path>"');
+  output = output.replace(/[A-Za-z]:(?:\\|\/)[^\s"']+/g, '<path>');
+  output = output.replace(/\/(?:Users|home)\/[^\s"']+/g, '<path>');
+  if (homeUnixSafe) {
+    output = output.replace(new RegExp(homeUnixSafe, 'gi'), '<home>');
+  }
+  if (homeWindowsSafe) {
+    output = output.replace(new RegExp(homeWindowsSafe, 'gi'), '<home>');
+  }
+  return output;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

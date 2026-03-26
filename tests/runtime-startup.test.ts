@@ -30,6 +30,13 @@ describe('runtime startup helpers', () => {
   it('parses startup CLI options including inline values', () => {
     expect(parseRuntimeCliOptions([
       '--diagnose-setup',
+      '--probe-provider-evolution',
+      '--probe-provider=codex',
+      '--probe-instance',
+      'default',
+      '--probe-profile',
+      'manual_smoke',
+      '--probe-model=gpt-5',
       '--refresh-setup-scan',
       '--startup-mode=app-managed',
       '--managed-by',
@@ -42,6 +49,11 @@ describe('runtime startup helpers', () => {
       'config/providers.yaml',
     ])).toEqual({
       diagnoseSetup: true,
+      probeProviderEvolution: true,
+      probeProvider: 'codex',
+      probeInstance: 'default',
+      probeProfile: 'manual_smoke',
+      probeModel: 'gpt-5',
       refreshSetupScan: true,
       startupMode: 'app-managed',
       managedBy: 'cats-inc',
@@ -250,6 +262,9 @@ describe('runtime startup helpers', () => {
     const help = getRuntimeHelpText();
     expect(help).toContain('Usage: cats-runtime [options]');
     expect(help).toContain('--diagnose-setup');
+    expect(help).toContain('--probe-provider-evolution');
+    expect(help).toContain('--probe-provider <provider>');
+    expect(help).toContain('--probe-profile <manual_smoke|manual_text>');
     expect(help).toContain('--refresh-setup-scan');
     expect(help).toContain('--startup-mode <standalone|app-managed>');
     expect(help).toContain('--ready-output <plain|json|silent>');

@@ -1036,7 +1036,7 @@ always-on self-adapting parser system.
 
 #### Current Implementation Status
 
-- the first `PLAN-021` slice is landed
+- the first two `PLAN-021` slices are landed
 - `src/core/compatibility/providerEvolution.ts` now owns a transport-neutral
   evidence collector and bundle shape
 - high-value CLI adapters now have optional instrumentation for:
@@ -1052,17 +1052,25 @@ always-on self-adapting parser system.
   - `goose`
   - `gemini`
   - `claude`
+- `cats-runtime --probe-provider-evolution --probe-provider <provider>` now
+  runs a bounded manual-first probe without starting the HTTP server
+- probe artifacts now include:
+  - the collected evidence bundle
+  - a derived capability snapshot
+  - baseline compare output against the latest matching prior artifact
 - normal runtime execution remains unchanged when evidence collection is not
   enabled
 
 #### Follow-through Direction
 
-- add a manual-first probe entrypoint that maintainers can run without opening
-  a new product/UI dependency
-- derive capability snapshots from collected evidence
-- compare current probe output to prior baselines
+- extend the manual probe flow beyond the first CLI-heavy providers when the
+  collector shape proves stable
+- decide whether recent probe artifacts deserve a bounded diagnostics read
+  surface after the CLI/manual path has settled
 - keep provider-specific parsing inside adapters while reusing the shared
   collector across future agent/A2A transports
+- refine semantic-drift heuristics and attach external release-note context
+  separately from runtime evidence when later follow-through needs it
 
 #### Deferred Scope
 
