@@ -88,9 +88,12 @@ requests into calls into this shared runtime.
 - Mutating flows now reject symbolic-link/junction alias paths and existing
   hardlinked mutation targets to reduce accidental writes through aliased
   filesystem paths.
-- This first safety hardening slice does **not** yet guarantee atomic
-  multi-file rollback for write/edit/patch operations; that remains follow-on
-  work.
+- The runtime now performs bounded rollback for multi-file `apply_patch`
+  failures so earlier file content/presence changes are restored when a later
+  hunk aborts the patch.
+- The safety model still does **not** yet guarantee full transactional
+  rollback for general `write_file` / `edit_file` operations, inode-level
+  metadata restoration, or empty parent-directory cleanup.
 
 ## Dependencies
 

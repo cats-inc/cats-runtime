@@ -69,49 +69,81 @@ export async function applyPatch(input: string, cwd: string): Promise<ApplyPatch
     modified: new Set<string>(),
     deleted: new Set<string>(),
   };
+  const rollbackSteps: Array<() => Promise<void>> = [];
 
-  for (const hunk of hunks) {
-    if (hunk.kind === 'add') {
-      const target = await resolvePatchPath(cwd, hunk.path);
-      await assertDoesNotExist(target.fullPath, target.displayPath);
-      await mkdir(dirname(target.fullPath), { recursive: true });
-      await writeFile(target.fullPath, hunk.content, 'utf-8');
-      recordSummary(summary, seen, 'added', target.displayPath);
-      continue;
-    }
-
-    if (hunk.kind === 'delete') {
-      const target = await resolvePatchPath(cwd, hunk.path);
-      await assertFileExists(target.fullPath, target.displayPath);
-      await assertSafeExistingFileMutation(target.fullPath, target.displayPath);
-      await unlink(target.fullPath);
-      recordSummary(summary, seen, 'deleted', target.displayPath);
-      continue;
-    }
-
-    const source = await resolvePatchPath(cwd, hunk.path);
-    await assertFileExists(source.fullPath, source.displayPath);
-    await assertSafeExistingFileMutation(source.fullPath, source.displayPath);
-    const updated = await applyUpdateHunks(source.fullPath, hunk.chunks);
-
-    if (hunk.movePath) {
-      const destination = await resolvePatchPath(cwd, hunk.movePath);
-      if (destination.fullPath === source.fullPath) {
-        await writeFile(source.fullPath, updated, 'utf-8');
-        recordSummary(summary, seen, 'modified', source.displayPath);
+  try {
+    for (const hunk of hunks) {
+      if (hunk.kind === 'add') {
+        const target = await resolvePatchPath(cwd, hunk.path);
+        await assertDoesNotExist(target.fullPath, target.displayPath);
+        await mkdir(dirname(target.fullPath), { recursive: true });
+        await writeFile(target.fullPath, hunk.content, 'utf-8');
+        rollbackSteps.push(async () => {
+          await unlinkIfExists(target.fullPath);
+        });
+        recordSummary(summary, seen, 'added', target.displayPath);
         continue;
       }
 
-      await assertDoesNotExist(destination.fullPath, destination.displayPath);
-      await mkdir(dirname(destination.fullPath), { recursive: true });
-      await writeFile(destination.fullPath, updated, 'utf-8');
-      await unlink(source.fullPath);
-      recordSummary(summary, seen, 'modified', destination.displayPath);
-      continue;
-    }
+      if (hunk.kind === 'delete') {
+        const target = await resolvePatchPath(cwd, hunk.path);
+        await assertFileExists(target.fullPath, target.displayPath);
+        await assertSafeExistingFileMutation(target.fullPath, target.displayPath);
+        const original = await readFile(target.fullPath, 'utf-8');
+        await unlink(target.fullPath);
+        rollbackSteps.push(async () => {
+          await mkdir(dirname(target.fullPath), { recursive: true });
+          await writeFile(target.fullPath, original, 'utf-8');
+        });
+        recordSummary(summary, seen, 'deleted', target.displayPath);
+        continue;
+      }
 
-    await writeFile(source.fullPath, updated, 'utf-8');
-    recordSummary(summary, seen, 'modified', source.displayPath);
+      const source = await resolvePatchPath(cwd, hunk.path);
+      await assertFileExists(source.fullPath, source.displayPath);
+      await assertSafeExistingFileMutation(source.fullPath, source.displayPath);
+      const original = await readFile(source.fullPath, 'utf-8');
+      const updated = await applyUpdateHunks(source.fullPath, hunk.chunks);
+
+      if (hunk.movePath) {
+        const destination = await resolvePatchPath(cwd, hunk.movePath);
+        if (destination.fullPath === source.fullPath) {
+          await writeFile(source.fullPath, updated, 'utf-8');
+          rollbackSteps.push(async () => {
+            await writeFile(source.fullPath, original, 'utf-8');
+          });
+          recordSummary(summary, seen, 'modified', source.displayPath);
+          continue;
+        }
+
+        await assertDoesNotExist(destination.fullPath, destination.displayPath);
+        await mkdir(dirname(destination.fullPath), { recursive: true });
+        await writeFile(destination.fullPath, updated, 'utf-8');
+        await unlink(source.fullPath);
+        rollbackSteps.push(async () => {
+          await unlinkIfExists(destination.fullPath);
+          await mkdir(dirname(source.fullPath), { recursive: true });
+          await writeFile(source.fullPath, original, 'utf-8');
+        });
+        recordSummary(summary, seen, 'modified', destination.displayPath);
+        continue;
+      }
+
+      await writeFile(source.fullPath, updated, 'utf-8');
+      rollbackSteps.push(async () => {
+        await writeFile(source.fullPath, original, 'utf-8');
+      });
+      recordSummary(summary, seen, 'modified', source.displayPath);
+    }
+  } catch (error) {
+    const rollbackFailures = await rollbackPatchMutations(rollbackSteps);
+    if (rollbackFailures.length > 0) {
+      throw new Error(
+        `${error instanceof Error ? error.message : String(error)} `
+        + `(rollback incomplete: ${rollbackFailures.join('; ')})`,
+      );
+    }
+    throw error;
   }
 
   return {
@@ -553,9 +585,33 @@ async function assertDoesNotExist(fullPath: string, displayPath: string): Promis
   }
 }
 
+async function rollbackPatchMutations(
+  rollbackSteps: Array<() => Promise<void>>,
+): Promise<string[]> {
+  const failures: string[] = [];
+  for (const step of [...rollbackSteps].reverse()) {
+    try {
+      await step();
+    } catch (error) {
+      failures.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+  return failures;
+}
+
 async function assertFileExists(fullPath: string, displayPath: string): Promise<void> {
   const info = await stat(fullPath);
   if (!info.isFile()) {
     throw new Error(`Patch target must be a file: ${displayPath}`);
+  }
+}
+
+async function unlinkIfExists(fullPath: string): Promise<void> {
+  try {
+    await unlink(fullPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error;
+    }
   }
 }

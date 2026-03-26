@@ -591,6 +591,62 @@ describe('LocalToolRuntime', () => {
       }
     });
 
+    it('rolls back earlier file additions when a later hunk fails', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const original = readFileSync(join(cwd, 'src', 'app.ts'), 'utf-8');
+        const result = await runtime.execute(sharedCtx(cwd), {
+          id: 'patch-4b',
+          name: 'apply_patch',
+          arguments: {
+            input: `*** Begin Patch
+*** Add File: src/ephemeral.ts
++export const ephemeral = true;
+*** Update File: src/app.ts
+@@
+-missing line
++still missing
+*** End Patch`,
+          },
+        });
+        expect(result.isError).toBe(true);
+        expect(result.output).toContain('Failed to find expected lines');
+        expect(existsSync(join(cwd, 'src', 'ephemeral.ts'))).toBe(false);
+        expect(readFileSync(join(cwd, 'src', 'app.ts'), 'utf-8')).toBe(original);
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('restores earlier updates when a later delete hunk fails', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const original = readFileSync(join(cwd, 'src', 'app.ts'), 'utf-8');
+        const result = await runtime.execute(sharedCtx(cwd), {
+          id: 'patch-4c',
+          name: 'apply_patch',
+          arguments: {
+            input: `*** Begin Patch
+*** Update File: src/app.ts
+@@
+-export const value = 1;
++export const value = 9;
+*** Delete File: src/missing.ts
+*** End Patch`,
+          },
+        });
+        expect(result.isError).toBe(true);
+        expect(result.output).toContain('ENOENT');
+        expect(readFileSync(join(cwd, 'src', 'app.ts'), 'utf-8')).toBe(original);
+      } finally {
+        cleanup();
+      }
+    });
+
     it('blocks in read_only workspace mode', async () => {
       const { cwd, cleanup } = createWorkspace();
       const runtime = new LocalToolRuntime();

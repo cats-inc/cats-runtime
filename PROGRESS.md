@@ -65,7 +65,7 @@
 #### Remaining Items
 
 - [ ] Deepen provider health probes beyond the current readiness summary and endpoint reachability probes, especially richer API/local auth/model semantics and Ollama model discovery
-- [ ] Harden shared local tool runtime safety beyond the current symlink/junction/hardlink alias guards, especially more atomic multi-file mutation behavior
+- [ ] Continue hardening shared local tool runtime mutation safety beyond the current bounded `apply_patch` rollback and symlink/junction/hardlink alias guards, especially write/edit transactionality
 - [ ] Continue broadening the shared local tool runtime beyond the current filesystem/shell/navigation/materialization set, especially richer diff/planning helpers
 - [ ] Continue refining capability partitioning and policy surfacing beyond the current profile summary/read-model slice and `standard` / `extended` / `read_only` split
 - [ ] Split Docker discovery snapshot creation out of `createDiscoveryStatusPayload()` so `GET /discovery/status` can reuse the live WSL snapshot without recomputing an unused WSL status store
@@ -326,7 +326,7 @@ product policy.
 
 - [ ] No full packaged onboarding or provider installation wizard in runtime
 - [ ] No deep semantic live health probes for every API/local transport yet; the first slice adds endpoint reachability but does not validate auth/model behavior for every remote target
-- [ ] No atomic multi-file rollback for shared local-tool writes or patch application yet
+- [ ] No full transactional rollback for shared local-tool writes/edits yet; `apply_patch` now restores bounded file content/presence on failure, but not inode-level metadata or empty parent-dir cleanup
 
 ### WP-9: Runtime-Managed Skills v0
 
