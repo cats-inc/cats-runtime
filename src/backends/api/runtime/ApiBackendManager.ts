@@ -166,6 +166,8 @@ function buildStrategyInstructionOverlay(
   let strategyPrompt: string | undefined;
   if (strategyId === 'react') {
     strategyPrompt = 'Execution strategy: react. Work in short reason-act-observe loops, avoid repeating the same tool calls, and stop once the user request is satisfied.';
+  } else if (strategyId === 'plan_execute') {
+    strategyPrompt = 'Execution strategy: plan_execute. Produce a short bounded plan, execute only the next necessary tool batch, then reassess before planning again.';
   } else if (strategyId === 'pdca') {
     strategyPrompt = 'Execution strategy: pdca. Work in explicit plan-do-check-act cycles: plan the next bounded action set, execute only that batch, check the results against the acceptance criteria, and then adjust before another cycle.';
   } else if (strategyId === 'reflexion') {
@@ -201,12 +203,15 @@ function resolveStrategyConstraints(
 } {
   const strategyContext = request?.strategyContext;
   const usesManagedLoopGuards = strategyId === 'react'
+    || strategyId === 'plan_execute'
     || strategyId === 'pdca'
     || strategyId === 'reflexion'
     || strategyId === 'tree_of_thoughts';
   const stepLimit = readStrategyPositiveInteger(
     strategyContext,
-    strategyId === 'pdca'
+    strategyId === 'plan_execute'
+      ? 'maxPlanSteps'
+      : strategyId === 'pdca'
       ? 'maxCycles'
       : strategyId === 'tree_of_thoughts'
         ? 'maxDepth'

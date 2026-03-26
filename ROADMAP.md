@@ -793,17 +793,18 @@ of the shipped peer diagnostics/read surfaces:
 - the first real runtime-hosted loop via `react`
 
 The next follow-through slices are now partially landed. The runtime now owns a
-real `pdca` loop with runtime-local plan/do/check/act phase events, plus a
-bounded `reflexion` loop with runtime-owned critique/revision passes,
+bounded `plan_execute` loop with runtime-local plan/execute/evaluate phase
+events, plus a real `pdca` loop with runtime-local plan/do/check/act phase
+events, a bounded `reflexion` loop with runtime-owned critique/revision passes,
 reflection-local state, and additive reflection events persisted onto the
-runtime session. The next additive slice now also lands a bounded
-`tree_of_thoughts` loop with runtime-owned branch sampling, pruning, selection,
-and strategy-local branch state. Later families remain deferred.
+runtime session, and a bounded `tree_of_thoughts` loop with runtime-owned
+branch sampling, pruning, selection, and strategy-local branch state. Later
+families remain deferred.
 
 That substrate is still intentionally incomplete. `cats` can now bridge
 product-owned defaults such as Chat -> `react`, Work -> `pdca`, and Code ->
-`reflexion`, and the runtime now owns `simple_tool_call`, `react`, `pdca`,
-`reflexion`, and `tree_of_thoughts`.
+`reflexion`, and the runtime now owns `simple_tool_call`, `react`,
+`plan_execute`, `pdca`, `reflexion`, and `tree_of_thoughts`.
 
 Unsupported strategy requests must still remain honest: preserve additive
 request metadata, resolve through the registry, and degrade to
@@ -815,6 +816,9 @@ already exist.
 - runtime-owned strategy registry and resolution order are landed
 - no-hint callers remain compatible through `simple_tool_call`
 - explicit `react` requests execute through the new bounded runtime-owned loop
+- explicit `plan_execute` requests now execute through a bounded runtime-owned
+  plan/execute/evaluate loop with additive phase events and strategy-local
+  plan-progress state
 - explicit `pdca` requests now execute through a real runtime-owned phase loop
   with additive plan/do/check/act events and strategy-local state
 - explicit `reflexion` requests now execute through a bounded runtime-owned
@@ -834,7 +838,7 @@ already exist.
   registry and execution seam
 - prioritize strategies that upper-layer products already point at through
   product-owned defaults, continuing with other deferred families after the
-  landed `tree_of_thoughts` slice
+  landed `plan_execute` and `tree_of_thoughts` slices
 - keep the rollout additive for existing session/message callers and stream or
   observe consumers
 - keep no-hint compatibility behavior intact while new families land

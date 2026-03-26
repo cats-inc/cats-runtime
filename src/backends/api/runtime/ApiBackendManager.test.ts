@@ -1444,6 +1444,255 @@ describe('ApiBackendManager', () => {
     }
   });
 
+  it('runs explicit plan_execute with bounded plan/evaluate events and runtime-owned inspection metadata', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-api-plan-execute-'));
+    const repoDir = join(root, 'repo');
+    mkdirSync(repoDir, { recursive: true });
+    writeFileSync(join(repoDir, 'answer.txt'), '42\n', 'utf-8');
+
+    try {
+      const registry = new SessionRegistry();
+      const session = registry.create({
+        id: 'api-session-plan-execute',
+        providerName: 'codex',
+        providerBackend: 'api',
+        providerInstanceId: 'gateway',
+        cwd: repoDir,
+      });
+
+      const requestBodies: Record<string, unknown>[] = [];
+      const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+        requestBodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        if (requestBodies.length === 1) {
+          return new Response(JSON.stringify({
+            id: 'resp_plan_execute_1',
+            output: [
+              {
+                type: 'message',
+                role: 'assistant',
+                content: [{ type: 'output_text', text: 'Plan: inspect answer.txt before answering.' }],
+              },
+              {
+                type: 'function_call',
+                call_id: 'call_read_answer_plan_execute',
+                name: 'read_file',
+                arguments: '{"path":"answer.txt"}',
+              },
+            ],
+            usage: {
+              input_tokens: 7,
+              output_tokens: 3,
+            },
+          }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+
+        return new Response(JSON.stringify({
+          id: 'resp_plan_execute_2',
+          output: [{
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: '42' }],
+          }],
+          usage: {
+            input_tokens: 4,
+            output_tokens: 1,
+          },
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      });
+
+      const manager = new ApiBackendManager(
+        { sessionBaseDir: root },
+        registry,
+        {
+          fetch: fetchMock as typeof fetch,
+          env: {
+            OPENAI_API_KEY: 'test-key',
+          },
+        },
+      );
+      const runtime = createRuntimeManager(root, manager);
+      const turn = {
+        message: 'Inspect answer.txt and return only the verified value.',
+        requestedStrategy: 'plan_execute' as const,
+        acceptanceCriteria: 'Return only the verified file value.',
+        strategyContext: {
+          maxPlanSteps: 4,
+          timeoutMs: 1500,
+          stuckThreshold: 2,
+        },
+        correlation: {
+          taskId: 'task-runtime-1',
+          product: 'work',
+        },
+      };
+
+      runtime.beginRun(session, turn);
+
+      const handle = manager.spawn(session.id, createTarget());
+      const events = await collectEvents(handle.streamMessage(turn));
+      for (const event of events) {
+        runtime.observeEvent(session.id, event);
+      }
+
+      const updated = registry.get(session.id)!;
+      const inspection = buildSessionInspection({
+        session: updated,
+        view: toSessionView(updated, {
+          attached: manager.isAttached(session.id),
+          externalSessionLiveWindowMs: 15000,
+        }),
+        trackedState: runtime.getTrackedState(session.id),
+        metering: buildMeteringSnapshot(),
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(String(requestBodies[0]?.instructions)).toContain('Execution strategy: plan_execute.');
+      expect(String(requestBodies[0]?.instructions)).toContain(
+        'Acceptance criteria:\nReturn only the verified file value.',
+      );
+      expect(String(requestBodies[0]?.instructions)).toContain('maxPlanSteps: 4');
+      expect(String(JSON.stringify(requestBodies[1]?.input))).toContain(
+        'Runtime plan_execute guidance',
+      );
+      expect(requestBodies[1]?.previous_response_id).toBe('resp_plan_execute_1');
+
+      expect(events).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            status: 'started',
+            strategyEvent: 'strategy_started',
+            effectiveStrategy: 'plan_execute',
+            strategyResolutionSource: 'explicit_request',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            strategyEvent: 'strategy_plan',
+            effectiveStrategy: 'plan_execute',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            strategyEvent: 'strategy_tool_call',
+            effectiveStrategy: 'plan_execute',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            strategyEvent: 'strategy_evaluation',
+            effectiveStrategy: 'plan_execute',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            status: 'completed',
+            strategyEvent: 'strategy_completed',
+            effectiveStrategy: 'plan_execute',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'tool_use',
+          toolName: 'read_file',
+          toolId: 'call_read_answer_plan_execute',
+        }),
+        expect.objectContaining({
+          type: 'tool_result',
+          toolName: 'read_file',
+          toolId: 'call_read_answer_plan_execute',
+          text: expect.stringContaining('42'),
+        }),
+        expect.objectContaining({
+          type: 'result',
+          sessionId: 'resp_plan_execute_2',
+          usage: {
+            inputTokens: 11,
+            outputTokens: 4,
+          },
+        }),
+      ]));
+
+      expect(updated).toMatchObject({
+        strategy: {
+          preferredStrategy: 'plan_execute',
+          request: {
+            requestedStrategy: 'plan_execute',
+            acceptanceCriteria: 'Return only the verified file value.',
+            strategyContext: {
+              maxPlanSteps: 4,
+              timeoutMs: 1500,
+              stuckThreshold: 2,
+            },
+            correlation: {
+              taskId: 'task-runtime-1',
+              product: 'work',
+            },
+          },
+          effectiveStrategy: 'plan_execute',
+          resolutionSource: 'explicit_request',
+          summary: {
+            status: 'completed',
+            stepCount: 2,
+            stepLimit: 4,
+            timeoutMs: 1500,
+            duplicateStepCount: 1,
+            lastStepSignature: 'read_file:{\"path\":\"answer.txt\"}',
+            lastEvent: 'strategy_completed',
+            resolutionSource: 'explicit_request',
+          },
+          localState: {
+            currentPhase: 'completed',
+            plannedSteps: 2,
+            executedSteps: 1,
+            consecutiveDuplicateToolCalls: 1,
+            lastToolCallSignature: 'read_file:{\"path\":\"answer.txt\"}',
+            lastToolCallCount: 1,
+          },
+        },
+      });
+
+      expect(inspection.strategy).toMatchObject({
+        requestedStrategy: 'plan_execute',
+        effectiveStrategy: 'plan_execute',
+        acceptanceCriteria: 'Return only the verified file value.',
+        correlation: {
+          taskId: 'task-runtime-1',
+          product: 'work',
+        },
+        state: {
+          preferredStrategy: 'plan_execute',
+          effectiveStrategy: 'plan_execute',
+          summary: {
+            status: 'completed',
+            stepCount: 2,
+          },
+          localState: {
+            currentPhase: 'completed',
+            plannedSteps: 2,
+            executedSteps: 1,
+          },
+        },
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
 it('runs explicit reflexion with additive reflection events and runtime-owned inspection metadata', async () => {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-api-reflexion-'));
   const repoDir = join(root, 'repo');
