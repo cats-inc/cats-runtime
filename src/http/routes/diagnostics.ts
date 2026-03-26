@@ -9,6 +9,14 @@ import {
   listProviderCatalog,
   type ProviderTargetDescriptor,
 } from '../../core/providerCatalog.js';
+import {
+  buildRemoteModelDiscoveryRequest,
+  resolveRemoteEndpoint,
+  sanitizeRemoteModelDiscoveryUrl,
+  type RemoteModelDiscoveryAuthMode,
+  type RemoteModelDiscoveryRequest,
+  type RemoteModelDiscoveryTarget,
+} from '../../core/models/remoteModelDiscovery.js';
 import { inspectProviderActiveConfig } from '../../core/providerActiveConfig.js';
 import { toCompatibilitySummaryView } from '../../core/compatibility/ProviderCompatibilityService.js';
 import type { CompatibilitySummaryView } from '../../core/compatibility/types.js';
@@ -42,29 +50,12 @@ type DiagnosticStatus = HealthStatus['status'];
 type DiagnosticsProbeMode = 'light' | 'live';
 const DIAGNOSTIC_BACKENDS: readonly BackendKind[] = ['cli', 'api', 'local', 'agent'];
 const DEFAULT_REMOTE_ENDPOINT_PROBE_TIMEOUT_MS = 5_000;
-type RemoteProbeAuthMode = 'none' | 'bearer' | 'x-api-key' | 'x-goog-api-key';
-type RemoteProbeTarget = 'endpoint' | 'models' | 'model_tags';
 
 interface DiagnosticCheck {
   code: string;
   status: DiagnosticStatus;
   message: string;
   details?: Record<string, unknown>;
-}
-
-interface RemoteProbeRequest {
-  url: string;
-  displayUrl: string;
-  method: 'GET';
-  headers: Record<string, string>;
-  headerNames: string[];
-  target: RemoteProbeTarget;
-  auth: {
-    mode: RemoteProbeAuthMode;
-    required: boolean;
-    applied: boolean;
-    credentialEnv?: string;
-  };
 }
 
 interface ProviderDiagnosticAvailability {
@@ -183,37 +174,6 @@ function buildEnvDescriptor(
   };
 }
 
-function getRemoteEndpoint(
-  instance: RemoteProviderInstanceConfig,
-  env?: Readonly<NodeJS.ProcessEnv>,
-): string | null {
-  const resolvedUrl = instance.urlEnv && env?.[instance.urlEnv]
-    ? env[instance.urlEnv]!
-    : instance.url;
-  const resolvedBaseUrl = instance.baseUrlEnv && env?.[instance.baseUrlEnv]
-    ? env[instance.baseUrlEnv]!
-    : instance.baseUrl;
-  if (instance.transport === 'openclaw' || instance.transport === 'openclaw_gateway') {
-    return resolvedUrl || resolvedBaseUrl || null;
-  }
-  if (instance.transport === 'agent_sdk' || instance.transport === 'agent_sdk_bridge') {
-    return resolvedBaseUrl || 'http://127.0.0.1:8082';
-  }
-  if (instance.transport === 'anthropic') {
-    return resolvedBaseUrl || 'https://api.anthropic.com';
-  }
-  if (instance.transport === 'openai') {
-    return resolvedBaseUrl || 'https://api.openai.com';
-  }
-  if (instance.transport === 'google' || instance.transport === 'gemini') {
-    return resolvedBaseUrl || 'https://generativelanguage.googleapis.com';
-  }
-  if (instance.transport === 'ollama') {
-    return resolvedBaseUrl || 'http://127.0.0.1:11434';
-  }
-  return resolvedBaseUrl || resolvedUrl || null;
-}
-
 function createCheck(
   code: string,
   status: DiagnosticStatus,
@@ -221,134 +181,6 @@ function createCheck(
   details?: Record<string, unknown>,
 ): DiagnosticCheck {
   return { code, status, message, details };
-}
-
-function sanitizeDiagnosticUrl(rawUrl: string): string {
-  const url = new URL(rawUrl);
-  url.username = '';
-  url.password = '';
-  for (const key of [...url.searchParams.keys()]) {
-    url.searchParams.set(key, '[redacted]');
-  }
-  return url.toString();
-}
-
-function endsWithPathSegments(pathSegments: string[], suffixSegments: string[]): boolean {
-  if (suffixSegments.length > pathSegments.length) {
-    return false;
-  }
-
-  return suffixSegments.every((segment, index) =>
-    pathSegments[pathSegments.length - suffixSegments.length + index] === segment,
-  );
-}
-
-function appendProbePath(
-  endpoint: string,
-  baseSegments: readonly string[],
-  fullSegments: readonly string[],
-): string {
-  const url = new URL(endpoint);
-  const pathSegments = url.pathname.split('/').filter(Boolean);
-  let resolvedSegments = [...pathSegments];
-
-  if (!endsWithPathSegments(pathSegments, [...fullSegments])) {
-    if (endsWithPathSegments(pathSegments, [...baseSegments])) {
-      resolvedSegments = [
-        ...pathSegments,
-        ...fullSegments.slice(baseSegments.length),
-      ];
-    } else {
-      resolvedSegments = [
-        ...pathSegments,
-        ...fullSegments,
-      ];
-    }
-  }
-
-  url.pathname = `/${resolvedSegments.join('/')}`;
-  return url.toString();
-}
-
-function hasAppliedAuthHeader(headers: Record<string, string>): boolean {
-  return Object.keys(headers).some((headerName) => {
-    const normalized = headerName.toLowerCase();
-    return normalized === 'authorization'
-      || normalized === 'x-api-key'
-      || normalized === 'x-goog-api-key';
-  });
-}
-
-function buildRemoteProbeRequest(
-  instance: RemoteProviderInstanceConfig,
-  env: Readonly<NodeJS.ProcessEnv>,
-): RemoteProbeRequest | null {
-  const endpoint = getRemoteEndpoint(instance, env);
-  if (!endpoint) {
-    return null;
-  }
-
-  const requiresApiKey = instance.transport === 'anthropic'
-    || instance.transport === 'openai'
-    || instance.transport === 'google'
-    || instance.transport === 'gemini';
-  let url = endpoint;
-  let target: RemoteProbeTarget = 'endpoint';
-  let authMode: RemoteProbeAuthMode = 'none';
-  const headers: Record<string, string> = {};
-
-  if (instance.transport === 'anthropic') {
-    url = appendProbePath(endpoint, ['v1'], ['v1', 'models']);
-    target = 'models';
-    authMode = 'x-api-key';
-    if (instance.apiKeyEnv && env[instance.apiKeyEnv]) {
-      headers['x-api-key'] = env[instance.apiKeyEnv]!;
-    }
-    headers['anthropic-version'] = '2023-06-01';
-  } else if (instance.transport === 'openai') {
-    url = appendProbePath(endpoint, ['v1'], ['v1', 'models']);
-    target = 'models';
-    authMode = 'bearer';
-    if (instance.apiKeyEnv && env[instance.apiKeyEnv]) {
-      headers.authorization = `Bearer ${env[instance.apiKeyEnv]!}`;
-    }
-    if (instance.organizationEnv && env[instance.organizationEnv]) {
-      headers['OpenAI-Organization'] = env[instance.organizationEnv]!;
-    }
-    if (instance.projectEnv && env[instance.projectEnv]) {
-      headers['OpenAI-Project'] = env[instance.projectEnv]!;
-    }
-  } else if (instance.transport === 'google' || instance.transport === 'gemini') {
-    url = appendProbePath(endpoint, ['v1beta'], ['v1beta', 'models']);
-    target = 'models';
-    authMode = 'x-goog-api-key';
-    if (instance.apiKeyEnv && env[instance.apiKeyEnv]) {
-      headers['x-goog-api-key'] = env[instance.apiKeyEnv]!;
-    }
-  } else if (instance.transport === 'ollama') {
-    url = appendProbePath(endpoint, ['api'], ['api', 'tags']);
-    target = 'model_tags';
-  }
-
-  const mergedHeaders = {
-    ...headers,
-    ...instance.headers,
-  };
-
-  return {
-    url,
-    displayUrl: sanitizeDiagnosticUrl(url),
-    method: 'GET',
-    headers: mergedHeaders,
-    headerNames: Object.keys(mergedHeaders).sort(),
-    target,
-    auth: {
-      mode: authMode,
-      required: requiresApiKey,
-      applied: hasAppliedAuthHeader(mergedHeaders),
-      ...(instance.apiKeyEnv ? { credentialEnv: instance.apiKeyEnv } : {}),
-    },
-  };
 }
 
 function classifyRemoteLiveProbe(
@@ -360,7 +192,7 @@ function classifyRemoteLiveProbe(
     latencyMs: number;
     timedOut: boolean;
     message: string;
-    target: RemoteProbeTarget;
+    target: RemoteModelDiscoveryTarget;
     authenticated: boolean;
     headerNames: string[];
   },
@@ -762,7 +594,7 @@ async function diagnoseAgentTarget(
   const config: Record<string, unknown> = {
     transport: instance.transport,
     model: instance.model || null,
-    endpoint: getRemoteEndpoint(instance, env),
+    endpoint: resolveRemoteEndpoint(instance, env),
     credentials: {
       urlEnv: buildEnvDescriptor(env, instance.urlEnv, false),
       baseUrlEnv: buildEnvDescriptor(env, instance.baseUrlEnv, false),
@@ -860,7 +692,7 @@ async function diagnoseRemoteConfigOnly(
   }
 
   const checks: DiagnosticCheck[] = [];
-  const endpoint = getRemoteEndpoint(instance, env);
+  const endpoint = resolveRemoteEndpoint(instance, env);
   const requiresApiKey = instance.transport === 'anthropic'
     || instance.transport === 'openai'
     || instance.transport === 'google'
@@ -898,7 +730,7 @@ async function diagnoseRemoteConfigOnly(
   }
 
   if (probeMode === 'live' && endpoint) {
-    const probeRequest = buildRemoteProbeRequest(instance, env);
+    const probeRequest = buildRemoteModelDiscoveryRequest(instance, env);
     if (probeRequest) {
       checks.push(
         createCheck(
@@ -924,7 +756,7 @@ async function diagnoseRemoteConfigOnly(
     }
     const liveProbe = await probeRemoteEndpoint(probeRequest || {
       url: endpoint,
-      displayUrl: sanitizeDiagnosticUrl(endpoint),
+      displayUrl: sanitizeRemoteModelDiscoveryUrl(endpoint),
       method: 'GET',
       headers: {},
       headerNames: [],
@@ -1042,7 +874,7 @@ async function diagnoseTarget(
       liveSupported: target.backend === 'cli'
         ? Boolean(result.compatibility?.probe.supportsLive)
         : target.backend === 'agent'
-          || Boolean(target.remoteInstance && getRemoteEndpoint(target.remoteInstance)),
+          || Boolean(target.remoteInstance && resolveRemoteEndpoint(target.remoteInstance, env)),
     },
   };
 }
@@ -1459,14 +1291,14 @@ function buildPeerGuardrailDiagnostics(
 }
 
 async function probeRemoteEndpoint(
-  request: RemoteProbeRequest,
+  request: RemoteModelDiscoveryRequest,
 ): Promise<{
     url: string;
     method: 'GET';
-    target: RemoteProbeTarget;
+    target: RemoteModelDiscoveryTarget;
     headerNames: string[];
     authenticated: boolean;
-    authMode: RemoteProbeAuthMode;
+    authMode: RemoteModelDiscoveryAuthMode;
     authRequired: boolean;
     reachable: boolean;
     statusCode?: number;

@@ -2495,8 +2495,13 @@ structured catalog:
 Catalog semantics:
 
 - `source: dynamic` means runtime discovery succeeded for the resolved target.
+  This now includes auth-ready remote API listings for OpenAI/Anthropic via
+  `GET /v1/models`, Gemini/Google via `GET /v1beta/models`, local Ollama via
+  `GET /api/tags` plus `GET /api/ps`, Pi CLI discovery, and agent-backed
+  adapter `listModels()` hooks.
 - `source: config` means runtime discovery was unavailable or failed and the
-  result fell back to configured target metadata.
+  result fell back to configured target metadata. For API targets, the runtime
+  keeps this fallback when auth is not configured or when remote listing fails.
 - `source: static` means the runtime used a curated compatibility table.
 - `cache` is present only for `dynamic` results. Config/static fallbacks return
   `cache: null`.

@@ -735,7 +735,15 @@ describe('provider diagnostics HTTP contract', () => {
       if (url === 'https://generativelanguage.test/v1beta/models') {
         const headers = new Headers(init?.headers);
         expect(headers.get('x-goog-api-key')).toBe('test-gemini-secret');
-        return new Response(JSON.stringify({ models: [] }), {
+        return new Response(JSON.stringify({
+          models: [
+            {
+              name: 'models/gemini-2.5-pro',
+              displayName: 'Gemini 2.5 Pro',
+              supportedGenerationMethods: ['generateContent'],
+            },
+          ],
+        }), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         });
@@ -835,9 +843,10 @@ describe('provider diagnostics HTTP contract', () => {
                 classification: 'http_ok',
               }),
               modelCatalog: expect.objectContaining({
-                source: 'config',
+                source: 'dynamic',
                 defaultModel: 'gemini-2.5-pro',
                 modelCount: 1,
+                warnings: [],
               }),
             }),
           }),

@@ -553,9 +553,10 @@ src/
 7. CLI targets flow into `WorkerPool`; API/local targets flow into `ApiBackendManager`; agent targets flow into `AgentBackendManager`
 8. Provider model-catalog reads resolve through the shared provider target and
    model catalog services in `src/core`, including runtime-owned active-config
-   hints when a provider family exposes a readable local default selection and
-   agent-backed OpenClaw `models.list` normalization into canonical
-   `provider/model` refs
+   hints when a provider family exposes a readable local default selection,
+   auth-ready OpenAI/Anthropic/Gemini remote model-list discovery, local
+   Ollama discovery, and agent-backed OpenClaw `models.list` normalization into
+   canonical `provider/model` refs
 9. CLI setup, diagnostics, and execution priming resolve through the shared
    compatibility service in `src/core/compatibility`, which consumes the
    runtime-owned metadata in `src/core/provider-install`, classifies targets,

@@ -676,6 +676,9 @@ For host-side setup or Settings surfaces, use:
   for each configured CLI target before or between probes, plus any additive
   runtime-owned `activeConfig` hints such as Goose's detected local
   provider/model selection
+- `GET /providers/{provider}/models` when a setup or repair flow needs the
+  runtime-owned resolved model catalog; auth-ready API targets now use remote
+  vendor model listing before falling back to configured/default metadata
 
 To inspect the publish payload locally without using the global npm cache:
 

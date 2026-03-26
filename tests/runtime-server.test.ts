@@ -2774,6 +2774,81 @@ providers:
     });
   });
 
+  it('GET /providers/:provider/models loads a dynamic OpenAI catalog when auth is configured', async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      expect(url).toBe('https://api.openai.test/v1/models');
+      const headers = new Headers(init?.headers);
+      expect(headers.get('authorization')).toBe('Bearer route-openai-key');
+      expect(headers.get('OpenAI-Organization')).toBe('route-openai-org');
+      expect(headers.get('OpenAI-Project')).toBe('route-openai-project');
+      return new Response(JSON.stringify({
+        data: [
+          { id: 'gpt-5.4' },
+          { id: 'gpt-5.4-mini' },
+          { id: 'text-embedding-3-small' },
+        ],
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    await withRuntime({
+      providerDefaultTargets: {
+        codex: { backend: 'api', instance: 'main' },
+      },
+      remoteProviderCatalog: {
+        api: {
+          codex: {
+            main: {
+              id: 'main',
+              providerName: 'codex',
+              backend: 'api',
+              transport: 'openai',
+              apiKeyEnv: 'OPENAI_API_KEY',
+              organizationEnv: 'OPENAI_ORG_ID',
+              projectEnv: 'OPENAI_PROJECT_ID',
+              baseUrl: 'https://api.openai.test',
+              model: 'gpt-5.4',
+            },
+          },
+        },
+        local: {},
+        agent: {},
+      },
+    }, {
+      apiBackend: {
+        fetch: fetchMock,
+        env: {
+          OPENAI_API_KEY: 'route-openai-key',
+          OPENAI_ORG_ID: 'route-openai-org',
+          OPENAI_PROJECT_ID: 'route-openai-project',
+        },
+      },
+    }, async (runtime) => {
+      const response = await runtime.app.request('/providers/codex/models?instance=api/main');
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        provider: 'codex',
+        backend: 'api',
+        instance: 'main',
+        defaultModel: 'gpt-5.4',
+        source: 'dynamic',
+        cache: {
+          servedFromCache: false,
+          cachedAt: expect.any(String),
+          ttlSec: 60,
+        },
+        models: [
+          { id: 'gpt-5.4', label: 'gpt-5.4', default: true, status: 'available' },
+          { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini', default: false, status: 'available' },
+        ],
+        warnings: [],
+      });
+    });
+  });
+
   it('GET /providers/:provider/models uses agent adapter model discovery when available', async () => {
     const bridgeFetch = vi.fn(async () => new Response(JSON.stringify({
       providers: [

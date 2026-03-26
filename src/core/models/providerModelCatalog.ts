@@ -17,6 +17,10 @@ import {
   discoverPiModels,
   type PiModelDiscoveryRunner,
 } from '../../backends/cli/pi/models.js';
+import {
+  buildRemoteModelDiscoveryRequest,
+  type RemoteModelDiscoveryRequest,
+} from './remoteModelDiscovery.js';
 
 export interface ProviderModelCatalogEntry {
   id: string;
@@ -62,6 +66,8 @@ interface DynamicCatalogLoadResult {
 }
 
 const DEFAULT_TTL_MS = 60_000;
+const DEFAULT_REMOTE_MODEL_DISCOVERY_TIMEOUT_MS = 5_000;
+const MAX_GEMINI_MODEL_LIST_PAGES = 5;
 
 const KIRO_NATIVE_MODELS: ProviderModelCatalogEntry[] = [
   { id: 'claude-opus-4.6', label: 'claude-opus-4.6', default: true },
@@ -168,6 +174,51 @@ function resolveBaseUrl(
 ): string {
   const fromEnv = instance.baseUrlEnv ? env[instance.baseUrlEnv] : undefined;
   return fromEnv || instance.baseUrl || fallback;
+}
+
+function filterPreferredModels(
+  models: ProviderModelCatalogEntry[],
+  predicate: (id: string) => boolean,
+): ProviderModelCatalogEntry[] {
+  const preferred = models.filter((model) => predicate(model.id));
+  return preferred.length > 0 ? preferred : models;
+}
+
+function isLikelyOpenAiCatalogModel(id: string): boolean {
+  const normalized = id.toLowerCase();
+  return normalized.startsWith('gpt-')
+    || /^o\d/.test(normalized)
+    || normalized.startsWith('chatgpt-')
+    || normalized.includes('codex');
+}
+
+function isLikelyAnthropicCatalogModel(id: string): boolean {
+  return id.toLowerCase().startsWith('claude-');
+}
+
+function isLikelyGeminiCatalogModel(id: string): boolean {
+  return id.toLowerCase().startsWith('gemini-');
+}
+
+function normalizeGeminiModelId(name: string): string {
+  return name.startsWith('models/') ? name.slice('models/'.length) : name;
+}
+
+function supportsGeminiGeneration(entry: Record<string, unknown>): boolean {
+  const methods = Array.isArray(entry.supportedGenerationMethods)
+    ? entry.supportedGenerationMethods
+    : [];
+  if (methods.length === 0) {
+    return true;
+  }
+
+  return methods.some((method) => typeof method === 'string'
+    && (
+      method === 'generateContent'
+      || method === 'streamGenerateContent'
+      || method.endsWith('.generateContent')
+      || method.endsWith('.streamGenerateContent')
+    ));
 }
 
 function withDefaultModel(
@@ -386,6 +437,10 @@ export class ProviderModelCatalogService {
   private async loadDynamicModels(
     target: ProviderTargetDescriptor,
   ): Promise<DynamicCatalogLoadResult | null> {
+    if (target.backend === 'api' && target.remoteInstance) {
+      return this.listRemoteApiModels(target.remoteInstance);
+    }
+
     if (target.backend === 'cli' && target.providerName === 'pi' && target.cliInstance) {
       return {
         models: (await discoverPiModels(target.cliInstance, {
@@ -412,6 +467,177 @@ export class ProviderModelCatalogService {
     }
 
     return null;
+  }
+
+  private async listRemoteApiModels(
+    instance: RemoteProviderInstanceConfig,
+  ): Promise<DynamicCatalogLoadResult | null> {
+    const request = buildRemoteModelDiscoveryRequest(instance, this.env);
+    if (!request || request.target !== 'models') {
+      return null;
+    }
+
+    if (request.auth.required && !request.auth.applied) {
+      return null;
+    }
+
+    if (instance.transport === 'openai') {
+      return this.listOpenAiModels(request);
+    }
+
+    if (instance.transport === 'anthropic') {
+      return this.listAnthropicModels(request);
+    }
+
+    if (instance.transport === 'google' || instance.transport === 'gemini') {
+      return this.listGeminiModels(request);
+    }
+
+    return null;
+  }
+
+  private async fetchRemoteDiscoveryPayload(
+    request: RemoteModelDiscoveryRequest,
+    url = request.url,
+  ): Promise<Record<string, unknown>> {
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      DEFAULT_REMOTE_MODEL_DISCOVERY_TIMEOUT_MS,
+    );
+    if (typeof timeout.unref === 'function') {
+      timeout.unref();
+    }
+
+    try {
+      const response = await this.fetchImpl(url, {
+        method: request.method,
+        ...(request.headerNames.length > 0 ? { headers: request.headers } : {}),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`Remote model list failed with status ${response.status}`);
+      }
+
+      const payload = await response.json();
+      if (!payload || typeof payload !== 'object') {
+        throw new Error('Remote model list returned a non-object JSON payload');
+      }
+
+      return payload as Record<string, unknown>;
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`Timed out while listing models from '${request.displayUrl}'`);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private async listOpenAiModels(
+    request: RemoteModelDiscoveryRequest,
+  ): Promise<DynamicCatalogLoadResult> {
+    const payload = await this.fetchRemoteDiscoveryPayload(request);
+    const discovered = dedupeModels(
+      (Array.isArray(payload.data) ? payload.data : []).flatMap((entry) => {
+        if (!entry || typeof entry !== 'object') {
+          return [];
+        }
+        const id = readNullableString((entry as Record<string, unknown>).id);
+        if (!id) {
+          return [];
+        }
+        return [{
+          id,
+          label: id,
+          status: 'available' as const,
+        }];
+      }),
+    );
+
+    return {
+      models: filterPreferredModels(discovered, isLikelyOpenAiCatalogModel),
+    };
+  }
+
+  private async listAnthropicModels(
+    request: RemoteModelDiscoveryRequest,
+  ): Promise<DynamicCatalogLoadResult> {
+    const payload = await this.fetchRemoteDiscoveryPayload(request);
+    const discovered = dedupeModels(
+      (Array.isArray(payload.data) ? payload.data : []).flatMap((entry) => {
+        if (!entry || typeof entry !== 'object') {
+          return [];
+        }
+        const record = entry as Record<string, unknown>;
+        const id = readNullableString(record.id);
+        if (!id) {
+          return [];
+        }
+        return [{
+          id,
+          label: readNullableString(record.display_name) || id,
+          status: 'available' as const,
+        }];
+      }),
+    );
+
+    return {
+      models: filterPreferredModels(discovered, isLikelyAnthropicCatalogModel),
+    };
+  }
+
+  private async listGeminiModels(
+    request: RemoteModelDiscoveryRequest,
+  ): Promise<DynamicCatalogLoadResult> {
+    const warnings: string[] = [];
+    const discovered: ProviderModelCatalogEntry[] = [];
+    let nextPageToken: string | null = null;
+
+    for (let pageIndex = 0; pageIndex < MAX_GEMINI_MODEL_LIST_PAGES; pageIndex += 1) {
+      const pageUrl = new URL(request.url);
+      if (nextPageToken) {
+        pageUrl.searchParams.set('pageToken', nextPageToken);
+      }
+      const payload = await this.fetchRemoteDiscoveryPayload(request, pageUrl.toString());
+      const models = Array.isArray(payload.models) ? payload.models : [];
+      for (const entry of models) {
+        if (!entry || typeof entry !== 'object') {
+          continue;
+        }
+        const record = entry as Record<string, unknown>;
+        if (!supportsGeminiGeneration(record)) {
+          continue;
+        }
+        const name = readNullableString(record.name);
+        if (!name) {
+          continue;
+        }
+        const id = normalizeGeminiModelId(name);
+        discovered.push({
+          id,
+          label: readNullableString(record.displayName) || id,
+          status: 'available',
+        });
+      }
+
+      nextPageToken = readNullableString(payload.nextPageToken);
+      if (!nextPageToken) {
+        break;
+      }
+
+      if (pageIndex === MAX_GEMINI_MODEL_LIST_PAGES - 1) {
+        warnings.push(
+          `Gemini model discovery stopped after ${MAX_GEMINI_MODEL_LIST_PAGES} page(s); additional pages remain.`,
+        );
+      }
+    }
+
+    return {
+      models: filterPreferredModels(dedupeModels(discovered), isLikelyGeminiCatalogModel),
+      ...(warnings.length > 0 ? { warnings } : {}),
+    };
   }
 
   private async listOllamaModels(

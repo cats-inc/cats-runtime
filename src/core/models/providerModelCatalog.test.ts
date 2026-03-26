@@ -316,6 +316,252 @@ describe('ProviderModelCatalogService', () => {
     expect(vi.mocked(piModelDiscoveryRunner.run)).toHaveBeenCalledTimes(1);
   });
 
+  it('loads a dynamic OpenAI catalog when auth is configured and caches the result', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      const url = typeof input === 'string' ? input : input.url;
+      expect(url).toBe('https://api.openai.test/v1/models');
+      const headers = new Headers(init?.headers);
+      expect(headers.get('authorization')).toBe('Bearer test-openai-key');
+      expect(headers.get('OpenAI-Organization')).toBe('test-openai-org');
+      expect(headers.get('OpenAI-Project')).toBe('test-openai-project');
+      return jsonResponse({
+        data: [
+          { id: 'gpt-5.4' },
+          { id: 'gpt-5.4-mini' },
+          { id: 'text-embedding-3-small' },
+        ],
+      });
+    });
+
+    const config = {
+      ...createCatalogConfig(),
+      providerDefaultTargets: {
+        codex: { backend: 'api', instance: 'main' },
+      },
+      remoteProviderCatalog: {
+        api: {
+          codex: {
+            main: {
+              id: 'main',
+              providerName: 'codex',
+              backend: 'api',
+              transport: 'openai',
+              apiKeyEnv: 'OPENAI_API_KEY',
+              organizationEnv: 'OPENAI_ORG_ID',
+              projectEnv: 'OPENAI_PROJECT_ID',
+              baseUrl: 'https://api.openai.test',
+              model: 'gpt-5.4',
+            },
+          },
+        },
+        local: createCatalogConfig().remoteProviderCatalog.local,
+        agent: createCatalogConfig().remoteProviderCatalog.agent,
+      },
+    } as const;
+
+    const service = new ProviderModelCatalogService(config as never, {
+      fetch: fetchMock,
+      env: {
+        OPENAI_API_KEY: 'test-openai-key',
+        OPENAI_ORG_ID: 'test-openai-org',
+        OPENAI_PROJECT_ID: 'test-openai-project',
+      },
+      ttlMs: 60_000,
+    });
+
+    const first = await service.getCatalog('codex');
+    expect(first).toEqual({
+      provider: 'codex',
+      backend: 'api',
+      instance: 'main',
+      defaultModel: 'gpt-5.4',
+      source: 'dynamic',
+      cache: {
+        servedFromCache: false,
+        cachedAt: expect.any(String),
+        ttlSec: 60,
+      },
+      models: [
+        {
+          id: 'gpt-5.4',
+          label: 'gpt-5.4',
+          default: true,
+          status: 'available',
+        },
+        {
+          id: 'gpt-5.4-mini',
+          label: 'gpt-5.4-mini',
+          default: false,
+          status: 'available',
+        },
+      ],
+      warnings: [],
+    });
+
+    const second = await service.getCatalog('codex');
+    expect(second.cache).toEqual({
+      servedFromCache: true,
+      cachedAt: expect.any(String),
+      ttlSec: 60,
+    });
+    expect(second.models).toEqual(first.models);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads paginated Gemini model catalogs through the shared runtime catalog service', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      const url = typeof input === 'string' ? input : input.url;
+      const headers = new Headers(init?.headers);
+      expect(headers.get('x-goog-api-key')).toBe('test-gemini-key');
+      if (url === 'https://generativelanguage.test/v1beta/models') {
+        return jsonResponse({
+          models: [
+            {
+              name: 'models/gemini-2.5-pro',
+              displayName: 'Gemini 2.5 Pro',
+              supportedGenerationMethods: ['generateContent'],
+            },
+            {
+              name: 'models/text-embedding-004',
+              displayName: 'Text Embedding 004',
+              supportedGenerationMethods: ['embedContent'],
+            },
+          ],
+          nextPageToken: 'page-2',
+        });
+      }
+
+      if (url === 'https://generativelanguage.test/v1beta/models?pageToken=page-2') {
+        return jsonResponse({
+          models: [
+            {
+              name: 'models/gemini-2.5-flash',
+              displayName: 'Gemini 2.5 Flash',
+              supportedGenerationMethods: ['streamGenerateContent'],
+            },
+          ],
+        });
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    const config = {
+      ...createCatalogConfig(),
+      providerDefaultTargets: {
+        gemini: { backend: 'api', instance: 'pro' },
+      },
+      remoteProviderCatalog: {
+        api: {
+          gemini: {
+            pro: {
+              id: 'pro',
+              providerName: 'gemini',
+              backend: 'api',
+              transport: 'gemini',
+              apiKeyEnv: 'GEMINI_API_KEY',
+              baseUrlEnv: 'GEMINI_BASE_URL',
+              model: 'gemini-2.5-pro',
+            },
+          },
+        },
+        local: createCatalogConfig().remoteProviderCatalog.local,
+        agent: createCatalogConfig().remoteProviderCatalog.agent,
+      },
+    } as const;
+
+    const service = new ProviderModelCatalogService(config as never, {
+      fetch: fetchMock,
+      env: {
+        GEMINI_API_KEY: 'test-gemini-key',
+        GEMINI_BASE_URL: 'https://generativelanguage.test',
+      },
+      ttlMs: 60_000,
+    });
+
+    const catalog = await service.getCatalog('gemini');
+    expect(catalog).toEqual({
+      provider: 'gemini',
+      backend: 'api',
+      instance: 'pro',
+      defaultModel: 'gemini-2.5-pro',
+      source: 'dynamic',
+      cache: {
+        servedFromCache: false,
+        cachedAt: expect.any(String),
+        ttlSec: 60,
+      },
+      models: [
+        {
+          id: 'gemini-2.5-pro',
+          label: 'Gemini 2.5 Pro',
+          default: true,
+          status: 'available',
+        },
+        {
+          id: 'gemini-2.5-flash',
+          label: 'Gemini 2.5 Flash',
+          default: false,
+          status: 'available',
+        },
+      ],
+      warnings: [],
+    });
+  });
+
+  it('keeps API targets on config fallback when remote model discovery auth is not ready', async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    const config = {
+      ...createCatalogConfig(),
+      providerDefaultTargets: {
+        claude: { backend: 'api', instance: 'sonnet' },
+      },
+      remoteProviderCatalog: {
+        api: {
+          claude: {
+            sonnet: {
+              id: 'sonnet',
+              providerName: 'claude',
+              backend: 'api',
+              transport: 'anthropic',
+              apiKeyEnv: 'ANTHROPIC_API_KEY',
+              baseUrl: 'https://api.anthropic.test',
+              model: 'claude-sonnet-4-6',
+            },
+          },
+        },
+        local: createCatalogConfig().remoteProviderCatalog.local,
+        agent: createCatalogConfig().remoteProviderCatalog.agent,
+      },
+    } as const;
+
+    const service = new ProviderModelCatalogService(config as never, {
+      fetch: fetchMock,
+      env: {},
+      ttlMs: 60_000,
+    });
+
+    const catalog = await service.getCatalog('claude');
+    expect(catalog).toEqual({
+      provider: 'claude',
+      backend: 'api',
+      instance: 'sonnet',
+      defaultModel: 'claude-sonnet-4-6',
+      source: 'config',
+      cache: null,
+      models: [
+        {
+          id: 'claude-sonnet-4-6',
+          label: 'claude-sonnet-4-6',
+          default: true,
+          status: 'configured',
+        },
+      ],
+      warnings: [],
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('builds an additive advanced catalog with presets and controls for OpenAI targets', async () => {
     const config = {
       ...createCatalogConfig(),
@@ -341,7 +587,16 @@ describe('ProviderModelCatalogService', () => {
       },
     } as const;
 
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        data: [
+          { id: 'gpt-5.4' },
+        ],
+      }),
+    );
+
     const service = new ProviderModelCatalogService(config as never, {
+      fetch: fetchMock,
       env: {
         OPENAI_API_KEY: 'test-key',
       },
@@ -353,14 +608,18 @@ describe('ProviderModelCatalogService', () => {
       backend: 'api',
       instance: 'main',
       defaultModel: 'gpt-5.4',
-      source: 'config',
-      cache: null,
+      source: 'dynamic',
+      cache: {
+        servedFromCache: false,
+        cachedAt: expect.any(String),
+        ttlSec: 60,
+      },
       entries: [
         {
           id: 'gpt-5.4',
           label: 'gpt-5.4',
           default: true,
-          status: 'configured',
+          status: 'available',
           capabilityTags: ['tool_use', 'reasoning'],
         },
       ],
