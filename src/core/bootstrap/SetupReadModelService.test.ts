@@ -48,6 +48,24 @@ describe('SetupReadModelService', () => {
       const readModel = await service.read();
 
       expect(readModel.repair.status).toBe('scan_required');
+      expect(readModel.repair.actions).toEqual([
+        expect.objectContaining({
+          kind: 'run_manual_scan',
+          path: '/setup-scan',
+          method: 'POST',
+          body: {
+            manual: true,
+          },
+        }),
+        expect.objectContaining({
+          kind: 'generate_setup_report',
+          path: '/diagnostics/setup-report',
+          method: 'POST',
+          body: {
+            refreshScan: true,
+          },
+        }),
+      ]);
       expect(readModel.repair.nextAction).toEqual(expect.objectContaining({
         kind: 'run_manual_scan',
         path: '/setup-scan',
@@ -152,18 +170,51 @@ describe('SetupReadModelService', () => {
 
       expect(readModel.repair.preferredScan.source).toBe('manualScan');
       expect(readModel.repair.status).toBe('attention_required');
-      expect(readModel.repair.providersNeedingAttention).toEqual([
+      expect(readModel.repair.providersReadyToApply).toEqual([
         {
+          provider: 'claude',
+          family: 'Claude',
+        },
+      ]);
+      expect(readModel.repair.providersNeedingAttention).toEqual([
+        expect.objectContaining({
           provider: 'codex',
           family: 'Codex',
           remediationCount: 1,
-        },
+          remediationPreview: [
+            {
+              code: 'install_missing',
+              summary: 'Install Codex CLI.',
+            },
+          ],
+        }),
       ]);
       expect(readModel.repair.nextAction).toEqual(expect.objectContaining({
         kind: 'apply_config',
         path: '/setup-apply',
         method: 'POST',
+        providers: ['claude'],
+        body: {
+          providers: ['claude'],
+        },
       }));
+      expect(readModel.repair.actions).toEqual([
+        expect.objectContaining({
+          kind: 'apply_config',
+          providers: ['claude'],
+        }),
+        expect.objectContaining({
+          kind: 'review_remediation',
+          providers: ['codex'],
+        }),
+        expect.objectContaining({
+          kind: 'generate_setup_report',
+          path: '/diagnostics/setup-report',
+          body: {
+            refreshScan: false,
+          },
+        }),
+      ]);
       expect(readModel.diagnostics.latestReport).toEqual(expect.objectContaining({
         artifactId: 'setup-report-test',
         status: 'degraded',

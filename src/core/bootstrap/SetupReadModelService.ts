@@ -9,6 +9,9 @@ import type {
   ProviderScanEntry,
   SetupState,
 } from './BootstrapService.js';
+import type { ProviderRemediationStep } from '../provider-install/types.js';
+
+const MAX_REMEDIATION_PREVIEW_STEPS = 3;
 
 export interface SetupStateReadModel {
   bootstrapRequired: boolean;
@@ -42,21 +45,28 @@ export interface SetupRepairSummary {
     unavailableCount: number;
     remediationCount: number;
   };
+  providersReadyToApply: Array<{
+    provider: string;
+    family: string;
+  }>;
   providersNeedingAttention: Array<{
     provider: string;
     family: string;
     remediationCount: number;
+    remediationPreview: ProviderRemediationStep[];
   }>;
   nextAction: SetupReadModelAction;
+  actions: SetupReadModelAction[];
 }
 
 export interface SetupReadModelAction {
-  kind: 'none' | 'run_manual_scan' | 'apply_config' | 'review_remediation';
+  kind: 'none' | 'run_manual_scan' | 'apply_config' | 'review_remediation' | 'generate_setup_report';
   label: string;
   summary: string;
   path?: string;
   method?: 'GET' | 'POST';
   body?: Record<string, unknown>;
+  providers?: string[];
 }
 
 export interface SetupLatestDiagnosticReportSummary {
@@ -154,6 +164,10 @@ function buildRepairSummary(input: {
 }): SetupRepairSummary {
   const preferredScan = pickPreferredScan(input.scan, input.manualScan);
   if (!preferredScan) {
+    const actions = [
+      createRunManualScanAction(),
+      createGenerateSetupReportAction(true),
+    ];
     return {
       status: 'scan_required',
       summary: 'No persisted setup scan is available yet. Run a manual scan to capture current provider readiness and remediation.',
@@ -165,28 +179,34 @@ function buildRepairSummary(input: {
         unavailableCount: 0,
         remediationCount: 0,
       },
+      providersReadyToApply: [],
       providersNeedingAttention: [],
-      nextAction: {
-        kind: 'run_manual_scan',
-        label: 'Run Manual Scan',
-        summary: 'Trigger a manual provider scan and persist the latest repair snapshot.',
-        path: '/setup-scan',
-        method: 'POST',
-        body: {
-          manual: true,
-        },
-      },
+      nextAction: actions[0]!,
+      actions,
     };
   }
 
+  const readyProviders = preferredScan.scan.providers.filter((provider) => provider.available);
   const unavailableProviders = preferredScan.scan.providers.filter((provider) => !provider.available);
   const remediationCount = preferredScan.scan.providers.reduce(
     (count, provider) => count + provider.remediation.length,
     0,
   );
   const availableCount = preferredScan.scan.providers.length - unavailableProviders.length;
+  const providersReadyToApply = readyProviders.map((provider) => ({
+    provider: provider.provider,
+    family: provider.family,
+  }));
 
   if (unavailableProviders.length === 0) {
+    const actions = input.bootstrapRequired
+      ? [
+          createApplyConfigAction(readyProviders),
+          createGenerateSetupReportAction(false),
+        ]
+      : [
+          createGenerateSetupReportAction(false),
+        ];
     return {
       status: 'ready',
       summary: input.bootstrapRequired
@@ -200,28 +220,22 @@ function buildRepairSummary(input: {
         unavailableCount: 0,
         remediationCount,
       },
+      providersReadyToApply,
       providersNeedingAttention: [],
-      nextAction: input.bootstrapRequired
-        ? {
-            kind: 'apply_config',
-            label: 'Apply Config',
-            summary: 'Choose the ready providers you want to enable and apply the generated providers.yaml.',
-            path: '/setup-apply',
-            method: 'POST',
-          }
-        : {
-            kind: 'none',
-            label: 'No Action Needed',
-            summary: 'No provider repair action is currently required.',
-          },
+      nextAction: input.bootstrapRequired ? actions[0]! : createNoAction(),
+      actions,
     };
   }
 
-  const providersNeedingAttention = unavailableProviders.map((provider) => ({
-    provider: provider.provider,
-    family: provider.family,
-    remediationCount: provider.remediation.length,
-  }));
+  const providersNeedingAttention = unavailableProviders.map((provider) =>
+    summarizeAttentionProvider(provider),
+  );
+  const actions = [
+    ...(input.bootstrapRequired && availableCount > 0 ? [createApplyConfigAction(readyProviders)] : []),
+    createReviewRemediationAction(unavailableProviders),
+    createGenerateSetupReportAction(false),
+    ...(input.bootstrapRequired && availableCount === 0 ? [createRunManualScanAction()] : []),
+  ];
 
   return {
     status: 'attention_required',
@@ -236,19 +250,91 @@ function buildRepairSummary(input: {
       unavailableCount: unavailableProviders.length,
       remediationCount,
     },
+    providersReadyToApply,
     providersNeedingAttention,
-    nextAction: {
-      kind: input.bootstrapRequired && availableCount > 0 ? 'apply_config' : 'review_remediation',
-      label: input.bootstrapRequired && availableCount > 0 ? 'Apply Ready Providers' : 'Review Remediation',
-      summary: input.bootstrapRequired && availableCount > 0
-        ? 'Apply the ready providers now, then use the per-provider remediation hints to repair the rest.'
-        : 'Review the per-provider remediation hints from the latest setup scan before the next retry.',
-      ...(input.bootstrapRequired && availableCount > 0
-        ? {
-            path: '/setup-apply',
-            method: 'POST' as const,
-          }
-        : {}),
+    nextAction: actions[0]!,
+    actions,
+  };
+}
+
+function summarizeAttentionProvider(
+  provider: ProviderScanEntry,
+): SetupRepairSummary['providersNeedingAttention'][number] {
+  return {
+    provider: provider.provider,
+    family: provider.family,
+    remediationCount: provider.remediation.length,
+    remediationPreview: provider.remediation.slice(0, MAX_REMEDIATION_PREVIEW_STEPS),
+  };
+}
+
+function createNoAction(): SetupReadModelAction {
+  return {
+    kind: 'none',
+    label: 'No Action Needed',
+    summary: 'No provider repair action is currently required.',
+  };
+}
+
+function createRunManualScanAction(): SetupReadModelAction {
+  return {
+    kind: 'run_manual_scan',
+    label: 'Run Manual Scan',
+    summary: 'Trigger a manual provider scan and persist the latest repair snapshot.',
+    path: '/setup-scan',
+    method: 'POST',
+    body: {
+      manual: true,
+    },
+  };
+}
+
+function createApplyConfigAction(
+  providers: ProviderScanEntry[],
+): SetupReadModelAction {
+  const providerIds = providers.map((provider) => provider.provider);
+  return {
+    kind: 'apply_config',
+    label: providerIds.length > 0 ? 'Apply Ready Providers' : 'Apply Config',
+    summary: providerIds.length > 0
+      ? 'Apply the currently ready providers now using the generated providers.yaml contract.'
+      : 'Choose the ready providers you want to enable and apply the generated providers.yaml.',
+    path: '/setup-apply',
+    method: 'POST',
+    ...(providerIds.length > 0
+      ? {
+          providers: providerIds,
+          body: {
+            providers: providerIds,
+          },
+        }
+      : {}),
+  };
+}
+
+function createReviewRemediationAction(
+  providers: ProviderScanEntry[],
+): SetupReadModelAction {
+  const providerIds = providers.map((provider) => provider.provider);
+  return {
+    kind: 'review_remediation',
+    label: 'Review Remediation',
+    summary: 'Review the per-provider remediation hints from the latest setup scan before the next retry.',
+    ...(providerIds.length > 0 ? { providers: providerIds } : {}),
+  };
+}
+
+function createGenerateSetupReportAction(refreshScan: boolean): SetupReadModelAction {
+  return {
+    kind: 'generate_setup_report',
+    label: 'Generate Setup Report',
+    summary: refreshScan
+      ? 'Capture a redacted setup diagnostic report and refresh the shared setup scan first.'
+      : 'Capture a redacted setup diagnostic report for operator review or sharing.',
+    path: '/diagnostics/setup-report',
+    method: 'POST',
+    body: {
+      refreshScan,
     },
   };
 }

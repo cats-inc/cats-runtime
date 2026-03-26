@@ -124,6 +124,12 @@ post-bootstrap follow-through:
 
 - `repair.status` / `repair.nextAction` tell operators whether the next step is
   to run a manual scan, apply ready providers, or review remediation
+- `repair.providersReadyToApply` surfaces the ready provider ids/families that
+  can be passed directly to `POST /setup-apply`
+- `repair.providersNeedingAttention` now includes bounded remediation previews
+  for providers that still need repair
+- `repair.actions` provides ordered runtime-owned follow-up actions using the
+  existing `/setup-scan`, `/setup-apply`, and `/diagnostics/setup-report` routes
 - `diagnostics.latestReport` points at the latest persisted setup report summary
   when one already exists under `<dataDir>/diagnostics/`
 

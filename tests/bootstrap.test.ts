@@ -377,6 +377,22 @@ describe('bootstrap mode server', () => {
             kind: 'run_manual_scan',
             path: '/setup-scan',
           }),
+          actions: expect.arrayContaining([
+            expect.objectContaining({
+              kind: 'run_manual_scan',
+              path: '/setup-scan',
+              body: {
+                manual: true,
+              },
+            }),
+            expect.objectContaining({
+              kind: 'generate_setup_report',
+              path: '/diagnostics/setup-report',
+              body: {
+                refreshScan: true,
+              },
+            }),
+          ]),
         }));
         expect(body.diagnostics).toEqual({
           latestReport: null,
@@ -650,10 +666,136 @@ describe('bootstrap mode server', () => {
             source: 'scan',
             providerCount: expect.any(Number),
           }),
+          providersReadyToApply: expect.any(Array),
           nextAction: expect.objectContaining({
             kind: 'apply_config',
             path: '/setup-apply',
+            providers: expect.any(Array),
           }),
+          actions: expect.arrayContaining([
+            expect.objectContaining({
+              kind: 'apply_config',
+              path: '/setup-apply',
+              providers: expect.any(Array),
+            }),
+            expect.objectContaining({
+              kind: 'generate_setup_report',
+              path: '/diagnostics/setup-report',
+            }),
+          ]),
+        }));
+        expect((body.repair as { providersReadyToApply: unknown[] }).providersReadyToApply.length)
+          .toBeGreaterThan(0);
+      } finally {
+        await runtime.close();
+      }
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('GET /setup-state surfaces remediation previews and repair actions after a manual scan with failures', { timeout: 60_000 }, async () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const env = createTestEnv(root);
+      ensureDirs(env);
+      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
+      const startup = createRuntimeStartupState({ bootstrapRequired: true });
+      const runtime = createRuntimeServer(config, {
+        startup,
+        compatibility: createFastCompatibility(env),
+      });
+      try {
+        const bootstrapService = runtime.context.bootstrapService;
+        if (!bootstrapService) {
+          throw new Error('Bootstrap service missing for test');
+        }
+
+        bootstrapService.getLatestManualScan = async () => ({
+          scannedAt: '2026-03-26T05:00:00.000Z',
+          scanType: 'manual',
+          providers: [
+            {
+              provider: 'claude',
+              family: 'Claude',
+              commandStatus: 'ready',
+              commandPath: 'claude',
+              version: '1.0.0',
+              authStatus: 'ready',
+              available: true,
+              install: null,
+              remediation: [],
+            },
+            {
+              provider: 'codex',
+              family: 'Codex',
+              commandStatus: 'missing_install',
+              commandPath: null,
+              version: null,
+              authStatus: 'unknown',
+              available: false,
+              install: null,
+              remediation: [
+                {
+                  code: 'install_missing',
+                  summary: 'Install Codex CLI.',
+                },
+                {
+                  code: 'auth_missing',
+                  summary: 'Set OPENAI_API_KEY.',
+                },
+              ],
+            },
+          ],
+        });
+
+        const response = await runtime.app.request('/setup-state');
+        expect(response.status).toBe(200);
+        const body = await response.json() as Record<string, unknown>;
+        expect(body.repair).toEqual(expect.objectContaining({
+          status: 'attention_required',
+          providersReadyToApply: [
+            {
+              provider: 'claude',
+              family: 'Claude',
+            },
+          ],
+          providersNeedingAttention: [
+            expect.objectContaining({
+              provider: 'codex',
+              family: 'Codex',
+              remediationCount: 2,
+              remediationPreview: [
+                {
+                  code: 'install_missing',
+                  summary: 'Install Codex CLI.',
+                },
+                {
+                  code: 'auth_missing',
+                  summary: 'Set OPENAI_API_KEY.',
+                },
+              ],
+            }),
+          ],
+          nextAction: expect.objectContaining({
+            kind: 'apply_config',
+            path: '/setup-apply',
+            providers: ['claude'],
+          }),
+          actions: expect.arrayContaining([
+            expect.objectContaining({
+              kind: 'apply_config',
+              providers: ['claude'],
+            }),
+            expect.objectContaining({
+              kind: 'review_remediation',
+              providers: ['codex'],
+            }),
+            expect.objectContaining({
+              kind: 'generate_setup_report',
+              path: '/diagnostics/setup-report',
+            }),
+          ]),
         }));
       } finally {
         await runtime.close();

@@ -963,8 +963,10 @@ evidence bundles and does not force hosts to invent their own report format.
   the normal HTTP server, so port conflicts or other startup failures still
   leave a redacted operator-facing artifact
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
-  next-action, and latest-setup-report summary metadata instead of forcing
-  later dashboard/setup follow-through to reconstruct that state client-side
+  next-action, actionable repair actions, ready-to-apply provider lists,
+  remediation previews, and latest-setup-report summary metadata instead of
+  forcing later dashboard/setup follow-through to reconstruct that state
+  client-side
 - reports now aggregate runtime path facts, config inspection, discovery
   posture, bootstrap setup snapshots, configured target counts, git presence,
   and compatibility-evidence directory references without copying raw evidence

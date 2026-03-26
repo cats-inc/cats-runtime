@@ -300,8 +300,10 @@ snapshot. Response shape:
 - `repair` — shared runtime-owned repair summary for dashboard/provider-setup follow-through
   - `status` — `ready`, `scan_required`, or `attention_required`
   - `preferredScan` — which persisted snapshot currently drives repair guidance (`scan`, `manualScan`, or `none`)
-  - `providersNeedingAttention` — compact list of provider ids/families that still need repair
+  - `providersReadyToApply` — compact list of currently ready provider ids/families that can be passed directly to `POST /setup-apply`
+  - `providersNeedingAttention` — compact list of provider ids/families that still need repair, including bounded `remediationPreview`
   - `nextAction` — operator-facing runtime action metadata such as `run_manual_scan`, `apply_config`, or `review_remediation`
+  - `actions` — ordered runtime-owned follow-up actions using the existing setup/diagnostics routes, including ready-to-send request bodies where the runtime can supply them honestly
 - `diagnostics.latestReport` — latest persisted setup diagnostic report summary when a setup report artifact already exists
   - includes `artifactId`, `artifactPath`, `generatedAt`, summary `status`, and `issueCounts`
 
