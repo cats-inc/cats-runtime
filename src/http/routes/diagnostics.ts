@@ -17,6 +17,7 @@ import type { HealthStatus } from '../../core/types.js';
 import type { AppContext } from '../app.js';
 import { getProviderCompatibilityService, getRuntimeMeteringService } from '../app.js';
 import {
+  DEFAULT_RUNTIME_AGENT_PROBE_TIMEOUT_MS,
   getFileBackedProviderDiscoveryInfo,
   getRuntimeEnvironment,
   isFileBackedProvider,
@@ -462,7 +463,13 @@ async function diagnoseAgentTarget(
     const shouldProbeLive = probeMode === 'live'
       || instance.transport === 'openclaw'
       || instance.transport === 'openclaw_gateway';
-    const probe = await probeRuntimeAgentInstance(instance, shouldProbeLive);
+    const probe = ctx.agentBackend
+      ? await ctx.agentBackend.probe(
+          target,
+          shouldProbeLive,
+          DEFAULT_RUNTIME_AGENT_PROBE_TIMEOUT_MS,
+        )
+      : await probeRuntimeAgentInstance(instance, shouldProbeLive);
     if (!probe.supported) {
       checks.push(
         createCheck(

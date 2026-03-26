@@ -141,7 +141,41 @@ class FakeOpenClawSocket extends EventTarget {
         type: 'res',
         id: frame.id,
         ok: true,
-        payload: { protocol: 1 },
+        payload: { type: 'hello-ok', protocol: 3 },
+      });
+      return;
+    }
+
+    if (method === 'health') {
+      this.emitFrame({
+        type: 'res',
+        id: frame.id,
+        ok: true,
+        payload: {
+          ok: true,
+          ts: 1_747_884_800_000,
+          durationMs: 12,
+          channels: {
+            telegram: {
+              linked: true,
+            },
+          },
+          channelOrder: ['telegram'],
+          channelLabels: {
+            telegram: 'Telegram',
+          },
+          heartbeatSeconds: 60,
+          defaultAgentId: 'default',
+          agents: [{
+            agentId: 'default',
+            isDefault: true,
+          }],
+          sessions: {
+            path: '/tmp/openclaw-sessions.json',
+            count: 1,
+            recent: [],
+          },
+        },
       });
       return;
     }
@@ -384,6 +418,12 @@ describe('agent backend integration', () => {
       expect(resumedEvents.map((event) => event.type)).toEqual(['init', 'text', 'result']);
 
       const agentRequests = sentFrames.filter((frame) => frame.method === 'agent');
+      const connectRequests = sentFrames.filter((frame) => frame.method === 'connect');
+      expect(connectRequests).toHaveLength(2);
+      expect(connectRequests[0]?.params).toEqual(expect.objectContaining({
+        minProtocol: 3,
+        maxProtocol: 3,
+      }));
       expect(agentRequests).toHaveLength(2);
       expect((agentRequests[0].params as Record<string, unknown>).sessionKey).toBe('task-123');
       expect((agentRequests[1].params as Record<string, unknown>).sessionKey).toBe('task-123');
@@ -391,6 +431,51 @@ describe('agent backend integration', () => {
         .toBe('Focus on architecture.\n\nDraft the report');
       expect((agentRequests[1].params as Record<string, unknown>).message)
         .toBe('Focus on architecture.\n\nContinue');
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
+  it('runs a live OpenClaw gateway health probe through provider diagnostics', async () => {
+    const { config, env, cleanup } = createAgentConfigRoot();
+    const sentFrames: Array<Record<string, unknown>> = [];
+    const runtime = createRuntimeServer(config, {
+      agentBackend: {
+        env,
+        webSocketFactory: createFakeWebSocketFactory([], sentFrames),
+      },
+    });
+
+    try {
+      const response = await runtime.app.request(
+        '/diagnostics/providers?probe=live&provider=openclaw&backend=agent&instance=gateway',
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual(expect.objectContaining({
+        providers: [
+          expect.objectContaining({
+            provider: 'openclaw',
+            backend: 'agent',
+            instance: 'gateway',
+            availability: expect.objectContaining({
+              probe: 'live',
+            }),
+            checks: expect.arrayContaining([
+              expect.objectContaining({
+                code: 'probe',
+                status: 'ok',
+                message: expect.stringContaining('Gateway health RPC succeeded'),
+              }),
+            ]),
+            reprobe: expect.objectContaining({
+              liveSupported: true,
+            }),
+          }),
+        ],
+      }));
+      expect(sentFrames.filter((frame) => frame.method === 'connect')).toHaveLength(1);
+      expect(sentFrames.filter((frame) => frame.method === 'health')).toHaveLength(1);
     } finally {
       await runtime.close();
       cleanup();

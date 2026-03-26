@@ -197,7 +197,7 @@ src/
 - Exposes runtime/host diagnostics at `GET /diagnostics/runtime`
 - Exposes provider availability plus CLI compatibility diagnostics at
   `GET /diagnostics/providers`, including live API/local endpoint reachability
-  probes when `probe=live`
+  probes and OpenClaw gateway `health` RPC probes when `probe=live`
 - Exposes runtime-owned browser session/page routes with pluggable driver
   metadata, normalized `browser_page` preview surfaces, aggregate browser
   summary reads, and explicit closed-session cleanup

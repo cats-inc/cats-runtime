@@ -414,7 +414,10 @@ runtime backend supports them. For CLI targets this now validates the runtime
 execution flags that `cats-runtime` actually uses when a family profile defines
 a safe live probe; API/local targets with configured endpoints now also perform
 bounded GET reachability probes and expose additive `config.liveProbe`
-metadata. Ollama probes use `/api/tags` against the configured base URL.
+metadata. Agent-backed OpenClaw targets now perform a real websocket
+handshake plus `health` RPC through the same `AgentBackendManager` runtime
+options used for live execution instead of reporting config-only validation.
+Ollama probes use `/api/tags` against the configured base URL.
 Successful HTTP reachability yields `endpoint_reachable`; network/timeout
 failures yield `endpoint_probe_failed`. Live remote/agent/local diagnostics now
 also try to load the runtime-owned model catalog for that target, surfacing

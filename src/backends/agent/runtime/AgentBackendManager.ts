@@ -1,4 +1,4 @@
-import type { ExecutionHandle, StreamEvent, TurnInput } from '../../../core/types.js';
+import type { ExecutionHandle, HealthStatus, StreamEvent, TurnInput } from '../../../core/types.js';
 import { mergeRuntimeInstructionLayers } from '../../../core/skills/catalog.js';
 import type { SessionRegistry } from '../../cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig, RemoteProviderInstanceConfig } from '../../cli/config.js';
@@ -24,6 +24,30 @@ function ensureAgentTarget(target: ProviderTargetDescriptor): RemoteProviderInst
   }
 
   return target.remoteInstance;
+}
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number | undefined,
+  message: string,
+): Promise<T> {
+  if (!timeoutMs || timeoutMs <= 0) {
+    return promise;
+  }
+
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
 }
 
 export class AgentBackendManager {
@@ -161,6 +185,43 @@ export class AgentBackendManager {
     }
 
     return adapter.listModels(instance);
+  }
+
+  async probe(
+    target: ProviderTargetDescriptor,
+    runProbe = true,
+    timeoutMs?: number,
+  ): Promise<{
+      kind: string;
+      supported: boolean;
+      result?: HealthStatus;
+    }> {
+    const instance = ensureAgentTarget(target);
+    const adapter = this.buildAdapter(instance);
+    if (!adapter.probe) {
+      return {
+        kind: adapter.kind,
+        supported: false,
+      };
+    }
+
+    if (!runProbe) {
+      return {
+        kind: adapter.kind,
+        supported: true,
+      };
+    }
+
+    return {
+      kind: adapter.kind,
+      supported: true,
+      result: await withTimeout(
+        adapter.probe(instance),
+        timeoutMs,
+        `Timed out while probing agent adapter '${adapter.kind}' for `
+        + `${target.providerName}/${target.instanceId}`,
+      ),
+    };
   }
 
   private async *streamTurn(

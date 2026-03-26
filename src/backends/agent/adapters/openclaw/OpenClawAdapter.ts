@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type {
   AgentRuntimeService,
+  HealthStatus,
   SessionArtifact,
   SessionProviderState,
   StreamEvent,
@@ -16,7 +17,7 @@ const DEFAULT_CLIENT_MODE = 'backend';
 const DEFAULT_CLIENT_VERSION = '0.1.0';
 const DEFAULT_ROLE = 'operator';
 const DEFAULT_SCOPES = ['operator.admin'];
-const PROTOCOL_VERSION = 1;
+const PROTOCOL_VERSION = 3;
 
 interface GatewayRequestFrame {
   type: 'req';
@@ -97,6 +98,41 @@ function resolveHeaders(
   return Object.keys(headers).length > 0 ? headers : undefined;
 }
 
+function resolveAuth(
+  instance: RemoteProviderInstanceConfig,
+  env: NodeJS.ProcessEnv,
+): { token?: string; password?: string } | undefined {
+  const authToken = instance.authTokenEnv ? env[instance.authTokenEnv] : undefined;
+  const password = instance.passwordEnv ? env[instance.passwordEnv] : undefined;
+  if (!authToken && !password) {
+    return undefined;
+  }
+
+  return {
+    ...(authToken ? { token: authToken } : {}),
+    ...(password ? { password } : {}),
+  };
+}
+
+function buildConnectParams(
+  instance: RemoteProviderInstanceConfig,
+  env: NodeJS.ProcessEnv,
+): Record<string, unknown> {
+  return {
+    minProtocol: PROTOCOL_VERSION,
+    maxProtocol: PROTOCOL_VERSION,
+    client: {
+      id: instance.clientId || DEFAULT_CLIENT_ID,
+      version: instance.clientVersion || DEFAULT_CLIENT_VERSION,
+      platform: process.platform,
+      mode: instance.clientMode || DEFAULT_CLIENT_MODE,
+    },
+    role: instance.role || DEFAULT_ROLE,
+    scopes: instance.scopes || DEFAULT_SCOPES,
+    auth: resolveAuth(instance, env),
+  };
+}
+
 function mergePayloadTemplate(
   template: Record<string, unknown> | undefined,
   payload: Record<string, unknown>,
@@ -159,6 +195,28 @@ function buildProviderState(
   };
 }
 
+function summarizeHealthPayload(payload: unknown, url: string): string {
+  const record = parseRecord(payload);
+  if (!record) {
+    return `Gateway health RPC succeeded for ${url}`;
+  }
+
+  const agents = Array.isArray(record.agents) ? record.agents.length : 0;
+  const sessions = parseRecord(record.sessions);
+  const sessionCount = typeof sessions?.count === 'number' ? sessions.count : undefined;
+  const channelOrder = Array.isArray(record.channelOrder) ? record.channelOrder.length : 0;
+  const durationMs = typeof record.durationMs === 'number' ? record.durationMs : undefined;
+  const detailParts = [
+    `Gateway health RPC succeeded for ${url}`,
+    ...(channelOrder > 0 ? [`${channelOrder} channel(s)`] : []),
+    ...(agents > 0 ? [`${agents} agent(s)`] : []),
+    ...(sessionCount !== undefined ? [`${sessionCount} session(s)`] : []),
+    ...(durationMs !== undefined ? [`${durationMs}ms snapshot`] : []),
+  ];
+
+  return detailParts.join(' | ');
+}
+
 class GatewayWsClient {
   private readonly pending = new Map<string, PendingRequest>();
   private challengeResolve!: (nonce: string) => void;
@@ -176,7 +234,7 @@ class GatewayWsClient {
     private readonly onEvent: (frame: GatewayEventFrame) => void,
   ) {}
 
-  async connect(connectParams: Record<string, unknown>, signal: AbortSignal): Promise<void> {
+  async connect(connectParams: Record<string, unknown>, signal: AbortSignal): Promise<unknown> {
     this.socket = this.factory(this.url, { headers: this.headers });
     const socket = this.socket;
 
@@ -228,7 +286,7 @@ class GatewayWsClient {
       'OpenClaw connect challenge timeout',
     );
 
-    await this.request('connect', {
+    return this.request('connect', {
       ...connectParams,
       nonce,
     }, DEFAULT_CONNECT_TIMEOUT_MS);
@@ -378,6 +436,7 @@ export class OpenClawAdapter implements AgentAdapter {
     const queue = new AsyncQueue();
     let initialized = false;
     const preInitEvents: StreamEvent[] = [];
+    const env = this.options.env || process.env;
     const client = new GatewayWsClient(factory, url, headers, (frame) => {
       const emit = (event: StreamEvent) => {
         if (!initialized) {
@@ -433,31 +492,7 @@ export class OpenClawAdapter implements AgentAdapter {
 
     const run = (async () => {
       try {
-        const authToken = input.instance.authTokenEnv
-          ? (this.options.env || process.env)[input.instance.authTokenEnv]
-          : undefined;
-        const password = input.instance.passwordEnv
-          ? (this.options.env || process.env)[input.instance.passwordEnv]
-          : undefined;
-
-        await client.connect({
-          minProtocol: PROTOCOL_VERSION,
-          maxProtocol: PROTOCOL_VERSION,
-          client: {
-            id: input.instance.clientId || DEFAULT_CLIENT_ID,
-            version: input.instance.clientVersion || DEFAULT_CLIENT_VERSION,
-            platform: process.platform,
-            mode: input.instance.clientMode || DEFAULT_CLIENT_MODE,
-          },
-          role: input.instance.role || DEFAULT_ROLE,
-          scopes: input.instance.scopes || DEFAULT_SCOPES,
-          auth: authToken || password
-            ? {
-                ...(authToken ? { token: authToken } : {}),
-                ...(password ? { password } : {}),
-              }
-            : undefined,
-        }, input.signal);
+        await client.connect(buildConnectParams(input.instance, env), input.signal);
 
         const agentParams = mergePayloadTemplate(input.instance.payloadTemplate, {
           message: prependInstructions(input.turn.message, input.turn.instructions),
@@ -575,19 +610,32 @@ export class OpenClawAdapter implements AgentAdapter {
     }
   }
 
-  async probe(instance: RemoteProviderInstanceConfig): Promise<{ status: 'ok' | 'degraded' | 'unavailable'; checkedAt: string; details?: string }> {
+  async probe(instance: RemoteProviderInstanceConfig): Promise<HealthStatus> {
+    const env = this.options.env || process.env;
+    const factory = this.options.webSocketFactory
+      || ((url: string | URL, init?: WebSocketInit) => new WebSocket(url, init));
+    const checkedAt = new Date().toISOString();
     try {
-      const url = requireUrl(instance, this.options.env || process.env);
-      return {
-        // MVP probe only validates resolvable config; it does not dial the websocket.
-        status: 'degraded',
-        checkedAt: new Date().toISOString(),
-        details: `Config validated only; live gateway probe not attempted (${url})`,
-      };
+      const url = requireUrl(instance, env);
+      const headers = resolveHeaders(instance, env);
+      const client = new GatewayWsClient(factory, url, headers, () => {});
+      const controller = new AbortController();
+      try {
+        await client.connect(buildConnectParams(instance, env), controller.signal);
+        const health = await client.request('health', { probe: true }, DEFAULT_CONNECT_TIMEOUT_MS);
+        return {
+          status: 'ok',
+          checkedAt,
+          details: summarizeHealthPayload(health, url),
+        };
+      } finally {
+        controller.abort();
+        client.close();
+      }
     } catch (error) {
       return {
         status: 'unavailable',
-        checkedAt: new Date().toISOString(),
+        checkedAt,
         details: error instanceof Error ? error.message : String(error),
       };
     }
