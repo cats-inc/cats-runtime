@@ -499,7 +499,9 @@ describe('provider diagnostics HTTP contract', () => {
                 source: 'config',
                 defaultModel: 'claude-sonnet-4-5',
                 modelCount: 1,
-                warnings: [],
+                warnings: [
+                  "Dynamic model discovery skipped for claude/api/sonnet: required x-api-key credentials are not configured via 'ANTHROPIC_API_KEY'.",
+                ],
               }),
             }),
             reprobe: expect.objectContaining({

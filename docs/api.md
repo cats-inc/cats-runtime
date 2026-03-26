@@ -2600,6 +2600,8 @@ Catalog semantics:
 - `source: config` means runtime discovery was unavailable or failed and the
   result fell back to configured target metadata. For API targets, the runtime
   keeps this fallback when auth is not configured or when remote listing fails.
+  In those cases, `warnings` now records the honest skip/failure reason instead
+  of silently degrading.
 - `source: static` means the runtime used a curated compatibility table.
 - `cache` is present only for `dynamic` results. Config/static fallbacks return
   `cache: null`.

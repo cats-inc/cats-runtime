@@ -129,7 +129,7 @@ dashboard integration intact.
 | Cover API/local behavior with automated tests | [x] | Transport, tool runtime, and end-to-end HTTP flows are under Vitest |
 | Add provider health probes and dashboard health surfacing | [x] | The runtime now exposes `/diagnostics/health`, richer `/health`/`/diagnostics/runtime` contracts, dashboard header health polling, bounded transport-native live auth/model probes for API/local targets, and additive HTTP semantic classifications such as auth/rate-limit/upstream warnings; broader tool/agent semantics still remain |
 | Add provider-specific caching/continuation optimizations | [x] | OpenAI `previous_response_id`, Anthropic prompt caching, and Gemini context caching are in place |
-| Stabilize provider model catalog/discovery contract | [x] | `GET /providers/{provider}/models` now documents and tests cache, fallback, error-code, Ollama running-model semantics, auth-ready OpenAI/Anthropic/Gemini remote listing before config/static fallback, and bounded timeout/abort degradation for HTTP-backed remote discovery |
+| Stabilize provider model catalog/discovery contract | [x] | `GET /providers/{provider}/models` now documents and tests cache, fallback, error-code, Ollama running-model semantics, auth-ready OpenAI/Anthropic/Gemini remote listing before config/static fallback, honest auth-skip warnings when dynamic API listing cannot run yet, and bounded timeout/abort degradation for HTTP-backed remote discovery |
 | Normalize first provider-agnostic API/local progress events | [x] | API/local sessions now emit additive `progress` events for continuation/cache lifecycle and Ollama warm-state hints |
 
 #### Verification

@@ -401,6 +401,12 @@ export class ProviderModelCatalogService {
       });
     }
 
+    const discoverySkipWarning = this.getDynamicDiscoverySkipWarning(target);
+    if (discoverySkipWarning) {
+      warnings.push(discoverySkipWarning);
+      return null;
+    }
+
     try {
       const loaded = await this.loadDynamicModels(target);
       if (!loaded) {
@@ -441,6 +447,28 @@ export class ProviderModelCatalogService {
       );
       return null;
     }
+  }
+
+  private getDynamicDiscoverySkipWarning(
+    target: ProviderTargetDescriptor,
+  ): string | null {
+    if (target.backend !== 'api' || !target.remoteInstance) {
+      return null;
+    }
+
+    const request = buildRemoteModelDiscoveryRequest(target.remoteInstance, this.env);
+    if (!request || request.target !== 'models') {
+      return null;
+    }
+
+    if (!request.auth.required || request.auth.applied) {
+      return null;
+    }
+
+    const credentialHint = request.auth.credentialEnv
+      ? ` via '${request.auth.credentialEnv}'`
+      : '';
+    return `Dynamic model discovery skipped for ${target.providerName}/${target.backend}/${target.instanceId}: required ${request.auth.mode} credentials are not configured${credentialHint}.`;
   }
 
   private async loadDynamicModels(

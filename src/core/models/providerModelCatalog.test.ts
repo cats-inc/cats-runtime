@@ -629,7 +629,9 @@ describe('ProviderModelCatalogService', () => {
           status: 'configured',
         },
       ],
-      warnings: [],
+      warnings: [
+        "Dynamic model discovery skipped for claude/api/sonnet: required x-api-key credentials are not configured via 'ANTHROPIC_API_KEY'.",
+      ],
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });

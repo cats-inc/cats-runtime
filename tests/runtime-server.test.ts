@@ -2943,6 +2943,63 @@ providers:
     });
   });
 
+  it('GET /providers/:provider/models surfaces auth-skip warnings when remote discovery credentials are missing', async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error('fetch should not run when auth is missing');
+    });
+
+    await withRuntime({
+      providerDefaultTargets: {
+        claude: { backend: 'api', instance: 'sonnet' },
+      },
+      remoteProviderCatalog: {
+        api: {
+          claude: {
+            sonnet: {
+              id: 'sonnet',
+              providerName: 'claude',
+              backend: 'api',
+              transport: 'anthropic',
+              apiKeyEnv: 'ANTHROPIC_API_KEY',
+              baseUrl: 'https://api.anthropic.test',
+              model: 'claude-sonnet-4-6',
+            },
+          },
+        },
+        local: {},
+        agent: {},
+      },
+    }, {
+      apiBackend: {
+        fetch: fetchMock,
+        env: {},
+      },
+    }, async (runtime) => {
+      const response = await runtime.app.request('/providers/claude/models?instance=api/sonnet');
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        provider: 'claude',
+        backend: 'api',
+        instance: 'sonnet',
+        defaultModel: 'claude-sonnet-4-6',
+        source: 'config',
+        cache: null,
+        models: [
+          {
+            id: 'claude-sonnet-4-6',
+            label: 'claude-sonnet-4-6',
+            default: true,
+            status: 'configured',
+          },
+        ],
+        warnings: [
+          "Dynamic model discovery skipped for claude/api/sonnet: required x-api-key credentials are not configured via 'ANTHROPIC_API_KEY'.",
+        ],
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
   it('GET /providers/:provider/models uses agent adapter model discovery when available', async () => {
     const bridgeFetch = vi.fn(async () => new Response(JSON.stringify({
       providers: [
