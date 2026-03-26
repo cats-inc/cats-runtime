@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { ClaudeProvider } from './claude.js';
+import type { StreamEvent } from './types.js';
+
+function toEventList(event: StreamEvent | StreamEvent[] | null): StreamEvent[] {
+  if (!event) {
+    return [];
+  }
+  return Array.isArray(event) ? event : [event];
+}
 
 describe('ClaudeProvider', () => {
   const provider = new ClaudeProvider();
@@ -117,6 +125,91 @@ describe('ClaudeProvider', () => {
       const event = provider.parseStreamLine(line);
       expect(event?.type).toBe('text');
       expect(event?.text).toBe('Hello!');
+    });
+
+    it('parses assistant tool_use blocks into progress plus tool_use events', () => {
+      const line = JSON.stringify({
+        type: 'assistant',
+        message: {
+          role: 'assistant',
+          content: [{
+            type: 'tool_use',
+            name: 'read_file',
+            id: 'tool-1',
+            input: { path: 'README.md' },
+          }],
+        },
+      });
+
+      expect(toEventList(provider.parseStreamLine(line))).toEqual([
+        {
+          type: 'progress',
+          text: 'Running tool: read_file',
+          metadata: {
+            kind: 'tool',
+            status: 'running',
+            source: 'provider',
+            provider: 'claude',
+            backend: 'cli',
+            native: {
+              sourceEvent: 'assistant',
+              toolName: 'read_file',
+            },
+          },
+        },
+        {
+          type: 'tool_use',
+          toolName: 'read_file',
+          toolId: 'tool-1',
+          toolArgs: { path: 'README.md' },
+        },
+      ]);
+    });
+
+    it('preserves text alongside assistant tool_use blocks', () => {
+      const line = JSON.stringify({
+        type: 'assistant',
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'text', text: 'Checking the file.' },
+            {
+              type: 'tool_use',
+              name: 'read_file',
+              id: 'tool-1',
+              input: { path: 'README.md' },
+            },
+          ],
+        },
+      });
+
+      expect(toEventList(provider.parseStreamLine(line))).toEqual([
+        {
+          type: 'text',
+          text: 'Checking the file.',
+        },
+        {
+          type: 'progress',
+          text: 'Running tool: read_file',
+          metadata: {
+            kind: 'tool',
+            status: 'running',
+            source: 'provider',
+            provider: 'claude',
+            backend: 'cli',
+            native: {
+              sourceEvent: 'assistant',
+              toolName: 'read_file',
+            },
+          },
+        },
+        {
+          type: 'tool_use',
+          toolName: 'read_file',
+          toolId: 'tool-1',
+          toolArgs: { path: 'README.md' },
+        },
+      ]);
     });
 
     it('parses content_block_delta', () => {

@@ -45,6 +45,43 @@ describe('provider evolution instrumentation', () => {
     expect(bundle.summary.normalizedEventTypes.text).toBe(1);
   });
 
+  it('records normalized Claude tool-use blocks instead of raw passthrough only', () => {
+    const collector = new ProviderEvolutionEvidenceCollector({
+      provider: 'claude',
+      instance: 'default',
+      parserId: 'claude-stream-json',
+      probeProfile: 'manual-smoke',
+      transport: 'cli',
+    });
+    const provider = new ClaudeProvider(undefined, collector);
+
+    expect(provider.parseStreamLine(JSON.stringify({
+      type: 'assistant',
+      message: {
+        role: 'assistant',
+        content: [{
+          type: 'tool_use',
+          name: 'read_file',
+          id: 'tool-1',
+          input: { path: 'README.md' },
+        }],
+      },
+    }))).toEqual([
+      expect.objectContaining({
+        type: 'progress',
+      }),
+      expect.objectContaining({
+        type: 'tool_use',
+        toolName: 'read_file',
+      }),
+    ]);
+
+    const bundle = collector.finalize();
+    expect(bundle.summary.normalizedCount).toBe(1);
+    expect(bundle.summary.normalizedEventTypes.progress).toBe(1);
+    expect(bundle.summary.normalizedEventTypes.tool_use).toBe(1);
+  });
+
   it('records ignored bootstrap responses for Codex', () => {
     const collector = new ProviderEvolutionEvidenceCollector({
       provider: 'codex',

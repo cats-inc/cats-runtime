@@ -12,6 +12,7 @@ import {
   observeNormalized,
   observeRawPassthrough,
 } from '../../../core/compatibility/providerEvolution.js';
+import { createRuntimeProgressEvent } from '../../../core/progress.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 
 export class ClaudeProvider implements Provider {
@@ -72,7 +73,7 @@ export class ClaudeProvider implements Provider {
     return JSON.stringify(msg) + '\n';
   }
 
-  parseStreamLine(line: string): StreamEvent | null {
+  parseStreamLine(line: string): StreamEvent | StreamEvent[] | null {
     const trimmed = line.trim();
     if (!trimmed) return null;
 
@@ -104,23 +105,12 @@ export class ClaudeProvider implements Provider {
 
     // assistant message — accumulate text content
     if (event.type === 'assistant' && event.message?.content) {
-      const texts = event.message.content
-        .map((block) => {
-          if (typeof block === 'string') return block;
-          if (block.text) return block.text;
-          return null;
-        })
-        .filter(Boolean);
-
-      if (texts.length > 0) {
+      const contentEvents = extractClaudeAssistantEvents(event.message.content);
+      if (contentEvents.length > 0) {
         return observeNormalized(this.evolutionObserver, {
           rawEventType: 'assistant',
           rawSample: event,
-        }, {
-          type: 'text',
-          text: texts.join(''),
-          raw: event,
-        });
+        }, contentEvents.length === 1 ? contentEvents[0]! : contentEvents);
       }
     }
 
@@ -164,4 +154,57 @@ export class ClaudeProvider implements Provider {
       raw: event,
     });
   }
+}
+
+function extractClaudeAssistantEvents(
+  content: NonNullable<ClaudeStreamEvent['message']>['content'],
+): StreamEvent[] {
+  const events: StreamEvent[] = [];
+  const textParts: string[] = [];
+
+  for (const block of content ?? []) {
+    if (typeof block === 'string') {
+      textParts.push(block);
+      continue;
+    }
+
+    if (block.type === 'tool_use') {
+      const toolName = block.name ?? 'unknown';
+      events.push(
+        createRuntimeProgressEvent({
+          text: `Running tool: ${toolName}`,
+          provider: 'claude',
+          backend: 'cli',
+          kind: 'tool',
+          status: 'running',
+          source: 'provider',
+          native: {
+            sourceEvent: 'assistant',
+            toolName,
+          },
+        }),
+        {
+          type: 'tool_use',
+          toolName,
+          toolId: block.id,
+          toolArgs: block.input,
+        },
+      );
+      continue;
+    }
+
+    if (typeof block.text === 'string' && block.text) {
+      textParts.push(block.text);
+    }
+  }
+
+  const text = textParts.join('');
+  if (text) {
+    events.unshift({
+      type: 'text',
+      text,
+    });
+  }
+
+  return events;
 }

@@ -29,7 +29,13 @@ export interface ClaudeStreamEvent {
   session_id?: string;
   message?: {
     role?: string;
-    content?: Array<{ type?: string; text?: string } | string>;
+    content?: Array<{
+      type?: string;
+      text?: string;
+      name?: string;
+      id?: string;
+      input?: Record<string, unknown>;
+    } | string>;
   };
   usage?: {
     input_tokens?: number;
