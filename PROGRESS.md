@@ -430,13 +430,13 @@ scheduler or workflow engine.
 | Make wakeups restart-safe | [x] | Wakeup requests persist under the runtime data dir and are reloaded on server restart |
 | Reuse existing session wake/resume flow | [x] | Triggered wakeups delegate to runtime session ensure-awake logic rather than inventing a second lifecycle |
 | Surface additive wakeup metadata in session/history inspection | [x] | `GET /sessions`, `GET /sessions/{id}`, and `GET /sessions/{id}/history` now expose session-target wakeup state when present |
+| Surface runtime-wide wakeup diagnostics aggregates | [x] | `GET /diagnostics/runtime` now exposes the full wakeup snapshot and `GET /diagnostics/health` exposes a polling-friendly wakeup summary |
 | Cover service and route behavior with tests | [x] | Vitest now covers coalescing, restart-safe replay, bounded timer ticks, and HTTP contract behavior |
 
 #### Deferred Boundaries
 
 - [ ] No richer retry/backoff policy or non-UTC scheduling semantics yet beyond the delivered cron recurrence slice
 - [ ] No provider/bootstrap wake targets for sessions that do not exist yet
-- [ ] No full runtime diagnostics aggregate for wakeup counts yet
 - [ ] No product workflow/approval semantics in runtime
 
 #### Verification

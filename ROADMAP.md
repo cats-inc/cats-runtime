@@ -3,7 +3,8 @@
 > Long-term project planning and milestones.
 >
 > This roadmap treats runtime-managed transcript compaction, recurring wakeup
-> scheduling, and runtime skill execution delivery as shipped baseline slices.
+> scheduling plus runtime-wide wakeup diagnostics aggregates, and runtime skill
+> execution delivery as shipped baseline slices.
 
 ## Optimizations
 

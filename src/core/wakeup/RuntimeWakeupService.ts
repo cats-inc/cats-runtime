@@ -70,6 +70,37 @@ export interface RuntimeWakeupServiceOptions {
   maxTerminalRequestsPerSession?: number;
 }
 
+export interface RuntimeWakeupDiagnosticsSummary {
+  status: 'ok' | 'degraded';
+  summary: string;
+  totalRequests: number;
+  openRequests: number;
+  scheduled: number;
+  due: number;
+  triggering: number;
+  recurring: number;
+  terminal: number;
+  triggered: number;
+  cancelled: number;
+  failed: number;
+  sessionsWithPending: number;
+  nextScheduledAt: string | null;
+}
+
+export interface RuntimeWakeupDiagnosticsSnapshot {
+  summary: RuntimeWakeupDiagnosticsSummary;
+  timer: {
+    active: boolean;
+    processing: boolean;
+    tickIntervalMs: number;
+    maxDuePerTick: number;
+  };
+  retention: {
+    maxTerminalRequests: number;
+    maxTerminalRequestsPerSession: number;
+  };
+}
+
 export class RuntimeWakeupValidationError extends Error {
   constructor(
     message: string,
@@ -229,6 +260,32 @@ function resolveWakeupScheduleAt(
   throw new RuntimeWakeupValidationError(
     'scheduleAt is required when recurrence is not provided.',
   );
+}
+
+function buildWakeupDiagnosticsSummaryText(
+  summary: Omit<RuntimeWakeupDiagnosticsSummary, 'summary'>,
+): string {
+  if (summary.totalRequests === 0) {
+    return 'No wakeup requests are tracked.';
+  }
+
+  if (summary.failed > 0) {
+    return `${summary.failed} wakeup request(s) have failed and need attention.`;
+  }
+
+  if (summary.due > 0) {
+    return `${summary.totalRequests} wakeup request(s) tracked; ${summary.due} are due for delivery.`;
+  }
+
+  if (summary.triggering > 0) {
+    return `${summary.totalRequests} wakeup request(s) tracked; ${summary.triggering} are currently triggering.`;
+  }
+
+  if (summary.openRequests > 0) {
+    return `${summary.openRequests} wakeup request(s) are currently pending.`;
+  }
+
+  return `${summary.terminal} terminal wakeup request(s) are retained in history.`;
 }
 
 export class RuntimeWakeupService {
@@ -528,6 +585,94 @@ export class RuntimeWakeupService {
       pendingRequestCount,
       nextScheduledAt: nextPendingRequest?.scheduleAt,
       lastRequest: cloneWakeupRequest(lastRequest),
+    };
+  }
+
+  buildDiagnosticsSummary(): RuntimeWakeupDiagnosticsSummary {
+    const nowMs = this.now().getTime();
+    let scheduled = 0;
+    let due = 0;
+    let triggering = 0;
+    let recurring = 0;
+    let terminal = 0;
+    let triggered = 0;
+    let cancelled = 0;
+    let failed = 0;
+    let nextPendingRequest: RuntimeWakeupRequest | undefined;
+    const sessionsWithPending = new Set<string>();
+
+    for (const request of this.requests.values()) {
+      if (request.recurrence) {
+        recurring += 1;
+      }
+
+      if (request.status === 'scheduled') {
+        scheduled += 1;
+        if (Date.parse(request.scheduleAt) <= nowMs) {
+          due += 1;
+        }
+        sessionsWithPending.add(request.target.sessionId);
+        if (!nextPendingRequest || sortRequests(request, nextPendingRequest) < 0) {
+          nextPendingRequest = request;
+        }
+        continue;
+      }
+
+      if (request.status === 'triggering') {
+        triggering += 1;
+        sessionsWithPending.add(request.target.sessionId);
+        if (!nextPendingRequest || sortRequests(request, nextPendingRequest) < 0) {
+          nextPendingRequest = request;
+        }
+        continue;
+      }
+
+      terminal += 1;
+      if (request.status === 'triggered') {
+        triggered += 1;
+      } else if (request.status === 'cancelled') {
+        cancelled += 1;
+      } else if (request.status === 'failed') {
+        failed += 1;
+      }
+    }
+
+    const openRequests = scheduled + triggering;
+    const summaryWithoutText = {
+      status: failed > 0 ? 'degraded' : 'ok',
+      totalRequests: this.requests.size,
+      openRequests,
+      scheduled,
+      due,
+      triggering,
+      recurring,
+      terminal,
+      triggered,
+      cancelled,
+      failed,
+      sessionsWithPending: sessionsWithPending.size,
+      nextScheduledAt: nextPendingRequest?.scheduleAt ?? null,
+    } satisfies Omit<RuntimeWakeupDiagnosticsSummary, 'summary'>;
+
+    return {
+      ...summaryWithoutText,
+      summary: buildWakeupDiagnosticsSummaryText(summaryWithoutText),
+    };
+  }
+
+  buildDiagnosticsSnapshot(): RuntimeWakeupDiagnosticsSnapshot {
+    return {
+      summary: this.buildDiagnosticsSummary(),
+      timer: {
+        active: this.timer !== null,
+        processing: this.processing,
+        tickIntervalMs: this.tickIntervalMs,
+        maxDuePerTick: this.maxDuePerTick,
+      },
+      retention: {
+        maxTerminalRequests: this.maxTerminalRequests,
+        maxTerminalRequestsPerSession: this.maxTerminalRequestsPerSession,
+      },
     };
   }
 

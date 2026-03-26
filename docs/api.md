@@ -418,6 +418,10 @@ integrate against:
 - runtime maintenance snapshots under `runtime.maintenance`, including:
   - `worktrees`: orphan-sweep results plus retained-session TTL diagnostics
   - `browser`: closed-session browser cleanup policy plus the last sweep result
+- runtime-wide `wakeups` diagnostics, including:
+  - `summary`: aggregate wakeup counts/status for polling and dashboards
+  - `timer`: whether the due-wakeup loop is active plus bounded processing limits
+  - `retention`: retained terminal-history limits
 - full `metering` state:
   - `summary`: aggregate status/counts
   - `usage`: totals plus `byProviderInstance` / `bySession`
@@ -514,7 +518,9 @@ Invalid `backend` values or malformed boolean filters such as
 
 `GET /diagnostics/health` now also includes a compact top-level `metering`
 summary so hosts can poll one route for both provider readiness and
-execution-guardrail state.
+execution-guardrail state. It also includes a compact top-level `wakeups`
+summary so hosts can inspect runtime-wide wakeup counts/status without a
+separate `GET /wakeups` call.
 
 ### App-Managed Lifecycle Events
 
@@ -967,6 +973,8 @@ slice:
 - `POST /wakeups/{id}/trigger` may return a terminal `failed` request with
   `lastExecution.error` when the wake attempt could not resume or attach the
   target session
+- runtime-wide wakeup state is also visible under `GET /diagnostics/runtime`
+  (`runtime.wakeups`) and `GET /diagnostics/health` (`wakeups`)
 
 Minimal create example:
 

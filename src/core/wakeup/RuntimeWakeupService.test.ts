@@ -235,4 +235,88 @@ describe('RuntimeWakeupService', () => {
     });
     expect(wakeSession).toHaveBeenCalledTimes(2);
   });
+
+  it('builds aggregate diagnostics summaries for runtime-wide wakeup state', async () => {
+    const now = new Date('2026-03-23T00:00:00.000Z');
+    const service = new RuntimeWakeupService({
+      persistPath: createPersistPath(),
+      now: () => new Date(now),
+      sessionExists: () => true,
+      wakeSession: vi.fn(async (sessionId: string) => {
+        if (sessionId === 'session-failed') {
+          throw new Error('wake failed');
+        }
+
+        return {
+          sessionId,
+          outcome: 'resumed' as const,
+        };
+      }),
+    });
+
+    service.create({
+      reason: 'Future wake.',
+      target: { kind: 'session', sessionId: 'session-future' },
+      scheduleAt: '2026-03-23T00:10:00.000Z',
+    });
+    service.create({
+      reason: 'Due wake.',
+      target: { kind: 'session', sessionId: 'session-due' },
+      scheduleAt: '2026-03-22T23:59:00.000Z',
+    });
+    service.create({
+      reason: 'Recurring wake.',
+      target: { kind: 'session', sessionId: 'session-recurring' },
+      recurrence: {
+        kind: 'cron',
+        expression: '*/5 * * * *',
+        timezone: 'UTC',
+      },
+    });
+    const cancelled = service.create({
+      reason: 'Cancelled wake.',
+      target: { kind: 'session', sessionId: 'session-cancelled' },
+      scheduleAt: '2026-03-23T00:02:00.000Z',
+    });
+    service.cancel(cancelled.request.id);
+    const failed = service.create({
+      reason: 'Failing wake.',
+      target: { kind: 'session', sessionId: 'session-failed' },
+      scheduleAt: '2026-03-23T00:00:00.000Z',
+    });
+    await service.trigger(failed.request.id, 'manual');
+
+    service.start();
+    const snapshot = service.buildDiagnosticsSnapshot();
+    service.close();
+
+    expect(snapshot).toEqual({
+      summary: {
+        status: 'degraded',
+        summary: '1 wakeup request(s) have failed and need attention.',
+        totalRequests: 5,
+        openRequests: 3,
+        scheduled: 3,
+        due: 1,
+        triggering: 0,
+        recurring: 1,
+        terminal: 2,
+        triggered: 0,
+        cancelled: 1,
+        failed: 1,
+        sessionsWithPending: 3,
+        nextScheduledAt: '2026-03-22T23:59:00.000Z',
+      },
+      timer: {
+        active: true,
+        processing: false,
+        tickIntervalMs: 1000,
+        maxDuePerTick: 8,
+      },
+      retention: {
+        maxTerminalRequests: 256,
+        maxTerminalRequestsPerSession: 16,
+      },
+    });
+  });
 });

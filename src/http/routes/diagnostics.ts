@@ -116,6 +116,37 @@ function pickAvailabilitySummary(checks: DiagnosticCheck[]): string {
   return checks[0]?.message || 'No diagnostics collected';
 }
 
+function getRuntimeWakeupSnapshot(ctx: AppContext) {
+  return ctx.wakeup?.buildDiagnosticsSnapshot() ?? {
+    summary: {
+      status: 'degraded' as const,
+      summary: 'Wakeup service is not initialized.',
+      totalRequests: 0,
+      openRequests: 0,
+      scheduled: 0,
+      due: 0,
+      triggering: 0,
+      recurring: 0,
+      terminal: 0,
+      triggered: 0,
+      cancelled: 0,
+      failed: 0,
+      sessionsWithPending: 0,
+      nextScheduledAt: null,
+    },
+    timer: {
+      active: false,
+      processing: false,
+      tickIntervalMs: 0,
+      maxDuePerTick: 0,
+    },
+    retention: {
+      maxTerminalRequests: 0,
+      maxTerminalRequestsPerSession: 0,
+    },
+  };
+}
+
 function buildEnvDescriptor(
   env: Readonly<NodeJS.ProcessEnv>,
   envName?: string,
@@ -929,6 +960,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
   const runtime = getRuntimeOperationalStatus(ctx.startup);
   const metering = getRuntimeMeteringService(ctx).buildSnapshot(ctx.registry.list());
   const peers = getPeerDiscoverySnapshot(ctx);
+  const wakeups = getRuntimeWakeupSnapshot(ctx);
 
   return c.json({
     service: RUNTIME_SERVICE_NAME,
@@ -947,6 +979,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
         ...(ctx.worktreeMaintenance ? { worktrees: ctx.worktreeMaintenance.snapshot() } : {}),
         ...(ctx.browserMaintenance ? { browser: ctx.browserMaintenance.snapshot() } : {}),
       },
+      wakeups,
       process: {
         pid: process.pid,
         ppid: process.ppid,
@@ -1042,6 +1075,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
     forceRefresh,
   );
   const peers = getPeerDiscoverySnapshot(ctx);
+  const wakeups = getRuntimeWakeupSnapshot(ctx);
   const providerSummary = summarizeProviderDiagnostics(catalog, providers, {
     defaultTargetsOnly: true,
     useAttentionSummary: true,
@@ -1082,6 +1116,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
         })),
     },
     peers,
+    wakeups: wakeups.summary,
     metering,
   });
 });

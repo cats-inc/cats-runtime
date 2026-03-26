@@ -239,9 +239,12 @@ Shutdown rules:
 Diagnostics rules:
 
 - `GET /diagnostics/runtime` exposes startup contract, path resolution, and
-  runtime listener metadata, including the compatibility evidence directory
+  runtime listener metadata, including the compatibility evidence directory and
+  the runtime-wide wakeup snapshot under `runtime.wakeups`
 - `GET /diagnostics/providers` exposes runtime-owned provider availability
   checks plus cached CLI compatibility summaries for host UX and setup flows
+- `GET /diagnostics/health` includes polling-friendly wakeup aggregate counts
+  under top-level `wakeups`
 - CLI targets now also expose a machine-readable `setup` block describing the
   resolved install metadata, command state (`missing_install`, `missing_path`,
   `misconfigured_command`, etc.), install prerequisites, shell PATH
@@ -660,10 +663,12 @@ For host-side setup or Settings surfaces, use:
 
 - `GET /diagnostics/runtime` to verify runtime contract, port binding, and
   resolved state paths, including where compatibility evidence bundles are
-  written
+  written, plus the full runtime-owned wakeup snapshot
 - `GET /diagnostics/providers?force=1` to decide whether a provider is
   immediately usable, needs user action, is running in a degraded profile, or
   failed to probe after an install/update
+- `GET /diagnostics/health` when a lighter host poll also needs aggregate
+  wakeup counts/status without fetching `/wakeups`
 - `GET /providers/config` to read the runtime-owned static `install` metadata
   for each configured CLI target before or between probes, plus any additive
   runtime-owned `activeConfig` hints such as Goose's detected local
