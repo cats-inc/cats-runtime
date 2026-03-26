@@ -2014,7 +2014,10 @@ events in addition to `init`, `text`, `result`, and `error`.
 `progress` is now the runtime-owned provider-agnostic mid-turn status contract
 across CLI and API/local transports. It is intended for upper layers that
 should not need to inspect provider-specific raw payloads just to surface
-runtime status. Example:
+runtime status. CLI providers with richer normalization now include Junie, Pi,
+Goose, Copilot, and Codex; Codex specifically surfaces additive planning,
+reasoning, command-output, file-change, session-status, and model-reroute
+checkpoints on this shared contract. Example:
 
 ```json
 {

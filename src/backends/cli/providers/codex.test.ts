@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CodexProvider } from './codex.js';
+import type { StreamEvent } from './types.js';
+
+function toEventList(event: StreamEvent | StreamEvent[] | null): StreamEvent[] {
+  if (!event) {
+    return [];
+  }
+  return Array.isArray(event) ? event : [event];
+}
 
 describe('CodexProvider', () => {
   let provider: CodexProvider;
@@ -279,43 +287,106 @@ describe('CodexProvider', () => {
       expect(event?.text).toBe('Hello world');
     });
 
-    it('parses item/started with commandExecution as tool_use', () => {
-      const event = provider.parseStreamLine(JSON.stringify({
+    it('parses item/started with commandExecution as progress plus tool_use', () => {
+      const events = toEventList(provider.parseStreamLine(JSON.stringify({
         jsonrpc: '2.0',
         method: 'item/started',
         params: {
           item: { type: 'commandExecution', command: 'bash', id: 'tool-1' },
         },
-      }));
-      expect(event?.type).toBe('tool_use');
-      expect(event?.toolName).toBe('bash');
-      expect(event?.toolId).toBe('tool-1');
+      })));
+      expect(events).toEqual([
+        {
+          type: 'progress',
+          text: 'Codex started command: bash',
+          metadata: {
+            kind: 'command',
+            status: 'started',
+            source: 'provider',
+            provider: 'codex',
+            backend: 'cli',
+            native: {
+              sourceEvent: 'item/started',
+              itemType: 'commandExecution',
+              toolName: 'bash',
+              itemId: 'tool-1',
+            },
+          },
+        },
+        {
+          type: 'tool_use',
+          toolName: 'bash',
+          toolId: 'tool-1',
+        },
+      ]);
     });
 
-    it('parses item/started with fileChange as tool_use', () => {
-      const event = provider.parseStreamLine(JSON.stringify({
+    it('parses item/started with fileChange as progress plus tool_use', () => {
+      const events = toEventList(provider.parseStreamLine(JSON.stringify({
         jsonrpc: '2.0',
         method: 'item/started',
         params: {
           item: { type: 'fileChange', name: 'edit_file', id: 'tool-2' },
         },
-      }));
-      expect(event?.type).toBe('tool_use');
-      expect(event?.toolName).toBe('edit_file');
-      expect(event?.toolId).toBe('tool-2');
+      })));
+      expect(events).toEqual([
+        {
+          type: 'progress',
+          text: 'Codex started file update: edit_file',
+          metadata: {
+            kind: 'files',
+            status: 'started',
+            source: 'provider',
+            provider: 'codex',
+            backend: 'cli',
+            native: {
+              sourceEvent: 'item/started',
+              itemType: 'fileChange',
+              toolName: 'edit_file',
+              itemId: 'tool-2',
+            },
+          },
+        },
+        {
+          type: 'tool_use',
+          toolName: 'edit_file',
+          toolId: 'tool-2',
+        },
+      ]);
     });
 
-    it('parses item/started with mcpToolCall as tool_use', () => {
-      const event = provider.parseStreamLine(JSON.stringify({
+    it('parses item/started with mcpToolCall as progress plus tool_use', () => {
+      const events = toEventList(provider.parseStreamLine(JSON.stringify({
         jsonrpc: '2.0',
         method: 'item/started',
         params: {
           item: { type: 'mcpToolCall', tool: 'file_read', id: 'tool-3' },
         },
-      }));
-      expect(event?.type).toBe('tool_use');
-      expect(event?.toolName).toBe('file_read');
-      expect(event?.toolId).toBe('tool-3');
+      })));
+      expect(events).toEqual([
+        {
+          type: 'progress',
+          text: 'Codex started tool: file_read',
+          metadata: {
+            kind: 'tool',
+            status: 'started',
+            source: 'provider',
+            provider: 'codex',
+            backend: 'cli',
+            native: {
+              sourceEvent: 'item/started',
+              itemType: 'mcpToolCall',
+              toolName: 'file_read',
+              itemId: 'tool-3',
+            },
+          },
+        },
+        {
+          type: 'tool_use',
+          toolName: 'file_read',
+          toolId: 'tool-3',
+        },
+      ]);
     });
 
     it('ignores item/started for agentMessage', () => {
@@ -415,6 +486,192 @@ describe('CodexProvider', () => {
       expect(event?.text).toContain('context_limit_exceeded');
     });
 
+    it('parses item/completed for command execution as completed progress', () => {
+      const event = provider.parseStreamLine(JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'item/completed',
+        params: {
+          item: { type: 'commandExecution', command: 'bash', id: 'tool-1' },
+        },
+      }));
+
+      expect(event).toEqual({
+        type: 'progress',
+        text: 'Codex completed command: bash',
+        metadata: {
+          kind: 'command',
+          status: 'completed',
+          source: 'provider',
+          provider: 'codex',
+          backend: 'cli',
+          native: {
+            sourceEvent: 'item/completed',
+            itemType: 'commandExecution',
+            toolName: 'bash',
+            itemId: 'tool-1',
+          },
+        },
+      });
+    });
+
+    it('parses plan, reasoning, and command deltas as progress events', () => {
+      const planEvent = provider.parseStreamLine(JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'item/plan/delta',
+        params: { delta: 'Plan next: inspect repository.' },
+      }));
+      const reasoningEvent = provider.parseStreamLine(JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'item/reasoning/summaryTextDelta',
+        params: { summaryText: 'Need to verify the config before editing.' },
+      }));
+      const commandEvent = provider.parseStreamLine(JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'item/commandExecution/outputDelta',
+        params: { outputDelta: 'package.json\\nREADME.md\\n' },
+      }));
+
+      expect(planEvent).toEqual({
+        type: 'progress',
+        text: 'Plan next: inspect repository.',
+        metadata: {
+          kind: 'plan',
+          status: 'running',
+          source: 'provider',
+          provider: 'codex',
+          backend: 'cli',
+          native: {
+            sourceEvent: 'item/plan/delta',
+            hasPlanDelta: true,
+          },
+        },
+      });
+      expect(reasoningEvent).toEqual({
+        type: 'progress',
+        text: 'Need to verify the config before editing.',
+        metadata: {
+          kind: 'reasoning',
+          status: 'running',
+          source: 'provider',
+          provider: 'codex',
+          backend: 'cli',
+          native: {
+            sourceEvent: 'item/reasoning/summaryTextDelta',
+            hasReasoningDelta: true,
+          },
+        },
+      });
+      expect(commandEvent).toEqual({
+        type: 'progress',
+        text: 'package.json\\nREADME.md\\n',
+        metadata: {
+          kind: 'command',
+          status: 'running',
+          source: 'provider',
+          provider: 'codex',
+          backend: 'cli',
+          native: {
+            sourceEvent: 'item/commandExecution/outputDelta',
+            hasOutputDelta: true,
+          },
+        },
+      });
+    });
+
+    it('parses plan, diff, thread, and model updates as progress events', () => {
+      const planEvent = provider.parseStreamLine(JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'turn/plan/updated',
+        params: {
+          plan: {
+            summary: 'Plan updated after repository scan.',
+            steps: [{ id: '1' }, { id: '2' }],
+          },
+        },
+      }));
+      const diffEvent = provider.parseStreamLine(JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'turn/diff/updated',
+        params: {
+          diff: {
+            files: ['src/a.ts', 'src/b.ts'],
+          },
+        },
+      }));
+      const statusEvent = provider.parseStreamLine(JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'thread/status/changed',
+        params: { status: 'busy' },
+      }));
+      const rerouteEvent = provider.parseStreamLine(JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'model/rerouted',
+        params: { fromModel: 'gpt-5.4', toModel: 'gpt-5.4-mini' },
+      }));
+
+      expect(planEvent).toEqual({
+        type: 'progress',
+        text: 'Plan updated after repository scan.',
+        metadata: {
+          kind: 'plan',
+          status: 'updated',
+          source: 'provider',
+          provider: 'codex',
+          backend: 'cli',
+          native: {
+            sourceEvent: 'turn/plan/updated',
+            stepCount: 2,
+          },
+        },
+      });
+      expect(diffEvent).toEqual({
+        type: 'progress',
+        text: 'Codex updated proposed file changes (2 files).',
+        metadata: {
+          kind: 'files',
+          status: 'updated',
+          source: 'provider',
+          provider: 'codex',
+          backend: 'cli',
+          native: {
+            sourceEvent: 'turn/diff/updated',
+            fileCount: 2,
+          },
+        },
+      });
+      expect(statusEvent).toEqual({
+        type: 'progress',
+        text: 'Codex session status changed to busy.',
+        metadata: {
+          kind: 'session',
+          status: 'updated',
+          source: 'provider',
+          provider: 'codex',
+          backend: 'cli',
+          native: {
+            sourceEvent: 'thread/status/changed',
+            threadStatus: 'busy',
+          },
+        },
+      });
+      expect(rerouteEvent).toEqual({
+        type: 'progress',
+        text: 'Codex rerouted from gpt-5.4 to gpt-5.4-mini.',
+        metadata: {
+          kind: 'model_state',
+          status: 'updated',
+          source: 'provider',
+          provider: 'codex',
+          backend: 'cli',
+          native: {
+            sourceEvent: 'model/rerouted',
+            fromModel: 'gpt-5.4',
+            toModel: 'gpt-5.4-mini',
+          },
+        },
+      });
+    });
+
     it('returns null for approval request notifications', () => {
       const event = provider.parseStreamLine(JSON.stringify({
         jsonrpc: '2.0',
@@ -426,9 +683,11 @@ describe('CodexProvider', () => {
 
     it('returns null for informational notifications', () => {
       for (const method of [
-        'turn/started', 'item/completed',
-        'item/commandExecution/outputDelta',
-        'thread/status/changed', 'thread/compacted',
+        'turn/started',
+        'thread/compacted',
+        'deprecationNotice',
+        'configWarning',
+        'error',
       ]) {
         const event = provider.parseStreamLine(JSON.stringify({
           jsonrpc: '2.0',

@@ -283,7 +283,7 @@ provider-agnostic progress without moving budget policy into `cats-runtime`.
 | Add additive metering config surface | [x] | `CATS_RUNTIME_GUARDRAIL_SESSION_TOTAL_TOKENS_WARN`, `CATS_RUNTIME_GUARDRAIL_SESSION_TOTAL_TOKENS_BLOCK`, and `CATS_RUNTIME_RATE_LIMIT_COOLDOWN_MS` are parsed centrally |
 | Enforce warn / block / cooldown preflight behavior on message execution | [x] | `POST /sessions/{id}/messages` now emits warning progress events or returns `guardrail_blocked` / `guardrail_cooldown` responses before turn execution |
 | Surface metering state over diagnostics routes | [x] | `GET /diagnostics/runtime` returns the full metering snapshot and `GET /diagnostics/health` exposes a polling-friendly metering summary |
-| Normalize provider-agnostic progress across multiple CLI providers | [x] | Junie, Pi, Goose, and Copilot now emit `type: "progress"` events with shared runtime metadata |
+| Normalize provider-agnostic progress across multiple CLI providers | [x] | Junie, Pi, Goose, Copilot, and Codex now emit `type: "progress"` events with shared runtime metadata; Codex additionally surfaces plan, reasoning, command-output, file-change, session-status, and model-reroute checkpoints instead of silently consuming those CLI notifications |
 | Extend API/local incident and progress surfacing onto the same contract | [x] | API/local transports now emit additive incident hints and normalized progress events for continuation/cache/warm-state flows |
 | Cover metering, incidents, guardrails, and progress with automated tests | [x] | Route, server, parser/provider, API integration, and direct metering-service tests cover the delivered slice |
 

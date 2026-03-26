@@ -68,6 +68,35 @@ describe('provider evolution instrumentation', () => {
     expect(bundle.summary.ignoredEventTypes.initialize).toBe(1);
   });
 
+  it('records normalized progress signals for Codex plan deltas', () => {
+    const collector = new ProviderEvolutionEvidenceCollector({
+      provider: 'codex',
+      instance: 'default',
+      parserId: 'codex-json-rpc',
+      probeProfile: 'manual-smoke',
+      transport: 'cli',
+    });
+    const provider = new CodexProvider(undefined, collector);
+
+    expect(provider.parseStreamLine(JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'item/plan/delta',
+      params: { delta: 'Inspect config before editing.' },
+    }))).toEqual({
+      type: 'progress',
+      text: 'Inspect config before editing.',
+      metadata: expect.objectContaining({
+        kind: 'plan',
+        status: 'running',
+      }),
+    });
+
+    const bundle = collector.finalize();
+    expect(bundle.summary.normalizedCount).toBe(1);
+    expect(bundle.summary.normalizedEventTypes.progress).toBe(1);
+    expect(bundle.summary.ignoredCount).toBe(0);
+  });
+
   it('records schema failures for Copilot event shapes that are missing required fields', () => {
     const collector = new ProviderEvolutionEvidenceCollector({
       provider: 'copilot',

@@ -15,6 +15,7 @@ import {
   observeSchemaFailure,
   observeUnknown,
 } from '../../../core/compatibility/providerEvolution.js';
+import { createRuntimeProgressEvent } from '../../../core/progress.js';
 import { mergeRuntimeInstructionLayers } from '../../../core/skills/catalog.js';
 
 interface JsonRpcRequest {
@@ -49,6 +50,15 @@ interface CodexPermissionPolicy {
   } };
   sandbox: 'read-only' | 'workspace-write';
 }
+
+const CODEX_TOOL_ITEM_TYPES = new Set([
+  'commandExecution',
+  'fileChange',
+  'mcpToolCall',
+  'dynamicToolCall',
+  'collabAgentToolCall',
+  'webSearch',
+]);
 
 export class CodexProvider implements Provider {
   name = 'codex';
@@ -244,7 +254,7 @@ export class CodexProvider implements Provider {
     return null;
   }
 
-  parseStreamLine(line: string): StreamEvent | null {
+  parseStreamLine(line: string): StreamEvent | StreamEvent[] | null {
     const trimmed = line.trim();
     if (!trimmed) return null;
 
@@ -331,7 +341,7 @@ export class CodexProvider implements Provider {
     }, null);
   }
 
-  private handleNotification(msg: JsonRpcResponse): StreamEvent | null {
+  private handleNotification(msg: JsonRpcResponse): StreamEvent | StreamEvent[] | null {
     const method = msg.method!;
     const params = msg.params ?? {};
 
@@ -378,12 +388,7 @@ export class CodexProvider implements Provider {
     if (method === 'item/started') {
       const item = params.item as Record<string, unknown> | undefined;
       const itemType = item?.type as string | undefined;
-
-      const toolTypes = [
-        'commandExecution', 'fileChange', 'mcpToolCall',
-        'dynamicToolCall', 'collabAgentToolCall', 'webSearch',
-      ];
-      if (itemType && toolTypes.includes(itemType)) {
+      if (itemType && CODEX_TOOL_ITEM_TYPES.has(itemType)) {
         const toolName = (item?.command as string)
           ?? (item?.tool as string)
           ?? (item?.name as string)
@@ -391,11 +396,24 @@ export class CodexProvider implements Provider {
         return observeNormalized(this.evolutionObserver, {
           rawEventType: `${method}:${itemType}`,
           rawSample: msg,
-        }, {
-          type: 'tool_use',
-          toolName,
-          toolId: item?.id as string,
-        });
+        }, [
+          createCodexProgressEvent({
+            text: formatCodexItemStartedText(itemType, toolName),
+            kind: resolveCodexToolItemProgressKind(itemType),
+            status: 'started',
+            native: {
+              sourceEvent: method,
+              itemType,
+              toolName,
+              itemId: item?.id,
+            },
+          }),
+          {
+            type: 'tool_use',
+            toolName,
+            toolId: item?.id as string,
+          },
+        ]);
       }
       // agentMessage, reasoning, plan, etc. — consume silently
       return observeIgnored(this.evolutionObserver, {
@@ -463,19 +481,148 @@ export class CodexProvider implements Provider {
       }, null);
     }
 
+    if (method === 'item/completed') {
+      const item = asRecord(params.item);
+      const itemType = readNonEmptyString(item?.type, params.itemType);
+      const progressEvent = itemType
+        ? createCodexItemCompletedProgressEvent(itemType, item, method)
+        : null;
+      if (progressEvent) {
+        return observeNormalized(this.evolutionObserver, {
+          rawEventType: `${method}:${itemType}`,
+          rawSample: msg,
+        }, progressEvent);
+      }
+      return observeIgnored(this.evolutionObserver, {
+        rawEventType: `${method}:${itemType || 'unknown'}`,
+        reason: 'non_actionable_item_completion',
+        rawSample: msg,
+      }, null);
+    }
+
+    if (method === 'item/commandExecution/outputDelta') {
+      const outputDelta = extractCodexDeltaText(params);
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: method,
+        rawSample: msg,
+      }, createCodexProgressEvent({
+        text: outputDelta || 'Codex emitted command output.',
+        kind: 'command',
+        status: 'running',
+        native: {
+          sourceEvent: method,
+          hasOutputDelta: Boolean(outputDelta),
+        },
+      }));
+    }
+
+    if (method === 'item/plan/delta') {
+      const planDelta = extractCodexDeltaText(params);
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: method,
+        rawSample: msg,
+      }, createCodexProgressEvent({
+        text: planDelta || 'Codex updated the plan.',
+        kind: 'plan',
+        status: 'running',
+        native: {
+          sourceEvent: method,
+          hasPlanDelta: Boolean(planDelta),
+        },
+      }));
+    }
+
+    if (method === 'item/reasoning/summaryTextDelta' || method === 'item/reasoning/textDelta') {
+      const reasoningDelta = extractCodexDeltaText(params);
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: method,
+        rawSample: msg,
+      }, createCodexProgressEvent({
+        text: reasoningDelta || 'Codex updated reasoning.',
+        kind: 'reasoning',
+        status: 'running',
+        native: {
+          sourceEvent: method,
+          hasReasoningDelta: Boolean(reasoningDelta),
+        },
+      }));
+    }
+
+    if (method === 'turn/diff/updated') {
+      const fileCount = countCodexDiffFiles(params);
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: method,
+        rawSample: msg,
+      }, createCodexProgressEvent({
+        text: fileCount === undefined
+          ? 'Codex updated proposed file changes.'
+          : `Codex updated proposed file changes (${fileCount} files).`,
+        kind: 'files',
+        status: 'updated',
+        native: {
+          sourceEvent: method,
+          ...(fileCount === undefined ? {} : { fileCount }),
+        },
+      }));
+    }
+
+    if (method === 'turn/plan/updated') {
+      const stepCount = countCodexPlanSteps(params);
+      const planSummary = extractCodexPlanSummary(params);
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: method,
+        rawSample: msg,
+      }, createCodexProgressEvent({
+        text: planSummary
+          || (stepCount === undefined
+            ? 'Codex updated the plan.'
+            : `Codex updated the plan (${stepCount} steps).`),
+        kind: 'plan',
+        status: 'updated',
+        native: {
+          sourceEvent: method,
+          ...(stepCount === undefined ? {} : { stepCount }),
+        },
+      }));
+    }
+
+    if (method === 'thread/status/changed') {
+      const status = extractCodexThreadStatus(params);
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: method,
+        rawSample: msg,
+      }, createCodexProgressEvent({
+        text: status ? `Codex session status changed to ${status}.` : 'Codex session status changed.',
+        kind: 'session',
+        status: 'updated',
+        native: {
+          sourceEvent: method,
+          ...(status ? { threadStatus: status } : {}),
+        },
+      }));
+    }
+
+    if (method === 'model/rerouted') {
+      const reroute = extractCodexModelReroute(params);
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: method,
+        rawSample: msg,
+      }, createCodexProgressEvent({
+        text: formatCodexModelRerouteText(reroute.fromModel, reroute.toModel),
+        kind: 'model_state',
+        status: 'updated',
+        native: {
+          sourceEvent: method,
+          ...(reroute.fromModel ? { fromModel: reroute.fromModel } : {}),
+          ...(reroute.toModel ? { toModel: reroute.toModel } : {}),
+        },
+      }));
+    }
+
     // Informational notifications — consume silently
     if (
       method === 'turn/started'
-      || method === 'item/completed'
-      || method === 'item/commandExecution/outputDelta'
-      || method === 'item/plan/delta'
-      || method === 'item/reasoning/summaryTextDelta'
-      || method === 'item/reasoning/textDelta'
-      || method === 'turn/diff/updated'
-      || method === 'turn/plan/updated'
-      || method === 'thread/status/changed'
       || method === 'thread/compacted'
-      || method === 'model/rerouted'
       || method === 'deprecationNotice'
       || method === 'configWarning'
       || method === 'error'
@@ -660,4 +807,225 @@ function formatJsonRpcError(error: NonNullable<JsonRpcResponse['error']>): strin
   }
 
   return `Codex JSON-RPC error: ${message}`;
+}
+
+function createCodexProgressEvent(input: {
+  text: string;
+  kind: 'plan' | 'reasoning' | 'tool' | 'command' | 'files' | 'model_state' | 'session';
+  status: 'started' | 'running' | 'updated' | 'completed';
+  native: Record<string, unknown>;
+}): StreamEvent {
+  return createRuntimeProgressEvent({
+    text: input.text,
+    provider: 'codex',
+    backend: 'cli',
+    kind: input.kind,
+    status: input.status,
+    source: 'provider',
+    native: input.native,
+  });
+}
+
+function createCodexItemCompletedProgressEvent(
+  itemType: string,
+  item: Record<string, unknown> | undefined,
+  sourceEvent: string,
+): StreamEvent | null {
+  const kind = resolveCodexItemProgressKind(itemType);
+  if (!kind) {
+    return null;
+  }
+
+  const toolName = resolveCodexItemToolName(itemType, item);
+  return createCodexProgressEvent({
+    text: formatCodexItemCompletedText(itemType, toolName),
+    kind,
+    status: 'completed',
+    native: {
+      sourceEvent,
+      itemType,
+      ...(toolName ? { toolName } : {}),
+      ...(item?.id ? { itemId: item.id } : {}),
+    },
+  });
+}
+
+function resolveCodexToolItemProgressKind(
+  itemType: string,
+): 'tool' | 'command' | 'files' {
+  if (itemType === 'commandExecution') {
+    return 'command';
+  }
+  if (itemType === 'fileChange') {
+    return 'files';
+  }
+  return 'tool';
+}
+
+function resolveCodexItemProgressKind(
+  itemType: string,
+): 'tool' | 'command' | 'files' | 'reasoning' | 'plan' | null {
+  if (CODEX_TOOL_ITEM_TYPES.has(itemType)) {
+    return resolveCodexToolItemProgressKind(itemType);
+  }
+  if (itemType === 'reasoning') {
+    return 'reasoning';
+  }
+  if (itemType === 'plan') {
+    return 'plan';
+  }
+  return null;
+}
+
+function resolveCodexItemToolName(
+  itemType: string,
+  item: Record<string, unknown> | undefined,
+): string | undefined {
+  if (itemType === 'reasoning' || itemType === 'plan') {
+    return undefined;
+  }
+  return readNonEmptyString(item?.command, item?.tool, item?.name, itemType);
+}
+
+function formatCodexItemStartedText(itemType: string, toolName: string): string {
+  if (itemType === 'commandExecution') {
+    return `Codex started command: ${toolName}`;
+  }
+  if (itemType === 'fileChange') {
+    return `Codex started file update: ${toolName}`;
+  }
+  if (itemType === 'webSearch') {
+    return `Codex started web search: ${toolName}`;
+  }
+  return `Codex started tool: ${toolName}`;
+}
+
+function formatCodexItemCompletedText(itemType: string, toolName: string | undefined): string {
+  if (itemType === 'reasoning') {
+    return 'Codex completed reasoning.';
+  }
+  if (itemType === 'plan') {
+    return 'Codex completed the current plan step.';
+  }
+  if (itemType === 'commandExecution') {
+    return toolName ? `Codex completed command: ${toolName}` : 'Codex completed a command.';
+  }
+  if (itemType === 'fileChange') {
+    return toolName ? `Codex completed file update: ${toolName}` : 'Codex completed a file update.';
+  }
+  if (itemType === 'webSearch') {
+    return toolName ? `Codex completed web search: ${toolName}` : 'Codex completed a web search.';
+  }
+  return toolName ? `Codex completed tool: ${toolName}` : 'Codex completed a tool.';
+}
+
+function extractCodexDeltaText(params: Record<string, unknown>): string | undefined {
+  const delta = asRecord(params.delta);
+  const output = asRecord(params.output);
+  const chunk = asRecord(params.chunk);
+  return readNonEmptyString(
+    params.delta,
+    params.text,
+    params.summaryText,
+    params.outputDelta,
+    params.stdout,
+    delta?.text,
+    delta?.delta,
+    output?.text,
+    output?.delta,
+    chunk?.text,
+    chunk?.delta,
+  );
+}
+
+function extractCodexPlanSummary(params: Record<string, unknown>): string | undefined {
+  const plan = asRecord(params.plan);
+  return readNonEmptyString(
+    params.summary,
+    params.title,
+    plan?.summary,
+    plan?.title,
+    plan?.currentStep,
+  );
+}
+
+function countCodexDiffFiles(params: Record<string, unknown>): number | undefined {
+  const diff = asRecord(params.diff);
+  return firstArrayLength(
+    diff?.files,
+    params.files,
+    params.updatedFiles,
+    params.changedFiles,
+  );
+}
+
+function countCodexPlanSteps(params: Record<string, unknown>): number | undefined {
+  const plan = asRecord(params.plan);
+  return firstArrayLength(plan?.steps, params.steps);
+}
+
+function extractCodexThreadStatus(params: Record<string, unknown>): string | undefined {
+  const thread = asRecord(params.thread);
+  return readNonEmptyString(params.status, thread?.status);
+}
+
+function extractCodexModelReroute(
+  params: Record<string, unknown>,
+): { fromModel?: string; toModel?: string } {
+  const previousModel = asRecord(params.previousModel);
+  const nextModel = asRecord(params.nextModel);
+  return {
+    fromModel: readNonEmptyString(
+      params.fromModel,
+      params.previousModel,
+      params.sourceModel,
+      previousModel?.name,
+      previousModel?.id,
+    ),
+    toModel: readNonEmptyString(
+      params.toModel,
+      params.model,
+      params.targetModel,
+      nextModel?.name,
+      nextModel?.id,
+    ),
+  };
+}
+
+function formatCodexModelRerouteText(fromModel?: string, toModel?: string): string {
+  if (fromModel && toModel) {
+    return `Codex rerouted from ${fromModel} to ${toModel}.`;
+  }
+  if (toModel) {
+    return `Codex rerouted to model ${toModel}.`;
+  }
+  if (fromModel) {
+    return `Codex rerouted away from model ${fromModel}.`;
+  }
+  return 'Codex rerouted to a different model.';
+}
+
+function readNonEmptyString(...candidates: unknown[]): string | undefined {
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return candidate;
+    }
+  }
+  return undefined;
+}
+
+function firstArrayLength(...candidates: unknown[]): number | undefined {
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate.length;
+    }
+  }
+  return undefined;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Record<string, unknown>;
 }
