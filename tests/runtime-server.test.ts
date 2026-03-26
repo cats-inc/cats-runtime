@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import { loadConfig } from '../src/core/config.js';
+import * as providerInstallRunner from '../src/core/provider-install/ProviderInstallCheckRunner.js';
 import { prepareSessionWorkspace } from '../src/core/workspace/sessionWorkspace.js';
 import { createDiscoveryController, createRuntimeServer } from '../src/server.js';
 import {
@@ -2637,6 +2638,59 @@ providers:
         warnings: [],
       });
     });
+  });
+
+  it('GET /providers/:provider/models loads a dynamic Pi catalog through the CLI runtime helper', async () => {
+    const spawnMock = vi.spyOn(providerInstallRunner, 'runSpawnedCommand').mockResolvedValueOnce({
+      exitCode: 0,
+      stdout: [
+        'provider    model',
+        'openai-codex  gpt-5.4',
+        'anthropic     claude-sonnet-4-5',
+        '',
+      ].join('\n'),
+      stderr: '',
+      timedOut: false,
+      durationMs: 3,
+    });
+
+    try {
+      await withRuntime({}, {}, async (runtime) => {
+        const response = await runtime.app.request('/providers/pi/models');
+        expect(response.status).toBe(200);
+        const payload = await response.json();
+        expect(payload).toEqual(expect.objectContaining({
+          provider: 'pi',
+          backend: 'cli',
+          instance: 'default',
+          defaultModel: 'openai-codex/gpt-5.4',
+          source: 'dynamic',
+          cache: {
+            servedFromCache: false,
+            cachedAt: expect.any(String),
+            ttlSec: 60,
+          },
+          warnings: [],
+        }));
+        expect(payload.models).toEqual([
+          {
+            id: 'anthropic/claude-sonnet-4-5',
+            label: 'anthropic/claude-sonnet-4-5',
+            default: false,
+            status: 'available',
+          },
+          {
+            id: 'openai-codex/gpt-5.4',
+            label: 'openai-codex/gpt-5.4',
+            default: true,
+            status: 'available',
+          },
+        ]);
+      });
+      expect(spawnMock).toHaveBeenCalledTimes(1);
+    } finally {
+      spawnMock.mockRestore();
+    }
   });
 
   it('GET /providers/:provider/models falls back to static catalog when dynamic discovery fails', async () => {

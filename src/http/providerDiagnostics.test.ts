@@ -517,6 +517,132 @@ describe('provider diagnostics HTTP contract', () => {
     }
   });
 
+  it('surfaces dynamic Pi model catalog details during live CLI diagnostics', async () => {
+    const config = makeConfig({
+      providerCommands: {
+        claude: { path: 'claude', runner: 'auto', runtime: { mode: 'native' } },
+        pi: { path: 'pi', runner: 'auto', runtime: { mode: 'native' } },
+      } as CliRuntimeConfig['providerCommands'],
+      providerDefaultInstances: {
+        claude: 'default',
+        pi: 'default',
+      },
+      providerInstances: {
+        auggie: {},
+        claude: {
+          default: {
+            id: 'default',
+            providerName: 'claude',
+            commandConfig: {
+              path: 'claude',
+              runner: 'auto',
+              runtime: { mode: 'native' },
+            },
+          },
+        },
+        codex: {},
+        copilot: {},
+        cursor: {},
+        gemini: {},
+        goose: {},
+        junie: {},
+        kiro: {},
+        opencode: {},
+        pi: {
+          default: {
+            id: 'default',
+            providerName: 'pi',
+            commandConfig: {
+              path: 'pi',
+              runner: 'auto',
+              runtime: { mode: 'native' },
+            },
+            piSessionsDir: join(rootDir, '.pi', 'sessions'),
+          },
+        },
+      },
+      providerDefaultTargets: {
+        pi: { backend: 'cli', instance: 'default' },
+      },
+    });
+    const compatibility = new ProviderCompatibilityService(config, {
+      runner: {
+        run: vi.fn(async (_providerName, _commandConfig, args: string[]) => ({
+          exitCode: 0,
+          stdout: args[0] === '--version'
+            ? 'pi 0.9.0\n'
+            : 'Usage: pi --mode --session --provider --model --append-system-prompt\n',
+          stderr: '',
+          timedOut: false,
+          durationMs: 3,
+        })),
+      },
+      installCheckRunner: createInstallCheckRunner(),
+      now: () => Date.parse('2026-03-23T00:02:00.000Z'),
+    });
+    const providerModelCatalog = new ProviderModelCatalogService(config, {
+      piModelDiscoveryRunner: {
+        run: vi.fn(async () => ({
+          exitCode: 0,
+          stdout: [
+            'provider    model',
+            'openai-codex  gpt-5.4',
+            'anthropic     claude-sonnet-4-5',
+            '',
+          ].join('\n'),
+          stderr: '',
+          timedOut: false,
+          durationMs: 3,
+        })),
+      },
+    });
+    const app = createApp({
+      config,
+      startup: createRuntimeStartupState(),
+      registry,
+      pool,
+      compatibility,
+      cursorNative: {} as never,
+      gooseNative: {} as never,
+      kiroNative: {} as never,
+      auggieSessions: {} as never,
+      opencodeNative: {} as never,
+      providerModelCatalog,
+    });
+
+    const response = await app.request('/diagnostics/providers?probe=live&provider=pi&backend=cli&instance=default');
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    const provider = payload.providers.find((entry: { provider: string; backend: string; instance: string }) =>
+      entry.provider === 'pi' && entry.backend === 'cli' && entry.instance === 'default',
+    );
+    expect(provider).toBeTruthy();
+    expect(provider).toEqual(expect.objectContaining({
+      availability: expect.objectContaining({
+        probe: 'live',
+      }),
+      config: expect.objectContaining({
+        modelCatalog: expect.objectContaining({
+          source: 'dynamic',
+          defaultModel: 'openai-codex/gpt-5.4',
+          modelCount: 2,
+          warnings: [],
+        }),
+      }),
+    }));
+    expect(provider.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'model_catalog_loaded',
+        status: 'ok',
+        details: expect.objectContaining({
+          source: 'dynamic',
+          modelCount: 2,
+          defaultModel: 'openai-codex/gpt-5.4',
+        }),
+      }),
+    ]));
+  });
+
   it('returns 400 for invalid provider diagnostics query filters', async () => {
     const app = createTestApp();
 

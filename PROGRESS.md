@@ -163,13 +163,12 @@ adapter end to end through the existing HTTP surface.
 | Build OpenClaw as the first `src/backends/agent` adapter | [x] | `AgentBackendManager` and `openclaw_gateway` adapter now create, stream, resume, reuse, and persist agent-backed sessions; diagnostics now reuse the same manager/runtime options for live gateway health probes, and provider model catalog reads now use gateway `models.list` with canonical `provider/model` refs |
 | Validate the contract with a second target such as an Agent SDK adapter | [x] | `agent_sdk_bridge` now validates the same contract against an external Agent SDK gateway |
 | Cover agent backend flows with automated tests | [x] | Config, route, OpenClaw, and Agent SDK bridge integration behavior are covered by Vitest |
-| Land the first Pi session-depth/runtime-validation slice on the CLI track | [x] | Pi now resumes via discovered session-file paths, validates resume-path ownership/runtime reachability, retries stale `unknown session` turns once fresh, and supports per-instance `instructions_file` layering |
+| Land the first Pi session-depth/runtime-validation slice on the CLI track | [x] | Pi now resumes via discovered session-file paths, validates resume-path ownership/runtime reachability, retries stale `unknown session` turns once fresh, supports per-instance `instructions_file` layering, and loads dynamic provider catalogs through `pi --list-models` |
 
 #### Next Steps
 
 - [ ] Expand dashboard surfacing for agent-specific services/artifacts beyond the current generic session views
 - [ ] Add stronger model-list coverage for later agent targets beyond the current OpenClaw gateway `models.list` and Agent SDK bridge coverage
-- [ ] Add `pi --list-models` helper/parsing and hand it off to the future provider model-catalog work
 - [ ] Deepen Pi-native transcript/history surfacing so resumed/fallback Pi sessions do not rely on generic JSONL heuristics alone
 
 ### WP-5: Session Fork, Context Transplant, and Lineage Primitives

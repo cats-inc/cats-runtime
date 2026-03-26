@@ -10,6 +10,7 @@ function createCatalogConfig() {
       ollama: { backend: 'local', instance: 'local' },
       codex: { backend: 'agent', instance: 'bridge' },
       goose: { backend: 'cli', instance: 'default' },
+      pi: { backend: 'cli', instance: 'default' },
     },
     providerDefaultInstances: {},
     providerInstances: {
@@ -24,6 +25,17 @@ function createCatalogConfig() {
           },
         },
       },
+      pi: {
+        default: {
+          id: 'default',
+          providerName: 'pi',
+          commandConfig: {
+            path: 'pi',
+            runner: 'auto',
+            runtime: { mode: 'native' },
+          },
+        },
+      },
     },
     providerCommands: {
       goose: {
@@ -31,7 +43,13 @@ function createCatalogConfig() {
         runner: 'auto',
         runtime: { mode: 'native' },
       },
+      pi: {
+        path: 'pi',
+        runner: 'auto',
+        runtime: { mode: 'native' },
+      },
     },
+    sessionBaseDir: '/tmp/cats-runtime-sessions',
     remoteProviderCatalog: {
       api: {},
       local: {
@@ -236,6 +254,66 @@ describe('ProviderModelCatalogService', () => {
     } finally {
       cleanup();
     }
+  });
+
+  it('loads dynamic Pi model catalogs through the shared runtime catalog service', async () => {
+    const piModelDiscoveryRunner = {
+      run: vi.fn(async () => ({
+        exitCode: 0,
+        stdout: [
+          'provider    model',
+          'openai-codex  gpt-5.4',
+          'anthropic     claude-sonnet-4-5',
+          '',
+        ].join('\n'),
+        stderr: '',
+        timedOut: false,
+        durationMs: 3,
+      })),
+    };
+
+    const service = new ProviderModelCatalogService(createCatalogConfig() as never, {
+      piModelDiscoveryRunner,
+      ttlMs: 60_000,
+    });
+
+    const first = await service.getCatalog('pi');
+    expect(first).toEqual(expect.objectContaining({
+      provider: 'pi',
+      backend: 'cli',
+      instance: 'default',
+      defaultModel: 'openai-codex/gpt-5.4',
+      source: 'dynamic',
+      cache: {
+        servedFromCache: false,
+        cachedAt: expect.any(String),
+        ttlSec: 60,
+      },
+      warnings: [],
+    }));
+    expect(first.models).toEqual([
+      {
+        id: 'anthropic/claude-sonnet-4-5',
+        label: 'anthropic/claude-sonnet-4-5',
+        default: false,
+        status: 'available',
+      },
+      {
+        id: 'openai-codex/gpt-5.4',
+        label: 'openai-codex/gpt-5.4',
+        default: true,
+        status: 'available',
+      },
+    ]);
+
+    const second = await service.getCatalog('pi');
+    expect(second.cache).toEqual({
+      servedFromCache: true,
+      cachedAt: expect.any(String),
+      ttlSec: 60,
+    });
+    expect(second.models).toEqual(first.models);
+    expect(vi.mocked(piModelDiscoveryRunner.run)).toHaveBeenCalledTimes(1);
   });
 
   it('builds an additive advanced catalog with presets and controls for OpenAI targets', async () => {

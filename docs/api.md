@@ -2420,6 +2420,8 @@ Error semantics:
 The first slice supports:
 
 - dynamic discovery for `ollama`
+- dynamic discovery for `pi` via the runtime-owned `pi --list-models` helper,
+  normalized into canonical `provider/model` refs
 - dynamic discovery for `agent_sdk_bridge` targets whose adapter exposes
   `listModels()`
 - dynamic discovery for `openclaw_gateway` targets via gateway `models.list`,

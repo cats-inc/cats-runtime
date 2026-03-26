@@ -419,6 +419,10 @@ async function diagnoseCliTarget(
     }
   }
 
+  if (probeMode === 'live') {
+    await appendModelCatalogDiagnostics(ctx, target, checks, config);
+  }
+
   return {
     checks,
     config,

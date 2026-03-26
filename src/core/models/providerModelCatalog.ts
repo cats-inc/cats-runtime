@@ -13,6 +13,10 @@ import {
   buildProviderAdvancedKnowledge,
   type ProviderAdvancedKnowledgeContext,
 } from './providerAdvancedKnowledge.js';
+import {
+  discoverPiModels,
+  type PiModelDiscoveryRunner,
+} from '../../backends/cli/pi/models.js';
 
 export interface ProviderModelCatalogEntry {
   id: string;
@@ -43,6 +47,7 @@ interface ProviderModelCatalogServiceOptions {
   fetch?: typeof fetch;
   env?: NodeJS.ProcessEnv;
   ttlMs?: number;
+  piModelDiscoveryRunner?: PiModelDiscoveryRunner;
 }
 
 interface CachedDynamicModels {
@@ -381,6 +386,18 @@ export class ProviderModelCatalogService {
   private async loadDynamicModels(
     target: ProviderTargetDescriptor,
   ): Promise<DynamicCatalogLoadResult | null> {
+    if (target.backend === 'cli' && target.providerName === 'pi' && target.cliInstance) {
+      return {
+        models: (await discoverPiModels(target.cliInstance, {
+          cwd: this.config.sessionBaseDir,
+          runner: this.options.piModelDiscoveryRunner,
+        })).map((model) => ({
+          ...model,
+          status: 'available' as const,
+        })),
+      };
+    }
+
     if (target.backend === 'local' && target.remoteInstance?.transport === 'ollama') {
       return this.listOllamaModels(target.remoteInstance);
     }

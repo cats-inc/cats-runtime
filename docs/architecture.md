@@ -267,6 +267,8 @@ src/
 - Resolves `(provider, instance)` into concrete command/runtime settings
 - Discovers external native/file-backed sessions from supported tools per provider instance
 - Encapsulates provider-specific spawn, resume, fork, and permission logic
+- Hosts runtime-owned CLI model discovery helpers, including Pi's
+  `pi --list-models` catalog normalization into canonical `provider/model` refs
 - Normalizes provider-native mid-turn updates onto shared `progress` events for
   Junie, Pi, Goose, and Copilot
 - Applies policy-aware WSL discovery for Cursor/Kiro and exposes discovery
