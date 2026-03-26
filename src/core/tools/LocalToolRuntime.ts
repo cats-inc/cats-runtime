@@ -61,12 +61,14 @@ interface ShellResult {
 
 const MAX_TEXT_OUTPUT = 12_000;
 const MAX_DIFF_PREVIEW_OUTPUT = 8_000;
+const MAX_BATCH_READ_OUTPUT = 16_000;
 const DEFAULT_READ_LINE_LIMIT = 400;
 const DEFAULT_LIST_ENTRIES = 200;
 const DEFAULT_GLOB_RESULTS = 200;
 const DEFAULT_GREP_MATCHES = 200;
 const DEFAULT_SHELL_TIMEOUT_MS = 15_000;
 const MAX_SHELL_TIMEOUT_MS = 60_000;
+const MAX_BATCH_READ_FILES = 50;
 const IGNORED_DIRECTORIES = new Set([
   '.git',
   '.hg',
@@ -147,6 +149,25 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         limit_lines: { type: 'integer', minimum: 1, maximum: 2000 },
       },
       required: ['path'],
+    },
+  },
+  {
+    name: 'read_files',
+    description: 'Read multiple UTF-8 text files from the workspace and return a bounded JSON payload.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        paths: {
+          type: 'array',
+          description: 'Relative file paths to read.',
+          items: { type: 'string' },
+          minItems: 1,
+          maxItems: MAX_BATCH_READ_FILES,
+        },
+        offset_line: { type: 'integer', minimum: 0 },
+        limit_lines: { type: 'integer', minimum: 1, maximum: 2000 },
+      },
+      required: ['paths'],
     },
   },
   {
@@ -566,6 +587,7 @@ const READ_ONLY_TOOLS = new Set([
   'list_files',
   'inspect_path',
   'read_file',
+  'read_files',
   'diff_file',
   'grep',
   'glob',
@@ -589,7 +611,7 @@ const PREVIEW_ONLY_TOOLS = new Set([
 const TOOL_ORDER = new Map(TOOL_DEFINITIONS.map((tool, index) => [tool.name, index]));
 
 const STANDARD_TOOLS = new Set([
-  'list_files', 'inspect_path', 'read_file', 'diff_file', 'write_file', 'create_directory', 'edit_file',
+  'list_files', 'inspect_path', 'read_file', 'read_files', 'diff_file', 'write_file', 'create_directory', 'edit_file',
   'apply_patch', 'grep', 'glob', 'run_shell',
   'audit-workspace', 'init-workspace', 'update-workspace',
   'audit-delivery-target', 'publish-artifacts', 'inspect-repo-status', 'create-commit', 'push-branch',
@@ -811,6 +833,25 @@ function truncate(text: string, limit = MAX_TEXT_OUTPUT): string {
   return `${text.slice(0, limit)}\n... [truncated ${text.length - limit} chars]`;
 }
 
+function truncateBoundedText(text: string, limit: number): {
+  text: string;
+  truncated: boolean;
+  omittedChars?: number;
+} {
+  if (text.length <= limit) {
+    return {
+      text,
+      truncated: false,
+    };
+  }
+
+  return {
+    text: `${text.slice(0, limit)}\n... [truncated ${text.length - limit} chars]`,
+    truncated: true,
+    omittedChars: text.length - limit,
+  };
+}
+
 function truncateDiffPreview(text: string, limit = MAX_DIFF_PREVIEW_OUTPUT): {
   text: string;
   truncated: boolean;
@@ -1022,6 +1063,8 @@ export class LocalToolRuntime {
           return await this.inspectPath(context, call.id, args);
         case 'read_file':
           return await this.readFile(context, call.id, args);
+        case 'read_files':
+          return await this.readFiles(context, call.id, args);
         case 'diff_file':
           return await this.diffFile(context, call.id, args);
         case 'write_file':
@@ -1216,6 +1259,102 @@ export class LocalToolRuntime {
       callId,
       name: 'read_file',
       output: truncate(content),
+    };
+  }
+
+  private async readFiles(
+    context: ToolExecutionContext,
+    callId: string,
+    args: Record<string, unknown>,
+  ): Promise<ToolResult> {
+    const requestedPaths = readOptionalStringArray(args, 'paths');
+    if (!requestedPaths || requestedPaths.length === 0) {
+      throw new Error(`Argument 'paths' must be a non-empty string array`);
+    }
+    if (requestedPaths.length > MAX_BATCH_READ_FILES) {
+      throw new Error(`Argument 'paths' must contain at most ${MAX_BATCH_READ_FILES} entries`);
+    }
+
+    const uniquePaths = Array.from(new Set(requestedPaths));
+    const offsetLine = readOptionalInteger(args, 'offset_line', 0, 0, Number.MAX_SAFE_INTEGER);
+    const limitLines = readOptionalInteger(args, 'limit_lines', DEFAULT_READ_LINE_LIMIT, 1, 2000);
+    let remainingBudget = MAX_BATCH_READ_OUTPUT;
+
+    const files: Array<Record<string, unknown>> = [];
+    for (const inputPath of uniquePaths) {
+      try {
+        const { fullPath, displayPath } = await resolveSafeWorkspacePath(context.cwd, inputPath);
+        let info;
+        try {
+          info = await stat(fullPath);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            files.push({
+              path: displayPath,
+              exists: false,
+            });
+            continue;
+          }
+          throw error;
+        }
+
+        if (info.isDirectory()) {
+          files.push({
+            path: displayPath,
+            exists: true,
+            error: 'Path is a directory, not a file',
+          });
+          continue;
+        }
+
+        if (looksBinaryFile(displayPath)) {
+          files.push({
+            path: displayPath,
+            exists: true,
+            error: 'read_files only supports UTF-8 text files',
+          });
+          continue;
+        }
+
+        if (remainingBudget <= 0) {
+          files.push({
+            path: displayPath,
+            exists: true,
+            omitted: true,
+            reason: 'content_budget_exhausted',
+          });
+          continue;
+        }
+
+        const content = await readTextFile(fullPath, offsetLine, limitLines);
+        const bounded = truncateBoundedText(content, remainingBudget);
+        remainingBudget = Math.max(0, remainingBudget - bounded.text.length);
+        files.push({
+          path: displayPath,
+          exists: true,
+          content: bounded.text,
+          ...(bounded.truncated ? { truncated: true, omittedChars: bounded.omittedChars } : {}),
+        });
+      } catch (error) {
+        files.push({
+          path: inputPath,
+          exists: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return {
+      callId,
+      name: 'read_files',
+      output: JSON.stringify({
+        requestedCount: requestedPaths.length,
+        uniqueCount: uniquePaths.length,
+        offsetLine,
+        limitLines,
+        contentBudgetChars: MAX_BATCH_READ_OUTPUT,
+        files,
+      }, null, 2),
     };
   }
 

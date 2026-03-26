@@ -66,7 +66,7 @@
 
 - [ ] Deepen provider health probes beyond the current readiness summary and endpoint reachability probes, especially richer API/local auth/model semantics and Ollama model discovery
 - [ ] Continue hardening shared local tool runtime mutation safety beyond the current bounded `apply_patch` rollback and symlink/junction/hardlink alias guards, especially write/edit transactionality
-- [ ] Continue broadening the shared local tool runtime beyond the current filesystem/shell/navigation/materialization set plus proposed-file diff inspection, especially richer planning helpers
+- [ ] Continue broadening the shared local tool runtime beyond the current filesystem/shell/navigation/materialization set plus proposed-file diff and bounded batch-read inspection, especially richer planning helpers
 - [ ] Continue refining capability partitioning and policy surfacing beyond the current profile summary/read-model slice and `standard` / `extended` / `read_only` split
 - [ ] Split Docker discovery snapshot creation out of `createDiscoveryStatusPayload()` so `GET /discovery/status` can reuse the live WSL snapshot without recomputing an unused WSL status store
 
@@ -125,7 +125,7 @@ dashboard integration intact.
 | Add backend-neutral provider catalog and runtime facade | [x] | Routes resolve provider targets without assuming CLI |
 | Add `src/backends/api` transport/runtime skeleton | [x] | Anthropic, OpenAI, Gemini, and Ollama transports are in-repo |
 | Support API/local session create, message, close, resume, and fork | [x] | Session lifecycle is runtime-managed across CLI and API backends |
-| Add shared local tool runtime for API/local sessions | [x] | `list_files`, `inspect_path`, `read_file`, `write_file`, `create_directory`, `edit_file`, `apply_patch`, `grep`, `glob`, and `run_shell` are enforced centrally, with extended `delete_file` / `rename_file` / `copy_file` support behind the opt-in profile |
+| Add shared local tool runtime for API/local sessions | [x] | `list_files`, `inspect_path`, `read_file`, `read_files`, `write_file`, `create_directory`, `edit_file`, `apply_patch`, `grep`, `glob`, and `run_shell` are enforced centrally, with extended `delete_file` / `rename_file` / `copy_file` support behind the opt-in profile |
 | Cover API/local behavior with automated tests | [x] | Transport, tool runtime, and end-to-end HTTP flows are under Vitest |
 | Add provider health probes and dashboard health surfacing | [x] | First slice now exposes `/diagnostics/health`, richer `/health`/`/diagnostics/runtime` contracts, dashboard header health polling, and bounded live endpoint probes for API/local targets; deeper transport-native semantic probes remain |
 | Add provider-specific caching/continuation optimizations | [x] | OpenAI `previous_response_id`, Anthropic prompt caching, and Gemini context caching are in place |

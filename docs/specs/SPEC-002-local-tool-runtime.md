@@ -82,9 +82,10 @@ requests into calls into this shared runtime.
 - Workspace-relative path checks are now shared across direct tool handlers and
   structured patch application, so `apply_patch` cannot bypass the same
   boundary rules as `read_file` / `write_file`.
-- The shared tool surface now includes machine-readable path inspection and
-  proposed-file diff inspection plus explicit directory materialization helpers
-  so hosts do not need ad hoc shell fallbacks for common
+- The shared tool surface now includes machine-readable path inspection,
+  bounded multi-file read inspection, and proposed-file diff inspection plus
+  explicit directory materialization helpers so hosts do not need ad hoc shell
+  fallbacks for common
   navigation/setup/planning tasks.
 - Mutating flows now reject symbolic-link/junction alias paths and existing
   hardlinked mutation targets to reduce accidental writes through aliased
