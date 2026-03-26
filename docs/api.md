@@ -323,6 +323,56 @@ Setup artifacts are persisted under `<dataDir>/setup/`:
 - `provider-scan.json` — latest scan results
 - `provider-manual-scan.json` — latest explicit manual scan results
 
+### Setup Diagnostic Report
+
+```text
+POST /diagnostics/setup-report
+GET  /diagnostics/setup-report/latest
+```
+
+These routes expose the first runtime-owned setup diagnostic report slice. They
+are additive operator/debug surfaces and do not replace compatibility evidence
+bundles or bootstrap scan snapshots.
+
+`POST /diagnostics/setup-report` writes a redacted JSON report under
+`<dataDir>/diagnostics/` and returns:
+
+- `status: "generated"`
+- `artifactPath` — absolute path to the persisted report on the local machine
+- `report` — the same redacted JSON payload that was written to disk
+
+Request options:
+
+- body: `{"refreshScan": true}` or query `?refresh=1`
+  - when set, the runtime first triggers an explicit shared setup scan through
+    the bootstrap service and then embeds the refreshed snapshot into the report
+
+The report currently includes:
+
+- runtime/platform facts such as Node version, platform, arch, and resolved
+  runtime paths
+- config inspection (`configPath`, parse status, usable target count)
+- listener port status
+- WSL/Docker discovery posture summary
+- git availability summary
+- shared bootstrap/setup state:
+  - provider universe summary
+  - configured provider/target counts
+  - latest setup scan and latest manual scan snapshots
+- references to the compatibility evidence directory and shared setup scan paths
+- a normalized issue list with stable `code` plus `info` / `warning` / `error`
+  severity
+
+The persisted artifact is redacted for sharing by default:
+
+- home-directory path segments are normalized
+- secret-looking values and bearer tokens are redacted
+- environment-variable values are reduced to safe summaries or omitted
+
+`GET /diagnostics/setup-report/latest` returns the latest persisted report plus
+its `artifactPath`, or `404 {"error":"setup_diagnostic_report_not_found"}`
+when no setup report has been generated yet.
+
 ### Runtime Diagnostics
 
 ```text

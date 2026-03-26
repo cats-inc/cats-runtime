@@ -48,6 +48,7 @@ import { discoveryRoutes } from './routes/discovery.js';
 import { browserRoutes } from './routes/browser.js';
 import { deliveryRoutes } from './routes/delivery.js';
 import { diagnosticsRoutes } from './routes/diagnostics.js';
+import { setupDiagnosticsRoutes } from './routes/setupDiagnostics.js';
 import { healthRoutes } from './routes/health.js';
 import { sessionRoutes } from './routes/sessions.js';
 import { setupRoutes } from './routes/setup.js';
@@ -316,6 +317,7 @@ export function createRuntimeApp(ctx: AppContext) {
 
   app.route('/', healthRoutes);
   app.route('/', diagnosticsRoutes);
+  app.route('/', setupDiagnosticsRoutes);
   app.route('/', setupRoutes);
   app.route('/', discoveryRoutes);
   app.route('/', browserRoutes);

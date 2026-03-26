@@ -90,6 +90,23 @@ Setup artifacts are persisted under `<dataDir>/setup/`:
 - `provider-scan.json` — latest scan results
 - `provider-manual-scan.json` — latest manual scan results
 
+When you need a shareable operator/debug snapshot after startup, the runtime
+now also supports a setup diagnostic report:
+
+```text
+POST /diagnostics/setup-report
+GET  /diagnostics/setup-report/latest
+```
+
+`POST /diagnostics/setup-report` writes a redacted JSON artifact under
+`<dataDir>/diagnostics/` and returns both the generated `report` payload and
+the local `artifactPath`. Pass `{"refreshScan": true}` or `?refresh=1` when
+you want the runtime to refresh the shared setup scan before generating the
+report.
+
+The first slice keeps this as an authenticated HTTP action over the running
+runtime. A non-server/CLI entry path is still a later follow-up.
+
 ### Discovery Posture
 
 WSL discovery defaults to `if_running` — bootstrap auto-scan will not start

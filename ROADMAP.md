@@ -935,4 +935,62 @@ different orchestration subsystem from the shared compatibility surface.
 - `docs/plans/PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md`
 
 ---
+### OPT-12: Setup Diagnostic Report Follow-through
+
+**Priority**: P2
+**Status**: In Progress
+
+#### Problem
+
+`cats-runtime` now has lightweight setup/bootstrap services and provider
+diagnostics, but operators still needed to stitch together setup-state,
+provider scans, config inspection, and path facts manually when preparing a
+shareable setup/debug snapshot.
+
+That gap is especially visible during bootstrap/repair work, where the runtime
+needs one bounded operator-facing artifact that is distinct from compatibility
+evidence bundles and does not force hosts to invent their own report format.
+
+#### Current Implementation Status
+
+- shared `SetupDiagnosticService` now writes redacted JSON reports under
+  `<dataDir>/diagnostics/`
+- `POST /diagnostics/setup-report` generates a fresh operator-facing report and
+  can optionally refresh the shared setup scan first
+- `GET /diagnostics/setup-report/latest` returns the latest persisted report
+- reports now aggregate runtime path facts, config inspection, discovery
+  posture, bootstrap setup snapshots, configured target counts, git presence,
+  and compatibility-evidence directory references without copying raw evidence
+- first-slice retention keeps only a bounded number of recent report artifacts
+
+#### Follow-through Direction
+
+- add a non-server diagnostic entry path so the same report can be generated
+  even when normal HTTP startup is not available
+- decide whether later host/CLI entry points should also emit a concise
+  human-readable summary alongside the JSON artifact
+- extend the report only through shared bootstrap/setup services rather than
+  creating a second standalone setup detection stack
+
+#### Deferred Scope
+
+- do not collapse setup reports and compatibility evidence into one artifact
+- do not claim artifact signing or attestation in the first slice
+- do not force a CLI/non-server entry path into the same change that lands the
+  shared service and HTTP route
+
+#### Affected Areas
+
+- `src/core/diagnostics/*`
+- `src/http/routes/setupDiagnostics.ts`
+- `docs/specs/SPEC-015-runtime-setup-diagnostic-report.md`
+- `docs/decisions/020-keep-setup-diagnostic-reports-config-derived-and-separate-from-compatibility-evidence.md`
+
+#### References
+
+- `docs/specs/SPEC-015-runtime-setup-diagnostic-report.md`
+- `docs/decisions/020-keep-setup-diagnostic-reports-config-derived-and-separate-from-compatibility-evidence.md`
+- `docs/specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md`
+
+---
 *Last updated: 2026-03-26*
