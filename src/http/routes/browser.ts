@@ -107,6 +107,25 @@ browserRoutes.post('/browser/sessions/:id/pages', async (c) => {
   }
 });
 
+browserRoutes.post('/browser/sessions/:id/pages/:pageId/navigate', async (c) => {
+  const ctx = c.get('ctx' as never) as AppContext;
+  const browser = getRuntimeBrowserService(ctx);
+  const browserSessionId = c.req.param('id');
+  const browserSession = browser.getSession(browserSessionId);
+  if (!browserSession) {
+    return c.json({ error: `Browser session '${browserSessionId}' was not found.` }, 404);
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  try {
+    const pageTarget = resolvePageTarget(ctx, browserSession, body);
+    const result = await browser.navigatePage(browserSessionId, c.req.param('pageId'), pageTarget);
+    return c.json(result);
+  } catch (error) {
+    return toBrowserErrorResponse(c, error);
+  }
+});
+
 browserRoutes.post('/browser/sessions/:id/pages/:pageId/close', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   try {

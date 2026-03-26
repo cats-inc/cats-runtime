@@ -105,6 +105,84 @@ describe('RuntimeBrowserService', () => {
     }));
   });
 
+  it('navigates an existing page in place and refreshes the preview surface', async () => {
+    const browser = new RuntimeBrowserService({
+      drivers: [
+        new ManualBrowserDriver(),
+      ],
+      now: (() => {
+        let current = new Date('2026-03-23T00:00:00.000Z');
+        return () => {
+          const value = current;
+          current = new Date(current.getTime() + 60_000);
+          return value;
+        };
+      })(),
+    });
+
+    const session = await browser.createSession({
+      runtimeSessionId: 'session-1',
+      label: 'Navigation Browser',
+    });
+    const created = await browser.createPage(session.id, {
+      url: 'http://127.0.0.1:4173',
+      label: 'Initial Preview',
+      binding: {
+        kind: 'manual_url',
+        runtimeSessionId: 'session-1',
+      },
+    });
+
+    const navigated = await browser.navigatePage(session.id, created.page.id, {
+      path: '/tmp/report.html',
+      label: 'Report Preview',
+      mediaType: 'text/html',
+      binding: {
+        kind: 'session_artifact',
+        runtimeSessionId: 'session-1',
+        artifactId: 'artifact-1',
+      },
+      metadata: {
+        source: 'navigate-test',
+      },
+    });
+
+    expect(navigated.session.status).toBe('ready');
+    expect(navigated.session.inspection.openPageCount).toBe(1);
+    expect(navigated.page).toEqual(expect.objectContaining({
+      id: created.page.id,
+      status: 'open',
+      label: 'Report Preview',
+      path: '/tmp/report.html',
+      mediaType: 'text/html',
+      binding: expect.objectContaining({
+        kind: 'session_artifact',
+        runtimeSessionId: 'session-1',
+        artifactId: 'artifact-1',
+      }),
+      metadata: expect.objectContaining({
+        mode: 'manual',
+        bindingKind: 'session_artifact',
+        targetMetadata: {
+          source: 'navigate-test',
+        },
+      }),
+      previewSurface: expect.objectContaining({
+        kind: 'browser_page',
+        source: 'browser_page',
+        status: 'ready',
+        renderHint: 'iframe',
+        mediaType: 'text/html',
+        path: '/tmp/report.html',
+        provenance: expect.objectContaining({
+          sessionId: 'session-1',
+          artifactId: 'artifact-1',
+          browserSessionId: session.id,
+        }),
+      }),
+    }));
+  });
+
   it('prunes closed browser sessions before creating beyond the configured capacity', async () => {
     const browser = new RuntimeBrowserService({
       drivers: [

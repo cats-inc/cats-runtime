@@ -3,6 +3,7 @@ import type {
   RuntimeBrowserDriver,
   RuntimeBrowserDriverClosePageInput,
   RuntimeBrowserDriverCreateSessionInput,
+  RuntimeBrowserDriverNavigatePageInput,
   RuntimeBrowserDriverOpenPageInput,
   RuntimeBrowserDriverCloseSessionInput,
 } from '../../core/browser/driver.js';
@@ -162,22 +163,39 @@ export class PlaywrightBrowserDriver implements RuntimeBrowserDriver {
         waitUntil: 'domcontentloaded',
         timeout: this.navigationTimeoutMs,
       });
-      const pageTitle = await page.title().catch(() => input.target.title || undefined);
-      return {
-        driverPageId: input.browserPageId,
-        ...(pageTitle ? { title: pageTitle } : {}),
-        metadata: {
-          mode: 'playwright',
-          navigatedUrl: pageUrl,
-          bindingKind: input.target.binding.kind,
-        },
-      };
+      return await this.buildNavigatedPageState(page, input.browserPageId, pageUrl, input.target.binding.kind);
     } catch (error) {
       this.pages.delete(input.browserPageId);
       if (page?.close) {
         await page.close().catch(() => undefined);
       }
       throw toPlaywrightValidationError(`open '${pageUrl}'`, error);
+    }
+  }
+
+  async navigatePage(
+    input: RuntimeBrowserDriverNavigatePageInput,
+  ): Promise<{ driverPageId?: string; title?: string; metadata?: Record<string, unknown> }> {
+    const tracked = this.pages.get(input.browserPageId);
+    if (!tracked || tracked.browserSessionId !== input.browserSessionId) {
+      throw new RuntimeBrowserValidationError(
+        `Playwright browser page '${input.browserPageId}' is not active in session '${input.browserSessionId}'.`,
+      );
+    }
+    const pageUrl = resolveNavigationTarget(input);
+    try {
+      await tracked.page.goto(pageUrl, {
+        waitUntil: 'domcontentloaded',
+        timeout: this.navigationTimeoutMs,
+      });
+      return await this.buildNavigatedPageState(
+        tracked.page,
+        input.browserPageId,
+        pageUrl,
+        input.target.binding.kind,
+      );
+    } catch (error) {
+      throw toPlaywrightValidationError(`navigate '${pageUrl}'`, error);
     }
   }
 
@@ -212,6 +230,24 @@ export class PlaywrightBrowserDriver implements RuntimeBrowserDriver {
       this.modulePromise = (this.options.moduleLoader || defaultModuleLoader)();
     }
     return this.modulePromise;
+  }
+
+  private async buildNavigatedPageState(
+    page: PlaywrightPageLike,
+    browserPageId: string,
+    pageUrl: string,
+    bindingKind: string,
+  ): Promise<{ driverPageId?: string; title?: string; metadata?: Record<string, unknown> }> {
+    const pageTitle = await page.title().catch(() => undefined);
+    return {
+      driverPageId: browserPageId,
+      ...(pageTitle ? { title: pageTitle } : {}),
+      metadata: {
+        mode: 'playwright',
+        navigatedUrl: pageUrl,
+        bindingKind,
+      },
+    };
   }
 }
 

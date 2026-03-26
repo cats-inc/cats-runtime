@@ -118,6 +118,7 @@ Current curated tools:
 - `browser_summary`
 - `create_browser_session`
 - `create_browser_page`
+- `navigate_browser_page`
 - `close_browser_page`
 - `close_browser_session`
 - `cleanup_browser_sessions`
@@ -578,6 +579,7 @@ GET /browser/sessions/{id}
 POST /browser/sessions
 POST /browser/sessions/cleanup
 POST /browser/sessions/{id}/pages
+POST /browser/sessions/{id}/pages/{pageId}/navigate
 POST /browser/sessions/{id}/close
 ```
 
@@ -622,6 +624,7 @@ GET  /browser/sessions
 GET  /browser/sessions/{id}
 POST /browser/sessions
 POST /browser/sessions/{id}/pages
+POST /browser/sessions/{id}/pages/{pageId}/navigate
 POST /browser/sessions/{id}/pages/{pageId}/close
 POST /browser/sessions/{id}/close
 POST /browser/sessions/cleanup
@@ -659,6 +662,18 @@ Create browser page from an artifact example:
 }
 ```
 
+Navigate an existing browser page example:
+
+```json
+{
+  "binding": {
+    "kind": "session_service",
+    "serviceId": "preview"
+  },
+  "label": "Updated Preview"
+}
+```
+
 Close a single browser page example:
 
 ```bash
@@ -671,6 +686,9 @@ Browser session responses include:
 - `inspection.driver`: machine-readable driver capability summary
 - `inspection.previewSurfaces`: normalized `browser_page` surfaces aligned with
   existing session/delivery preview-surface contracts
+- existing pages can be updated in place through
+  `POST /browser/sessions/{id}/pages/{pageId}/navigate` instead of forcing a
+  new browser-page record for every preview change
 - closed pages remain in history but now truthfully degrade to
   `previewSurface.status: "blocked"` plus `renderHint: "none"`
 - `GET /browser/summary`: aggregate session/page counts plus machine-readable

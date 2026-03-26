@@ -410,6 +410,66 @@ export class RuntimeBrowserService {
     };
   }
 
+  async navigatePage(
+    browserSessionId: string,
+    browserPageId: string,
+    input: CreateRuntimeBrowserPageInput,
+  ): Promise<{ session: RuntimeBrowserSessionView; page: RuntimeBrowserPage }> {
+    const session = this.sessions.get(browserSessionId);
+    if (!session) {
+      throw new RuntimeBrowserNotFoundError(`Browser session '${browserSessionId}' was not found.`);
+    }
+    if (session.status === 'closed') {
+      throw new RuntimeBrowserValidationError(
+        `Browser session '${browserSessionId}' is already closed.`,
+      );
+    }
+    const page = this.pages.get(browserPageId);
+    if (!page || page.browserSessionId !== browserSessionId) {
+      throw new RuntimeBrowserNotFoundError(
+        `Browser page '${browserPageId}' was not found in session '${browserSessionId}'.`,
+      );
+    }
+    if (page.status === 'closed') {
+      throw new RuntimeBrowserValidationError(
+        `Browser page '${browserPageId}' is already closed.`,
+      );
+    }
+
+    validateBrowserPageTarget(input);
+
+    const driver = this.requireDriver(session.driverId);
+    const driverPageState = await (
+      driver.navigatePage
+        ? driver.navigatePage({
+            browserSessionId,
+            browserPageId,
+            target: input,
+          })
+        : driver.openPage({
+            browserSessionId,
+            browserPageId,
+            target: input,
+          })
+    );
+    const now = this.now().toISOString();
+    page.label = input.label;
+    page.title = driverPageState.title ?? input.title;
+    page.url = input.url;
+    page.path = input.path;
+    page.mediaType = input.mediaType;
+    page.binding = cloneBinding(input.binding);
+    page.metadata = mergeMetadata(input.metadata, driverPageState.metadata);
+    page.updatedAt = now;
+    session.updatedAt = now;
+    this.persistState();
+
+    return {
+      session: this.buildSessionView(session),
+      page: this.buildPageView(page),
+    };
+  }
+
   private async createSessionInternal(
     input: CreateRuntimeBrowserSessionInput = {},
   ): Promise<RuntimeBrowserSessionView> {

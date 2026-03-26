@@ -210,7 +210,8 @@ src/
   probe status text
 - Exposes runtime-owned browser session/page routes with pluggable driver
   metadata, normalized `browser_page` preview surfaces, aggregate browser
-  summary reads, and explicit closed-session cleanup
+  summary reads, explicit in-place page navigation/update, and explicit
+  closed-session cleanup
 - Exposes the standalone runtime-owned versioned filterable skill catalog at
   `GET /skills/catalog`
 - Exposes runtime-owned delivery execution routes such as delivery audit,
@@ -345,7 +346,8 @@ src/
 - Runs runtime-owned closed-session maintenance sweeps so stale browser records
   can expire on a bounded TTL without waiting for explicit cleanup routes
 - Supports page-level close without tearing down the owning browser session,
-  while downgrading closed-page preview truth so hosts stop treating them as
+  page-level navigation/update without forcing a new browser-page record, and
+  downgraded closed-page preview truth so hosts stop treating closed pages as
   live previews
 - Defines browser-page preview-surface normalization aligned with existing
   service/artifact preview contracts

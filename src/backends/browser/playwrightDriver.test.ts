@@ -94,6 +94,32 @@ describe('PlaywrightBrowserDriver', () => {
       }),
     );
 
+    const navigated = await driver.navigatePage({
+      browserSessionId: 'browser-session-1',
+      browserPageId: 'browser-page-1',
+      target: {
+        url: 'http://127.0.0.1:4174',
+        binding: {
+          kind: 'manual_url',
+        },
+      },
+    });
+    expect(goto).toHaveBeenLastCalledWith(
+      'http://127.0.0.1:4174',
+      expect.objectContaining({
+        waitUntil: 'domcontentloaded',
+      }),
+    );
+    expect(navigated).toEqual(expect.objectContaining({
+      driverPageId: 'browser-page-1',
+      title: 'Preview Title',
+      metadata: expect.objectContaining({
+        mode: 'playwright',
+        navigatedUrl: 'http://127.0.0.1:4174',
+        bindingKind: 'manual_url',
+      }),
+    }));
+
     await driver.closePage({
       browserSessionId: 'browser-session-1',
       browserPageId: 'browser-page-1',

@@ -1,6 +1,7 @@
 import type {
   RuntimeBrowserDriver,
   RuntimeBrowserDriverClosePageInput,
+  RuntimeBrowserDriverNavigatePageInput,
   RuntimeBrowserDriverOpenPageInput,
 } from '../../core/browser/driver.js';
 import type { RuntimeBrowserDriverDescriptor } from '../../core/types.js';
@@ -51,5 +52,18 @@ export class ManualBrowserDriver implements RuntimeBrowserDriver {
 
   async closePage(_input: RuntimeBrowserDriverClosePageInput): Promise<void> {
     // Manual pages do not own external resources yet.
+  }
+
+  async navigatePage(
+    input: RuntimeBrowserDriverNavigatePageInput,
+  ): Promise<{ title?: string; metadata: Record<string, unknown> }> {
+    return {
+      ...(input.target.title ? { title: input.target.title } : {}),
+      metadata: {
+        mode: 'manual',
+        bindingKind: input.target.binding.kind,
+        ...(input.target.metadata ? { targetMetadata: input.target.metadata } : {}),
+      },
+    };
   }
 }

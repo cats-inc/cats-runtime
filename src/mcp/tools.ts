@@ -241,6 +241,7 @@ function buildBrowserSessionPaths(browserSessionId: string) {
   return {
     browserSessionPath: `/browser/sessions/${browserSessionId}`,
     createBrowserPagePath: `/browser/sessions/${browserSessionId}/pages`,
+    navigateBrowserPagePath: `/browser/sessions/${browserSessionId}/pages/:pageId/navigate`,
     closeBrowserPagePath: `/browser/sessions/${browserSessionId}/pages/:pageId/close`,
     closeBrowserSessionPath: `/browser/sessions/${browserSessionId}/close`,
   };
@@ -1086,6 +1087,31 @@ async function createBrowserPage(
   };
 }
 
+async function navigateBrowserPage(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const browserSessionId = readRequiredString(args, 'browserSessionId');
+  const browserPageId = readRequiredString(args, 'browserPageId');
+  const { browserSessionId: _browserSessionId, browserPageId: _browserPageId, ...body } = args;
+  const result = await requestRuntimeJson(
+    ctx,
+    `/browser/sessions/${encodeURIComponent(browserSessionId)}/pages/${encodeURIComponent(browserPageId)}/navigate`,
+    { body },
+  );
+  ensureRouteSuccess('navigate_browser_page', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'navigate_browser_page result');
+  return {
+    summary: `Navigated browser page ${browserPageId} in session ${browserSessionId}.`,
+    structuredContent: {
+      responseStatus: result.status,
+      ...payload,
+      ...buildBrowserSessionPaths(browserSessionId),
+    },
+  };
+}
+
 async function closeBrowserPage(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -1842,6 +1868,39 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: createBrowserPage,
+  },
+  {
+    definition: {
+      name: 'navigate_browser_page',
+      title: 'Navigate Browser Page',
+      description: 'Navigate an existing browser page to a new manual URL/path or runtime preview binding.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          browserSessionId: { type: 'string' },
+          browserPageId: { type: 'string' },
+          label: { type: 'string' },
+          title: { type: 'string' },
+          url: { type: 'string' },
+          path: { type: 'string' },
+          mediaType: { type: 'string' },
+          binding: {
+            type: 'object',
+            properties: {
+              kind: { type: 'string', enum: BROWSER_BINDING_KINDS },
+              runtimeSessionId: { type: 'string' },
+              serviceId: { type: 'string' },
+              artifactId: { type: 'string' },
+            },
+            additionalProperties: false,
+          },
+          metadata: { type: 'object' },
+        },
+        required: ['browserSessionId', 'browserPageId'],
+        additionalProperties: false,
+      },
+    },
+    execute: navigateBrowserPage,
   },
   {
     definition: {

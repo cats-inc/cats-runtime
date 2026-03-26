@@ -250,6 +250,7 @@ describe('runtime MCP facade', () => {
       'browser_summary',
       'create_browser_session',
       'create_browser_page',
+      'navigate_browser_page',
       'close_browser_page',
       'close_browser_session',
       'cleanup_browser_sessions',
@@ -1656,12 +1657,54 @@ describe('runtime MCP facade', () => {
     );
     const browserPageId = browserPageResult.result.structuredContent.page.id;
 
-    const listBrowserSessionsResponse = await app.request('/mcp', {
+    const navigateBrowserPageResponse = await app.request('/mcp', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
         id: 18,
+        method: 'tools/call',
+        params: {
+          name: 'navigate_browser_page',
+          arguments: {
+            browserSessionId,
+            browserPageId,
+            url: 'http://127.0.0.1:4173',
+            label: 'Attached Preview',
+          },
+        },
+      }),
+    });
+    expect(navigateBrowserPageResponse.status).toBe(200);
+    const navigatedPage = await navigateBrowserPageResponse.json() as {
+      result: {
+        structuredContent: {
+          page: { id: string; label?: string; previewSurface: { kind: string; url?: string } };
+          session: { inspection: { openPageCount: number; closedPageCount: number } };
+        };
+      };
+    };
+    expect(navigatedPage.result.structuredContent.page).toEqual(expect.objectContaining({
+      id: browserPageId,
+      label: 'Attached Preview',
+      previewSurface: expect.objectContaining({
+        kind: 'browser_page',
+        url: 'http://127.0.0.1:4173',
+      }),
+    }));
+    expect(navigatedPage.result.structuredContent.session.inspection).toEqual(
+      expect.objectContaining({
+        openPageCount: 1,
+        closedPageCount: 0,
+      }),
+    );
+
+    const listBrowserSessionsResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 19,
         method: 'tools/call',
         params: {
           name: 'list_browser_sessions',
@@ -1693,7 +1736,7 @@ describe('runtime MCP facade', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 19,
+        id: 20,
         method: 'tools/call',
         params: {
           name: 'close_browser_page',
@@ -1732,7 +1775,7 @@ describe('runtime MCP facade', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        id: 20,
+        id: 21,
         method: 'tools/call',
         params: {
           name: 'close_browser_session',

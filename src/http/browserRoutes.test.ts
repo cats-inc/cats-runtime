@@ -245,6 +245,77 @@ describe('browser HTTP contract', () => {
     }));
   });
 
+  it('navigates an existing browser page without creating a second page', async () => {
+    const app = createTestApp();
+
+    const createResponse = await app.request('/browser/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        runtimeSessionId: 'session-service',
+        label: 'Manual Preview Session',
+      }),
+    });
+    expect(createResponse.status).toBe(201);
+    const created = await createResponse.json() as {
+      session: { id: string };
+    };
+
+    const pageResponse = await app.request(`/browser/sessions/${created.session.id}/pages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        url: 'http://127.0.0.1:3000',
+        label: 'Manual Preview',
+      }),
+    });
+    expect(pageResponse.status).toBe(201);
+    const pagePayload = await pageResponse.json() as {
+      page: { id: string };
+    };
+
+    const navigateResponse = await app.request(
+      `/browser/sessions/${created.session.id}/pages/${pagePayload.page.id}/navigate`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          binding: {
+            kind: 'session_service',
+            serviceId: 'preview',
+          },
+          label: 'Service Preview',
+        }),
+      },
+    );
+    expect(navigateResponse.status).toBe(200);
+    await expect(navigateResponse.json()).resolves.toEqual(expect.objectContaining({
+      page: expect.objectContaining({
+        id: pagePayload.page.id,
+        label: 'Service Preview',
+        binding: expect.objectContaining({
+          kind: 'session_service',
+          runtimeSessionId: 'session-service',
+          serviceId: 'preview',
+        }),
+        previewSurface: expect.objectContaining({
+          kind: 'browser_page',
+          status: 'ready',
+          renderHint: 'iframe',
+          url: 'http://127.0.0.1:4173',
+        }),
+      }),
+      session: expect.objectContaining({
+        id: created.session.id,
+        status: 'ready',
+        inspection: expect.objectContaining({
+          openPageCount: 1,
+          closedPageCount: 0,
+        }),
+      }),
+    }));
+  });
+
   it('binds browser pages to runtime session services and artifacts without changing the preview-surface schema', async () => {
     const app = createTestApp();
 

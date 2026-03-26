@@ -57,6 +57,8 @@ Current tools:
 - `browser_summary`
 - `create_browser_session`
 - `create_browser_page`
+- `navigate_browser_page`
+- `close_browser_page`
 - `close_browser_session`
 - `cleanup_browser_sessions`
 - `audit_workspace`
@@ -263,6 +265,8 @@ tool surface here. The first shared tool names are:
 - `browser_summary`
 - `create_browser_session`
 - `create_browser_page`
+- `navigate_browser_page`
+- `close_browser_page`
 - `close_browser_session`
 - `cleanup_browser_sessions`
 - `audit_workspace`
