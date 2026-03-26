@@ -21,7 +21,26 @@ describe('buildApiRuntimeExecutionStrategyCatalog', () => {
         id: 'react',
         availability: 'supported',
         runtimeOwnedExecution: true,
+        requestSupport: {
+          acceptanceCriteria: true,
+          strategyContext: true,
+          correlation: true,
+        },
         requestedContextKeys: ['maxSteps', 'timeoutMs', 'stuckThreshold'],
+        contextSchema: expect.arrayContaining([
+          expect.objectContaining({
+            key: 'maxSteps',
+            valueType: 'integer',
+            minimum: 1,
+            defaultValue: 20,
+            defaultSources: ['instance.maxToolSteps', 'runtime.defaultMaxToolSteps'],
+          }),
+          expect.objectContaining({
+            key: 'stuckThreshold',
+            defaultValue: 2,
+            defaultSources: ['runtime.defaultStuckThreshold'],
+          }),
+        ]),
         guardrails: {
           stepLimit: true,
           timeoutMs: true,
@@ -38,6 +57,13 @@ describe('buildApiRuntimeExecutionStrategyCatalog', () => {
         id: 'tree_of_thoughts',
         availability: 'supported',
         requestedContextKeys: ['maxDepth', 'maxSteps', 'branchCount', 'timeoutMs', 'stuckThreshold'],
+        contextSchema: expect.arrayContaining([
+          expect.objectContaining({
+            key: 'branchCount',
+            valueType: 'integer',
+            minimum: 1,
+          }),
+        ]),
         guardrails: expect.objectContaining({
           branchCount: true,
         }),
@@ -51,7 +77,13 @@ describe('buildApiRuntimeExecutionStrategyCatalog', () => {
         id: 'deps',
         availability: 'fallback_only',
         runtimeOwnedExecution: false,
+        requestSupport: {
+          acceptanceCriteria: false,
+          strategyContext: false,
+          correlation: true,
+        },
         fallbackStrategy: 'simple_tool_call',
+        contextSchema: [],
         strategyEvents: [],
       }),
     ]));

@@ -458,7 +458,8 @@ integrate against:
   - `summary`: supported-family counts, fallback-only counts, compatibility
     default, and runtime-hosted backend scope
   - `strategies`: per-family availability, execution model, bounded accepted
-    `strategyContext` keys, guardrail support, emitted strategy events, and
+    `strategyContext` keys plus machine-readable `requestSupport` and
+    `contextSchema` metadata, guardrail support, emitted strategy events, and
     fallback truth for deferred hints such as `deps`
 - full `metering` state:
   - `summary`: aggregate status/counts

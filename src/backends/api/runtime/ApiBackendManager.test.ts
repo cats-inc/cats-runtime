@@ -92,11 +92,27 @@ describe('ApiBackendManager', () => {
           id: 'react',
           availability: 'supported',
           runtimeOwnedExecution: true,
+          requestSupport: {
+            acceptanceCriteria: true,
+            strategyContext: true,
+            correlation: true,
+          },
+          contextSchema: expect.arrayContaining([
+            expect.objectContaining({
+              key: 'maxSteps',
+              defaultValue: 20,
+            }),
+          ]),
         }),
         expect.objectContaining({
           id: 'deps',
           availability: 'fallback_only',
           fallbackStrategy: 'simple_tool_call',
+          requestSupport: {
+            acceptanceCriteria: false,
+            strategyContext: false,
+            correlation: true,
+          },
         }),
       ]),
     });

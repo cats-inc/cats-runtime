@@ -11,6 +11,28 @@ type StrategyExecutionModel =
   | 'deferred';
 
 export type ApiRuntimeExecutionStrategyAvailability = 'supported' | 'fallback_only';
+export type ApiRuntimeExecutionStrategyContextValueType = 'integer';
+export type ApiRuntimeExecutionStrategyDefaultSource =
+  | 'strategyContext.maxSteps'
+  | 'instance.maxToolSteps'
+  | 'instance.timeoutMs'
+  | 'runtime.defaultMaxToolSteps'
+  | 'runtime.defaultStuckThreshold';
+
+export interface ApiRuntimeExecutionStrategyContextField {
+  key: string;
+  valueType: ApiRuntimeExecutionStrategyContextValueType;
+  minimum: number;
+  description: string;
+  defaultValue?: number;
+  defaultSources?: ApiRuntimeExecutionStrategyDefaultSource[];
+}
+
+export interface ApiRuntimeExecutionStrategyRequestSupport {
+  acceptanceCriteria: boolean;
+  strategyContext: boolean;
+  correlation: true;
+}
 
 export interface ApiRuntimeExecutionStrategyCatalogEntry {
   id: RuntimeExecutionStrategyId;
@@ -20,7 +42,9 @@ export interface ApiRuntimeExecutionStrategyCatalogEntry {
   runtimeOwnedExecution: boolean;
   runtimeHostedBackends: RuntimeHostedStrategyBackend[];
   description: string;
+  requestSupport: ApiRuntimeExecutionStrategyRequestSupport;
   requestedContextKeys: string[];
+  contextSchema: ApiRuntimeExecutionStrategyContextField[];
   strategyEvents: string[];
   guardrails: {
     stepLimit: boolean;
@@ -47,6 +71,26 @@ export interface ApiRuntimeExecutionStrategyCatalog {
 }
 
 const RUNTIME_HOSTED_BACKENDS = ['api', 'local'] as const satisfies readonly RuntimeHostedStrategyBackend[];
+const DEFAULT_MAX_TOOL_STEPS = 20;
+const DEFAULT_STUCK_THRESHOLD = 2;
+
+function buildIntegerContextField(
+  key: string,
+  description: string,
+  options: {
+    defaultValue?: number;
+    defaultSources?: ApiRuntimeExecutionStrategyDefaultSource[];
+  } = {},
+): ApiRuntimeExecutionStrategyContextField {
+  return {
+    key,
+    valueType: 'integer',
+    minimum: 1,
+    description,
+    ...(typeof options.defaultValue === 'number' ? { defaultValue: options.defaultValue } : {}),
+    ...(options.defaultSources ? { defaultSources: [...options.defaultSources] } : {}),
+  };
+}
 
 const STRATEGY_CATALOG: readonly ApiRuntimeExecutionStrategyCatalogEntry[] = [
   {
@@ -57,7 +101,22 @@ const STRATEGY_CATALOG: readonly ApiRuntimeExecutionStrategyCatalogEntry[] = [
     runtimeOwnedExecution: true,
     runtimeHostedBackends: [...RUNTIME_HOSTED_BACKENDS],
     description: 'Compatibility wrapper over the legacy runtime-managed tool loop.',
+    requestSupport: {
+      acceptanceCriteria: false,
+      strategyContext: true,
+      correlation: true,
+    },
     requestedContextKeys: ['maxSteps'],
+    contextSchema: [
+      buildIntegerContextField(
+        'maxSteps',
+        'Caps the compatibility loop tool iterations before the runtime returns a step-limit failure.',
+        {
+          defaultValue: DEFAULT_MAX_TOOL_STEPS,
+          defaultSources: ['instance.maxToolSteps', 'runtime.defaultMaxToolSteps'],
+        },
+      ),
+    ],
     strategyEvents: [
       'strategy_started',
       'strategy_tool_call',
@@ -84,7 +143,37 @@ const STRATEGY_CATALOG: readonly ApiRuntimeExecutionStrategyCatalogEntry[] = [
     runtimeOwnedExecution: true,
     runtimeHostedBackends: [...RUNTIME_HOSTED_BACKENDS],
     description: 'Runtime-owned reason/act loop with bounded stuck detection.',
+    requestSupport: {
+      acceptanceCriteria: true,
+      strategyContext: true,
+      correlation: true,
+    },
     requestedContextKeys: ['maxSteps', 'timeoutMs', 'stuckThreshold'],
+    contextSchema: [
+      buildIntegerContextField(
+        'maxSteps',
+        'Caps ReAct tool-loop iterations before the runtime returns a step-limit failure.',
+        {
+          defaultValue: DEFAULT_MAX_TOOL_STEPS,
+          defaultSources: ['instance.maxToolSteps', 'runtime.defaultMaxToolSteps'],
+        },
+      ),
+      buildIntegerContextField(
+        'timeoutMs',
+        'Bounds the total runtime-owned ReAct loop duration when the provider instance exposes a timeout budget.',
+        {
+          defaultSources: ['instance.timeoutMs'],
+        },
+      ),
+      buildIntegerContextField(
+        'stuckThreshold',
+        'Trips repeated-tool-call stuck detection after this many consecutive duplicate plans.',
+        {
+          defaultValue: DEFAULT_STUCK_THRESHOLD,
+          defaultSources: ['runtime.defaultStuckThreshold'],
+        },
+      ),
+    ],
     strategyEvents: [
       'strategy_started',
       'strategy_step',
@@ -111,7 +200,49 @@ const STRATEGY_CATALOG: readonly ApiRuntimeExecutionStrategyCatalogEntry[] = [
     runtimeOwnedExecution: true,
     runtimeHostedBackends: [...RUNTIME_HOSTED_BACKENDS],
     description: 'Runtime-owned bounded planning loop that replans after each tool batch.',
+    requestSupport: {
+      acceptanceCriteria: true,
+      strategyContext: true,
+      correlation: true,
+    },
     requestedContextKeys: ['maxPlanSteps', 'maxSteps', 'timeoutMs', 'stuckThreshold'],
+    contextSchema: [
+      buildIntegerContextField(
+        'maxPlanSteps',
+        'Primary cap for bounded plan/execute/evaluate iterations before the runtime returns a step-limit failure.',
+        {
+          defaultValue: DEFAULT_MAX_TOOL_STEPS,
+          defaultSources: [
+            'strategyContext.maxSteps',
+            'instance.maxToolSteps',
+            'runtime.defaultMaxToolSteps',
+          ],
+        },
+      ),
+      buildIntegerContextField(
+        'maxSteps',
+        'Fallback cap used when maxPlanSteps is omitted.',
+        {
+          defaultValue: DEFAULT_MAX_TOOL_STEPS,
+          defaultSources: ['instance.maxToolSteps', 'runtime.defaultMaxToolSteps'],
+        },
+      ),
+      buildIntegerContextField(
+        'timeoutMs',
+        'Bounds the full runtime-owned plan/execute/evaluate loop when the provider instance exposes a timeout budget.',
+        {
+          defaultSources: ['instance.timeoutMs'],
+        },
+      ),
+      buildIntegerContextField(
+        'stuckThreshold',
+        'Trips repeated-plan stuck detection after this many consecutive duplicate tool-call plans.',
+        {
+          defaultValue: DEFAULT_STUCK_THRESHOLD,
+          defaultSources: ['runtime.defaultStuckThreshold'],
+        },
+      ),
+    ],
     strategyEvents: [
       'strategy_started',
       'strategy_plan',
@@ -136,7 +267,49 @@ const STRATEGY_CATALOG: readonly ApiRuntimeExecutionStrategyCatalogEntry[] = [
     runtimeOwnedExecution: true,
     runtimeHostedBackends: [...RUNTIME_HOSTED_BACKENDS],
     description: 'Runtime-owned plan/do/check/act loop with bounded iteration control.',
+    requestSupport: {
+      acceptanceCriteria: true,
+      strategyContext: true,
+      correlation: true,
+    },
     requestedContextKeys: ['maxCycles', 'maxSteps', 'timeoutMs', 'stuckThreshold'],
+    contextSchema: [
+      buildIntegerContextField(
+        'maxCycles',
+        'Primary cap for bounded plan/do/check/act cycles before the runtime returns a step-limit failure.',
+        {
+          defaultValue: DEFAULT_MAX_TOOL_STEPS,
+          defaultSources: [
+            'strategyContext.maxSteps',
+            'instance.maxToolSteps',
+            'runtime.defaultMaxToolSteps',
+          ],
+        },
+      ),
+      buildIntegerContextField(
+        'maxSteps',
+        'Fallback cap used when maxCycles is omitted.',
+        {
+          defaultValue: DEFAULT_MAX_TOOL_STEPS,
+          defaultSources: ['instance.maxToolSteps', 'runtime.defaultMaxToolSteps'],
+        },
+      ),
+      buildIntegerContextField(
+        'timeoutMs',
+        'Bounds the full runtime-owned PDCA loop when the provider instance exposes a timeout budget.',
+        {
+          defaultSources: ['instance.timeoutMs'],
+        },
+      ),
+      buildIntegerContextField(
+        'stuckThreshold',
+        'Trips repeated-plan stuck detection after this many duplicate cycles.',
+        {
+          defaultValue: DEFAULT_STUCK_THRESHOLD,
+          defaultSources: ['runtime.defaultStuckThreshold'],
+        },
+      ),
+    ],
     strategyEvents: [
       'strategy_started',
       'strategy_plan',
@@ -162,7 +335,37 @@ const STRATEGY_CATALOG: readonly ApiRuntimeExecutionStrategyCatalogEntry[] = [
     runtimeOwnedExecution: true,
     runtimeHostedBackends: [...RUNTIME_HOSTED_BACKENDS],
     description: 'Runtime-owned critique/revision loop that persists reflection-local state.',
+    requestSupport: {
+      acceptanceCriteria: true,
+      strategyContext: true,
+      correlation: true,
+    },
     requestedContextKeys: ['maxSteps', 'timeoutMs', 'stuckThreshold'],
+    contextSchema: [
+      buildIntegerContextField(
+        'maxSteps',
+        'Caps critique/revision passes before the runtime returns a step-limit failure.',
+        {
+          defaultValue: DEFAULT_MAX_TOOL_STEPS,
+          defaultSources: ['instance.maxToolSteps', 'runtime.defaultMaxToolSteps'],
+        },
+      ),
+      buildIntegerContextField(
+        'timeoutMs',
+        'Bounds the full runtime-owned reflexion loop when the provider instance exposes a timeout budget.',
+        {
+          defaultSources: ['instance.timeoutMs'],
+        },
+      ),
+      buildIntegerContextField(
+        'stuckThreshold',
+        'Trips repeated-revision stuck detection after this many duplicate passes.',
+        {
+          defaultValue: DEFAULT_STUCK_THRESHOLD,
+          defaultSources: ['runtime.defaultStuckThreshold'],
+        },
+      ),
+    ],
     strategyEvents: [
       'strategy_started',
       'strategy_step',
@@ -186,7 +389,53 @@ const STRATEGY_CATALOG: readonly ApiRuntimeExecutionStrategyCatalogEntry[] = [
     runtimeOwnedExecution: true,
     runtimeHostedBackends: [...RUNTIME_HOSTED_BACKENDS],
     description: 'Runtime-owned branch/evaluate/prune/select loop with bounded branch sampling.',
+    requestSupport: {
+      acceptanceCriteria: true,
+      strategyContext: true,
+      correlation: true,
+    },
     requestedContextKeys: ['maxDepth', 'maxSteps', 'branchCount', 'timeoutMs', 'stuckThreshold'],
+    contextSchema: [
+      buildIntegerContextField(
+        'maxDepth',
+        'Primary cap for branch/evaluate/prune/select rounds before the runtime returns a step-limit failure.',
+        {
+          defaultValue: DEFAULT_MAX_TOOL_STEPS,
+          defaultSources: [
+            'strategyContext.maxSteps',
+            'instance.maxToolSteps',
+            'runtime.defaultMaxToolSteps',
+          ],
+        },
+      ),
+      buildIntegerContextField(
+        'maxSteps',
+        'Fallback cap used when maxDepth is omitted.',
+        {
+          defaultValue: DEFAULT_MAX_TOOL_STEPS,
+          defaultSources: ['instance.maxToolSteps', 'runtime.defaultMaxToolSteps'],
+        },
+      ),
+      buildIntegerContextField(
+        'branchCount',
+        'Limits how many candidate branches the runtime samples before pruning.',
+      ),
+      buildIntegerContextField(
+        'timeoutMs',
+        'Bounds the full runtime-owned tree-of-thoughts loop when the provider instance exposes a timeout budget.',
+        {
+          defaultSources: ['instance.timeoutMs'],
+        },
+      ),
+      buildIntegerContextField(
+        'stuckThreshold',
+        'Trips repeated-branch stuck detection after this many duplicate branch selections.',
+        {
+          defaultValue: DEFAULT_STUCK_THRESHOLD,
+          defaultSources: ['runtime.defaultStuckThreshold'],
+        },
+      ),
+    ],
     strategyEvents: [
       'strategy_started',
       'strategy_branch',
@@ -212,7 +461,13 @@ const STRATEGY_CATALOG: readonly ApiRuntimeExecutionStrategyCatalogEntry[] = [
     runtimeOwnedExecution: false,
     runtimeHostedBackends: [...RUNTIME_HOSTED_BACKENDS],
     description: 'Known deferred family; runtime preserves the hint but does not execute a native loop yet.',
+    requestSupport: {
+      acceptanceCriteria: false,
+      strategyContext: false,
+      correlation: true,
+    },
     requestedContextKeys: [],
+    contextSchema: [],
     strategyEvents: [],
     guardrails: {
       stepLimit: false,
@@ -231,7 +486,14 @@ export function buildApiRuntimeExecutionStrategyCatalog(): ApiRuntimeExecutionSt
   const strategies = STRATEGY_CATALOG.map((entry) => ({
     ...entry,
     runtimeHostedBackends: [...entry.runtimeHostedBackends],
+    requestSupport: {
+      ...entry.requestSupport,
+    },
     requestedContextKeys: [...entry.requestedContextKeys],
+    contextSchema: entry.contextSchema.map((field) => ({
+      ...field,
+      ...(field.defaultSources ? { defaultSources: [...field.defaultSources] } : {}),
+    })),
     strategyEvents: [...entry.strategyEvents],
     guardrails: {
       ...entry.guardrails,

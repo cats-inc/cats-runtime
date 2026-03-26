@@ -857,6 +857,10 @@ already exist.
 - `GET /diagnostics/runtime` and `GET /diagnostics/health` now expose a
   runtime-owned strategy catalog/summary so hosts can inspect which strategy
   families are actually implemented versus compatibility-fallback only
+- those diagnostics now also expose additive per-family `requestSupport` and
+  machine-readable `contextSchema` metadata so hosts can see which
+  `acceptanceCriteria` / `strategyContext` inputs the runtime actually uses
+  and what bounded numeric keys/default sources each family understands
 
 #### Follow-through Direction
 

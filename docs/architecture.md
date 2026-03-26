@@ -598,7 +598,8 @@ src/
    API/local auth/model probe requests, additive provider-tooling ownership /
    baseline-profile summaries plus bounded tooling observability truth,
    additive runtime execution-strategy catalog/summary truth for implemented
-   versus compatibility-fallback-only families,
+   versus compatibility-fallback-only families, including per-family
+   request-support and strategy-context schema metadata,
    additive HTTP semantic classifications, additive OpenClaw
    `tools.catalog`-backed remote tool discovery on
    `GET /providers/{provider}/tools` for agent targets that support it, and additive
