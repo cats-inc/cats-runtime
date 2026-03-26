@@ -95,10 +95,13 @@ requests into calls into this shared runtime.
   hunk aborts the patch.
 - Single-file `write_file` and `edit_file` now stage sibling temp files and
   atomically replace the target so failed commit paths restore the previous
-  file contents instead of leaving partially written text behind.
+  file contents instead of leaving partially written text behind, preserve the
+  previous file mode when replacing an existing file, and clean up newly
+  created empty parent directories when a new-file commit path aborts.
 - The safety model still does **not** yet guarantee full transactional
-  rollback for general `write_file` / `edit_file` operations, inode-level
-  metadata restoration, or empty parent-directory cleanup.
+  rollback for general `write_file` / `edit_file` operations or broader
+  metadata restoration such as timestamps, ownership, or other inode-level
+  attributes.
 
 ## Dependencies
 

@@ -1,4 +1,5 @@
 import { existsSync, linkSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmod as chmodAsync, rename as renameAsync, stat as statAsync, unlink as unlinkAsync, writeFile as writeFileAsync } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -136,15 +137,34 @@ describe('LocalToolRuntime', () => {
   describe('writeTextFileAtomically', () => {
     it('restores the original file when the staged replacement fails', async () => {
       const target = '/virtual/workspace/app.ts';
-      const files = new Map<string, string>([[target, 'before']]);
+      const files = new Map<string, { content: string; mode: number }>([
+        [target, { content: 'before', mode: 0o644 }],
+      ]);
       let failCommit = true;
 
       await expect(writeTextFileAtomically(target, 'after', {
+        async chmod(path, mode) {
+          const entry = files.get(path);
+          if (!entry) {
+            const error = Object.assign(new Error(`Missing path ${path}`), { code: 'ENOENT' });
+            throw error;
+          }
+          entry.mode = mode;
+        },
+        async stat(path) {
+          const entry = files.get(path);
+          if (!entry) {
+            const error = Object.assign(new Error(`Missing path ${path}`), { code: 'ENOENT' });
+            throw error;
+          }
+          return { mode: entry.mode };
+        },
         async writeFile(path, content) {
-          files.set(path, content);
+          files.set(path, { content, mode: 0o600 });
         },
         async rename(from, to) {
-          if (!files.has(from)) {
+          const entry = files.get(from);
+          if (!entry) {
             const error = Object.assign(new Error(`Missing source ${from}`), { code: 'ENOENT' });
             throw error;
           }
@@ -152,7 +172,7 @@ describe('LocalToolRuntime', () => {
             failCommit = false;
             throw new Error('simulated commit failure');
           }
-          files.set(to, files.get(from)!);
+          files.set(to, entry);
           files.delete(from);
         },
         async unlink(path) {
@@ -160,9 +180,91 @@ describe('LocalToolRuntime', () => {
         },
       })).rejects.toThrow('simulated commit failure');
 
-      expect(files.get(target)).toBe('before');
+      expect(files.get(target)).toEqual({ content: 'before', mode: 0o644 });
       expect(Array.from(files.keys()).filter((path) => path.includes('.cats-runtime-'))).toEqual([]);
     });
+
+    it('preserves the existing file mode when a staged replacement succeeds', async () => {
+      const target = '/virtual/workspace/script.sh';
+      const files = new Map<string, { content: string; mode: number }>([
+        [target, { content: '#!/bin/sh\necho before\n', mode: 0o755 }],
+      ]);
+
+      await writeTextFileAtomically(target, '#!/bin/sh\necho after\n', {
+        async chmod(path, mode) {
+          const entry = files.get(path);
+          if (!entry) {
+            const error = Object.assign(new Error(`Missing path ${path}`), { code: 'ENOENT' });
+            throw error;
+          }
+          entry.mode = mode;
+        },
+        async stat(path) {
+          const entry = files.get(path);
+          if (!entry) {
+            const error = Object.assign(new Error(`Missing path ${path}`), { code: 'ENOENT' });
+            throw error;
+          }
+          return { mode: entry.mode };
+        },
+        async writeFile(path, content) {
+          files.set(path, { content, mode: 0o600 });
+        },
+        async rename(from, to) {
+          const entry = files.get(from);
+          if (!entry) {
+            const error = Object.assign(new Error(`Missing source ${from}`), { code: 'ENOENT' });
+            throw error;
+          }
+          files.set(to, entry);
+          files.delete(from);
+        },
+        async unlink(path) {
+          files.delete(path);
+        },
+      });
+
+      expect(files.get(target)).toEqual({
+        content: '#!/bin/sh\necho after\n',
+        mode: 0o755,
+      });
+      expect(Array.from(files.keys()).filter((path) => path.includes('.cats-runtime-'))).toEqual([]);
+    });
+  });
+
+  it('cleans up newly created parent directories when a write_file commit fails', async () => {
+    const { cwd, cleanup } = createWorkspace();
+    const runtime = new LocalToolRuntime({
+      atomicWriteOps: {
+        chmod: chmodAsync,
+        stat: statAsync,
+        writeFile: writeFileAsync,
+        async rename(from, to) {
+          if (from.includes('.cats-runtime-write-')) {
+            throw new Error('simulated commit failure');
+          }
+          await renameAsync(from, to);
+        },
+        unlink: unlinkAsync,
+      },
+    });
+
+    try {
+      const result = await runtime.execute(sharedCtx(cwd), {
+        id: 'tool-write-failure',
+        name: 'write_file',
+        arguments: {
+          path: 'nested/deeper/new.txt',
+          content: 'hello\n',
+        },
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.output).toContain('simulated commit failure');
+      expect(existsSync(join(cwd, 'nested'))).toBe(false);
+    } finally {
+      cleanup();
+    }
   });
 
   it('blocks mutations in read_only mode and path escapes', async () => {

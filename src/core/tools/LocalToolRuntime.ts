@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { copyFile, readdir, readFile, rmdir, stat, mkdir, rename, unlink, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, readdir, readFile, rmdir, stat, mkdir, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname, extname, resolve } from 'node:path';
 import path from 'node:path';
 import type {
@@ -24,6 +24,8 @@ import type { RuntimeManagementDomain, RuntimeManagementAction } from '../manage
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const matchesGlob: (filePath: string, pattern: string) => boolean = (path as any).matchesGlob;
 const DEFAULT_ATOMIC_WRITE_OPS: AtomicWriteOps = {
+  chmod,
+  stat,
   writeFile,
   rename,
   unlink,
@@ -41,9 +43,15 @@ interface ToolCapabilityMetadata {
 }
 
 interface AtomicWriteOps {
+  chmod(path: string, mode: number): Promise<void>;
+  stat(path: string): Promise<{ mode: number }>;
   writeFile(path: string, content: string, encoding: BufferEncoding): Promise<void>;
   rename(from: string, to: string): Promise<void>;
   unlink(path: string): Promise<void>;
+}
+
+export interface LocalToolRuntimeOptions {
+  atomicWriteOps?: AtomicWriteOps;
 }
 
 export interface ToolCall {
@@ -803,6 +811,52 @@ async function unlinkBestEffort(path: string, ops: AtomicWriteOps): Promise<void
   }
 }
 
+async function ensureParentDirectories(fullPath: string): Promise<string[]> {
+  const createdDirectories: string[] = [];
+  let current = dirname(fullPath);
+
+  while (true) {
+    try {
+      const info = await stat(current);
+      if (!info.isDirectory()) {
+        throw new Error(`Parent path is not a directory: ${current}`);
+      }
+      break;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
+
+      createdDirectories.push(current);
+      const parent = dirname(current);
+      if (parent === current) {
+        break;
+      }
+      current = parent;
+    }
+  }
+
+  for (const directory of [...createdDirectories].reverse()) {
+    await mkdir(directory);
+  }
+
+  return createdDirectories;
+}
+
+async function cleanupEmptyDirectories(paths: string[]): Promise<void> {
+  for (const directory of paths) {
+    try {
+      await rmdir(directory);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT' || code === 'ENOTEMPTY' || code === 'EPERM') {
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
 export async function writeTextFileAtomically(
   fullPath: string,
   content: string,
@@ -811,10 +865,23 @@ export async function writeTextFileAtomically(
   const tempPath = createAtomicWritePath(fullPath, 'write');
   const backupPath = createAtomicWritePath(fullPath, 'backup');
   let backupCreated = false;
+  let existingMode: number | undefined;
+
+  try {
+    existingMode = (await ops.stat(fullPath)).mode;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error;
+    }
+  }
 
   await ops.writeFile(tempPath, content, 'utf-8');
 
   try {
+    if (existingMode !== undefined) {
+      await ops.chmod(tempPath, existingMode);
+    }
+
     try {
       await ops.rename(fullPath, backupPath);
       backupCreated = true;
@@ -1176,7 +1243,12 @@ async function executeShell(
 export class LocalToolRuntime {
   private readonly substrate = new WorkspaceSubstrateService();
   private readonly delivery = new RuntimeDeliveryService({});
+  private readonly atomicWriteOps: AtomicWriteOps;
   private management?: RuntimeManagementService;
+
+  constructor(options: LocalToolRuntimeOptions = {}) {
+    this.atomicWriteOps = options.atomicWriteOps ?? DEFAULT_ATOMIC_WRITE_OPS;
+  }
 
   setManagementService(service: RuntimeManagementService): void {
     this.management = service;
@@ -1556,8 +1628,13 @@ export class LocalToolRuntime {
         throw error;
       }
     }
-    await mkdir(dirname(fullPath), { recursive: true });
-    await writeTextFileAtomically(fullPath, content);
+    const createdDirectories = await ensureParentDirectories(fullPath);
+    try {
+      await writeTextFileAtomically(fullPath, content, this.atomicWriteOps);
+    } catch (error) {
+      await cleanupEmptyDirectories(createdDirectories);
+      throw error;
+    }
     return {
       callId,
       name: 'write_file',
@@ -1635,7 +1712,7 @@ export class LocalToolRuntime {
       ? content.replace(oldString, newString)
       : content.replaceAll(oldString, newString);
 
-    await writeTextFileAtomically(fullPath, updated);
+    await writeTextFileAtomically(fullPath, updated, this.atomicWriteOps);
 
     return {
       callId,

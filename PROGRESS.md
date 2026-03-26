@@ -66,7 +66,7 @@
 #### Remaining Items
 
 - [ ] Deepen provider health probes beyond the current readiness summary and endpoint reachability probes, especially richer API/local auth/model semantics and Ollama model discovery
-- [ ] Continue hardening shared local tool runtime mutation safety beyond the current bounded `apply_patch` rollback, staged atomic `write_file` / `edit_file` replacement, and symlink/junction/hardlink alias guards, especially inode/metadata restoration and parent-directory cleanup
+- [ ] Continue hardening shared local tool runtime mutation safety beyond the current bounded `apply_patch` rollback, staged atomic `write_file` / `edit_file` replacement, symlink/junction/hardlink alias guards, preserved file modes on staged replacements, and failed-create empty parent-directory cleanup, especially broader metadata restoration
 - [ ] Continue broadening the shared local tool runtime beyond the current filesystem/shell/navigation/materialization set plus proposed-file diff and bounded batch-read inspection, especially richer planning helpers
 - [ ] Continue refining capability partitioning and policy surfacing beyond the current profile summary/read-model slice, per-tool capability/access metadata, and `standard` / `extended` / `read_only` split
 
@@ -326,7 +326,7 @@ product policy.
 
 - [ ] No full packaged onboarding or provider installation wizard in runtime
 - [ ] No deep semantic live health probes for every API/local transport yet; the first slice adds endpoint reachability but does not validate auth/model behavior for every remote target
-- [ ] No full transactional rollback for shared local-tool writes/edits yet; `apply_patch` now restores bounded file content/presence on failure, but not inode-level metadata or empty parent-dir cleanup
+- [ ] No full transactional rollback for shared local-tool writes/edits yet; `apply_patch` now restores bounded file content/presence on failure, while `write_file` / `edit_file` preserve existing file modes and clean empty parent dirs after failed new-file writes, but broader metadata restoration still remains
 
 ### WP-9: Runtime-Managed Skills v0
 
