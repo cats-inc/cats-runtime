@@ -251,7 +251,10 @@ Diagnostics rules:
   persistence, npm prefix drift, auth state, version state, and additive
   remediation steps
 - `GET /diagnostics/providers?probe=live` enables live probes where the current
-  backend supports them
+  backend supports them; API/local targets now use transport-native model/tag
+  probe requests (`/v1/models`, `/v1beta/models`, `/api/tags`) and expose
+  redacted `config.liveProbe` request metadata such as the semantic target,
+  applied auth mode, and request header names
 - `force=1|true|refresh` refreshes cached CLI compatibility assessments so
   install/upgrade flows can re-probe immediately
 

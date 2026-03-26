@@ -468,23 +468,29 @@ surface for hosts and dashboards. The response includes:
 - sanitized env-variable presence metadata
 - additive `config.modelCatalog` summaries (`source`, `defaultModel`,
   `modelCount`, cache metadata when applicable, and warnings)
+- additive `config.liveProbe` request metadata for API/local targets, including
+  the semantic probe target, redacted request URL, auth application summary,
+  and request header names
 - target-level diagnostics details for CLI, API/local, and agent backends
 
 `GET /diagnostics/providers?probe=live` enables live probes where the current
 runtime backend supports them. For CLI targets this now validates the runtime
 execution flags that `cats-runtime` actually uses when a family profile defines
 a safe live probe; API/local targets with configured endpoints now also perform
-bounded GET reachability probes and expose additive `config.liveProbe`
-metadata, including additive HTTP classifications such as `auth_required`,
-`auth_rejected`, `rate_limited`, `endpoint_not_found`, `upstream_error`, and
-network/timeout outcomes. Agent-backed OpenClaw targets now perform a real websocket
+bounded transport-native GET probes against provider model/catalog endpoints and
+expose additive `config.liveProbe` metadata, including probe `target`,
+`headerNames`, `authentication`, and additive HTTP classifications such as
+`auth_required`, `auth_rejected`, `rate_limited`, `endpoint_not_found`,
+`upstream_error`, and network/timeout outcomes. Agent-backed OpenClaw targets now perform a real websocket
 handshake plus `health` RPC through the same `AgentBackendManager` runtime
 options used for live execution instead of reporting config-only validation.
 Those same runtime-managed websocket options now also back OpenClaw
 `models.list` catalog loading, so live diagnostics and `GET /providers/{provider}/models`
 can report canonical `provider/model` refs instead of a config-only fallback
 when the gateway exposes model discovery.
-Ollama probes use `/api/tags` against the configured base URL.
+OpenAI and Anthropic probes use `GET /v1/models` against the resolved base URL,
+Gemini/Google probes use `GET /v1beta/models`, and Ollama probes use
+`GET /api/tags`.
 Successful HTTP reachability yields `endpoint_reachable`; network/timeout
 failures yield `endpoint_probe_failed`, while reachable non-2xx responses add
 semantic checks such as `endpoint_auth_required`, `endpoint_auth_rejected`,

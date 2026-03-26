@@ -196,8 +196,8 @@ src/
 - Exposes aggregate runtime + provider health at `GET /diagnostics/health`
 - Exposes runtime/host diagnostics at `GET /diagnostics/runtime`
 - Exposes provider availability plus CLI compatibility diagnostics at
-  `GET /diagnostics/providers`, including live API/local endpoint reachability
-  probes and OpenClaw gateway `health` RPC probes when `probe=live`
+  `GET /diagnostics/providers`, including live API/local transport-native
+  auth/model probes and OpenClaw gateway `health` RPC probes when `probe=live`
 - Reuses the same agent-backend runtime options for OpenClaw gateway
   `models.list` discovery, so provider model catalogs and diagnostics can
   expose canonical `provider/model` refs instead of config-only fallback data
@@ -572,10 +572,10 @@ src/
 13. Startup/readiness state is exposed over `GET /health`, while
    `GET /diagnostics/health`, `GET /diagnostics/runtime`, and
    `GET /diagnostics/providers` expose the runtime-owned host integration
-   surface, including runtime maintenance snapshots plus live endpoint
-   reachability, additive HTTP semantic classifications, and additive
-   model-catalog/configured-model readiness checks for API/local/agent targets
-   when requested
+   surface, including runtime maintenance snapshots plus transport-native
+   API/local auth/model probe requests, additive HTTP semantic classifications,
+   and additive model-catalog/configured-model readiness checks for
+   API/local/agent targets when requested
 14. `POST /mcp` reuses those same runtime-owned services as an additive
     orchestrator/tool surface
 15. Optional machine-readable process output emits startup and shutdown

@@ -42,12 +42,29 @@ type DiagnosticStatus = HealthStatus['status'];
 type DiagnosticsProbeMode = 'light' | 'live';
 const DIAGNOSTIC_BACKENDS: readonly BackendKind[] = ['cli', 'api', 'local', 'agent'];
 const DEFAULT_REMOTE_ENDPOINT_PROBE_TIMEOUT_MS = 5_000;
+type RemoteProbeAuthMode = 'none' | 'bearer' | 'x-api-key' | 'x-goog-api-key';
+type RemoteProbeTarget = 'endpoint' | 'models' | 'model_tags';
 
 interface DiagnosticCheck {
   code: string;
   status: DiagnosticStatus;
   message: string;
   details?: Record<string, unknown>;
+}
+
+interface RemoteProbeRequest {
+  url: string;
+  displayUrl: string;
+  method: 'GET';
+  headers: Record<string, string>;
+  headerNames: string[];
+  target: RemoteProbeTarget;
+  auth: {
+    mode: RemoteProbeAuthMode;
+    required: boolean;
+    applied: boolean;
+    credentialEnv?: string;
+  };
 }
 
 interface ProviderDiagnosticAvailability {
@@ -166,26 +183,35 @@ function buildEnvDescriptor(
   };
 }
 
-function getRemoteEndpoint(instance: RemoteProviderInstanceConfig): string | null {
+function getRemoteEndpoint(
+  instance: RemoteProviderInstanceConfig,
+  env?: Readonly<NodeJS.ProcessEnv>,
+): string | null {
+  const resolvedUrl = instance.urlEnv && env?.[instance.urlEnv]
+    ? env[instance.urlEnv]!
+    : instance.url;
+  const resolvedBaseUrl = instance.baseUrlEnv && env?.[instance.baseUrlEnv]
+    ? env[instance.baseUrlEnv]!
+    : instance.baseUrl;
   if (instance.transport === 'openclaw' || instance.transport === 'openclaw_gateway') {
-    return instance.url || instance.baseUrl || null;
+    return resolvedUrl || resolvedBaseUrl || null;
   }
   if (instance.transport === 'agent_sdk' || instance.transport === 'agent_sdk_bridge') {
-    return instance.baseUrl || 'http://127.0.0.1:8082';
+    return resolvedBaseUrl || 'http://127.0.0.1:8082';
   }
   if (instance.transport === 'anthropic') {
-    return instance.baseUrl || 'https://api.anthropic.com';
+    return resolvedBaseUrl || 'https://api.anthropic.com';
   }
   if (instance.transport === 'openai') {
-    return instance.baseUrl || 'https://api.openai.com';
+    return resolvedBaseUrl || 'https://api.openai.com';
   }
   if (instance.transport === 'google' || instance.transport === 'gemini') {
-    return instance.baseUrl || 'https://generativelanguage.googleapis.com';
+    return resolvedBaseUrl || 'https://generativelanguage.googleapis.com';
   }
   if (instance.transport === 'ollama') {
-    return instance.baseUrl || 'http://127.0.0.1:11434';
+    return resolvedBaseUrl || 'http://127.0.0.1:11434';
   }
-  return instance.baseUrl || instance.url || null;
+  return resolvedBaseUrl || resolvedUrl || null;
 }
 
 function createCheck(
@@ -197,6 +223,134 @@ function createCheck(
   return { code, status, message, details };
 }
 
+function sanitizeDiagnosticUrl(rawUrl: string): string {
+  const url = new URL(rawUrl);
+  url.username = '';
+  url.password = '';
+  for (const key of [...url.searchParams.keys()]) {
+    url.searchParams.set(key, '[redacted]');
+  }
+  return url.toString();
+}
+
+function endsWithPathSegments(pathSegments: string[], suffixSegments: string[]): boolean {
+  if (suffixSegments.length > pathSegments.length) {
+    return false;
+  }
+
+  return suffixSegments.every((segment, index) =>
+    pathSegments[pathSegments.length - suffixSegments.length + index] === segment,
+  );
+}
+
+function appendProbePath(
+  endpoint: string,
+  baseSegments: readonly string[],
+  fullSegments: readonly string[],
+): string {
+  const url = new URL(endpoint);
+  const pathSegments = url.pathname.split('/').filter(Boolean);
+  let resolvedSegments = [...pathSegments];
+
+  if (!endsWithPathSegments(pathSegments, [...fullSegments])) {
+    if (endsWithPathSegments(pathSegments, [...baseSegments])) {
+      resolvedSegments = [
+        ...pathSegments,
+        ...fullSegments.slice(baseSegments.length),
+      ];
+    } else {
+      resolvedSegments = [
+        ...pathSegments,
+        ...fullSegments,
+      ];
+    }
+  }
+
+  url.pathname = `/${resolvedSegments.join('/')}`;
+  return url.toString();
+}
+
+function hasAppliedAuthHeader(headers: Record<string, string>): boolean {
+  return Object.keys(headers).some((headerName) => {
+    const normalized = headerName.toLowerCase();
+    return normalized === 'authorization'
+      || normalized === 'x-api-key'
+      || normalized === 'x-goog-api-key';
+  });
+}
+
+function buildRemoteProbeRequest(
+  instance: RemoteProviderInstanceConfig,
+  env: Readonly<NodeJS.ProcessEnv>,
+): RemoteProbeRequest | null {
+  const endpoint = getRemoteEndpoint(instance, env);
+  if (!endpoint) {
+    return null;
+  }
+
+  const requiresApiKey = instance.transport === 'anthropic'
+    || instance.transport === 'openai'
+    || instance.transport === 'google'
+    || instance.transport === 'gemini';
+  let url = endpoint;
+  let target: RemoteProbeTarget = 'endpoint';
+  let authMode: RemoteProbeAuthMode = 'none';
+  const headers: Record<string, string> = {};
+
+  if (instance.transport === 'anthropic') {
+    url = appendProbePath(endpoint, ['v1'], ['v1', 'models']);
+    target = 'models';
+    authMode = 'x-api-key';
+    if (instance.apiKeyEnv && env[instance.apiKeyEnv]) {
+      headers['x-api-key'] = env[instance.apiKeyEnv]!;
+    }
+    headers['anthropic-version'] = '2023-06-01';
+  } else if (instance.transport === 'openai') {
+    url = appendProbePath(endpoint, ['v1'], ['v1', 'models']);
+    target = 'models';
+    authMode = 'bearer';
+    if (instance.apiKeyEnv && env[instance.apiKeyEnv]) {
+      headers.authorization = `Bearer ${env[instance.apiKeyEnv]!}`;
+    }
+    if (instance.organizationEnv && env[instance.organizationEnv]) {
+      headers['OpenAI-Organization'] = env[instance.organizationEnv]!;
+    }
+    if (instance.projectEnv && env[instance.projectEnv]) {
+      headers['OpenAI-Project'] = env[instance.projectEnv]!;
+    }
+  } else if (instance.transport === 'google' || instance.transport === 'gemini') {
+    url = appendProbePath(endpoint, ['v1beta'], ['v1beta', 'models']);
+    target = 'models';
+    authMode = 'x-goog-api-key';
+    if (instance.apiKeyEnv && env[instance.apiKeyEnv]) {
+      headers['x-goog-api-key'] = env[instance.apiKeyEnv]!;
+    }
+  } else if (instance.transport === 'ollama') {
+    url = appendProbePath(endpoint, ['api'], ['api', 'tags']);
+    target = 'model_tags';
+  }
+
+  const mergedHeaders = {
+    ...headers,
+    ...instance.headers,
+  };
+
+  return {
+    url,
+    displayUrl: sanitizeDiagnosticUrl(url),
+    method: 'GET',
+    headers: mergedHeaders,
+    headerNames: Object.keys(mergedHeaders).sort(),
+    target,
+    auth: {
+      mode: authMode,
+      required: requiresApiKey,
+      applied: hasAppliedAuthHeader(mergedHeaders),
+      ...(instance.apiKeyEnv ? { credentialEnv: instance.apiKeyEnv } : {}),
+    },
+  };
+}
+
 function classifyRemoteLiveProbe(
   target: ProviderTargetDescriptor,
   probe: {
@@ -206,6 +360,9 @@ function classifyRemoteLiveProbe(
     latencyMs: number;
     timedOut: boolean;
     message: string;
+    target: RemoteProbeTarget;
+    authenticated: boolean;
+    headerNames: string[];
   },
 ): {
     classification: string;
@@ -219,6 +376,9 @@ function classifyRemoteLiveProbe(
 
   const details = {
     url: probe.url,
+    target: probe.target,
+    authenticated: probe.authenticated,
+    headerNames: probe.headerNames,
     ...(probe.statusCode !== undefined ? { statusCode: probe.statusCode } : {}),
     latencyMs: probe.latencyMs,
   };
@@ -602,7 +762,7 @@ async function diagnoseAgentTarget(
   const config: Record<string, unknown> = {
     transport: instance.transport,
     model: instance.model || null,
-    endpoint: getRemoteEndpoint(instance),
+    endpoint: getRemoteEndpoint(instance, env),
     credentials: {
       urlEnv: buildEnvDescriptor(env, instance.urlEnv, false),
       baseUrlEnv: buildEnvDescriptor(env, instance.baseUrlEnv, false),
@@ -700,7 +860,7 @@ async function diagnoseRemoteConfigOnly(
   }
 
   const checks: DiagnosticCheck[] = [];
-  const endpoint = getRemoteEndpoint(instance);
+  const endpoint = getRemoteEndpoint(instance, env);
   const requiresApiKey = instance.transport === 'anthropic'
     || instance.transport === 'openai'
     || instance.transport === 'google'
@@ -712,7 +872,16 @@ async function diagnoseRemoteConfigOnly(
     endpoint,
     credentials: {
       apiKeyEnv: apiKey,
+      ...(instance.baseUrlEnv
+        ? { baseUrlEnv: buildEnvDescriptor(env, instance.baseUrlEnv, false) }
+        : {}),
       authTokenEnv: buildEnvDescriptor(env, instance.authTokenEnv, false),
+      ...(instance.organizationEnv
+        ? { organizationEnv: buildEnvDescriptor(env, instance.organizationEnv, false) }
+        : {}),
+      ...(instance.projectEnv
+        ? { projectEnv: buildEnvDescriptor(env, instance.projectEnv, false) }
+        : {}),
     },
   };
 
@@ -729,11 +898,54 @@ async function diagnoseRemoteConfigOnly(
   }
 
   if (probeMode === 'live' && endpoint) {
-    const liveProbe = await probeRemoteEndpoint(endpoint, instance.transport);
+    const probeRequest = buildRemoteProbeRequest(instance, env);
+    if (probeRequest) {
+      checks.push(
+        createCheck(
+          probeRequest.auth.applied ? 'live_probe_authenticated' : 'live_probe_unauthenticated',
+          probeRequest.auth.required && !probeRequest.auth.applied ? 'degraded' : 'ok',
+          probeRequest.auth.applied
+            ? `Live probe for ${target.providerName}/${target.instanceId} will use ${probeRequest.auth.mode} auth against ${probeRequest.target}`
+            : probeRequest.auth.required
+              ? `Live probe for ${target.providerName}/${target.instanceId} is running without required ${probeRequest.auth.mode} credentials`
+              : `Live probe for ${target.providerName}/${target.instanceId} does not require provider auth`,
+          {
+            url: probeRequest.displayUrl,
+            target: probeRequest.target,
+            headerNames: probeRequest.headerNames,
+            authentication: {
+              mode: probeRequest.auth.mode,
+              required: probeRequest.auth.required,
+              applied: probeRequest.auth.applied,
+            },
+          },
+        ),
+      );
+    }
+    const liveProbe = await probeRemoteEndpoint(probeRequest || {
+      url: endpoint,
+      displayUrl: sanitizeDiagnosticUrl(endpoint),
+      method: 'GET',
+      headers: {},
+      headerNames: [],
+      target: 'endpoint',
+      auth: {
+        mode: 'none',
+        required: false,
+        applied: false,
+      },
+    });
     const classifiedLiveProbe = classifyRemoteLiveProbe(target, liveProbe);
     config.liveProbe = {
       url: liveProbe.url,
-      method: 'GET',
+      method: liveProbe.method,
+      target: liveProbe.target,
+      headerNames: liveProbe.headerNames,
+      authentication: {
+        mode: liveProbe.authMode,
+        required: liveProbe.authRequired,
+        applied: liveProbe.authenticated,
+      },
       reachable: liveProbe.reachable,
       ...(liveProbe.statusCode !== undefined ? { statusCode: liveProbe.statusCode } : {}),
       latencyMs: liveProbe.latencyMs,
@@ -749,6 +961,9 @@ async function diagnoseRemoteConfigOnly(
           : liveProbe.message,
         {
           url: liveProbe.url,
+          target: liveProbe.target,
+          authenticated: liveProbe.authenticated,
+          headerNames: liveProbe.headerNames,
           ...(liveProbe.statusCode !== undefined ? { statusCode: liveProbe.statusCode } : {}),
           latencyMs: liveProbe.latencyMs,
           ...(liveProbe.timedOut ? { timedOut: true } : {}),
@@ -1244,45 +1459,62 @@ function buildPeerGuardrailDiagnostics(
 }
 
 async function probeRemoteEndpoint(
-  endpoint: string,
-  transport: string | undefined,
+  request: RemoteProbeRequest,
 ): Promise<{
     url: string;
+    method: 'GET';
+    target: RemoteProbeTarget;
+    headerNames: string[];
+    authenticated: boolean;
+    authMode: RemoteProbeAuthMode;
+    authRequired: boolean;
     reachable: boolean;
     statusCode?: number;
     latencyMs: number;
     timedOut: boolean;
     message: string;
   }> {
-  const url = resolveRemoteProbeUrl(endpoint, transport);
   const startedAt = Date.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DEFAULT_REMOTE_ENDPOINT_PROBE_TIMEOUT_MS);
 
   try {
-    const response = await fetch(url, {
-      method: 'GET',
+    const response = await fetch(request.url, {
+      method: request.method,
+      ...(request.headerNames.length > 0 ? { headers: request.headers } : {}),
       signal: controller.signal,
     });
     const latencyMs = Date.now() - startedAt;
     return {
-      url,
+      url: request.displayUrl,
+      method: request.method,
+      target: request.target,
+      headerNames: request.headerNames,
+      authenticated: request.auth.applied,
+      authMode: request.auth.mode,
+      authRequired: request.auth.required,
       reachable: true,
       statusCode: response.status,
       latencyMs,
       timedOut: false,
-      message: `Live probe reached '${url}' (HTTP ${response.status}).`,
+      message: `Live probe reached '${request.displayUrl}' (HTTP ${response.status}).`,
     };
   } catch (error) {
     const timedOut = error instanceof Error && error.name === 'AbortError';
     const latencyMs = Date.now() - startedAt;
     return {
-      url,
+      url: request.displayUrl,
+      method: request.method,
+      target: request.target,
+      headerNames: request.headerNames,
+      authenticated: request.auth.applied,
+      authMode: request.auth.mode,
+      authRequired: request.auth.required,
       reachable: false,
       latencyMs,
       timedOut,
       message: timedOut
-        ? `Timed out while probing '${url}'.`
+        ? `Timed out while probing '${request.displayUrl}'.`
         : error instanceof Error
           ? error.message
           : String(error),
@@ -1290,12 +1522,4 @@ async function probeRemoteEndpoint(
   } finally {
     clearTimeout(timeout);
   }
-}
-
-function resolveRemoteProbeUrl(endpoint: string, transport: string | undefined): string {
-  const url = new URL(endpoint);
-  if (transport === 'ollama') {
-    url.pathname = url.pathname.replace(/\/$/, '') + '/api/tags';
-  }
-  return url.toString();
 }

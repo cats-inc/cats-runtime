@@ -334,14 +334,20 @@ describe('provider diagnostics HTTP contract', () => {
     }));
   });
 
-  it('runs live endpoint probes for API and local targets when requested', async () => {
-    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+  it('runs transport-native live probes for Anthropic and Ollama targets', async () => {
+    const fetchMock = vi.fn(async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
       const url = typeof input === 'string'
         ? input
         : input instanceof URL
           ? input.toString()
           : input.url;
-      if (url === 'https://api.anthropic.test/v1') {
+      if (url === 'https://api.anthropic.test/v1/models') {
+        const headers = new Headers(init?.headers);
+        expect(headers.get('anthropic-version')).toBe('2023-06-01');
+        expect(headers.has('x-api-key')).toBe(false);
         return new Response('', { status: 401 });
       }
       if (url === 'http://127.0.0.1:11434/api/tags') {
@@ -415,10 +421,27 @@ describe('provider diagnostics HTTP contract', () => {
                 status: 'unavailable',
               }),
               expect.objectContaining({
+                code: 'live_probe_unauthenticated',
+                status: 'degraded',
+                details: expect.objectContaining({
+                  url: 'https://api.anthropic.test/v1/models',
+                  target: 'models',
+                  headerNames: ['anthropic-version'],
+                  authentication: expect.objectContaining({
+                    mode: 'x-api-key',
+                    required: true,
+                    applied: false,
+                  }),
+                }),
+              }),
+              expect.objectContaining({
                 code: 'endpoint_reachable',
                 status: 'ok',
                 details: expect.objectContaining({
-                  url: 'https://api.anthropic.test/v1',
+                  url: 'https://api.anthropic.test/v1/models',
+                  target: 'models',
+                  authenticated: false,
+                  headerNames: ['anthropic-version'],
                   statusCode: 401,
                 }),
               }),
@@ -426,14 +449,24 @@ describe('provider diagnostics HTTP contract', () => {
                 code: 'endpoint_auth_required',
                 status: 'unavailable',
                 details: expect.objectContaining({
-                  url: 'https://api.anthropic.test/v1',
+                  url: 'https://api.anthropic.test/v1/models',
+                  target: 'models',
+                  authenticated: false,
+                  headerNames: ['anthropic-version'],
                   statusCode: 401,
                 }),
               }),
             ]),
             config: expect.objectContaining({
               liveProbe: expect.objectContaining({
-                url: 'https://api.anthropic.test/v1',
+                url: 'https://api.anthropic.test/v1/models',
+                target: 'models',
+                headerNames: ['anthropic-version'],
+                authentication: expect.objectContaining({
+                  mode: 'x-api-key',
+                  required: true,
+                  applied: false,
+                }),
                 reachable: true,
                 statusCode: 401,
                 classification: 'auth_required',
@@ -475,6 +508,9 @@ describe('provider diagnostics HTTP contract', () => {
                 status: 'ok',
                 details: expect.objectContaining({
                   url: 'http://127.0.0.1:11434/api/tags',
+                  target: 'model_tags',
+                  authenticated: false,
+                  headerNames: [],
                   statusCode: 200,
                 }),
               }),
@@ -503,6 +539,13 @@ describe('provider diagnostics HTTP contract', () => {
             config: expect.objectContaining({
               liveProbe: expect.objectContaining({
                 url: 'http://127.0.0.1:11434/api/tags',
+                target: 'model_tags',
+                headerNames: [],
+                authentication: expect.objectContaining({
+                  mode: 'none',
+                  required: false,
+                  applied: false,
+                }),
                 reachable: true,
                 statusCode: 200,
                 classification: 'http_ok',
@@ -527,14 +570,24 @@ describe('provider diagnostics HTTP contract', () => {
     }
   });
 
-  it('classifies remote live probe HTTP semantics beyond basic reachability', async () => {
-    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+  it('classifies OpenAI live probes with transport-native auth headers', async () => {
+    vi.stubEnv('OPENAI_API_KEY', 'test-openai-secret');
+    vi.stubEnv('OPENAI_ORG_ID', 'test-openai-org');
+    vi.stubEnv('OPENAI_PROJECT_ID', 'test-openai-project');
+    const fetchMock = vi.fn(async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
       const url = typeof input === 'string'
         ? input
         : input instanceof URL
           ? input.toString()
           : input.url;
-      if (url === 'https://api.openai.test/v1') {
+      if (url === 'https://api.openai.test/v1/models') {
+        const headers = new Headers(init?.headers);
+        expect(headers.get('authorization')).toBe('Bearer test-openai-secret');
+        expect(headers.get('OpenAI-Organization')).toBe('test-openai-org');
+        expect(headers.get('OpenAI-Project')).toBe('test-openai-project');
         return new Response('', { status: 429 });
       }
       throw new Error(`Unexpected live probe URL: ${url}`);
@@ -556,6 +609,8 @@ describe('provider diagnostics HTTP contract', () => {
                 transport: 'openai',
                 baseUrl: 'https://api.openai.test/v1',
                 apiKeyEnv: 'OPENAI_API_KEY',
+                organizationEnv: 'OPENAI_ORG_ID',
+                projectEnv: 'OPENAI_PROJECT_ID',
                 model: 'gpt-5.4',
               },
             },
@@ -569,25 +624,49 @@ describe('provider diagnostics HTTP contract', () => {
         '/diagnostics/providers?probe=live&provider=codex&backend=api&instance=default',
       );
       expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      const responseText = await response.text();
+      expect(responseText).not.toContain('test-openai-secret');
+      expect(responseText).not.toContain('test-openai-org');
+      expect(responseText).not.toContain('test-openai-project');
+      expect(JSON.parse(responseText)).toEqual(expect.objectContaining({
         providers: [
           expect.objectContaining({
             provider: 'codex',
             backend: 'api',
             instance: 'default',
             availability: expect.objectContaining({
-              status: 'unavailable',
+              status: 'degraded',
               attentionCodes: expect.arrayContaining([
-                'api_key_present',
                 'endpoint_rate_limited',
               ]),
             }),
             checks: expect.arrayContaining([
               expect.objectContaining({
+                code: 'api_key_present',
+                status: 'ok',
+              }),
+              expect.objectContaining({
+                code: 'live_probe_authenticated',
+                status: 'ok',
+                details: expect.objectContaining({
+                  url: 'https://api.openai.test/v1/models',
+                  target: 'models',
+                  headerNames: ['OpenAI-Organization', 'OpenAI-Project', 'authorization'],
+                  authentication: expect.objectContaining({
+                    mode: 'bearer',
+                    required: true,
+                    applied: true,
+                  }),
+                }),
+              }),
+              expect.objectContaining({
                 code: 'endpoint_reachable',
                 status: 'ok',
                 details: expect.objectContaining({
-                  url: 'https://api.openai.test/v1',
+                  url: 'https://api.openai.test/v1/models',
+                  target: 'models',
+                  authenticated: true,
+                  headerNames: ['OpenAI-Organization', 'OpenAI-Project', 'authorization'],
                   statusCode: 429,
                 }),
               }),
@@ -595,14 +674,38 @@ describe('provider diagnostics HTTP contract', () => {
                 code: 'endpoint_rate_limited',
                 status: 'degraded',
                 details: expect.objectContaining({
-                  url: 'https://api.openai.test/v1',
+                  url: 'https://api.openai.test/v1/models',
+                  target: 'models',
+                  authenticated: true,
+                  headerNames: ['OpenAI-Organization', 'OpenAI-Project', 'authorization'],
                   statusCode: 429,
                 }),
               }),
             ]),
             config: expect.objectContaining({
+              credentials: expect.objectContaining({
+                apiKeyEnv: expect.objectContaining({
+                  name: 'OPENAI_API_KEY',
+                  present: true,
+                }),
+                organizationEnv: expect.objectContaining({
+                  name: 'OPENAI_ORG_ID',
+                  present: true,
+                }),
+                projectEnv: expect.objectContaining({
+                  name: 'OPENAI_PROJECT_ID',
+                  present: true,
+                }),
+              }),
               liveProbe: expect.objectContaining({
-                url: 'https://api.openai.test/v1',
+                url: 'https://api.openai.test/v1/models',
+                target: 'models',
+                headerNames: ['OpenAI-Organization', 'OpenAI-Project', 'authorization'],
+                authentication: expect.objectContaining({
+                  mode: 'bearer',
+                  required: true,
+                  applied: true,
+                }),
                 reachable: true,
                 statusCode: 429,
                 classification: 'rate_limited',
@@ -612,6 +715,136 @@ describe('provider diagnostics HTTP contract', () => {
         ],
       }));
     } finally {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('uses transport-native Gemini model probes without leaking api keys', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-gemini-secret');
+    vi.stubEnv('GEMINI_BASE_URL', 'https://generativelanguage.test');
+    const fetchMock = vi.fn(async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      const url = typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+      if (url === 'https://generativelanguage.test/v1beta/models') {
+        const headers = new Headers(init?.headers);
+        expect(headers.get('x-goog-api-key')).toBe('test-gemini-secret');
+        return new Response(JSON.stringify({ models: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`Unexpected live probe URL: ${url}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const app = createTestApp(makeConfig({
+        providerDefaultTargets: {
+          gemini: { backend: 'api', instance: 'default' },
+        },
+        remoteProviderCatalog: {
+          api: {
+            gemini: {
+              default: {
+                id: 'default',
+                providerName: 'gemini',
+                backend: 'api',
+                transport: 'gemini',
+                baseUrlEnv: 'GEMINI_BASE_URL',
+                apiKeyEnv: 'GEMINI_API_KEY',
+                model: 'gemini-2.5-pro',
+              },
+            },
+          },
+          local: {},
+          agent: {},
+        },
+      }));
+
+      const response = await app.request(
+        '/diagnostics/providers?probe=live&provider=gemini&backend=api&instance=default',
+      );
+      expect(response.status).toBe(200);
+      const responseText = await response.text();
+      expect(responseText).not.toContain('test-gemini-secret');
+      const payload = JSON.parse(responseText) as {
+        providers: Array<Record<string, unknown>>;
+      };
+      expect(payload).toEqual(expect.objectContaining({
+        providers: [
+          expect.objectContaining({
+            provider: 'gemini',
+            backend: 'api',
+            instance: 'default',
+            availability: expect.objectContaining({
+              status: 'ok',
+              probe: 'live',
+            }),
+            checks: expect.arrayContaining([
+              expect.objectContaining({
+                code: 'api_key_present',
+                status: 'ok',
+              }),
+              expect.objectContaining({
+                code: 'live_probe_authenticated',
+                status: 'ok',
+                details: expect.objectContaining({
+                  url: 'https://generativelanguage.test/v1beta/models',
+                  target: 'models',
+                  headerNames: ['x-goog-api-key'],
+                }),
+              }),
+              expect.objectContaining({
+                code: 'endpoint_reachable',
+                status: 'ok',
+                details: expect.objectContaining({
+                  url: 'https://generativelanguage.test/v1beta/models',
+                  target: 'models',
+                  authenticated: true,
+                  headerNames: ['x-goog-api-key'],
+                  statusCode: 200,
+                }),
+              }),
+            ]),
+            config: expect.objectContaining({
+              endpoint: 'https://generativelanguage.test',
+              credentials: expect.objectContaining({
+                baseUrlEnv: expect.objectContaining({
+                  name: 'GEMINI_BASE_URL',
+                  present: true,
+                }),
+              }),
+              liveProbe: expect.objectContaining({
+                url: 'https://generativelanguage.test/v1beta/models',
+                target: 'models',
+                headerNames: ['x-goog-api-key'],
+                authentication: expect.objectContaining({
+                  mode: 'x-goog-api-key',
+                  required: true,
+                  applied: true,
+                }),
+                reachable: true,
+                statusCode: 200,
+                classification: 'http_ok',
+              }),
+              modelCatalog: expect.objectContaining({
+                source: 'config',
+                defaultModel: 'gemini-2.5-pro',
+                modelCount: 1,
+              }),
+            }),
+          }),
+        ],
+      }));
+    } finally {
+      vi.unstubAllEnvs();
       vi.unstubAllGlobals();
     }
   });
