@@ -529,6 +529,34 @@ describe('agent backend integration', () => {
     }
   });
 
+  it('keeps agent tooling ownership honest on the provider tooling route', async () => {
+    const { config, env, cleanup } = createAgentConfigRoot();
+    const runtime = createRuntimeServer(config, {
+      agentBackend: {
+        env,
+        webSocketFactory: createFakeWebSocketFactory([], []),
+      },
+    });
+
+    try {
+      const response = await runtime.app.request('/providers/openclaw/tools?instance=agent/gateway');
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        provider: 'openclaw',
+        backend: 'agent',
+        instance: 'gateway',
+        target: 'agent/gateway',
+        source: 'provider_managed',
+        discoverable: false,
+        sessionScopedOverrides: false,
+        summary: expect.stringContaining('external agent runtime'),
+      });
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
   it('loads a dynamic OpenClaw model catalog through the provider models route', async () => {
     const { config, env, cleanup } = createAgentConfigRoot({
       model: 'anthropic/claude-test-a',

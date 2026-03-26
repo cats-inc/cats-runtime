@@ -677,6 +677,9 @@ For host-side setup or Settings surfaces, use:
   runtime-owned `activeConfig` hints such as Goose's detected local
   provider/model selection, plus bounded `tooling` summaries showing whether a
   target uses runtime-managed local tools or provider-owned tooling
+- `GET /providers/{provider}/tools` when a setup or operator flow needs the
+  standalone bounded tooling view for one resolved target without fetching the
+  full provider topology
 - `GET /providers/{provider}/models` when a setup or repair flow needs the
   runtime-owned resolved model catalog; auth-ready API targets now use remote
   vendor model listing before falling back to configured/default metadata

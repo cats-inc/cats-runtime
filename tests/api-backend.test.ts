@@ -268,6 +268,53 @@ describe('API backend integration', () => {
     }
   });
 
+  it('exposes runtime-owned tooling policy for API and local targets', async () => {
+    const { config, cleanup } = createApiConfigRoot();
+    const runtime = createRuntimeServer(config);
+
+    try {
+      const apiResponse = await runtime.app.request('/providers/claude/tools?instance=api/sonnet');
+      expect(apiResponse.status).toBe(200);
+      await expect(apiResponse.json()).resolves.toEqual({
+        provider: 'claude',
+        backend: 'api',
+        instance: 'sonnet',
+        target: 'api/sonnet',
+        source: 'runtime_local',
+        discoverable: true,
+        sessionScopedOverrides: true,
+        summary: expect.stringContaining(`'standard' profile`),
+        policy: expect.objectContaining({
+          profile: 'standard',
+          counts: {
+            total: 28,
+            fullAccess: 28,
+            previewOnly: 0,
+            blocked: 0,
+          },
+        }),
+      });
+
+      const localResponse = await runtime.app.request('/providers/ollama/tools?instance=local/local');
+      expect(localResponse.status).toBe(200);
+      await expect(localResponse.json()).resolves.toEqual(expect.objectContaining({
+        provider: 'ollama',
+        backend: 'local',
+        instance: 'local',
+        target: 'local/local',
+        source: 'runtime_local',
+        discoverable: true,
+        sessionScopedOverrides: true,
+        policy: expect.objectContaining({
+          profile: 'standard',
+        }),
+      }));
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
   it('runs local tools through Codex/OpenAI sessions and supports read_only mode', async () => {
     const { config, env, cleanup } = createApiConfigRoot();
     let openAiCalls = 0;

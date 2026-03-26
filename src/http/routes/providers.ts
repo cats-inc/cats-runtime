@@ -3,6 +3,7 @@ import {
   isProviderTargetResolutionError,
   listConfiguredProviders,
   listProviderCatalog,
+  resolveProviderTarget,
 } from '../../core/providerCatalog.js';
 import { inspectProviderActiveConfig } from '../../core/providerActiveConfig.js';
 import type { ProviderName } from '../../backends/cli/providers/types.js';
@@ -85,6 +86,35 @@ providerRoutes.get('/providers/:provider/models', async (c) => {
   } catch (err) {
     const payload: Record<string, unknown> = {
       error: `Failed to inspect provider models: ${err}`,
+    };
+    if (isProviderTargetResolutionError(err)) {
+      payload.code = err.code;
+    }
+
+    return c.json(
+      payload,
+      getRouteErrorStatus(err),
+    );
+  }
+});
+
+providerRoutes.get('/providers/:provider/tools', (c) => {
+  const ctx = c.get('ctx' as never) as AppContext;
+  const providerName = c.req.param('provider');
+  const instance = c.req.query('instance') || undefined;
+
+  try {
+    const target = resolveProviderTarget(ctx.config, providerName, instance);
+    return c.json({
+      provider: target.providerName,
+      backend: target.backend,
+      instance: target.instanceId,
+      target: `${target.backend}/${target.instanceId}`,
+      ...buildProviderToolingSummary(target),
+    });
+  } catch (err) {
+    const payload: Record<string, unknown> = {
+      error: `Failed to inspect provider tools: ${err}`,
     };
     if (isProviderTargetResolutionError(err)) {
       payload.code = err.code;

@@ -1405,6 +1405,51 @@ backends:
     });
   });
 
+  it('GET /providers/:provider/tools keeps CLI tooling ownership honest', async () => {
+    await withRuntime({
+      providerDefaultInstances: {
+        cursor: 'ubuntu',
+      },
+      providerInstances: {
+        auggie: {},
+        claude: {},
+        codex: {},
+        copilot: {},
+        cursor: {
+          ubuntu: {
+            id: 'ubuntu',
+            providerName: 'cursor',
+            commandConfig: {
+              path: 'cursor-agent',
+              runner: 'auto',
+              runtime: { mode: 'wsl', distro: 'Ubuntu', environmentId: 'ubuntu' },
+            },
+            cursorChatsDir: '/wsl/ubuntu/.cursor/chats',
+          },
+        },
+        gemini: {},
+        goose: {},
+        junie: {},
+        kiro: {},
+        opencode: {},
+        pi: {},
+      },
+    }, {}, async (runtime) => {
+      const response = await runtime.app.request('/providers/cursor/tools?instance=cli/ubuntu');
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        provider: 'cursor',
+        backend: 'cli',
+        instance: 'ubuntu',
+        target: 'cli/ubuntu',
+        source: 'provider_native',
+        discoverable: false,
+        sessionScopedOverrides: false,
+        summary: expect.stringContaining('provider-native tools'),
+      });
+    });
+  });
+
   it('GET /providers/config returns configured provider instances for the dashboard', async () => {
     await withRuntime({
       providerDefaultInstances: {

@@ -2083,6 +2083,7 @@ GET /diagnostics/peers
 GET /pool/status
 GET /discovery/status
 GET /providers/config
+GET /providers/{provider}/tools
 GET /providers/{provider}/models
 GET /skills/catalog
 GET /browse?path=...
@@ -2432,6 +2433,39 @@ Each instance entry also exposes additive `tooling` metadata:
 - `policy`: for API/local targets only, the bounded runtime tool-profile
   inspection (`profile`, counts, and per-tool access classification) before any
   session-level permission narrowing
+
+`GET /providers/{provider}/tools` is the standalone runtime-owned tooling read
+surface for one resolved target. It accepts optional `?instance=<backend/id>`
+and returns the same bounded tooling summary without forcing hosts to fetch the
+full provider topology:
+
+```json
+{
+  "provider": "claude",
+  "backend": "api",
+  "instance": "sonnet",
+  "target": "api/sonnet",
+  "source": "runtime_local",
+  "discoverable": true,
+  "sessionScopedOverrides": true,
+  "summary": "Runtime-managed local tools default to the 'standard' profile (28 tool(s)) before per-session permission narrowing.",
+  "policy": {
+    "profile": "standard",
+    "permissionMode": "skip",
+    "whitelistActive": false,
+    "counts": {
+      "total": 28,
+      "fullAccess": 28,
+      "previewOnly": 0,
+      "blocked": 0
+    }
+  }
+}
+```
+
+For CLI and agent targets the route stays honest: it still returns `200`, but
+`source` becomes `provider_native` or `provider_managed`, `discoverable` stays
+`false`, and no synthetic runtime tool catalog is invented.
 
 For CLI backends, instance entries also expose runtime-owned `install` metadata
 even before a probe has run. The `install` object includes:
