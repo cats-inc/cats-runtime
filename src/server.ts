@@ -87,6 +87,7 @@ interface RuntimeServerOptions {
   apiBackend?: ApiBackendOptions;
   agentBackend?: AgentBackendOptions;
   startup?: RuntimeStartupState;
+  compatibility?: ProviderCompatibilityService;
 }
 
 interface WatcherSpec {
@@ -770,7 +771,7 @@ export function createRuntimeServer(
       startupTimeoutMs: config.opencodeServerStartupTimeoutMs,
     }),
   );
-  const compatibility = new ProviderCompatibilityService(config);
+  const compatibility = options.compatibility ?? new ProviderCompatibilityService(config);
   const pool = new WorkerPool(
     config,
     registry,

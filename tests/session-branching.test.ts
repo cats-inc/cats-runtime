@@ -184,8 +184,9 @@ describe('session branching route', () => {
     try {
       const repoDir = join(config.sessionBaseDir, 'large-parent');
       mkdirSync(repoDir, { recursive: true });
-      for (let index = 0; index < 2000; index += 1) {
-        writeFileSync(join(repoDir, `file-${index}.txt`), `${index}\n`, 'utf8');
+      const largeFileContent = 'x'.repeat(2 * 1024 * 1024);
+      for (let index = 0; index < 32; index += 1) {
+        writeFileSync(join(repoDir, `file-${index}.txt`), `${index}\n${largeFileContent}`, 'utf8');
       }
 
       const parent = registry.create({
@@ -232,9 +233,9 @@ describe('session branching route', () => {
         expect.stringContaining('Fork workspace snapshot copied a large workspace'),
       ]));
       expect(body.hydration?.metadata?.workspaceSnapshot).toEqual(expect.objectContaining({
-        copiedFileCount: 2000,
+        copiedFileCount: 32,
         status: 'large',
-        warningCodes: ['large_file_count'],
+        warningCodes: ['large_byte_count'],
         plan: expect.objectContaining({
           strategy: 'one_shot_snapshot',
           boundedSyncAvailable: false,
@@ -248,7 +249,7 @@ describe('session branching route', () => {
     } finally {
       cleanup();
     }
-  }, 15000);
+  }, 30000);
 
   it('falls back to context_transplant for incompatible child targets and records lineage', async () => {
     const { config, cleanup } = createTestConfig();

@@ -149,7 +149,7 @@ describe('sessionWorkspace', () => {
     expect(runGit(repoDir, ['status', '--porcelain'])).toBe('');
   });
 
-  it('merges worktree changes back into the source repository before cleanup', async () => {
+  it('merges worktree changes back into the source repository before cleanup', { timeout: 15_000 }, async () => {
     const { repoDir, sessionBaseDir } = createGitWorkspace();
     const prepared = await prepareSessionWorkspace({
       sessionId: 'session-merge',

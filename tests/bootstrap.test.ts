@@ -8,6 +8,7 @@ import {
   shouldEnterBootstrapMode,
   type ConfigInspection,
 } from '../src/core/configInspection.js';
+import { ProviderCompatibilityService } from '../src/core/compatibility/ProviderCompatibilityService.js';
 import { loadConfig } from '../src/core/config.js';
 import { createRuntimeServer } from '../src/server.js';
 import {
@@ -65,6 +66,45 @@ function ensureDirs(env: NodeJS.ProcessEnv): void {
       mkdirSync(env[key]!, { recursive: true });
     }
   }
+}
+
+function createFastCompatibility(env: NodeJS.ProcessEnv): ProviderCompatibilityService {
+  return new ProviderCompatibilityService(loadConfig(env), {
+    runner: {
+      run: async (providerName, _commandConfig, args) => ({
+        exitCode: 0,
+        stdout: args[0] === '--version'
+          ? `${providerName} 1.0.0-test\n`
+          : 'Usage: --help --version\n',
+        stderr: '',
+        timedOut: false,
+        durationMs: 0,
+      }),
+    },
+    installCheckRunner: {
+      lookupCommand: async (command) => ({
+        available: true,
+        resolvedPath: `/runtime/bin/${command}`,
+        timedOut: false,
+      }),
+      checkPath: async () => ({
+        exists: true,
+        timedOut: false,
+      }),
+      checkNpmPackage: async () => ({
+        exists: true,
+        timedOut: false,
+      }),
+      checkShellRcEntry: async () => ({
+        exists: true,
+        timedOut: false,
+      }),
+      getNpmPrefix: async () => ({
+        value: process.platform === 'win32' ? undefined : '/runtime/.npm-global',
+        timedOut: false,
+      }),
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -572,7 +612,10 @@ describe('bootstrap mode server', () => {
       ensureDirs(env);
       const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
       const startup = createRuntimeStartupState({ bootstrapRequired: true });
-      const runtime = createRuntimeServer(config, { startup });
+      const runtime = createRuntimeServer(config, {
+        startup,
+        compatibility: createFastCompatibility(env),
+      });
       try {
         // Run a scan first
         await runtime.app.request('/setup-scan', {
@@ -660,7 +703,10 @@ describe('bootstrap mode server', () => {
       const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
       // Start in bootstrap, scan, then exit bootstrap to verify detail persists
       const startup = createRuntimeStartupState({ bootstrapRequired: true });
-      const runtime = createRuntimeServer(config, { startup });
+      const runtime = createRuntimeServer(config, {
+        startup,
+        compatibility: createFastCompatibility(env),
+      });
       try {
         // Run a scan while still in bootstrap
         await runtime.app.request('/setup-scan', {

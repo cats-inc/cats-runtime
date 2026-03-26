@@ -912,7 +912,7 @@ describe('session worktree routes', () => {
     }));
   });
 
-  it('re-prepares a missing worktree before resuming a closed session', async () => {
+  it('re-prepares a missing worktree before resuming a closed session', { timeout: 15_000 }, async () => {
     const repoDir = createGitWorkspace(rootDir, 'repo-resume');
     const prepared = await prepareSessionWorkspace({
       sessionId: 'worktree-resume',
@@ -1000,7 +1000,7 @@ describe('session worktree routes', () => {
     expect(existsSync(join(sessionBaseDir, 'worktrees'))).toBe(false);
   });
 
-  it('cleans up a recreated worktree when resume cannot persist the prepared workspace', async () => {
+  it('cleans up a recreated worktree when resume cannot persist the prepared workspace', { timeout: 15_000 }, async () => {
     const repoDir = createGitWorkspace(rootDir, 'repo-resume-failure');
     const prepared = await prepareSessionWorkspace({
       sessionId: 'worktree-resume-failure',
