@@ -487,6 +487,10 @@ surface for hosts and dashboards. The response includes:
   request URL, auth application summary, and request header names, while agent
   targets now expose adapter-specific bounded truth such as OpenClaw gateway
   health snapshot counts or Agent SDK provider-registry/model visibility
+- additive `config.toolCatalog` summary metadata for live agent probes when the
+  resolved adapter exposes bounded remote tool discovery, including method,
+  summary, tool/group counts, bounded group metadata, and any temporary load
+  error
 - target-level diagnostics details for CLI, API/local, and agent backends
 
 Agent targets now also include an additive `agent_runtime_contract` check. It
@@ -2618,6 +2622,13 @@ machine-readable remote inventory:
 If a remote catalog probe is supported but temporarily fails, the route still
 returns `200` and includes `catalog.status: "unavailable"` plus a bounded
 error string instead of collapsing the entire tooling inspection surface.
+
+For the same catalog-capable agent targets, `GET /diagnostics/providers?probe=live`
+now also adds bounded remote tool-catalog validation under
+`providers[].config.toolCatalog` plus a matching `tool_catalog_loaded` or
+`tool_catalog_unavailable` diagnostic check. This keeps the heavier semantic
+probe on the diagnostics surface while leaving `GET /providers/{provider}/tools`
+as the full remote inventory read route.
 
 For agent targets, the standalone tooling route also includes the same additive
 `agentRuntime` inspection object used by `GET /providers/config` and

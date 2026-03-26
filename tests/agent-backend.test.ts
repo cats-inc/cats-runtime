@@ -609,6 +609,20 @@ describe('agent backend integration', () => {
                   defaultModel: 'openclaw-coder',
                 }),
               }),
+              expect.objectContaining({
+                code: 'tool_catalog_loaded',
+                status: 'ok',
+                message: '3 tool(s) across 2 group(s) advertised by the OpenClaw gateway.',
+                details: expect.objectContaining({
+                  method: 'tools_catalog',
+                  toolCount: 3,
+                  groupCount: 2,
+                  groups: [
+                    { id: 'core', label: 'Core', toolCount: 2 },
+                    { id: 'plugin:media', label: 'Media', toolCount: 1 },
+                  ],
+                }),
+              }),
             ]),
             config: expect.objectContaining({
               agentRuntime: expect.objectContaining({
@@ -637,6 +651,18 @@ describe('agent backend integration', () => {
                 defaultModel: 'openclaw-coder',
                 modelCount: 3,
               }),
+              toolCatalog: {
+                source: 'provider_remote',
+                status: 'ready',
+                method: 'tools_catalog',
+                summary: '3 tool(s) across 2 group(s) advertised by the OpenClaw gateway.',
+                toolCount: 3,
+                groupCount: 2,
+                groups: [
+                  { id: 'core', label: 'Core', toolCount: 2 },
+                  { id: 'plugin:media', label: 'Media', toolCount: 1 },
+                ],
+              },
             }),
             reprobe: expect.objectContaining({
               liveSupported: true,
@@ -644,9 +670,10 @@ describe('agent backend integration', () => {
           }),
         ],
       }));
-      expect(sentFrames.filter((frame) => frame.method === 'connect')).toHaveLength(2);
+      expect(sentFrames.filter((frame) => frame.method === 'connect')).toHaveLength(3);
       expect(sentFrames.filter((frame) => frame.method === 'health')).toHaveLength(1);
       expect(sentFrames.filter((frame) => frame.method === 'models.list')).toHaveLength(1);
+      expect(sentFrames.filter((frame) => frame.method === 'tools.catalog')).toHaveLength(1);
     } finally {
       await runtime.close();
       cleanup();
@@ -996,6 +1023,15 @@ describe('agent backend integration', () => {
                   status: 'available',
                 }),
               }),
+              expect.objectContaining({
+                code: 'tool_catalog_loaded',
+                status: 'ok',
+                details: expect.objectContaining({
+                  method: 'tools_catalog',
+                  toolCount: 3,
+                  groupCount: 2,
+                }),
+              }),
             ]),
             config: expect.objectContaining({
               agentRuntime: expect.objectContaining({
@@ -1010,13 +1046,21 @@ describe('agent backend integration', () => {
                 modelCount: 2,
                 warnings: [],
               }),
+              toolCatalog: expect.objectContaining({
+                source: 'provider_remote',
+                status: 'ready',
+                method: 'tools_catalog',
+                toolCount: 3,
+                groupCount: 2,
+              }),
             }),
           }),
         ],
       }));
-      expect(sentFrames.filter((frame) => frame.method === 'connect')).toHaveLength(2);
+      expect(sentFrames.filter((frame) => frame.method === 'connect')).toHaveLength(3);
       expect(sentFrames.filter((frame) => frame.method === 'health')).toHaveLength(1);
       expect(sentFrames.filter((frame) => frame.method === 'models.list')).toHaveLength(1);
+      expect(sentFrames.filter((frame) => frame.method === 'tools.catalog')).toHaveLength(1);
     } finally {
       await runtime.close();
       cleanup();

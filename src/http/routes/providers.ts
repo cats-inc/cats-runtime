@@ -11,8 +11,7 @@ import { inspectAgentTarget } from '../../backends/agent/inspection.js';
 import { buildProviderInstallCatalogView } from '../../core/provider-install/knowledge.js';
 import {
   buildProviderToolingSummary,
-  buildProviderRemoteToolCatalog,
-  buildUnavailableProviderRemoteToolCatalog,
+  loadProviderRemoteToolCatalog,
 } from '../../core/tools/providerTooling.js';
 import type { AppContext } from '../app.js';
 import { getProviderCompatibilityService } from '../app.js';
@@ -124,20 +123,10 @@ providerRoutes.get('/providers/:provider/tools', async (c) => {
         ? ctx.agentBackend.inspect(target)
         : inspectAgentTarget(target.remoteInstance, { env: process.env })
       : undefined;
-    const remoteToolDiscoveryMethod = agentRuntime?.transport.toolDiscovery
-      && agentRuntime.transport.toolDiscovery !== 'none'
-      ? agentRuntime.transport.toolDiscovery
-      : 'tools_catalog';
-    const remoteCatalog = target.backend === 'agent'
-      && agentRuntime?.capabilities.toolCatalog === true
-      && ctx.agentBackend
-      ? await ctx.agentBackend.listTools(target)
-        .then((catalog) => buildProviderRemoteToolCatalog(catalog))
-        .catch((error) => buildUnavailableProviderRemoteToolCatalog(
-          remoteToolDiscoveryMethod,
-          error instanceof Error ? error.message : String(error),
-        ))
-      : undefined;
+    const remoteCatalog = await loadProviderRemoteToolCatalog(target, {
+      agentRuntime,
+      agentBackend: ctx.agentBackend,
+    });
     return c.json({
       provider: target.providerName,
       backend: target.backend,

@@ -37,6 +37,24 @@ interface ProviderToolingSummaryOptions {
   remoteCatalog?: ProviderRemoteToolCatalog;
 }
 
+interface ProviderRemoteToolCatalogLoader {
+  listTools(target: ProviderTargetDescriptor): Promise<AgentAdapterToolCatalog>;
+}
+
+interface ProviderRemoteToolCatalogLoadOptions {
+  agentRuntime?: AgentAdapterInspection;
+  agentBackend?: ProviderRemoteToolCatalogLoader;
+}
+
+export function getProviderRemoteToolDiscoveryMethod(
+  agentRuntime?: AgentAdapterInspection,
+): ProviderRemoteToolCatalog['method'] {
+  return agentRuntime?.transport.toolDiscovery
+    && agentRuntime.transport.toolDiscovery !== 'none'
+    ? agentRuntime.transport.toolDiscovery
+    : 'tools_catalog';
+}
+
 export function buildProviderRemoteToolCatalog(
   catalog: AgentAdapterToolCatalog,
 ): ProviderRemoteToolCatalog {
@@ -67,6 +85,32 @@ export function buildUnavailableProviderRemoteToolCatalog(
     tools: [],
     error,
   };
+}
+
+export async function loadProviderRemoteToolCatalog(
+  target: ProviderTargetDescriptor,
+  options: ProviderRemoteToolCatalogLoadOptions = {},
+): Promise<ProviderRemoteToolCatalog | undefined> {
+  if (target.backend !== 'agent' || options.agentRuntime?.capabilities.toolCatalog !== true) {
+    return undefined;
+  }
+
+  const method = getProviderRemoteToolDiscoveryMethod(options.agentRuntime);
+  if (!options.agentBackend) {
+    return buildUnavailableProviderRemoteToolCatalog(
+      method,
+      'Agent backend is not initialized.',
+    );
+  }
+
+  try {
+    return buildProviderRemoteToolCatalog(await options.agentBackend.listTools(target));
+  } catch (error) {
+    return buildUnavailableProviderRemoteToolCatalog(
+      method,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
 }
 
 export function buildProviderToolingSummary(

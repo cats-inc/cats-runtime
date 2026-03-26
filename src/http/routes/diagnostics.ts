@@ -26,7 +26,10 @@ import { inspectProviderActiveConfig } from '../../core/providerActiveConfig.js'
 import { toCompatibilitySummaryView } from '../../core/compatibility/ProviderCompatibilityService.js';
 import type { CompatibilitySummaryView } from '../../core/compatibility/types.js';
 import type { ProviderSetupSummary } from '../../core/provider-install/types.js';
-import { buildProviderToolingSummary } from '../../core/tools/providerTooling.js';
+import {
+  buildProviderToolingSummary,
+  loadProviderRemoteToolCatalog,
+} from '../../core/tools/providerTooling.js';
 import type { HealthStatus } from '../../core/types.js';
 import type { AppContext } from '../app.js';
 import { getProviderCompatibilityService, getRuntimeMeteringService } from '../app.js';
@@ -723,6 +726,36 @@ async function diagnoseAgentTarget(
 
   if (probeMode === 'live') {
     await appendModelCatalogDiagnostics(ctx, target, checks, config);
+    const toolCatalog = await loadProviderRemoteToolCatalog(target, {
+      agentRuntime,
+      agentBackend: ctx.agentBackend,
+    });
+    if (toolCatalog) {
+      config.toolCatalog = {
+        source: toolCatalog.source,
+        status: toolCatalog.status,
+        method: toolCatalog.method,
+        summary: toolCatalog.summary,
+        toolCount: toolCatalog.toolCount,
+        groupCount: toolCatalog.groupCount,
+        groups: toolCatalog.groups.map((group) => ({ ...group })),
+        ...(toolCatalog.error ? { error: toolCatalog.error } : {}),
+      };
+      checks.push(
+        createCheck(
+          toolCatalog.status === 'ready' ? 'tool_catalog_loaded' : 'tool_catalog_unavailable',
+          toolCatalog.status === 'ready' ? 'ok' : 'degraded',
+          toolCatalog.summary,
+          {
+            method: toolCatalog.method,
+            toolCount: toolCatalog.toolCount,
+            groupCount: toolCatalog.groupCount,
+            groups: toolCatalog.groups.map((group) => ({ ...group })),
+            ...(toolCatalog.error ? { error: toolCatalog.error } : {}),
+          },
+        ),
+      );
+    }
   }
 
   return { checks, config };
