@@ -423,7 +423,8 @@ integrate against:
   evidence directory
 - runtime maintenance snapshots under `runtime.maintenance`, including:
   - `worktrees`: orphan-sweep results plus retained-session TTL diagnostics
-  - `browser`: closed-session browser cleanup policy plus the last sweep result
+  - `browser`: browser cleanup policy plus the last sweep result, including
+    background closed-session maintenance and explicit idle-ready cleanup support
 - runtime-wide `wakeups` diagnostics, including:
   - `summary`: aggregate wakeup counts/status for polling and dashboards
   - `timer`: whether the due-wakeup loop is active plus bounded processing limits
@@ -694,7 +695,9 @@ Browser session responses include:
 - `GET /browser/summary`: aggregate session/page counts plus machine-readable
   cleanup candidates
 - `POST /browser/sessions/cleanup`: explicit maintenance route for deleting
-  closed browser sessions without waiting for capacity-pressure pruning
+  closed browser sessions, or idle ready sessions whose known pages are all
+  already closed, without waiting for background maintenance or capacity-pressure
+  pruning
 
 Browser maintenance state is also visible under `GET /diagnostics/runtime` as
 `runtime.maintenance.browser`, so hosts can inspect the active TTL policy and
@@ -712,14 +715,18 @@ cleanup candidates. The response includes:
 - `attachedRuntimeSessionCount`: number of matching browser sessions still
   attached to a runtime session
 - `drivers`: per-driver aggregate counts
-- `cleanupCandidates`: closed-session candidates for explicit cleanup
+- `cleanupCandidates`: explicit cleanup candidates for the requested status
 
 `POST /browser/sessions/cleanup` accepts:
 
 - `driverId`
 - `runtimeSessionId`
 - `olderThanMs`
-- optional `status`, but only `closed` is accepted
+- optional `status`
+  - `closed` targets terminal browser sessions using the same TTL semantics as
+    the background maintenance sweep
+  - `ready` targets idle retained sessions whose recorded page set is non-empty
+    and whose known pages are all already closed
 
 The cleanup response is machine-readable and includes:
 

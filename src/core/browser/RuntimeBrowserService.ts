@@ -123,7 +123,7 @@ export interface RuntimeBrowserCleanupResult {
   filters: {
     driverId?: string;
     runtimeSessionId?: string;
-    status: 'closed';
+    status: RuntimeBrowserSessionView['status'];
     olderThanMs: number;
   };
   matchedSessionCount: number;
@@ -187,7 +187,7 @@ export class RuntimeBrowserService {
     const sessions = this.listStoredSessions(options);
     const cleanupCandidates = this.selectCleanupSessions({
       ...options,
-      status: 'closed',
+      status: options.status ?? 'closed',
       olderThanMs: options.olderThanMs ?? 0,
     });
 
@@ -231,9 +231,10 @@ export class RuntimeBrowserService {
     options: CleanupRuntimeBrowserSessionsOptions = {},
   ): RuntimeBrowserCleanupResult {
     const olderThanMs = Math.max(0, options.olderThanMs ?? 0);
+    const status = options.status ?? 'closed';
     const candidates = this.selectCleanupSessions({
       ...options,
-      status: 'closed',
+      status,
       olderThanMs,
     });
     const matchedPageCount = candidates.reduce((total, session) => total + session.pageIds.length, 0);
@@ -253,7 +254,7 @@ export class RuntimeBrowserService {
       action: 'cleanup_browser_sessions',
       filters: {
         ...buildBrowserSessionFilters(options),
-        status: 'closed',
+        status,
         olderThanMs,
       },
       matchedSessionCount: candidates.length,
@@ -608,10 +609,19 @@ export class RuntimeBrowserService {
   ): StoredBrowserSession[] {
     const olderThanMs = Math.max(0, options.olderThanMs ?? 0);
     const now = this.now().getTime();
+    const status = options.status ?? 'closed';
     return this.listStoredSessions({
       ...options,
-      status: 'closed',
-    }).filter((session) => isClosedBrowserSessionOlderThan(session, olderThanMs, now));
+      status,
+    }).filter((session) => {
+      if (status === 'closed') {
+        return isClosedBrowserSessionOlderThan(session, olderThanMs, now);
+      }
+      if (status === 'ready') {
+        return isIdleReadyBrowserSessionOlderThan(session, this.pages, olderThanMs, now);
+      }
+      return false;
+    });
   }
 
   private loadPersistedState(): void {
@@ -866,6 +876,36 @@ function isClosedBrowserSessionOlderThan(
     return false;
   }
   const referenceTime = Date.parse(session.closedAt || session.updatedAt);
+  if (!Number.isFinite(referenceTime)) {
+    return false;
+  }
+  return now - referenceTime >= olderThanMs;
+}
+
+function isIdleReadyBrowserSessionOlderThan(
+  session: StoredBrowserSession,
+  pages: Map<string, StoredBrowserPage>,
+  olderThanMs: number,
+  now: number,
+): boolean {
+  if (session.status !== 'ready' || session.pageIds.length === 0) {
+    return false;
+  }
+  let sawPage = false;
+  for (const pageId of session.pageIds) {
+    const page = pages.get(pageId);
+    if (!page) {
+      continue;
+    }
+    sawPage = true;
+    if (page.status === 'open') {
+      return false;
+    }
+  }
+  if (!sawPage) {
+    return false;
+  }
+  const referenceTime = Date.parse(session.updatedAt);
   if (!Number.isFinite(referenceTime)) {
     return false;
   }

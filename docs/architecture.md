@@ -211,7 +211,8 @@ src/
 - Exposes runtime-owned browser session/page routes with pluggable driver
   metadata, normalized `browser_page` preview surfaces, aggregate browser
   summary reads, explicit in-place page navigation/update, and explicit
-  closed-session cleanup
+  cleanup for both closed sessions and idle retained ready sessions whose
+  known pages are already closed
 - Exposes the standalone runtime-owned versioned filterable skill catalog at
   `GET /skills/catalog`
 - Exposes runtime-owned delivery execution routes such as delivery audit,
@@ -344,7 +345,9 @@ src/
   downgraded to `closed` after runtime restart instead of pretending a remote
   browser process survived
 - Runs runtime-owned closed-session maintenance sweeps so stale browser records
-  can expire on a bounded TTL without waiting for explicit cleanup routes
+  can expire on a bounded TTL without waiting for explicit cleanup routes, and
+  supports explicit cleanup of idle retained ready sessions once their known
+  page set has fully closed
 - Supports page-level close without tearing down the owning browser session,
   page-level navigation/update without forcing a new browser-page record, and
   downgraded closed-page preview truth so hosts stop treating closed pages as

@@ -286,8 +286,9 @@ The browser MCP tools are additive wrappers over the same runtime-owned
 `/browser/*` substrate. `list_browser_sessions` now accepts the same
 `status=ready|closed` filter as direct HTTP, `browser_summary` exposes the
 aggregate read model for hosts, and `cleanup_browser_sessions` provides the
-same explicit closed-session maintenance seam as `POST /browser/sessions/cleanup`.
-They do not require a separate browser service and do not introduce a
+same explicit cleanup seam as `POST /browser/sessions/cleanup` for both closed
+browser sessions and idle retained ready sessions whose known pages are already
+closed. They do not require a separate browser service and do not introduce a
 dependency on other monorepo browser projects.
 
 This keeps the product/runtime ownership split explicit:

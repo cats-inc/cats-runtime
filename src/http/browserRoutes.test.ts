@@ -600,6 +600,70 @@ describe('browser HTTP contract', () => {
     }));
   });
 
+  it('cleans up ready browser sessions that no longer have open pages when requested', async () => {
+    let now = new Date('2026-03-23T00:00:00.000Z');
+    browser = new RuntimeBrowserService({
+      drivers: [
+        new ManualBrowserDriver(),
+      ],
+      now: () => now,
+    });
+
+    const keepSession = await browser.createSession({
+      label: 'Keep Browser',
+    });
+    await browser.createPage(keepSession.id, {
+      url: 'http://127.0.0.1:4173',
+      binding: {
+        kind: 'manual_url',
+      },
+    });
+
+    now = new Date('2026-03-23T00:05:00.000Z');
+    const idleSession = await browser.createSession({
+      label: 'Idle Browser',
+    });
+    const idlePage = await browser.createPage(idleSession.id, {
+      path: '/tmp/report.html',
+      binding: {
+        kind: 'manual_url',
+      },
+    });
+    await browser.closePage(idleSession.id, idlePage.page.id);
+
+    now = new Date('2026-03-23T00:20:00.000Z');
+    const app = createTestApp();
+    const cleanupResponse = await app.request('/browser/sessions/cleanup', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        status: 'ready',
+        olderThanMs: 300000,
+      }),
+    });
+    expect(cleanupResponse.status).toBe(200);
+    await expect(cleanupResponse.json()).resolves.toEqual({
+      action: 'cleanup_browser_sessions',
+      filters: {
+        olderThanMs: 300000,
+        status: 'ready',
+      },
+      matchedSessionCount: 1,
+      matchedPageCount: 1,
+      removedSessionCount: 1,
+      removedPageCount: 1,
+      removedSessionIds: [idleSession.id],
+      remainingSessionCount: 1,
+      remainingClosedSessionCount: 0,
+    });
+
+    expect(browser.getSession(idleSession.id)).toBeUndefined();
+    expect(browser.getSession(keepSession.id)).toEqual(expect.objectContaining({
+      id: keepSession.id,
+      status: 'ready',
+    }));
+  });
+
   it('reloads persisted browser sessions from the runtime data dir on a fresh app instance', async () => {
     const firstApp = createTestApp();
 

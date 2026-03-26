@@ -154,15 +154,10 @@ browserRoutes.post('/browser/sessions/cleanup', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   try {
     const status = parseOptionalBrowserSessionStatus(body?.status);
-    if (status && status !== 'closed') {
-      throw new RuntimeBrowserValidationError(
-        'Browser session cleanup only supports status \'closed\'.',
-      );
-    }
     return c.json(getRuntimeBrowserService(ctx).cleanupSessions({
       driverId: parseOptionalString(body?.driverId),
       runtimeSessionId: parseOptionalString(body?.runtimeSessionId),
-      status: 'closed',
+      status: status ?? 'closed',
       olderThanMs: parseOptionalNonNegativeInteger(body?.olderThanMs, 'olderThanMs'),
     }));
   } catch (error) {

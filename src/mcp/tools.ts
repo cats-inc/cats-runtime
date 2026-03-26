@@ -1167,9 +1167,6 @@ async function cleanupBrowserSessions(
     RUNTIME_BROWSER_SESSION_STATUSES,
     'status must be a valid browser session status',
   );
-  if (status && status !== 'closed') {
-    throw new McpToolError(-32602, 'cleanup_browser_sessions only supports status "closed"');
-  }
 
   const body: Record<string, unknown> = {};
   const driverId = readOptionalString(args, 'driverId');

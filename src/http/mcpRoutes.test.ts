@@ -737,6 +737,131 @@ describe('runtime MCP facade', () => {
     });
   });
 
+  it('cleans up idle ready browser sessions through MCP without touching sessions that still have open pages', async () => {
+    const app = createTestApp();
+
+    const keepResponse = await app.request('/browser/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        label: 'Keep Browser',
+      }),
+    });
+    const keepSession = await keepResponse.json() as {
+      session: { id: string };
+    };
+    await app.request(`/browser/sessions/${keepSession.session.id}/pages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        url: 'http://127.0.0.1:4173',
+        binding: {
+          kind: 'manual_url',
+        },
+      }),
+    });
+
+    const idleSessionResponse = await app.request('/browser/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        label: 'Idle Browser',
+      }),
+    });
+    const idleSession = await idleSessionResponse.json() as {
+      session: { id: string };
+    };
+    const idlePageResponse = await app.request(`/browser/sessions/${idleSession.session.id}/pages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        path: '/tmp/report.html',
+        binding: {
+          kind: 'manual_url',
+        },
+      }),
+    });
+    const idlePage = await idlePageResponse.json() as {
+      page: { id: string };
+    };
+    await app.request(`/browser/sessions/${idleSession.session.id}/pages/${idlePage.page.id}/close`, {
+      method: 'POST',
+    });
+
+    const summaryResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 10,
+        method: 'tools/call',
+        params: {
+          name: 'browser_summary',
+          arguments: {
+            status: 'ready',
+            olderThanMs: 0,
+          },
+        },
+      }),
+    });
+    expect(summaryResponse.status).toBe(200);
+    const summaryPayload = await summaryResponse.json() as {
+      result: {
+        structuredContent: {
+          cleanupCandidates: { sessionIds: string[] };
+        };
+      };
+    };
+    expect(summaryPayload.result.structuredContent.cleanupCandidates.sessionIds).toEqual([
+      idleSession.session.id,
+    ]);
+
+    const cleanupResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 11,
+        method: 'tools/call',
+        params: {
+          name: 'cleanup_browser_sessions',
+          arguments: {
+            status: 'ready',
+            olderThanMs: 0,
+          },
+        },
+      }),
+    });
+    expect(cleanupResponse.status).toBe(200);
+    await expect(cleanupResponse.json()).resolves.toEqual({
+      jsonrpc: '2.0',
+      id: 11,
+      result: {
+        content: [
+          {
+            type: 'text',
+            text: 'Removed 1 browser session(s) during cleanup.',
+          },
+        ],
+        structuredContent: {
+          action: 'cleanup_browser_sessions',
+          cleanupPath: '/browser/sessions/cleanup',
+          filters: {
+            olderThanMs: 0,
+            status: 'ready',
+          },
+          matchedSessionCount: 1,
+          matchedPageCount: 1,
+          removedSessionCount: 1,
+          removedPageCount: 1,
+          removedSessionIds: [idleSession.session.id],
+          remainingSessionCount: 1,
+          remainingClosedSessionCount: 0,
+        },
+      },
+    });
+  });
+
   it('exposes workspace and delivery audit tools without making MCP the only runtime API', async () => {
     const app = createTestApp();
     const workspacePath = join(rootDir, 'workspace');

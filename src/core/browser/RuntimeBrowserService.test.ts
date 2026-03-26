@@ -359,6 +359,65 @@ describe('RuntimeBrowserService', () => {
     }));
   });
 
+  it('cleans up ready sessions that have no open pages after the requested threshold', async () => {
+    let now = new Date('2026-03-23T00:00:00.000Z');
+    const browser = new RuntimeBrowserService({
+      drivers: [
+        new ManualBrowserDriver(),
+      ],
+      now: () => now,
+    });
+
+    const activeSession = await browser.createSession({
+      label: 'Keep Open Page',
+    });
+    await browser.createPage(activeSession.id, {
+      url: 'http://127.0.0.1:4173',
+      binding: {
+        kind: 'manual_url',
+      },
+    });
+
+    now = new Date('2026-03-23T00:05:00.000Z');
+    const idleSession = await browser.createSession({
+      label: 'Cleanup Idle Ready',
+    });
+    const idlePage = await browser.createPage(idleSession.id, {
+      path: '/tmp/report.html',
+      binding: {
+        kind: 'manual_url',
+      },
+    });
+    await browser.closePage(idleSession.id, idlePage.page.id);
+
+    now = new Date('2026-03-23T00:20:00.000Z');
+    expect(browser.cleanupSessions({
+      status: 'ready',
+      olderThanMs: 5 * 60 * 1000,
+    })).toEqual({
+      action: 'cleanup_browser_sessions',
+      filters: {
+        olderThanMs: 5 * 60 * 1000,
+        status: 'ready',
+      },
+      matchedSessionCount: 1,
+      matchedPageCount: 1,
+      removedSessionCount: 1,
+      removedPageCount: 1,
+      removedSessionIds: [idleSession.id],
+      remainingSessionCount: 1,
+      remainingClosedSessionCount: 0,
+    });
+    expect(browser.getSession(idleSession.id)).toBeUndefined();
+    expect(browser.getSession(activeSession.id)).toEqual(expect.objectContaining({
+      id: activeSession.id,
+      status: 'ready',
+      inspection: expect.objectContaining({
+        openPageCount: 1,
+      }),
+    }));
+  });
+
   it('persists browser sessions/pages across service restarts when storage is configured', async () => {
     const rootDir = mkdtempSync(join(tmpdir(), 'cats-runtime-browser-persist-'));
     const storageFile = join(rootDir, 'browser', 'sessions.json');

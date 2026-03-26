@@ -236,7 +236,9 @@ Deepen the runtime-owned browser subsystem without coupling it to any monorepo
   to the affected runtime session
 - `GET /browser/summary`, `POST /browser/sessions/cleanup`, matching MCP
   tools, and runtime background maintenance now provide a host-facing
-  aggregate read/maintenance seam for closed browser-session cleanup
+  aggregate read/maintenance seam for closed browser-session cleanup; explicit
+  cleanup now also supports idle retained `ready` sessions once their known
+  page set is fully closed
 - Richer retained-session/browser recovery policy plus additional real drivers
   beyond Playwright remain deferred
 
