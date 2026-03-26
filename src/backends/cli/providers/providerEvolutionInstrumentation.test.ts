@@ -148,6 +148,39 @@ describe('provider evolution instrumentation', () => {
     expect(bundle.summary.unknownEventTypes['future.event']).toBe(1);
   });
 
+  it('records normalized Gemini tool results instead of dropping them', () => {
+    const collector = new ProviderEvolutionEvidenceCollector({
+      provider: 'gemini',
+      instance: 'default',
+      parserId: 'gemini-stream-json',
+      probeProfile: 'manual-smoke',
+      transport: 'cli',
+    });
+    const provider = new GeminiProvider(undefined, collector);
+
+    expect(provider.parseStreamLine(JSON.stringify({
+      type: 'tool_result',
+      tool_name: 'readFile',
+      tool_id: 'tool-1',
+      content: [{ text: 'hello' }],
+    }))).toEqual([
+      expect.objectContaining({
+        type: 'progress',
+      }),
+      expect.objectContaining({
+        type: 'tool_result',
+        toolName: 'readFile',
+        toolId: 'tool-1',
+        text: 'hello',
+      }),
+    ]);
+
+    const bundle = collector.finalize();
+    expect(bundle.summary.normalizedCount).toBe(1);
+    expect(bundle.summary.normalizedEventTypes.progress).toBe(1);
+    expect(bundle.summary.normalizedEventTypes.tool_result).toBe(1);
+  });
+
   it('records schema failures for Goose message events without content blocks', () => {
     const collector = new ProviderEvolutionEvidenceCollector({
       provider: 'goose',

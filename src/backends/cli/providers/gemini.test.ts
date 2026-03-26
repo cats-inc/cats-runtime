@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { GeminiProvider } from './gemini.js';
+import type { StreamEvent } from './types.js';
+
+function toEventList(event: StreamEvent | StreamEvent[] | null): StreamEvent[] {
+  if (!event) {
+    return [];
+  }
+  return Array.isArray(event) ? event : [event];
+}
 
 describe('GeminiProvider', () => {
   const provider = new GeminiProvider();
@@ -88,7 +96,40 @@ describe('GeminiProvider', () => {
       expect(event).toEqual({ type: 'tool_use', toolName: 'readFile', toolId: 't1' });
     });
 
-    it('skips tool_result event', () => {
+    it('promotes tool_result events into progress plus tool_result output', () => {
+      const line = JSON.stringify({
+        type: 'tool_result',
+        tool_name: 'readFile',
+        tool_id: 't1',
+        content: [{ text: 'File contents' }],
+      });
+      expect(toEventList(provider.parseStreamLine(line))).toEqual([
+        {
+          type: 'progress',
+          text: 'Gemini completed tool: readFile',
+          metadata: {
+            kind: 'tool',
+            status: 'updated',
+            source: 'provider',
+            provider: 'gemini',
+            backend: 'cli',
+            native: {
+              sourceEvent: 'tool_result',
+              toolName: 'readFile',
+              toolId: 't1',
+            },
+          },
+        },
+        {
+          type: 'tool_result',
+          toolName: 'readFile',
+          toolId: 't1',
+          text: 'File contents',
+        },
+      ]);
+    });
+
+    it('drops malformed tool_result events with a schema failure instead of fabricating output', () => {
       const line = JSON.stringify({ type: 'tool_result' });
       expect(provider.parseStreamLine(line)).toBeNull();
     });

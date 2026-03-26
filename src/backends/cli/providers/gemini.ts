@@ -14,6 +14,7 @@ import {
   observeSchemaFailure,
   observeUnknown,
 } from '../../../core/compatibility/providerEvolution.js';
+import { createRuntimeProgressEvent } from '../../../core/progress.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 
 interface GeminiStreamEvent {
@@ -79,7 +80,7 @@ export class GeminiProvider implements Provider {
     return compileRuntimeTurnPrompt(content, turn);
   }
 
-  parseStreamLine(line: string): StreamEvent | null {
+  parseStreamLine(line: string): StreamEvent | StreamEvent[] | null {
     const trimmed = line.trim();
     if (!trimmed) return null;
 
@@ -160,13 +161,42 @@ export class GeminiProvider implements Provider {
       });
     }
 
-    // tool_result — skip
+    // tool_result — promote to the shared runtime event tape
     if (event.type === 'tool_result') {
-      return observeIgnored(this.evolutionObserver, {
+      const text = extractText(event.content) || event.message;
+      if (!event.tool_name && !event.tool_id && !text) {
+        return observeSchemaFailure(this.evolutionObserver, {
+          rawEventType: 'tool_result',
+          reason: 'tool_result_without_identity_or_content',
+          rawSample: event,
+        }, null);
+      }
+      return observeNormalized(this.evolutionObserver, {
         rawEventType: 'tool_result',
-        reason: 'tool_result_not_promoted',
         rawSample: event,
-      }, null);
+      }, [
+        createRuntimeProgressEvent({
+          text: event.tool_name
+            ? `Gemini completed tool: ${event.tool_name}`
+            : 'Gemini completed a tool call.',
+          provider: 'gemini',
+          backend: 'cli',
+          kind: 'tool',
+          status: 'updated',
+          source: 'provider',
+          native: {
+            sourceEvent: event.type,
+            ...(event.tool_name ? { toolName: event.tool_name } : {}),
+            ...(event.tool_id ? { toolId: event.tool_id } : {}),
+          },
+        }),
+        {
+          type: 'tool_result',
+          toolName: event.tool_name,
+          toolId: event.tool_id,
+          ...(text ? { text } : {}),
+        },
+      ]);
     }
 
     // error
