@@ -97,6 +97,23 @@ describe('peer routes', () => {
           stale: 1,
         }),
       }),
+      network: {
+        summary: 'Peer execution auth is not configured; inbound peer execution will stay unavailable even if endpoints are advertised.',
+        auth: {
+          sharedSecretConfigured: false,
+          sharedSecretCount: 0,
+        },
+        local: null,
+        peers: {
+          total: 1,
+          tls: 0,
+          trustedLanPlaintext: 1,
+          externalPlaintext: 0,
+          unresolved: 0,
+          attention: 1,
+          warning: 0,
+        },
+      },
       peers: [
         expect.objectContaining({
           identity: expect.objectContaining({
@@ -275,6 +292,42 @@ describe('peer routes', () => {
           ],
         },
       },
+      network: {
+        summary: 'Peer execution auth is not configured; inbound peer execution will stay unavailable even if endpoints are advertised.',
+        auth: {
+          sharedSecretConfigured: false,
+          sharedSecretCount: 0,
+        },
+        local: null,
+        peers: {
+          total: 1,
+          tls: 0,
+          trustedLanPlaintext: 1,
+          externalPlaintext: 0,
+          unresolved: 0,
+          attention: 1,
+          warning: 0,
+        },
+        entries: [
+          {
+            peerId: 'peer-live',
+            displayName: 'peer-live',
+            trustState: 'unknown',
+            trustReason: 'unverified',
+            posture: {
+              endpoint: 'http://peer-live.local:3110/',
+              host: 'peer-live.local',
+              port: 3110,
+              scheme: 'http',
+              scope: 'local',
+              classification: 'trusted_lan_plaintext',
+              level: 'attention',
+              attention: 'lan_only_plaintext',
+              summary: 'Peer endpoint is plaintext HTTP on a loopback/private/LAN address; keep it behind a tightly trusted network or add TLS.',
+            },
+          },
+        ],
+      },
       peers: [
         expect.objectContaining({
           identity: expect.objectContaining({
@@ -342,6 +395,23 @@ describe('peer routes', () => {
     const peersResponse = await app.request('/peers');
     expect(peersResponse.status).toBe(200);
     expect(await peersResponse.json()).toEqual(expect.objectContaining({
+      network: {
+        summary: 'Peer execution auth is not configured; inbound peer execution will stay unavailable even if endpoints are advertised.',
+        auth: {
+          sharedSecretConfigured: false,
+          sharedSecretCount: 0,
+        },
+        local: null,
+        peers: {
+          total: 1,
+          tls: 0,
+          trustedLanPlaintext: 1,
+          externalPlaintext: 0,
+          unresolved: 0,
+          attention: 1,
+          warning: 0,
+        },
+      },
       guardrails: {
         authFailures: {
           windowMs: 1_000,
@@ -372,6 +442,42 @@ describe('peer routes', () => {
     const peerResponse = await app.request('/peers/peer-live');
     expect(peerResponse.status).toBe(200);
     expect(await peerResponse.json()).toEqual(expect.objectContaining({
+      network: {
+        summary: {
+          summary: 'Peer execution auth is not configured; inbound peer execution will stay unavailable even if endpoints are advertised.',
+          auth: {
+            sharedSecretConfigured: false,
+            sharedSecretCount: 0,
+          },
+          local: null,
+          peers: {
+            total: 1,
+            tls: 0,
+            trustedLanPlaintext: 1,
+            externalPlaintext: 0,
+            unresolved: 0,
+            attention: 1,
+            warning: 0,
+          },
+        },
+        peer: {
+          peerId: 'peer-live',
+          displayName: 'peer-live',
+          trustState: 'unknown',
+          trustReason: 'unverified',
+          posture: {
+            endpoint: 'http://peer-live.local:3110/',
+            host: 'peer-live.local',
+            port: 3110,
+            scheme: 'http',
+            scope: 'local',
+            classification: 'trusted_lan_plaintext',
+            level: 'attention',
+            attention: 'lan_only_plaintext',
+            summary: 'Peer endpoint is plaintext HTTP on a loopback/private/LAN address; keep it behind a tightly trusted network or add TLS.',
+          },
+        },
+      },
       guardrails: {
         inboundExecutions: {
           peerId: 'peer-live',
@@ -454,6 +560,42 @@ describe('peer routes', () => {
     const response = await app.request('/peers/peer-live');
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual(expect.objectContaining({
+      network: {
+        summary: {
+          summary: 'Peer execution auth is not configured; inbound peer execution will stay unavailable even if endpoints are advertised.',
+          auth: {
+            sharedSecretConfigured: false,
+            sharedSecretCount: 0,
+          },
+          local: null,
+          peers: {
+            total: 1,
+            tls: 0,
+            trustedLanPlaintext: 1,
+            externalPlaintext: 0,
+            unresolved: 0,
+            attention: 1,
+            warning: 0,
+          },
+        },
+        peer: {
+          peerId: 'peer-live',
+          displayName: 'peer-live',
+          trustState: 'unknown',
+          trustReason: 'unverified',
+          posture: {
+            endpoint: 'http://peer-live.local:3110/',
+            host: 'peer-live.local',
+            port: 3110,
+            scheme: 'http',
+            scope: 'local',
+            classification: 'trusted_lan_plaintext',
+            level: 'attention',
+            attention: 'lan_only_plaintext',
+            summary: 'Peer endpoint is plaintext HTTP on a loopback/private/LAN address; keep it behind a tightly trusted network or add TLS.',
+          },
+        },
+      },
       guardrails: {
         inboundExecutions: {
           peerId: 'peer-live',

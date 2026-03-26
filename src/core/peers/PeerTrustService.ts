@@ -33,6 +33,10 @@ export class PeerTrustService {
     return this.sharedSecretBuffers.length > 0;
   }
 
+  get sharedSecretCount(): number {
+    return this.sharedSecretBuffers.length;
+  }
+
   validateSharedSecret(token: string | undefined): boolean {
     if (this.sharedSecretBuffers.length === 0 || typeof token !== 'string') {
       return false;

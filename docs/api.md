@@ -2441,7 +2441,10 @@ POST /peer/executions
 returns live peers. `?includeStale=true` adds stale entries. When peer
 execution admission control is enabled, the response also includes an additive
 `guardrails` summary with current auth-throttling, inbound-capacity totals, and
-bounded replay-protection counters.
+bounded replay-protection counters. It now also includes an additive `network`
+summary describing the local advertised endpoint posture, whether peer
+shared-secret auth is configured, and whether discovered peers are TLS,
+trusted-LAN plaintext, or externally exposed plaintext endpoints.
 
 Example response shape:
 
@@ -2466,6 +2469,27 @@ Example response shape:
       "rejected": 0
     }
   },
+  "network": {
+    "summary": "Peer endpoints are plaintext HTTP on loopback/private/LAN addresses; keep peer routing inside a tightly trusted network or add TLS.",
+    "auth": {
+      "sharedSecretConfigured": true,
+      "sharedSecretCount": 1
+    },
+    "local": {
+      "endpoint": "http://127.0.0.1:3110/",
+      "classification": "trusted_lan_plaintext",
+      "level": "attention"
+    },
+    "peers": {
+      "total": 1,
+      "tls": 0,
+      "trustedLanPlaintext": 1,
+      "externalPlaintext": 0,
+      "unresolved": 0,
+      "attention": 1,
+      "warning": 0
+    }
+  },
   "peers": [
     {
       "identity": {
@@ -2486,13 +2510,17 @@ Example response shape:
 `404`. When peer execution admission control is enabled, the detail response
 also includes additive `guardrails.inboundExecutions` plus
 `guardrails.replay` state for that peer, including whether a peer-specific
-quota override is active.
+quota override is active. It now also includes `network.summary` plus a
+peer-specific `network.peer` posture record so operators can tell whether the
+selected peer is TLS-fronted, trusted-LAN plaintext, externally exposed
+plaintext, or missing a stable advertised endpoint.
 
 `GET /diagnostics/peers` is the host-facing peer diagnostics summary. It
 combines the LAN discovery snapshot, registry summary counts, the current
 bounded peer list, and a bounded `guardrails` diagnostics snapshot for peer
 auth throttling, inbound execution admission, and replay-protection state
-without changing the semantics of `GET /health`.
+without changing the semantics of `GET /health`. It now also includes a fuller
+`network` snapshot with per-peer posture entries for operator diagnostics.
 
 `POST /peer/executions` is the dedicated runtime-to-runtime execution contract.
 It is not a general host route and it does not replace the existing session

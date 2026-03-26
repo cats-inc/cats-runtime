@@ -1870,6 +1870,52 @@ providers:
             overrideApplied: false,
           },
         },
+        network: {
+          summary: {
+            summary: 'Peer execution auth is not configured; inbound peer execution will stay unavailable even if endpoints are advertised.',
+            auth: {
+              sharedSecretConfigured: false,
+              sharedSecretCount: 0,
+            },
+            local: {
+              endpoint: `http://${address.host}:${address.port}/`,
+              host: address.host,
+              port: address.port,
+              scheme: 'http',
+              scope: 'loopback',
+              classification: 'trusted_lan_plaintext',
+              level: 'attention',
+              attention: 'lan_only_plaintext',
+              summary: 'Peer endpoint is plaintext HTTP on a loopback/private/LAN address; keep it behind a tightly trusted network or add TLS.',
+            },
+            peers: {
+              total: 2,
+              tls: 0,
+              trustedLanPlaintext: 2,
+              externalPlaintext: 0,
+              unresolved: 0,
+              attention: 2,
+              warning: 0,
+            },
+          },
+          peer: {
+            peerId: localPeerId,
+            displayName: 'local-runtime',
+            trustState: 'self',
+            trustReason: 'local_runtime',
+            posture: {
+              endpoint: `http://${address.host}:${address.port}/`,
+              host: address.host,
+              port: address.port,
+              scheme: 'http',
+              scope: 'loopback',
+              classification: 'trusted_lan_plaintext',
+              level: 'attention',
+              attention: 'lan_only_plaintext',
+              summary: 'Peer endpoint is plaintext HTTP on a loopback/private/LAN address; keep it behind a tightly trusted network or add TLS.',
+            },
+          },
+        },
         peer: expect.objectContaining({
           identity: expect.objectContaining({
             peerId: localPeerId,

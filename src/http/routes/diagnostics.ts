@@ -25,6 +25,10 @@ import {
   type RuntimeRouteEnv,
 } from './diagnosticsSupport.js';
 import {
+  getPeerNetworkPostureSnapshot,
+  buildPeerNetworkPostureSummary,
+} from './peerNetworkDiagnostics.js';
+import {
   RUNTIME_SERVICE_NAME,
   RUNTIME_VERSION,
   getRuntimeLifecycleContract,
@@ -816,7 +820,10 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
         platform: process.platform,
         nodeVersion: process.version,
       },
-      peers,
+      peers: {
+        ...peers,
+        network: buildPeerNetworkPostureSummary(ctx).network,
+      },
     },
     metering,
   });
@@ -840,6 +847,7 @@ diagnosticsRoutes.get('/diagnostics/peers', (c) => {
       discovery,
       summary: discovery.registry,
       ...buildPeerGuardrailDiagnostics(ctx),
+      network: getPeerNetworkPostureSnapshot(ctx, includeStale),
       peers,
     });
   } catch (error) {

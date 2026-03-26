@@ -126,6 +126,12 @@ Relevant runtime-owned peer routes:
 - `GET /diagnostics/peers`
 - `POST /peer/executions`
 
+The read-only peer routes now also surface additive network-posture diagnostics:
+
+- whether peer shared-secret auth is configured
+- whether the local advertised endpoint is TLS, trusted-LAN plaintext, or unresolved
+- whether discovered peers are TLS-fronted, trusted-LAN plaintext, externally exposed plaintext, or missing stable advertised endpoints
+
 `POST /peer/executions` is runtime-to-runtime only. It uses the peer shared
 secret, not the normal host-facing `CATS_RUNTIME_API_KEY`.
 
@@ -152,6 +158,9 @@ Current auth/trust model:
   LAN, put the runtime behind TLS
 - current v0 includes HMAC body signing plus bounded nonce/timestamp replay
   protection, but it still does not include per-peer credentials
+- use `/peers`, `/peers/{peerId}`, or `/diagnostics/peers` to confirm the
+  runtime sees your local/remote peer endpoints as TLS-fronted versus
+  trusted-LAN plaintext before enabling broader peer routing
 
 Current topology boundary:
 

@@ -13,6 +13,25 @@ export type PeerRoutingMode = 'local' | 'peer';
 export type PeerRoutingStrategy = 'explicit' | 'provider_affinity' | 'least_busy';
 export type PeerExecutionTransport = 'sse' | 'ndjson';
 export type PeerExecutionWorkspaceMode = 'none' | 'read_only';
+export type PeerNetworkPostureLevel = 'ok' | 'attention' | 'warning';
+export type PeerNetworkPostureClassification =
+  | 'tls'
+  | 'trusted_lan_plaintext'
+  | 'external_plaintext'
+  | 'unresolved';
+export type PeerNetworkHostScope =
+  | 'loopback'
+  | 'private'
+  | 'local'
+  | 'public'
+  | 'unknown';
+export type PeerNetworkPostureAttentionCode =
+  | 'none'
+  | 'lan_only_plaintext'
+  | 'tls_required'
+  | 'endpoint_missing'
+  | 'endpoint_invalid'
+  | 'auth_missing';
 export type PeerExecutionFailureCode =
   | 'peer_route_disabled'
   | 'peer_not_found'
@@ -103,6 +122,52 @@ export interface PeerRegistrySummary {
   trusted: number;
   unknown: number;
   rejected: number;
+}
+
+export interface PeerNetworkEndpointPosture {
+  endpoint?: string;
+  host?: string;
+  port?: number;
+  scheme: 'https' | 'http' | 'unknown';
+  scope: PeerNetworkHostScope;
+  classification: PeerNetworkPostureClassification;
+  level: PeerNetworkPostureLevel;
+  attention: PeerNetworkPostureAttentionCode;
+  summary: string;
+}
+
+export interface PeerNetworkPostureEntry {
+  peerId: string;
+  displayName: string;
+  trustState: PeerTrustState;
+  trustReason: string;
+  posture: PeerNetworkEndpointPosture;
+}
+
+export interface PeerNetworkPostureCounts {
+  total: number;
+  tls: number;
+  trustedLanPlaintext: number;
+  externalPlaintext: number;
+  unresolved: number;
+  attention: number;
+  warning: number;
+}
+
+export interface PeerNetworkPostureAuthSummary {
+  sharedSecretConfigured: boolean;
+  sharedSecretCount: number;
+}
+
+export interface PeerNetworkPostureSummary {
+  summary: string;
+  auth: PeerNetworkPostureAuthSummary;
+  local: PeerNetworkEndpointPosture | null;
+  peers: PeerNetworkPostureCounts;
+}
+
+export interface PeerNetworkPostureSnapshot extends PeerNetworkPostureSummary {
+  entries: PeerNetworkPostureEntry[];
 }
 
 export interface StaticPeerSeed {

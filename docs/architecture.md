@@ -248,6 +248,9 @@ src/
   guardrails so operators can tighten auth-failure, inbound-concurrency, and
   replay ceilings for specific trusted peers without changing the shared LAN
   defaults
+- Adds a runtime-owned peer network-posture classifier so read-only peer
+  surfaces can distinguish TLS-fronted endpoints from trusted-LAN plaintext,
+  externally exposed plaintext, or missing/invalid advertised endpoints
 - Treats peer execution as an execution-only extension: the caller runtime
   still owns host-visible session ids, history, observe snapshots, wakeups,
   browser state, and worktree lifecycle

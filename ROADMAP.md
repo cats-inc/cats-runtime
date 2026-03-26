@@ -743,8 +743,11 @@ following work is still intentionally deferred:
 - additive per-peer quota overrides for auth-failure throttling, inbound
   execution concurrency, and replay nonce ceilings are now available for
   trusted peer ids via `CATS_RUNTIME_PEER_LIMIT_OVERRIDES`
-- document and optionally enforce a TLS-fronted posture for any deployment
-  outside a tightly trusted LAN
+- read-only peer routes and runtime diagnostics now classify local/remote peer
+  endpoints as TLS, trusted-LAN plaintext, externally exposed plaintext, or
+  unresolved so operators can confirm network posture before wider rollout
+- optional enforcement of a TLS-fronted posture for any deployment outside a
+  tightly trusted LAN remains deferred
 
 #### Runtime Dashboard / Operator Follow-up
 

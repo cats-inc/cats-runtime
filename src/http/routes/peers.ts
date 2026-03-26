@@ -2,6 +2,10 @@ import { Hono } from 'hono';
 import { getPeerDiscoverySnapshot } from '../../core/peers/discoverySnapshot.js';
 import type { AppContext } from '../app.js';
 import type { RuntimeRouteEnv } from './diagnosticsSupport.js';
+import {
+  buildPeerNetworkPostureDetail,
+  buildPeerNetworkPostureSummary,
+} from './peerNetworkDiagnostics.js';
 
 export const peerRoutes = new Hono<RuntimeRouteEnv>();
 
@@ -18,6 +22,7 @@ peerRoutes.get('/peers', (c) => {
       },
       discovery: getPeerDiscoverySnapshot(ctx),
       ...buildPeerGuardrailSummary(ctx),
+      ...buildPeerNetworkPostureSummary(ctx, includeStale),
       peers,
     });
   } catch (error) {
@@ -42,6 +47,7 @@ peerRoutes.get('/peers/:peerId', (c) => {
     return c.json({
       discovery: getPeerDiscoverySnapshot(ctx),
       ...buildPeerGuardrailDetail(ctx, peerId),
+      ...buildPeerNetworkPostureDetail(ctx, peerId, includeStale),
       peer,
     });
   } catch (error) {
