@@ -53,7 +53,7 @@ Add your project-specific automation scripts here.
 | [a2a/](./a2a/) | Template | A2A protocol examples and templates; some current examples still need A2A v1 alignment |
 | [specs/](./specs/) | Complete | Feature specifications for runtime capabilities and future delivery tracks; see `specs/README.md` for the full list |
 | [plans/](./plans/) | Complete | Implementation plans for WSL discovery, API/backend expansion, startup contract, runtime-managed skills, browser-preview substrate, provider compatibility/evidence, and metering/progress/guardrails |
-| [decisions/](./decisions/) | Complete | Architecture Decision Records for packaging, install/check metadata, diagnostics, workspace substrate, delivery policy boundaries, runtime-owned metering/guardrails, LAN peer-sharing scope, standalone bootstrap/config boundaries, advanced model-selection ownership, and management-adapter boundaries |
+| [decisions/](./decisions/) | Complete | Architecture Decision Records for packaging, install/check metadata, diagnostics, workspace substrate, delivery policy boundaries, runtime-owned metering/guardrails, LAN peer-sharing scope, standalone bootstrap/config boundaries, advanced model-selection ownership, management-adapter boundaries, and provider-evolution evidence boundaries |
 
 **Legend**: Complete | Partial | Template
 
@@ -61,7 +61,7 @@ Add your project-specific automation scripts here.
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| [research/](./research/) | Partial | Research notes and external sources, including Paperclip alignment notes, setup-diagnostic/report research, LAN peer-sharing exploration, workspace contract terminology/semantics, a current maturity-gap assessment, AAIF/A2A layering guidance, and a CLI provider event-capability audit |
+| [research/](./research/) | Partial | Research notes and external sources, including Paperclip alignment notes, setup-diagnostic/report research, LAN peer-sharing exploration, workspace contract terminology/semantics, a current maturity-gap assessment, AAIF/A2A layering guidance, a CLI provider event-capability audit, and provider-evolution evidence framing |
 
 ## Context-Driven Development
 

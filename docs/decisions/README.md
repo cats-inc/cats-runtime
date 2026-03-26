@@ -38,6 +38,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
+| [025-keep-provider-evolution-detection-manual-first-and-evidence-driven](./025-keep-provider-evolution-detection-manual-first-and-evidence-driven.md) | Keep provider evolution detection manual-first and evidence-driven | Proposed | 2026-03-27 |
 | [024-own-pluggable-execution-strategies-as-runtime-session-local-substrate](./024-own-pluggable-execution-strategies-as-runtime-session-local-substrate.md) | Own pluggable execution strategies as a runtime session-local substrate | Proposed | 2026-03-26 |
 | [023-treat-management-clis-as-runtime-owned-control-plane-adapters-not-session-providers](./023-treat-management-clis-as-runtime-owned-control-plane-adapters-not-session-providers.md) | Treat management CLIs as runtime-owned control-plane adapters, not session providers | Accepted | 2026-03-25 |
 | [022-model-advanced-selection-as-entries-presets-and-provider-specific-controls](./022-model-advanced-selection-as-entries-presets-and-provider-specific-controls.md) | Model advanced selection as entries, presets, and provider-specific controls | Accepted | 2026-03-25 |
@@ -74,6 +75,6 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 ---
 
-*Last updated: 2026-03-26*
+*Last updated: 2026-03-27*
 
 *See also: [AGENTS.md](../../../AGENTS.md) for decision-making protocols*
