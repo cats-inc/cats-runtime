@@ -65,7 +65,7 @@
 #### Remaining Items
 
 - [ ] Deepen provider health probes beyond the current readiness summary and endpoint reachability probes, especially richer API/local auth/model semantics and Ollama model discovery
-- [ ] Continue hardening shared local tool runtime mutation safety beyond the current bounded `apply_patch` rollback and symlink/junction/hardlink alias guards, especially write/edit transactionality
+- [ ] Continue hardening shared local tool runtime mutation safety beyond the current bounded `apply_patch` rollback, staged atomic `write_file` / `edit_file` replacement, and symlink/junction/hardlink alias guards, especially inode/metadata restoration and parent-directory cleanup
 - [ ] Continue broadening the shared local tool runtime beyond the current filesystem/shell/navigation/materialization set plus proposed-file diff and bounded batch-read inspection, especially richer planning helpers
 - [ ] Continue refining capability partitioning and policy surfacing beyond the current profile summary/read-model slice, per-tool capability/access metadata, and `standard` / `extended` / `read_only` split
 

@@ -23,6 +23,11 @@ import type { RuntimeManagementDomain, RuntimeManagementAction } from '../manage
 // path.matchesGlob — Node 22+ built-in; @types/node@20 lacks the typedef
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const matchesGlob: (filePath: string, pattern: string) => boolean = (path as any).matchesGlob;
+const DEFAULT_ATOMIC_WRITE_OPS: AtomicWriteOps = {
+  writeFile,
+  rename,
+  unlink,
+};
 
 export interface ToolDefinition {
   name: string;
@@ -33,6 +38,12 @@ export interface ToolDefinition {
 interface ToolCapabilityMetadata {
   domain: 'filesystem' | 'search' | 'shell' | 'workspace' | 'delivery' | 'review' | 'deployment';
   mutating: boolean;
+}
+
+interface AtomicWriteOps {
+  writeFile(path: string, content: string, encoding: BufferEncoding): Promise<void>;
+  rename(from: string, to: string): Promise<void>;
+  unlink(path: string): Promise<void>;
 }
 
 export interface ToolCall {
@@ -778,6 +789,63 @@ export function buildToolPolicyInspection(input: {
   };
 }
 
+function createAtomicWritePath(fullPath: string, suffix: 'write' | 'backup'): string {
+  const nonce = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `${fullPath}.cats-runtime-${suffix}-${nonce}.${suffix === 'write' ? 'tmp' : 'bak'}`;
+}
+
+async function unlinkBestEffort(path: string, ops: AtomicWriteOps): Promise<void> {
+  try {
+    await ops.unlink(path);
+  } catch {
+    // Best-effort cleanup only; committed writes should not fail because
+    // temporary siblings could not be removed afterward.
+  }
+}
+
+export async function writeTextFileAtomically(
+  fullPath: string,
+  content: string,
+  ops: AtomicWriteOps = DEFAULT_ATOMIC_WRITE_OPS,
+): Promise<void> {
+  const tempPath = createAtomicWritePath(fullPath, 'write');
+  const backupPath = createAtomicWritePath(fullPath, 'backup');
+  let backupCreated = false;
+
+  await ops.writeFile(tempPath, content, 'utf-8');
+
+  try {
+    try {
+      await ops.rename(fullPath, backupPath);
+      backupCreated = true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
+    }
+
+    await ops.rename(tempPath, fullPath);
+  } catch (error) {
+    await unlinkBestEffort(tempPath, ops);
+    if (backupCreated) {
+      try {
+        await ops.rename(backupPath, fullPath);
+      } catch (restoreError) {
+        throw new Error(
+          `Failed to atomically write ${fullPath}: ${(error as Error).message}; `
+            + `restore failed: ${(restoreError as Error).message}`,
+        );
+      }
+      await unlinkBestEffort(backupPath, ops);
+    }
+    throw error;
+  }
+
+  if (backupCreated) {
+    await unlinkBestEffort(backupPath, ops);
+  }
+}
+
 function shouldIgnoreDirectory(name: string): boolean {
   return IGNORED_DIRECTORIES.has(name);
 }
@@ -1489,7 +1557,7 @@ export class LocalToolRuntime {
       }
     }
     await mkdir(dirname(fullPath), { recursive: true });
-    await writeFile(fullPath, content, 'utf-8');
+    await writeTextFileAtomically(fullPath, content);
     return {
       callId,
       name: 'write_file',
@@ -1567,7 +1635,7 @@ export class LocalToolRuntime {
       ? content.replace(oldString, newString)
       : content.replaceAll(oldString, newString);
 
-    await writeFile(fullPath, updated, 'utf-8');
+    await writeTextFileAtomically(fullPath, updated);
 
     return {
       callId,

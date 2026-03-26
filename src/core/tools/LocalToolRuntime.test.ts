@@ -1,9 +1,9 @@
-import { existsSync, linkSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, linkSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { ToolExecutionContext } from './LocalToolRuntime.js';
-import { buildToolPolicyInspection, LocalToolRuntime } from './LocalToolRuntime.js';
+import { buildToolPolicyInspection, LocalToolRuntime, writeTextFileAtomically } from './LocalToolRuntime.js';
 
 function createWorkspace() {
   const cwd = mkdtempSync(join(tmpdir(), 'cats-runtime-tools-'));
@@ -45,6 +45,11 @@ function extendedCtx(cwd: string): ToolExecutionContext {
     permissionMode: 'skip',
     toolProfile: 'extended',
   };
+}
+
+function listAtomicWriteArtifacts(dir: string): string[] {
+  return readdirSync(dir).filter((name) =>
+    name.includes('.cats-runtime-write-') || name.includes('.cats-runtime-backup-'));
 }
 
 describe('LocalToolRuntime', () => {
@@ -122,9 +127,42 @@ describe('LocalToolRuntime', () => {
       });
       expect(write.isError).toBeUndefined();
       expect(readFileSync(join(cwd, 'src', 'app.ts'), 'utf-8')).toBe('export const value = 2;\n');
+      expect(listAtomicWriteArtifacts(join(cwd, 'src'))).toEqual([]);
     } finally {
       cleanup();
     }
+  });
+
+  describe('writeTextFileAtomically', () => {
+    it('restores the original file when the staged replacement fails', async () => {
+      const target = '/virtual/workspace/app.ts';
+      const files = new Map<string, string>([[target, 'before']]);
+      let failCommit = true;
+
+      await expect(writeTextFileAtomically(target, 'after', {
+        async writeFile(path, content) {
+          files.set(path, content);
+        },
+        async rename(from, to) {
+          if (!files.has(from)) {
+            const error = Object.assign(new Error(`Missing source ${from}`), { code: 'ENOENT' });
+            throw error;
+          }
+          if (from.includes('.cats-runtime-write-') && failCommit) {
+            failCommit = false;
+            throw new Error('simulated commit failure');
+          }
+          files.set(to, files.get(from)!);
+          files.delete(from);
+        },
+        async unlink(path) {
+          files.delete(path);
+        },
+      })).rejects.toThrow('simulated commit failure');
+
+      expect(files.get(target)).toBe('before');
+      expect(Array.from(files.keys()).filter((path) => path.includes('.cats-runtime-'))).toEqual([]);
+    });
   });
 
   it('blocks mutations in read_only mode and path escapes', async () => {
@@ -562,6 +600,7 @@ describe('LocalToolRuntime', () => {
         expect(result.isError).toBeUndefined();
         expect(result.output).toContain('Replaced 1 occurrence');
         expect(readFileSync(join(cwd, 'src', 'app.ts'), 'utf-8')).toContain('const value = 42');
+        expect(listAtomicWriteArtifacts(join(cwd, 'src'))).toEqual([]);
       } finally {
         cleanup();
       }

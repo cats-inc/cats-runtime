@@ -93,6 +93,9 @@ requests into calls into this shared runtime.
 - The runtime now performs bounded rollback for multi-file `apply_patch`
   failures so earlier file content/presence changes are restored when a later
   hunk aborts the patch.
+- Single-file `write_file` and `edit_file` now stage sibling temp files and
+  atomically replace the target so failed commit paths restore the previous
+  file contents instead of leaving partially written text behind.
 - The safety model still does **not** yet guarantee full transactional
   rollback for general `write_file` / `edit_file` operations, inode-level
   metadata restoration, or empty parent-directory cleanup.
