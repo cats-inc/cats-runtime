@@ -61,7 +61,7 @@ Add your project-specific automation scripts here.
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| [research/](./research/) | Partial | Research notes and external sources, including Paperclip alignment notes, setup-diagnostic/report research, LAN peer-sharing exploration, workspace contract terminology/semantics, a current maturity-gap assessment, and AAIF/A2A layering guidance |
+| [research/](./research/) | Partial | Research notes and external sources, including Paperclip alignment notes, setup-diagnostic/report research, LAN peer-sharing exploration, workspace contract terminology/semantics, a current maturity-gap assessment, AAIF/A2A layering guidance, and a CLI provider event-capability audit |
 
 ## Context-Driven Development
 
@@ -101,4 +101,4 @@ later passes:
 
 ---
 
-*Last updated: 2026-03-25*
+*Last updated: 2026-03-27*
