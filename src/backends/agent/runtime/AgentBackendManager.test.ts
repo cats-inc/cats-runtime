@@ -158,4 +158,77 @@ describe('AgentBackendManager', () => {
       },
     });
   });
+
+  it('passes through bounded remote tool catalogs when the adapter supports discovery', async () => {
+    const registry = new SessionRegistry();
+    const adapter: AgentAdapter = {
+      kind: 'test-adapter',
+      async *invoke() {
+        yield { type: 'result', sessionId: 'unused' };
+      },
+      async listTools() {
+        return {
+          method: 'tools_catalog',
+          summary: '2 tool(s) across 2 group(s)',
+          toolCount: 2,
+          groupCount: 2,
+          groups: [
+            { id: 'core', label: 'Core', toolCount: 1 },
+            { id: 'plugin:media', label: 'Media', toolCount: 1 },
+          ],
+          tools: [
+            { name: 'read_file', source: 'core', groupId: 'core' },
+            {
+              name: 'share_image',
+              source: 'plugin',
+              groupId: 'plugin:media',
+              pluginId: 'media',
+              optional: true,
+            },
+          ],
+        };
+      },
+    };
+    vi.mocked(buildAgentAdapter).mockReturnValue(adapter);
+
+    const manager = new AgentBackendManager(
+      { sessionBaseDir: '/tmp/cats-runtime-tests' },
+      registry,
+    );
+
+    const target: ProviderTargetDescriptor = {
+      providerName: 'openclaw',
+      backend: 'agent',
+      instanceId: 'gateway',
+      defaultTarget: true,
+      remoteInstance: {
+        id: 'gateway',
+        providerName: 'openclaw',
+        backend: 'agent',
+        transport: 'openclaw_gateway',
+        model: 'openclaw-coder',
+      },
+    };
+
+    await expect(manager.listTools(target)).resolves.toEqual({
+      method: 'tools_catalog',
+      summary: '2 tool(s) across 2 group(s)',
+      toolCount: 2,
+      groupCount: 2,
+      groups: [
+        { id: 'core', label: 'Core', toolCount: 1 },
+        { id: 'plugin:media', label: 'Media', toolCount: 1 },
+      ],
+      tools: [
+        { name: 'read_file', source: 'core', groupId: 'core' },
+        {
+          name: 'share_image',
+          source: 'plugin',
+          groupId: 'plugin:media',
+          pluginId: 'media',
+          optional: true,
+        },
+      ],
+    });
+  });
 });

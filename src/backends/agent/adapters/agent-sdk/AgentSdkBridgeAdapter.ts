@@ -82,6 +82,7 @@ function buildInspection(
       protocol: 'agent_sdk_http_v1',
       liveProbe: 'providers_get',
       modelDiscovery: 'providers_get',
+      toolDiscovery: 'none',
       streaming: 'sse',
     },
     request: {
@@ -109,6 +110,7 @@ function buildInspection(
     capabilities: {
       probe: true,
       modelDiscovery: true,
+      toolCatalog: false,
       cancel: true,
       runtimeServices: true,
       toolCallEvents: true,

@@ -2467,12 +2467,12 @@ The object includes:
 - operator-facing `summary`
 - resolved `endpoint`
 - `transport` semantics (`kind`, `protocol`, `liveProbe`, `modelDiscovery`,
-  `streaming`)
+  `toolDiscovery`, `streaming`)
 - outbound `request.headerNames`
 - bounded `auth` inspection (`mechanisms`, configured credential slots)
 - `continuity` truth for provider-managed session state and remote cancel support
-- additive capability flags such as `probe`, `modelDiscovery`, `cancel`,
-  `runtimeServices`, and `toolCallEvents`
+- additive capability flags such as `probe`, `modelDiscovery`, `toolCatalog`,
+  `cancel`, `runtimeServices`, and `toolCallEvents`
 
 `GET /providers/{provider}/tools` is the standalone runtime-owned tooling read
 surface for one resolved target. It accepts optional `?instance=<backend/id>`
@@ -2508,17 +2508,56 @@ full provider topology:
 }
 ```
 
-For CLI and agent targets the route stays honest: it still returns `200`, but
-`source` becomes `provider_native` or `provider_managed`, `discoverable` stays
-`false`, and no synthetic runtime tool catalog is invented. Those targets still
-include bounded `observability` truth so hosts can distinguish provider-owned
-catalogs from runtime-enumerated ones and can see whether the runtime can
-observe remote tool-call events or runtime service updates.
+For CLI targets the route stays honest: it still returns `200`, but `source`
+becomes `provider_native`, `discoverable` stays `false`, and no synthetic
+runtime tool catalog is invented.
+
+Agent targets now split into two cases:
+
+- adapters without remote tool discovery support still return the bounded
+  `provider_managed` summary only
+- adapters with bounded discovery support (the first slice is OpenClaw
+  `tools.catalog`) return `discoverable: true`, set
+  `observability.catalog: "provider_remote_enumerated"`, and may include an
+  additive `catalog` object
+
+The additive `catalog` object preserves provider ownership while giving hosts a
+machine-readable remote inventory:
+
+```json
+{
+  "source": "provider_remote",
+  "status": "ready",
+  "method": "tools_catalog",
+  "summary": "3 tool(s) across 2 group(s) advertised by the OpenClaw gateway.",
+  "toolCount": 3,
+  "groupCount": 2,
+  "groups": [
+    { "id": "core", "label": "Core", "toolCount": 2 },
+    { "id": "plugin:media", "label": "Media", "toolCount": 1 }
+  ],
+  "tools": [
+    { "name": "read_file", "source": "core", "groupId": "core" },
+    {
+      "name": "share_image",
+      "source": "plugin",
+      "groupId": "plugin:media",
+      "pluginId": "media",
+      "optional": true
+    }
+  ]
+}
+```
+
+If a remote catalog probe is supported but temporarily fails, the route still
+returns `200` and includes `catalog.status: "unavailable"` plus a bounded
+error string instead of collapsing the entire tooling inspection surface.
 
 For agent targets, the standalone tooling route also includes the same additive
 `agentRuntime` inspection object used by `GET /providers/config` and
 `GET /diagnostics/providers`, so hosts can inspect remote tool-call/service
-observability without fetching a second provider read model.
+observability, remote tool-discovery support, and request transport details
+without fetching a second provider read model.
 
 For CLI backends, instance entries also expose runtime-owned `install` metadata
 even before a probe has run. The `install` object includes:

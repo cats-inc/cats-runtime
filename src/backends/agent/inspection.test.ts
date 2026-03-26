@@ -29,6 +29,7 @@ describe('inspectAgentTarget', () => {
         protocol: 'openclaw_gateway_v3',
         liveProbe: 'rpc_health',
         modelDiscovery: 'models_list',
+        toolDiscovery: 'tools_catalog',
         streaming: 'agent_event_frames',
       },
       request: {
@@ -51,6 +52,7 @@ describe('inspectAgentTarget', () => {
       capabilities: {
         probe: true,
         modelDiscovery: true,
+        toolCatalog: true,
         cancel: false,
         runtimeServices: true,
         toolCallEvents: false,
@@ -83,6 +85,7 @@ describe('inspectAgentTarget', () => {
         protocol: 'agent_sdk_http_v1',
         liveProbe: 'providers_get',
         modelDiscovery: 'providers_get',
+        toolDiscovery: 'none',
         streaming: 'sse',
       },
       request: {
@@ -104,6 +107,7 @@ describe('inspectAgentTarget', () => {
       capabilities: {
         probe: true,
         modelDiscovery: true,
+        toolCatalog: false,
         cancel: true,
         runtimeServices: true,
         toolCallEvents: true,

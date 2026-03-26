@@ -37,6 +37,30 @@ export interface AgentAdapterProbeResult {
   checks?: AgentAdapterProbeCheck[];
 }
 
+export interface AgentAdapterToolCatalogEntry {
+  name: string;
+  title?: string;
+  groupId?: string;
+  source: 'core' | 'plugin' | 'channel' | 'session' | 'unknown';
+  pluginId?: string;
+  optional?: boolean;
+}
+
+export interface AgentAdapterToolCatalogGroup {
+  id: string;
+  label?: string;
+  toolCount: number;
+}
+
+export interface AgentAdapterToolCatalog {
+  method: 'tools_catalog' | 'tools_effective' | 'providers_get';
+  summary: string;
+  toolCount: number;
+  groupCount: number;
+  groups: AgentAdapterToolCatalogGroup[];
+  tools: AgentAdapterToolCatalogEntry[];
+}
+
 export interface AgentAdapterInspection {
   adapter: string;
   family: 'gateway' | 'bridge' | 'generic';
@@ -47,6 +71,7 @@ export interface AgentAdapterInspection {
     protocol: 'openclaw_gateway_v3' | 'agent_sdk_http_v1' | 'generic';
     liveProbe: 'rpc_health' | 'providers_get' | 'none';
     modelDiscovery: 'models_list' | 'providers_get' | 'none';
+    toolDiscovery: 'tools_catalog' | 'tools_effective' | 'providers_get' | 'none';
     streaming: 'agent_event_frames' | 'sse' | 'generic';
   };
   request: {
@@ -65,6 +90,7 @@ export interface AgentAdapterInspection {
   capabilities: {
     probe: boolean;
     modelDiscovery: boolean;
+    toolCatalog: boolean;
     cancel: boolean;
     runtimeServices: boolean;
     toolCallEvents: boolean;
@@ -76,6 +102,7 @@ export interface AgentAdapter {
   invoke(input: AgentInvokeInput): AsyncGenerator<StreamEvent>;
   probe?(instance: RemoteProviderInstanceConfig): Promise<AgentAdapterProbeResult>;
   listModels?(instance: RemoteProviderInstanceConfig): Promise<Array<{ id: string; label: string }>>;
+  listTools?(instance: RemoteProviderInstanceConfig): Promise<AgentAdapterToolCatalog>;
   inspect?(instance: RemoteProviderInstanceConfig): AgentAdapterInspection;
   cancel?(
     sessionId: string,

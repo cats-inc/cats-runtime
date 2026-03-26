@@ -32,6 +32,7 @@ function buildGenericInspection(
       protocol: 'generic',
       liveProbe: 'none',
       modelDiscovery: 'none',
+      toolDiscovery: 'none',
       streaming: 'generic',
     },
     request: {
@@ -50,6 +51,7 @@ function buildGenericInspection(
     capabilities: {
       probe: false,
       modelDiscovery: false,
+      toolCatalog: false,
       cancel: false,
       runtimeServices: false,
       toolCallEvents: false,

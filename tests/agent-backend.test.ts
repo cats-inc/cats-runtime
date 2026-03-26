@@ -204,6 +204,39 @@ class FakeOpenClawSocket extends EventTarget {
       return;
     }
 
+    if (method === 'tools.catalog') {
+      this.emitFrame({
+        type: 'res',
+        id: frame.id,
+        ok: true,
+        payload: {
+          groups: [
+            {
+              id: 'core',
+              label: 'Core',
+              tools: [
+                { name: 'read_file', source: 'core' },
+                { name: 'write_file', source: 'core' },
+              ],
+            },
+            {
+              id: 'plugin:media',
+              label: 'Media',
+              tools: [
+                {
+                  name: 'share_image',
+                  source: 'plugin',
+                  pluginId: 'media',
+                  optional: true,
+                },
+              ],
+            },
+          ],
+        },
+      });
+      return;
+    }
+
     if (method === 'agent') {
       const params = frame.params as Record<string, unknown>;
       const script = this.scripts.shift() || {
@@ -334,6 +367,7 @@ describe('agent backend integration', () => {
                   protocol: 'openclaw_gateway_v3',
                   liveProbe: 'rpc_health',
                   modelDiscovery: 'models_list',
+                  toolDiscovery: 'tools_catalog',
                   streaming: 'agent_event_frames',
                 },
                 request: {
@@ -356,6 +390,7 @@ describe('agent backend integration', () => {
                 capabilities: {
                   probe: true,
                   modelDiscovery: true,
+                  toolCatalog: true,
                   cancel: false,
                   runtimeServices: true,
                   toolCallEvents: false,
@@ -363,11 +398,11 @@ describe('agent backend integration', () => {
               },
               tooling: {
                 source: 'provider_managed',
-                discoverable: false,
+                discoverable: true,
                 sessionScopedOverrides: false,
-                summary: expect.stringContaining('external agent runtime'),
+                summary: expect.stringContaining('query a bounded remote tool catalog'),
                 observability: {
-                  catalog: 'not_enumerated',
+                  catalog: 'provider_remote_enumerated',
                   toolCallEvents: false,
                   runtimeServices: true,
                 },
@@ -800,6 +835,7 @@ describe('agent backend integration', () => {
             protocol: 'openclaw_gateway_v3',
             liveProbe: 'rpc_health',
             modelDiscovery: 'models_list',
+            toolDiscovery: 'tools_catalog',
             streaming: 'agent_event_frames',
           },
           request: {
@@ -821,17 +857,35 @@ describe('agent backend integration', () => {
           capabilities: {
             probe: true,
             modelDiscovery: true,
+            toolCatalog: true,
             cancel: false,
             runtimeServices: true,
             toolCallEvents: false,
           },
         }),
         source: 'provider_managed',
-        discoverable: false,
+        discoverable: true,
         sessionScopedOverrides: false,
         summary: expect.stringContaining('external agent runtime'),
+        catalog: {
+          source: 'provider_remote',
+          status: 'ready',
+          method: 'tools_catalog',
+          summary: '3 tool(s) across 2 group(s) advertised by the OpenClaw gateway.',
+          toolCount: 3,
+          groupCount: 2,
+          groups: [
+            { id: 'core', label: 'Core', toolCount: 2 },
+            { id: 'plugin:media', label: 'Media', toolCount: 1 },
+          ],
+          tools: [
+            { name: 'read_file', source: 'core', groupId: 'core' },
+            { name: 'share_image', source: 'plugin', groupId: 'plugin:media', pluginId: 'media', optional: true },
+            { name: 'write_file', source: 'core', groupId: 'core' },
+          ],
+        },
         observability: {
-          catalog: 'not_enumerated',
+          catalog: 'provider_remote_enumerated',
           toolCallEvents: false,
           runtimeServices: true,
         },
@@ -1058,6 +1112,7 @@ describe('agent backend integration', () => {
                   protocol: 'agent_sdk_http_v1',
                   liveProbe: 'providers_get',
                   modelDiscovery: 'providers_get',
+                  toolDiscovery: 'none',
                   streaming: 'sse',
                 },
                 request: {
@@ -1079,6 +1134,7 @@ describe('agent backend integration', () => {
                 capabilities: {
                   probe: true,
                   modelDiscovery: true,
+                  toolCatalog: false,
                   cancel: true,
                   runtimeServices: true,
                   toolCallEvents: true,

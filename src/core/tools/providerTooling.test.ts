@@ -92,6 +92,7 @@ describe('buildProviderToolingSummary', () => {
           protocol: 'openclaw_gateway_v3',
           liveProbe: 'rpc_health',
           modelDiscovery: 'models_list',
+          toolDiscovery: 'tools_catalog',
           streaming: 'agent_event_frames',
         },
         request: {
@@ -110,6 +111,7 @@ describe('buildProviderToolingSummary', () => {
         capabilities: {
           probe: true,
           modelDiscovery: true,
+          toolCatalog: true,
           cancel: false,
           runtimeServices: true,
           toolCallEvents: false,
@@ -119,11 +121,11 @@ describe('buildProviderToolingSummary', () => {
 
     expect(summary).toEqual({
       source: 'provider_managed',
-      discoverable: false,
+      discoverable: true,
       sessionScopedOverrides: false,
-      summary: expect.stringContaining('does not enumerate a remote tool catalog'),
+      summary: expect.stringContaining('can query a bounded remote tool catalog'),
       observability: {
-        catalog: 'not_enumerated',
+        catalog: 'provider_remote_enumerated',
         toolCallEvents: false,
         runtimeServices: true,
       },

@@ -12,6 +12,9 @@ import type {
   AgentBackendOptions,
   AgentInvokeInput,
   AgentAdapterProbeResult,
+  AgentAdapterToolCatalog,
+  AgentAdapterToolCatalogEntry,
+  AgentAdapterToolCatalogGroup,
 } from '../../types.js';
 import { parseRecord, parseServices, prependInstructions, readString } from '../../utils.js';
 
@@ -49,6 +52,8 @@ interface GatewayModelCatalogEntry {
   id: string;
   label: string;
 }
+
+interface GatewayToolCatalogGroup extends AgentAdapterToolCatalogGroup {}
 
 interface PendingRequest {
   resolve: (value: any) => void;
@@ -132,6 +137,7 @@ function buildInspection(
       protocol: 'openclaw_gateway_v3',
       liveProbe: 'rpc_health',
       modelDiscovery: 'models_list',
+      toolDiscovery: 'tools_catalog',
       streaming: 'agent_event_frames',
     },
     request: {
@@ -170,6 +176,7 @@ function buildInspection(
     capabilities: {
       probe: true,
       modelDiscovery: true,
+      toolCatalog: true,
       cancel: false,
       runtimeServices: true,
       toolCallEvents: false,
@@ -377,6 +384,121 @@ function parseGatewayModelCatalog(payload: unknown): GatewayModelCatalogEntry[] 
   }
 
   return [...deduped.values()];
+}
+
+function normalizeGatewayToolSource(value: unknown): AgentAdapterToolCatalogEntry['source'] {
+  switch (value) {
+    case 'core':
+    case 'plugin':
+    case 'channel':
+    case 'session':
+      return value;
+    default:
+      return 'unknown';
+  }
+}
+
+function parseGatewayToolEntry(
+  entry: unknown,
+  inheritedGroupId?: string,
+): AgentAdapterToolCatalogEntry | null {
+  const record = parseRecord(entry);
+  if (!record) {
+    return null;
+  }
+
+  const name = readString(record.name) || readString(record.id);
+  if (!name) {
+    return null;
+  }
+
+  const groupId = readString(record.groupId)
+    || readString(record.group)
+    || inheritedGroupId;
+
+  return {
+    name,
+    source: normalizeGatewayToolSource(readString(record.source)),
+    ...(readString(record.title) || readString(record.label)
+      ? { title: readString(record.title) || readString(record.label) }
+      : {}),
+    ...(groupId ? { groupId } : {}),
+    ...(readString(record.pluginId) ? { pluginId: readString(record.pluginId)! } : {}),
+    ...(record.optional === true ? { optional: true } : {}),
+  };
+}
+
+function parseGatewayToolCatalog(payload: unknown): AgentAdapterToolCatalog {
+  const record = parseRecord(payload) || {};
+  const tools: AgentAdapterToolCatalogEntry[] = [];
+  const groups: GatewayToolCatalogGroup[] = [];
+
+  if (Array.isArray(record.groups)) {
+    for (const groupEntry of record.groups) {
+      const groupRecord = parseRecord(groupEntry);
+      if (!groupRecord) {
+        continue;
+      }
+
+      const groupId = readString(groupRecord.id)
+        || readString(groupRecord.key)
+        || readString(groupRecord.name);
+      if (!groupId) {
+        continue;
+      }
+
+      const label = readString(groupRecord.label)
+        || readString(groupRecord.title)
+        || readString(groupRecord.name);
+      const groupTools = Array.isArray(groupRecord.tools)
+        ? groupRecord.tools
+          .map((entry) => parseGatewayToolEntry(entry, groupId))
+          .filter((entry): entry is AgentAdapterToolCatalogEntry => Boolean(entry))
+        : [];
+
+      groups.push({
+        id: groupId,
+        ...(label ? { label } : {}),
+        toolCount: groupTools.length,
+      });
+      tools.push(...groupTools);
+    }
+  }
+
+  if (tools.length === 0 && Array.isArray(record.tools)) {
+    tools.push(
+      ...record.tools
+        .map((entry) => parseGatewayToolEntry(entry))
+        .filter((entry): entry is AgentAdapterToolCatalogEntry => Boolean(entry)),
+    );
+  }
+
+  if (groups.length === 0) {
+    const counts = new Map<string, number>();
+    for (const tool of tools) {
+      const key = tool.groupId || tool.source;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    for (const [id, toolCount] of counts.entries()) {
+      groups.push({
+        id,
+        label: id,
+        toolCount,
+      });
+    }
+  }
+
+  groups.sort((left, right) => left.id.localeCompare(right.id));
+  tools.sort((left, right) => left.name.localeCompare(right.name));
+
+  return {
+    method: 'tools_catalog',
+    summary: `${tools.length} tool(s) across ${groups.length} group(s) advertised by the OpenClaw gateway.`,
+    toolCount: tools.length,
+    groupCount: groups.length,
+    groups,
+    tools,
+  };
 }
 
 class GatewayWsClient {
@@ -846,6 +968,29 @@ export class OpenClawAdapter implements AgentAdapter {
         DEFAULT_CONNECT_TIMEOUT_MS,
       );
       return parseGatewayModelCatalog(payload);
+    } finally {
+      controller.abort();
+      client.close();
+    }
+  }
+
+  async listTools(instance: RemoteProviderInstanceConfig): Promise<AgentAdapterToolCatalog> {
+    const env = this.options.env || process.env;
+    const factory = this.options.webSocketFactory
+      || ((url: string | URL, init?: WebSocketInit) => new WebSocket(url, init));
+    const url = requireUrl(instance, env);
+    const headers = resolveHeaders(instance, env);
+    const client = new GatewayWsClient(factory, url, headers, () => {});
+    const controller = new AbortController();
+
+    try {
+      await client.connect(buildConnectParams(instance, env), controller.signal);
+      const payload = await client.request(
+        'tools.catalog',
+        {},
+        DEFAULT_CONNECT_TIMEOUT_MS,
+      );
+      return parseGatewayToolCatalog(payload);
     } finally {
       controller.abort();
       client.close();

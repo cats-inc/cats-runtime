@@ -1,7 +1,22 @@
 import type { ProviderTargetDescriptor } from '../providerCatalog.js';
 import type { RuntimeToolPolicyInspection } from '../types.js';
 import { buildToolPolicyInspection } from './LocalToolRuntime.js';
-import type { AgentAdapterInspection } from '../../backends/agent/types.js';
+import type {
+  AgentAdapterInspection,
+  AgentAdapterToolCatalog,
+} from '../../backends/agent/types.js';
+
+export interface ProviderRemoteToolCatalog {
+  source: 'provider_remote';
+  status: 'ready' | 'unavailable';
+  method: AgentAdapterToolCatalog['method'];
+  summary: string;
+  toolCount: number;
+  groupCount: number;
+  groups: AgentAdapterToolCatalog['groups'];
+  tools: AgentAdapterToolCatalog['tools'];
+  error?: string;
+}
 
 export interface ProviderToolingSummary {
   source: 'runtime_local' | 'provider_native' | 'provider_managed';
@@ -9,8 +24,9 @@ export interface ProviderToolingSummary {
   sessionScopedOverrides: boolean;
   summary: string;
   policy?: RuntimeToolPolicyInspection;
+  catalog?: ProviderRemoteToolCatalog;
   observability: {
-    catalog: 'runtime_enumerated' | 'not_enumerated';
+    catalog: 'runtime_enumerated' | 'provider_remote_enumerated' | 'not_enumerated';
     toolCallEvents: boolean;
     runtimeServices: boolean;
   };
@@ -18,6 +34,39 @@ export interface ProviderToolingSummary {
 
 interface ProviderToolingSummaryOptions {
   agentRuntime?: AgentAdapterInspection;
+  remoteCatalog?: ProviderRemoteToolCatalog;
+}
+
+export function buildProviderRemoteToolCatalog(
+  catalog: AgentAdapterToolCatalog,
+): ProviderRemoteToolCatalog {
+  return {
+    source: 'provider_remote',
+    status: 'ready',
+    method: catalog.method,
+    summary: catalog.summary,
+    toolCount: catalog.toolCount,
+    groupCount: catalog.groupCount,
+    groups: catalog.groups,
+    tools: catalog.tools,
+  };
+}
+
+export function buildUnavailableProviderRemoteToolCatalog(
+  method: ProviderRemoteToolCatalog['method'],
+  error: string,
+): ProviderRemoteToolCatalog {
+  return {
+    source: 'provider_remote',
+    status: 'unavailable',
+    method,
+    summary: `Remote tool catalog could not be loaded: ${error}`,
+    toolCount: 0,
+    groupCount: 0,
+    groups: [],
+    tools: [],
+    error,
+  };
 }
 
 export function buildProviderToolingSummary(
@@ -45,6 +94,7 @@ export function buildProviderToolingSummary(
   }
 
   if (target.backend === 'agent') {
+    const remoteCatalogCapable = options.agentRuntime?.capabilities.toolCatalog === true;
     const toolCallEvents = options.agentRuntime?.capabilities.toolCallEvents === true;
     const runtimeServices = options.agentRuntime?.capabilities.runtimeServices === true;
     const observationSummary = (() => {
@@ -59,16 +109,19 @@ export function buildProviderToolingSummary(
       }
       return 'The runtime currently does not expose bounded remote tool-call or service-update observation.';
     })();
+    const discoverySummary = remoteCatalogCapable
+      ? 'The runtime can query a bounded remote tool catalog from the external agent runtime.'
+      : 'cats-runtime does not enumerate a remote tool catalog.';
 
     return {
       source: 'provider_managed',
-      discoverable: false,
+      discoverable: remoteCatalogCapable,
       sessionScopedOverrides: false,
       summary: `Tool execution for ${target.providerName}/${target.instanceId} is owned `
-        + 'by the external agent runtime; cats-runtime does not enumerate a remote tool catalog. '
-        + observationSummary,
+        + `by the external agent runtime; ${discoverySummary} ${observationSummary}`,
+      ...(options.remoteCatalog ? { catalog: options.remoteCatalog } : {}),
       observability: {
-        catalog: 'not_enumerated',
+        catalog: remoteCatalogCapable ? 'provider_remote_enumerated' : 'not_enumerated',
         toolCallEvents,
         runtimeServices,
       },

@@ -12,6 +12,7 @@ import { inspectAgentTarget } from '../inspection.js';
 import type {
   AgentBackendOptions,
   AgentAdapterProbeResult,
+  AgentAdapterToolCatalog,
   AgentBackendStatus,
   AgentAdapter,
   AgentAdapterInspection,
@@ -188,6 +189,19 @@ export class AgentBackendManager {
     }
 
     return adapter.listModels(instance);
+  }
+
+  async listTools(target: ProviderTargetDescriptor): Promise<AgentAdapterToolCatalog> {
+    const instance = ensureAgentTarget(target);
+    const adapter = this.buildAdapter(instance);
+    if (!adapter.listTools) {
+      throw new Error(
+        `Agent adapter '${adapter.kind}' does not support remote tool discovery for `
+        + `${target.providerName}/${target.instanceId}`,
+      );
+    }
+
+    return adapter.listTools(instance);
   }
 
   async probe(

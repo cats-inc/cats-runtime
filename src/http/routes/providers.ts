@@ -9,7 +9,11 @@ import { inspectProviderActiveConfig } from '../../core/providerActiveConfig.js'
 import type { ProviderName } from '../../backends/cli/providers/types.js';
 import { inspectAgentTarget } from '../../backends/agent/inspection.js';
 import { buildProviderInstallCatalogView } from '../../core/provider-install/knowledge.js';
-import { buildProviderToolingSummary } from '../../core/tools/providerTooling.js';
+import {
+  buildProviderToolingSummary,
+  buildProviderRemoteToolCatalog,
+  buildUnavailableProviderRemoteToolCatalog,
+} from '../../core/tools/providerTooling.js';
 import type { AppContext } from '../app.js';
 import { getProviderCompatibilityService } from '../app.js';
 import { getRouteErrorStatus } from '../routeErrors.js';
@@ -108,7 +112,7 @@ providerRoutes.get('/providers/:provider/models', async (c) => {
   }
 });
 
-providerRoutes.get('/providers/:provider/tools', (c) => {
+providerRoutes.get('/providers/:provider/tools', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const providerName = c.req.param('provider');
   const instance = c.req.query('instance') || undefined;
@@ -120,13 +124,27 @@ providerRoutes.get('/providers/:provider/tools', (c) => {
         ? ctx.agentBackend.inspect(target)
         : inspectAgentTarget(target.remoteInstance, { env: process.env })
       : undefined;
+    const remoteToolDiscoveryMethod = agentRuntime?.transport.toolDiscovery
+      && agentRuntime.transport.toolDiscovery !== 'none'
+      ? agentRuntime.transport.toolDiscovery
+      : 'tools_catalog';
+    const remoteCatalog = target.backend === 'agent'
+      && agentRuntime?.capabilities.toolCatalog === true
+      && ctx.agentBackend
+      ? await ctx.agentBackend.listTools(target)
+        .then((catalog) => buildProviderRemoteToolCatalog(catalog))
+        .catch((error) => buildUnavailableProviderRemoteToolCatalog(
+          remoteToolDiscoveryMethod,
+          error instanceof Error ? error.message : String(error),
+        ))
+      : undefined;
     return c.json({
       provider: target.providerName,
       backend: target.backend,
       instance: target.instanceId,
       target: `${target.backend}/${target.instanceId}`,
       ...(agentRuntime ? { agentRuntime } : {}),
-      ...buildProviderToolingSummary(target, { agentRuntime }),
+      ...buildProviderToolingSummary(target, { agentRuntime, remoteCatalog }),
     });
   } catch (err) {
     const payload: Record<string, unknown> = {

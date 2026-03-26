@@ -583,7 +583,9 @@ src/
    surface, including runtime maintenance snapshots plus transport-native
    API/local auth/model probe requests, additive provider-tooling ownership /
    baseline-profile summaries plus bounded tooling observability truth,
-   additive HTTP semantic classifications, and additive
+   additive HTTP semantic classifications, additive OpenClaw
+   `tools.catalog`-backed remote tool discovery on
+   `GET /providers/{provider}/tools` for agent targets that support it, and additive
    model-catalog/configured-model readiness checks for
    API/local/agent targets when requested
 14. `POST /mcp` reuses those same runtime-owned services as an additive
