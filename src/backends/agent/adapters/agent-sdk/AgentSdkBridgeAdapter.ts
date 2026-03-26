@@ -172,6 +172,92 @@ function parseBridgeProviderRegistry(
   };
 }
 
+function isBridgeProviderSemanticallyReady(
+  registry: ReturnType<typeof parseBridgeProviderRegistry>,
+): boolean {
+  return registry.providerListed
+    && registry.capabilities.streaming
+    && (registry.configuredModelListed !== false);
+}
+
+function summarizeBridgeRegistryHealth(
+  registry: ReturnType<typeof parseBridgeProviderRegistry>,
+  expectedProvider: string,
+  configuredModel: string | undefined,
+): string {
+  if (!registry.providerListed) {
+    return `${expectedProvider} not listed by Agent SDK bridge`;
+  }
+
+  if (configuredModel && registry.configuredModelListed === false) {
+    return `Configured model '${configuredModel}' is not visible via Agent SDK bridge`;
+  }
+
+  if (!registry.capabilities.streaming) {
+    return `${expectedProvider} is listed by Agent SDK bridge but does not advertise streaming support`;
+  }
+
+  return `${expectedProvider} available via Agent SDK bridge`;
+}
+
+function buildBridgeProbeChecks(
+  registry: ReturnType<typeof parseBridgeProviderRegistry>,
+  endpoint: string,
+  expectedProvider: string,
+  configuredModel: string | undefined,
+): AgentAdapterProbeCheck[] {
+  const providerLabel = `${expectedProvider} via Agent SDK bridge`;
+  return [
+    {
+      code: 'bridge_provider_listed',
+      status: registry.providerListed ? ('ok' as const) : ('degraded' as const),
+      message: registry.providerListed
+        ? `${providerLabel} is listed by the bridge provider registry`
+        : `${providerLabel} is not listed by the bridge provider registry`,
+      details: {
+        endpoint,
+        targetProvider: expectedProvider,
+        providerCount: registry.providerCount,
+        modelCount: registry.modelCount,
+        ...(registry.defaultModel ? { defaultModel: registry.defaultModel } : {}),
+        capabilities: registry.capabilities,
+      },
+    },
+    ...(configuredModel
+      ? [{
+          code: 'bridge_configured_model_visible',
+          status: registry.configuredModelListed === true ? ('ok' as const) : ('degraded' as const),
+          message: registry.configuredModelListed === true
+            ? `Configured model '${configuredModel}' is visible through the bridge provider registry`
+            : `Configured model '${configuredModel}' is not visible through the bridge provider registry`,
+          details: {
+            endpoint,
+            targetProvider: expectedProvider,
+            configuredModel,
+            configuredModelListed: registry.configuredModelListed === true,
+            modelCount: registry.modelCount,
+            ...(registry.defaultModel ? { defaultModel: registry.defaultModel } : {}),
+          },
+        }]
+      : []),
+    ...(registry.providerListed
+      ? [{
+          code: 'bridge_provider_streaming_supported',
+          status: registry.capabilities.streaming ? ('ok' as const) : ('degraded' as const),
+          message: registry.capabilities.streaming
+            ? `${providerLabel} advertises streaming support in the bridge provider registry`
+            : `${providerLabel} does not advertise streaming support in the bridge provider registry`,
+          details: {
+            endpoint,
+            targetProvider: expectedProvider,
+            streamingAdvertised: registry.capabilities.streaming,
+            capabilities: registry.capabilities,
+          },
+        }]
+      : []),
+  ];
+}
+
 function buildProviderState(
   input: AgentInvokeInput,
   bridgeSessionId: string,
@@ -404,49 +490,14 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
 
       const payload = await response.json() as Record<string, unknown>;
       const registry = parseBridgeProviderRegistry(payload, expected, configuredModel);
-      const providerLabel = `${expected} via Agent SDK bridge`;
-      const checks: AgentAdapterProbeCheck[] = [
-        {
-          code: 'bridge_provider_listed',
-          status: registry.providerListed ? ('ok' as const) : ('degraded' as const),
-          message: registry.providerListed
-            ? `${providerLabel} is listed by the bridge provider registry`
-            : `${providerLabel} is not listed by the bridge provider registry`,
-          details: {
-            endpoint,
-            targetProvider: expected,
-            providerCount: registry.providerCount,
-            modelCount: registry.modelCount,
-            ...(registry.defaultModel ? { defaultModel: registry.defaultModel } : {}),
-            capabilities: registry.capabilities,
-          },
-        },
-        ...(configuredModel
-          ? [{
-              code: 'bridge_configured_model_visible',
-              status: registry.configuredModelListed === true ? ('ok' as const) : ('degraded' as const),
-              message: registry.configuredModelListed === true
-                ? `Configured model '${configuredModel}' is visible through the bridge provider registry`
-                : `Configured model '${configuredModel}' is not visible through the bridge provider registry`,
-              details: {
-                endpoint,
-                targetProvider: expected,
-                configuredModel,
-                configuredModelListed: registry.configuredModelListed === true,
-                modelCount: registry.modelCount,
-                ...(registry.defaultModel ? { defaultModel: registry.defaultModel } : {}),
-              },
-            }]
-          : []),
-      ];
+      const checks = buildBridgeProbeChecks(registry, endpoint, expected, configuredModel);
+      const semanticallyReady = isBridgeProviderSemanticallyReady(registry);
 
       return {
         health: {
-          status: registry.providerListed ? 'ok' : 'degraded',
+          status: semanticallyReady ? 'ok' : 'degraded',
           checkedAt,
-          details: registry.providerListed
-            ? `${expected} available via Agent SDK bridge`
-            : `${expected} not listed by Agent SDK bridge`,
+          details: summarizeBridgeRegistryHealth(registry, expected, configuredModel),
         },
         liveProbe: {
           endpoint,
@@ -454,6 +505,7 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
           providerCount: registry.providerCount,
           providerListed: registry.providerListed,
           modelCount: registry.modelCount,
+          semanticStatus: semanticallyReady ? 'ok' : 'degraded',
           ...(registry.defaultModel ? { defaultModel: registry.defaultModel } : {}),
           ...(configuredModel ? { configuredModel } : {}),
           ...(registry.configuredModelListed !== undefined

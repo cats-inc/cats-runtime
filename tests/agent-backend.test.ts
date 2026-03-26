@@ -771,6 +771,20 @@ describe('agent backend integration', () => {
                 }),
               }),
               expect.objectContaining({
+                code: 'bridge_provider_streaming_supported',
+                status: 'ok',
+                details: expect.objectContaining({
+                  endpoint: 'http://agent-sdk.test/api/v1/providers',
+                  targetProvider: 'claude',
+                  streamingAdvertised: true,
+                  capabilities: {
+                    streaming: true,
+                    mcp: true,
+                    vision: false,
+                  },
+                }),
+              }),
+              expect.objectContaining({
                 code: 'model_catalog_loaded',
                 status: 'ok',
                 details: expect.objectContaining({
@@ -803,6 +817,7 @@ describe('agent backend integration', () => {
                 providerCount: 1,
                 providerListed: true,
                 modelCount: 2,
+                semanticStatus: 'ok',
                 defaultModel: 'sonnet',
                 configuredModel: 'sonnet',
                 configuredModelListed: true,
@@ -821,6 +836,106 @@ describe('agent backend integration', () => {
             }),
             reprobe: expect.objectContaining({
               liveSupported: true,
+            }),
+          }),
+        ],
+      }));
+      expect(fetchCalls).toEqual([
+        { url: 'http://agent-sdk.test/api/v1/providers', method: 'GET' },
+        { url: 'http://agent-sdk.test/api/v1/providers', method: 'GET' },
+      ]);
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
+  it('degrades Agent SDK bridge live diagnostics when the registry omits streaming support', async () => {
+    const { config, env, cleanup } = createAgentSdkConfigRoot();
+    const fetchCalls: Array<{ url: string; method: string }> = [];
+    const runtime = createRuntimeServer(config, {
+      agentBackend: {
+        env,
+        fetch: async (input, init) => {
+          const url = String(input);
+          const method = init?.method || 'GET';
+          fetchCalls.push({ url, method });
+
+          if (url === 'http://agent-sdk.test/api/v1/providers') {
+            return new Response(JSON.stringify({
+              providers: [
+                {
+                  name: 'claude',
+                  default_model: 'sonnet',
+                  models: ['sonnet', 'haiku'],
+                  capabilities: {
+                    streaming: false,
+                    mcp: true,
+                    vision: false,
+                  },
+                },
+              ],
+            }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
+          }
+
+          throw new Error(`Unexpected fetch: ${method} ${url}`);
+        },
+      },
+    });
+
+    try {
+      const response = await runtime.app.request(
+        '/diagnostics/providers?probe=live&provider=claude&backend=agent&instance=sdk',
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual(expect.objectContaining({
+        providers: [
+          expect.objectContaining({
+            provider: 'claude',
+            backend: 'agent',
+            instance: 'sdk',
+            availability: expect.objectContaining({
+              status: 'degraded',
+              probe: 'live',
+            }),
+            checks: expect.arrayContaining([
+              expect.objectContaining({
+                code: 'probe',
+                status: 'degraded',
+                message: 'claude is listed by Agent SDK bridge but does not advertise streaming support',
+              }),
+              expect.objectContaining({
+                code: 'bridge_provider_streaming_supported',
+                status: 'degraded',
+                details: expect.objectContaining({
+                  endpoint: 'http://agent-sdk.test/api/v1/providers',
+                  targetProvider: 'claude',
+                  streamingAdvertised: false,
+                  capabilities: {
+                    streaming: false,
+                    mcp: true,
+                    vision: false,
+                  },
+                }),
+              }),
+            ]),
+            config: expect.objectContaining({
+              liveProbe: expect.objectContaining({
+                adapter: 'agent_sdk_bridge',
+                endpoint: 'http://agent-sdk.test/api/v1/providers',
+                targetProvider: 'claude',
+                semanticStatus: 'degraded',
+                configuredModel: 'sonnet',
+                configuredModelListed: true,
+                capabilities: {
+                  streaming: false,
+                  mcp: true,
+                  vision: false,
+                },
+              }),
             }),
           }),
         ],

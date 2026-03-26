@@ -535,8 +535,9 @@ reporting config-only validation, and surface additive `config.liveProbe`
 snapshot fields such as advertised agent/channel/session counts. Agent SDK
 bridge targets now use the same live diagnostics surface to validate
 `GET /api/v1/providers` semantically, adding bounded checks for target-provider
-listing plus configured-model visibility and surfacing the same provider
-registry summary under `config.liveProbe`. Those same runtime-managed options
+listing, configured-model visibility, and registry-declared streaming support,
+and surfacing the same provider registry summary under `config.liveProbe`
+including `semanticStatus`. Those same runtime-managed options
 also back OpenClaw `models.list` and Agent SDK bridge provider-registry model
 loading, so live diagnostics and `GET /providers/{provider}/models` can report
 runtime-derived model truth instead of a config-only fallback when the remote

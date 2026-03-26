@@ -274,7 +274,10 @@ Diagnostics rules:
   backend supports them; API/local targets now use transport-native model/tag
   probe requests (`/v1/models`, `/v1beta/models`, `/api/tags`) and expose
   redacted `config.liveProbe` request metadata such as the semantic target,
-  applied auth mode, and request header names
+  applied auth mode, and request header names; Agent SDK bridge targets also
+  validate provider-registry listing, configured-model visibility, and
+  registry-declared streaming support before reporting a live bridge target as
+  fully ready
 - `force=1|true|refresh` refreshes cached CLI compatibility assessments so
   install/upgrade flows can re-probe immediately
 
