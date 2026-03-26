@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type {
   AgentRuntimeService,
-  HealthStatus,
   SessionArtifact,
   SessionProviderState,
   StreamEvent,
@@ -12,6 +11,7 @@ import type {
   AgentAdapterInspection,
   AgentBackendOptions,
   AgentInvokeInput,
+  AgentAdapterProbeResult,
 } from '../../types.js';
 import { parseRecord, parseServices, prependInstructions, readString } from '../../utils.js';
 
@@ -294,6 +294,46 @@ function summarizeHealthPayload(payload: unknown, url: string): string {
   ];
 
   return detailParts.join(' | ');
+}
+
+function buildGatewayHealthProbeSnapshot(
+  payload: unknown,
+  url: string,
+): {
+    endpoint: string;
+    agentCount: number;
+    channelCount: number;
+    linkedChannels: string[];
+    sessionCount?: number;
+    defaultAgentId?: string;
+    latencyMs?: number;
+  } {
+  const record = parseRecord(payload);
+  const agents = Array.isArray(record?.agents)
+    ? record.agents.filter((entry) => parseRecord(entry))
+    : [];
+  const channels = parseRecord(record?.channels);
+  const channelNames = Array.isArray(record?.channelOrder)
+    ? record.channelOrder.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
+    : Object.keys(channels || {});
+  const linkedChannels = channelNames.filter((name) => {
+    const channel = parseRecord(channels?.[name]);
+    return channel?.linked === true;
+  });
+  const sessions = parseRecord(record?.sessions);
+  const sessionCount = typeof sessions?.count === 'number' ? sessions.count : undefined;
+  const defaultAgentId = readString(record?.defaultAgentId) || undefined;
+  const latencyMs = typeof record?.durationMs === 'number' ? record.durationMs : undefined;
+
+  return {
+    endpoint: url,
+    agentCount: agents.length,
+    channelCount: channelNames.length,
+    linkedChannels,
+    ...(sessionCount !== undefined ? { sessionCount } : {}),
+    ...(defaultAgentId ? { defaultAgentId } : {}),
+    ...(latencyMs !== undefined ? { latencyMs } : {}),
+  };
 }
 
 function canonicalGatewayModelRef(provider: string, modelId: string): string {
@@ -732,7 +772,7 @@ export class OpenClawAdapter implements AgentAdapter {
     }
   }
 
-  async probe(instance: RemoteProviderInstanceConfig): Promise<HealthStatus> {
+  async probe(instance: RemoteProviderInstanceConfig): Promise<AgentAdapterProbeResult> {
     const env = this.options.env || process.env;
     const factory = this.options.webSocketFactory
       || ((url: string | URL, init?: WebSocketInit) => new WebSocket(url, init));
@@ -745,10 +785,32 @@ export class OpenClawAdapter implements AgentAdapter {
       try {
         await client.connect(buildConnectParams(instance, env), controller.signal);
         const health = await client.request('health', { probe: true }, DEFAULT_CONNECT_TIMEOUT_MS);
+        const liveProbe = buildGatewayHealthProbeSnapshot(health, url);
         return {
-          status: 'ok',
-          checkedAt,
-          details: summarizeHealthPayload(health, url),
+          health: {
+            status: 'ok',
+            checkedAt,
+            details: summarizeHealthPayload(health, url),
+          },
+          liveProbe,
+          checks: [
+            {
+              code: 'gateway_agents_visible',
+              status: liveProbe.agentCount > 0 ? 'ok' : 'degraded',
+              message: liveProbe.agentCount > 0
+                ? `Gateway advertised ${liveProbe.agentCount} agent(s) in the health snapshot`
+                : 'Gateway health snapshot did not advertise any agents',
+              details: {
+                endpoint: url,
+                agentCount: liveProbe.agentCount,
+                channelCount: liveProbe.channelCount,
+                linkedChannels: liveProbe.linkedChannels,
+                ...(liveProbe.defaultAgentId ? { defaultAgentId: liveProbe.defaultAgentId } : {}),
+                ...(liveProbe.sessionCount !== undefined ? { sessionCount: liveProbe.sessionCount } : {}),
+                ...(liveProbe.latencyMs !== undefined ? { latencyMs: liveProbe.latencyMs } : {}),
+              },
+            },
+          ],
         };
       } finally {
         controller.abort();
@@ -756,9 +818,11 @@ export class OpenClawAdapter implements AgentAdapter {
       }
     } catch (error) {
       return {
-        status: 'unavailable',
-        checkedAt,
-        details: error instanceof Error ? error.message : String(error),
+        health: {
+          status: 'unavailable',
+          checkedAt,
+          details: error instanceof Error ? error.message : String(error),
+        },
       };
     }
   }

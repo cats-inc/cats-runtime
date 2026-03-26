@@ -477,9 +477,11 @@ surface for hosts and dashboards. The response includes:
   surface, provider-managed continuity, and runtime-visible capability flags
 - additive `config.modelCatalog` summaries (`source`, `defaultModel`,
   `modelCount`, cache metadata when applicable, and warnings)
-- additive `config.liveProbe` request metadata for API/local targets, including
-  the semantic probe target, redacted request URL, auth application summary,
-  and request header names
+- additive `config.liveProbe` request/semantic metadata for API/local and
+  agent targets; API/local targets include the semantic probe target, redacted
+  request URL, auth application summary, and request header names, while agent
+  targets now expose adapter-specific bounded truth such as OpenClaw gateway
+  health snapshot counts or Agent SDK provider-registry/model visibility
 - target-level diagnostics details for CLI, API/local, and agent backends
 
 Agent targets now also include an additive `agent_runtime_contract` check. It
@@ -495,13 +497,19 @@ bounded transport-native GET probes against provider model/catalog endpoints and
 expose additive `config.liveProbe` metadata, including probe `target`,
 `headerNames`, `authentication`, and additive HTTP classifications such as
 `auth_required`, `auth_rejected`, `rate_limited`, `endpoint_not_found`,
-`upstream_error`, and network/timeout outcomes. Agent-backed OpenClaw targets now perform a real websocket
-handshake plus `health` RPC through the same `AgentBackendManager` runtime
-options used for live execution instead of reporting config-only validation.
-Those same runtime-managed websocket options now also back OpenClaw
-`models.list` catalog loading, so live diagnostics and `GET /providers/{provider}/models`
-can report canonical `provider/model` refs instead of a config-only fallback
-when the gateway exposes model discovery.
+`upstream_error`, and network/timeout outcomes. Agent-backed OpenClaw targets
+now perform a real websocket handshake plus `health` RPC through the same
+`AgentBackendManager` runtime options used for live execution instead of
+reporting config-only validation, and surface additive `config.liveProbe`
+snapshot fields such as advertised agent/channel/session counts. Agent SDK
+bridge targets now use the same live diagnostics surface to validate
+`GET /api/v1/providers` semantically, adding bounded checks for target-provider
+listing plus configured-model visibility and surfacing the same provider
+registry summary under `config.liveProbe`. Those same runtime-managed options
+also back OpenClaw `models.list` and Agent SDK bridge provider-registry model
+loading, so live diagnostics and `GET /providers/{provider}/models` can report
+runtime-derived model truth instead of a config-only fallback when the remote
+target exposes model discovery.
 OpenAI and Anthropic probes use `GET /v1/models` against the resolved base URL,
 Gemini/Google probes use `GET /v1beta/models`, and Ollama probes use
 `GET /api/tags`.

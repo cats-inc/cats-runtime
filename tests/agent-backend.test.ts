@@ -548,6 +548,19 @@ describe('agent backend integration', () => {
                 message: expect.stringContaining('Gateway health RPC succeeded'),
               }),
               expect.objectContaining({
+                code: 'gateway_agents_visible',
+                status: 'ok',
+                details: expect.objectContaining({
+                  endpoint: 'ws://gateway.test/ws',
+                  agentCount: 1,
+                  channelCount: 1,
+                  linkedChannels: ['telegram'],
+                  defaultAgentId: 'default',
+                  sessionCount: 1,
+                  latencyMs: 12,
+                }),
+              }),
+              expect.objectContaining({
                 code: 'model_catalog_loaded',
                 status: 'ok',
                 details: expect.objectContaining({
@@ -569,6 +582,16 @@ describe('agent backend integration', () => {
                   providerManagedSessions: true,
                 }),
               }),
+              liveProbe: expect.objectContaining({
+                adapter: 'openclaw',
+                endpoint: 'ws://gateway.test/ws',
+                agentCount: 1,
+                channelCount: 1,
+                linkedChannels: ['telegram'],
+                defaultAgentId: 'default',
+                sessionCount: 1,
+                latencyMs: 12,
+              }),
               modelCatalog: expect.objectContaining({
                 source: 'dynamic',
                 defaultModel: 'openclaw-coder',
@@ -584,6 +607,161 @@ describe('agent backend integration', () => {
       expect(sentFrames.filter((frame) => frame.method === 'connect')).toHaveLength(2);
       expect(sentFrames.filter((frame) => frame.method === 'health')).toHaveLength(1);
       expect(sentFrames.filter((frame) => frame.method === 'models.list')).toHaveLength(1);
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
+  it('surfaces Agent SDK provider-registry semantics in live provider diagnostics', async () => {
+    const { config, env, cleanup } = createAgentSdkConfigRoot();
+    const fetchCalls: Array<{ url: string; method: string }> = [];
+    const fakeFetch: typeof fetch = async (input, init) => {
+      const url = String(input);
+      const method = init?.method || 'GET';
+      fetchCalls.push({ url, method });
+
+      if (url === 'http://agent-sdk.test/api/v1/providers' && method === 'GET') {
+        return new Response(JSON.stringify({
+          providers: [
+            {
+              name: 'claude',
+              models: ['sonnet', 'haiku'],
+              default_model: 'sonnet',
+              capabilities: {
+                streaming: true,
+                mcp: true,
+                vision: false,
+              },
+            },
+          ],
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
+      throw new Error(`Unexpected fetch: ${method} ${url}`);
+    };
+
+    const runtime = createRuntimeServer(config, {
+      agentBackend: {
+        env,
+        fetch: fakeFetch,
+      },
+    });
+
+    try {
+      const response = await runtime.app.request(
+        '/diagnostics/providers?probe=live&provider=claude&backend=agent&instance=sdk',
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual(expect.objectContaining({
+        providers: [
+          expect.objectContaining({
+            provider: 'claude',
+            backend: 'agent',
+            instance: 'sdk',
+            availability: expect.objectContaining({
+              probe: 'live',
+            }),
+            checks: expect.arrayContaining([
+              expect.objectContaining({
+                code: 'agent_runtime_contract',
+                status: 'ok',
+              }),
+              expect.objectContaining({
+                code: 'probe',
+                status: 'ok',
+                message: expect.stringContaining('claude available via Agent SDK bridge'),
+              }),
+              expect.objectContaining({
+                code: 'bridge_provider_listed',
+                status: 'ok',
+                details: expect.objectContaining({
+                  endpoint: 'http://agent-sdk.test/api/v1/providers',
+                  targetProvider: 'claude',
+                  providerCount: 1,
+                  modelCount: 2,
+                  defaultModel: 'sonnet',
+                  capabilities: {
+                    streaming: true,
+                    mcp: true,
+                    vision: false,
+                  },
+                }),
+              }),
+              expect.objectContaining({
+                code: 'bridge_configured_model_visible',
+                status: 'ok',
+                details: expect.objectContaining({
+                  endpoint: 'http://agent-sdk.test/api/v1/providers',
+                  targetProvider: 'claude',
+                  configuredModel: 'sonnet',
+                  configuredModelListed: true,
+                  modelCount: 2,
+                  defaultModel: 'sonnet',
+                }),
+              }),
+              expect.objectContaining({
+                code: 'model_catalog_loaded',
+                status: 'ok',
+                details: expect.objectContaining({
+                  source: 'dynamic',
+                  modelCount: 2,
+                  defaultModel: 'sonnet',
+                }),
+              }),
+              expect.objectContaining({
+                code: 'configured_model_present',
+                status: 'ok',
+                details: expect.objectContaining({
+                  model: 'sonnet',
+                  source: 'dynamic',
+                  status: 'available',
+                }),
+              }),
+            ]),
+            config: expect.objectContaining({
+              agentRuntime: expect.objectContaining({
+                adapter: 'agent_sdk_bridge',
+                transport: expect.objectContaining({
+                  protocol: 'agent_sdk_http_v1',
+                }),
+              }),
+              liveProbe: {
+                adapter: 'agent_sdk_bridge',
+                endpoint: 'http://agent-sdk.test/api/v1/providers',
+                targetProvider: 'claude',
+                providerCount: 1,
+                providerListed: true,
+                modelCount: 2,
+                defaultModel: 'sonnet',
+                configuredModel: 'sonnet',
+                configuredModelListed: true,
+                capabilities: {
+                  streaming: true,
+                  mcp: true,
+                  vision: false,
+                },
+              },
+              modelCatalog: expect.objectContaining({
+                source: 'dynamic',
+                defaultModel: 'sonnet',
+                modelCount: 2,
+                warnings: [],
+              }),
+            }),
+            reprobe: expect.objectContaining({
+              liveSupported: true,
+            }),
+          }),
+        ],
+      }));
+      expect(fetchCalls).toEqual([
+        { url: 'http://agent-sdk.test/api/v1/providers', method: 'GET' },
+        { url: 'http://agent-sdk.test/api/v1/providers', method: 'GET' },
+      ]);
     } finally {
       await runtime.close();
       cleanup();

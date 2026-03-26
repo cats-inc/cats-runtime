@@ -197,14 +197,17 @@ src/
 - Exposes runtime/host diagnostics at `GET /diagnostics/runtime`
 - Exposes provider availability plus CLI compatibility diagnostics at
   `GET /diagnostics/providers`, including live API/local transport-native
-  auth/model probes and OpenClaw gateway `health` RPC probes when `probe=live`
+  auth/model probes, additive OpenClaw gateway health-snapshot details, and
+  Agent SDK provider-registry/model-visibility checks when `probe=live`
 - Reuses the same agent-backend runtime options for OpenClaw gateway
   `models.list` discovery, so provider model catalogs and diagnostics can
   expose canonical `provider/model` refs instead of config-only fallback data
 - Exposes additive agent-target inspection read models on `/providers/config`
   and `/diagnostics/providers` so operators can read adapter family, transport
   semantics, auth surface, provider-managed continuity, and bounded capability
-  truth without inferring them from provider names
+  truth without inferring them from provider names; live agent diagnostics also
+  project adapter-specific `config.liveProbe` summaries instead of only generic
+  probe status text
 - Exposes runtime-owned browser session/page routes with pluggable driver
   metadata, normalized `browser_page` preview surfaces, aggregate browser
   summary reads, and explicit closed-session cleanup

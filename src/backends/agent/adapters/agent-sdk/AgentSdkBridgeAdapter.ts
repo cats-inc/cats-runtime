@@ -1,6 +1,5 @@
 import type {
   AgentRuntimeService,
-  HealthStatus,
   SessionProviderState,
   StreamEvent,
 } from '../../../../core/types.js';
@@ -10,7 +9,9 @@ import type {
   AgentAdapter,
   AgentAdapterInspection,
   AgentBackendOptions,
+  AgentAdapterProbeCheck,
   AgentInvokeInput,
+  AgentAdapterProbeResult,
 } from '../../types.js';
 import { parseServices, prependInstructions } from '../../utils.js';
 
@@ -112,6 +113,60 @@ function buildInspection(
       runtimeServices: true,
       toolCallEvents: true,
     },
+  };
+}
+
+function parseBridgeProviderCapabilities(
+  value: unknown,
+): { streaming: boolean; mcp: boolean; vision: boolean } {
+  const record = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  return {
+    streaming: record.streaming === true,
+    mcp: record.mcp === true,
+    vision: record.vision === true,
+  };
+}
+
+function parseBridgeProviderRegistry(
+  payload: Record<string, unknown>,
+  expectedProvider: string,
+  configuredModel: string | undefined,
+): {
+    providerCount: number;
+    providerListed: boolean;
+    modelCount: number;
+    defaultModel?: string;
+    configuredModel?: string;
+    configuredModelListed?: boolean;
+    capabilities: {
+      streaming: boolean;
+      mcp: boolean;
+      vision: boolean;
+    };
+  } {
+  const providers = Array.isArray(payload.providers) ? payload.providers : [];
+  const provider = providers.find((entry) =>
+    entry && typeof entry === 'object' && (entry as Record<string, unknown>).name === expectedProvider,
+  ) as Record<string, unknown> | undefined;
+  const models = Array.isArray(provider?.models)
+    ? provider.models.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
+    : [];
+  const defaultModel = typeof provider?.default_model === 'string' && provider.default_model.length > 0
+    ? provider.default_model
+    : undefined;
+  const providerListed = Boolean(provider);
+  const configuredModelListed = configuredModel
+    ? models.includes(configuredModel)
+    : undefined;
+
+  return {
+    providerCount: providers.length,
+    providerListed,
+    modelCount: models.length,
+    ...(defaultModel ? { defaultModel } : {}),
+    ...(configuredModel ? { configuredModel } : {}),
+    ...(configuredModelListed !== undefined ? { configuredModelListed } : {}),
+    capabilities: parseBridgeProviderCapabilities(provider?.capabilities),
   };
 }
 
@@ -317,41 +372,107 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
     };
   }
 
-  async probe(instance: RemoteProviderInstanceConfig): Promise<HealthStatus> {
+  async probe(instance: RemoteProviderInstanceConfig): Promise<AgentAdapterProbeResult> {
     const env = this.options.env || process.env;
     const baseUrl = resolveBaseUrl(instance, env).replace(/\/$/, '');
+    const checkedAt = new Date().toISOString();
+    const endpoint = `${baseUrl}/api/v1/providers`;
+    const expected = mapBridgeProvider(instance.providerName);
+    const configuredModel = instance.model?.trim() || undefined;
 
     try {
-      const response = await this.fetchImpl(`${baseUrl}/api/v1/providers`, {
+      const response = await this.fetchImpl(endpoint, {
         headers: buildHeaders(instance, env),
       });
       if (!response.ok) {
         return {
-          status: 'unavailable',
-          checkedAt: new Date().toISOString(),
-          details: await readErrorBody(response),
+          health: {
+            status: 'unavailable',
+            checkedAt,
+            details: await readErrorBody(response),
+          },
+          liveProbe: {
+            endpoint,
+            targetProvider: expected,
+            ...(configuredModel ? { configuredModel } : {}),
+            statusCode: response.status,
+          },
         };
       }
 
       const payload = await response.json() as Record<string, unknown>;
-      const providers = Array.isArray(payload.providers) ? payload.providers : [];
-      const expected = mapBridgeProvider(instance.providerName);
-      const supported = providers.some((entry) =>
-        entry && typeof entry === 'object' && (entry as Record<string, unknown>).name === expected,
-      );
+      const registry = parseBridgeProviderRegistry(payload, expected, configuredModel);
+      const providerLabel = `${expected} via Agent SDK bridge`;
+      const checks: AgentAdapterProbeCheck[] = [
+        {
+          code: 'bridge_provider_listed',
+          status: registry.providerListed ? ('ok' as const) : ('degraded' as const),
+          message: registry.providerListed
+            ? `${providerLabel} is listed by the bridge provider registry`
+            : `${providerLabel} is not listed by the bridge provider registry`,
+          details: {
+            endpoint,
+            targetProvider: expected,
+            providerCount: registry.providerCount,
+            modelCount: registry.modelCount,
+            ...(registry.defaultModel ? { defaultModel: registry.defaultModel } : {}),
+            capabilities: registry.capabilities,
+          },
+        },
+        ...(configuredModel
+          ? [{
+              code: 'bridge_configured_model_visible',
+              status: registry.configuredModelListed === true ? ('ok' as const) : ('degraded' as const),
+              message: registry.configuredModelListed === true
+                ? `Configured model '${configuredModel}' is visible through the bridge provider registry`
+                : `Configured model '${configuredModel}' is not visible through the bridge provider registry`,
+              details: {
+                endpoint,
+                targetProvider: expected,
+                configuredModel,
+                configuredModelListed: registry.configuredModelListed === true,
+                modelCount: registry.modelCount,
+                ...(registry.defaultModel ? { defaultModel: registry.defaultModel } : {}),
+              },
+            }]
+          : []),
+      ];
 
       return {
-        status: supported ? 'ok' : 'degraded',
-        checkedAt: new Date().toISOString(),
-        details: supported
-          ? `${expected} available via Agent SDK bridge`
-          : `${expected} not listed by Agent SDK bridge`,
+        health: {
+          status: registry.providerListed ? 'ok' : 'degraded',
+          checkedAt,
+          details: registry.providerListed
+            ? `${expected} available via Agent SDK bridge`
+            : `${expected} not listed by Agent SDK bridge`,
+        },
+        liveProbe: {
+          endpoint,
+          targetProvider: expected,
+          providerCount: registry.providerCount,
+          providerListed: registry.providerListed,
+          modelCount: registry.modelCount,
+          ...(registry.defaultModel ? { defaultModel: registry.defaultModel } : {}),
+          ...(configuredModel ? { configuredModel } : {}),
+          ...(registry.configuredModelListed !== undefined
+            ? { configuredModelListed: registry.configuredModelListed }
+            : {}),
+          capabilities: registry.capabilities,
+        },
+        checks,
       };
     } catch (error) {
       return {
-        status: 'unavailable',
-        checkedAt: new Date().toISOString(),
-        details: error instanceof Error ? error.message : String(error),
+        health: {
+          status: 'unavailable',
+          checkedAt,
+          details: error instanceof Error ? error.message : String(error),
+        },
+        liveProbe: {
+          endpoint,
+          targetProvider: expected,
+          ...(configuredModel ? { configuredModel } : {}),
+        },
       };
     }
   }
@@ -368,8 +489,8 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
     }
 
     const payload = await response.json() as Record<string, unknown>;
-    const providers = Array.isArray(payload.providers) ? payload.providers : [];
     const expected = mapBridgeProvider(instance.providerName);
+    const providers = Array.isArray(payload.providers) ? payload.providers : [];
     const provider = providers.find((entry) =>
       entry && typeof entry === 'object' && (entry as Record<string, unknown>).name === expected,
     ) as Record<string, unknown> | undefined;

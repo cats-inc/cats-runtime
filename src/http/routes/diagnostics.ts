@@ -185,6 +185,27 @@ function createCheck(
   return { code, status, message, details };
 }
 
+function appendAgentProbeChecks(
+  checks: DiagnosticCheck[],
+  probeChecks: Array<{
+    code: string;
+    status: DiagnosticStatus;
+    message: string;
+    details?: Record<string, unknown>;
+  }> | undefined,
+): void {
+  for (const check of probeChecks || []) {
+    checks.push(
+      createCheck(
+        check.code,
+        check.status,
+        check.message,
+        check.details,
+      ),
+    );
+  }
+}
+
 function classifyRemoteLiveProbe(
   target: ProviderTargetDescriptor,
   probe: {
@@ -670,13 +691,22 @@ async function diagnoseAgentTarget(
       return { checks, config };
     }
 
+    const probeHealth = probe.result.health;
+    if (probe.result.liveProbe) {
+      config.liveProbe = {
+        adapter: probe.kind,
+        ...probe.result.liveProbe,
+      };
+    }
+
     checks.push(
       createCheck(
         'probe',
-        probe.result.status,
-        probe.result.details || `Probe completed for ${target.providerName}/${target.instanceId}`,
+        probeHealth.status,
+        probeHealth.details || `Probe completed for ${target.providerName}/${target.instanceId}`,
       ),
     );
+    appendAgentProbeChecks(checks, probe.result.checks);
   } catch (error) {
     checks.push(
       createCheck(

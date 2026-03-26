@@ -79,4 +79,83 @@ describe('AgentBackendManager', () => {
       { type: 'result', sessionId: 'agent-session' },
     ]);
   });
+
+  it('preserves structured probe details from the agent adapter', async () => {
+    const registry = new SessionRegistry();
+    const adapter: AgentAdapter = {
+      kind: 'test-adapter',
+      async *invoke() {
+        yield { type: 'result', sessionId: 'unused' };
+      },
+      async probe() {
+        return {
+          health: {
+            status: 'ok',
+            checkedAt: '2026-03-26T00:00:00.000Z',
+            details: 'probe ok',
+          },
+          liveProbe: {
+            endpoint: 'http://agent.test/providers',
+            providerListed: true,
+          },
+          checks: [
+            {
+              code: 'bridge_provider_listed',
+              status: 'ok',
+              message: 'provider listed',
+              details: {
+                providerListed: true,
+              },
+            },
+          ],
+        };
+      },
+    };
+    vi.mocked(buildAgentAdapter).mockReturnValue(adapter);
+
+    const manager = new AgentBackendManager(
+      { sessionBaseDir: '/tmp/cats-runtime-tests' },
+      registry,
+    );
+
+    const target: ProviderTargetDescriptor = {
+      providerName: 'claude',
+      backend: 'agent',
+      instanceId: 'bridge',
+      defaultTarget: true,
+      remoteInstance: {
+        id: 'bridge',
+        providerName: 'claude',
+        backend: 'agent',
+        transport: 'agent_sdk_bridge',
+        model: 'claude-sonnet-4',
+      },
+    };
+
+    await expect(manager.probe(target, true, 1000)).resolves.toEqual({
+      kind: 'test-adapter',
+      supported: true,
+      result: {
+        health: {
+          status: 'ok',
+          checkedAt: '2026-03-26T00:00:00.000Z',
+          details: 'probe ok',
+        },
+        liveProbe: {
+          endpoint: 'http://agent.test/providers',
+          providerListed: true,
+        },
+        checks: [
+          {
+            code: 'bridge_provider_listed',
+            status: 'ok',
+            message: 'provider listed',
+            details: {
+              providerListed: true,
+            },
+          },
+        ],
+      },
+    });
+  });
 });

@@ -6,6 +6,7 @@ import type {
   ProviderRuntimeConfig,
   RemoteProviderInstanceConfig,
 } from '../../backends/cli/config.js';
+import type { AgentAdapterProbeResult } from '../../backends/agent/types.js';
 import {
   getConfiguredFileBackedProviderPath,
   resolveFileBackedProviderPath,
@@ -16,7 +17,6 @@ import {
   quoteForBash,
 } from '../../backends/cli/runtime/runtime.js';
 import type { RuntimeConfig } from '../../core/config.js';
-import type { HealthStatus } from '../../core/types.js';
 import type { AppContext } from '../app.js';
 
 const FILE_BACKED_PROVIDER_NAMES = [
@@ -68,14 +68,14 @@ export interface FileBackedProviderDiscoveryInfo {
 export interface RuntimeAgentProbeResult {
   kind: string;
   supported: boolean;
-  result?: HealthStatus;
+  result?: AgentAdapterProbeResult;
 }
 
 export interface RuntimeAgentProbeOptions {
   timeoutMs?: number;
   adapter?: {
     kind: string;
-    probe?: (instance: RemoteProviderInstanceConfig) => Promise<HealthStatus>;
+    probe?: (instance: RemoteProviderInstanceConfig) => Promise<AgentAdapterProbeResult>;
   };
 }
 

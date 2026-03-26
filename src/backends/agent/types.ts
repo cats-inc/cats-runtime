@@ -24,6 +24,19 @@ export interface AgentAdapterInspectionCredential {
   configured: boolean;
 }
 
+export interface AgentAdapterProbeCheck {
+  code: string;
+  status: HealthStatus['status'];
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+export interface AgentAdapterProbeResult {
+  health: HealthStatus;
+  liveProbe?: Record<string, unknown>;
+  checks?: AgentAdapterProbeCheck[];
+}
+
 export interface AgentAdapterInspection {
   adapter: string;
   family: 'gateway' | 'bridge' | 'generic';
@@ -61,7 +74,7 @@ export interface AgentAdapterInspection {
 export interface AgentAdapter {
   readonly kind: string;
   invoke(input: AgentInvokeInput): AsyncGenerator<StreamEvent>;
-  probe?(instance: RemoteProviderInstanceConfig): Promise<HealthStatus>;
+  probe?(instance: RemoteProviderInstanceConfig): Promise<AgentAdapterProbeResult>;
   listModels?(instance: RemoteProviderInstanceConfig): Promise<Array<{ id: string; label: string }>>;
   inspect?(instance: RemoteProviderInstanceConfig): AgentAdapterInspection;
   cancel?(

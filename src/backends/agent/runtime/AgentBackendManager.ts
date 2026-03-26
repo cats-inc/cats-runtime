@@ -1,4 +1,4 @@
-import type { ExecutionHandle, HealthStatus, StreamEvent, TurnInput } from '../../../core/types.js';
+import type { ExecutionHandle, StreamEvent, TurnInput } from '../../../core/types.js';
 import { mergeRuntimeInstructionLayers } from '../../../core/skills/catalog.js';
 import type { SessionRegistry } from '../../cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig, RemoteProviderInstanceConfig } from '../../cli/config.js';
@@ -11,6 +11,7 @@ import { buildAgentAdapter } from '../adapters/registry.js';
 import { inspectAgentTarget } from '../inspection.js';
 import type {
   AgentBackendOptions,
+  AgentAdapterProbeResult,
   AgentBackendStatus,
   AgentAdapter,
   AgentAdapterInspection,
@@ -196,7 +197,7 @@ export class AgentBackendManager {
   ): Promise<{
       kind: string;
       supported: boolean;
-      result?: HealthStatus;
+      result?: AgentAdapterProbeResult;
     }> {
     const instance = ensureAgentTarget(target);
     const adapter = this.buildAdapter(instance);
