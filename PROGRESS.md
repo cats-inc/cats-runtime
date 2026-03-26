@@ -169,7 +169,6 @@ adapter end to end through the existing HTTP surface.
 
 - [ ] Expand dashboard surfacing for agent-specific services/artifacts beyond the current generic session views
 - [ ] Add stronger model-list coverage for later agent targets beyond the current OpenClaw gateway `models.list` and Agent SDK bridge coverage
-- [ ] Deepen Pi-native transcript/history surfacing so resumed/fallback Pi sessions do not rely on generic JSONL heuristics alone
 
 ### WP-5: Session Fork, Context Transplant, and Lineage Primitives
 

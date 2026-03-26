@@ -61,6 +61,19 @@ interface HistoryTranscriptMetadata {
     | 'generic_jsonl'
     | 'pi_native'
     | 'none';
+  sources?: HistoryTranscriptSourceMetadata[];
+}
+
+interface HistoryTranscriptSourceMetadata {
+  ownership: Exclude<HistoryTranscriptMetadata['ownership'], 'none'>;
+  source: Exclude<HistoryTranscriptMetadata['source'], 'none'>;
+  parser: Exclude<HistoryTranscriptMetadata['parser'], 'none'>;
+  path?: string;
+  messageCount: number;
+  fallback?: {
+    attemptedParser: Exclude<HistoryTranscriptMetadata['parser'], 'none'>;
+    reason: 'load_failed';
+  };
 }
 
 function buildHistoryMetadata(ctx: AppContext, session: SessionInfo) {
@@ -109,6 +122,18 @@ function buildHistoryResponse(
     messages,
     transcript,
     ...buildHistoryMetadata(ctx, session),
+  };
+}
+
+function buildTranscriptSource(
+  path: string | undefined,
+  messageCount: number,
+  source: Omit<HistoryTranscriptSourceMetadata, 'messageCount' | 'path'>,
+): HistoryTranscriptSourceMetadata {
+  return {
+    ...source,
+    messageCount,
+    ...(path ? { path } : {}),
   };
 }
 
@@ -265,6 +290,13 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
         ownership: 'provider',
         source: 'service',
         parser: 'cursor_native',
+        sources: [
+          buildTranscriptSource(undefined, messages.length, {
+            ownership: 'provider',
+            source: 'service',
+            parser: 'cursor_native',
+          }),
+        ],
       }));
     } catch (err) {
       return c.json({ error: `Failed to load Cursor history: ${err}` }, 500);
@@ -289,6 +321,13 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
         ownership: 'provider',
         source: 'service',
         parser: 'kiro_native',
+        sources: [
+          buildTranscriptSource(undefined, messages.length, {
+            ownership: 'provider',
+            source: 'service',
+            parser: 'kiro_native',
+          }),
+        ],
       }));
     } catch (err) {
       return c.json({ error: `Failed to load Kiro history: ${err}` }, 500);
@@ -305,6 +344,13 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
         ownership: 'provider',
         source: 'service',
         parser: 'auggie_native',
+        sources: [
+          buildTranscriptSource(undefined, messages.length, {
+            ownership: 'provider',
+            source: 'service',
+            parser: 'auggie_native',
+          }),
+        ],
       }));
     } catch (err) {
       return c.json({ error: `Failed to load Auggie history: ${err}` }, 500);
@@ -329,6 +375,13 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
         ownership: 'provider',
         source: 'service',
         parser: 'opencode_native',
+        sources: [
+          buildTranscriptSource(undefined, messages.length, {
+            ownership: 'provider',
+            source: 'service',
+            parser: 'opencode_native',
+          }),
+        ],
       }));
     } catch (err) {
       return c.json({ error: `Failed to load OpenCode history: ${err}` }, 500);
@@ -355,9 +408,12 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
     source: 'jsonl',
     parser: 'generic_jsonl',
   };
+  const transcriptSources: HistoryTranscriptSourceMetadata[] = [];
 
   for (const filePath of paths) {
+    const ownership = filePath === session.providerSourcePath ? 'provider' : 'runtime';
     if (session.providerName === 'pi' && filePath === session.providerSourcePath) {
+      const messageCountBefore = messages.length;
       try {
         const piMessages = await loadPiHistory(filePath);
         messages.push(...piMessages);
@@ -366,14 +422,20 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
           source: 'jsonl',
           parser: 'pi_native',
         };
+        transcriptSources.push(buildTranscriptSource(filePath, messages.length - messageCountBefore, {
+          ownership: 'provider',
+          source: 'jsonl',
+          parser: 'pi_native',
+        }));
+        continue;
       } catch {
         // Fall through to the generic parser for any unreadable Pi transcripts.
       }
-      continue;
     }
 
     // Gemini single-JSON session format
     if (filePath.endsWith('.json')) {
+      const messageCountBefore = messages.length;
       try {
         const raw = readFileSync(filePath, 'utf-8');
         const data = JSON.parse(raw);
@@ -385,16 +447,22 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
             messages.push({ role: 'assistant', text, timestamp: msg.timestamp });
         }
         transcript = {
-          ownership: filePath === session.providerSourcePath ? 'provider' : 'runtime',
+          ownership,
           source: 'json',
           parser: 'gemini_native',
         };
+        transcriptSources.push(buildTranscriptSource(filePath, messages.length - messageCountBefore, {
+          ownership,
+          source: 'json',
+          parser: 'gemini_native',
+        }));
       } catch {
         // Non-fatal
       }
       continue;
     }
 
+    const messageCountBefore = messages.length;
     let hasEventMsgUser = false;
     const pendingResponseUsers: HistoryMessage[] = [];
 
@@ -482,6 +550,27 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
     if (!hasEventMsgUser) {
       messages.push(...pendingResponseUsers);
     }
+
+    transcriptSources.push(buildTranscriptSource(filePath, messages.length - messageCountBefore, {
+      ownership,
+      source: 'jsonl',
+      parser: 'generic_jsonl',
+      ...(session.providerName === 'pi' && filePath === session.providerSourcePath
+        ? {
+          fallback: {
+            attemptedParser: 'pi_native',
+            reason: 'load_failed' as const,
+          },
+        }
+        : {}),
+    }));
+  }
+
+  if (transcriptSources.length > 0) {
+    transcript = {
+      ...transcript,
+      sources: transcriptSources,
+    };
   }
 
   return c.json(buildHistoryResponse(ctx, session, messages, transcript));

@@ -290,6 +290,15 @@ describe('Pi session management', () => {
         ownership: 'provider',
         source: 'jsonl',
         parser: 'pi_native',
+        sources: [
+          {
+            ownership: 'provider',
+            source: 'jsonl',
+            parser: 'pi_native',
+            path: sourcePath,
+            messageCount: 2,
+          },
+        ],
       },
       messages: [
         {
@@ -381,6 +390,96 @@ describe('Pi session management', () => {
           role: 'assistant',
           text: 'Looks good.',
           timestamp: '2026-03-23T00:00:01.000Z',
+        },
+      ],
+    });
+  });
+
+  it('surfaces both Pi-native and runtime-managed transcript sources when fallback history exists', async () => {
+    const providerSourcePath = join(piSessionsDir, 'workspace', 'provider-session.jsonl');
+    mkdirSync(join(piSessionsDir, 'workspace'), { recursive: true });
+    writeFileSync(providerSourcePath, [
+      JSON.stringify({
+        type: 'message',
+        timestamp: '2026-03-23T00:00:00.000Z',
+        message: {
+          role: 'user',
+          content: [{ type: 'text', text: 'Inspect the build output.' }],
+        },
+      }),
+      JSON.stringify({
+        type: 'message',
+        timestamp: '2026-03-23T00:00:01.000Z',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'The build passed cleanly.' }],
+        },
+      }),
+      '',
+    ].join('\n'));
+
+    const session = registry.create({
+      id: 'pi-history-mixed',
+      providerName: 'pi',
+      providerBackend: 'cli',
+      cwd: 'C:/repo',
+      workspaceMode: 'shared',
+    });
+    const runtimeSourcePath = join(sessionBaseDir, 'history', `${session.id}.jsonl`);
+    mkdirSync(join(sessionBaseDir, 'history'), { recursive: true });
+    writeFileSync(runtimeSourcePath, [
+      JSON.stringify({
+        type: 'assistant',
+        timestamp: '2026-03-23T00:00:03.000Z',
+        message: {
+          content: [{ type: 'text', text: 'Fallback runtime note.' }],
+        },
+      }),
+      '',
+    ].join('\n'));
+    registry.setSourcePath(session.id, runtimeSourcePath);
+    session.providerSourcePath = providerSourcePath;
+    registry.updateStatus(session.id, 'closed');
+
+    const response = await app.request(`/sessions/${session.id}/history`);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      transcript: {
+        ownership: 'provider',
+        source: 'jsonl',
+        parser: 'pi_native',
+        sources: [
+          {
+            ownership: 'provider',
+            source: 'jsonl',
+            parser: 'pi_native',
+            path: providerSourcePath,
+            messageCount: 2,
+          },
+          {
+            ownership: 'runtime',
+            source: 'jsonl',
+            parser: 'generic_jsonl',
+            path: runtimeSourcePath,
+            messageCount: 1,
+          },
+        ],
+      },
+      messages: [
+        {
+          role: 'user',
+          text: 'Inspect the build output.',
+          timestamp: '2026-03-23T00:00:00.000Z',
+        },
+        {
+          role: 'assistant',
+          text: 'The build passed cleanly.',
+          timestamp: '2026-03-23T00:00:01.000Z',
+        },
+        {
+          role: 'assistant',
+          text: 'Fallback runtime note.',
+          timestamp: '2026-03-23T00:00:03.000Z',
         },
       ],
     });

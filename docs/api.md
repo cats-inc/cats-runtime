@@ -1961,6 +1961,9 @@ such as:
 - `ownership`: whether the transcript source is provider-owned, runtime-owned, or absent
 - `source`: `service`, `jsonl`, `json`, or `none`
 - `parser`: runtime parser/service path used to build the returned message list
+- `sources`: additive per-source provenance entries when the runtime merged
+  multiple transcript origins (for example a Pi-native provider transcript plus
+  later runtime-managed fallback JSONL)
 
 This makes Pi-native and other provider-native history reads easier to inspect
 without forcing hosts to infer transcript semantics from provider names alone.

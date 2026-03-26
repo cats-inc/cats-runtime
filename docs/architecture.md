@@ -414,9 +414,10 @@ src/
 - Enriches current/last-run inspection with per-run preview surfaces derived
   from agent services and artifacts so hosts can render the output of one run
   without diffing whole-session state
-- Normalizes history provenance metadata and Pi-native transcript parsing so
-  provider-owned session files can still feed the same runtime-owned history
-  route contract
+- Normalizes history provenance metadata, per-source transcript provenance, and
+  Pi-native transcript parsing so provider-owned session files plus later
+  runtime-managed fallback history can still feed the same runtime-owned
+  history route contract
 - Keeps `audit-workspace` read-only even when callers request apply, and uses
   `*.bootstrap` review copies instead of blind overwrite for conflicting files
 - Owns delivery audit/export/repo primitives and normalized preview-surface
