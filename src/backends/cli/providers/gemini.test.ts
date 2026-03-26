@@ -85,6 +85,79 @@ describe('GeminiProvider', () => {
       expect(event).toEqual({ type: 'text', text: 'Part 1Part 2' });
     });
 
+    it('promotes assistant multipart functionCall blocks into progress plus tool_use', () => {
+      const line = JSON.stringify({
+        type: 'message',
+        role: 'assistant',
+        content: [
+          { text: 'Checking the workspace.' },
+          { functionCall: { name: 'readFile', args: { path: 'README.md' } } },
+        ],
+      });
+
+      expect(toEventList(provider.parseStreamLine(line))).toEqual([
+        { type: 'text', text: 'Checking the workspace.' },
+        {
+          type: 'progress',
+          text: 'Running tool: readFile',
+          metadata: {
+            kind: 'tool',
+            status: 'running',
+            source: 'provider',
+            provider: 'gemini',
+            backend: 'cli',
+            native: {
+              sourceEvent: 'message:assistant',
+              toolName: 'readFile',
+            },
+          },
+        },
+        {
+          type: 'tool_use',
+          toolName: 'readFile',
+          toolArgs: { path: 'README.md' },
+        },
+      ]);
+    });
+
+    it('promotes assistant multipart functionResponse blocks into progress plus tool_result', () => {
+      const line = JSON.stringify({
+        type: 'message',
+        role: 'assistant',
+        content: [
+          {
+            functionResponse: {
+              name: 'readFile',
+              response: { contents: 'hello' },
+            },
+          },
+        ],
+      });
+
+      expect(toEventList(provider.parseStreamLine(line))).toEqual([
+        {
+          type: 'progress',
+          text: 'Gemini completed tool: readFile',
+          metadata: {
+            kind: 'tool',
+            status: 'updated',
+            source: 'provider',
+            provider: 'gemini',
+            backend: 'cli',
+            native: {
+              sourceEvent: 'message:assistant',
+              toolName: 'readFile',
+            },
+          },
+        },
+        {
+          type: 'tool_result',
+          toolName: 'readFile',
+          text: '{"contents":"hello"}',
+        },
+      ]);
+    });
+
     it('skips user message echo', () => {
       const line = JSON.stringify({ type: 'message', role: 'user', content: 'Hi' });
       expect(provider.parseStreamLine(line)).toBeNull();

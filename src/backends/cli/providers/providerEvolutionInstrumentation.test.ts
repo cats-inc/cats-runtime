@@ -218,6 +218,50 @@ describe('provider evolution instrumentation', () => {
     expect(bundle.summary.normalizedEventTypes.tool_result).toBe(1);
   });
 
+  it('records normalized Gemini multipart assistant tool blocks', () => {
+    const collector = new ProviderEvolutionEvidenceCollector({
+      provider: 'gemini',
+      instance: 'default',
+      parserId: 'gemini-stream-json',
+      probeProfile: 'manual-smoke',
+      transport: 'cli',
+    });
+    const provider = new GeminiProvider(undefined, collector);
+
+    expect(provider.parseStreamLine(JSON.stringify({
+      type: 'message',
+      role: 'assistant',
+      content: [
+        { text: 'Checking files.' },
+        { functionCall: { name: 'readFile', args: { path: 'README.md' } } },
+        { functionResponse: { name: 'readFile', response: { ok: true } } },
+      ],
+    }))).toEqual([
+      expect.objectContaining({
+        type: 'text',
+      }),
+      expect.objectContaining({
+        type: 'progress',
+      }),
+      expect.objectContaining({
+        type: 'tool_use',
+      }),
+      expect.objectContaining({
+        type: 'progress',
+      }),
+      expect.objectContaining({
+        type: 'tool_result',
+      }),
+    ]);
+
+    const bundle = collector.finalize();
+    expect(bundle.summary.normalizedCount).toBe(1);
+    expect(bundle.summary.normalizedEventTypes.text).toBe(1);
+    expect(bundle.summary.normalizedEventTypes.progress).toBe(2);
+    expect(bundle.summary.normalizedEventTypes.tool_use).toBe(1);
+    expect(bundle.summary.normalizedEventTypes.tool_result).toBe(1);
+  });
+
   it('records schema failures for Goose message events without content blocks', () => {
     const collector = new ProviderEvolutionEvidenceCollector({
       provider: 'goose',

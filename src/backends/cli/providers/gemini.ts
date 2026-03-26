@@ -32,24 +32,6 @@ interface GeminiStreamEvent {
   };
 }
 
-/**
- * Extract text from Gemini content which can be a string or a part-list array.
- * Part-list format: [{ text: "..." }, { functionCall: ... }, ...]
- */
-function extractText(content: unknown): string {
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    return content
-      .map((part: Record<string, unknown>) => {
-        if (typeof part.text === 'string') return part.text;
-        return '';
-      })
-      .filter(Boolean)
-      .join('');
-  }
-  return '';
-}
-
 export class GeminiProvider implements Provider {
   name = 'gemini';
   ephemeral = true;
@@ -126,19 +108,16 @@ export class GeminiProvider implements Provider {
         }, null);
       }
       if (event.role === 'assistant' && event.content) {
-        const text = extractText(event.content);
-        if (text) {
+        const messageEvents = extractGeminiAssistantEvents(event.content);
+        if (messageEvents.length > 0) {
           return observeNormalized(this.evolutionObserver, {
             rawEventType: 'message:assistant',
             rawSample: event,
-          }, {
-            type: 'text',
-            text,
-          });
+          }, messageEvents.length === 1 ? messageEvents[0]! : messageEvents);
         }
         return observeSchemaFailure(this.evolutionObserver, {
           rawEventType: 'message:assistant',
-          reason: 'assistant_message_without_text',
+          reason: 'assistant_message_without_supported_parts',
           rawSample: event,
         }, null);
       }
@@ -163,7 +142,7 @@ export class GeminiProvider implements Provider {
 
     // tool_result — promote to the shared runtime event tape
     if (event.type === 'tool_result') {
-      const text = extractText(event.content) || event.message;
+      const text = extractGeminiToolResultText(event.content) || event.message;
       if (!event.tool_name && !event.tool_id && !text) {
         return observeSchemaFailure(this.evolutionObserver, {
           rawEventType: 'tool_result',
@@ -233,4 +212,148 @@ export class GeminiProvider implements Provider {
       text: trimmed,
     });
   }
+}
+
+function extractGeminiAssistantEvents(content: unknown): StreamEvent[] {
+  if (typeof content === 'string') {
+    return content ? [{ type: 'text', text: content }] : [];
+  }
+  if (!Array.isArray(content)) {
+    return [];
+  }
+
+  const textParts: string[] = [];
+  const events: StreamEvent[] = [];
+
+  for (const part of content) {
+    if (!part || typeof part !== 'object' || Array.isArray(part)) {
+      continue;
+    }
+
+    if (typeof part.text === 'string' && part.text) {
+      textParts.push(part.text);
+    }
+
+    const functionCall = asRecord(part.functionCall);
+    if (functionCall) {
+      const toolName = readNonEmptyString(functionCall.name);
+      const toolArgs = asRecord(functionCall.args) ?? asRecord(functionCall.arguments);
+      if (!toolName && !toolArgs) {
+        continue;
+      }
+      events.push(
+        createRuntimeProgressEvent({
+          text: `Running tool: ${toolName ?? 'unknown'}`,
+          provider: 'gemini',
+          backend: 'cli',
+          kind: 'tool',
+          status: 'running',
+          source: 'provider',
+          native: {
+            sourceEvent: 'message:assistant',
+            ...(toolName ? { toolName } : {}),
+          },
+        }),
+        {
+          type: 'tool_use',
+          toolName,
+          toolArgs,
+        },
+      );
+    }
+
+    const functionResponse = asRecord(part.functionResponse);
+    if (functionResponse) {
+      const toolName = readNonEmptyString(functionResponse.name);
+      const responseText = stringifyGeminiResponse(
+        functionResponse.response ?? functionResponse.content ?? functionResponse.output,
+      );
+      if (!toolName && !responseText) {
+        continue;
+      }
+      events.push(
+        createRuntimeProgressEvent({
+          text: toolName
+            ? `Gemini completed tool: ${toolName}`
+            : 'Gemini completed a tool call.',
+          provider: 'gemini',
+          backend: 'cli',
+          kind: 'tool',
+          status: 'updated',
+          source: 'provider',
+          native: {
+            sourceEvent: 'message:assistant',
+            ...(toolName ? { toolName } : {}),
+          },
+        }),
+        {
+          type: 'tool_result',
+          ...(toolName ? { toolName } : {}),
+          ...(responseText ? { text: responseText } : {}),
+        },
+      );
+    }
+  }
+
+  const text = textParts.join('');
+  if (text) {
+    events.unshift({ type: 'text', text });
+  }
+
+  return events;
+}
+
+function extractGeminiToolResultText(content: unknown): string {
+  if (typeof content === 'string') {
+    return content;
+  }
+  if (!Array.isArray(content)) {
+    return '';
+  }
+
+  return content
+    .map((part) => {
+      if (!part || typeof part !== 'object' || Array.isArray(part)) {
+        return '';
+      }
+      if (typeof part.text === 'string') {
+        return part.text;
+      }
+      return stringifyGeminiResponse(
+        (part as Record<string, unknown>).response
+        ?? (part as Record<string, unknown>).content
+        ?? (part as Record<string, unknown>).output,
+      );
+    })
+    .filter(Boolean)
+    .join('');
+}
+
+function stringifyGeminiResponse(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (value === undefined || value === null) {
+    return '';
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Record<string, unknown>;
+}
+
+function readNonEmptyString(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
 }
