@@ -121,19 +121,29 @@ export class ClaudeProvider implements Provider {
       }, createClaudeToolUseEvents({
         name: event.tool_use.name,
         id: event.tool_use.id,
+        sourceEvent: 'assistant',
       }));
     }
 
+    if (event.type === 'content_block_start' && event.content_block) {
+      const blockEvents = extractClaudeContentBlockEvents(event.content_block, 'content_block_start');
+      if (blockEvents.length > 0) {
+        return observeNormalized(this.evolutionObserver, {
+          rawEventType: 'content_block_start',
+          rawSample: event,
+        }, blockEvents.length === 1 ? blockEvents[0]! : blockEvents);
+      }
+    }
+
     // content_block_delta — streaming text chunks
-    if (event.type === 'content_block_delta' && event.content_block_delta?.text) {
-      return observeNormalized(this.evolutionObserver, {
-        rawEventType: 'content_block_delta',
-        rawSample: event,
-      }, {
-        type: 'text',
-        text: event.content_block_delta.text,
-        raw: event,
-      });
+    if (event.type === 'content_block_delta' && event.content_block_delta) {
+      const deltaEvents = extractClaudeContentBlockDeltaEvents(event.content_block_delta, event);
+      if (deltaEvents.length > 0) {
+        return observeNormalized(this.evolutionObserver, {
+          rawEventType: 'content_block_delta',
+          rawSample: event,
+        }, deltaEvents.length === 1 ? deltaEvents[0]! : deltaEvents);
+      }
     }
 
     // result — done, with token usage
@@ -178,12 +188,32 @@ function extractClaudeAssistantEvents(
       continue;
     }
 
-    if (block.type === 'tool_use') {
+    if (block.type === 'tool_use' || block.type === 'server_tool_use') {
       events.push(...createClaudeToolUseEvents({
         name: block.name,
         id: block.id,
         input: block.input,
+        sourceEvent: 'assistant',
       }));
+      continue;
+    }
+
+    if (block.type === 'tool_result' || block.type === 'server_tool_result') {
+      events.push(...createClaudeToolResultEvents({
+        toolId: block.tool_use_id,
+        text: stringifyClaudeContent(block.content),
+        isError: block.is_error === true,
+        sourceEvent: 'assistant',
+      }));
+      continue;
+    }
+
+    if (block.type === 'thinking' || block.type === 'redacted_thinking') {
+      events.push(createClaudeReasoningEvent(
+        typeof block.thinking === 'string' ? block.thinking : block.text,
+        'updated',
+        'assistant',
+      ));
       continue;
     }
 
@@ -207,6 +237,7 @@ function createClaudeToolUseEvents(tool: {
   name?: string;
   id?: string;
   input?: Record<string, unknown>;
+  sourceEvent: string;
 }): StreamEvent[] {
   const toolName = tool.name ?? 'unknown';
   return [
@@ -218,7 +249,7 @@ function createClaudeToolUseEvents(tool: {
       status: 'running',
       source: 'provider',
       native: {
-        sourceEvent: 'assistant',
+        sourceEvent: tool.sourceEvent,
         toolName,
       },
     }),
@@ -229,4 +260,126 @@ function createClaudeToolUseEvents(tool: {
       toolArgs: tool.input,
     },
   ];
+}
+
+function createClaudeToolResultEvents(tool: {
+  toolName?: string;
+  toolId?: string;
+  text?: string;
+  isError?: boolean;
+  sourceEvent: string;
+}): StreamEvent[] {
+  if (!tool.toolName && !tool.toolId && !tool.text) {
+    return [];
+  }
+
+  return [
+    createRuntimeProgressEvent({
+      text: tool.toolName
+        ? `Claude completed tool: ${tool.toolName}`
+        : 'Claude completed a tool call.',
+      provider: 'claude',
+      backend: 'cli',
+      kind: 'tool',
+      status: tool.isError ? 'failed' : 'updated',
+      source: 'provider',
+      native: {
+        sourceEvent: tool.sourceEvent,
+        ...(tool.toolName ? { toolName: tool.toolName } : {}),
+        ...(tool.toolId ? { toolId: tool.toolId } : {}),
+      },
+    }),
+    {
+      type: 'tool_result',
+      ...(tool.toolName ? { toolName: tool.toolName } : {}),
+      ...(tool.toolId ? { toolId: tool.toolId } : {}),
+      ...(tool.text ? { text: tool.text } : {}),
+      ...(tool.isError === true ? { isError: true } : {}),
+    },
+  ];
+}
+
+function createClaudeReasoningEvent(
+  text: string | undefined,
+  status: 'running' | 'updated',
+  sourceEvent: string,
+): StreamEvent {
+  return createRuntimeProgressEvent({
+    text: typeof text === 'string' && text.trim() ? text : 'Claude updated reasoning.',
+    provider: 'claude',
+    backend: 'cli',
+    kind: 'reasoning',
+    status,
+    source: 'provider',
+    native: {
+      sourceEvent,
+    },
+  });
+}
+
+function extractClaudeContentBlockEvents(
+  block: NonNullable<ClaudeStreamEvent['content_block']>,
+  sourceEvent: string,
+): StreamEvent[] {
+  if (block.type === 'tool_use' || block.type === 'server_tool_use') {
+    return createClaudeToolUseEvents({
+      name: block.name,
+      id: block.id,
+      input: block.input,
+      sourceEvent,
+    });
+  }
+
+  if (block.type === 'tool_result' || block.type === 'server_tool_result') {
+    return createClaudeToolResultEvents({
+      toolName: block.name,
+      toolId: block.tool_use_id,
+      text: stringifyClaudeContent(block.content),
+      isError: block.is_error === true,
+      sourceEvent,
+    });
+  }
+
+  if (block.type === 'thinking' || block.type === 'redacted_thinking') {
+    return [createClaudeReasoningEvent(block.thinking ?? block.text, 'updated', sourceEvent)];
+  }
+
+  if (typeof block.text === 'string' && block.text) {
+    return [{ type: 'text', text: block.text }];
+  }
+
+  return [];
+}
+
+function extractClaudeContentBlockDeltaEvents(
+  delta: NonNullable<ClaudeStreamEvent['content_block_delta']>,
+  raw: ClaudeStreamEvent,
+): StreamEvent[] {
+  if (delta.type === 'text_delta' && delta.text) {
+    return [{
+      type: 'text',
+      text: delta.text,
+      raw,
+    }];
+  }
+
+  if (delta.type === 'thinking_delta') {
+    return [createClaudeReasoningEvent(delta.thinking ?? delta.text, 'running', 'content_block_delta')];
+  }
+
+  return [];
+}
+
+function stringifyClaudeContent(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    return value || undefined;
+  }
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 }

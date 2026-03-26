@@ -35,6 +35,10 @@ export interface ClaudeStreamEvent {
       name?: string;
       id?: string;
       input?: Record<string, unknown>;
+      thinking?: string;
+      tool_use_id?: string;
+      content?: unknown;
+      is_error?: boolean;
     } | string>;
   };
   usage?: {
@@ -43,9 +47,23 @@ export interface ClaudeStreamEvent {
     cache_read_input_tokens?: number;
     cache_creation_input_tokens?: number;
   };
+  content_block?: {
+    type?: string;
+    text?: string;
+    name?: string;
+    id?: string;
+    input?: Record<string, unknown>;
+    thinking?: string;
+    tool_use_id?: string;
+    content?: unknown;
+    is_error?: boolean;
+  };
   content_block_delta?: {
     type?: string;
     text?: string;
+    thinking?: string;
+    partial_json?: string;
+    signature?: string;
   };
   tool_use?: {
     name?: string;

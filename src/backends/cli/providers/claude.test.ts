@@ -166,6 +166,71 @@ describe('ClaudeProvider', () => {
       ]);
     });
 
+    it('promotes assistant thinking blocks into reasoning progress', () => {
+      const line = JSON.stringify({
+        type: 'assistant',
+        message: {
+          role: 'assistant',
+          content: [{
+            type: 'thinking',
+            thinking: 'Checking the repo state.',
+          }],
+        },
+      });
+
+      expect(provider.parseStreamLine(line)).toEqual({
+        type: 'progress',
+        text: 'Checking the repo state.',
+        metadata: {
+          kind: 'reasoning',
+          status: 'updated',
+          source: 'provider',
+          provider: 'claude',
+          backend: 'cli',
+          native: {
+            sourceEvent: 'assistant',
+          },
+        },
+      });
+    });
+
+    it('promotes assistant tool_result blocks into progress plus tool_result events', () => {
+      const line = JSON.stringify({
+        type: 'assistant',
+        message: {
+          role: 'assistant',
+          content: [{
+            type: 'tool_result',
+            tool_use_id: 'tool-1',
+            content: 'File contents',
+          }],
+        },
+      });
+
+      expect(toEventList(provider.parseStreamLine(line))).toEqual([
+        {
+          type: 'progress',
+          text: 'Claude completed a tool call.',
+          metadata: {
+            kind: 'tool',
+            status: 'updated',
+            source: 'provider',
+            provider: 'claude',
+            backend: 'cli',
+            native: {
+              sourceEvent: 'assistant',
+              toolId: 'tool-1',
+            },
+          },
+        },
+        {
+          type: 'tool_result',
+          toolId: 'tool-1',
+          text: 'File contents',
+        },
+      ]);
+    });
+
     it('preserves text alongside assistant tool_use blocks', () => {
       const line = JSON.stringify({
         type: 'assistant',
@@ -244,6 +309,67 @@ describe('ClaudeProvider', () => {
           toolArgs: undefined,
         },
       ]);
+    });
+
+    it('promotes content_block_start tool_use frames into progress plus tool_use events', () => {
+      const line = JSON.stringify({
+        type: 'content_block_start',
+        content_block: {
+          type: 'tool_use',
+          name: 'read_file',
+          id: 'tool-stream',
+          input: { path: 'README.md' },
+        },
+      });
+
+      expect(toEventList(provider.parseStreamLine(line))).toEqual([
+        {
+          type: 'progress',
+          text: 'Running tool: read_file',
+          metadata: {
+            kind: 'tool',
+            status: 'running',
+            source: 'provider',
+            provider: 'claude',
+            backend: 'cli',
+            native: {
+              sourceEvent: 'content_block_start',
+              toolName: 'read_file',
+            },
+          },
+        },
+        {
+          type: 'tool_use',
+          toolName: 'read_file',
+          toolId: 'tool-stream',
+          toolArgs: { path: 'README.md' },
+        },
+      ]);
+    });
+
+    it('promotes content_block_delta thinking updates into reasoning progress', () => {
+      const line = JSON.stringify({
+        type: 'content_block_delta',
+        content_block_delta: {
+          type: 'thinking_delta',
+          thinking: 'Still checking the repo.',
+        },
+      });
+
+      expect(provider.parseStreamLine(line)).toEqual({
+        type: 'progress',
+        text: 'Still checking the repo.',
+        metadata: {
+          kind: 'reasoning',
+          status: 'running',
+          source: 'provider',
+          provider: 'claude',
+          backend: 'cli',
+          native: {
+            sourceEvent: 'content_block_delta',
+          },
+        },
+      });
     });
 
     it('parses content_block_delta', () => {
