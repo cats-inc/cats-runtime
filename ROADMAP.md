@@ -127,11 +127,13 @@ leaking backend-specific wire formats to consumers.
 
 - Landed a shared runtime `progress` event helper in `src/core/progress.ts`
 - Normalized Junie onto `type: "progress"` instead of runtime `raw` passthrough
-- Extended the same contract to Pi, Goose, Copilot, Codex, and Cursor CLI integrations;
+- Extended the same contract to Pi, Goose, Copilot, Codex, Cursor, Claude, and Gemini CLI integrations;
   Codex now emits additive plan/reasoning/command/files/session/model-state
   checkpoints instead of silently dropping those JSON-RPC notifications, and
   Cursor now promotes provider `thinking` frames onto the same shared runtime
-  reasoning contract
+  reasoning contract; Claude now lifts tool-use frames into shared progress plus
+  `tool_use`, and Gemini now lifts tool completion into shared progress plus
+  `tool_result`
 - Kept provider-native details additive under `metadata.native`
 - Reused the same event contract for API/local cache and warm-state hints
 - Added additive metering/guardrail metadata so progress and execution
@@ -160,6 +162,8 @@ leaking backend-specific wire formats to consumers.
 - `copilot`
 - `codex`
 - `cursor`
+- `claude`
+- `gemini`
 
 #### Affected Files
 
