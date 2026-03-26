@@ -114,6 +114,16 @@ export class ClaudeProvider implements Provider {
       }
     }
 
+    if (event.type === 'assistant' && event.tool_use) {
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: 'assistant:tool_use',
+        rawSample: event,
+      }, createClaudeToolUseEvents({
+        name: event.tool_use.name,
+        id: event.tool_use.id,
+      }));
+    }
+
     // content_block_delta — streaming text chunks
     if (event.type === 'content_block_delta' && event.content_block_delta?.text) {
       return observeNormalized(this.evolutionObserver, {
@@ -169,27 +179,11 @@ function extractClaudeAssistantEvents(
     }
 
     if (block.type === 'tool_use') {
-      const toolName = block.name ?? 'unknown';
-      events.push(
-        createRuntimeProgressEvent({
-          text: `Running tool: ${toolName}`,
-          provider: 'claude',
-          backend: 'cli',
-          kind: 'tool',
-          status: 'running',
-          source: 'provider',
-          native: {
-            sourceEvent: 'assistant',
-            toolName,
-          },
-        }),
-        {
-          type: 'tool_use',
-          toolName,
-          toolId: block.id,
-          toolArgs: block.input,
-        },
-      );
+      events.push(...createClaudeToolUseEvents({
+        name: block.name,
+        id: block.id,
+        input: block.input,
+      }));
       continue;
     }
 
@@ -207,4 +201,32 @@ function extractClaudeAssistantEvents(
   }
 
   return events;
+}
+
+function createClaudeToolUseEvents(tool: {
+  name?: string;
+  id?: string;
+  input?: Record<string, unknown>;
+}): StreamEvent[] {
+  const toolName = tool.name ?? 'unknown';
+  return [
+    createRuntimeProgressEvent({
+      text: `Running tool: ${toolName}`,
+      provider: 'claude',
+      backend: 'cli',
+      kind: 'tool',
+      status: 'running',
+      source: 'provider',
+      native: {
+        sourceEvent: 'assistant',
+        toolName,
+      },
+    }),
+    {
+      type: 'tool_use',
+      toolName,
+      toolId: tool.id,
+      toolArgs: tool.input,
+    },
+  ];
 }

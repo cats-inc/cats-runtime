@@ -212,6 +212,40 @@ describe('ClaudeProvider', () => {
       ]);
     });
 
+    it('accepts legacy top-level assistant tool_use frames', () => {
+      const line = JSON.stringify({
+        type: 'assistant',
+        tool_use: {
+          name: 'read_file',
+          id: 'tool-legacy',
+        },
+      });
+
+      expect(toEventList(provider.parseStreamLine(line))).toEqual([
+        {
+          type: 'progress',
+          text: 'Running tool: read_file',
+          metadata: {
+            kind: 'tool',
+            status: 'running',
+            source: 'provider',
+            provider: 'claude',
+            backend: 'cli',
+            native: {
+              sourceEvent: 'assistant',
+              toolName: 'read_file',
+            },
+          },
+        },
+        {
+          type: 'tool_use',
+          toolName: 'read_file',
+          toolId: 'tool-legacy',
+          toolArgs: undefined,
+        },
+      ]);
+    });
+
     it('parses content_block_delta', () => {
       const line = JSON.stringify({
         type: 'content_block_delta',
