@@ -46,6 +46,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 
 | Plan | Title | Status | Related Spec |
 |------|-------|--------|--------------|
+| [PLAN-021](./PLAN-021-provider-evolution-evidence-and-capability-probes.md) | Provider Evolution Evidence and Capability Probes | Draft | [SPEC-021](../specs/SPEC-021-provider-evolution-evidence-and-capability-probes.md), [ADR-025](../decisions/025-keep-provider-evolution-detection-manual-first-and-evidence-driven.md), [ADR-026](../decisions/026-model-a2a-as-an-agent-backend-adapter.md) |
 | [PLAN-020](./PLAN-020-pluggable-execution-strategy-substrate.md) | Pluggable Execution Strategy Substrate | Draft | [SPEC-020](../specs/SPEC-020-pluggable-execution-strategy-substrate.md), [ADR-024](../decisions/024-own-pluggable-execution-strategies-as-runtime-session-local-substrate.md) |
 | [PLAN-019](./PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md) | Shared Runtime UI Foundation for Dashboard, Playground, and Provider Setup | Draft | [SPEC-017](../specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md) |
 | [PLAN-018](./PLAN-018-advanced-provider-model-catalog-and-selection-schema.md) | Advanced Provider Model Catalog and Selection Schema | Draft | [SPEC-018](../specs/SPEC-018-advanced-provider-model-catalog-and-selection-schema.md), [ADR-022](../decisions/022-model-advanced-selection-as-entries-presets-and-provider-specific-controls.md) |
@@ -79,4 +80,4 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 ---
 
 *See also: [specs/](../specs/) for feature specifications*
-*Last updated: 2026-03-26*
+*Last updated: 2026-03-27*
