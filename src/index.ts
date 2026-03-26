@@ -5,8 +5,12 @@ import { pathToFileURL } from 'node:url';
 import { loadDotEnv } from './core/dotenv.js';
 import { loadConfig } from './core/config.js';
 import {
+  formatProviderEvolutionProbeArtifactListSummary,
+  formatProviderEvolutionProbeArtifactReadSummary,
   formatProviderEvolutionProbeSummary,
   generateProviderEvolutionProbeArtifact,
+  listProviderEvolutionProbeArtifacts,
+  readProviderEvolutionProbeArtifact,
 } from './core/compatibility/providerEvolutionEntry.js';
 import {
   formatSetupDiagnosticEntrySummary,
@@ -60,6 +64,28 @@ async function main(): Promise<void> {
     process.stderr.write(formatProviderEvolutionProbeSummary(result));
     process.stdout.write(`${JSON.stringify({
       status: 'generated',
+      artifactPath: result.artifactPath,
+      artifact: result.artifact,
+    })}\n`);
+    return;
+  }
+
+  if (cliOptions.listProviderEvolutionArtifacts) {
+    const artifacts = await listProviderEvolutionProbeArtifacts(cliOptions, process.env);
+    process.stderr.write(formatProviderEvolutionProbeArtifactListSummary(artifacts, cliOptions));
+    process.stdout.write(`${JSON.stringify({
+      status: 'listed',
+      count: artifacts.length,
+      artifacts,
+    })}\n`);
+    return;
+  }
+
+  if (cliOptions.readProviderEvolutionArtifact) {
+    const result = await readProviderEvolutionProbeArtifact(cliOptions, process.env);
+    process.stderr.write(formatProviderEvolutionProbeArtifactReadSummary(result));
+    process.stdout.write(`${JSON.stringify({
+      status: 'loaded',
       artifactPath: result.artifactPath,
       artifact: result.artifact,
     })}\n`);

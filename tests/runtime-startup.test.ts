@@ -31,12 +31,16 @@ describe('runtime startup helpers', () => {
     expect(parseRuntimeCliOptions([
       '--diagnose-setup',
       '--probe-provider-evolution',
+      '--list-provider-evolution-artifacts',
+      '--read-provider-evolution-artifact=artifact-1',
       '--probe-provider=codex',
       '--probe-instance',
       'default',
       '--probe-profile',
       'manual_smoke',
       '--probe-model=gpt-5',
+      '--probe-limit',
+      '5',
       '--refresh-setup-scan',
       '--startup-mode=app-managed',
       '--managed-by',
@@ -50,10 +54,13 @@ describe('runtime startup helpers', () => {
     ])).toEqual({
       diagnoseSetup: true,
       probeProviderEvolution: true,
+      listProviderEvolutionArtifacts: true,
+      readProviderEvolutionArtifact: 'artifact-1',
       probeProvider: 'codex',
       probeInstance: 'default',
       probeProfile: 'manual_smoke',
       probeModel: 'gpt-5',
+      probeLimit: '5',
       refreshSetupScan: true,
       startupMode: 'app-managed',
       managedBy: 'cats-inc',
@@ -263,8 +270,11 @@ describe('runtime startup helpers', () => {
     expect(help).toContain('Usage: cats-runtime [options]');
     expect(help).toContain('--diagnose-setup');
     expect(help).toContain('--probe-provider-evolution');
+    expect(help).toContain('--list-provider-evolution-artifacts');
+    expect(help).toContain('--read-provider-evolution-artifact <artifactId>');
     expect(help).toContain('--probe-provider <provider>');
     expect(help).toContain('--probe-profile <manual_smoke|manual_text>');
+    expect(help).toContain('--probe-limit <count>');
     expect(help).toContain('--refresh-setup-scan');
     expect(help).toContain('--startup-mode <standalone|app-managed>');
     expect(help).toContain('--ready-output <plain|json|silent>');

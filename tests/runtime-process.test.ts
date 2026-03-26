@@ -51,6 +51,36 @@ interface SetupDiagnosticCliOutput {
   };
 }
 
+interface ProviderEvolutionArtifactListCliOutput {
+  status: 'listed';
+  count: number;
+  artifacts: Array<{
+    artifactId: string;
+    provider: string;
+    instance: string;
+    probeProfile: string;
+    review: {
+      classifications: string[];
+      summary: string;
+    };
+  }>;
+}
+
+interface ProviderEvolutionArtifactReadCliOutput {
+  status: 'loaded';
+  artifactPath: string;
+  artifact: {
+    id: string;
+    provider: string;
+    instance: string;
+    probeProfile: string;
+    review: {
+      classifications: string[];
+      summary: string;
+    };
+  };
+}
+
 const testsDir = dirname(fileURLToPath(import.meta.url));
 const runtimeRoot = resolve(testsDir, '..');
 const runtimeEntry = join(runtimeRoot, 'dist', 'index.js');
@@ -240,6 +270,80 @@ async function waitForProcessOutput(
     child.on('close', onClose);
     child.on('error', onError);
   });
+}
+
+function writeProviderEvolutionArtifact(
+  env: NodeJS.ProcessEnv,
+  provider: string,
+  artifactId: string,
+): string {
+  const providerDir = join(
+    env.CATS_RUNTIME_DATA_DIR!,
+    'compatibility',
+    'provider-evolution',
+    provider,
+  );
+  mkdirSync(providerDir, { recursive: true });
+  const artifactPath = join(providerDir, `${artifactId}.json`);
+  writeFileSync(artifactPath, `${JSON.stringify({
+    schemaVersion: 1,
+    id: artifactId,
+    provider,
+    instance: 'default',
+    parserId: `${provider}-json-rpc`,
+    probeProfile: 'manual_smoke',
+    transport: 'cli',
+    capturedAt: '2026-03-27T00:00:00.000Z',
+    execution: {
+      status: 'completed',
+      durationMs: 1000,
+      turnsPlanned: 2,
+      turnsCompleted: 2,
+    },
+    capabilitySnapshot: {
+      incrementalText: { observed: true, count: 1 },
+      toolUse: { observed: false, count: 0 },
+      toolResult: { observed: false, count: 0 },
+      progress: { observed: false, count: 0 },
+      finalResult: { observed: true, count: 1 },
+      ignoredEventTypes: [],
+      schemaFailures: {},
+      observedEventTypes: ['result', 'text'],
+      normalizedEventTypes: { text: 1, result: 1 },
+      rawPassthroughEventTypes: [],
+      counters: {
+        normalized: 2,
+        ignored: 0,
+        unknown: 0,
+        schemaFailure: 0,
+        rawPassthrough: 0,
+      },
+    },
+    evidence: {
+      schemaVersion: 1,
+      provider,
+      instance: 'default',
+      parserId: `${provider}-json-rpc`,
+      probeProfile: 'manual_smoke',
+      transport: 'cli',
+      capturedAt: '2026-03-27T00:00:00.000Z',
+      rawSamples: [],
+      normalizedSamples: [],
+      summary: {
+        normalizedCount: 2,
+        ignoredCount: 0,
+        unknownCount: 0,
+        schemaFailureCount: 0,
+        rawPassthroughCount: 0,
+        normalizedEventTypes: { text: 1, result: 1 },
+        ignoredEventTypes: {},
+        unknownEventTypes: {},
+        schemaFailureCounts: {},
+        rawPassthroughEventTypes: {},
+      },
+    },
+  }, null, 2)}\n`, 'utf8');
+  return artifactPath;
 }
 
 async function waitForLifecycleEvent(
@@ -707,6 +811,75 @@ describe('runtime process startup contract', () => {
           resolveClose();
         });
       });
+      cleanup();
+    }
+  }, 20000);
+
+  it('can list retained provider-evolution artifacts without starting the HTTP server', async () => {
+    const { env, cleanup } = createRuntimeProcessEnv(3211);
+    writeProviderEvolutionArtifact(env, 'codex', 'artifact-1');
+    const child = spawnSetupDiagnostic([
+      '--list-provider-evolution-artifacts',
+      '--probe-provider',
+      'codex',
+      '--probe-limit',
+      '5',
+    ], env);
+
+    try {
+      const output = await waitForProcessOutput(child);
+      expect(output.code).toBe(0);
+
+      const payload = JSON.parse(output.stdout.trim()) as ProviderEvolutionArtifactListCliOutput;
+      expect(payload.status).toBe('listed');
+      expect(payload.count).toBe(1);
+      expect(payload.artifacts[0]).toMatchObject({
+        artifactId: 'artifact-1',
+        provider: 'codex',
+        instance: 'default',
+        probeProfile: 'manual_smoke',
+        review: {
+          classifications: ['baseline'],
+          summary: 'No prior matching baseline artifact was available.',
+        },
+      });
+      expect(output.stderr).toContain('Listed 1 provider-evolution artifact(s) for codex.');
+      expect(output.stderr).toContain('codex/default manual_smoke [baseline]');
+    } finally {
+      cleanup();
+    }
+  }, 20000);
+
+  it('can read a retained provider-evolution artifact without starting the HTTP server', async () => {
+    const { env, cleanup } = createRuntimeProcessEnv(3212);
+    const artifactPath = writeProviderEvolutionArtifact(env, 'codex', 'artifact-2');
+    const child = spawnSetupDiagnostic([
+      '--read-provider-evolution-artifact',
+      'artifact-2',
+      '--probe-provider',
+      'codex',
+    ], env);
+
+    try {
+      const output = await waitForProcessOutput(child);
+      expect(output.code).toBe(0);
+
+      const payload = JSON.parse(output.stdout.trim()) as ProviderEvolutionArtifactReadCliOutput;
+      expect(payload.status).toBe('loaded');
+      expect(payload.artifactPath).toBe(artifactPath);
+      expect(payload.artifact).toMatchObject({
+        id: 'artifact-2',
+        provider: 'codex',
+        instance: 'default',
+        probeProfile: 'manual_smoke',
+        review: {
+          classifications: ['baseline'],
+          summary: 'No prior matching baseline artifact was available.',
+        },
+      });
+      expect(output.stderr).toContain('Loaded provider-evolution artifact artifact-2');
+      expect(output.stderr).toContain(`Artifact: ${artifactPath}`);
+    } finally {
       cleanup();
     }
   }, 20000);

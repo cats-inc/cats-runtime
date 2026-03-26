@@ -65,10 +65,13 @@ export interface RuntimeCliOptions {
   bootstrap?: boolean;
   diagnoseSetup?: boolean;
   probeProviderEvolution?: boolean;
+  listProviderEvolutionArtifacts?: boolean;
+  readProviderEvolutionArtifact?: string;
   probeProvider?: string;
   probeInstance?: string;
   probeProfile?: string;
   probeModel?: string;
+  probeLimit?: string;
   refreshSetupScan?: boolean;
   startupMode?: RuntimeStartupMode;
   managedBy?: string;
@@ -178,6 +181,22 @@ export function parseRuntimeCliOptions(argv: string[]): RuntimeCliOptions {
       continue;
     }
 
+    if (arg === '--list-provider-evolution-artifacts') {
+      options.listProviderEvolutionArtifacts = true;
+      continue;
+    }
+
+    if (arg === '--read-provider-evolution-artifact') {
+      options.readProviderEvolutionArtifact = readOptionValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--read-provider-evolution-artifact=')) {
+      options.readProviderEvolutionArtifact = arg.slice('--read-provider-evolution-artifact='.length);
+      continue;
+    }
+
     if (arg === '--probe-provider') {
       options.probeProvider = readOptionValue(argv, index, arg);
       index += 1;
@@ -219,6 +238,17 @@ export function parseRuntimeCliOptions(argv: string[]): RuntimeCliOptions {
 
     if (arg.startsWith('--probe-model=')) {
       options.probeModel = arg.slice('--probe-model='.length);
+      continue;
+    }
+
+    if (arg === '--probe-limit') {
+      options.probeLimit = readOptionValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--probe-limit=')) {
+      options.probeLimit = arg.slice('--probe-limit='.length);
       continue;
     }
 
@@ -604,10 +634,13 @@ export function getRuntimeHelpText(): string {
     '  --bootstrap                            Force bootstrap/setup mode',
     '  --diagnose-setup                       Generate a setup diagnostic report and exit',
     '  --probe-provider-evolution             Run a manual provider-evolution probe and exit',
+    '  --list-provider-evolution-artifacts    List retained provider-evolution probe artifacts and exit',
+    '  --read-provider-evolution-artifact <artifactId>',
     '  --probe-provider <provider>',
     '  --probe-instance <instance>',
     '  --probe-profile <manual_smoke|manual_text>',
     '  --probe-model <model>',
+    '  --probe-limit <count>',
     '  --refresh-setup-scan                   Refresh the shared setup scan before generating a diagnostic report',
     '  --startup-mode <standalone|app-managed>',
     '  --managed-by <name>',

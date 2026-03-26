@@ -26,6 +26,8 @@ import type { ProviderEvolutionEvidenceObserver } from './providerEvolution.js';
 import {
   formatProviderEvolutionProbeEntrySummary,
   getProviderEvolutionProbeProfile,
+  summarizeProviderEvolutionProbeArtifact,
+  type ProviderEvolutionProbeArtifactSummary,
   ProviderEvolutionProbeService,
   type ProviderEvolutionProbeProfile,
   type ProviderEvolutionProbeStoredArtifact,
@@ -102,6 +104,32 @@ export async function generateProviderEvolutionProbeArtifact(
   });
 }
 
+export async function listProviderEvolutionProbeArtifacts(
+  cliOptions: RuntimeCliOptions,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<ProviderEvolutionProbeArtifactSummary[]> {
+  const context = resolveProviderEvolutionEntryContext(env);
+  return context.probeService.listArtifacts(resolveProbeArtifactQuery(cliOptions));
+}
+
+export async function readProviderEvolutionProbeArtifact(
+  cliOptions: RuntimeCliOptions,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<ProviderEvolutionProbeStoredArtifact> {
+  const artifactId = cliOptions.readProviderEvolutionArtifact?.trim();
+  if (!artifactId) {
+    throw new Error('Missing --read-provider-evolution-artifact value');
+  }
+
+  const providerName = parseOptionalProbeProviderName(cliOptions.probeProvider);
+  const context = resolveProviderEvolutionEntryContext(env);
+  const artifact = await context.probeService.readArtifactById(artifactId, providerName);
+  if (!artifact) {
+    throw new Error(`Provider-evolution artifact '${artifactId}' was not found.`);
+  }
+  return artifact;
+}
+
 export function resolveProviderEvolutionEntryContext(
   env: NodeJS.ProcessEnv = process.env,
 ): ProviderEvolutionEntryContext {
@@ -123,6 +151,34 @@ export function formatProviderEvolutionProbeSummary(
   result: ProviderEvolutionProbeStoredArtifact,
 ): string {
   return formatProviderEvolutionProbeEntrySummary(result);
+}
+
+export function formatProviderEvolutionProbeArtifactListSummary(
+  artifacts: ProviderEvolutionProbeArtifactSummary[],
+  cliOptions: RuntimeCliOptions,
+): string {
+  const scope = describeProbeArtifactScope(cliOptions);
+  if (artifacts.length === 0) {
+    return `No provider-evolution artifacts matched ${scope}.\n`;
+  }
+
+  const lines = [
+    `Listed ${artifacts.length} provider-evolution artifact(s) for ${scope}.`,
+    ...artifacts.map((artifact) => formatProbeArtifactSummaryLine(artifact)),
+  ];
+  return `${lines.join('\n')}\n`;
+}
+
+export function formatProviderEvolutionProbeArtifactReadSummary(
+  artifact: ProviderEvolutionProbeStoredArtifact,
+): string {
+  const summary = summarizeProviderEvolutionProbeArtifact(artifact);
+  const lines = [
+    `Loaded provider-evolution artifact ${summary.artifactId}: ${summary.review.summary}`,
+    ...summary.review.highlights.map((highlight) => `- ${highlight}`),
+    `Artifact: ${artifact.artifactPath}`,
+  ];
+  return `${lines.join('\n')}\n`;
 }
 
 interface RunCliProbeProfileOptions {
@@ -257,4 +313,60 @@ function parseProbeProviderName(value: string | undefined): ProviderName {
 
 export function parseProviderEvolutionProbeCliOptions(argv: string[]): RuntimeCliOptions {
   return parseRuntimeCliOptions(argv);
+}
+
+function resolveProbeArtifactQuery(
+  cliOptions: RuntimeCliOptions,
+): {
+  provider?: string;
+  instance?: string;
+  probeProfile?: string;
+  limit?: number;
+} {
+  const provider = parseOptionalProbeProviderName(cliOptions.probeProvider);
+  const limit = parseOptionalProbeLimit(cliOptions.probeLimit);
+  return {
+    ...(provider ? { provider } : {}),
+    ...(cliOptions.probeInstance ? { instance: cliOptions.probeInstance.trim() } : {}),
+    ...(cliOptions.probeProfile ? { probeProfile: cliOptions.probeProfile.trim() } : {}),
+    ...(typeof limit === 'number' ? { limit } : {}),
+  };
+}
+
+function parseOptionalProbeLimit(value: string | undefined): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    throw new Error(`Invalid --probe-limit value '${value}'`);
+  }
+  return parsed;
+}
+
+function parseOptionalProbeProviderName(value: string | undefined): ProviderName | undefined {
+  return value ? parseProbeProviderName(value) : undefined;
+}
+
+function describeProbeArtifactScope(cliOptions: RuntimeCliOptions): string {
+  const parts = [
+    cliOptions.probeProvider?.trim(),
+    cliOptions.probeInstance?.trim(),
+    cliOptions.probeProfile?.trim(),
+  ].filter((value): value is string => Boolean(value));
+  return parts.length > 0 ? parts.join('/') : 'all retained probes';
+}
+
+function formatProbeArtifactSummaryLine(
+  artifact: ProviderEvolutionProbeArtifactSummary,
+): string {
+  const classifications = artifact.review.classifications.join(', ');
+  return [
+    '-',
+    artifact.capturedAt,
+    `${artifact.provider}/${artifact.instance}`,
+    artifact.probeProfile,
+    `[${classifications}]`,
+    artifact.review.summary,
+  ].join(' ');
 }

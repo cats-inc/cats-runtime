@@ -134,6 +134,8 @@ public HTTP surface, use the provider-evolution probe entrypoint:
 node dist/index.js --probe-provider-evolution --probe-provider codex
 node dist/index.js --probe-provider-evolution --probe-provider claude --probe-profile manual_text
 node dist/index.js --probe-provider-evolution --probe-provider goose --probe-model anthropic/claude-sonnet-4
+node dist/index.js --list-provider-evolution-artifacts --probe-provider codex --probe-limit 5
+node dist/index.js --read-provider-evolution-artifact artifact-id --probe-provider codex
 ```
 
 The probe path is intentionally manual-first and currently supports the
@@ -148,6 +150,16 @@ summary plus stdout JSON with:
 - the captured evidence bundle
 - a derived capability snapshot
 - baseline compare output against the latest matching prior artifact, when one exists
+
+The same manual-first CLI flow can now inspect retained probe history without
+opening any public HTTP surface:
+
+- `--list-provider-evolution-artifacts` prints a concise stderr summary and
+  machine-readable stdout JSON with newest-first retained artifact summaries
+- `--read-provider-evolution-artifact <artifactId>` re-reads one retained
+  artifact and prints the full stored artifact JSON to stdout
+- `--probe-provider`, `--probe-instance`, and `--probe-profile` can scope the
+  retained-artifact listing, and `--probe-limit <count>` caps list output
 
 `GET /diagnostics/setup-report` lists the retained reports newest-first with
 their `artifactId`, `artifactPath`, `generatedAt`, and bounded summary fields.
