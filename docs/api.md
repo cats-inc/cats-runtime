@@ -1402,6 +1402,19 @@ resolution source, bounded step summaries, timeout/failure details, and
 duplicate/stuck detection without writing strategy state back into product task
 records.
 
+For API/local sessions, `inspection.tools` is also additive and runtime-owned.
+It surfaces the resolved shared-local-tool policy for the current session:
+
+- `profile`: the resolved provider-instance tool profile (or `standard` fallback)
+- `permissionMode`: the effective runtime permission mode
+- `whitelistActive`: whether a session-level whitelist is constraining tools
+- `allowedTools`: normalized whitelist entries when present
+- `fullAccessTools`: tools currently callable without preview-only restrictions
+- `previewOnlyTools`: tools callable only in safe preview mode (for example
+  delivery/workspace operations with `apply: false`)
+- `blockedTools`: profile tools currently blocked by the effective permission
+  policy
+
 `inspection.maintenance` is also runtime-owned and additive. It gives hosts one
 machine-readable place to read:
 

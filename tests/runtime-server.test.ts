@@ -2316,6 +2316,85 @@ providers:
     });
   });
 
+  it('surfaces resolved local tool policy for API-backed sessions in session inspection', async () => {
+    await withRuntime({
+      providerDefaultTargets: {
+        codex: { backend: 'api', instance: 'main' },
+      },
+      remoteProviderCatalog: {
+        api: {
+          codex: {
+            main: {
+              id: 'main',
+              providerName: 'codex',
+              backend: 'api',
+              transport: 'openai',
+              apiKeyEnv: 'OPENAI_API_KEY',
+              baseUrl: 'https://example.test',
+              model: 'gpt-5.4',
+              toolProfile: 'extended',
+            },
+          },
+        },
+        local: {},
+        agent: {},
+      },
+    }, {}, async (runtime) => {
+      const createResponse = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider: 'codex',
+          cwd: '/tmp/cats-runtime-repo',
+          permissionMode: 'default',
+        }),
+      });
+
+      expect(createResponse.status).toBe(201);
+      const created = await createResponse.json() as Record<string, unknown>;
+      expect(created.inspection).toEqual(expect.objectContaining({
+        tools: expect.objectContaining({
+          profile: 'extended',
+          permissionMode: 'default',
+          whitelistActive: false,
+          fullAccessTools: expect.arrayContaining([
+            'list_files',
+            'inspect_path',
+            'read_file',
+            'grep',
+            'audit-workspace',
+          ]),
+          previewOnlyTools: expect.arrayContaining([
+            'init-workspace',
+            'publish-artifacts',
+            'create-commit',
+          ]),
+          blockedTools: expect.arrayContaining([
+            'write_file',
+            'create_directory',
+            'edit_file',
+            'delete_file',
+            'copy_file',
+          ]),
+        }),
+      }));
+
+      const detailResponse = await runtime.app.request(`/sessions/${created.id}`);
+      expect(detailResponse.status).toBe(200);
+      expect(await detailResponse.json()).toEqual(expect.objectContaining({
+        inspection: expect.objectContaining({
+          tools: expect.objectContaining({
+            profile: 'extended',
+            permissionMode: 'default',
+            previewOnlyTools: expect.arrayContaining(['push-branch']),
+          }),
+        }),
+      }));
+    });
+  });
+
   it('POST /sessions keeps legacy model-only requests accepted during migration', async () => {
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/sessions', {

@@ -43,6 +43,7 @@ import {
   toSessionView,
   toSessionViews,
 } from '../../backends/cli/pool/sessionView.js';
+import { buildToolPolicyInspection } from '../../core/tools/LocalToolRuntime.js';
 import {
   getCursorNative,
   getGooseNative,
@@ -181,6 +182,36 @@ function resolveSessionBranching(
   });
 }
 
+function resolveSessionToolPolicyInspection(
+  ctx: AppContext,
+  session: SessionInfo,
+) {
+  if (session.providerBackend !== 'api' && session.providerBackend !== 'local') {
+    return undefined;
+  }
+
+  const defaultTarget = getProviderDefaultTarget(ctx.config, session.providerName);
+  const resolvedInstanceId = session.providerInstanceId || defaultTarget?.instance;
+
+  try {
+    const target = resolveProviderTarget(
+      ctx.config,
+      session.providerName,
+      resolvedInstanceId ? `${session.providerBackend}/${resolvedInstanceId}` : undefined,
+    );
+    return buildToolPolicyInspection({
+      toolProfile: target.remoteInstance?.toolProfile,
+      permissionMode: session.permissionMode,
+      allowedTools: session.allowedTools,
+    });
+  } catch {
+    return buildToolPolicyInspection({
+      permissionMode: session.permissionMode,
+      allowedTools: session.allowedTools,
+    });
+  }
+}
+
 function serializeSession(ctx: AppContext, session: SessionInfo) {
   const runtime = getRuntimeSessionManager(ctx);
   const browserSessions = getRuntimeBrowserService(ctx).listSessions({
@@ -193,6 +224,7 @@ function serializeSession(ctx: AppContext, session: SessionInfo) {
   const lineage = getSessionLineage(session);
   const branching = resolveSessionBranching(ctx, session);
   const wakeup = ctx.wakeup?.getSessionWakeState(session.id);
+  const toolPolicy = resolveSessionToolPolicyInspection(ctx, session);
   const inspection = buildSessionInspection({
     session,
     view,
@@ -200,6 +232,7 @@ function serializeSession(ctx: AppContext, session: SessionInfo) {
     metering: getRuntimeMeteringService(ctx).buildSessionSnapshot(session),
     wakeupPending: Boolean(wakeup?.pending),
     browserSessions,
+    toolPolicy,
   });
   const strategyRequest = readRuntimeExecutionStrategyRequest(session);
   const strategyState = readRuntimeExecutionStrategyState(session);
@@ -252,6 +285,7 @@ function serializeSessions(
       includeCapabilities: options.includeBranchCapabilities,
     });
     const wakeup = ctx.wakeup?.getSessionWakeState(sessions[index].id);
+    const toolPolicy = resolveSessionToolPolicyInspection(ctx, sessions[index]);
     const strategyRequest = readRuntimeExecutionStrategyRequest(sessions[index]);
     const strategyState = readRuntimeExecutionStrategyState(sessions[index]);
     const { maintenanceState: _maintenanceState, strategy: _strategy, ...publicView } = view;
@@ -270,6 +304,7 @@ function serializeSessions(
         metering: metering.buildSessionSnapshot(sessions[index]),
         wakeupPending: Boolean(wakeup?.pending),
         browserSessions,
+        toolPolicy,
       }),
       branching,
       ...(wakeup ? { wakeup } : {}),

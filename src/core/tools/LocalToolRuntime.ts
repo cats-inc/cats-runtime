@@ -2,7 +2,11 @@ import { spawn } from 'node:child_process';
 import { copyFile, readdir, readFile, rmdir, stat, mkdir, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname, extname, resolve } from 'node:path';
 import path from 'node:path';
-import type { PermissionMode, WorkspaceMode } from '../types.js';
+import type {
+  PermissionMode,
+  RuntimeToolPolicyInspection,
+  WorkspaceMode,
+} from '../types.js';
 import { applyPatch as applyStructuredPatch } from './applyPatch.js';
 import {
   assertDistinctWorkspaceFiles,
@@ -560,6 +564,13 @@ const READ_ONLY_TOOLS = new Set([
   'inspect-deployment',
   'read-deployment-logs',
 ]);
+const PREVIEW_ONLY_TOOLS = new Set([
+  'init-workspace',
+  'update-workspace',
+  'publish-artifacts',
+  'create-commit',
+  'push-branch',
+]);
 const TOOL_ORDER = new Map(TOOL_DEFINITIONS.map((tool, index) => [tool.name, index]));
 
 const STANDARD_TOOLS = new Set([
@@ -595,6 +606,72 @@ function normalizeProfile(profile?: string): string {
 
 function normalizeToolName(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function listToolDefinitionsForProfile(profile?: string): ToolDefinition[] {
+  const normalized = normalizeProfile(profile);
+  const allowed = PROFILE_TOOLS[normalized] ?? PROFILE_TOOLS.standard;
+  return TOOL_DEFINITIONS
+    .filter((tool) => allowed.has(tool.name))
+    .sort((left, right) => (TOOL_ORDER.get(left.name) ?? 0) - (TOOL_ORDER.get(right.name) ?? 0));
+}
+
+function isReadOnlyCompatibleDefinition(name: string): boolean {
+  return READ_ONLY_TOOLS.has(name) || PREVIEW_ONLY_TOOLS.has(name);
+}
+
+export function buildToolPolicyInspection(input: {
+  toolProfile?: string;
+  permissionMode?: PermissionMode;
+  allowedTools?: string[];
+}): RuntimeToolPolicyInspection {
+  const profile = normalizeProfile(input.toolProfile);
+  const permissionMode = input.permissionMode ?? 'skip';
+  const profileTools = listToolDefinitionsForProfile(profile).map((tool) => tool.name);
+  const normalizedAllowedTools = Array.from(new Set(
+    (input.allowedTools || [])
+      .filter((value): value is string => typeof value === 'string')
+      .map(normalizeToolName),
+  ));
+  const whitelist = new Set(normalizedAllowedTools);
+
+  const fullAccessTools: string[] = [];
+  const previewOnlyTools: string[] = [];
+  const blockedTools: string[] = [];
+
+  for (const toolName of profileTools) {
+    if (permissionMode === 'skip') {
+      fullAccessTools.push(toolName);
+      continue;
+    }
+
+    if (permissionMode === 'whitelist') {
+      if (whitelist.has(toolName)) {
+        fullAccessTools.push(toolName);
+      } else {
+        blockedTools.push(toolName);
+      }
+      continue;
+    }
+
+    if (READ_ONLY_TOOLS.has(toolName)) {
+      fullAccessTools.push(toolName);
+    } else if (PREVIEW_ONLY_TOOLS.has(toolName)) {
+      previewOnlyTools.push(toolName);
+    } else {
+      blockedTools.push(toolName);
+    }
+  }
+
+  return {
+    profile,
+    permissionMode,
+    whitelistActive: permissionMode === 'whitelist',
+    ...(normalizedAllowedTools.length > 0 ? { allowedTools: normalizedAllowedTools } : {}),
+    fullAccessTools,
+    previewOnlyTools,
+    blockedTools,
+  };
 }
 
 function shouldIgnoreDirectory(name: string): boolean {
@@ -896,11 +973,7 @@ export class LocalToolRuntime {
   }
 
   listTools(profile?: string): ToolDefinition[] {
-    const normalized = normalizeProfile(profile);
-    const allowed = PROFILE_TOOLS[normalized] ?? PROFILE_TOOLS.standard;
-    return TOOL_DEFINITIONS
-      .filter((tool) => allowed.has(tool.name))
-      .sort((left, right) => (TOOL_ORDER.get(left.name) ?? 0) - (TOOL_ORDER.get(right.name) ?? 0));
+    return listToolDefinitionsForProfile(profile);
   }
 
   async execute(context: ToolExecutionContext, call: ToolCall): Promise<ToolResult> {
@@ -980,10 +1053,7 @@ export class LocalToolRuntime {
     }
 
     return (
-      (name === 'init-workspace' || name === 'update-workspace')
-      && args.apply !== true
-    ) || (
-      (name === 'publish-artifacts' || name === 'create-commit' || name === 'push-branch')
+      PREVIEW_ONLY_TOOLS.has(name)
       && args.apply !== true
     );
   }

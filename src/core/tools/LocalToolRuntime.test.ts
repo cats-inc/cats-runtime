@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { ToolExecutionContext } from './LocalToolRuntime.js';
-import { LocalToolRuntime } from './LocalToolRuntime.js';
+import { buildToolPolicyInspection, LocalToolRuntime } from './LocalToolRuntime.js';
 
 function createWorkspace() {
   const cwd = mkdtempSync(join(tmpdir(), 'cats-runtime-tools-'));
@@ -1033,6 +1033,61 @@ describe('LocalToolRuntime', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools();
       expect(tools.length).toBe(26);
+    });
+
+    it('builds read-only compatible tool policy summaries', () => {
+      const policy = buildToolPolicyInspection({
+        toolProfile: 'extended',
+        permissionMode: 'default',
+      });
+
+      expect(policy).toEqual(expect.objectContaining({
+        profile: 'extended',
+        permissionMode: 'default',
+        whitelistActive: false,
+      }));
+      expect(policy.fullAccessTools).toEqual(expect.arrayContaining([
+        'list_files',
+        'inspect_path',
+        'read_file',
+        'grep',
+        'audit-workspace',
+        'audit-review-target',
+      ]));
+      expect(policy.previewOnlyTools).toEqual(expect.arrayContaining([
+        'init-workspace',
+        'update-workspace',
+        'publish-artifacts',
+        'create-commit',
+        'push-branch',
+      ]));
+      expect(policy.blockedTools).toEqual(expect.arrayContaining([
+        'write_file',
+        'create_directory',
+        'edit_file',
+        'apply_patch',
+        'delete_file',
+        'copy_file',
+      ]));
+    });
+
+    it('builds whitelist-based tool policy summaries', () => {
+      const policy = buildToolPolicyInspection({
+        toolProfile: 'extended',
+        permissionMode: 'whitelist',
+        allowedTools: ['grep', ' copy_file ', 'unknown_tool', 'grep'],
+      });
+
+      expect(policy).toEqual(expect.objectContaining({
+        profile: 'extended',
+        permissionMode: 'whitelist',
+        whitelistActive: true,
+        allowedTools: ['grep', 'copy_file', 'unknown_tool'],
+      }));
+      expect(policy.fullAccessTools).toEqual(['grep', 'copy_file']);
+      expect(policy.previewOnlyTools).toEqual([]);
+      expect(policy.blockedTools).toContain('write_file');
+      expect(policy.blockedTools).toContain('init-workspace');
     });
   });
 

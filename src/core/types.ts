@@ -1421,6 +1421,16 @@ export interface RuntimeExecutionStrategyInspection {
   state?: RuntimeExecutionStrategyState;
 }
 
+export interface RuntimeToolPolicyInspection {
+  profile: string;
+  permissionMode: PermissionMode;
+  whitelistActive: boolean;
+  allowedTools?: string[];
+  fullAccessTools: string[];
+  previewOnlyTools: string[];
+  blockedTools: string[];
+}
+
 export interface RuntimeSessionInspection {
   state: RuntimeSessionExecutionState;
   attached: boolean;
@@ -1433,6 +1443,7 @@ export interface RuntimeSessionInspection {
   metering: RuntimeSessionMeteringSnapshot;
   maintenance: RuntimeSessionMaintenance;
   strategy?: RuntimeExecutionStrategyInspection;
+  tools?: RuntimeToolPolicyInspection;
   skills?: SessionSkillState;
   artifacts: SessionArtifact[];
   services: AgentRuntimeService[];

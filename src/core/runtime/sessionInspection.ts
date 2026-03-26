@@ -3,6 +3,7 @@ import type {
   AgentRuntimeService,
   RuntimeBrowserSessionView,
   RuntimeExecutionStrategyInspection,
+  RuntimeToolPolicyInspection,
   RuntimePreviewSurface,
   RuntimePreviewSurfaceRenderHint,
   RuntimeSessionInspection,
@@ -42,6 +43,7 @@ export interface BuildSessionInspectionInput {
   metering: RuntimeSessionMeteringSnapshot;
   wakeupPending?: boolean;
   browserSessions?: RuntimeBrowserSessionView[];
+  toolPolicy?: RuntimeToolPolicyInspection;
 }
 
 export function buildSessionInspection(
@@ -94,6 +96,7 @@ export function buildSessionInspection(
       trackedMaintenance: input.trackedState?.maintenance ?? input.session.maintenanceState,
     }),
     ...(strategy ? { strategy } : {}),
+    ...(input.toolPolicy ? { tools: structuredClone(input.toolPolicy) } : {}),
     ...(input.session.skills ? { skills: cloneSkillState(input.session.skills) } : {}),
     artifacts,
     services,
