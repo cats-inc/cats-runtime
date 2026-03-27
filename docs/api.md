@@ -1260,8 +1260,57 @@ source workspace instead of the transient worktree path. API-backed and
 local-model sessions also include `providerBackend`. Session payloads now also
 carry a canonical `workspace` block plus additive legacy `workspaceIsolation`
 metadata when the runtime is tracking a source, sandbox, or worktree-backed
-workspace surface. Branch-aware session payloads now also include a
+workspace surface. Session, history, and observe payloads now also include a
+bounded runtime-owned `providerTarget` read model so hosts can inspect backend
+semantics without joining against `/providers/config` first. It includes:
+
+- resolved provider target identity (`provider`, `backend`, `instance`,
+  `target`, `resolved`)
+- target transport/model hints when the runtime owns them (`transport`, `model`)
+- backend-neutral continuity truth (`continuity`)
+- target-owned tooling/discoverability truth (`tooling`)
+- additive `agentRuntime` inspection for agent-backed sessions when available
+
+`providerTarget.tooling` is target-owned baseline capability truth, while
+`inspection.tools` remains the session-scoped permission/profile read model for
+API/local sessions. Branch-aware session payloads now also include a
 `branching` block:
+
+Example `providerTarget` shape:
+
+```json
+{
+  "providerTarget": {
+    "provider": "codex",
+    "backend": "api",
+    "instance": "main",
+    "target": "api/main",
+    "resolved": true,
+    "transport": "openai",
+    "model": "gpt-5",
+    "continuity": {
+      "source": "runtime_stateful",
+      "resume": true,
+      "fork": true,
+      "permissions": true,
+      "providerManagedSessions": false,
+      "sessionKey": false,
+      "providerSessionState": true,
+      "remoteCancel": false
+    },
+    "tooling": {
+      "source": "runtime_local",
+      "discoverable": true,
+      "sessionScopedOverrides": true,
+      "observability": {
+        "catalog": "runtime_enumerated",
+        "toolCallEvents": true,
+        "runtimeServices": false
+      }
+    }
+  }
+}
+```
 
 Example `workspace` shape:
 
@@ -2227,6 +2276,9 @@ without forcing hosts to infer transcript semantics from provider names alone.
 The same session/history/observe surfaces now also carry additive
 runtime-owned strategy resolution/state metadata, so hosts do not need a
 separate task-status event bus just to inspect execution-strategy state.
+`GET /sessions/{id}/history` also reuses the same additive `providerTarget`
+read model returned by `GET /sessions/{id}` so provider continuity/tooling
+semantics stay visible alongside transcript provenance.
 
 ### Runtime Inspection
 
@@ -2250,7 +2302,8 @@ resolved `instance` alongside the runtime metadata.
 `GET /sessions/{id}/observe` returns a machine-readable run-inspection snapshot
 without requiring a live stream connection. When wakeups exist for the session,
 the same additive `wakeup` block returned by `GET /sessions/{id}` and
-`GET /sessions/{id}/history` is also included:
+`GET /sessions/{id}/history` is also included, along with the same
+`session.providerTarget` read model used by the other session-facing surfaces:
 
 ```json
 {

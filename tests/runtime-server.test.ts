@@ -2012,6 +2012,35 @@ providers:
             providerName: 'cursor',
             providerInstanceId: 'ubuntu',
             cwd: 'C:/repo',
+            providerTarget: {
+              provider: 'cursor',
+              backend: 'cli',
+              instance: 'ubuntu',
+              target: 'cli/ubuntu',
+              resolved: true,
+              continuity: {
+                source: 'provider_native',
+                summary: expect.stringContaining('CLI provider owns native conversation continuity'),
+                resume: true,
+                fork: false,
+                permissions: false,
+                providerManagedSessions: true,
+                sessionKey: false,
+                providerSessionState: false,
+                remoteCancel: false,
+              },
+              tooling: {
+                source: 'provider_native',
+                discoverable: false,
+                sessionScopedOverrides: false,
+                summary: expect.stringContaining('provider-native tools'),
+                observability: {
+                  catalog: 'not_enumerated',
+                  toolCallEvents: false,
+                  runtimeServices: false,
+                },
+              },
+            },
           }),
         ],
         count: 1,
@@ -2718,10 +2747,56 @@ providers:
           ]),
         }),
       }));
+      expect(created.providerTarget).toEqual({
+        provider: 'codex',
+        backend: 'api',
+        instance: 'main',
+        target: 'api/main',
+        resolved: true,
+        transport: 'openai',
+        model: 'gpt-5.4',
+        continuity: {
+          source: 'runtime_stateful',
+          summary: expect.stringContaining('cats-runtime owns the host-visible session lifecycle'),
+          resume: true,
+          fork: true,
+          permissions: true,
+          providerManagedSessions: false,
+          sessionKey: false,
+          providerSessionState: true,
+          remoteCancel: false,
+        },
+        tooling: {
+          source: 'runtime_local',
+          discoverable: true,
+          sessionScopedOverrides: true,
+          summary: expect.stringContaining(`'extended' profile`),
+          policy: expect.objectContaining({
+            profile: 'extended',
+            counts: expect.objectContaining({
+              total: 31,
+            }),
+          }),
+          observability: {
+            catalog: 'runtime_enumerated',
+            toolCallEvents: true,
+            runtimeServices: false,
+          },
+        },
+      });
 
       const detailResponse = await runtime.app.request(`/sessions/${created.id}`);
       expect(detailResponse.status).toBe(200);
       expect(await detailResponse.json()).toEqual(expect.objectContaining({
+        providerTarget: expect.objectContaining({
+          provider: 'codex',
+          backend: 'api',
+          instance: 'main',
+          target: 'api/main',
+          resolved: true,
+          transport: 'openai',
+          model: 'gpt-5.4',
+        }),
         inspection: expect.objectContaining({
           tools: expect.objectContaining({
             profile: 'extended',
@@ -2733,6 +2808,36 @@ providers:
               previewOnly: 5,
               blocked: 10,
             },
+          }),
+        }),
+      }));
+
+      const historyResponse = await runtime.app.request(`/sessions/${created.id}/history`);
+      expect(historyResponse.status).toBe(200);
+      expect(await historyResponse.json()).toEqual(expect.objectContaining({
+        providerTarget: expect.objectContaining({
+          provider: 'codex',
+          backend: 'api',
+          instance: 'main',
+          target: 'api/main',
+          resolved: true,
+          transport: 'openai',
+          model: 'gpt-5.4',
+        }),
+      }));
+
+      const observeResponse = await runtime.app.request(`/sessions/${created.id}/observe`);
+      expect(observeResponse.status).toBe(200);
+      expect(await observeResponse.json()).toEqual(expect.objectContaining({
+        session: expect.objectContaining({
+          providerTarget: expect.objectContaining({
+            provider: 'codex',
+            backend: 'api',
+            instance: 'main',
+            target: 'api/main',
+            resolved: true,
+            transport: 'openai',
+            model: 'gpt-5.4',
           }),
         }),
       }));

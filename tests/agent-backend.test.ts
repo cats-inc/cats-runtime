@@ -577,6 +577,33 @@ describe('agent backend integration', () => {
       const created = await createResponse.json() as { id: string; providerBackend: string; sessionKey: string };
       expect(created.providerBackend).toBe('agent');
       expect(created.sessionKey).toBe('task-123');
+      expect(created).toEqual(expect.objectContaining({
+        providerTarget: expect.objectContaining({
+          provider: 'openclaw',
+          backend: 'agent',
+          instance: 'gateway',
+          target: 'agent/gateway',
+          resolved: true,
+          transport: 'openclaw_gateway',
+          model: 'openclaw-coder',
+          continuity: expect.objectContaining({
+            source: 'provider_managed',
+            providerManagedSessions: true,
+            sessionKey: true,
+            providerSessionState: true,
+          }),
+          tooling: expect.objectContaining({
+            source: 'provider_managed',
+            discoverable: true,
+          }),
+          agentRuntime: expect.objectContaining({
+            adapter: 'openclaw',
+            transport: expect.objectContaining({
+              protocol: 'openclaw_gateway_v3',
+            }),
+          }),
+        }),
+      }));
 
       const messageResponse = await runtime.app.request(`/sessions/${created.id}/messages`, {
         method: 'POST',
@@ -606,6 +633,31 @@ describe('agent backend integration', () => {
           parser: 'generic_jsonl',
         },
         sessionKey: 'task-123',
+        providerTarget: {
+          provider: 'openclaw',
+          backend: 'agent',
+          instance: 'gateway',
+          target: 'agent/gateway',
+          resolved: true,
+          transport: 'openclaw_gateway',
+          model: 'openclaw-coder',
+          continuity: expect.objectContaining({
+            source: 'provider_managed',
+            providerManagedSessions: true,
+            sessionKey: true,
+            providerSessionState: true,
+          }),
+          tooling: expect.objectContaining({
+            source: 'provider_managed',
+            discoverable: true,
+          }),
+          agentRuntime: expect.objectContaining({
+            adapter: 'openclaw',
+            transport: expect.objectContaining({
+              protocol: 'openclaw_gateway_v3',
+            }),
+          }),
+        },
         outputDir: '/tmp/out',
         context: {
           source: 'interactive',

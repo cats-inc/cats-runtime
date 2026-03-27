@@ -58,6 +58,7 @@ import {
   type ProviderTargetDescriptor,
 } from '../../core/providerCatalog.js';
 import { resolveSessionProviderTarget } from '../providerTargets.js';
+import { buildSessionProviderTargetSummary } from '../sessionProviderTarget.js';
 import {
   attachBranchMetadata,
   buildSessionBranchObservability,
@@ -236,9 +237,11 @@ function serializeSession(ctx: AppContext, session: SessionInfo) {
   });
   const strategyRequest = readRuntimeExecutionStrategyRequest(session);
   const strategyState = readRuntimeExecutionStrategyState(session);
+  const providerTarget = buildSessionProviderTargetSummary(ctx, session);
   const { maintenanceState: _maintenanceState, strategy: _strategy, ...publicView } = view;
   return {
     ...publicView,
+    providerTarget,
     requestedStrategy: strategyRequest?.requestedStrategy,
     acceptanceCriteria: strategyRequest?.acceptanceCriteria,
     strategyContext: strategyRequest?.strategyContext,
@@ -288,9 +291,13 @@ function serializeSessions(
     const toolPolicy = resolveSessionToolPolicyInspection(ctx, sessions[index]);
     const strategyRequest = readRuntimeExecutionStrategyRequest(sessions[index]);
     const strategyState = readRuntimeExecutionStrategyState(sessions[index]);
+    const providerTarget = buildSessionProviderTargetSummary(ctx, sessions[index], {
+      expensiveCliCapabilities: false,
+    });
     const { maintenanceState: _maintenanceState, strategy: _strategy, ...publicView } = view;
     return {
       ...publicView,
+      providerTarget,
       requestedStrategy: strategyRequest?.requestedStrategy,
       acceptanceCriteria: strategyRequest?.acceptanceCriteria,
       strategyContext: strategyRequest?.strategyContext,

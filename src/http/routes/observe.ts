@@ -6,6 +6,7 @@ import {
   getRuntimeSessionManager,
   type AppContext,
 } from '../app.js';
+import { buildSessionProviderTargetSummary } from '../sessionProviderTarget.js';
 import { toSessionView } from '../../backends/cli/pool/sessionView.js';
 import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
 import type { StreamEvent } from '../../core/types.js';
@@ -32,6 +33,7 @@ observeRoutes.get('/sessions/:id/observe', async (c) => {
   return c.json({
     session: {
       ...view,
+      providerTarget: buildSessionProviderTargetSummary(ctx, session),
       ...(wakeup ? { wakeup } : {}),
       inspection: buildSessionInspection({
         session,

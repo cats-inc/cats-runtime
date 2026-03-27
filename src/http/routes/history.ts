@@ -21,6 +21,7 @@ import {
   getKiroNative,
   getOpencodeNative,
 } from '../providerServices.js';
+import { buildSessionProviderTargetSummary } from '../sessionProviderTarget.js';
 import type { PiMessagePart, PiStreamEvent } from '../../backends/cli/pi/parser.js';
 
 export const historyRoutes = new Hono();
@@ -87,6 +88,7 @@ function buildHistoryMetadata(ctx: AppContext, session: SessionInfo) {
   const strategyState = readRuntimeExecutionStrategyState(session);
   return {
     sessionKey: session.sessionKey,
+    providerTarget: buildSessionProviderTargetSummary(ctx, session),
     requestedStrategy: strategyRequest?.requestedStrategy,
     acceptanceCriteria: strategyRequest?.acceptanceCriteria,
     strategyContext: strategyRequest?.strategyContext,

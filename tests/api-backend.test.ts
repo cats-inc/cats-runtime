@@ -584,6 +584,24 @@ describe('API backend integration', () => {
       const historyBody = await historyResponse.json();
       expect(historyBody).toMatchObject({
         sessionKey: expect.any(String),
+        providerTarget: {
+          provider: 'codex',
+          backend: 'api',
+          instance: 'main',
+          target: 'api/main',
+          resolved: true,
+          transport: 'openai',
+          model: 'gpt-5',
+          continuity: expect.objectContaining({
+            source: 'runtime_stateful',
+            providerManagedSessions: false,
+            providerSessionState: true,
+          }),
+          tooling: expect.objectContaining({
+            source: 'runtime_local',
+            discoverable: true,
+          }),
+        },
         artifacts: [],
         messages: [
           { role: 'user', text: 'Read src/app.ts and summarize it.', timestamp: expect.any(String) },
