@@ -491,6 +491,33 @@ async function providersConfig(
   };
 }
 
+async function providerTools(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const provider = readRequiredString(args, 'provider');
+  const searchParams = new URLSearchParams();
+  appendSingleQueryValue(searchParams, 'instance', readOptionalString(args, 'instance'));
+  const path = searchParams.size > 0
+    ? `/providers/${encodeURIComponent(provider)}/tools?${searchParams.toString()}`
+    : `/providers/${encodeURIComponent(provider)}/tools`;
+  const result = await requestRuntimeJson(ctx, path, { method: 'GET' });
+  ensureRouteSuccess('provider_tools', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'provider_tools result');
+  const summary = typeof payload.summary === 'string'
+    ? payload.summary
+    : `Provider tooling inspection for ${provider}.`;
+
+  return {
+    summary,
+    structuredContent: {
+      ...payload,
+      toolsPath: path,
+    },
+  };
+}
+
 async function providerDiagnostics(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -2070,6 +2097,23 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: async (ctx) => providersConfig(ctx),
+  },
+  {
+    definition: {
+      name: 'provider_tools',
+      title: 'Provider Tools',
+      description: 'Return the runtime-owned provider tooling inspection summary exposed by the existing provider tooling route.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          provider: { type: 'string' },
+          instance: { type: 'string' },
+        },
+        required: ['provider'],
+        additionalProperties: false,
+      },
+    },
+    execute: providerTools,
   },
   {
     definition: {

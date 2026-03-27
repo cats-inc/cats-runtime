@@ -1056,6 +1056,10 @@ evidence bundles and does not force hosts to invent their own report format.
   backends, instance-level runtime/tooling/continuity summaries, model-catalog
   snapshots, and execution-strategy catalog metadata without stitching together
   private read paths
+- the same provider tooling inspection surface is now also exposed through MCP
+  as `provider_tools`, so orchestrator-style hosts can inspect runtime-local,
+  provider-native, or remote-discovered tool ownership without inventing a
+  second tooling contract
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
   remediation previews, and latest-setup-report summary metadata including a

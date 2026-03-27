@@ -354,6 +354,7 @@ describe('runtime MCP facade', () => {
       'list_sessions',
       'health_diagnostics',
       'providers_config',
+      'provider_tools',
       'provider_diagnostics',
       'reprobe_provider_diagnostics',
       'list_provider_evolution_artifacts',
@@ -546,6 +547,46 @@ describe('runtime MCP facade', () => {
         ]),
       }),
     );
+
+    const providerToolsResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 3.4,
+        method: 'tools/call',
+        params: {
+          name: 'provider_tools',
+          arguments: {
+            provider: 'claude',
+            instance: 'default',
+          },
+        },
+      }),
+    });
+    expect(providerToolsResponse.status).toBe(200);
+    const providerTools = await providerToolsResponse.json() as {
+      result: {
+        structuredContent: {
+          provider: string;
+          backend: string;
+          instance: string;
+          toolsPath: string;
+          source: string;
+          summary: string;
+        };
+      };
+    };
+    expect(providerTools.result.structuredContent.toolsPath).toBe(
+      '/providers/claude/tools?instance=default',
+    );
+    expect(providerTools.result.structuredContent).toEqual(expect.objectContaining({
+      provider: 'claude',
+      backend: 'cli',
+      instance: 'default',
+      source: 'provider_native',
+      summary: expect.stringContaining('provider-native tools'),
+    }));
 
     const providerDiagnosticsResponse = await app.request('/mcp', {
       method: 'POST',
