@@ -9,6 +9,11 @@ import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
 import type { CliRuntimeConfig } from '../backends/cli/config.js';
 import { createRuntimeApp } from './app.js';
 import { createRuntimeStartupState } from '../startup.js';
+import { getRuntimeResolvedPaths } from '../core/config.js';
+import {
+  ProviderEvolutionProbeService,
+  PROVIDER_EVOLUTION_PROBE_PROFILES,
+} from '../core/compatibility/providerEvolutionProbe.js';
 import type { StreamEvent, TurnInput } from '../core/types.js';
 
 describe('runtime MCP facade', () => {
@@ -233,6 +238,8 @@ describe('runtime MCP facade', () => {
       'runtime_summary',
       'list_sessions',
       'provider_diagnostics',
+      'list_provider_evolution_artifacts',
+      'read_provider_evolution_artifact',
       'observe_session',
       'list_runtime_skills',
       'create_session',
@@ -369,6 +376,128 @@ describe('runtime MCP facade', () => {
       }),
     ]);
     vi.mocked(pool.getCapabilities).mockClear();
+
+    const probeService = new ProviderEvolutionProbeService({
+      rootDir: join(
+        getRuntimeResolvedPaths(makeConfig()).compatibilityEvidenceDir,
+        'provider-evolution',
+      ),
+    });
+    const artifact = await probeService.run({
+      target: {
+        provider: 'claude',
+        instance: 'default',
+        parserId: 'claude-stream-json',
+        probeProfile: 'manual_text',
+        transport: 'cli',
+        version: '1.2.3',
+      },
+      profile: PROVIDER_EVOLUTION_PROBE_PROFILES.manual_text,
+      run: async ({ observer }) => {
+        observer.recordNormalized({
+          rawEventType: 'assistant',
+          events: { type: 'text', text: 'alpha' },
+        });
+        observer.recordNormalized({
+          rawEventType: 'result',
+          events: { type: 'result' },
+        });
+        return {
+          status: 'completed',
+          turnsCompleted: 1,
+          emittedEventCount: 2,
+        };
+      },
+    });
+
+    const listEvolutionResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 32,
+        method: 'tools/call',
+        params: {
+          name: 'list_provider_evolution_artifacts',
+          arguments: {
+            provider: 'claude',
+            classification: ['baseline'],
+            limit: 1,
+          },
+        },
+      }),
+    });
+    expect(listEvolutionResponse.status).toBe(200);
+    const listedEvolution = await listEvolutionResponse.json() as {
+      result: {
+        structuredContent: {
+          artifactsPath: string;
+          query: {
+            provider: string;
+            reviewClassifications: string[];
+            limit: number;
+          };
+          artifacts: Array<{
+            artifactId: string;
+            provider: string;
+            parserId: string;
+          }>;
+        };
+      };
+    };
+    expect(listedEvolution.result.structuredContent.artifactsPath).toBe(
+      '/diagnostics/providers/evolution?provider=claude&classification=baseline&limit=1',
+    );
+    expect(listedEvolution.result.structuredContent.query).toEqual({
+      provider: 'claude',
+      reviewClassifications: ['baseline'],
+      limit: 1,
+    });
+    expect(listedEvolution.result.structuredContent.artifacts).toEqual([
+      expect.objectContaining({
+        artifactId: artifact.artifact.id,
+        provider: 'claude',
+        parserId: 'claude-stream-json',
+      }),
+    ]);
+
+    const readEvolutionResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 33,
+        method: 'tools/call',
+        params: {
+          name: 'read_provider_evolution_artifact',
+          arguments: {
+            artifactId: artifact.artifact.id,
+            provider: 'claude',
+          },
+        },
+      }),
+    });
+    expect(readEvolutionResponse.status).toBe(200);
+    const readEvolution = await readEvolutionResponse.json() as {
+      result: {
+        structuredContent: {
+          artifactPath: string;
+          relativePath: string;
+          artifact: {
+            id: string;
+            provider: string;
+          };
+        };
+      };
+    };
+    expect(readEvolution.result.structuredContent.artifactPath).toBe(
+      `/diagnostics/providers/evolution/${artifact.artifact.id}?provider=claude`,
+    );
+    expect(readEvolution.result.structuredContent.relativePath).toContain('claude/');
+    expect(readEvolution.result.structuredContent.artifact).toEqual(expect.objectContaining({
+      id: artifact.artifact.id,
+      provider: 'claude',
+    }));
 
     const listSessionsResponse = await app.request('/mcp', {
       method: 'POST',

@@ -61,6 +61,16 @@ const SUBSTRATE_PROFILES = ['minimal', 'standard', 'a2a-enabled'] as const;
 const ENABLED_AGENTS = ['claude', 'gemini', 'codex'] as const;
 const DIAGNOSTICS_PROBE_MODES = ['light', 'live'] as const;
 const PROVIDER_BACKENDS = ['cli', 'api', 'local', 'agent'] as const;
+const PROVIDER_EVOLUTION_TRANSPORTS = ['cli', 'agent', 'api', 'unknown'] as const;
+const PROVIDER_EVOLUTION_REVIEW_CLASSIFICATIONS = [
+  'baseline',
+  'stable',
+  'upgrade',
+  'regression',
+  'schema_change',
+  'semantic_drift_suspected',
+] as const;
+const RUNTIME_MODES = ['native', 'wsl', 'docker'] as const;
 const RUNTIME_SKILL_FAMILIES = ['base', 'orchestration', 'work', 'chat', 'code'] as const;
 const RUNTIME_SKILL_PACKAGE_KINDS = ['base', 'role', 'bundle'] as const;
 const RUNTIME_SKILL_DELIVERY_HINTS = ['filesystem', 'instructions', 'none'] as const;
@@ -388,6 +398,121 @@ async function providerDiagnostics(
     structuredContent: {
       ...payload,
       providersPath: path,
+    },
+  };
+}
+
+async function listProviderEvolutionArtifacts(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const searchParams = new URLSearchParams();
+  appendSingleQueryValue(searchParams, 'provider', readOptionalString(args, 'provider'));
+  appendSingleQueryValue(searchParams, 'instance', readOptionalString(args, 'instance'));
+  appendSingleQueryValue(searchParams, 'parserId', readOptionalString(args, 'parserId'));
+  appendSingleQueryValue(searchParams, 'probeProfile', readOptionalString(args, 'probeProfile'));
+  appendSingleQueryValue(
+    searchParams,
+    'transport',
+    readOptionalEnumString(
+      args,
+      'transport',
+      PROVIDER_EVOLUTION_TRANSPORTS,
+      'transport must be a valid provider-evolution transport',
+    ),
+  );
+  appendSingleQueryValue(
+    searchParams,
+    'runtimeMode',
+    readOptionalEnumString(
+      args,
+      'runtimeMode',
+      RUNTIME_MODES,
+      'runtimeMode must be a valid runtime mode',
+    ),
+  );
+  appendQueryValues(
+    searchParams,
+    'classification',
+    readOptionalEnumStringArray(
+      args,
+      'classification',
+      PROVIDER_EVOLUTION_REVIEW_CLASSIFICATIONS,
+      'classification values must be valid provider-evolution review classifications',
+    ),
+  );
+  appendSingleQueryValue(searchParams, 'limit', readOptionalInteger(args, 'limit', 1));
+
+  const path = searchParams.size > 0
+    ? `/diagnostics/providers/evolution?${searchParams.toString()}`
+    : '/diagnostics/providers/evolution';
+  const result = await requestRuntimeJson(ctx, path, { method: 'GET' });
+  ensureRouteSuccess('list_provider_evolution_artifacts', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'list_provider_evolution_artifacts result');
+  const artifacts = Array.isArray(payload.artifacts) ? payload.artifacts : [];
+
+  return {
+    summary: `Retained provider-evolution artifacts: ${artifacts.length}.`,
+    structuredContent: {
+      ...payload,
+      artifactsPath: path,
+    },
+  };
+}
+
+async function readProviderEvolutionArtifact(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const artifactId = readRequiredString(args, 'artifactId');
+  const searchParams = new URLSearchParams();
+  appendSingleQueryValue(searchParams, 'provider', readOptionalString(args, 'provider'));
+  appendSingleQueryValue(searchParams, 'instance', readOptionalString(args, 'instance'));
+  appendSingleQueryValue(searchParams, 'parserId', readOptionalString(args, 'parserId'));
+  appendSingleQueryValue(searchParams, 'probeProfile', readOptionalString(args, 'probeProfile'));
+  appendSingleQueryValue(
+    searchParams,
+    'transport',
+    readOptionalEnumString(
+      args,
+      'transport',
+      PROVIDER_EVOLUTION_TRANSPORTS,
+      'transport must be a valid provider-evolution transport',
+    ),
+  );
+  appendSingleQueryValue(
+    searchParams,
+    'runtimeMode',
+    readOptionalEnumString(
+      args,
+      'runtimeMode',
+      RUNTIME_MODES,
+      'runtimeMode must be a valid runtime mode',
+    ),
+  );
+  appendQueryValues(
+    searchParams,
+    'classification',
+    readOptionalEnumStringArray(
+      args,
+      'classification',
+      PROVIDER_EVOLUTION_REVIEW_CLASSIFICATIONS,
+      'classification values must be valid provider-evolution review classifications',
+    ),
+  );
+
+  const query = searchParams.size > 0 ? `?${searchParams.toString()}` : '';
+  const path = `/diagnostics/providers/evolution/${encodeURIComponent(artifactId)}${query}`;
+  const result = await requestRuntimeJson(ctx, path, { method: 'GET' });
+  ensureRouteSuccess('read_provider_evolution_artifact', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'read_provider_evolution_artifact result');
+  return {
+    summary: `Provider-evolution artifact ${artifactId}.`,
+    structuredContent: {
+      ...payload,
+      artifactPath: path,
     },
   };
 }
@@ -1372,6 +1497,57 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: providerDiagnostics,
+  },
+  {
+    definition: {
+      name: 'list_provider_evolution_artifacts',
+      title: 'List Provider Evolution Artifacts',
+      description: 'List retained provider-evolution probe artifacts through the runtime-owned diagnostics read surface.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          provider: { type: 'string' },
+          instance: { type: 'string' },
+          parserId: { type: 'string' },
+          probeProfile: { type: 'string' },
+          transport: { type: 'string', enum: PROVIDER_EVOLUTION_TRANSPORTS },
+          runtimeMode: { type: 'string', enum: RUNTIME_MODES },
+          classification: {
+            type: 'array',
+            items: { type: 'string', enum: PROVIDER_EVOLUTION_REVIEW_CLASSIFICATIONS },
+          },
+          limit: { type: 'integer', minimum: 1 },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: listProviderEvolutionArtifacts,
+  },
+  {
+    definition: {
+      name: 'read_provider_evolution_artifact',
+      title: 'Read Provider Evolution Artifact',
+      description: 'Read one retained provider-evolution probe artifact by id through the runtime-owned diagnostics surface.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          artifactId: { type: 'string' },
+          provider: { type: 'string' },
+          instance: { type: 'string' },
+          parserId: { type: 'string' },
+          probeProfile: { type: 'string' },
+          transport: { type: 'string', enum: PROVIDER_EVOLUTION_TRANSPORTS },
+          runtimeMode: { type: 'string', enum: RUNTIME_MODES },
+          classification: {
+            type: 'array',
+            items: { type: 'string', enum: PROVIDER_EVOLUTION_REVIEW_CLASSIFICATIONS },
+          },
+        },
+        required: ['artifactId'],
+        additionalProperties: false,
+      },
+    },
+    execute: readProviderEvolutionArtifact,
   },
   {
     definition: {

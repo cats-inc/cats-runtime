@@ -101,6 +101,8 @@ Current curated tools:
 - `runtime_summary`
 - `list_sessions`
 - `provider_diagnostics`
+- `list_provider_evolution_artifacts`
+- `read_provider_evolution_artifact`
 - `observe_session`
 - `list_runtime_skills`
 - `create_session`
@@ -144,6 +146,12 @@ tags, delivery hints, additive `sortBy` / `sortDirection`, and additive
 contract as `GET /diagnostics/providers`, including additive `probe` (`light`
 or `live`), `provider` / `backend` / `instance` / `defaultOnly` target
 filters, and `forceRefresh` semantics for cached compatibility assessments.
+`list_provider_evolution_artifacts` and `read_provider_evolution_artifact`
+reuse the same retained provider-evolution artifact read surfaces as
+`GET /diagnostics/providers/evolution` and
+`GET /diagnostics/providers/evolution/{artifactId}`, including additive
+provider / instance / parser / transport / runtime-mode / review-classification
+filters.
 `list_sessions` and `observe_session` also reuse the same additive session
 `providerTarget` read model exposed by the direct HTTP session/history/observe
 surfaces, so MCP hosts can inspect backend continuity/tooling semantics without
