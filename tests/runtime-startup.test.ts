@@ -24,6 +24,7 @@ import {
   markRuntimeStopping,
   parseRuntimeCliOptions,
   resolveRuntimeStartupState,
+  validateRuntimeServerStartupState,
 } from '../src/startup.js';
 
 describe('runtime startup helpers', () => {
@@ -116,6 +117,93 @@ describe('runtime startup helpers', () => {
     expect(startup.readySignal).toBe('http');
     expect(startup.ready).toBe(false);
     expect(startup.phase).toBe('starting');
+  });
+
+  it('trims managedBy from CLI or env during startup resolution', () => {
+    const fromCli = resolveRuntimeStartupState(
+      {
+        startupMode: 'app-managed',
+        managedBy: '  cats-inc  ',
+      },
+      {},
+    );
+    const fromEnv = resolveRuntimeStartupState(
+      {
+        startupMode: 'app-managed',
+      },
+      {
+        CATS_RUNTIME_MANAGED_BY: '  cats-inc  ',
+      },
+    );
+
+    expect(fromCli.managedBy).toBe('cats-inc');
+    expect(fromEnv.managedBy).toBe('cats-inc');
+  });
+
+  it('rejects missing managedBy for app-managed runtime startup', () => {
+    const startup = resolveRuntimeStartupState(
+      { startupMode: 'app-managed' },
+      {},
+    );
+
+    expect(() => validateRuntimeServerStartupState(
+      { startupMode: 'app-managed' },
+      {},
+      startup,
+    )).toThrow(/requires --managed-by <name> or CATS_RUNTIME_MANAGED_BY/i);
+  });
+
+  it('rejects invalid env startup mode or ready output when not overridden', () => {
+    const startup = resolveRuntimeStartupState(
+      {},
+      {
+        CATS_RUNTIME_STARTUP_MODE: 'app-managed',
+        CATS_RUNTIME_MANAGED_BY: 'cats-inc',
+      },
+    );
+
+    expect(() => validateRuntimeServerStartupState(
+      {},
+      {
+        CATS_RUNTIME_STARTUP_MODE: 'managed-ish',
+      },
+      startup,
+    )).toThrow(/Invalid CATS_RUNTIME_STARTUP_MODE/i);
+
+    expect(() => validateRuntimeServerStartupState(
+      {},
+      {
+        CATS_RUNTIME_READY_OUTPUT: 'yaml',
+      },
+      startup,
+    )).toThrow(/Invalid CATS_RUNTIME_READY_OUTPUT/i);
+  });
+
+  it('ignores invalid env startup mode or ready output when CLI already overrides them', () => {
+    const startup = resolveRuntimeStartupState(
+      {
+        startupMode: 'app-managed',
+        managedBy: 'cats-inc',
+        readyOutput: 'json',
+      },
+      {
+        CATS_RUNTIME_STARTUP_MODE: 'managed-ish',
+        CATS_RUNTIME_READY_OUTPUT: 'yaml',
+      },
+    );
+
+    expect(() => validateRuntimeServerStartupState(
+      {
+        startupMode: 'app-managed',
+        managedBy: 'cats-inc',
+        readyOutput: 'json',
+      },
+      {
+        CATS_RUNTIME_STARTUP_MODE: 'managed-ish',
+        CATS_RUNTIME_READY_OUTPUT: 'yaml',
+      },
+      startup,
+    )).not.toThrow();
   });
 
   it('formats JSON lifecycle and startup error messages for managed startup', () => {

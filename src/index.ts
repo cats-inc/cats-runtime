@@ -33,6 +33,7 @@ import {
   markRuntimeStopping,
   parseRuntimeCliOptions,
   resolveRuntimeStartupState,
+  validateRuntimeServerStartupState,
   type RuntimeShutdownReason,
 } from './startup.js';
 
@@ -124,6 +125,7 @@ async function main(): Promise<void> {
   }
 
   startup = resolveRuntimeStartupState(cliOptions, process.env);
+  validateRuntimeServerStartupState(cliOptions, process.env, startup);
 
   const inspection = inspectRuntimeConfig(process.env);
   if (shouldEnterBootstrapMode(inspection, cliOptions.bootstrap === true)) {

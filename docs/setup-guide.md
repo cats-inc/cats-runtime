@@ -645,6 +645,9 @@ node dist/index.js --startup-mode app-managed --managed-by cats --ready-output j
 
 In that mode:
 
+- `app-managed` startup requires an explicit host identifier via
+  `--managed-by <name>` or `CATS_RUNTIME_MANAGED_BY`; startup now fails fast
+  if that metadata is missing
 - stdout emits single-line JSON lifecycle events when the runtime changes state
 - `GET /health` remains the authoritative readiness endpoint
 - `GET /diagnostics/runtime` and `GET /diagnostics/providers` give hosts a

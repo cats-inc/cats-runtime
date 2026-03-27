@@ -152,6 +152,11 @@ function isReadyOutput(value: string): value is RuntimeReadyOutput {
   return value === 'plain' || value === 'json' || value === 'silent';
 }
 
+function trimOptionalCliValue(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
 function readOptionValue(argv: string[], index: number, flag: string): string {
   const value = argv[index + 1];
   if (!value || value.startsWith('--')) {
@@ -440,9 +445,9 @@ export function resolveRuntimeStartupState(
   options: RuntimeCliOptions,
   env: NodeJS.ProcessEnv,
 ): RuntimeStartupState {
-  const modeFromEnv = env.CATS_RUNTIME_STARTUP_MODE;
-  const managedByFromEnv = env.CATS_RUNTIME_MANAGED_BY;
-  const readyOutputFromEnv = env.CATS_RUNTIME_READY_OUTPUT;
+  const modeFromEnv = trimOptionalCliValue(env.CATS_RUNTIME_STARTUP_MODE);
+  const managedByFromEnv = trimOptionalCliValue(env.CATS_RUNTIME_MANAGED_BY);
+  const readyOutputFromEnv = trimOptionalCliValue(env.CATS_RUNTIME_READY_OUTPUT);
   const normalizedModeFromEnv: RuntimeStartupMode | undefined = isStartupMode(modeFromEnv ?? '')
     ? modeFromEnv as RuntimeStartupMode
     : undefined;
@@ -459,9 +464,31 @@ export function resolveRuntimeStartupState(
 
   return createRuntimeStartupState({
     mode,
-    managedBy: options.managedBy ?? managedByFromEnv,
+    managedBy: trimOptionalCliValue(options.managedBy) ?? managedByFromEnv,
     readyOutput,
   });
+}
+
+export function validateRuntimeServerStartupState(
+  options: RuntimeCliOptions,
+  env: NodeJS.ProcessEnv,
+  startup: Pick<RuntimeStartupState, 'mode' | 'managedBy'>,
+): void {
+  const modeFromEnv = trimOptionalCliValue(env.CATS_RUNTIME_STARTUP_MODE);
+  if (!options.startupMode && modeFromEnv && !isStartupMode(modeFromEnv)) {
+    throw new Error(`Invalid CATS_RUNTIME_STARTUP_MODE value '${modeFromEnv}'`);
+  }
+
+  const readyOutputFromEnv = trimOptionalCliValue(env.CATS_RUNTIME_READY_OUTPUT);
+  if (!options.readyOutput && readyOutputFromEnv && !isReadyOutput(readyOutputFromEnv)) {
+    throw new Error(`Invalid CATS_RUNTIME_READY_OUTPUT value '${readyOutputFromEnv}'`);
+  }
+
+  if (startup.mode === 'app-managed' && !trimOptionalCliValue(startup.managedBy)) {
+    throw new Error(
+      'App-managed startup requires --managed-by <name> or CATS_RUNTIME_MANAGED_BY.',
+    );
+  }
 }
 
 export function getRuntimeReadinessSnapshot(

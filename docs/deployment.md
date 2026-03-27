@@ -77,6 +77,9 @@ node dist/index.js --startup-mode app-managed --managed-by cats --ready-output j
 
 Expected behavior:
 
+- `app-managed` startup requires an explicit host identifier via
+  `--managed-by <name>` or `CATS_RUNTIME_MANAGED_BY`; startup now fails fast
+  if that metadata is missing
 - stdout emits single-line JSON lifecycle events:
   `runtime.ready`, `runtime.stopping`, and `runtime.stopped`
 - stderr emits a single-line JSON `runtime.startup_error` event on startup failure

@@ -220,6 +220,23 @@ function spawnRuntime(
   );
 }
 
+function spawnRuntimeWithArgs(
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  cwd = runtimeRoot,
+): ChildProcessWithoutNullStreams {
+  return spawn(
+    process.execPath,
+    [runtimeEntry, ...args],
+    {
+      cwd,
+      env,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
+    },
+  );
+}
+
 function spawnSetupDiagnostic(
   args: string[],
   env: NodeJS.ProcessEnv,
@@ -833,6 +850,91 @@ describe('runtime process startup contract', () => {
           resolveClose();
         });
       });
+      cleanup();
+    }
+  }, 20000);
+
+  it('emits startup_error when app-managed startup omits managedBy', async () => {
+    const port = await reservePort();
+    const { env, cleanup } = createRuntimeProcessEnv(port);
+    delete env.CATS_RUNTIME_MANAGED_BY;
+    delete env.CATS_RUNTIME_STARTUP_MODE;
+    delete env.CATS_RUNTIME_READY_OUTPUT;
+    const child = spawnRuntimeWithArgs([
+      '--startup-mode',
+      'app-managed',
+      '--ready-output',
+      'json',
+      '--port',
+      String(port),
+    ], env);
+
+    try {
+      const startupError = await waitForLifecycleEvent(child, 'runtime.startup_error');
+      expect(startupError).toMatchObject({
+        event: 'runtime.startup_error',
+        service: 'cats-runtime',
+        contractVersion: RUNTIME_STARTUP_CONTRACT_VERSION,
+        mode: 'app-managed',
+        phase: 'starting',
+        readySignal: 'http',
+        readinessPath: '/health',
+        ready: false,
+        error: expect.stringContaining('requires --managed-by'),
+      });
+
+      if (child.exitCode === null) {
+        const [code, signal] = await once(child, 'exit') as [number | null, NodeJS.Signals | null];
+        expect(code).toBe(1);
+        expect(signal).toBeNull();
+      } else {
+        expect(child.exitCode).toBe(1);
+      }
+    } finally {
+      if (child.exitCode === null) {
+        child.kill();
+      }
+      cleanup();
+    }
+  }, 20000);
+
+  it('emits startup_error when env config supplies an invalid ready output', async () => {
+    const port = await reservePort();
+    const { env, cleanup } = createRuntimeProcessEnv(port);
+    env.CATS_RUNTIME_STARTUP_MODE = 'app-managed';
+    env.CATS_RUNTIME_MANAGED_BY = 'cats-inc';
+    env.CATS_RUNTIME_READY_OUTPUT = 'yaml';
+    const child = spawnRuntimeWithArgs([
+      '--port',
+      String(port),
+    ], env);
+
+    try {
+      const startupError = await waitForLifecycleEvent(child, 'runtime.startup_error');
+      expect(startupError).toMatchObject({
+        event: 'runtime.startup_error',
+        service: 'cats-runtime',
+        contractVersion: RUNTIME_STARTUP_CONTRACT_VERSION,
+        mode: 'app-managed',
+        managedBy: 'cats-inc',
+        phase: 'starting',
+        readySignal: 'http',
+        readinessPath: '/health',
+        ready: false,
+        error: expect.stringContaining('Invalid CATS_RUNTIME_READY_OUTPUT'),
+      });
+
+      if (child.exitCode === null) {
+        const [code, signal] = await once(child, 'exit') as [number | null, NodeJS.Signals | null];
+        expect(code).toBe(1);
+        expect(signal).toBeNull();
+      } else {
+        expect(child.exitCode).toBe(1);
+      }
+    } finally {
+      if (child.exitCode === null) {
+        child.kill();
+      }
       cleanup();
     }
   }, 20000);
