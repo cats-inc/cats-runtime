@@ -425,6 +425,7 @@ longer retained.
 GET /diagnostics/health
 GET /diagnostics/runtime
 GET /diagnostics/providers
+POST /diagnostics/providers/reprobe
 GET /diagnostics/providers/evidence
 GET /diagnostics/providers/evidence/:artifactId
 ```
@@ -595,6 +596,21 @@ only appears usable because runtime had to inject the configured model as a
 fallback.
 `force=1|true|refresh` can be combined with either probe mode to bypass the CLI
 compatibility cache after a provider install or upgrade.
+
+`POST /diagnostics/providers/reprobe` is the explicit host-facing equivalent of
+that cache-bypass flow. It accepts a JSON body with optional:
+
+- `provider`
+- `backend`
+- `instance`
+- `defaultOnly`
+- `probe: "light" | "live"`
+
+The route always forces a fresh compatibility assessment for the selected
+targets, returns the same diagnostics payload shape as
+`GET /diagnostics/providers`, and adds top-level
+`reprobe.forceRefresh: true`. Invalid `backend`, `defaultOnly`, or `probe`
+values return `400`.
 
 `GET /diagnostics/providers` also accepts additive target filters:
 

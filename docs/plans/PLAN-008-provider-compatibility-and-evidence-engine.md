@@ -242,6 +242,7 @@ bundle structure.
 | 2026-03-27 | Retained CLI compatibility evidence now has the same bounded latest-artifact read model on `/diagnostics/providers` and `/providers/config`, so hosts can inspect the most recent degraded parser/profile evidence without shelling out to manual list/read commands or adding a new route |
 | 2026-03-27 | OpenCode compatibility follow-through now validates the same `models --help` seam that the shared model-catalog service uses for dynamic `opencode models` discovery, so live diagnostics can distinguish a healthy native-session install from one that lacks the runtime-owned model-listing contract |
 | 2026-03-27 | Host-facing retained compatibility evidence follow-through landed on the diagnostics surface: `GET /diagnostics/providers/evidence` now lists bounded redacted compatibility bundles with provider/instance/classification/parser/profile/runtime filters, and `GET /diagnostics/providers/evidence/:artifactId` re-reads a specific retained artifact without forcing operators back to the CLI-only list/read flow |
+| 2026-03-27 | Host-facing explicit re-probe follow-through also landed: `POST /diagnostics/providers/reprobe` now runs a forced compatibility refresh for selected targets with optional `light`/`live` mode, so operators no longer need to overload `GET /diagnostics/providers?force=1` for write-like reprobe actions |
 
 ---
 

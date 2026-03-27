@@ -1292,30 +1292,42 @@ diagnosticsRoutes.get('/diagnostics/peers', (c) => {
 diagnosticsRoutes.get('/diagnostics/providers', async (c) => {
   try {
     const ctx = c.get('ctx');
-    const probeMode = c.req.query('probe') === 'live' ? 'live' : 'light';
+    const probeMode = parseDiagnosticsProbeMode(c.req.query('probe'));
     const forceRefresh = parseForceRefreshQuery(c.req.query('force'));
     const filters = parseProviderDiagnosticsFilters(c.req.query());
-    const env = getRuntimeEnvironment();
-    const { catalog, providers } = await collectProviderDiagnostics(
+    return c.json(await buildProviderDiagnosticsPayload(
       ctx,
       probeMode,
-      env,
+      getRuntimeEnvironment(),
       forceRefresh,
       filters,
-    );
-    const summary = summarizeProviderDiagnostics(catalog, providers, {
-      queryHasFilters: hasProviderDiagnosticsFilters(filters),
-    });
+    ));
+  } catch (error) {
+    if (error instanceof DiagnosticsQueryError) {
+      return c.json({ error: error.message }, 400);
+    }
+    throw error;
+  }
+});
+
+diagnosticsRoutes.post('/diagnostics/providers/reprobe', async (c) => {
+  try {
+    const ctx = c.get('ctx');
+    const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+    const probeMode = parseOptionalProbeModeValue(body.probe) ?? 'light';
+    const filters = parseProviderDiagnosticsBodyFilters(body);
 
     return c.json({
-      service: RUNTIME_SERVICE_NAME,
-      version: RUNTIME_VERSION,
-      timestamp: new Date().toISOString(),
-      probe: probeMode,
-      query: buildProviderDiagnosticsQuery(filters),
-      readiness: getRuntimeReadinessSnapshot(ctx.startup),
-      summary,
-      providers,
+      ...(await buildProviderDiagnosticsPayload(
+        ctx,
+        probeMode,
+        getRuntimeEnvironment(),
+        true,
+        filters,
+      )),
+      reprobe: {
+        forceRefresh: true,
+      },
     });
   } catch (error) {
     if (error instanceof DiagnosticsQueryError) {
@@ -1412,6 +1424,40 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
 
 export { diagnosticsRoutes };
 
+async function buildProviderDiagnosticsPayload(
+  ctx: AppContext,
+  probeMode: DiagnosticsProbeMode,
+  env: NodeJS.ProcessEnv,
+  forceRefresh: boolean,
+  filters: ProviderDiagnosticsFilters = { defaultOnly: false },
+) {
+  const { catalog, providers } = await collectProviderDiagnostics(
+    ctx,
+    probeMode,
+    env,
+    forceRefresh,
+    filters,
+  );
+  const summary = summarizeProviderDiagnostics(catalog, providers, {
+    queryHasFilters: hasProviderDiagnosticsFilters(filters),
+  });
+
+  return {
+    service: RUNTIME_SERVICE_NAME,
+    version: RUNTIME_VERSION,
+    timestamp: new Date().toISOString(),
+    probe: probeMode,
+    query: buildProviderDiagnosticsQuery(filters),
+    readiness: getRuntimeReadinessSnapshot(ctx.startup),
+    summary,
+    providers,
+  };
+}
+
+function parseDiagnosticsProbeMode(value: string | undefined): DiagnosticsProbeMode {
+  return value === 'live' ? 'live' : 'light';
+}
+
 function parseForceRefreshQuery(value: string | undefined): boolean {
   return value === '1' || value === 'true' || value === 'refresh';
 }
@@ -1439,6 +1485,19 @@ function parseOptionalQueryString(value: string | undefined): string | undefined
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+function parseOptionalStringValue(
+  value: unknown,
+  fieldName: string,
+): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value !== 'string') {
+    throw new DiagnosticsQueryError(`Invalid ${fieldName} value.`);
+  }
+  return parseOptionalQueryString(value);
+}
+
 function parseOptionalBackend(value: string | undefined): BackendKind | undefined {
   const backend = parseOptionalQueryString(value);
   if (!backend) {
@@ -1461,6 +1520,49 @@ function parseOptionalBooleanQuery(value: string | undefined): boolean | undefin
     return false;
   }
   throw new DiagnosticsQueryError(`Invalid boolean query value '${value}'.`);
+}
+
+function parseOptionalBooleanValue(
+  value: unknown,
+  fieldName: string,
+): boolean | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'string') {
+    return parseOptionalBooleanQuery(value);
+  }
+  throw new DiagnosticsQueryError(`Invalid ${fieldName} value.`);
+}
+
+function parseOptionalProbeModeValue(value: unknown): DiagnosticsProbeMode | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (value === 'light' || value === 'live') {
+    return value;
+  }
+  throw new DiagnosticsQueryError(`Unsupported provider diagnostics probe '${String(value)}'.`);
+}
+
+function parseProviderDiagnosticsBodyFilters(
+  body: Record<string, unknown>,
+): ProviderDiagnosticsFilters {
+  const provider = parseOptionalStringValue(body.provider, 'provider');
+  const backend = body.backend === undefined
+    ? undefined
+    : parseOptionalBackend(parseOptionalStringValue(body.backend, 'backend'));
+  const instance = parseOptionalStringValue(body.instance, 'instance');
+
+  return {
+    ...(provider ? { provider } : {}),
+    ...(backend ? { backend } : {}),
+    ...(instance ? { instance } : {}),
+    defaultOnly: parseOptionalBooleanValue(body.defaultOnly, 'defaultOnly') === true,
+  };
 }
 
 function hasProviderDiagnosticsFilters(filters: ProviderDiagnosticsFilters): boolean {

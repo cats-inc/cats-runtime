@@ -1753,4 +1753,68 @@ describe('provider diagnostics HTTP contract', () => {
       error: "Invalid boolean query value 'maybe'.",
     });
   });
+
+  it('supports explicit provider diagnostics reprobe through a POST route', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/diagnostics/providers/reprobe', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        provider: 'claude',
+        backend: 'cli',
+        instance: 'default',
+        probe: 'live',
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      probe: 'live',
+      reprobe: {
+        forceRefresh: true,
+      },
+      query: {
+        hasFilters: true,
+        filters: {
+          provider: 'claude',
+          backend: 'cli',
+          instance: 'default',
+        },
+      },
+      providers: [
+        expect.objectContaining({
+          provider: 'claude',
+          backend: 'cli',
+          instance: 'default',
+          compatibility: expect.objectContaining({
+            probe: expect.objectContaining({
+              mode: 'live',
+            }),
+          }),
+        }),
+      ],
+    }));
+  });
+
+  it('returns 400 for invalid explicit reprobe payloads', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/diagnostics/providers/reprobe', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        probe: 'full',
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Unsupported provider diagnostics probe 'full'.",
+    });
+  });
 });

@@ -1147,6 +1147,9 @@ always-on self-adapting parser system.
   retained compatibility bundles through additive host-facing read routes,
   keeping re-read/list workflows on the shared runtime-owned evidence service
   instead of inventing a second artifact path
+- `POST /diagnostics/providers/reprobe` now gives hosts an explicit forced
+  compatibility refresh route instead of requiring write-like operator flows to
+  piggyback on `GET /diagnostics/providers?force=1`
 - the CLI/manual-first flow can now also:
   - list retained provider-evolution artifacts newest-first
   - re-read a retained artifact by id without starting the HTTP server
