@@ -35,6 +35,8 @@ describe('runtime startup helpers', () => {
       '--read-setup-diagnostic-report=setup-report-1',
       '--setup-report-limit',
       '2',
+      '--list-compatibility-evidence',
+      '--read-compatibility-evidence=compat-artifact-1',
       '--probe-provider-evolution',
       '--list-provider-evolution-artifacts',
       '--read-provider-evolution-artifact=artifact-1',
@@ -75,6 +77,8 @@ describe('runtime startup helpers', () => {
       listSetupDiagnosticReports: true,
       readSetupDiagnosticReport: 'setup-report-1',
       setupReportLimit: '2',
+      listCompatibilityEvidence: true,
+      readCompatibilityEvidence: 'compat-artifact-1',
       probeProviderEvolution: true,
       listProviderEvolutionArtifacts: true,
       readProviderEvolutionArtifact: 'artifact-1',
@@ -396,6 +400,8 @@ describe('runtime startup helpers', () => {
     expect(help).toContain('--list-setup-diagnostic-reports');
     expect(help).toContain('--read-setup-diagnostic-report <artifactId>');
     expect(help).toContain('--setup-report-limit <count>');
+    expect(help).toContain('--list-compatibility-evidence');
+    expect(help).toContain('--read-compatibility-evidence <artifactId>');
     expect(help).toContain('--probe-provider-evolution');
     expect(help).toContain('--list-provider-evolution-artifacts');
     expect(help).toContain('--read-provider-evolution-artifact <artifactId>');

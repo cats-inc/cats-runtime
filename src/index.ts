@@ -5,6 +5,12 @@ import { pathToFileURL } from 'node:url';
 import { loadDotEnv } from './core/dotenv.js';
 import { loadConfig } from './core/config.js';
 import {
+  formatCompatibilityEvidenceArtifactListSummary,
+  formatCompatibilityEvidenceArtifactReadSummary,
+  listCompatibilityEvidenceArtifacts,
+  readCompatibilityEvidenceArtifact,
+} from './core/compatibility/compatibilityEvidenceEntry.js';
+import {
   formatProviderEvolutionProbeArtifactListSummary,
   formatProviderEvolutionProbeArtifactReadSummary,
   formatProviderEvolutionProbeArtifactReviewSummary,
@@ -89,6 +95,28 @@ async function main(): Promise<void> {
       status: 'loaded',
       artifactPath: artifact.artifactPath,
       report: artifact.report,
+    })}\n`);
+    return;
+  }
+
+  if (cliOptions.listCompatibilityEvidence) {
+    const artifacts = await listCompatibilityEvidenceArtifacts(cliOptions, process.env);
+    process.stderr.write(formatCompatibilityEvidenceArtifactListSummary(artifacts, cliOptions));
+    process.stdout.write(`${JSON.stringify({
+      status: 'listed',
+      count: artifacts.length,
+      artifacts,
+    })}\n`);
+    return;
+  }
+
+  if (cliOptions.readCompatibilityEvidence) {
+    const artifact = await readCompatibilityEvidenceArtifact(cliOptions, process.env);
+    process.stderr.write(formatCompatibilityEvidenceArtifactReadSummary(artifact));
+    process.stdout.write(`${JSON.stringify({
+      status: 'loaded',
+      artifactPath: artifact.artifactPath,
+      artifact: artifact.artifact,
     })}\n`);
     return;
   }

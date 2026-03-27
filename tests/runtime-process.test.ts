@@ -112,6 +112,36 @@ interface ProviderEvolutionArtifactReadCliOutput {
   };
 }
 
+interface CompatibilityEvidenceListCliOutput {
+  status: 'listed';
+  count: number;
+  artifacts: Array<{
+    artifactId: string;
+    provider: string;
+    instance: string;
+    classification: string;
+    summary: string;
+  }>;
+}
+
+interface CompatibilityEvidenceReadCliOutput {
+  status: 'loaded';
+  artifactPath: string;
+  artifact: {
+    id: string;
+    classification: string;
+    summary: string;
+    target: {
+      provider: string;
+      instanceId: string;
+    };
+    profile: {
+      id: string;
+      parserId: string;
+    };
+  };
+}
+
 interface ProviderEvolutionArtifactReviewCliOutput {
   status: 'reviewed';
   artifactPath: string;
@@ -439,6 +469,66 @@ function writeProviderEvolutionArtifact(
         rawPassthroughEventTypes: {},
       },
     },
+  }, null, 2)}\n`, 'utf8');
+  return artifactPath;
+}
+
+function writeCompatibilityEvidenceArtifact(
+  env: NodeJS.ProcessEnv,
+  provider: string,
+  artifactId: string,
+  overrides: Partial<{
+    instanceId: string;
+    classification: 'degraded' | 'unsupported_version' | 'unrecognized_protocol' | 'probe_failed';
+    summary: string;
+    capturedAt: string;
+    parserId: string;
+    profileId: string;
+  }> = {},
+): string {
+  const providerDir = join(env.CATS_RUNTIME_DATA_DIR!, 'compatibility', provider);
+  mkdirSync(providerDir, { recursive: true });
+  const artifactPath = join(providerDir, `${artifactId}.json`);
+  writeFileSync(artifactPath, `${JSON.stringify({
+    schemaVersion: 3,
+    id: artifactId,
+    capturedAt: overrides.capturedAt || '2026-03-27T00:00:00.000Z',
+    classification: overrides.classification || 'unsupported_version',
+    summary: overrides.summary || 'Provider version is newer than the best-fit profile.',
+    target: {
+      provider,
+      instanceId: overrides.instanceId || 'default',
+    },
+    profile: {
+      id: overrides.profileId || `${provider}-cli-best-fit`,
+      label: `${provider} best fit`,
+      protocolFamily: provider,
+      parserId: overrides.parserId || `${provider}-json`,
+      confidence: 'fallback',
+    },
+    fingerprint: {
+      provider,
+      instanceId: overrides.instanceId || 'default',
+      command: provider,
+      runner: 'auto',
+      runtime: { mode: 'native' },
+      version: {
+        detected: true,
+        source: 'command',
+      },
+      features: [],
+      checkedAt: overrides.capturedAt || '2026-03-27T00:00:00.000Z',
+    },
+    warnings: [],
+    setup: {
+      status: 'ready',
+      summary: 'ready',
+      install: null,
+      auth: null,
+      remediation: [],
+    },
+    probes: {},
+    checks: [],
   }, null, 2)}\n`, 'utf8');
   return artifactPath;
 }
@@ -1200,6 +1290,82 @@ describe('runtime process startup contract', () => {
       });
       expect(output.stderr).toContain('Listed 1 provider-evolution artifact(s) for codex.');
       expect(output.stderr).toContain('codex/default manual_smoke [baseline]');
+    } finally {
+      cleanup();
+    }
+  }, 20000);
+
+  it('can list retained compatibility evidence artifacts without starting the HTTP server', async () => {
+    const { env, cleanup } = createRuntimeProcessEnv(3215);
+    writeCompatibilityEvidenceArtifact(env, 'codex', 'compat-1');
+    const child = spawnSetupDiagnostic([
+      '--list-compatibility-evidence',
+      '--probe-provider',
+      'codex',
+      '--probe-limit',
+      '5',
+    ], env);
+
+    try {
+      const output = await waitForProcessOutput(child);
+      expect(output.code).toBe(0);
+
+      const payload = JSON.parse(output.stdout.trim()) as CompatibilityEvidenceListCliOutput;
+      expect(payload.status).toBe('listed');
+      expect(payload.count).toBe(1);
+      expect(payload.artifacts[0]).toMatchObject({
+        artifactId: 'compat-1',
+        provider: 'codex',
+        instance: 'default',
+        classification: 'unsupported_version',
+      });
+      expect(output.stderr).toContain('Listed 1 compatibility evidence artifact(s) for codex.');
+      expect(output.stderr).toContain('codex/default [unsupported_version]');
+    } finally {
+      cleanup();
+    }
+  }, 20000);
+
+  it('can read retained compatibility evidence without starting the HTTP server', async () => {
+    const { env, cleanup } = createRuntimeProcessEnv(3216);
+    const artifactPath = writeCompatibilityEvidenceArtifact(env, 'claude', 'compat-2', {
+      instanceId: 'ubuntu',
+      classification: 'probe_failed',
+      summary: 'Compatibility probe failed while checking the provider.',
+      parserId: 'claude-stream-json',
+    });
+    const child = spawnSetupDiagnostic([
+      '--read-compatibility-evidence',
+      'compat-2',
+      '--probe-provider',
+      'claude',
+      '--probe-instance',
+      'ubuntu',
+    ], env);
+
+    try {
+      const output = await waitForProcessOutput(child);
+      expect(output.code).toBe(0);
+
+      const payload = JSON.parse(output.stdout.trim()) as CompatibilityEvidenceReadCliOutput;
+      expect(payload.status).toBe('loaded');
+      expect(payload.artifactPath).toBe(artifactPath);
+      expect(payload.artifact).toMatchObject({
+        id: 'compat-2',
+        classification: 'probe_failed',
+        summary: 'Compatibility probe failed while checking the provider.',
+        target: {
+          provider: 'claude',
+          instanceId: 'ubuntu',
+        },
+        profile: {
+          parserId: 'claude-stream-json',
+        },
+      });
+      expect(output.stderr).toContain('Loaded compatibility evidence artifact compat-2');
+      expect(output.stderr).toContain('- Classification: probe_failed');
+      expect(output.stderr).toContain('- Parser: claude-stream-json');
+      expect(output.stderr).toContain(`Artifact: ${artifactPath}`);
     } finally {
       cleanup();
     }

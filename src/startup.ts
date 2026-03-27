@@ -67,6 +67,8 @@ export interface RuntimeCliOptions {
   listSetupDiagnosticReports?: boolean;
   readSetupDiagnosticReport?: string;
   setupReportLimit?: string;
+  listCompatibilityEvidence?: boolean;
+  readCompatibilityEvidence?: string;
   probeProviderEvolution?: boolean;
   listProviderEvolutionArtifacts?: boolean;
   readProviderEvolutionArtifact?: string;
@@ -215,6 +217,22 @@ export function parseRuntimeCliOptions(argv: string[]): RuntimeCliOptions {
 
     if (arg.startsWith('--setup-report-limit=')) {
       options.setupReportLimit = arg.slice('--setup-report-limit='.length);
+      continue;
+    }
+
+    if (arg === '--list-compatibility-evidence') {
+      options.listCompatibilityEvidence = true;
+      continue;
+    }
+
+    if (arg === '--read-compatibility-evidence') {
+      options.readCompatibilityEvidence = readOptionValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--read-compatibility-evidence=')) {
+      options.readCompatibilityEvidence = arg.slice('--read-compatibility-evidence='.length);
       continue;
     }
 
@@ -789,6 +807,8 @@ export function getRuntimeHelpText(): string {
     '  --list-setup-diagnostic-reports        List retained setup diagnostic reports and exit',
     '  --read-setup-diagnostic-report <artifactId>',
     '  --setup-report-limit <count>',
+    '  --list-compatibility-evidence          List retained compatibility evidence artifacts and exit',
+    '  --read-compatibility-evidence <artifactId>',
     '  --probe-provider-evolution             Run a manual provider-evolution probe and exit',
     '  --list-provider-evolution-artifacts    List retained provider-evolution probe artifacts and exit',
     '  --read-provider-evolution-artifact <artifactId>',

@@ -1099,6 +1099,9 @@ always-on self-adapting parser system.
   - persisted review classifications, summary text, and bounded highlights
 - the runtime now has internal latest/list/read-by-id probe-artifact summaries
   for manual/operator follow-through
+- the same manual-first retained-artifact family now also includes
+  compatibility evidence list/read helpers for the redacted bundles already
+  captured on degraded CLI assessments
 - the CLI/manual-first flow can now also:
   - list retained provider-evolution artifacts newest-first
   - re-read a retained artifact by id without starting the HTTP server
@@ -1138,6 +1141,9 @@ always-on self-adapting parser system.
 - refine semantic-drift heuristics and broaden operator workflows around the
   now-landed retained review update path for classifications / highlights /
   references without introducing automatic release-note scraping
+- keep the redacted compatibility evidence bundles inspectable through the same
+  non-server retained-artifact tooling family instead of adding a new route by
+  default
 
 #### Deferred Scope
 

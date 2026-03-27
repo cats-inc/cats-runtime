@@ -632,6 +632,19 @@ selector and operator tooling can distinguish gateway-vs-bridge targets, read
 their resolved endpoint/probe shape, and see whether remote cancel is supported
 without learning adapter internals.
 
+When a degraded or failed CLI compatibility assessment captured redacted
+evidence under `<dataDir>/compatibility/<provider>/`, the same runtime CLI now
+supports manual-first retained inspection without starting the HTTP server:
+
+```powershell
+node dist/index.js --list-compatibility-evidence --probe-provider codex --probe-limit 5
+node dist/index.js --read-compatibility-evidence artifact-id --probe-provider codex
+```
+
+These commands reuse the runtime-owned retained artifact store and keep stdout
+machine-readable while printing concise stderr summaries, similar to setup
+diagnostic reports and provider-evolution artifact inspection.
+
 ## Running the Project
 
 ### Manual start
