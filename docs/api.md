@@ -615,6 +615,8 @@ desktop shells, and the embedded dashboard. It combines:
 - compact setup-report summary metadata so hosts can see bootstrap mode plus the
   latest retained setup diagnostic headline/highlights without separately
   fetching `GET /setup-state`
+- compact runtime-skill catalog summary metadata so hosts can see whether the
+  runtime skill library loaded and how many packages are currently available
 - compact runtime execution-strategy summary metadata so hosts can distinguish
   implemented strategy families from compatibility-fallback-only hints
 - a light provider-health summary over each provider's default target, suitable
@@ -666,6 +668,9 @@ integrate against:
 - runtime setup diagnostics metadata under `runtime.setup`, including
   `bootstrapRequired` plus the latest retained setup-report headline,
   highlights, and issue counts when a setup diagnostic artifact exists
+- runtime skill catalog metadata under `runtime.skills`, including the resolved
+  root path, loaded/empty/missing state, package counts by family/package kind,
+  and delivery-hint totals
 - full `metering` state:
   - `summary`: aggregate status/counts
   - `usage`: totals plus `byProviderInstance` / `bySession`

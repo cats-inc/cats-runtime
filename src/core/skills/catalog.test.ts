@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildRuntimeSkillInstructionOverlay,
+  inspectRuntimeSkillCatalog,
   listRuntimeSkillCatalog,
   mergeRuntimeSkillInstructions,
   resolveRuntimeSkillManifest,
@@ -359,6 +360,95 @@ describe('runtime skill catalog', () => {
         },
       }),
     ]);
+  });
+
+  it('summarizes runtime skill catalog inspection state and counts', () => {
+    const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
+    cleanupPaths.push(sessionBaseDir);
+    const skillsRoot = join(sessionBaseDir, 'skills');
+    writeSkillPackage(skillsRoot, 'coordinator', {
+      family: 'orchestration',
+      packageKind: 'role',
+      deliveryHints: ['filesystem', 'instructions'],
+    });
+    writeSkillPackage(skillsRoot, 'companion', {
+      family: 'chat',
+      packageKind: 'base',
+      deliveryHints: ['instructions'],
+    });
+
+    expect(inspectRuntimeSkillCatalog(join(sessionBaseDir, 'missing-skills'))).toEqual({
+      rootPath: join(sessionBaseDir, 'missing-skills'),
+      state: 'missing',
+      totalSkills: 0,
+      families: {
+        base: 0,
+        orchestration: 0,
+        work: 0,
+        chat: 0,
+        code: 0,
+      },
+      packageKinds: {
+        base: 0,
+        role: 0,
+        bundle: 0,
+      },
+      deliveryHints: {
+        filesystem: 0,
+        instructions: 0,
+        none: 0,
+      },
+      summary: 'Runtime skills root is missing.',
+    });
+
+    mkdirSync(join(sessionBaseDir, 'empty-skills'), { recursive: true });
+    expect(inspectRuntimeSkillCatalog(join(sessionBaseDir, 'empty-skills'))).toEqual({
+      rootPath: join(sessionBaseDir, 'empty-skills'),
+      state: 'empty',
+      totalSkills: 0,
+      families: {
+        base: 0,
+        orchestration: 0,
+        work: 0,
+        chat: 0,
+        code: 0,
+      },
+      packageKinds: {
+        base: 0,
+        role: 0,
+        bundle: 0,
+      },
+      deliveryHints: {
+        filesystem: 0,
+        instructions: 0,
+        none: 0,
+      },
+      summary: 'Runtime skills root is present but no runtime skill packages were discovered.',
+    });
+
+    expect(inspectRuntimeSkillCatalog(skillsRoot)).toEqual({
+      rootPath: skillsRoot,
+      state: 'loaded',
+      totalSkills: 2,
+      families: {
+        base: 0,
+        orchestration: 1,
+        work: 0,
+        chat: 1,
+        code: 0,
+      },
+      packageKinds: {
+        base: 1,
+        role: 1,
+        bundle: 0,
+      },
+      deliveryHints: {
+        filesystem: 1,
+        instructions: 2,
+        none: 0,
+      },
+      summary: '2 runtime skill(s) across 2 families are available.',
+    });
   });
 
   it('resolves nested family packages by requested skill id', () => {

@@ -145,18 +145,45 @@ const RUNTIME_SKILL_FAMILY_SET = new Set<RuntimeSkillFamily>([
   'chat',
   'code',
 ]);
+const RUNTIME_SKILL_FAMILY_VALUES = [
+  'base',
+  'orchestration',
+  'work',
+  'chat',
+  'code',
+] as const satisfies readonly RuntimeSkillFamily[];
 
 const RUNTIME_SKILL_PACKAGE_KIND_SET = new Set<RuntimeSkillPackageKind>([
   'base',
   'role',
   'bundle',
 ]);
+const RUNTIME_SKILL_PACKAGE_KIND_VALUES = [
+  'base',
+  'role',
+  'bundle',
+] as const satisfies readonly RuntimeSkillPackageKind[];
 
 const RUNTIME_SKILL_DELIVERY_HINT_SET = new Set<RuntimeSkillDeliveryMode>([
   'filesystem',
   'instructions',
   'none',
 ]);
+const RUNTIME_SKILL_DELIVERY_HINT_VALUES = [
+  'filesystem',
+  'instructions',
+  'none',
+] as const satisfies readonly RuntimeSkillDeliveryMode[];
+
+export interface RuntimeSkillCatalogInspection {
+  rootPath: string;
+  state: 'loaded' | 'empty' | 'missing';
+  totalSkills: number;
+  families: Record<RuntimeSkillFamily, number>;
+  packageKinds: Record<RuntimeSkillPackageKind, number>;
+  deliveryHints: Record<RuntimeSkillDeliveryMode, number>;
+  summary: string;
+}
 
 function normalizeOptionalToken(value: string | undefined): string | undefined {
   const normalized = value?.trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
@@ -667,6 +694,64 @@ export function listRuntimeSkillCatalog(
   skillsRoot: string = SKILLS_ROOT,
 ): RuntimeSkillCatalogEntry[] {
   return buildRuntimeSkillCatalogPackages(skillsRoot).map((skillPackage) => toResolvedSkill(skillPackage));
+}
+
+export function inspectRuntimeSkillCatalog(
+  skillsRoot: string = SKILLS_ROOT,
+): RuntimeSkillCatalogInspection {
+  const skills = listRuntimeSkillCatalog(skillsRoot);
+  const families = Object.fromEntries(
+    RUNTIME_SKILL_FAMILY_VALUES.map((family) => [family, 0]),
+  ) as Record<RuntimeSkillFamily, number>;
+  const packageKinds = Object.fromEntries(
+    RUNTIME_SKILL_PACKAGE_KIND_VALUES.map((kind) => [kind, 0]),
+  ) as Record<RuntimeSkillPackageKind, number>;
+  const deliveryHints = Object.fromEntries(
+    RUNTIME_SKILL_DELIVERY_HINT_VALUES.map((hint) => [hint, 0]),
+  ) as Record<RuntimeSkillDeliveryMode, number>;
+
+  for (const skill of skills) {
+    families[skill.library.family] += 1;
+    packageKinds[skill.library.packageKind] += 1;
+    for (const hint of skill.library.deliveryHints) {
+      deliveryHints[hint] += 1;
+    }
+  }
+
+  if (!existsSync(skillsRoot)) {
+    return {
+      rootPath: skillsRoot,
+      state: 'missing',
+      totalSkills: 0,
+      families,
+      packageKinds,
+      deliveryHints,
+      summary: 'Runtime skills root is missing.',
+    };
+  }
+
+  if (skills.length === 0) {
+    return {
+      rootPath: skillsRoot,
+      state: 'empty',
+      totalSkills: 0,
+      families,
+      packageKinds,
+      deliveryHints,
+      summary: 'Runtime skills root is present but no runtime skill packages were discovered.',
+    };
+  }
+
+  const familyCount = Object.values(families).filter((count) => count > 0).length;
+  return {
+    rootPath: skillsRoot,
+    state: 'loaded',
+    totalSkills: skills.length,
+    families,
+    packageKinds,
+    deliveryHints,
+    summary: `${skills.length} runtime skill(s) across ${familyCount} famil${familyCount === 1 ? 'y' : 'ies'} are available.`,
+  };
 }
 
 function toResolvedSkill(skillPackage: RuntimeSkillPackage): ResolvedRuntimeSkill {

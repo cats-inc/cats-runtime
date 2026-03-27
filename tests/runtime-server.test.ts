@@ -602,6 +602,21 @@ describe('runtime server', () => {
               latestUpdatedAt: null,
             },
           },
+          skills: expect.objectContaining({
+            rootPath: expect.stringContaining('skills'),
+            state: 'loaded',
+            totalSkills: expect.any(Number),
+            families: expect.objectContaining({
+              code: expect.any(Number),
+            }),
+            packageKinds: expect.objectContaining({
+              role: expect.any(Number),
+            }),
+            deliveryHints: expect.objectContaining({
+              instructions: expect.any(Number),
+            }),
+            summary: expect.stringContaining('runtime skill'),
+          }),
           setup: {
             bootstrapRequired: false,
             latestReport: null,
@@ -1407,6 +1422,13 @@ backends:
             oldestStartedAt: null,
             latestUpdatedAt: null,
           },
+        },
+        skills: {
+          summary: expect.objectContaining({
+            state: 'loaded',
+            totalSkills: expect.any(Number),
+            summary: expect.stringContaining('runtime skill'),
+          }),
         },
         setup: {
           bootstrapRequired: false,
