@@ -98,6 +98,8 @@ function resolveCompatibilityEvidenceQuery(
     ...(provider ? { provider } : {}),
     ...(cliOptions.probeInstance ? { instance: cliOptions.probeInstance.trim() } : {}),
     ...(classifications ? { classifications } : {}),
+    ...(cliOptions.probeParser?.trim() ? { parserId: cliOptions.probeParser.trim() } : {}),
+    ...(cliOptions.probeProfile?.trim() ? { profileId: cliOptions.probeProfile.trim() } : {}),
     ...(typeof limit === 'number' ? { limit } : {}),
   };
 }
@@ -152,6 +154,8 @@ function describeCompatibilityEvidenceScope(cliOptions: RuntimeCliOptions): stri
   const parts = [
     cliOptions.probeProvider?.trim(),
     cliOptions.probeInstance?.trim(),
+    cliOptions.probeParser?.trim() ? `parser=${cliOptions.probeParser.trim()}` : undefined,
+    cliOptions.probeProfile?.trim() ? `profile=${cliOptions.probeProfile.trim()}` : undefined,
     cliOptions.probeClassifications?.length
       ? `classification=${cliOptions.probeClassifications.join(',')}`
       : undefined,

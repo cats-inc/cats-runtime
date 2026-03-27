@@ -1411,6 +1411,50 @@ describe('runtime process startup contract', () => {
     }
   }, 20000);
 
+  it('can filter retained compatibility evidence artifacts by parser and profile', async () => {
+    const { env, cleanup } = createRuntimeProcessEnv(3218);
+    writeCompatibilityEvidenceArtifact(env, 'codex', 'compat-json', {
+      parserId: 'codex-json-rpc',
+      profileId: 'codex-cli-best-fit',
+    });
+    writeCompatibilityEvidenceArtifact(env, 'codex', 'compat-stream', {
+      parserId: 'codex-stream-json',
+      profileId: 'codex-cli-fallback',
+    });
+    const child = spawnSetupDiagnostic([
+      '--list-compatibility-evidence',
+      '--probe-provider',
+      'codex',
+      '--probe-parser',
+      'codex-stream-json',
+      '--probe-profile',
+      'codex-cli-fallback',
+    ], env);
+
+    try {
+      const output = await waitForProcessOutput(child);
+      expect(output.code).toBe(0);
+
+      const payload = JSON.parse(output.stdout.trim()) as CompatibilityEvidenceListCliOutput;
+      expect(payload.status).toBe('listed');
+      expect(payload.count).toBe(1);
+      expect(payload.artifacts).toEqual([
+        expect.objectContaining({
+          artifactId: 'compat-stream',
+          provider: 'codex',
+          parserId: 'codex-stream-json',
+          profileId: 'codex-cli-fallback',
+        }),
+      ]);
+      expect(output.stderr).toContain(
+        'Listed 1 compatibility evidence artifact(s) for codex/parser=codex-stream-json/profile=codex-cli-fallback.',
+      );
+      expect(output.stderr).toContain('codex/default [unsupported_version]');
+    } finally {
+      cleanup();
+    }
+  }, 20000);
+
   it('can filter retained provider-evolution artifacts by parser, transport, and review classification', async () => {
     const { env, cleanup } = createRuntimeProcessEnv(3213);
     writeProviderEvolutionArtifact(env, 'claude', 'artifact-cli', {

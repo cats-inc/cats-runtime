@@ -639,6 +639,7 @@ supports manual-first retained inspection without starting the HTTP server:
 ```powershell
 node dist/index.js --list-compatibility-evidence --probe-provider codex --probe-limit 5
 node dist/index.js --list-compatibility-evidence --probe-provider codex --probe-classification probe_failed
+node dist/index.js --list-compatibility-evidence --probe-provider codex --probe-parser codex-json-rpc --probe-profile codex-cli-best-fit
 node dist/index.js --read-compatibility-evidence artifact-id --probe-provider codex
 ```
 
@@ -647,7 +648,9 @@ machine-readable while printing concise stderr summaries, similar to setup
 diagnostic reports and provider-evolution artifact inspection. The same
 `--probe-classification` filter used by retained provider-evolution triage can
 also narrow compatibility evidence list/read flows to one or more runtime
-compatibility classes such as `probe_failed` or `unsupported_version`.
+compatibility classes such as `probe_failed` or `unsupported_version`, and the
+same `--probe-parser` / `--probe-profile` selectors can narrow retained
+compatibility evidence to one parser/profile family without rerunning a probe.
 
 ## Running the Project
 

@@ -45,6 +45,8 @@ export interface CompatibilityEvidenceArtifactQuery {
   provider?: string;
   instance?: string;
   classifications?: CompatibilityClassification[];
+  parserId?: string;
+  profileId?: string;
   limit?: number;
 }
 
@@ -207,6 +209,12 @@ function matchesCompatibilityEvidenceQuery(
     && query.classifications.length > 0
     && !query.classifications.includes(artifact.classification)
   ) {
+    return false;
+  }
+  if (query.parserId && artifact.profile.parserId !== query.parserId) {
+    return false;
+  }
+  if (query.profileId && artifact.profile.id !== query.profileId) {
     return false;
   }
   return true;

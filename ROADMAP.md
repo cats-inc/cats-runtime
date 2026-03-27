@@ -1106,6 +1106,9 @@ always-on self-adapting parser system.
   `--probe-classification` filters so offline triage can focus on
   `probe_failed`, `unsupported_version`, or other compatibility classes
   without starting the HTTP server
+- the same offline triage flow now also accepts `--probe-parser` and
+  `--probe-profile` filters so retained compatibility bundles can be narrowed
+  to one parser/profile family without rerunning a probe
 - the CLI/manual-first flow can now also:
   - list retained provider-evolution artifacts newest-first
   - re-read a retained artifact by id without starting the HTTP server

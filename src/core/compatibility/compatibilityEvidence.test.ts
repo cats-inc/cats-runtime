@@ -154,4 +154,45 @@ describe('CompatibilityEvidenceService', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it('filters retained compatibility evidence by parser and profile ids', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-evidence-'));
+    const service = new CompatibilityEvidenceService({ rootDir: root });
+
+    try {
+      writeCompatibilityEvidenceArtifact(root, 'codex', 'artifact-cli', {
+        parserId: 'codex-json-rpc',
+        profileId: 'codex-cli-best-fit',
+      });
+      writeCompatibilityEvidenceArtifact(root, 'codex', 'artifact-fallback', {
+        parserId: 'codex-stream-json',
+        profileId: 'codex-cli-fallback',
+      });
+
+      const listed = await service.listArtifacts({
+        provider: 'codex',
+        parserId: 'codex-stream-json',
+        profileId: 'codex-cli-fallback',
+      });
+      expect(listed.map((artifact) => artifact.artifactId)).toEqual(['artifact-fallback']);
+
+      const read = await service.readArtifactById('artifact-fallback', {
+        provider: 'codex',
+        parserId: 'codex-stream-json',
+        profileId: 'codex-cli-fallback',
+      });
+      expect(read?.artifact.profile).toMatchObject({
+        parserId: 'codex-stream-json',
+        id: 'codex-cli-fallback',
+      });
+
+      await expect(service.readArtifactById('artifact-cli', {
+        provider: 'codex',
+        parserId: 'codex-stream-json',
+        profileId: 'codex-cli-fallback',
+      })).resolves.toBeNull();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
