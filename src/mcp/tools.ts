@@ -2644,6 +2644,84 @@ async function commitChanges(
   };
 }
 
+async function publishArtifacts(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const workspacePath = readOptionalString(args, 'workspacePath');
+  const sessionId = readOptionalString(args, 'sessionId');
+  if (!workspacePath && !sessionId) {
+    throw new McpToolError(-32602, 'workspacePath or sessionId is required');
+  }
+
+  const result = await requestRuntimeJson(ctx, '/delivery/artifacts/publish', {
+    body: args,
+  });
+  ensureRouteSuccess('publish_artifacts', result.status, result.body);
+
+  const deliveryResult = ensureObject(result.body, 'publish_artifacts result');
+  return {
+    summary: `Artifact publication ${readOptionalString(deliveryResult, 'state') || 'completed'}.`,
+    structuredContent: {
+      responseStatus: result.status,
+      publishPath: '/delivery/artifacts/publish',
+      ...deliveryResult,
+    },
+  };
+}
+
+async function inspectRepoStatus(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const workspacePath = readOptionalString(args, 'workspacePath');
+  const sessionId = readOptionalString(args, 'sessionId');
+  if (!workspacePath && !sessionId) {
+    throw new McpToolError(-32602, 'workspacePath or sessionId is required');
+  }
+
+  const result = await requestRuntimeJson(ctx, '/delivery/repo/status', {
+    body: args,
+  });
+  ensureRouteSuccess('inspect_repo_status', result.status, result.body);
+
+  const deliveryResult = ensureObject(result.body, 'inspect_repo_status result');
+  return {
+    summary: `Repo status ${readOptionalString(deliveryResult, 'state') || 'completed'}.`,
+    structuredContent: {
+      responseStatus: result.status,
+      repoStatusPath: '/delivery/repo/status',
+      ...deliveryResult,
+    },
+  };
+}
+
+async function pushBranch(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const workspacePath = readOptionalString(args, 'workspacePath');
+  const sessionId = readOptionalString(args, 'sessionId');
+  if (!workspacePath && !sessionId) {
+    throw new McpToolError(-32602, 'workspacePath or sessionId is required');
+  }
+
+  const result = await requestRuntimeJson(ctx, '/delivery/repo/push', {
+    body: args,
+  });
+  ensureRouteSuccess('push_branch', result.status, result.body);
+
+  const deliveryResult = ensureObject(result.body, 'push_branch result');
+  return {
+    summary: `Branch push ${readOptionalString(deliveryResult, 'state') || 'completed'}.`,
+    structuredContent: {
+      responseStatus: result.status,
+      pushPath: '/delivery/repo/push',
+      ...deliveryResult,
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Management adapter MCP handler factory
 // ---------------------------------------------------------------------------
@@ -4082,6 +4160,103 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: commitChanges,
+  },
+  {
+    definition: {
+      name: 'publish_artifacts',
+      title: 'Publish Artifacts',
+      description: 'Preview or apply runtime-owned artifact publication/export using the delivery contract.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          workspacePath: { type: 'string' },
+          sessionId: { type: 'string' },
+          artifactIds: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+          includeSessionArtifacts: { type: 'boolean' },
+          includeSessionServices: { type: 'boolean' },
+          apply: { type: 'boolean' },
+          actorRole: { type: 'string', enum: ACTOR_ROLES },
+          approved: { type: 'boolean' },
+          artifacts: {
+            type: 'array',
+            items: { type: 'object' },
+          },
+          publication: {
+            type: 'object',
+            properties: {
+              directory: { type: 'string' },
+              manifestFileName: { type: 'string' },
+              publicBaseUrl: { type: 'string' },
+            },
+            additionalProperties: false,
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: publishArtifacts,
+  },
+  {
+    definition: {
+      name: 'inspect_repo_status',
+      title: 'Inspect Repo Status',
+      description: 'Inspect repo-backed delivery readiness using the runtime delivery contract.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          workspacePath: { type: 'string' },
+          sessionId: { type: 'string' },
+          artifactIds: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+          includeSessionArtifacts: { type: 'boolean' },
+          includeSessionServices: { type: 'boolean' },
+          repo: {
+            type: 'object',
+            properties: {
+              remote: { type: 'string' },
+              branch: { type: 'string' },
+            },
+            additionalProperties: false,
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: inspectRepoStatus,
+  },
+  {
+    definition: {
+      name: 'push_branch',
+      title: 'Push Branch',
+      description: 'Preview or apply Git branch push using the runtime delivery contract.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          workspacePath: { type: 'string' },
+          sessionId: { type: 'string' },
+          apply: { type: 'boolean' },
+          actorRole: { type: 'string', enum: ACTOR_ROLES },
+          approved: { type: 'boolean' },
+          repo: {
+            type: 'object',
+            properties: {
+              remote: { type: 'string' },
+              branch: { type: 'string' },
+              setUpstream: { type: 'boolean' },
+              forceWithLease: { type: 'boolean' },
+            },
+            additionalProperties: false,
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: pushBranch,
   },
 
   // -------------------------------------------------------------------------

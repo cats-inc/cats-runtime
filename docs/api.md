@@ -173,7 +173,10 @@ Current curated tools:
 - `audit_workspace`
 - `init_workspace`
 - `audit_delivery_target`
+- `publish_artifacts`
+- `inspect_repo_status`
 - `commit_changes`
+- `push_branch`
 - `audit_review_target`
 - `open_pull_request`
 - `inspect_pull_request`
@@ -195,6 +198,13 @@ filters, and `forceRefresh` semantics for cached compatibility assessments.
 `reprobe_provider_diagnostics` reuses the same explicit bounded refresh seam as
 `POST /diagnostics/providers/reprobe`, so MCP hosts can request a fresh
 compatibility assessment without overloading the read-only diagnostics tool.
+
+`audit_delivery_target`, `publish_artifacts`, `inspect_repo_status`,
+`commit_changes`, and `push_branch` reuse the same runtime-owned delivery
+contract as `POST /delivery/audit`, `POST /delivery/artifacts/publish`,
+`POST /delivery/repo/status`, `POST /delivery/repo/commit`, and
+`POST /delivery/repo/push`; the MCP facade remains a thin wrapper over the
+existing delivery routes rather than a second delivery API surface.
 `list_compatibility_evidence_artifacts` and
 `read_compatibility_evidence_artifact` reuse the same retained compatibility
 evidence read surfaces as `GET /diagnostics/providers/evidence` and

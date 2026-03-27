@@ -264,7 +264,10 @@ describe('MCP stdio transport', () => {
             expect.objectContaining({ name: 'cleanup_browser_sessions' }),
             expect.objectContaining({ name: 'cancel_session' }),
             expect.objectContaining({ name: 'resume_session' }),
+            expect.objectContaining({ name: 'publish_artifacts' }),
+            expect.objectContaining({ name: 'inspect_repo_status' }),
             expect.objectContaining({ name: 'commit_changes' }),
+            expect.objectContaining({ name: 'push_branch' }),
           ]),
         },
     });

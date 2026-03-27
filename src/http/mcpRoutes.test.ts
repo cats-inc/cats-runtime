@@ -644,6 +644,9 @@ describe('runtime MCP facade', () => {
       'init_workspace',
       'audit_delivery_target',
       'commit_changes',
+      'publish_artifacts',
+      'inspect_repo_status',
+      'push_branch',
       'audit_review_target',
       'open_pull_request',
       'inspect_pull_request',
@@ -3301,6 +3304,183 @@ describe('runtime MCP facade', () => {
     expect(deliveryAudit.result.structuredContent.action).toBe('audit-delivery-target');
     expect(deliveryAudit.result.structuredContent.contract.mode).toBe('preview');
   });
+
+  it('exposes delivery follow-through tools over MCP without inventing a second delivery contract', async () => {
+    const app = createTestApp();
+    const repoDir = createGitWorkspace('workspace-delivery-mcp');
+    const remoteDir = join(rootDir, 'workspace-delivery-mcp-remote.git');
+    runGit(rootDir, ['init', '--bare', remoteDir]);
+    runGit(repoDir, ['remote', 'add', 'origin', remoteDir]);
+    const branch = runGit(repoDir, ['branch', '--show-current']);
+    writeFileSync(join(repoDir, 'report.html'), '<html><body>report</body></html>\n', 'utf8');
+
+    const repoStatusResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 9.1,
+        method: 'tools/call',
+        params: {
+          name: 'inspect_repo_status',
+          arguments: {
+            workspacePath: repoDir,
+          },
+        },
+      }),
+    });
+    expect(repoStatusResponse.status).toBe(200);
+    const repoStatus = await repoStatusResponse.json() as {
+      result: {
+        structuredContent: {
+          responseStatus: number;
+          action: string;
+          state: string;
+          repoStatusPath: string;
+          repo: {
+            repository: boolean;
+            defaultRemote?: string;
+            branch?: string;
+          };
+        };
+      };
+    };
+    expect(repoStatus.result.structuredContent).toEqual(expect.objectContaining({
+      responseStatus: 200,
+      action: 'inspect-repo-status',
+      state: 'ready',
+      repoStatusPath: '/delivery/repo/status',
+      repo: expect.objectContaining({
+        repository: true,
+        defaultRemote: 'origin',
+        branch,
+      }),
+    }));
+
+    const publishResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 9.2,
+        method: 'tools/call',
+        params: {
+          name: 'publish_artifacts',
+          arguments: {
+            workspacePath: repoDir,
+            apply: true,
+            actorRole: 'boss_cat',
+            artifacts: [
+              {
+                id: 'report',
+                label: 'Report',
+                path: 'report.html',
+                mediaType: 'text/html',
+              },
+            ],
+            publication: {
+              directory: 'dist',
+              publicBaseUrl: 'https://example.test/artifacts',
+            },
+          },
+        },
+      }),
+    });
+    expect(publishResponse.status).toBe(200);
+    const published = await publishResponse.json() as {
+      result: {
+        structuredContent: {
+          responseStatus: number;
+          action: string;
+          state: string;
+          publishPath: string;
+          artifacts: Array<{
+            id: string;
+            copied: boolean;
+          }>;
+          metadata: {
+            publication: {
+              directory: string;
+              manifestPath: string;
+            };
+          };
+        };
+      };
+    };
+    expect(published.result.structuredContent).toEqual(expect.objectContaining({
+      responseStatus: 200,
+      action: 'publish-artifacts',
+      state: 'completed',
+      publishPath: '/delivery/artifacts/publish',
+      metadata: expect.objectContaining({
+        publication: expect.objectContaining({
+          directory: join(repoDir, 'dist'),
+          manifestPath: join(repoDir, 'dist', 'delivery-manifest.json'),
+        }),
+      }),
+    }));
+    expect(published.result.structuredContent.artifacts).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'report',
+        copied: true,
+      }),
+    ]));
+
+    const pushResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 9.3,
+        method: 'tools/call',
+        params: {
+          name: 'push_branch',
+          arguments: {
+            workspacePath: repoDir,
+            apply: true,
+            actorRole: 'boss_cat',
+            repo: {
+              remote: 'origin',
+              branch,
+              setUpstream: true,
+            },
+          },
+        },
+      }),
+    });
+    expect(pushResponse.status).toBe(200);
+    const pushed = await pushResponse.json() as {
+      result: {
+        structuredContent: {
+          responseStatus: number;
+          action: string;
+          state: string;
+          pushPath: string;
+          metadata: {
+            push: {
+              remote: string;
+              branch: string;
+              setUpstream: boolean;
+            };
+          };
+        };
+      };
+    };
+    expect(pushed.result.structuredContent).toEqual(expect.objectContaining({
+      responseStatus: 200,
+      action: 'push-branch',
+      state: 'completed',
+      pushPath: '/delivery/repo/push',
+      metadata: expect.objectContaining({
+        push: expect.objectContaining({
+          remote: 'origin',
+          branch,
+          setUpstream: true,
+        }),
+      }),
+    }));
+    expect(runGit(repoDir, ['ls-remote', '--heads', 'origin', branch])).toContain(branch);
+  }, 10_000);
 
   it('exposes mutation tools aligned with existing session, workspace, and delivery contracts', async () => {
     const app = createTestApp();
