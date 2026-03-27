@@ -154,6 +154,7 @@ node dist/index.js --probe-provider-evolution --probe-provider codex --probe-ref
 node dist/index.js --list-provider-evolution-artifacts --probe-provider codex --probe-limit 5
 node dist/index.js --list-provider-evolution-artifacts --probe-provider claude --probe-instance agent/sdk
 node dist/index.js --list-provider-evolution-artifacts --probe-provider claude --probe-parser agent_sdk_http_v1 --probe-transport agent
+node dist/index.js --list-provider-evolution-artifacts --probe-provider codex --probe-classification regression
 node dist/index.js --read-provider-evolution-artifact artifact-id --probe-provider codex
 ```
 
@@ -184,6 +185,10 @@ opening any public HTTP surface:
 - `--probe-provider`, `--probe-instance`, `--probe-parser`,
   `--probe-transport`, and `--probe-profile` can scope the retained-artifact
   listing, and `--probe-limit <count>` caps list output
+- `--probe-classification <classification>` can be repeated during list/read
+  flows to focus triage on artifacts whose review already includes
+  `baseline`, `stable`, `upgrade`, `regression`, `schema_change`, or
+  `semantic_drift_suspected`
 - `--probe-reference <kind=url>` can be repeated during probe generation to
   attach manual release-note or changelog context without mixing that material
   into the runtime-owned evidence bundle

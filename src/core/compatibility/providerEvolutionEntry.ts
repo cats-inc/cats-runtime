@@ -36,6 +36,7 @@ import {
   getProviderEvolutionProbeProfile,
   summarizeProviderEvolutionProbeArtifact,
   type ProviderEvolutionExternalReference,
+  type ProviderEvolutionReviewClassification,
   type ProviderEvolutionProbeArtifactSummary,
   ProviderEvolutionProbeService,
   type ProviderEvolutionProbeProfile,
@@ -466,12 +467,14 @@ function resolveProbeArtifactQuery(
   const provider = parseOptionalProbeProviderName(cliOptions.probeProvider);
   const limit = parseOptionalProbeLimit(cliOptions.probeLimit);
   const transport = parseOptionalProbeTransport(cliOptions.probeTransport);
+  const reviewClassifications = parseOptionalProbeClassifications(cliOptions.probeClassifications);
   return {
     ...(provider ? { provider } : {}),
     ...(cliOptions.probeInstance ? { instance: cliOptions.probeInstance.trim() } : {}),
     ...(cliOptions.probeParser ? { parserId: cliOptions.probeParser.trim() } : {}),
     ...(cliOptions.probeProfile ? { probeProfile: cliOptions.probeProfile.trim() } : {}),
     ...(transport ? { transport } : {}),
+    ...(reviewClassifications ? { reviewClassifications } : {}),
     ...(typeof limit === 'number' ? { limit } : {}),
   };
 }
@@ -511,6 +514,17 @@ function parseOptionalProbeTransport(
   }
 
   return normalized;
+}
+
+function parseOptionalProbeClassifications(
+  values: string[] | undefined,
+): ProviderEvolutionReviewClassification[] | undefined {
+  if (!values?.length) {
+    return undefined;
+  }
+
+  const classifications = Array.from(new Set(values.map(parseProbeClassification)));
+  return classifications.length > 0 ? classifications : undefined;
 }
 
 function resolveProbeReferences(
@@ -573,6 +587,28 @@ function normalizeProbeReferenceKind(
   }
 }
 
+function parseProbeClassification(
+  value: string,
+): ProviderEvolutionReviewClassification {
+  switch (value.trim().toLowerCase()) {
+    case 'baseline':
+    case 'stable':
+    case 'upgrade':
+    case 'regression':
+      return value.trim().toLowerCase() as ProviderEvolutionReviewClassification;
+    case 'schema_change':
+    case 'schema-change':
+      return 'schema_change';
+    case 'semantic_drift_suspected':
+    case 'semantic-drift-suspected':
+      return 'semantic_drift_suspected';
+    default:
+      throw new Error(
+        `Invalid --probe-classification value '${value}'. Valid values: baseline, stable, upgrade, regression, schema_change, semantic_drift_suspected`,
+      );
+  }
+}
+
 function resolveAgentProbeParserId(
   adapter: AgentAdapter,
   instance: RemoteProviderInstanceConfig,
@@ -592,6 +628,9 @@ function describeProbeArtifactScope(cliOptions: RuntimeCliOptions): string {
     cliOptions.probeProfile?.trim(),
     cliOptions.probeParser?.trim() ? `parser=${cliOptions.probeParser.trim()}` : undefined,
     cliOptions.probeTransport?.trim() ? `transport=${cliOptions.probeTransport.trim()}` : undefined,
+    cliOptions.probeClassifications?.length
+      ? `classification=${cliOptions.probeClassifications.join(',')}`
+      : undefined,
   ].filter((value): value is string => Boolean(value));
   return parts.length > 0 ? parts.join('/') : 'all retained probes';
 }

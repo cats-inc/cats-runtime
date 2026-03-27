@@ -329,6 +329,11 @@ function writeProviderEvolutionArtifact(
     parserId: string;
     probeProfile: string;
     transport: 'cli' | 'agent' | 'api' | 'unknown';
+    review: {
+      classifications: string[];
+      summary: string;
+      highlights?: string[];
+    };
     reviewContext: {
       references: Array<{
         kind: string;
@@ -363,6 +368,11 @@ function writeProviderEvolutionArtifact(
       durationMs: 1000,
       turnsPlanned: 2,
       turnsCompleted: 2,
+    },
+    review: overrides.review || {
+      classifications: ['baseline'],
+      summary: 'No prior matching baseline artifact was available.',
+      highlights: [],
     },
     reviewContext: overrides.reviewContext,
     capabilitySnapshot: {
@@ -1173,7 +1183,7 @@ describe('runtime process startup contract', () => {
     }
   }, 20000);
 
-  it('can filter retained provider-evolution artifacts by parser and transport', async () => {
+  it('can filter retained provider-evolution artifacts by parser, transport, and review classification', async () => {
     const { env, cleanup } = createRuntimeProcessEnv(3213);
     writeProviderEvolutionArtifact(env, 'claude', 'artifact-cli', {
       parserId: 'claude-stream-json',
@@ -1183,6 +1193,10 @@ describe('runtime process startup contract', () => {
       instance: 'agent/sdk',
       parserId: 'agent_sdk_http_v1',
       transport: 'agent',
+      review: {
+        classifications: ['upgrade'],
+        summary: 'Detected upgrade relative to the latest baseline.',
+      },
     });
     const child = spawnSetupDiagnostic([
       '--list-provider-evolution-artifacts',
@@ -1192,6 +1206,8 @@ describe('runtime process startup contract', () => {
       'agent_sdk_http_v1',
       '--probe-transport',
       'agent',
+      '--probe-classification',
+      'upgrade',
     ], env);
 
     try {
@@ -1208,12 +1224,16 @@ describe('runtime process startup contract', () => {
           instance: 'agent/sdk',
           parserId: 'agent_sdk_http_v1',
           transport: 'agent',
+          review: {
+            classifications: ['upgrade'],
+            summary: 'Detected upgrade relative to the latest baseline.',
+          },
         }),
       ]);
       expect(output.stderr).toContain(
-        'Listed 1 provider-evolution artifact(s) for claude/parser=agent_sdk_http_v1/transport=agent.',
+        'Listed 1 provider-evolution artifact(s) for claude/parser=agent_sdk_http_v1/transport=agent/classification=upgrade.',
       );
-      expect(output.stderr).toContain('claude/agent/sdk manual_smoke [baseline]');
+      expect(output.stderr).toContain('claude/agent/sdk manual_smoke [upgrade]');
     } finally {
       cleanup();
     }

@@ -166,6 +166,7 @@ export interface ProviderEvolutionProbeArtifactQuery {
   parserId?: string;
   probeProfile?: string;
   transport?: ProviderEvolutionTransport;
+  reviewClassifications?: ProviderEvolutionReviewClassification[];
   limit?: number;
 }
 
@@ -743,6 +744,12 @@ function matchesProviderEvolutionArtifactQuery(
     return false;
   }
   if (query.transport && artifact.transport !== query.transport) {
+    return false;
+  }
+  if (
+    query.reviewClassifications?.length
+    && !query.reviewClassifications.some((classification) => artifact.review.classifications.includes(classification))
+  ) {
     return false;
   }
   return true;

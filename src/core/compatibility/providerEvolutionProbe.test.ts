@@ -387,6 +387,19 @@ describe('ProviderEvolutionProbeService', () => {
     ]);
     expect(listed[1]?.review.classifications).toEqual(['baseline']);
 
+    const filtered = await service.listArtifacts({
+      provider: 'codex',
+      reviewClassifications: ['upgrade'],
+    });
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]?.artifactId).toBe(current.artifact.id);
+
+    const noMatch = await service.listArtifacts({
+      provider: 'codex',
+      reviewClassifications: ['schema_change'],
+    });
+    expect(noMatch).toEqual([]);
+
     const reread = await service.readArtifactById(current.artifact.id, {
       provider: 'codex',
     });
@@ -407,6 +420,12 @@ describe('ProviderEvolutionProbeService', () => {
       provider: 'codex',
       parserId: 'other-parser',
     })).resolves.toBeNull();
+    await expect(service.readLatestArtifact({
+      provider: 'codex',
+      reviewClassifications: ['baseline'],
+    })).resolves.toEqual(expect.objectContaining({
+      artifactId: baseline.artifact.id,
+    }));
 
     rmSync(root, { recursive: true, force: true });
   });

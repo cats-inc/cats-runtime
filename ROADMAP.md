@@ -1102,6 +1102,7 @@ always-on self-adapting parser system.
 - the CLI/manual-first flow can now also:
   - list retained provider-evolution artifacts newest-first
   - re-read a retained artifact by id without starting the HTTP server
+  - filter retained artifacts by review classification for narrower triage
   - filter retained artifacts by parser id and transport for narrower
     operator review
 - the shared manual probe flow now also supports the first agent-backed targets
