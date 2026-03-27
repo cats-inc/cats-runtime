@@ -5,6 +5,14 @@ import type {
   StreamEvent,
   TurnInput,
 } from './types.js';
+import type {
+  InitStreamEvent,
+  RawStreamEvent,
+  ResultStreamEvent,
+  TextStreamEvent,
+  ToolResultStreamEvent,
+  ToolUseStreamEvent,
+} from '../../../core/types.js';
 import { createRuntimeProgressEvent } from '../../../core/progress.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 
@@ -87,14 +95,14 @@ export class CursorProvider implements Provider {
     try {
       event = JSON.parse(trimmed) as CursorStreamEvent;
     } catch {
-      return { type: 'raw', text: trimmed };
+      return { type: 'raw', text: trimmed } satisfies RawStreamEvent;
     }
 
     if (event.type === 'system' && event.subtype === 'init') {
       return {
         type: 'init',
         sessionId: event.session_id,
-      };
+      } satisfies InitStreamEvent;
     }
 
     if (event.type === 'user') {
@@ -144,7 +152,7 @@ export class CursorProvider implements Provider {
           inputTokens: event.usage.inputTokens ?? 0,
           outputTokens: event.usage.outputTokens ?? 0,
         } : undefined,
-      };
+      } satisfies ResultStreamEvent;
     }
 
     return null;
@@ -210,7 +218,7 @@ function extractCursorAssistantEvents(
           toolName,
           ...(typeof item.id === 'string' && item.id ? { toolId: item.id } : {}),
           ...(item.input ? { toolArgs: item.input } : {}),
-        },
+        } satisfies ToolUseStreamEvent,
       );
       continue;
     }
@@ -239,14 +247,14 @@ function extractCursorAssistantEvents(
             : {}),
           ...(toolText ? { text: toolText } : {}),
           ...(item.is_error === true ? { isError: true } : {}),
-        },
+        } satisfies ToolResultStreamEvent,
       );
     }
   }
 
   const text = textParts.join('');
   if (text) {
-    events.unshift({ type: 'text', text });
+    events.unshift({ type: 'text', text } satisfies TextStreamEvent);
   }
 
   return events;

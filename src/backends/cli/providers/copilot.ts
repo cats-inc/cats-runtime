@@ -11,6 +11,13 @@ import type {
   StreamEvent,
   TurnInput,
 } from './types.js';
+import type {
+  InitStreamEvent,
+  ResultStreamEvent,
+  TextStreamEvent,
+  ToolResultStreamEvent,
+  ToolUseStreamEvent,
+} from '../../../core/types.js';
 import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
 import {
   observeIgnored,
@@ -135,7 +142,7 @@ export class CopilotProvider implements Provider {
         }, {
           type: 'init',
           sessionId: this._sessionId,
-        });
+        } satisfies InitStreamEvent);
 
       case 'assistant.turn_start':
         if (!this._sessionId) {
@@ -151,7 +158,7 @@ export class CopilotProvider implements Provider {
         }, {
           type: 'init',
           sessionId: this._sessionId,
-        });
+        } satisfies InitStreamEvent);
 
       case 'assistant.message_delta':
         this._sawMessageDelta = true;
@@ -168,7 +175,7 @@ export class CopilotProvider implements Provider {
         }, {
           type: 'text',
           text: (inner?.deltaContent as string) ?? '',
-        });
+        } satisfies TextStreamEvent);
 
       case 'assistant.message': {
         // Capture outputTokens for usage tracking
@@ -189,7 +196,7 @@ export class CopilotProvider implements Provider {
           events.push({
             type: 'text',
             text: content,
-          });
+          } satisfies TextStreamEvent);
         }
 
         if (toolRequestEvents.length > 0) {
@@ -239,7 +246,7 @@ export class CopilotProvider implements Provider {
                 },
               }
             : undefined,
-        });
+        } satisfies ResultStreamEvent);
 
       case 'session.shutdown': {
         const usage = extractUsageFromShutdown(inner, this._lastOutputTokens);
@@ -252,7 +259,7 @@ export class CopilotProvider implements Provider {
           sessionId: this._sessionId,
           usage,
           metadata: runtimeUsage ? { runtimeUsage } : undefined,
-        });
+        } satisfies ResultStreamEvent);
       }
 
       case 'session.model_change':
@@ -419,7 +426,7 @@ function extractCopilotToolRequests(value: unknown): StreamEvent[] {
         ...(toolName ? { toolName } : {}),
         ...(toolId ? { toolId } : {}),
         ...(toolArgs ? { toolArgs } : {}),
-      },
+      } satisfies ToolUseStreamEvent,
     );
   }
 
@@ -473,7 +480,7 @@ function extractCopilotToolResults(value: unknown): StreamEvent[] {
         ...(toolId ? { toolId } : {}),
         ...(text ? { text } : {}),
         ...(isError ? { isError: true } : {}),
-      },
+      } satisfies ToolResultStreamEvent,
     );
   }
 

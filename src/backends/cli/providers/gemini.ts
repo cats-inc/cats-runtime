@@ -6,6 +6,15 @@ import type {
   StreamEvent,
   TurnInput,
 } from './types.js';
+import type {
+  ErrorStreamEvent,
+  InitStreamEvent,
+  RawStreamEvent,
+  ResultStreamEvent,
+  TextStreamEvent,
+  ToolResultStreamEvent,
+  ToolUseStreamEvent,
+} from '../../../core/types.js';
 import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
 import {
   observeIgnored,
@@ -76,12 +85,12 @@ export class GeminiProvider implements Provider {
       }, {
         type: 'raw',
         text: trimmed,
-      });
+      } satisfies RawStreamEvent);
     }
 
     // init — session ID
     if (event.type === 'init') {
-      const value: StreamEvent = {
+      const value: InitStreamEvent = {
         type: 'init',
         sessionId: event.session_id,
       };
@@ -137,7 +146,7 @@ export class GeminiProvider implements Provider {
         type: 'tool_use',
         toolName: event.tool_name,
         toolId: event.tool_id,
-      });
+      } satisfies ToolUseStreamEvent);
     }
 
     // tool_result — promote to the shared runtime event tape
@@ -174,7 +183,7 @@ export class GeminiProvider implements Provider {
           toolName: event.tool_name,
           toolId: event.tool_id,
           ...(text ? { text } : {}),
-        },
+        } satisfies ToolResultStreamEvent,
       ]);
     }
 
@@ -186,7 +195,7 @@ export class GeminiProvider implements Provider {
       }, {
         type: 'error',
         text: event.message || 'Gemini CLI reported an error.',
-      });
+      } satisfies ErrorStreamEvent);
     }
 
     // result — final event with usage stats
@@ -200,7 +209,7 @@ export class GeminiProvider implements Provider {
           inputTokens: event.stats.input_tokens ?? 0,
           outputTokens: event.stats.output_tokens ?? 0,
         } : undefined,
-      });
+      } satisfies ResultStreamEvent);
     }
 
     return observeUnknown(this.evolutionObserver, {
@@ -210,13 +219,13 @@ export class GeminiProvider implements Provider {
     }, {
       type: 'raw',
       text: trimmed,
-    });
+    } satisfies RawStreamEvent);
   }
 }
 
 function extractGeminiAssistantEvents(content: unknown): StreamEvent[] {
   if (typeof content === 'string') {
-    return content ? [{ type: 'text', text: content }] : [];
+    return content ? [{ type: 'text', text: content } satisfies TextStreamEvent] : [];
   }
   if (!Array.isArray(content)) {
     return [];
@@ -258,7 +267,7 @@ function extractGeminiAssistantEvents(content: unknown): StreamEvent[] {
           type: 'tool_use',
           toolName,
           toolArgs,
-        },
+        } satisfies ToolUseStreamEvent,
       );
     }
 
@@ -290,14 +299,14 @@ function extractGeminiAssistantEvents(content: unknown): StreamEvent[] {
           type: 'tool_result',
           ...(toolName ? { toolName } : {}),
           ...(responseText ? { text: responseText } : {}),
-        },
+        } satisfies ToolResultStreamEvent,
       );
     }
   }
 
   const text = textParts.join('');
   if (text) {
-    events.unshift({ type: 'text', text });
+    events.unshift({ type: 'text', text } satisfies TextStreamEvent);
   }
 
   return events;

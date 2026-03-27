@@ -273,6 +273,7 @@ documented residual debt list.
 | 2026-03-27 | First conservative slice landed: `src/core/types.ts` now exports discriminated `StreamEvent` members while keeping the wire shape stable; runtime build and full test suite stayed green after compile fallout was resolved without broad `as` casts. |
 | 2026-03-27 | Tightened agent-backed producers so the OpenClaw and Agent SDK adapters now emit exact discriminated union members (`init`, `text`, `raw`, `tool_use`, `tool_result`, `result`, `error`) instead of relying on a generic bag-of-optionals event literal shape. |
 | 2026-03-27 | Tightened API/local runtime producers so `ApiBackendManager`, `ApiStrategyExecutionContext`, and the shared runtime progress helper now emit exact discriminated members for `error`, `progress`, `init`, `text`, `tool_use`, `tool_result`, and `result` while preserving the existing SSE/NDJSON payload shape. |
+| 2026-03-27 | Tightened rich CLI providers and the Junie parser so Claude, Gemini, Cursor, Copilot, and Junie tool/event builders now emit exact `raw`, `init`, `text`, `tool_use`, `tool_result`, `progress`, `result`, and `error` variants instead of relying on loose bag-of-optionals event literals. |
 
 ---
 

@@ -1,4 +1,13 @@
-import type { StreamEvent } from '../../../core/types.js';
+import type {
+  ErrorStreamEvent,
+  ProgressStreamEvent,
+  RawStreamEvent,
+  ResultStreamEvent,
+  StreamEvent,
+  TextStreamEvent,
+  ToolResultStreamEvent,
+  ToolUseStreamEvent,
+} from '../../../core/types.js';
 import { createRuntimeProgressEvent } from '../../../core/progress.js';
 
 export interface JunieUsageTotals {
@@ -55,7 +64,7 @@ export function parseJunieStreamLine(line: string): StreamEvent | StreamEvent[] 
   try {
     data = JSON.parse(trimmed);
   } catch {
-    return { type: 'raw', text: trimmed };
+    return { type: 'raw', text: trimmed } satisfies RawStreamEvent;
   }
 
   // Empty object {} means no result (e.g. failed session resume)
@@ -67,14 +76,14 @@ export function parseJunieStreamLine(line: string): StreamEvent | StreamEvent[] 
 
   const events: StreamEvent[] = [];
   if (data.result) {
-    events.push({ type: 'text', text: data.result });
+    events.push({ type: 'text', text: data.result } satisfies TextStreamEvent);
   }
   events.push({
     type: 'result',
     sessionId: data.sessionId,
     usage,
     metadata: usage ? { runtimeUsage: toJunieRuntimeUsage(usage) } : undefined,
-  });
+  } satisfies ResultStreamEvent);
 
   return events.length === 1 ? events[0] : events;
 }
@@ -187,7 +196,7 @@ export function parseJunieSessionEventLine(
             type: 'error',
             sessionId: options.sessionId,
             text: 'Junie cancelled the task before returning a result.',
-          }],
+          } satisfies ErrorStreamEvent],
           terminal: true,
         };
       }
@@ -195,14 +204,14 @@ export function parseJunieSessionEventLine(
       const events: StreamEvent[] = [];
       const resultText = readString(agentEvent.result);
       if (resultText) {
-        events.push({ type: 'text', text: resultText });
+        events.push({ type: 'text', text: resultText } satisfies TextStreamEvent);
       }
       events.push({
         type: 'result',
         sessionId: options.sessionId,
         usage: sanitizeUsage(options.usage),
         metadata: options.usage ? { runtimeUsage: toJunieRuntimeUsage(options.usage) } : undefined,
-      });
+      } satisfies ResultStreamEvent);
       return {
         events,
         terminal: true,
@@ -220,7 +229,7 @@ function buildJunieProgressEvent(
   sessionId: string | undefined,
   state: string | undefined,
   agentEvent: Record<string, unknown>,
-): StreamEvent {
+): ProgressStreamEvent {
   return createRuntimeProgressEvent({
     text,
     sessionId,
@@ -284,7 +293,7 @@ function buildJunieToolLifecycleEvents(
         ...(toolId ? { toolId } : {}),
         ...(resultText ? { text: resultText } : {}),
         ...(isError ? { isError: true } : {}),
-      },
+      } satisfies ToolResultStreamEvent,
     ];
   }
 
@@ -310,7 +319,7 @@ function buildJunieToolLifecycleEvents(
       type: 'tool_use',
       ...(toolName ? { toolName } : {}),
       ...(toolId ? { toolId } : {}),
-    },
+    } satisfies ToolUseStreamEvent,
   ];
 }
 

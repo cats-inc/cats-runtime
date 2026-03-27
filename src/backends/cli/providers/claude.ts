@@ -7,6 +7,15 @@ import type {
   ClaudeStreamEvent,
   TurnInput,
 } from './types.js';
+import type {
+  InitStreamEvent,
+  ProgressStreamEvent,
+  RawStreamEvent,
+  ResultStreamEvent,
+  TextStreamEvent,
+  ToolResultStreamEvent,
+  ToolUseStreamEvent,
+} from '../../../core/types.js';
 import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
 import {
   observeNormalized,
@@ -88,7 +97,7 @@ export class ClaudeProvider implements Provider {
       }, {
         type: 'raw',
         text: trimmed,
-      });
+      } satisfies RawStreamEvent);
     }
 
     // system/init — session ID
@@ -100,7 +109,7 @@ export class ClaudeProvider implements Provider {
         type: 'init',
         sessionId: event.session_id,
         raw: event,
-      });
+      } satisfies InitStreamEvent);
     }
 
     // assistant message — accumulate text content
@@ -161,7 +170,7 @@ export class ClaudeProvider implements Provider {
           outputTokens: event.usage.output_tokens ?? 0,
         } : undefined,
         raw: event,
-      });
+      } satisfies ResultStreamEvent);
     }
 
     // Pass through anything else as raw
@@ -172,7 +181,7 @@ export class ClaudeProvider implements Provider {
     }, {
       type: 'raw',
       raw: event,
-    });
+    } satisfies RawStreamEvent);
   }
 }
 
@@ -227,7 +236,7 @@ function extractClaudeAssistantEvents(
     events.unshift({
       type: 'text',
       text,
-    });
+    } satisfies TextStreamEvent);
   }
 
   return events;
@@ -238,7 +247,7 @@ function createClaudeToolUseEvents(tool: {
   id?: string;
   input?: Record<string, unknown>;
   sourceEvent: string;
-}): StreamEvent[] {
+}): Array<ProgressStreamEvent | ToolUseStreamEvent> {
   const toolName = tool.name ?? 'unknown';
   return [
     createRuntimeProgressEvent({
@@ -258,7 +267,7 @@ function createClaudeToolUseEvents(tool: {
       toolName,
       toolId: tool.id,
       toolArgs: tool.input,
-    },
+    } satisfies ToolUseStreamEvent,
   ];
 }
 
@@ -268,7 +277,7 @@ function createClaudeToolResultEvents(tool: {
   text?: string;
   isError?: boolean;
   sourceEvent: string;
-}): StreamEvent[] {
+}): Array<ProgressStreamEvent | ToolResultStreamEvent> {
   if (!tool.toolName && !tool.toolId && !tool.text) {
     return [];
   }
@@ -295,7 +304,7 @@ function createClaudeToolResultEvents(tool: {
       ...(tool.toolId ? { toolId: tool.toolId } : {}),
       ...(tool.text ? { text: tool.text } : {}),
       ...(tool.isError === true ? { isError: true } : {}),
-    },
+    } satisfies ToolResultStreamEvent,
   ];
 }
 
@@ -303,7 +312,7 @@ function createClaudeReasoningEvent(
   text: string | undefined,
   status: 'running' | 'updated',
   sourceEvent: string,
-): StreamEvent {
+): ProgressStreamEvent {
   return createRuntimeProgressEvent({
     text: typeof text === 'string' && text.trim() ? text : 'Claude updated reasoning.',
     provider: 'claude',
@@ -345,7 +354,7 @@ function extractClaudeContentBlockEvents(
   }
 
   if (typeof block.text === 'string' && block.text) {
-    return [{ type: 'text', text: block.text }];
+    return [{ type: 'text', text: block.text } satisfies TextStreamEvent];
   }
 
   return [];
@@ -360,7 +369,7 @@ function extractClaudeContentBlockDeltaEvents(
       type: 'text',
       text: delta.text,
       raw,
-    }];
+    } satisfies TextStreamEvent];
   }
 
   if (delta.type === 'thinking_delta') {
