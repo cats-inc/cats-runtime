@@ -1142,6 +1142,11 @@ always-on self-adapting parser system.
   retained compatibility evidence summary for matching CLI targets, so hosts
   can inspect recent degraded parser/profile evidence without shelling out to
   the CLI list/read helpers
+- `GET /diagnostics/providers/evidence` and
+  `GET /diagnostics/providers/evidence/:artifactId` now expose the same
+  retained compatibility bundles through additive host-facing read routes,
+  keeping re-read/list workflows on the shared runtime-owned evidence service
+  instead of inventing a second artifact path
 - the CLI/manual-first flow can now also:
   - list retained provider-evolution artifacts newest-first
   - re-read a retained artifact by id without starting the HTTP server

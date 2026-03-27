@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRuntimeApp as createApp } from './app.js';
 import { createRuntimeStartupState } from '../startup.js';
 import type { CliRuntimeConfig } from '../backends/cli/config.js';
+import type { RuntimeMode } from '../backends/cli/config.js';
 import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
 import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
 import { getRuntimeResolvedPaths } from '../core/config.js';
@@ -34,6 +35,7 @@ function writeCompatibilityEvidenceArtifact(
     capturedAt: string;
     parserId: string;
     profileId: string;
+    runtimeMode: RuntimeMode;
   }> = {},
 ): string {
   const providerDir = join(root, provider);
@@ -61,7 +63,7 @@ function writeCompatibilityEvidenceArtifact(
       instanceId: overrides.instanceId || 'default',
       command: provider,
       runner: 'auto',
-      runtime: { mode: 'native' },
+      runtime: { mode: overrides.runtimeMode || 'native' },
       version: {
         detected: true,
         source: 'command',
@@ -598,6 +600,90 @@ describe('provider diagnostics HTTP contract', () => {
         }),
       }),
     }));
+  });
+
+  it('lists retained compatibility evidence artifacts through diagnostics routes', async () => {
+    const config = makeConfig();
+    const root = getRuntimeResolvedPaths(config).compatibilityEvidenceDir;
+    writeCompatibilityEvidenceArtifact(root, 'claude', 'compat-artifact-1', {
+      instanceId: 'default',
+      classification: 'probe_failed',
+      parserId: 'claude-stream-json',
+      profileId: 'claude-cli-best-fit',
+      runtimeMode: 'native',
+    });
+    writeCompatibilityEvidenceArtifact(root, 'claude', 'compat-artifact-2', {
+      instanceId: 'default',
+      classification: 'degraded',
+      parserId: 'claude-stream-json',
+      profileId: 'claude-cli-fallback',
+      capturedAt: '2026-03-28T00:00:00.000Z',
+      runtimeMode: 'docker',
+    });
+
+    const app = createTestApp(config);
+    const response = await app.request(
+      '/diagnostics/providers/evidence?provider=claude&classification=degraded&runtimeMode=docker&limit=5',
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      query: {
+        provider: 'claude',
+        classifications: ['degraded'],
+        runtimeMode: 'docker',
+        limit: 5,
+      },
+      artifacts: [
+        expect.objectContaining({
+          artifactId: 'compat-artifact-2',
+          provider: 'claude',
+          instance: 'default',
+          classification: 'degraded',
+          parserId: 'claude-stream-json',
+          profileId: 'claude-cli-fallback',
+          runtimeMode: 'docker',
+          relativePath: 'claude/compat-artifact-2.json',
+        }),
+      ],
+    });
+  });
+
+  it('reads retained compatibility evidence artifacts by id through diagnostics routes', async () => {
+    const config = makeConfig();
+    const root = getRuntimeResolvedPaths(config).compatibilityEvidenceDir;
+    writeCompatibilityEvidenceArtifact(root, 'claude', 'compat-artifact-read', {
+      instanceId: 'default',
+      classification: 'probe_failed',
+      parserId: 'claude-stream-json',
+      profileId: 'claude-cli-best-fit',
+    });
+
+    const app = createTestApp(config);
+    const response = await app.request('/diagnostics/providers/evidence/compat-artifact-read');
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      relativePath: 'claude/compat-artifact-read.json',
+      artifact: expect.objectContaining({
+        id: 'compat-artifact-read',
+        classification: 'probe_failed',
+        target: {
+          provider: 'claude',
+          instanceId: 'default',
+        },
+        profile: expect.objectContaining({
+          id: 'claude-cli-best-fit',
+          parserId: 'claude-stream-json',
+        }),
+      }),
+    });
+
+    const missing = await app.request('/diagnostics/providers/evidence/missing-artifact');
+    expect(missing.status).toBe(404);
+    await expect(missing.json()).resolves.toEqual({
+      error: 'compatibility_evidence_not_found',
+    });
   });
 
   it('filters provider diagnostics by provider/backend/instance and echoes the applied query', async () => {

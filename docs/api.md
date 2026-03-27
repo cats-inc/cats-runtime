@@ -425,6 +425,8 @@ longer retained.
 GET /diagnostics/health
 GET /diagnostics/runtime
 GET /diagnostics/providers
+GET /diagnostics/providers/evidence
+GET /diagnostics/providers/evidence/:artifactId
 ```
 
 `GET /diagnostics/health` is the machine-readable aggregate for packaged hosts,
@@ -642,6 +644,24 @@ compatibility artifact, not a new re-probe route. The summary includes:
 - `parserId`
 - `profileId`
 - `relativePath`
+
+`GET /diagnostics/providers/evidence` exposes the retained compatibility
+evidence family directly for host/operator workflows that need more than the
+latest per-target summary. The route does not trigger a new probe; it only
+lists already-captured redacted artifacts. It accepts additive filters:
+
+- `provider`
+- `instance`
+- repeated `classification`
+- `parserId`
+- `profileId`
+- `runtimeMode=native|wsl|docker`
+- `limit`
+
+`GET /diagnostics/providers/evidence/:artifactId` re-reads one retained
+artifact by id and returns the stored redacted compatibility artifact plus its
+`relativePath`. Unknown artifact ids return `404` with
+`error: "compatibility_evidence_not_found"`.
 
 `GET /diagnostics/providers` also includes additive per-target `metering`
 snapshots. This is a read-only operator surface over the runtime-owned

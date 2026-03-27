@@ -16,6 +16,20 @@ export type CompatibilityEvidenceLatestArtifactReadModel = Pick<
   | 'relativePath'
 >;
 
+export type CompatibilityEvidenceArtifactListItemReadModel = Pick<
+  CompatibilityEvidenceArtifactSummary,
+  | 'artifactId'
+  | 'provider'
+  | 'instance'
+  | 'classification'
+  | 'summary'
+  | 'capturedAt'
+  | 'parserId'
+  | 'profileId'
+  | 'runtimeMode'
+  | 'relativePath'
+>;
+
 export function createCompatibilityEvidenceService(
   config: Pick<CliRuntimeConfig, 'configPath' | 'dataDir' | 'sessionBaseDir'>,
 ): CompatibilityEvidenceService {
@@ -34,6 +48,23 @@ export function summarizeCompatibilityEvidenceArtifactForReadModel(
     capturedAt: artifact.capturedAt,
     parserId: artifact.parserId,
     profileId: artifact.profileId,
+    relativePath: artifact.relativePath,
+  };
+}
+
+export function summarizeCompatibilityEvidenceArtifactForListReadModel(
+  artifact: CompatibilityEvidenceArtifactSummary,
+): CompatibilityEvidenceArtifactListItemReadModel {
+  return {
+    artifactId: artifact.artifactId,
+    provider: artifact.provider,
+    instance: artifact.instance,
+    classification: artifact.classification,
+    summary: artifact.summary,
+    capturedAt: artifact.capturedAt,
+    parserId: artifact.parserId,
+    profileId: artifact.profileId,
+    runtimeMode: artifact.runtimeMode,
     relativePath: artifact.relativePath,
   };
 }
