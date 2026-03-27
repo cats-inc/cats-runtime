@@ -1,4 +1,11 @@
-import type { StreamEvent } from '../../../core/types.js';
+import type {
+  RawStreamEvent,
+  ResultStreamEvent,
+  StreamEvent,
+  TextStreamEvent,
+  ToolResultStreamEvent,
+  ToolUseStreamEvent,
+} from '../../../core/types.js';
 import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
 import {
   observeIgnored,
@@ -144,7 +151,7 @@ function parseCurrentMessageEvent(
       toolName: message.toolName,
       text,
       isError: message.isError ?? false,
-    });
+    } satisfies ToolResultStreamEvent);
   }
 
   if (message.role !== 'assistant') {
@@ -179,13 +186,13 @@ function parseCurrentMessageEvent(
         toolId: part.id,
         toolName: part.name ?? 'unknown',
         toolArgs: part.arguments,
-      });
+      } satisfies ToolUseStreamEvent);
     }
   }
 
   const text = extractTextContent(message.content);
   if (text) {
-    events.push({ type: 'text', text });
+    events.push({ type: 'text', text } satisfies TextStreamEvent);
   }
 
   const usage = extractUsage(message);
@@ -194,7 +201,7 @@ function parseCurrentMessageEvent(
       type: 'result',
       usage,
       metadata: buildPiUsageMetadata(message),
-    });
+    } satisfies ResultStreamEvent);
   }
 
   if (events.length === 0) {
@@ -238,7 +245,7 @@ export function parsePiStreamLine(
     }, {
       type: 'raw',
       text: trimmed,
-    });
+    } satisfies RawStreamEvent);
   }
 
   const eventType = event.type ?? '';
@@ -284,7 +291,7 @@ export function parsePiStreamLine(
           }, {
             type: 'text',
             text,
-          });
+          } satisfies TextStreamEvent);
         }
       }
     }
@@ -312,7 +319,7 @@ export function parsePiStreamLine(
         rawSample: event,
       }, {
         type: 'result',
-      });
+      } satisfies ResultStreamEvent);
     }
     if (msg.stopReason === 'toolUse') {
       return observeIgnored(observer, {
@@ -330,7 +337,7 @@ export function parsePiStreamLine(
       type: 'result',
       usage: usage ? extractUsage(msg) : undefined,
       metadata: buildPiUsageMetadata(msg),
-    });
+    } satisfies ResultStreamEvent);
   }
 
   if (eventType === 'message_start' || eventType === 'message_end') {
@@ -351,7 +358,7 @@ export function parsePiStreamLine(
       }, {
         type: 'text',
         text: assistantEvent.delta,
-      });
+      } satisfies TextStreamEvent);
     }
     if (assistantEvent?.type === 'thinking' && assistantEvent.delta) {
       return observeNormalized(observer, {
@@ -398,7 +405,7 @@ export function parsePiStreamLine(
         type: 'tool_use',
         toolName: event.toolName ?? 'unknown',
         toolId: event.toolCallId,
-      },
+      } satisfies ToolUseStreamEvent,
     ]);
   }
 
@@ -414,7 +421,7 @@ export function parsePiStreamLine(
       toolId: event.toolCallId,
       text: resultText,
       isError: event.isError ?? false,
-    });
+    } satisfies ToolResultStreamEvent);
   }
 
   if (eventType === 'tool_execution_update') {
@@ -433,7 +440,7 @@ export function parsePiStreamLine(
   }, {
     type: 'raw',
     raw: event,
-  });
+  } satisfies RawStreamEvent);
 }
 
 /**

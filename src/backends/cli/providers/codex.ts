@@ -4,9 +4,18 @@ import type {
   ProviderCapabilities,
   PermissionMode,
   ProviderSpawnOptions,
-  StreamEvent,
   TurnInput,
 } from './types.js';
+import type {
+  ErrorStreamEvent,
+  InitStreamEvent,
+  ProgressStreamEvent,
+  RawStreamEvent,
+  ResultStreamEvent,
+  StreamEvent,
+  TextStreamEvent,
+  ToolUseStreamEvent,
+} from '../../../core/types.js';
 import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
 import {
   observeIgnored,
@@ -268,7 +277,7 @@ export class CodexProvider implements Provider {
       }, {
         type: 'raw',
         text: trimmed,
-      });
+      } satisfies RawStreamEvent);
     }
 
     // JSON-RPC response (has id, no method)
@@ -288,7 +297,7 @@ export class CodexProvider implements Provider {
       rawSample: msg,
     }, {
       type: 'raw',
-    });
+    } satisfies RawStreamEvent);
   }
 
   private handleResponse(msg: JsonRpcResponse): StreamEvent | null {
@@ -305,7 +314,7 @@ export class CodexProvider implements Provider {
       }, {
         type: 'error',
         text: formatJsonRpcError(msg.error),
-      });
+      } satisfies ErrorStreamEvent);
     }
 
     const result = msg.result ?? {};
@@ -323,7 +332,7 @@ export class CodexProvider implements Provider {
         }, {
           type: 'init',
           sessionId: tid,
-        });
+        } satisfies InitStreamEvent);
       }
       // No threadId — this is the initialize response, consume internally
       return observeIgnored(this.evolutionObserver, {
@@ -357,7 +366,7 @@ export class CodexProvider implements Provider {
         }, {
           type: 'init',
           sessionId: this.threadId,
-        });
+        } satisfies InitStreamEvent);
       }
       return observeSchemaFailure(this.evolutionObserver, {
         rawEventType: method,
@@ -381,7 +390,7 @@ export class CodexProvider implements Provider {
       }, {
         type: 'text',
         text: (params.delta as string) ?? '',
-      });
+      } satisfies TextStreamEvent);
     }
 
     // Item started — only emit tool_use for actual tool items
@@ -412,7 +421,7 @@ export class CodexProvider implements Provider {
             type: 'tool_use',
             toolName,
             toolId: item?.id as string,
-          },
+          } satisfies ToolUseStreamEvent,
         ]);
       }
       // agentMessage, reasoning, plan, etc. — consume silently
@@ -450,7 +459,7 @@ export class CodexProvider implements Provider {
       }, {
         type: 'result',
         usage,
-      });
+      } satisfies ResultStreamEvent);
     }
 
     // Turn failed
@@ -461,7 +470,7 @@ export class CodexProvider implements Provider {
       }, {
         type: 'error',
         text: JSON.stringify(params),
-      });
+      } satisfies ErrorStreamEvent);
     }
 
     // Auto-approve requests are handled by buildAutoResponse
@@ -641,7 +650,7 @@ export class CodexProvider implements Provider {
       rawSample: msg,
     }, {
       type: 'raw',
-    });
+    } satisfies RawStreamEvent);
   }
 
   private resolveThreadBootstrapMethod(opts: ProviderSpawnOptions): string {
@@ -814,7 +823,7 @@ function createCodexProgressEvent(input: {
   kind: 'plan' | 'reasoning' | 'tool' | 'command' | 'files' | 'model_state' | 'session';
   status: 'started' | 'running' | 'updated' | 'completed';
   native: Record<string, unknown>;
-}): StreamEvent {
+}): ProgressStreamEvent {
   return createRuntimeProgressEvent({
     text: input.text,
     provider: 'codex',

@@ -181,7 +181,7 @@ change.
       events
 - [x] Update agent adapters and managers under `src/backends/agent/*` where
       they build event objects directly
-- [ ] Update CLI parsers/providers that construct event literals so the new
+- [x] Update CLI parsers/providers that construct event literals so the new
       union compiles without broad `as` casts
 
 **Deliverables**: main event producers emit union members rather than relying
@@ -277,6 +277,7 @@ documented residual debt list.
 | 2026-03-27 | Hardened the first dense CLI-side consumers so `WorkerProcess` and the live `JunieProvider` loop now use narrowing-friendly helpers for session-identity and terminal-event handling while keeping the streaming behavior unchanged. |
 | 2026-03-27 | Hardened the main HTTP message streaming path so `src/http/routes/messages.ts` now narrows `text`, `tool_use`, `tool_result`, `result`, `error`, and session-identity events through local helpers across both NDJSON and SSE flows without changing any wire payloads. |
 | 2026-03-27 | Tightened leaf CLI providers/parsers so OpenCode, Goose, Kiro, and Auggie now emit exact typed `tool_use`, `text`, `result`, `error`, and `raw` variants in their runtime-owned event builders and after-turn helpers. |
+| 2026-03-27 | Completed the CLI producer sweep by tightening Codex and Pi parser event literals as well; `src/backends/cli/**` no longer relies on broad `as StreamEvent` / `satisfies StreamEvent` escape hatches for parser/provider event construction. |
 
 ---
 
