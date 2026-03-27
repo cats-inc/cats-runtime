@@ -38,6 +38,13 @@ import {
   summarizeProviderEvolutionArtifactForReadModel,
   type ProviderEvolutionLatestArtifactReadModel,
 } from '../../core/compatibility/providerEvolutionReadModel.js';
+import {
+  summarizeProviderEvolutionProbeArtifact,
+  type ProviderEvolutionExternalReference,
+  type ProviderEvolutionProbeArtifactQuery,
+  type ProviderEvolutionReviewClassification,
+  type ProviderEvolutionProbeReviewUpdate,
+} from '../../core/compatibility/providerEvolutionProbe.js';
 import { buildProviderContinuitySummary } from '../../core/providerContinuity.js';
 import type { ProviderSetupSummary } from '../../core/provider-install/types.js';
 import {
@@ -1345,6 +1352,45 @@ diagnosticsRoutes.post('/diagnostics/providers/reprobe', async (c) => {
   }
 });
 
+diagnosticsRoutes.post('/diagnostics/providers/evolution/:artifactId/review', async (c) => {
+  try {
+    const ctx = c.get('ctx');
+    const artifactId = c.req.param('artifactId')?.trim();
+    if (!artifactId) {
+      throw new DiagnosticsQueryError('Missing provider-evolution artifact id.');
+    }
+
+    const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+    const update = parseProviderEvolutionReviewUpdateBody(body);
+    const query = parseProviderEvolutionArtifactIdentityBody(body);
+    const probeService = createProviderEvolutionProbeService(ctx.config);
+    const artifact = await probeService.updateArtifactReviewById(
+      artifactId,
+      update,
+      query,
+    );
+
+    if (!artifact) {
+      return c.json({
+        error: `Provider-evolution artifact '${artifactId}' was not found.`,
+        code: 'provider_evolution_artifact_not_found',
+      }, 404);
+    }
+
+    return c.json({
+      artifact: summarizeProviderEvolutionArtifactForReadModel(
+        summarizeProviderEvolutionProbeArtifact(artifact),
+      ),
+      updated: true,
+    });
+  } catch (error) {
+    if (error instanceof DiagnosticsQueryError) {
+      return c.json({ error: error.message }, 400);
+    }
+    throw error;
+  }
+});
+
 diagnosticsRoutes.get('/diagnostics/health', async (c) => {
   const ctx = c.get('ctx');
   const probeMode = c.req.query('probe') === 'live' ? 'live' : 'light';
@@ -1506,6 +1552,25 @@ function parseOptionalStringValue(
   return parseOptionalQueryString(value);
 }
 
+function parseOptionalStringArrayValue(
+  value: unknown,
+  fieldName: string,
+): string[] | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new DiagnosticsQueryError(`Invalid ${fieldName} value.`);
+  }
+
+  const values = Array.from(new Set(
+    value.map((entry) => parseOptionalStringValue(entry, fieldName)).filter(
+      (entry): entry is string => Boolean(entry),
+    ),
+  ));
+  return values.length > 0 ? values : undefined;
+}
+
 function parseOptionalBackend(value: string | undefined): BackendKind | undefined {
   const backend = parseOptionalQueryString(value);
   if (!backend) {
@@ -1571,6 +1636,192 @@ function parseProviderDiagnosticsBodyFilters(
     ...(instance ? { instance } : {}),
     defaultOnly: parseOptionalBooleanValue(body.defaultOnly, 'defaultOnly') === true,
   };
+}
+
+function parseProviderEvolutionArtifactIdentityBody(
+  body: Record<string, unknown>,
+): ProviderEvolutionProbeArtifactQuery {
+  const provider = parseOptionalStringValue(body.provider, 'provider');
+  const instance = parseOptionalStringValue(body.instance, 'instance');
+  const parserId = parseOptionalStringValue(body.parserId, 'parserId');
+  const probeProfile = parseOptionalStringValue(body.probeProfile, 'probeProfile');
+  const transport = parseOptionalProviderEvolutionTransport(body.transport);
+  const runtimeMode = parseOptionalProviderEvolutionRuntimeMode(body.runtimeMode);
+
+  return {
+    ...(provider ? { provider } : {}),
+    ...(instance ? { instance } : {}),
+    ...(parserId ? { parserId } : {}),
+    ...(probeProfile ? { probeProfile } : {}),
+    ...(transport ? { transport } : {}),
+    ...(runtimeMode ? { runtimeMode } : {}),
+  };
+}
+
+function parseProviderEvolutionReviewUpdateBody(
+  body: Record<string, unknown>,
+): ProviderEvolutionProbeReviewUpdate {
+  const classifications = parseOptionalProviderEvolutionClassifications(body.classifications);
+  const summary = parseOptionalStringValue(body.summary, 'summary');
+  const highlights = parseOptionalStringArrayValue(body.highlights, 'highlights');
+  const references = parseOptionalProviderEvolutionReferences(body.references);
+
+  if (!classifications && !summary && !highlights && !references) {
+    throw new DiagnosticsQueryError(
+      'Provider-evolution review update requires at least one of classifications, summary, highlights, or references.',
+    );
+  }
+
+  return {
+    ...(classifications ? { classifications } : {}),
+    ...(summary ? { summary } : {}),
+    ...(highlights ? { highlights } : {}),
+    ...(references ? { references } : {}),
+  };
+}
+
+function parseOptionalProviderEvolutionTransport(
+  value: unknown,
+): ProviderEvolutionProbeArtifactQuery['transport'] {
+  const normalized = parseOptionalStringValue(value, 'transport');
+  if (!normalized) {
+    return undefined;
+  }
+
+  switch (normalized.toLowerCase()) {
+    case 'cli':
+    case 'agent':
+    case 'api':
+    case 'unknown':
+      return normalized.toLowerCase() as ProviderEvolutionProbeArtifactQuery['transport'];
+    default:
+      throw new DiagnosticsQueryError(`Unsupported provider-evolution transport '${normalized}'.`);
+  }
+}
+
+function parseOptionalProviderEvolutionRuntimeMode(
+  value: unknown,
+): ProviderEvolutionProbeArtifactQuery['runtimeMode'] {
+  const normalized = parseOptionalStringValue(value, 'runtimeMode');
+  if (!normalized) {
+    return undefined;
+  }
+
+  switch (normalized.toLowerCase()) {
+    case 'native':
+    case 'wsl':
+    case 'docker':
+      return normalized.toLowerCase() as ProviderEvolutionProbeArtifactQuery['runtimeMode'];
+    default:
+      throw new DiagnosticsQueryError(`Unsupported provider-evolution runtimeMode '${normalized}'.`);
+  }
+}
+
+function parseOptionalProviderEvolutionClassifications(
+  value: unknown,
+): ProviderEvolutionReviewClassification[] | undefined {
+  const rawValues = parseOptionalStringArrayValue(value, 'classifications');
+  if (!rawValues) {
+    return undefined;
+  }
+
+  const classifications = Array.from(new Set(
+    rawValues.map((entry) => parseProviderEvolutionReviewClassification(entry)),
+  ));
+  return classifications.length > 0 ? classifications : undefined;
+}
+
+function parseProviderEvolutionReviewClassification(
+  value: string,
+): ProviderEvolutionReviewClassification {
+  switch (value.trim().toLowerCase()) {
+    case 'baseline':
+    case 'stable':
+    case 'upgrade':
+    case 'regression':
+      return value.trim().toLowerCase() as ProviderEvolutionReviewClassification;
+    case 'schema_change':
+    case 'schema-change':
+      return 'schema_change';
+    case 'semantic_drift_suspected':
+    case 'semantic-drift-suspected':
+      return 'semantic_drift_suspected';
+    default:
+      throw new DiagnosticsQueryError(
+        `Invalid provider-evolution classification '${value}'.`,
+      );
+  }
+}
+
+function parseOptionalProviderEvolutionReferences(
+  value: unknown,
+): ProviderEvolutionExternalReference[] | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (!Array.isArray(value)) {
+    throw new DiagnosticsQueryError('Invalid references value.');
+  }
+
+  const references = value.map((entry) => parseProviderEvolutionReference(entry));
+  return references.length > 0 ? references : undefined;
+}
+
+function parseProviderEvolutionReference(value: unknown): ProviderEvolutionExternalReference {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new DiagnosticsQueryError('Invalid provider-evolution reference value.');
+  }
+
+  const record = value as Record<string, unknown>;
+  const kind = parseProviderEvolutionReferenceKind(record.kind);
+  const urlValue = parseOptionalStringValue(record.url, 'reference.url');
+  if (!urlValue) {
+    throw new DiagnosticsQueryError('Invalid reference.url value.');
+  }
+
+  let url: URL;
+  try {
+    url = new URL(urlValue);
+  } catch {
+    throw new DiagnosticsQueryError(
+      `Invalid provider-evolution reference URL '${urlValue}'.`,
+    );
+  }
+
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new DiagnosticsQueryError(
+      `Invalid provider-evolution reference URL '${urlValue}'.`,
+    );
+  }
+
+  return {
+    kind,
+    url: url.toString(),
+  };
+}
+
+function parseProviderEvolutionReferenceKind(
+  value: unknown,
+): ProviderEvolutionExternalReference['kind'] {
+  const normalized = parseOptionalStringValue(value, 'reference.kind');
+  if (!normalized) {
+    throw new DiagnosticsQueryError('Invalid reference.kind value.');
+  }
+
+  switch (normalized.trim().toLowerCase()) {
+    case 'release_notes':
+    case 'release-notes':
+      return 'release_notes';
+    case 'changelog':
+    case 'issue':
+    case 'announcement':
+    case 'other':
+      return normalized.trim().toLowerCase() as ProviderEvolutionExternalReference['kind'];
+    default:
+      throw new DiagnosticsQueryError(
+        `Invalid provider-evolution reference kind '${normalized}'.`,
+      );
+  }
 }
 
 function hasProviderDiagnosticsFilters(filters: ProviderDiagnosticsFilters): boolean {

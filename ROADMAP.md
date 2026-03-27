@@ -1157,6 +1157,9 @@ always-on self-adapting parser system.
   - filter retained artifacts by review classification for narrower triage
   - filter retained artifacts by parser id, runtime mode, and transport for narrower
     operator review
+- `POST /diagnostics/providers/evolution/:artifactId/review` now exposes the
+  same bounded retained-artifact review write-back seam to host/operator
+  tooling, while still keeping probe execution itself manual-first
 - the shared manual probe flow now also supports the first agent-backed targets
   via `--probe-instance agent/<instance>`
 - Agent SDK bridge probes now preserve normalized `tool_result` output while

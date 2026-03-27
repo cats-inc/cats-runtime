@@ -1845,4 +1845,153 @@ describe('provider diagnostics HTTP contract', () => {
       error: "Unsupported provider diagnostics probe 'full'.",
     });
   });
+
+  it('supports manual provider-evolution review updates through a POST route', async () => {
+    const config = makeConfig();
+    let now = Date.parse('2026-03-27T00:00:00.000Z');
+    const probeService = new ProviderEvolutionProbeService({
+      rootDir: join(
+        getRuntimeResolvedPaths(config).compatibilityEvidenceDir,
+        'provider-evolution',
+      ),
+      now: () => now,
+    });
+
+    const artifact = await probeService.run({
+      target: {
+        provider: 'codex',
+        instance: 'default',
+        parserId: 'codex-jsonrpc',
+        probeProfile: 'manual_text',
+        transport: 'cli',
+        version: '1.2.3',
+      },
+      profile: PROVIDER_EVOLUTION_PROBE_PROFILES.manual_text,
+      run: async ({ observer }) => {
+        observer.recordNormalized({
+          rawEventType: 'assistant',
+          events: { type: 'text', text: 'alpha' },
+        });
+        observer.recordNormalized({
+          rawEventType: 'result',
+          events: { type: 'result' },
+        });
+        return {
+          status: 'completed',
+          turnsCompleted: 1,
+          emittedEventCount: 2,
+        };
+      },
+    });
+
+    const app = createTestApp(config);
+    const response = await app.request(
+      `/diagnostics/providers/evolution/${artifact.artifact.id}/review`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider: 'codex',
+          classifications: ['regression', 'schema-change'],
+          summary: 'Manual review flagged a regression with schema changes.',
+          highlights: [
+            'Removed event types: future.event',
+            'Schema changes observed for tool_result.',
+          ],
+          references: [
+            {
+              kind: 'issue',
+              url: 'https://docs.example.com/issues/codex-cli-regression',
+            },
+          ],
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      artifact: expect.objectContaining({
+        artifactId: artifact.artifact.id,
+        review: {
+          classifications: ['regression', 'schema_change'],
+          summary: 'Manual review flagged a regression with schema changes.',
+          highlights: [
+            'Removed event types: future.event',
+            'Schema changes observed for tool_result.',
+          ],
+        },
+        reviewContext: {
+          references: [
+            {
+              kind: 'issue',
+              url: 'https://docs.example.com/issues/codex-cli-regression',
+            },
+          ],
+        },
+      }),
+      updated: true,
+    });
+
+    const reread = await probeService.readArtifactById(artifact.artifact.id, {
+      provider: 'codex',
+    });
+    expect(reread?.artifact.review).toEqual({
+      classifications: ['regression', 'schema_change'],
+      summary: 'Manual review flagged a regression with schema changes.',
+      highlights: [
+        'Removed event types: future.event',
+        'Schema changes observed for tool_result.',
+      ],
+    });
+    expect(reread?.artifact.reviewContext).toEqual({
+      references: [
+        {
+          kind: 'issue',
+          url: 'https://docs.example.com/issues/codex-cli-regression',
+        },
+      ],
+    });
+  });
+
+  it('returns 400 for invalid provider-evolution review payloads', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/diagnostics/providers/evolution/artifact-1/review', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        classifications: ['future_state'],
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Invalid provider-evolution classification 'future_state'.",
+    });
+  });
+
+  it('returns 404 when reviewing a missing provider-evolution artifact', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/diagnostics/providers/evolution/missing-artifact/review', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        provider: 'claude',
+        summary: 'No artifact was found.',
+      }),
+    });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      error: "Provider-evolution artifact 'missing-artifact' was not found.",
+      code: 'provider_evolution_artifact_not_found',
+    });
+  });
 });

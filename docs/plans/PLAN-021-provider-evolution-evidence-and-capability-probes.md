@@ -167,9 +167,9 @@ expansion without blocking the first CLI-focused slice.
 | `src/backends/cli/**` | Modify | Add provider-specific instrumentation for ignored/unknown/schema-failure paths |
 | `src/backends/agent/**` | Audit / minimal modify | Ensure future compatibility with the shared evidence collector without forcing first-slice implementation |
 | `src/core/**` | Create/Modify | Add shared evidence collector, snapshot derivation, and compare helpers |
-| `src/http/routes/diagnostics.ts` | Optional later modify | Only if a later slice exposes probe summaries through diagnostics |
+| `src/http/routes/diagnostics.ts` | Modify | Diagnostics now expose latest retained summaries, explicit reprobe, retained artifact list/read, and bounded review write-back without adding a dedicated probe trigger |
 | `tests/**/*.test.ts` | Create/Modify | Add collector, snapshot, compare, and adapter instrumentation coverage |
-| `docs/api.md` | Deferred | Only if a public/manual probe route is later exposed |
+| `docs/api.md` | Modify | Documents retained artifact summaries plus bounded diagnostics read/write surfaces for manual-first probe follow-through |
 | `docs/architecture.md` | Follow-on | Document the evidence collector and manual probe boundary after implementation lands |
 
 ## Technical Decisions
@@ -216,6 +216,7 @@ expansion without blocking the first CLI-focused slice.
 | 2026-03-27 | Agent follow-through landed for the first OpenClaw and Agent SDK bridge targets; remaining work is now limited to optional release-note/changelog attachment and later breadth/depth expansion rather than missing core probe infrastructure |
 | 2026-03-27 | Manual `reviewContext.references[]` attachment landed for probe artifacts through repeated `--probe-reference <kind=url>` flags, and the same separate-from-evidence context now flows through retained artifact summaries/read models without adding any new public probe route or automatic scraping behavior. |
 | 2026-03-27 | Retained provider-evolution artifacts now preserve optional CLI `runtimeMode` metadata and accept additive `--probe-runtime <native|wsl|docker>` list/read/review filtering, so offline triage and latest-artifact summaries can distinguish native, WSL, and Docker baselines without adding a new route. |
+| 2026-03-27 | Bounded host/operator write-back follow-through landed for retained artifacts: `POST /diagnostics/providers/evolution/:artifactId/review` now updates classifications, summary text, highlights, and external references in place while reusing the same stored artifact/read-model flow and still avoiding a public probe trigger. |
 
 ---
 

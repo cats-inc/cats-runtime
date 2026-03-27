@@ -426,6 +426,7 @@ GET /diagnostics/health
 GET /diagnostics/runtime
 GET /diagnostics/providers
 POST /diagnostics/providers/reprobe
+POST /diagnostics/providers/evolution/:artifactId/review
 GET /diagnostics/providers/evidence
 GET /diagnostics/providers/evidence/:artifactId
 ```
@@ -651,6 +652,36 @@ probe route. The summary includes:
 - optional `reviewContext.references[]` for manually attached release-note /
   changelog / issue / announcement URLs
 - `relativePath`
+
+`POST /diagnostics/providers/evolution/:artifactId/review` is the bounded
+host-facing write-back route for retained provider-evolution artifacts. It does
+not run a new probe; it only updates manual review metadata on an already
+captured artifact. The JSON body accepts additive review fields:
+
+- `classifications: Array<"baseline" | "stable" | "upgrade" | "regression" | "schema_change" | "semantic_drift_suspected">`
+- `summary`
+- `highlights`
+- `references: Array<{ kind: "release_notes" | "changelog" | "issue" | "announcement" | "other"; url: string }>`
+
+It also accepts optional identity filters so hosts can guard against updating
+the wrong retained artifact in mixed-provider stores:
+
+- `provider`
+- `instance`
+- `parserId`
+- `probeProfile`
+- `transport=cli|agent|api|unknown`
+- `runtimeMode=native|wsl|docker`
+
+At least one review field must be present. Successful responses return:
+
+- `updated: true`
+- `artifact`: the same bounded read model used by
+  `providerEvolution.latestArtifact`
+
+Unknown artifact ids return `404` with
+`code: "provider_evolution_artifact_not_found"`. Invalid classifications,
+transport/runtime filters, or malformed reference URLs return `400`.
 
 When a retained CLI compatibility evidence bundle exists for a target,
 `GET /diagnostics/providers` also adds `compatibilityEvidence.latestArtifact`.
