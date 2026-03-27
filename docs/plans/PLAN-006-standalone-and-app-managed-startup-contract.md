@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress |
+| **Status** | Completed |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | Human review pending |
@@ -72,14 +72,14 @@ coexist without collapsing the runtime into product-app internals.
 
 ### Phase 2: Executable and Packaging Hardening
 
-- [ ] Confirm or add an explicit executable package entry suitable for direct
+- [x] Confirm or add an explicit executable package entry suitable for direct
       runtime invocation.
-- [ ] Curate published package contents so standalone runtime execution has the
+- [x] Curate published package contents so standalone runtime execution has the
       required built assets and config examples without shipping unnecessary
       development material.
 - [x] Add or tighten startup-time validation for missing config and unsupported
       environments.
-- [ ] Decide whether current programmatic exports remain internal/dev-oriented
+- [x] Decide whether current programmatic exports remain internal/dev-oriented
       surfaces or need clearer documentation as non-host integration helpers.
 
 **Deliverables**: clearer runtime package entry and publish contract.
@@ -108,7 +108,7 @@ coexist without collapsing the runtime into product-app internals.
       Electron wrappers.
 - [x] Update setup/deployment docs to explain standalone versus app-managed
       startup.
-- [ ] Record any follow-up gaps that belong in separate plans rather than
+- [x] Record any follow-up gaps that belong in separate plans rather than
       expanding this slice.
 
 **Deliverables**: verified runtime startup contract and clear host guidance.
@@ -165,6 +165,14 @@ coexist without collapsing the runtime into product-app internals.
 | 2026-03-21 | Implemented startup contract version 1, readiness/diagnostics routes, and child-process shutdown coverage |
 | 2026-03-21 | Follow-up hardening removed blocking diagnostics probes and fixed the start/close lifecycle race; Phase 2 packaging tasks remain open, so plan status stays In Progress |
 | 2026-03-27 | Tightened server-startup validation so invalid env-driven startup metadata no longer silently falls back, app-managed mode now fails fast without `managedBy`, and child-process startup-error coverage now verifies those supervisor-facing cases. |
+| 2026-03-27 | Added publish-contract verification for executable `bin` entries and dry-run package contents, documented root-module exports as internal/dev-oriented helpers rather than the supported host boundary, and closed the remaining packaging-only follow-ups for this plan. |
+
+## Follow-up Gaps Recorded Outside This Plan
+
+- Installer/distribution formats beyond the npm package entrypoints remain
+  outside this startup-contract slice.
+- Future export-surface expansion, if any, should be tracked by the specific
+  subsystem plan that needs it rather than broadening the startup contract.
 
 ---
 

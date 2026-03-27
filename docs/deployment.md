@@ -51,6 +51,11 @@ The executable package uses the same runtime entrypoint and supports either
 bootstrap-first startup with no preexisting config, or config supplied through
 `.env`, `config/providers.yaml`, or explicit environment variables.
 
+For production packaging, treat the published binaries plus the HTTP contract
+as the supported host boundary. The package root JavaScript export remains a
+runtime helper for tests/dev embedding rather than a source-import contract for
+product hosts.
+
 Supported startup flags:
 
 - `--startup-mode <standalone|app-managed>`
@@ -68,6 +73,8 @@ an Electron host. In that mode:
 - the host process owns process supervision
 - readiness should be checked over the runtime HTTP boundary
 - the runtime remains a separate process, not an in-process product import
+- `cats-runtime` / `cats-runtime-mcp` are the supported package entrypoints;
+  root-module imports remain internal/dev-oriented helpers
 
 Recommended child-process invocation:
 

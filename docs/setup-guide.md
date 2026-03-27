@@ -635,6 +635,10 @@ node dist/index.js
 This is the same entrypoint that the npm `bin` command uses for package-style
 execution.
 
+The supported production boundary is still the executable plus HTTP contract.
+The package root JavaScript export remains a runtime construction helper for
+tests/dev embedding, not the recommended host integration path for product apps.
+
 ### App-managed local start
 
 For host-supervised local startup, run the same binary in app-managed mode:
@@ -654,6 +658,9 @@ In that mode:
   machine-readable integration surface beyond raw stdout parsing
 - the process stays a separate HTTP service rather than being source-imported
   into the host app
+- the published `cats-runtime` / `cats-runtime-mcp` binaries remain the
+  supported package entrypoints; root-module imports are still treated as
+  internal/dev-oriented helpers
 - graceful shutdown may be triggered by `SIGINT`, `SIGTERM`, or by closing the
   child stdin stream from the host process
 
