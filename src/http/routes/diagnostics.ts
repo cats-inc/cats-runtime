@@ -81,6 +81,7 @@ import {
   getRuntimeReadinessSnapshot,
   getRuntimeShutdownContract,
 } from '../../startup.js';
+import { SetupDiagnosticService } from '../../core/diagnostics/SetupDiagnosticService.js';
 
 type DiagnosticStatus = HealthStatus['status'];
 type DiagnosticsProbeMode = 'light' | 'live';
@@ -139,6 +140,22 @@ interface ProviderDiagnosticsFilters {
   backend?: BackendKind;
   instance?: string;
   defaultOnly: boolean;
+}
+
+interface RuntimeSetupDiagnosticsSummary {
+  bootstrapRequired: boolean;
+  latestReport: {
+    artifactId: string;
+    generatedAt: string;
+    status: 'ok' | 'degraded' | 'unavailable';
+    issueCounts: {
+      info: number;
+      warnings: number;
+      errors: number;
+    };
+    headline: string;
+    highlights: string[];
+  } | null;
 }
 
 class DiagnosticsQueryError extends Error {}
@@ -1241,6 +1258,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
   const executionStrategies = ctx.apiBackend?.inspectExecutionStrategies()
     ?? buildApiRuntimeExecutionStrategyCatalog();
   const management = getRuntimeManagementService(ctx).inspectOperations();
+  const setup = buildRuntimeSetupDiagnosticsSummary(ctx);
 
   return c.json({
     service: RUNTIME_SERVICE_NAME,
@@ -1264,6 +1282,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
       management: {
         operations: management.summary,
       },
+      setup,
       wakeups,
       process: {
         pid: process.pid,
@@ -1477,6 +1496,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
   const executionStrategies = ctx.apiBackend?.inspectExecutionStrategies()
     ?? buildApiRuntimeExecutionStrategyCatalog();
   const management = getRuntimeManagementService(ctx).inspectOperations();
+  const setup = buildRuntimeSetupDiagnosticsSummary(ctx);
   const providerSummary = summarizeProviderDiagnostics(catalog, providers, {
     defaultTargetsOnly: true,
     useAttentionSummary: true,
@@ -1540,6 +1560,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
     management: {
       summary: management.summary,
     },
+    setup,
     wakeups: wakeups.summary,
     metering,
   });
@@ -1583,6 +1604,30 @@ function parseDiagnosticsProbeMode(value: string | undefined): DiagnosticsProbeM
 
 function parseForceRefreshQuery(value: string | undefined): boolean {
   return value === '1' || value === 'true' || value === 'refresh';
+}
+
+function buildRuntimeSetupDiagnosticsSummary(ctx: AppContext): RuntimeSetupDiagnosticsSummary {
+  const latestReport = ctx.bootstrapService
+    ? new SetupDiagnosticService({
+        config: ctx.config,
+        startup: ctx.startup,
+        bootstrapService: ctx.bootstrapService,
+      }).readLatestReport()
+    : null;
+
+  return {
+    bootstrapRequired: ctx.startup.bootstrapRequired,
+    latestReport: latestReport
+      ? {
+          artifactId: latestReport.report.artifactId,
+          generatedAt: latestReport.report.generatedAt,
+          status: latestReport.report.summary.status,
+          issueCounts: latestReport.report.summary.issueCounts,
+          headline: latestReport.report.summary.headline,
+          highlights: [...latestReport.report.summary.highlights],
+        }
+      : null,
+  };
 }
 
 function parseProviderDiagnosticsFilters(

@@ -602,6 +602,10 @@ describe('runtime server', () => {
               latestUpdatedAt: null,
             },
           },
+          setup: {
+            bootstrapRequired: false,
+            latestReport: null,
+          },
           wakeups: {
             summary: {
               status: 'ok',
@@ -1404,6 +1408,10 @@ backends:
             latestUpdatedAt: null,
           },
         },
+        setup: {
+          bootstrapRequired: false,
+          latestReport: null,
+        },
         wakeups: {
           status: 'ok',
           summary: 'No wakeup requests are tracked.',
@@ -1556,6 +1564,150 @@ backends:
           oldestStartedAt: expect.any(String),
           latestUpdatedAt: expect.any(String),
         }),
+      });
+    } finally {
+      await runtime.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('surfaces latest setup diagnostic report summary on runtime and health diagnostics', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-setup-diagnostics-health-test-'));
+    const configPath = join(root, 'providers.yaml');
+
+    writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+routing:
+  providers:
+    codex:
+      default_target:
+        backend: cli
+        instance: default
+backends:
+  cli:
+    providers:
+      codex:
+        instances:
+          default:
+            environment: native
+            command: ${JSON.stringify(process.execPath)}
+            runner: direct
+            sessions_dir: ~/.codex/sessions
+`.trimStart());
+
+    const env = {
+      HOME: root,
+      USERPROFILE: root,
+      CATS_RUNTIME_CONFIG_PATH: configPath,
+      CATS_RUNTIME_HOST: '127.0.0.1',
+      CATS_RUNTIME_PORT: '3110',
+      CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
+      CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
+      CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
+      CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
+      CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
+    };
+
+    for (const dir of [
+      env.CATS_RUNTIME_DATA_DIR,
+      env.CATS_RUNTIME_SESSION_BASE_DIR,
+      env.CODEX_SESSIONS_DIR,
+    ]) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    const runtime = createRuntimeServer(loadConfig(env), {
+      startup: createRuntimeStartupState({ bootstrapRequired: true }),
+    });
+    try {
+      const generateResponse = await runtime.app.request('/diagnostics/setup-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshScan: false }),
+      });
+      expect(generateResponse.status).toBe(200);
+      const generated = await generateResponse.json() as {
+        report: {
+          artifactId: string;
+          generatedAt: string;
+          summary: {
+            status: 'ok' | 'degraded' | 'unavailable';
+            issueCounts: {
+              info: number;
+              warnings: number;
+              errors: number;
+            };
+            headline: string;
+            highlights: string[];
+          };
+        };
+      };
+
+      const runtimeResponse = await runtime.app.request('/diagnostics/runtime');
+      expect(runtimeResponse.status).toBe(200);
+      const runtimePayload = await runtimeResponse.json() as {
+        runtime: {
+          setup: {
+            bootstrapRequired: boolean;
+            latestReport: {
+              artifactId: string;
+              generatedAt: string;
+              status: 'ok' | 'degraded' | 'unavailable';
+              issueCounts: {
+                info: number;
+                warnings: number;
+                errors: number;
+              };
+              headline: string;
+              highlights: string[];
+            } | null;
+          };
+        };
+      };
+      expect(runtimePayload.runtime.setup).toEqual({
+        bootstrapRequired: true,
+        latestReport: {
+          artifactId: generated.report.artifactId,
+          generatedAt: generated.report.generatedAt,
+          status: generated.report.summary.status,
+          issueCounts: generated.report.summary.issueCounts,
+          headline: generated.report.summary.headline,
+          highlights: generated.report.summary.highlights,
+        },
+      });
+
+      const healthResponse = await runtime.app.request('/diagnostics/health');
+      expect(healthResponse.status).toBe(200);
+      const healthPayload = await healthResponse.json() as {
+        setup: {
+          bootstrapRequired: boolean;
+          latestReport: {
+            artifactId: string;
+            generatedAt: string;
+            status: 'ok' | 'degraded' | 'unavailable';
+            issueCounts: {
+              info: number;
+              warnings: number;
+              errors: number;
+            };
+            headline: string;
+            highlights: string[];
+          } | null;
+        };
+      };
+      expect(healthPayload.setup).toEqual({
+        bootstrapRequired: true,
+        latestReport: {
+          artifactId: generated.report.artifactId,
+          generatedAt: generated.report.generatedAt,
+          status: generated.report.summary.status,
+          issueCounts: generated.report.summary.issueCounts,
+          headline: generated.report.summary.headline,
+          highlights: generated.report.summary.highlights,
+        },
       });
     } finally {
       await runtime.close();
