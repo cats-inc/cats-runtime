@@ -66,7 +66,7 @@ It must not:
 - public task event bus
 - product-default inference from Chat/Work/Code names
 - direct imports of `cats` task contracts
-- later-family implementation of `reflexion`, `tree_of_thoughts`, or `deps`
+- later-family implementation beyond the first shipped families
 - forced CLI migration onto the new substrate
 
 ## Implementation Phases
@@ -218,6 +218,7 @@ substrate.
 | 2026-03-26 | The next follow-through slice is landed and verified; `reflexion` now runs as a bounded runtime-owned critique/revision loop with additive reflection events and strategy-local state |
 | 2026-03-26 | The next follow-through slice is landed and verified; `tree_of_thoughts` now runs as a bounded runtime-owned branch/evaluate/prune/select loop with additive branch events and strategy-local state |
 | 2026-03-26 | The next follow-through slice is landed and verified; `plan_execute` now runs as a bounded runtime-owned plan/execute/evaluate loop with additive phase events, stuck detection, and strategy-local plan-progress state |
+| 2026-03-27 | A later-family follow-through slice landed and verified after the core plan completed; `deps` now runs as a bounded runtime-owned describe/explain/plan/select loop with additive phase/replan events, explicit strategy-local state, and the same runtime-hosted strategy catalog/inspection surfaces as the earlier families |
 
 ---
 

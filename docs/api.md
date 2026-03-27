@@ -480,8 +480,7 @@ integrate against:
     default, and runtime-hosted backend scope
   - `strategies`: per-family availability, execution model, bounded accepted
     `strategyContext` keys plus machine-readable `requestSupport` and
-    `contextSchema` metadata, guardrail support, emitted strategy events, and
-    fallback truth for deferred hints such as `deps`
+    `contextSchema` metadata, guardrail support, and emitted strategy events
 - full `metering` state:
   - `summary`: aggregate status/counts
   - `usage`: totals plus `byProviderInstance` / `bySession`
@@ -1858,10 +1857,10 @@ metadata.
 
 When no strategy hint is provided, runtime-hosted API/local loops continue to
 use the compatibility `simple_tool_call` path. Explicit `react`,
-`plan_execute`, `pdca`, `reflexion`, and `tree_of_thoughts` requests resolve
-through runtime-hosted loops. Unsupported hints such as `deps` remain additive
-request metadata but compatibility-fallback to `simple_tool_call`. Strategy
-resolution is additive and currently follows
+`plan_execute`, `pdca`, `deps`, `reflexion`, and `tree_of_thoughts` requests
+resolve through runtime-hosted loops. Unsupported hints remain additive request
+metadata but compatibility-fallback to `simple_tool_call`. Strategy resolution
+is additive and currently follows
 explicit request, then runtime-owned remembered preference, then the
 compatibility fallback. Existing callers that do not send strategy fields
 remain valid.

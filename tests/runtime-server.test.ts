@@ -565,13 +565,11 @@ describe('runtime server', () => {
           executionStrategies: {
             summary: {
               totalFamilies: 7,
-              supportedFamilies: 6,
-              fallbackOnlyFamilies: 1,
+              supportedFamilies: 7,
+              fallbackOnlyFamilies: 0,
               compatibilityDefault: 'simple_tool_call',
               runtimeHostedBackends: ['api', 'local'],
-              summary:
-                "6 runtime-hosted strategy families are available for api/local loops. "
-                + "1 known deferred hint family still falls back to 'simple_tool_call'.",
+              summary: '7 runtime-hosted strategy families are available for api/local loops.',
             },
             strategies: expect.arrayContaining([
               expect.objectContaining({
@@ -588,8 +586,8 @@ describe('runtime server', () => {
               }),
               expect.objectContaining({
                 id: 'deps',
-                availability: 'fallback_only',
-                fallbackStrategy: 'simple_tool_call',
+                availability: 'supported',
+                executionModel: 'phase_loop',
               }),
             ]),
           },
@@ -1301,13 +1299,11 @@ backends:
           },
           executionStrategies: {
             totalFamilies: 7,
-            supportedFamilies: 6,
-            fallbackOnlyFamilies: 1,
+            supportedFamilies: 7,
+            fallbackOnlyFamilies: 0,
             compatibilityDefault: 'simple_tool_call',
             runtimeHostedBackends: ['api', 'local'],
-            summary:
-              "6 runtime-hosted strategy families are available for api/local loops. "
-              + "1 known deferred hint family still falls back to 'simple_tool_call'.",
+            summary: '7 runtime-hosted strategy families are available for api/local loops.',
           },
         },
         providers: {
@@ -1634,13 +1630,11 @@ backends:
           },
           executionStrategies: {
             totalFamilies: 7,
-            supportedFamilies: 6,
-            fallbackOnlyFamilies: 1,
+            supportedFamilies: 7,
+            fallbackOnlyFamilies: 0,
             compatibilityDefault: 'simple_tool_call',
             runtimeHostedBackends: ['api', 'local'],
-            summary:
-              "6 runtime-hosted strategy families are available for api/local loops. "
-              + "1 known deferred hint family still falls back to 'simple_tool_call'.",
+            summary: '7 runtime-hosted strategy families are available for api/local loops.',
           },
         },
         providers: {
@@ -2078,8 +2072,8 @@ backends:
         executionStrategies: expect.objectContaining({
           summary: expect.objectContaining({
             totalFamilies: 7,
-            supportedFamilies: 6,
-            fallbackOnlyFamilies: 1,
+            supportedFamilies: 7,
+            fallbackOnlyFamilies: 0,
             compatibilityDefault: 'simple_tool_call',
           }),
         }),
@@ -2202,8 +2196,8 @@ backends:
       expect(providerPayload.executionStrategies).toEqual(expect.objectContaining({
         summary: expect.objectContaining({
           totalFamilies: 7,
-          supportedFamilies: 6,
-          fallbackOnlyFamilies: 1,
+          supportedFamilies: 7,
+          fallbackOnlyFamilies: 0,
           compatibilityDefault: 'simple_tool_call',
         }),
       }));
@@ -2426,8 +2420,8 @@ providers:
         executionStrategies: expect.objectContaining({
           summary: expect.objectContaining({
             totalFamilies: 7,
-            supportedFamilies: 6,
-            fallbackOnlyFamilies: 1,
+            supportedFamilies: 7,
+            fallbackOnlyFamilies: 0,
             compatibilityDefault: 'simple_tool_call',
           }),
         }),

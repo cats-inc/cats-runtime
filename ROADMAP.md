@@ -858,12 +858,12 @@ families remain deferred.
 That substrate is still intentionally incomplete. `cats` can now bridge
 product-owned defaults such as Chat -> `react`, Work -> `pdca`, and Code ->
 `reflexion`, and the runtime now owns `simple_tool_call`, `react`,
-`plan_execute`, `pdca`, `reflexion`, and `tree_of_thoughts`.
+`plan_execute`, `pdca`, `deps`, `reflexion`, and `tree_of_thoughts`.
 
 Unsupported strategy requests must still remain honest: preserve additive
 request metadata, resolve through the registry, and degrade to
-`simple_tool_call` rather than pretending later-family semantics such as `deps`
-already exist.
+`simple_tool_call` rather than pretending any not-yet-implemented family
+already exists.
 
 #### Current Implementation Status
 
@@ -878,11 +878,12 @@ already exist.
 - explicit `reflexion` requests now execute through a bounded runtime-owned
   critique/revision loop with additive reflection events and strategy-local
   state
+- explicit `deps` requests now execute through a bounded runtime-owned
+  describe/explain/plan/select loop with additive structured phase events and
+  strategy-local state
 - explicit `tree_of_thoughts` requests now execute through a bounded
   runtime-owned branch/evaluate/prune/select loop with additive branch events
   and strategy-local branch state
-- unsupported hints such as `deps` remain visible in request metadata but
-  compatibility-fallback to `simple_tool_call`
 - runtime session state owns strategy-local summaries; product task records stay
   outside the runtime boundary
 - `GET /diagnostics/runtime`, `GET /diagnostics/health`, and
@@ -910,12 +911,10 @@ already exist.
 
 #### Deferred Scope
 
-- do not fake later families such as `deps` by smuggling product task-planning
-  logic into prompt overlays
 - do not move product defaults into runtime-owned policy; `cats` remains
   responsible for default selection
 - do not widen the follow-through into a full strategy-family explosion such as
-  `deps` and every other family all at once
+  every remaining family all at once
 - do not replace compatibility fallback until supported families are truly
   runtime-hosted
 

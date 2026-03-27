@@ -7,13 +7,11 @@ describe('buildApiRuntimeExecutionStrategyCatalog', () => {
 
     expect(catalog.summary).toEqual({
       totalFamilies: 7,
-      supportedFamilies: 6,
-      fallbackOnlyFamilies: 1,
+      supportedFamilies: 7,
+      fallbackOnlyFamilies: 0,
       compatibilityDefault: 'simple_tool_call',
       runtimeHostedBackends: ['api', 'local'],
-      summary:
-        "6 runtime-hosted strategy families are available for api/local loops. "
-        + "1 known deferred hint family still falls back to 'simple_tool_call'.",
+      summary: '7 runtime-hosted strategy families are available for api/local loops.',
     });
 
     expect(catalog.strategies).toEqual(expect.arrayContaining([
@@ -75,16 +73,26 @@ describe('buildApiRuntimeExecutionStrategyCatalog', () => {
       }),
       expect.objectContaining({
         id: 'deps',
-        availability: 'fallback_only',
-        runtimeOwnedExecution: false,
+        availability: 'supported',
+        runtimeOwnedExecution: true,
         requestSupport: {
-          acceptanceCriteria: false,
-          strategyContext: false,
+          acceptanceCriteria: true,
+          strategyContext: true,
           correlation: true,
         },
-        fallbackStrategy: 'simple_tool_call',
-        contextSchema: [],
-        strategyEvents: [],
+        requestedContextKeys: ['maxSteps', 'timeoutMs', 'stuckThreshold'],
+        contextSchema: expect.arrayContaining([
+          expect.objectContaining({
+            key: 'maxSteps',
+            defaultValue: 20,
+          }),
+        ]),
+        strategyEvents: expect.arrayContaining([
+          'strategy_describe',
+          'strategy_select',
+          'strategy_replan',
+        ]),
+        executionModel: 'phase_loop',
       }),
     ]));
   });

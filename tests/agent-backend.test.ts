@@ -550,8 +550,8 @@ describe('agent backend integration', () => {
         executionStrategies: expect.objectContaining({
           summary: expect.objectContaining({
             totalFamilies: 7,
-            supportedFamilies: 6,
-            fallbackOnlyFamilies: 1,
+            supportedFamilies: 7,
+            fallbackOnlyFamilies: 0,
             compatibilityDefault: 'simple_tool_call',
           }),
         }),
@@ -1588,8 +1588,8 @@ describe('agent backend integration', () => {
         executionStrategies: expect.objectContaining({
           summary: expect.objectContaining({
             totalFamilies: 7,
-            supportedFamilies: 6,
-            fallbackOnlyFamilies: 1,
+            supportedFamilies: 7,
+            fallbackOnlyFamilies: 0,
             compatibilityDefault: 'simple_tool_call',
           }),
         }),

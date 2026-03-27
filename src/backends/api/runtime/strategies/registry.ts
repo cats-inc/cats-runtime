@@ -1,3 +1,4 @@
+import { depsStrategy } from './depsStrategy.js';
 import { RuntimeExecutionStrategyRegistry } from '../../../../core/runtime/strategies/registry.js';
 import { planExecuteStrategy } from './planExecuteStrategy.js';
 import { pdcaStrategy } from './pdcaStrategy.js';
@@ -13,6 +14,7 @@ export const API_RUNTIME_EXECUTION_STRATEGY_IDS = [
   'react',
   'plan_execute',
   'pdca',
+  'deps',
   'reflexion',
   'tree_of_thoughts',
 ] as const;
@@ -23,6 +25,7 @@ export function createApiRuntimeExecutionStrategyRegistry(): RuntimeExecutionStr
     reactStrategy,
     planExecuteStrategy,
     pdcaStrategy,
+    depsStrategy,
     reflexionStrategy,
     treeOfThoughtsStrategy,
   ]);

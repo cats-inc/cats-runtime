@@ -79,13 +79,11 @@ describe('ApiBackendManager', () => {
     expect(manager.inspectExecutionStrategies()).toEqual({
       summary: {
         totalFamilies: 7,
-        supportedFamilies: 6,
-        fallbackOnlyFamilies: 1,
+        supportedFamilies: 7,
+        fallbackOnlyFamilies: 0,
         compatibilityDefault: 'simple_tool_call',
         runtimeHostedBackends: ['api', 'local'],
-        summary:
-          "6 runtime-hosted strategy families are available for api/local loops. "
-          + "1 known deferred hint family still falls back to 'simple_tool_call'.",
+        summary: '7 runtime-hosted strategy families are available for api/local loops.',
       },
       strategies: expect.arrayContaining([
         expect.objectContaining({
@@ -106,13 +104,13 @@ describe('ApiBackendManager', () => {
         }),
         expect.objectContaining({
           id: 'deps',
-          availability: 'fallback_only',
-          fallbackStrategy: 'simple_tool_call',
+          availability: 'supported',
           requestSupport: {
-            acceptanceCriteria: false,
-            strategyContext: false,
+            acceptanceCriteria: true,
+            strategyContext: true,
             correlation: true,
           },
+          requestedContextKeys: ['maxSteps', 'timeoutMs', 'stuckThreshold'],
         }),
       ]),
     });
@@ -550,7 +548,7 @@ describe('ApiBackendManager', () => {
     const handle = manager.spawn(session.id, createTarget());
     const events = await collectEvents(handle.streamMessage({
       message: 'hello',
-      requestedStrategy: 'deps',
+      requestedStrategy: 'work_graph',
       correlation: {
         taskId: 'task-work-1',
         product: 'work',
@@ -560,15 +558,15 @@ describe('ApiBackendManager', () => {
 
     expect(events).toContainEqual(expect.objectContaining({
       type: 'progress',
-      text: "Requested strategy 'deps' is not supported by this runtime; falling back to 'simple_tool_call'.",
+      text: "Requested strategy 'work_graph' is not supported by this runtime; falling back to 'simple_tool_call'.",
       metadata: expect.objectContaining({
         kind: 'strategy',
         status: 'fallback',
         strategyEvent: 'strategy_degraded',
-        requestedStrategy: 'deps',
+        requestedStrategy: 'work_graph',
         effectiveStrategy: 'simple_tool_call',
         strategyResolutionSource: 'compatibility_fallback',
-        degradedStrategy: 'deps',
+        degradedStrategy: 'work_graph',
         fallbackStrategy: 'simple_tool_call',
       }),
     }));
@@ -592,7 +590,7 @@ describe('ApiBackendManager', () => {
     expect(updated).toMatchObject({
       strategy: {
         request: {
-          requestedStrategy: 'deps',
+          requestedStrategy: 'work_graph',
           correlation: {
             taskId: 'task-work-1',
             product: 'work',
@@ -610,6 +608,275 @@ describe('ApiBackendManager', () => {
     expect(updated?.strategy?.preferredStrategy).toBeUndefined();
   });
 
+  it('runs explicit deps with additive phase events and runtime-owned inspection metadata', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-api-deps-'));
+    const repoDir = join(root, 'repo');
+    mkdirSync(repoDir, { recursive: true });
+    writeFileSync(join(repoDir, 'answer.txt'), '42\n', 'utf-8');
+
+    try {
+      const registry = new SessionRegistry();
+      const session = registry.create({
+        id: 'api-session-deps',
+        providerName: 'codex',
+        providerBackend: 'api',
+        providerInstanceId: 'gateway',
+        cwd: repoDir,
+      });
+
+      const requestBodies: Record<string, unknown>[] = [];
+      const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+        requestBodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        if (requestBodies.length === 1) {
+          return new Response(JSON.stringify({
+            id: 'resp_deps_1',
+            output: [
+              {
+                type: 'message',
+                role: 'assistant',
+                content: [{ type: 'output_text', text: 'Describe: answer.txt likely contains the final value.' }],
+              },
+              {
+                type: 'function_call',
+                call_id: 'call_read_answer_deps',
+                name: 'read_file',
+                arguments: '{"path":"answer.txt"}',
+              },
+            ],
+            usage: {
+              input_tokens: 7,
+              output_tokens: 3,
+            },
+          }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+
+        return new Response(JSON.stringify({
+          id: 'resp_deps_2',
+          output: [{
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: '42' }],
+          }],
+          usage: {
+            input_tokens: 4,
+            output_tokens: 1,
+          },
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      });
+
+      const manager = new ApiBackendManager(
+        { sessionBaseDir: root },
+        registry,
+        {
+          fetch: fetchMock as typeof fetch,
+          env: {
+            OPENAI_API_KEY: 'test-key',
+          },
+        },
+      );
+      const runtime = createRuntimeManager(root, manager);
+      const turn = {
+        message: 'Inspect answer.txt and return only the verified value.',
+        requestedStrategy: 'deps' as const,
+        acceptanceCriteria: 'Return only the verified file value.',
+        strategyContext: {
+          maxSteps: 4,
+          timeoutMs: 1500,
+          stuckThreshold: 2,
+        },
+        correlation: {
+          taskId: 'task-runtime-deps-1',
+          product: 'work',
+        },
+      };
+
+      runtime.beginRun(session, turn);
+
+      const handle = manager.spawn(session.id, createTarget());
+      const events = await collectEvents(handle.streamMessage(turn));
+      for (const event of events) {
+        runtime.observeEvent(session.id, event);
+      }
+
+      const updated = registry.get(session.id)!;
+      const inspection = buildSessionInspection({
+        session: updated,
+        view: toSessionView(updated, {
+          attached: manager.isAttached(session.id),
+          externalSessionLiveWindowMs: 15000,
+        }),
+        trackedState: runtime.getTrackedState(session.id),
+        metering: buildMeteringSnapshot(),
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(String(requestBodies[0]?.instructions)).toContain('Execution strategy: deps.');
+      expect(String(requestBodies[0]?.instructions)).toContain(
+        'Acceptance criteria:\nReturn only the verified file value.',
+      );
+      expect(String(requestBodies[0]?.instructions)).toContain('maxSteps: 4');
+      expect(String(JSON.stringify(requestBodies[1]?.input))).toContain(
+        'Runtime deps guidance',
+      );
+      expect(requestBodies[1]?.previous_response_id).toBe('resp_deps_1');
+
+      expect(events).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            status: 'started',
+            strategyEvent: 'strategy_started',
+            effectiveStrategy: 'deps',
+            strategyResolutionSource: 'explicit_request',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            strategyEvent: 'strategy_describe',
+            effectiveStrategy: 'deps',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            strategyEvent: 'strategy_explain',
+            effectiveStrategy: 'deps',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            strategyEvent: 'strategy_plan',
+            effectiveStrategy: 'deps',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            strategyEvent: 'strategy_select',
+            effectiveStrategy: 'deps',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            strategyEvent: 'strategy_replan',
+            effectiveStrategy: 'deps',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'progress',
+          metadata: expect.objectContaining({
+            kind: 'strategy',
+            status: 'completed',
+            strategyEvent: 'strategy_completed',
+            effectiveStrategy: 'deps',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'tool_use',
+          toolName: 'read_file',
+          toolId: 'call_read_answer_deps',
+        }),
+        expect.objectContaining({
+          type: 'tool_result',
+          toolName: 'read_file',
+          toolId: 'call_read_answer_deps',
+          text: expect.stringContaining('42'),
+        }),
+        expect.objectContaining({
+          type: 'result',
+          sessionId: 'resp_deps_2',
+          usage: {
+            inputTokens: 11,
+            outputTokens: 4,
+          },
+        }),
+      ]));
+
+      expect(updated).toMatchObject({
+        strategy: {
+          preferredStrategy: 'deps',
+          request: {
+            requestedStrategy: 'deps',
+            acceptanceCriteria: 'Return only the verified file value.',
+            strategyContext: {
+              maxSteps: 4,
+              timeoutMs: 1500,
+              stuckThreshold: 2,
+            },
+            correlation: {
+              taskId: 'task-runtime-deps-1',
+              product: 'work',
+            },
+          },
+          effectiveStrategy: 'deps',
+          resolutionSource: 'explicit_request',
+          summary: {
+            status: 'completed',
+            stepCount: 2,
+            stepLimit: 4,
+            timeoutMs: 1500,
+            duplicateStepCount: 1,
+            lastStepSignature: 'read_file:{\"path\":\"answer.txt\"}',
+            lastEvent: 'strategy_completed',
+            resolutionSource: 'explicit_request',
+          },
+          localState: {
+            currentPhase: 'completed',
+            describedSteps: 2,
+            explainedSteps: 2,
+            plannedSteps: 2,
+            selectedSteps: 2,
+            consecutiveDuplicateToolCalls: 1,
+            lastToolCallSignature: 'read_file:{\"path\":\"answer.txt\"}',
+            lastToolCallCount: 1,
+          },
+        },
+      });
+
+      expect(inspection.strategy).toMatchObject({
+        requestedStrategy: 'deps',
+        effectiveStrategy: 'deps',
+        acceptanceCriteria: 'Return only the verified file value.',
+        correlation: {
+          taskId: 'task-runtime-deps-1',
+          product: 'work',
+        },
+        state: {
+          preferredStrategy: 'deps',
+          effectiveStrategy: 'deps',
+          summary: {
+            status: 'completed',
+            stepCount: 2,
+          },
+          localState: {
+            currentPhase: 'completed',
+            describedSteps: 2,
+            explainedSteps: 2,
+            plannedSteps: 2,
+            selectedSteps: 2,
+          },
+        },
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('does not repeat strategy_degraded events once an unsupported persisted strategy already resolved through compatibility fallback', async () => {
     const registry = new SessionRegistry();
     const session = registry.create({
@@ -620,7 +887,7 @@ describe('ApiBackendManager', () => {
       cwd: '/repo',
       strategy: {
         request: {
-          requestedStrategy: 'deps',
+          requestedStrategy: 'work_graph',
         },
         effectiveStrategy: 'simple_tool_call',
         resolutionSource: 'compatibility_fallback',

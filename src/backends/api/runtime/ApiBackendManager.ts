@@ -179,6 +179,8 @@ function buildStrategyInstructionOverlay(
     strategyPrompt = 'Execution strategy: reflexion. Produce a bounded draft, critique it explicitly against the acceptance criteria, and revise before finalizing; use tools only when the critique reveals a concrete gap.';
   } else if (strategyId === 'tree_of_thoughts') {
     strategyPrompt = 'Execution strategy: tree_of_thoughts. The runtime will explore multiple candidate branches, prune weaker paths, and ask you to commit to one bounded branch at a time. Keep each reply focused on a single selected path.';
+  } else if (strategyId === 'deps') {
+    strategyPrompt = 'Execution strategy: deps. Work in describe-explain-plan-select cycles: describe the current state, explain the key constraints, plan the next bounded action batch, then select either the final answer or the minimum necessary tool calls.';
   }
   if (!strategyPrompt) {
     return undefined;
@@ -210,6 +212,7 @@ function resolveStrategyConstraints(
   const usesManagedLoopGuards = strategyId === 'react'
     || strategyId === 'plan_execute'
     || strategyId === 'pdca'
+    || strategyId === 'deps'
     || strategyId === 'reflexion'
     || strategyId === 'tree_of_thoughts';
   const stepLimit = readStrategyPositiveInteger(
