@@ -617,6 +617,9 @@ desktop shells, and the embedded dashboard. It combines:
   fetching `GET /setup-state`
 - compact runtime-skill catalog summary metadata so hosts can see whether the
   runtime skill library loaded and how many packages are currently available
+- compact runtime-tooling summary metadata so hosts can see the standard and
+  extended local-tool profile counts, mutating/read-only-compatible totals, and
+  broad domain breakdowns without calling any session-scoped tool surface
 - compact runtime execution-strategy summary metadata so hosts can distinguish
   implemented strategy families from compatibility-fallback-only hints
 - a light provider-health summary over each provider's default target, suitable
@@ -671,6 +674,9 @@ integrate against:
 - runtime skill catalog metadata under `runtime.skills`, including the resolved
   root path, loaded/empty/missing state, package counts by family/package kind,
   and delivery-hint totals
+- runtime tooling metadata under `runtime.tools`, including bounded standard
+  and extended profile summaries with total-tool, mutating-tool,
+  read-only-compatible, and broad domain counts
 - full `metering` state:
   - `summary`: aggregate status/counts
   - `usage`: totals plus `byProviderInstance` / `bySession`

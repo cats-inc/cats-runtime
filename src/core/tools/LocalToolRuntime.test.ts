@@ -4,7 +4,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { ToolExecutionContext } from './LocalToolRuntime.js';
-import { buildToolPolicyInspection, LocalToolRuntime, writeTextFileAtomically } from './LocalToolRuntime.js';
+import {
+  buildRuntimeToolCatalogSummary,
+  buildToolPolicyInspection,
+  LocalToolRuntime,
+  writeTextFileAtomically,
+} from './LocalToolRuntime.js';
 
 function createWorkspace() {
   const cwd = mkdtempSync(join(tmpdir(), 'cats-runtime-tools-'));
@@ -1438,6 +1443,42 @@ describe('LocalToolRuntime', () => {
         'audit-review-target', 'open-pull-request', 'inspect-pull-request', 'wait-review-checks',
         'audit-deployment-target', 'create-deployment', 'inspect-deployment', 'read-deployment-logs',
       ]);
+    });
+
+    it('summarizes runtime tool profile counts for diagnostics', () => {
+      expect(buildRuntimeToolCatalogSummary()).toEqual({
+        profiles: {
+          standard: {
+            totalTools: 28,
+            mutatingTools: 12,
+            readOnlyCompatibleTools: 21,
+            domains: {
+              filesystem: 9,
+              search: 2,
+              shell: 1,
+              workspace: 3,
+              delivery: 5,
+              review: 4,
+              deployment: 4,
+            },
+          },
+          extended: {
+            totalTools: 31,
+            mutatingTools: 15,
+            readOnlyCompatibleTools: 21,
+            domains: {
+              filesystem: 12,
+              search: 2,
+              shell: 1,
+              workspace: 3,
+              delivery: 5,
+              review: 4,
+              deployment: 4,
+            },
+          },
+        },
+        summary: 'Runtime tooling exposes 28 tools in the standard profile and 31 in the extended profile.',
+      });
     });
 
     it('read_only profile lists 16 tools', () => {

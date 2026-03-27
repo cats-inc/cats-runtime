@@ -602,6 +602,17 @@ describe('runtime server', () => {
               latestUpdatedAt: null,
             },
           },
+          tools: expect.objectContaining({
+            profiles: expect.objectContaining({
+              standard: expect.objectContaining({
+                totalTools: 28,
+              }),
+              extended: expect.objectContaining({
+                totalTools: 31,
+              }),
+            }),
+            summary: expect.stringContaining('Runtime tooling exposes'),
+          }),
           skills: expect.objectContaining({
             rootPath: expect.stringContaining('skills'),
             state: 'loaded',
@@ -1422,6 +1433,19 @@ backends:
             oldestStartedAt: null,
             latestUpdatedAt: null,
           },
+        },
+        tools: {
+          summary: expect.objectContaining({
+            profiles: expect.objectContaining({
+              standard: expect.objectContaining({
+                totalTools: 28,
+              }),
+              extended: expect.objectContaining({
+                totalTools: 31,
+              }),
+            }),
+            summary: expect.stringContaining('Runtime tooling exposes'),
+          }),
         },
         skills: {
           summary: expect.objectContaining({

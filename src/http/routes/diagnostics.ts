@@ -51,6 +51,7 @@ import {
   buildProviderToolingSummary,
   loadProviderRemoteToolCatalog,
 } from '../../core/tools/providerTooling.js';
+import { buildRuntimeToolCatalogSummary } from '../../core/tools/LocalToolRuntime.js';
 import { inspectRuntimeSkillCatalog } from '../../core/skills/catalog.js';
 import type { HealthStatus } from '../../core/types.js';
 import type { AppContext } from '../app.js';
@@ -1261,6 +1262,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
   const management = getRuntimeManagementService(ctx).inspectOperations();
   const setup = buildRuntimeSetupDiagnosticsSummary(ctx);
   const skills = inspectRuntimeSkillCatalog();
+  const tools = buildRuntimeToolCatalogSummary();
 
   return c.json({
     service: RUNTIME_SERVICE_NAME,
@@ -1284,6 +1286,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
       management: {
         operations: management.summary,
       },
+      tools,
       skills,
       setup,
       wakeups,
@@ -1501,6 +1504,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
   const management = getRuntimeManagementService(ctx).inspectOperations();
   const setup = buildRuntimeSetupDiagnosticsSummary(ctx);
   const skills = inspectRuntimeSkillCatalog();
+  const tools = buildRuntimeToolCatalogSummary();
   const providerSummary = summarizeProviderDiagnostics(catalog, providers, {
     defaultTargetsOnly: true,
     useAttentionSummary: true,
@@ -1563,6 +1567,9 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
     },
     management: {
       summary: management.summary,
+    },
+    tools: {
+      summary: tools,
     },
     skills: {
       summary: {

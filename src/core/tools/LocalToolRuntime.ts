@@ -67,6 +67,21 @@ export interface ToolResult {
   isError?: boolean;
 }
 
+export interface RuntimeToolProfileSummary {
+  totalTools: number;
+  mutatingTools: number;
+  readOnlyCompatibleTools: number;
+  domains: Record<ToolCapabilityMetadata['domain'], number>;
+}
+
+export interface RuntimeToolCatalogSummary {
+  profiles: {
+    standard: RuntimeToolProfileSummary;
+    extended: RuntimeToolProfileSummary;
+  };
+  summary: string;
+}
+
 export interface ToolExecutionContext {
   sessionId: string;
   cwd: string;
@@ -794,6 +809,53 @@ export function buildToolPolicyInspection(input: {
       blocked: blockedTools.length,
     },
     capabilities,
+  };
+}
+
+export function buildRuntimeToolCatalogSummary(): RuntimeToolCatalogSummary {
+  const summarizeProfile = (toolProfile: 'standard' | 'extended'): RuntimeToolProfileSummary => {
+    const inspection = buildToolPolicyInspection({
+      toolProfile,
+      permissionMode: 'skip',
+    });
+    const domains = {
+      filesystem: 0,
+      search: 0,
+      shell: 0,
+      workspace: 0,
+      delivery: 0,
+      review: 0,
+      deployment: 0,
+    } satisfies Record<ToolCapabilityMetadata['domain'], number>;
+
+    let mutatingTools = 0;
+    let readOnlyCompatibleTools = 0;
+    for (const capability of inspection.capabilities) {
+      domains[capability.domain] += 1;
+      if (capability.mutating) {
+        mutatingTools += 1;
+      }
+      if (capability.readOnlyCompatible) {
+        readOnlyCompatibleTools += 1;
+      }
+    }
+
+    return {
+      totalTools: inspection.counts.total,
+      mutatingTools,
+      readOnlyCompatibleTools,
+      domains,
+    };
+  };
+
+  const standard = summarizeProfile('standard');
+  const extended = summarizeProfile('extended');
+  return {
+    profiles: {
+      standard,
+      extended,
+    },
+    summary: `Runtime tooling exposes ${standard.totalTools} tools in the standard profile and ${extended.totalTools} in the extended profile.`,
   };
 }
 
