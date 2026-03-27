@@ -219,6 +219,7 @@ expansion without blocking the first CLI-focused slice.
 | 2026-03-27 | Bounded host/operator write-back follow-through landed for retained artifacts: `POST /diagnostics/providers/evolution/:artifactId/review` now updates classifications, summary text, highlights, and external references in place while reusing the same stored artifact/read-model flow and still avoiding a public probe trigger. |
 | 2026-03-27 | Bounded host/operator retained-artifact inspection follow-through also landed: `GET /diagnostics/providers/evolution` now lists stored provider-evolution artifacts with additive provider/instance/parser/runtime/classification filters, and `GET /diagnostics/providers/evolution/:artifactId` re-reads the full stored artifact without introducing a public probe trigger. |
 | 2026-03-27 | Read-only MCP follow-through landed for retained provider-evolution artifacts: `list_provider_evolution_artifacts` and `read_provider_evolution_artifact` now reuse the same bounded diagnostics list/read surfaces and filters over HTTP JSON-RPC and stdio without introducing an MCP-only evidence path. |
+| 2026-03-27 | MCP write follow-through also landed for retained provider-evolution reviews: `review_provider_evolution_artifact` now reuses the same bounded diagnostics review route over HTTP JSON-RPC and stdio, so orchestrator-style hosts can attach classifications, summaries, highlights, and external references without inventing a second review/update path. |
 
 ---
 

@@ -106,6 +106,7 @@ Current curated tools:
 - `read_compatibility_evidence_artifact`
 - `list_provider_evolution_artifacts`
 - `read_provider_evolution_artifact`
+- `review_provider_evolution_artifact`
 - `observe_session`
 - `list_runtime_skills`
 - `create_session`
@@ -164,6 +165,10 @@ reuse the same retained provider-evolution artifact read surfaces as
 `GET /diagnostics/providers/evolution/{artifactId}`, including additive
 provider / instance / parser / transport / runtime-mode / review-classification
 filters.
+`review_provider_evolution_artifact` reuses the same bounded retained-artifact
+review write seam as `POST /diagnostics/providers/evolution/{artifactId}/review`,
+including additive artifact identity filters plus review classifications,
+summary, highlights, and external references.
 `list_sessions` and `observe_session` also reuse the same additive session
 `providerTarget` read model exposed by the direct HTTP session/history/observe
 surfaces, so MCP hosts can inspect backend continuity/tooling semantics without

@@ -304,6 +304,7 @@ describe('runtime MCP facade', () => {
       'list_provider_evolution_artifacts',
       'list_compatibility_evidence_artifacts',
       'read_provider_evolution_artifact',
+      'review_provider_evolution_artifact',
       'read_compatibility_evidence_artifact',
       'observe_session',
       'list_runtime_skills',
@@ -635,6 +636,83 @@ describe('runtime MCP facade', () => {
       id: artifact.artifact.id,
       provider: 'claude',
     }));
+
+    const reviewEvolutionResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 33.5,
+        method: 'tools/call',
+        params: {
+          name: 'review_provider_evolution_artifact',
+          arguments: {
+            artifactId: artifact.artifact.id,
+            provider: 'claude',
+            classifications: ['regression', 'schema_change'],
+            summary: 'Manual MCP review flagged a regression with schema changes.',
+            highlights: [
+              'Removed event types: future.event',
+              'Schema changes observed for tool_result.',
+            ],
+            references: [
+              {
+                kind: 'issue',
+                url: 'https://docs.example.com/issues/claude-cli-regression',
+              },
+            ],
+          },
+        },
+      }),
+    });
+    expect(reviewEvolutionResponse.status).toBe(200);
+    const reviewedEvolution = await reviewEvolutionResponse.json() as {
+      result: {
+        structuredContent: {
+          updated: boolean;
+          reviewPath: string;
+          artifact: {
+            artifactId: string;
+            review: {
+              classifications: string[];
+              summary: string;
+              highlights: string[];
+            };
+            reviewContext: {
+              references: Array<{
+                kind: string;
+                url: string;
+              }>;
+            };
+          };
+        };
+      };
+    };
+    expect(reviewedEvolution.result.structuredContent.updated).toBe(true);
+    expect(reviewedEvolution.result.structuredContent.reviewPath).toBe(
+      `/diagnostics/providers/evolution/${artifact.artifact.id}/review`,
+    );
+    expect(reviewedEvolution.result.structuredContent.artifact).toEqual(
+      expect.objectContaining({
+        artifactId: artifact.artifact.id,
+        review: {
+          classifications: ['regression', 'schema_change'],
+          summary: 'Manual MCP review flagged a regression with schema changes.',
+          highlights: [
+            'Removed event types: future.event',
+            'Schema changes observed for tool_result.',
+          ],
+        },
+        reviewContext: {
+          references: [
+            {
+              kind: 'issue',
+              url: 'https://docs.example.com/issues/claude-cli-regression',
+            },
+          ],
+        },
+      }),
+    );
 
     writeCompatibilityEvidenceArtifact(
       getRuntimeResolvedPaths(makeConfig()).compatibilityEvidenceDir,

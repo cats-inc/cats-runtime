@@ -70,6 +70,13 @@ const PROVIDER_EVOLUTION_REVIEW_CLASSIFICATIONS = [
   'schema_change',
   'semantic_drift_suspected',
 ] as const;
+const PROVIDER_EVOLUTION_REFERENCE_KINDS = [
+  'release_notes',
+  'changelog',
+  'issue',
+  'announcement',
+  'other',
+] as const;
 const COMPATIBILITY_EVIDENCE_CLASSIFICATIONS = [
   'degraded',
   'unsupported_version',
@@ -170,6 +177,20 @@ function readOptionalStringArray(record: Record<string, unknown>, key: string): 
   return items.length > 0 ? items : undefined;
 }
 
+function readOptionalObjectArray(
+  record: Record<string, unknown>,
+  key: string,
+): Record<string, unknown>[] | undefined {
+  const value = record[key];
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const items = value
+    .filter((entry): entry is Record<string, unknown> => Boolean(asRecord(entry)))
+    .map((entry) => entry);
+  return items.length > 0 ? items : undefined;
+}
+
 function readOptionalEnumString<T extends string>(
   record: Record<string, unknown>,
   key: string,
@@ -205,6 +226,47 @@ function readOptionalEnumStringArray<T extends string>(
     }
   }
   return values as T[];
+}
+
+function readOptionalProviderEvolutionReferences(
+  record: Record<string, unknown>,
+  key: string,
+): Array<{ kind: typeof PROVIDER_EVOLUTION_REFERENCE_KINDS[number]; url: string }> | undefined {
+  const values = readOptionalObjectArray(record, key);
+  if (!values) {
+    return undefined;
+  }
+
+  return values.map((value, index) => {
+    const kind = readOptionalEnumString(
+      value,
+      'kind',
+      PROVIDER_EVOLUTION_REFERENCE_KINDS,
+      `references[${index}].kind must be a valid provider-evolution reference kind`,
+    );
+    const url = readOptionalString(value, 'url');
+    if (!kind) {
+      throw new McpToolError(-32602, `references[${index}].kind is required`);
+    }
+    if (!url) {
+      throw new McpToolError(-32602, `references[${index}].url is required`);
+    }
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        throw new Error('unsupported protocol');
+      }
+      return {
+        kind,
+        url: parsed.toString(),
+      };
+    } catch {
+      throw new McpToolError(
+        -32602,
+        `references[${index}].url must be a valid http or https URL`,
+      );
+    }
+  });
 }
 
 function readRouteErrorMessage(body: unknown, fallback: string): string {
@@ -672,6 +734,95 @@ async function readProviderEvolutionArtifact(
     structuredContent: {
       ...payload,
       artifactPath: path,
+    },
+  };
+}
+
+async function reviewProviderEvolutionArtifact(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const artifactId = readRequiredString(args, 'artifactId');
+  const body: Record<string, unknown> = {
+    artifactId,
+  };
+
+  const provider = readOptionalString(args, 'provider');
+  if (provider) {
+    body.provider = provider;
+  }
+  const instance = readOptionalString(args, 'instance');
+  if (instance) {
+    body.instance = instance;
+  }
+  const parserId = readOptionalString(args, 'parserId');
+  if (parserId) {
+    body.parserId = parserId;
+  }
+  const probeProfile = readOptionalString(args, 'probeProfile');
+  if (probeProfile) {
+    body.probeProfile = probeProfile;
+  }
+  const transport = readOptionalEnumString(
+    args,
+    'transport',
+    PROVIDER_EVOLUTION_TRANSPORTS,
+    'transport must be a valid provider-evolution transport',
+  );
+  if (transport) {
+    body.transport = transport;
+  }
+  const runtimeMode = readOptionalEnumString(
+    args,
+    'runtimeMode',
+    RUNTIME_MODES,
+    'runtimeMode must be a valid runtime mode',
+  );
+  if (runtimeMode) {
+    body.runtimeMode = runtimeMode;
+  }
+
+  const classifications = readOptionalEnumStringArray(
+    args,
+    'classifications',
+    PROVIDER_EVOLUTION_REVIEW_CLASSIFICATIONS,
+    'classifications values must be valid provider-evolution review classifications',
+  );
+  if (classifications) {
+    body.classifications = classifications;
+  }
+
+  const summary = readOptionalString(args, 'summary');
+  if (summary) {
+    body.summary = summary;
+  }
+
+  const highlights = readOptionalStringArray(args, 'highlights');
+  if (highlights) {
+    body.highlights = highlights;
+  }
+
+  const references = readOptionalProviderEvolutionReferences(args, 'references');
+  if (references) {
+    body.references = references;
+  }
+
+  const result = await requestRuntimeJson(
+    ctx,
+    `/diagnostics/providers/evolution/${encodeURIComponent(artifactId)}/review`,
+    {
+      method: 'POST',
+      body,
+    },
+  );
+  ensureRouteSuccess('review_provider_evolution_artifact', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'review_provider_evolution_artifact result');
+  return {
+    summary: `Updated provider-evolution artifact ${artifactId}.`,
+    structuredContent: {
+      ...payload,
+      reviewPath: `/diagnostics/providers/evolution/${encodeURIComponent(artifactId)}/review`,
     },
   };
 }
@@ -1750,6 +1901,49 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: readProviderEvolutionArtifact,
+  },
+  {
+    definition: {
+      name: 'review_provider_evolution_artifact',
+      title: 'Review Provider Evolution Artifact',
+      description: 'Update retained provider-evolution artifact review metadata through the bounded diagnostics write surface.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          artifactId: { type: 'string' },
+          provider: { type: 'string' },
+          instance: { type: 'string' },
+          parserId: { type: 'string' },
+          probeProfile: { type: 'string' },
+          transport: { type: 'string', enum: PROVIDER_EVOLUTION_TRANSPORTS },
+          runtimeMode: { type: 'string', enum: RUNTIME_MODES },
+          classifications: {
+            type: 'array',
+            items: { type: 'string', enum: PROVIDER_EVOLUTION_REVIEW_CLASSIFICATIONS },
+          },
+          summary: { type: 'string' },
+          highlights: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+          references: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                kind: { type: 'string', enum: PROVIDER_EVOLUTION_REFERENCE_KINDS },
+                url: { type: 'string' },
+              },
+              required: ['kind', 'url'],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ['artifactId'],
+        additionalProperties: false,
+      },
+    },
+    execute: reviewProviderEvolutionArtifact,
   },
   {
     definition: {

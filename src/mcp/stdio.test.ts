@@ -218,6 +218,7 @@ describe('MCP stdio transport', () => {
             expect.objectContaining({ name: 'read_compatibility_evidence_artifact' }),
             expect.objectContaining({ name: 'list_provider_evolution_artifacts' }),
             expect.objectContaining({ name: 'read_provider_evolution_artifact' }),
+            expect.objectContaining({ name: 'review_provider_evolution_artifact' }),
             expect.objectContaining({ name: 'list_runtime_skills' }),
             expect.objectContaining({ name: 'browser_summary' }),
             expect.objectContaining({ name: 'cleanup_browser_sessions' }),
