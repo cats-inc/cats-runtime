@@ -1089,6 +1089,10 @@ always-on self-adapting parser system.
 - Agent SDK bridge probes now preserve normalized `tool_result` output while
   recording dropped/unknown/schema-failure/raw-passthrough bridge frames for
   evidence review
+- OpenClaw gateway probes now record ignored gateway lifecycle frames,
+  malformed websocket payloads, schema-failure event shapes, and unknown
+  gateway streams through the same evidence collector without changing the
+  runtime-visible `text` / `raw` / `result` contract
 - normal runtime execution remains unchanged when evidence collection is not
   enabled
 

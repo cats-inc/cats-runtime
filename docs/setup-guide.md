@@ -170,10 +170,10 @@ The current agent-backed slice stays manual-first and transport-neutral:
 - it reuses the same capability snapshot / baseline-compare artifact contract
   as CLI probes
 - it does not add a new public HTTP route
-- the first delivered adapter instrumentation is on Agent SDK bridge, which now
-  records ignored, unknown, schema-failure, and raw-passthrough bridge frames
-  alongside normalized shared runtime events such as `text`, `tool_use`,
-  `tool_result`, and `result`
+- the first delivered adapter instrumentation is on Agent SDK bridge and
+  OpenClaw gateway, which now record ignored, unknown, schema-failure, and
+  raw-passthrough transport frames alongside normalized shared runtime events
+  such as `text`, `tool_use`, `tool_result`, `raw`, and `result`
 
 `GET /diagnostics/setup-report` lists the retained reports newest-first with
 their `artifactId`, `artifactPath`, `generatedAt`, and bounded summary fields.

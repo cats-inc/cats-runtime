@@ -5,6 +5,12 @@ import type {
   SessionProviderState,
   StreamEvent,
 } from '../../../../core/types.js';
+import {
+  observeIgnored,
+  observeRawPassthrough,
+  observeSchemaFailure,
+  observeUnknown,
+} from '../../../../core/compatibility/providerEvolution.js';
 import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
 import type {
   AgentAdapter,
@@ -60,6 +66,8 @@ interface PendingRequest {
   reject: (error: Error) => void;
   timer?: ReturnType<typeof setTimeout>;
 }
+
+type GatewayDroppedFrameKind = 'raw_passthrough' | 'schema_failure';
 
 type QueueItem = StreamEvent | Error | null;
 
@@ -516,6 +524,7 @@ class GatewayWsClient {
     private readonly url: string,
     private readonly headers: Record<string, string> | undefined,
     private readonly onEvent: (frame: GatewayEventFrame) => void,
+    private readonly onDroppedFrame?: (kind: GatewayDroppedFrameKind, raw: unknown) => void,
   ) {}
 
   async connect(connectParams: Record<string, unknown>, signal: AbortSignal): Promise<unknown> {
@@ -632,11 +641,13 @@ class GatewayWsClient {
     try {
       parsed = JSON.parse(raw);
     } catch {
+      this.onDroppedFrame?.('raw_passthrough', raw);
       return;
     }
 
     const eventFrame = parseRecord(parsed);
     if (!eventFrame) {
+      this.onDroppedFrame?.('schema_failure', parsed);
       return;
     }
 
@@ -655,6 +666,7 @@ class GatewayWsClient {
     }
 
     if (eventFrame.type !== 'res' || typeof eventFrame.id !== 'string') {
+      this.onDroppedFrame?.('schema_failure', parsed);
       return;
     }
 
@@ -721,6 +733,7 @@ export class OpenClawAdapter implements AgentAdapter {
     let initialized = false;
     const preInitEvents: StreamEvent[] = [];
     const env = this.options.env || process.env;
+    const observer = input.evolutionObserver;
     const client = new GatewayWsClient(factory, url, headers, (frame) => {
       const emit = (event: StreamEvent) => {
         if (!initialized) {
@@ -731,17 +744,32 @@ export class OpenClawAdapter implements AgentAdapter {
       };
 
       if (frame.event !== 'agent') {
+        observeIgnored(observer, {
+          rawEventType: frame.event,
+          reason: 'gateway_lifecycle_event',
+          rawSample: frame,
+        }, null);
         return;
       }
 
       const payload = parseRecord(frame.payload);
       if (!payload) {
+        observeSchemaFailure(observer, {
+          rawEventType: frame.event,
+          reason: 'event_without_payload',
+          rawSample: frame,
+        }, null);
         return;
       }
 
       const stream = readString(payload.stream) || 'unknown';
       const data = parseRecord(payload.data);
       if (!data) {
+        observeSchemaFailure(observer, {
+          rawEventType: stream,
+          reason: 'stream_without_data',
+          rawSample: frame,
+        }, null);
         return;
       }
 
@@ -749,7 +777,13 @@ export class OpenClawAdapter implements AgentAdapter {
         const text = readString(data.delta) || readString(data.text);
         if (text) {
           emit({ type: 'text', text, raw: frame });
+          return;
         }
+        observeSchemaFailure(observer, {
+          rawEventType: stream,
+          reason: 'assistant_without_text',
+          rawSample: frame,
+        }, null);
         return;
       }
 
@@ -770,8 +804,35 @@ export class OpenClawAdapter implements AgentAdapter {
             artifacts,
             raw: frame,
           });
+          return;
         }
+        observeSchemaFailure(observer, {
+          rawEventType: stream,
+          reason: 'artifact_without_items',
+          rawSample: frame,
+        }, null);
+        return;
       }
+      observeUnknown(observer, {
+        rawEventType: stream,
+        reason: 'unhandled_gateway_stream',
+        rawSample: frame,
+      }, null);
+    }, (kind, raw) => {
+      if (kind === 'raw_passthrough') {
+        observeRawPassthrough(observer, {
+          rawEventType: 'ws_message',
+          reason: 'non_json_frame',
+          rawSample: raw,
+        }, null);
+        return;
+      }
+
+      observeSchemaFailure(observer, {
+        rawEventType: 'ws_frame',
+        reason: 'invalid_gateway_frame',
+        rawSample: raw,
+      }, null);
     });
 
     const run = (async () => {
