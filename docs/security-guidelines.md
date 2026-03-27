@@ -42,7 +42,32 @@ Before committing, verify:
 
 ### Authentication & Authorization
 
-- (Add project-specific auth guidelines)
+- `CATS_RUNTIME_API_KEY` protects host-facing runtime routes. Keep it distinct
+  from any upstream provider secret.
+- Remote API providers such as Anthropic, OpenAI, and Gemini should reference
+  env names in `config/providers.yaml` (`api_key_env`, `organization_env`,
+  `project_env`) rather than embedding secret values in config files.
+- Peer execution uses a separate shared secret
+  (`CATS_RUNTIME_PEER_SHARED_SECRET`), not the host-facing
+  `CATS_RUNTIME_API_KEY`.
+- If you expose runtime routes outside a fully trusted LAN, terminate TLS in
+  front of `cats-runtime`; bearer-style host or peer credentials should not be
+  sent over plaintext networks.
+
+### Runtime-Specific Secret Boundaries
+
+- Keep `.env.example` as placeholders only; never replace those entries with
+  live secrets in git.
+- Treat provider credentials independently:
+  - `ANTHROPIC_API_KEY`
+  - `OPENAI_API_KEY`
+  - `OPENAI_ORG_ID`
+  - `OPENAI_PROJECT_ID`
+  - `GEMINI_API_KEY`
+- Do not copy those values into `config/providers.yaml`, logs, retained probe
+  artifacts, or setup reports.
+- When adding diagnostics or evidence capture, prefer env-presence summaries and
+  redacted header-name metadata over raw token values.
 
 ### Dependencies
 
