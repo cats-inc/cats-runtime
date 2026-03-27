@@ -1105,6 +1105,10 @@ evidence bundles and does not force hosts to invent their own report format.
   exposed through MCP as `resume_management_operation`, so orchestrator-style
   hosts can re-enter long-running review/deployment waits without inventing a
   parallel management operation protocol
+- the same runtime-owned native session inspection/import seams are now also
+  exposed through MCP for Cursor, Kiro, Auggie, and OpenCode, so
+  orchestrator-style hosts can inventory or import provider-native local
+  sessions without reaching around the runtime HTTP contract
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
   remediation previews, and latest-setup-report summary metadata including a

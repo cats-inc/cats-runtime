@@ -102,6 +102,29 @@ const ACTOR_ROLES = [
   'operator',
 ] as const;
 const MANAGEMENT_ACTOR_CLASSES = ['system', 'owner', 'operator', 'service'] as const;
+const NATIVE_SESSION_MCP_PROVIDERS = [
+  {
+    provider: 'cursor',
+    label: 'Cursor',
+    supportsStartIfNeeded: true,
+  },
+  {
+    provider: 'kiro',
+    label: 'Kiro',
+    supportsStartIfNeeded: true,
+  },
+  {
+    provider: 'auggie',
+    label: 'Auggie',
+    supportsStartIfNeeded: false,
+  },
+  {
+    provider: 'opencode',
+    label: 'OpenCode',
+    supportsStartIfNeeded: false,
+  },
+] as const;
+type NativeSessionMcpProvider = typeof NATIVE_SESSION_MCP_PROVIDERS[number];
 
 function ensureObject(value: unknown, label: string): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -653,6 +676,122 @@ async function peerDiagnostics(
       discoveryStatusPath: '/discovery/status',
     },
   };
+}
+
+function buildNativeSessionsListPath(
+  provider: NativeSessionMcpProvider['provider'],
+  args: Record<string, unknown>,
+): string {
+  const searchParams = new URLSearchParams();
+  appendSingleQueryValue(searchParams, 'cwd', readOptionalString(args, 'cwd'));
+  appendSingleQueryValue(searchParams, 'instance', readOptionalString(args, 'instance'));
+  return searchParams.size > 0
+    ? `/${provider}/sessions?${searchParams.toString()}`
+    : `/${provider}/sessions`;
+}
+
+async function listNativeProviderSessions(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+  provider: NativeSessionMcpProvider,
+): Promise<McpToolCallResult> {
+  const sessionsPath = buildNativeSessionsListPath(provider.provider, args);
+  const result = await requestRuntimeJson(ctx, sessionsPath, { method: 'GET' });
+  ensureRouteSuccess(`list_${provider.provider}_sessions`, result.status, result.body);
+
+  const payload = ensureObject(result.body, `list_${provider.provider}_sessions result`);
+  const sessions = Array.isArray(payload.sessions) ? payload.sessions : [];
+  return {
+    summary: `Returned ${sessions.length} ${provider.label} session entr${sessions.length === 1 ? 'y' : 'ies'}.`,
+    structuredContent: {
+      ...payload,
+      sessionsPath,
+      discoverPath: `/${provider.provider}/sessions/discover`,
+    },
+  };
+}
+
+async function discoverNativeProviderSessions(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+  provider: NativeSessionMcpProvider,
+): Promise<McpToolCallResult> {
+  const discoverPath = `/${provider.provider}/sessions/discover`;
+  const body: Record<string, unknown> = {};
+  const cwd = readOptionalString(args, 'cwd');
+  const instance = readOptionalString(args, 'instance');
+  const group = readOptionalString(args, 'group');
+  const startIfNeeded = readOptionalBoolean(args, 'startIfNeeded');
+  if (cwd) {
+    body.cwd = cwd;
+  }
+  if (instance) {
+    body.instance = instance;
+  }
+  if (group) {
+    body.group = group;
+  }
+  if (provider.supportsStartIfNeeded && startIfNeeded !== undefined) {
+    body.startIfNeeded = startIfNeeded;
+  }
+
+  const result = await requestRuntimeJson(ctx, discoverPath, { body });
+  ensureRouteSuccess(`discover_${provider.provider}_sessions`, result.status, result.body);
+
+  const payload = ensureObject(result.body, `discover_${provider.provider}_sessions result`);
+  const sessions = Array.isArray(payload.sessions) ? payload.sessions : [];
+  return {
+    summary: `Imported ${sessions.length} ${provider.label} session entr${sessions.length === 1 ? 'y' : 'ies'}.`,
+    structuredContent: {
+      responseStatus: result.status,
+      ...payload,
+      discoverPath,
+      sessionsPath: buildNativeSessionsListPath(provider.provider, args),
+    },
+  };
+}
+
+function createNativeProviderSessionHandlers(): McpToolHandler[] {
+  return NATIVE_SESSION_MCP_PROVIDERS.flatMap((provider) => {
+    const sharedProperties: Record<string, unknown> = {
+      cwd: { type: 'string' },
+      instance: { type: 'string' },
+    };
+    const discoverProperties: Record<string, unknown> = {
+      ...sharedProperties,
+      group: { type: 'string' },
+      ...(provider.supportsStartIfNeeded ? { startIfNeeded: { type: 'boolean' } } : {}),
+    };
+
+    return [
+      {
+        definition: {
+          name: `list_${provider.provider}_sessions`,
+          title: `List ${provider.label} Sessions`,
+          description: `Return ${provider.label} native sessions through the existing ${provider.label} session inspection route.`,
+          inputSchema: {
+            type: 'object',
+            properties: sharedProperties,
+            additionalProperties: false,
+          },
+        },
+        execute: (ctx, args) => listNativeProviderSessions(ctx, args, provider),
+      },
+      {
+        definition: {
+          name: `discover_${provider.provider}_sessions`,
+          title: `Discover ${provider.label} Sessions`,
+          description: `Import ${provider.label} native sessions through the existing ${provider.label} session discovery route.`,
+          inputSchema: {
+            type: 'object',
+            properties: discoverProperties,
+            additionalProperties: false,
+          },
+        },
+        execute: (ctx, args) => discoverNativeProviderSessions(ctx, args, provider),
+      },
+    ];
+  });
 }
 
 async function providersConfig(
@@ -2712,6 +2851,7 @@ const TOOL_HANDLERS: McpToolHandler[] = [
     },
     execute: peerDiagnostics,
   },
+  ...createNativeProviderSessionHandlers(),
   {
     definition: {
       name: 'providers_config',

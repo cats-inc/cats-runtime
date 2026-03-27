@@ -318,6 +318,67 @@ describe('runtime MCP facade', () => {
     });
     peerExecutionAdmission.recordAuthFailure('peer:lab');
     peerExecutionReplay.validate('peer:peer-live', peerNow, 'nonce-1');
+    const cursorNativeSessions = [
+      {
+        providerSessionId: 'cursor-native-1',
+        cwd: join(rootDir, 'cursor-workspace'),
+        summary: 'Cursor native session',
+        messageCount: 4,
+        lastActivity: '2026-03-27T00:00:00.000Z',
+        model: 'cursor-sonnet',
+      },
+    ];
+    const kiroNativeSessions = [
+      {
+        providerSessionId: 'kiro-native-1',
+        cwd: join(rootDir, 'kiro-workspace'),
+        summary: 'Kiro native session',
+        messageCount: 2,
+        lastActivity: '2026-03-27T00:01:00.000Z',
+        model: 'kiro-default',
+      },
+    ];
+    const auggieNativeSessions = [
+      {
+        providerSessionId: 'auggie-native-1',
+        cwd: join(rootDir, 'auggie-workspace'),
+        summary: 'Auggie native session',
+        sourcePath: join(rootDir, '.augment', 'sessions', 'auggie-native-1.json'),
+        messageCount: 5,
+        lastActivity: '2026-03-27T00:02:00.000Z',
+        model: 'auggie-pro',
+      },
+    ];
+    const opencodeNativeSessions = [
+      {
+        providerSessionId: 'opencode-native-1',
+        cwd: join(rootDir, 'opencode-workspace'),
+        summary: 'OpenCode native session',
+        messageCount: 3,
+        lastActivity: '2026-03-27T00:03:00.000Z',
+        model: 'opencode-default',
+      },
+    ];
+    const cursorNative = {
+      listSessions: vi.fn(async (cwd: string) =>
+        cursorNativeSessions.filter((session) => session.cwd === cwd)),
+      listAllSessions: vi.fn(async () => cursorNativeSessions),
+    };
+    const kiroNative = {
+      listSessions: vi.fn(async (cwd: string) =>
+        kiroNativeSessions.filter((session) => session.cwd === cwd)),
+      listAllSessions: vi.fn(async () => kiroNativeSessions),
+    };
+    const auggieSessions = {
+      listSessions: vi.fn(async (cwd: string) =>
+        auggieNativeSessions.filter((session) => session.cwd === cwd)),
+      listAllSessions: vi.fn(async () => auggieNativeSessions),
+    };
+    const opencodeNative = {
+      listSessions: vi.fn(async (cwd: string) =>
+        opencodeNativeSessions.filter((session) => session.cwd === cwd)),
+      listAllSessions: vi.fn(async () => opencodeNativeSessions),
+    };
     const providerModelCatalog = {
       inspectSummary: vi.fn(() => ({
         source: 'config',
@@ -382,11 +443,11 @@ describe('runtime MCP facade', () => {
       startup,
       registry,
       pool,
-      cursorNative: {} as never,
+      cursorNative: cursorNative as never,
       gooseNative: {} as never,
-      kiroNative: {} as never,
-      auggieSessions: {} as never,
-      opencodeNative: {} as never,
+      kiroNative: kiroNative as never,
+      auggieSessions: auggieSessions as never,
+      opencodeNative: opencodeNative as never,
       providerModelCatalog: providerModelCatalog as never,
       management,
       wakeup,
@@ -496,6 +557,14 @@ describe('runtime MCP facade', () => {
       'list_peers',
       'read_peer',
       'peer_diagnostics',
+      'list_cursor_sessions',
+      'discover_cursor_sessions',
+      'list_kiro_sessions',
+      'discover_kiro_sessions',
+      'list_auggie_sessions',
+      'discover_auggie_sessions',
+      'list_opencode_sessions',
+      'discover_opencode_sessions',
       'providers_config',
       'provider_tools',
       'provider_models',
@@ -2091,6 +2160,264 @@ describe('runtime MCP facade', () => {
     expect(resumed.result.structuredContent.managementDiagnosticsPath).toBe(
       '/management/diagnostics',
     );
+  });
+
+  it('exposes native session inspection and discovery tools for supported CLI providers', async () => {
+    const app = createTestApp();
+
+    const listCursorResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 31.58,
+        method: 'tools/call',
+        params: {
+          name: 'list_cursor_sessions',
+          arguments: {
+            cwd: join(rootDir, 'cursor-workspace'),
+          },
+        },
+      }),
+    });
+    expect(listCursorResponse.status).toBe(200);
+    const listCursor = await listCursorResponse.json() as {
+      result: {
+        structuredContent: {
+          count: number;
+          sessionsPath: string;
+          sessions: Array<{
+            providerSessionId: string;
+          }>;
+        };
+      };
+    };
+    expect(listCursor.result.structuredContent.count).toBe(1);
+    expect(listCursor.result.structuredContent.sessionsPath).toBe(
+      `/cursor/sessions?cwd=${encodeURIComponent(join(rootDir, 'cursor-workspace'))}`,
+    );
+    expect(listCursor.result.structuredContent.sessions[0]?.providerSessionId).toBe(
+      'cursor-native-1',
+    );
+
+    const discoverCursorResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 31.59,
+        method: 'tools/call',
+        params: {
+          name: 'discover_cursor_sessions',
+          arguments: {
+            cwd: join(rootDir, 'cursor-workspace'),
+            group: 'native-imports',
+            startIfNeeded: true,
+          },
+        },
+      }),
+    });
+    expect(discoverCursorResponse.status).toBe(200);
+    const discoverCursor = await discoverCursorResponse.json() as {
+      result: {
+        structuredContent: {
+          responseStatus: number;
+          count: number;
+          discoverPath: string;
+          sessions: Array<{
+            providerName: string;
+            group?: string;
+          }>;
+        };
+      };
+    };
+    expect(discoverCursor.result.structuredContent.responseStatus).toBe(200);
+    expect(discoverCursor.result.structuredContent.count).toBe(1);
+    expect(discoverCursor.result.structuredContent.discoverPath).toBe('/cursor/sessions/discover');
+    expect(discoverCursor.result.structuredContent.sessions[0]).toEqual(expect.objectContaining({
+      providerName: 'cursor',
+      group: 'native-imports',
+    }));
+
+    const listKiroResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 31.6,
+        method: 'tools/call',
+        params: {
+          name: 'list_kiro_sessions',
+          arguments: {},
+        },
+      }),
+    });
+    expect(listKiroResponse.status).toBe(200);
+    const listKiro = await listKiroResponse.json() as {
+      result: {
+        structuredContent: {
+          count: number;
+          sessions: Array<{
+            providerSessionId: string;
+          }>;
+        };
+      };
+    };
+    expect(listKiro.result.structuredContent.count).toBe(1);
+    expect(listKiro.result.structuredContent.sessions[0]?.providerSessionId).toBe('kiro-native-1');
+
+    const discoverKiroResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 31.61,
+        method: 'tools/call',
+        params: {
+          name: 'discover_kiro_sessions',
+          arguments: {
+            startIfNeeded: true,
+          },
+        },
+      }),
+    });
+    expect(discoverKiroResponse.status).toBe(200);
+    const discoverKiro = await discoverKiroResponse.json() as {
+      result: {
+        structuredContent: {
+          count: number;
+          sessions: Array<{
+            providerName: string;
+          }>;
+        };
+      };
+    };
+    expect(discoverKiro.result.structuredContent.count).toBe(1);
+    expect(discoverKiro.result.structuredContent.sessions[0]?.providerName).toBe('kiro');
+
+    const listAuggieResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 31.62,
+        method: 'tools/call',
+        params: {
+          name: 'list_auggie_sessions',
+          arguments: {},
+        },
+      }),
+    });
+    expect(listAuggieResponse.status).toBe(200);
+    const listAuggie = await listAuggieResponse.json() as {
+      result: {
+        structuredContent: {
+          count: number;
+          sessions: Array<{
+            providerSessionId: string;
+          }>;
+        };
+      };
+    };
+    expect(listAuggie.result.structuredContent.count).toBe(1);
+    expect(listAuggie.result.structuredContent.sessions[0]?.providerSessionId).toBe(
+      'auggie-native-1',
+    );
+
+    const discoverAuggieResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 31.63,
+        method: 'tools/call',
+        params: {
+          name: 'discover_auggie_sessions',
+          arguments: {
+            group: 'native-imports',
+          },
+        },
+      }),
+    });
+    expect(discoverAuggieResponse.status).toBe(200);
+    const discoverAuggie = await discoverAuggieResponse.json() as {
+      result: {
+        structuredContent: {
+          count: number;
+          sessions: Array<{
+            providerName: string;
+            group?: string;
+          }>;
+        };
+      };
+    };
+    expect(discoverAuggie.result.structuredContent.count).toBe(1);
+    expect(discoverAuggie.result.structuredContent.sessions[0]).toEqual(expect.objectContaining({
+      providerName: 'auggie',
+      group: 'native-imports',
+    }));
+
+    const listOpencodeResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 31.64,
+        method: 'tools/call',
+        params: {
+          name: 'list_opencode_sessions',
+          arguments: {},
+        },
+      }),
+    });
+    expect(listOpencodeResponse.status).toBe(200);
+    const listOpencode = await listOpencodeResponse.json() as {
+      result: {
+        structuredContent: {
+          count: number;
+          sessions: Array<{
+            providerSessionId: string;
+          }>;
+        };
+      };
+    };
+    expect(listOpencode.result.structuredContent.count).toBe(1);
+    expect(listOpencode.result.structuredContent.sessions[0]?.providerSessionId).toBe(
+      'opencode-native-1',
+    );
+
+    const discoverOpencodeResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 31.65,
+        method: 'tools/call',
+        params: {
+          name: 'discover_opencode_sessions',
+          arguments: {
+            group: 'native-imports',
+          },
+        },
+      }),
+    });
+    expect(discoverOpencodeResponse.status).toBe(200);
+    const discoverOpencode = await discoverOpencodeResponse.json() as {
+      result: {
+        structuredContent: {
+          count: number;
+          sessions: Array<{
+            providerName: string;
+            group?: string;
+          }>;
+        };
+      };
+    };
+    expect(discoverOpencode.result.structuredContent.count).toBe(1);
+    expect(discoverOpencode.result.structuredContent.sessions[0]).toEqual(expect.objectContaining({
+      providerName: 'opencode',
+      group: 'native-imports',
+    }));
   });
 
   it('exposes wakeup inspection tools aligned with the existing wakeup read routes', async () => {

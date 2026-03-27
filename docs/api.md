@@ -112,6 +112,14 @@ Current curated tools:
 - `list_peers`
 - `read_peer`
 - `peer_diagnostics`
+- `list_cursor_sessions`
+- `discover_cursor_sessions`
+- `list_kiro_sessions`
+- `discover_kiro_sessions`
+- `list_auggie_sessions`
+- `discover_auggie_sessions`
+- `list_opencode_sessions`
+- `discover_opencode_sessions`
 - `providers_config`
 - `provider_tools`
 - `provider_models`
@@ -235,6 +243,13 @@ same runtime-owned discovery and peer diagnostics surfaces as
 peer list/detail/diagnostics reads, so MCP hosts can inspect LAN discovery
 state, bounded peer registry entries, and peer guardrail/network posture data
 without inventing MCP-only peer contracts.
+`list_cursor_sessions`, `discover_cursor_sessions`, `list_kiro_sessions`,
+`discover_kiro_sessions`, `list_auggie_sessions`, `discover_auggie_sessions`,
+`list_opencode_sessions`, and `discover_opencode_sessions` reuse the same
+runtime-owned native-session inspection/import seams as the existing
+`GET /{provider}/sessions` and `POST /{provider}/sessions/discover` routes, so
+MCP hosts can inventory or import runtime-local native sessions for supported
+CLI providers without shelling out to a second discovery protocol.
 `providers_config` reuses the same provider topology/read-model surface as
 `GET /providers/config`, so MCP hosts can inspect configured backends,
 instance-level runtime/tooling/continuity summaries, model-catalog snapshots,
