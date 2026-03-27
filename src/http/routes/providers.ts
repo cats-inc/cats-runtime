@@ -23,6 +23,7 @@ providerRoutes.get('/providers/config', (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const providerCatalog = listProviderCatalog(ctx.config);
   const compatibility = getProviderCompatibilityService(ctx);
+  const executionStrategies = ctx.apiBackend?.inspectExecutionStrategies();
 
   const providers = Object.fromEntries(
     listConfiguredProviders(ctx.config).flatMap((providerName) => {
@@ -85,7 +86,10 @@ providerRoutes.get('/providers/config', (c) => {
     }),
   );
 
-  return c.json({ providers });
+  return c.json({
+    providers,
+    ...(executionStrategies ? { executionStrategies } : {}),
+  });
 });
 
 providerRoutes.get('/providers/:provider/models', async (c) => {

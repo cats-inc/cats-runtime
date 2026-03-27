@@ -854,9 +854,10 @@ already exist.
   compatibility-fallback to `simple_tool_call`
 - runtime session state owns strategy-local summaries; product task records stay
   outside the runtime boundary
-- `GET /diagnostics/runtime` and `GET /diagnostics/health` now expose a
-  runtime-owned strategy catalog/summary so hosts can inspect which strategy
-  families are actually implemented versus compatibility-fallback only
+- `GET /diagnostics/runtime`, `GET /diagnostics/health`, and
+  `GET /providers/config` now expose a runtime-owned strategy catalog/summary
+  so hosts can inspect which strategy families are actually implemented versus
+  compatibility-fallback only
 - those diagnostics now also expose additive per-family `requestSupport` and
   machine-readable `contextSchema` metadata so hosts can see which
   `acceptanceCriteria` / `strategyContext` inputs the runtime actually uses

@@ -2557,6 +2557,19 @@ or other clients that need to offer provider-instance selection. Each instance
 entry includes its backend kind (`cli`, `api`, `local`, or `agent`) plus any
 transport or runtime metadata that applies to that backend.
 
+The same response now also includes additive top-level `executionStrategies`
+metadata. This reuses the runtime-owned strategy catalog already exposed by
+`GET /diagnostics/runtime` and `GET /diagnostics/health`, so hosts can inspect
+implemented versus compatibility-fallback strategy families without making a
+second diagnostics request. The read model includes:
+
+- `summary`: total family counts, supported versus fallback-only counts, and
+  the compatibility default
+- `strategies[*].requestSupport`: whether a family accepts explicit
+  `requestedStrategy`, `acceptanceCriteria`, and `strategyContext`
+- `strategies[*].contextSchema`: machine-readable bounded numeric keys and
+  default sources for `strategyContext`
+
 Each instance entry also exposes additive `tooling` metadata:
 
 - `source`: `runtime_local`, `provider_native`, or `provider_managed`

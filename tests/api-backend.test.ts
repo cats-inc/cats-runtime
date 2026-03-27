@@ -114,7 +114,7 @@ describe('API backend integration', () => {
     try {
       const response = await runtime.app.request('/providers/config');
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({
+      expect(await response.json()).toEqual(expect.objectContaining({
         providers: {
           claude: {
             defaultInstance: 'sonnet',
@@ -286,7 +286,15 @@ describe('API backend integration', () => {
             ],
           },
         },
-      });
+        executionStrategies: expect.objectContaining({
+          summary: expect.objectContaining({
+            totalFamilies: 7,
+            supportedFamilies: 6,
+            fallbackOnlyFamilies: 1,
+            compatibilityDefault: 'simple_tool_call',
+          }),
+        }),
+      }));
     } finally {
       await runtime.close();
       cleanup();

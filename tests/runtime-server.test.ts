@@ -1552,7 +1552,7 @@ backends:
     }, {}, async (runtime) => {
       const response = await runtime.app.request('/providers/config');
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({
+      expect(await response.json()).toEqual(expect.objectContaining({
         providers: {
           cursor: {
             defaultInstance: 'ubuntu',
@@ -1637,7 +1637,15 @@ backends:
             ],
           },
         },
-      });
+        executionStrategies: expect.objectContaining({
+          summary: expect.objectContaining({
+            totalFamilies: 7,
+            supportedFamilies: 6,
+            fallbackOnlyFamilies: 1,
+            compatibilityDefault: 'simple_tool_call',
+          }),
+        }),
+      }));
     });
   });
 
@@ -1690,7 +1698,23 @@ backends:
           defaultBackend: string;
           instances: Array<Record<string, unknown>>;
         }>;
+        executionStrategies?: {
+          summary: {
+            totalFamilies: number;
+            supportedFamilies: number;
+            fallbackOnlyFamilies: number;
+            compatibilityDefault: string;
+          };
+        };
       };
+      expect(providerPayload.executionStrategies).toEqual(expect.objectContaining({
+        summary: expect.objectContaining({
+          totalFamilies: 7,
+          supportedFamilies: 6,
+          fallbackOnlyFamilies: 1,
+          compatibilityDefault: 'simple_tool_call',
+        }),
+      }));
       expect(providerPayload.providers.goose).toEqual({
         defaultInstance: 'default',
         defaultBackend: 'cli',
@@ -1823,7 +1847,7 @@ providers:
     try {
       const catalogResponse = await runtime.app.request('/providers/config');
       expect(catalogResponse.status).toBe(200);
-      expect(await catalogResponse.json()).toEqual({
+      expect(await catalogResponse.json()).toEqual(expect.objectContaining({
         providers: {
           claude: {
             defaultInstance: 'default',
@@ -1859,7 +1883,15 @@ providers:
             ],
           },
         },
-      });
+        executionStrategies: expect.objectContaining({
+          summary: expect.objectContaining({
+            totalFamilies: 7,
+            supportedFamilies: 6,
+            fallbackOnlyFamilies: 1,
+            compatibilityDefault: 'simple_tool_call',
+          }),
+        }),
+      }));
 
       const response = await runtime.app.request('/sessions', {
         method: 'POST',

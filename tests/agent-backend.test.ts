@@ -346,7 +346,7 @@ describe('agent backend integration', () => {
     try {
       const providerResponse = await runtime.app.request('/providers/config');
       expect(providerResponse.status).toBe(200);
-      expect(await providerResponse.json()).toEqual({
+      expect(await providerResponse.json()).toEqual(expect.objectContaining({
         providers: {
           openclaw: {
             defaultInstance: 'gateway',
@@ -412,7 +412,15 @@ describe('agent backend integration', () => {
             })],
           },
         },
-      });
+        executionStrategies: expect.objectContaining({
+          summary: expect.objectContaining({
+            totalFamilies: 7,
+            supportedFamilies: 6,
+            fallbackOnlyFamilies: 1,
+            compatibilityDefault: 'simple_tool_call',
+          }),
+        }),
+      }));
 
       const createResponse = await runtime.app.request('/sessions', {
         method: 'POST',
@@ -1250,7 +1258,7 @@ describe('agent backend integration', () => {
     try {
       const providerResponse = await runtime.app.request('/providers/config');
       expect(providerResponse.status).toBe(200);
-      expect(await providerResponse.json()).toEqual({
+      expect(await providerResponse.json()).toEqual(expect.objectContaining({
         providers: {
           claude: {
             defaultInstance: 'sdk',
@@ -1315,7 +1323,15 @@ describe('agent backend integration', () => {
             })],
           },
         },
-      });
+        executionStrategies: expect.objectContaining({
+          summary: expect.objectContaining({
+            totalFamilies: 7,
+            supportedFamilies: 6,
+            fallbackOnlyFamilies: 1,
+            compatibilityDefault: 'simple_tool_call',
+          }),
+        }),
+      }));
 
       const createResponse = await runtime.app.request('/sessions', {
         method: 'POST',
