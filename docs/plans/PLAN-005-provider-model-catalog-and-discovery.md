@@ -189,6 +189,7 @@ slice.
 | 2026-03-27 | Follow-through hardening landed: HTTP-backed remote model discovery now has explicit timeout/abort degradation, and later refresh failures reuse the last cached dynamic catalog with additive `cache.stale` metadata instead of immediately dropping to config/static fallback |
 | 2026-03-27 | Manual refresh follow-through landed: `GET /providers/{provider}/models` and `/models/advanced` now accept additive `refresh=1|true` cache-bypass semantics so hosts can re-read dynamic catalogs after model/runtime changes without waiting for TTL expiry |
 | 2026-03-27 | Aggregate follow-through landed: `GET /providers/models` now returns one runtime-owned catalog per configured provider default target, reusing the same service and refresh semantics instead of forcing hosts to fan out one request per provider |
+| 2026-03-27 | Provider-topology follow-through landed: `/providers/config` instance entries now expose a bounded best-known `modelCatalog` summary that reuses cached dynamic catalogs when available and otherwise stays on config/static truth, so selectors can inspect model availability without forcing live discovery fan-out |
 
 ---
 

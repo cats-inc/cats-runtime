@@ -1963,6 +1963,18 @@ backends:
                   remoteCancel: false,
                 },
                 metering: expectIdleMeteringSummary(),
+                modelCatalog: {
+                  source: 'static',
+                  defaultModel: 'gpt-5.4',
+                  modelCount: 3,
+                  warnings: [],
+                  statusCounts: {
+                    configured: 0,
+                    available: 0,
+                    running: 0,
+                    unknown: 3,
+                  },
+                },
                 tooling: {
                   source: 'provider_native',
                   discoverable: false,
@@ -2013,6 +2025,18 @@ backends:
                   remoteCancel: false,
                 },
                 metering: expectIdleMeteringSummary(),
+                modelCatalog: {
+                  source: 'static',
+                  defaultModel: 'gpt-5.4',
+                  modelCount: 3,
+                  warnings: [],
+                  statusCounts: {
+                    configured: 0,
+                    available: 0,
+                    running: 0,
+                    unknown: 3,
+                  },
+                },
                 tooling: {
                   source: 'provider_native',
                   discoverable: false,
@@ -2201,6 +2225,18 @@ backends:
             remoteCancel: false,
           },
           metering: expectIdleMeteringSummary(),
+          modelCatalog: {
+            source: 'static',
+            defaultModel: 'anthropic/claude-sonnet-4-5',
+            modelCount: 3,
+            warnings: [],
+            statusCounts: {
+              configured: 1,
+              available: 0,
+              running: 0,
+              unknown: 2,
+            },
+          },
           tooling: {
             source: 'provider_native',
             discoverable: false,
@@ -2348,6 +2384,18 @@ providers:
                   remoteCancel: false,
                 },
                 metering: expectIdleMeteringSummary(),
+                modelCatalog: {
+                  source: 'static',
+                  defaultModel: 'claude-opus-4-6',
+                  modelCount: 3,
+                  warnings: [],
+                  statusCounts: {
+                    configured: 0,
+                    available: 0,
+                    running: 0,
+                    unknown: 3,
+                  },
+                },
                 tooling: {
                   source: 'provider_native',
                   discoverable: false,

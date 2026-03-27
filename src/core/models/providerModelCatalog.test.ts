@@ -181,6 +181,57 @@ describe('ProviderModelCatalogService', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('inspects cached dynamic catalog summaries without triggering another probe', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.endsWith('/api/tags')) {
+        return jsonResponse({
+          models: [
+            { name: 'deepseek-r1:14b' },
+          ],
+        });
+      }
+
+      if (url.endsWith('/api/ps')) {
+        return jsonResponse({
+          models: [
+            { name: 'deepseek-r1:14b' },
+          ],
+        });
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    const service = new ProviderModelCatalogService(createCatalogConfig() as never, {
+      fetch: fetchMock,
+      ttlMs: 60_000,
+    });
+
+    await service.getCatalog('ollama');
+
+    expect(service.inspectSummary('ollama')).toEqual({
+      source: 'dynamic',
+      defaultModel: 'qwen3:latest',
+      modelCount: 2,
+      warnings: [
+        "Configured default model 'qwen3:latest' was not returned by dynamic discovery; added as configured fallback.",
+      ],
+      statusCounts: {
+        configured: 1,
+        available: 0,
+        running: 1,
+        unknown: 0,
+      },
+      cache: {
+        servedFromCache: true,
+        cachedAt: expect.any(String),
+        ttlSec: 60,
+      },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps dynamic Ollama discovery when the running-model probe fails', async () => {
     const fetchMock = vi.fn<typeof fetch>(async (input) => {
       const url = typeof input === 'string' ? input : input.url;
@@ -593,6 +644,58 @@ describe('ProviderModelCatalogService', () => {
       ],
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('inspects bounded API model summaries without triggering remote discovery', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => {
+      throw new Error('inspectSummary should not trigger remote discovery');
+    });
+
+    const config = {
+      ...createCatalogConfig(),
+      providerDefaultTargets: {
+        codex: { backend: 'api', instance: 'main' },
+      },
+      remoteProviderCatalog: {
+        api: {
+          codex: {
+            main: {
+              id: 'main',
+              providerName: 'codex',
+              backend: 'api',
+              transport: 'openai',
+              apiKeyEnv: 'OPENAI_API_KEY',
+              baseUrl: 'https://api.openai.test',
+              model: 'gpt-5.4',
+            },
+          },
+        },
+        local: createCatalogConfig().remoteProviderCatalog.local,
+        agent: createCatalogConfig().remoteProviderCatalog.agent,
+      },
+    } as const;
+
+    const service = new ProviderModelCatalogService(config as never, {
+      fetch: fetchMock,
+      env: {
+        OPENAI_API_KEY: 'test-openai-key',
+      },
+      ttlMs: 60_000,
+    });
+
+    expect(service.inspectSummary('codex')).toEqual({
+      source: 'config',
+      defaultModel: 'gpt-5.4',
+      modelCount: 1,
+      warnings: [],
+      statusCounts: {
+        configured: 1,
+        available: 0,
+        running: 0,
+        unknown: 0,
+      },
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('loads paginated Gemini model catalogs through the shared runtime catalog service', async () => {

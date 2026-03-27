@@ -53,6 +53,22 @@ export interface ProviderModelCatalogResult {
   warnings: string[];
 }
 
+export interface ProviderModelCatalogStatusCounts {
+  configured: number;
+  available: number;
+  running: number;
+  unknown: number;
+}
+
+export interface ProviderModelCatalogSummary {
+  source: ProviderModelCatalogResult['source'];
+  defaultModel: string | null;
+  modelCount: number;
+  warnings: string[];
+  statusCounts: ProviderModelCatalogStatusCounts;
+  cache?: ProviderModelCatalogCacheMetadata;
+}
+
 interface ProviderModelCatalogServiceOptions {
   agentBackend?: AgentBackendManager;
   fetch?: typeof fetch;
@@ -316,6 +332,47 @@ function dedupeModels(models: ProviderModelCatalogEntry[]): ProviderModelCatalog
   return Array.from(deduped.values());
 }
 
+function countModelStatuses(models: ProviderModelCatalogEntry[]): ProviderModelCatalogStatusCounts {
+  const counts: ProviderModelCatalogStatusCounts = {
+    configured: 0,
+    available: 0,
+    running: 0,
+    unknown: 0,
+  };
+
+  for (const model of models) {
+    switch (model.status) {
+      case 'configured':
+        counts.configured += 1;
+        break;
+      case 'available':
+        counts.available += 1;
+        break;
+      case 'running':
+        counts.running += 1;
+        break;
+      default:
+        counts.unknown += 1;
+        break;
+    }
+  }
+
+  return counts;
+}
+
+export function summarizeProviderModelCatalog(
+  catalog: ProviderModelCatalogResult,
+): ProviderModelCatalogSummary {
+  return {
+    source: catalog.source,
+    defaultModel: catalog.defaultModel,
+    modelCount: catalog.models.length,
+    warnings: [...catalog.warnings],
+    statusCounts: countModelStatuses(catalog.models),
+    ...(catalog.cache ? { cache: catalog.cache } : {}),
+  };
+}
+
 export function getStaticProviderModels(
   target: Pick<ProviderTargetDescriptor, 'providerName' | 'cliInstance'>,
 ): ProviderModelCatalogEntry[] {
@@ -380,6 +437,37 @@ export class ProviderModelCatalogService {
     return knowledge.catalog;
   }
 
+  inspectSummary(
+    providerName: string,
+    requestedInstance?: string,
+  ): ProviderModelCatalogSummary {
+    const target = resolveProviderTarget(this.config, providerName, requestedInstance);
+    return this.inspectSummaryForTarget(target);
+  }
+
+  inspectSummaryForTarget(
+    target: ProviderTargetDescriptor,
+  ): ProviderModelCatalogSummary {
+    const defaultModel = resolveDefaultModel(target, this.env);
+    const warnings: string[] = [];
+    const cachedDynamic = this.getCachedDynamicCatalog(target, defaultModel, warnings);
+    if (cachedDynamic) {
+      return summarizeProviderModelCatalog(cachedDynamic);
+    }
+
+    const discoverySkipWarning = this.getDynamicDiscoverySkipWarning(target);
+    if (discoverySkipWarning) {
+      warnings.push(discoverySkipWarning);
+    }
+
+    const configCatalog = this.tryConfigCatalog(target, defaultModel, warnings);
+    if (configCatalog) {
+      return summarizeProviderModelCatalog(configCatalog);
+    }
+
+    return summarizeProviderModelCatalog(this.buildStaticCatalog(target, defaultModel, warnings));
+  }
+
   private async getCatalogForTarget(
     target: ProviderTargetDescriptor,
     options: ProviderModelCatalogRequestOptions = {},
@@ -401,6 +489,26 @@ export class ProviderModelCatalogService {
 
   private cacheKey(target: ProviderTargetDescriptor): string {
     return `${target.providerName}:${target.backend}:${target.instanceId}`;
+  }
+
+  private getCachedDynamicCatalog(
+    target: ProviderTargetDescriptor,
+    defaultModel: string | null,
+    warnings: string[],
+  ): ProviderModelCatalogResult | null {
+    const cached = this.dynamicCache.get(this.cacheKey(target));
+    if (!cached) {
+      return null;
+    }
+
+    const stale = Date.now() - cached.cachedAt > this.ttlMs;
+    return this.buildCatalog(target, {
+      defaultModel,
+      source: 'dynamic',
+      cache: buildCacheMetadata(this.ttlMs, cached.cachedAt, true, stale),
+      models: withDefaultModel(cached.models, defaultModel).models,
+      warnings: [...warnings, ...cached.warnings],
+    });
   }
 
   private async tryDynamicCatalog(

@@ -2732,6 +2732,29 @@ This reuses the same runtime-owned metering service behind
 selector/provider-topology reads can show temporary cooldown pressure without a
 second diagnostics request.
 
+Each instance entry now also exposes additive compact `modelCatalog` summary
+metadata:
+
+- `source`: best-known catalog source for that target (`dynamic`, `config`, or
+  `static`)
+- `defaultModel`: resolved default-model hint after runtime-owned active-config
+  and configured-model fallback
+- `modelCount`: bounded count of entries in the best-known catalog
+- `warnings`: additive discovery/auth/fallback warnings when the runtime had to
+  stay on config/static truth
+- `statusCounts`: bounded counts for `configured`, `available`, `running`, and
+  `unknown` entries
+- optional `cache`: only when a retained dynamic catalog is already cached for
+  that target
+
+This `modelCatalog` summary is intentionally bounded and does not force a new
+live discovery round just because a caller asked for `/providers/config`. The
+runtime reuses an already cached dynamic catalog when one exists, otherwise it
+falls back to best-known config/static truth. Use `GET /providers/models`,
+`GET /providers/{provider}/models`, or `GET /providers/{provider}/models/advanced`
+when the caller explicitly wants the full catalog payload and optional refresh
+semantics.
+
 Each instance entry also exposes additive `tooling` metadata:
 
 - `source`: `runtime_local`, `provider_native`, or `provider_managed`

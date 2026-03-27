@@ -150,6 +150,20 @@ describe('API backend integration', () => {
                   remoteCancel: false,
                 },
                 metering: expectIdleMeteringSummary(),
+                modelCatalog: {
+                  source: 'config',
+                  defaultModel: 'claude-sonnet-4-6',
+                  modelCount: 1,
+                  warnings: [
+                    "Dynamic model discovery skipped for claude/api/sonnet: required x-api-key credentials are not configured via 'ANTHROPIC_API_KEY'.",
+                  ],
+                  statusCounts: {
+                    configured: 1,
+                    available: 0,
+                    running: 0,
+                    unknown: 0,
+                  },
+                },
                 tooling: {
                   source: 'runtime_local',
                   discoverable: true,
@@ -188,6 +202,20 @@ describe('API backend integration', () => {
                   remoteCancel: false,
                 },
                 metering: expectIdleMeteringSummary(),
+                modelCatalog: {
+                  source: 'config',
+                  defaultModel: 'claude-opus-4-6',
+                  modelCount: 1,
+                  warnings: [
+                    "Dynamic model discovery skipped for claude/api/opus: required x-api-key credentials are not configured via 'ANTHROPIC_API_KEY'.",
+                  ],
+                  statusCounts: {
+                    configured: 1,
+                    available: 0,
+                    running: 0,
+                    unknown: 0,
+                  },
+                },
                 tooling: {
                   source: 'runtime_local',
                   discoverable: true,
@@ -232,6 +260,20 @@ describe('API backend integration', () => {
                   remoteCancel: false,
                 },
                 metering: expectIdleMeteringSummary(),
+                modelCatalog: {
+                  source: 'config',
+                  defaultModel: 'gpt-5',
+                  modelCount: 1,
+                  warnings: [
+                    "Dynamic model discovery skipped for codex/api/main: required bearer credentials are not configured via 'OPENAI_API_KEY'.",
+                  ],
+                  statusCounts: {
+                    configured: 1,
+                    available: 0,
+                    running: 0,
+                    unknown: 0,
+                  },
+                },
                 tooling: {
                   source: 'runtime_local',
                   discoverable: true,
@@ -276,6 +318,20 @@ describe('API backend integration', () => {
                   remoteCancel: false,
                 },
                 metering: expectIdleMeteringSummary(),
+                modelCatalog: {
+                  source: 'config',
+                  defaultModel: 'gemini-2.5-pro',
+                  modelCount: 1,
+                  warnings: [
+                    "Dynamic model discovery skipped for gemini/api/pro: required x-goog-api-key credentials are not configured via 'GEMINI_API_KEY'.",
+                  ],
+                  statusCounts: {
+                    configured: 1,
+                    available: 0,
+                    running: 0,
+                    unknown: 0,
+                  },
+                },
                 tooling: {
                   source: 'runtime_local',
                   discoverable: true,
@@ -320,6 +376,18 @@ describe('API backend integration', () => {
                   remoteCancel: false,
                 },
                 metering: expectIdleMeteringSummary(),
+                modelCatalog: {
+                  source: 'config',
+                  defaultModel: 'qwen3:latest',
+                  modelCount: 1,
+                  warnings: [],
+                  statusCounts: {
+                    configured: 1,
+                    available: 0,
+                    running: 0,
+                    unknown: 0,
+                  },
+                },
                 tooling: {
                   source: 'runtime_local',
                   discoverable: true,

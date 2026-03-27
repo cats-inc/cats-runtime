@@ -650,6 +650,9 @@ tightening and cleanup steps are intentionally deferred.
 - `GET /providers/models` now exists as an additive aggregate default-target
   read surface so hosts can fetch one runtime-owned catalog per configured
   provider without doing their own per-provider fan-out
+- `/providers/config` instance entries now also expose a bounded best-known
+  `modelCatalog` summary so selectors/operator tooling can read source/default/
+  running-state counts without forcing a live multi-provider discovery round
 - `GET /providers/:provider/models/advanced` exists as the additive advanced
   catalog surface
 - session create/read contracts now support additive `modelSelection` and

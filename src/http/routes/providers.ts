@@ -99,6 +99,10 @@ providerRoutes.get('/providers/config', async (c) => {
               instance: instance.instanceId,
             })
           : null;
+        const modelCatalog = ctx.providerModelCatalog.inspectSummary(
+          instance.providerName,
+          `${instance.backend}/${instance.instanceId}`,
+        );
         const metering = getRuntimeMeteringService(ctx).buildProviderTargetSnapshot({
           provider: instance.providerName,
           instance: instance.instanceId,
@@ -123,6 +127,7 @@ providerRoutes.get('/providers/config', async (c) => {
           ...(agentRuntime ? { agentRuntime } : {}),
           continuity,
           metering: metering.summary,
+          modelCatalog,
           tooling: buildProviderToolingSummary(instance, { agentRuntime }),
           install: instance.backend === 'cli' && instance.cliInstance
             ? buildProviderInstallCatalogView(

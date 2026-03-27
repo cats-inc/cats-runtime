@@ -635,6 +635,13 @@ Agent-backed instances now also expose additive `agentRuntime` metadata so the
 selector and operator tooling can distinguish gateway-vs-bridge targets, read
 their resolved endpoint/probe shape, and see whether remote cancel is supported
 without learning adapter internals.
+The same `/providers/config` instance entries now also expose a bounded
+`modelCatalog` summary (`source`, `defaultModel`, `modelCount`, `warnings`,
+`statusCounts`, and optional cached-dynamic metadata) so selectors can show the
+best-known model availability truth without forcing a full live model-catalog
+fan-out on page load. When the UI or operator explicitly needs the full catalog
+or a manual refresh, use `GET /providers/models`,
+`GET /providers/{provider}/models`, or `GET /providers/{provider}/models/advanced`.
 
 When a degraded or failed CLI compatibility assessment captured redacted
 evidence under `<dataDir>/compatibility/<provider>/`, the same runtime CLI now
