@@ -1,13 +1,18 @@
+import { join } from 'node:path';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRuntimeApp as createApp } from './app.js';
 import { createRuntimeStartupState } from '../startup.js';
 import type { CliRuntimeConfig } from '../backends/cli/config.js';
 import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
 import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
+import { getRuntimeResolvedPaths } from '../core/config.js';
 import { ProviderCompatibilityService } from '../core/compatibility/ProviderCompatibilityService.js';
+import {
+  ProviderEvolutionProbeService,
+  PROVIDER_EVOLUTION_PROBE_PROFILES,
+} from '../core/compatibility/providerEvolutionProbe.js';
 import { ProviderModelCatalogService } from '../core/models/providerModelCatalog.js';
 import type { ProviderInstallCheckRunner } from '../core/provider-install/ProviderInstallCheckRunner.js';
 
@@ -273,6 +278,119 @@ describe('provider diagnostics HTTP contract', () => {
         stale: false,
       }),
       attentionCodes: [],
+    }));
+  });
+
+  it('surfaces the latest provider-evolution probe artifact summary', async () => {
+    const config = makeConfig();
+    let now = Date.parse('2026-03-27T00:00:00.000Z');
+    const probeService = new ProviderEvolutionProbeService({
+      rootDir: join(
+        getRuntimeResolvedPaths(config).compatibilityEvidenceDir,
+        'provider-evolution',
+      ),
+      now: () => now,
+    });
+
+    const request = {
+      target: {
+        provider: 'claude',
+        instance: 'default',
+        parserId: 'claude-stream-json',
+        probeProfile: 'manual_text',
+        transport: 'cli' as const,
+        version: '1.2.3',
+      },
+      profile: PROVIDER_EVOLUTION_PROBE_PROFILES.manual_text,
+    };
+
+    await probeService.run({
+      ...request,
+      run: async ({ observer }) => {
+        observer.recordNormalized({
+          rawEventType: 'assistant',
+          events: { type: 'text', text: 'alpha' },
+        });
+        observer.recordNormalized({
+          rawEventType: 'result',
+          events: { type: 'result' },
+        });
+        return {
+          status: 'completed' as const,
+          turnsCompleted: 1,
+          emittedEventCount: 2,
+        };
+      },
+    });
+
+    now += 1000;
+
+    const current = await probeService.run({
+      ...request,
+      run: async ({ observer }) => {
+        observer.recordNormalized({
+          rawEventType: 'assistant',
+          events: { type: 'text', text: 'alpha' },
+        });
+        observer.recordNormalized({
+          rawEventType: 'result',
+          events: { type: 'result' },
+        });
+        observer.recordUnknown({
+          rawEventType: 'future.event',
+          rawSample: { type: 'future.event' },
+        });
+        return {
+          status: 'completed' as const,
+          turnsCompleted: 1,
+          emittedEventCount: 3,
+        };
+      },
+    });
+
+    const app = createTestApp(config);
+    const response = await app.request(
+      '/diagnostics/providers?provider=claude&backend=cli&instance=default',
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      providers: [
+        expect.objectContaining({
+          provider: 'claude',
+          backend: 'cli',
+          instance: 'default',
+          providerEvolution: {
+            latestArtifact: expect.objectContaining({
+              artifactId: current.artifact.id,
+              probeProfile: 'manual_text',
+              transport: 'cli',
+              version: '1.2.3',
+              relativePath: expect.stringContaining('claude'),
+              capabilitySnapshot: expect.objectContaining({
+                incrementalText: expect.objectContaining({
+                  observed: true,
+                  count: 1,
+                }),
+                finalResult: expect.objectContaining({
+                  observed: true,
+                  count: 1,
+                }),
+              }),
+              compare: expect.objectContaining({
+                addedEventTypeCount: 1,
+                removedEventTypeCount: 0,
+                frequencyDropCount: 0,
+                schemaChangeCount: 0,
+                semanticDriftSuspected: false,
+              }),
+              review: expect.objectContaining({
+                classifications: ['upgrade'],
+              }),
+            }),
+          },
+        }),
+      ],
     }));
   });
 

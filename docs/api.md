@@ -588,6 +588,22 @@ re-filtering the full response client-side. The response now also includes:
 Invalid `backend` values or malformed boolean filters such as
 `defaultOnly=maybe` return `400` with a client-safe `error` string.
 
+When a retained manual provider-evolution artifact exists for a target,
+`GET /diagnostics/providers` also adds `providerEvolution.latestArtifact`.
+This is a bounded read model over the latest retained artifact, not a new
+probe route. The summary includes:
+
+- `artifactId`
+- `capturedAt`
+- `probeProfile`
+- `transport`
+- optional `version`
+- `execution` summary
+- `capabilitySnapshot`
+- optional `compare` counts against the latest matching baseline
+- `review` classifications/highlights
+- `relativePath`
+
 `GET /diagnostics/health` now also includes a compact top-level `metering`
 summary so hosts can poll one route for both provider readiness and
 execution-guardrail state. It also includes a compact top-level `wakeups`

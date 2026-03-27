@@ -313,6 +313,10 @@ Diagnostics rules:
   the runtime-wide wakeup snapshot under `runtime.wakeups`
 - `GET /diagnostics/providers` exposes runtime-owned provider availability
   checks plus cached CLI compatibility summaries for host UX and setup flows
+- when a retained manual provider-evolution artifact exists for a target, the
+  same diagnostics surface also exposes additive
+  `providerEvolution.latestArtifact` summary data so operators can inspect the
+  latest capability snapshot/review without rerunning the probe
 - agent targets now also expose additive `config.agentRuntime` metadata plus an
   `agent_runtime_contract` check so operators can read gateway-vs-bridge
   transport, auth, and continuity semantics without opening a session

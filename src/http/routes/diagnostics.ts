@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { Hono } from 'hono';
 import type { BackendKind, RemoteProviderInstanceConfig } from '../../backends/cli/config.js';
 import { inspectAgentTarget } from '../../backends/agent/inspection.js';
@@ -26,6 +27,10 @@ import {
 import { inspectProviderActiveConfig } from '../../core/providerActiveConfig.js';
 import { toCompatibilitySummaryView } from '../../core/compatibility/ProviderCompatibilityService.js';
 import type { CompatibilitySummaryView } from '../../core/compatibility/types.js';
+import {
+  ProviderEvolutionProbeService,
+  type ProviderEvolutionProbeArtifactSummary,
+} from '../../core/compatibility/providerEvolutionProbe.js';
 import type { ProviderSetupSummary } from '../../core/provider-install/types.js';
 import {
   buildProviderToolingSummary,
@@ -87,11 +92,28 @@ interface ProviderDiagnosticResult {
   checks: DiagnosticCheck[];
   setup?: ProviderSetupSummary;
   compatibility?: CompatibilitySummaryView;
+  providerEvolution?: {
+    latestArtifact: ProviderEvolutionDiagnosticArtifactSummary;
+  };
   reprobe: {
     forceSupported: boolean;
     liveSupported: boolean;
   };
 }
+
+type ProviderEvolutionDiagnosticArtifactSummary = Pick<
+  ProviderEvolutionProbeArtifactSummary,
+  | 'artifactId'
+  | 'capturedAt'
+  | 'probeProfile'
+  | 'transport'
+  | 'version'
+  | 'execution'
+  | 'capabilitySnapshot'
+  | 'compare'
+  | 'review'
+  | 'relativePath'
+>;
 
 const diagnosticsRoutes = new Hono<RuntimeRouteEnv>();
 
@@ -923,6 +945,7 @@ async function diagnoseTarget(
   probeMode: DiagnosticsProbeMode,
   env: Readonly<NodeJS.ProcessEnv>,
   forceRefresh = false,
+  probeService?: ProviderEvolutionProbeService,
 ): Promise<ProviderDiagnosticResult> {
   let result: {
     checks: DiagnosticCheck[];
@@ -949,6 +972,12 @@ async function diagnoseTarget(
     summary: pickAvailabilitySummary(result.checks),
     attentionCodes,
   };
+  const latestProbeArtifact = probeService
+    ? await probeService.readLatestArtifact({
+        provider: target.providerName,
+        instance: resolveProviderEvolutionArtifactInstance(target),
+      })
+    : null;
 
   return {
     provider: target.providerName,
@@ -961,6 +990,11 @@ async function diagnoseTarget(
     checks: result.checks,
     setup: result.setup,
     compatibility: result.compatibility,
+    ...(latestProbeArtifact ? {
+      providerEvolution: {
+        latestArtifact: summarizeProviderEvolutionArtifactForDiagnostics(latestProbeArtifact),
+      },
+    } : {}),
     reprobe: {
       forceSupported: target.backend === 'cli',
       liveSupported: target.backend === 'cli'
@@ -1002,10 +1036,13 @@ async function collectProviderDiagnostics(
 }> {
   const fullCatalog = listProviderCatalog(ctx.config);
   const catalog = filterProviderDiagnosticsCatalog(fullCatalog, filters);
+  const probeService = new ProviderEvolutionProbeService({
+    rootDir: join(getRuntimeResolvedPaths(ctx.config).compatibilityEvidenceDir, 'provider-evolution'),
+  });
   const providers = await Promise.all(
     Object.values(catalog)
       .flatMap((entry) => entry.instances)
-      .map((target) => diagnoseTarget(ctx, target, probeMode, env, forceRefresh)),
+      .map((target) => diagnoseTarget(ctx, target, probeMode, env, forceRefresh, probeService)),
   );
 
   return {
@@ -1089,6 +1126,31 @@ function summarizeProviderDiagnostics(
   }
 
   return summary;
+}
+
+function resolveProviderEvolutionArtifactInstance(
+  target: ProviderTargetDescriptor,
+): string {
+  return target.backend === 'cli'
+    ? target.instanceId
+    : `${target.backend}/${target.instanceId}`;
+}
+
+function summarizeProviderEvolutionArtifactForDiagnostics(
+  artifact: ProviderEvolutionProbeArtifactSummary,
+): ProviderEvolutionDiagnosticArtifactSummary {
+  return {
+    artifactId: artifact.artifactId,
+    capturedAt: artifact.capturedAt,
+    probeProfile: artifact.probeProfile,
+    transport: artifact.transport,
+    version: artifact.version,
+    execution: artifact.execution,
+    capabilitySnapshot: artifact.capabilitySnapshot,
+    compare: artifact.compare,
+    review: artifact.review,
+    relativePath: artifact.relativePath,
+  };
 }
 
 diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
