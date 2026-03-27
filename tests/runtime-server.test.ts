@@ -1967,7 +1967,9 @@ backends:
                   source: 'static',
                   defaultModel: 'gpt-5.4',
                   modelCount: 3,
-                  warnings: [],
+                  warnings: [
+                    'Dynamic model discovery is not available for cursor/cli/ubuntu because Cursor does not currently expose a stable model-listing seam to the runtime.',
+                  ],
                   statusCounts: {
                     configured: 0,
                     available: 0,
@@ -2029,7 +2031,9 @@ backends:
                   source: 'static',
                   defaultModel: 'gpt-5.4',
                   modelCount: 3,
-                  warnings: [],
+                  warnings: [
+                    'Dynamic model discovery is not available for cursor/cli/debian because Cursor does not currently expose a stable model-listing seam to the runtime.',
+                  ],
                   statusCounts: {
                     configured: 0,
                     available: 0,

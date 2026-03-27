@@ -193,6 +193,7 @@ slice.
 | 2026-03-27 | Aggregate follow-through landed: `GET /providers/models` now returns one runtime-owned catalog per configured provider default target, reusing the same service and refresh semantics instead of forcing hosts to fan out one request per provider |
 | 2026-03-27 | Provider-topology follow-through landed: `/providers/config` instance entries now expose a bounded best-known `modelCatalog` summary that reuses cached dynamic catalogs when available and otherwise stays on config/static truth, so selectors can inspect model availability without forcing live discovery fan-out |
 | 2026-03-27 | CLI breadth follow-through landed for OpenCode: the shared catalog service now uses the runtime-owned `opencode models` helper for dynamic `provider/model` discovery and forwards runtime `refresh=1` requests to upstream `--refresh`, while Cursor remains on config/static fallback until it exposes a similarly stable listing seam |
+| 2026-03-27 | Cursor fallback honesty follow-through landed: config/static catalog reads now surface an explicit additive warning for `cursor/cli/*` targets so hosts do not mistake the current fallback path for a real dynamic listing seam |
 
 ---
 

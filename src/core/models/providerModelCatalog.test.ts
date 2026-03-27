@@ -445,6 +445,54 @@ describe('ProviderModelCatalogService', () => {
     }
   });
 
+  it('adds an honest warning when Cursor still uses the static catalog fallback', async () => {
+    const config = {
+      ...createCatalogConfig(),
+      providerDefaultTargets: {
+        cursor: { backend: 'cli', instance: 'default' },
+      },
+      providerInstances: {
+        ...createCatalogConfig().providerInstances,
+        cursor: {
+          default: {
+            id: 'default',
+            providerName: 'cursor',
+            commandConfig: {
+              path: 'cursor-agent',
+              runner: 'auto',
+              runtime: { mode: 'native' },
+            },
+          },
+        },
+      },
+      providerCommands: {
+        ...createCatalogConfig().providerCommands,
+        cursor: {
+          path: 'cursor-agent',
+          runner: 'auto',
+          runtime: { mode: 'native' },
+        },
+      },
+    } as const;
+
+    const service = new ProviderModelCatalogService(config as never);
+
+    expect(service.inspectSummary('cursor')).toEqual({
+      source: 'static',
+      defaultModel: 'gpt-5.4',
+      modelCount: 3,
+      warnings: [
+        'Dynamic model discovery is not available for cursor/cli/default because Cursor does not currently expose a stable model-listing seam to the runtime.',
+      ],
+      statusCounts: {
+        configured: 0,
+        available: 0,
+        running: 0,
+        unknown: 3,
+      },
+    });
+  });
+
   it('loads dynamic Pi model catalogs through the shared runtime catalog service', async () => {
     const piModelDiscoveryRunner = {
       run: vi.fn(async () => ({

@@ -2754,6 +2754,10 @@ falls back to best-known config/static truth. Use `GET /providers/models`,
 `GET /providers/{provider}/models`, or `GET /providers/{provider}/models/advanced`
 when the caller explicitly wants the full catalog payload and optional refresh
 semantics.
+For CLI providers such as Cursor that still do not expose a stable
+runtime-trustworthy model-listing seam, the same `warnings` array now carries a
+bounded additive explanation that the runtime is intentionally staying on the
+config/static fallback instead of pretending dynamic discovery exists.
 
 Each instance entry also exposes additive `tooling` metadata:
 

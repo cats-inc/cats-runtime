@@ -656,6 +656,10 @@ tightening and cleanup steps are intentionally deferred.
 - dynamic CLI-backed catalog discovery now also includes OpenCode through the
   runtime-owned `opencode models` helper, and runtime `refresh=1` forwards to
   upstream `--refresh` for that provider family
+- Cursor remains on config/static catalog fallback for now, and the runtime now
+  surfaces an explicit additive warning on `/providers/config` and
+  `GET /providers/:provider/models` so hosts do not mistake that fallback for a
+  real dynamic listing seam
 - CLI compatibility live probes for OpenCode now validate that same
   `models --help` seam, so operator diagnostics and model-catalog readiness are
   anchored to one provider-native contract instead of separate assumptions

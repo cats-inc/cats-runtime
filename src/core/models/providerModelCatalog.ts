@@ -365,6 +365,18 @@ function countModelStatuses(models: ProviderModelCatalogEntry[]): ProviderModelC
   return counts;
 }
 
+function appendKnownStaticCatalogWarnings(
+  target: ProviderTargetDescriptor,
+  warnings: string[],
+): void {
+  if (target.backend === 'cli' && target.providerName === 'cursor') {
+    warnings.push(
+      `Dynamic model discovery is not available for ${target.providerName}/${target.backend}/${target.instanceId} `
+      + 'because Cursor does not currently expose a stable model-listing seam to the runtime.',
+    );
+  }
+}
+
 export function summarizeProviderModelCatalog(
   catalog: ProviderModelCatalogResult,
 ): ProviderModelCatalogSummary {
@@ -465,6 +477,7 @@ export class ProviderModelCatalogService {
       warnings.push(discoverySkipWarning);
     }
 
+    appendKnownStaticCatalogWarnings(target, warnings);
     const configCatalog = this.tryConfigCatalog(target, defaultModel, warnings);
     if (configCatalog) {
       return summarizeProviderModelCatalog(configCatalog);
@@ -484,6 +497,7 @@ export class ProviderModelCatalogService {
       return dynamic;
     }
 
+    appendKnownStaticCatalogWarnings(target, warnings);
     const configCatalog = this.tryConfigCatalog(target, defaultModel, warnings);
     if (configCatalog) {
       return configCatalog;
