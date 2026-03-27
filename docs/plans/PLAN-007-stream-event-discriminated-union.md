@@ -276,6 +276,7 @@ documented residual debt list.
 | 2026-03-27 | Tightened rich CLI providers and the Junie parser so Claude, Gemini, Cursor, Copilot, and Junie tool/event builders now emit exact `raw`, `init`, `text`, `tool_use`, `tool_result`, `progress`, `result`, and `error` variants instead of relying on loose bag-of-optionals event literals. |
 | 2026-03-27 | Hardened the first dense CLI-side consumers so `WorkerProcess` and the live `JunieProvider` loop now use narrowing-friendly helpers for session-identity and terminal-event handling while keeping the streaming behavior unchanged. |
 | 2026-03-27 | Hardened the main HTTP message streaming path so `src/http/routes/messages.ts` now narrows `text`, `tool_use`, `tool_result`, `result`, `error`, and session-identity events through local helpers across both NDJSON and SSE flows without changing any wire payloads. |
+| 2026-03-27 | Tightened leaf CLI providers/parsers so OpenCode, Goose, Kiro, and Auggie now emit exact typed `tool_use`, `text`, `result`, `error`, and `raw` variants in their runtime-owned event builders and after-turn helpers. |
 
 ---
 

@@ -3,9 +3,13 @@ import type {
   Provider,
   ProviderCapabilities,
   ProviderSpawnOptions,
-  StreamEvent,
   TurnInput,
 } from './types.js';
+import type {
+  ResultStreamEvent,
+  StreamEvent,
+  TextStreamEvent,
+} from '../../../core/types.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 
 const ANSI_RE = /\x1b(?:\[[0-9;?]*[A-Za-z]|][^\u0007]*(?:\u0007|\x1b\\)|[()][AB012])/g;
@@ -48,7 +52,7 @@ export class KiroProvider implements Provider {
     return {
       type: 'result',
       sessionId: latest.providerSessionId,
-    };
+    } satisfies ResultStreamEvent;
   }
 
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
@@ -96,7 +100,7 @@ export class KiroProvider implements Provider {
     }
 
     if (!text.trim()) return null;
-    return { type: 'text', text: `${text}\n` };
+    return { type: 'text', text: `${text}\n` } satisfies TextStreamEvent;
   }
 }
 

@@ -7,6 +7,7 @@ import type {
   StreamEvent,
   TurnInput,
 } from './types.js';
+import type { ResultStreamEvent } from '../../../core/types.js';
 import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 
@@ -36,7 +37,7 @@ export class GooseProvider implements Provider {
     return {
       type: 'result',
       sessionId: latest.providerSessionId,
-    };
+    } satisfies ResultStreamEvent;
   }
 
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {

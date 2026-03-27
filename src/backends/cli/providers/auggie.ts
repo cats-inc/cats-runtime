@@ -7,9 +7,14 @@ import type {
   Provider,
   ProviderCapabilities,
   ProviderSpawnOptions,
-  StreamEvent,
   TurnInput,
 } from './types.js';
+import type {
+  ErrorStreamEvent,
+  ResultStreamEvent,
+  StreamEvent,
+  TextStreamEvent,
+} from '../../../core/types.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 
 interface AuggieResultLine {
@@ -161,7 +166,7 @@ export class AuggieProvider implements Provider {
       return {
         type: 'error',
         text: text.trim() || 'Auggie request failed',
-      };
+      } satisfies ErrorStreamEvent;
     }
 
     if (!text.trim()) return null;
@@ -169,7 +174,7 @@ export class AuggieProvider implements Provider {
     return {
       type: 'text',
       text,
-    };
+    } satisfies TextStreamEvent;
   }
 
   private async resolveUpdatedSession(opts: ProviderSpawnOptions): Promise<AuggieSavedSession | null> {
@@ -195,7 +200,7 @@ export class AuggieProvider implements Provider {
         type: 'result',
         sessionId: opts.resumeSessionId,
         usage,
-      };
+      } satisfies ResultStreamEvent;
     }
 
     if (updatedSession) {
@@ -203,7 +208,7 @@ export class AuggieProvider implements Provider {
         type: 'result',
         sessionId: updatedSession.providerSessionId,
         usage,
-      };
+      } satisfies ResultStreamEvent;
     }
 
     if (this.lastResult?.remoteSessionId) {
@@ -211,13 +216,13 @@ export class AuggieProvider implements Provider {
         type: 'result',
         sessionId: this.lastResult.remoteSessionId,
         usage,
-      };
+      } satisfies ResultStreamEvent;
     }
 
     return {
       type: 'result',
       usage,
-    };
+    } satisfies ResultStreamEvent;
   }
 
   private buildEmptyResponseError(updatedSession: AuggieSavedSession | null): string {

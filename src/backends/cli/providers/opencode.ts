@@ -4,9 +4,14 @@ import type {
   ProviderCapabilities,
   ProviderSpawnOptions,
   ProviderTurnOptions,
-  StreamEvent,
   TurnInput,
 } from './types.js';
+import type {
+  ResultStreamEvent,
+  StreamEvent,
+  TextStreamEvent,
+  ToolUseStreamEvent,
+} from '../../../core/types.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 
 const REQUEST_POLL_INTERVAL_MS = 250;
@@ -66,21 +71,21 @@ export class OpencodeProvider implements Provider {
           type: 'tool_use',
           toolId: toolUse.toolId,
           toolName: toolUse.toolName,
-        };
+        } satisfies ToolUseStreamEvent;
       }
 
       if (result.text) {
         yield {
           type: 'text',
           text: result.text,
-        };
+        } satisfies TextStreamEvent;
       }
 
       yield {
         type: 'result',
         sessionId: result.sessionId,
         usage: result.usage,
-      };
+      } satisfies ResultStreamEvent;
     } finally {
       automationRunning = false;
       automationController.abort();

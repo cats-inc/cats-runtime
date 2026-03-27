@@ -1,4 +1,11 @@
-import type { StreamEvent } from '../../../core/types.js';
+import type {
+  RawStreamEvent,
+  ResultStreamEvent,
+  StreamEvent,
+  TextStreamEvent,
+  ToolResultStreamEvent,
+  ToolUseStreamEvent,
+} from '../../../core/types.js';
 import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
 import {
   observeIgnored,
@@ -64,7 +71,7 @@ export function parseGooseStreamLine(
     }, {
       type: 'raw',
       text: trimmed,
-    });
+    } satisfies RawStreamEvent);
   }
 
   if (event.type === 'complete') {
@@ -84,7 +91,7 @@ export function parseGooseStreamLine(
             },
           }
         : undefined,
-    });
+    } satisfies ResultStreamEvent);
   }
 
   if (event.type === 'message' && event.message) {
@@ -107,7 +114,7 @@ export function parseGooseStreamLine(
       }, {
         type: 'text',
         text: block.text,
-      });
+      } satisfies TextStreamEvent);
     }
 
     // Tool request
@@ -129,7 +136,7 @@ export function parseGooseStreamLine(
             toolName,
           },
         }),
-        { type: 'tool_use', toolName, toolId: block.id },
+        { type: 'tool_use', toolName, toolId: block.id } satisfies ToolUseStreamEvent,
       ]);
     }
 
@@ -158,7 +165,7 @@ export function parseGooseStreamLine(
           toolId: block.id,
           text: resultTexts.join(''),
           isError: block.toolResult?.value?.isError ?? false,
-        },
+        } satisfies ToolResultStreamEvent,
       ]);
     }
 
@@ -176,7 +183,7 @@ export function parseGooseStreamLine(
   }, {
     type: 'raw',
     raw: event,
-  });
+  } satisfies RawStreamEvent);
 }
 
 /**
