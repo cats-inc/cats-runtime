@@ -127,6 +127,9 @@ Current curated tools:
 - `observe_session`
 - `list_wakeups`
 - `read_wakeup`
+- `create_wakeup`
+- `cancel_wakeup`
+- `trigger_wakeup`
 - `list_runtime_skills`
 - `create_session`
 - `send_message`
@@ -242,6 +245,11 @@ inventing a second session-inspection contract.
 surfaces as `GET /wakeups` and `GET /wakeups/{id}`, including additive
 `status` / `sessionId` filters on the list tool, so MCP hosts can inspect the
 scheduled-wakeup backlog without inventing a second scheduling contract.
+`create_wakeup`, `cancel_wakeup`, and `trigger_wakeup` reuse the same
+runtime-owned wakeup mutation seams as `POST /wakeups`,
+`POST /wakeups/{id}/cancel`, and `POST /wakeups/{id}/trigger`, so MCP hosts can
+schedule, cancel, and manually fire wakeups without inventing an MCP-only
+wakeup lifecycle.
 `list_sessions` and `observe_session` also reuse the same additive session
 `providerTarget` read model exposed by the direct HTTP session/history/observe
 surfaces, so MCP hosts can inspect backend continuity/tooling semantics without

@@ -395,6 +395,9 @@ describe('runtime MCP facade', () => {
       'observe_session',
       'list_wakeups',
       'read_wakeup',
+      'create_wakeup',
+      'cancel_wakeup',
+      'trigger_wakeup',
       'list_runtime_skills',
       'create_session',
       'send_message',
@@ -1776,6 +1779,166 @@ describe('runtime MCP facade', () => {
       id: created.request.id,
       reason: 'Wake the session later.',
       status: 'scheduled',
+    }));
+  });
+
+  it('exposes wakeup mutation tools aligned with the existing wakeup routes', async () => {
+    const app = createTestApp();
+
+    const createWakeupResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 32,
+        method: 'tools/call',
+        params: {
+          name: 'create_wakeup',
+          arguments: {
+            reason: 'Wake the session from MCP.',
+            target: {
+              kind: 'session',
+              sessionId: 'session-1',
+            },
+            scheduleAt: '2026-03-27T01:10:00.000Z',
+          },
+        },
+      }),
+    });
+    expect(createWakeupResponse.status).toBe(200);
+    const createdWakeup = await createWakeupResponse.json() as {
+      result: {
+        structuredContent: {
+          responseStatus: number;
+          coalesced: boolean;
+          wakeupPath: string;
+          wakeupsPath: string;
+          sessionPath: string;
+          observePath: string;
+          historyPath: string;
+          request: {
+            id: string;
+            status: string;
+            reason: string;
+          };
+        };
+      };
+    };
+    expect(createdWakeup.result.structuredContent.responseStatus).toBe(201);
+    expect(createdWakeup.result.structuredContent.coalesced).toBe(false);
+    expect(createdWakeup.result.structuredContent.wakeupsPath).toBe('/wakeups');
+    expect(createdWakeup.result.structuredContent.wakeupPath).toBe(
+      `/wakeups/${createdWakeup.result.structuredContent.request.id}`,
+    );
+    expect(createdWakeup.result.structuredContent.sessionPath).toBe('/sessions/session-1');
+    expect(createdWakeup.result.structuredContent.observePath).toBe('/sessions/session-1/observe');
+    expect(createdWakeup.result.structuredContent.historyPath).toBe('/sessions/session-1/history');
+    expect(createdWakeup.result.structuredContent.request).toEqual(expect.objectContaining({
+      reason: 'Wake the session from MCP.',
+      status: 'scheduled',
+    }));
+
+    const cancelWakeupResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 32.1,
+        method: 'tools/call',
+        params: {
+          name: 'cancel_wakeup',
+          arguments: {
+            wakeupId: createdWakeup.result.structuredContent.request.id,
+          },
+        },
+      }),
+    });
+    expect(cancelWakeupResponse.status).toBe(200);
+    const cancelledWakeup = await cancelWakeupResponse.json() as {
+      result: {
+        structuredContent: {
+          responseStatus: number;
+          wakeupPath: string;
+          request: {
+            id: string;
+            status: string;
+          };
+        };
+      };
+    };
+    expect(cancelledWakeup.result.structuredContent.responseStatus).toBe(200);
+    expect(cancelledWakeup.result.structuredContent.wakeupPath).toBe(
+      `/wakeups/${createdWakeup.result.structuredContent.request.id}/cancel`,
+    );
+    expect(cancelledWakeup.result.structuredContent.request).toEqual(expect.objectContaining({
+      id: createdWakeup.result.structuredContent.request.id,
+      status: 'cancelled',
+    }));
+
+    const directCreateResponse = await app.request('/wakeups', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        reason: 'Trigger from MCP.',
+        target: {
+          kind: 'session',
+          sessionId: 'session-1',
+        },
+        scheduleAt: '2026-03-27T01:20:00.000Z',
+      }),
+    });
+    expect(directCreateResponse.status).toBe(201);
+    const directCreate = await directCreateResponse.json() as {
+      request: {
+        id: string;
+      };
+    };
+
+    const triggerWakeupResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 32.2,
+        method: 'tools/call',
+        params: {
+          name: 'trigger_wakeup',
+          arguments: {
+            wakeupId: directCreate.request.id,
+          },
+        },
+      }),
+    });
+    expect(triggerWakeupResponse.status).toBe(200);
+    const triggeredWakeup = await triggerWakeupResponse.json() as {
+      result: {
+        structuredContent: {
+          responseStatus: number;
+          wakeupPath: string;
+          request: {
+            id: string;
+            status: string;
+            lastExecution: {
+              source: string;
+              sessionId: string;
+              outcome: string;
+            };
+          };
+        };
+      };
+    };
+    expect(triggeredWakeup.result.structuredContent.responseStatus).toBe(200);
+    expect(triggeredWakeup.result.structuredContent.wakeupPath).toBe(
+      `/wakeups/${directCreate.request.id}/trigger`,
+    );
+    expect(triggeredWakeup.result.structuredContent.request).toEqual(expect.objectContaining({
+      id: directCreate.request.id,
+      status: 'triggered',
+      lastExecution: expect.objectContaining({
+        source: 'manual',
+        sessionId: 'session-1',
+        outcome: 'resumed',
+      }),
     }));
   });
 

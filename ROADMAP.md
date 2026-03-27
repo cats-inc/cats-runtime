@@ -1084,6 +1084,10 @@ evidence bundles and does not force hosts to invent their own report format.
   through MCP as `list_wakeups` and `read_wakeup`, so orchestrator-style hosts
   can inspect scheduled-wakeup backlog and retained request state without
   inventing an MCP-only scheduling contract
+- the same runtime-owned wakeup mutation seams are now also exposed through MCP
+  as `create_wakeup`, `cancel_wakeup`, and `trigger_wakeup`, so
+  orchestrator-style hosts can schedule, cancel, and manually fire wakeups
+  without inventing a second wakeup lifecycle
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
   remediation previews, and latest-setup-report summary metadata including a

@@ -395,6 +395,16 @@ function runtimeSummary(ctx: AppContext): McpToolCallResult {
   };
 }
 
+function buildWakeupTargetSessionPaths(request: Record<string, unknown>) {
+  const target = asRecord(request.target);
+  if (!target || target.kind !== 'session') {
+    return {};
+  }
+
+  const sessionId = readOptionalString(target, 'sessionId');
+  return sessionId ? buildSessionPaths(sessionId) : {};
+}
+
 async function runtimeDiagnostics(
   ctx: AppContext,
 ): Promise<McpToolCallResult> {
@@ -1306,6 +1316,78 @@ async function readWakeup(
       ...payload,
       wakeupPath,
       wakeupsPath: '/wakeups',
+      ...buildWakeupTargetSessionPaths(payload),
+    },
+  };
+}
+
+async function createWakeup(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const result = await requestRuntimeJson(ctx, '/wakeups', { body: args });
+  ensureRouteSuccess('create_wakeup', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'create_wakeup result');
+  const request = ensureObject(payload.request, 'create_wakeup request');
+  const wakeupId = readRequiredString(request, 'id');
+  const coalesced = typeof payload.coalesced === 'boolean' ? payload.coalesced : false;
+  return {
+    summary: coalesced
+      ? `Coalesced wakeup request ${wakeupId}.`
+      : `Created wakeup request ${wakeupId}.`,
+    structuredContent: {
+      responseStatus: result.status,
+      ...payload,
+      wakeupsPath: '/wakeups',
+      wakeupPath: `/wakeups/${wakeupId}`,
+      ...buildWakeupTargetSessionPaths(request),
+    },
+  };
+}
+
+async function cancelWakeup(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const wakeupId = readRequiredString(args, 'wakeupId');
+  const wakeupPath = `/wakeups/${encodeURIComponent(wakeupId)}/cancel`;
+  const result = await requestRuntimeJson(ctx, wakeupPath, { body: {} });
+  ensureRouteSuccess('cancel_wakeup', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'cancel_wakeup result');
+  const request = ensureObject(payload.request, 'cancel_wakeup request');
+  return {
+    summary: `Cancelled wakeup request ${wakeupId}.`,
+    structuredContent: {
+      responseStatus: result.status,
+      ...payload,
+      wakeupPath,
+      wakeupsPath: '/wakeups',
+      ...buildWakeupTargetSessionPaths(request),
+    },
+  };
+}
+
+async function triggerWakeup(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const wakeupId = readRequiredString(args, 'wakeupId');
+  const wakeupPath = `/wakeups/${encodeURIComponent(wakeupId)}/trigger`;
+  const result = await requestRuntimeJson(ctx, wakeupPath, { body: {} });
+  ensureRouteSuccess('trigger_wakeup', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'trigger_wakeup result');
+  const request = ensureObject(payload.request, 'trigger_wakeup request');
+  return {
+    summary: `Triggered wakeup request ${wakeupId}.`,
+    structuredContent: {
+      responseStatus: result.status,
+      ...payload,
+      wakeupPath,
+      wakeupsPath: '/wakeups',
+      ...buildWakeupTargetSessionPaths(request),
     },
   };
 }
@@ -2748,6 +2830,59 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: readWakeup,
+  },
+  {
+    definition: {
+      name: 'create_wakeup',
+      title: 'Create Wakeup',
+      description: 'Create or coalesce a wakeup request through the same runtime-owned wakeup route used by direct HTTP clients.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          reason: { type: 'string' },
+          target: { type: 'object' },
+          scheduleAt: { type: 'string' },
+          recurrence: { type: 'object' },
+          coalesceKey: { type: 'string' },
+          metadata: { type: 'object' },
+        },
+        required: ['reason', 'target'],
+        additionalProperties: false,
+      },
+    },
+    execute: createWakeup,
+  },
+  {
+    definition: {
+      name: 'cancel_wakeup',
+      title: 'Cancel Wakeup',
+      description: 'Cancel a scheduled wakeup through the same runtime-owned wakeup route used by direct HTTP clients.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          wakeupId: { type: 'string' },
+        },
+        required: ['wakeupId'],
+        additionalProperties: false,
+      },
+    },
+    execute: cancelWakeup,
+  },
+  {
+    definition: {
+      name: 'trigger_wakeup',
+      title: 'Trigger Wakeup',
+      description: 'Manually trigger a wakeup through the same runtime-owned wakeup route used by direct HTTP clients.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          wakeupId: { type: 'string' },
+        },
+        required: ['wakeupId'],
+        additionalProperties: false,
+      },
+    },
+    execute: triggerWakeup,
   },
   {
     definition: {
