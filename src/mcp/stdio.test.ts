@@ -216,6 +216,7 @@ describe('MCP stdio transport', () => {
             expect.objectContaining({ name: 'health_diagnostics' }),
             expect.objectContaining({ name: 'pool_status' }),
             expect.objectContaining({ name: 'management_diagnostics' }),
+            expect.objectContaining({ name: 'resume_management_operation' }),
             expect.objectContaining({ name: 'discovery_status' }),
             expect.objectContaining({ name: 'list_peers' }),
             expect.objectContaining({ name: 'read_peer' }),

@@ -1101,6 +1101,10 @@ evidence bundles and does not force hosts to invent their own report format.
   and `peer_diagnostics`, so orchestrator-style hosts can inspect bounded peer
   registry entries, peer guardrails, and discovery posture without inventing a
   second peer-control contract
+- the same runtime-owned management operation follow-through seam is now also
+  exposed through MCP as `resume_management_operation`, so orchestrator-style
+  hosts can re-enter long-running review/deployment waits without inventing a
+  parallel management operation protocol
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
   remediation previews, and latest-setup-report summary metadata including a

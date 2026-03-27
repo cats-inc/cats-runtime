@@ -107,6 +107,7 @@ Current curated tools:
 - `health_diagnostics`
 - `pool_status`
 - `management_diagnostics`
+- `resume_management_operation`
 - `discovery_status`
 - `list_peers`
 - `read_peer`
@@ -223,6 +224,10 @@ operator read surfaces as `GET /pool/status` and `GET /management/diagnostics`,
 including additive `domain` / `workspacePath` filtering for management
 diagnostics, so MCP hosts can inspect worker-pool pressure and management
 adapter readiness without inventing parallel orchestration contracts.
+`resume_management_operation` reuses the same runtime-owned management
+operation follow-through seam as `POST /management/operations/{operationId}/resume`,
+including additive `timeoutMs`, so MCP hosts can re-enter long-running review
+or deployment waits without inventing a parallel operation-control contract.
 `discovery_status`, `list_peers`, `read_peer`, and `peer_diagnostics` reuse the
 same runtime-owned discovery and peer diagnostics surfaces as
 `GET /discovery/status`, `GET /peers`, `GET /peers/{peerId}`, and

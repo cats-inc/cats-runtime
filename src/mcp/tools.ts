@@ -538,6 +538,32 @@ async function managementDiagnostics(
   };
 }
 
+async function resumeManagementOperation(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const operationId = readRequiredString(args, 'operationId');
+  const operationResumePath = `/management/operations/${encodeURIComponent(operationId)}/resume`;
+  const timeoutMs = readOptionalInteger(args, 'timeoutMs', 0);
+  const result = await requestRuntimeJson(ctx, operationResumePath, {
+    body: {
+      ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+    },
+  });
+  ensureRouteSuccess('resume_management_operation', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'resume_management_operation result');
+  const state = typeof payload.state === 'string' ? payload.state : 'unknown';
+  return {
+    summary: `Management operation ${operationId} resumed with state ${state}.`,
+    structuredContent: {
+      ...payload,
+      operationResumePath,
+      managementDiagnosticsPath: '/management/diagnostics',
+    },
+  };
+}
+
 async function discoveryStatus(
   ctx: AppContext,
 ): Promise<McpToolCallResult> {
@@ -2608,6 +2634,23 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: managementDiagnostics,
+  },
+  {
+    definition: {
+      name: 'resume_management_operation',
+      title: 'Resume Management Operation',
+      description: 'Resume a previously started management operation through the existing management operation resume route.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          operationId: { type: 'string' },
+          timeoutMs: { type: 'integer', minimum: 0 },
+        },
+        required: ['operationId'],
+        additionalProperties: false,
+      },
+    },
+    execute: resumeManagementOperation,
   },
   {
     definition: {

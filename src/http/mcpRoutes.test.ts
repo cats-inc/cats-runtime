@@ -226,7 +226,9 @@ describe('runtime MCP facade', () => {
     return repoDir;
   }
 
-  function createTestApp() {
+  function createTestApp(options?: {
+    configureManagement?: (management: RuntimeManagementService) => void;
+  }) {
     const startup = createRuntimeStartupState();
     const peerNow = Date.parse('2026-03-25T00:00:05.000Z');
     const bootstrapService = {
@@ -282,6 +284,7 @@ describe('runtime MCP facade', () => {
     management.registerAdapter(new StubManagementAdapter('zeabur', ['deployment'], [
       'audit_deployment_target', 'create_deployment', 'inspect_deployment', 'read_deployment_logs',
     ]));
+    options?.configureManagement?.(management);
     const peerRegistry = new PeerRegistry({
       stalePeerTtlMs: 5_000,
       now: () => peerNow,
@@ -488,6 +491,7 @@ describe('runtime MCP facade', () => {
       'health_diagnostics',
       'pool_status',
       'management_diagnostics',
+      'resume_management_operation',
       'discovery_status',
       'list_peers',
       'read_peer',
@@ -2030,6 +2034,63 @@ describe('runtime MCP facade', () => {
         }),
       }),
     ]);
+  });
+
+  it('resumes management operations through MCP without inventing a second operation contract', async () => {
+    let operationId = '';
+    const app = createTestApp({
+      configureManagement: (management) => {
+        const op = management.operations.create();
+        management.operations.complete(op.operationId, { checks: 'passed' });
+        operationId = op.operationId;
+      },
+    });
+
+    const response = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 31.57,
+        method: 'tools/call',
+        params: {
+          name: 'resume_management_operation',
+          arguments: {
+            operationId,
+            timeoutMs: 5_000,
+          },
+        },
+      }),
+    });
+    expect(response.status).toBe(200);
+    const resumed = await response.json() as {
+      result: {
+        structuredContent: {
+          state: string;
+          outputs: {
+            checks: string;
+          };
+          operation: {
+            operationId: string;
+            status: string;
+          };
+          operationResumePath: string;
+          managementDiagnosticsPath: string;
+        };
+      };
+    };
+    expect(resumed.result.structuredContent.state).toBe('completed');
+    expect(resumed.result.structuredContent.outputs.checks).toBe('passed');
+    expect(resumed.result.structuredContent.operation).toEqual(expect.objectContaining({
+      operationId,
+      status: 'completed',
+    }));
+    expect(resumed.result.structuredContent.operationResumePath).toBe(
+      `/management/operations/${operationId}/resume`,
+    );
+    expect(resumed.result.structuredContent.managementDiagnosticsPath).toBe(
+      '/management/diagnostics',
+    );
   });
 
   it('exposes wakeup inspection tools aligned with the existing wakeup read routes', async () => {
