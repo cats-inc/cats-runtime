@@ -215,6 +215,7 @@ expansion without blocking the first CLI-focused slice.
 | 2026-03-27 | Core manual-first slices landed: high-value CLI adapters now emit transport-neutral evidence, manual probes persist capability snapshots with baseline compare and review summaries, retained artifact list/read commands exist, and diagnostics/provider-config surfaces can reuse the latest bounded summary without adding a public probe route |
 | 2026-03-27 | Agent follow-through landed for the first OpenClaw and Agent SDK bridge targets; remaining work is now limited to optional release-note/changelog attachment and later breadth/depth expansion rather than missing core probe infrastructure |
 | 2026-03-27 | Manual `reviewContext.references[]` attachment landed for probe artifacts through repeated `--probe-reference <kind=url>` flags, and the same separate-from-evidence context now flows through retained artifact summaries/read models without adding any new public probe route or automatic scraping behavior. |
+| 2026-03-27 | Retained provider-evolution artifacts now preserve optional CLI `runtimeMode` metadata and accept additive `--probe-runtime <native|wsl|docker>` list/read/review filtering, so offline triage and latest-artifact summaries can distinguish native, WSL, and Docker baselines without adding a new route. |
 
 ---
 

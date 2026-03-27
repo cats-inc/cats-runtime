@@ -152,6 +152,7 @@ describe('provider evolution probe snapshot/compare', () => {
         parserId: 'codex-json-rpc',
         probeProfile: 'manual-smoke',
         transport: 'cli',
+        runtimeMode: 'native',
         capturedAt: '2026-03-27T00:00:00.000Z',
         execution: {
           status: 'completed',
@@ -232,6 +233,7 @@ describe('provider evolution probe snapshot/compare', () => {
       'schema_change',
       'semantic_drift_suspected',
     ]);
+    expect(summary.runtimeMode).toBe('native');
     expect(summary.compare).toEqual({
       baselineArtifactId: 'baseline-1',
       baselineCapturedAt: '2026-03-26T00:00:00.000Z',
@@ -260,6 +262,7 @@ describe('ProviderEvolutionProbeService', () => {
         parserId: 'codex-json-rpc',
         probeProfile: 'manual_text',
         transport: 'cli' as const,
+        runtimeMode: 'native' as const,
         version: '1.2.3',
       },
       reviewContext: {
@@ -359,6 +362,7 @@ describe('ProviderEvolutionProbeService', () => {
     });
     expect(latest).toEqual(expect.objectContaining({
       artifactId: current.artifact.id,
+      runtimeMode: 'native',
       review: expect.objectContaining({
         classifications: ['upgrade'],
       }),
@@ -404,6 +408,7 @@ describe('ProviderEvolutionProbeService', () => {
       provider: 'codex',
     });
     expect(reread?.artifact.review.classifications).toEqual(['upgrade']);
+    expect(reread?.artifact.runtimeMode).toBe('native');
     expect(reread?.artifact.reviewContext).toEqual({
       references: [
         {
@@ -425,6 +430,24 @@ describe('ProviderEvolutionProbeService', () => {
       reviewClassifications: ['baseline'],
     })).resolves.toEqual(expect.objectContaining({
       artifactId: baseline.artifact.id,
+    }));
+
+    now += 1000;
+    const docker = await service.run({
+      ...request,
+      target: {
+        ...request.target,
+        runtimeMode: 'docker',
+      },
+    });
+    expect(docker.artifact.compare).toBeUndefined();
+
+    await expect(service.readLatestArtifact({
+      provider: 'codex',
+      runtimeMode: 'docker',
+    })).resolves.toEqual(expect.objectContaining({
+      artifactId: docker.artifact.id,
+      runtimeMode: 'docker',
     }));
 
     const reviewed = await service.updateArtifactReviewById(

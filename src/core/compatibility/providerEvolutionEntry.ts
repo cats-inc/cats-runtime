@@ -7,6 +7,7 @@ import {
   getProviderDefaultInstanceId,
   resolveProviderInstance,
   type CliRuntimeConfig,
+  type RuntimeMode,
   type RemoteProviderInstanceConfig,
 } from '../../backends/cli/config.js';
 import type { Provider, ProviderName } from '../../backends/cli/providers/types.js';
@@ -113,6 +114,7 @@ export async function generateProviderEvolutionProbeArtifact(
         parserId: assessment.profile.parserId,
         probeProfile: profile.id,
         transport: 'cli',
+        runtimeMode: assessment.fingerprint.runtime.mode,
         version: assessment.fingerprint.version.normalized || assessment.fingerprint.version.raw,
       },
       reviewContext: {
@@ -513,12 +515,14 @@ function resolveProbeArtifactIdentityQuery(
 ): ProviderEvolutionProbeArtifactQuery {
   const provider = parseOptionalProbeProviderName(cliOptions.probeProvider);
   const transport = parseOptionalProbeTransport(cliOptions.probeTransport);
+  const runtimeMode = parseOptionalProbeRuntimeMode(cliOptions.probeRuntime);
   return {
     ...(provider ? { provider } : {}),
     ...(cliOptions.probeInstance ? { instance: cliOptions.probeInstance.trim() } : {}),
     ...(cliOptions.probeParser ? { parserId: cliOptions.probeParser.trim() } : {}),
     ...(cliOptions.probeProfile ? { probeProfile: cliOptions.probeProfile.trim() } : {}),
     ...(transport ? { transport } : {}),
+    ...(runtimeMode ? { runtimeMode } : {}),
   };
 }
 
@@ -580,6 +584,26 @@ function parseOptionalProbeTransport(
   }
 
   return normalized;
+}
+
+function parseOptionalProbeRuntimeMode(
+  value: string | undefined,
+): RuntimeMode | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  switch (normalized) {
+    case 'native':
+    case 'wsl':
+    case 'docker':
+      return normalized;
+    default:
+      throw new Error(
+        `Invalid --probe-runtime value '${value}'. Valid values: native, wsl, docker`,
+      );
+  }
 }
 
 function parseOptionalProbeClassifications(
@@ -718,6 +742,7 @@ function describeProbeArtifactScope(cliOptions: RuntimeCliOptions): string {
     cliOptions.probeInstance?.trim(),
     cliOptions.probeProfile?.trim(),
     cliOptions.probeParser?.trim() ? `parser=${cliOptions.probeParser.trim()}` : undefined,
+    cliOptions.probeRuntime?.trim() ? `runtime=${cliOptions.probeRuntime.trim()}` : undefined,
     cliOptions.probeTransport?.trim() ? `transport=${cliOptions.probeTransport.trim()}` : undefined,
     cliOptions.probeClassifications?.length
       ? `classification=${cliOptions.probeClassifications.join(',')}`

@@ -384,7 +384,8 @@ The report currently includes:
   classification, summary, parser/profile, and relativePath only)
 - bounded `report.references.providerEvolutionArtifacts[]` metadata for the
   latest retained provider-evolution artifacts (`artifactId`, provider/instance,
-  parser/profile, transport, relativePath, and bounded review summary only)
+  parser/profile, transport, optional runtimeMode, relativePath, and bounded
+  review summary only)
 - a normalized issue list with stable `code` plus `info` / `warning` / `error`
   severity
 
@@ -620,6 +621,7 @@ probe route. The summary includes:
 - `capturedAt`
 - `probeProfile`
 - `transport`
+- optional `runtimeMode`
 - optional `version`
 - `execution` summary
 - `capabilitySnapshot`
@@ -2698,7 +2700,10 @@ When a retained manual provider-evolution artifact exists for an instance, the
 same instance entry also exposes additive `providerEvolution.latestArtifact`.
 This reuses the retained artifact read model already surfaced on
 `GET /diagnostics/providers`, so hosts can inspect the latest capability
-snapshot/review without making a second provider diagnostics call.
+snapshot/review without making a second provider diagnostics call. The same
+bounded summary now also carries optional `runtimeMode` for CLI-backed probe
+artifacts so hosts can tell whether the latest retained baseline came from a
+native, WSL, or Docker target.
 
 When a retained CLI compatibility evidence bundle exists for an instance, the
 same instance entry also exposes additive `compatibilityEvidence.latestArtifact`.

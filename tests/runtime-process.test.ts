@@ -84,6 +84,7 @@ interface ProviderEvolutionArtifactListCliOutput {
     provider: string;
     instance: string;
     probeProfile: string;
+    runtimeMode?: string;
     review: {
       classifications: string[];
       summary: string;
@@ -99,6 +100,7 @@ interface ProviderEvolutionArtifactReadCliOutput {
     provider: string;
     instance: string;
     probeProfile: string;
+    runtimeMode?: string;
     review: {
       classifications: string[];
       summary: string;
@@ -153,6 +155,7 @@ interface ProviderEvolutionArtifactReviewCliOutput {
     provider: string;
     instance: string;
     probeProfile: string;
+    runtimeMode?: string;
     review: {
       classifications: string[];
       summary: string;
@@ -384,6 +387,7 @@ function writeProviderEvolutionArtifact(
     parserId: string;
     probeProfile: string;
     transport: 'cli' | 'agent' | 'api' | 'unknown';
+    runtimeMode: 'native' | 'wsl' | 'docker';
     review: {
       classifications: string[];
       summary: string;
@@ -401,6 +405,7 @@ function writeProviderEvolutionArtifact(
   const parserId = overrides.parserId || `${provider}-json-rpc`;
   const probeProfile = overrides.probeProfile || 'manual_smoke';
   const transport = overrides.transport || 'cli';
+  const runtimeMode = overrides.runtimeMode || 'native';
   const providerDir = join(
     env.CATS_RUNTIME_DATA_DIR!,
     'compatibility',
@@ -417,6 +422,7 @@ function writeProviderEvolutionArtifact(
     parserId,
     probeProfile,
     transport,
+    runtimeMode,
     capturedAt: '2026-03-27T00:00:00.000Z',
     execution: {
       status: 'completed',
@@ -1293,6 +1299,45 @@ describe('runtime process startup contract', () => {
         },
       });
       expect(output.stderr).toContain('Listed 1 provider-evolution artifact(s) for codex.');
+      expect(output.stderr).toContain('codex/default manual_smoke [baseline]');
+    } finally {
+      cleanup();
+    }
+  }, 20000);
+
+  it('can filter retained provider-evolution artifacts by runtime mode', async () => {
+    const { env, cleanup } = createRuntimeProcessEnv(3214);
+    writeProviderEvolutionArtifact(env, 'codex', 'artifact-native', {
+      runtimeMode: 'native',
+    });
+    writeProviderEvolutionArtifact(env, 'codex', 'artifact-docker', {
+      runtimeMode: 'docker',
+    });
+    const child = spawnSetupDiagnostic([
+      '--list-provider-evolution-artifacts',
+      '--probe-provider',
+      'codex',
+      '--probe-runtime',
+      'docker',
+    ], env);
+
+    try {
+      const output = await waitForProcessOutput(child);
+      expect(output.code).toBe(0);
+
+      const payload = JSON.parse(output.stdout.trim()) as ProviderEvolutionArtifactListCliOutput;
+      expect(payload.status).toBe('listed');
+      expect(payload.count).toBe(1);
+      expect(payload.artifacts).toEqual([
+        expect.objectContaining({
+          artifactId: 'artifact-docker',
+          provider: 'codex',
+          runtimeMode: 'docker',
+        }),
+      ]);
+      expect(output.stderr).toContain(
+        'Listed 1 provider-evolution artifact(s) for codex/runtime=docker.',
+      );
       expect(output.stderr).toContain('codex/default manual_smoke [baseline]');
     } finally {
       cleanup();

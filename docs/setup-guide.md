@@ -59,7 +59,7 @@ Supported startup flags:
 - `--probe-provider-evolution` — run a manual provider-evolution probe and exit without starting the HTTP server
 - `--probe-provider <provider>` — required with `--probe-provider-evolution`
 - `--probe-instance <instance>` — optional instance override for the selected provider
-- `--probe-runtime <native|wsl|docker>` — optional retained-artifact runtime filter for compatibility evidence list/read flows
+- `--probe-runtime <native|wsl|docker>` — optional retained-artifact runtime filter for compatibility evidence and provider-evolution list/read flows
 - `--probe-profile <manual_smoke|manual_text>` — optional probe profile override
 - `--probe-model <model>` — optional model override for the probe run
 - `--refresh-setup-scan` — refresh the shared setup scan before generating the setup diagnostic report
@@ -153,6 +153,7 @@ node dist/index.js --probe-provider-evolution --probe-provider claude --probe-in
 node dist/index.js --probe-provider-evolution --probe-provider goose --probe-model anthropic/claude-sonnet-4
 node dist/index.js --probe-provider-evolution --probe-provider codex --probe-reference release_notes=https://docs.example.com/releases/codex-cli-1-2-3 --probe-reference changelog=https://docs.example.com/changelog/codex-cli
 node dist/index.js --list-provider-evolution-artifacts --probe-provider codex --probe-limit 5
+node dist/index.js --list-provider-evolution-artifacts --probe-provider codex --probe-runtime docker
 node dist/index.js --list-provider-evolution-artifacts --probe-provider claude --probe-instance agent/sdk
 node dist/index.js --list-provider-evolution-artifacts --probe-provider claude --probe-parser agent_sdk_http_v1 --probe-transport agent
 node dist/index.js --list-provider-evolution-artifacts --probe-provider codex --probe-classification regression
@@ -188,8 +189,10 @@ opening any public HTTP surface:
   artifact's review metadata in place and prints the updated artifact JSON to
   stdout
 - `--probe-provider`, `--probe-instance`, `--probe-parser`,
-  `--probe-transport`, and `--probe-profile` can scope the retained-artifact
-  listing, and `--probe-limit <count>` caps list output
+  `--probe-runtime`, `--probe-transport`, and `--probe-profile` can scope the
+  retained-artifact listing, and `--probe-limit <count>` caps list output
+- `--probe-runtime <native|wsl|docker>` lets retained provider-evolution
+  triage stay on one CLI runtime mode without rerunning a probe
 - `--probe-classification <classification>` can be repeated during list/read
   flows to focus triage on artifacts whose review already includes
   `baseline`, `stable`, `upgrade`, `regression`, `schema_change`, or

@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import type { RuntimeMode } from '../../backends/cli/config.js';
 import type { ProviderEvolutionEvidenceObserver, ProviderEvolutionEvidenceBundle, ProviderEvolutionTransport } from './providerEvolution.js';
 import { ProviderEvolutionEvidenceCollector } from './providerEvolution.js';
 
@@ -117,6 +118,7 @@ export interface ProviderEvolutionProbeArtifact {
   parserId: string;
   probeProfile: string;
   transport: ProviderEvolutionTransport;
+  runtimeMode?: RuntimeMode;
   version?: string;
   capturedAt: string;
   execution: ProviderEvolutionProbeExecutionSummary;
@@ -146,6 +148,7 @@ export interface ProviderEvolutionProbeArtifactSummary {
   parserId: string;
   probeProfile: string;
   transport: ProviderEvolutionTransport;
+  runtimeMode?: RuntimeMode;
   version?: string;
   capturedAt: string;
   execution: ProviderEvolutionProbeExecutionSummary;
@@ -173,6 +176,7 @@ export interface ProviderEvolutionProbeArtifactQuery {
   parserId?: string;
   probeProfile?: string;
   transport?: ProviderEvolutionTransport;
+  runtimeMode?: RuntimeMode;
   reviewClassifications?: ProviderEvolutionReviewClassification[];
   limit?: number;
 }
@@ -184,6 +188,7 @@ export interface ProviderEvolutionProbeRequest {
     parserId: string;
     probeProfile: string;
     transport?: ProviderEvolutionTransport;
+    runtimeMode?: RuntimeMode;
     version?: string;
   };
   reviewContext?: {
@@ -298,6 +303,7 @@ export class ProviderEvolutionProbeService {
       parserId: request.target.parserId,
       probeProfile: request.profile.id,
       transport: request.target.transport ?? 'unknown',
+      ...(request.target.runtimeMode ? { runtimeMode: request.target.runtimeMode } : {}),
       version: request.target.version,
       capturedAt: new Date(this.now()).toISOString(),
       execution,
@@ -411,6 +417,7 @@ export class ProviderEvolutionProbeService {
         && parsed.instance === target.instance
         && parsed.parserId === target.parserId
         && parsed.probeProfile === profileId
+        && matchesBaselineRuntimeMode(parsed.runtimeMode, target.runtimeMode)
       ) {
         artifacts.push(stored);
       }
@@ -658,6 +665,7 @@ export function summarizeProviderEvolutionProbeArtifact(
     parserId: result.artifact.parserId,
     probeProfile: result.artifact.probeProfile,
     transport: result.artifact.transport,
+    runtimeMode: result.artifact.runtimeMode,
     version: result.artifact.version,
     capturedAt: result.artifact.capturedAt,
     execution: result.artifact.execution,
@@ -810,6 +818,9 @@ function matchesProviderEvolutionArtifactQuery(
   if (query.transport && artifact.transport !== query.transport) {
     return false;
   }
+  if (query.runtimeMode && artifact.runtimeMode !== query.runtimeMode) {
+    return false;
+  }
   if (
     query.reviewClassifications?.length
     && !query.reviewClassifications.some((classification) => artifact.review.classifications.includes(classification))
@@ -817,6 +828,17 @@ function matchesProviderEvolutionArtifactQuery(
     return false;
   }
   return true;
+}
+
+function matchesBaselineRuntimeMode(
+  artifactRuntimeMode: RuntimeMode | undefined,
+  targetRuntimeMode: RuntimeMode | undefined,
+): boolean {
+  if (!targetRuntimeMode) {
+    return artifactRuntimeMode === undefined;
+  }
+
+  return artifactRuntimeMode === undefined || artifactRuntimeMode === targetRuntimeMode;
 }
 
 function summarizeProviderEvolutionProbeReview(

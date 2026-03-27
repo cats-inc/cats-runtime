@@ -12,6 +12,7 @@ export type ProviderEvolutionLatestArtifactReadModel = Pick<
   | 'capturedAt'
   | 'probeProfile'
   | 'transport'
+  | 'runtimeMode'
   | 'version'
   | 'execution'
   | 'capabilitySnapshot'
@@ -45,6 +46,7 @@ export function summarizeProviderEvolutionArtifactForReadModel(
     capturedAt: artifact.capturedAt,
     probeProfile: artifact.probeProfile,
     transport: artifact.transport,
+    runtimeMode: artifact.runtimeMode,
     version: artifact.version,
     execution: artifact.execution,
     capabilitySnapshot: artifact.capabilitySnapshot,

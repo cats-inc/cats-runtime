@@ -1132,7 +1132,7 @@ always-on self-adapting parser system.
   - re-read a retained artifact by id without starting the HTTP server
   - update retained artifact review metadata in place without rerunning a probe
   - filter retained artifacts by review classification for narrower triage
-  - filter retained artifacts by parser id and transport for narrower
+  - filter retained artifacts by parser id, runtime mode, and transport for narrower
     operator review
 - the shared manual probe flow now also supports the first agent-backed targets
   via `--probe-instance agent/<instance>`
