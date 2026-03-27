@@ -109,6 +109,72 @@ describe('AgentSdkBridgeAdapter', () => {
     }));
   });
 
+  it('derives a bounded tool catalog from the bridge provider registry when tools are listed', async () => {
+    const adapter = new AgentSdkBridgeAdapter({
+      fetch: async () => new Response(JSON.stringify({
+        providers: [
+          {
+            name: 'claude',
+            tool_groups: [
+              {
+                id: 'core',
+                label: 'Core',
+                tools: [
+                  { name: 'read_file', source: 'core' },
+                  { name: 'write_file', source: 'core' },
+                ],
+              },
+            ],
+            tools: [
+              { name: 'search', source: 'plugin', pluginId: 'workspace' },
+            ],
+          },
+        ],
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    });
+
+    await expect(adapter.listTools(createInstance())).resolves.toEqual({
+      method: 'providers_get',
+      summary: '2 tool(s) across 1 group(s) exposed by the Agent SDK bridge provider registry.',
+      toolCount: 2,
+      groupCount: 1,
+      groups: [
+        {
+          id: 'core',
+          label: 'Core',
+          toolCount: 2,
+        },
+      ],
+      tools: [
+        { name: 'read_file', source: 'core', groupId: 'core' },
+        { name: 'write_file', source: 'core', groupId: 'core' },
+      ],
+    });
+  });
+
+  it('fails bounded tool discovery when the bridge registry omits tool metadata', async () => {
+    const adapter = new AgentSdkBridgeAdapter({
+      fetch: async () => new Response(JSON.stringify({
+        providers: [
+          {
+            name: 'claude',
+            models: ['sonnet'],
+          },
+        ],
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    });
+
+    await expect(adapter.listTools(createInstance())).rejects.toThrow(
+      /did not expose a tool catalog/i,
+    );
+  });
+
   it('records dropped and unknown bridge events for provider-evolution evidence while preserving tool_result output', async () => {
     const encoder = new TextEncoder();
     const adapter = new AgentSdkBridgeAdapter({

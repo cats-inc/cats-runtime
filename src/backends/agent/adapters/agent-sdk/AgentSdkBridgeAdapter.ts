@@ -14,6 +14,8 @@ import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
 import type {
   AgentAdapter,
   AgentAdapterInspection,
+  AgentAdapterToolCatalog,
+  AgentAdapterToolCatalogEntry,
   AgentBackendOptions,
   AgentAdapterProbeCheck,
   AgentInvokeInput,
@@ -81,14 +83,14 @@ function buildInspection(
   return {
     adapter: 'agent_sdk_bridge',
     family: 'bridge',
-    summary: 'Agent SDK bridge uses runtime-owned HTTP session creation plus SSE message streaming against a provider-managed remote session.',
+    summary: 'Agent SDK bridge uses runtime-owned HTTP session creation plus SSE message streaming against a provider-managed remote session, and reuses the provider registry for bounded model/tool inspection when available.',
     endpoint: resolveBaseUrl(instance, env),
     transport: {
       kind: 'http',
       protocol: 'agent_sdk_http_v1',
       liveProbe: 'providers_get',
       modelDiscovery: 'providers_get',
-      toolDiscovery: 'none',
+      toolDiscovery: 'providers_get',
       streaming: 'sse',
     },
     request: {
@@ -116,11 +118,167 @@ function buildInspection(
     capabilities: {
       probe: true,
       modelDiscovery: true,
-      toolCatalog: false,
+      toolCatalog: true,
       cancel: true,
       runtimeServices: true,
       toolCallEvents: true,
     },
+  };
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object'
+    ? value as Record<string, unknown>
+    : undefined;
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : undefined;
+}
+
+function normalizeBridgeToolSource(
+  value: string | undefined,
+): AgentAdapterToolCatalogEntry['source'] {
+  switch (value) {
+    case 'core':
+    case 'plugin':
+    case 'channel':
+    case 'session':
+    case 'unknown':
+      return value;
+    default:
+      return 'unknown';
+  }
+}
+
+function parseBridgeToolEntry(
+  value: unknown,
+  inheritedGroupId?: string,
+): AgentAdapterToolCatalogEntry | undefined {
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return {
+      name: value.trim(),
+      source: 'unknown',
+      ...(inheritedGroupId ? { groupId: inheritedGroupId } : {}),
+    };
+  }
+
+  const record = asRecord(value);
+  if (!record) {
+    return undefined;
+  }
+
+  const name = readString(record.name)
+    || readString(record.toolName)
+    || readString(record.id)
+    || readString(record.key);
+  if (!name) {
+    return undefined;
+  }
+
+  const groupId = readString(record.groupId)
+    || readString(record.group)
+    || inheritedGroupId;
+
+  return {
+    name,
+    source: normalizeBridgeToolSource(readString(record.source) || readString(record.kind)),
+    ...(readString(record.title) || readString(record.label)
+      ? { title: readString(record.title) || readString(record.label) }
+      : {}),
+    ...(groupId ? { groupId } : {}),
+    ...(readString(record.pluginId) || readString(record.plugin)
+      ? { pluginId: readString(record.pluginId) || readString(record.plugin) }
+      : {}),
+    ...(record.optional === true || record.required === false ? { optional: true } : {}),
+  };
+}
+
+function parseBridgeToolCatalog(
+  providerRecord: Record<string, unknown>,
+): AgentAdapterToolCatalog | undefined {
+  const catalogRecord = asRecord(providerRecord.toolCatalog)
+    || asRecord(providerRecord.tool_catalog)
+    || providerRecord;
+  const tools: AgentAdapterToolCatalogEntry[] = [];
+  const groups: AgentAdapterToolCatalog['groups'] = [];
+  const rawGroups = Array.isArray(catalogRecord.toolGroups)
+    ? catalogRecord.toolGroups
+    : Array.isArray(catalogRecord.tool_groups)
+      ? catalogRecord.tool_groups
+      : Array.isArray(catalogRecord.groups)
+        ? catalogRecord.groups
+        : [];
+
+  for (const entry of rawGroups) {
+    const groupRecord = asRecord(entry);
+    if (!groupRecord) {
+      continue;
+    }
+
+    const groupId = readString(groupRecord.id)
+      || readString(groupRecord.key)
+      || readString(groupRecord.name);
+    if (!groupId) {
+      continue;
+    }
+
+    const label = readString(groupRecord.label)
+      || readString(groupRecord.title)
+      || readString(groupRecord.name);
+    const groupTools = Array.isArray(groupRecord.tools)
+      ? groupRecord.tools
+        .map((tool) => parseBridgeToolEntry(tool, groupId))
+        .filter((tool): tool is AgentAdapterToolCatalogEntry => Boolean(tool))
+      : [];
+
+    groups.push({
+      id: groupId,
+      ...(label ? { label } : {}),
+      toolCount: groupTools.length,
+    });
+    tools.push(...groupTools);
+  }
+
+  if (tools.length === 0 && Array.isArray(catalogRecord.tools)) {
+    tools.push(
+      ...catalogRecord.tools
+        .map((entry) => parseBridgeToolEntry(entry))
+        .filter((entry): entry is AgentAdapterToolCatalogEntry => Boolean(entry)),
+    );
+  }
+
+  if (tools.length === 0) {
+    return undefined;
+  }
+
+  if (groups.length === 0) {
+    const counts = new Map<string, number>();
+    for (const tool of tools) {
+      const key = tool.groupId || tool.source;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    for (const [id, toolCount] of counts.entries()) {
+      groups.push({
+        id,
+        label: id,
+        toolCount,
+      });
+    }
+  }
+
+  groups.sort((left, right) => left.id.localeCompare(right.id));
+  tools.sort((left, right) => left.name.localeCompare(right.name));
+
+  return {
+    method: 'providers_get',
+    summary: `${tools.length} tool(s) across ${groups.length} group(s) exposed by the Agent SDK bridge provider registry.`,
+    toolCount: tools.length,
+    groupCount: groups.length,
+    groups,
+    tools,
   };
 }
 
@@ -176,6 +334,16 @@ function parseBridgeProviderRegistry(
     ...(configuredModelListed !== undefined ? { configuredModelListed } : {}),
     capabilities: parseBridgeProviderCapabilities(provider?.capabilities),
   };
+}
+
+function findBridgeProvider(
+  payload: Record<string, unknown>,
+  expectedProvider: string,
+): Record<string, unknown> | undefined {
+  const providers = Array.isArray(payload.providers) ? payload.providers : [];
+  return providers.find((entry) =>
+    entry && typeof entry === 'object' && (entry as Record<string, unknown>).name === expectedProvider,
+  ) as Record<string, unknown> | undefined;
 }
 
 function isBridgeProviderSemanticallyReady(
@@ -645,14 +813,39 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
 
     const payload = await response.json() as Record<string, unknown>;
     const expected = mapBridgeProvider(instance.providerName);
-    const providers = Array.isArray(payload.providers) ? payload.providers : [];
-    const provider = providers.find((entry) =>
-      entry && typeof entry === 'object' && (entry as Record<string, unknown>).name === expected,
-    ) as Record<string, unknown> | undefined;
+    const provider = findBridgeProvider(payload, expected);
     const models = Array.isArray(provider?.models) ? provider.models : [];
     return models
       .filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
       .map((entry) => ({ id: entry, label: entry }));
+  }
+
+  async listTools(instance: RemoteProviderInstanceConfig): Promise<AgentAdapterToolCatalog> {
+    const env = this.options.env || process.env;
+    const baseUrl = resolveBaseUrl(instance, env).replace(/\/$/, '');
+    const response = await this.fetchImpl(`${baseUrl}/api/v1/providers`, {
+      headers: buildHeaders(instance, env),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Agent SDK bridge tool catalog failed: ${await readErrorBody(response)}`);
+    }
+
+    const payload = await response.json() as Record<string, unknown>;
+    const expected = mapBridgeProvider(instance.providerName);
+    const provider = findBridgeProvider(payload, expected);
+    if (!provider) {
+      throw new Error(`Agent SDK bridge provider registry did not list '${expected}'.`);
+    }
+
+    const catalog = parseBridgeToolCatalog(provider);
+    if (!catalog) {
+      throw new Error(
+        `Agent SDK bridge provider registry did not expose a tool catalog for '${expected}'.`,
+      );
+    }
+
+    return catalog;
   }
 
   async cancel(

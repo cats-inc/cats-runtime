@@ -2750,8 +2750,9 @@ Agent targets now split into two cases:
 
 - adapters without remote tool discovery support still return the bounded
   `provider_managed` summary only
-- adapters with bounded discovery support (the first slice is OpenClaw
-  `tools.catalog`) return `discoverable: true`, set
+- adapters with bounded discovery support (the first slices are OpenClaw
+  `tools.catalog` and Agent SDK bridge provider-registry catalogs) return
+  `discoverable: true`, set
   `observability.catalog: "provider_remote_enumerated"`, and may include an
   additive `catalog` object
 

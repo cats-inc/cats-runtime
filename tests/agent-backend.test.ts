@@ -1052,6 +1052,7 @@ describe('agent backend integration', () => {
       expect(fetchCalls).toEqual([
         { url: 'http://agent-sdk.test/api/v1/providers', method: 'GET' },
         { url: 'http://agent-sdk.test/api/v1/providers', method: 'GET' },
+        { url: 'http://agent-sdk.test/api/v1/providers', method: 'GET' },
       ]);
     } finally {
       await runtime.close();
@@ -1157,6 +1158,7 @@ describe('agent backend integration', () => {
         ],
       }));
       expect(fetchCalls).toEqual([
+        { url: 'http://agent-sdk.test/api/v1/providers', method: 'GET' },
         { url: 'http://agent-sdk.test/api/v1/providers', method: 'GET' },
         { url: 'http://agent-sdk.test/api/v1/providers', method: 'GET' },
       ]);
@@ -1420,6 +1422,36 @@ describe('agent backend integration', () => {
         : undefined;
       fetchCalls.push({ url, method, body });
 
+      if (url === 'http://agent-sdk.test/api/v1/providers' && method === 'GET') {
+        return new Response(JSON.stringify({
+          providers: [
+            {
+              name: 'claude',
+              default_model: 'sonnet',
+              models: ['sonnet', 'haiku'],
+              capabilities: {
+                streaming: true,
+                mcp: true,
+                vision: false,
+              },
+              tool_groups: [
+                {
+                  id: 'core',
+                  label: 'Core',
+                  tools: [
+                    { name: 'grep', source: 'core' },
+                    { name: 'read_file', source: 'core' },
+                  ],
+                },
+              ],
+            },
+          ],
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
       if (url === 'http://agent-sdk.test/api/v1/sessions' && method === 'POST') {
         return new Response(JSON.stringify({
           id: 'bridge-session-1',
@@ -1509,7 +1541,7 @@ describe('agent backend integration', () => {
                   protocol: 'agent_sdk_http_v1',
                   liveProbe: 'providers_get',
                   modelDiscovery: 'providers_get',
-                  toolDiscovery: 'none',
+                  toolDiscovery: 'providers_get',
                   streaming: 'sse',
                 },
                 request: {
@@ -1531,7 +1563,7 @@ describe('agent backend integration', () => {
                 capabilities: {
                   probe: true,
                   modelDiscovery: true,
-                  toolCatalog: false,
+                  toolCatalog: true,
                   cancel: true,
                   runtimeServices: true,
                   toolCallEvents: true,
@@ -1539,11 +1571,11 @@ describe('agent backend integration', () => {
               },
               tooling: {
                 source: 'provider_managed',
-                discoverable: false,
+                discoverable: true,
                 sessionScopedOverrides: false,
                 summary: expect.stringContaining('external agent runtime'),
                 observability: {
-                  catalog: 'not_enumerated',
+                  catalog: 'provider_remote_enumerated',
                   toolCallEvents: true,
                   runtimeServices: true,
                 },

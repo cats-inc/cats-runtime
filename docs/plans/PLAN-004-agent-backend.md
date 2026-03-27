@@ -355,6 +355,7 @@ difference between logical session identity and provider-managed resume tokens.
 | 2026-03-17 | Landed Phase 1-4 core implementation: shared session/bootstrap/output contract, `backends.agent` config/catalog plumbing, and OpenClaw Gateway MVP |
 | 2026-03-17 | Added `agent_sdk_bridge` as the second adapter target using the external `genai-gateway-agent` boundary and shared agent contract |
 | 2026-03-26 | OpenClaw `models.list` discovery, agent runtime inspection, live tool-catalog summaries, and retained provider-evolution summaries landed on runtime diagnostics/config surfaces; remaining work is now limited to third-party adapter plug-in guidance rather than missing runtime seams |
+| 2026-03-27 | Agent SDK bridge adapter now derives bounded remote tool catalogs from the shared provider registry, and the same tool-discovery truth is surfaced on `/providers/{provider}/tools` plus live provider diagnostics alongside the existing bridge model/streaming checks |
 
 ---
 
