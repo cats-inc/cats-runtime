@@ -651,6 +651,10 @@ also narrow compatibility evidence list/read flows to one or more runtime
 compatibility classes such as `probe_failed` or `unsupported_version`, and the
 same `--probe-parser` / `--probe-profile` selectors can narrow retained
 compatibility evidence to one parser/profile family without rerunning a probe.
+When those retained artifacts exist, the latest bounded summary is also reused
+by `GET /diagnostics/providers` and `/providers/config` under
+`compatibilityEvidence.latestArtifact`, so hosts can inspect recent degraded
+compatibility evidence without starting the CLI helper flow.
 
 ## Running the Project
 

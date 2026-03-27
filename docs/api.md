@@ -626,6 +626,19 @@ probe route. The summary includes:
   changelog / issue / announcement URLs
 - `relativePath`
 
+When a retained CLI compatibility evidence bundle exists for a target,
+`GET /diagnostics/providers` also adds `compatibilityEvidence.latestArtifact`.
+This is a bounded read model over the latest retained degraded/failing
+compatibility artifact, not a new re-probe route. The summary includes:
+
+- `artifactId`
+- `classification`
+- `summary`
+- `capturedAt`
+- `parserId`
+- `profileId`
+- `relativePath`
+
 `GET /diagnostics/providers` also includes additive per-target `metering`
 snapshots. This is a read-only operator surface over the runtime-owned
 metering service, not a second compatibility classifier. Each target now
@@ -2683,6 +2696,12 @@ same instance entry also exposes additive `providerEvolution.latestArtifact`.
 This reuses the retained artifact read model already surfaced on
 `GET /diagnostics/providers`, so hosts can inspect the latest capability
 snapshot/review without making a second provider diagnostics call.
+
+When a retained CLI compatibility evidence bundle exists for an instance, the
+same instance entry also exposes additive `compatibilityEvidence.latestArtifact`.
+This mirrors the same bounded retained-artifact summary from
+`GET /diagnostics/providers`, so hosts can show the most recent degraded or
+failed compatibility evidence without shelling out to the CLI list/read flow.
 
 The same retained summary now also carries optional
 `reviewContext.references[]` when a maintainer attached external release-note

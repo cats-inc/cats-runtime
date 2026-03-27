@@ -10,6 +10,10 @@ import type { ProviderName } from '../../backends/cli/providers/types.js';
 import { inspectAgentTarget } from '../../backends/agent/inspection.js';
 import { buildProviderInstallCatalogView } from '../../core/provider-install/knowledge.js';
 import {
+  createCompatibilityEvidenceService,
+  summarizeCompatibilityEvidenceArtifactForReadModel,
+} from '../../core/compatibility/compatibilityEvidenceReadModel.js';
+import {
   createProviderEvolutionProbeService,
   resolveProviderEvolutionArtifactInstance,
   summarizeProviderEvolutionArtifactForReadModel,
@@ -32,6 +36,7 @@ providerRoutes.get('/providers/config', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const providerCatalog = listProviderCatalog(ctx.config);
   const compatibility = getProviderCompatibilityService(ctx);
+  const compatibilityEvidence = createCompatibilityEvidenceService(ctx.config);
   const executionStrategies = ctx.apiBackend?.inspectExecutionStrategies();
   const probeService = createProviderEvolutionProbeService(ctx.config);
 
@@ -68,6 +73,12 @@ providerRoutes.get('/providers/config', async (c) => {
           provider: instance.providerName,
           instance: resolveProviderEvolutionArtifactInstance(instance),
         });
+        const latestCompatibilityEvidence = instance.backend === 'cli'
+          ? await compatibilityEvidence.readLatestArtifact({
+              provider: instance.providerName,
+              instance: instance.instanceId,
+            })
+          : null;
         const metering = getRuntimeMeteringService(ctx).buildProviderTargetSnapshot({
           provider: instance.providerName,
           instance: instance.instanceId,
@@ -105,6 +116,13 @@ providerRoutes.get('/providers/config', async (c) => {
               instance.instanceId,
             ) || null
             : null,
+          ...(latestCompatibilityEvidence ? {
+            compatibilityEvidence: {
+              latestArtifact: summarizeCompatibilityEvidenceArtifactForReadModel(
+                latestCompatibilityEvidence,
+              ),
+            },
+          } : {}),
           ...(latestProbeArtifact ? {
             providerEvolution: {
               latestArtifact: summarizeProviderEvolutionArtifactForReadModel(latestProbeArtifact),

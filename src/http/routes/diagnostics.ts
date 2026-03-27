@@ -27,6 +27,11 @@ import { inspectProviderActiveConfig } from '../../core/providerActiveConfig.js'
 import { toCompatibilitySummaryView } from '../../core/compatibility/ProviderCompatibilityService.js';
 import type { CompatibilitySummaryView } from '../../core/compatibility/types.js';
 import {
+  createCompatibilityEvidenceService,
+  summarizeCompatibilityEvidenceArtifactForReadModel,
+  type CompatibilityEvidenceLatestArtifactReadModel,
+} from '../../core/compatibility/compatibilityEvidenceReadModel.js';
+import {
   createProviderEvolutionProbeService,
   resolveProviderEvolutionArtifactInstance,
   summarizeProviderEvolutionArtifactForReadModel,
@@ -100,6 +105,9 @@ interface ProviderDiagnosticResult {
   setup?: ProviderSetupSummary;
   compatibility?: CompatibilitySummaryView;
   metering: RuntimeProviderTargetMeteringSnapshot;
+  compatibilityEvidence?: {
+    latestArtifact: CompatibilityEvidenceLatestArtifactReadModel;
+  };
   providerEvolution?: {
     latestArtifact: ProviderEvolutionLatestArtifactReadModel;
   };
@@ -993,6 +1001,7 @@ async function diagnoseTarget(
   probeMode: DiagnosticsProbeMode,
   env: Readonly<NodeJS.ProcessEnv>,
   forceRefresh = false,
+  compatibilityEvidenceService?: ReturnType<typeof createCompatibilityEvidenceService>,
   probeService?: ReturnType<typeof createProviderEvolutionProbeService>,
 ): Promise<ProviderDiagnosticResult> {
   let result: {
@@ -1026,6 +1035,12 @@ async function diagnoseTarget(
         instance: resolveProviderEvolutionArtifactInstance(target),
       })
     : null;
+  const latestCompatibilityEvidence = target.backend === 'cli' && compatibilityEvidenceService
+    ? await compatibilityEvidenceService.readLatestArtifact({
+        provider: target.providerName,
+        instance: target.instanceId,
+      })
+    : null;
   const metering = getRuntimeMeteringService(ctx).buildProviderTargetSnapshot({
     provider: target.providerName,
     instance: target.instanceId,
@@ -1044,6 +1059,13 @@ async function diagnoseTarget(
     setup: result.setup,
     compatibility: result.compatibility,
     metering,
+    ...(latestCompatibilityEvidence ? {
+      compatibilityEvidence: {
+        latestArtifact: summarizeCompatibilityEvidenceArtifactForReadModel(
+          latestCompatibilityEvidence,
+        ),
+      },
+    } : {}),
     ...(latestProbeArtifact ? {
       providerEvolution: {
         latestArtifact: summarizeProviderEvolutionArtifactForReadModel(latestProbeArtifact),
@@ -1090,11 +1112,20 @@ async function collectProviderDiagnostics(
 }> {
   const fullCatalog = listProviderCatalog(ctx.config);
   const catalog = filterProviderDiagnosticsCatalog(fullCatalog, filters);
+  const compatibilityEvidenceService = createCompatibilityEvidenceService(ctx.config);
   const probeService = createProviderEvolutionProbeService(ctx.config);
   const providers = await Promise.all(
     Object.values(catalog)
       .flatMap((entry) => entry.instances)
-      .map((target) => diagnoseTarget(ctx, target, probeMode, env, forceRefresh, probeService)),
+      .map((target) => diagnoseTarget(
+        ctx,
+        target,
+        probeMode,
+        env,
+        forceRefresh,
+        compatibilityEvidenceService,
+        probeService,
+      )),
   );
 
   return {

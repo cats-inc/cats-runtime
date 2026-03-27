@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRuntimeApp as createApp } from './app.js';
@@ -21,6 +21,66 @@ function createAbortError(): Error {
   const error = new Error('Aborted');
   error.name = 'AbortError';
   return error;
+}
+
+function writeCompatibilityEvidenceArtifact(
+  root: string,
+  provider: string,
+  artifactId: string,
+  overrides: Partial<{
+    instanceId: string;
+    classification: 'degraded' | 'unsupported_version' | 'unrecognized_protocol' | 'probe_failed';
+    summary: string;
+    capturedAt: string;
+    parserId: string;
+    profileId: string;
+  }> = {},
+): string {
+  const providerDir = join(root, provider);
+  mkdirSync(providerDir, { recursive: true });
+  const artifactPath = join(providerDir, `${artifactId}.json`);
+  writeFileSync(artifactPath, `${JSON.stringify({
+    schemaVersion: 3,
+    id: artifactId,
+    capturedAt: overrides.capturedAt || '2026-03-27T00:00:00.000Z',
+    classification: overrides.classification || 'probe_failed',
+    summary: overrides.summary || 'Compatibility probe failed while checking the provider.',
+    target: {
+      provider,
+      instanceId: overrides.instanceId || 'default',
+    },
+    profile: {
+      id: overrides.profileId || `${provider}-cli-best-fit`,
+      label: `${provider} best fit`,
+      protocolFamily: provider,
+      parserId: overrides.parserId || `${provider}-json`,
+      confidence: 'fallback',
+    },
+    fingerprint: {
+      provider,
+      instanceId: overrides.instanceId || 'default',
+      command: provider,
+      runner: 'auto',
+      runtime: { mode: 'native' },
+      version: {
+        detected: true,
+        source: 'command',
+      },
+      features: [],
+      checkedAt: overrides.capturedAt || '2026-03-27T00:00:00.000Z',
+    },
+    warnings: [],
+    setup: {
+      status: 'ready',
+      summary: 'ready',
+      install: null,
+      auth: null,
+      remediation: [],
+    },
+    probes: {},
+    checks: [],
+  }, null, 2)}\n`, 'utf8');
+  return artifactPath;
 }
 
 describe('provider diagnostics HTTP contract', () => {
@@ -474,6 +534,70 @@ describe('provider diagnostics HTTP contract', () => {
         }),
       }),
     ]);
+  });
+
+  it('surfaces the latest retained compatibility evidence summary on diagnostics and provider config', async () => {
+    const config = makeConfig();
+    writeCompatibilityEvidenceArtifact(
+      getRuntimeResolvedPaths(config).compatibilityEvidenceDir,
+      'claude',
+      'compat-artifact-1',
+      {
+        instanceId: 'default',
+        classification: 'probe_failed',
+        summary: 'Compatibility probe failed while checking the provider.',
+        parserId: 'claude-stream-json',
+        profileId: 'claude-cli-best-fit',
+      },
+    );
+
+    const app = createTestApp(config);
+
+    const diagnosticsResponse = await app.request(
+      '/diagnostics/providers?provider=claude&backend=cli&instance=default',
+    );
+    expect(diagnosticsResponse.status).toBe(200);
+    await expect(diagnosticsResponse.json()).resolves.toEqual(expect.objectContaining({
+      providers: [
+        expect.objectContaining({
+          provider: 'claude',
+          backend: 'cli',
+          instance: 'default',
+          compatibilityEvidence: {
+            latestArtifact: expect.objectContaining({
+              artifactId: 'compat-artifact-1',
+              classification: 'probe_failed',
+              summary: 'Compatibility probe failed while checking the provider.',
+              parserId: 'claude-stream-json',
+              profileId: 'claude-cli-best-fit',
+              relativePath: expect.stringContaining('claude/compat-artifact-1.json'),
+            }),
+          },
+        }),
+      ],
+    }));
+
+    const configResponse = await app.request('/providers/config');
+    expect(configResponse.status).toBe(200);
+    await expect(configResponse.json()).resolves.toEqual(expect.objectContaining({
+      providers: expect.objectContaining({
+        claude: expect.objectContaining({
+          instances: expect.arrayContaining([
+            expect.objectContaining({
+              id: 'default',
+              compatibilityEvidence: {
+                latestArtifact: expect.objectContaining({
+                  artifactId: 'compat-artifact-1',
+                  classification: 'probe_failed',
+                  parserId: 'claude-stream-json',
+                  profileId: 'claude-cli-best-fit',
+                }),
+              },
+            }),
+          ]),
+        }),
+      }),
+    }));
   });
 
   it('filters provider diagnostics by provider/backend/instance and echoes the applied query', async () => {

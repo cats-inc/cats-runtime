@@ -1112,6 +1112,10 @@ always-on self-adapting parser system.
 - the same offline triage flow now also accepts `--probe-parser` and
   `--probe-profile` filters so retained compatibility bundles can be narrowed
   to one parser/profile family without rerunning a probe
+- `/diagnostics/providers` and `/providers/config` now also reuse the latest
+  retained compatibility evidence summary for matching CLI targets, so hosts
+  can inspect recent degraded parser/profile evidence without shelling out to
+  the CLI list/read helpers
 - the CLI/manual-first flow can now also:
   - list retained provider-evolution artifacts newest-first
   - re-read a retained artifact by id without starting the HTTP server

@@ -238,6 +238,7 @@ bundle structure.
 | 2026-03-27 | Offline evidence triage follow-through landed for retained provider-evolution artifacts: repeated `--probe-classification` filters now let operators focus list/read flows on `upgrade`, `regression`, `schema_change`, or `semantic_drift_suspected` review classes without adding a new host-facing probe route |
 | 2026-03-27 | Manual review workflow helpers now let operators update retained provider-evolution artifact classifications, summary text, highlights, and external references in place via CLI without rerunning a probe or adding a public write route |
 | 2026-03-27 | `/diagnostics/providers` now also exposes additive per-target `metering` snapshots from the shared runtime-owned metering service so operators can distinguish compatibility/setup drift from recent rate-limit incidents and active cooldown/block guardrails without changing the compatibility cache or adding a second route |
+| 2026-03-27 | Retained CLI compatibility evidence now has the same bounded latest-artifact read model on `/diagnostics/providers` and `/providers/config`, so hosts can inspect the most recent degraded parser/profile evidence without shelling out to manual list/read commands or adding a new route |
 
 ---
 
