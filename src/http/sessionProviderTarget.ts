@@ -1,5 +1,7 @@
 import { inspectAgentTarget } from '../backends/agent/inspection.js';
 import type { AgentAdapterInspection } from '../backends/agent/types.js';
+import { inspectApiTarget } from '../backends/api/inspection.js';
+import type { ApiRuntimeInspection } from '../backends/api/inspection.js';
 import type { BackendKind } from '../backends/cli/config.js';
 import type { SessionInfo } from '../backends/cli/pool/types.js';
 import type { ProviderTargetDescriptor } from '../core/providerCatalog.js';
@@ -22,6 +24,7 @@ export interface SessionProviderTargetSummary {
   model?: string;
   continuity: ProviderContinuitySummary;
   tooling: ProviderToolingSummary;
+  apiRuntime?: ApiRuntimeInspection;
   agentRuntime?: AgentAdapterInspection;
   resolutionWarning?: string;
 }
@@ -137,11 +140,18 @@ function inspectSessionAgentRuntime(
     : inspectAgentTarget(target.remoteInstance, { env: process.env });
 }
 
+function inspectSessionApiRuntime(
+  target: ProviderTargetDescriptor,
+): ApiRuntimeInspection | undefined {
+  return inspectApiTarget(target);
+}
+
 function buildSummaryFromTarget(
   target: ProviderTargetDescriptor,
   capabilities: ProviderCapabilities,
   options: {
     resolved: boolean;
+    apiRuntime?: ApiRuntimeInspection;
     agentRuntime?: AgentAdapterInspection;
     resolutionWarning?: string;
   },
@@ -161,6 +171,7 @@ function buildSummaryFromTarget(
     tooling: buildProviderToolingSummary(target, {
       ...(options.agentRuntime ? { agentRuntime: options.agentRuntime } : {}),
     }),
+    ...(options.apiRuntime ? { apiRuntime: options.apiRuntime } : {}),
     ...(options.agentRuntime ? { agentRuntime: options.agentRuntime } : {}),
     ...(options.resolutionWarning ? { resolutionWarning: options.resolutionWarning } : {}),
   };
@@ -175,9 +186,11 @@ export function buildSessionProviderTargetSummary(
 
   try {
     const target = resolveSessionProviderTarget(ctx.config, session);
+    const apiRuntime = inspectSessionApiRuntime(target);
     const agentRuntime = inspectSessionAgentRuntime(ctx, target);
     return buildSummaryFromTarget(target, capabilities, {
       resolved: true,
+      ...(apiRuntime ? { apiRuntime } : {}),
       ...(agentRuntime ? { agentRuntime } : {}),
     });
   } catch (error) {

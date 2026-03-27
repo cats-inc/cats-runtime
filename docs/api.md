@@ -1418,11 +1418,15 @@ semantics without joining against `/providers/config` first. It includes:
 - target transport/model hints when the runtime owns them (`transport`, `model`)
 - backend-neutral continuity truth (`continuity`)
 - target-owned tooling/discoverability truth (`tooling`)
+- additive `apiRuntime` inspection for API/local sessions when available
 - additive `agentRuntime` inspection for agent-backed sessions when available
 
 `providerTarget.tooling` is target-owned baseline capability truth, while
 `inspection.tools` remains the session-scoped permission/profile read model for
-API/local sessions. Branch-aware session payloads now also include a
+API/local sessions. When present, `providerTarget.apiRuntime` mirrors the same
+continuation/cache/provider-native-tool posture exposed on provider topology
+surfaces, but scoped to the resolved session target. Branch-aware session
+payloads now also include a
 `branching` block:
 
 Example `providerTarget` shape:
@@ -1437,6 +1441,10 @@ Example `providerTarget` shape:
     "resolved": true,
     "transport": "openai",
     "model": "gpt-5",
+    "apiRuntime": {
+      "family": "api_runtime",
+      "transport": "openai"
+    },
     "continuity": {
       "source": "runtime_stateful",
       "resume": true,

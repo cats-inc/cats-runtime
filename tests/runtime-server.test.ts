@@ -3273,6 +3273,23 @@ providers:
         resolved: true,
         transport: 'openai',
         model: 'gpt-5.4',
+        apiRuntime: {
+          family: 'api_runtime',
+          transport: 'openai',
+          continuation: {
+            strategy: 'previous_response_id',
+            summary: expect.stringContaining('previous_response_id'),
+          },
+          caching: {
+            strategy: 'none',
+            active: false,
+            summary: expect.stringContaining('No separate cache layer'),
+          },
+          providerNativeTools: {
+            state: 'deferred',
+            summary: expect.stringContaining('Runtime-local tools remain primary'),
+          },
+        },
         continuity: {
           source: 'runtime_stateful',
           summary: expect.stringContaining('cats-runtime owns the host-visible session lifecycle'),
@@ -3314,6 +3331,10 @@ providers:
           resolved: true,
           transport: 'openai',
           model: 'gpt-5.4',
+          apiRuntime: expect.objectContaining({
+            family: 'api_runtime',
+            transport: 'openai',
+          }),
         }),
         inspection: expect.objectContaining({
           tools: expect.objectContaining({
@@ -3341,6 +3362,10 @@ providers:
           resolved: true,
           transport: 'openai',
           model: 'gpt-5.4',
+          apiRuntime: expect.objectContaining({
+            family: 'api_runtime',
+            transport: 'openai',
+          }),
         }),
       }));
 
@@ -3356,6 +3381,10 @@ providers:
             resolved: true,
             transport: 'openai',
             model: 'gpt-5.4',
+            apiRuntime: expect.objectContaining({
+              family: 'api_runtime',
+              transport: 'openai',
+            }),
           }),
         }),
       }));

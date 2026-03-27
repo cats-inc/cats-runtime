@@ -547,6 +547,7 @@ The phase ordering above is based on the current vendor API surfaces reviewed on
 | 2026-03-26 | Major follow-through slices landed: provider-native continuation/caching optimizations, dynamic remote model discovery, runtime-owned tool-loop hardening, additive strategy substrate adoption for API/local execution, richer provider/tooling diagnostics, and bounded live auth/model/tool probes; remaining work is now concentrated in deeper semantic validation and later provider-specific follow-ons |
 | 2026-03-27 | Shared read-model follow-through landed: `/providers/config` and `/diagnostics/providers` now expose additive `apiRuntime` inspection metadata so hosts can inspect continuation, cache/warm-state, and provider-native-tool posture for API/local targets without inferring that state from transport names alone |
 | 2026-03-27 | Tooling-surface follow-through landed: `GET /providers/{provider}/tools` now also includes additive `apiRuntime` inspection metadata for API/local targets, so hosts can inspect runtime-owned tooling policy and API/local optimization posture in one call without fetching a second read model. |
+| 2026-03-27 | Session-facing read-model follow-through landed: `/sessions`, `/sessions/{id}/history`, and `/sessions/{id}/observe` now also carry additive `providerTarget.apiRuntime` metadata for API/local sessions, so host-side run inspection can see continuation/cache/provider-native-tool posture without joining back to provider topology routes. |
 
 ---
 
