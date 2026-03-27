@@ -2039,6 +2039,25 @@ async function listBrowserSessions(
   };
 }
 
+async function readBrowserSession(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const browserSessionId = readRequiredString(args, 'browserSessionId');
+  const path = `/browser/sessions/${encodeURIComponent(browserSessionId)}`;
+  const result = await requestRuntimeJson(ctx, path, { method: 'GET' });
+  ensureRouteSuccess('read_browser_session', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'read_browser_session result');
+  return {
+    summary: `Read browser session ${browserSessionId}.`,
+    structuredContent: {
+      ...payload,
+      ...buildBrowserSessionPaths(browserSessionId),
+    },
+  };
+}
+
 async function browserSummary(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -3373,6 +3392,22 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: listBrowserSessions,
+  },
+  {
+    definition: {
+      name: 'read_browser_session',
+      title: 'Read Browser Session',
+      description: 'Return one runtime-owned browser session through the existing browser session read route.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          browserSessionId: { type: 'string' },
+        },
+        required: ['browserSessionId'],
+        additionalProperties: false,
+      },
+    },
+    execute: readBrowserSession,
   },
   {
     definition: {

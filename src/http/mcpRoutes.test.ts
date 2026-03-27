@@ -431,6 +431,7 @@ describe('runtime MCP facade', () => {
       'report_compaction_follow_through',
       'list_browser_drivers',
       'list_browser_sessions',
+      'read_browser_session',
       'browser_summary',
       'create_browser_session',
       'create_browser_page',
@@ -3499,6 +3500,57 @@ describe('runtime MCP facade', () => {
         }),
       }),
     ]);
+
+    const readBrowserSessionResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 19.5,
+        method: 'tools/call',
+        params: {
+          name: 'read_browser_session',
+          arguments: {
+            browserSessionId,
+          },
+        },
+      }),
+    });
+    expect(readBrowserSessionResponse.status).toBe(200);
+    const readBrowserSession = await readBrowserSessionResponse.json() as {
+      result: {
+        structuredContent: {
+          browserSessionPath: string;
+          createBrowserPagePath: string;
+          closeBrowserSessionPath: string;
+          session: {
+            id: string;
+            runtimeSessionId?: string;
+            inspection: {
+              openPageCount: number;
+              closedPageCount: number;
+            };
+          };
+        };
+      };
+    };
+    expect(readBrowserSession.result.structuredContent.browserSessionPath).toBe(
+      `/browser/sessions/${browserSessionId}`,
+    );
+    expect(readBrowserSession.result.structuredContent.createBrowserPagePath).toBe(
+      `/browser/sessions/${browserSessionId}/pages`,
+    );
+    expect(readBrowserSession.result.structuredContent.closeBrowserSessionPath).toBe(
+      `/browser/sessions/${browserSessionId}/close`,
+    );
+    expect(readBrowserSession.result.structuredContent.session).toEqual(expect.objectContaining({
+      id: browserSessionId,
+      runtimeSessionId: 'session-1',
+      inspection: expect.objectContaining({
+        openPageCount: 1,
+        closedPageCount: 0,
+      }),
+    }));
 
     const closeBrowserPageResponse = await app.request('/mcp', {
       method: 'POST',

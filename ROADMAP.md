@@ -1092,6 +1092,10 @@ evidence bundles and does not force hosts to invent their own report format.
   MCP as `pool_status` and `management_diagnostics`, so orchestrator-style
   hosts can inspect worker saturation and management-adapter readiness without
   bespoke runtime wrappers
+- the same runtime-owned browser session detail surface is now also exposed
+  through MCP as `read_browser_session`, so orchestrator-style hosts can drill
+  into one browser session's page/binding state without rebuilding that read
+  model client-side
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
   remediation previews, and latest-setup-report summary metadata including a

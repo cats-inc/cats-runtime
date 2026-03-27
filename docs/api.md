@@ -145,6 +145,7 @@ Current curated tools:
 - `report_compaction_follow_through`
 - `list_browser_drivers`
 - `list_browser_sessions`
+- `read_browser_session`
 - `browser_summary`
 - `create_browser_session`
 - `create_browser_page`
@@ -257,6 +258,10 @@ runtime-owned wakeup mutation seams as `POST /wakeups`,
 `POST /wakeups/{id}/cancel`, and `POST /wakeups/{id}/trigger`, so MCP hosts can
 schedule, cancel, and manually fire wakeups without inventing an MCP-only
 wakeup lifecycle.
+`read_browser_session` reuses the same runtime-owned browser session detail
+surface as `GET /browser/sessions/{id}`, so MCP hosts can inspect one browser
+session's current pages, bindings, and cleanup paths without fanning out from
+the browser session list.
 `list_sessions` and `observe_session` also reuse the same additive session
 `providerTarget` read model exposed by the direct HTTP session/history/observe
 surfaces, so MCP hosts can inspect backend continuity/tooling semantics without
