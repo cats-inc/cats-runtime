@@ -518,6 +518,34 @@ async function providerTools(
   };
 }
 
+async function providerModels(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const provider = readRequiredString(args, 'provider');
+  const searchParams = new URLSearchParams();
+  appendSingleQueryValue(searchParams, 'instance', readOptionalString(args, 'instance'));
+  if (readOptionalBoolean(args, 'forceRefresh') === true) {
+    searchParams.set('refresh', '1');
+  }
+  const path = searchParams.size > 0
+    ? `/providers/${encodeURIComponent(provider)}/models?${searchParams.toString()}`
+    : `/providers/${encodeURIComponent(provider)}/models`;
+  const result = await requestRuntimeJson(ctx, path, { method: 'GET' });
+  ensureRouteSuccess('provider_models', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'provider_models result');
+  const models = Array.isArray(payload.models) ? payload.models : [];
+
+  return {
+    summary: `Provider model catalog for ${provider} contains ${models.length} model(s).`,
+    structuredContent: {
+      ...payload,
+      modelsPath: path,
+    },
+  };
+}
+
 async function providerDiagnostics(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -2114,6 +2142,24 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: providerTools,
+  },
+  {
+    definition: {
+      name: 'provider_models',
+      title: 'Provider Models',
+      description: 'Return the runtime-owned provider model catalog exposed by the existing provider models route.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          provider: { type: 'string' },
+          instance: { type: 'string' },
+          forceRefresh: { type: 'boolean' },
+        },
+        required: ['provider'],
+        additionalProperties: false,
+      },
+    },
+    execute: providerModels,
   },
   {
     definition: {

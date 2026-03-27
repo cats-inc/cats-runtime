@@ -1060,6 +1060,10 @@ evidence bundles and does not force hosts to invent their own report format.
   as `provider_tools`, so orchestrator-style hosts can inspect runtime-local,
   provider-native, or remote-discovered tool ownership without inventing a
   second tooling contract
+- the same per-target provider model catalog surface is now also exposed
+  through MCP as `provider_models`, so orchestrator-style hosts can inspect
+  model availability, discovery warnings, and bounded refresh semantics without
+  dropping down to direct HTTP calls
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
   remediation previews, and latest-setup-report summary metadata including a

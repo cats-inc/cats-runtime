@@ -104,6 +104,7 @@ Current curated tools:
 - `health_diagnostics`
 - `providers_config`
 - `provider_tools`
+- `provider_models`
 - `provider_diagnostics`
 - `reprobe_provider_diagnostics`
 - `list_compatibility_evidence_artifacts`
@@ -208,6 +209,10 @@ and execution-strategy catalog metadata without joining multiple routes first.
 `GET /providers/{provider}/tools`, so MCP hosts can inspect runtime-local,
 provider-native, or agent/API-discovered tool ownership without needing a
 parallel MCP-only contract.
+`provider_models` reuses the same provider-model catalog surface as
+`GET /providers/{provider}/models`, including additive `instance` selection and
+bounded `forceRefresh` semantics, so MCP hosts can inspect per-target model
+availability and discovery warnings without shelling out to the HTTP API.
 `list_sessions` and `observe_session` also reuse the same additive session
 `providerTarget` read model exposed by the direct HTTP session/history/observe
 surfaces, so MCP hosts can inspect backend continuity/tooling semantics without
