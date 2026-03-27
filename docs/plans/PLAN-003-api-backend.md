@@ -6,7 +6,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress |
+| **Status** | In Progress (Major API/Local Slices Landed) |
 | **Owner** | Codex |
 | **Assigned To** | Claude |
 | **Reviewer** | Gemini |
@@ -542,6 +542,7 @@ The phase ordering above is based on the current vendor API surfaces reviewed on
 |------|--------|
 | 2026-03-16 | Plan created for the `src/backends/api` delivery track covering Claude, Codex, Gemini, and Ollama execution |
 | 2026-03-16 | Phase 1 through the first half of Phase 3 landed: backend-neutral runtime seam, split CLI/API/local provider topology, API/local session lifecycle, Anthropic/OpenAI/Gemini/Ollama transports, and the first shared local tool runtime (`list_files`, `read_file`, `write_file`, `grep`, `run_shell`) |
+| 2026-03-26 | Major follow-through slices landed: provider-native continuation/caching optimizations, dynamic remote model discovery, runtime-owned tool-loop hardening, additive strategy substrate adoption for API/local execution, richer provider/tooling diagnostics, and bounded live auth/model/tool probes; remaining work is now concentrated in deeper semantic validation and later provider-specific follow-ons |
 
 ---
 

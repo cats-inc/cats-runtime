@@ -5,7 +5,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
@@ -195,4 +195,3 @@ permanent foundation
 
 *Decision made: 2026-03-19*
 *Decision makers: Proposed by Codex from user direction*
-

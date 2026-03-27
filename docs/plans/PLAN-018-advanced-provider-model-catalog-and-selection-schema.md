@@ -8,7 +8,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | Completed |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User / Claude follow-up |
@@ -369,13 +369,13 @@ After resolution:
 
 ### Phase 1: Advanced Catalog Core Types and Migration Contract Freeze
 
-- [ ] Add parallel advanced catalog types under `src/core/models/*`
-- [ ] Keep the existing v1 `ProviderModelCatalogResult` contract stable
-- [ ] Add public structured-selection and resolved-snapshot types in
+- [x] Add parallel advanced catalog types under `src/core/models/*`
+- [x] Keep the existing v1 `ProviderModelCatalogResult` contract stable
+- [x] Add public structured-selection and resolved-snapshot types in
       `src/core/types.ts`
-- [ ] Define mapping rules between legacy `model` and new selection/resolution
+- [x] Define mapping rules between legacy `model` and new selection/resolution
       fields
-- [ ] Add validation helpers for `entryMode`, namespaced control keys, control
+- [x] Add validation helpers for `entryMode`, namespaced control keys, control
       value kinds, and scope/applicability
 
 **Deliverables**: a frozen additive contract foundation that does not mutate the
@@ -383,13 +383,13 @@ existing v1 provider-model or session `model` surfaces.
 
 ### Phase 2: Provider Knowledge Layer for Entries, Presets, and Controls
 
-- [ ] Add runtime-owned curated knowledge modules for advanced entries,
+- [x] Add runtime-owned curated knowledge modules for advanced entries,
       presets, controls, and default selections
-- [ ] Encode preset applicability and preferred-entry metadata explicitly
-- [ ] Encode control applicability, scope, and semantic tags explicitly
-- [ ] Reuse current discovery / active-config seams only as augmentation over
+- [x] Encode preset applicability and preferred-entry metadata explicitly
+- [x] Encode control applicability, scope, and semantic tags explicitly
+- [x] Reuse current discovery / active-config seams only as augmentation over
       curated knowledge
-- [ ] Establish a support matrix that marks targets as:
+- [x] Establish a support matrix that marks targets as:
       full-resolution, entry-resolution-only, or read-contract-only
 
 **Deliverables**: a truthful knowledge layer that separates concrete entries,
@@ -398,13 +398,13 @@ payloads.
 
 ### Phase 3: Additive Route `GET /providers/{provider}/models/advanced`
 
-- [ ] Add an advanced catalog service that resolves provider target plus
+- [x] Add an advanced catalog service that resolves provider target plus
       knowledge plus dynamic augmentation
-- [ ] Add `GET /providers/{provider}/models/advanced`
-- [ ] Reuse current target-resolution and error semantics from the v1 route
-- [ ] Return `entries`, `presets`, `controls`, `defaultSelection`, and additive
+- [x] Add `GET /providers/{provider}/models/advanced`
+- [x] Reuse current target-resolution and error semantics from the v1 route
+- [x] Return `entries`, `presets`, `controls`, `defaultSelection`, and additive
       provenance/warnings
-- [ ] Add regression tests that prove `GET /providers/{provider}/models`
+- [x] Add regression tests that prove `GET /providers/{provider}/models`
       remains stable during the rollout
 
 **Deliverables**: a new advanced read contract with no breaking change to the
@@ -412,15 +412,15 @@ current v1 catalog route.
 
 ### Phase 4: Structured Selection Contract in Session Create / View
 
-- [ ] Extend `POST /sessions` with an additive `modelSelection` field
-- [ ] Keep legacy `model`-only create payloads accepted and internally map them
+- [x] Extend `POST /sessions` with an additive `modelSelection` field
+- [x] Keep legacy `model`-only create payloads accepted and internally map them
       to `modelSelection`
-- [ ] Validate dual-write payloads and reject ambiguous mismatches
-- [ ] Persist authoritative `modelSelection` plus resolved `modelResolution` in
+- [x] Validate dual-write payloads and reject ambiguous mismatches
+- [x] Persist authoritative `modelSelection` plus resolved `modelResolution` in
       `SessionRegistry`
-- [ ] Update session serialization so create/list/detail/resume/fork responses
+- [x] Update session serialization so create/list/detail/resume/fork responses
       expose structured selection additively while preserving top-level `model`
-- [ ] Re-resolve the compatibility snapshot on create, resume, and fork without
+- [x] Re-resolve the compatibility snapshot on create, resume, and fork without
       mutating the authoritative selection on simple reads
 
 **Deliverables**: session APIs gain structured selection additively while
@@ -428,20 +428,20 @@ remaining backward-compatible for existing callers.
 
 ### Phase 5: Resolution Pipeline from Selection to Backend Execution Args
 
-- [ ] Add a runtime resolver that converts target + structured selection +
+- [x] Add a runtime resolver that converts target + structured selection +
       optional request overrides into:
       resolved entry, legacy model snapshot, resolved control map, warnings,
       and backend-private execution details
-- [ ] Enforce precedence:
+- [x] Enforce precedence:
       entry defaults -> preset defaults -> explicit session controls ->
       per-request overrides
-- [ ] Enforce explicit pin vs auto-resolution behavior
-- [ ] Wire the resolver into create/resume/fork/message execution paths so
+- [x] Enforce explicit pin vs auto-resolution behavior
+- [x] Wire the resolver into create/resume/fork/message execution paths so
       session defaults drive backend input even before public message overrides
       exist
-- [ ] Keep existing backend `model` handoff populated from the resolved
+- [x] Keep existing backend `model` handoff populated from the resolved
       compatibility snapshot while each backend path gains richer support
-- [ ] Roll out execution support in tiers:
+- [x] Roll out execution support in tiers:
       API first, local entry-first, CLI provider-by-provider, agent read-only
       beyond resolved `model` in the first rollout
 
@@ -451,16 +451,16 @@ selection objects directly.
 
 ### Phase 6: Compatibility Hardening, Documentation, and Verification
 
-- [ ] Add advanced catalog route tests for entries, presets, controls,
+- [x] Add advanced catalog route tests for entries, presets, controls,
       default-selection, and warning/provenance behavior
-- [ ] Add preset/control applicability tests
-- [ ] Add explicit-vs-auto resolution tests
-- [ ] Add precedence tests covering preset defaults, explicit controls, and
+- [x] Add preset/control applicability tests
+- [x] Add explicit-vs-auto resolution tests
+- [x] Add precedence tests covering preset defaults, explicit controls, and
       request overrides
-- [ ] Add backwards-compatibility tests for the v1 route and legacy
+- [x] Add backwards-compatibility tests for the v1 route and legacy
       `POST /sessions` payloads
-- [ ] Add session persistence / hydration tests for save-load-resume-fork flows
-- [ ] Update `docs/api.md` and `docs/architecture.md` after implementation
+- [x] Add session persistence / hydration tests for save-load-resume-fork flows
+- [x] Update `docs/api.md` and `docs/architecture.md` after implementation
       lands
 
 **Deliverables**: a verified additive rollout with docs and coverage aligned to
@@ -583,18 +583,18 @@ first additive runtime rollout.
 
 ## Rollout Checklist
 
-- [ ] `GET /providers/{provider}/models` remains backward-compatible
-- [ ] `GET /providers/{provider}/models/advanced` exists and returns advanced
+- [x] `GET /providers/{provider}/models` remains backward-compatible
+- [x] `GET /providers/{provider}/models/advanced` exists and returns advanced
       schema
-- [ ] `POST /sessions` accepts both legacy `model` and additive structured
+- [x] `POST /sessions` accepts both legacy `model` and additive structured
       selection
-- [ ] session read surfaces expose additive `modelSelection` plus
+- [x] session read surfaces expose additive `modelSelection` plus
       `modelResolution` while preserving top-level `model`
-- [ ] resolver enforces explicit pin vs auto behavior and precedence ordering
-- [ ] unsupported backend/target combinations reject or mark unavailable
+- [x] resolver enforces explicit pin vs auto behavior and precedence ordering
+- [x] unsupported backend/target combinations reject or mark unavailable
       controls instead of silently dropping them
-- [ ] backend support tiers are documented in code/tests/docs
-- [ ] any contract-tightening cleanup is parked in the blocked coordinated
+- [x] backend support tiers are documented in code/tests/docs
+- [x] any contract-tightening cleanup is parked in the blocked coordinated
       follow-up phase
 
 ## Progress Log
@@ -602,6 +602,7 @@ first additive runtime rollout.
 | Date | Update |
 |------|--------|
 | 2026-03-25 | Plan created for `SPEC-018` with additive migration discipline, runtime-first rollout ordering, and explicit compatibility rules for existing `cats` consumers |
+| 2026-03-26 | Phase 1-6 additive rollout shipped: runtime-owned advanced catalog knowledge, `GET /providers/{provider}/models/advanced`, additive session `modelSelection` / `modelResolution`, resolution and precedence plumbing, staged backend support, and compatibility regression coverage all landed; coordinated cleanup remains blocked on later `cats` follow-up |
 
 ---
 

@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Recurring Slice Landed) |
+| **Status** | Implemented (Recurring Slice) |
 | **Owner** | Codex |
 | **Reviewer** | User / Team 4 |
 

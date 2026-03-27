@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Approved |
+| **Status** | Implemented (Core Slice) |
 | **Owner** | Codex |
 | **Reviewer** | User-approved via discussion |
 
@@ -259,4 +259,3 @@ work, not a prerequisite for first product integration.
 *Created: 2026-03-19*
 *Author: Codex*
 *Related Plan: [PLAN-005](../plans/PLAN-005-provider-model-catalog-and-discovery.md)*
-

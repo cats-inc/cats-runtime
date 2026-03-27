@@ -8,7 +8,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | Completed |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | Claude / user follow-up |
@@ -64,13 +64,13 @@ logic.
 
 ### Phase 1: Core Catalog Contract and Target Resolution
 
-- [ ] Add shared model catalog types under `src/core`
-- [ ] Introduce a `ProviderModelCatalogService` that resolves provider family,
+- [x] Add shared model catalog types under `src/core`
+- [x] Introduce a `ProviderModelCatalogService` that resolves provider family,
       backend kind, instance id, and default model using existing catalog and
       config plumbing
-- [ ] Define the internal cache key and result shape used by both service and
+- [x] Define the internal cache key and result shape used by both service and
       route layers
-- [ ] Normalize response semantics for `source`, `cache`, `models`, and
+- [x] Normalize response semantics for `source`, `cache`, `models`, and
       optional `warnings`
 
 **Deliverables**: one backend-neutral service contract that can answer model
@@ -78,13 +78,13 @@ catalog lookups for a resolved runtime target.
 
 ### Phase 2: Discovery Strategies and Fallbacks
 
-- [ ] Implement dynamic discovery for `ollama`
-- [ ] Integrate `agent` adapter `listModels()` where available
-- [ ] Reuse or fold the current Kiro static model table into the generic
+- [x] Implement dynamic discovery for `ollama`
+- [x] Integrate `agent` adapter `listModels()` where available
+- [x] Reuse or fold the current Kiro static model table into the generic
       fallback layer
-- [ ] Add config-derived fallback for configured providers that do not expose a
+- [x] Add config-derived fallback for configured providers that do not expose a
       dynamic listing
-- [ ] Add curated static fallback where config-only output is too thin to be
+- [x] Add curated static fallback where config-only output is too thin to be
       useful
 
 **Deliverables**: working `dynamic -> config -> static` discovery flow with a
@@ -92,12 +92,12 @@ small initial strategy set.
 
 ### Phase 3: Cache Semantics and HTTP Surface
 
-- [ ] Add in-memory TTL caching keyed by resolved provider target
-- [ ] Use a short default TTL for discovery-backed results, with `60s` as the
+- [x] Add in-memory TTL caching keyed by resolved provider target
+- [x] Use a short default TTL for discovery-backed results, with `60s` as the
       initial baseline
-- [ ] Add `GET /providers/{provider}/models?instance=...`
-- [ ] Return client errors for unknown providers or invalid instance ids
-- [ ] Keep provider-specific compatibility routes working while steering new
+- [x] Add `GET /providers/{provider}/models?instance=...`
+- [x] Return client errors for unknown providers or invalid instance ids
+- [x] Keep provider-specific compatibility routes working while steering new
       consumers toward the generic route
 
 **Deliverables**: one documented runtime endpoint with stable cache and error
@@ -105,12 +105,12 @@ semantics.
 
 ### Phase 4: Documentation and Verification
 
-- [ ] Update `docs/api.md` with the new route and response contract
-- [ ] Update `docs/architecture.md` if the catalog service changes the runtime
+- [x] Update `docs/api.md` with the new route and response contract
+- [x] Update `docs/architecture.md` if the catalog service changes the runtime
       layering in a meaningful way
-- [ ] Add service and route tests for dynamic discovery, fallback behavior, and
+- [x] Add service and route tests for dynamic discovery, fallback behavior, and
       cache hits
-- [ ] Record any provider-specific limitations or warnings discovered during
+- [x] Record any provider-specific limitations or warnings discovered during
       implementation
 
 **Deliverables**: docs and tests aligned with the shipped contract.
@@ -185,9 +185,9 @@ slice.
 | Date | Update |
 |------|--------|
 | 2026-03-19 | Plan created after `SPEC-004` approval and follow-up review feedback |
+| 2026-03-26 | Core catalog delivery shipped: `ProviderModelCatalogService`, `GET /providers/{provider}/models`, TTL caching, dynamic `ollama` and agent-backed `listModels()` discovery, Kiro/static fallback unification, and route/service regression coverage all landed; later aggregate/refresh follow-ons remain intentionally deferred |
 
 ---
 
 *Created: 2026-03-19*
 *Author: Codex*
-

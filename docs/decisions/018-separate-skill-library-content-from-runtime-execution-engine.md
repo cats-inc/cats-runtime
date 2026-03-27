@@ -5,7 +5,7 @@
 
 ## Status
 
-Draft (Pending Review)
+Accepted
 
 ## Date
 

@@ -1,7 +1,7 @@
 # ADR-025: Keep Provider Evolution Detection Manual-First and Evidence-Driven
 
 Date: 2026-03-27
-Status: Proposed
+Status: Accepted
 
 ## Context
 

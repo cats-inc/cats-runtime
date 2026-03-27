@@ -8,7 +8,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress |
+| **Status** | In Progress (Core Agent Backend Landed) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | Gemini |
@@ -232,7 +232,7 @@ difference between logical session identity and provider-managed resume tokens.
 - [x] Map gateway event frames into `StreamEvent`
 - [x] Support close/cancel semantics as far as gateway capabilities allow
 - [x] Add OpenClaw-specific `probe()`
-- [ ] Support optional OpenClaw model listing if the target exposes it
+- [x] Support optional OpenClaw model listing if the target exposes it
 
 **Deliverables**:
 
@@ -354,6 +354,7 @@ difference between logical session identity and provider-managed resume tokens.
 | 2026-03-17 | Added ADR-006 and clarified `sessionKey` semantics, explicit reuse policy, provider-session fallback, and non-Git output assumptions |
 | 2026-03-17 | Landed Phase 1-4 core implementation: shared session/bootstrap/output contract, `backends.agent` config/catalog plumbing, and OpenClaw Gateway MVP |
 | 2026-03-17 | Added `agent_sdk_bridge` as the second adapter target using the external `genai-gateway-agent` boundary and shared agent contract |
+| 2026-03-26 | OpenClaw `models.list` discovery, agent runtime inspection, live tool-catalog summaries, and retained provider-evolution summaries landed on runtime diagnostics/config surfaces; remaining work is now limited to third-party adapter plug-in guidance rather than missing runtime seams |
 
 ---
 

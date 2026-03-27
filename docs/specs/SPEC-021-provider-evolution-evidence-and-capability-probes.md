@@ -1,7 +1,7 @@
 # SPEC-021: Provider Evolution Evidence and Capability Probes
 
 Date: 2026-03-27
-Status: Draft
+Status: In Progress (Core Manual-First Slices Landed)
 Owner: Runtime
 
 ## Summary

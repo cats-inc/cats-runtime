@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Implementing (Slice 1) |
+| **Status** | Implemented (Slice 1) |
 | **Owner** | Codex |
 | **Reviewer** | User |
 

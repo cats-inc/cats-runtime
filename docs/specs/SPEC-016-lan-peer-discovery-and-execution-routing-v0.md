@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | Implemented |
 | **Owner** | Codex |
 | **Reviewer** | User / runtime workstream |
 

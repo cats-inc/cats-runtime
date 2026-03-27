@@ -48,24 +48,24 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 
 | Spec | Title | Status | Related Plan |
 |------|-------|--------|--------------|
-| [SPEC-021](./SPEC-021-provider-evolution-evidence-and-capability-probes.md) | Provider Evolution Evidence and Capability Probes | Draft | TBD |
-| [SPEC-020](./SPEC-020-pluggable-execution-strategy-substrate.md) | Pluggable Execution Strategy Substrate | Draft | TBD |
-| [SPEC-019](./SPEC-019-runtime-owned-management-adapters-for-forge-and-deployment-control-planes.md) | Runtime-Owned Management Adapters for Forge and Deployment Control Planes | Draft | TBD |
-| [SPEC-018](./SPEC-018-advanced-provider-model-catalog-and-selection-schema.md) | Advanced Provider Model Catalog and Selection Schema | Draft | TBD |
+| [SPEC-021](./SPEC-021-provider-evolution-evidence-and-capability-probes.md) | Provider Evolution Evidence and Capability Probes | In Progress (Core Manual-First Slices Landed) | [PLAN-021](../plans/PLAN-021-provider-evolution-evidence-and-capability-probes.md) |
+| [SPEC-020](./SPEC-020-pluggable-execution-strategy-substrate.md) | Pluggable Execution Strategy Substrate | Implemented | [PLAN-020](../plans/PLAN-020-pluggable-execution-strategy-substrate.md) |
+| [SPEC-019](./SPEC-019-runtime-owned-management-adapters-for-forge-and-deployment-control-planes.md) | Runtime-Owned Management Adapters for Forge and Deployment Control Planes | Implemented (Slice 1) | [PLAN-016](../plans/PLAN-016-management-adapter-subsystem.md) |
+| [SPEC-018](./SPEC-018-advanced-provider-model-catalog-and-selection-schema.md) | Advanced Provider Model Catalog and Selection Schema | Implemented | [PLAN-018](../plans/PLAN-018-advanced-provider-model-catalog-and-selection-schema.md) |
 | [SPEC-017](./SPEC-017-standalone-provider-bootstrap-and-generated-config.md) | Standalone Provider Bootstrap and Generated Config | Draft | TBD |
-| [SPEC-016](./SPEC-016-lan-peer-discovery-and-execution-routing-v0.md) | LAN Peer Discovery and Execution Routing v0 | Draft | TBD |
-| [SPEC-015](./SPEC-015-runtime-setup-diagnostic-report.md) | Runtime Setup Diagnostic Report | Draft | TBD |
-| [SPEC-014](./SPEC-014-session-maintenance-worktree-isolation-and-compaction-hooks.md) | Session Maintenance, Worktree Isolation, and Compaction Hooks | Draft (Pending Review) | TBD |
-| [SPEC-013](./SPEC-013-internal-skill-library-and-role-taxonomy.md) | Internal Skill Library and Role Taxonomy | Draft (Pending Review) | TBD |
-| [SPEC-012](./SPEC-012-scheduled-wakeup-substrate.md) | Scheduled Wakeup Substrate | In Progress (First Slice Landed) | TBD |
-| [SPEC-011](./SPEC-011-session-fork-and-context-transplant-primitives.md) | Session Fork and Context-Transplant Primitives | Draft (Pending Review) | TBD |
+| [SPEC-016](./SPEC-016-lan-peer-discovery-and-execution-routing-v0.md) | LAN Peer Discovery and Execution Routing v0 | Implemented | [PLAN-017](../plans/PLAN-017-lan-peer-discovery-and-execution-routing-v0.md) |
+| [SPEC-015](./SPEC-015-runtime-setup-diagnostic-report.md) | Runtime Setup Diagnostic Report | Implemented (Slice 1) | TBD |
+| [SPEC-014](./SPEC-014-session-maintenance-worktree-isolation-and-compaction-hooks.md) | Session Maintenance, Worktree Isolation, and Compaction Hooks | Implemented (Maintenance and Runtime Compaction Slices) | [PLAN-012](../plans/PLAN-012-session-maintenance-hooks-and-cleanup-discipline.md), [PLAN-014](../plans/PLAN-014-worktree-isolation-execution-layer.md) |
+| [SPEC-013](./SPEC-013-internal-skill-library-and-role-taxonomy.md) | Internal Skill Library and Role Taxonomy | Implemented | TBD |
+| [SPEC-012](./SPEC-012-scheduled-wakeup-substrate.md) | Scheduled Wakeup Substrate | Implemented (Recurring Slice) | TBD |
+| [SPEC-011](./SPEC-011-session-fork-and-context-transplant-primitives.md) | Session Fork and Context-Transplant Primitives | Implemented (Slice 1) | [PLAN-010](../plans/PLAN-010-session-discipline-and-run-inspector.md), [PLAN-012](../plans/PLAN-012-session-maintenance-hooks-and-cleanup-discipline.md) |
 | [SPEC-010](./SPEC-010-usage-metering-rate-limit-detection-and-execution-guardrails.md) | Usage Metering, Rate-Limit Detection, and Execution Guardrails | In Progress (First Slice Landed) | [PLAN-009](../plans/PLAN-009-usage-metering-progress-and-guardrails.md) |
-| [SPEC-009](./SPEC-009-executable-delivery-and-governance-primitives.md) | Executable Delivery and Governance Primitives | Draft (Pending Review) | TBD |
-| [SPEC-008](./SPEC-008-workspace-substrate-init-audit-and-update.md) | Workspace Substrate Init, Audit, and Update | Draft (Pending Review) | TBD |
-| [SPEC-007](./SPEC-007-provider-compatibility-and-evidence-engine.md) | Provider Compatibility and Evidence Engine | In Progress (First Slice Landed) | [PLAN-008-provider-compatibility-and-evidence-engine](../plans/PLAN-008-provider-compatibility-and-evidence-engine.md) |
+| [SPEC-009](./SPEC-009-executable-delivery-and-governance-primitives.md) | Executable Delivery and Governance Primitives | Implemented (Slice 1) | [PLAN-015](../plans/PLAN-015-mcp-mutation-tools-and-stdio-facade.md) |
+| [SPEC-008](./SPEC-008-workspace-substrate-init-audit-and-update.md) | Workspace Substrate Init, Audit, and Update | Implemented (First Slice) | [PLAN-014](../plans/PLAN-014-worktree-isolation-execution-layer.md) |
+| [SPEC-007](./SPEC-007-provider-compatibility-and-evidence-engine.md) | Provider Compatibility and Evidence Engine | In Progress (Second Slice Landed) | [PLAN-008-provider-compatibility-and-evidence-engine](../plans/PLAN-008-provider-compatibility-and-evidence-engine.md) |
 | [SPEC-006](./SPEC-006-a2a-protocol-project-memory-and-skill-layering.md) | A2A Protocol, Project Memory, and Skill Layering | Approved | TBD |
-| [SPEC-005](./SPEC-005-runtime-managed-skills-v0.md) | Runtime-Managed Skills v0 | In Progress (First Slice Landed) | [PLAN-008-runtime-managed-skills-v0](../plans/PLAN-008-runtime-managed-skills-v0.md) |
-| [SPEC-004](./SPEC-004-provider-model-catalog-and-discovery.md) | Provider Model Catalog and Discovery | Approved | [PLAN-005](../plans/PLAN-005-provider-model-catalog-and-discovery.md) |
+| [SPEC-005](./SPEC-005-runtime-managed-skills-v0.md) | Runtime-Managed Skills v0 | In Progress (Execution Delivery Slice Landed) | [PLAN-008-runtime-managed-skills-v0](../plans/PLAN-008-runtime-managed-skills-v0.md) |
+| [SPEC-004](./SPEC-004-provider-model-catalog-and-discovery.md) | Provider Model Catalog and Discovery | Implemented (Core Slice) | [PLAN-005](../plans/PLAN-005-provider-model-catalog-and-discovery.md) |
 | [SPEC-003](./SPEC-003-agent-backend.md) | Agent Backend for External Agent Runtimes | Approved | [PLAN-004](../plans/PLAN-004-agent-backend.md) |
 | [SPEC-002](./SPEC-002-local-tool-runtime.md) | Shared Local Tool Runtime | Approved | [PLAN-003](../plans/PLAN-003-api-backend.md) |
 | [SPEC-001](./SPEC-001-wsl-discovery-policy.md) | WSL Discovery Policy and Dashboard Status | Implemented | [PLAN-001](../plans/PLAN-001-wsl-discovery-policy.md) |

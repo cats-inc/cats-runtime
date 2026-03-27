@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Maintenance and Runtime Compaction Slices Landed) |
+| **Status** | Implemented (Maintenance and Runtime Compaction Slices) |
 | **Owner** | Codex |
 | **Reviewer** | User / runtime-maintenance workstream |
 

@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft (Pending Review) |
+| **Status** | Implemented |
 | **Owner** | Codex |
 | **Reviewer** | User / skills workstream |
 

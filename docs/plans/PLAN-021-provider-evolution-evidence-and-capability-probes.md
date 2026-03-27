@@ -8,7 +8,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | In Progress (Core Manual-First Slices Landed) |
 | **Owner** | Codex |
 | **Assigned To** | TBD |
 | **Reviewer** | User |
@@ -72,12 +72,12 @@ exist in the runtime.
 
 ### Phase 1: Adapter Instrumentation and Observable Drops
 
-- [ ] Audit provider adapters for meaningful `return null` / ignored-event paths
-- [ ] Add thin instrumentation hooks so adapters can record:
+- [x] Audit provider adapters for meaningful `return null` / ignored-event paths
+- [x] Add thin instrumentation hooks so adapters can record:
       `ignored`, `unknown`, `normalized`, and `schema_failure`
-- [ ] Ensure existing normal runtime behavior is preserved when probe collection
+- [x] Ensure existing normal runtime behavior is preserved when probe collection
       is disabled
-- [ ] Keep provider-specific parsing rules adapter-owned; do not move parser
+- [x] Keep provider-specific parsing rules adapter-owned; do not move parser
       logic into a generic collector
 
 **Deliverables**: adapters can expose what they currently normalize, ignore, or
@@ -85,37 +85,37 @@ drop without yet changing host-facing UX.
 
 ### Phase 2: Shared Evidence Collector and Bundle Shape
 
-- [ ] Add a shared runtime-owned evidence collector
-- [ ] Define a stable evidence bundle shape including:
+- [x] Add a shared runtime-owned evidence collector
+- [x] Define a stable evidence bundle shape including:
       provider, instance, version, probe profile, timestamps, raw samples,
       normalized samples, ignored counts, and schema failures
-- [ ] Support transport-neutral evidence capture so future protocol-backed
+- [x] Support transport-neutral evidence capture so future protocol-backed
       adapters are not forced into line-oriented assumptions
-- [ ] Add serialization/storage helpers for evidence bundle output
+- [x] Add serialization/storage helpers for evidence bundle output
 
 **Deliverables**: a reusable collector that can accumulate comparable evidence
 across providers without duplicating bookkeeping in every adapter.
 
 ### Phase 3: Manual Probe Entry and Probe Profiles
 
-- [ ] Add a manual probe command or internal runtime entrypoint
-- [ ] Support targeting by provider, optional instance, and optional model or
+- [x] Add a manual probe command or internal runtime entrypoint
+- [x] Support targeting by provider, optional instance, and optional model or
       probe profile
-- [ ] Define a small set of deterministic probe profiles that try to elicit:
+- [x] Define a small set of deterministic probe profiles that try to elicit:
       incremental text, tool use, tool result, progress, and final result
-- [ ] Ensure probes can run without requiring host-app routes or UI
+- [x] Ensure probes can run without requiring host-app routes or UI
 
 **Deliverables**: maintainers can manually run a repeatable probe and produce an
 evidence bundle for a selected provider profile.
 
 ### Phase 4: Capability Snapshot and Baseline Compare
 
-- [ ] Derive a capability snapshot from each evidence bundle
-- [ ] Track at minimum:
+- [x] Derive a capability snapshot from each evidence bundle
+- [x] Track at minimum:
       incrementalText, toolUse, toolResult, progress, finalResult,
       ignoredEventTypes, and schemaFailures
-- [ ] Define baseline artifact storage for previous probe snapshots
-- [ ] Add compare output that highlights:
+- [x] Define baseline artifact storage for previous probe snapshots
+- [x] Add compare output that highlights:
       added event types, removed event types, event frequency drops, and newly
       failing schema paths
 
@@ -124,9 +124,9 @@ to classify likely upgrades, regressions, and schema changes.
 
 ### Phase 5: Semantic Drift Heuristics and Review Output
 
-- [ ] Add weak-signal heuristics for semantic drift warnings
-- [ ] Keep semantic drift classification advisory rather than blocking
-- [ ] Produce human-readable summaries that distinguish:
+- [x] Add weak-signal heuristics for semantic drift warnings
+- [x] Keep semantic drift classification advisory rather than blocking
+- [x] Produce human-readable summaries that distinguish:
       evidence, classification, and external context
 - [ ] Add hooks or fields for attaching release-note/changelog references
       without mixing them into runtime evidence
@@ -136,13 +136,13 @@ changed" without pretending the runtime can fully self-interpret all changes.
 
 ### Phase 6: Test Coverage and Provider Rollout Order
 
-- [ ] Add unit tests for collector bookkeeping, snapshot derivation, and compare
+- [x] Add unit tests for collector bookkeeping, snapshot derivation, and compare
       logic
-- [ ] Add integration tests for adapter instrumentation where stable fixtures
+- [x] Add integration tests for adapter instrumentation where stable fixtures
       exist
-- [ ] Start rollout with the richest/highest-value providers first:
+- [x] Start rollout with the richest/highest-value providers first:
       Codex, Copilot, Pi, Goose, Gemini, Claude
-- [ ] Defer thin/noisy providers where instrumentation has limited value until
+- [x] Defer thin/noisy providers where instrumentation has limited value until
       the framework is stable
 
 **Deliverables**: the framework is verified against at least a representative
@@ -150,11 +150,11 @@ subset of high-signal providers before it expands further.
 
 ### Phase 7: Follow-Through Into Agent Backends
 
-- [ ] Audit whether OpenClaw and Agent SDK adapters should emit comparable
+- [x] Audit whether OpenClaw and Agent SDK adapters should emit comparable
       evidence through the same collector
-- [ ] Keep the collector transport-neutral enough for future A2A adapters
-- [ ] Document any adapter-specific gaps revealed by the first rollout
-- [ ] Defer any A2A-specific implementation details until a concrete adapter
+- [x] Keep the collector transport-neutral enough for future A2A adapters
+- [x] Document any adapter-specific gaps revealed by the first rollout
+- [x] Defer any A2A-specific implementation details until a concrete adapter
       plan is approved
 
 **Deliverables**: the framework remains future-compatible with `agent` backend
@@ -212,6 +212,8 @@ expansion without blocking the first CLI-focused slice.
 | Date | Update |
 |------|--------|
 | 2026-03-27 | Plan created for adapter instrumentation, shared evidence collection, manual probe entry, baseline compare, and future agent-backend compatibility |
+| 2026-03-27 | Core manual-first slices landed: high-value CLI adapters now emit transport-neutral evidence, manual probes persist capability snapshots with baseline compare and review summaries, retained artifact list/read commands exist, and diagnostics/provider-config surfaces can reuse the latest bounded summary without adding a public probe route |
+| 2026-03-27 | Agent follow-through landed for the first OpenClaw and Agent SDK bridge targets; remaining work is now limited to optional release-note/changelog attachment and later breadth/depth expansion rather than missing core probe infrastructure |
 
 ---
 
