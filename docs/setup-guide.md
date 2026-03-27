@@ -29,6 +29,14 @@ npm install
 npm test
 ```
 
+If you plan to enable API/local provider instances, set the matching secrets in
+your real `.env` before startup. `.env.example` now includes placeholders for:
+
+- `ANTHROPIC_API_KEY`
+- `OPENAI_API_KEY`
+- `OPENAI_ORG_ID` / `OPENAI_PROJECT_ID` when your OpenAI tenant requires them
+- `GEMINI_API_KEY`
+
 For a package-style local run:
 
 ```powershell
@@ -572,6 +580,10 @@ For remote API providers, shared settings belong at the provider level. Put
 `backends.api.providers.<name>`, then let each instance override only what
 actually differs, usually `model`. That avoids copying the same API key across
 `claude.sonnet`, `gemini.flash`, and similar instance variants.
+
+Keep the actual secret values in `.env` or your host environment. The
+`config/providers.yaml` file should only reference env names such as
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY`.
 
 Agent backends follow the same pattern. Put shared gateway/auth settings such as
 `transport`, `url_env`, `auth_token_env`, and `client_id` at the provider

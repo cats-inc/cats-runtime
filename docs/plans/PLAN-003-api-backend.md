@@ -553,6 +553,7 @@ The phase ordering above is based on the current vendor API surfaces reviewed on
 | 2026-03-27 | Tooling-surface follow-through landed: `GET /providers/{provider}/tools` now also includes additive `apiRuntime` inspection metadata for API/local targets, so hosts can inspect runtime-owned tooling policy and API/local optimization posture in one call without fetching a second read model. |
 | 2026-03-27 | Session-facing read-model follow-through landed: `/sessions`, `/sessions/{id}/history`, and `/sessions/{id}/observe` now also carry additive `providerTarget.apiRuntime` metadata for API/local sessions, so host-side run inspection can see continuation/cache/provider-native-tool posture without joining back to provider topology routes. |
 | 2026-03-28 | Backlog reality check: Phases 0-3 are now effectively complete, and the remaining plan work is limited to selective provider-native follow-through (Anthropic server tools, OpenAI background/built-in tools, Gemini file/upload-search features, Ollama pull/manage lifecycle operations), `.env.example` cleanup, security-doc follow-through, and a tighter API/local regression matrix. |
+| 2026-03-28 | Operator/config follow-through landed: `.env.example` now includes placeholders for Anthropic/OpenAI/Gemini API credentials, and `docs/setup-guide.md` now makes the env-vs-YAML secret boundary explicit for API/local instances. |
 
 ---
 
