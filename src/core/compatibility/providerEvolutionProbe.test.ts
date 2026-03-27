@@ -262,6 +262,22 @@ describe('ProviderEvolutionProbeService', () => {
         transport: 'cli' as const,
         version: '1.2.3',
       },
+      reviewContext: {
+        references: [
+          {
+            kind: 'release_notes' as const,
+            url: 'https://docs.example.com/releases/codex-cli-1-2-3',
+          },
+          {
+            kind: 'release_notes' as const,
+            url: 'https://docs.example.com/releases/codex-cli-1-2-3',
+          },
+          {
+            kind: 'changelog' as const,
+            url: 'https://docs.example.com/changelog/codex-cli',
+          },
+        ],
+      },
       profile: PROVIDER_EVOLUTION_PROBE_PROFILES.manual_text,
       run: async ({ observer }: { observer: ProviderEvolutionEvidenceObserver }) => {
         observer.recordNormalized({
@@ -314,12 +330,27 @@ describe('ProviderEvolutionProbeService', () => {
     expect(current.artifact.compare?.addedEventTypes).toEqual(['future.event']);
     expect(current.artifact.review.classifications).toEqual(['upgrade']);
     expect(current.artifact.review.highlights).toContain('Added event types: future.event');
+    expect(current.artifact.reviewContext).toEqual({
+      references: [
+        {
+          kind: 'changelog',
+          url: 'https://docs.example.com/changelog/codex-cli',
+        },
+        {
+          kind: 'release_notes',
+          url: 'https://docs.example.com/releases/codex-cli-1-2-3',
+        },
+      ],
+    });
     expect(current.artifactPath).toContain('codex');
     expect(formatProviderEvolutionProbeEntrySummary(current)).toContain(
       'Provider evolution probe completed for codex/default.',
     );
     expect(formatProviderEvolutionProbeEntrySummary(current)).toContain(
       'Review: Detected upgrade relative to the latest baseline.',
+    );
+    expect(formatProviderEvolutionProbeEntrySummary(current)).toContain(
+      'External references: changelog=https://docs.example.com/changelog/codex-cli, release_notes=https://docs.example.com/releases/codex-cli-1-2-3',
     );
 
     const latest = await service.readLatestArtifact({
@@ -331,6 +362,18 @@ describe('ProviderEvolutionProbeService', () => {
       review: expect.objectContaining({
         classifications: ['upgrade'],
       }),
+      reviewContext: {
+        references: [
+          {
+            kind: 'changelog',
+            url: 'https://docs.example.com/changelog/codex-cli',
+          },
+          {
+            kind: 'release_notes',
+            url: 'https://docs.example.com/releases/codex-cli-1-2-3',
+          },
+        ],
+      },
     }));
 
     const listed = await service.listArtifacts({
@@ -348,6 +391,18 @@ describe('ProviderEvolutionProbeService', () => {
       provider: 'codex',
     });
     expect(reread?.artifact.review.classifications).toEqual(['upgrade']);
+    expect(reread?.artifact.reviewContext).toEqual({
+      references: [
+        {
+          kind: 'changelog',
+          url: 'https://docs.example.com/changelog/codex-cli',
+        },
+        {
+          kind: 'release_notes',
+          url: 'https://docs.example.com/releases/codex-cli-1-2-3',
+        },
+      ],
+    });
     await expect(service.readArtifactById(current.artifact.id, {
       provider: 'codex',
       parserId: 'other-parser',

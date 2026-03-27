@@ -103,6 +103,12 @@ interface ProviderEvolutionArtifactReadCliOutput {
       classifications: string[];
       summary: string;
     };
+    reviewContext?: {
+      references: Array<{
+        kind: string;
+        url: string;
+      }>;
+    };
   };
 }
 
@@ -323,6 +329,12 @@ function writeProviderEvolutionArtifact(
     parserId: string;
     probeProfile: string;
     transport: 'cli' | 'agent' | 'api' | 'unknown';
+    reviewContext: {
+      references: Array<{
+        kind: string;
+        url: string;
+      }>;
+    };
   }> = {},
 ): string {
   const instance = overrides.instance || 'default';
@@ -352,6 +364,7 @@ function writeProviderEvolutionArtifact(
       turnsPlanned: 2,
       turnsCompleted: 2,
     },
+    reviewContext: overrides.reviewContext,
     capabilitySnapshot: {
       incrementalText: { observed: true, count: 1 },
       toolUse: { observed: false, count: 0 },
@@ -1208,7 +1221,16 @@ describe('runtime process startup contract', () => {
 
   it('can read a retained provider-evolution artifact without starting the HTTP server', async () => {
     const { env, cleanup } = createRuntimeProcessEnv(3212);
-    const artifactPath = writeProviderEvolutionArtifact(env, 'codex', 'artifact-2');
+    const artifactPath = writeProviderEvolutionArtifact(env, 'codex', 'artifact-2', {
+      reviewContext: {
+        references: [
+          {
+            kind: 'release_notes',
+            url: 'https://docs.example.com/releases/codex-cli-1-2-3',
+          },
+        ],
+      },
+    });
     const child = spawnSetupDiagnostic([
       '--read-provider-evolution-artifact',
       'artifact-2',
@@ -1232,8 +1254,19 @@ describe('runtime process startup contract', () => {
           classifications: ['baseline'],
           summary: 'No prior matching baseline artifact was available.',
         },
+        reviewContext: {
+          references: [
+            {
+              kind: 'release_notes',
+              url: 'https://docs.example.com/releases/codex-cli-1-2-3',
+            },
+          ],
+        },
       });
       expect(output.stderr).toContain('Loaded provider-evolution artifact artifact-2');
+      expect(output.stderr).toContain(
+        'External references: release_notes=https://docs.example.com/releases/codex-cli-1-2-3',
+      );
       expect(output.stderr).toContain(`Artifact: ${artifactPath}`);
     } finally {
       cleanup();

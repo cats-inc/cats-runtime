@@ -75,6 +75,18 @@ export type ProviderEvolutionReviewClassification =
   | 'schema_change'
   | 'semantic_drift_suspected';
 
+export type ProviderEvolutionExternalReferenceKind =
+  | 'release_notes'
+  | 'changelog'
+  | 'issue'
+  | 'announcement'
+  | 'other';
+
+export interface ProviderEvolutionExternalReference {
+  kind: ProviderEvolutionExternalReferenceKind;
+  url: string;
+}
+
 export interface ProviderEvolutionProbeReviewSummary {
   classifications: ProviderEvolutionReviewClassification[];
   summary: string;
@@ -104,6 +116,9 @@ export interface ProviderEvolutionProbeArtifact {
   capabilitySnapshot: ProviderEvolutionCapabilitySnapshot;
   compare?: ProviderEvolutionBaselineCompare;
   review: ProviderEvolutionProbeReviewSummary;
+  reviewContext?: {
+    references: ProviderEvolutionExternalReference[];
+  };
   baseline?: {
     artifactId: string;
     capturedAt: string;
@@ -138,6 +153,9 @@ export interface ProviderEvolutionProbeArtifactSummary {
     semanticDriftSuspected: boolean;
   };
   review: ProviderEvolutionProbeReviewSummary;
+  reviewContext?: {
+    references: ProviderEvolutionExternalReference[];
+  };
   relativePath: string;
   artifactPath: string;
 }
@@ -159,6 +177,9 @@ export interface ProviderEvolutionProbeRequest {
     probeProfile: string;
     transport?: ProviderEvolutionTransport;
     version?: string;
+  };
+  reviewContext?: {
+    references?: ProviderEvolutionExternalReference[];
   };
   profile: ProviderEvolutionProbeProfile;
   run: (input: {
@@ -259,6 +280,7 @@ export class ProviderEvolutionProbeService {
         })
       : undefined;
     const review = summarizeProviderEvolutionProbeReview(compare);
+    const reviewContext = normalizeProviderEvolutionReviewContext(request.reviewContext);
 
     const artifact: ProviderEvolutionProbeArtifact = {
       schemaVersion: PROVIDER_EVOLUTION_PROBE_ARTIFACT_SCHEMA_VERSION,
@@ -274,6 +296,7 @@ export class ProviderEvolutionProbeService {
       capabilitySnapshot,
       compare,
       review,
+      ...(reviewContext ? { reviewContext } : {}),
       baseline: baseline ? {
         artifactId: baseline.artifact.id,
         capturedAt: baseline.artifact.capturedAt,
@@ -582,6 +605,14 @@ export function formatProviderEvolutionProbeEntrySummary(
     lines.push('Baseline compare: none (no prior matching artifact).');
   }
 
+  if (result.artifact.reviewContext?.references.length) {
+    lines.push(
+      `External references: ${result.artifact.reviewContext.references
+        .map((reference) => `${reference.kind}=${reference.url}`)
+        .join(', ')}`,
+    );
+  }
+
   for (const highlight of review.highlights) {
     lines.push(`- ${highlight}`);
   }
@@ -616,6 +647,7 @@ export function summarizeProviderEvolutionProbeArtifact(
         }
       : undefined,
     review: result.artifact.review,
+    reviewContext: result.artifact.reviewContext,
     relativePath: result.relativePath,
     artifactPath: result.artifactPath,
   };
@@ -666,7 +698,32 @@ function hydrateProviderEvolutionProbeArtifact(
   return {
     ...artifact,
     review: artifact.review ?? summarizeProviderEvolutionProbeReview(artifact.compare),
+    reviewContext: normalizeProviderEvolutionReviewContext(artifact.reviewContext),
   };
+}
+
+function normalizeProviderEvolutionReviewContext(
+  value: { references?: ProviderEvolutionExternalReference[] } | undefined,
+): { references: ProviderEvolutionExternalReference[] } | undefined {
+  if (!value?.references?.length) {
+    return undefined;
+  }
+
+  const deduped = new Map<string, ProviderEvolutionExternalReference>();
+  for (const reference of value.references) {
+    const key = `${reference.kind}\u0000${reference.url}`;
+    deduped.set(key, {
+      kind: reference.kind,
+      url: reference.url,
+    });
+  }
+
+  const references = [...deduped.values()]
+    .sort((left, right) => {
+      const kindOrder = left.kind.localeCompare(right.kind);
+      return kindOrder !== 0 ? kindOrder : left.url.localeCompare(right.url);
+    });
+  return references.length > 0 ? { references } : undefined;
 }
 
 function matchesProviderEvolutionArtifactQuery(

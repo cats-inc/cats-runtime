@@ -150,6 +150,7 @@ node dist/index.js --probe-provider-evolution --probe-provider codex
 node dist/index.js --probe-provider-evolution --probe-provider claude --probe-profile manual_text
 node dist/index.js --probe-provider-evolution --probe-provider claude --probe-instance agent/sdk
 node dist/index.js --probe-provider-evolution --probe-provider goose --probe-model anthropic/claude-sonnet-4
+node dist/index.js --probe-provider-evolution --probe-provider codex --probe-reference release_notes=https://docs.example.com/releases/codex-cli-1-2-3 --probe-reference changelog=https://docs.example.com/changelog/codex-cli
 node dist/index.js --list-provider-evolution-artifacts --probe-provider codex --probe-limit 5
 node dist/index.js --list-provider-evolution-artifacts --probe-provider claude --probe-instance agent/sdk
 node dist/index.js --list-provider-evolution-artifacts --probe-provider claude --probe-parser agent_sdk_http_v1 --probe-transport agent
@@ -169,6 +170,8 @@ summary plus stdout JSON with:
 - the local `artifactPath`
 - the captured evidence bundle
 - a derived capability snapshot
+- optional `reviewContext.references[]` for manually attached release-note,
+  changelog, issue, or announcement URLs
 - baseline compare output against the latest matching prior artifact, when one exists
 
 The same manual-first CLI flow can now inspect retained probe history without
@@ -181,6 +184,9 @@ opening any public HTTP surface:
 - `--probe-provider`, `--probe-instance`, `--probe-parser`,
   `--probe-transport`, and `--probe-profile` can scope the retained-artifact
   listing, and `--probe-limit <count>` caps list output
+- `--probe-reference <kind=url>` can be repeated during probe generation to
+  attach manual release-note or changelog context without mixing that material
+  into the runtime-owned evidence bundle
 
 The current agent-backed slice stays manual-first and transport-neutral:
 

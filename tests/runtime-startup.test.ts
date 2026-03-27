@@ -47,6 +47,9 @@ describe('runtime startup helpers', () => {
       '--probe-profile',
       'manual_smoke',
       '--probe-model=gpt-5',
+      '--probe-reference',
+      'release_notes=https://docs.example.com/releases/codex-cli-1-2-3',
+      '--probe-reference=changelog=https://docs.example.com/changelog/codex-cli',
       '--probe-limit',
       '5',
       '--refresh-setup-scan',
@@ -73,6 +76,10 @@ describe('runtime startup helpers', () => {
       probeTransport: 'cli',
       probeProfile: 'manual_smoke',
       probeModel: 'gpt-5',
+      probeReferences: [
+        'release_notes=https://docs.example.com/releases/codex-cli-1-2-3',
+        'changelog=https://docs.example.com/changelog/codex-cli',
+      ],
       probeLimit: '5',
       refreshSetupScan: true,
       startupMode: 'app-managed',
@@ -379,6 +386,7 @@ describe('runtime startup helpers', () => {
     expect(help).toContain('--probe-parser <parserId>');
     expect(help).toContain('--probe-transport <cli|agent|api|unknown>');
     expect(help).toContain('--probe-profile <manual_smoke|manual_text>');
+    expect(help).toContain('--probe-reference <kind=url>');
     expect(help).toContain('--probe-limit <count>');
     expect(help).toContain('--refresh-setup-scan');
     expect(help).toContain('--startup-mode <standalone|app-managed>');

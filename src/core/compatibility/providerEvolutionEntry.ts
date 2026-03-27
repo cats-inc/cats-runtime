@@ -35,6 +35,7 @@ import {
   formatProviderEvolutionProbeEntrySummary,
   getProviderEvolutionProbeProfile,
   summarizeProviderEvolutionProbeArtifact,
+  type ProviderEvolutionExternalReference,
   type ProviderEvolutionProbeArtifactSummary,
   ProviderEvolutionProbeService,
   type ProviderEvolutionProbeProfile,
@@ -111,6 +112,9 @@ export async function generateProviderEvolutionProbeArtifact(
         transport: 'cli',
         version: assessment.fingerprint.version.normalized || assessment.fingerprint.version.raw,
       },
+      reviewContext: {
+        references: resolveProbeReferences(cliOptions),
+      },
       profile,
       run: ({ profile: selectedProfile, observer }) => runCliProbeProfile({
         config: context.config,
@@ -136,6 +140,9 @@ export async function generateProviderEvolutionProbeArtifact(
         parserId,
         probeProfile: profile.id,
         transport: 'agent',
+      },
+      reviewContext: {
+        references: resolveProbeReferences(cliOptions),
       },
       profile,
       run: ({ profile: selectedProfile, observer }) => runAgentProbeProfile({
@@ -228,6 +235,11 @@ export function formatProviderEvolutionProbeArtifactReadSummary(
   const lines = [
     `Loaded provider-evolution artifact ${summary.artifactId}: ${summary.review.summary}`,
     ...summary.review.highlights.map((highlight) => `- ${highlight}`),
+    ...(summary.reviewContext?.references.length
+      ? [`- External references: ${summary.reviewContext.references
+          .map((reference) => `${reference.kind}=${reference.url}`)
+          .join(', ')}`]
+      : []),
     `Artifact: ${artifact.artifactPath}`,
   ];
   return `${lines.join('\n')}\n`;
@@ -499,6 +511,66 @@ function parseOptionalProbeTransport(
   }
 
   return normalized;
+}
+
+function resolveProbeReferences(
+  cliOptions: RuntimeCliOptions,
+): ProviderEvolutionExternalReference[] | undefined {
+  const references = (cliOptions.probeReferences || []).map(parseProbeReference);
+  return references.length > 0 ? references : undefined;
+}
+
+function parseProbeReference(value: string): ProviderEvolutionExternalReference {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new Error('Invalid --probe-reference value');
+  }
+
+  const separatorIndex = trimmed.indexOf('=');
+  const rawKind = separatorIndex > 0 ? trimmed.slice(0, separatorIndex).trim() : 'other';
+  const rawUrl = separatorIndex > 0 ? trimmed.slice(separatorIndex + 1).trim() : trimmed;
+  const kind = normalizeProbeReferenceKind(rawKind);
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    throw new Error(
+      `Invalid --probe-reference URL '${rawUrl}'. Expected an absolute http(s) URL.`,
+    );
+  }
+
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error(
+      `Invalid --probe-reference URL '${rawUrl}'. Expected an absolute http(s) URL.`,
+    );
+  }
+
+  return {
+    kind,
+    url: url.toString(),
+  };
+}
+
+function normalizeProbeReferenceKind(
+  value: string,
+): ProviderEvolutionExternalReference['kind'] {
+  switch (value.trim().toLowerCase()) {
+    case 'release_notes':
+    case 'release-notes':
+      return 'release_notes';
+    case 'changelog':
+      return 'changelog';
+    case 'issue':
+      return 'issue';
+    case 'announcement':
+      return 'announcement';
+    case 'other':
+      return 'other';
+    default:
+      throw new Error(
+        `Invalid --probe-reference kind '${value}'. Valid kinds: release_notes, changelog, issue, announcement, other`,
+      );
+  }
 }
 
 function resolveAgentProbeParserId(

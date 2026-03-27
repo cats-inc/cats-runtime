@@ -622,6 +622,8 @@ probe route. The summary includes:
 - `capabilitySnapshot`
 - optional `compare` counts against the latest matching baseline
 - `review` classifications/highlights
+- optional `reviewContext.references[]` for manually attached release-note /
+  changelog / issue / announcement URLs
 - `relativePath`
 
 `GET /diagnostics/health` now also includes a compact top-level `metering`
@@ -2664,6 +2666,12 @@ same instance entry also exposes additive `providerEvolution.latestArtifact`.
 This reuses the retained artifact read model already surfaced on
 `GET /diagnostics/providers`, so hosts can inspect the latest capability
 snapshot/review without making a second provider diagnostics call.
+
+The same retained summary now also carries optional
+`reviewContext.references[]` when a maintainer attached external release-note
+or changelog URLs during manual probe generation. These references are
+additive review context and are kept separate from the runtime-owned evidence
+bundle itself.
 
 Each instance entry also exposes additive `tooling` metadata:
 

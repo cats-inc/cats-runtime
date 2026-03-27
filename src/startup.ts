@@ -76,6 +76,7 @@ export interface RuntimeCliOptions {
   probeTransport?: string;
   probeProfile?: string;
   probeModel?: string;
+  probeReferences?: string[];
   probeLimit?: string;
   refreshSetupScan?: boolean;
   startupMode?: RuntimeStartupMode;
@@ -297,6 +298,21 @@ export function parseRuntimeCliOptions(argv: string[]): RuntimeCliOptions {
 
     if (arg.startsWith('--probe-model=')) {
       options.probeModel = arg.slice('--probe-model='.length);
+      continue;
+    }
+
+    if (arg === '--probe-reference') {
+      const value = readOptionValue(argv, index, arg);
+      options.probeReferences = [...(options.probeReferences || []), value];
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--probe-reference=')) {
+      options.probeReferences = [
+        ...(options.probeReferences || []),
+        arg.slice('--probe-reference='.length),
+      ];
       continue;
     }
 
@@ -726,6 +742,7 @@ export function getRuntimeHelpText(): string {
     '  --probe-transport <cli|agent|api|unknown>',
     '  --probe-profile <manual_smoke|manual_text>',
     '  --probe-model <model>',
+    '  --probe-reference <kind=url>',
     '  --probe-limit <count>',
     '  --refresh-setup-scan                   Refresh the shared setup scan before generating a diagnostic report',
     '  --startup-mode <standalone|app-managed>',

@@ -17,6 +17,7 @@ export type ProviderEvolutionLatestArtifactReadModel = Pick<
   | 'capabilitySnapshot'
   | 'compare'
   | 'review'
+  | 'reviewContext'
   | 'relativePath'
 >;
 
@@ -49,6 +50,7 @@ export function summarizeProviderEvolutionArtifactForReadModel(
     capabilitySnapshot: artifact.capabilitySnapshot,
     compare: artifact.compare,
     review: artifact.review,
+    reviewContext: artifact.reviewContext,
     relativePath: artifact.relativePath,
   };
 }

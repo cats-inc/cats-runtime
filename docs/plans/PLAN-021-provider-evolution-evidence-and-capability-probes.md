@@ -8,7 +8,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Core Manual-First Slices Landed) |
+| **Status** | Completed |
 | **Owner** | Codex |
 | **Assigned To** | TBD |
 | **Reviewer** | User |
@@ -128,7 +128,7 @@ to classify likely upgrades, regressions, and schema changes.
 - [x] Keep semantic drift classification advisory rather than blocking
 - [x] Produce human-readable summaries that distinguish:
       evidence, classification, and external context
-- [ ] Add hooks or fields for attaching release-note/changelog references
+- [x] Add hooks or fields for attaching release-note/changelog references
       without mixing them into runtime evidence
 
 **Deliverables**: maintainers get reviewable output that can say "something
@@ -214,6 +214,7 @@ expansion without blocking the first CLI-focused slice.
 | 2026-03-27 | Plan created for adapter instrumentation, shared evidence collection, manual probe entry, baseline compare, and future agent-backend compatibility |
 | 2026-03-27 | Core manual-first slices landed: high-value CLI adapters now emit transport-neutral evidence, manual probes persist capability snapshots with baseline compare and review summaries, retained artifact list/read commands exist, and diagnostics/provider-config surfaces can reuse the latest bounded summary without adding a public probe route |
 | 2026-03-27 | Agent follow-through landed for the first OpenClaw and Agent SDK bridge targets; remaining work is now limited to optional release-note/changelog attachment and later breadth/depth expansion rather than missing core probe infrastructure |
+| 2026-03-27 | Manual `reviewContext.references[]` attachment landed for probe artifacts through repeated `--probe-reference <kind=url>` flags, and the same separate-from-evidence context now flows through retained artifact summaries/read models without adding any new public probe route or automatic scraping behavior. |
 
 ---
 

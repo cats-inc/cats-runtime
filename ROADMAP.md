@@ -1133,8 +1133,9 @@ always-on self-adapting parser system.
   collector shape proves stable, including broader agent/A2A adapter coverage
 - keep provider-specific parsing inside adapters while reusing the shared
   collector across future agent/A2A transports
-- refine semantic-drift heuristics and attach external release-note context
-  separately from runtime evidence when later follow-through needs it
+- refine semantic-drift heuristics and broaden operator workflows around the
+  now-landed manual `reviewContext.references[]` attachment path without
+  introducing automatic release-note scraping
 
 #### Deferred Scope
 

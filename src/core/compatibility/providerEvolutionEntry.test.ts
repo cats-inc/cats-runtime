@@ -93,11 +93,20 @@ describe('provider evolution entry summaries', () => {
           summary: 'Captured the first retained provider-evolution baseline.',
           highlights: ['No prior matching baseline artifact was found.'],
         },
+        reviewContext: {
+          references: [
+            {
+              kind: 'release_notes',
+              url: 'https://docs.example.com/releases/codex-cli-1-2-3',
+            },
+          ],
+        },
         evidence: {} as never,
       },
     })).toBe([
       'Loaded provider-evolution artifact artifact-1: Captured the first retained provider-evolution baseline.',
       '- No prior matching baseline artifact was found.',
+      '- External references: release_notes=https://docs.example.com/releases/codex-cli-1-2-3',
       'Artifact: C:/tmp/provider-evolution/codex/artifact-1.json',
       '',
     ].join('\n'));
@@ -222,6 +231,10 @@ backends:
         probeProvider: 'claude',
         probeInstance: 'agent/sdk',
         probeProfile: 'manual_smoke',
+        probeReferences: [
+          'release_notes=https://docs.example.com/releases/agent-sdk-1-0',
+          'changelog=https://docs.example.com/changelog/agent-sdk',
+        ],
       }, env);
 
       await expect(resolveProviderEvolutionEntryContext(env).probeService.readLatestArtifact({
@@ -242,6 +255,18 @@ backends:
       expect(result.artifact.evidence.summary.normalizedEventTypes.text).toBe(2);
       expect(result.artifact.evidence.summary.normalizedEventTypes.tool_use).toBe(1);
       expect(result.artifact.review.classifications).toEqual(['baseline']);
+      expect(result.artifact.reviewContext).toEqual({
+        references: [
+          {
+            kind: 'changelog',
+            url: 'https://docs.example.com/changelog/agent-sdk',
+          },
+          {
+            kind: 'release_notes',
+            url: 'https://docs.example.com/releases/agent-sdk-1-0',
+          },
+        ],
+      });
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
