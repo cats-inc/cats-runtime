@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | Draft (UI Follow-Through Not Started) |
 | **Owner** | Codex |
 | **Assigned To** | TBD |
 | **Reviewer** | User / runtime setup workstream |
@@ -28,6 +28,9 @@
   - provider setup APIs already exist
 - The remaining gap is that the runtime-owned UI is still three mostly isolated static pages with duplicated CSS/JS, inconsistent visual language, and no shared bootstrap discovery read seam.
 - The goal is to converge `dashboard`, `playground`, and `provider-setup` onto one lightweight runtime-owned UI foundation while preserving static HTML artifacts, existing route behavior, and the current non-SPA runtime model.
+- The plan is still intentionally not started: runtime-owned bootstrap/setup read
+  seams are already in place, so the remaining work here is primarily shared
+  UI/build-layer follow-through rather than missing runtime core substrate.
 
 ## Scope
 

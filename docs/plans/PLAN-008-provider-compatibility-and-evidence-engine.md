@@ -9,7 +9,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Compatibility Core and Manual Probe Slices Landed) |
+| **Status** | In Progress (Core Delivered; Follow-Ons Remain) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User / runtime workstream |
@@ -82,16 +82,16 @@ failure evidence into runtime-owned assets and services.
 
 ### Phase 1: Knowledge Base and Core Contracts
 
-- [ ] Add shared compatibility types under `src/core/compatibility`
-- [ ] Define the provider-family manifest/profile shape
-- [ ] Encode first-wave compatibility knowledge for major CLI families
-- [ ] Add a fingerprint result shape that can represent:
+- [x] Add shared compatibility types under `src/core/compatibility`
+- [x] Define the provider-family manifest/profile shape
+- [x] Encode first-wave compatibility knowledge for major CLI families
+- [x] Add a fingerprint result shape that can represent:
       - version known / unknown
       - runtime mode
       - command resolution
       - observed output/protocol signature
       - detected feature hints
-- [ ] Define normalized result classes:
+- [x] Define normalized result classes:
       - `ready`
       - `degraded`
       - `unsupported_version`
@@ -103,13 +103,13 @@ direction that providers, diagnostics, and tests can share.
 
 ### Phase 2: Probe, Fingerprint, and Evidence Capture
 
-- [ ] Add a compatibility service that can probe a resolved provider target
-- [ ] Support version lookup and runtime-aware command probing without assuming
+- [x] Add a compatibility service that can probe a resolved provider target
+- [x] Support version lookup and runtime-aware command probing without assuming
       version data is always available
-- [ ] Add protocol/signature fallback when version is unavailable or ambiguous
-- [ ] Add evidence capture helpers that persist redacted JSON bundles under a
+- [x] Add protocol/signature fallback when version is unavailable or ambiguous
+- [x] Add evidence capture helpers that persist redacted JSON bundles under a
       runtime-owned evidence directory
-- [ ] Make evidence bundles include enough data for replay/regression fixtures:
+- [x] Make evidence bundles include enough data for replay/regression fixtures:
       - provider family
       - target/backend/runtime
       - selected profile
@@ -123,13 +123,13 @@ bundle structure.
 
 ### Phase 3: Shared Runtime Integration
 
-- [ ] Route CLI diagnostics through the shared compatibility service instead of
+- [x] Route CLI diagnostics through the shared compatibility service instead of
       route-local ad hoc checks
-- [ ] Reuse the same service before CLI execution/spawn so runtime turns do not
+- [x] Reuse the same service before CLI execution/spawn so runtime turns do not
       bypass compatibility selection
-- [ ] Feed the selected profile and classification into provider construction
+- [x] Feed the selected profile and classification into provider construction
       without rewriting every adapter
-- [ ] Expose re-probe-friendly semantics:
+- [x] Expose re-probe-friendly semantics:
       - cache reuse for normal paths
       - explicit force refresh from diagnostics/API query when requested
       - automatic refresh when cached compatibility is stale or missing
@@ -138,23 +138,25 @@ bundle structure.
 
 ### Phase 4: Public Contract, Docs, and Regression Coverage
 
-- [ ] Extend the diagnostics/provider route payloads with machine-readable
+- [x] Extend the diagnostics/provider route payloads with machine-readable
       compatibility metadata and degraded-path explanations
-- [ ] Add targeted unit tests for:
+- [x] Add targeted unit tests for:
       - profile selection
       - version/fingerprint fallback
       - evidence redaction and persistence
       - replay from captured bundles/fixtures
-- [ ] Add integration tests for diagnostics and session execution behavior
-- [ ] Update `docs/api.md`, `docs/architecture.md`, and `docs/setup-guide.md`
-- [ ] Update `PROGRESS.md` with the delivered compatibility/evidence slice
+- [x] Add integration tests for diagnostics and session execution behavior
+- [x] Update `docs/api.md`, `docs/architecture.md`, and `docs/setup-guide.md`
+- [x] Update `PROGRESS.md` with the delivered compatibility/evidence slice
 
 **Deliverables**: shipped contract, replay foundation, and synchronized docs.
 
 ### Phase 5: Deferred Follow-Ons
 
-- [ ] Expand first-class manifests and live probes for more provider families
-- [ ] Add host-facing explicit re-probe/write-back APIs beyond query-flag
+- [ ] Expand first-class manifests and live probes only when additional
+      provider families become runtime-critical beyond the current major CLI
+      coverage
+- [x] Add host-facing explicit re-probe/write-back APIs beyond query-flag
       refresh
 - [ ] Revisit whether compatibility knowledge should move from TypeScript-owned
       manifests into runtime-owned config assets or a hybrid split
@@ -245,6 +247,7 @@ bundle structure.
 | 2026-03-27 | Host-facing explicit re-probe follow-through also landed: `POST /diagnostics/providers/reprobe` now runs a forced compatibility refresh for selected targets with optional `light`/`live` mode, so operators no longer need to overload `GET /diagnostics/providers?force=1` for write-like reprobe actions |
 | 2026-03-27 | MCP read-model follow-through landed for retained compatibility evidence: `list_compatibility_evidence_artifacts` and `read_compatibility_evidence_artifact` now reuse the same bounded diagnostics list/read surfaces and filters over HTTP JSON-RPC and stdio, so orchestrator-style hosts can inspect degraded parser/profile evidence without shelling out to CLI helpers or inventing an MCP-only evidence path |
 | 2026-03-27 | MCP write follow-through also landed for explicit compatibility refresh: `reprobe_provider_diagnostics` now reuses `POST /diagnostics/providers/reprobe` over HTTP JSON-RPC and stdio, so orchestrator-style hosts can request a bounded forced refresh without overloading the read-only diagnostics tool or inventing a second reprobe path |
+| 2026-03-28 | Backlog reality check: phases 1-4 are now effectively complete. The remaining plan work is limited to optional breadth expansion for new provider families, a possible future move from TypeScript-owned manifests into runtime-owned assets, and deeper coupling of rate-limit/metering knowledge back into the compatibility engine itself. |
 
 ---
 

@@ -6,7 +6,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Major API/Local Slices Landed) |
+| **Status** | In Progress (Provider-Specific Optimizations and Verification Follow-Through Remain) |
 | **Owner** | Codex |
 | **Assigned To** | Claude |
 | **Reviewer** | Gemini |
@@ -318,11 +318,11 @@ src/core/
 
 ### Phase 0: Architecture Record and Scope Gates
 
-- [ ] Record `ADR-005` before implementation starts, covering:
+- [x] Record `ADR-005` before implementation starts, covering:
       backend-neutral session execution, runtime-managed transcripts as source
       of truth, instance-level backend selection, fetch-first transport policy,
       and Ollama as an independent provider.
-- [ ] Create `SPEC-002` for the shared local tool runtime before Phase 3 work
+- [x] Create `SPEC-002` for the shared local tool runtime before Phase 3 work
       begins, because that subsystem is large enough to deserve its own
       requirements and approval flow.
 
@@ -331,21 +331,21 @@ tool runtime has a dedicated scope document before implementation expands.
 
 ### Phase 1: Backend-Neutral Runtime Seam
 
-- [ ] Move stable session, capability, and stream contracts out of
+- [x] Move stable session, capability, and stream contracts out of
       `src/backends/cli` into `src/core`.
-- [ ] Introduce backend-aware provider instance types with `backend: cli | api`.
-- [ ] Introduce `RuntimeSessionManager` / `RuntimeFacade` so HTTP routes stop
+- [x] Introduce backend-aware provider instance types with `backend: cli | api`.
+- [x] Introduce `RuntimeSessionManager` / `RuntimeFacade` so HTTP routes stop
       depending directly on `WorkerPool`.
-- [ ] Add `codex` and `ollama` to the provider catalog, dashboard ordering,
+- [x] Add `codex` and `ollama` to the provider catalog, dashboard ordering,
       and provider metadata responses.
-- [ ] Define backend probe semantics so dashboard and operators can distinguish
+- [x] Define backend probe semantics so dashboard and operators can distinguish
       "active execution handle" from "backend health / availability".
-- [ ] Generalize `AppContext`, config types, and routing helpers so they no
+- [x] Generalize `AppContext`, config types, and routing helpers so they no
       longer hard-depend on CLI-only classes.
-- [ ] Enumerate and patch provider-catalog ripple points: `KNOWN_PROVIDERS`,
+- [x] Enumerate and patch provider-catalog ripple points: `KNOWN_PROVIDERS`,
       provider validation, discovery no-op behavior, dashboard ordering, and
       helper resolution.
-- [ ] Generalize `StreamEvent.raw` away from `ClaudeStreamEvent` so non-CLI
+- [x] Generalize `StreamEvent.raw` away from `ClaudeStreamEvent` so non-CLI
       backends can preserve raw payloads without type abuse.
 
 **Deliverables**: The server can resolve provider instances without assuming
@@ -354,15 +354,15 @@ than directly on `WorkerPool`, and the public HTTP contract remains unchanged.
 
 ### Phase 2: API Transport Foundation
 
-- [ ] Build `src/backends/api/transports` for Anthropic, OpenAI, Gemini, and
+- [x] Build `src/backends/api/transports` for Anthropic, OpenAI, Gemini, and
       Ollama.
-- [ ] Normalize provider streams into the existing `StreamEvent` envelope.
-- [ ] Create `ApiExecution` objects that behave like worker handles for active
+- [x] Normalize provider streams into the existing `StreamEvent` envelope.
+- [x] Create `ApiExecution` objects that behave like worker handles for active
       turns.
-- [ ] Persist canonical runtime-managed transcripts for every API session.
-- [ ] Reserve transcript metadata and transport hooks for prompt/context caching
+- [x] Persist canonical runtime-managed transcripts for every API session.
+- [x] Reserve transcript metadata and transport hooks for prompt/context caching
       and continuation IDs so resume is not hard-coded to full-history replay.
-- [ ] Support `create`, `message`, `resume`, `fork`, `close`, `delete`, and
+- [x] Support `create`, `message`, `resume`, `fork`, `close`, `delete`, and
       `history` for API sessions.
 
 **Deliverables**: API-backed and Ollama-backed sessions work end to end for
@@ -371,12 +371,12 @@ provider-specific resume optimizations.
 
 ### Phase 3: Local Tool Runtime and Workspace Policy
 
-- [ ] Implement runtime-hosted tools for filesystem inspection, search, patch
+- [x] Implement runtime-hosted tools for filesystem inspection, search, patch
       application, and shell execution.
-- [ ] Enforce `workspaceMode` and `permissionMode` against those tools.
-- [ ] Emit normalized tool events and persist tool calls/results in history.
-- [ ] Add per-turn timeout, cancellation, and max-step guardrails.
-- [ ] Add Ollama-specific model catalog and health queries so the dashboard can
+- [x] Enforce `workspaceMode` and `permissionMode` against those tools.
+- [x] Emit normalized tool events and persist tool calls/results in history.
+- [x] Add per-turn timeout, cancellation, and max-step guardrails.
+- [x] Add Ollama-specific model catalog and health queries so the dashboard can
       validate local availability before session creation.
 
 **Deliverables**: API and Ollama sessions can operate on local workspaces with a
@@ -384,15 +384,18 @@ runtime policy that is comparable to CLI agent workflows.
 
 ### Phase 4: Provider-Specific Optimizations
 
-- [ ] Anthropic: prompt caching and selectively enabled server tools where they
-      improve quality over local tools.
-- [ ] OpenAI: `previous_response_id`, background mode, and chosen built-in tools
-      where they lower latency or token replay cost.
-- [ ] Gemini: context caching, file upload support, and selective Google Search
-      or URL-context integration.
-- [ ] Ollama: optional native `/api/chat` path, model warm-up hints, and local
-      model lifecycle operations such as list / pull / running-model checks.
-- [ ] Add runtime-wide per-instance/session/workspace usage, rate-limit, and
+- [ ] Anthropic: selective server-tool follow-through where it materially
+      improves quality over runtime-local tools; prompt-cache support is
+      already shipped.
+- [ ] OpenAI: background mode and chosen built-in tools where they lower
+      latency or token replay cost; `previous_response_id` continuation is
+      already shipped.
+- [ ] Gemini: file upload support and selective Google Search or URL-context
+      integration; cached-content reuse is already shipped.
+- [ ] Ollama: remaining local model lifecycle operations such as runtime-owned
+      pull/manage follow-through; native `/api/chat`, keep-alive hints, and
+      installed/running model inspection are already shipped.
+- [x] Add runtime-wide per-instance/session/workspace usage, rate-limit, and
       concurrency guardrails through shared runtime metering rather than an
       API-only subsystem.
 
@@ -405,11 +408,12 @@ capable than a pure history-replay MVP.
       transport, and default model for each instance, now including additive
       `apiRuntime`, `continuity`, `tooling`, `metering`, and bounded
       `modelCatalog` inspection metadata for API/local targets.
-- [ ] Consider an additive `GET /ollama/models` endpoint or fold model listing
+- [x] Consider an additive `GET /ollama/models` endpoint or fold model listing
       into provider metadata for local-model selection.
-- [ ] Update setup, API, architecture, and security docs.
-- [ ] Add `providers.yaml.example` entries for API instances and `.env.example`
-      placeholders for the required keys.
+- [ ] Update the remaining security-oriented docs follow-through for API/local
+      execution; setup, API, and architecture docs are already in sync.
+- [x] Add `providers.yaml.example` entries for API instances.
+- [ ] Add `.env.example` placeholders for the required API credentials.
 - [ ] Add a regression matrix for stream parsing, tool calls, resume, fork,
       abort, and rate-limit retries.
 
@@ -548,6 +552,7 @@ The phase ordering above is based on the current vendor API surfaces reviewed on
 | 2026-03-27 | Shared read-model follow-through landed: `/providers/config` and `/diagnostics/providers` now expose additive `apiRuntime` inspection metadata so hosts can inspect continuation, cache/warm-state, and provider-native-tool posture for API/local targets without inferring that state from transport names alone |
 | 2026-03-27 | Tooling-surface follow-through landed: `GET /providers/{provider}/tools` now also includes additive `apiRuntime` inspection metadata for API/local targets, so hosts can inspect runtime-owned tooling policy and API/local optimization posture in one call without fetching a second read model. |
 | 2026-03-27 | Session-facing read-model follow-through landed: `/sessions`, `/sessions/{id}/history`, and `/sessions/{id}/observe` now also carry additive `providerTarget.apiRuntime` metadata for API/local sessions, so host-side run inspection can see continuation/cache/provider-native-tool posture without joining back to provider topology routes. |
+| 2026-03-28 | Backlog reality check: Phases 0-3 are now effectively complete, and the remaining plan work is limited to selective provider-native follow-through (Anthropic server tools, OpenAI background/built-in tools, Gemini file/upload-search features, Ollama pull/manage lifecycle operations), `.env.example` cleanup, security-doc follow-through, and a tighter API/local regression matrix. |
 
 ---
 
