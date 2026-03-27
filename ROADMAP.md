@@ -1102,6 +1102,10 @@ always-on self-adapting parser system.
 - the same manual-first retained-artifact family now also includes
   compatibility evidence list/read helpers for the redacted bundles already
   captured on degraded CLI assessments
+- those retained compatibility evidence helpers now also accept repeated
+  `--probe-classification` filters so offline triage can focus on
+  `probe_failed`, `unsupported_version`, or other compatibility classes
+  without starting the HTTP server
 - the CLI/manual-first flow can now also:
   - list retained provider-evolution artifacts newest-first
   - re-read a retained artifact by id without starting the HTTP server

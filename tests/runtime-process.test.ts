@@ -1371,6 +1371,46 @@ describe('runtime process startup contract', () => {
     }
   }, 20000);
 
+  it('can filter retained compatibility evidence artifacts by classification', async () => {
+    const { env, cleanup } = createRuntimeProcessEnv(3217);
+    writeCompatibilityEvidenceArtifact(env, 'claude', 'compat-degraded', {
+      classification: 'degraded',
+    });
+    writeCompatibilityEvidenceArtifact(env, 'claude', 'compat-failed', {
+      classification: 'probe_failed',
+      summary: 'Compatibility probe failed while checking the provider.',
+    });
+    const child = spawnSetupDiagnostic([
+      '--list-compatibility-evidence',
+      '--probe-provider',
+      'claude',
+      '--probe-classification',
+      'probe_failed',
+    ], env);
+
+    try {
+      const output = await waitForProcessOutput(child);
+      expect(output.code).toBe(0);
+
+      const payload = JSON.parse(output.stdout.trim()) as CompatibilityEvidenceListCliOutput;
+      expect(payload.status).toBe('listed');
+      expect(payload.count).toBe(1);
+      expect(payload.artifacts).toEqual([
+        expect.objectContaining({
+          artifactId: 'compat-failed',
+          provider: 'claude',
+          classification: 'probe_failed',
+        }),
+      ]);
+      expect(output.stderr).toContain(
+        'Listed 1 compatibility evidence artifact(s) for claude/classification=probe_failed.',
+      );
+      expect(output.stderr).toContain('claude/default [probe_failed]');
+    } finally {
+      cleanup();
+    }
+  }, 20000);
+
   it('can filter retained provider-evolution artifacts by parser, transport, and review classification', async () => {
     const { env, cleanup } = createRuntimeProcessEnv(3213);
     writeProviderEvolutionArtifact(env, 'claude', 'artifact-cli', {

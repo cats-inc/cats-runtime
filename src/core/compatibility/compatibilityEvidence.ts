@@ -44,6 +44,7 @@ export interface CompatibilityEvidenceStoredArtifact {
 export interface CompatibilityEvidenceArtifactQuery {
   provider?: string;
   instance?: string;
+  classifications?: CompatibilityClassification[];
   limit?: number;
 }
 
@@ -199,6 +200,13 @@ function matchesCompatibilityEvidenceQuery(
     return false;
   }
   if (query.instance && artifact.target.instanceId !== query.instance) {
+    return false;
+  }
+  if (
+    query.classifications
+    && query.classifications.length > 0
+    && !query.classifications.includes(artifact.classification)
+  ) {
     return false;
   }
   return true;

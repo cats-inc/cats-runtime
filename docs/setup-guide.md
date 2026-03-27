@@ -638,12 +638,16 @@ supports manual-first retained inspection without starting the HTTP server:
 
 ```powershell
 node dist/index.js --list-compatibility-evidence --probe-provider codex --probe-limit 5
+node dist/index.js --list-compatibility-evidence --probe-provider codex --probe-classification probe_failed
 node dist/index.js --read-compatibility-evidence artifact-id --probe-provider codex
 ```
 
 These commands reuse the runtime-owned retained artifact store and keep stdout
 machine-readable while printing concise stderr summaries, similar to setup
-diagnostic reports and provider-evolution artifact inspection.
+diagnostic reports and provider-evolution artifact inspection. The same
+`--probe-classification` filter used by retained provider-evolution triage can
+also narrow compatibility evidence list/read flows to one or more runtime
+compatibility classes such as `probe_failed` or `unsupported_version`.
 
 ## Running the Project
 

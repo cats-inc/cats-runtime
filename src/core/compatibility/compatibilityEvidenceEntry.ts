@@ -7,6 +7,7 @@ import {
   type CompatibilityEvidenceArtifactSummary,
   type CompatibilityEvidenceStoredArtifact,
 } from './compatibilityEvidence.js';
+import type { CompatibilityClassification } from './types.js';
 import type { RuntimeCliOptions } from '../../startup.js';
 
 interface CompatibilityEvidenceEntryContext {
@@ -91,10 +92,12 @@ function resolveCompatibilityEvidenceQuery(
 ): CompatibilityEvidenceArtifactQuery {
   const provider = parseOptionalProbeProviderName(cliOptions.probeProvider);
   const limit = parseOptionalProbeLimit(cliOptions.probeLimit);
+  const classifications = parseOptionalCompatibilityClassifications(cliOptions.probeClassifications);
 
   return {
     ...(provider ? { provider } : {}),
     ...(cliOptions.probeInstance ? { instance: cliOptions.probeInstance.trim() } : {}),
+    ...(classifications ? { classifications } : {}),
     ...(typeof limit === 'number' ? { limit } : {}),
   };
 }
@@ -118,10 +121,40 @@ function parseOptionalProbeProviderName(value: string | undefined): string | und
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+function parseOptionalCompatibilityClassifications(
+  values: string[] | undefined,
+): CompatibilityClassification[] | undefined {
+  if (!values || values.length === 0) {
+    return undefined;
+  }
+
+  const classifications = Array.from(new Set(values.map(parseCompatibilityClassification)));
+  return classifications.length > 0 ? classifications : undefined;
+}
+
+function parseCompatibilityClassification(value: string): CompatibilityClassification {
+  const trimmed = value.trim();
+  switch (trimmed) {
+    case 'ready':
+    case 'degraded':
+    case 'unsupported_version':
+    case 'unrecognized_protocol':
+    case 'probe_failed':
+      return trimmed;
+    default:
+      throw new Error(
+        `Invalid --probe-classification value '${value}'. Valid values: ready, degraded, unsupported_version, unrecognized_protocol, probe_failed`,
+      );
+  }
+}
+
 function describeCompatibilityEvidenceScope(cliOptions: RuntimeCliOptions): string {
   const parts = [
     cliOptions.probeProvider?.trim(),
     cliOptions.probeInstance?.trim(),
+    cliOptions.probeClassifications?.length
+      ? `classification=${cliOptions.probeClassifications.join(',')}`
+      : undefined,
   ].filter((value): value is string => Boolean(value));
 
   return parts.length > 0 ? parts.join('/') : 'all retained compatibility evidence';

@@ -121,4 +121,37 @@ describe('CompatibilityEvidenceService', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it('filters retained compatibility evidence by classification', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-evidence-'));
+    const service = new CompatibilityEvidenceService({ rootDir: root });
+
+    try {
+      writeCompatibilityEvidenceArtifact(root, 'codex', 'artifact-degraded', {
+        classification: 'degraded',
+      });
+      writeCompatibilityEvidenceArtifact(root, 'codex', 'artifact-failed', {
+        classification: 'probe_failed',
+      });
+
+      const listed = await service.listArtifacts({
+        provider: 'codex',
+        classifications: ['probe_failed'],
+      });
+      expect(listed.map((artifact) => artifact.artifactId)).toEqual(['artifact-failed']);
+
+      const read = await service.readArtifactById('artifact-failed', {
+        provider: 'codex',
+        classifications: ['probe_failed'],
+      });
+      expect(read?.artifact.classification).toBe('probe_failed');
+
+      await expect(service.readArtifactById('artifact-degraded', {
+        provider: 'codex',
+        classifications: ['probe_failed'],
+      })).resolves.toBeNull();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
