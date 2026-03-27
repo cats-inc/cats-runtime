@@ -125,6 +125,8 @@ Current curated tools:
 - `run_setup_scan`
 - `apply_setup_config`
 - `observe_session`
+- `list_wakeups`
+- `read_wakeup`
 - `list_runtime_skills`
 - `create_session`
 - `send_message`
@@ -236,6 +238,10 @@ history and branch-lineage surfaces as `GET /sessions/{id}/history` and
 `GET /sessions/{id}/lineage`, so MCP hosts can inspect transcript metadata,
 provider-target context, and branch ancestry/descendant state without
 inventing a second session-inspection contract.
+`list_wakeups` and `read_wakeup` reuse the same runtime-owned wakeup read
+surfaces as `GET /wakeups` and `GET /wakeups/{id}`, including additive
+`status` / `sessionId` filters on the list tool, so MCP hosts can inspect the
+scheduled-wakeup backlog without inventing a second scheduling contract.
 `list_sessions` and `observe_session` also reuse the same additive session
 `providerTarget` read model exposed by the direct HTTP session/history/observe
 surfaces, so MCP hosts can inspect backend continuity/tooling semantics without

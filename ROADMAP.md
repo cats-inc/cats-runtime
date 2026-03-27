@@ -1080,6 +1080,10 @@ evidence bundles and does not force hosts to invent their own report format.
   also exposed through MCP as `session_history` and `session_lineage`, so
   orchestrator-style hosts can inspect transcript metadata and branch ancestry
   without falling back to direct HTTP session reads
+- the same runtime-owned wakeup inspection surfaces are now also exposed
+  through MCP as `list_wakeups` and `read_wakeup`, so orchestrator-style hosts
+  can inspect scheduled-wakeup backlog and retained request state without
+  inventing an MCP-only scheduling contract
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
   remediation previews, and latest-setup-report summary metadata including a

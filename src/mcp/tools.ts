@@ -91,6 +91,7 @@ const RUNTIME_SKILL_SORT_FIELDS = ['id', 'title', 'family', 'slug', 'role'] as c
 const SORT_DIRECTIONS = ['asc', 'desc'] as const;
 const RUNTIME_BROWSER_SESSION_STATUSES = ['ready', 'closed'] as const;
 const BROWSER_BINDING_KINDS = ['manual_url', 'session_service', 'session_artifact'] as const;
+const WAKEUP_STATUSES = ['scheduled', 'triggering', 'triggered', 'cancelled', 'failed'] as const;
 const ACTOR_ROLES = [
   'boss_cat',
   'specialist_cat',
@@ -1252,6 +1253,59 @@ async function sessionLineage(
       sessionPath: `/sessions/${sessionId}`,
       historyPath: `/sessions/${sessionId}/history`,
       observePath: `/sessions/${sessionId}/observe`,
+    },
+  };
+}
+
+async function listWakeups(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const searchParams = new URLSearchParams();
+  appendSingleQueryValue(
+    searchParams,
+    'status',
+    readOptionalEnumString(
+      args,
+      'status',
+      WAKEUP_STATUSES,
+      'status must be a valid wakeup status',
+    ),
+  );
+  appendSingleQueryValue(searchParams, 'sessionId', readOptionalString(args, 'sessionId'));
+  const wakeupsPath = searchParams.size > 0
+    ? `/wakeups?${searchParams.toString()}`
+    : '/wakeups';
+  const result = await requestRuntimeJson(ctx, wakeupsPath, { method: 'GET' });
+  ensureRouteSuccess('list_wakeups', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'list_wakeups result');
+  const wakeups = Array.isArray(payload.wakeups) ? payload.wakeups : [];
+  return {
+    summary: `Returned ${wakeups.length} wakeup request(s).`,
+    structuredContent: {
+      ...payload,
+      wakeupsPath,
+    },
+  };
+}
+
+async function readWakeup(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const wakeupId = readRequiredString(args, 'wakeupId');
+  const wakeupPath = `/wakeups/${encodeURIComponent(wakeupId)}`;
+  const result = await requestRuntimeJson(ctx, wakeupPath, { method: 'GET' });
+  ensureRouteSuccess('read_wakeup', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'read_wakeup result');
+  return {
+    summary: `Read wakeup request ${wakeupId}.`,
+    structuredContent: {
+      ...payload,
+      wakeupPath,
+      wakeupsPath: '/wakeups',
     },
   };
 }
@@ -2662,6 +2716,38 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: observeSession,
+  },
+  {
+    definition: {
+      name: 'list_wakeups',
+      title: 'List Wakeups',
+      description: 'Return wakeup requests through the same runtime-owned wakeup list route used by direct HTTP clients.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          status: { type: 'string', enum: WAKEUP_STATUSES },
+          sessionId: { type: 'string' },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: listWakeups,
+  },
+  {
+    definition: {
+      name: 'read_wakeup',
+      title: 'Read Wakeup',
+      description: 'Return one wakeup request through the same runtime-owned wakeup detail route used by direct HTTP clients.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          wakeupId: { type: 'string' },
+        },
+        required: ['wakeupId'],
+        additionalProperties: false,
+      },
+    },
+    execute: readWakeup,
   },
   {
     definition: {

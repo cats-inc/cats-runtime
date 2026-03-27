@@ -10,6 +10,7 @@ import type { CliRuntimeConfig } from '../backends/cli/config.js';
 import { createRuntimeApp } from './app.js';
 import { createRuntimeStartupState } from '../startup.js';
 import { getRuntimeResolvedPaths } from '../core/config.js';
+import { RuntimeWakeupService } from '../core/wakeup/RuntimeWakeupService.js';
 import {
   ProviderEvolutionProbeService,
   PROVIDER_EVOLUTION_PROBE_PROFILES,
@@ -211,6 +212,14 @@ describe('runtime MCP facade', () => {
     const completeBootstrap = vi.fn(() => {
       startup.bootstrapRequired = false;
     });
+    const wakeup = new RuntimeWakeupService({
+      persistPath: join(dataDir, 'wakeups.json'),
+      sessionExists: (sessionId) => registry.get(sessionId) !== undefined,
+      wakeSession: vi.fn(async (sessionId: string) => ({
+        sessionId,
+        outcome: 'resumed' as const,
+      })),
+    });
     const providerModelCatalog = {
       inspectSummary: vi.fn(() => ({
         source: 'config',
@@ -281,6 +290,7 @@ describe('runtime MCP facade', () => {
       auggieSessions: {} as never,
       opencodeNative: {} as never,
       providerModelCatalog: providerModelCatalog as never,
+      wakeup,
       bootstrapService: bootstrapService as never,
       completeBootstrap,
     });
@@ -383,6 +393,8 @@ describe('runtime MCP facade', () => {
       'run_setup_scan',
       'apply_setup_config',
       'observe_session',
+      'list_wakeups',
+      'read_wakeup',
       'list_runtime_skills',
       'create_session',
       'send_message',
@@ -1657,6 +1669,114 @@ describe('runtime MCP facade', () => {
     expect(observe.result.structuredContent.session.inspection.state).toBe('idle');
     expect(observe.result.structuredContent.observePath).toBe('/sessions/session-1/observe');
     expect(pool.getCapabilities).toHaveBeenCalledWith('claude', 'default');
+  });
+
+  it('exposes wakeup inspection tools aligned with the existing wakeup read routes', async () => {
+    const app = createTestApp();
+
+    const createResponse = await app.request('/wakeups', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        reason: 'Wake the session later.',
+        target: {
+          kind: 'session',
+          sessionId: 'session-1',
+        },
+        scheduleAt: '2026-03-27T01:00:00.000Z',
+      }),
+    });
+    expect(createResponse.status).toBe(201);
+    const created = await createResponse.json() as {
+      request: {
+        id: string;
+      };
+    };
+
+    const listWakeupsResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 31.8,
+        method: 'tools/call',
+        params: {
+          name: 'list_wakeups',
+          arguments: {
+            status: 'scheduled',
+            sessionId: 'session-1',
+          },
+        },
+      }),
+    });
+    expect(listWakeupsResponse.status).toBe(200);
+    const listWakeups = await listWakeupsResponse.json() as {
+      result: {
+        structuredContent: {
+          wakeupsPath: string;
+          wakeups: Array<{
+            id: string;
+            reason: string;
+            status: string;
+            target: {
+              kind: string;
+              sessionId: string;
+            };
+          }>;
+        };
+      };
+    };
+    expect(listWakeups.result.structuredContent.wakeupsPath).toBe(
+      '/wakeups?status=scheduled&sessionId=session-1',
+    );
+    expect(listWakeups.result.structuredContent.wakeups).toEqual([
+      expect.objectContaining({
+        id: created.request.id,
+        reason: 'Wake the session later.',
+        status: 'scheduled',
+        target: {
+          kind: 'session',
+          sessionId: 'session-1',
+        },
+      }),
+    ]);
+
+    const readWakeupResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 31.9,
+        method: 'tools/call',
+        params: {
+          name: 'read_wakeup',
+          arguments: {
+            wakeupId: created.request.id,
+          },
+        },
+      }),
+    });
+    expect(readWakeupResponse.status).toBe(200);
+    const readWakeup = await readWakeupResponse.json() as {
+      result: {
+        structuredContent: {
+          wakeupPath: string;
+          wakeupsPath: string;
+          request: {
+            id: string;
+            reason: string;
+            status: string;
+          };
+        };
+      };
+    };
+    expect(readWakeup.result.structuredContent.wakeupPath).toBe(`/wakeups/${created.request.id}`);
+    expect(readWakeup.result.structuredContent.wakeupsPath).toBe('/wakeups');
+    expect(readWakeup.result.structuredContent.request).toEqual(expect.objectContaining({
+      id: created.request.id,
+      reason: 'Wake the session later.',
+      status: 'scheduled',
+    }));
   });
 
   it('exposes the runtime skill catalog through MCP with the same lightweight filters as HTTP', async () => {
