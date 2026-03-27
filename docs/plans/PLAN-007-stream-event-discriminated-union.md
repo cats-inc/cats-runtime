@@ -7,7 +7,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | In Progress (First Conservative Slice Landed) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | Claude / user follow-up |
@@ -161,10 +161,10 @@ Design notes:
 
 ### Phase 1: Introduce the Union in Core
 
-- [ ] Replace the current flat `StreamEvent` interface in `src/core/types.ts`
+- [x] Replace the current flat `StreamEvent` interface in `src/core/types.ts`
       with per-event interfaces and a `StreamEvent` union
-- [ ] Extract small shared aliases such as `StreamUsage`
-- [ ] Keep exported names stable so imports outside `src/core/types.ts` do not
+- [x] Extract small shared aliases such as `StreamUsage`
+- [x] Keep exported names stable so imports outside `src/core/types.ts` do not
       need mass renaming
 - [ ] Add a tiny internal helper such as `assertNever()` only if a core
       consumer needs exhaustive switching immediately
@@ -174,7 +174,7 @@ change.
 
 ### Phase 2: Migrate High-Fan-Out Producers
 
-- [ ] Update `src/core/runtime/ManagedExecutionHandle.ts` to emit exact error
+- [x] Update `src/core/runtime/ManagedExecutionHandle.ts` to emit exact error
       events
 - [ ] Update `src/backends/api/runtime/ApiBackendManager.ts` to emit exact
       `init`, `text`, `tool_use`, `tool_result`, `result`, and `progress`
@@ -270,6 +270,7 @@ documented residual debt list.
 | Date | Update |
 |------|--------|
 | 2026-03-21 | Plan created after post-commit review flagged `StreamEvent` narrowing debt |
+| 2026-03-27 | First conservative slice landed: `src/core/types.ts` now exports discriminated `StreamEvent` members while keeping the wire shape stable; runtime build and full test suite stayed green after compile fallout was resolved without broad `as` casts. |
 
 ---
 

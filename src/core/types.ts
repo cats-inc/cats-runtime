@@ -1563,14 +1563,12 @@ export interface TurnInput extends RuntimeExecutionStrategyRequest {
   outputDir?: string;
 }
 
-export interface StreamEvent {
-  type: 'init' | 'text' | 'tool_use' | 'tool_result' | 'result' | 'error' | 'raw' | 'progress';
+interface StreamEventBase {
   sessionId?: string;
   providerSessionId?: string;
   text?: string;
   toolName?: string;
   toolId?: string;
-  toolArgs?: Record<string, unknown>;
   isError?: boolean;
   usage?: StreamUsage;
   summary?: string;
@@ -1580,6 +1578,68 @@ export interface StreamEvent {
   metadata?: Record<string, unknown>;
   raw?: unknown;
 }
+
+interface StreamEventStatePatch {
+}
+
+export interface InitStreamEvent extends StreamEventBase, StreamEventStatePatch {
+  type: 'init';
+  text?: string;
+}
+
+export interface TextStreamEvent extends StreamEventBase {
+  type: 'text';
+  text: string;
+}
+
+export interface ToolUseStreamEvent extends StreamEventBase {
+  type: 'tool_use';
+  text?: string;
+  toolName?: string;
+  toolId?: string;
+  toolArgs?: Record<string, unknown>;
+}
+
+export interface ToolResultStreamEvent extends StreamEventBase {
+  type: 'tool_result';
+  text?: string;
+  toolName?: string;
+  toolId?: string;
+  isError?: boolean;
+}
+
+export interface ResultStreamEvent extends StreamEventBase, StreamEventStatePatch {
+  type: 'result';
+  text?: string;
+}
+
+export interface ErrorStreamEvent extends StreamEventBase {
+  type: 'error';
+  text: string;
+}
+
+export interface RawStreamEvent extends StreamEventBase {
+  type: 'raw';
+  text?: string;
+}
+
+export interface ProgressStreamEvent extends StreamEventBase, StreamEventStatePatch {
+  type: 'progress';
+  text: string;
+  toolName?: string;
+  toolId?: string;
+  isError?: boolean;
+}
+
+export type StreamEvent =
+  | InitStreamEvent
+  | TextStreamEvent
+  | ToolUseStreamEvent
+  | ToolResultStreamEvent
+  | ResultStreamEvent
+  | ErrorStreamEvent
+  | RawStreamEvent
+  | ProgressStreamEvent;
 
 export interface HealthStatus {
   status: 'ok' | 'degraded' | 'unavailable';

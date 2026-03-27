@@ -58,10 +58,10 @@ export class ManagedExecutionHandle implements ExecutionHandle {
         yield event;
       }
     } catch (error) {
-      const errorEvent: StreamEvent = {
+      const errorEvent = {
         type: 'error',
         text: error instanceof Error ? error.message : String(error),
-      };
+      } satisfies StreamEvent;
       this.emitter.emit('event', errorEvent);
       this.emitter.emit('error', error);
       yield errorEvent;

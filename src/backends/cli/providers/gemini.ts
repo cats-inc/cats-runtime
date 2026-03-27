@@ -185,7 +185,7 @@ export class GeminiProvider implements Provider {
         rawSample: event,
       }, {
         type: 'error',
-        text: event.message,
+        text: event.message || 'Gemini CLI reported an error.',
       });
     }
 
