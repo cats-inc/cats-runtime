@@ -9,6 +9,7 @@ import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
 import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
 import { getRuntimeResolvedPaths } from '../core/config.js';
 import { ProviderCompatibilityService } from '../core/compatibility/ProviderCompatibilityService.js';
+import { RuntimeMeteringService } from '../core/usage/RuntimeMeteringService.js';
 import {
   ProviderEvolutionProbeService,
   PROVIDER_EVOLUTION_PROBE_PROFILES,
@@ -129,7 +130,12 @@ describe('provider diagnostics HTTP contract', () => {
     };
   }
 
-  function createTestApp(config: CliRuntimeConfig = makeConfig()) {
+  function createTestApp(
+    config: CliRuntimeConfig = makeConfig(),
+    options: {
+      metering?: RuntimeMeteringService;
+    } = {},
+  ) {
     const compatibility = new ProviderCompatibilityService(config, {
       runner: {
         run: vi.fn(async (_providerName, _commandConfig, args: string[]) => {
@@ -172,6 +178,7 @@ describe('provider diagnostics HTTP contract', () => {
       auggieSessions: {} as never,
       opencodeNative: {} as never,
       providerModelCatalog,
+      metering: options.metering,
     });
   }
 
@@ -392,6 +399,81 @@ describe('provider diagnostics HTTP contract', () => {
         }),
       ],
     }));
+  });
+
+  it('surfaces additive provider-target metering snapshots on diagnostics', async () => {
+    const metering = new RuntimeMeteringService({
+      rateLimitCooldownMs: 5_000,
+    });
+    const session = {
+      id: 'metering-session-1',
+      providerName: 'claude',
+      providerBackend: 'cli' as const,
+      providerInstanceId: 'default',
+      cwd: sessionBaseDir,
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+    };
+
+    metering.observeEvent(session as never, {
+      type: 'error',
+      text: '429 Too Many Requests. Retry after 2s.',
+    }, {
+      turnStartedAt: Date.now() - 20,
+    });
+
+    const app = createTestApp(makeConfig(), { metering });
+    const response = await app.request(
+      '/diagnostics/providers?provider=claude&backend=cli&instance=default',
+    );
+
+    expect(response.status).toBe(200);
+    const payload = await response.json() as {
+      providers: Array<{
+        provider: string;
+        backend: string;
+        instance: string;
+        metering: {
+          summary: {
+            status: string;
+            incidents: number;
+            activeGuardrails: number;
+            activeCooldowns: number;
+          };
+          recentIncidents: Array<{
+            classification: string;
+          }>;
+          activeGuardrails: Array<{
+            outcome: string;
+          }>;
+        };
+      }>;
+    };
+    expect(payload.providers).toEqual([
+      expect.objectContaining({
+        provider: 'claude',
+        backend: 'cli',
+        instance: 'default',
+        metering: expect.objectContaining({
+          summary: expect.objectContaining({
+            status: 'degraded',
+            incidents: 1,
+            activeGuardrails: 1,
+            activeCooldowns: 1,
+          }),
+          recentIncidents: expect.arrayContaining([
+            expect.objectContaining({
+              classification: 'rate_limited',
+            }),
+          ]),
+          activeGuardrails: expect.arrayContaining([
+            expect.objectContaining({
+              outcome: 'cooldown',
+            }),
+          ]),
+        }),
+      }),
+    ]);
   });
 
   it('filters provider diagnostics by provider/backend/instance and echoes the applied query', async () => {

@@ -626,6 +626,23 @@ probe route. The summary includes:
   changelog / issue / announcement URLs
 - `relativePath`
 
+`GET /diagnostics/providers` also includes additive per-target `metering`
+snapshots. This is a read-only operator surface over the runtime-owned
+metering service, not a second compatibility classifier. Each target now
+includes:
+
+- `metering.target`: resolved `provider`, `instance`, and `backend`
+- `metering.summary`: bounded status/counts for recent incidents plus active
+  guardrails (`status`, `incidents`, `activeGuardrails`, `activeCooldowns`,
+  `activeBlocks`, `warningOnlyGuardrails`)
+- `metering.recentIncidents`: recent provider-target incidents such as
+  `rate_limited`
+- `metering.activeGuardrails`: currently active cooldown/block outcomes for the
+  same target
+
+This lets hosts distinguish setup/compatibility degradation from runtime-owned
+quota or cooldown pressure without making a second diagnostics request.
+
 `GET /diagnostics/health` now also includes a compact top-level `metering`
 summary so hosts can poll one route for both provider readiness and
 execution-guardrail state. It also includes a compact top-level `wakeups`

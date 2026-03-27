@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type {
+  ProviderBackend,
   RuntimeGuardrailResult,
   RuntimeMeteringSnapshot,
   RuntimeMeteringSummary,
@@ -35,6 +36,17 @@ interface RuntimeMeteringOptions {
 interface ObserveEventOptions {
   turnStartedAt: number;
   observedAt?: string;
+}
+
+export interface RuntimeProviderTargetMeteringSnapshot {
+  target: {
+    provider: string;
+    instance: string;
+    backend: ProviderBackend;
+  };
+  summary: RuntimeMeteringSummary;
+  recentIncidents: RuntimeRateLimitIncident[];
+  activeGuardrails: RuntimeGuardrailResult[];
 }
 
 export class RuntimeMeteringService {
@@ -316,6 +328,36 @@ export class RuntimeMeteringService {
       preflight,
       activeGuardrails,
       recentIncidents,
+    };
+  }
+
+  buildProviderTargetSnapshot(target: {
+    provider: string;
+    instance: string;
+    backend: ProviderBackend;
+  }): RuntimeProviderTargetMeteringSnapshot {
+    this.evictExpiredGuardrails();
+
+    const activeGuardrails = Array.from(this.providerGuardrails.values()).filter((guardrail) =>
+      isGuardrailActive(guardrail)
+      && guardrail.provider === target.provider
+      && guardrail.instance === target.instance
+      && guardrail.backend === target.backend,
+    );
+    const recentIncidents = [...this.incidents]
+      .filter((incident) =>
+        incident.provider === target.provider
+        && incident.instance === target.instance
+        && incident.backend === target.backend,
+      )
+      .slice(-10)
+      .reverse();
+
+    return {
+      target,
+      summary: buildSummary(0, recentIncidents.length, activeGuardrails),
+      recentIncidents,
+      activeGuardrails,
     };
   }
 

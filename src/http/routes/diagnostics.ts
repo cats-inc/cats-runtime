@@ -45,6 +45,7 @@ import {
   getRuntimeBrowserService,
   getRuntimeMeteringService,
 } from '../app.js';
+import type { RuntimeProviderTargetMeteringSnapshot } from '../../core/usage/RuntimeMeteringService.js';
 import {
   DEFAULT_RUNTIME_AGENT_PROBE_TIMEOUT_MS,
   getFileBackedProviderDiscoveryInfo,
@@ -98,6 +99,7 @@ interface ProviderDiagnosticResult {
   checks: DiagnosticCheck[];
   setup?: ProviderSetupSummary;
   compatibility?: CompatibilitySummaryView;
+  metering: RuntimeProviderTargetMeteringSnapshot;
   providerEvolution?: {
     latestArtifact: ProviderEvolutionLatestArtifactReadModel;
   };
@@ -1024,6 +1026,11 @@ async function diagnoseTarget(
         instance: resolveProviderEvolutionArtifactInstance(target),
       })
     : null;
+  const metering = getRuntimeMeteringService(ctx).buildProviderTargetSnapshot({
+    provider: target.providerName,
+    instance: target.instanceId,
+    backend: target.backend,
+  });
 
   return {
     provider: target.providerName,
@@ -1036,6 +1043,7 @@ async function diagnoseTarget(
     checks: result.checks,
     setup: result.setup,
     compatibility: result.compatibility,
+    metering,
     ...(latestProbeArtifact ? {
       providerEvolution: {
         latestArtifact: summarizeProviderEvolutionArtifactForReadModel(latestProbeArtifact),

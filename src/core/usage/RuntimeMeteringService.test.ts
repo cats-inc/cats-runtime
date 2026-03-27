@@ -216,4 +216,45 @@ describe('RuntimeMeteringService', () => {
       instance: 'payg',
     }));
   });
+
+  it('builds provider-target snapshots for diagnostics read models', () => {
+    const service = new RuntimeMeteringService({
+      rateLimitCooldownMs: 5_000,
+    });
+    const session = createSession({
+      providerName: 'claude',
+      providerBackend: 'cli',
+      providerInstanceId: 'default',
+    });
+
+    service.observeEvent(session, {
+      type: 'error',
+      text: '429 Too Many Requests. Retry after 2s.',
+    }, {
+      turnStartedAt: Date.now() - 10,
+    });
+
+    const snapshot = service.buildProviderTargetSnapshot({
+      provider: 'claude',
+      instance: 'default',
+      backend: 'cli',
+    });
+
+    expect(snapshot.summary).toEqual(expect.objectContaining({
+      status: 'degraded',
+      incidents: 1,
+      activeGuardrails: 1,
+      activeCooldowns: 1,
+    }));
+    expect(snapshot.recentIncidents).toEqual([
+      expect.objectContaining({
+        classification: 'rate_limited',
+      }),
+    ]);
+    expect(snapshot.activeGuardrails).toEqual([
+      expect.objectContaining({
+        outcome: 'cooldown',
+      }),
+    ]);
+  });
 });

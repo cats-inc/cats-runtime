@@ -1122,6 +1122,11 @@ always-on self-adapting parser system.
   `providerEvolution.latestArtifact` summaries, reusing the retained artifact
   read model to surface capability snapshot, compare counts, review
   classification, and relative artifact path for each matching provider target
+- the same provider diagnostics surface now also includes additive per-target
+  `metering` snapshots so operators can tell when a target looks degraded
+  because runtime-owned cooldowns, recent rate-limit incidents, or active
+  blocks are in effect instead of assuming every warning came from setup or
+  compatibility drift
 - `/providers/config` instance entries now reuse the same retained artifact
   read model, so host/provider-selection flows can fetch provider topology and
   latest provider-evolution summary in one call
