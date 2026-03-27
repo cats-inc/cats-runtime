@@ -15,6 +15,7 @@ function writeCompatibilityEvidenceArtifact(
     capturedAt: string;
     parserId: string;
     profileId: string;
+    runtimeMode: 'native' | 'wsl' | 'docker';
   }> = {},
 ): string {
   const providerDir = join(root, provider);
@@ -42,7 +43,7 @@ function writeCompatibilityEvidenceArtifact(
       instanceId: overrides.instanceId || 'default',
       command: provider,
       runner: 'auto',
-      runtime: { mode: 'native' },
+      runtime: { mode: overrides.runtimeMode || 'native' },
       version: {
         detected: true,
         source: 'command',
@@ -190,6 +191,46 @@ describe('CompatibilityEvidenceService', () => {
         provider: 'codex',
         parserId: 'codex-stream-json',
         profileId: 'codex-cli-fallback',
+      })).resolves.toBeNull();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('filters retained compatibility evidence by runtime mode', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-evidence-'));
+    const service = new CompatibilityEvidenceService({ rootDir: root });
+
+    try {
+      writeCompatibilityEvidenceArtifact(root, 'codex', 'artifact-native', {
+        runtimeMode: 'native',
+      });
+      writeCompatibilityEvidenceArtifact(root, 'codex', 'artifact-docker', {
+        runtimeMode: 'docker',
+      });
+
+      const listed = await service.listArtifacts({
+        provider: 'codex',
+        runtimeMode: 'docker',
+      });
+      expect(listed).toEqual([
+        expect.objectContaining({
+          artifactId: 'artifact-docker',
+          runtimeMode: 'docker',
+        }),
+      ]);
+
+      const read = await service.readArtifactById('artifact-docker', {
+        provider: 'codex',
+        runtimeMode: 'docker',
+      });
+      expect(read?.artifact.fingerprint.runtime).toEqual({
+        mode: 'docker',
+      });
+
+      await expect(service.readArtifactById('artifact-native', {
+        provider: 'codex',
+        runtimeMode: 'docker',
       })).resolves.toBeNull();
     } finally {
       rmSync(root, { recursive: true, force: true });

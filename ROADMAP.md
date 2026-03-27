@@ -1119,6 +1119,10 @@ always-on self-adapting parser system.
 - the same offline triage flow now also accepts `--probe-parser` and
   `--probe-profile` filters so retained compatibility bundles can be narrowed
   to one parser/profile family without rerunning a probe
+- the same retained compatibility evidence helpers now also accept
+  `--probe-runtime <native|wsl|docker>` so offline triage can focus on one CLI
+  runtime mode across mixed local/WSL/container installs without adding a new
+  route
 - `/diagnostics/providers` and `/providers/config` now also reuse the latest
   retained compatibility evidence summary for matching CLI targets, so hosts
   can inspect recent degraded parser/profile evidence without shelling out to

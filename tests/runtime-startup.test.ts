@@ -47,6 +47,8 @@ describe('runtime startup helpers', () => {
       'default',
       '--probe-parser',
       'codex-json-rpc',
+      '--probe-runtime',
+      'native',
       '--probe-transport=cli',
       '--probe-profile',
       'manual_smoke',
@@ -86,6 +88,7 @@ describe('runtime startup helpers', () => {
       probeProvider: 'codex',
       probeInstance: 'default',
       probeParser: 'codex-json-rpc',
+      probeRuntime: 'native',
       probeTransport: 'cli',
       probeProfile: 'manual_smoke',
       probeModel: 'gpt-5',
@@ -408,6 +411,7 @@ describe('runtime startup helpers', () => {
     expect(help).toContain('--review-provider-evolution-artifact <artifactId>');
     expect(help).toContain('--probe-provider <provider>');
     expect(help).toContain('--probe-parser <parserId>');
+    expect(help).toContain('--probe-runtime <native|wsl|docker>');
     expect(help).toContain('--probe-transport <cli|agent|api|unknown>');
     expect(help).toContain('--probe-profile <manual_smoke|manual_text>');
     expect(help).toContain('--probe-review-summary <text>');

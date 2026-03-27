@@ -1,5 +1,6 @@
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import type { RuntimeMode } from '../../backends/cli/config.js';
 import type {
   CompatibilityAssessment,
   CompatibilityClassification,
@@ -31,6 +32,7 @@ export interface CompatibilityEvidenceArtifactSummary {
   capturedAt: string;
   parserId: string;
   profileId: string;
+  runtimeMode?: RuntimeMode;
   relativePath: string;
   artifactPath: string;
 }
@@ -47,6 +49,7 @@ export interface CompatibilityEvidenceArtifactQuery {
   classifications?: CompatibilityClassification[];
   parserId?: string;
   profileId?: string;
+  runtimeMode?: RuntimeMode;
   limit?: number;
 }
 
@@ -185,6 +188,7 @@ export function summarizeCompatibilityEvidenceArtifact(
     capturedAt: stored.artifact.capturedAt,
     parserId: stored.artifact.profile.parserId,
     profileId: stored.artifact.profile.id,
+    runtimeMode: resolveRuntimeMode(stored.artifact),
     relativePath: stored.relativePath.replace(/\\/g, '/'),
     artifactPath: stored.artifactPath,
   };
@@ -217,5 +221,15 @@ function matchesCompatibilityEvidenceQuery(
   if (query.profileId && artifact.profile.id !== query.profileId) {
     return false;
   }
+  if (query.runtimeMode && resolveRuntimeMode(artifact) !== query.runtimeMode) {
+    return false;
+  }
   return true;
+}
+
+function resolveRuntimeMode(
+  artifact: CompatibilityEvidenceArtifactRecord,
+): RuntimeMode | undefined {
+  const mode = artifact.fingerprint?.runtime?.mode;
+  return typeof mode === 'string' ? mode as RuntimeMode : undefined;
 }

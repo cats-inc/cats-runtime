@@ -76,6 +76,7 @@ export interface RuntimeCliOptions {
   probeProvider?: string;
   probeInstance?: string;
   probeParser?: string;
+  probeRuntime?: string;
   probeTransport?: string;
   probeProfile?: string;
   probeModel?: string;
@@ -298,6 +299,17 @@ export function parseRuntimeCliOptions(argv: string[]): RuntimeCliOptions {
 
     if (arg.startsWith('--probe-parser=')) {
       options.probeParser = arg.slice('--probe-parser='.length);
+      continue;
+    }
+
+    if (arg === '--probe-runtime') {
+      options.probeRuntime = readOptionValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--probe-runtime=')) {
+      options.probeRuntime = arg.slice('--probe-runtime='.length);
       continue;
     }
 
@@ -816,6 +828,7 @@ export function getRuntimeHelpText(): string {
     '  --probe-provider <provider>',
     '  --probe-instance <instance>',
     '  --probe-parser <parserId>',
+    '  --probe-runtime <native|wsl|docker>',
     '  --probe-transport <cli|agent|api|unknown>',
     '  --probe-profile <manual_smoke|manual_text>',
     '  --probe-model <model>',

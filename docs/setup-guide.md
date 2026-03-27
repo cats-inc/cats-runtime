@@ -59,6 +59,7 @@ Supported startup flags:
 - `--probe-provider-evolution` — run a manual provider-evolution probe and exit without starting the HTTP server
 - `--probe-provider <provider>` — required with `--probe-provider-evolution`
 - `--probe-instance <instance>` — optional instance override for the selected provider
+- `--probe-runtime <native|wsl|docker>` — optional retained-artifact runtime filter for compatibility evidence list/read flows
 - `--probe-profile <manual_smoke|manual_text>` — optional probe profile override
 - `--probe-model <model>` — optional model override for the probe run
 - `--refresh-setup-scan` — refresh the shared setup scan before generating the setup diagnostic report
@@ -640,6 +641,7 @@ supports manual-first retained inspection without starting the HTTP server:
 node dist/index.js --list-compatibility-evidence --probe-provider codex --probe-limit 5
 node dist/index.js --list-compatibility-evidence --probe-provider codex --probe-classification probe_failed
 node dist/index.js --list-compatibility-evidence --probe-provider codex --probe-parser codex-json-rpc --probe-profile codex-cli-best-fit
+node dist/index.js --list-compatibility-evidence --probe-provider codex --probe-runtime docker
 node dist/index.js --read-compatibility-evidence artifact-id --probe-provider codex
 ```
 
@@ -651,6 +653,9 @@ also narrow compatibility evidence list/read flows to one or more runtime
 compatibility classes such as `probe_failed` or `unsupported_version`, and the
 same `--probe-parser` / `--probe-profile` selectors can narrow retained
 compatibility evidence to one parser/profile family without rerunning a probe.
+`--probe-runtime <native|wsl|docker>` can further narrow retained evidence to
+one CLI runtime mode such as `docker` when operators are triaging mixed local,
+WSL, and container-backed installs.
 When those retained artifacts exist, the latest bounded summary is also reused
 by `GET /diagnostics/providers` and `/providers/config` under
 `compatibilityEvidence.latestArtifact`, so hosts can inspect recent degraded

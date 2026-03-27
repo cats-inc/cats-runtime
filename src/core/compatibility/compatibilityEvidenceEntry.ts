@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { getRuntimeResolvedPaths, loadConfig, type RuntimeConfig } from '../config.js';
+import type { RuntimeMode } from '../../backends/cli/config.js';
 import {
   CompatibilityEvidenceService,
   summarizeCompatibilityEvidenceArtifact,
@@ -93,12 +94,14 @@ function resolveCompatibilityEvidenceQuery(
   const provider = parseOptionalProbeProviderName(cliOptions.probeProvider);
   const limit = parseOptionalProbeLimit(cliOptions.probeLimit);
   const classifications = parseOptionalCompatibilityClassifications(cliOptions.probeClassifications);
+  const runtimeMode = parseOptionalProbeRuntimeMode(cliOptions.probeRuntime);
 
   return {
     ...(provider ? { provider } : {}),
     ...(cliOptions.probeInstance ? { instance: cliOptions.probeInstance.trim() } : {}),
     ...(classifications ? { classifications } : {}),
     ...(cliOptions.probeParser?.trim() ? { parserId: cliOptions.probeParser.trim() } : {}),
+    ...(runtimeMode ? { runtimeMode } : {}),
     ...(cliOptions.probeProfile?.trim() ? { profileId: cliOptions.probeProfile.trim() } : {}),
     ...(typeof limit === 'number' ? { limit } : {}),
   };
@@ -121,6 +124,24 @@ function parseOptionalProbeProviderName(value: string | undefined): string | und
   }
   const trimmed = value.trim().toLowerCase();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function parseOptionalProbeRuntimeMode(value: string | undefined): RuntimeMode | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const trimmed = value.trim().toLowerCase();
+  switch (trimmed) {
+    case 'native':
+    case 'wsl':
+    case 'docker':
+      return trimmed;
+    default:
+      throw new Error(
+        `Invalid --probe-runtime value '${value}'. Valid values: native, wsl, docker`,
+      );
+  }
 }
 
 function parseOptionalCompatibilityClassifications(
@@ -155,6 +176,7 @@ function describeCompatibilityEvidenceScope(cliOptions: RuntimeCliOptions): stri
     cliOptions.probeProvider?.trim(),
     cliOptions.probeInstance?.trim(),
     cliOptions.probeParser?.trim() ? `parser=${cliOptions.probeParser.trim()}` : undefined,
+    cliOptions.probeRuntime?.trim() ? `runtime=${cliOptions.probeRuntime.trim()}` : undefined,
     cliOptions.probeProfile?.trim() ? `profile=${cliOptions.probeProfile.trim()}` : undefined,
     cliOptions.probeClassifications?.length
       ? `classification=${cliOptions.probeClassifications.join(',')}`

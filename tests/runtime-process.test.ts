@@ -121,6 +121,9 @@ interface CompatibilityEvidenceListCliOutput {
     instance: string;
     classification: string;
     summary: string;
+    parserId?: string;
+    profileId?: string;
+    runtimeMode?: string;
   }>;
 }
 
@@ -484,6 +487,7 @@ function writeCompatibilityEvidenceArtifact(
     capturedAt: string;
     parserId: string;
     profileId: string;
+    runtimeMode: 'native' | 'wsl' | 'docker';
   }> = {},
 ): string {
   const providerDir = join(env.CATS_RUNTIME_DATA_DIR!, 'compatibility', provider);
@@ -511,7 +515,7 @@ function writeCompatibilityEvidenceArtifact(
       instanceId: overrides.instanceId || 'default',
       command: provider,
       runner: 'auto',
-      runtime: { mode: 'native' },
+      runtime: { mode: overrides.runtimeMode || 'native' },
       version: {
         detected: true,
         source: 'command',
@@ -1448,6 +1452,45 @@ describe('runtime process startup contract', () => {
       ]);
       expect(output.stderr).toContain(
         'Listed 1 compatibility evidence artifact(s) for codex/parser=codex-stream-json/profile=codex-cli-fallback.',
+      );
+      expect(output.stderr).toContain('codex/default [unsupported_version]');
+    } finally {
+      cleanup();
+    }
+  }, 20000);
+
+  it('can filter retained compatibility evidence artifacts by runtime mode', async () => {
+    const { env, cleanup } = createRuntimeProcessEnv(3219);
+    writeCompatibilityEvidenceArtifact(env, 'codex', 'compat-native', {
+      runtimeMode: 'native',
+    });
+    writeCompatibilityEvidenceArtifact(env, 'codex', 'compat-docker', {
+      runtimeMode: 'docker',
+    });
+    const child = spawnSetupDiagnostic([
+      '--list-compatibility-evidence',
+      '--probe-provider',
+      'codex',
+      '--probe-runtime',
+      'docker',
+    ], env);
+
+    try {
+      const output = await waitForProcessOutput(child);
+      expect(output.code).toBe(0);
+
+      const payload = JSON.parse(output.stdout.trim()) as CompatibilityEvidenceListCliOutput;
+      expect(payload.status).toBe('listed');
+      expect(payload.count).toBe(1);
+      expect(payload.artifacts).toEqual([
+        expect.objectContaining({
+          artifactId: 'compat-docker',
+          provider: 'codex',
+          runtimeMode: 'docker',
+        }),
+      ]);
+      expect(output.stderr).toContain(
+        'Listed 1 compatibility evidence artifact(s) for codex/runtime=docker.',
       );
       expect(output.stderr).toContain('codex/default [unsupported_version]');
     } finally {
