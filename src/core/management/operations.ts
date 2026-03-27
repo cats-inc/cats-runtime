@@ -4,6 +4,31 @@ import type { RuntimeManagementOperation, RuntimeManagementOperationStatus } fro
 const DEFAULT_TTL_MS = 10 * 60_000; // 10 minutes
 const MAX_OPERATIONS = 100;
 
+export interface ManagementOperationStoreSummary {
+  total: number;
+  polling: number;
+  completed: number;
+  failed: number;
+  oldestStartedAt: string | null;
+  latestUpdatedAt: string | null;
+}
+
+export interface ManagementOperationDiagnosticEntry {
+  operationId: string;
+  status: RuntimeManagementOperationStatus;
+  startedAt: string;
+  updatedAt: string;
+  timeoutMs?: number;
+  domain?: string;
+  action?: string;
+  adapter?: string;
+}
+
+export interface ManagementOperationStoreDiagnostics {
+  summary: ManagementOperationStoreSummary;
+  recent: ManagementOperationDiagnosticEntry[];
+}
+
 export class ManagementOperationStore {
   private readonly operations = new Map<string, RuntimeManagementOperation>();
 
@@ -86,8 +111,61 @@ export class ManagementOperationStore {
     return this.operations.size;
   }
 
+  inspect(limit = 5): ManagementOperationStoreDiagnostics {
+    this.cleanup();
+    const operations = [...this.operations.values()]
+      .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
+    const summary: ManagementOperationStoreSummary = {
+      total: operations.length,
+      polling: operations.filter((operation) => operation.status === 'polling').length,
+      completed: operations.filter((operation) => operation.status === 'completed').length,
+      failed: operations.filter((operation) => operation.status === 'failed').length,
+      oldestStartedAt: operations.length > 0
+        ? operations.reduce(
+            (oldest, operation) => operation.startedAt < oldest ? operation.startedAt : oldest,
+            operations[0]!.startedAt,
+          )
+        : null,
+      latestUpdatedAt: operations.length > 0 ? operations[0]!.updatedAt : null,
+    };
+
+    return {
+      summary,
+      recent: operations.slice(0, Math.max(0, limit)).map((operation) => this.toDiagnosticEntry(operation)),
+    };
+  }
+
   private isExpired(op: RuntimeManagementOperation): boolean {
     const age = Date.now() - new Date(op.updatedAt).getTime();
     return age > DEFAULT_TTL_MS;
   }
+
+  private toDiagnosticEntry(
+    operation: RuntimeManagementOperation,
+  ): ManagementOperationDiagnosticEntry {
+    const requestContext = (
+      operation.result?._requestContext
+      && typeof operation.result._requestContext === 'object'
+      && !Array.isArray(operation.result._requestContext)
+    ) ? operation.result._requestContext as Record<string, unknown> : undefined;
+
+    return {
+      operationId: operation.operationId,
+      status: operation.status,
+      startedAt: operation.startedAt,
+      updatedAt: operation.updatedAt,
+      ...(operation.timeoutMs !== undefined ? { timeoutMs: operation.timeoutMs } : {}),
+      ...(readOptionalString(requestContext, 'domain') ? { domain: readOptionalString(requestContext, 'domain') } : {}),
+      ...(readOptionalString(requestContext, 'action') ? { action: readOptionalString(requestContext, 'action') } : {}),
+      ...(readOptionalString(requestContext, 'adapter') ? { adapter: readOptionalString(requestContext, 'adapter') } : {}),
+    };
+  }
+}
+
+function readOptionalString(
+  value: Record<string, unknown> | undefined,
+  key: string,
+): string | undefined {
+  const candidate = value?.[key];
+  return typeof candidate === 'string' && candidate.length > 0 ? candidate : undefined;
 }

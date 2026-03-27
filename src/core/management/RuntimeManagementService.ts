@@ -1,7 +1,10 @@
 import type { ManagementAdapter } from './adapters/types.js';
 import type { GithubReviewAdapter } from './adapters/github/GithubReviewAdapter.js';
 import type { ManagementConfig } from './config.js';
-import { ManagementOperationStore } from './operations.js';
+import {
+  ManagementOperationStore,
+  type ManagementOperationStoreDiagnostics,
+} from './operations.js';
 import {
   MUTATING_MANAGEMENT_ACTIONS,
   createManagementIssue,
@@ -176,6 +179,10 @@ export class RuntimeManagementService {
       capabilityGaps: [],
       operation: activeOp,
     };
+  }
+
+  inspectOperations(limit = 5): ManagementOperationStoreDiagnostics {
+    return this.operations.inspect(limit);
   }
 
   // -----------------------------------------------------------------------

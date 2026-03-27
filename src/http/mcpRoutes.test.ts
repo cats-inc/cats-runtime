@@ -2053,7 +2053,31 @@ describe('runtime MCP facade', () => {
   });
 
   it('exposes pool and management diagnostics through MCP without introducing new read contracts', async () => {
-    const app = createTestApp();
+    let completedOperationId = '';
+    let pollingOperationId = '';
+    const app = createTestApp({
+      configureManagement: (management) => {
+        const completed = management.operations.create();
+        management.operations.complete(completed.operationId, {
+          _requestContext: {
+            domain: 'review',
+            action: 'wait_review_checks',
+            adapter: 'github',
+          },
+        });
+        completedOperationId = completed.operationId;
+
+        const polling = management.operations.create(15_000);
+        management.operations.update(polling.operationId, 'polling', {
+          _requestContext: {
+            domain: 'deployment',
+            action: 'create_deployment',
+            adapter: 'zeabur',
+          },
+        });
+        pollingOperationId = polling.operationId;
+      },
+    });
 
     const poolStatusResponse = await app.request('/mcp', {
       method: 'POST',
@@ -2119,6 +2143,21 @@ describe('runtime MCP facade', () => {
               status: string;
             };
           }>;
+          operations: {
+            summary: {
+              total: number;
+              polling: number;
+              completed: number;
+              failed: number;
+            };
+            recent: Array<{
+              operationId: string;
+              status: string;
+              domain?: string;
+              action?: string;
+              adapter?: string;
+            }>;
+          };
         };
       };
     };
@@ -2135,6 +2174,31 @@ describe('runtime MCP facade', () => {
         }),
       }),
     ]);
+    expect(managementDiagnostics.result.structuredContent.operations.summary).toEqual(
+      expect.objectContaining({
+        total: 2,
+        polling: 1,
+        completed: 1,
+        failed: 0,
+      }),
+    );
+    expect(managementDiagnostics.result.structuredContent.operations.recent).toHaveLength(2);
+    expect(managementDiagnostics.result.structuredContent.operations.recent).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        operationId: pollingOperationId,
+        status: 'polling',
+        domain: 'deployment',
+        action: 'create_deployment',
+        adapter: 'zeabur',
+      }),
+      expect.objectContaining({
+        operationId: completedOperationId,
+        status: 'completed',
+        domain: 'review',
+        action: 'wait_review_checks',
+        adapter: 'github',
+      }),
+    ]));
   });
 
   it('resumes management operations through MCP without inventing a second operation contract', async () => {

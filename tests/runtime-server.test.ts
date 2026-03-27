@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import { loadConfig } from '../src/core/config.js';
+import { getRuntimeManagementService } from '../src/http/app.js';
 import * as providerInstallRunner from '../src/core/provider-install/ProviderInstallCheckRunner.js';
 import { prepareSessionWorkspace } from '../src/core/workspace/sessionWorkspace.js';
 import { createDiscoveryController, createRuntimeServer } from '../src/server.js';
@@ -590,6 +591,16 @@ describe('runtime server', () => {
                 executionModel: 'phase_loop',
               }),
             ]),
+          },
+          management: {
+            operations: {
+              total: 0,
+              polling: 0,
+              completed: 0,
+              failed: 0,
+              oldestStartedAt: null,
+              latestUpdatedAt: null,
+            },
           },
           wakeups: {
             summary: {
@@ -1383,6 +1394,16 @@ backends:
             cleanupCandidateOlderThanMs: 1800000,
           },
         },
+        management: {
+          summary: {
+            total: 0,
+            polling: 0,
+            completed: 0,
+            failed: 0,
+            oldestStartedAt: null,
+            latestUpdatedAt: null,
+          },
+        },
         wakeups: {
           status: 'ok',
           summary: 'No wakeup requests are tracked.',
@@ -1413,6 +1434,132 @@ backends:
       await runtime.close();
       rmSync(root, { recursive: true, force: true });
       vi.unstubAllEnvs();
+    }
+  });
+
+  it('surfaces management operation aggregates on runtime and health diagnostics', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-management-health-test-'));
+    const configPath = join(root, 'providers.yaml');
+
+    writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+routing:
+  providers:
+    codex:
+      default_target:
+        backend: cli
+        instance: default
+backends:
+  cli:
+    providers:
+      codex:
+        instances:
+          default:
+            environment: native
+            command: ${JSON.stringify(process.execPath)}
+            runner: direct
+            sessions_dir: ~/.codex/sessions
+`.trimStart());
+
+    const env = {
+      HOME: root,
+      USERPROFILE: root,
+      CATS_RUNTIME_CONFIG_PATH: configPath,
+      CATS_RUNTIME_HOST: '127.0.0.1',
+      CATS_RUNTIME_PORT: '3110',
+      CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
+      CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
+      CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
+      CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
+      CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
+    };
+
+    for (const dir of [
+      env.CATS_RUNTIME_DATA_DIR,
+      env.CATS_RUNTIME_SESSION_BASE_DIR,
+      env.CODEX_SESSIONS_DIR,
+    ]) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    const runtime = createRuntimeServer(loadConfig(env));
+    try {
+      const management = getRuntimeManagementService(runtime.context);
+      const completed = management.operations.create();
+      management.operations.complete(completed.operationId, {
+        _requestContext: {
+          domain: 'review',
+          action: 'wait_review_checks',
+          adapter: 'github',
+        },
+      });
+
+      const polling = management.operations.create(15_000);
+      management.operations.update(polling.operationId, 'polling', {
+        _requestContext: {
+          domain: 'deployment',
+          action: 'create_deployment',
+          adapter: 'zeabur',
+        },
+      });
+
+      const runtimeResponse = await runtime.app.request('/diagnostics/runtime');
+      expect(runtimeResponse.status).toBe(200);
+      const runtimePayload = await runtimeResponse.json() as {
+        runtime: {
+          management: {
+            operations: {
+              total: number;
+              polling: number;
+              completed: number;
+              failed: number;
+              oldestStartedAt: string | null;
+              latestUpdatedAt: string | null;
+            };
+          };
+        };
+      };
+      expect(runtimePayload.runtime.management).toEqual({
+        operations: expect.objectContaining({
+          total: 2,
+          polling: 1,
+          completed: 1,
+          failed: 0,
+          oldestStartedAt: expect.any(String),
+          latestUpdatedAt: expect.any(String),
+        }),
+      });
+
+      const healthResponse = await runtime.app.request('/diagnostics/health');
+      expect(healthResponse.status).toBe(200);
+      const healthPayload = await healthResponse.json() as {
+        management: {
+          summary: {
+            total: number;
+            polling: number;
+            completed: number;
+            failed: number;
+            oldestStartedAt: string | null;
+            latestUpdatedAt: string | null;
+          };
+        };
+      };
+      expect(healthPayload.management).toEqual({
+        summary: expect.objectContaining({
+          total: 2,
+          polling: 1,
+          completed: 1,
+          failed: 0,
+          oldestStartedAt: expect.any(String),
+          latestUpdatedAt: expect.any(String),
+        }),
+      });
+    } finally {
+      await runtime.close();
+      rmSync(root, { recursive: true, force: true });
     }
   });
 
@@ -1714,6 +1861,16 @@ backends:
             cleanupCandidateSessions: 0,
             cleanupCandidatePages: 0,
             cleanupCandidateOlderThanMs: 1800000,
+          },
+        },
+        management: {
+          summary: {
+            total: 0,
+            polling: 0,
+            completed: 0,
+            failed: 0,
+            oldestStartedAt: null,
+            latestUpdatedAt: null,
           },
         },
         wakeups: {

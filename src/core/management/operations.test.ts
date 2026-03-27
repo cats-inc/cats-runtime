@@ -92,4 +92,69 @@ describe('ManagementOperationStore', () => {
     vi.advanceTimersByTime(2 * 60_000);
     expect(store.get(op.operationId)).toBeDefined();
   });
+
+  it('summarizes recent operations with bounded request context details', () => {
+    const polling = store.create(30_000);
+    store.update(polling.operationId, 'polling', {
+      _requestContext: {
+        domain: 'review',
+        action: 'wait_review_checks',
+        adapter: 'github',
+      },
+    });
+
+    vi.advanceTimersByTime(1_000);
+
+    const completed = store.create();
+    store.complete(completed.operationId, {
+      _requestContext: {
+        domain: 'deployment',
+        action: 'create_deployment',
+        adapter: 'zeabur',
+      },
+    });
+
+    const diagnostics = store.inspect();
+    expect(diagnostics.summary).toEqual({
+      total: 2,
+      polling: 1,
+      completed: 1,
+      failed: 0,
+      oldestStartedAt: '2026-01-01T00:00:00.000Z',
+      latestUpdatedAt: '2026-01-01T00:00:01.000Z',
+    });
+    expect(diagnostics.recent).toEqual([
+      expect.objectContaining({
+        operationId: completed.operationId,
+        status: 'completed',
+        domain: 'deployment',
+        action: 'create_deployment',
+        adapter: 'zeabur',
+      }),
+      expect.objectContaining({
+        operationId: polling.operationId,
+        status: 'polling',
+        timeoutMs: 30_000,
+        domain: 'review',
+        action: 'wait_review_checks',
+        adapter: 'github',
+      }),
+    ]);
+  });
+
+  it('drops expired operations before building diagnostics', () => {
+    store.create();
+    vi.advanceTimersByTime(11 * 60_000);
+
+    const diagnostics = store.inspect();
+    expect(diagnostics.summary).toEqual({
+      total: 0,
+      polling: 0,
+      completed: 0,
+      failed: 0,
+      oldestStartedAt: null,
+      latestUpdatedAt: null,
+    });
+    expect(diagnostics.recent).toEqual([]);
+  });
 });

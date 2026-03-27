@@ -56,6 +56,7 @@ import type { AppContext } from '../app.js';
 import {
   getProviderCompatibilityService,
   getRuntimeBrowserService,
+  getRuntimeManagementService,
   getRuntimeMeteringService,
 } from '../app.js';
 import type { RuntimeProviderTargetMeteringSnapshot } from '../../core/usage/RuntimeMeteringService.js';
@@ -1239,6 +1240,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
   const worktrees = getRuntimeWorktreeDiagnostics(ctx);
   const executionStrategies = ctx.apiBackend?.inspectExecutionStrategies()
     ?? buildApiRuntimeExecutionStrategyCatalog();
+  const management = getRuntimeManagementService(ctx).inspectOperations();
 
   return c.json({
     service: RUNTIME_SERVICE_NAME,
@@ -1259,6 +1261,9 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
       },
       browser: browser.summary,
       executionStrategies,
+      management: {
+        operations: management.summary,
+      },
       wakeups,
       process: {
         pid: process.pid,
@@ -1471,6 +1476,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
   const worktrees = getRuntimeWorktreeDiagnostics(ctx);
   const executionStrategies = ctx.apiBackend?.inspectExecutionStrategies()
     ?? buildApiRuntimeExecutionStrategyCatalog();
+  const management = getRuntimeManagementService(ctx).inspectOperations();
   const providerSummary = summarizeProviderDiagnostics(catalog, providers, {
     defaultTargetsOnly: true,
     useAttentionSummary: true,
@@ -1530,6 +1536,9 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
         cleanupCandidatePages: browser.summary.cleanupCandidates.pageCount,
         cleanupCandidateOlderThanMs: browser.summary.cleanupCandidates.olderThanMs,
       },
+    },
+    management: {
+      summary: management.summary,
     },
     wakeups: wakeups.summary,
     metering,

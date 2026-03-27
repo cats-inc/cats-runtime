@@ -609,6 +609,9 @@ desktop shells, and the embedded dashboard. It combines:
   runtime maintenance snapshot
 - compact browser aggregate summary metadata so hosts can see preview backlog
   and cleanup-candidate counts without calling `/browser/summary`
+- compact management-operation backlog summary metadata so hosts can see
+  retained `polling` / `completed` / `failed` operation counts without polling
+  `GET /management/diagnostics`
 - compact runtime execution-strategy summary metadata so hosts can distinguish
   implemented strategy families from compatibility-fallback-only hints
 - a light provider-health summary over each provider's default target, suitable
@@ -654,6 +657,9 @@ integrate against:
   - `strategies`: per-family availability, execution model, bounded accepted
     `strategyContext` keys plus machine-readable `requestSupport` and
     `contextSchema` metadata, guardrail support, and emitted strategy events
+- runtime management backlog metadata under `runtime.management.operations`,
+  including retained `polling` / `completed` / `failed` counts plus
+  `oldestStartedAt` / `latestUpdatedAt`
 - full `metering` state:
   - `summary`: aggregate status/counts
   - `usage`: totals plus `byProviderInstance` / `bySession`
@@ -1248,10 +1254,21 @@ timeout, the result includes `state: 'completed'`. Otherwise, the response
 includes an `operation` with `status: 'polling'` and an `operationId` for
 resumption via `POST /management/operations/:operationId/resume`.
 
-`GET /management/diagnostics` returns adapter readiness and install/auth
-guidance. It is separate from `GET /diagnostics/providers` to avoid mixing
-management adapters with AI provider-model diagnostics. Optional query
-parameter `domain` filters by domain.
+`GET /management/diagnostics` returns adapter readiness/install/auth guidance
+plus additive retained-operation diagnostics. It is separate from
+`GET /diagnostics/providers` to avoid mixing management adapters with AI
+provider-model diagnostics. Optional query parameters are:
+
+- `domain`
+- `workspacePath`
+
+The response now also includes:
+
+- `operations.summary`: retained counts for `polling`, `completed`, and
+  `failed` operations plus `oldestStartedAt` / `latestUpdatedAt`
+- `operations.recent`: bounded recent retained operations with
+  `operationId`, `status`, timestamps, and any stored `domain` / `action` /
+  `adapter` request context when available
 
 Management adapter configuration lives in `config/management.yaml`, separate
 from `config/providers.yaml`.

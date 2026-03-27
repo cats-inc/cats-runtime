@@ -96,7 +96,10 @@ managementRoutes.get('/management/diagnostics', async (c) => {
       domains: domain ? [domain] : undefined,
       workspacePath: workspacePath || undefined,
     });
-    return c.json({ adapters: results });
+    return c.json({
+      adapters: results,
+      operations: service.inspectOperations(),
+    });
   } catch (error) {
     return c.json({
       error: error instanceof Error ? error.message : String(error),
