@@ -62,6 +62,12 @@ describe('inspectApiTarget', () => {
         active: true,
         keepAlive: '30m',
       }),
+      localModelLifecycle: expect.objectContaining({
+        source: 'runtime_model_catalog',
+        installedModels: 'dynamic',
+        runningModels: 'dynamic',
+        management: 'deferred',
+      }),
       providerNativeTools: expect.objectContaining({
         state: 'runtime_local_only',
       }),

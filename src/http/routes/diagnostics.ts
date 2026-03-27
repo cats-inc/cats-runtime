@@ -24,6 +24,7 @@ import {
   type RemoteModelDiscoveryRequest,
   type RemoteModelDiscoveryTarget,
 } from '../../core/models/remoteModelDiscovery.js';
+import { summarizeProviderModelCatalog } from '../../core/models/providerModelCatalog.js';
 import { inspectProviderActiveConfig } from '../../core/providerActiveConfig.js';
 import { toCompatibilitySummaryView } from '../../core/compatibility/ProviderCompatibilityService.js';
 import type { CompatibilitySummaryView } from '../../core/compatibility/types.js';
@@ -455,17 +456,15 @@ async function appendModelCatalogDiagnostics(
       target.providerName,
       `${target.backend}/${target.instanceId}`,
     );
+    const summary = summarizeProviderModelCatalog(catalog);
     config.modelCatalog = {
-      source: catalog.source,
-      defaultModel: catalog.defaultModel,
-      ...(catalog.defaultModel
-        ? {
-            defaultModelStatus: catalog.models.find((entry) => entry.id === catalog.defaultModel)?.status,
-          }
-        : {}),
-      modelCount: catalog.models.length,
-      warnings: [...catalog.warnings],
-      ...(catalog.cache ? { cache: catalog.cache } : {}),
+      source: summary.source,
+      defaultModel: summary.defaultModel,
+      ...(summary.defaultModelStatus ? { defaultModelStatus: summary.defaultModelStatus } : {}),
+      modelCount: summary.modelCount,
+      warnings: [...summary.warnings],
+      statusCounts: summary.statusCounts,
+      ...(summary.cache ? { cache: summary.cache } : {}),
     };
 
     checks.push(

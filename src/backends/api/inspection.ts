@@ -31,6 +31,13 @@ export interface ApiRuntimeInspection {
     state: 'runtime_local_only' | 'deferred';
     summary: string;
   };
+  localModelLifecycle?: {
+    source: 'runtime_model_catalog';
+    installedModels: 'dynamic';
+    runningModels: 'dynamic';
+    management: 'deferred';
+    summary: string;
+  };
 }
 
 export function inspectApiTarget(
@@ -133,6 +140,13 @@ export function inspectApiTarget(
       providerNativeTools: {
         state: 'runtime_local_only',
         summary: 'Runtime-local tools remain primary; Ollama does not add a separate hosted-tool contract here.',
+      },
+      localModelLifecycle: {
+        source: 'runtime_model_catalog',
+        installedModels: 'dynamic',
+        runningModels: 'dynamic',
+        management: 'deferred',
+        summary: 'cats-runtime can inspect installed and running Ollama models through the runtime-owned catalog, while pull/manage operations remain deferred.',
       },
     };
   }

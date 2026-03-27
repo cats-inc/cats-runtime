@@ -415,6 +415,12 @@ describe('API backend integration', () => {
                     strategy: 'keep_alive',
                     active: false,
                   }),
+                  localModelLifecycle: expect.objectContaining({
+                    source: 'runtime_model_catalog',
+                    installedModels: 'dynamic',
+                    runningModels: 'dynamic',
+                    management: 'deferred',
+                  }),
                   providerNativeTools: expect.objectContaining({
                     state: 'runtime_local_only',
                   }),
@@ -548,6 +554,12 @@ describe('API backend integration', () => {
           transport: 'ollama',
           caching: expect.objectContaining({
             strategy: 'keep_alive',
+          }),
+          localModelLifecycle: expect.objectContaining({
+            source: 'runtime_model_catalog',
+            installedModels: 'dynamic',
+            runningModels: 'dynamic',
+            management: 'deferred',
           }),
         }),
         continuity: {

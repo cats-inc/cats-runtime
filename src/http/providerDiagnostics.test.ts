@@ -1000,6 +1000,12 @@ describe('provider diagnostics HTTP contract', () => {
                   strategy: 'keep_alive',
                   active: false,
                 }),
+                localModelLifecycle: expect.objectContaining({
+                  source: 'runtime_model_catalog',
+                  installedModels: 'dynamic',
+                  runningModels: 'dynamic',
+                  management: 'deferred',
+                }),
               }),
               continuity: expect.objectContaining({
                 source: 'runtime_stateful',
@@ -1024,6 +1030,12 @@ describe('provider diagnostics HTTP contract', () => {
                 defaultModel: 'qwen2.5-coder:7b',
                 defaultModelStatus: 'configured',
                 modelCount: 1,
+                statusCounts: {
+                  configured: 1,
+                  available: 0,
+                  running: 0,
+                  unknown: 0,
+                },
                 warnings: expect.arrayContaining([
                   expect.stringContaining("Configured default model 'qwen2.5-coder:7b'"),
                 ]),

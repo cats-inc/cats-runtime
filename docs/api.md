@@ -747,8 +747,10 @@ surface for hosts and dashboards. The response includes:
   before any per-session permission narrowing
 - additive `config.apiRuntime` inspection metadata for API/local targets,
   including runtime-managed continuation strategy, provider-specific
-  caching/warm-state posture, and whether provider-native hosted tools are
-  still deferred versus available only through runtime-local execution
+  caching/warm-state posture, whether provider-native hosted tools are still
+  deferred versus available only through runtime-local execution, and for
+  Ollama targets a bounded `localModelLifecycle` summary describing the
+  runtime-owned installed/running-model inspection seam
 - additive `config.continuity` summaries describing whether the resolved
   target is `runtime_stateful`, `provider_native`, or `provider_managed`, plus
   bounded resume/fork/permission and remote-session affordance truth
@@ -756,7 +758,7 @@ surface for hosts and dashboards. The response includes:
   including adapter family, probe/model-discovery transport shape, bounded auth
   surface, provider-managed continuity, and runtime-visible capability flags
 - additive `config.modelCatalog` summaries (`source`, `defaultModel`,
-  `modelCount`, cache metadata when applicable, and warnings)
+  `modelCount`, `statusCounts`, cache metadata when applicable, and warnings)
 - additive `config.liveProbe` request/semantic metadata for API/local and
   agent targets; API/local targets include the semantic probe target, redacted
   request URL, auth application summary, and request header names, while agent
@@ -3116,6 +3118,9 @@ object includes:
 - `providerNativeTools` state/summary describing whether hosted provider tools
   remain deferred or whether the target stays runtime-local-only for tool
   execution
+- optional `localModelLifecycle` for Ollama targets, describing the
+  runtime-owned installed/running-model inspection seam while local pull/manage
+  operations remain deferred
 
 Each instance entry also exposes additive `continuity` metadata:
 
