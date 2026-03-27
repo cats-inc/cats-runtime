@@ -224,6 +224,8 @@ describe('MCP stdio transport', () => {
             expect.objectContaining({ name: 'read_latest_setup_diagnostic_report' }),
             expect.objectContaining({ name: 'read_setup_diagnostic_report' }),
             expect.objectContaining({ name: 'setup_state' }),
+            expect.objectContaining({ name: 'run_setup_scan' }),
+            expect.objectContaining({ name: 'apply_setup_config' }),
             expect.objectContaining({ name: 'list_runtime_skills' }),
             expect.objectContaining({ name: 'browser_summary' }),
             expect.objectContaining({ name: 'cleanup_browser_sessions' }),

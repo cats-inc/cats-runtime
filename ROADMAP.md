@@ -1043,6 +1043,10 @@ evidence bundles and does not force hosts to invent their own report format.
   `setup_state`, so orchestrator-style hosts can inspect bootstrap-required
   status, preferred scan source, next-action guidance, and latest setup-report
   summary metadata without inventing a second setup orchestration contract
+- the same bounded setup workflow mutations are now also exposed through MCP as
+  `run_setup_scan` and `apply_setup_config`, so orchestrator-style hosts can
+  request a manual scan or apply generated provider config without inventing an
+  MCP-only bootstrap lifecycle
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
   remediation previews, and latest-setup-report summary metadata including a

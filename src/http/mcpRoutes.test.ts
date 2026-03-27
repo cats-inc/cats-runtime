@@ -180,6 +180,7 @@ describe('runtime MCP facade', () => {
   }
 
   function createTestApp() {
+    const startup = createRuntimeStartupState();
     const bootstrapService = {
       getSetupState: vi.fn(async () => ({
         status: 'pending',
@@ -203,7 +204,13 @@ describe('runtime MCP facade', () => {
         scanType: 'manual',
         providers: [],
       })),
+      applyConfig: vi.fn(async (_providers: string[]) => ({
+        configPath: join(rootDir, 'config', 'providers.yaml'),
+      })),
     };
+    const completeBootstrap = vi.fn(() => {
+      startup.bootstrapRequired = false;
+    });
 
     const workerStream = async function* (turn: string | TurnInput): AsyncGenerator<StreamEvent> {
       const input = typeof turn === 'string' ? turn : turn.message;
@@ -240,7 +247,7 @@ describe('runtime MCP facade', () => {
 
     return createRuntimeApp({
       config: makeConfig(),
-      startup: createRuntimeStartupState(),
+      startup,
       registry,
       pool,
       cursorNative: {} as never,
@@ -250,6 +257,7 @@ describe('runtime MCP facade', () => {
       opencodeNative: {} as never,
       providerModelCatalog: {} as never,
       bootstrapService: bootstrapService as never,
+      completeBootstrap,
     });
   }
 
@@ -337,6 +345,8 @@ describe('runtime MCP facade', () => {
       'read_latest_setup_diagnostic_report',
       'read_setup_diagnostic_report',
       'setup_state',
+      'run_setup_scan',
+      'apply_setup_config',
       'observe_session',
       'list_runtime_skills',
       'create_session',
@@ -1022,6 +1032,68 @@ describe('runtime MCP facade', () => {
         expect.objectContaining({ kind: 'generate_setup_report' }),
       ]),
     }));
+
+    const runSetupScanResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 35.95,
+        method: 'tools/call',
+        params: {
+          name: 'run_setup_scan',
+          arguments: {
+            manual: true,
+          },
+        },
+      }),
+    });
+    expect(runSetupScanResponse.status).toBe(200);
+    const runSetupScan = await runSetupScanResponse.json() as {
+      result: {
+        structuredContent: {
+          setupScanPath: string;
+          status: string;
+          scan: {
+            scanType: string;
+          };
+        };
+      };
+    };
+    expect(runSetupScan.result.structuredContent.setupScanPath).toBe('/setup-scan');
+    expect(runSetupScan.result.structuredContent.status).toBe('completed');
+    expect(runSetupScan.result.structuredContent.scan.scanType).toBe('manual');
+
+    const applySetupConfigResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 35.96,
+        method: 'tools/call',
+        params: {
+          name: 'apply_setup_config',
+          arguments: {
+            providers: ['claude'],
+          },
+        },
+      }),
+    });
+    expect(applySetupConfigResponse.status).toBe(200);
+    const appliedSetupConfig = await applySetupConfigResponse.json() as {
+      result: {
+        structuredContent: {
+          setupApplyPath: string;
+          status: string;
+          bootstrapRequired: boolean;
+          configPath: string;
+        };
+      };
+    };
+    expect(appliedSetupConfig.result.structuredContent.setupApplyPath).toBe('/setup-apply');
+    expect(appliedSetupConfig.result.structuredContent.status).toBe('applied');
+    expect(appliedSetupConfig.result.structuredContent.bootstrapRequired).toBe(false);
+    expect(appliedSetupConfig.result.structuredContent.configPath).toContain('providers.yaml');
 
     vi.mocked(pool.getCapabilities).mockClear();
 

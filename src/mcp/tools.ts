@@ -939,6 +939,61 @@ async function setupState(
   };
 }
 
+async function runSetupScan(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const body: Record<string, unknown> = {};
+  if (readOptionalBoolean(args, 'manual') === true) {
+    body.manual = true;
+  }
+
+  const result = await requestRuntimeJson(ctx, '/setup-scan', {
+    method: 'POST',
+    body,
+  });
+  ensureRouteSuccess('run_setup_scan', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'run_setup_scan result');
+  const scan = asRecord(payload.scan);
+  const scanType = typeof scan?.scanType === 'string' ? scan.scanType : 'unknown';
+
+  return {
+    summary: `Completed ${scanType} setup scan.`,
+    structuredContent: {
+      ...payload,
+      setupScanPath: '/setup-scan',
+    },
+  };
+}
+
+async function applySetupConfig(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const providers = readOptionalStringArray(args, 'providers');
+  if (!providers || providers.length === 0) {
+    throw new McpToolError(-32602, 'providers must be a non-empty array of provider names');
+  }
+
+  const result = await requestRuntimeJson(ctx, '/setup-apply', {
+    method: 'POST',
+    body: {
+      providers,
+    },
+  });
+  ensureRouteSuccess('apply_setup_config', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'apply_setup_config result');
+  return {
+    summary: `Applied setup config for ${providers.length} provider(s).`,
+    structuredContent: {
+      ...payload,
+      setupApplyPath: '/setup-apply',
+    },
+  };
+}
+
 async function observeSession(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -2153,6 +2208,40 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: async (ctx) => setupState(ctx),
+  },
+  {
+    definition: {
+      name: 'run_setup_scan',
+      title: 'Run Setup Scan',
+      description: 'Trigger the existing runtime-owned setup scan route, optionally in manual mode.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          manual: { type: 'boolean' },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: runSetupScan,
+  },
+  {
+    definition: {
+      name: 'apply_setup_config',
+      title: 'Apply Setup Config',
+      description: 'Apply generated provider config through the existing runtime-owned bootstrap route.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          providers: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+        },
+        required: ['providers'],
+        additionalProperties: false,
+      },
+    },
+    execute: applySetupConfig,
   },
   {
     definition: {

@@ -112,6 +112,8 @@ Current curated tools:
 - `read_latest_setup_diagnostic_report`
 - `read_setup_diagnostic_report`
 - `setup_state`
+- `run_setup_scan`
+- `apply_setup_config`
 - `observe_session`
 - `list_runtime_skills`
 - `create_session`
@@ -185,6 +187,10 @@ the standalone CLI entry.
 MCP hosts can inspect bootstrap-required status, preferred scan source,
 actionable repair actions, and latest setup-report summary metadata without
 inventing a second setup orchestration contract.
+`run_setup_scan` and `apply_setup_config` reuse the same bounded setup workflow
+mutation seams as `POST /setup-scan` and `POST /setup-apply`, so MCP hosts can
+request a manual scan or apply a generated provider config without inventing an
+MCP-only bootstrap lifecycle.
 `list_sessions` and `observe_session` also reuse the same additive session
 `providerTarget` read model exposed by the direct HTTP session/history/observe
 surfaces, so MCP hosts can inspect backend continuity/tooling semantics without
