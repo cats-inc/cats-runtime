@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Hono } from 'hono';
@@ -104,11 +104,59 @@ async function createProviderEvolutionArtifact(root: string): Promise<void> {
   });
 }
 
+function createCompatibilityEvidenceArtifact(root: string): void {
+  const config = loadConfig(createTestEnv(root));
+  const providerDir = join(getRuntimeResolvedPaths(config).compatibilityEvidenceDir, 'claude');
+  mkdirSync(providerDir, { recursive: true });
+  writeFileSync(join(providerDir, 'compat-artifact-1.json'), `${JSON.stringify({
+    schemaVersion: 3,
+    id: 'compat-artifact-1',
+    capturedAt: '2026-03-26T00:00:00.000Z',
+    classification: 'probe_failed',
+    summary: 'Compatibility probe failed while checking the provider.',
+    target: {
+      provider: 'claude',
+      instanceId: 'default',
+    },
+    profile: {
+      id: 'claude-cli-best-fit',
+      label: 'claude best fit',
+      protocolFamily: 'claude',
+      parserId: 'claude-cli',
+      confidence: 'fallback',
+    },
+    fingerprint: {
+      provider: 'claude',
+      instanceId: 'default',
+      command: 'claude',
+      runner: 'auto',
+      runtime: { mode: 'native' },
+      version: {
+        detected: true,
+        source: 'command',
+      },
+      features: [],
+      checkedAt: '2026-03-26T00:00:00.000Z',
+    },
+    warnings: [],
+    setup: {
+      status: 'ready',
+      summary: 'ready',
+      install: null,
+      auth: null,
+      remediation: [],
+    },
+    probes: {},
+    checks: [],
+  }, null, 2)}\n`, 'utf8');
+}
+
 describe('setup diagnostics routes', () => {
   it('generates, lists, and reads setup diagnostic artifacts', async () => {
     const { root, cleanup } = createTestRoot();
     try {
       await createProviderEvolutionArtifact(root);
+      createCompatibilityEvidenceArtifact(root);
       const app = new Hono<{ Variables: { ctx: AppContext } }>();
       const ctx = {
         config: loadConfig(createTestEnv(root)),
@@ -149,6 +197,11 @@ describe('setup diagnostics routes', () => {
           artifactId: string;
           setup: { scan: { source: string } };
           references: {
+            compatibilityEvidenceArtifacts: Array<{
+              provider: string;
+              classification: string;
+              relativePath: string;
+            }>;
             providerEvolutionArtifacts: Array<{
               provider: string;
               relativePath: string;
@@ -158,6 +211,15 @@ describe('setup diagnostics routes', () => {
       };
       expect(postBody.status).toBe('generated');
       expect(postBody.report.setup.scan.source).toBe('refreshed');
+      expect(postBody.report.references.compatibilityEvidenceArtifacts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            provider: 'claude',
+            classification: 'probe_failed',
+            relativePath: expect.stringMatching(/claude[\\/]/),
+          }),
+        ]),
+      );
       expect(postBody.report.references.providerEvolutionArtifacts).toEqual(
         expect.arrayContaining([
           expect.objectContaining({

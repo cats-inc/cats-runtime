@@ -24,6 +24,10 @@ import {
   listProviderCatalog,
   type ProviderCatalogEntry,
 } from '../providerCatalog.js';
+import {
+  createCompatibilityEvidenceService,
+  type CompatibilityEvidenceLatestArtifactReadModel,
+} from '../compatibility/compatibilityEvidenceReadModel.js';
 import { createProviderEvolutionProbeService } from '../compatibility/providerEvolutionReadModel.js';
 import type { ProviderEvolutionProbeArtifactSummary } from '../compatibility/providerEvolutionProbe.js';
 import type {
@@ -33,6 +37,7 @@ import type {
 } from '../bootstrap/BootstrapService.js';
 
 const DEFAULT_REPORT_RETENTION_LIMIT = 5;
+const DEFAULT_COMPATIBILITY_EVIDENCE_REFERENCE_LIMIT = 3;
 const DEFAULT_PROVIDER_EVOLUTION_REFERENCE_LIMIT = 3;
 const REPORT_FILE_PREFIX = 'setup-report-';
 const REPORT_FILE_SUFFIX = '.json';
@@ -56,6 +61,12 @@ export interface SetupDiagnosticProviderEvolutionReference {
   capturedAt: string;
   relativePath: string;
   review: Pick<ProviderEvolutionProbeArtifactSummary['review'], 'classifications' | 'summary'>;
+}
+
+export interface SetupDiagnosticCompatibilityEvidenceReference extends
+  CompatibilityEvidenceLatestArtifactReadModel {
+  provider: string;
+  instance: string;
 }
 
 export interface SetupDiagnosticReport {
@@ -142,6 +153,7 @@ export interface SetupDiagnosticReport {
     latestScanPath: string;
     latestManualScanPath: string;
     compatibilityEvidenceDir: string;
+    compatibilityEvidenceArtifacts: SetupDiagnosticCompatibilityEvidenceReference[];
     providerEvolutionArtifacts: SetupDiagnosticProviderEvolutionReference[];
   };
   issues: SetupDiagnosticIssue[];
@@ -230,6 +242,7 @@ export class SetupDiagnosticService {
     const port = await checkPortAvailability(listener.host, listener.port, this.startup);
     const git = await inspectGit();
     const evidenceFileCount = countJsonArtifacts(paths.compatibilityEvidenceDir);
+    const compatibilityEvidenceArtifacts = await listCompatibilityEvidenceReferences(this.config);
     const providerEvolutionArtifacts = await listProviderEvolutionReferences(this.config);
 
     let scanSource: SetupDiagnosticReport['setup']['scan']['source'] = 'missing';
@@ -347,6 +360,7 @@ export class SetupDiagnosticService {
         latestScanPath: join(paths.dataDir, 'setup', 'provider-scan.json'),
         latestManualScanPath: join(paths.dataDir, 'setup', 'provider-manual-scan.json'),
         compatibilityEvidenceDir: paths.compatibilityEvidenceDir,
+        compatibilityEvidenceArtifacts,
         providerEvolutionArtifacts,
       },
       issues,
@@ -883,6 +897,30 @@ async function listProviderEvolutionReferences(
           classifications: [...artifact.review.classifications],
           summary: artifact.review.summary,
         },
+      }));
+  } catch {
+    return [];
+  }
+}
+
+async function listCompatibilityEvidenceReferences(
+  config: Pick<RuntimeConfig, 'configPath' | 'dataDir' | 'sessionBaseDir'>,
+): Promise<SetupDiagnosticCompatibilityEvidenceReference[]> {
+  try {
+    return (await createCompatibilityEvidenceService(config)
+      .listArtifacts({
+        limit: DEFAULT_COMPATIBILITY_EVIDENCE_REFERENCE_LIMIT,
+      }))
+      .map((artifact) => ({
+        artifactId: artifact.artifactId,
+        provider: artifact.provider,
+        instance: artifact.instance,
+        classification: artifact.classification,
+        summary: artifact.summary,
+        capturedAt: artifact.capturedAt,
+        parserId: artifact.parserId,
+        profileId: artifact.profileId,
+        relativePath: artifact.relativePath,
       }));
   } catch {
     return [];

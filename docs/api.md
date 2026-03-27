@@ -379,6 +379,9 @@ The report currently includes:
   - configured provider/target counts
   - latest setup scan and latest manual scan snapshots
 - references to the compatibility evidence directory and shared setup scan paths
+- bounded `report.references.compatibilityEvidenceArtifacts[]` metadata for the
+  latest retained CLI compatibility evidence (`artifactId`, provider/instance,
+  classification, summary, parser/profile, and relativePath only)
 - bounded `report.references.providerEvolutionArtifacts[]` metadata for the
   latest retained provider-evolution artifacts (`artifactId`, provider/instance,
   parser/profile, transport, relativePath, and bounded review summary only)

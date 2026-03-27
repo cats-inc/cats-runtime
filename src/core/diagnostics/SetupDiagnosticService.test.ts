@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -98,6 +98,53 @@ async function createProviderEvolutionArtifact(root: string): Promise<void> {
   });
 }
 
+function createCompatibilityEvidenceArtifact(root: string): void {
+  const config = loadConfig(createTestEnv(root));
+  const providerDir = join(getRuntimeResolvedPaths(config).compatibilityEvidenceDir, 'claude');
+  mkdirSync(providerDir, { recursive: true });
+  writeFileSync(join(providerDir, 'compat-artifact-1.json'), `${JSON.stringify({
+    schemaVersion: 3,
+    id: 'compat-artifact-1',
+    capturedAt: '2026-03-26T00:00:00.000Z',
+    classification: 'probe_failed',
+    summary: 'Compatibility probe failed while checking the provider.',
+    target: {
+      provider: 'claude',
+      instanceId: 'default',
+    },
+    profile: {
+      id: 'claude-cli-best-fit',
+      label: 'claude best fit',
+      protocolFamily: 'claude',
+      parserId: 'claude-cli',
+      confidence: 'fallback',
+    },
+    fingerprint: {
+      provider: 'claude',
+      instanceId: 'default',
+      command: 'claude',
+      runner: 'auto',
+      runtime: { mode: 'native' },
+      version: {
+        detected: true,
+        source: 'command',
+      },
+      features: [],
+      checkedAt: '2026-03-26T00:00:00.000Z',
+    },
+    warnings: [],
+    setup: {
+      status: 'ready',
+      summary: 'ready',
+      install: null,
+      auth: null,
+      remediation: [],
+    },
+    probes: {},
+    checks: [],
+  }, null, 2)}\n`, 'utf8');
+}
+
 describe('SetupDiagnosticService', () => {
   it('lists retained reports newest-first and reads specific artifacts by id', async () => {
     const { root, cleanup } = createTestRoot();
@@ -167,6 +214,38 @@ describe('SetupDiagnosticService', () => {
         ]),
       );
       expect(artifact.report.references.providerEvolutionArtifacts[0]).not.toHaveProperty('evidence');
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('references recent compatibility evidence artifacts without embedding full bundles', async () => {
+    const { root, cleanup } = createTestRoot();
+
+    try {
+      createCompatibilityEvidenceArtifact(root);
+
+      const service = new SetupDiagnosticService({
+        config: loadConfig(createTestEnv(root)),
+        bootstrapService: createBootstrapStub(),
+        now: () => new Date('2026-03-26T00:00:00.000Z'),
+      });
+
+      const artifact = await service.generateReport();
+      expect(artifact.report.references.compatibilityEvidenceArtifacts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            artifactId: 'compat-artifact-1',
+            provider: 'claude',
+            instance: 'default',
+            classification: 'probe_failed',
+            parserId: 'claude-cli',
+            profileId: 'claude-cli-best-fit',
+            relativePath: expect.stringMatching(/claude[\\/]/),
+          }),
+        ]),
+      );
+      expect(artifact.report.references.compatibilityEvidenceArtifacts[0]).not.toHaveProperty('checks');
     } finally {
       cleanup();
     }

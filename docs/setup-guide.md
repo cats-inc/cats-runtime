@@ -655,6 +655,10 @@ When those retained artifacts exist, the latest bounded summary is also reused
 by `GET /diagnostics/providers` and `/providers/config` under
 `compatibilityEvidence.latestArtifact`, so hosts can inspect recent degraded
 compatibility evidence without starting the CLI helper flow.
+The same bounded summary now also flows into setup diagnostic report artifacts
+under `report.references.compatibilityEvidenceArtifacts[]`, so one generated
+setup/debug bundle can point operators at the most recent retained degraded
+compatibility evidence without embedding the full raw bundle.
 
 ## Running the Project
 

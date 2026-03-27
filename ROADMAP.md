@@ -1025,6 +1025,10 @@ evidence bundles and does not force hosts to invent their own report format.
 - reports now aggregate runtime path facts, config inspection, discovery
   posture, bootstrap setup snapshots, configured target counts, git presence,
   and compatibility-evidence directory references without copying raw evidence
+- the same setup report now also carries bounded
+  `references.compatibilityEvidenceArtifacts[]` metadata so one shared debug
+  artifact can point at the latest retained degraded CLI compatibility bundles
+  without embedding raw evidence
 - setup reports now also carry bounded `references.providerEvolutionArtifacts[]`
   metadata so operators can jump from a shareable setup report to the latest
   retained provider-evolution artifacts without embedding full evidence payloads
