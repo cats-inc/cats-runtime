@@ -10,6 +10,8 @@ import type { CliRuntimeConfig } from '../backends/cli/config.js';
 import { createRuntimeApp } from './app.js';
 import { createRuntimeStartupState } from '../startup.js';
 import { getRuntimeResolvedPaths } from '../core/config.js';
+import { RuntimeManagementService } from '../core/management/RuntimeManagementService.js';
+import { StubManagementAdapter } from '../core/management/adapters/stub/StubAdapter.js';
 import { RuntimeWakeupService } from '../core/wakeup/RuntimeWakeupService.js';
 import {
   ProviderEvolutionProbeService,
@@ -220,6 +222,21 @@ describe('runtime MCP facade', () => {
         outcome: 'resumed' as const,
       })),
     });
+    const management = new RuntimeManagementService({
+      config: {
+        version: 1,
+        adapters: {
+          review: { default: 'github', instances: {} },
+          deployment: { default: 'zeabur', instances: {} },
+        },
+      },
+    });
+    management.registerAdapter(new StubManagementAdapter('github', ['review'], [
+      'audit_review_target', 'open_pull_request', 'inspect_pull_request', 'wait_review_checks',
+    ]));
+    management.registerAdapter(new StubManagementAdapter('zeabur', ['deployment'], [
+      'audit_deployment_target', 'create_deployment', 'inspect_deployment', 'read_deployment_logs',
+    ]));
     const providerModelCatalog = {
       inspectSummary: vi.fn(() => ({
         source: 'config',
@@ -290,6 +307,7 @@ describe('runtime MCP facade', () => {
       auggieSessions: {} as never,
       opencodeNative: {} as never,
       providerModelCatalog: providerModelCatalog as never,
+      management,
       wakeup,
       bootstrapService: bootstrapService as never,
       completeBootstrap,
@@ -373,6 +391,8 @@ describe('runtime MCP facade', () => {
       'session_history',
       'session_lineage',
       'health_diagnostics',
+      'pool_status',
+      'management_diagnostics',
       'providers_config',
       'provider_tools',
       'provider_models',
@@ -1672,6 +1692,91 @@ describe('runtime MCP facade', () => {
     expect(observe.result.structuredContent.session.inspection.state).toBe('idle');
     expect(observe.result.structuredContent.observePath).toBe('/sessions/session-1/observe');
     expect(pool.getCapabilities).toHaveBeenCalledWith('claude', 'default');
+  });
+
+  it('exposes pool and management diagnostics through MCP without introducing new read contracts', async () => {
+    const app = createTestApp();
+
+    const poolStatusResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 31.55,
+        method: 'tools/call',
+        params: {
+          name: 'pool_status',
+          arguments: {},
+        },
+      }),
+    });
+    expect(poolStatusResponse.status).toBe(200);
+    const poolStatus = await poolStatusResponse.json() as {
+      result: {
+        structuredContent: {
+          poolStatusPath: string;
+          active: number;
+          idle: number;
+          busy: number;
+          providers: Record<string, number>;
+        };
+      };
+    };
+    expect(poolStatus.result.structuredContent).toEqual(expect.objectContaining({
+      poolStatusPath: '/pool/status',
+      active: 1,
+      idle: 1,
+      busy: 0,
+      providers: {
+        claude: 1,
+      },
+    }));
+
+    const managementDiagnosticsResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 31.56,
+        method: 'tools/call',
+        params: {
+          name: 'management_diagnostics',
+          arguments: {
+            domain: 'review',
+            workspacePath: '/tmp/repo',
+          },
+        },
+      }),
+    });
+    expect(managementDiagnosticsResponse.status).toBe(200);
+    const managementDiagnostics = await managementDiagnosticsResponse.json() as {
+      result: {
+        structuredContent: {
+          diagnosticsPath: string;
+          adapters: Array<{
+            adapter: string;
+            domain: string;
+            transport: string;
+            availability: {
+              status: string;
+            };
+          }>;
+        };
+      };
+    };
+    expect(managementDiagnostics.result.structuredContent.diagnosticsPath).toBe(
+      '/management/diagnostics?domain=review&workspacePath=%2Ftmp%2Frepo',
+    );
+    expect(managementDiagnostics.result.structuredContent.adapters).toEqual([
+      expect.objectContaining({
+        adapter: 'github',
+        domain: 'review',
+        transport: 'cli',
+        availability: expect.objectContaining({
+          status: 'ok',
+        }),
+      }),
+    ]);
   });
 
   it('exposes wakeup inspection tools aligned with the existing wakeup read routes', async () => {

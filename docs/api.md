@@ -105,6 +105,8 @@ Current curated tools:
 - `session_history`
 - `session_lineage`
 - `health_diagnostics`
+- `pool_status`
+- `management_diagnostics`
 - `providers_config`
 - `provider_tools`
 - `provider_models`
@@ -211,6 +213,11 @@ aggregate diagnostics surfaces as `GET /diagnostics/runtime` and
 `GET /diagnostics/health`, including additive `probe` / `forceRefresh` health
 query semantics, so MCP hosts can consume the richer operator/readiness
 snapshots without polling bespoke JSON-RPC-only contracts.
+`pool_status` and `management_diagnostics` reuse the same runtime-owned
+operator read surfaces as `GET /pool/status` and `GET /management/diagnostics`,
+including additive `domain` / `workspacePath` filtering for management
+diagnostics, so MCP hosts can inspect worker-pool pressure and management
+adapter readiness without inventing parallel orchestration contracts.
 `providers_config` reuses the same provider topology/read-model surface as
 `GET /providers/config`, so MCP hosts can inspect configured backends,
 instance-level runtime/tooling/continuity summaries, model-catalog snapshots,

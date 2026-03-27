@@ -92,6 +92,7 @@ const SORT_DIRECTIONS = ['asc', 'desc'] as const;
 const RUNTIME_BROWSER_SESSION_STATUSES = ['ready', 'closed'] as const;
 const BROWSER_BINDING_KINDS = ['manual_url', 'session_service', 'session_artifact'] as const;
 const WAKEUP_STATUSES = ['scheduled', 'triggering', 'triggered', 'cancelled', 'failed'] as const;
+const MANAGEMENT_DOMAINS = ['review', 'deployment'] as const;
 const ACTOR_ROLES = [
   'boss_cat',
   'specialist_cat',
@@ -478,6 +479,54 @@ async function healthDiagnostics(
     structuredContent: {
       ...payload,
       diagnosticsPath: path,
+    },
+  };
+}
+
+async function poolStatus(ctx: AppContext): Promise<McpToolCallResult> {
+  const poolStatusPath = '/pool/status';
+  const result = await requestRuntimeJson(ctx, poolStatusPath, { method: 'GET' });
+  ensureRouteSuccess('pool_status', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'pool_status result');
+  return {
+    summary: 'Returned runtime worker-pool status.',
+    structuredContent: {
+      ...payload,
+      poolStatusPath,
+    },
+  };
+}
+
+async function managementDiagnostics(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const searchParams = new URLSearchParams();
+  appendSingleQueryValue(
+    searchParams,
+    'domain',
+    readOptionalEnumString(
+      args,
+      'domain',
+      MANAGEMENT_DOMAINS,
+      'domain must be a valid management domain',
+    ),
+  );
+  appendSingleQueryValue(searchParams, 'workspacePath', readOptionalString(args, 'workspacePath'));
+  const diagnosticsPath = searchParams.size > 0
+    ? `/management/diagnostics?${searchParams.toString()}`
+    : '/management/diagnostics';
+  const result = await requestRuntimeJson(ctx, diagnosticsPath, { method: 'GET' });
+  ensureRouteSuccess('management_diagnostics', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'management_diagnostics result');
+  const adapters = Array.isArray(payload.adapters) ? payload.adapters : [];
+  return {
+    summary: `Returned ${adapters.length} management diagnostic entr${adapters.length === 1 ? 'y' : 'ies'}.`,
+    structuredContent: {
+      ...payload,
+      diagnosticsPath,
     },
   };
 }
@@ -2413,6 +2462,35 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: healthDiagnostics,
+  },
+  {
+    definition: {
+      name: 'pool_status',
+      title: 'Pool Status',
+      description: 'Return the worker-pool overview exposed by the existing runtime-owned pool-status route.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        additionalProperties: false,
+      },
+    },
+    execute: async (ctx) => poolStatus(ctx),
+  },
+  {
+    definition: {
+      name: 'management_diagnostics',
+      title: 'Management Diagnostics',
+      description: 'Return runtime-owned management-adapter diagnostics through the existing management diagnostics route.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          domain: { type: 'string', enum: MANAGEMENT_DOMAINS },
+          workspacePath: { type: 'string' },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: managementDiagnostics,
   },
   {
     definition: {

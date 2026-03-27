@@ -1088,6 +1088,10 @@ evidence bundles and does not force hosts to invent their own report format.
   as `create_wakeup`, `cancel_wakeup`, and `trigger_wakeup`, so
   orchestrator-style hosts can schedule, cancel, and manually fire wakeups
   without inventing a second wakeup lifecycle
+- the same pool/management operator read surfaces are now also exposed through
+  MCP as `pool_status` and `management_diagnostics`, so orchestrator-style
+  hosts can inspect worker saturation and management-adapter readiness without
+  bespoke runtime wrappers
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
   remediation previews, and latest-setup-report summary metadata including a
