@@ -565,6 +565,69 @@ describe('ProviderCompatibilityService', () => {
     ]));
   });
 
+  it('validates the OpenCode models subcommand as the live compatibility seam', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-opencode-live-'));
+    tempDirs.push(root);
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      runner: {
+        run: vi.fn(async (_providerName, _commandConfig, args: string[]) => {
+          if (args[0] === '--version') {
+            return {
+              exitCode: 0,
+              stdout: 'opencode 1.1.0\n',
+              stderr: '',
+              timedOut: false,
+              durationMs: 3,
+            };
+          }
+
+          if (args[0] === 'models') {
+            return {
+              exitCode: 0,
+              stdout: 'Usage: opencode models [provider]\n  --refresh\n  --verbose\n',
+              stderr: '',
+              timedOut: false,
+              durationMs: 3,
+            };
+          }
+
+          return {
+            exitCode: 0,
+            stdout: 'Usage: opencode serve\n  models\n  serve\n',
+            stderr: '',
+            timedOut: false,
+            durationMs: 3,
+          };
+        }),
+      },
+      installCheckRunner: createInstallCheckRunner(),
+      now: () => Date.parse('2026-03-23T00:00:47.000Z'),
+    });
+
+    const assessment = await service.assessCliTarget(createCliTarget('opencode'), {
+      probeMode: 'live',
+    });
+    expect(assessment.classification).toBe('ready');
+    expect(assessment.profile.id).toBe('opencode-cli-native-v1');
+    expect(assessment.probe).toEqual({
+      mode: 'live',
+      supportsLive: true,
+      liveValidated: true,
+    });
+    expect(assessment.probes.live).toEqual(expect.objectContaining({
+      kind: 'live',
+      commandSummary: 'models --help',
+      ok: true,
+    }));
+    expect(assessment.fingerprint.features).toEqual(expect.arrayContaining([
+      'token:models',
+      'live:--refresh',
+    ]));
+  });
+
   it('marks cached summaries as stale once the ttl expires', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-cache-summary-'));
     tempDirs.push(root);

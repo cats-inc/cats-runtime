@@ -656,6 +656,9 @@ tightening and cleanup steps are intentionally deferred.
 - dynamic CLI-backed catalog discovery now also includes OpenCode through the
   runtime-owned `opencode models` helper, and runtime `refresh=1` forwards to
   upstream `--refresh` for that provider family
+- CLI compatibility live probes for OpenCode now validate that same
+  `models --help` seam, so operator diagnostics and model-catalog readiness are
+  anchored to one provider-native contract instead of separate assumptions
 - `GET /providers/:provider/models/advanced` exists as the additive advanced
   catalog surface
 - session create/read contracts now support additive `modelSelection` and

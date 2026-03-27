@@ -413,8 +413,9 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       spawnBaseArgs: [],
       minVersionMajor: 1,
       allowUnknownVersion: true,
-      helpTokens: ['serve'],
-      liveProbeArgs: ['--help'],
+      helpTokens: ['serve', 'models'],
+      liveProbeArgs: ['models', '--help'],
+      liveProbeTokens: ['--refresh'],
     },
     {
       id: 'opencode-cli-native-best-fit',
@@ -424,7 +425,9 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       parserId: 'opencode-native',
       spawnBaseArgs: [],
       allowUnknownVersion: true,
-      liveProbeArgs: ['--help'],
+      helpTokens: ['models'],
+      liveProbeArgs: ['models', '--help'],
+      liveProbeTokens: ['--refresh'],
     },
   ),
 };

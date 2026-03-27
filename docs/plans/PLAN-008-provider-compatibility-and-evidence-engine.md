@@ -240,6 +240,7 @@ bundle structure.
 | 2026-03-27 | Manual review workflow helpers now let operators update retained provider-evolution artifact classifications, summary text, highlights, and external references in place via CLI without rerunning a probe or adding a public write route |
 | 2026-03-27 | `/diagnostics/providers` now also exposes additive per-target `metering` snapshots from the shared runtime-owned metering service so operators can distinguish compatibility/setup drift from recent rate-limit incidents and active cooldown/block guardrails without changing the compatibility cache or adding a second route |
 | 2026-03-27 | Retained CLI compatibility evidence now has the same bounded latest-artifact read model on `/diagnostics/providers` and `/providers/config`, so hosts can inspect the most recent degraded parser/profile evidence without shelling out to manual list/read commands or adding a new route |
+| 2026-03-27 | OpenCode compatibility follow-through now validates the same `models --help` seam that the shared model-catalog service uses for dynamic `opencode models` discovery, so live diagnostics can distinguish a healthy native-session install from one that lacks the runtime-owned model-listing contract |
 
 ---
 
