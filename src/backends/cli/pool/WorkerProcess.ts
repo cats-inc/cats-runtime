@@ -2,8 +2,14 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { createInterface } from 'node:readline';
 import type { ProviderCommandConfig } from '../config.js';
-import type { TurnInput } from '../../../core/types.js';
-import type { Provider, ProviderSpawnOptions, StreamEvent } from '../providers/types.js';
+import type {
+  ErrorStreamEvent,
+  InitStreamEvent,
+  ResultStreamEvent,
+  StreamEvent,
+  TurnInput,
+} from '../../../core/types.js';
+import type { Provider, ProviderSpawnOptions } from '../providers/types.js';
 import { buildProcessSpawnConfig } from '../runtime/runtime.js';
 
 export interface WorkerProcessEvents {
@@ -16,6 +22,18 @@ export interface WorkerProcessEvents {
 export interface SpawnResilienceConfig {
   retries: number;
   timeoutMs: number;
+}
+
+function isSessionIdentityEvent(
+  event: StreamEvent,
+): event is InitStreamEvent | ResultStreamEvent {
+  return event.type === 'init' || event.type === 'result';
+}
+
+function isTerminalStreamEvent(
+  event: StreamEvent,
+): event is ErrorStreamEvent | ResultStreamEvent {
+  return event.type === 'result' || event.type === 'error';
 }
 
 export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
@@ -99,8 +117,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       if (parsed) {
         const events = Array.isArray(parsed) ? parsed : [parsed];
         for (const event of events) {
-          // Track session ID for ephemeral resume
-          if ((event.type === 'init' || event.type === 'result') && event.sessionId) {
+          if (isSessionIdentityEvent(event) && event.sessionId) {
             this._providerSessionId = event.sessionId;
           }
           // If provider has pending messages after init, send them
@@ -171,13 +188,13 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
         this.spawnOpts = { ...this.spawnOpts, resumeSessionId: this._providerSessionId };
       }
 
-        try {
-          await this.runProviderBeforeTurn();
+      try {
+        await this.runProviderBeforeTurn();
         for await (const event of this.provider.streamTurn(turn, {
           ...this.spawnOpts,
           signal: controller.signal,
         })) {
-          if ((event.type === 'init' || event.type === 'result') && event.sessionId) {
+          if (isSessionIdentityEvent(event) && event.sessionId) {
             this._providerSessionId = event.sessionId;
           }
           this.emit('event', event);
@@ -209,7 +226,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     const onEvent = (event: StreamEvent) => {
       sawEvent = true;
       push(event);
-      if (event.type === 'result' || event.type === 'error') {
+      if (isTerminalStreamEvent(event)) {
         push(null); // signal done
       }
     };
@@ -411,7 +428,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
 
     const events = Array.isArray(result) ? result : [result];
     for (const event of events) {
-      if ((event.type === 'init' || event.type === 'result') && event.sessionId) {
+      if (isSessionIdentityEvent(event) && event.sessionId) {
         this._providerSessionId = event.sessionId;
       }
       this.emit('event', event);

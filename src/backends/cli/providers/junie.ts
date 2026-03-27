@@ -18,12 +18,23 @@ import type {
   StreamEvent,
   TurnInput,
 } from './types.js';
+import type {
+  ErrorStreamEvent,
+  InitStreamEvent,
+  ResultStreamEvent,
+} from '../../../core/types.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 
 const DEFAULT_JUNIE_SESSIONS_DIR = join(os.homedir(), '.junie', 'sessions');
 const SESSION_POLL_INTERVAL_MS = 250;
 const DEFAULT_JUNIE_TURN_TIMEOUT_MS = 10 * 60 * 1000;
 const JUNIE_TURN_TIMEOUT_ENV = 'CATS_JUNIE_TURN_TIMEOUT_MS';
+
+function isSessionIdentityEvent(
+  event: StreamEvent,
+): event is InitStreamEvent | ResultStreamEvent {
+  return event.type === 'init' || event.type === 'result';
+}
 
 export class JunieProvider implements Provider {
   name = 'junie';
@@ -173,7 +184,7 @@ export class JunieProvider implements Provider {
     const enqueue = (event: StreamEvent) => {
       if (finished) return;
 
-      if ((event.type === 'init' || event.type === 'result') && event.sessionId) {
+      if (isSessionIdentityEvent(event) && event.sessionId) {
         state.sessionId = event.sessionId;
       }
 
@@ -209,7 +220,7 @@ export class JunieProvider implements Provider {
         return;
       }
       state.initEmitted = true;
-      enqueue({ type: 'init', sessionId: state.sessionId });
+      enqueue({ type: 'init', sessionId: state.sessionId } satisfies InitStreamEvent);
     };
 
     const applyEvents = (events: StreamEvent | StreamEvent[] | null) => {
@@ -263,7 +274,7 @@ export class JunieProvider implements Provider {
           type: 'error',
           sessionId: state.sessionId,
           text: buildJunieTurnTimeoutError(turnTimeoutMs, state),
-        });
+        } satisfies ErrorStreamEvent);
       }, turnTimeoutMs);
     }
 
@@ -296,7 +307,7 @@ export class JunieProvider implements Provider {
     });
 
     child.on('error', (error) => {
-      enqueue({ type: 'error', text: error.message });
+      enqueue({ type: 'error', text: error.message } satisfies ErrorStreamEvent);
     });
 
     child.on('close', (code) => {
@@ -338,7 +349,7 @@ export class JunieProvider implements Provider {
       enqueue({
         type: 'error',
         text: buildJunieExitError(exitCode, stderrLines),
-      });
+      } satisfies ErrorStreamEvent);
     })();
 
     try {
