@@ -221,6 +221,8 @@ describe('MCP stdio transport', () => {
             expect.objectContaining({ name: 'list_peers' }),
             expect.objectContaining({ name: 'read_peer' }),
             expect.objectContaining({ name: 'peer_diagnostics' }),
+            expect.objectContaining({ name: 'list_codex_sessions' }),
+            expect.objectContaining({ name: 'discover_codex_sessions' }),
             expect.objectContaining({ name: 'list_cursor_sessions' }),
             expect.objectContaining({ name: 'discover_cursor_sessions' }),
             expect.objectContaining({ name: 'list_kiro_sessions' }),

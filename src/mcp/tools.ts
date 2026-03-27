@@ -104,6 +104,11 @@ const ACTOR_ROLES = [
 const MANAGEMENT_ACTOR_CLASSES = ['system', 'owner', 'operator', 'service'] as const;
 const NATIVE_SESSION_MCP_PROVIDERS = [
   {
+    provider: 'codex',
+    label: 'Codex',
+    supportsStartIfNeeded: false,
+  },
+  {
     provider: 'cursor',
     label: 'Cursor',
     supportsStartIfNeeded: true,

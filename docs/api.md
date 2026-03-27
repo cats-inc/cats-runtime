@@ -112,6 +112,8 @@ Current curated tools:
 - `list_peers`
 - `read_peer`
 - `peer_diagnostics`
+- `list_codex_sessions`
+- `discover_codex_sessions`
 - `list_cursor_sessions`
 - `discover_cursor_sessions`
 - `list_kiro_sessions`
@@ -243,7 +245,7 @@ same runtime-owned discovery and peer diagnostics surfaces as
 peer list/detail/diagnostics reads, so MCP hosts can inspect LAN discovery
 state, bounded peer registry entries, and peer guardrail/network posture data
 without inventing MCP-only peer contracts.
-`list_cursor_sessions`, `discover_cursor_sessions`, `list_kiro_sessions`,
+`list_codex_sessions`, `discover_codex_sessions`, `list_cursor_sessions`, `discover_cursor_sessions`, `list_kiro_sessions`,
 `discover_kiro_sessions`, `list_auggie_sessions`, `discover_auggie_sessions`,
 `list_opencode_sessions`, and `discover_opencode_sessions` reuse the same
 runtime-owned native-session inspection/import seams as the existing

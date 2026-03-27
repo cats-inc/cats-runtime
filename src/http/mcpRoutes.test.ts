@@ -318,6 +318,31 @@ describe('runtime MCP facade', () => {
     });
     peerExecutionAdmission.recordAuthFailure('peer:lab');
     peerExecutionReplay.validate('peer:peer-live', peerNow, 'nonce-1');
+    const codexDayDir = join(rootDir, '.codex', 'sessions', '2026', '03', '27');
+    mkdirSync(codexDayDir, { recursive: true });
+    writeFileSync(
+      join(codexDayDir, 'rollout-2026-03-27T00-00-00-codex-native-1.jsonl'),
+      [
+        JSON.stringify({
+          timestamp: '2026-03-27T00:00:00.000Z',
+          type: 'session_meta',
+          payload: {
+            id: 'codex-native-1',
+            cwd: join(rootDir, 'codex-workspace'),
+            model_provider: 'openai',
+          },
+        }),
+        JSON.stringify({
+          timestamp: '2026-03-27T00:00:05.000Z',
+          type: 'event_msg',
+          payload: {
+            type: 'user_message',
+            message: 'Inspect the project status',
+          },
+        }),
+      ].join('\n') + '\n',
+      'utf8',
+    );
     const cursorNativeSessions = [
       {
         providerSessionId: 'cursor-native-1',
@@ -557,6 +582,8 @@ describe('runtime MCP facade', () => {
       'list_peers',
       'read_peer',
       'peer_diagnostics',
+      'list_codex_sessions',
+      'discover_codex_sessions',
       'list_cursor_sessions',
       'discover_cursor_sessions',
       'list_kiro_sessions',
@@ -2164,6 +2191,71 @@ describe('runtime MCP facade', () => {
 
   it('exposes native session inspection and discovery tools for supported CLI providers', async () => {
     const app = createTestApp();
+
+    const listCodexResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 31.575,
+        method: 'tools/call',
+        params: {
+          name: 'list_codex_sessions',
+          arguments: {
+            cwd: join(rootDir, 'codex-workspace'),
+          },
+        },
+      }),
+    });
+    expect(listCodexResponse.status).toBe(200);
+    const listCodex = await listCodexResponse.json() as {
+      result: {
+        structuredContent: {
+          count: number;
+          sessions: Array<{
+            providerSessionId: string;
+          }>;
+        };
+      };
+    };
+    expect(listCodex.result.structuredContent.count).toBe(1);
+    expect(listCodex.result.structuredContent.sessions[0]?.providerSessionId).toBe(
+      'codex-native-1',
+    );
+
+    const discoverCodexResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 31.576,
+        method: 'tools/call',
+        params: {
+          name: 'discover_codex_sessions',
+          arguments: {
+            cwd: join(rootDir, 'codex-workspace'),
+            group: 'native-imports',
+          },
+        },
+      }),
+    });
+    expect(discoverCodexResponse.status).toBe(200);
+    const discoverCodex = await discoverCodexResponse.json() as {
+      result: {
+        structuredContent: {
+          count: number;
+          sessions: Array<{
+            providerName: string;
+            group?: string;
+          }>;
+        };
+      };
+    };
+    expect(discoverCodex.result.structuredContent.count).toBe(1);
+    expect(discoverCodex.result.structuredContent.sessions[0]).toEqual(expect.objectContaining({
+      providerName: 'codex',
+      group: 'native-imports',
+    }));
 
     const listCursorResponse = await app.request('/mcp', {
       method: 'POST',

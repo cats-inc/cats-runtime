@@ -1109,6 +1109,9 @@ evidence bundles and does not force hosts to invent their own report format.
   exposed through MCP for Cursor, Kiro, Auggie, and OpenCode, so
   orchestrator-style hosts can inventory or import provider-native local
   sessions without reaching around the runtime HTTP contract
+- the same runtime-owned file-backed/native session inspection/import seams now
+  include Codex over MCP as well, so orchestrator-style hosts can inventory or
+  import discovered Codex rollout sessions without rebuilding the scanner flow
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
   remediation previews, and latest-setup-report summary metadata including a
