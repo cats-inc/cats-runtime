@@ -408,6 +408,64 @@ async function providerDiagnostics(
   };
 }
 
+async function reprobeProviderDiagnostics(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const body: Record<string, unknown> = {};
+  const probe = readOptionalEnumString(
+    args,
+    'probe',
+    DIAGNOSTICS_PROBE_MODES,
+    'probe must be a valid diagnostics probe mode',
+  );
+  if (probe) {
+    body.probe = probe;
+  }
+
+  const provider = readOptionalString(args, 'provider');
+  if (provider) {
+    body.provider = provider;
+  }
+
+  const backend = readOptionalEnumString(
+    args,
+    'backend',
+    PROVIDER_BACKENDS,
+    'backend must be a valid provider backend',
+  );
+  if (backend) {
+    body.backend = backend;
+  }
+
+  const instance = readOptionalString(args, 'instance');
+  if (instance) {
+    body.instance = instance;
+  }
+
+  if (readOptionalBoolean(args, 'defaultOnly') === true) {
+    body.defaultOnly = true;
+  }
+
+  const result = await requestRuntimeJson(ctx, '/diagnostics/providers/reprobe', {
+    method: 'POST',
+    body,
+  });
+  ensureRouteSuccess('reprobe_provider_diagnostics', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'reprobe_provider_diagnostics result');
+  const summary = asRecord(payload.summary);
+  const targets = typeof summary?.targets === 'number' ? summary.targets : 0;
+
+  return {
+    summary: `Reprobed provider diagnostics for ${targets} target(s).`,
+    structuredContent: {
+      ...payload,
+      reprobePath: '/diagnostics/providers/reprobe',
+    },
+  };
+}
+
 async function listProviderEvolutionArtifacts(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -1598,6 +1656,25 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: providerDiagnostics,
+  },
+  {
+    definition: {
+      name: 'reprobe_provider_diagnostics',
+      title: 'Reprobe Provider Diagnostics',
+      description: 'Force a bounded provider diagnostics refresh through the runtime-owned diagnostics reprobe route.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          probe: { type: 'string', enum: DIAGNOSTICS_PROBE_MODES },
+          provider: { type: 'string' },
+          backend: { type: 'string', enum: PROVIDER_BACKENDS },
+          instance: { type: 'string' },
+          defaultOnly: { type: 'boolean' },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: reprobeProviderDiagnostics,
   },
   {
     definition: {

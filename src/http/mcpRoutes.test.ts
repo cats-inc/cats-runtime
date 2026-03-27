@@ -300,6 +300,7 @@ describe('runtime MCP facade', () => {
       'runtime_summary',
       'list_sessions',
       'provider_diagnostics',
+      'reprobe_provider_diagnostics',
       'list_provider_evolution_artifacts',
       'list_compatibility_evidence_artifacts',
       'read_provider_evolution_artifact',
@@ -440,6 +441,78 @@ describe('runtime MCP facade', () => {
       }),
     ]);
     vi.mocked(pool.getCapabilities).mockClear();
+
+    const reprobeDiagnosticsResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 30.5,
+        method: 'tools/call',
+        params: {
+          name: 'reprobe_provider_diagnostics',
+          arguments: {
+            provider: 'claude',
+            backend: 'cli',
+            instance: 'default',
+            probe: 'live',
+          },
+        },
+      }),
+    });
+    expect(reprobeDiagnosticsResponse.status).toBe(200);
+    const reprobeDiagnostics = await reprobeDiagnosticsResponse.json() as {
+      result: {
+        structuredContent: {
+          probe: string;
+          reprobePath: string;
+          reprobe: {
+            forceRefresh: boolean;
+          };
+          query: {
+            hasFilters: boolean;
+            filters: Record<string, string | boolean>;
+          };
+          providers: Array<{
+            provider: string;
+            backend: string;
+            instance: string;
+            compatibility: {
+              probe: {
+                mode: string;
+              };
+            };
+          }>;
+        };
+      };
+    };
+    expect(reprobeDiagnostics.result.structuredContent.probe).toBe('live');
+    expect(reprobeDiagnostics.result.structuredContent.reprobePath).toBe(
+      '/diagnostics/providers/reprobe',
+    );
+    expect(reprobeDiagnostics.result.structuredContent.reprobe).toEqual({
+      forceRefresh: true,
+    });
+    expect(reprobeDiagnostics.result.structuredContent.query).toEqual({
+      hasFilters: true,
+      filters: {
+        provider: 'claude',
+        backend: 'cli',
+        instance: 'default',
+      },
+    });
+    expect(reprobeDiagnostics.result.structuredContent.providers).toEqual([
+      expect.objectContaining({
+        provider: 'claude',
+        backend: 'cli',
+        instance: 'default',
+        compatibility: expect.objectContaining({
+          probe: expect.objectContaining({
+            mode: 'live',
+          }),
+        }),
+      }),
+    ]);
 
     const probeService = new ProviderEvolutionProbeService({
       rootDir: join(
@@ -672,6 +745,8 @@ describe('runtime MCP facade', () => {
         provider: 'claude',
       }),
     }));
+
+    vi.mocked(pool.getCapabilities).mockClear();
 
     const listSessionsResponse = await app.request('/mcp', {
       method: 'POST',

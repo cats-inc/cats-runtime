@@ -101,6 +101,7 @@ Current curated tools:
 - `runtime_summary`
 - `list_sessions`
 - `provider_diagnostics`
+- `reprobe_provider_diagnostics`
 - `list_compatibility_evidence_artifacts`
 - `read_compatibility_evidence_artifact`
 - `list_provider_evolution_artifacts`
@@ -148,6 +149,9 @@ tags, delivery hints, additive `sortBy` / `sortDirection`, and additive
 contract as `GET /diagnostics/providers`, including additive `probe` (`light`
 or `live`), `provider` / `backend` / `instance` / `defaultOnly` target
 filters, and `forceRefresh` semantics for cached compatibility assessments.
+`reprobe_provider_diagnostics` reuses the same explicit bounded refresh seam as
+`POST /diagnostics/providers/reprobe`, so MCP hosts can request a fresh
+compatibility assessment without overloading the read-only diagnostics tool.
 `list_compatibility_evidence_artifacts` and
 `read_compatibility_evidence_artifact` reuse the same retained compatibility
 evidence read surfaces as `GET /diagnostics/providers/evidence` and
