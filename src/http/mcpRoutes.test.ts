@@ -211,6 +211,24 @@ describe('runtime MCP facade', () => {
     const completeBootstrap = vi.fn(() => {
       startup.bootstrapRequired = false;
     });
+    const providerModelCatalog = {
+      inspectSummary: vi.fn(() => ({
+        source: 'config',
+        defaultModel: null,
+        defaultModelStatus: 'unknown',
+        modelCount: 0,
+        warnings: [],
+        statusCounts: {
+          available: 0,
+          unavailable: 0,
+          unknown: 0,
+        },
+      })),
+      getCatalog: vi.fn(async () => ({
+        source: 'config',
+        models: [],
+      })),
+    };
 
     const workerStream = async function* (turn: string | TurnInput): AsyncGenerator<StreamEvent> {
       const input = typeof turn === 'string' ? turn : turn.message;
@@ -255,7 +273,7 @@ describe('runtime MCP facade', () => {
       kiroNative: {} as never,
       auggieSessions: {} as never,
       opencodeNative: {} as never,
-      providerModelCatalog: {} as never,
+      providerModelCatalog: providerModelCatalog as never,
       bootstrapService: bootstrapService as never,
       completeBootstrap,
     });
@@ -335,6 +353,7 @@ describe('runtime MCP facade', () => {
       'runtime_diagnostics',
       'list_sessions',
       'health_diagnostics',
+      'providers_config',
       'provider_diagnostics',
       'reprobe_provider_diagnostics',
       'list_provider_evolution_artifacts',
@@ -486,6 +505,47 @@ describe('runtime MCP facade', () => {
     );
     expect(healthDiagnostics.result.structuredContent.status).toEqual(expect.any(String));
     expect(healthDiagnostics.result.structuredContent.providers.probe).toBe('light');
+
+    const providersConfigResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 3.3,
+        method: 'tools/call',
+        params: {
+          name: 'providers_config',
+          arguments: {},
+        },
+      }),
+    });
+    expect(providersConfigResponse.status).toBe(200);
+    const providersConfig = await providersConfigResponse.json() as {
+      result: {
+        structuredContent: {
+          configPath: string;
+          providers: Record<string, {
+            defaultInstance: string;
+            instances: Array<{
+              id: string;
+              target: string;
+            }>;
+          }>;
+        };
+      };
+    };
+    expect(providersConfig.result.structuredContent.configPath).toBe('/providers/config');
+    expect(providersConfig.result.structuredContent.providers.claude).toEqual(
+      expect.objectContaining({
+        defaultInstance: 'default',
+        instances: expect.arrayContaining([
+          expect.objectContaining({
+            id: 'default',
+            target: 'cli/default',
+          }),
+        ]),
+      }),
+    );
 
     const providerDiagnosticsResponse = await app.request('/mcp', {
       method: 'POST',

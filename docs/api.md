@@ -102,6 +102,7 @@ Current curated tools:
 - `runtime_diagnostics`
 - `list_sessions`
 - `health_diagnostics`
+- `providers_config`
 - `provider_diagnostics`
 - `reprobe_provider_diagnostics`
 - `list_compatibility_evidence_artifacts`
@@ -198,6 +199,10 @@ aggregate diagnostics surfaces as `GET /diagnostics/runtime` and
 `GET /diagnostics/health`, including additive `probe` / `forceRefresh` health
 query semantics, so MCP hosts can consume the richer operator/readiness
 snapshots without polling bespoke JSON-RPC-only contracts.
+`providers_config` reuses the same provider topology/read-model surface as
+`GET /providers/config`, so MCP hosts can inspect configured backends,
+instance-level runtime/tooling/continuity summaries, model-catalog snapshots,
+and execution-strategy catalog metadata without joining multiple routes first.
 `list_sessions` and `observe_session` also reuse the same additive session
 `providerTarget` read model exposed by the direct HTTP session/history/observe
 surfaces, so MCP hosts can inspect backend continuity/tooling semantics without

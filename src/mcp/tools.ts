@@ -471,6 +471,26 @@ async function healthDiagnostics(
   };
 }
 
+async function providersConfig(
+  ctx: AppContext,
+): Promise<McpToolCallResult> {
+  const path = '/providers/config';
+  const result = await requestRuntimeJson(ctx, path, { method: 'GET' });
+  ensureRouteSuccess('providers_config', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'providers_config result');
+  const providers = asRecord(payload.providers);
+  const providerCount = providers ? Object.keys(providers).length : 0;
+
+  return {
+    summary: `Configured provider families: ${providerCount}.`,
+    structuredContent: {
+      ...payload,
+      configPath: path,
+    },
+  };
+}
+
 async function providerDiagnostics(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -2037,6 +2057,19 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: healthDiagnostics,
+  },
+  {
+    definition: {
+      name: 'providers_config',
+      title: 'Providers Config',
+      description: 'Return the configured provider topology and inspection summaries exposed by the existing runtime-owned provider config route.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        additionalProperties: false,
+      },
+    },
+    execute: async (ctx) => providersConfig(ctx),
   },
   {
     definition: {

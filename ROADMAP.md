@@ -1051,6 +1051,11 @@ evidence bundles and does not force hosts to invent their own report format.
   `runtime_diagnostics` and `health_diagnostics`, including health probe/force
   query semantics, so orchestrator-style hosts can consume richer readiness and
   operator snapshots without inventing bespoke JSON-RPC-only diagnostics
+- the same provider topology/inspection summary is now also exposed through MCP
+  as `providers_config`, so orchestrator-style hosts can inspect configured
+  backends, instance-level runtime/tooling/continuity summaries, model-catalog
+  snapshots, and execution-strategy catalog metadata without stitching together
+  private read paths
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
   remediation previews, and latest-setup-report summary metadata including a
