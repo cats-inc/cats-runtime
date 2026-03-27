@@ -55,6 +55,18 @@ function nativeExecutionPlatform(): 'windows' | 'macos' | 'linux' {
   return 'linux';
 }
 
+function expectIdleMeteringSummary() {
+  return expect.objectContaining({
+    status: 'ok',
+    summary: 'No active metering incidents or guardrails.',
+    usageRecords: 0,
+    incidents: 0,
+    activeGuardrails: 0,
+    activeCooldowns: 0,
+    activeBlocks: 0,
+  });
+}
+
 function runGit(cwd: string, args: string[]): string {
   const result = spawnSync('git', args, {
     cwd,
@@ -1950,6 +1962,7 @@ backends:
                   providerSessionState: false,
                   remoteCancel: false,
                 },
+                metering: expectIdleMeteringSummary(),
                 tooling: {
                   source: 'provider_native',
                   discoverable: false,
@@ -1999,6 +2012,7 @@ backends:
                   providerSessionState: false,
                   remoteCancel: false,
                 },
+                metering: expectIdleMeteringSummary(),
                 tooling: {
                   source: 'provider_native',
                   discoverable: false,
@@ -2041,6 +2055,60 @@ backends:
             compatibilityDefault: 'simple_tool_call',
           }),
         }),
+      }));
+    });
+  });
+
+  it('GET /providers/config surfaces additive metering summaries per target', async () => {
+    await withRuntime({}, {}, async (runtime) => {
+      runtime.context.metering.observeEvent({
+        id: 'metering-session-1',
+        providerName: 'codex',
+        providerBackend: 'cli',
+        providerInstanceId: 'default',
+        cwd: runtime.context.config.sessionBaseDir,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+      } as never, {
+        type: 'error',
+        text: '429 Too Many Requests. Retry after 2s.',
+      }, {
+        turnStartedAt: Date.now() - 10,
+      });
+
+      const response = await runtime.app.request('/providers/config');
+      expect(response.status).toBe(200);
+      const payload = await response.json() as {
+        providers: Record<string, {
+          instances: Array<{
+            id: string;
+            metering: {
+              status: string;
+              incidents: number;
+              activeGuardrails: number;
+              activeCooldowns: number;
+              activeBlocks: number;
+            };
+          }>;
+        }>;
+      };
+
+      const codexInstance = payload.providers.codex?.instances.find((instance) => instance.id === 'default');
+      expect(codexInstance?.metering).toEqual(expect.objectContaining({
+        status: 'degraded',
+        incidents: 1,
+        activeGuardrails: 1,
+        activeCooldowns: 1,
+        activeBlocks: 0,
+      }));
+
+      const claudeInstance = payload.providers.claude?.instances.find((instance) => instance.id === 'default');
+      expect(claudeInstance?.metering).toEqual(expect.objectContaining({
+        status: 'ok',
+        incidents: 0,
+        activeGuardrails: 0,
+        activeCooldowns: 0,
+        activeBlocks: 0,
       }));
     });
   });
@@ -2132,6 +2200,7 @@ backends:
             providerSessionState: false,
             remoteCancel: false,
           },
+          metering: expectIdleMeteringSummary(),
           tooling: {
             source: 'provider_native',
             discoverable: false,
@@ -2278,6 +2347,7 @@ providers:
                   providerSessionState: false,
                   remoteCancel: false,
                 },
+                metering: expectIdleMeteringSummary(),
                 tooling: {
                   source: 'provider_native',
                   discoverable: false,

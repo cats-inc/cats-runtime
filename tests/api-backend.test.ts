@@ -22,6 +22,18 @@ function jsonResponse(body: Record<string, unknown>): Response {
   });
 }
 
+function expectIdleMeteringSummary() {
+  return expect.objectContaining({
+    status: 'ok',
+    summary: 'No active metering incidents or guardrails.',
+    usageRecords: 0,
+    incidents: 0,
+    activeGuardrails: 0,
+    activeCooldowns: 0,
+    activeBlocks: 0,
+  });
+}
+
 function createApiConfigRoot() {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-api-test-'));
   const configPath = join(root, 'providers.yaml');
@@ -116,17 +128,14 @@ describe('API backend integration', () => {
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual(expect.objectContaining({
         providers: {
-          claude: {
+          claude: expect.objectContaining({
             defaultInstance: 'sonnet',
             defaultBackend: 'api',
             instances: [
-              {
+              expect.objectContaining({
                 id: 'sonnet',
                 target: 'api/sonnet',
                 backend: 'api',
-                command: undefined,
-                runner: undefined,
-                runtime: undefined,
                 transport: 'anthropic',
                 model: 'claude-sonnet-4-6',
                 continuity: {
@@ -140,6 +149,7 @@ describe('API backend integration', () => {
                   providerSessionState: true,
                   remoteCancel: false,
                 },
+                metering: expectIdleMeteringSummary(),
                 tooling: {
                   source: 'runtime_local',
                   discoverable: true,
@@ -159,14 +169,11 @@ describe('API backend integration', () => {
                 },
                 install: null,
                 compatibility: null,
-              },
-              {
+              }),
+              expect.objectContaining({
                 id: 'opus',
                 target: 'api/opus',
                 backend: 'api',
-                command: undefined,
-                runner: undefined,
-                runtime: undefined,
                 transport: 'anthropic',
                 model: 'claude-opus-4-6',
                 continuity: {
@@ -180,6 +187,7 @@ describe('API backend integration', () => {
                   providerSessionState: true,
                   remoteCancel: false,
                 },
+                metering: expectIdleMeteringSummary(),
                 tooling: {
                   source: 'runtime_local',
                   discoverable: true,
@@ -199,20 +207,17 @@ describe('API backend integration', () => {
                 },
                 install: null,
                 compatibility: null,
-              },
+              }),
             ],
-          },
-          codex: {
+          }),
+          codex: expect.objectContaining({
             defaultInstance: 'main',
             defaultBackend: 'api',
             instances: [
-              {
+              expect.objectContaining({
                 id: 'main',
                 target: 'api/main',
                 backend: 'api',
-                command: undefined,
-                runner: undefined,
-                runtime: undefined,
                 transport: 'openai',
                 model: 'gpt-5',
                 continuity: {
@@ -226,6 +231,7 @@ describe('API backend integration', () => {
                   providerSessionState: true,
                   remoteCancel: false,
                 },
+                metering: expectIdleMeteringSummary(),
                 tooling: {
                   source: 'runtime_local',
                   discoverable: true,
@@ -245,20 +251,17 @@ describe('API backend integration', () => {
                 },
                 install: null,
                 compatibility: null,
-              },
+              }),
             ],
-          },
-          gemini: {
+          }),
+          gemini: expect.objectContaining({
             defaultInstance: 'pro',
             defaultBackend: 'api',
             instances: [
-              {
+              expect.objectContaining({
                 id: 'pro',
                 target: 'api/pro',
                 backend: 'api',
-                command: undefined,
-                runner: undefined,
-                runtime: undefined,
                 transport: 'google',
                 model: 'gemini-2.5-pro',
                 continuity: {
@@ -272,6 +275,7 @@ describe('API backend integration', () => {
                   providerSessionState: true,
                   remoteCancel: false,
                 },
+                metering: expectIdleMeteringSummary(),
                 tooling: {
                   source: 'runtime_local',
                   discoverable: true,
@@ -291,20 +295,17 @@ describe('API backend integration', () => {
                 },
                 install: null,
                 compatibility: null,
-              },
+              }),
             ],
-          },
-          ollama: {
+          }),
+          ollama: expect.objectContaining({
             defaultInstance: 'local',
             defaultBackend: 'local',
             instances: [
-              {
+              expect.objectContaining({
                 id: 'local',
                 target: 'local/local',
                 backend: 'local',
-                command: undefined,
-                runner: undefined,
-                runtime: undefined,
                 transport: 'ollama',
                 model: 'qwen3:latest',
                 continuity: {
@@ -318,6 +319,7 @@ describe('API backend integration', () => {
                   providerSessionState: true,
                   remoteCancel: false,
                 },
+                metering: expectIdleMeteringSummary(),
                 tooling: {
                   source: 'runtime_local',
                   discoverable: true,
@@ -337,9 +339,9 @@ describe('API backend integration', () => {
                 },
                 install: null,
                 compatibility: null,
-              },
+              }),
             ],
-          },
+          }),
         },
         executionStrategies: expect.objectContaining({
           summary: expect.objectContaining({

@@ -2690,6 +2690,20 @@ or changelog URLs during manual probe generation or later retained-artifact
 review updates. These references are additive review context and are kept
 separate from the runtime-owned evidence bundle itself.
 
+Each instance entry also exposes additive compact `metering` summary metadata:
+
+- `status`: `ok` or `degraded`
+- `summary`: operator-facing explanation of whether the target is currently
+  under runtime-owned cooldown/block pressure
+- `usageRecords`, `incidents`, `activeGuardrails`, `activeCooldowns`,
+  `activeBlocks`: bounded counts for that resolved provider target
+
+This reuses the same runtime-owned metering service behind
+`GET /diagnostics/runtime`, `GET /diagnostics/health`, and
+`GET /diagnostics/providers`, but keeps the `/providers/config` copy compact so
+selector/provider-topology reads can show temporary cooldown pressure without a
+second diagnostics request.
+
 Each instance entry also exposes additive `tooling` metadata:
 
 - `source`: `runtime_local`, `provider_native`, or `provider_managed`

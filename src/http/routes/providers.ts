@@ -20,7 +20,10 @@ import {
   loadProviderRemoteToolCatalog,
 } from '../../core/tools/providerTooling.js';
 import type { AppContext } from '../app.js';
-import { getProviderCompatibilityService } from '../app.js';
+import {
+  getProviderCompatibilityService,
+  getRuntimeMeteringService,
+} from '../app.js';
 import { getRouteErrorStatus } from '../routeErrors.js';
 
 export const providerRoutes = new Hono();
@@ -65,6 +68,11 @@ providerRoutes.get('/providers/config', async (c) => {
           provider: instance.providerName,
           instance: resolveProviderEvolutionArtifactInstance(instance),
         });
+        const metering = getRuntimeMeteringService(ctx).buildProviderTargetSnapshot({
+          provider: instance.providerName,
+          instance: instance.instanceId,
+          backend: instance.backend,
+        });
 
         return {
           ...(instance.backend === 'cli' && instance.cliInstance
@@ -83,6 +91,7 @@ providerRoutes.get('/providers/config', async (c) => {
           model: instance.remoteInstance?.model,
           ...(agentRuntime ? { agentRuntime } : {}),
           continuity,
+          metering: metering.summary,
           tooling: buildProviderToolingSummary(instance, { agentRuntime }),
           install: instance.backend === 'cli' && instance.cliInstance
             ? buildProviderInstallCatalogView(
