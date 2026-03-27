@@ -426,6 +426,8 @@ GET /diagnostics/health
 GET /diagnostics/runtime
 GET /diagnostics/providers
 POST /diagnostics/providers/reprobe
+GET /diagnostics/providers/evolution
+GET /diagnostics/providers/evolution/:artifactId
 POST /diagnostics/providers/evolution/:artifactId/review
 GET /diagnostics/providers/evidence
 GET /diagnostics/providers/evidence/:artifactId
@@ -652,6 +654,29 @@ probe route. The summary includes:
 - optional `reviewContext.references[]` for manually attached release-note /
   changelog / issue / announcement URLs
 - `relativePath`
+
+`GET /diagnostics/providers/evolution` exposes the retained provider-evolution
+artifact family directly for host/operator workflows that need more than the
+latest per-target summary. The route does not trigger a new probe; it only
+lists already-captured artifacts. It accepts additive filters:
+
+- `provider`
+- `instance`
+- `parserId`
+- `probeProfile`
+- `transport=cli|agent|api|unknown`
+- `runtimeMode=native|wsl|docker`
+- repeated `classification`
+- `limit`
+
+Each returned list entry is a bounded summary that includes the same fields as
+`providerEvolution.latestArtifact`, plus `provider`, `instance`, and `parserId`
+for operator filtering and UI rendering.
+
+`GET /diagnostics/providers/evolution/:artifactId` re-reads one retained
+provider-evolution artifact by id and returns the stored artifact plus its
+`relativePath`. Unknown artifact ids return `404` with
+`code: "provider_evolution_artifact_not_found"`.
 
 `POST /diagnostics/providers/evolution/:artifactId/review` is the bounded
 host-facing write-back route for retained provider-evolution artifacts. It does

@@ -1160,6 +1160,10 @@ always-on self-adapting parser system.
 - `POST /diagnostics/providers/evolution/:artifactId/review` now exposes the
   same bounded retained-artifact review write-back seam to host/operator
   tooling, while still keeping probe execution itself manual-first
+- `GET /diagnostics/providers/evolution` and
+  `GET /diagnostics/providers/evolution/:artifactId` now expose the same
+  retained provider-evolution artifacts to host/operator tooling for bounded
+  list/re-read flows without turning diagnostics into a probe trigger
 - the shared manual probe flow now also supports the first agent-backed targets
   via `--probe-instance agent/<instance>`
 - Agent SDK bridge probes now preserve normalized `tool_result` output while

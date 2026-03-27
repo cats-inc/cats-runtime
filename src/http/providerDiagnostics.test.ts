@@ -1846,6 +1846,162 @@ describe('provider diagnostics HTTP contract', () => {
     });
   });
 
+  it('lists retained provider-evolution artifacts through diagnostics routes', async () => {
+    const config = makeConfig();
+    let now = Date.parse('2026-03-27T00:00:00.000Z');
+    const probeService = new ProviderEvolutionProbeService({
+      rootDir: join(
+        getRuntimeResolvedPaths(config).compatibilityEvidenceDir,
+        'provider-evolution',
+      ),
+      now: () => now,
+    });
+
+    const artifact = await probeService.run({
+      target: {
+        provider: 'codex',
+        instance: 'default',
+        parserId: 'codex-jsonrpc',
+        probeProfile: 'manual_text',
+        transport: 'cli',
+        runtimeMode: 'docker',
+        version: '1.2.3',
+      },
+      profile: PROVIDER_EVOLUTION_PROBE_PROFILES.manual_text,
+      run: async ({ observer }) => {
+        observer.recordNormalized({
+          rawEventType: 'assistant',
+          events: { type: 'text', text: 'alpha' },
+        });
+        observer.recordNormalized({
+          rawEventType: 'result',
+          events: { type: 'result' },
+        });
+        return {
+          status: 'completed',
+          turnsCompleted: 1,
+          emittedEventCount: 2,
+        };
+      },
+    });
+
+    await probeService.updateArtifactReviewById(artifact.artifact.id, {
+      classifications: ['regression'],
+      summary: 'Manual review flagged a regression.',
+      highlights: ['Removed future.event output.'],
+    }, {
+      provider: 'codex',
+      runtimeMode: 'docker',
+    });
+
+    const app = createTestApp(config);
+    const response = await app.request(
+      '/diagnostics/providers/evolution?provider=codex&runtimeMode=docker&classification=regression&limit=1',
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      query: {
+        provider: 'codex',
+        runtimeMode: 'docker',
+        reviewClassifications: ['regression'],
+        limit: 1,
+      },
+      artifacts: [
+        expect.objectContaining({
+          artifactId: artifact.artifact.id,
+          provider: 'codex',
+          instance: 'default',
+          parserId: 'codex-jsonrpc',
+          probeProfile: 'manual_text',
+          transport: 'cli',
+          runtimeMode: 'docker',
+          version: '1.2.3',
+          review: expect.objectContaining({
+            classifications: ['regression'],
+            summary: 'Manual review flagged a regression.',
+          }),
+        }),
+      ],
+    });
+  });
+
+  it('reads retained provider-evolution artifacts by id through diagnostics routes', async () => {
+    const config = makeConfig();
+    const probeService = new ProviderEvolutionProbeService({
+      rootDir: join(
+        getRuntimeResolvedPaths(config).compatibilityEvidenceDir,
+        'provider-evolution',
+      ),
+    });
+
+    const artifact = await probeService.run({
+      target: {
+        provider: 'claude',
+        instance: 'default',
+        parserId: 'claude-stream-json',
+        probeProfile: 'manual_text',
+        transport: 'cli',
+        version: '1.2.3',
+      },
+      profile: PROVIDER_EVOLUTION_PROBE_PROFILES.manual_text,
+      run: async ({ observer }) => {
+        observer.recordNormalized({
+          rawEventType: 'assistant',
+          events: { type: 'text', text: 'alpha' },
+        });
+        observer.recordNormalized({
+          rawEventType: 'result',
+          events: { type: 'result' },
+        });
+        return {
+          status: 'completed',
+          turnsCompleted: 1,
+          emittedEventCount: 2,
+        };
+      },
+    });
+
+    const app = createTestApp(config);
+    const response = await app.request(
+      `/diagnostics/providers/evolution/${artifact.artifact.id}?provider=claude`,
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      relativePath: expect.stringContaining('claude/'),
+      artifact: expect.objectContaining({
+        id: artifact.artifact.id,
+        provider: 'claude',
+        instance: 'default',
+        parserId: 'claude-stream-json',
+        probeProfile: 'manual_text',
+        transport: 'cli',
+        version: '1.2.3',
+      }),
+    });
+
+    const missing = await app.request('/diagnostics/providers/evolution/missing-artifact');
+    expect(missing.status).toBe(404);
+    await expect(missing.json()).resolves.toEqual({
+      error: "Provider-evolution artifact 'missing-artifact' was not found.",
+      code: 'provider_evolution_artifact_not_found',
+    });
+  });
+
+  it('returns 400 for invalid provider-evolution artifact query filters', async () => {
+    const app = createTestApp();
+
+    const response = await app.request(
+      '/diagnostics/providers/evolution?runtimeMode=hyperv&classification=future_state',
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Unsupported provider-evolution runtimeMode 'hyperv'.",
+    });
+  });
+
   it('supports manual provider-evolution review updates through a POST route', async () => {
     const config = makeConfig();
     let now = Date.parse('2026-03-27T00:00:00.000Z');

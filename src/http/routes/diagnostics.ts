@@ -1352,6 +1352,66 @@ diagnosticsRoutes.post('/diagnostics/providers/reprobe', async (c) => {
   }
 });
 
+diagnosticsRoutes.get('/diagnostics/providers/evolution', async (c) => {
+  try {
+    const ctx = c.get('ctx');
+    const query = parseProviderEvolutionArtifactQuery(new URL(c.req.url));
+    const probeService = createProviderEvolutionProbeService(ctx.config);
+    const artifacts = await probeService.listArtifacts(query);
+
+    return c.json({
+      query: {
+        ...query,
+        ...(query.reviewClassifications
+          ? { reviewClassifications: query.reviewClassifications }
+          : {}),
+      },
+      artifacts: artifacts.map((artifact) => ({
+        ...summarizeProviderEvolutionArtifactForReadModel(artifact),
+        provider: artifact.provider,
+        instance: artifact.instance,
+        parserId: artifact.parserId,
+      })),
+    });
+  } catch (error) {
+    if (error instanceof DiagnosticsQueryError) {
+      return c.json({ error: error.message }, 400);
+    }
+    throw error;
+  }
+});
+
+diagnosticsRoutes.get('/diagnostics/providers/evolution/:artifactId', async (c) => {
+  try {
+    const ctx = c.get('ctx');
+    const artifactId = c.req.param('artifactId')?.trim();
+    if (!artifactId) {
+      throw new DiagnosticsQueryError('Missing provider-evolution artifact id.');
+    }
+
+    const query = parseProviderEvolutionArtifactQuery(new URL(c.req.url));
+    const probeService = createProviderEvolutionProbeService(ctx.config);
+    const artifact = await probeService.readArtifactById(artifactId, query);
+
+    if (!artifact) {
+      return c.json({
+        error: `Provider-evolution artifact '${artifactId}' was not found.`,
+        code: 'provider_evolution_artifact_not_found',
+      }, 404);
+    }
+
+    return c.json({
+      relativePath: artifact.relativePath.replace(/\\/g, '/'),
+      artifact: artifact.artifact,
+    });
+  } catch (error) {
+    if (error instanceof DiagnosticsQueryError) {
+      return c.json({ error: error.message }, 400);
+    }
+    throw error;
+  }
+});
+
 diagnosticsRoutes.post('/diagnostics/providers/evolution/:artifactId/review', async (c) => {
   try {
     const ctx = c.get('ctx');
@@ -1658,6 +1718,25 @@ function parseProviderEvolutionArtifactIdentityBody(
   };
 }
 
+function parseProviderEvolutionArtifactQuery(
+  url: URL,
+): ProviderEvolutionProbeArtifactQuery {
+  return {
+    provider: parseOptionalQueryString(url.searchParams.get('provider') ?? undefined),
+    instance: parseOptionalQueryString(url.searchParams.get('instance') ?? undefined),
+    parserId: parseOptionalQueryString(url.searchParams.get('parserId') ?? undefined),
+    probeProfile: parseOptionalQueryString(url.searchParams.get('probeProfile') ?? undefined),
+    transport: parseOptionalProviderEvolutionTransport(
+      url.searchParams.get('transport') ?? undefined,
+    ),
+    runtimeMode: parseOptionalProviderEvolutionRuntimeMode(
+      url.searchParams.get('runtimeMode') ?? undefined,
+    ),
+    reviewClassifications: parseProviderEvolutionReviewClassifications(url.searchParams),
+    limit: parseOptionalPositiveIntQuery(url.searchParams.get('limit') ?? undefined, 'limit'),
+  };
+}
+
 function parseProviderEvolutionReviewUpdateBody(
   body: Record<string, unknown>,
 ): ProviderEvolutionProbeReviewUpdate {
@@ -1731,6 +1810,24 @@ function parseOptionalProviderEvolutionClassifications(
   return classifications.length > 0 ? classifications : undefined;
 }
 
+function parseProviderEvolutionReviewClassifications(
+  searchParams: URLSearchParams,
+): ProviderEvolutionReviewClassification[] | undefined {
+  const values = searchParams.getAll('classification')
+    .flatMap((value) => value.split(','))
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+
+  if (values.length === 0) {
+    return undefined;
+  }
+
+  const classifications = Array.from(new Set(
+    values.map((value) => parseProviderEvolutionReviewClassification(value)),
+  ));
+  return classifications.length > 0 ? classifications : undefined;
+}
+
 function parseProviderEvolutionReviewClassification(
   value: string,
 ): ProviderEvolutionReviewClassification {
@@ -1751,6 +1848,22 @@ function parseProviderEvolutionReviewClassification(
         `Invalid provider-evolution classification '${value}'.`,
       );
   }
+}
+
+function parseOptionalPositiveIntQuery(
+  value: string | undefined,
+  fieldName: string,
+): number | undefined {
+  const normalized = parseOptionalQueryString(value);
+  if (!normalized) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(normalized, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new DiagnosticsQueryError(`Invalid ${fieldName} value.`);
+  }
+  return parsed;
 }
 
 function parseOptionalProviderEvolutionReferences(
