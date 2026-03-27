@@ -18,6 +18,10 @@ import {
   type PiModelDiscoveryRunner,
 } from '../../backends/cli/pi/models.js';
 import {
+  discoverOpencodeModels,
+  type OpencodeModelDiscoveryRunner,
+} from '../../backends/cli/opencode/models.js';
+import {
   buildRemoteModelDiscoveryRequest,
   DEFAULT_REMOTE_MODEL_DISCOVERY_TIMEOUT_MS,
   fetchRemoteModelDiscovery,
@@ -75,6 +79,7 @@ interface ProviderModelCatalogServiceOptions {
   env?: NodeJS.ProcessEnv;
   ttlMs?: number;
   piModelDiscoveryRunner?: PiModelDiscoveryRunner;
+  opencodeModelDiscoveryRunner?: OpencodeModelDiscoveryRunner;
   remoteDiscoveryTimeoutMs?: number;
 }
 
@@ -537,7 +542,7 @@ export class ProviderModelCatalogService {
     }
 
     try {
-      const loaded = await this.loadDynamicModels(target);
+      const loaded = await this.loadDynamicModels(target, options);
       if (!loaded) {
         return null;
       }
@@ -611,6 +616,7 @@ export class ProviderModelCatalogService {
 
   private async loadDynamicModels(
     target: ProviderTargetDescriptor,
+    options: ProviderModelCatalogRequestOptions = {},
   ): Promise<DynamicCatalogLoadResult | null> {
     if (target.backend === 'api' && target.remoteInstance) {
       return this.listRemoteApiModels(target.remoteInstance);
@@ -621,6 +627,19 @@ export class ProviderModelCatalogService {
         models: (await discoverPiModels(target.cliInstance, {
           cwd: this.config.sessionBaseDir,
           runner: this.options.piModelDiscoveryRunner,
+        })).map((model) => ({
+          ...model,
+          status: 'available' as const,
+        })),
+      };
+    }
+
+    if (target.backend === 'cli' && target.providerName === 'opencode' && target.cliInstance) {
+      return {
+        models: (await discoverOpencodeModels(target.cliInstance, {
+          cwd: this.config.sessionBaseDir,
+          refresh: options.forceRefresh,
+          runner: this.options.opencodeModelDiscoveryRunner,
         })).map((model) => ({
           ...model,
           status: 'available' as const,

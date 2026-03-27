@@ -10,6 +10,7 @@ function createCatalogConfig() {
       ollama: { backend: 'local', instance: 'local' },
       codex: { backend: 'agent', instance: 'bridge' },
       goose: { backend: 'cli', instance: 'default' },
+      opencode: { backend: 'cli', instance: 'default' },
       pi: { backend: 'cli', instance: 'default' },
     },
     providerDefaultInstances: {},
@@ -20,6 +21,17 @@ function createCatalogConfig() {
           providerName: 'goose',
           commandConfig: {
             path: 'goose',
+            runner: 'auto',
+            runtime: { mode: 'native' },
+          },
+        },
+      },
+      opencode: {
+        default: {
+          id: 'default',
+          providerName: 'opencode',
+          commandConfig: {
+            path: 'opencode',
             runner: 'auto',
             runtime: { mode: 'native' },
           },
@@ -40,6 +52,11 @@ function createCatalogConfig() {
     providerCommands: {
       goose: {
         path: 'goose',
+        runner: 'auto',
+        runtime: { mode: 'native' },
+      },
+      opencode: {
+        path: 'opencode',
         runner: 'auto',
         runtime: { mode: 'native' },
       },
@@ -486,6 +503,99 @@ describe('ProviderModelCatalogService', () => {
     });
     expect(second.models).toEqual(first.models);
     expect(vi.mocked(piModelDiscoveryRunner.run)).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads dynamic OpenCode model catalogs and forwards runtime refresh to the CLI helper', async () => {
+    const opencodeModelDiscoveryRunner = {
+      run: vi.fn(async (_instance, args: string[]) => ({
+        exitCode: 0,
+        stdout: args.includes('--refresh')
+          ? [
+              'anthropic/claude-sonnet-4-5',
+              'opencode-go/glm-5',
+              'openai/gpt-5.4',
+            ].join('\n')
+          : [
+              'anthropic/claude-sonnet-4-5',
+              'opencode-go/glm-5',
+            ].join('\n'),
+        stderr: '',
+        timedOut: false,
+        durationMs: 3,
+      })),
+    };
+
+    const service = new ProviderModelCatalogService(createCatalogConfig() as never, {
+      opencodeModelDiscoveryRunner,
+      ttlMs: 60_000,
+    });
+
+    const first = await service.getCatalog('opencode');
+    expect(first).toEqual(expect.objectContaining({
+      provider: 'opencode',
+      backend: 'cli',
+      instance: 'default',
+      defaultModel: 'opencode-go/glm-5',
+      source: 'dynamic',
+      cache: {
+        servedFromCache: false,
+        cachedAt: expect.any(String),
+        ttlSec: 60,
+      },
+      warnings: [],
+    }));
+    expect(first.models).toEqual([
+      {
+        id: 'anthropic/claude-sonnet-4-5',
+        label: 'anthropic/claude-sonnet-4-5',
+        default: false,
+        status: 'available',
+      },
+      {
+        id: 'opencode-go/glm-5',
+        label: 'opencode-go/glm-5',
+        default: true,
+        status: 'available',
+      },
+    ]);
+
+    const refreshed = await service.getCatalog('opencode', undefined, { forceRefresh: true });
+    expect(refreshed.models).toEqual([
+      {
+        id: 'anthropic/claude-sonnet-4-5',
+        label: 'anthropic/claude-sonnet-4-5',
+        default: false,
+        status: 'available',
+      },
+      {
+        id: 'openai/gpt-5.4',
+        label: 'openai/gpt-5.4',
+        default: false,
+        status: 'available',
+      },
+      {
+        id: 'opencode-go/glm-5',
+        label: 'opencode-go/glm-5',
+        default: true,
+        status: 'available',
+      },
+    ]);
+    expect(vi.mocked(opencodeModelDiscoveryRunner.run)).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        providerName: 'opencode',
+      }),
+      ['models'],
+      '/tmp/cats-runtime-sessions',
+    );
+    expect(vi.mocked(opencodeModelDiscoveryRunner.run)).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        providerName: 'opencode',
+      }),
+      ['models', '--refresh'],
+      '/tmp/cats-runtime-sessions',
+    );
   });
 
   it('loads a dynamic OpenAI catalog when auth is configured and caches the result', async () => {

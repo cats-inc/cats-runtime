@@ -124,9 +124,11 @@ semantics.
 - [x] Add explicit timeout and abort handling for discovery-backed HTTP fetches
       such as `ollama` model listing so partial hangs degrade into fallback
       warnings instead of long-lived requests
-- [ ] Expand dynamic discovery to more CLI or API-backed providers only when
+- [x] Expand dynamic discovery to more CLI or API-backed providers only when
       they have clear, stable listing semantics
-      Candidates to evaluate first: `pi`, `opencode`, and `cursor`
+      Landed first on `pi` and `opencode`; `cursor` remains config/static
+      because the runtime still does not have a clear upstream model-listing
+      seam to trust
 
 **Deliverables**: a bounded follow-on list instead of scope creep in the first
 slice.
@@ -190,6 +192,7 @@ slice.
 | 2026-03-27 | Manual refresh follow-through landed: `GET /providers/{provider}/models` and `/models/advanced` now accept additive `refresh=1|true` cache-bypass semantics so hosts can re-read dynamic catalogs after model/runtime changes without waiting for TTL expiry |
 | 2026-03-27 | Aggregate follow-through landed: `GET /providers/models` now returns one runtime-owned catalog per configured provider default target, reusing the same service and refresh semantics instead of forcing hosts to fan out one request per provider |
 | 2026-03-27 | Provider-topology follow-through landed: `/providers/config` instance entries now expose a bounded best-known `modelCatalog` summary that reuses cached dynamic catalogs when available and otherwise stays on config/static truth, so selectors can inspect model availability without forcing live discovery fan-out |
+| 2026-03-27 | CLI breadth follow-through landed for OpenCode: the shared catalog service now uses the runtime-owned `opencode models` helper for dynamic `provider/model` discovery and forwards runtime `refresh=1` requests to upstream `--refresh`, while Cursor remains on config/static fallback until it exposes a similarly stable listing seam |
 
 ---
 

@@ -3873,6 +3873,120 @@ providers:
     }
   });
 
+  it('GET /providers/:provider/models loads a dynamic OpenCode catalog through the CLI runtime helper', async () => {
+    const spawnMock = vi.spyOn(providerInstallRunner, 'runSpawnedCommand')
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: [
+          'anthropic/claude-sonnet-4-5',
+          'opencode-go/glm-5',
+        ].join('\n'),
+        stderr: '',
+        timedOut: false,
+        durationMs: 3,
+      })
+      .mockResolvedValueOnce({
+        exitCode: 0,
+        stdout: [
+          'anthropic/claude-sonnet-4-5',
+          'opencode-go/glm-5',
+          'openai/gpt-5.4',
+        ].join('\n'),
+        stderr: '',
+        timedOut: false,
+        durationMs: 3,
+      });
+
+    try {
+      await withRuntime({}, {}, async (runtime) => {
+        const first = await runtime.app.request('/providers/opencode/models');
+        expect(first.status).toBe(200);
+        expect(await first.json()).toEqual({
+          provider: 'opencode',
+          backend: 'cli',
+          instance: 'default',
+          defaultModel: 'opencode-go/glm-5',
+          source: 'dynamic',
+          cache: {
+            servedFromCache: false,
+            cachedAt: expect.any(String),
+            ttlSec: 60,
+          },
+          models: [
+            {
+              id: 'anthropic/claude-sonnet-4-5',
+              label: 'anthropic/claude-sonnet-4-5',
+              default: false,
+              status: 'available',
+            },
+            {
+              id: 'opencode-go/glm-5',
+              label: 'opencode-go/glm-5',
+              default: true,
+              status: 'available',
+            },
+          ],
+          warnings: [],
+        });
+
+        const refreshed = await runtime.app.request('/providers/opencode/models?refresh=1');
+        expect(refreshed.status).toBe(200);
+        expect(await refreshed.json()).toEqual({
+          provider: 'opencode',
+          backend: 'cli',
+          instance: 'default',
+          defaultModel: 'opencode-go/glm-5',
+          source: 'dynamic',
+          cache: {
+            servedFromCache: false,
+            cachedAt: expect.any(String),
+            ttlSec: 60,
+          },
+          models: [
+            {
+              id: 'anthropic/claude-sonnet-4-5',
+              label: 'anthropic/claude-sonnet-4-5',
+              default: false,
+              status: 'available',
+            },
+            {
+              id: 'openai/gpt-5.4',
+              label: 'openai/gpt-5.4',
+              default: false,
+              status: 'available',
+            },
+            {
+              id: 'opencode-go/glm-5',
+              label: 'opencode-go/glm-5',
+              default: true,
+              status: 'available',
+            },
+          ],
+          warnings: [],
+        });
+      });
+
+      expect(spawnMock).toHaveBeenNthCalledWith(
+        1,
+        expect.any(String),
+        expect.arrayContaining(['models']),
+        expect.objectContaining({
+          timeoutMs: 20_000,
+        }),
+      );
+      expect(spawnMock).toHaveBeenNthCalledWith(
+        2,
+        expect.any(String),
+        expect.arrayContaining(['models', '--refresh']),
+        expect.objectContaining({
+          timeoutMs: 20_000,
+        }),
+      );
+    } finally {
+      spawnMock.mockRestore();
+    }
+  });
+
   it('GET /providers/:provider/models falls back to static catalog when dynamic discovery fails', async () => {
     const fetchMock = vi.fn(async () => {
       throw new Error('connection refused');

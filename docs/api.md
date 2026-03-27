@@ -3033,6 +3033,9 @@ The first slice supports:
 - dynamic discovery for `ollama`
 - dynamic discovery for `pi` via the runtime-owned `pi --list-models` helper,
   normalized into canonical `provider/model` refs
+- dynamic discovery for `opencode` via the runtime-owned `opencode models`
+  helper, normalized into canonical `provider/model` refs and forwarding
+  runtime `refresh=1` cache-bypass requests to upstream `--refresh`
 - dynamic discovery for `agent_sdk_bridge` targets whose adapter exposes
   `listModels()`
 - dynamic discovery for `openclaw_gateway` targets via gateway `models.list`,

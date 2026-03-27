@@ -653,6 +653,9 @@ tightening and cleanup steps are intentionally deferred.
 - `/providers/config` instance entries now also expose a bounded best-known
   `modelCatalog` summary so selectors/operator tooling can read source/default/
   running-state counts without forcing a live multi-provider discovery round
+- dynamic CLI-backed catalog discovery now also includes OpenCode through the
+  runtime-owned `opencode models` helper, and runtime `refresh=1` forwards to
+  upstream `--refresh` for that provider family
 - `GET /providers/:provider/models/advanced` exists as the additive advanced
   catalog surface
 - session create/read contracts now support additive `modelSelection` and
