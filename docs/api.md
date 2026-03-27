@@ -102,6 +102,8 @@ Current curated tools:
 - `runtime_diagnostics`
 - `list_sessions`
 - `read_session`
+- `session_history`
+- `session_lineage`
 - `health_diagnostics`
 - `providers_config`
 - `provider_tools`
@@ -229,6 +231,11 @@ catalog contract.
 `GET /sessions/{id}`, so MCP hosts can inspect the additive session
 provider-target, strategy, inspection, and wakeup metadata without bypassing
 the existing session read contract.
+`session_history` and `session_lineage` reuse the same runtime-owned session
+history and branch-lineage surfaces as `GET /sessions/{id}/history` and
+`GET /sessions/{id}/lineage`, so MCP hosts can inspect transcript metadata,
+provider-target context, and branch ancestry/descendant state without
+inventing a second session-inspection contract.
 `list_sessions` and `observe_session` also reuse the same additive session
 `providerTarget` read model exposed by the direct HTTP session/history/observe
 surfaces, so MCP hosts can inspect backend continuity/tooling semantics without

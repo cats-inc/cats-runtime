@@ -1213,6 +1213,49 @@ async function readSession(
   };
 }
 
+async function sessionHistory(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const sessionId = readRequiredString(args, 'sessionId');
+  const historyPath = `/sessions/${encodeURIComponent(sessionId)}/history`;
+  const result = await requestRuntimeJson(ctx, historyPath, { method: 'GET' });
+  ensureRouteSuccess('session_history', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'session_history result');
+  return {
+    summary: `Loaded session history for ${sessionId}.`,
+    structuredContent: {
+      history: payload,
+      historyPath,
+      sessionPath: `/sessions/${sessionId}`,
+      observePath: `/sessions/${sessionId}/observe`,
+    },
+  };
+}
+
+async function sessionLineage(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const sessionId = readRequiredString(args, 'sessionId');
+  const lineagePath = `/sessions/${encodeURIComponent(sessionId)}/lineage`;
+  const result = await requestRuntimeJson(ctx, lineagePath, { method: 'GET' });
+  ensureRouteSuccess('session_lineage', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'session_lineage result');
+  return {
+    summary: `Loaded session lineage for ${sessionId}.`,
+    structuredContent: {
+      lineage: payload,
+      lineagePath,
+      sessionPath: `/sessions/${sessionId}`,
+      historyPath: `/sessions/${sessionId}/history`,
+      observePath: `/sessions/${sessionId}/observe`,
+    },
+  };
+}
+
 async function listRuntimeSkills(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -2186,6 +2229,38 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: readSession,
+  },
+  {
+    definition: {
+      name: 'session_history',
+      title: 'Session History',
+      description: 'Return the runtime-owned session history payload exposed by the existing session history route.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sessionId: { type: 'string' },
+        },
+        required: ['sessionId'],
+        additionalProperties: false,
+      },
+    },
+    execute: sessionHistory,
+  },
+  {
+    definition: {
+      name: 'session_lineage',
+      title: 'Session Lineage',
+      description: 'Return the runtime-owned session branch-lineage payload exposed by the existing session lineage route.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sessionId: { type: 'string' },
+        },
+        required: ['sessionId'],
+        additionalProperties: false,
+      },
+    },
+    execute: sessionLineage,
   },
   {
     definition: {

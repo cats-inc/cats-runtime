@@ -1076,6 +1076,10 @@ evidence bundles and does not force hosts to invent their own report format.
   as `read_session`, so orchestrator-style hosts can inspect additive
   provider-target, strategy, wakeup, and inspection metadata without
   bypassing the existing session read contract
+- the same runtime-owned session history and branch-lineage surfaces are now
+  also exposed through MCP as `session_history` and `session_lineage`, so
+  orchestrator-style hosts can inspect transcript metadata and branch ancestry
+  without falling back to direct HTTP session reads
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
   remediation previews, and latest-setup-report summary metadata including a

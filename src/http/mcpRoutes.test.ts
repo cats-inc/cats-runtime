@@ -360,6 +360,8 @@ describe('runtime MCP facade', () => {
       'runtime_diagnostics',
       'list_sessions',
       'read_session',
+      'session_history',
+      'session_lineage',
       'health_diagnostics',
       'providers_config',
       'provider_tools',
@@ -1479,6 +1481,130 @@ describe('runtime MCP facade', () => {
         instance: 'default',
         target: 'cli/default',
         resolved: true,
+      }),
+    }));
+
+    const sessionHistoryResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 31.6,
+        method: 'tools/call',
+        params: {
+          name: 'session_history',
+          arguments: {
+            sessionId: 'session-1',
+          },
+        },
+      }),
+    });
+    expect(sessionHistoryResponse.status).toBe(200);
+    const sessionHistory = await sessionHistoryResponse.json() as {
+      result: {
+        structuredContent: {
+          sessionPath: string;
+          observePath: string;
+          historyPath: string;
+          history: {
+            messages: unknown[];
+            transcript: {
+              ownership: string;
+              source: string;
+              parser: string;
+            };
+            providerTarget: {
+              provider: string;
+              backend: string;
+              instance: string;
+              target: string;
+              resolved: boolean;
+            };
+          };
+        };
+      };
+    };
+    expect(sessionHistory.result.structuredContent.sessionPath).toBe('/sessions/session-1');
+    expect(sessionHistory.result.structuredContent.observePath).toBe('/sessions/session-1/observe');
+    expect(sessionHistory.result.structuredContent.historyPath).toBe('/sessions/session-1/history');
+    expect(sessionHistory.result.structuredContent.history.messages).toEqual([]);
+    expect(sessionHistory.result.structuredContent.history.transcript).toEqual({
+      ownership: 'none',
+      source: 'none',
+      parser: 'none',
+    });
+    expect(sessionHistory.result.structuredContent.history.providerTarget).toEqual(
+      expect.objectContaining({
+        provider: 'claude',
+        backend: 'cli',
+        instance: 'default',
+        target: 'cli/default',
+        resolved: true,
+      }),
+    );
+
+    const sessionLineageResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 31.7,
+        method: 'tools/call',
+        params: {
+          name: 'session_lineage',
+          arguments: {
+            sessionId: 'session-1',
+          },
+        },
+      }),
+    });
+    expect(sessionLineageResponse.status).toBe(200);
+    const sessionLineage = await sessionLineageResponse.json() as {
+      result: {
+        structuredContent: {
+          sessionPath: string;
+          observePath: string;
+          historyPath: string;
+          lineagePath: string;
+          lineage: {
+            rootSessionId: string;
+            parentSessionId: string | null;
+            ancestors: unknown[];
+            children: unknown[];
+            descendants: unknown[];
+            session: {
+              id: string;
+              providerTarget: {
+                provider: string;
+                backend: string;
+                instance: string;
+                target: string;
+                resolved: boolean;
+              };
+            };
+          };
+        };
+      };
+    };
+    expect(sessionLineage.result.structuredContent.sessionPath).toBe('/sessions/session-1');
+    expect(sessionLineage.result.structuredContent.observePath).toBe('/sessions/session-1/observe');
+    expect(sessionLineage.result.structuredContent.historyPath).toBe('/sessions/session-1/history');
+    expect(sessionLineage.result.structuredContent.lineagePath).toBe('/sessions/session-1/lineage');
+    expect(sessionLineage.result.structuredContent.lineage).toEqual(expect.objectContaining({
+      rootSessionId: 'session-1',
+      parentSessionId: null,
+      ancestors: [],
+      children: [],
+      descendants: [],
+      session: expect.objectContaining({
+        id: 'session-1',
+        providerTarget: expect.objectContaining({
+          provider: 'claude',
+          backend: 'cli',
+          instance: 'default',
+          target: 'cli/default',
+          resolved: true,
+        }),
       }),
     }));
 
