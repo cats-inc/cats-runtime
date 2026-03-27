@@ -118,6 +118,22 @@ export interface RuntimeBrowserSummary {
   cleanupCandidates: RuntimeBrowserCleanupCandidateSummary;
 }
 
+export interface RuntimeBrowserDriverCatalogSummary {
+  totalDrivers: number;
+  readyDrivers: number;
+  degradedDrivers: number;
+  unsupportedDrivers: number;
+  persistentSessionDrivers: number;
+  liveAutomationDrivers: number;
+  manualUrlEntryDrivers: number;
+  summary: string;
+}
+
+export interface RuntimeBrowserDriverCatalogInspection {
+  drivers: RuntimeBrowserDriverDescriptor[];
+  summary: RuntimeBrowserDriverCatalogSummary;
+}
+
 export interface RuntimeBrowserCleanupResult {
   action: 'cleanup_browser_sessions';
   filters: {
@@ -169,6 +185,25 @@ export class RuntimeBrowserService {
 
   listDrivers(): RuntimeBrowserDriverDescriptor[] {
     return Array.from(this.drivers.values()).map((driver) => cloneDriverDescriptor(driver.descriptor));
+  }
+
+  inspectDriverCatalog(): RuntimeBrowserDriverCatalogInspection {
+    const drivers = this.listDrivers();
+    const summary = {
+      totalDrivers: drivers.length,
+      readyDrivers: drivers.filter((driver) => driver.status === 'ready').length,
+      degradedDrivers: drivers.filter((driver) => driver.status === 'degraded').length,
+      unsupportedDrivers: drivers.filter((driver) => driver.status === 'unsupported').length,
+      persistentSessionDrivers: drivers.filter((driver) => driver.capabilities.persistentSessions).length,
+      liveAutomationDrivers: drivers.filter((driver) => driver.capabilities.liveAutomation).length,
+      manualUrlEntryDrivers: drivers.filter((driver) => driver.capabilities.manualUrlEntry).length,
+      summary: `${drivers.length} browser driver(s) are registered for runtime preview flows.`,
+    } satisfies RuntimeBrowserDriverCatalogSummary;
+
+    return {
+      drivers,
+      summary,
+    };
   }
 
   createSession(input: CreateRuntimeBrowserSessionInput = {}): Promise<RuntimeBrowserSessionView> {

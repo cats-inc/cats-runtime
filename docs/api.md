@@ -609,6 +609,8 @@ desktop shells, and the embedded dashboard. It combines:
   runtime maintenance snapshot
 - compact browser aggregate summary metadata so hosts can see preview backlog
   and cleanup-candidate counts without calling `/browser/summary`
+- compact browser-driver catalog metadata so hosts can see runtime preview
+  driver availability/capability posture without calling `/browser/drivers`
 - compact management-operation backlog summary metadata so hosts can see
   retained `polling` / `completed` / `failed` operation counts without polling
   `GET /management/diagnostics`
@@ -654,6 +656,8 @@ integrate against:
 - current aggregate browser state under `runtime.browser`, reusing the same
   browser summary model as `GET /browser/summary` with the maintenance TTL
   applied to cleanup-candidate counts
+- runtime browser-driver metadata under `runtime.browserDrivers`, including the
+  registered driver descriptors and a bounded capability summary
 - runtime maintenance snapshots under `runtime.maintenance`, including:
   - `worktrees`: orphan-sweep results plus bounded current retained-worktree
     summaries (counts, policy/reason-code breakdown, sampled session ids) and

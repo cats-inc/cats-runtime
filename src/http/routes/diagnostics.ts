@@ -1257,6 +1257,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
   const peers = getPeerDiscoverySnapshot(ctx);
   const wakeups = getRuntimeWakeupSnapshot(ctx);
   const browser = getRuntimeBrowserDiagnostics(ctx);
+  const browserDrivers = getRuntimeBrowserService(ctx).inspectDriverCatalog();
   const worktrees = getRuntimeWorktreeDiagnostics(ctx);
   const executionStrategies = ctx.apiBackend?.inspectExecutionStrategies()
     ?? buildApiRuntimeExecutionStrategyCatalog();
@@ -1285,6 +1286,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
         ...(browser.maintenance ? { browser: browser.maintenance } : {}),
       },
       browser: browser.summary,
+      browserDrivers,
       executionStrategies,
       management: {
         adapters: managementAdapters,
@@ -1503,6 +1505,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
   const peers = getPeerDiscoverySnapshot(ctx);
   const wakeups = getRuntimeWakeupSnapshot(ctx);
   const browser = getRuntimeBrowserDiagnostics(ctx);
+  const browserDrivers = getRuntimeBrowserService(ctx).inspectDriverCatalog();
   const worktrees = getRuntimeWorktreeDiagnostics(ctx);
   const executionStrategies = ctx.apiBackend?.inspectExecutionStrategies()
     ?? buildApiRuntimeExecutionStrategyCatalog();
@@ -1571,6 +1574,9 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
         cleanupCandidatePages: browser.summary.cleanupCandidates.pageCount,
         cleanupCandidateOlderThanMs: browser.summary.cleanupCandidates.olderThanMs,
       },
+    },
+    browserDrivers: {
+      summary: browserDrivers.summary,
     },
     management: {
       adapters: managementAdapters.summary,

@@ -6,6 +6,39 @@ import { ManualBrowserDriver } from '../../backends/browser/manualDriver.js';
 import { RuntimeBrowserService } from './RuntimeBrowserService.js';
 
 describe('RuntimeBrowserService', () => {
+  it('summarizes registered browser drivers for diagnostics', () => {
+    const browser = new RuntimeBrowserService({
+      drivers: [
+        new ManualBrowserDriver(),
+      ],
+      now: () => new Date('2026-03-23T00:00:00.000Z'),
+    });
+
+    expect(browser.inspectDriverCatalog()).toEqual({
+      drivers: [
+        expect.objectContaining({
+          id: 'manual',
+          status: 'ready',
+          capabilities: expect.objectContaining({
+            persistentSessions: true,
+            manualUrlEntry: true,
+            liveAutomation: false,
+          }),
+        }),
+      ],
+      summary: {
+        totalDrivers: 1,
+        readyDrivers: 1,
+        degradedDrivers: 0,
+        unsupportedDrivers: 0,
+        persistentSessionDrivers: 1,
+        liveAutomationDrivers: 0,
+        manualUrlEntryDrivers: 1,
+        summary: '1 browser driver(s) are registered for runtime preview flows.',
+      },
+    });
+  });
+
   it('creates manual browser sessions/pages and derives normalized browser-page preview surfaces', async () => {
     const browser = new RuntimeBrowserService({
       drivers: [

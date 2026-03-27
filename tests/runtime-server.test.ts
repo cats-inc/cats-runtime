@@ -563,6 +563,37 @@ describe('runtime server', () => {
               sessionIds: [],
             },
           },
+          browserDrivers: {
+            drivers: [
+              {
+                id: 'manual',
+                kind: 'manual',
+                status: 'ready',
+                title: 'Manual Browser Driver',
+                summary: 'Registers previewable pages and URLs without owning a real browser process.',
+                capabilities: {
+                  persistentSessions: true,
+                  manualUrlEntry: true,
+                  serviceBindings: true,
+                  artifactBindings: true,
+                  liveAutomation: false,
+                },
+                warnings: [
+                  'This driver does not launch or automate a browser. It only records runtime-owned page metadata.',
+                ],
+              },
+            ],
+            summary: {
+              totalDrivers: 1,
+              readyDrivers: 1,
+              degradedDrivers: 0,
+              unsupportedDrivers: 0,
+              persistentSessionDrivers: 1,
+              liveAutomationDrivers: 0,
+              manualUrlEntryDrivers: 1,
+              summary: '1 browser driver(s) are registered for runtime preview flows.',
+            },
+          },
           executionStrategies: {
             summary: {
               totalFamilies: 7,
@@ -1485,6 +1516,18 @@ backends:
             cleanupCandidateSessions: 0,
             cleanupCandidatePages: 0,
             cleanupCandidateOlderThanMs: 1800000,
+          },
+        },
+        browserDrivers: {
+          summary: {
+            totalDrivers: 1,
+            readyDrivers: 1,
+            degradedDrivers: 0,
+            unsupportedDrivers: 0,
+            persistentSessionDrivers: 1,
+            liveAutomationDrivers: 0,
+            manualUrlEntryDrivers: 1,
+            summary: '1 browser driver(s) are registered for runtime preview flows.',
           },
         },
         management: {
