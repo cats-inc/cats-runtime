@@ -36,6 +36,9 @@ describe('runtime startup helpers', () => {
       '--probe-provider=codex',
       '--probe-instance',
       'default',
+      '--probe-parser',
+      'codex-json-rpc',
+      '--probe-transport=cli',
       '--probe-profile',
       'manual_smoke',
       '--probe-model=gpt-5',
@@ -58,6 +61,8 @@ describe('runtime startup helpers', () => {
       readProviderEvolutionArtifact: 'artifact-1',
       probeProvider: 'codex',
       probeInstance: 'default',
+      probeParser: 'codex-json-rpc',
+      probeTransport: 'cli',
       probeProfile: 'manual_smoke',
       probeModel: 'gpt-5',
       probeLimit: '5',
@@ -273,6 +278,8 @@ describe('runtime startup helpers', () => {
     expect(help).toContain('--list-provider-evolution-artifacts');
     expect(help).toContain('--read-provider-evolution-artifact <artifactId>');
     expect(help).toContain('--probe-provider <provider>');
+    expect(help).toContain('--probe-parser <parserId>');
+    expect(help).toContain('--probe-transport <cli|agent|api|unknown>');
     expect(help).toContain('--probe-profile <manual_smoke|manual_text>');
     expect(help).toContain('--probe-limit <count>');
     expect(help).toContain('--refresh-setup-scan');

@@ -69,6 +69,8 @@ export interface RuntimeCliOptions {
   readProviderEvolutionArtifact?: string;
   probeProvider?: string;
   probeInstance?: string;
+  probeParser?: string;
+  probeTransport?: string;
   probeProfile?: string;
   probeModel?: string;
   probeLimit?: string;
@@ -216,6 +218,28 @@ export function parseRuntimeCliOptions(argv: string[]): RuntimeCliOptions {
 
     if (arg.startsWith('--probe-instance=')) {
       options.probeInstance = arg.slice('--probe-instance='.length);
+      continue;
+    }
+
+    if (arg === '--probe-parser') {
+      options.probeParser = readOptionValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--probe-parser=')) {
+      options.probeParser = arg.slice('--probe-parser='.length);
+      continue;
+    }
+
+    if (arg === '--probe-transport') {
+      options.probeTransport = readOptionValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--probe-transport=')) {
+      options.probeTransport = arg.slice('--probe-transport='.length);
       continue;
     }
 
@@ -638,6 +662,8 @@ export function getRuntimeHelpText(): string {
     '  --read-provider-evolution-artifact <artifactId>',
     '  --probe-provider <provider>',
     '  --probe-instance <instance>',
+    '  --probe-parser <parserId>',
+    '  --probe-transport <cli|agent|api|unknown>',
     '  --probe-profile <manual_smoke|manual_text>',
     '  --probe-model <model>',
     '  --probe-limit <count>',

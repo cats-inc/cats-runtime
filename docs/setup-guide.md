@@ -137,6 +137,7 @@ node dist/index.js --probe-provider-evolution --probe-provider claude --probe-in
 node dist/index.js --probe-provider-evolution --probe-provider goose --probe-model anthropic/claude-sonnet-4
 node dist/index.js --list-provider-evolution-artifacts --probe-provider codex --probe-limit 5
 node dist/index.js --list-provider-evolution-artifacts --probe-provider claude --probe-instance agent/sdk
+node dist/index.js --list-provider-evolution-artifacts --probe-provider claude --probe-parser agent_sdk_http_v1 --probe-transport agent
 node dist/index.js --read-provider-evolution-artifact artifact-id --probe-provider codex
 ```
 
@@ -162,8 +163,9 @@ opening any public HTTP surface:
   machine-readable stdout JSON with newest-first retained artifact summaries
 - `--read-provider-evolution-artifact <artifactId>` re-reads one retained
   artifact and prints the full stored artifact JSON to stdout
-- `--probe-provider`, `--probe-instance`, and `--probe-profile` can scope the
-  retained-artifact listing, and `--probe-limit <count>` caps list output
+- `--probe-provider`, `--probe-instance`, `--probe-parser`,
+  `--probe-transport`, and `--probe-profile` can scope the retained-artifact
+  listing, and `--probe-limit <count>` caps list output
 
 The current agent-backed slice stays manual-first and transport-neutral:
 

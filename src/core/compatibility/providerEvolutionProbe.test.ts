@@ -344,8 +344,14 @@ describe('ProviderEvolutionProbeService', () => {
     ]);
     expect(listed[1]?.review.classifications).toEqual(['baseline']);
 
-    const reread = await service.readArtifactById(current.artifact.id, 'codex');
+    const reread = await service.readArtifactById(current.artifact.id, {
+      provider: 'codex',
+    });
     expect(reread?.artifact.review.classifications).toEqual(['upgrade']);
+    await expect(service.readArtifactById(current.artifact.id, {
+      provider: 'codex',
+      parserId: 'other-parser',
+    })).resolves.toBeNull();
 
     rmSync(root, { recursive: true, force: true });
   });

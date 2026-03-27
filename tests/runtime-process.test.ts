@@ -276,7 +276,17 @@ function writeProviderEvolutionArtifact(
   env: NodeJS.ProcessEnv,
   provider: string,
   artifactId: string,
+  overrides: Partial<{
+    instance: string;
+    parserId: string;
+    probeProfile: string;
+    transport: 'cli' | 'agent' | 'api' | 'unknown';
+  }> = {},
 ): string {
+  const instance = overrides.instance || 'default';
+  const parserId = overrides.parserId || `${provider}-json-rpc`;
+  const probeProfile = overrides.probeProfile || 'manual_smoke';
+  const transport = overrides.transport || 'cli';
   const providerDir = join(
     env.CATS_RUNTIME_DATA_DIR!,
     'compatibility',
@@ -289,10 +299,10 @@ function writeProviderEvolutionArtifact(
     schemaVersion: 1,
     id: artifactId,
     provider,
-    instance: 'default',
-    parserId: `${provider}-json-rpc`,
-    probeProfile: 'manual_smoke',
-    transport: 'cli',
+    instance,
+    parserId,
+    probeProfile,
+    transport,
     capturedAt: '2026-03-27T00:00:00.000Z',
     execution: {
       status: 'completed',
@@ -322,10 +332,10 @@ function writeProviderEvolutionArtifact(
     evidence: {
       schemaVersion: 1,
       provider,
-      instance: 'default',
-      parserId: `${provider}-json-rpc`,
-      probeProfile: 'manual_smoke',
-      transport: 'cli',
+      instance,
+      parserId,
+      probeProfile,
+      transport,
       capturedAt: '2026-03-27T00:00:00.000Z',
       rawSamples: [],
       normalizedSamples: [],
@@ -845,6 +855,52 @@ describe('runtime process startup contract', () => {
       });
       expect(output.stderr).toContain('Listed 1 provider-evolution artifact(s) for codex.');
       expect(output.stderr).toContain('codex/default manual_smoke [baseline]');
+    } finally {
+      cleanup();
+    }
+  }, 20000);
+
+  it('can filter retained provider-evolution artifacts by parser and transport', async () => {
+    const { env, cleanup } = createRuntimeProcessEnv(3213);
+    writeProviderEvolutionArtifact(env, 'claude', 'artifact-cli', {
+      parserId: 'claude-stream-json',
+      transport: 'cli',
+    });
+    writeProviderEvolutionArtifact(env, 'claude', 'artifact-agent', {
+      instance: 'agent/sdk',
+      parserId: 'agent_sdk_http_v1',
+      transport: 'agent',
+    });
+    const child = spawnSetupDiagnostic([
+      '--list-provider-evolution-artifacts',
+      '--probe-provider',
+      'claude',
+      '--probe-parser',
+      'agent_sdk_http_v1',
+      '--probe-transport',
+      'agent',
+    ], env);
+
+    try {
+      const output = await waitForProcessOutput(child);
+      expect(output.code).toBe(0);
+
+      const payload = JSON.parse(output.stdout.trim()) as ProviderEvolutionArtifactListCliOutput;
+      expect(payload.status).toBe('listed');
+      expect(payload.count).toBe(1);
+      expect(payload.artifacts).toEqual([
+        expect.objectContaining({
+          artifactId: 'artifact-agent',
+          provider: 'claude',
+          instance: 'agent/sdk',
+          parserId: 'agent_sdk_http_v1',
+          transport: 'agent',
+        }),
+      ]);
+      expect(output.stderr).toContain(
+        'Listed 1 provider-evolution artifact(s) for claude/parser=agent_sdk_http_v1/transport=agent.',
+      );
+      expect(output.stderr).toContain('claude/agent/sdk manual_smoke [baseline]');
     } finally {
       cleanup();
     }

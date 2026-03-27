@@ -59,8 +59,10 @@ describe('provider evolution entry summaries', () => {
     ], {
       probeProvider: 'codex',
       probeInstance: 'default',
+      probeParser: 'codex-json-rpc',
+      probeTransport: 'cli',
     })).toBe([
-      'Listed 1 provider-evolution artifact(s) for codex/default.',
+      'Listed 1 provider-evolution artifact(s) for codex/default/parser=codex-json-rpc/transport=cli.',
       '- 2026-03-27T00:00:00.000Z codex/default manual_smoke [upgrade] Detected upgrade relative to the latest baseline.',
       '',
     ].join('\n'));

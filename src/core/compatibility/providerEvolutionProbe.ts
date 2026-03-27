@@ -300,15 +300,15 @@ export class ProviderEvolutionProbeService {
 
   async readArtifactById(
     artifactId: string,
-    provider?: string,
+    query: ProviderEvolutionProbeArtifactQuery = {},
   ): Promise<ProviderEvolutionProbeStoredArtifact | null> {
-    const relativePaths = await this.listArtifactRelativePaths(provider);
+    const relativePaths = await this.listArtifactRelativePaths(query.provider);
     for (const relativePath of relativePaths) {
       if (!relativePath.endsWith(`${artifactId}.json`)) {
         continue;
       }
       const stored = await this.readStoredArtifact(relativePath);
-      if (stored) {
+      if (stored && matchesProviderEvolutionArtifactQuery(stored.artifact, query)) {
         return stored;
       }
     }

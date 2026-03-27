@@ -27,7 +27,10 @@ import {
   type RuntimeConfig,
 } from '../config.js';
 import { ProviderCompatibilityService } from './ProviderCompatibilityService.js';
-import type { ProviderEvolutionEvidenceObserver } from './providerEvolution.js';
+import type {
+  ProviderEvolutionEvidenceObserver,
+  ProviderEvolutionTransport,
+} from './providerEvolution.js';
 import {
   formatProviderEvolutionProbeEntrySummary,
   getProviderEvolutionProbeProfile,
@@ -168,9 +171,11 @@ export async function readProviderEvolutionProbeArtifact(
     throw new Error('Missing --read-provider-evolution-artifact value');
   }
 
-  const providerName = parseOptionalProbeProviderName(cliOptions.probeProvider);
   const context = resolveProviderEvolutionEntryContext(env);
-  const artifact = await context.probeService.readArtifactById(artifactId, providerName);
+  const artifact = await context.probeService.readArtifactById(
+    artifactId,
+    resolveProbeArtifactQuery(cliOptions),
+  );
   if (!artifact) {
     throw new Error(`Provider-evolution artifact '${artifactId}' was not found.`);
   }
@@ -441,15 +446,20 @@ function resolveProbeArtifactQuery(
 ): {
   provider?: string;
   instance?: string;
+  parserId?: string;
   probeProfile?: string;
+  transport?: ProviderEvolutionTransport;
   limit?: number;
 } {
   const provider = parseOptionalProbeProviderName(cliOptions.probeProvider);
   const limit = parseOptionalProbeLimit(cliOptions.probeLimit);
+  const transport = parseOptionalProbeTransport(cliOptions.probeTransport);
   return {
     ...(provider ? { provider } : {}),
     ...(cliOptions.probeInstance ? { instance: cliOptions.probeInstance.trim() } : {}),
+    ...(cliOptions.probeParser ? { parserId: cliOptions.probeParser.trim() } : {}),
     ...(cliOptions.probeProfile ? { probeProfile: cliOptions.probeProfile.trim() } : {}),
+    ...(transport ? { transport } : {}),
     ...(typeof limit === 'number' ? { limit } : {}),
   };
 }
@@ -469,6 +479,28 @@ function parseOptionalProbeProviderName(value: string | undefined): string | und
   return value ? parseProbeProviderName(value) : undefined;
 }
 
+function parseOptionalProbeTransport(
+  value: string | undefined,
+): ProviderEvolutionTransport | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (
+    normalized !== 'cli'
+    && normalized !== 'agent'
+    && normalized !== 'api'
+    && normalized !== 'unknown'
+  ) {
+    throw new Error(
+      `Invalid --probe-transport value '${value}'. Valid values: cli, agent, api, unknown`,
+    );
+  }
+
+  return normalized;
+}
+
 function resolveAgentProbeParserId(
   adapter: AgentAdapter,
   instance: RemoteProviderInstanceConfig,
@@ -486,6 +518,8 @@ function describeProbeArtifactScope(cliOptions: RuntimeCliOptions): string {
     cliOptions.probeProvider?.trim(),
     cliOptions.probeInstance?.trim(),
     cliOptions.probeProfile?.trim(),
+    cliOptions.probeParser?.trim() ? `parser=${cliOptions.probeParser.trim()}` : undefined,
+    cliOptions.probeTransport?.trim() ? `transport=${cliOptions.probeTransport.trim()}` : undefined,
   ].filter((value): value is string => Boolean(value));
   return parts.length > 0 ? parts.join('/') : 'all retained probes';
 }
