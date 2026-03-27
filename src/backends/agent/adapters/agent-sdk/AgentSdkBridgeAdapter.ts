@@ -1,7 +1,14 @@
 import type {
+  ErrorStreamEvent,
+  InitStreamEvent,
   AgentRuntimeService,
+  ResultStreamEvent,
   SessionProviderState,
   StreamEvent,
+  StreamUsage,
+  TextStreamEvent,
+  ToolResultStreamEvent,
+  ToolUseStreamEvent,
 } from '../../../../core/types.js';
 import { parseSseEvents, readErrorBody } from '../../../../core/streamParsers.js';
 import {
@@ -544,9 +551,9 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
       type: 'init',
       providerSessionId: bridgeSessionId,
       providerState: buildProviderState(input, bridgeSessionId, 'active'),
-    };
+    } satisfies InitStreamEvent;
 
-    let usage: StreamEvent['usage'];
+    let usage: StreamUsage | undefined;
     let services: AgentRuntimeService[] | undefined;
     let upstreamProviderSessionId: string | undefined;
     const observer = input.evolutionObserver;
@@ -607,7 +614,7 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
           type: 'text',
           providerSessionId: bridgeSessionId,
           text: payload.content,
-        };
+        } satisfies TextStreamEvent;
         continue;
       }
 
@@ -627,7 +634,7 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
           toolArgs: payload.toolInput && typeof payload.toolInput === 'object'
             ? payload.toolInput as Record<string, unknown>
             : {},
-        };
+        } satisfies ToolUseStreamEvent;
         continue;
       }
 
@@ -666,7 +673,7 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
           ...(toolId ? { toolId } : {}),
           ...(text ? { text } : {}),
           ...(payload.isError === true ? { isError: true } : {}),
-        };
+        } satisfies ToolResultStreamEvent;
         continue;
       }
 
@@ -704,7 +711,7 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
           providerState: buildProviderState(input, bridgeSessionId, 'error', services, {
             upstreamProviderSessionId,
           }),
-        };
+        } satisfies ErrorStreamEvent;
         return;
       }
 
@@ -726,7 +733,7 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
       metadata: {
         provider: bridgeProvider,
       },
-    };
+    } satisfies ResultStreamEvent;
   }
 
   async probe(instance: RemoteProviderInstanceConfig): Promise<AgentAdapterProbeResult> {

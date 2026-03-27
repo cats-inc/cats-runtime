@@ -1,9 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import type {
+  ErrorStreamEvent,
+  InitStreamEvent,
   AgentRuntimeService,
+  RawStreamEvent,
+  ResultStreamEvent,
   SessionArtifact,
   SessionProviderState,
   StreamEvent,
+  TextStreamEvent,
 } from '../../../../core/types.js';
 import {
   observeIgnored,
@@ -776,7 +781,7 @@ export class OpenClawAdapter implements AgentAdapter {
       if (stream === 'assistant') {
         const text = readString(data.delta) || readString(data.text);
         if (text) {
-          emit({ type: 'text', text, raw: frame });
+          emit({ type: 'text', text, raw: frame } satisfies TextStreamEvent);
           return;
         }
         observeSchemaFailure(observer, {
@@ -792,7 +797,7 @@ export class OpenClawAdapter implements AgentAdapter {
           type: 'error',
           text: readString(data.error) || readString(data.message) || 'OpenClaw agent error',
           raw: frame,
-        });
+        } satisfies ErrorStreamEvent);
         return;
       }
 
@@ -803,7 +808,7 @@ export class OpenClawAdapter implements AgentAdapter {
             type: 'raw',
             artifacts,
             raw: frame,
-          });
+          } satisfies RawStreamEvent);
           return;
         }
         observeSchemaFailure(observer, {
@@ -869,7 +874,7 @@ export class OpenClawAdapter implements AgentAdapter {
             acceptedRecord,
           ),
           raw: acceptedRecord,
-        });
+        } satisfies InitStreamEvent);
         initialized = true;
         for (const event of preInitEvents.splice(0)) {
           queue.push(event);
@@ -882,7 +887,7 @@ export class OpenClawAdapter implements AgentAdapter {
             providerSessionId,
             text: readString(acceptedRecord?.summary) || 'OpenClaw agent request failed',
             raw: acceptedRecord,
-          });
+          } satisfies ErrorStreamEvent);
           queue.push(null);
           return;
         }
@@ -928,7 +933,7 @@ export class OpenClawAdapter implements AgentAdapter {
             finalPayload,
           ),
           raw: finalPayload,
-        });
+        } satisfies ResultStreamEvent);
         queue.push(null);
       } catch (error) {
         queue.push(error instanceof Error ? error : new Error(String(error)));

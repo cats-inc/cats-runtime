@@ -179,7 +179,7 @@ change.
 - [ ] Update `src/backends/api/runtime/ApiBackendManager.ts` to emit exact
       `init`, `text`, `tool_use`, `tool_result`, `result`, and `progress`
       events
-- [ ] Update agent adapters and managers under `src/backends/agent/*` where
+- [x] Update agent adapters and managers under `src/backends/agent/*` where
       they build event objects directly
 - [ ] Update CLI parsers/providers that construct event literals so the new
       union compiles without broad `as` casts
@@ -271,6 +271,7 @@ documented residual debt list.
 |------|--------|
 | 2026-03-21 | Plan created after post-commit review flagged `StreamEvent` narrowing debt |
 | 2026-03-27 | First conservative slice landed: `src/core/types.ts` now exports discriminated `StreamEvent` members while keeping the wire shape stable; runtime build and full test suite stayed green after compile fallout was resolved without broad `as` casts. |
+| 2026-03-27 | Tightened agent-backed producers so the OpenClaw and Agent SDK adapters now emit exact discriminated union members (`init`, `text`, `raw`, `tool_use`, `tool_result`, `result`, `error`) instead of relying on a generic bag-of-optionals event literal shape. |
 
 ---
 
