@@ -306,6 +306,10 @@ describe('runtime MCP facade', () => {
       'read_provider_evolution_artifact',
       'review_provider_evolution_artifact',
       'read_compatibility_evidence_artifact',
+      'generate_setup_diagnostic_report',
+      'list_setup_diagnostic_reports',
+      'read_latest_setup_diagnostic_report',
+      'read_setup_diagnostic_report',
       'observe_session',
       'list_runtime_skills',
       'create_session',
@@ -823,6 +827,136 @@ describe('runtime MCP facade', () => {
         provider: 'claude',
       }),
     }));
+
+    const generateSetupReportResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 35.5,
+        method: 'tools/call',
+        params: {
+          name: 'generate_setup_diagnostic_report',
+          arguments: {},
+        },
+      }),
+    });
+    expect(generateSetupReportResponse.status).toBe(200);
+    const generatedSetupReport = await generateSetupReportResponse.json() as {
+      result: {
+        structuredContent: {
+          reportPath: string;
+          status: string;
+          report: {
+            artifactId: string;
+            summary: {
+              headline: string;
+            };
+          };
+        };
+      };
+    };
+    expect(generatedSetupReport.result.structuredContent.reportPath).toBe('/diagnostics/setup-report');
+    expect(generatedSetupReport.result.structuredContent.status).toBe('generated');
+    expect(generatedSetupReport.result.structuredContent.report.artifactId).toEqual(expect.any(String));
+    expect(generatedSetupReport.result.structuredContent.report.summary.headline).toEqual(expect.any(String));
+
+    const setupReportArtifactId = generatedSetupReport.result.structuredContent.report.artifactId;
+
+    const listSetupReportsResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 35.6,
+        method: 'tools/call',
+        params: {
+          name: 'list_setup_diagnostic_reports',
+          arguments: {
+            limit: 1,
+          },
+        },
+      }),
+    });
+    expect(listSetupReportsResponse.status).toBe(200);
+    const listedSetupReports = await listSetupReportsResponse.json() as {
+      result: {
+        structuredContent: {
+          reportsPath: string;
+          artifacts: Array<{
+            artifactId: string;
+          }>;
+        };
+      };
+    };
+    expect(listedSetupReports.result.structuredContent.reportsPath).toBe(
+      '/diagnostics/setup-report?limit=1',
+    );
+    expect(listedSetupReports.result.structuredContent.artifacts).toEqual([
+      expect.objectContaining({
+        artifactId: setupReportArtifactId,
+      }),
+    ]);
+
+    const latestSetupReportResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 35.7,
+        method: 'tools/call',
+        params: {
+          name: 'read_latest_setup_diagnostic_report',
+          arguments: {},
+        },
+      }),
+    });
+    expect(latestSetupReportResponse.status).toBe(200);
+    const latestSetupReport = await latestSetupReportResponse.json() as {
+      result: {
+        structuredContent: {
+          reportPath: string;
+          report: {
+            artifactId: string;
+          };
+        };
+      };
+    };
+    expect(latestSetupReport.result.structuredContent.reportPath).toBe(
+      '/diagnostics/setup-report/latest',
+    );
+    expect(latestSetupReport.result.structuredContent.report.artifactId).toBe(setupReportArtifactId);
+
+    const readSetupReportResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 35.8,
+        method: 'tools/call',
+        params: {
+          name: 'read_setup_diagnostic_report',
+          arguments: {
+            artifactId: setupReportArtifactId,
+          },
+        },
+      }),
+    });
+    expect(readSetupReportResponse.status).toBe(200);
+    const readSetupReport = await readSetupReportResponse.json() as {
+      result: {
+        structuredContent: {
+          reportPath: string;
+          report: {
+            artifactId: string;
+          };
+        };
+      };
+    };
+    expect(readSetupReport.result.structuredContent.reportPath).toBe(
+      `/diagnostics/setup-report/${encodeURIComponent(setupReportArtifactId)}`,
+    );
+    expect(readSetupReport.result.structuredContent.report.artifactId).toBe(setupReportArtifactId);
 
     vi.mocked(pool.getCapabilities).mockClear();
 

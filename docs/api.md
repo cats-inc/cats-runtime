@@ -107,6 +107,10 @@ Current curated tools:
 - `list_provider_evolution_artifacts`
 - `read_provider_evolution_artifact`
 - `review_provider_evolution_artifact`
+- `generate_setup_diagnostic_report`
+- `list_setup_diagnostic_reports`
+- `read_latest_setup_diagnostic_report`
+- `read_setup_diagnostic_report`
 - `observe_session`
 - `list_runtime_skills`
 - `create_session`
@@ -169,6 +173,13 @@ filters.
 review write seam as `POST /diagnostics/providers/evolution/{artifactId}/review`,
 including additive artifact identity filters plus review classifications,
 summary, highlights, and external references.
+`generate_setup_diagnostic_report`, `list_setup_diagnostic_reports`,
+`read_latest_setup_diagnostic_report`, and `read_setup_diagnostic_report` reuse
+the same bounded setup-report lifecycle as `POST /diagnostics/setup-report`,
+`GET /diagnostics/setup-report`, `GET /diagnostics/setup-report/latest`, and
+`GET /diagnostics/setup-report/{artifactId}`, so MCP hosts can trigger, list,
+and inspect retained operator-facing setup artifacts without shelling out to
+the standalone CLI entry.
 `list_sessions` and `observe_session` also reuse the same additive session
 `providerTarget` read model exposed by the direct HTTP session/history/observe
 surfaces, so MCP hosts can inspect backend continuity/tooling semantics without

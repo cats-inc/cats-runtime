@@ -827,6 +827,98 @@ async function reviewProviderEvolutionArtifact(
   };
 }
 
+async function generateSetupDiagnosticReport(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const body: Record<string, unknown> = {};
+  if (readOptionalBoolean(args, 'refreshScan') === true) {
+    body.refreshScan = true;
+  }
+
+  const result = await requestRuntimeJson(ctx, '/diagnostics/setup-report', {
+    method: 'POST',
+    body,
+  });
+  ensureRouteSuccess('generate_setup_diagnostic_report', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'generate_setup_diagnostic_report result');
+  const report = asRecord(payload.report);
+  const artifactId = typeof report?.artifactId === 'string' ? report.artifactId : 'unknown';
+
+  return {
+    summary: `Generated setup diagnostic report ${artifactId}.`,
+    structuredContent: {
+      ...payload,
+      reportPath: '/diagnostics/setup-report',
+    },
+  };
+}
+
+async function listSetupDiagnosticReports(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const searchParams = new URLSearchParams();
+  appendSingleQueryValue(searchParams, 'limit', readOptionalInteger(args, 'limit', 1));
+
+  const path = searchParams.size > 0
+    ? `/diagnostics/setup-report?${searchParams.toString()}`
+    : '/diagnostics/setup-report';
+  const result = await requestRuntimeJson(ctx, path, { method: 'GET' });
+  ensureRouteSuccess('list_setup_diagnostic_reports', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'list_setup_diagnostic_reports result');
+  const artifacts = Array.isArray(payload.artifacts) ? payload.artifacts : [];
+
+  return {
+    summary: `Retained setup diagnostic reports: ${artifacts.length}.`,
+    structuredContent: {
+      ...payload,
+      reportsPath: path,
+    },
+  };
+}
+
+async function readLatestSetupDiagnosticReport(
+  ctx: AppContext,
+): Promise<McpToolCallResult> {
+  const path = '/diagnostics/setup-report/latest';
+  const result = await requestRuntimeJson(ctx, path, { method: 'GET' });
+  ensureRouteSuccess('read_latest_setup_diagnostic_report', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'read_latest_setup_diagnostic_report result');
+  const report = asRecord(payload.report);
+  const artifactId = typeof report?.artifactId === 'string' ? report.artifactId : 'latest';
+
+  return {
+    summary: `Latest setup diagnostic report ${artifactId}.`,
+    structuredContent: {
+      ...payload,
+      reportPath: path,
+    },
+  };
+}
+
+async function readSetupDiagnosticReport(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const artifactId = readRequiredString(args, 'artifactId');
+  const path = `/diagnostics/setup-report/${encodeURIComponent(artifactId)}`;
+  const result = await requestRuntimeJson(ctx, path, { method: 'GET' });
+  ensureRouteSuccess('read_setup_diagnostic_report', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'read_setup_diagnostic_report result');
+  return {
+    summary: `Setup diagnostic report ${artifactId}.`,
+    structuredContent: {
+      ...payload,
+      reportPath: path,
+    },
+  };
+}
+
 async function observeSession(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -1969,6 +2061,65 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: readCompatibilityEvidenceArtifact,
+  },
+  {
+    definition: {
+      name: 'generate_setup_diagnostic_report',
+      title: 'Generate Setup Diagnostic Report',
+      description: 'Generate a redacted setup diagnostic report through the existing runtime-owned setup diagnostics route.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          refreshScan: { type: 'boolean' },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: generateSetupDiagnosticReport,
+  },
+  {
+    definition: {
+      name: 'list_setup_diagnostic_reports',
+      title: 'List Setup Diagnostic Reports',
+      description: 'List retained setup diagnostic report artifacts through the existing runtime-owned diagnostics read surface.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          limit: { type: 'integer', minimum: 1 },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: listSetupDiagnosticReports,
+  },
+  {
+    definition: {
+      name: 'read_latest_setup_diagnostic_report',
+      title: 'Read Latest Setup Diagnostic Report',
+      description: 'Read the latest retained setup diagnostic report through the existing runtime-owned diagnostics surface.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        additionalProperties: false,
+      },
+    },
+    execute: readLatestSetupDiagnosticReport,
+  },
+  {
+    definition: {
+      name: 'read_setup_diagnostic_report',
+      title: 'Read Setup Diagnostic Report',
+      description: 'Read one retained setup diagnostic report by id through the existing runtime-owned diagnostics surface.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          artifactId: { type: 'string' },
+        },
+        required: ['artifactId'],
+        additionalProperties: false,
+      },
+    },
+    execute: readSetupDiagnosticReport,
   },
   {
     definition: {

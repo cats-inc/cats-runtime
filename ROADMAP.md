@@ -1033,6 +1033,12 @@ evidence bundles and does not force hosts to invent their own report format.
   newest-first via `--list-setup-diagnostic-reports` and re-read one retained
   artifact by id via `--read-setup-diagnostic-report <artifactId>`, with
   optional `--setup-report-limit <count>` scoping for bounded operator review
+- the same setup-report lifecycle is now also exposed through MCP as
+  `generate_setup_diagnostic_report`, `list_setup_diagnostic_reports`,
+  `read_latest_setup_diagnostic_report`, and
+  `read_setup_diagnostic_report`, so orchestrator-style hosts can trigger and
+  inspect retained operator-facing setup artifacts without shelling out to the
+  standalone CLI entry
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
   remediation previews, and latest-setup-report summary metadata including a
