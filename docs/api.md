@@ -99,7 +99,9 @@ Supported JSON-RPC methods:
 Current curated tools:
 
 - `runtime_summary`
+- `runtime_diagnostics`
 - `list_sessions`
+- `health_diagnostics`
 - `provider_diagnostics`
 - `reprobe_provider_diagnostics`
 - `list_compatibility_evidence_artifacts`
@@ -191,6 +193,11 @@ inventing a second setup orchestration contract.
 mutation seams as `POST /setup-scan` and `POST /setup-apply`, so MCP hosts can
 request a manual scan or apply a generated provider config without inventing an
 MCP-only bootstrap lifecycle.
+`runtime_diagnostics` and `health_diagnostics` reuse the same runtime-owned
+aggregate diagnostics surfaces as `GET /diagnostics/runtime` and
+`GET /diagnostics/health`, including additive `probe` / `forceRefresh` health
+query semantics, so MCP hosts can consume the richer operator/readiness
+snapshots without polling bespoke JSON-RPC-only contracts.
 `list_sessions` and `observe_session` also reuse the same additive session
 `providerTarget` read model exposed by the direct HTTP session/history/observe
 surfaces, so MCP hosts can inspect backend continuity/tooling semantics without

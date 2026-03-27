@@ -394,6 +394,23 @@ function runtimeSummary(ctx: AppContext): McpToolCallResult {
   };
 }
 
+async function runtimeDiagnostics(
+  ctx: AppContext,
+): Promise<McpToolCallResult> {
+  const path = '/diagnostics/runtime';
+  const result = await requestRuntimeJson(ctx, path, { method: 'GET' });
+  ensureRouteSuccess('runtime_diagnostics', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'runtime_diagnostics result');
+  return {
+    summary: 'Runtime diagnostics snapshot.',
+    structuredContent: {
+      ...payload,
+      diagnosticsPath: path,
+    },
+  };
+}
+
 async function listSessions(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -413,6 +430,43 @@ async function listSessions(
           expensiveCliCapabilities: false,
         }),
       ),
+    },
+  };
+}
+
+async function healthDiagnostics(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const searchParams = new URLSearchParams();
+  appendSingleQueryValue(
+    searchParams,
+    'probe',
+    readOptionalEnumString(
+      args,
+      'probe',
+      DIAGNOSTICS_PROBE_MODES,
+      'probe must be a valid diagnostics probe mode',
+    ),
+  );
+  if (readOptionalBoolean(args, 'forceRefresh') === true) {
+    searchParams.set('force', '1');
+  }
+
+  const path = searchParams.size > 0
+    ? `/diagnostics/health?${searchParams.toString()}`
+    : '/diagnostics/health';
+  const result = await requestRuntimeJson(ctx, path, { method: 'GET' });
+  ensureRouteSuccess('health_diagnostics', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'health_diagnostics result');
+  const status = typeof payload.status === 'string' ? payload.status : 'unknown';
+
+  return {
+    summary: `Runtime health diagnostics status: ${status}.`,
+    structuredContent: {
+      ...payload,
+      diagnosticsPath: path,
     },
   };
 }
@@ -1940,6 +1994,19 @@ const TOOL_HANDLERS: McpToolHandler[] = [
   },
   {
     definition: {
+      name: 'runtime_diagnostics',
+      title: 'Runtime Diagnostics',
+      description: 'Return the full runtime diagnostics snapshot exposed by the existing runtime-owned diagnostics route.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        additionalProperties: false,
+      },
+    },
+    execute: async (ctx) => runtimeDiagnostics(ctx),
+  },
+  {
+    definition: {
       name: 'list_sessions',
       title: 'List Sessions',
       description: 'Return tracked runtime sessions, optionally filtered by provider or status.',
@@ -1954,6 +2021,22 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: listSessions,
+  },
+  {
+    definition: {
+      name: 'health_diagnostics',
+      title: 'Health Diagnostics',
+      description: 'Return the polling-friendly health diagnostics snapshot exposed by the existing runtime-owned diagnostics route.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          probe: { type: 'string', enum: DIAGNOSTICS_PROBE_MODES },
+          forceRefresh: { type: 'boolean' },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: healthDiagnostics,
   },
   {
     definition: {

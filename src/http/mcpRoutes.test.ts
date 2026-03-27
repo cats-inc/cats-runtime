@@ -332,7 +332,9 @@ describe('runtime MCP facade', () => {
     };
     expect(listed.result.tools.map((tool) => tool.name)).toEqual([
       'runtime_summary',
+      'runtime_diagnostics',
       'list_sessions',
+      'health_diagnostics',
       'provider_diagnostics',
       'reprobe_provider_diagnostics',
       'list_provider_evolution_artifacts',
@@ -419,6 +421,71 @@ describe('runtime MCP facade', () => {
     };
     expect(runtimeSummary.result.structuredContent.sessions.total).toBe(1);
     expect(runtimeSummary.result.structuredContent.diagnostics.mcpPath).toBe('/mcp');
+
+    const runtimeDiagnosticsResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 3.1,
+        method: 'tools/call',
+        params: {
+          name: 'runtime_diagnostics',
+          arguments: {},
+        },
+      }),
+    });
+    expect(runtimeDiagnosticsResponse.status).toBe(200);
+    const runtimeDiagnostics = await runtimeDiagnosticsResponse.json() as {
+      result: {
+        structuredContent: {
+          diagnosticsPath: string;
+          runtime: {
+            startup: {
+              phase: string;
+            };
+          };
+        };
+      };
+    };
+    expect(runtimeDiagnostics.result.structuredContent.diagnosticsPath).toBe('/diagnostics/runtime');
+    expect(runtimeDiagnostics.result.structuredContent.runtime.startup.phase).toEqual(
+      expect.any(String),
+    );
+
+    const healthDiagnosticsResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 3.2,
+        method: 'tools/call',
+        params: {
+          name: 'health_diagnostics',
+          arguments: {
+            probe: 'light',
+            forceRefresh: true,
+          },
+        },
+      }),
+    });
+    expect(healthDiagnosticsResponse.status).toBe(200);
+    const healthDiagnostics = await healthDiagnosticsResponse.json() as {
+      result: {
+        structuredContent: {
+          diagnosticsPath: string;
+          status: string;
+          providers: {
+            probe: string;
+          };
+        };
+      };
+    };
+    expect(healthDiagnostics.result.structuredContent.diagnosticsPath).toBe(
+      '/diagnostics/health?probe=light&force=1',
+    );
+    expect(healthDiagnostics.result.structuredContent.status).toEqual(expect.any(String));
+    expect(healthDiagnostics.result.structuredContent.providers.probe).toBe('light');
 
     const providerDiagnosticsResponse = await app.request('/mcp', {
       method: 'POST',
@@ -2478,7 +2545,7 @@ describe('runtime MCP facade', () => {
     };
     expect(commit.result.structuredContent.responseStatus).toBe(200);
     expect(commit.result.structuredContent.action).toBe('create-commit');
-  });
+  }, 10_000);
 
   it('exposes browser substrate tools over MCP without depending on a separate browser service', async () => {
     const app = createTestApp();

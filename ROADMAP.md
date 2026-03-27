@@ -1047,6 +1047,10 @@ evidence bundles and does not force hosts to invent their own report format.
   `run_setup_scan` and `apply_setup_config`, so orchestrator-style hosts can
   request a manual scan or apply generated provider config without inventing an
   MCP-only bootstrap lifecycle
+- the same aggregate runtime diagnostics are now also exposed through MCP as
+  `runtime_diagnostics` and `health_diagnostics`, including health probe/force
+  query semantics, so orchestrator-style hosts can consume richer readiness and
+  operator snapshots without inventing bespoke JSON-RPC-only diagnostics
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
   remediation previews, and latest-setup-report summary metadata including a
