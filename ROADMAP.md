@@ -999,6 +999,10 @@ evidence bundles and does not force hosts to invent their own report format.
   the normal HTTP server, so port conflicts or other startup failures still
   leave a redacted operator-facing artifact; the entry path now also prints a
   concise stderr summary while preserving stdout JSON for automation
+- the same non-server setup-diagnostic flow can now also list retained reports
+  newest-first via `--list-setup-diagnostic-reports` and re-read one retained
+  artifact by id via `--read-setup-diagnostic-report <artifactId>`, with
+  optional `--setup-report-limit <count>` scoping for bounded operator review
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
   remediation previews, and latest-setup-report summary metadata including a
@@ -1024,8 +1028,9 @@ evidence bundles and does not force hosts to invent their own report format.
 
 - do not collapse setup reports and compatibility evidence into one artifact
 - do not claim artifact signing or attestation in the first slice
-- do not force a CLI/non-server entry path into the same change that lands the
-  shared service and HTTP route
+- do not add a dedicated host-facing setup-report inspection route beyond the
+  current HTTP and manual CLI entry points until a stronger operator workflow
+  needs it
 
 #### Affected Areas
 

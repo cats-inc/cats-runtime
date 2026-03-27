@@ -13,8 +13,12 @@ import {
   readProviderEvolutionProbeArtifact,
 } from './core/compatibility/providerEvolutionEntry.js';
 import {
+  formatSetupDiagnosticReportListSummary,
+  formatSetupDiagnosticReportReadSummary,
   formatSetupDiagnosticEntrySummary,
   generateSetupDiagnosticEntryArtifact,
+  listSetupDiagnosticEntryReports,
+  readSetupDiagnosticEntryReport,
 } from './core/diagnostics/setupDiagnosticEntry.js';
 import { inspectRuntimeConfig, shouldEnterBootstrapMode } from './core/configInspection.js';
 import { createRuntimeServer } from './server.js';
@@ -55,6 +59,33 @@ async function main(): Promise<void> {
       status: 'generated',
       artifactPath: result.artifactPath,
       report: result.report,
+    })}\n`);
+    return;
+  }
+
+  if (cliOptions.listSetupDiagnosticReports) {
+    const artifacts = listSetupDiagnosticEntryReports(cliOptions, process.env);
+    process.stderr.write(formatSetupDiagnosticReportListSummary(artifacts));
+    process.stdout.write(`${JSON.stringify({
+      status: 'listed',
+      count: artifacts.length,
+      artifacts,
+    })}\n`);
+    return;
+  }
+
+  if (cliOptions.readSetupDiagnosticReport) {
+    const artifact = readSetupDiagnosticEntryReport(cliOptions, process.env);
+    if (!artifact) {
+      throw new Error(
+        `Setup diagnostic report '${cliOptions.readSetupDiagnosticReport}' was not found.`,
+      );
+    }
+    process.stderr.write(formatSetupDiagnosticReportReadSummary(artifact));
+    process.stdout.write(`${JSON.stringify({
+      status: 'loaded',
+      artifactPath: artifact.artifactPath,
+      report: artifact.report,
     })}\n`);
     return;
   }

@@ -51,6 +51,31 @@ interface SetupDiagnosticCliOutput {
   };
 }
 
+interface SetupDiagnosticListCliOutput {
+  status: 'listed';
+  count: number;
+  artifacts: Array<{
+    artifactId: string;
+    generatedAt: string;
+    summary: {
+      status: 'ok' | 'degraded' | 'unavailable';
+      headline: string;
+    };
+  }>;
+}
+
+interface SetupDiagnosticReadCliOutput {
+  status: 'loaded';
+  artifactPath: string;
+  report: {
+    artifactId: string;
+    summary: {
+      status: 'ok' | 'degraded' | 'unavailable';
+      headline: string;
+    };
+  };
+}
+
 interface ProviderEvolutionArtifactListCliOutput {
   status: 'listed';
   count: number;
@@ -352,6 +377,112 @@ function writeProviderEvolutionArtifact(
         rawPassthroughEventTypes: {},
       },
     },
+  }, null, 2)}\n`, 'utf8');
+  return artifactPath;
+}
+
+function writeSetupDiagnosticArtifact(
+  env: NodeJS.ProcessEnv,
+  artifactId: string,
+  overrides: Partial<{
+    generatedAt: string;
+    status: 'ok' | 'degraded' | 'unavailable';
+    headline: string;
+  }> = {},
+): string {
+  const diagnosticsDir = join(env.CATS_RUNTIME_DATA_DIR!, 'diagnostics');
+  mkdirSync(diagnosticsDir, { recursive: true });
+  const artifactPath = join(diagnosticsDir, `${artifactId}.json`);
+  writeFileSync(artifactPath, `${JSON.stringify({
+    service: 'cats-runtime',
+    version: '0.1.0',
+    generatedAt: overrides.generatedAt || '2026-03-27T00:00:00.000Z',
+    artifactId,
+    summary: {
+      status: overrides.status || 'degraded',
+      issueCounts: {
+        info: 0,
+        warnings: 2,
+        errors: 0,
+      },
+      headline: overrides.headline || 'Setup report found 2 warning(s).',
+      highlights: [
+        'Codex CLI is unavailable.',
+      ],
+    },
+    platform: {
+      nodeVersion: process.version,
+      platform: process.platform,
+      arch: process.arch,
+      pid: process.pid,
+      cwd: process.cwd(),
+    },
+    runtime: {
+      listener: {
+        host: '127.0.0.1',
+        port: 3110,
+      },
+      paths: {
+        configPath: null,
+        dataDir: env.CATS_RUNTIME_DATA_DIR,
+        sessionBaseDir: env.CATS_RUNTIME_SESSION_BASE_DIR,
+        diagnosticsDir,
+        compatibilityEvidenceDir: join(env.CATS_RUNTIME_DATA_DIR!, 'compatibility'),
+      },
+      pathChecks: {
+        dataDirWritable: true,
+        diagnosticsDirWritable: true,
+        configPathExists: true,
+      },
+    },
+    config: {
+      inspection: {
+        configPath: env.CATS_RUNTIME_CONFIG_PATH,
+        fileExists: true,
+        parseError: null,
+        hasUsableTargets: true,
+        bootstrapRequired: false,
+      },
+      port: {
+        status: 'available',
+        message: 'Port 3110 is available.',
+      },
+    },
+    discovery: {
+      status: 'disabled',
+      message: 'Discovery disabled.',
+      transport: 'none',
+      distributors: [],
+    },
+    dependencies: {
+      git: {
+        available: true,
+      },
+      compatibilityEvidence: {
+        directory: join(env.CATS_RUNTIME_DATA_DIR!, 'compatibility'),
+        fileCount: 0,
+      },
+    },
+    setup: {
+      state: null,
+      providerUniverse: [],
+      configured: {
+        providers: 1,
+        targets: 1,
+        defaultTargets: 1,
+      },
+      scan: {
+        source: 'missing',
+        latest: null,
+        manual: null,
+      },
+    },
+    references: {
+      latestScanPath: join(env.CATS_RUNTIME_DATA_DIR!, 'setup', 'provider-scan.json'),
+      latestManualScanPath: join(env.CATS_RUNTIME_DATA_DIR!, 'setup', 'provider-manual-scan.json'),
+      compatibilityEvidenceDir: join(env.CATS_RUNTIME_DATA_DIR!, 'compatibility'),
+    },
+    issues: [],
   }, null, 2)}\n`, 'utf8');
   return artifactPath;
 }
@@ -821,6 +952,73 @@ describe('runtime process startup contract', () => {
           resolveClose();
         });
       });
+      cleanup();
+    }
+  }, 20000);
+
+  it('can list retained setup diagnostic reports without starting the HTTP server', async () => {
+    const { env, cleanup } = createRuntimeProcessEnv(3210);
+    writeSetupDiagnosticArtifact(env, 'setup-report-older', {
+      generatedAt: '2026-03-27T00:00:00.000Z',
+      headline: 'Older setup report.',
+    });
+    writeSetupDiagnosticArtifact(env, 'setup-report-latest', {
+      generatedAt: '2026-03-27T01:00:00.000Z',
+      headline: 'Latest setup report.',
+    });
+    const child = spawnSetupDiagnostic([
+      '--list-setup-diagnostic-reports',
+      '--setup-report-limit',
+      '1',
+    ], env);
+
+    try {
+      const output = await waitForProcessOutput(child);
+      expect(output.code).toBe(0);
+
+      const payload = JSON.parse(output.stdout.trim()) as SetupDiagnosticListCliOutput;
+      expect(payload.status).toBe('listed');
+      expect(payload.count).toBe(1);
+      expect(payload.artifacts).toEqual([
+        expect.objectContaining({
+          artifactId: 'setup-report-latest',
+          generatedAt: '2026-03-27T01:00:00.000Z',
+          summary: expect.objectContaining({
+            headline: 'Latest setup report.',
+          }),
+        }),
+      ]);
+      expect(output.stderr).toContain('Listed 1 retained setup diagnostic report(s).');
+      expect(output.stderr).toContain('[degraded] Latest setup report.');
+    } finally {
+      cleanup();
+    }
+  }, 20000);
+
+  it('can read a retained setup diagnostic report without starting the HTTP server', async () => {
+    const { env, cleanup } = createRuntimeProcessEnv(3214);
+    const artifactPath = writeSetupDiagnosticArtifact(env, 'setup-report-read');
+    const child = spawnSetupDiagnostic([
+      '--read-setup-diagnostic-report',
+      'setup-report-read',
+    ], env);
+
+    try {
+      const output = await waitForProcessOutput(child);
+      expect(output.code).toBe(0);
+
+      const payload = JSON.parse(output.stdout.trim()) as SetupDiagnosticReadCliOutput;
+      expect(payload.status).toBe('loaded');
+      expect(payload.artifactPath).toBe(artifactPath);
+      expect(payload.report).toMatchObject({
+        artifactId: 'setup-report-read',
+        summary: {
+          headline: 'Setup report found 2 warning(s).',
+        },
+      });
+      expect(output.stderr).toContain('Loaded setup diagnostic report setup-report-read');
+      expect(output.stderr).toContain(`Artifact: ${artifactPath}`);
+    } finally {
       cleanup();
     }
   }, 20000);

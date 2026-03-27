@@ -10,6 +10,7 @@ import {
 import {
   SetupDiagnosticService,
   type SetupDiagnosticArtifact,
+  type SetupDiagnosticArtifactSummary,
 } from './SetupDiagnosticService.js';
 
 export interface SetupDiagnosticEntryContext {
@@ -62,17 +63,34 @@ export async function generateSetupDiagnosticEntryArtifact(
   cliOptions: RuntimeCliOptions,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<SetupDiagnosticArtifact> {
-  const context = resolveSetupDiagnosticEntryContext(cliOptions, env);
-  const service = new SetupDiagnosticService({
-    config: context.config,
-    startup: context.startup,
-    bootstrapService: context.bootstrapService,
-    ...(context.configLoadError ? { configLoadError: context.configLoadError } : {}),
-  });
+  const service = createSetupDiagnosticEntryService(cliOptions, env);
 
   return service.generateReport({
     refreshScan: cliOptions.refreshSetupScan === true,
   });
+}
+
+export function listSetupDiagnosticEntryReports(
+  cliOptions: RuntimeCliOptions,
+  env: NodeJS.ProcessEnv = process.env,
+): SetupDiagnosticArtifactSummary[] {
+  const service = createSetupDiagnosticEntryService(cliOptions, env);
+  return service.listReports({
+    limit: parseOptionalSetupReportLimit(cliOptions.setupReportLimit),
+  });
+}
+
+export function readSetupDiagnosticEntryReport(
+  cliOptions: RuntimeCliOptions,
+  env: NodeJS.ProcessEnv = process.env,
+): SetupDiagnosticArtifact | null {
+  const artifactId = cliOptions.readSetupDiagnosticReport?.trim();
+  if (!artifactId) {
+    throw new Error('Missing --read-setup-diagnostic-report value');
+  }
+
+  const service = createSetupDiagnosticEntryService(cliOptions, env);
+  return service.readReport(artifactId);
 }
 
 export function formatSetupDiagnosticEntrySummary(
@@ -84,4 +102,57 @@ export function formatSetupDiagnosticEntrySummary(
     `Artifact: ${artifact.artifactPath}`,
   ];
   return `${lines.join('\n')}\n`;
+}
+
+export function formatSetupDiagnosticReportListSummary(
+  artifacts: SetupDiagnosticArtifactSummary[],
+): string {
+  if (artifacts.length === 0) {
+    return 'No retained setup diagnostic reports were found.\n';
+  }
+
+  const lines = [
+    `Listed ${artifacts.length} retained setup diagnostic report(s).`,
+    ...artifacts.map((artifact) => (
+      `- ${artifact.generatedAt} [${artifact.summary.status}] ${artifact.summary.headline}`
+    )),
+  ];
+  return `${lines.join('\n')}\n`;
+}
+
+export function formatSetupDiagnosticReportReadSummary(
+  artifact: SetupDiagnosticArtifact,
+): string {
+  const lines = [
+    `Loaded setup diagnostic report ${artifact.report.artifactId}: ${artifact.report.summary.headline}`,
+    ...artifact.report.summary.highlights.map((highlight) => `- ${highlight}`),
+    `Artifact: ${artifact.artifactPath}`,
+  ];
+  return `${lines.join('\n')}\n`;
+}
+
+function createSetupDiagnosticEntryService(
+  cliOptions: RuntimeCliOptions,
+  env: NodeJS.ProcessEnv,
+): SetupDiagnosticService {
+  const context = resolveSetupDiagnosticEntryContext(cliOptions, env);
+  return new SetupDiagnosticService({
+    config: context.config,
+    startup: context.startup,
+    bootstrapService: context.bootstrapService,
+    ...(context.configLoadError ? { configLoadError: context.configLoadError } : {}),
+  });
+}
+
+function parseOptionalSetupReportLimit(value: string | undefined): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    throw new Error(`Invalid --setup-report-limit value '${value}'`);
+  }
+
+  return parsed;
 }

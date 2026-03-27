@@ -64,6 +64,9 @@ export interface RuntimeCliOptions {
   help?: boolean;
   bootstrap?: boolean;
   diagnoseSetup?: boolean;
+  listSetupDiagnosticReports?: boolean;
+  readSetupDiagnosticReport?: string;
+  setupReportLimit?: string;
   probeProviderEvolution?: boolean;
   listProviderEvolutionArtifacts?: boolean;
   readProviderEvolutionArtifact?: string;
@@ -175,6 +178,33 @@ export function parseRuntimeCliOptions(argv: string[]): RuntimeCliOptions {
 
     if (arg === '--diagnose-setup') {
       options.diagnoseSetup = true;
+      continue;
+    }
+
+    if (arg === '--list-setup-diagnostic-reports') {
+      options.listSetupDiagnosticReports = true;
+      continue;
+    }
+
+    if (arg === '--read-setup-diagnostic-report') {
+      options.readSetupDiagnosticReport = readOptionValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--read-setup-diagnostic-report=')) {
+      options.readSetupDiagnosticReport = arg.slice('--read-setup-diagnostic-report='.length);
+      continue;
+    }
+
+    if (arg === '--setup-report-limit') {
+      options.setupReportLimit = readOptionValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--setup-report-limit=')) {
+      options.setupReportLimit = arg.slice('--setup-report-limit='.length);
       continue;
     }
 
@@ -657,6 +687,9 @@ export function getRuntimeHelpText(): string {
     'Options:',
     '  --bootstrap                            Force bootstrap/setup mode',
     '  --diagnose-setup                       Generate a setup diagnostic report and exit',
+    '  --list-setup-diagnostic-reports        List retained setup diagnostic reports and exit',
+    '  --read-setup-diagnostic-report <artifactId>',
+    '  --setup-report-limit <count>',
     '  --probe-provider-evolution             Run a manual provider-evolution probe and exit',
     '  --list-provider-evolution-artifacts    List retained provider-evolution probe artifacts and exit',
     '  --read-provider-evolution-artifact <artifactId>',

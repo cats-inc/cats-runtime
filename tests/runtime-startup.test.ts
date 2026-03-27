@@ -30,6 +30,10 @@ describe('runtime startup helpers', () => {
   it('parses startup CLI options including inline values', () => {
     expect(parseRuntimeCliOptions([
       '--diagnose-setup',
+      '--list-setup-diagnostic-reports',
+      '--read-setup-diagnostic-report=setup-report-1',
+      '--setup-report-limit',
+      '2',
       '--probe-provider-evolution',
       '--list-provider-evolution-artifacts',
       '--read-provider-evolution-artifact=artifact-1',
@@ -56,6 +60,9 @@ describe('runtime startup helpers', () => {
       'config/providers.yaml',
     ])).toEqual({
       diagnoseSetup: true,
+      listSetupDiagnosticReports: true,
+      readSetupDiagnosticReport: 'setup-report-1',
+      setupReportLimit: '2',
       probeProviderEvolution: true,
       listProviderEvolutionArtifacts: true,
       readProviderEvolutionArtifact: 'artifact-1',
@@ -274,6 +281,9 @@ describe('runtime startup helpers', () => {
     const help = getRuntimeHelpText();
     expect(help).toContain('Usage: cats-runtime [options]');
     expect(help).toContain('--diagnose-setup');
+    expect(help).toContain('--list-setup-diagnostic-reports');
+    expect(help).toContain('--read-setup-diagnostic-report <artifactId>');
+    expect(help).toContain('--setup-report-limit <count>');
     expect(help).toContain('--probe-provider-evolution');
     expect(help).toContain('--list-provider-evolution-artifacts');
     expect(help).toContain('--read-provider-evolution-artifact <artifactId>');

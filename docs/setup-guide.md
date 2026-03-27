@@ -53,6 +53,9 @@ Supported startup flags:
 
 - `--bootstrap` — force bootstrap/setup mode even with a valid config
 - `--diagnose-setup` — generate a setup diagnostic report and exit without starting the HTTP server
+- `--list-setup-diagnostic-reports` — list retained setup diagnostic reports and exit without starting the HTTP server
+- `--read-setup-diagnostic-report <artifactId>` — re-read one retained setup diagnostic report and exit
+- `--setup-report-limit <count>` — cap retained setup report listing output
 - `--probe-provider-evolution` — run a manual provider-evolution probe and exit without starting the HTTP server
 - `--probe-provider <provider>` — required with `--probe-provider-evolution`
 - `--probe-instance <instance>` — optional instance override for the selected provider
@@ -119,6 +122,8 @@ from the runtime entrypoint:
 ```powershell
 node dist/index.js --diagnose-setup
 node dist/index.js --diagnose-setup --refresh-setup-scan
+node dist/index.js --list-setup-diagnostic-reports --setup-report-limit 5
+node dist/index.js --read-setup-diagnostic-report setup-report-20260327T010203000Z
 ```
 
 The CLI path writes the same redacted artifact under `<dataDir>/diagnostics/`
@@ -126,6 +131,16 @@ and prints a concise operator summary to stderr plus the machine-readable JSON
 payload to stdout with `status`, `artifactPath`, and `report`. Use this path
 when port conflicts or other startup failures make the running HTTP action
 unavailable.
+
+The same manual CLI seam can now inspect retained setup-report history without
+starting the HTTP server:
+
+- `--list-setup-diagnostic-reports` prints newest-first retained report
+  summaries to stdout JSON and a concise operator summary to stderr
+- `--read-setup-diagnostic-report <artifactId>` re-reads one retained report by
+  id and prints the full stored report JSON to stdout
+- `--setup-report-limit <count>` narrows the retained listing when operators
+  only want the latest few snapshots
 
 When you want to inspect provider event drift manually without opening any
 public HTTP surface, use the provider-evolution probe entrypoint:
