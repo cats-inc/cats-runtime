@@ -874,6 +874,17 @@ describe('provider diagnostics HTTP contract', () => {
               }),
             ]),
             config: expect.objectContaining({
+              apiRuntime: expect.objectContaining({
+                family: 'api_runtime',
+                transport: 'anthropic',
+                continuation: expect.objectContaining({
+                  strategy: 'runtime_transcript',
+                }),
+                caching: expect.objectContaining({
+                  strategy: 'prompt_cache',
+                  active: true,
+                }),
+              }),
               continuity: expect.objectContaining({
                 source: 'runtime_stateful',
                 providerManagedSessions: false,
@@ -978,6 +989,17 @@ describe('provider diagnostics HTTP contract', () => {
               }),
             ]),
             config: expect.objectContaining({
+              apiRuntime: expect.objectContaining({
+                family: 'api_runtime',
+                transport: 'ollama',
+                continuation: expect.objectContaining({
+                  strategy: 'runtime_transcript',
+                }),
+                caching: expect.objectContaining({
+                  strategy: 'keep_alive',
+                  active: false,
+                }),
+              }),
               continuity: expect.objectContaining({
                 source: 'runtime_stateful',
                 providerManagedSessions: false,

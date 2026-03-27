@@ -532,6 +532,10 @@ surface for hosts and dashboards. The response includes:
   runtime-managed local tools, provider-native CLI tools, or provider-managed
   agent tooling; API/local targets include the default runtime tool profile
   before any per-session permission narrowing
+- additive `config.apiRuntime` inspection metadata for API/local targets,
+  including runtime-managed continuation strategy, provider-specific
+  caching/warm-state posture, and whether provider-native hosted tools are
+  still deferred versus available only through runtime-local execution
 - additive `config.continuity` summaries describing whether the resolved
   target is `runtime_stateful`, `provider_native`, or `provider_managed`, plus
   bounded resume/fork/permission and remote-session affordance truth
@@ -2808,6 +2812,22 @@ Each instance entry also exposes additive `tooling` metadata:
 - `policy`: for API/local targets only, the bounded runtime tool-profile
   inspection (`profile`, counts, and per-tool access classification) before any
   session-level permission narrowing
+
+API/local instances also expose additive `apiRuntime` inspection metadata. This
+is a bounded operator/read-model surface, not a new execution contract. The
+object includes:
+
+- `family: "api_runtime"`
+- resolved `transport`
+- `continuation` strategy/summary describing whether the runtime uses canonical
+  transcript replay or a provider-specific optimization such as OpenAI
+  `previous_response_id`
+- `caching` strategy/summary describing provider-native cache/warm-state hints
+  such as Anthropic prompt caching, Gemini cached-content reuse, or Ollama
+  `keep_alive`
+- `providerNativeTools` state/summary describing whether hosted provider tools
+  remain deferred or whether the target stays runtime-local-only for tool
+  execution
 
 Each instance entry also exposes additive `continuity` metadata:
 

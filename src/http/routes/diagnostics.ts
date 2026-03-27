@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { BackendKind, RemoteProviderInstanceConfig } from '../../backends/cli/config.js';
 import { inspectAgentTarget } from '../../backends/agent/inspection.js';
 import { buildApiRuntimeExecutionStrategyCatalog } from '../../backends/api/runtime/strategies/catalog.js';
+import { inspectApiTarget } from '../../backends/api/inspection.js';
 import {
   getRuntimeListenerConfig,
   getRuntimeResolvedPaths,
@@ -860,10 +861,12 @@ async function diagnoseRemoteConfigOnly(
     || instance.transport === 'google'
     || instance.transport === 'gemini';
   const apiKey = buildEnvDescriptor(env, instance.apiKeyEnv, requiresApiKey);
+  const apiRuntime = inspectApiTarget(target);
   const config: Record<string, unknown> = {
     transport: instance.transport,
     model: instance.model || null,
     endpoint,
+    ...(apiRuntime ? { apiRuntime } : {}),
     continuity: buildProviderContinuitySummary(target, {
       capabilities: ctx.apiBackend?.getCapabilities() || {
         resume: true,

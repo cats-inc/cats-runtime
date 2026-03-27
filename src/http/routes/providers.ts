@@ -8,6 +8,7 @@ import {
 import { inspectProviderActiveConfig } from '../../core/providerActiveConfig.js';
 import type { ProviderName } from '../../backends/cli/providers/types.js';
 import { inspectAgentTarget } from '../../backends/agent/inspection.js';
+import { inspectApiTarget } from '../../backends/api/inspection.js';
 import { buildProviderInstallCatalogView } from '../../core/provider-install/knowledge.js';
 import {
   createCompatibilityEvidenceService,
@@ -108,6 +109,7 @@ providerRoutes.get('/providers/config', async (c) => {
           instance: instance.instanceId,
           backend: instance.backend,
         });
+        const apiRuntime = inspectApiTarget(instance);
 
         return {
           ...(instance.backend === 'cli' && instance.cliInstance
@@ -124,6 +126,7 @@ providerRoutes.get('/providers/config', async (c) => {
           runtime: instance.cliInstance?.commandConfig.runtime,
           transport: instance.remoteInstance?.transport,
           model: instance.remoteInstance?.model,
+          ...(apiRuntime ? { apiRuntime } : {}),
           ...(agentRuntime ? { agentRuntime } : {}),
           continuity,
           metering: metering.summary,

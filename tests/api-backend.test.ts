@@ -138,6 +138,20 @@ describe('API backend integration', () => {
                 backend: 'api',
                 transport: 'anthropic',
                 model: 'claude-sonnet-4-6',
+                apiRuntime: expect.objectContaining({
+                  family: 'api_runtime',
+                  transport: 'anthropic',
+                  continuation: expect.objectContaining({
+                    strategy: 'runtime_transcript',
+                  }),
+                  caching: expect.objectContaining({
+                    strategy: 'prompt_cache',
+                    active: true,
+                  }),
+                  providerNativeTools: expect.objectContaining({
+                    state: 'deferred',
+                  }),
+                }),
                 continuity: {
                   source: 'runtime_stateful',
                   summary: expect.stringContaining('cats-runtime owns the host-visible session lifecycle'),
@@ -248,6 +262,17 @@ describe('API backend integration', () => {
                 backend: 'api',
                 transport: 'openai',
                 model: 'gpt-5',
+                apiRuntime: expect.objectContaining({
+                  family: 'api_runtime',
+                  transport: 'openai',
+                  continuation: expect.objectContaining({
+                    strategy: 'previous_response_id',
+                  }),
+                  caching: expect.objectContaining({
+                    strategy: 'none',
+                    active: false,
+                  }),
+                }),
                 continuity: {
                   source: 'runtime_stateful',
                   summary: expect.stringContaining('cats-runtime owns the host-visible session lifecycle'),
@@ -306,6 +331,18 @@ describe('API backend integration', () => {
                 backend: 'api',
                 transport: 'google',
                 model: 'gemini-2.5-pro',
+                apiRuntime: expect.objectContaining({
+                  family: 'api_runtime',
+                  transport: 'google',
+                  continuation: expect.objectContaining({
+                    strategy: 'runtime_transcript',
+                  }),
+                  caching: expect.objectContaining({
+                    strategy: 'cached_content',
+                    active: true,
+                    ttl: '3600s',
+                  }),
+                }),
                 continuity: {
                   source: 'runtime_stateful',
                   summary: expect.stringContaining('cats-runtime owns the host-visible session lifecycle'),
@@ -364,6 +401,20 @@ describe('API backend integration', () => {
                 backend: 'local',
                 transport: 'ollama',
                 model: 'qwen3:latest',
+                apiRuntime: expect.objectContaining({
+                  family: 'api_runtime',
+                  transport: 'ollama',
+                  continuation: expect.objectContaining({
+                    strategy: 'runtime_transcript',
+                  }),
+                  caching: expect.objectContaining({
+                    strategy: 'keep_alive',
+                    active: false,
+                  }),
+                  providerNativeTools: expect.objectContaining({
+                    state: 'runtime_local_only',
+                  }),
+                }),
                 continuity: {
                   source: 'runtime_stateful',
                   summary: expect.stringContaining('cats-runtime owns the host-visible session lifecycle'),

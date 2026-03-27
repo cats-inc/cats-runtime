@@ -401,8 +401,10 @@ capable than a pure history-replay MVP.
 
 ### Phase 5: Dashboard, Docs, and Verification
 
-- [ ] Extend `GET /providers/config` so the dashboard can display backend kind,
-      transport, and default model for each instance.
+- [x] Extend `GET /providers/config` so the dashboard can display backend kind,
+      transport, and default model for each instance, now including additive
+      `apiRuntime`, `continuity`, `tooling`, `metering`, and bounded
+      `modelCatalog` inspection metadata for API/local targets.
 - [ ] Consider an additive `GET /ollama/models` endpoint or fold model listing
       into provider metadata for local-model selection.
 - [ ] Update setup, API, architecture, and security docs.
@@ -543,6 +545,7 @@ The phase ordering above is based on the current vendor API surfaces reviewed on
 | 2026-03-16 | Plan created for the `src/backends/api` delivery track covering Claude, Codex, Gemini, and Ollama execution |
 | 2026-03-16 | Phase 1 through the first half of Phase 3 landed: backend-neutral runtime seam, split CLI/API/local provider topology, API/local session lifecycle, Anthropic/OpenAI/Gemini/Ollama transports, and the first shared local tool runtime (`list_files`, `read_file`, `write_file`, `grep`, `run_shell`) |
 | 2026-03-26 | Major follow-through slices landed: provider-native continuation/caching optimizations, dynamic remote model discovery, runtime-owned tool-loop hardening, additive strategy substrate adoption for API/local execution, richer provider/tooling diagnostics, and bounded live auth/model/tool probes; remaining work is now concentrated in deeper semantic validation and later provider-specific follow-ons |
+| 2026-03-27 | Shared read-model follow-through landed: `/providers/config` and `/diagnostics/providers` now expose additive `apiRuntime` inspection metadata so hosts can inspect continuation, cache/warm-state, and provider-native-tool posture for API/local targets without inferring that state from transport names alone |
 
 ---
 
