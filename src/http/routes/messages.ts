@@ -10,7 +10,15 @@ import {
 import type { SessionInfo, SessionInvocationContext, TurnInput } from '../../backends/cli/pool/types.js';
 import type { SessionRegistry } from '../../backends/cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig } from '../../backends/cli/config.js';
-import type { StreamEvent } from '../../core/types.js';
+import type {
+  ErrorStreamEvent,
+  InitStreamEvent,
+  ResultStreamEvent,
+  StreamEvent,
+  TextStreamEvent,
+  ToolResultStreamEvent,
+  ToolUseStreamEvent,
+} from '../../core/types.js';
 import { hydrateSessionState } from '../../core/hydration/sessionHydration.js';
 import { ManagedExecutionHandle } from '../../core/runtime/ManagedExecutionHandle.js';
 import { buildRuntimeExecutionStrategySessionPatch } from '../../core/runtime/strategies/state.js';
@@ -69,6 +77,42 @@ function getOrCreateSourcePath(
 }
 
 export const messageRoutes = new Hono();
+
+function isSessionIdentityEvent(
+  event: StreamEvent,
+): event is InitStreamEvent | ResultStreamEvent {
+  return event.type === 'init' || event.type === 'result';
+}
+
+function isTextStreamEvent(
+  event: StreamEvent,
+): event is TextStreamEvent {
+  return event.type === 'text';
+}
+
+function isToolUseStreamEvent(
+  event: StreamEvent,
+): event is ToolUseStreamEvent {
+  return event.type === 'tool_use';
+}
+
+function isToolResultStreamEvent(
+  event: StreamEvent,
+): event is ToolResultStreamEvent {
+  return event.type === 'tool_result';
+}
+
+function isResultStreamEvent(
+  event: StreamEvent,
+): event is ResultStreamEvent {
+  return event.type === 'result';
+}
+
+function isErrorStreamEvent(
+  event: StreamEvent,
+): event is ErrorStreamEvent {
+  return event.type === 'error';
+}
 
 function flushAssistantText(
   sourcePath: string | null,
@@ -282,7 +326,7 @@ function applyObservedEventToSession(
 ): void {
   if (
     !options.peerRouted
-    && (observedEvent.type === 'init' || observedEvent.type === 'result')
+    && isSessionIdentityEvent(observedEvent)
     && (observedEvent.providerSessionId || observedEvent.sessionId)
   ) {
     ctx.registry.setProviderSessionId(
@@ -605,11 +649,11 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
               peerRouted,
             });
 
-            if (observedEvent.type === 'text') {
-              assistantText += observedEvent.text ?? '';
+            if (isTextStreamEvent(observedEvent)) {
+              assistantText += observedEvent.text;
             }
 
-            if (observedEvent.type === 'tool_use' && historyState.sourcePath) {
+            if (isToolUseStreamEvent(observedEvent) && historyState.sourcePath) {
               assistantText = flushAssistantText(historyState.sourcePath, assistantText);
               appendHistory(historyState.sourcePath, {
                 type: 'tool_use',
@@ -620,7 +664,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
               });
             }
 
-            if (observedEvent.type === 'tool_result' && historyState.sourcePath) {
+            if (isToolResultStreamEvent(observedEvent) && historyState.sourcePath) {
               appendHistory(historyState.sourcePath, {
                 type: 'tool_result',
                 toolId: observedEvent.toolId,
@@ -631,7 +675,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
               });
             }
 
-            if (observedEvent.type === 'result') {
+            if (isResultStreamEvent(observedEvent)) {
               completed = true;
               assistantText = flushAssistantText(historyState.sourcePath, assistantText);
               ctx.registry.recordMessage(
@@ -642,7 +686,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
               restoreReadyIfSessionStillInteractive(ctx.registry, id);
             }
 
-            if (observedEvent.type === 'error') {
+            if (isErrorStreamEvent(observedEvent)) {
               completed = true;
               assistantText = flushAssistantText(historyState.sourcePath, assistantText);
               restoreReadyIfSessionStillInteractive(ctx.registry, id);
@@ -658,7 +702,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
           const errorEvent = metering.observeEvent(executionSession, {
             type: 'error',
             text: String(err),
-          }, { turnStartedAt });
+          } satisfies ErrorStreamEvent, { turnStartedAt });
           runtime.observeEvent(id, errorEvent);
           assistantText = flushAssistantText(historyState.sourcePath, assistantText);
           controller.enqueue(
@@ -720,11 +764,11 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
           peerRouted,
         });
 
-        if (observedEvent.type === 'text') {
-          assistantText += observedEvent.text ?? '';
+        if (isTextStreamEvent(observedEvent)) {
+          assistantText += observedEvent.text;
         }
 
-        if (observedEvent.type === 'tool_use' && sseHistoryState.sourcePath) {
+        if (isToolUseStreamEvent(observedEvent) && sseHistoryState.sourcePath) {
           assistantText = flushAssistantText(sseHistoryState.sourcePath, assistantText);
           appendHistory(sseHistoryState.sourcePath, {
             type: 'tool_use',
@@ -735,7 +779,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
           });
         }
 
-        if (observedEvent.type === 'tool_result' && sseHistoryState.sourcePath) {
+        if (isToolResultStreamEvent(observedEvent) && sseHistoryState.sourcePath) {
           appendHistory(sseHistoryState.sourcePath, {
             type: 'tool_result',
             toolId: observedEvent.toolId,
@@ -746,7 +790,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
           });
         }
 
-        if (observedEvent.type === 'result') {
+        if (isResultStreamEvent(observedEvent)) {
           completed = true;
           assistantText = flushAssistantText(sseHistoryState.sourcePath, assistantText);
           ctx.registry.recordMessage(
@@ -757,7 +801,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
           restoreReadyIfSessionStillInteractive(ctx.registry, id);
         }
 
-        if (observedEvent.type === 'error') {
+        if (isErrorStreamEvent(observedEvent)) {
           completed = true;
           assistantText = flushAssistantText(sseHistoryState.sourcePath, assistantText);
           restoreReadyIfSessionStillInteractive(ctx.registry, id);
@@ -774,7 +818,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
       const errorEvent = metering.observeEvent(executionSession, {
         type: 'error',
         text: String(err),
-      }, { turnStartedAt });
+      } satisfies ErrorStreamEvent, { turnStartedAt });
       runtime.observeEvent(id, errorEvent);
       await stream.writeSSE({
         data: JSON.stringify(errorEvent),

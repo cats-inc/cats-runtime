@@ -189,7 +189,7 @@ on a bag-of-optionals shape.
 
 ### Phase 3: Harden Core Consumers
 
-- [ ] Update `src/http/routes/messages.ts` so event handling benefits from
+- [x] Update `src/http/routes/messages.ts` so event handling benefits from
       narrowing in the main streaming path
 - [x] Update `src/backends/cli/pool/WorkerProcess.ts` and
       `src/backends/cli/providers/junie.ts` where event-type branching is
@@ -275,6 +275,7 @@ documented residual debt list.
 | 2026-03-27 | Tightened API/local runtime producers so `ApiBackendManager`, `ApiStrategyExecutionContext`, and the shared runtime progress helper now emit exact discriminated members for `error`, `progress`, `init`, `text`, `tool_use`, `tool_result`, and `result` while preserving the existing SSE/NDJSON payload shape. |
 | 2026-03-27 | Tightened rich CLI providers and the Junie parser so Claude, Gemini, Cursor, Copilot, and Junie tool/event builders now emit exact `raw`, `init`, `text`, `tool_use`, `tool_result`, `progress`, `result`, and `error` variants instead of relying on loose bag-of-optionals event literals. |
 | 2026-03-27 | Hardened the first dense CLI-side consumers so `WorkerProcess` and the live `JunieProvider` loop now use narrowing-friendly helpers for session-identity and terminal-event handling while keeping the streaming behavior unchanged. |
+| 2026-03-27 | Hardened the main HTTP message streaming path so `src/http/routes/messages.ts` now narrows `text`, `tool_use`, `tool_result`, `result`, `error`, and session-identity events through local helpers across both NDJSON and SSE flows without changing any wire payloads. |
 
 ---
 
