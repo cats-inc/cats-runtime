@@ -644,6 +644,9 @@ tightening and cleanup steps are intentionally deferred.
 - that v1 route now also prefers a stale cached dynamic catalog, marked with
   additive `cache.stale: true`, when a later refresh fails after the TTL
   window instead of immediately dropping to config/static fallback
+- that same v1 surface now also accepts additive `refresh=1|true` query
+  semantics so hosts can manually bypass a still-fresh catalog cache after
+  model/runtime changes without waiting for the TTL window
 - `GET /providers/:provider/models/advanced` exists as the additive advanced
   catalog surface
 - session create/read contracts now support additive `modelSelection` and

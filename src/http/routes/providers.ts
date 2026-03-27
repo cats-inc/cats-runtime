@@ -32,6 +32,26 @@ import { getRouteErrorStatus } from '../routeErrors.js';
 
 export const providerRoutes = new Hono();
 
+class ProviderCatalogQueryError extends Error {}
+
+function parseModelCatalogRefreshQuery(value: string | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === '1' || normalized === 'true' || normalized === 'refresh' || normalized === 'force') {
+    return true;
+  }
+  if (normalized === '0' || normalized === 'false') {
+    return false;
+  }
+
+  throw new ProviderCatalogQueryError(
+    `Invalid refresh query value '${value}'. Use true/false or 1/0.`,
+  );
+}
+
 providerRoutes.get('/providers/config', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const providerCatalog = listProviderCatalog(ctx.config);
@@ -161,12 +181,18 @@ providerRoutes.get('/providers/:provider/models', async (c) => {
   const instance = c.req.query('instance') || undefined;
 
   try {
-    const catalog = await ctx.providerModelCatalog.getCatalog(providerName, instance);
+    const forceRefresh = parseModelCatalogRefreshQuery(c.req.query('refresh'));
+    const catalog = await ctx.providerModelCatalog.getCatalog(providerName, instance, {
+      forceRefresh,
+    });
     return c.json(catalog);
   } catch (err) {
     const payload: Record<string, unknown> = {
       error: `Failed to inspect provider models: ${err}`,
     };
+    if (err instanceof ProviderCatalogQueryError) {
+      return c.json({ error: err.message }, 400);
+    }
     if (isProviderTargetResolutionError(err)) {
       payload.code = err.code;
     }
@@ -239,12 +265,18 @@ providerRoutes.get('/providers/:provider/models/advanced', async (c) => {
   const instance = c.req.query('instance') || undefined;
 
   try {
-    const catalog = await ctx.providerModelCatalog.getAdvancedCatalog(providerName, instance);
+    const forceRefresh = parseModelCatalogRefreshQuery(c.req.query('refresh'));
+    const catalog = await ctx.providerModelCatalog.getAdvancedCatalog(providerName, instance, {
+      forceRefresh,
+    });
     return c.json(catalog);
   } catch (err) {
     const payload: Record<string, unknown> = {
       error: `Failed to inspect advanced provider models: ${err}`,
     };
+    if (err instanceof ProviderCatalogQueryError) {
+      return c.json({ error: err.message }, 400);
+    }
     if (isProviderTargetResolutionError(err)) {
       payload.code = err.code;
     }

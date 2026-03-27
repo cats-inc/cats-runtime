@@ -285,6 +285,55 @@ describe('ProviderModelCatalogService', () => {
     }
   });
 
+  it('bypasses a fresh dynamic cache when forceRefresh is requested', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.endsWith('/api/tags')) {
+        return jsonResponse({
+          models: [
+            { name: fetchMock.mock.calls.length <= 1 ? 'deepseek-r1:14b' : 'qwen2.5-coder:7b' },
+          ],
+        });
+      }
+
+      if (url.endsWith('/api/ps')) {
+        return jsonResponse({ models: [] });
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    const service = new ProviderModelCatalogService(createCatalogConfig() as never, {
+      fetch: fetchMock,
+      ttlMs: 60_000,
+    });
+
+    const first = await service.getCatalog('ollama');
+    expect(first.source).toBe('dynamic');
+    expect(first.cache).toEqual(expect.objectContaining({
+      servedFromCache: false,
+    }));
+    expect(first.models).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'deepseek-r1:14b',
+      }),
+    ]));
+
+    const refreshed = await service.getCatalog('ollama', undefined, {
+      forceRefresh: true,
+    });
+    expect(refreshed.source).toBe('dynamic');
+    expect(refreshed.cache).toEqual(expect.objectContaining({
+      servedFromCache: false,
+    }));
+    expect(refreshed.models).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'qwen2.5-coder:7b',
+      }),
+    ]));
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
   it('uses runtime-owned Goose config as the default-model hint for CLI catalogs', async () => {
     const { env, cleanup } = createGooseConfigRoot([
       'GOOSE_PROVIDER: anthropic',

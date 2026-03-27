@@ -2913,8 +2913,9 @@ but it gives hosts and playgrounds a runtime-owned hint about the provider's
 current local default selection without reviving a sample-only shim route.
 
 `GET /providers/{provider}/models` is the runtime-owned per-provider model
-catalog route. It accepts optional `?instance=<instance-id>` and returns a
-structured catalog:
+catalog route. It accepts optional `?instance=<instance-id>` plus additive
+`?refresh=1|true` cache-bypass semantics for manual re-read after model or
+auth changes, and returns a structured catalog:
 
 ```json
 {
@@ -2958,6 +2959,9 @@ Catalog semantics:
   previously discovered dynamic catalog, the refresh attempt failed after the
   TTL window, and the route deliberately served the retained dynamic snapshot
   instead of dropping straight to `config` or `static`.
+- `refresh=1|true|refresh|force` bypasses a still-fresh dynamic cache and
+  forces the runtime to attempt a new dynamic discovery round for the selected
+  target. Invalid refresh values return HTTP `400`.
 - `warnings` stays empty on clean discovery, and becomes additive when the
   runtime had to degrade gracefully. For example, dynamic discovery may still
   return `source: dynamic` with warnings if a secondary probe such as Ollama's
@@ -2976,6 +2980,11 @@ Catalog semantics:
   `available` for dynamically discovered but not currently warm models, and
   `configured` when the runtime injected the configured default into the result
   because discovery did not report it.
+
+`GET /providers/{provider}/models/advanced` accepts the same additive
+`?instance=<instance-id>&refresh=1` query semantics and reuses the same
+underlying catalog refresh behavior before layering advanced selection/control
+metadata on top.
 
 Error semantics:
 

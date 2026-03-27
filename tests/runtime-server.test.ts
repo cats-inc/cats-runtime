@@ -3969,6 +3969,87 @@ providers:
     }
   });
 
+  it('GET /providers/:provider/models refreshes a cached dynamic catalog when requested', async () => {
+    let revision = 0;
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+
+      if (url.endsWith('/api/tags')) {
+        return new Response(JSON.stringify({
+          models: [
+            { name: revision === 0 ? 'deepseek-r1:14b' : 'qwen2.5-coder:7b' },
+          ],
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
+      if (url.endsWith('/api/ps')) {
+        return new Response(JSON.stringify({ models: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    await withRuntime({
+      providerDefaultTargets: {
+        ollama: { backend: 'local', instance: 'local' },
+      },
+      remoteProviderCatalog: {
+        api: {},
+        local: {
+          ollama: {
+            local: {
+              id: 'local',
+              providerName: 'ollama',
+              backend: 'local',
+              transport: 'ollama',
+              baseUrl: 'http://127.0.0.1:11434',
+              model: 'qwen2.5-coder:7b',
+            },
+          },
+        },
+        agent: {},
+      },
+    }, { apiBackend: { fetch: fetchMock } }, async (runtime) => {
+      const first = await runtime.app.request('/providers/ollama/models');
+      expect(first.status).toBe(200);
+      await expect(first.json()).resolves.toEqual(expect.objectContaining({
+        source: 'dynamic',
+        cache: expect.objectContaining({
+          servedFromCache: false,
+        }),
+        models: expect.arrayContaining([
+          expect.objectContaining({
+            id: 'deepseek-r1:14b',
+          }),
+        ]),
+      }));
+
+      revision = 1;
+
+      const refreshed = await runtime.app.request('/providers/ollama/models?refresh=1');
+      expect(refreshed.status).toBe(200);
+      await expect(refreshed.json()).resolves.toEqual(expect.objectContaining({
+        source: 'dynamic',
+        cache: expect.objectContaining({
+          servedFromCache: false,
+        }),
+        models: expect.arrayContaining([
+          expect.objectContaining({
+            id: 'qwen2.5-coder:7b',
+            default: true,
+          }),
+        ]),
+      }));
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+    });
+  });
+
   it('GET /providers/:provider/models returns 400 for unknown providers', async () => {
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/providers/missing/models');
@@ -3987,6 +4068,16 @@ providers:
       expect(await response.json()).toEqual({
         error: "Failed to inspect provider models: Error: Unknown codex target 'api/missing'. Valid: cli/default",
         code: 'unknown_target',
+      });
+    });
+  });
+
+  it('GET /providers/:provider/models returns 400 for invalid refresh query values', async () => {
+    await withRuntime({}, {}, async (runtime) => {
+      const response = await runtime.app.request('/providers/codex/models?refresh=maybe');
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: "Invalid refresh query value 'maybe'. Use true/false or 1/0.",
       });
     });
   });

@@ -62,6 +62,10 @@ interface ProviderModelCatalogServiceOptions {
   remoteDiscoveryTimeoutMs?: number;
 }
 
+interface ProviderModelCatalogRequestOptions {
+  forceRefresh?: boolean;
+}
+
 interface CachedDynamicModels {
   cachedAt: number;
   models: ProviderModelCatalogEntry[];
@@ -344,40 +348,45 @@ export class ProviderModelCatalogService {
   async getCatalog(
     providerName: string,
     requestedInstance?: string,
+    options: ProviderModelCatalogRequestOptions = {},
   ): Promise<ProviderModelCatalogResult> {
     const target = resolveProviderTarget(this.config, providerName, requestedInstance);
-    return this.getCatalogForTarget(target);
+    return this.getCatalogForTarget(target, options);
   }
 
   async getAdvancedKnowledge(
     providerName: string,
     requestedInstance?: string,
+    options: ProviderModelCatalogRequestOptions = {},
   ): Promise<ProviderAdvancedKnowledgeContext> {
     const target = resolveProviderTarget(this.config, providerName, requestedInstance);
-    return this.getAdvancedKnowledgeForTarget(target);
+    return this.getAdvancedKnowledgeForTarget(target, options);
   }
 
   async getAdvancedKnowledgeForTarget(
     target: ProviderTargetDescriptor,
+    options: ProviderModelCatalogRequestOptions = {},
   ): Promise<ProviderAdvancedKnowledgeContext> {
-    const catalog = await this.getCatalogForTarget(target);
+    const catalog = await this.getCatalogForTarget(target, options);
     return buildProviderAdvancedKnowledge(target, catalog);
   }
 
   async getAdvancedCatalog(
     providerName: string,
     requestedInstance?: string,
+    options: ProviderModelCatalogRequestOptions = {},
   ) {
-    const knowledge = await this.getAdvancedKnowledge(providerName, requestedInstance);
+    const knowledge = await this.getAdvancedKnowledge(providerName, requestedInstance, options);
     return knowledge.catalog;
   }
 
   private async getCatalogForTarget(
     target: ProviderTargetDescriptor,
+    options: ProviderModelCatalogRequestOptions = {},
   ): Promise<ProviderModelCatalogResult> {
     const defaultModel = resolveDefaultModel(target, this.env);
     const warnings: string[] = [];
-    const dynamic = await this.tryDynamicCatalog(target, defaultModel, warnings);
+    const dynamic = await this.tryDynamicCatalog(target, defaultModel, warnings, options);
     if (dynamic) {
       return dynamic;
     }
@@ -398,11 +407,12 @@ export class ProviderModelCatalogService {
     target: ProviderTargetDescriptor,
     defaultModel: string | null,
     warnings: string[],
+    options: ProviderModelCatalogRequestOptions = {},
   ): Promise<ProviderModelCatalogResult | null> {
     const key = this.cacheKey(target);
     const cached = this.dynamicCache.get(key);
     const now = Date.now();
-    if (cached && now - cached.cachedAt < this.ttlMs) {
+    if (!options.forceRefresh && cached && now - cached.cachedAt < this.ttlMs) {
       return this.buildCatalog(target, {
         defaultModel,
         source: 'dynamic',
