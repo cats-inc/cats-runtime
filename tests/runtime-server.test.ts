@@ -499,6 +499,28 @@ describe('runtime server', () => {
                 sweepIntervalMs: 60000,
                 retainedTtlMs: 86400000,
               },
+              retained: {
+                totalSessions: 0,
+                attachedSessions: 0,
+                cleanupEligibleSessions: 0,
+                expiredSessions: 0,
+                sampleLimit: 25,
+                omittedSessionCount: 0,
+                sampleSessionIds: [],
+                expiredSampleSessionIds: [],
+                policyCounts: {
+                  discard: 0,
+                  merge: 0,
+                  preserve: 0,
+                },
+                reasonCodeCounts: {
+                  sourceWorkspaceDirty: 0,
+                  worktreeDetachFailed: 0,
+                  worktreePreserved: 0,
+                  other: 0,
+                },
+                sessions: [],
+              },
             },
             browser: {
               policy: {
@@ -683,6 +705,39 @@ describe('runtime server', () => {
       runtime.context.registry.flush();
       expect(runtime.context.registry.get(session.id)).toBeDefined();
       expect(existsSync(prepared.workspaceIsolation.worktree!.worktreePath)).toBe(true);
+
+      const diagnosticsBeforeSweep = await runtime.app.request('/diagnostics/runtime');
+      expect(diagnosticsBeforeSweep.status).toBe(200);
+      expect((await diagnosticsBeforeSweep.json()).runtime.maintenance.worktrees.retained)
+        .toEqual(expect.objectContaining({
+          totalSessions: 1,
+          attachedSessions: 0,
+          cleanupEligibleSessions: 1,
+          expiredSessions: 1,
+          sampleSessionIds: ['runtime-server-worktree-gc'],
+          expiredSampleSessionIds: ['runtime-server-worktree-gc'],
+          policyCounts: {
+            discard: 0,
+            merge: 0,
+            preserve: 1,
+          },
+          reasonCodeCounts: {
+            sourceWorkspaceDirty: 0,
+            worktreeDetachFailed: 0,
+            worktreePreserved: 1,
+            other: 0,
+          },
+          sessions: [
+            expect.objectContaining({
+              sessionId: 'runtime-server-worktree-gc',
+              attached: false,
+              cleanupEligible: true,
+              policy: 'preserve',
+              expired: true,
+              reasonCodes: ['worktree_preserved'],
+            }),
+          ],
+        }));
 
       const sweep = await runtime.context.worktreeMaintenance?.sweep();
       expect(sweep).toEqual(expect.objectContaining({

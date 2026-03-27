@@ -2,10 +2,12 @@ import { readdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import type { SessionRegistry } from '../../backends/cli/pool/SessionRegistry.js';
 import type { RuntimeSessionManager } from '../runtime/RuntimeSessionManager.js';
+import type { SessionInfo, WorktreeCleanupPolicy } from '../types.js';
 import { cleanupOrphanedWorktree } from './sessionWorkspace.js';
 
 const DEFAULT_WORKTREE_SWEEP_INTERVAL_MS = 60_000;
 const DEFAULT_RETAINED_WORKTREE_TTL_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_RETAINED_WORKTREE_SAMPLE_LIMIT = 25;
 
 export interface RuntimeWorktreeMaintenanceSweepResult {
   observedAt: string;
@@ -28,7 +30,40 @@ export interface RuntimeWorktreeMaintenanceSnapshot {
     sweepIntervalMs: number;
     retainedTtlMs: number;
   };
+  retained: RuntimeWorktreeRetainedSummarySnapshot;
   lastSweep?: RuntimeWorktreeMaintenanceSweepResult;
+}
+
+export interface RuntimeWorktreeRetainedSessionSnapshot {
+  sessionId: string;
+  attached: boolean;
+  cleanupEligible: boolean;
+  policy: WorktreeCleanupPolicy;
+  observedAt: string;
+  ageMs?: number;
+  expired: boolean;
+  reasonCodes: string[];
+}
+
+export interface RuntimeWorktreeRetainedSummarySnapshot {
+  totalSessions: number;
+  attachedSessions: number;
+  cleanupEligibleSessions: number;
+  expiredSessions: number;
+  sampleLimit: number;
+  omittedSessionCount: number;
+  sampleSessionIds: string[];
+  expiredSampleSessionIds: string[];
+  oldestObservedAt?: string;
+  newestObservedAt?: string;
+  policyCounts: Record<WorktreeCleanupPolicy, number>;
+  reasonCodeCounts: {
+    sourceWorkspaceDirty: number;
+    worktreeDetachFailed: number;
+    worktreePreserved: number;
+    other: number;
+  };
+  sessions: RuntimeWorktreeRetainedSessionSnapshot[];
 }
 
 export interface RuntimeWorktreeMaintenanceServiceOptions {
@@ -82,6 +117,7 @@ export class RuntimeWorktreeMaintenanceService {
         sweepIntervalMs: this.sweepIntervalMs,
         retainedTtlMs: this.retainedTtlMs,
       },
+      retained: this.buildRetainedSummarySnapshot(),
       ...(this.lastSweep ? { lastSweep: cloneSweepResult(this.lastSweep) } : {}),
     };
   }
@@ -189,6 +225,87 @@ export class RuntimeWorktreeMaintenanceService {
     }
   }
 
+  private buildRetainedSummarySnapshot(): RuntimeWorktreeRetainedSummarySnapshot {
+    const retainedSessions = this.options.registry.list()
+      .filter((session) => isRetainedWorktreeSession(session))
+      .sort((left, right) => left.id.localeCompare(right.id));
+    const nowMs = this.now().getTime();
+    const policyCounts: Record<WorktreeCleanupPolicy, number> = {
+      discard: 0,
+      merge: 0,
+      preserve: 0,
+    };
+    const reasonCodeCounts: RuntimeWorktreeRetainedSummarySnapshot['reasonCodeCounts'] = {
+      sourceWorkspaceDirty: 0,
+      worktreeDetachFailed: 0,
+      worktreePreserved: 0,
+      other: 0,
+    };
+    const entries = retainedSessions.map((session) => {
+      const lastCleanup = session.workspaceIsolation!.worktree!.lastCleanup!;
+      const observedAtMs = Date.parse(lastCleanup.observedAt);
+      const expired = Number.isFinite(observedAtMs) && nowMs - observedAtMs >= this.retainedTtlMs;
+      const attached = this.options.runtime.isAttached(session.id);
+      const hasKnownReason = lastCleanup.reasonCodes.some((code) => {
+        if (code === 'source_workspace_dirty') {
+          reasonCodeCounts.sourceWorkspaceDirty += 1;
+          return true;
+        }
+        if (code === 'worktree_detach_failed') {
+          reasonCodeCounts.worktreeDetachFailed += 1;
+          return true;
+        }
+        if (code === 'worktree_preserved') {
+          reasonCodeCounts.worktreePreserved += 1;
+          return true;
+        }
+        return false;
+      });
+      if (!hasKnownReason) {
+        reasonCodeCounts.other += 1;
+      }
+      policyCounts[lastCleanup.policy] += 1;
+
+      return {
+        sessionId: session.id,
+        attached,
+        cleanupEligible: !attached,
+        policy: lastCleanup.policy,
+        observedAt: lastCleanup.observedAt,
+        ...(Number.isFinite(observedAtMs) ? { ageMs: Math.max(0, nowMs - observedAtMs) } : {}),
+        expired,
+        reasonCodes: [...lastCleanup.reasonCodes],
+      } satisfies RuntimeWorktreeRetainedSessionSnapshot;
+    });
+    const sample = entries.slice(0, DEFAULT_RETAINED_WORKTREE_SAMPLE_LIMIT);
+    const expiredSampleSessionIds = sample
+      .filter((entry) => entry.expired)
+      .map((entry) => entry.sessionId);
+    const observedAts = entries
+      .map((entry) => entry.observedAt)
+      .filter((value) => value.length > 0)
+      .sort();
+
+    return {
+      totalSessions: entries.length,
+      attachedSessions: entries.filter((entry) => entry.attached).length,
+      cleanupEligibleSessions: entries.filter((entry) => entry.cleanupEligible).length,
+      expiredSessions: entries.filter((entry) => entry.expired).length,
+      sampleLimit: DEFAULT_RETAINED_WORKTREE_SAMPLE_LIMIT,
+      omittedSessionCount: Math.max(0, entries.length - sample.length),
+      sampleSessionIds: sample.map((entry) => entry.sessionId),
+      expiredSampleSessionIds,
+      ...(observedAts[0] ? { oldestObservedAt: observedAts[0] } : {}),
+      ...(observedAts.length > 0 ? { newestObservedAt: observedAts[observedAts.length - 1] } : {}),
+      policyCounts,
+      reasonCodeCounts,
+      sessions: sample.map((entry) => ({
+        ...entry,
+        reasonCodes: [...entry.reasonCodes],
+      })),
+    };
+  }
+
   private async collectOrphanedWorktreePaths(
     trackedWorktrees: ReadonlyMap<string, string>,
   ): Promise<string[]> {
@@ -243,6 +360,12 @@ function cloneSweepResult(
     autoCleanedRetainedSessionIds: [...sweep.autoCleanedRetainedSessionIds],
     failedAutoCleanedRetainedSessionIds: [...sweep.failedAutoCleanedRetainedSessionIds],
   };
+}
+
+function isRetainedWorktreeSession(session: SessionInfo): boolean {
+  return session.status === 'closed'
+    && session.workspaceIsolation?.mode === 'worktree'
+    && session.workspaceIsolation.worktree?.lastCleanup?.status === 'retained';
 }
 
 function normalizePath(value: string): string {

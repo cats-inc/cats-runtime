@@ -478,6 +478,9 @@ src/
 - Provides shared orphan-worktree cleanup helpers plus background maintenance
   sweeps for abandoned worktrees and conservative TTL cleanup of expired
   preserved retained worktrees
+- Projects bounded current retained-worktree summary/counts into runtime
+  diagnostics so hosts can inspect cleanup backlog without scraping session
+  lists or waiting for the next sweeper pass
 
 ### `src/core/wakeup`
 

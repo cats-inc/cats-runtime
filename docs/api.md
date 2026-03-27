@@ -453,7 +453,9 @@ integrate against:
 - listener and local-state path resolution, including the compatibility
   evidence directory
 - runtime maintenance snapshots under `runtime.maintenance`, including:
-  - `worktrees`: orphan-sweep results plus retained-session TTL diagnostics
+  - `worktrees`: orphan-sweep results plus bounded current retained-worktree
+    summaries (counts, policy/reason-code breakdown, sampled session ids) and
+    retained-session TTL diagnostics from the last sweep
   - `browser`: browser cleanup policy plus the last sweep result, including
     background closed-session maintenance and explicit idle-ready cleanup support
 - runtime-wide `wakeups` diagnostics, including:

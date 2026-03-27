@@ -57,6 +57,92 @@ afterEach(() => {
 });
 
 describe('RuntimeWorktreeMaintenanceService', () => {
+  it('summarizes retained worktree sessions even before the next sweep', async () => {
+    const { repoDir, sessionBaseDir } = createGitWorkspace();
+    const registry = new SessionRegistry();
+    const prepared = await prepareSessionWorkspace({
+      sessionId: 'retained-summary-session',
+      sessionBaseDir,
+      cwd: repoDir,
+      workspaceMode: 'shared',
+      workspaceIsolationMode: 'worktree',
+      now: new Date('2026-03-22T00:00:00.000Z'),
+    });
+
+    registry.create({
+      id: 'retained-summary-session',
+      providerName: 'codex',
+      cwd: prepared.cwd,
+      workspaceMode: prepared.workspaceMode,
+      workspaceIsolation: {
+        ...prepared.workspaceIsolation,
+        worktree: {
+          ...prepared.workspaceIsolation.worktree!,
+          lastCleanup: {
+            policy: 'merge',
+            status: 'retained',
+            observedAt: '2026-03-22T00:00:00.000Z',
+            reasonCodes: ['source_workspace_dirty'],
+            mergedPathCount: 0,
+          },
+        },
+      },
+    });
+    registry.updateStatus('retained-summary-session', 'closed');
+
+    const service = new RuntimeWorktreeMaintenanceService({
+      sessionBaseDir,
+      registry,
+      runtime: {
+        isAttached: vi.fn((sessionId: string) => sessionId === 'retained-summary-session'),
+      } as never,
+      retainedTtlMs: 60 * 60 * 1000,
+      now: () => new Date('2026-03-24T00:00:00.000Z'),
+    });
+
+    expect(service.snapshot()).toEqual({
+      policy: {
+        sweepIntervalMs: 60000,
+        retainedTtlMs: 60 * 60 * 1000,
+      },
+      retained: {
+        totalSessions: 1,
+        attachedSessions: 1,
+        cleanupEligibleSessions: 0,
+        expiredSessions: 1,
+        sampleLimit: 25,
+        omittedSessionCount: 0,
+        sampleSessionIds: ['retained-summary-session'],
+        expiredSampleSessionIds: ['retained-summary-session'],
+        oldestObservedAt: '2026-03-22T00:00:00.000Z',
+        newestObservedAt: '2026-03-22T00:00:00.000Z',
+        policyCounts: {
+          discard: 0,
+          merge: 1,
+          preserve: 0,
+        },
+        reasonCodeCounts: {
+          sourceWorkspaceDirty: 1,
+          worktreeDetachFailed: 0,
+          worktreePreserved: 0,
+          other: 0,
+        },
+        sessions: [
+          {
+            sessionId: 'retained-summary-session',
+            attached: true,
+            cleanupEligible: false,
+            policy: 'merge',
+            observedAt: '2026-03-22T00:00:00.000Z',
+            ageMs: 48 * 60 * 60 * 1000,
+            expired: true,
+            reasonCodes: ['source_workspace_dirty'],
+          },
+        ],
+      },
+    });
+  });
+
   it('removes orphaned worktrees during a sweep', async () => {
     const { repoDir, sessionBaseDir } = createGitWorkspace();
     const prepared = await prepareSessionWorkspace({

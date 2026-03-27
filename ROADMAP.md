@@ -347,6 +347,9 @@ cleanup discipline while keeping product approval/policy above runtime.
 - orphaned worktrees are now swept in the background, and retained worktree
   sessions surface TTL-style expiry diagnostics plus background auto-clean
   results through runtime maintenance
+- `/diagnostics/runtime` now also exposes a bounded current retained-worktree
+  summary (counts, policy/reason-code breakdown, sample session ids) so
+  operators can see cleanup backlog without waiting for the next sweep
 - retained reset/delete cleanup now auto-settles the rest of the lifecycle
   once bounded cleanup succeeds, and the background sweeper auto-cleans
   expired preserved retained worktrees conservatively
