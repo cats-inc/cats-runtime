@@ -1949,6 +1949,52 @@ async function closeSession(
   };
 }
 
+async function cancelSession(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const sessionId = readRequiredString(args, 'sessionId');
+  const cancelPath = `/sessions/${encodeURIComponent(sessionId)}/cancel`;
+  const result = await requestRuntimeJson(ctx, cancelPath, {
+    body: {},
+  });
+  ensureRouteSuccess('cancel_session', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'cancel_session result');
+  return {
+    summary: `Cancelled the active turn for session ${sessionId}.`,
+    structuredContent: {
+      responseStatus: result.status,
+      ...payload,
+      cancelPath,
+      ...buildSessionPaths(sessionId),
+    },
+  };
+}
+
+async function resumeSession(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const sessionId = readRequiredString(args, 'sessionId');
+  const resumePath = `/sessions/${encodeURIComponent(sessionId)}/resume`;
+  const result = await requestRuntimeJson(ctx, resumePath, {
+    body: {},
+  });
+  ensureRouteSuccess('resume_session', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'resume_session result');
+  return {
+    summary: `Resumed session ${sessionId}.`,
+    structuredContent: {
+      responseStatus: result.status,
+      session: payload,
+      resumePath,
+      ...buildSessionPaths(sessionId),
+    },
+  };
+}
+
 async function resetSession(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -3454,6 +3500,38 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: closeSession,
+  },
+  {
+    definition: {
+      name: 'cancel_session',
+      title: 'Cancel Session',
+      description: 'Cancel the active turn for one runtime session through the existing session cancel route.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sessionId: { type: 'string' },
+        },
+        required: ['sessionId'],
+        additionalProperties: false,
+      },
+    },
+    execute: cancelSession,
+  },
+  {
+    definition: {
+      name: 'resume_session',
+      title: 'Resume Session',
+      description: 'Resume one runtime session through the existing session resume route.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sessionId: { type: 'string' },
+        },
+        required: ['sessionId'],
+        additionalProperties: false,
+      },
+    },
+    execute: resumeSession,
   },
   {
     definition: {

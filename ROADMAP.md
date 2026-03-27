@@ -1112,6 +1112,9 @@ evidence bundles and does not force hosts to invent their own report format.
 - the same runtime-owned file-backed/native session inspection/import seams now
   include Codex over MCP as well, so orchestrator-style hosts can inventory or
   import discovered Codex rollout sessions without rebuilding the scanner flow
+- the same runtime-owned session lifecycle seams now also expose `cancel` and
+  `resume` over MCP, so orchestrator-style hosts can stop an in-flight turn or
+  re-attach an inactive session without inventing MCP-only lifecycle verbs
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
   remediation previews, and latest-setup-report summary metadata including a

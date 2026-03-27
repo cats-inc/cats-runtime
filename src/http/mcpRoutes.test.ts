@@ -621,6 +621,8 @@ describe('runtime MCP facade', () => {
       'create_session',
       'send_message',
       'close_session',
+      'cancel_session',
+      'resume_session',
       'reset_session',
       'fork_session',
       'delete_session',
@@ -3440,6 +3442,94 @@ describe('runtime MCP facade', () => {
       `/sessions/${createdSessionId}/close`,
     );
     expect(closed.result.structuredContent.status).toBe('closed');
+
+    const seedDiscoveredCodexResponse = await app.request('/codex/sessions/discover', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        cwd: join(rootDir, 'codex-workspace'),
+        group: 'resume-target',
+      }),
+    });
+    expect(seedDiscoveredCodexResponse.status).toBe(200);
+    const seededCodex = await seedDiscoveredCodexResponse.json() as {
+      sessions: Array<{
+        id: string;
+      }>;
+    };
+    const discoveredCodexSessionId = seededCodex.sessions[0]?.id;
+    expect(discoveredCodexSessionId).toEqual(expect.any(String));
+
+    const resumeResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 13.1,
+        method: 'tools/call',
+        params: {
+          name: 'resume_session',
+          arguments: {
+            sessionId: discoveredCodexSessionId,
+          },
+        },
+      }),
+    });
+    expect(resumeResponse.status).toBe(200);
+    const resumed = await resumeResponse.json() as {
+      result: {
+        structuredContent: {
+          responseStatus: number;
+          resumePath: string;
+          session: {
+            id: string;
+            status: string;
+          };
+        };
+      };
+    };
+    expect(resumed.result.structuredContent.responseStatus).toBe(200);
+    expect(resumed.result.structuredContent.resumePath).toBe(
+      `/sessions/${discoveredCodexSessionId}/resume`,
+    );
+    expect(resumed.result.structuredContent.session).toEqual(expect.objectContaining({
+      id: discoveredCodexSessionId,
+      providerName: 'codex',
+      status: expect.any(String),
+    }));
+
+    const cancelResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 13.2,
+        method: 'tools/call',
+        params: {
+          name: 'cancel_session',
+          arguments: {
+            sessionId: discoveredCodexSessionId,
+          },
+        },
+      }),
+    });
+    expect(cancelResponse.status).toBe(200);
+    const cancelled = await cancelResponse.json() as {
+      result: {
+        structuredContent: {
+          responseStatus: number;
+          action: string;
+          cancelPath: string;
+          status: string;
+        };
+      };
+    };
+    expect(cancelled.result.structuredContent.responseStatus).toBe(200);
+    expect(cancelled.result.structuredContent.action).toBe('cancel');
+    expect(cancelled.result.structuredContent.cancelPath).toBe(
+      `/sessions/${discoveredCodexSessionId}/cancel`,
+    );
+    expect(cancelled.result.structuredContent.status).toBe('ready');
 
     const repoDir = createGitWorkspace('workspace-cleanup-retry');
     const createWorktreeResponse = await app.request('/sessions', {

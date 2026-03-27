@@ -152,6 +152,8 @@ Current curated tools:
 - `send_message`
 - `fork_session`
 - `close_session`
+- `cancel_session`
+- `resume_session`
 - `reset_session`
 - `delete_session`
 - `cleanup_session_workspace`
@@ -277,6 +279,10 @@ catalog contract.
 `GET /sessions/{id}`, so MCP hosts can inspect the additive session
 provider-target, strategy, inspection, and wakeup metadata without bypassing
 the existing session read contract.
+`cancel_session` and `resume_session` reuse the same runtime-owned session
+lifecycle seams as `POST /sessions/{id}/cancel` and `POST /sessions/{id}/resume`,
+so MCP hosts can stop an in-flight turn or re-attach an inactive runtime
+session without inventing MCP-only lifecycle verbs.
 `session_history` and `session_lineage` reuse the same runtime-owned session
 history and branch-lineage surfaces as `GET /sessions/{id}/history` and
 `GET /sessions/{id}/lineage`, so MCP hosts can inspect transcript metadata,
