@@ -61,7 +61,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 | [PLAN-008-provider-compatibility-and-evidence-engine](./PLAN-008-provider-compatibility-and-evidence-engine.md) | Provider Compatibility and Evidence Engine | In Progress (Second Slice Landed) | [SPEC-007](../specs/SPEC-007-provider-compatibility-and-evidence-engine.md) |
 | [PLAN-008-runtime-managed-skills-v0](./PLAN-008-runtime-managed-skills-v0.md) | Runtime-Managed Skills v0 | Completed | [SPEC-005](../specs/SPEC-005-runtime-managed-skills-v0.md) |
 | [PLAN-009](./PLAN-009-usage-metering-progress-and-guardrails.md) | Usage Metering, Provider-Agnostic Progress, and Guardrails | Completed | [SPEC-010](../specs/SPEC-010-usage-metering-rate-limit-detection-and-execution-guardrails.md) |
-| [PLAN-007](./PLAN-007-stream-event-discriminated-union.md) | StreamEvent Discriminated Union Cleanup | In Progress (First Conservative Slice Landed) | N/A |
+| [PLAN-007](./PLAN-007-stream-event-discriminated-union.md) | StreamEvent Discriminated Union Cleanup | Completed | N/A |
 | [PLAN-005](./PLAN-005-provider-model-catalog-and-discovery.md) | Provider Model Catalog and Discovery | Completed | [SPEC-004](../specs/SPEC-004-provider-model-catalog-and-discovery.md) |
 | [PLAN-006](./PLAN-006-standalone-and-app-managed-startup-contract.md) | Standalone and App-Managed Startup Contract | Completed | N/A |
 | [PLAN-004](./PLAN-004-agent-backend.md) | Agent Backend for OpenClaw and Future Agent SDK Runtimes | In Progress (Core Agent Backend Landed) | [SPEC-003](../specs/SPEC-003-agent-backend.md) |

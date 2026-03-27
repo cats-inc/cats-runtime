@@ -7,7 +7,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (First Conservative Slice Landed) |
+| **Status** | Completed |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | Claude / user follow-up |
@@ -194,9 +194,9 @@ on a bag-of-optionals shape.
 - [x] Update `src/backends/cli/pool/WorkerProcess.ts` and
       `src/backends/cli/providers/junie.ts` where event-type branching is
       already dense enough to benefit from the union
-- [ ] Keep `src/http/streaming.ts` unchanged unless type fallout requires a
+- [x] Keep `src/http/streaming.ts` unchanged unless type fallout requires a
       helper wrapper
-- [ ] Avoid mechanical repo-wide switch rewrites; only touch consumers that
+- [x] Avoid mechanical repo-wide switch rewrites; only touch consumers that
       currently branch on `event.type` or persist event payload fields
 
 **Deliverables**: the highest-risk event consumers compile cleanly and gain
@@ -204,11 +204,11 @@ useful narrowing.
 
 ### Phase 4: Verification and Cleanup
 
-- [ ] Add or update tests for event construction and event-consumer branches
-- [ ] Run `npm run build`
-- [ ] Run targeted Vitest suites covering HTTP message streaming, worker
+- [x] Add or update tests for event construction and event-consumer branches
+- [x] Run `npm run build`
+- [x] Run targeted Vitest suites covering HTTP message streaming, worker
       process behavior, and parser/provider event translation
-- [ ] Document any event variants that remain intentionally loose after the
+- [x] Document any event variants that remain intentionally loose after the
       first pass
 
 **Deliverables**: type-safe event modeling with regression coverage and a
@@ -278,6 +278,7 @@ documented residual debt list.
 | 2026-03-27 | Hardened the main HTTP message streaming path so `src/http/routes/messages.ts` now narrows `text`, `tool_use`, `tool_result`, `result`, `error`, and session-identity events through local helpers across both NDJSON and SSE flows without changing any wire payloads. |
 | 2026-03-27 | Tightened leaf CLI providers/parsers so OpenCode, Goose, Kiro, and Auggie now emit exact typed `tool_use`, `text`, `result`, `error`, and `raw` variants in their runtime-owned event builders and after-turn helpers. |
 | 2026-03-27 | Completed the CLI producer sweep by tightening Codex and Pi parser event literals as well; `src/backends/cli/**` no longer relies on broad `as StreamEvent` / `satisfies StreamEvent` escape hatches for parser/provider event construction. |
+| 2026-03-27 | Full verification closeout landed: targeted producer/consumer suites and the full `npm test` gate passed after the remaining CLI/event-consumer slices were merged, and the first-pass residual debt is now intentionally limited to conservative `tool_result` / `raw` payload looseness rather than untyped event construction. |
 
 ---
 
