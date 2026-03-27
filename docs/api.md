@@ -612,6 +612,9 @@ desktop shells, and the embedded dashboard. It combines:
 - compact management-operation backlog summary metadata so hosts can see
   retained `polling` / `completed` / `failed` operation counts without polling
   `GET /management/diagnostics`
+- compact management-adapter catalog metadata so hosts can see configured
+  domain coverage and transport posture without calling
+  `GET /management/diagnostics`
 - compact setup-report summary metadata so hosts can see bootstrap mode plus the
   latest retained setup diagnostic headline/highlights without separately
   fetching `GET /setup-state`
@@ -671,6 +674,9 @@ integrate against:
 - runtime management backlog metadata under `runtime.management.operations`,
   including retained `polling` / `completed` / `failed` counts plus
   `oldestStartedAt` / `latestUpdatedAt`
+- runtime management adapter metadata under `runtime.management.adapters`,
+  including configured defaults, registered adapter/domain/action coverage, and
+  transport counts
 - runtime setup diagnostics metadata under `runtime.setup`, including
   `bootstrapRequired` plus the latest retained setup-report headline,
   highlights, and issue counts when a setup diagnostic artifact exists

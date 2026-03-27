@@ -593,6 +593,51 @@ describe('runtime server', () => {
             ]),
           },
           management: {
+            adapters: {
+              defaults: {
+                review: 'github',
+                deployment: 'zeabur',
+              },
+              adapters: [
+                {
+                  id: 'github',
+                  label: 'GitHub CLI (gh)',
+                  transport: 'cli',
+                  domains: ['review'],
+                  actions: [
+                    'audit_review_target',
+                    'open_pull_request',
+                    'inspect_pull_request',
+                    'wait_review_checks',
+                  ],
+                  defaultDomains: ['review'],
+                },
+                {
+                  id: 'zeabur',
+                  label: 'Zeabur CLI',
+                  transport: 'cli',
+                  domains: ['deployment'],
+                  actions: [
+                    'audit_deployment_target',
+                    'create_deployment',
+                    'inspect_deployment',
+                    'read_deployment_logs',
+                  ],
+                  defaultDomains: ['deployment'],
+                },
+              ],
+              summary: {
+                totalAdapters: 2,
+                totalDomains: 2,
+                readOnlyActions: 6,
+                mutatingActions: 2,
+                transports: {
+                  cli: 2,
+                  api: 0,
+                },
+                summary: '2 management adapter(s) cover 2 domain(s) with 6 read-only and 2 mutating actions.',
+              },
+            },
             operations: {
               total: 0,
               polling: 0,
@@ -1443,6 +1488,17 @@ backends:
           },
         },
         management: {
+          adapters: {
+            totalAdapters: 2,
+            totalDomains: 2,
+            readOnlyActions: 6,
+            mutatingActions: 2,
+            transports: {
+              cli: 2,
+              api: 0,
+            },
+            summary: '2 management adapter(s) cover 2 domain(s) with 6 read-only and 2 mutating actions.',
+          },
           summary: {
             total: 0,
             polling: 0,

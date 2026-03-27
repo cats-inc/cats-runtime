@@ -8,8 +8,10 @@ import {
 import {
   MUTATING_MANAGEMENT_ACTIONS,
   createManagementIssue,
+  type RuntimeManagementAction,
   type RuntimeManagementAuthorization,
   type RuntimeManagementContract,
+  type RuntimeManagementDomain,
   type RuntimeManagementRequest,
   type RuntimeManagementResult,
 } from './types.js';
@@ -21,6 +23,31 @@ import {
 export interface RuntimeManagementDependencies {
   config?: ManagementConfig;
   adapters?: Map<string, ManagementAdapter>;
+}
+
+export interface RuntimeManagementAdapterInspectionEntry {
+  id: string;
+  label: string;
+  transport: 'cli' | 'api';
+  domains: RuntimeManagementDomain[];
+  actions: RuntimeManagementAction[];
+  defaultDomains: RuntimeManagementDomain[];
+}
+
+export interface RuntimeManagementAdapterCatalogInspection {
+  defaults: Partial<Record<RuntimeManagementDomain, string>>;
+  adapters: RuntimeManagementAdapterInspectionEntry[];
+  summary: {
+    totalAdapters: number;
+    totalDomains: number;
+    readOnlyActions: number;
+    mutatingActions: number;
+    transports: {
+      cli: number;
+      api: number;
+    };
+    summary: string;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -183,6 +210,54 @@ export class RuntimeManagementService {
 
   inspectOperations(limit = 5): ManagementOperationStoreDiagnostics {
     return this.operations.inspect(limit);
+  }
+
+  inspectAdapterCatalog(): RuntimeManagementAdapterCatalogInspection {
+    const defaults = {
+      ...(this.config?.adapters.review?.default ? { review: this.config.adapters.review.default } : {}),
+      ...(this.config?.adapters.deployment?.default ? { deployment: this.config.adapters.deployment.default } : {}),
+    } satisfies Partial<Record<RuntimeManagementDomain, string>>;
+    const transports = { cli: 0, api: 0 };
+    const domainSet = new Set<RuntimeManagementDomain>();
+    const actionSet = new Set<RuntimeManagementAction>();
+    const entries = [...this.adapters.values()]
+      .map((adapter) => {
+        transports[adapter.descriptor.transport] += 1;
+        const domains = [...new Set(adapter.descriptor.capabilities.map((cap) => cap.domain))];
+        const actions = [...new Set(adapter.descriptor.capabilities.flatMap((cap) => cap.actions))];
+        for (const domain of domains) {
+          domainSet.add(domain);
+        }
+        for (const action of actions) {
+          actionSet.add(action);
+        }
+        return {
+          id: adapter.descriptor.id,
+          label: adapter.descriptor.label,
+          transport: adapter.descriptor.transport,
+          domains,
+          actions,
+          defaultDomains: (Object.entries(defaults) as Array<[RuntimeManagementDomain, string]>)
+            .filter(([, adapterId]) => adapterId === adapter.descriptor.id)
+            .map(([domain]) => domain),
+        } satisfies RuntimeManagementAdapterInspectionEntry;
+      })
+      .sort((left, right) => left.id.localeCompare(right.id));
+
+    const mutatingActions = [...actionSet].filter((action) => MUTATING_MANAGEMENT_ACTIONS.has(action)).length;
+    const readOnlyActions = actionSet.size - mutatingActions;
+    return {
+      defaults,
+      adapters: entries,
+      summary: {
+        totalAdapters: entries.length,
+        totalDomains: domainSet.size,
+        readOnlyActions,
+        mutatingActions,
+        transports,
+        summary: `${entries.length} management adapter(s) cover ${domainSet.size} domain(s) with ${readOnlyActions} read-only and ${mutatingActions} mutating actions.`,
+      },
+    };
   }
 
   // -----------------------------------------------------------------------

@@ -1261,6 +1261,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
   const executionStrategies = ctx.apiBackend?.inspectExecutionStrategies()
     ?? buildApiRuntimeExecutionStrategyCatalog();
   const management = getRuntimeManagementService(ctx).inspectOperations();
+  const managementAdapters = getRuntimeManagementService(ctx).inspectAdapterCatalog();
   const setup = buildRuntimeSetupDiagnosticsSummary(ctx);
   const skills = inspectRuntimeSkillCatalog();
   const tools = buildRuntimeToolCatalogSummary();
@@ -1286,6 +1287,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
       browser: browser.summary,
       executionStrategies,
       management: {
+        adapters: managementAdapters,
         operations: management.summary,
       },
       delivery,
@@ -1505,6 +1507,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
   const executionStrategies = ctx.apiBackend?.inspectExecutionStrategies()
     ?? buildApiRuntimeExecutionStrategyCatalog();
   const management = getRuntimeManagementService(ctx).inspectOperations();
+  const managementAdapters = getRuntimeManagementService(ctx).inspectAdapterCatalog();
   const setup = buildRuntimeSetupDiagnosticsSummary(ctx);
   const skills = inspectRuntimeSkillCatalog();
   const tools = buildRuntimeToolCatalogSummary();
@@ -1570,6 +1573,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
       },
     },
     management: {
+      adapters: managementAdapters.summary,
       summary: management.summary,
     },
     delivery: {
