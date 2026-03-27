@@ -40,7 +40,11 @@ import {
 } from '../../core/tools/providerTooling.js';
 import type { HealthStatus } from '../../core/types.js';
 import type { AppContext } from '../app.js';
-import { getProviderCompatibilityService, getRuntimeMeteringService } from '../app.js';
+import {
+  getProviderCompatibilityService,
+  getRuntimeBrowserService,
+  getRuntimeMeteringService,
+} from '../app.js';
 import {
   DEFAULT_RUNTIME_AGENT_PROBE_TIMEOUT_MS,
   getFileBackedProviderDiscoveryInfo,
@@ -172,6 +176,18 @@ function getRuntimeWakeupSnapshot(ctx: AppContext) {
       maxTerminalRequests: 0,
       maxTerminalRequestsPerSession: 0,
     },
+  };
+}
+
+function getRuntimeBrowserDiagnostics(ctx: AppContext) {
+  const maintenance = ctx.browserMaintenance?.snapshot();
+  const summary = getRuntimeBrowserService(ctx).summarizeSessions({
+    olderThanMs: maintenance?.policy.closedSessionTtlMs ?? 0,
+  });
+
+  return {
+    maintenance,
+    summary,
   };
 }
 
@@ -1141,6 +1157,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
   const metering = getRuntimeMeteringService(ctx).buildSnapshot(ctx.registry.list());
   const peers = getPeerDiscoverySnapshot(ctx);
   const wakeups = getRuntimeWakeupSnapshot(ctx);
+  const browser = getRuntimeBrowserDiagnostics(ctx);
   const executionStrategies = ctx.apiBackend?.inspectExecutionStrategies()
     ?? buildApiRuntimeExecutionStrategyCatalog();
 
@@ -1159,8 +1176,9 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
       paths,
       maintenance: {
         ...(ctx.worktreeMaintenance ? { worktrees: ctx.worktreeMaintenance.snapshot() } : {}),
-        ...(ctx.browserMaintenance ? { browser: ctx.browserMaintenance.snapshot() } : {}),
+        ...(browser.maintenance ? { browser: browser.maintenance } : {}),
       },
+      browser: browser.summary,
       executionStrategies,
       wakeups,
       process: {
@@ -1259,6 +1277,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
   );
   const peers = getPeerDiscoverySnapshot(ctx);
   const wakeups = getRuntimeWakeupSnapshot(ctx);
+  const browser = getRuntimeBrowserDiagnostics(ctx);
   const executionStrategies = ctx.apiBackend?.inspectExecutionStrategies()
     ?? buildApiRuntimeExecutionStrategyCatalog();
   const providerSummary = summarizeProviderDiagnostics(catalog, providers, {
@@ -1302,6 +1321,20 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
         })),
     },
     peers,
+    browser: {
+      summary: {
+        totalSessions: browser.summary.sessions.total,
+        readySessions: browser.summary.sessions.ready,
+        closedSessions: browser.summary.sessions.closed,
+        totalPages: browser.summary.pages.total,
+        openPages: browser.summary.pages.open,
+        closedPages: browser.summary.pages.closed,
+        attachedRuntimeSessionCount: browser.summary.attachedRuntimeSessionCount,
+        cleanupCandidateSessions: browser.summary.cleanupCandidates.sessionCount,
+        cleanupCandidatePages: browser.summary.cleanupCandidates.pageCount,
+        cleanupCandidateOlderThanMs: browser.summary.cleanupCandidates.olderThanMs,
+      },
+    },
     wakeups: wakeups.summary,
     metering,
   });

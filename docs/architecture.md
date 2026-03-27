@@ -217,6 +217,9 @@ src/
   summary reads, explicit in-place page navigation/update, and explicit
   cleanup for both closed sessions and idle retained ready sessions whose
   known pages are already closed
+- Reuses the same browser summary read model on `GET /diagnostics/runtime` and
+  compact `GET /diagnostics/health` aggregates so packaged hosts can inspect
+  preview backlog without separately polling `/browser/summary`
 - Exposes the standalone runtime-owned versioned filterable skill catalog at
   `GET /skills/catalog`
 - Exposes runtime-owned delivery execution routes such as delivery audit,

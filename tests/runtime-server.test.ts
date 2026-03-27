@@ -529,6 +529,27 @@ describe('runtime server', () => {
               },
             },
           },
+          browser: {
+            filters: {},
+            sessions: {
+              total: 0,
+              ready: 0,
+              closed: 0,
+            },
+            pages: {
+              total: 0,
+              open: 0,
+              closed: 0,
+            },
+            attachedRuntimeSessionCount: 0,
+            drivers: [],
+            cleanupCandidates: {
+              olderThanMs: 1800000,
+              sessionCount: 0,
+              pageCount: 0,
+              sessionIds: [],
+            },
+          },
           executionStrategies: {
             summary: {
               totalFamilies: 7,
@@ -664,6 +685,138 @@ describe('runtime server', () => {
       });
     });
   });
+
+  it('surfaces current browser aggregate state on runtime and health diagnostics', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-browser-diagnostics-test-'));
+    const configPath = join(root, 'providers.yaml');
+    writeFileSync(configPath, 'providers: {}\n', 'utf8');
+
+    const env = {
+      HOME: root,
+      USERPROFILE: root,
+      CATS_RUNTIME_CONFIG_PATH: configPath,
+      CATS_RUNTIME_HOST: '127.0.0.1',
+      CATS_RUNTIME_PORT: '3110',
+      CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
+      CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
+      CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
+      CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
+      AUGGIE_SESSIONS_DIR: join(root, '.augment', 'sessions'),
+      CLAUDE_PROJECTS_DIR: join(root, '.claude', 'projects'),
+      CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
+      COPILOT_SESSIONS_DIR: join(root, '.copilot', 'session-state'),
+      CURSOR_CHATS_DIR: join(root, '.cursor', 'chats'),
+      GEMINI_SESSIONS_DIR: join(root, '.gemini', 'tmp'),
+      KIRO_DB_PATH: join(root, '.kiro', 'data.sqlite3'),
+      PI_SESSIONS_DIR: join(root, '.pi', 'agent', 'sessions'),
+    };
+
+    for (const dir of [
+      env.CATS_RUNTIME_SESSION_BASE_DIR,
+      env.CATS_RUNTIME_DATA_DIR,
+      env.AUGGIE_SESSIONS_DIR,
+      env.CLAUDE_PROJECTS_DIR,
+      env.CODEX_SESSIONS_DIR,
+      env.COPILOT_SESSIONS_DIR,
+      env.CURSOR_CHATS_DIR,
+      env.GEMINI_SESSIONS_DIR,
+      join(root, '.kiro'),
+      join(root, '.junie', 'sessions'),
+      env.PI_SESSIONS_DIR,
+    ]) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    const runtime = createRuntimeServer(loadConfig(env));
+    try {
+      runtime.context.registry.create({
+        id: 'browser-runtime-session',
+        providerName: 'codex',
+        cwd: '/tmp/browser-runtime-session',
+      });
+
+      const attachedBrowser = await runtime.context.browser.createSession({
+        runtimeSessionId: 'browser-runtime-session',
+        label: 'Attached Browser',
+      });
+      await runtime.context.browser.createPage(attachedBrowser.id, {
+        url: 'http://127.0.0.1:4173',
+        binding: {
+          kind: 'manual_url',
+          runtimeSessionId: 'browser-runtime-session',
+        },
+      });
+
+      const closedBrowser = await runtime.context.browser.createSession({
+        label: 'Closed Browser',
+      });
+      await runtime.context.browser.createPage(closedBrowser.id, {
+        path: '/tmp/browser-report.html',
+        binding: {
+          kind: 'manual_url',
+        },
+      });
+      await runtime.context.browser.closeSession(closedBrowser.id);
+
+      const runtimeResponse = await runtime.app.request('/diagnostics/runtime');
+      expect(runtimeResponse.status).toBe(200);
+      expect((await runtimeResponse.json()).runtime.browser).toEqual({
+        filters: {},
+        sessions: {
+          total: 2,
+          ready: 1,
+          closed: 1,
+        },
+        pages: {
+          total: 2,
+          open: 1,
+          closed: 1,
+        },
+        attachedRuntimeSessionCount: 1,
+        drivers: [
+          {
+            driverId: 'manual',
+            sessions: {
+              total: 2,
+              ready: 1,
+              closed: 1,
+            },
+            pages: {
+              total: 2,
+              open: 1,
+              closed: 1,
+            },
+          },
+        ],
+        cleanupCandidates: {
+          olderThanMs: 1800000,
+          sessionCount: 0,
+          pageCount: 0,
+          sessionIds: [],
+        },
+      });
+
+      const healthResponse = await runtime.app.request('/diagnostics/health');
+      expect(healthResponse.status).toBe(200);
+      expect((await healthResponse.json()).browser).toEqual({
+        summary: {
+          totalSessions: 2,
+          readySessions: 1,
+          closedSessions: 1,
+          totalPages: 2,
+          openPages: 1,
+          closedPages: 1,
+          attachedRuntimeSessionCount: 1,
+          cleanupCandidateSessions: 0,
+          cleanupCandidatePages: 0,
+          cleanupCandidateOlderThanMs: 1800000,
+        },
+      });
+    } finally {
+      await runtime.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 10000);
 
   it('background worktree maintenance auto-cleans expired preserved delete sessions', async () => {
     await withRuntime({}, {}, async (runtime) => {
@@ -1096,6 +1249,20 @@ backends:
             }),
           ]),
         }),
+        browser: {
+          summary: {
+            totalSessions: 0,
+            readySessions: 0,
+            closedSessions: 0,
+            totalPages: 0,
+            openPages: 0,
+            closedPages: 0,
+            attachedRuntimeSessionCount: 0,
+            cleanupCandidateSessions: 0,
+            cleanupCandidatePages: 0,
+            cleanupCandidateOlderThanMs: 1800000,
+          },
+        },
         wakeups: {
           status: 'ok',
           summary: 'No wakeup requests are tracked.',
@@ -1402,6 +1569,20 @@ backends:
             }),
           ]),
         }),
+        browser: {
+          summary: {
+            totalSessions: 0,
+            readySessions: 0,
+            closedSessions: 0,
+            totalPages: 0,
+            openPages: 0,
+            closedPages: 0,
+            attachedRuntimeSessionCount: 0,
+            cleanupCandidateSessions: 0,
+            cleanupCandidatePages: 0,
+            cleanupCandidateOlderThanMs: 1800000,
+          },
+        },
         wakeups: {
           status: 'ok',
           summary: 'No wakeup requests are tracked.',

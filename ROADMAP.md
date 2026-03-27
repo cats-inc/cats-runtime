@@ -247,6 +247,9 @@ Deepen the runtime-owned browser subsystem without coupling it to any monorepo
 - Browser sessions already surface through session, history, and observe
   inspection payloads, and reset/delete cleanup clears browser sessions bound
   to the affected runtime session
+- `GET /diagnostics/runtime` now also exposes the current aggregate browser
+  summary, and `GET /diagnostics/health` exposes a compact browser summary, so
+  hosts can inspect preview backlog without separately calling `/browser/summary`
 - `GET /browser/summary`, `POST /browser/sessions/cleanup`, matching MCP
   tools, and runtime background maintenance now provide a host-facing
   aggregate read/maintenance seam for closed browser-session cleanup; explicit

@@ -427,6 +427,8 @@ GET /diagnostics/providers
 desktop shells, and the embedded dashboard. It combines:
 
 - runtime readiness and startup/shutdown contract metadata
+- compact browser aggregate summary metadata so hosts can see preview backlog
+  and cleanup-candidate counts without calling `/browser/summary`
 - compact runtime execution-strategy summary metadata so hosts can distinguish
   implemented strategy families from compatibility-fallback-only hints
 - a light provider-health summary over each provider's default target, suitable
@@ -452,6 +454,9 @@ integrate against:
 - supported shutdown signals/reasons
 - listener and local-state path resolution, including the compatibility
   evidence directory
+- current aggregate browser state under `runtime.browser`, reusing the same
+  browser summary model as `GET /browser/summary` with the maintenance TTL
+  applied to cleanup-candidate counts
 - runtime maintenance snapshots under `runtime.maintenance`, including:
   - `worktrees`: orphan-sweep results plus bounded current retained-worktree
     summaries (counts, policy/reason-code breakdown, sampled session ids) and
