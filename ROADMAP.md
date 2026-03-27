@@ -1039,6 +1039,10 @@ evidence bundles and does not force hosts to invent their own report format.
   `read_setup_diagnostic_report`, so orchestrator-style hosts can trigger and
   inspect retained operator-facing setup artifacts without shelling out to the
   standalone CLI entry
+- the same setup repair read model is now also exposed through MCP as
+  `setup_state`, so orchestrator-style hosts can inspect bootstrap-required
+  status, preferred scan source, next-action guidance, and latest setup-report
+  summary metadata without inventing a second setup orchestration contract
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
   remediation previews, and latest-setup-report summary metadata including a

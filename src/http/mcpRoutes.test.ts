@@ -180,6 +180,31 @@ describe('runtime MCP facade', () => {
   }
 
   function createTestApp() {
+    const bootstrapService = {
+      getSetupState: vi.fn(async () => ({
+        status: 'pending',
+        lastScanAt: null,
+        lastManualScanAt: null,
+        appliedAt: null,
+        appliedConfigPath: null,
+        error: null,
+      })),
+      getLatestScan: vi.fn(async () => null),
+      getLatestManualScan: vi.fn(async () => null),
+      getProviderUniverse: vi.fn(() => [
+        {
+          provider: 'claude',
+          familyLabel: 'Claude',
+          binaryName: 'claude',
+        },
+      ]),
+      scan: vi.fn(async () => ({
+        scannedAt: '2026-03-27T00:00:00.000Z',
+        scanType: 'manual',
+        providers: [],
+      })),
+    };
+
     const workerStream = async function* (turn: string | TurnInput): AsyncGenerator<StreamEvent> {
       const input = typeof turn === 'string' ? turn : turn.message;
       yield { type: 'text', text: `reply: ${input}` };
@@ -224,6 +249,7 @@ describe('runtime MCP facade', () => {
       auggieSessions: {} as never,
       opencodeNative: {} as never,
       providerModelCatalog: {} as never,
+      bootstrapService: bootstrapService as never,
     });
   }
 
@@ -310,6 +336,7 @@ describe('runtime MCP facade', () => {
       'list_setup_diagnostic_reports',
       'read_latest_setup_diagnostic_report',
       'read_setup_diagnostic_report',
+      'setup_state',
       'observe_session',
       'list_runtime_skills',
       'create_session',
@@ -957,6 +984,44 @@ describe('runtime MCP facade', () => {
       `/diagnostics/setup-report/${encodeURIComponent(setupReportArtifactId)}`,
     );
     expect(readSetupReport.result.structuredContent.report.artifactId).toBe(setupReportArtifactId);
+
+    const setupStateResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 35.9,
+        method: 'tools/call',
+        params: {
+          name: 'setup_state',
+          arguments: {},
+        },
+      }),
+    });
+    expect(setupStateResponse.status).toBe(200);
+    const setupState = await setupStateResponse.json() as {
+      result: {
+        structuredContent: {
+          setupStatePath: string;
+          bootstrapRequired: boolean;
+          repair: {
+            status: string;
+            actions: Array<{
+              kind: string;
+            }>;
+          };
+        };
+      };
+    };
+    expect(setupState.result.structuredContent.setupStatePath).toBe('/setup-state');
+    expect(setupState.result.structuredContent.bootstrapRequired).toBe(false);
+    expect(setupState.result.structuredContent.repair).toEqual(expect.objectContaining({
+      status: 'scan_required',
+      actions: expect.arrayContaining([
+        expect.objectContaining({ kind: 'run_manual_scan' }),
+        expect.objectContaining({ kind: 'generate_setup_report' }),
+      ]),
+    }));
 
     vi.mocked(pool.getCapabilities).mockClear();
 

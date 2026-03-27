@@ -111,6 +111,7 @@ Current curated tools:
 - `list_setup_diagnostic_reports`
 - `read_latest_setup_diagnostic_report`
 - `read_setup_diagnostic_report`
+- `setup_state`
 - `observe_session`
 - `list_runtime_skills`
 - `create_session`
@@ -180,6 +181,10 @@ the same bounded setup-report lifecycle as `POST /diagnostics/setup-report`,
 `GET /diagnostics/setup-report/{artifactId}`, so MCP hosts can trigger, list,
 and inspect retained operator-facing setup artifacts without shelling out to
 the standalone CLI entry.
+`setup_state` reuses the same shared repair read model as `GET /setup-state`, so
+MCP hosts can inspect bootstrap-required status, preferred scan source,
+actionable repair actions, and latest setup-report summary metadata without
+inventing a second setup orchestration contract.
 `list_sessions` and `observe_session` also reuse the same additive session
 `providerTarget` read model exposed by the direct HTTP session/history/observe
 surfaces, so MCP hosts can inspect backend continuity/tooling semantics without

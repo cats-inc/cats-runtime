@@ -919,6 +919,26 @@ async function readSetupDiagnosticReport(
   };
 }
 
+async function setupState(
+  ctx: AppContext,
+): Promise<McpToolCallResult> {
+  const path = '/setup-state';
+  const result = await requestRuntimeJson(ctx, path, { method: 'GET' });
+  ensureRouteSuccess('setup_state', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'setup_state result');
+  const repair = asRecord(payload.repair);
+  const status = typeof repair?.status === 'string' ? repair.status : 'unknown';
+
+  return {
+    summary: `Setup state repair status: ${status}.`,
+    structuredContent: {
+      ...payload,
+      setupStatePath: path,
+    },
+  };
+}
+
 async function observeSession(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -2120,6 +2140,19 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: readSetupDiagnosticReport,
+  },
+  {
+    definition: {
+      name: 'setup_state',
+      title: 'Setup State',
+      description: 'Return the shared setup-state repair read model exposed by the existing runtime-owned bootstrap route.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        additionalProperties: false,
+      },
+    },
+    execute: async (ctx) => setupState(ctx),
   },
   {
     definition: {
