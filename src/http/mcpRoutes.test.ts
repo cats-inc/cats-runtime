@@ -356,6 +356,7 @@ describe('runtime MCP facade', () => {
       'providers_config',
       'provider_tools',
       'provider_models',
+      'providers_models',
       'provider_diagnostics',
       'reprobe_provider_diagnostics',
       'list_provider_evolution_artifacts',
@@ -622,6 +623,43 @@ describe('runtime MCP facade', () => {
     expect(providerModels.result.structuredContent).toEqual(expect.objectContaining({
       source: 'config',
       models: [],
+    }));
+
+    const providersModelsResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 3.6,
+        method: 'tools/call',
+        params: {
+          name: 'providers_models',
+          arguments: {
+            forceRefresh: true,
+          },
+        },
+      }),
+    });
+    expect(providersModelsResponse.status).toBe(200);
+    const providersModels = await providersModelsResponse.json() as {
+      result: {
+        structuredContent: {
+          modelsPath: string;
+          providers: Record<string, {
+            source: string;
+            models: unknown[];
+          }>;
+        };
+      };
+    };
+    expect(providersModels.result.structuredContent.modelsPath).toBe(
+      '/providers/models?refresh=1',
+    );
+    expect(providersModels.result.structuredContent.providers).toEqual(expect.objectContaining({
+      claude: {
+        source: 'config',
+        models: [],
+      },
     }));
 
     const providerDiagnosticsResponse = await app.request('/mcp', {

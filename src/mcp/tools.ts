@@ -546,6 +546,33 @@ async function providerModels(
   };
 }
 
+async function providersModels(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const searchParams = new URLSearchParams();
+  if (readOptionalBoolean(args, 'forceRefresh') === true) {
+    searchParams.set('refresh', '1');
+  }
+  const path = searchParams.size > 0
+    ? `/providers/models?${searchParams.toString()}`
+    : '/providers/models';
+  const result = await requestRuntimeJson(ctx, path, { method: 'GET' });
+  ensureRouteSuccess('providers_models', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'providers_models result');
+  const providers = asRecord(payload.providers);
+  const providerCount = providers ? Object.keys(providers).length : 0;
+
+  return {
+    summary: `Aggregate provider model catalogs available for ${providerCount} provider family(s).`,
+    structuredContent: {
+      ...payload,
+      modelsPath: path,
+    },
+  };
+}
+
 async function providerDiagnostics(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -2160,6 +2187,21 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: providerModels,
+  },
+  {
+    definition: {
+      name: 'providers_models',
+      title: 'Providers Models',
+      description: 'Return the aggregate configured-provider model catalogs exposed by the existing providers models route.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          forceRefresh: { type: 'boolean' },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: providersModels,
   },
   {
     definition: {
