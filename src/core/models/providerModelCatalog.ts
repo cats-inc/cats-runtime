@@ -67,6 +67,7 @@ export interface ProviderModelCatalogStatusCounts {
 export interface ProviderModelCatalogSummary {
   source: ProviderModelCatalogResult['source'];
   defaultModel: string | null;
+  defaultModelStatus?: ProviderModelCatalogEntry['status'];
   modelCount: number;
   warnings: string[];
   statusCounts: ProviderModelCatalogStatusCounts;
@@ -380,9 +381,13 @@ function appendKnownStaticCatalogWarnings(
 export function summarizeProviderModelCatalog(
   catalog: ProviderModelCatalogResult,
 ): ProviderModelCatalogSummary {
+  const defaultModelStatus = catalog.defaultModel
+    ? catalog.models.find((entry) => entry.id === catalog.defaultModel)?.status
+    : undefined;
   return {
     source: catalog.source,
     defaultModel: catalog.defaultModel,
+    ...(defaultModelStatus ? { defaultModelStatus } : {}),
     modelCount: catalog.models.length,
     warnings: [...catalog.warnings],
     statusCounts: countModelStatuses(catalog.models),

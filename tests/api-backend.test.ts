@@ -167,6 +167,7 @@ describe('API backend integration', () => {
                 modelCatalog: {
                   source: 'config',
                   defaultModel: 'claude-sonnet-4-6',
+                  defaultModelStatus: 'configured',
                   modelCount: 1,
                   warnings: [
                     "Dynamic model discovery skipped for claude/api/sonnet: required x-api-key credentials are not configured via 'ANTHROPIC_API_KEY'.",
@@ -219,6 +220,7 @@ describe('API backend integration', () => {
                 modelCatalog: {
                   source: 'config',
                   defaultModel: 'claude-opus-4-6',
+                  defaultModelStatus: 'configured',
                   modelCount: 1,
                   warnings: [
                     "Dynamic model discovery skipped for claude/api/opus: required x-api-key credentials are not configured via 'ANTHROPIC_API_KEY'.",
@@ -288,6 +290,7 @@ describe('API backend integration', () => {
                 modelCatalog: {
                   source: 'config',
                   defaultModel: 'gpt-5',
+                  defaultModelStatus: 'configured',
                   modelCount: 1,
                   warnings: [
                     "Dynamic model discovery skipped for codex/api/main: required bearer credentials are not configured via 'OPENAI_API_KEY'.",
@@ -358,6 +361,7 @@ describe('API backend integration', () => {
                 modelCatalog: {
                   source: 'config',
                   defaultModel: 'gemini-2.5-pro',
+                  defaultModelStatus: 'configured',
                   modelCount: 1,
                   warnings: [
                     "Dynamic model discovery skipped for gemini/api/pro: required x-goog-api-key credentials are not configured via 'GEMINI_API_KEY'.",
@@ -430,6 +434,7 @@ describe('API backend integration', () => {
                 modelCatalog: {
                   source: 'config',
                   defaultModel: 'qwen3:latest',
+                  defaultModelStatus: 'configured',
                   modelCount: 1,
                   warnings: [],
                   statusCounts: {

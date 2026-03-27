@@ -412,6 +412,11 @@ async function appendModelCatalogDiagnostics(
     config.modelCatalog = {
       source: catalog.source,
       defaultModel: catalog.defaultModel,
+      ...(catalog.defaultModel
+        ? {
+            defaultModelStatus: catalog.models.find((entry) => entry.id === catalog.defaultModel)?.status,
+          }
+        : {}),
       modelCount: catalog.models.length,
       warnings: [...catalog.warnings],
       ...(catalog.cache ? { cache: catalog.cache } : {}),

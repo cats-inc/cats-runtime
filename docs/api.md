@@ -2778,6 +2778,9 @@ metadata:
   `static`)
 - `defaultModel`: resolved default-model hint after runtime-owned active-config
   and configured-model fallback
+- optional `defaultModelStatus`: current status of that resolved default-model
+  entry when the bounded summary can determine it (`configured`, `available`,
+  or `running`)
 - `modelCount`: bounded count of entries in the best-known catalog
 - `warnings`: additive discovery/auth/fallback warnings when the runtime had to
   stay on config/static truth

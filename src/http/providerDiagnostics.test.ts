@@ -924,6 +924,7 @@ describe('provider diagnostics HTTP contract', () => {
               modelCatalog: expect.objectContaining({
                 source: 'config',
                 defaultModel: 'claude-sonnet-4-5',
+                defaultModelStatus: 'configured',
                 modelCount: 1,
                 warnings: [
                   "Dynamic model discovery skipped for claude/api/sonnet: required x-api-key credentials are not configured via 'ANTHROPIC_API_KEY'.",
@@ -1021,6 +1022,7 @@ describe('provider diagnostics HTTP contract', () => {
               modelCatalog: expect.objectContaining({
                 source: 'dynamic',
                 defaultModel: 'qwen2.5-coder:7b',
+                defaultModelStatus: 'configured',
                 modelCount: 1,
                 warnings: expect.arrayContaining([
                   expect.stringContaining("Configured default model 'qwen2.5-coder:7b'"),
@@ -1300,6 +1302,7 @@ describe('provider diagnostics HTTP contract', () => {
               modelCatalog: expect.objectContaining({
                 source: 'config',
                 defaultModel: 'gpt-5.4',
+                defaultModelStatus: 'configured',
                 modelCount: 1,
                 warnings: expect.arrayContaining([
                   "Dynamic model discovery failed for codex/api/default: Timed out while listing models from 'https://api.openai.test/v1/models'",
@@ -1442,6 +1445,7 @@ describe('provider diagnostics HTTP contract', () => {
               modelCatalog: expect.objectContaining({
                 source: 'dynamic',
                 defaultModel: 'gemini-2.5-pro',
+                defaultModelStatus: 'available',
                 modelCount: 1,
                 warnings: [],
               }),
@@ -1568,6 +1572,7 @@ describe('provider diagnostics HTTP contract', () => {
         modelCatalog: expect.objectContaining({
           source: 'dynamic',
           defaultModel: 'openai-codex/gpt-5.4',
+          defaultModelStatus: 'available',
           modelCount: 2,
           warnings: [],
         }),
@@ -1743,6 +1748,7 @@ describe('provider diagnostics HTTP contract', () => {
         modelCatalog: expect.objectContaining({
           source: 'dynamic',
           defaultModel: 'opencode-go/glm-5',
+          defaultModelStatus: 'available',
           modelCount: 2,
           warnings: [],
         }),

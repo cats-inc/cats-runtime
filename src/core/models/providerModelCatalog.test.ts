@@ -230,6 +230,7 @@ describe('ProviderModelCatalogService', () => {
     expect(service.inspectSummary('ollama')).toEqual({
       source: 'dynamic',
       defaultModel: 'qwen3:latest',
+      defaultModelStatus: 'configured',
       modelCount: 2,
       warnings: [
         "Configured default model 'qwen3:latest' was not returned by dynamic discovery; added as configured fallback.",
@@ -844,6 +845,7 @@ describe('ProviderModelCatalogService', () => {
     expect(service.inspectSummary('codex')).toEqual({
       source: 'config',
       defaultModel: 'gpt-5.4',
+      defaultModelStatus: 'configured',
       modelCount: 1,
       warnings: [],
       statusCounts: {
