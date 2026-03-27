@@ -15,6 +15,68 @@ import {
   PROVIDER_EVOLUTION_PROBE_PROFILES,
 } from '../core/compatibility/providerEvolutionProbe.js';
 import type { StreamEvent, TurnInput } from '../core/types.js';
+import type { RuntimeMode } from '../backends/cli/config.js';
+
+function writeCompatibilityEvidenceArtifact(
+  root: string,
+  provider: string,
+  artifactId: string,
+  overrides: Partial<{
+    instanceId: string;
+    classification: 'degraded' | 'unsupported_version' | 'unrecognized_protocol' | 'probe_failed';
+    summary: string;
+    capturedAt: string;
+    parserId: string;
+    profileId: string;
+    runtimeMode: RuntimeMode;
+  }> = {},
+): string {
+  const providerDir = join(root, provider);
+  mkdirSync(providerDir, { recursive: true });
+  const artifactPath = join(providerDir, `${artifactId}.json`);
+  writeFileSync(artifactPath, `${JSON.stringify({
+    schemaVersion: 3,
+    id: artifactId,
+    capturedAt: overrides.capturedAt || '2026-03-27T00:00:00.000Z',
+    classification: overrides.classification || 'probe_failed',
+    summary: overrides.summary || 'Compatibility probe failed while checking the provider.',
+    target: {
+      provider,
+      instanceId: overrides.instanceId || 'default',
+    },
+    profile: {
+      id: overrides.profileId || `${provider}-cli-best-fit`,
+      label: `${provider} best fit`,
+      protocolFamily: provider,
+      parserId: overrides.parserId || `${provider}-json`,
+      confidence: 'fallback',
+    },
+    fingerprint: {
+      provider,
+      instanceId: overrides.instanceId || 'default',
+      command: provider,
+      runner: 'auto',
+      runtime: { mode: overrides.runtimeMode || 'native' },
+      version: {
+        detected: true,
+        source: 'command',
+      },
+      features: [],
+      checkedAt: overrides.capturedAt || '2026-03-27T00:00:00.000Z',
+    },
+    warnings: [],
+    setup: {
+      status: 'ready',
+      summary: 'ready',
+      install: null,
+      auth: null,
+      remediation: [],
+    },
+    probes: {},
+    checks: [],
+  }, null, 2)}\n`, 'utf8');
+  return artifactPath;
+}
 
 describe('runtime MCP facade', () => {
   let rootDir: string;
@@ -239,7 +301,9 @@ describe('runtime MCP facade', () => {
       'list_sessions',
       'provider_diagnostics',
       'list_provider_evolution_artifacts',
+      'list_compatibility_evidence_artifacts',
       'read_provider_evolution_artifact',
+      'read_compatibility_evidence_artifact',
       'observe_session',
       'list_runtime_skills',
       'create_session',
@@ -497,6 +561,116 @@ describe('runtime MCP facade', () => {
     expect(readEvolution.result.structuredContent.artifact).toEqual(expect.objectContaining({
       id: artifact.artifact.id,
       provider: 'claude',
+    }));
+
+    writeCompatibilityEvidenceArtifact(
+      getRuntimeResolvedPaths(makeConfig()).compatibilityEvidenceDir,
+      'claude',
+      'compat-artifact-mcp',
+      {
+        classification: 'degraded',
+        parserId: 'claude-stream-json',
+        profileId: 'claude-cli-best-fit',
+        runtimeMode: 'docker',
+      },
+    );
+
+    const listCompatibilityResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 34,
+        method: 'tools/call',
+        params: {
+          name: 'list_compatibility_evidence_artifacts',
+          arguments: {
+            provider: 'claude',
+            classification: ['degraded'],
+            runtimeMode: 'docker',
+            limit: 1,
+          },
+        },
+      }),
+    });
+    expect(listCompatibilityResponse.status).toBe(200);
+    const listedCompatibility = await listCompatibilityResponse.json() as {
+      result: {
+        structuredContent: {
+          artifactsPath: string;
+          query: {
+            provider: string;
+            classifications: string[];
+            runtimeMode: string;
+            limit: number;
+          };
+          artifacts: Array<{
+            artifactId: string;
+            provider: string;
+            parserId: string;
+            runtimeMode: string;
+          }>;
+        };
+      };
+    };
+    expect(listedCompatibility.result.structuredContent.artifactsPath).toBe(
+      '/diagnostics/providers/evidence?provider=claude&runtimeMode=docker&classification=degraded&limit=1',
+    );
+    expect(listedCompatibility.result.structuredContent.query).toEqual({
+      provider: 'claude',
+      classifications: ['degraded'],
+      runtimeMode: 'docker',
+      limit: 1,
+    });
+    expect(listedCompatibility.result.structuredContent.artifacts).toEqual([
+      expect.objectContaining({
+        artifactId: 'compat-artifact-mcp',
+        provider: 'claude',
+        parserId: 'claude-stream-json',
+        runtimeMode: 'docker',
+      }),
+    ]);
+
+    const readCompatibilityResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 35,
+        method: 'tools/call',
+        params: {
+          name: 'read_compatibility_evidence_artifact',
+          arguments: {
+            artifactId: 'compat-artifact-mcp',
+            provider: 'claude',
+          },
+        },
+      }),
+    });
+    expect(readCompatibilityResponse.status).toBe(200);
+    const readCompatibility = await readCompatibilityResponse.json() as {
+      result: {
+        structuredContent: {
+          artifactPath: string;
+          relativePath: string;
+          artifact: {
+            id: string;
+            target: {
+              provider: string;
+            };
+          };
+        };
+      };
+    };
+    expect(readCompatibility.result.structuredContent.artifactPath).toBe(
+      '/diagnostics/providers/evidence/compat-artifact-mcp?provider=claude',
+    );
+    expect(readCompatibility.result.structuredContent.relativePath).toContain('claude/');
+    expect(readCompatibility.result.structuredContent.artifact).toEqual(expect.objectContaining({
+      id: 'compat-artifact-mcp',
+      target: expect.objectContaining({
+        provider: 'claude',
+      }),
     }));
 
     const listSessionsResponse = await app.request('/mcp', {

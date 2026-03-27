@@ -70,6 +70,12 @@ const PROVIDER_EVOLUTION_REVIEW_CLASSIFICATIONS = [
   'schema_change',
   'semantic_drift_suspected',
 ] as const;
+const COMPATIBILITY_EVIDENCE_CLASSIFICATIONS = [
+  'degraded',
+  'unsupported_version',
+  'unrecognized_protocol',
+  'probe_failed',
+] as const;
 const RUNTIME_MODES = ['native', 'wsl', 'docker'] as const;
 const RUNTIME_SKILL_FAMILIES = ['base', 'orchestration', 'work', 'chat', 'code'] as const;
 const RUNTIME_SKILL_PACKAGE_KINDS = ['base', 'role', 'bundle'] as const;
@@ -457,6 +463,101 @@ async function listProviderEvolutionArtifacts(
     structuredContent: {
       ...payload,
       artifactsPath: path,
+    },
+  };
+}
+
+async function listCompatibilityEvidenceArtifacts(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const searchParams = new URLSearchParams();
+  appendSingleQueryValue(searchParams, 'provider', readOptionalString(args, 'provider'));
+  appendSingleQueryValue(searchParams, 'instance', readOptionalString(args, 'instance'));
+  appendSingleQueryValue(searchParams, 'parserId', readOptionalString(args, 'parserId'));
+  appendSingleQueryValue(searchParams, 'profileId', readOptionalString(args, 'profileId'));
+  appendSingleQueryValue(
+    searchParams,
+    'runtimeMode',
+    readOptionalEnumString(
+      args,
+      'runtimeMode',
+      RUNTIME_MODES,
+      'runtimeMode must be a valid runtime mode',
+    ),
+  );
+  appendQueryValues(
+    searchParams,
+    'classification',
+    readOptionalEnumStringArray(
+      args,
+      'classification',
+      COMPATIBILITY_EVIDENCE_CLASSIFICATIONS,
+      'classification values must be valid compatibility evidence classifications',
+    ),
+  );
+  appendSingleQueryValue(searchParams, 'limit', readOptionalInteger(args, 'limit', 1));
+
+  const path = searchParams.size > 0
+    ? `/diagnostics/providers/evidence?${searchParams.toString()}`
+    : '/diagnostics/providers/evidence';
+  const result = await requestRuntimeJson(ctx, path, { method: 'GET' });
+  ensureRouteSuccess('list_compatibility_evidence_artifacts', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'list_compatibility_evidence_artifacts result');
+  const artifacts = Array.isArray(payload.artifacts) ? payload.artifacts : [];
+
+  return {
+    summary: `Retained compatibility evidence artifacts: ${artifacts.length}.`,
+    structuredContent: {
+      ...payload,
+      artifactsPath: path,
+    },
+  };
+}
+
+async function readCompatibilityEvidenceArtifact(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const artifactId = readRequiredString(args, 'artifactId');
+  const searchParams = new URLSearchParams();
+  appendSingleQueryValue(searchParams, 'provider', readOptionalString(args, 'provider'));
+  appendSingleQueryValue(searchParams, 'instance', readOptionalString(args, 'instance'));
+  appendSingleQueryValue(searchParams, 'parserId', readOptionalString(args, 'parserId'));
+  appendSingleQueryValue(searchParams, 'profileId', readOptionalString(args, 'profileId'));
+  appendSingleQueryValue(
+    searchParams,
+    'runtimeMode',
+    readOptionalEnumString(
+      args,
+      'runtimeMode',
+      RUNTIME_MODES,
+      'runtimeMode must be a valid runtime mode',
+    ),
+  );
+  appendQueryValues(
+    searchParams,
+    'classification',
+    readOptionalEnumStringArray(
+      args,
+      'classification',
+      COMPATIBILITY_EVIDENCE_CLASSIFICATIONS,
+      'classification values must be valid compatibility evidence classifications',
+    ),
+  );
+
+  const query = searchParams.size > 0 ? `?${searchParams.toString()}` : '';
+  const path = `/diagnostics/providers/evidence/${encodeURIComponent(artifactId)}${query}`;
+  const result = await requestRuntimeJson(ctx, path, { method: 'GET' });
+  ensureRouteSuccess('read_compatibility_evidence_artifact', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'read_compatibility_evidence_artifact result');
+  return {
+    summary: `Compatibility evidence artifact ${artifactId}.`,
+    structuredContent: {
+      ...payload,
+      artifactPath: path,
     },
   };
 }
@@ -1525,6 +1626,30 @@ const TOOL_HANDLERS: McpToolHandler[] = [
   },
   {
     definition: {
+      name: 'list_compatibility_evidence_artifacts',
+      title: 'List Compatibility Evidence Artifacts',
+      description: 'List retained compatibility evidence artifacts through the runtime-owned diagnostics read surface.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          provider: { type: 'string' },
+          instance: { type: 'string' },
+          parserId: { type: 'string' },
+          profileId: { type: 'string' },
+          runtimeMode: { type: 'string', enum: RUNTIME_MODES },
+          classification: {
+            type: 'array',
+            items: { type: 'string', enum: COMPATIBILITY_EVIDENCE_CLASSIFICATIONS },
+          },
+          limit: { type: 'integer', minimum: 1 },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: listCompatibilityEvidenceArtifacts,
+  },
+  {
+    definition: {
       name: 'read_provider_evolution_artifact',
       title: 'Read Provider Evolution Artifact',
       description: 'Read one retained provider-evolution probe artifact by id through the runtime-owned diagnostics surface.',
@@ -1548,6 +1673,31 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: readProviderEvolutionArtifact,
+  },
+  {
+    definition: {
+      name: 'read_compatibility_evidence_artifact',
+      title: 'Read Compatibility Evidence Artifact',
+      description: 'Read one retained compatibility evidence artifact by id through the runtime-owned diagnostics surface.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          artifactId: { type: 'string' },
+          provider: { type: 'string' },
+          instance: { type: 'string' },
+          parserId: { type: 'string' },
+          profileId: { type: 'string' },
+          runtimeMode: { type: 'string', enum: RUNTIME_MODES },
+          classification: {
+            type: 'array',
+            items: { type: 'string', enum: COMPATIBILITY_EVIDENCE_CLASSIFICATIONS },
+          },
+        },
+        required: ['artifactId'],
+        additionalProperties: false,
+      },
+    },
+    execute: readCompatibilityEvidenceArtifact,
   },
   {
     definition: {
