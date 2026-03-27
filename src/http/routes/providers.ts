@@ -10,6 +10,11 @@ import type { ProviderName } from '../../backends/cli/providers/types.js';
 import { inspectAgentTarget } from '../../backends/agent/inspection.js';
 import { buildProviderInstallCatalogView } from '../../core/provider-install/knowledge.js';
 import {
+  createProviderEvolutionProbeService,
+  resolveProviderEvolutionArtifactInstance,
+  summarizeProviderEvolutionArtifactForReadModel,
+} from '../../core/compatibility/providerEvolutionReadModel.js';
+import {
   buildProviderToolingSummary,
   loadProviderRemoteToolCatalog,
 } from '../../core/tools/providerTooling.js';
@@ -19,25 +24,30 @@ import { getRouteErrorStatus } from '../routeErrors.js';
 
 export const providerRoutes = new Hono();
 
-providerRoutes.get('/providers/config', (c) => {
+providerRoutes.get('/providers/config', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const providerCatalog = listProviderCatalog(ctx.config);
   const compatibility = getProviderCompatibilityService(ctx);
   const executionStrategies = ctx.apiBackend?.inspectExecutionStrategies();
+  const probeService = createProviderEvolutionProbeService(ctx.config);
 
-  const providers = Object.fromEntries(
-    listConfiguredProviders(ctx.config).flatMap((providerName) => {
+  const providerEntries = await Promise.all(
+    listConfiguredProviders(ctx.config).map(async (providerName) => {
       const provider = providerCatalog[providerName];
       if (!provider) {
-        return [];
+        return null;
       }
 
-      const instances = provider.instances.map((instance) => {
+      const instances = await Promise.all(provider.instances.map(async (instance) => {
         const agentRuntime = instance.backend === 'agent' && instance.remoteInstance
           ? ctx.agentBackend
             ? ctx.agentBackend.inspect(instance)
             : inspectAgentTarget(instance.remoteInstance, { env: process.env })
           : undefined;
+        const latestProbeArtifact = await probeService.readLatestArtifact({
+          provider: instance.providerName,
+          instance: resolveProviderEvolutionArtifactInstance(instance),
+        });
 
         return {
           ...(instance.backend === 'cli' && instance.cliInstance
@@ -68,22 +78,30 @@ providerRoutes.get('/providers/config', (c) => {
               instance.instanceId,
             ) || null
             : null,
+          ...(latestProbeArtifact ? {
+            providerEvolution: {
+              latestArtifact: summarizeProviderEvolutionArtifactForReadModel(latestProbeArtifact),
+            },
+          } : {}),
         };
-      });
+      }));
 
       if (instances.length === 0) {
-        return [];
+        return null;
       }
 
-      return [[
+      return [
         providerName,
         {
           defaultInstance: provider.defaultTarget?.instance || instances[0]?.id || 'default',
           defaultBackend: provider.defaultTarget?.backend,
           instances,
         },
-      ]];
+      ] as const;
     }),
+  );
+  const providers = Object.fromEntries(
+    providerEntries.filter((entry): entry is NonNullable<typeof entry> => entry !== null),
   );
 
   return c.json({

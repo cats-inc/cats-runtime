@@ -2586,6 +2586,12 @@ second diagnostics request. The read model includes:
 - `strategies[*].contextSchema`: machine-readable bounded numeric keys and
   default sources for `strategyContext`
 
+When a retained manual provider-evolution artifact exists for an instance, the
+same instance entry also exposes additive `providerEvolution.latestArtifact`.
+This reuses the retained artifact read model already surfaced on
+`GET /diagnostics/providers`, so hosts can inspect the latest capability
+snapshot/review without making a second provider diagnostics call.
+
 Each instance entry also exposes additive `tooling` metadata:
 
 - `source`: `runtime_local`, `provider_native`, or `provider_managed`

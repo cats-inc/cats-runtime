@@ -3,6 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from '../src/core/config.js';
+import {
+  ProviderEvolutionProbeService,
+  PROVIDER_EVOLUTION_PROBE_PROFILES,
+} from '../src/core/compatibility/providerEvolutionProbe.js';
 import { createRuntimeServer } from '../src/server.js';
 
 function parseNdjson(text: string): Array<Record<string, unknown>> {
@@ -329,6 +333,126 @@ function createFakeWebSocketFactory(
 }
 
 describe('agent backend integration', () => {
+  it('surfaces retained provider-evolution summaries on /providers/config', async () => {
+    const { config, env, cleanup } = createAgentConfigRoot();
+    let now = Date.parse('2026-03-27T00:00:00.000Z');
+    const probeService = new ProviderEvolutionProbeService({
+      rootDir: join(config.dataDir, 'compatibility', 'provider-evolution'),
+      now: () => now,
+    });
+
+    const request = {
+      target: {
+        provider: 'openclaw',
+        instance: 'agent/gateway',
+        parserId: 'openclaw-gateway-v3',
+        probeProfile: 'manual_text',
+        transport: 'agent' as const,
+        version: '3',
+      },
+      profile: PROVIDER_EVOLUTION_PROBE_PROFILES.manual_text,
+    };
+
+    await probeService.run({
+      ...request,
+      run: async ({ observer }) => {
+        observer.recordNormalized({
+          rawEventType: 'agent.output.delta',
+          events: { type: 'text', text: 'alpha' },
+        });
+        observer.recordNormalized({
+          rawEventType: 'run.completed',
+          events: { type: 'result' },
+        });
+        return {
+          status: 'completed' as const,
+          turnsCompleted: 1,
+          emittedEventCount: 2,
+        };
+      },
+    });
+
+    now += 1000;
+
+    const current = await probeService.run({
+      ...request,
+      run: async ({ observer }) => {
+        observer.recordNormalized({
+          rawEventType: 'agent.output.delta',
+          events: { type: 'text', text: 'alpha' },
+        });
+        observer.recordNormalized({
+          rawEventType: 'run.completed',
+          events: { type: 'result' },
+        });
+        observer.recordSchemaFailure({
+          rawEventType: 'gateway.event',
+          rawSample: { event: 'gateway.event' },
+        });
+        return {
+          status: 'completed' as const,
+          turnsCompleted: 1,
+          emittedEventCount: 3,
+        };
+      },
+    });
+
+    const runtime = createRuntimeServer(config, {
+      agentBackend: {
+        env,
+      },
+    });
+
+    try {
+      const response = await runtime.app.request('/providers/config');
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual(expect.objectContaining({
+        providers: expect.objectContaining({
+          openclaw: expect.objectContaining({
+            instances: [
+              expect.objectContaining({
+                id: 'gateway',
+                target: 'agent/gateway',
+                providerEvolution: {
+                  latestArtifact: expect.objectContaining({
+                    artifactId: current.artifact.id,
+                    probeProfile: 'manual_text',
+                    transport: 'agent',
+                    version: '3',
+                    relativePath: expect.stringContaining('openclaw'),
+                    capabilitySnapshot: expect.objectContaining({
+                      incrementalText: expect.objectContaining({
+                        observed: true,
+                        count: 1,
+                      }),
+                      finalResult: expect.objectContaining({
+                        observed: true,
+                        count: 1,
+                      }),
+                    }),
+                    compare: expect.objectContaining({
+                      addedEventTypeCount: 0,
+                      removedEventTypeCount: 0,
+                      frequencyDropCount: 0,
+                      schemaChangeCount: 1,
+                      semanticDriftSuspected: false,
+                    }),
+                    review: expect.objectContaining({
+                      classifications: ['schema_change'],
+                    }),
+                  }),
+                },
+              }),
+            ],
+          }),
+        }),
+      }));
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
   it('creates, streams, resumes, and reuses OpenClaw-backed sessions', async () => {
     const { config, env, cleanup } = createAgentConfigRoot();
     const sentFrames: Array<Record<string, unknown>> = [];

@@ -1057,7 +1057,7 @@ always-on self-adapting parser system.
 
 #### Current Implementation Status
 
-- the first six `PLAN-021` slices are landed
+- the first seven `PLAN-021` slices are landed
 - `src/core/compatibility/providerEvolution.ts` now owns a transport-neutral
   evidence collector and bundle shape
 - high-value CLI adapters now have optional instrumentation for:
@@ -1098,6 +1098,9 @@ always-on self-adapting parser system.
   `providerEvolution.latestArtifact` summaries, reusing the retained artifact
   read model to surface capability snapshot, compare counts, review
   classification, and relative artifact path for each matching provider target
+- `/providers/config` instance entries now reuse the same retained artifact
+  read model, so host/provider-selection flows can fetch provider topology and
+  latest provider-evolution summary in one call
 - normal runtime execution remains unchanged when evidence collection is not
   enabled
 

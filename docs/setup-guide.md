@@ -317,6 +317,9 @@ Diagnostics rules:
   same diagnostics surface also exposes additive
   `providerEvolution.latestArtifact` summary data so operators can inspect the
   latest capability snapshot/review without rerunning the probe
+- `GET /providers/config` now reuses the same retained artifact summary on
+  matching instance entries, so provider-selection flows can fetch topology and
+  the latest provider-evolution review in one call
 - agent targets now also expose additive `config.agentRuntime` metadata plus an
   `agent_runtime_contract` check so operators can read gateway-vs-bridge
   transport, auth, and continuity semantics without opening a session
