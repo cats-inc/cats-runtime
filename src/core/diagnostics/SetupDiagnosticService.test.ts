@@ -2,7 +2,11 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { loadConfig } from '../config.js';
+import { getRuntimeResolvedPaths, loadConfig } from '../config.js';
+import {
+  ProviderEvolutionProbeService,
+  PROVIDER_EVOLUTION_PROBE_PROFILES,
+} from '../compatibility/providerEvolutionProbe.js';
 import {
   SetupDiagnosticService,
   type SetupDiagnosticBootstrapService,
@@ -70,6 +74,30 @@ function createBootstrapStub(): SetupDiagnosticBootstrapService {
   };
 }
 
+async function createProviderEvolutionArtifact(root: string): Promise<void> {
+  const config = loadConfig(createTestEnv(root));
+  const service = new ProviderEvolutionProbeService({
+    rootDir: join(getRuntimeResolvedPaths(config).compatibilityEvidenceDir, 'provider-evolution'),
+  });
+
+  await service.run({
+    target: {
+      provider: 'claude',
+      instance: 'default',
+      parserId: 'claude-cli',
+      probeProfile: PROVIDER_EVOLUTION_PROBE_PROFILES.manual_text.id,
+      transport: 'stdio',
+      version: '1.0.0',
+    },
+    profile: PROVIDER_EVOLUTION_PROBE_PROFILES.manual_text,
+    run: async () => ({
+      status: 'completed',
+      turnsCompleted: PROVIDER_EVOLUTION_PROBE_PROFILES.manual_text.turns.length,
+      emittedEventCount: 0,
+    }),
+  });
+}
+
 describe('SetupDiagnosticService', () => {
   it('lists retained reports newest-first and reads specific artifacts by id', async () => {
     const { root, cleanup } = createTestRoot();
@@ -105,6 +133,40 @@ describe('SetupDiagnosticService', () => {
         report: first.report,
       });
       expect(service.readReport('../not-allowed')).toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('references recent provider-evolution artifacts without embedding full evidence', async () => {
+    const { root, cleanup } = createTestRoot();
+
+    try {
+      await createProviderEvolutionArtifact(root);
+
+      const service = new SetupDiagnosticService({
+        config: loadConfig(createTestEnv(root)),
+        bootstrapService: createBootstrapStub(),
+        now: () => new Date('2026-03-26T00:00:00.000Z'),
+      });
+
+      const artifact = await service.generateReport();
+      expect(artifact.report.references.providerEvolutionArtifacts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            provider: 'claude',
+            instance: 'default',
+            parserId: 'claude-cli',
+            probeProfile: 'manual_text',
+            transport: 'stdio',
+            relativePath: expect.stringMatching(/claude[\\/]/),
+            review: expect.objectContaining({
+              classifications: ['baseline'],
+            }),
+          }),
+        ]),
+      );
+      expect(artifact.report.references.providerEvolutionArtifacts[0]).not.toHaveProperty('evidence');
     } finally {
       cleanup();
     }

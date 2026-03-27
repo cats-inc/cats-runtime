@@ -24,6 +24,8 @@ import {
   listProviderCatalog,
   type ProviderCatalogEntry,
 } from '../providerCatalog.js';
+import { createProviderEvolutionProbeService } from '../compatibility/providerEvolutionReadModel.js';
+import type { ProviderEvolutionProbeArtifactSummary } from '../compatibility/providerEvolutionProbe.js';
 import type {
   BootstrapScanResult,
   ProviderUniverseEntry,
@@ -31,6 +33,7 @@ import type {
 } from '../bootstrap/BootstrapService.js';
 
 const DEFAULT_REPORT_RETENTION_LIMIT = 5;
+const DEFAULT_PROVIDER_EVOLUTION_REFERENCE_LIMIT = 3;
 const REPORT_FILE_PREFIX = 'setup-report-';
 const REPORT_FILE_SUFFIX = '.json';
 const COMMAND_LOOKUP_TIMEOUT_MS = 2_000;
@@ -41,6 +44,18 @@ export interface SetupDiagnosticIssue {
   severity: 'info' | 'warning' | 'error';
   message: string;
   details?: Record<string, unknown>;
+}
+
+export interface SetupDiagnosticProviderEvolutionReference {
+  artifactId: string;
+  provider: string;
+  instance: string;
+  parserId: string;
+  probeProfile: string;
+  transport: string;
+  capturedAt: string;
+  relativePath: string;
+  review: Pick<ProviderEvolutionProbeArtifactSummary['review'], 'classifications' | 'summary'>;
 }
 
 export interface SetupDiagnosticReport {
@@ -127,6 +142,7 @@ export interface SetupDiagnosticReport {
     latestScanPath: string;
     latestManualScanPath: string;
     compatibilityEvidenceDir: string;
+    providerEvolutionArtifacts: SetupDiagnosticProviderEvolutionReference[];
   };
   issues: SetupDiagnosticIssue[];
 }
@@ -214,6 +230,7 @@ export class SetupDiagnosticService {
     const port = await checkPortAvailability(listener.host, listener.port, this.startup);
     const git = await inspectGit();
     const evidenceFileCount = countJsonArtifacts(paths.compatibilityEvidenceDir);
+    const providerEvolutionArtifacts = await listProviderEvolutionReferences(this.config);
 
     let scanSource: SetupDiagnosticReport['setup']['scan']['source'] = 'missing';
     let state: SetupState | null = null;
@@ -330,6 +347,7 @@ export class SetupDiagnosticService {
         latestScanPath: join(paths.dataDir, 'setup', 'provider-scan.json'),
         latestManualScanPath: join(paths.dataDir, 'setup', 'provider-manual-scan.json'),
         compatibilityEvidenceDir: paths.compatibilityEvidenceDir,
+        providerEvolutionArtifacts,
       },
       issues,
     }, env);
@@ -842,6 +860,33 @@ function countJsonArtifacts(pathValue: string): number {
   }
 
   return readdirSync(pathValue).filter((entry) => entry.endsWith('.json')).length;
+}
+
+async function listProviderEvolutionReferences(
+  config: Pick<RuntimeConfig, 'configPath' | 'dataDir' | 'sessionBaseDir'>,
+): Promise<SetupDiagnosticProviderEvolutionReference[]> {
+  try {
+    return (await createProviderEvolutionProbeService(config)
+      .listArtifacts({
+        limit: DEFAULT_PROVIDER_EVOLUTION_REFERENCE_LIMIT,
+      }))
+      .map((artifact) => ({
+        artifactId: artifact.artifactId,
+        provider: artifact.provider,
+        instance: artifact.instance,
+        parserId: artifact.parserId,
+        probeProfile: artifact.probeProfile,
+        transport: artifact.transport,
+        capturedAt: artifact.capturedAt,
+        relativePath: artifact.relativePath,
+        review: {
+          classifications: [...artifact.review.classifications],
+          summary: artifact.review.summary,
+        },
+      }));
+  } catch {
+    return [];
+  }
 }
 
 function listReportPaths(diagnosticsDir: string): string[] {

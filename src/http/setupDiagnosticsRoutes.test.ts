@@ -3,7 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
-import { loadConfig } from '../core/config.js';
+import {
+  ProviderEvolutionProbeService,
+  PROVIDER_EVOLUTION_PROBE_PROFILES,
+} from '../core/compatibility/providerEvolutionProbe.js';
+import { getRuntimeResolvedPaths, loadConfig } from '../core/config.js';
 import type { SetupDiagnosticBootstrapService } from '../core/diagnostics/SetupDiagnosticService.js';
 import type { AppContext } from './app.js';
 import { setupDiagnosticsRoutes } from './routes/setupDiagnostics.js';
@@ -76,10 +80,35 @@ function createBootstrapStub(): SetupDiagnosticBootstrapService {
   };
 }
 
+async function createProviderEvolutionArtifact(root: string): Promise<void> {
+  const config = loadConfig(createTestEnv(root));
+  const service = new ProviderEvolutionProbeService({
+    rootDir: join(getRuntimeResolvedPaths(config).compatibilityEvidenceDir, 'provider-evolution'),
+  });
+
+  await service.run({
+    target: {
+      provider: 'claude',
+      instance: 'default',
+      parserId: 'claude-cli',
+      probeProfile: PROVIDER_EVOLUTION_PROBE_PROFILES.manual_text.id,
+      transport: 'stdio',
+      version: '1.0.0',
+    },
+    profile: PROVIDER_EVOLUTION_PROBE_PROFILES.manual_text,
+    run: async () => ({
+      status: 'completed',
+      turnsCompleted: PROVIDER_EVOLUTION_PROBE_PROFILES.manual_text.turns.length,
+      emittedEventCount: 0,
+    }),
+  });
+}
+
 describe('setup diagnostics routes', () => {
   it('generates, lists, and reads setup diagnostic artifacts', async () => {
     const { root, cleanup } = createTestRoot();
     try {
+      await createProviderEvolutionArtifact(root);
       const app = new Hono<{ Variables: { ctx: AppContext } }>();
       const ctx = {
         config: loadConfig(createTestEnv(root)),
@@ -116,10 +145,27 @@ describe('setup diagnostics routes', () => {
       const postBody = await postResponse.json() as {
         status: string;
         artifactPath: string;
-        report: { artifactId: string; setup: { scan: { source: string } } };
+        report: {
+          artifactId: string;
+          setup: { scan: { source: string } };
+          references: {
+            providerEvolutionArtifacts: Array<{
+              provider: string;
+              relativePath: string;
+            }>;
+          };
+        };
       };
       expect(postBody.status).toBe('generated');
       expect(postBody.report.setup.scan.source).toBe('refreshed');
+      expect(postBody.report.references.providerEvolutionArtifacts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            provider: 'claude',
+            relativePath: expect.stringMatching(/claude[\\/]/),
+          }),
+        ]),
+      );
       expect(existsSync(postBody.artifactPath)).toBe(true);
 
       await new Promise((resolve) => setTimeout(resolve, 20));
