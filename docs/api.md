@@ -2932,7 +2932,10 @@ Catalog semantics:
   of silently degrading.
 - `source: static` means the runtime used a curated compatibility table.
 - `cache` is present only for `dynamic` results. Config/static fallbacks return
-  `cache: null`.
+  `cache: null`. `cache.stale: true` is additive and means the runtime had a
+  previously discovered dynamic catalog, the refresh attempt failed after the
+  TTL window, and the route deliberately served the retained dynamic snapshot
+  instead of dropping straight to `config` or `static`.
 - `warnings` stays empty on clean discovery, and becomes additive when the
   runtime had to degrade gracefully. For example, dynamic discovery may still
   return `source: dynamic` with warnings if a secondary probe such as Ollama's
@@ -2941,6 +2944,11 @@ Catalog semantics:
 - HTTP-backed remote discovery is bounded with a 5-second timeout. Stalled
   OpenAI/Anthropic/Gemini or Ollama endpoints now degrade into warnings plus
   `config`/`static` fallback instead of hanging the request indefinitely.
+- When a target already has a cached dynamic catalog, refresh failures after
+  the TTL window now prefer that stale dynamic snapshot over an immediate
+  config/static downgrade. Those responses keep `source: dynamic`, return
+  `cache.stale: true`, and add a warning explaining that refresh failed and a
+  retained catalog snapshot was served instead.
 - `models[].status` is additive runtime metadata. Current values are:
   `running` for models that the runtime knows are already warm/loaded,
   `available` for dynamically discovered but not currently warm models, and

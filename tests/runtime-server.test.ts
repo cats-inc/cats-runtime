@@ -3838,6 +3838,137 @@ providers:
     });
   });
 
+  it('GET /providers/:provider/models reuses stale dynamic cache when refresh fails after TTL', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-27T00:00:00.000Z'));
+
+    try {
+      let refreshFailed = false;
+      const fetchMock = vi.fn(async (input: string | URL | Request) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+        if (refreshFailed) {
+          throw new Error('connection refused');
+        }
+
+        if (url.endsWith('/api/tags')) {
+          return new Response(JSON.stringify({
+            models: [
+              { name: 'deepseek-r1:14b' },
+              { name: 'qwen2.5-coder:7b' },
+            ],
+          }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+
+        if (url.endsWith('/api/ps')) {
+          return new Response(JSON.stringify({
+            models: [
+              { name: 'qwen2.5-coder:7b' },
+            ],
+          }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      });
+
+      await withRuntime({
+        providerDefaultTargets: {
+          ollama: { backend: 'local', instance: 'local' },
+        },
+        remoteProviderCatalog: {
+          api: {},
+          local: {
+            ollama: {
+              local: {
+                id: 'local',
+                providerName: 'ollama',
+                backend: 'local',
+                transport: 'ollama',
+                baseUrl: 'http://127.0.0.1:11434',
+                model: 'qwen2.5-coder:7b',
+              },
+            },
+          },
+          agent: {},
+        },
+      }, { apiBackend: { fetch: fetchMock } }, async (runtime) => {
+        const first = await runtime.app.request('/providers/ollama/models');
+        expect(first.status).toBe(200);
+        expect(await first.json()).toEqual({
+          provider: 'ollama',
+          backend: 'local',
+          instance: 'local',
+          defaultModel: 'qwen2.5-coder:7b',
+          source: 'dynamic',
+          cache: {
+            servedFromCache: false,
+            cachedAt: '2026-03-27T00:00:00.000Z',
+            ttlSec: 60,
+          },
+          models: [
+            {
+              id: 'deepseek-r1:14b',
+              label: 'deepseek-r1:14b',
+              default: false,
+              status: 'available',
+            },
+            {
+              id: 'qwen2.5-coder:7b',
+              label: 'qwen2.5-coder:7b',
+              default: true,
+              status: 'running',
+            },
+          ],
+          warnings: [],
+        });
+
+        refreshFailed = true;
+        vi.setSystemTime(new Date('2026-03-27T00:01:01.000Z'));
+
+        const second = await runtime.app.request('/providers/ollama/models');
+        expect(second.status).toBe(200);
+        expect(await second.json()).toEqual({
+          provider: 'ollama',
+          backend: 'local',
+          instance: 'local',
+          defaultModel: 'qwen2.5-coder:7b',
+          source: 'dynamic',
+          cache: {
+            servedFromCache: true,
+            cachedAt: '2026-03-27T00:00:00.000Z',
+            ttlSec: 60,
+            stale: true,
+          },
+          models: [
+            {
+              id: 'deepseek-r1:14b',
+              label: 'deepseek-r1:14b',
+              default: false,
+              status: 'available',
+            },
+            {
+              id: 'qwen2.5-coder:7b',
+              label: 'qwen2.5-coder:7b',
+              default: true,
+              status: 'running',
+            },
+          ],
+          warnings: [
+            'Dynamic model discovery failed for ollama/local/local: connection refused Serving stale cached catalog from 2026-03-27T00:00:00.000Z.',
+          ],
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(3);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('GET /providers/:provider/models returns 400 for unknown providers', async () => {
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/providers/missing/models');

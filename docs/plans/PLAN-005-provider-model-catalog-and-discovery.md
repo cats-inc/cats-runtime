@@ -121,7 +121,7 @@ semantics.
       `cats` server integration is real
 - [ ] Revisit whether an explicit refresh endpoint is needed after cache
       behavior is exercised
-- [ ] Add explicit timeout and abort handling for discovery-backed HTTP fetches
+- [x] Add explicit timeout and abort handling for discovery-backed HTTP fetches
       such as `ollama` model listing so partial hangs degrade into fallback
       warnings instead of long-lived requests
 - [ ] Expand dynamic discovery to more CLI or API-backed providers only when
@@ -186,6 +186,7 @@ slice.
 |------|--------|
 | 2026-03-19 | Plan created after `SPEC-004` approval and follow-up review feedback |
 | 2026-03-26 | Core catalog delivery shipped: `ProviderModelCatalogService`, `GET /providers/{provider}/models`, TTL caching, dynamic `ollama` and agent-backed `listModels()` discovery, Kiro/static fallback unification, and route/service regression coverage all landed; later aggregate/refresh follow-ons remain intentionally deferred |
+| 2026-03-27 | Follow-through hardening landed: HTTP-backed remote model discovery now has explicit timeout/abort degradation, and later refresh failures reuse the last cached dynamic catalog with additive `cache.stale` metadata instead of immediately dropping to config/static fallback |
 
 ---
 

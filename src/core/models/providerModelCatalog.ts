@@ -39,6 +39,7 @@ export interface ProviderModelCatalogCacheMetadata {
   servedFromCache: boolean;
   cachedAt: string | null;
   ttlSec: number | null;
+  stale?: boolean;
 }
 
 export interface ProviderModelCatalogResult {
@@ -264,6 +265,20 @@ function withDefaultModel(
   };
 }
 
+function buildCacheMetadata(
+  ttlMs: number,
+  cachedAtMs: number,
+  servedFromCache: boolean,
+  stale = false,
+): ProviderModelCatalogCacheMetadata {
+  return {
+    servedFromCache,
+    cachedAt: new Date(cachedAtMs).toISOString(),
+    ttlSec: Math.floor(ttlMs / 1000),
+    ...(stale ? { stale: true } : {}),
+  };
+}
+
 function statusRank(status: ProviderModelCatalogEntry['status']): number {
   switch (status) {
     case 'running':
@@ -391,11 +406,7 @@ export class ProviderModelCatalogService {
       return this.buildCatalog(target, {
         defaultModel,
         source: 'dynamic',
-        cache: {
-          servedFromCache: true,
-          cachedAt: new Date(cached.cachedAt).toISOString(),
-          ttlSec: Math.floor(this.ttlMs / 1000),
-        },
+        cache: buildCacheMetadata(this.ttlMs, cached.cachedAt, true),
         models: withDefaultModel(cached.models, defaultModel).models,
         warnings: [...warnings, ...cached.warnings],
       });
@@ -431,20 +442,29 @@ export class ProviderModelCatalogService {
       return this.buildCatalog(target, {
         defaultModel,
         source: 'dynamic',
-        cache: {
-          servedFromCache: false,
-          cachedAt: new Date(now).toISOString(),
-          ttlSec: Math.floor(this.ttlMs / 1000),
-        },
+        cache: buildCacheMetadata(this.ttlMs, now, false),
         models: normalized.models,
         warnings: [...warnings, ...dynamicWarnings],
       });
     } catch (error) {
-      warnings.push(
-        `Dynamic model discovery failed for ${target.providerName}/${target.backend}/${target.instanceId}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+      const errorMessage = `Dynamic model discovery failed for ${target.providerName}/${target.backend}/${target.instanceId}: ${
+        error instanceof Error ? error.message : String(error)
+      }`;
+      if (cached) {
+        return this.buildCatalog(target, {
+          defaultModel,
+          source: 'dynamic',
+          cache: buildCacheMetadata(this.ttlMs, cached.cachedAt, true, true),
+          models: withDefaultModel(cached.models, defaultModel).models,
+          warnings: [
+            ...warnings,
+            ...cached.warnings,
+            `${errorMessage} Serving stale cached catalog from ${new Date(cached.cachedAt).toISOString()}.`,
+          ],
+        });
+      }
+
+      warnings.push(errorMessage);
       return null;
     }
   }

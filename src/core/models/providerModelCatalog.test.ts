@@ -219,6 +219,72 @@ describe('ProviderModelCatalogService', () => {
     ]);
   });
 
+  it('reuses stale dynamic catalogs when refresh fails after the TTL window', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-27T00:00:00.000Z'));
+
+    try {
+      let refreshFailed = false;
+      const fetchMock = vi.fn<typeof fetch>(async (input) => {
+        const url = typeof input === 'string' ? input : input.url;
+        if (refreshFailed) {
+          throw new Error('connection refused');
+        }
+
+        if (url.endsWith('/api/tags')) {
+          return jsonResponse({
+            models: [
+              { name: 'deepseek-r1:14b' },
+            ],
+          });
+        }
+
+        if (url.endsWith('/api/ps')) {
+          return jsonResponse({
+            models: [
+              { name: 'deepseek-r1:14b' },
+            ],
+          });
+        }
+
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      });
+
+      const service = new ProviderModelCatalogService(createCatalogConfig() as never, {
+        fetch: fetchMock,
+        ttlMs: 60_000,
+      });
+
+      const first = await service.getCatalog('ollama');
+      expect(first.source).toBe('dynamic');
+      expect(first.cache).toEqual({
+        servedFromCache: false,
+        cachedAt: '2026-03-27T00:00:00.000Z',
+        ttlSec: 60,
+      });
+
+      refreshFailed = true;
+      vi.setSystemTime(new Date('2026-03-27T00:01:01.000Z'));
+
+      const second = await service.getCatalog('ollama');
+      expect(second.source).toBe('dynamic');
+      expect(second.cache).toEqual({
+        servedFromCache: true,
+        cachedAt: '2026-03-27T00:00:00.000Z',
+        ttlSec: 60,
+        stale: true,
+      });
+      expect(second.models).toEqual(first.models);
+      expect(second.warnings).toEqual([
+        "Configured default model 'qwen3:latest' was not returned by dynamic discovery; added as configured fallback.",
+        "Dynamic model discovery failed for ollama/local/local: connection refused Serving stale cached catalog from 2026-03-27T00:00:00.000Z.",
+      ]);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('uses runtime-owned Goose config as the default-model hint for CLI catalogs', async () => {
     const { env, cleanup } = createGooseConfigRoot([
       'GOOSE_PROVIDER: anthropic',

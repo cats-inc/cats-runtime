@@ -641,6 +641,9 @@ tightening and cleanup steps are intentionally deferred.
 #### Current Implementation Status
 
 - `GET /providers/:provider/models` remains the stable v1 compatibility surface
+- that v1 route now also prefers a stale cached dynamic catalog, marked with
+  additive `cache.stale: true`, when a later refresh fails after the TTL
+  window instead of immediately dropping to config/static fallback
 - `GET /providers/:provider/models/advanced` exists as the additive advanced
   catalog surface
 - session create/read contracts now support additive `modelSelection` and
