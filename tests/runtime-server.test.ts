@@ -1689,6 +1689,9 @@ backends:
       const runtimePayload = await runtimeResponse.json() as {
         runtime: {
           management: {
+            adapters: {
+              summary: string;
+            };
             operations: {
               total: number;
               polling: number;
@@ -1700,7 +1703,12 @@ backends:
           };
         };
       };
-      expect(runtimePayload.runtime.management).toEqual({
+      expect(runtimePayload.runtime.management).toEqual(expect.objectContaining({
+        adapters: expect.objectContaining({
+          summary: expect.objectContaining({
+            summary: expect.stringContaining('management adapter'),
+          }),
+        }),
         operations: expect.objectContaining({
           total: 2,
           polling: 1,
@@ -1709,12 +1717,15 @@ backends:
           oldestStartedAt: expect.any(String),
           latestUpdatedAt: expect.any(String),
         }),
-      });
+      }));
 
       const healthResponse = await runtime.app.request('/diagnostics/health');
       expect(healthResponse.status).toBe(200);
       const healthPayload = await healthResponse.json() as {
         management: {
+          adapters: {
+            summary: string;
+          };
           summary: {
             total: number;
             polling: number;
@@ -1725,7 +1736,10 @@ backends:
           };
         };
       };
-      expect(healthPayload.management).toEqual({
+      expect(healthPayload.management).toEqual(expect.objectContaining({
+        adapters: expect.objectContaining({
+          summary: expect.stringContaining('management adapter'),
+        }),
         summary: expect.objectContaining({
           total: 2,
           polling: 1,
@@ -1734,7 +1748,7 @@ backends:
           oldestStartedAt: expect.any(String),
           latestUpdatedAt: expect.any(String),
         }),
-      });
+      }));
     } finally {
       await runtime.close();
       rmSync(root, { recursive: true, force: true });
@@ -2185,7 +2199,30 @@ backends:
             cleanupCandidateOlderThanMs: 1800000,
           },
         },
+        browserDrivers: {
+          summary: {
+            totalDrivers: 1,
+            readyDrivers: 1,
+            degradedDrivers: 0,
+            unsupportedDrivers: 0,
+            persistentSessionDrivers: 1,
+            liveAutomationDrivers: 0,
+            manualUrlEntryDrivers: 1,
+            summary: '1 browser driver(s) are registered for runtime preview flows.',
+          },
+        },
         management: {
+          adapters: {
+            totalAdapters: 2,
+            totalDomains: 2,
+            readOnlyActions: 6,
+            mutatingActions: 2,
+            transports: {
+              cli: 2,
+              api: 0,
+            },
+            summary: '2 management adapter(s) cover 2 domain(s) with 6 read-only and 2 mutating actions.',
+          },
           summary: {
             total: 0,
             polling: 0,
@@ -2194,6 +2231,59 @@ backends:
             oldestStartedAt: null,
             latestUpdatedAt: null,
           },
+        },
+        delivery: {
+          summary: {
+            totalActions: 5,
+            readOnlyActions: 2,
+            mutatingActions: 3,
+          },
+        },
+        tools: {
+          summary: {
+            profiles: {
+              standard: {
+                totalTools: 28,
+                mutatingTools: 12,
+                readOnlyCompatibleTools: 21,
+                domains: {
+                  filesystem: 9,
+                  search: 2,
+                  shell: 1,
+                  workspace: 3,
+                  delivery: 5,
+                  review: 4,
+                  deployment: 4,
+                },
+              },
+              extended: {
+                totalTools: 31,
+                mutatingTools: 15,
+                readOnlyCompatibleTools: 21,
+                domains: {
+                  filesystem: 12,
+                  search: 2,
+                  shell: 1,
+                  workspace: 3,
+                  delivery: 5,
+                  review: 4,
+                  deployment: 4,
+                },
+              },
+            },
+            summary: 'Runtime tooling exposes 28 tools in the standard profile and 31 in the extended profile.',
+          },
+        },
+        skills: {
+          summary: {
+            state: 'loaded',
+            totalSkills: 31,
+            summary: '31 runtime skill(s) across 4 families are available.',
+          },
+        },
+        setup: {
+          bootstrapRequired: false,
+          latestReport: null,
         },
         wakeups: {
           status: 'ok',
@@ -2705,6 +2795,7 @@ backends:
           modelCatalog: {
             source: 'static',
             defaultModel: 'anthropic/claude-sonnet-4-5',
+            defaultModelStatus: 'configured',
             modelCount: 3,
             warnings: [],
             statusCounts: {
