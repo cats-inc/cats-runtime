@@ -2950,6 +2950,12 @@ full provider topology:
 }
 ```
 
+API/local targets now also include the same additive `apiRuntime` inspection
+object used by `GET /providers/config` and `GET /diagnostics/providers`, so
+hosts can inspect continuation, cache/warm-state, and provider-native-tool
+posture alongside the tooling policy without fetching a second provider read
+model.
+
 For CLI targets the route stays honest: it still returns `200`, but `source`
 becomes `provider_native`, `discoverable` stays `false`, and no synthetic
 runtime tool catalog is invented.

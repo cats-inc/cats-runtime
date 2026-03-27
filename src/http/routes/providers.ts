@@ -250,6 +250,7 @@ providerRoutes.get('/providers/:provider/tools', async (c) => {
 
   try {
     const target = resolveProviderTarget(ctx.config, providerName, instance);
+    const apiRuntime = inspectApiTarget(target);
     const agentRuntime = target.backend === 'agent' && target.remoteInstance
       ? ctx.agentBackend
         ? ctx.agentBackend.inspect(target)
@@ -264,6 +265,7 @@ providerRoutes.get('/providers/:provider/tools', async (c) => {
       backend: target.backend,
       instance: target.instanceId,
       target: `${target.backend}/${target.instanceId}`,
+      ...(apiRuntime ? { apiRuntime } : {}),
       ...(agentRuntime ? { agentRuntime } : {}),
       continuity: buildProviderContinuitySummary(target, {
         capabilities: target.backend === 'cli'

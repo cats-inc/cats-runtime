@@ -494,6 +494,17 @@ describe('API backend integration', () => {
         backend: 'api',
         instance: 'sonnet',
         target: 'api/sonnet',
+        apiRuntime: expect.objectContaining({
+          family: 'api_runtime',
+          transport: 'anthropic',
+          continuation: expect.objectContaining({
+            strategy: 'runtime_transcript',
+          }),
+          caching: expect.objectContaining({
+            strategy: 'prompt_cache',
+            active: true,
+          }),
+        }),
         continuity: {
           source: 'runtime_stateful',
           summary: expect.stringContaining('cats-runtime owns the host-visible session lifecycle'),
@@ -532,6 +543,13 @@ describe('API backend integration', () => {
         backend: 'local',
         instance: 'local',
         target: 'local/local',
+        apiRuntime: expect.objectContaining({
+          family: 'api_runtime',
+          transport: 'ollama',
+          caching: expect.objectContaining({
+            strategy: 'keep_alive',
+          }),
+        }),
         continuity: {
           source: 'runtime_stateful',
           summary: expect.stringContaining('cats-runtime owns the host-visible session lifecycle'),
