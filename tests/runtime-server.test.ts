@@ -594,6 +594,20 @@ describe('runtime server', () => {
               summary: '1 browser driver(s) are registered for runtime preview flows.',
             },
           },
+          pool: expect.objectContaining({
+            active: 0,
+            busy: 0,
+            idle: 0,
+            providers: {},
+            backends: expect.objectContaining({
+              cli: expect.objectContaining({
+                active: 0,
+                busy: 0,
+                idle: 0,
+                providers: {},
+              }),
+            }),
+          }),
           executionStrategies: {
             summary: {
               totalFamilies: 7,
@@ -1530,6 +1544,16 @@ backends:
             summary: '1 browser driver(s) are registered for runtime preview flows.',
           },
         },
+        pool: {
+          summary: {
+            active: 0,
+            busy: 0,
+            idle: 0,
+            providerCount: 0,
+            backends: ['cli', 'api', 'agent'],
+            summary: 'Runtime pool tracks 0 active session(s) across 0 provider(s).',
+          },
+        },
         management: {
           adapters: {
             totalAdapters: 2,
@@ -2209,6 +2233,16 @@ backends:
             liveAutomationDrivers: 0,
             manualUrlEntryDrivers: 1,
             summary: '1 browser driver(s) are registered for runtime preview flows.',
+          },
+        },
+        pool: {
+          summary: {
+            active: 0,
+            busy: 0,
+            idle: 0,
+            providerCount: 0,
+            backends: ['cli', 'api', 'agent'],
+            summary: 'Runtime pool tracks 0 active session(s) across 0 provider(s).',
           },
         },
         management: {

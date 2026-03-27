@@ -611,6 +611,8 @@ desktop shells, and the embedded dashboard. It combines:
   and cleanup-candidate counts without calling `/browser/summary`
 - compact browser-driver catalog metadata so hosts can see runtime preview
   driver availability/capability posture without calling `/browser/drivers`
+- compact pool summary metadata so hosts can see active/busy/idle session
+  counts plus backend coverage without polling `/pool/status`
 - compact management-operation backlog summary metadata so hosts can see
   retained `polling` / `completed` / `failed` operation counts without polling
   `GET /management/diagnostics`
@@ -658,6 +660,8 @@ integrate against:
   applied to cleanup-candidate counts
 - runtime browser-driver metadata under `runtime.browserDrivers`, including the
   registered driver descriptors and a bounded capability summary
+- runtime pool metadata under `runtime.pool`, reusing the same aggregated
+  backend read model as `GET /pool/status`
 - runtime maintenance snapshots under `runtime.maintenance`, including:
   - `worktrees`: orphan-sweep results plus bounded current retained-worktree
     summaries (counts, policy/reason-code breakdown, sampled session ids) and

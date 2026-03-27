@@ -61,6 +61,7 @@ import {
   getRuntimeBrowserService,
   getRuntimeManagementService,
   getRuntimeMeteringService,
+  getRuntimeSessionManager,
 } from '../app.js';
 import type { RuntimeProviderTargetMeteringSnapshot } from '../../core/usage/RuntimeMeteringService.js';
 import {
@@ -251,6 +252,23 @@ function getRuntimeWorktreeDiagnostics(ctx: AppContext) {
       autoCleanedRetainedSessions: snapshot.lastSweep?.autoCleanedRetainedSessionCount ?? 0,
       failedAutoCleanedRetainedSessions: snapshot.lastSweep?.failedAutoCleanedRetainedSessionCount ?? 0,
     },
+  };
+}
+
+function buildRuntimePoolDiagnosticsSummary(ctx: AppContext) {
+  const pool = getRuntimeSessionManager(ctx).status();
+  const providerCount = Object.keys(pool.providers || {}).length;
+  const backends = 'backends' in pool
+    ? Object.keys(pool.backends)
+    : ['cli'];
+
+  return {
+    active: pool.active,
+    busy: pool.busy,
+    idle: pool.idle,
+    providerCount,
+    backends,
+    summary: `Runtime pool tracks ${pool.active} active session(s) across ${providerCount} provider(s).`,
   };
 }
 
@@ -1267,6 +1285,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
   const skills = inspectRuntimeSkillCatalog();
   const tools = buildRuntimeToolCatalogSummary();
   const delivery = inspectRuntimeDeliveryContract();
+  const pool = getRuntimeSessionManager(ctx).status();
 
   return c.json({
     service: RUNTIME_SERVICE_NAME,
@@ -1287,6 +1306,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
       },
       browser: browser.summary,
       browserDrivers,
+      pool,
       executionStrategies,
       management: {
         adapters: managementAdapters,
@@ -1515,6 +1535,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
   const skills = inspectRuntimeSkillCatalog();
   const tools = buildRuntimeToolCatalogSummary();
   const delivery = inspectRuntimeDeliveryContract();
+  const poolSummary = buildRuntimePoolDiagnosticsSummary(ctx);
   const providerSummary = summarizeProviderDiagnostics(catalog, providers, {
     defaultTargetsOnly: true,
     useAttentionSummary: true,
@@ -1577,6 +1598,9 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
     },
     browserDrivers: {
       summary: browserDrivers.summary,
+    },
+    pool: {
+      summary: poolSummary,
     },
     management: {
       adapters: managementAdapters.summary,
