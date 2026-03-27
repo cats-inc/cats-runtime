@@ -620,6 +620,9 @@ desktop shells, and the embedded dashboard. It combines:
 - compact runtime-tooling summary metadata so hosts can see the standard and
   extended local-tool profile counts, mutating/read-only-compatible totals, and
   broad domain breakdowns without calling any session-scoped tool surface
+- compact runtime-delivery summary metadata so hosts can see how many
+  read-only vs mutating delivery actions are available without calling a
+  delivery route
 - compact runtime execution-strategy summary metadata so hosts can distinguish
   implemented strategy families from compatibility-fallback-only hints
 - a light provider-health summary over each provider's default target, suitable
@@ -677,6 +680,9 @@ integrate against:
 - runtime tooling metadata under `runtime.tools`, including bounded standard
   and extended profile summaries with total-tool, mutating-tool,
   read-only-compatible, and broad domain counts
+- runtime delivery metadata under `runtime.delivery`, including the bounded
+  action catalog, preview-default/approval posture, capability keys, and
+  preview-surface kinds
 - full `metering` state:
   - `summary`: aggregate status/counts
   - `usage`: totals plus `byProviderInstance` / `bySession`

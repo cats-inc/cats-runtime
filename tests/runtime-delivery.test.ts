@@ -4,7 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from '../src/core/config.js';
-import { RuntimeDeliveryService } from '../src/core/runtime/RuntimeDeliveryService.js';
+import {
+  inspectRuntimeDeliveryContract,
+  RuntimeDeliveryService,
+} from '../src/core/runtime/RuntimeDeliveryService.js';
 import { createRuntimeServer } from '../src/server.js';
 
 function createWorkspace(prefix: string) {
@@ -92,6 +95,33 @@ function createRuntimeConfig(root: string) {
 }
 
 describe('RuntimeDeliveryService', () => {
+  it('summarizes runtime delivery contract metadata for diagnostics', () => {
+    expect(inspectRuntimeDeliveryContract()).toEqual({
+      actions: {
+        readOnly: ['audit-delivery-target', 'inspect-repo-status'],
+        mutating: ['publish-artifacts', 'create-commit', 'push-branch'],
+      },
+      approval: {
+        privilegedActorRoles: ['boss_cat', 'system', 'owner'],
+        previewDefault: true,
+        summary: 'Runtime delivery defaults every action to preview mode; artifact publication, commit, and push require privileged actorRole or explicit approval before apply.',
+      },
+      capabilities: [
+        'artifactPublication',
+        'repoStatus',
+        'commit',
+        'push',
+        'previewSurfaces',
+      ],
+      previewSurfaceKinds: ['artifact', 'service'],
+      summary: {
+        totalActions: 5,
+        readOnlyActions: 2,
+        mutatingActions: 3,
+      },
+    });
+  });
+
   it('reports degraded artifact-only delivery audit with normalized preview surfaces', async () => {
     const { root, cleanup } = createWorkspace('cats-runtime-delivery-audit-');
     const service = createService();

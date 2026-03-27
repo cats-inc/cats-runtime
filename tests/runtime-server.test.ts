@@ -602,6 +602,24 @@ describe('runtime server', () => {
               latestUpdatedAt: null,
             },
           },
+          delivery: {
+            actions: {
+              readOnly: ['audit-delivery-target', 'inspect-repo-status'],
+              mutating: ['publish-artifacts', 'create-commit', 'push-branch'],
+            },
+            approval: {
+              privilegedActorRoles: ['boss_cat', 'system', 'owner'],
+              previewDefault: true,
+              summary: expect.stringContaining('defaults every action to preview mode'),
+            },
+            capabilities: ['artifactPublication', 'repoStatus', 'commit', 'push', 'previewSurfaces'],
+            previewSurfaceKinds: ['artifact', 'service'],
+            summary: {
+              totalActions: 5,
+              readOnlyActions: 2,
+              mutatingActions: 3,
+            },
+          },
           tools: expect.objectContaining({
             profiles: expect.objectContaining({
               standard: expect.objectContaining({
@@ -1432,6 +1450,13 @@ backends:
             failed: 0,
             oldestStartedAt: null,
             latestUpdatedAt: null,
+          },
+        },
+        delivery: {
+          summary: {
+            totalActions: 5,
+            readOnlyActions: 2,
+            mutatingActions: 3,
           },
         },
         tools: {

@@ -30,6 +30,7 @@ import type {
   RuntimeDeliverySummary,
   RuntimeDeliveryWarning,
   RuntimePreviewSurface,
+  RuntimePreviewSurfaceKind,
   RuntimePreviewSurfaceRenderHint,
   RuntimePreviewSurfaceSource,
   RuntimeRepoRemoteStatus,
@@ -58,6 +59,21 @@ const MUTATING_ACTIONS = new Set<RuntimeDeliveryAction>([
   'create-commit',
   'push-branch',
 ]);
+const READ_ONLY_ACTIONS: RuntimeDeliveryAction[] = [
+  'audit-delivery-target',
+  'inspect-repo-status',
+];
+const DELIVERY_CAPABILITY_KEYS: Array<keyof RuntimeDeliveryCapabilities> = [
+  'artifactPublication',
+  'repoStatus',
+  'commit',
+  'push',
+  'previewSurfaces',
+];
+const DELIVERY_PREVIEW_SURFACE_KINDS: RuntimePreviewSurfaceKind[] = [
+  'artifact',
+  'service',
+];
 
 interface CommandResult {
   code: number | null;
@@ -90,6 +106,27 @@ interface PublicationPlan {
 
 export interface RuntimeDeliveryDependencies {
   registry?: Pick<SessionRegistry, 'get'>;
+}
+
+export interface RuntimeDeliveryActionCatalogSummary {
+  totalActions: number;
+  readOnlyActions: number;
+  mutatingActions: number;
+}
+
+export interface RuntimeDeliveryContractInspection {
+  actions: {
+    readOnly: RuntimeDeliveryAction[];
+    mutating: RuntimeDeliveryAction[];
+  };
+  approval: {
+    privilegedActorRoles: WorkspaceSubstrateActorRole[];
+    previewDefault: true;
+    summary: string;
+  };
+  capabilities: Array<keyof RuntimeDeliveryCapabilities>;
+  previewSurfaceKinds: RuntimePreviewSurfaceKind[];
+  summary: RuntimeDeliveryActionCatalogSummary;
 }
 
 function normalizeWorkspacePath(workspacePath: string | undefined): string | undefined {
@@ -157,6 +194,28 @@ function createDefaultCapabilities(): RuntimeDeliveryCapabilities {
     commit: createCapability('blocked', 'Commit creation requires a repository target.'),
     push: createCapability('blocked', 'Branch push requires a repository target and remote.'),
     previewSurfaces: createCapability('blocked', 'No preview-capable surfaces were found.'),
+  };
+}
+
+export function inspectRuntimeDeliveryContract(): RuntimeDeliveryContractInspection {
+  const mutating = [...MUTATING_ACTIONS];
+  return {
+    actions: {
+      readOnly: [...READ_ONLY_ACTIONS],
+      mutating,
+    },
+    approval: {
+      privilegedActorRoles: [...PRIVILEGED_ACTOR_ROLES],
+      previewDefault: true,
+      summary: 'Runtime delivery defaults every action to preview mode; artifact publication, commit, and push require privileged actorRole or explicit approval before apply.',
+    },
+    capabilities: [...DELIVERY_CAPABILITY_KEYS],
+    previewSurfaceKinds: [...DELIVERY_PREVIEW_SURFACE_KINDS],
+    summary: {
+      totalActions: READ_ONLY_ACTIONS.length + mutating.length,
+      readOnlyActions: READ_ONLY_ACTIONS.length,
+      mutatingActions: mutating.length,
+    },
   };
 }
 
