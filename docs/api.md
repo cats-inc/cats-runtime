@@ -509,6 +509,9 @@ surface for hosts and dashboards. The response includes:
   runtime-managed local tools, provider-native CLI tools, or provider-managed
   agent tooling; API/local targets include the default runtime tool profile
   before any per-session permission narrowing
+- additive `config.continuity` summaries describing whether the resolved
+  target is `runtime_stateful`, `provider_native`, or `provider_managed`, plus
+  bounded resume/fork/permission and remote-session affordance truth
 - additive `config.agentRuntime` inspection metadata for agent targets,
   including adapter family, probe/model-discovery transport shape, bounded auth
   surface, provider-managed continuity, and runtime-visible capability flags
@@ -2607,6 +2610,19 @@ Each instance entry also exposes additive `tooling` metadata:
   inspection (`profile`, counts, and per-tool access classification) before any
   session-level permission narrowing
 
+Each instance entry also exposes additive `continuity` metadata:
+
+- `source`
+  - `runtime_stateful`: `cats-runtime` owns the caller-visible session lifecycle
+  - `provider_native`: the CLI provider owns native continuity ids while the
+    runtime keeps remote-session state and remote cancel out of scope
+  - `provider_managed`: an external agent runtime owns provider-managed session
+    continuity while `cats-runtime` keeps the caller-visible facade local
+- `resume`, `fork`, `permissions`: the resolved capability truth for the target
+- `providerManagedSessions`, `sessionKey`, `providerSessionState`,
+  `remoteCancel`: bounded continuity affordances describing upstream-owned
+  session state
+
 Agent-backed instances now also expose additive `agentRuntime` inspection
 metadata. This is a bounded operator read model, not a new session contract.
 The object includes:
@@ -2713,6 +2729,9 @@ For agent targets, the standalone tooling route also includes the same additive
 `GET /diagnostics/providers`, so hosts can inspect remote tool-call/service
 observability, remote tool-discovery support, and request transport details
 without fetching a second provider read model.
+
+The same tooling route also exposes additive `continuity` metadata for the
+resolved target, reusing the same summary shape as `GET /providers/config`.
 
 For CLI backends, instance entries also expose runtime-owned `install` metadata
 even before a probe has run. The `install` object includes:

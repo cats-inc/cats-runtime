@@ -32,6 +32,7 @@ import {
   summarizeProviderEvolutionArtifactForReadModel,
   type ProviderEvolutionLatestArtifactReadModel,
 } from '../../core/compatibility/providerEvolutionReadModel.js';
+import { buildProviderContinuitySummary } from '../../core/providerContinuity.js';
 import type { ProviderSetupSummary } from '../../core/provider-install/types.js';
 import {
   buildProviderToolingSummary,
@@ -528,6 +529,9 @@ async function diagnoseCliTarget(
     command: instance.commandConfig.path,
     runner: instance.commandConfig.runner,
     runtime,
+    continuity: buildProviderContinuitySummary(target, {
+      capabilities: ctx.pool.getCapabilities(target.providerName, target.instanceId),
+    }),
     tooling: buildProviderToolingSummary(target),
     compatibility: toCompatibilitySummaryView(assessment),
   };
@@ -639,6 +643,14 @@ async function diagnoseAgentTarget(
     transport: instance.transport,
     model: instance.model || null,
     endpoint: resolveRemoteEndpoint(instance, env),
+    continuity: buildProviderContinuitySummary(target, {
+      capabilities: ctx.agentBackend?.getCapabilities() || {
+        resume: true,
+        fork: true,
+        permissions: false,
+      },
+      agentRuntime,
+    }),
     tooling: buildProviderToolingSummary(target, { agentRuntime }),
     agentRuntime,
     credentials: {
@@ -802,6 +814,13 @@ async function diagnoseRemoteConfigOnly(
     transport: instance.transport,
     model: instance.model || null,
     endpoint,
+    continuity: buildProviderContinuitySummary(target, {
+      capabilities: ctx.apiBackend?.getCapabilities() || {
+        resume: true,
+        fork: true,
+        permissions: true,
+      },
+    }),
     tooling: buildProviderToolingSummary(target),
     credentials: {
       apiKeyEnv: apiKey,

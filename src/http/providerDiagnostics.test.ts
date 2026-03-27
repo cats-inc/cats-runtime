@@ -582,6 +582,11 @@ describe('provider diagnostics HTTP contract', () => {
               }),
             ]),
             config: expect.objectContaining({
+              continuity: expect.objectContaining({
+                source: 'runtime_stateful',
+                providerManagedSessions: false,
+                providerSessionState: true,
+              }),
               tooling: expect.objectContaining({
                 source: 'runtime_local',
                 discoverable: true,
@@ -681,6 +686,11 @@ describe('provider diagnostics HTTP contract', () => {
               }),
             ]),
             config: expect.objectContaining({
+              continuity: expect.objectContaining({
+                source: 'runtime_stateful',
+                providerManagedSessions: false,
+                providerSessionState: true,
+              }),
               liveProbe: expect.objectContaining({
                 url: 'http://127.0.0.1:11434/api/tags',
                 target: 'model_tags',
@@ -827,6 +837,11 @@ describe('provider diagnostics HTTP contract', () => {
               }),
             ]),
             config: expect.objectContaining({
+              continuity: expect.objectContaining({
+                source: 'runtime_stateful',
+                providerManagedSessions: false,
+                providerSessionState: true,
+              }),
               credentials: expect.objectContaining({
                 apiKeyEnv: expect.objectContaining({
                   name: 'OPENAI_API_KEY',
@@ -955,6 +970,11 @@ describe('provider diagnostics HTTP contract', () => {
               }),
             ]),
             config: expect.objectContaining({
+              continuity: expect.objectContaining({
+                source: 'runtime_stateful',
+                providerManagedSessions: false,
+                providerSessionState: true,
+              }),
               liveProbe: expect.objectContaining({
                 url: 'https://api.openai.test/v1/models',
                 target: 'models',
@@ -1226,6 +1246,11 @@ describe('provider diagnostics HTTP contract', () => {
         probe: 'live',
       }),
       config: expect.objectContaining({
+        continuity: expect.objectContaining({
+          source: 'provider_native',
+          providerManagedSessions: true,
+          providerSessionState: false,
+        }),
         modelCatalog: expect.objectContaining({
           source: 'dynamic',
           defaultModel: 'openai-codex/gpt-5.4',

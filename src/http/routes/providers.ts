@@ -14,6 +14,7 @@ import {
   resolveProviderEvolutionArtifactInstance,
   summarizeProviderEvolutionArtifactForReadModel,
 } from '../../core/compatibility/providerEvolutionReadModel.js';
+import { buildProviderContinuitySummary } from '../../core/providerContinuity.js';
 import {
   buildProviderToolingSummary,
   loadProviderRemoteToolCatalog,
@@ -44,6 +45,22 @@ providerRoutes.get('/providers/config', async (c) => {
             ? ctx.agentBackend.inspect(instance)
             : inspectAgentTarget(instance.remoteInstance, { env: process.env })
           : undefined;
+        const continuity = buildProviderContinuitySummary(instance, {
+          capabilities: instance.backend === 'cli'
+            ? ctx.pool.getCapabilities(instance.providerName, instance.instanceId)
+            : instance.backend === 'agent'
+              ? (ctx.agentBackend?.getCapabilities() || {
+                  resume: true,
+                  fork: true,
+                  permissions: false,
+                })
+              : (ctx.apiBackend?.getCapabilities() || {
+                  resume: true,
+                  fork: true,
+                  permissions: true,
+                }),
+          ...(agentRuntime ? { agentRuntime } : {}),
+        });
         const latestProbeArtifact = await probeService.readLatestArtifact({
           provider: instance.providerName,
           instance: resolveProviderEvolutionArtifactInstance(instance),
@@ -65,6 +82,7 @@ providerRoutes.get('/providers/config', async (c) => {
           transport: instance.remoteInstance?.transport,
           model: instance.remoteInstance?.model,
           ...(agentRuntime ? { agentRuntime } : {}),
+          continuity,
           tooling: buildProviderToolingSummary(instance, { agentRuntime }),
           install: instance.backend === 'cli' && instance.cliInstance
             ? buildProviderInstallCatalogView(
@@ -155,6 +173,22 @@ providerRoutes.get('/providers/:provider/tools', async (c) => {
       instance: target.instanceId,
       target: `${target.backend}/${target.instanceId}`,
       ...(agentRuntime ? { agentRuntime } : {}),
+      continuity: buildProviderContinuitySummary(target, {
+        capabilities: target.backend === 'cli'
+          ? ctx.pool.getCapabilities(target.providerName, target.instanceId)
+          : target.backend === 'agent'
+            ? (ctx.agentBackend?.getCapabilities() || {
+                resume: true,
+                fork: true,
+                permissions: false,
+              })
+            : (ctx.apiBackend?.getCapabilities() || {
+                resume: true,
+                fork: true,
+                permissions: true,
+              }),
+        ...(agentRuntime ? { agentRuntime } : {}),
+      }),
       ...buildProviderToolingSummary(target, { agentRuntime, remoteCatalog }),
     });
   } catch (err) {

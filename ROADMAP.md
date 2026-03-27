@@ -1108,6 +1108,10 @@ always-on self-adapting parser system.
 - `/providers/config` instance entries now reuse the same retained artifact
   read model, so host/provider-selection flows can fetch provider topology and
   latest provider-evolution summary in one call
+- provider topology/tooling/diagnostics read surfaces now also expose additive
+  backend-neutral `continuity` summaries so hosts can tell whether a target is
+  runtime-stateful, provider-native, or provider-managed without inferring that
+  from backend names alone
 - normal runtime execution remains unchanged when evidence collection is not
   enabled
 

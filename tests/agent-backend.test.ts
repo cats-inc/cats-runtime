@@ -481,6 +481,17 @@ describe('agent backend integration', () => {
               backend: 'agent',
               transport: 'openclaw_gateway',
               model: 'openclaw-coder',
+              continuity: {
+                source: 'provider_managed',
+                summary: expect.stringContaining('external agent runtime owns provider-managed session continuity'),
+                resume: true,
+                fork: true,
+                permissions: false,
+                providerManagedSessions: true,
+                sessionKey: true,
+                providerSessionState: true,
+                remoteCancel: false,
+              },
               agentRuntime: {
                 adapter: 'openclaw',
                 family: 'gateway',
@@ -757,6 +768,13 @@ describe('agent backend integration', () => {
               }),
             ]),
             config: expect.objectContaining({
+              continuity: expect.objectContaining({
+                source: 'provider_managed',
+                providerManagedSessions: true,
+                sessionKey: true,
+                providerSessionState: true,
+                remoteCancel: false,
+              }),
               agentRuntime: expect.objectContaining({
                 adapter: 'openclaw',
                 family: 'gateway',
@@ -936,6 +954,13 @@ describe('agent backend integration', () => {
               }),
             ]),
             config: expect.objectContaining({
+              continuity: expect.objectContaining({
+                source: 'provider_managed',
+                providerManagedSessions: true,
+                sessionKey: true,
+                providerSessionState: true,
+                remoteCancel: true,
+              }),
               agentRuntime: expect.objectContaining({
                 adapter: 'agent_sdk_bridge',
                 transport: expect.objectContaining({
@@ -1055,6 +1080,13 @@ describe('agent backend integration', () => {
               }),
             ]),
             config: expect.objectContaining({
+              continuity: expect.objectContaining({
+                source: 'provider_managed',
+                providerManagedSessions: true,
+                sessionKey: true,
+                providerSessionState: true,
+                remoteCancel: true,
+              }),
               liveProbe: expect.objectContaining({
                 adapter: 'agent_sdk_bridge',
                 endpoint: 'http://agent-sdk.test/api/v1/providers',
@@ -1099,6 +1131,17 @@ describe('agent backend integration', () => {
         backend: 'agent',
         instance: 'gateway',
         target: 'agent/gateway',
+        continuity: {
+          source: 'provider_managed',
+          summary: expect.stringContaining('external agent runtime owns provider-managed session continuity'),
+          resume: true,
+          fork: true,
+          permissions: false,
+          providerManagedSessions: true,
+          sessionKey: true,
+          providerSessionState: true,
+          remoteCancel: false,
+        },
         agentRuntime: expect.objectContaining({
           adapter: 'openclaw',
           family: 'gateway',
@@ -1393,6 +1436,17 @@ describe('agent backend integration', () => {
               backend: 'agent',
               transport: 'agent_sdk_bridge',
               model: 'sonnet',
+              continuity: {
+                source: 'provider_managed',
+                summary: expect.stringContaining('external agent runtime owns provider-managed session continuity'),
+                resume: true,
+                fork: true,
+                permissions: false,
+                providerManagedSessions: true,
+                sessionKey: true,
+                providerSessionState: true,
+                remoteCancel: true,
+              },
               agentRuntime: {
                 adapter: 'agent_sdk_bridge',
                 family: 'bridge',

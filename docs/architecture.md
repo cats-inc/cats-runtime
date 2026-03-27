@@ -202,6 +202,10 @@ src/
 - Reuses the same agent-backend runtime options for OpenClaw gateway
   `models.list` discovery, so provider model catalogs and diagnostics can
   expose canonical `provider/model` refs instead of config-only fallback data
+- Exposes additive backend-neutral `continuity` summaries on
+  `/providers/config`, `/providers/{provider}/tools`, and
+  `/diagnostics/providers` so hosts can read session ownership semantics
+  without inferring them from backend names
 - Exposes additive agent-target inspection read models on `/providers/config`
   and `/diagnostics/providers` so operators can read adapter family, transport
   semantics, auth surface, provider-managed continuity, and bounded capability
@@ -550,6 +554,9 @@ src/
   diagnostics, and CLI execution priming, including `light` vs `live`
   runtime-flag probes, stale-cache-aware summaries, and replay-friendly
   evidence bundles
+- Hosts backend-neutral provider inspectability helpers such as the shared
+  `continuity` summary read model reused by provider config/tooling/diagnostics
+  routes
 - Defines stable exported runtime types
 - Keeps shared utilities out of provider modules
 - Owns the shared `progress` event helper and metering/guardrail type contracts
@@ -597,6 +604,8 @@ src/
    surface, including runtime maintenance snapshots plus transport-native
    API/local auth/model probe requests, additive provider-tooling ownership /
    baseline-profile summaries plus bounded tooling observability truth,
+   additive backend-neutral continuity summaries describing runtime-stateful
+   versus provider-native versus provider-managed session semantics,
    additive runtime execution-strategy catalog/summary truth for implemented
    versus compatibility-fallback-only families, including per-family
    request-support and strategy-context schema metadata,
