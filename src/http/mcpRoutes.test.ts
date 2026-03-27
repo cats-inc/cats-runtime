@@ -13,10 +13,15 @@ import { getRuntimeResolvedPaths } from '../core/config.js';
 import { RuntimeManagementService } from '../core/management/RuntimeManagementService.js';
 import { StubManagementAdapter } from '../core/management/adapters/stub/StubAdapter.js';
 import { RuntimeWakeupService } from '../core/wakeup/RuntimeWakeupService.js';
+import { PeerRegistry } from '../core/peers/PeerRegistry.js';
+import { createDisabledPeerDiscoverySnapshot } from '../core/peers/PeerDiscoveryController.js';
+import { PeerExecutionAdmissionService } from '../core/peers/PeerExecutionAdmissionService.js';
+import { PeerExecutionReplayService } from '../core/peers/PeerExecutionReplayService.js';
 import {
   ProviderEvolutionProbeService,
   PROVIDER_EVOLUTION_PROBE_PROFILES,
 } from '../core/compatibility/providerEvolutionProbe.js';
+import type { PeerAdvertisement } from '../core/peers/types.js';
 import type { StreamEvent, TurnInput } from '../core/types.js';
 import type { RuntimeMode } from '../backends/cli/config.js';
 
@@ -79,6 +84,45 @@ function writeCompatibilityEvidenceArtifact(
     checks: [],
   }, null, 2)}\n`, 'utf8');
   return artifactPath;
+}
+
+function createPeerAdvertisement(
+  peerId: string,
+  observedAt: string,
+  ttlMs: number,
+): PeerAdvertisement {
+  return {
+    identity: {
+      peerId,
+      displayName: peerId,
+      runtimeVersion: '0.1.0-test',
+      advertisedUrl: `http://${peerId}.local:3110`,
+    },
+    observedAt,
+    ttlMs,
+    capabilities: {
+      providers: ['codex'],
+      targets: [{
+        provider: 'codex',
+        backend: 'cli',
+        instance: 'default',
+        default: true,
+      }],
+      targetLimit: 16,
+      truncated: false,
+    },
+    load: {
+      activeSessions: 0,
+      busyWorkers: 0,
+      idleWorkers: 1,
+      providerWorkers: {},
+      capacityState: 'idle',
+    },
+    trust: {
+      state: 'unknown',
+      reason: 'unverified',
+    },
+  };
 }
 
 describe('runtime MCP facade', () => {
@@ -184,6 +228,7 @@ describe('runtime MCP facade', () => {
 
   function createTestApp() {
     const startup = createRuntimeStartupState();
+    const peerNow = Date.parse('2026-03-25T00:00:05.000Z');
     const bootstrapService = {
       getSetupState: vi.fn(async () => ({
         status: 'pending',
@@ -237,6 +282,39 @@ describe('runtime MCP facade', () => {
     management.registerAdapter(new StubManagementAdapter('zeabur', ['deployment'], [
       'audit_deployment_target', 'create_deployment', 'inspect_deployment', 'read_deployment_logs',
     ]));
+    const peerRegistry = new PeerRegistry({
+      stalePeerTtlMs: 5_000,
+      now: () => peerNow,
+    });
+    peerRegistry.upsert(
+      createPeerAdvertisement('peer-live', '2026-03-25T00:00:03.000Z', 5_000),
+      { sourceId: 'lan:live', sourceKind: 'lan' },
+    );
+    peerRegistry.upsert(
+      createPeerAdvertisement('peer-stale', '2026-03-25T00:00:00.000Z', 1_000),
+      { sourceId: 'lan:stale', sourceKind: 'lan' },
+    );
+    const peerExecutionAdmission = new PeerExecutionAdmissionService({
+      config: {
+        authFailureWindowMs: 1_000,
+        maxAuthFailuresPerWindow: 2,
+        maxInboundExecutions: 4,
+        maxInboundExecutionsPerPeer: 2,
+        limitOverrides: [],
+      },
+      now: () => peerNow,
+    });
+    const peerExecutionReplay = new PeerExecutionReplayService({
+      config: {
+        replayWindowMs: 60_000,
+        replayNonceTtlMs: 120_000,
+        maxReplayNoncesPerCaller: 16,
+        limitOverrides: [],
+      },
+      now: () => peerNow,
+    });
+    peerExecutionAdmission.recordAuthFailure('peer:lab');
+    peerExecutionReplay.validate('peer:peer-live', peerNow, 'nonce-1');
     const providerModelCatalog = {
       inspectSummary: vi.fn(() => ({
         source: 'config',
@@ -309,6 +387,23 @@ describe('runtime MCP facade', () => {
       providerModelCatalog: providerModelCatalog as never,
       management,
       wakeup,
+      peerRegistry,
+      peerCapabilities: {
+        getLocalPeerId: () => 'local-peer',
+      } as never,
+      peerDiscovery: {
+        snapshot: () => ({
+          ...createDisabledPeerDiscoverySnapshot('local-peer', peerRegistry.summary(peerNow)),
+          enabled: true,
+          status: 'running',
+          stalePeerTtlMs: 5_000,
+          pruneIntervalMs: 1_000,
+          advertiseIntervalMs: 2_000,
+          summary: 'Peer discovery is running with 1 live peer(s).',
+        }),
+      } as never,
+      peerExecutionAdmission,
+      peerExecutionReplay,
       bootstrapService: bootstrapService as never,
       completeBootstrap,
     });
@@ -393,6 +488,10 @@ describe('runtime MCP facade', () => {
       'health_diagnostics',
       'pool_status',
       'management_diagnostics',
+      'discovery_status',
+      'list_peers',
+      'read_peer',
+      'peer_diagnostics',
       'providers_config',
       'provider_tools',
       'provider_models',
@@ -1693,6 +1792,159 @@ describe('runtime MCP facade', () => {
     expect(observe.result.structuredContent.session.inspection.state).toBe('idle');
     expect(observe.result.structuredContent.observePath).toBe('/sessions/session-1/observe');
     expect(pool.getCapabilities).toHaveBeenCalledWith('claude', 'default');
+  });
+
+  it('exposes discovery and peer inspection data through tools/call', async () => {
+    const app = createTestApp();
+
+    const discoveryStatusResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 3.3,
+        method: 'tools/call',
+        params: {
+          name: 'discovery_status',
+          arguments: {},
+        },
+      }),
+    });
+    expect(discoveryStatusResponse.status).toBe(200);
+    const discoveryStatus = await discoveryStatusResponse.json() as {
+      result: {
+        structuredContent: {
+          discoveryStatusPath: string;
+          peersPath: string;
+          peerDiagnosticsPath: string;
+          lan: {
+            status: string;
+            registry: {
+              total: number;
+              alive: number;
+            };
+          };
+        };
+      };
+    };
+    expect(discoveryStatus.result.structuredContent.discoveryStatusPath).toBe('/discovery/status');
+    expect(discoveryStatus.result.structuredContent.peersPath).toBe('/peers');
+    expect(discoveryStatus.result.structuredContent.peerDiagnosticsPath).toBe('/diagnostics/peers');
+    expect(discoveryStatus.result.structuredContent.lan.status).toBe('running');
+    expect(discoveryStatus.result.structuredContent.lan.registry).toEqual(expect.objectContaining({
+      total: 2,
+      alive: 1,
+    }));
+
+    const listPeersResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 3.4,
+        method: 'tools/call',
+        params: {
+          name: 'list_peers',
+          arguments: {
+            includeStale: true,
+          },
+        },
+      }),
+    });
+    expect(listPeersResponse.status).toBe(200);
+    const listPeers = await listPeersResponse.json() as {
+      result: {
+        structuredContent: {
+          peersPath: string;
+          query: {
+            includeStale: boolean;
+          };
+          peers: Array<{
+            identity: {
+              peerId: string;
+            };
+          }>;
+        };
+      };
+    };
+    expect(listPeers.result.structuredContent.peersPath).toBe('/peers?includeStale=true');
+    expect(listPeers.result.structuredContent.query.includeStale).toBe(true);
+    expect(listPeers.result.structuredContent.peers.map((peer) => peer.identity.peerId)).toEqual([
+      'peer-live',
+      'peer-stale',
+    ]);
+
+    const readPeerResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 3.5,
+        method: 'tools/call',
+        params: {
+          name: 'read_peer',
+          arguments: {
+            peerId: 'peer-live',
+          },
+        },
+      }),
+    });
+    expect(readPeerResponse.status).toBe(200);
+    const readPeer = await readPeerResponse.json() as {
+      result: {
+        structuredContent: {
+          peerPath: string;
+          peersPath: string;
+          peer: {
+            identity: {
+              peerId: string;
+            };
+          };
+        };
+      };
+    };
+    expect(readPeer.result.structuredContent.peerPath).toBe('/peers/peer-live');
+    expect(readPeer.result.structuredContent.peersPath).toBe('/peers');
+    expect(readPeer.result.structuredContent.peer.identity.peerId).toBe('peer-live');
+
+    const peerDiagnosticsResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 3.6,
+        method: 'tools/call',
+        params: {
+          name: 'peer_diagnostics',
+          arguments: {
+            includeStale: true,
+          },
+        },
+      }),
+    });
+    expect(peerDiagnosticsResponse.status).toBe(200);
+    const peerDiagnostics = await peerDiagnosticsResponse.json() as {
+      result: {
+        structuredContent: {
+          peerDiagnosticsPath: string;
+          summary: {
+            total: number;
+            alive: number;
+            stale: number;
+          };
+          peers: Array<unknown>;
+        };
+      };
+    };
+    expect(peerDiagnostics.result.structuredContent.peerDiagnosticsPath).toBe(
+      '/diagnostics/peers?includeStale=true',
+    );
+    expect(peerDiagnostics.result.structuredContent.summary).toEqual(expect.objectContaining({
+      total: 2,
+      alive: 1,
+      stale: 1,
+    }));
+    expect(peerDiagnostics.result.structuredContent.peers).toHaveLength(2);
   });
 
   it('exposes pool and management diagnostics through MCP without introducing new read contracts', async () => {

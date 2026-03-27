@@ -107,6 +107,10 @@ Current curated tools:
 - `health_diagnostics`
 - `pool_status`
 - `management_diagnostics`
+- `discovery_status`
+- `list_peers`
+- `read_peer`
+- `peer_diagnostics`
 - `providers_config`
 - `provider_tools`
 - `provider_models`
@@ -219,6 +223,13 @@ operator read surfaces as `GET /pool/status` and `GET /management/diagnostics`,
 including additive `domain` / `workspacePath` filtering for management
 diagnostics, so MCP hosts can inspect worker-pool pressure and management
 adapter readiness without inventing parallel orchestration contracts.
+`discovery_status`, `list_peers`, `read_peer`, and `peer_diagnostics` reuse the
+same runtime-owned discovery and peer diagnostics surfaces as
+`GET /discovery/status`, `GET /peers`, `GET /peers/{peerId}`, and
+`GET /diagnostics/peers`, including additive `includeStale` filtering on the
+peer list/detail/diagnostics reads, so MCP hosts can inspect LAN discovery
+state, bounded peer registry entries, and peer guardrail/network posture data
+without inventing MCP-only peer contracts.
 `providers_config` reuses the same provider topology/read-model surface as
 `GET /providers/config`, so MCP hosts can inspect configured backends,
 instance-level runtime/tooling/continuity summaries, model-catalog snapshots,

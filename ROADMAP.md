@@ -1096,6 +1096,11 @@ evidence bundles and does not force hosts to invent their own report format.
   through MCP as `read_browser_session`, so orchestrator-style hosts can drill
   into one browser session's page/binding state without rebuilding that read
   model client-side
+- the same runtime-owned LAN discovery and peer inspection surfaces are now
+  also exposed through MCP as `discovery_status`, `list_peers`, `read_peer`,
+  and `peer_diagnostics`, so orchestrator-style hosts can inspect bounded peer
+  registry entries, peer guardrails, and discovery posture without inventing a
+  second peer-control contract
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
   remediation previews, and latest-setup-report summary metadata including a

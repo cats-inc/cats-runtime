@@ -327,6 +327,13 @@ function buildBrowserSessionPaths(browserSessionId: string) {
   };
 }
 
+function buildPeerSupportPaths() {
+  return {
+    peerDiagnosticsPath: '/diagnostics/peers',
+    discoveryStatusPath: '/discovery/status',
+  };
+}
+
 function appendQueryValues(
   searchParams: URLSearchParams,
   key: string,
@@ -527,6 +534,97 @@ async function managementDiagnostics(
     structuredContent: {
       ...payload,
       diagnosticsPath,
+    },
+  };
+}
+
+async function discoveryStatus(
+  ctx: AppContext,
+): Promise<McpToolCallResult> {
+  const discoveryStatusPath = '/discovery/status';
+  const result = await requestRuntimeJson(ctx, discoveryStatusPath, { method: 'GET' });
+  ensureRouteSuccess('discovery_status', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'discovery_status result');
+  const lan = asRecord(payload.lan);
+  const status = typeof lan?.status === 'string' ? lan.status : 'unknown';
+
+  return {
+    summary: `Runtime discovery status: ${status}.`,
+    structuredContent: {
+      ...payload,
+      peersPath: '/peers',
+      ...buildPeerSupportPaths(),
+    },
+  };
+}
+
+async function listPeers(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const includeStale = readOptionalBoolean(args, 'includeStale') === true;
+  const peersPath = includeStale ? '/peers?includeStale=true' : '/peers';
+  const result = await requestRuntimeJson(ctx, peersPath, { method: 'GET' });
+  ensureRouteSuccess('list_peers', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'list_peers result');
+  const peers = Array.isArray(payload.peers) ? payload.peers : [];
+
+  return {
+    summary: `Returned ${peers.length} peer entr${peers.length === 1 ? 'y' : 'ies'}.`,
+    structuredContent: {
+      ...payload,
+      peersPath,
+      ...buildPeerSupportPaths(),
+    },
+  };
+}
+
+async function readPeer(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const peerId = readRequiredString(args, 'peerId');
+  const includeStale = readOptionalBoolean(args, 'includeStale') === true;
+  const peerPath = includeStale
+    ? `/peers/${encodeURIComponent(peerId)}?includeStale=true`
+    : `/peers/${encodeURIComponent(peerId)}`;
+  const result = await requestRuntimeJson(ctx, peerPath, { method: 'GET' });
+  ensureRouteSuccess('read_peer', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'read_peer result');
+  return {
+    summary: `Read peer ${peerId}.`,
+    structuredContent: {
+      ...payload,
+      peersPath: '/peers',
+      peerPath,
+      ...buildPeerSupportPaths(),
+    },
+  };
+}
+
+async function peerDiagnostics(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const includeStale = readOptionalBoolean(args, 'includeStale') === true;
+  const peerDiagnosticsPath = includeStale
+    ? '/diagnostics/peers?includeStale=true'
+    : '/diagnostics/peers';
+  const result = await requestRuntimeJson(ctx, peerDiagnosticsPath, { method: 'GET' });
+  ensureRouteSuccess('peer_diagnostics', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'peer_diagnostics result');
+  const peers = Array.isArray(payload.peers) ? payload.peers : [];
+  return {
+    summary: `Peer diagnostics returned ${peers.length} peer entr${peers.length === 1 ? 'y' : 'ies'}.`,
+    structuredContent: {
+      ...payload,
+      peersPath: '/peers',
+      peerDiagnosticsPath,
+      discoveryStatusPath: '/discovery/status',
     },
   };
 }
@@ -2510,6 +2608,66 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: managementDiagnostics,
+  },
+  {
+    definition: {
+      name: 'discovery_status',
+      title: 'Discovery Status',
+      description: 'Return runtime discovery status through the existing discovery status route.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        additionalProperties: false,
+      },
+    },
+    execute: discoveryStatus,
+  },
+  {
+    definition: {
+      name: 'list_peers',
+      title: 'List Peers',
+      description: 'Return the runtime peer registry through the existing peer list route.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          includeStale: { type: 'boolean' },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: listPeers,
+  },
+  {
+    definition: {
+      name: 'read_peer',
+      title: 'Read Peer',
+      description: 'Return one runtime peer through the existing peer read route.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          peerId: { type: 'string' },
+          includeStale: { type: 'boolean' },
+        },
+        required: ['peerId'],
+        additionalProperties: false,
+      },
+    },
+    execute: readPeer,
+  },
+  {
+    definition: {
+      name: 'peer_diagnostics',
+      title: 'Peer Diagnostics',
+      description: 'Return runtime peer discovery diagnostics through the existing peer diagnostics route.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          includeStale: { type: 'boolean' },
+        },
+        additionalProperties: false,
+      },
+    },
+    execute: peerDiagnostics,
   },
   {
     definition: {
