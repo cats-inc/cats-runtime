@@ -818,6 +818,103 @@ describe('runtime server', () => {
     }
   }, 10000);
 
+  it('surfaces retained worktree backlog on health diagnostics', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-worktree-health-test-'));
+    const configPath = join(root, 'providers.yaml');
+    writeFileSync(configPath, 'providers: {}\n', 'utf8');
+
+    const env = {
+      HOME: root,
+      USERPROFILE: root,
+      CATS_RUNTIME_CONFIG_PATH: configPath,
+      CATS_RUNTIME_HOST: '127.0.0.1',
+      CATS_RUNTIME_PORT: '3110',
+      CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
+      CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
+      CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
+      CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
+      AUGGIE_SESSIONS_DIR: join(root, '.augment', 'sessions'),
+      CLAUDE_PROJECTS_DIR: join(root, '.claude', 'projects'),
+      CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
+      COPILOT_SESSIONS_DIR: join(root, '.copilot', 'session-state'),
+      CURSOR_CHATS_DIR: join(root, '.cursor', 'chats'),
+      GEMINI_SESSIONS_DIR: join(root, '.gemini', 'tmp'),
+      KIRO_DB_PATH: join(root, '.kiro', 'data.sqlite3'),
+      PI_SESSIONS_DIR: join(root, '.pi', 'agent', 'sessions'),
+    };
+
+    for (const dir of [
+      env.CATS_RUNTIME_SESSION_BASE_DIR,
+      env.CATS_RUNTIME_DATA_DIR,
+      env.AUGGIE_SESSIONS_DIR,
+      env.CLAUDE_PROJECTS_DIR,
+      env.CODEX_SESSIONS_DIR,
+      env.COPILOT_SESSIONS_DIR,
+      env.CURSOR_CHATS_DIR,
+      env.GEMINI_SESSIONS_DIR,
+      join(root, '.kiro'),
+      join(root, '.junie', 'sessions'),
+      env.PI_SESSIONS_DIR,
+    ]) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    const runtime = createRuntimeServer(loadConfig(env));
+    try {
+      const repoDir = createGitWorkspace(root, 'runtime-health-worktree');
+      const prepared = await prepareSessionWorkspace({
+        sessionId: 'runtime-health-retained-worktree',
+        sessionBaseDir: env.CATS_RUNTIME_SESSION_BASE_DIR,
+        cwd: repoDir,
+        workspaceMode: 'shared',
+        workspaceIsolationMode: 'worktree',
+        now: new Date('2026-03-22T00:00:00.000Z'),
+      });
+
+      runtime.context.registry.create({
+        id: 'runtime-health-retained-worktree',
+        providerName: 'codex',
+        cwd: prepared.cwd,
+        workspaceMode: prepared.workspaceMode,
+        workspaceIsolation: {
+          ...prepared.workspaceIsolation,
+          worktree: {
+            ...prepared.workspaceIsolation.worktree!,
+            lastCleanup: {
+              policy: 'preserve',
+              status: 'retained',
+              observedAt: '2026-03-22T00:00:00.000Z',
+              reasonCodes: ['worktree_preserved'],
+              mergedPathCount: 0,
+            },
+          },
+        },
+      });
+      runtime.context.registry.updateStatus('runtime-health-retained-worktree', 'closed');
+
+      const response = await runtime.app.request('/diagnostics/health');
+      expect(response.status).toBe(200);
+      expect((await response.json()).worktrees).toEqual({
+        summary: {
+          retainedSessions: 1,
+          attachedSessions: 0,
+          cleanupEligibleSessions: 1,
+          expiredSessions: 1,
+          retainedTtlMs: 86400000,
+          sweepIntervalMs: 60000,
+          lastSweepAt: null,
+          orphanedWorktrees: 0,
+          failedOrphanedWorktrees: 0,
+          autoCleanedRetainedSessions: 0,
+          failedAutoCleanedRetainedSessions: 0,
+        },
+      });
+    } finally {
+      await runtime.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 10000);
+
   it('background worktree maintenance auto-cleans expired preserved delete sessions', async () => {
     await withRuntime({}, {}, async (runtime) => {
       const repoDir = createGitWorkspace(
@@ -1249,6 +1346,21 @@ backends:
             }),
           ]),
         }),
+        worktrees: {
+          summary: {
+            retainedSessions: 0,
+            attachedSessions: 0,
+            cleanupEligibleSessions: 0,
+            expiredSessions: 0,
+            retainedTtlMs: 86400000,
+            sweepIntervalMs: 60000,
+            lastSweepAt: null,
+            orphanedWorktrees: 0,
+            failedOrphanedWorktrees: 0,
+            autoCleanedRetainedSessions: 0,
+            failedAutoCleanedRetainedSessions: 0,
+          },
+        },
         browser: {
           summary: {
             totalSessions: 0,
@@ -1569,6 +1681,21 @@ backends:
             }),
           ]),
         }),
+        worktrees: {
+          summary: {
+            retainedSessions: 0,
+            attachedSessions: 0,
+            cleanupEligibleSessions: 0,
+            expiredSessions: 0,
+            retainedTtlMs: 86400000,
+            sweepIntervalMs: 60000,
+            lastSweepAt: expect.any(String),
+            orphanedWorktrees: 0,
+            failedOrphanedWorktrees: 0,
+            autoCleanedRetainedSessions: 0,
+            failedAutoCleanedRetainedSessions: 0,
+          },
+        },
         browser: {
           summary: {
             totalSessions: 0,

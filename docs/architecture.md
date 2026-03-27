@@ -220,6 +220,9 @@ src/
 - Reuses the same browser summary read model on `GET /diagnostics/runtime` and
   compact `GET /diagnostics/health` aggregates so packaged hosts can inspect
   preview backlog without separately polling `/browser/summary`
+- Reuses the retained-worktree maintenance read model on
+  `GET /diagnostics/health` so packaged hosts can poll for retained cleanup
+  backlog without fetching the full `/diagnostics/runtime` snapshot
 - Exposes the standalone runtime-owned versioned filterable skill catalog at
   `GET /skills/catalog`
 - Exposes runtime-owned delivery execution routes such as delivery audit,

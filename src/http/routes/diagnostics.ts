@@ -191,6 +191,30 @@ function getRuntimeBrowserDiagnostics(ctx: AppContext) {
   };
 }
 
+function getRuntimeWorktreeDiagnostics(ctx: AppContext) {
+  const snapshot = ctx.worktreeMaintenance?.snapshot();
+  if (!snapshot) {
+    return undefined;
+  }
+
+  return {
+    snapshot,
+    summary: {
+      retainedSessions: snapshot.retained.totalSessions,
+      attachedSessions: snapshot.retained.attachedSessions,
+      cleanupEligibleSessions: snapshot.retained.cleanupEligibleSessions,
+      expiredSessions: snapshot.retained.expiredSessions,
+      retainedTtlMs: snapshot.policy.retainedTtlMs,
+      sweepIntervalMs: snapshot.policy.sweepIntervalMs,
+      lastSweepAt: snapshot.lastSweep?.observedAt ?? null,
+      orphanedWorktrees: snapshot.lastSweep?.orphanedWorktreeCount ?? 0,
+      failedOrphanedWorktrees: snapshot.lastSweep?.failedOrphanedWorktreeCount ?? 0,
+      autoCleanedRetainedSessions: snapshot.lastSweep?.autoCleanedRetainedSessionCount ?? 0,
+      failedAutoCleanedRetainedSessions: snapshot.lastSweep?.failedAutoCleanedRetainedSessionCount ?? 0,
+    },
+  };
+}
+
 function buildEnvDescriptor(
   env: Readonly<NodeJS.ProcessEnv>,
   envName?: string,
@@ -1158,6 +1182,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
   const peers = getPeerDiscoverySnapshot(ctx);
   const wakeups = getRuntimeWakeupSnapshot(ctx);
   const browser = getRuntimeBrowserDiagnostics(ctx);
+  const worktrees = getRuntimeWorktreeDiagnostics(ctx);
   const executionStrategies = ctx.apiBackend?.inspectExecutionStrategies()
     ?? buildApiRuntimeExecutionStrategyCatalog();
 
@@ -1175,7 +1200,7 @@ diagnosticsRoutes.get('/diagnostics/runtime', (c) => {
       listener,
       paths,
       maintenance: {
-        ...(ctx.worktreeMaintenance ? { worktrees: ctx.worktreeMaintenance.snapshot() } : {}),
+        ...(worktrees ? { worktrees: worktrees.snapshot } : {}),
         ...(browser.maintenance ? { browser: browser.maintenance } : {}),
       },
       browser: browser.summary,
@@ -1278,6 +1303,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
   const peers = getPeerDiscoverySnapshot(ctx);
   const wakeups = getRuntimeWakeupSnapshot(ctx);
   const browser = getRuntimeBrowserDiagnostics(ctx);
+  const worktrees = getRuntimeWorktreeDiagnostics(ctx);
   const executionStrategies = ctx.apiBackend?.inspectExecutionStrategies()
     ?? buildApiRuntimeExecutionStrategyCatalog();
   const providerSummary = summarizeProviderDiagnostics(catalog, providers, {
@@ -1321,6 +1347,11 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
         })),
     },
     peers,
+    ...(worktrees ? {
+      worktrees: {
+        summary: worktrees.summary,
+      },
+    } : {}),
     browser: {
       summary: {
         totalSessions: browser.summary.sessions.total,

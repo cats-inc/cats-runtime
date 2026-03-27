@@ -427,6 +427,9 @@ GET /diagnostics/providers
 desktop shells, and the embedded dashboard. It combines:
 
 - runtime readiness and startup/shutdown contract metadata
+- compact retained-worktree backlog summary metadata so hosts can see retained,
+  expired, and auto-clean follow-through counts without polling the full
+  runtime maintenance snapshot
 - compact browser aggregate summary metadata so hosts can see preview backlog
   and cleanup-candidate counts without calling `/browser/summary`
 - compact runtime execution-strategy summary metadata so hosts can distinguish

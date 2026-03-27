@@ -302,6 +302,9 @@ Current gaps:
 - retained worktree sessions now surface TTL-style expiry diagnostics plus
   background auto-clean results, but preserved/orphaned worktrees still need a
   broader retained-worktree GC policy
+- `GET /diagnostics/health` now also exposes a compact retained-worktree
+  backlog summary so polling hosts can see retained/expired/auto-cleaned counts
+  without fetching the full `/diagnostics/runtime` maintenance snapshot
 - `worktreeCleanupPolicy: "merge"` intentionally stops and returns
   `status: "retained"` when the source repo is already dirty, because runtime
   does not yet own conflict-resolution policy
