@@ -106,6 +106,7 @@ Current curated tools:
 - `provider_tools`
 - `provider_models`
 - `providers_models`
+- `provider_advanced_models`
 - `provider_diagnostics`
 - `reprobe_provider_diagnostics`
 - `list_compatibility_evidence_artifacts`
@@ -218,6 +219,11 @@ availability and discovery warnings without shelling out to the HTTP API.
 surface as `GET /providers/models`, including bounded `forceRefresh`
 semantics, so MCP hosts can inspect all configured provider families in one
 call without fanning out per-provider reads.
+`provider_advanced_models` reuses the same advanced per-target model-catalog
+surface as `GET /providers/{provider}/models/advanced`, including additive
+`instance` selection and bounded `forceRefresh` semantics, so MCP hosts can
+inspect richer model-resolution metadata without needing a separate MCP-only
+catalog contract.
 `list_sessions` and `observe_session` also reuse the same additive session
 `providerTarget` read model exposed by the direct HTTP session/history/observe
 surfaces, so MCP hosts can inspect backend continuity/tooling semantics without

@@ -1068,6 +1068,10 @@ evidence bundles and does not force hosts to invent their own report format.
   exposed through MCP as `providers_models`, so orchestrator-style hosts can
   inspect the full configured provider set in one call without fanning out to
   every provider family manually
+- the same advanced per-target provider model catalog surface is now also
+  exposed through MCP as `provider_advanced_models`, so orchestrator-style
+  hosts can inspect richer resolution/readiness metadata without inventing a
+  second advanced-catalog contract
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
   remediation previews, and latest-setup-report summary metadata including a

@@ -573,6 +573,34 @@ async function providersModels(
   };
 }
 
+async function providerAdvancedModels(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const provider = readRequiredString(args, 'provider');
+  const searchParams = new URLSearchParams();
+  appendSingleQueryValue(searchParams, 'instance', readOptionalString(args, 'instance'));
+  if (readOptionalBoolean(args, 'forceRefresh') === true) {
+    searchParams.set('refresh', '1');
+  }
+  const path = searchParams.size > 0
+    ? `/providers/${encodeURIComponent(provider)}/models/advanced?${searchParams.toString()}`
+    : `/providers/${encodeURIComponent(provider)}/models/advanced`;
+  const result = await requestRuntimeJson(ctx, path, { method: 'GET' });
+  ensureRouteSuccess('provider_advanced_models', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'provider_advanced_models result');
+  const models = Array.isArray(payload.models) ? payload.models : [];
+
+  return {
+    summary: `Advanced provider model catalog for ${provider} contains ${models.length} model(s).`,
+    structuredContent: {
+      ...payload,
+      modelsPath: path,
+    },
+  };
+}
+
 async function providerDiagnostics(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -2202,6 +2230,24 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: providersModels,
+  },
+  {
+    definition: {
+      name: 'provider_advanced_models',
+      title: 'Provider Advanced Models',
+      description: 'Return the runtime-owned advanced provider model catalog exposed by the existing advanced provider models route.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          provider: { type: 'string' },
+          instance: { type: 'string' },
+          forceRefresh: { type: 'boolean' },
+        },
+        required: ['provider'],
+        additionalProperties: false,
+      },
+    },
+    execute: providerAdvancedModels,
   },
   {
     definition: {

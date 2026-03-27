@@ -228,6 +228,13 @@ describe('runtime MCP facade', () => {
         source: 'config',
         models: [],
       })),
+      getAdvancedCatalog: vi.fn(async () => ({
+        source: 'config',
+        resolution: {
+          strategy: 'provider_default',
+        },
+        models: [],
+      })),
     };
 
     const workerStream = async function* (turn: string | TurnInput): AsyncGenerator<StreamEvent> {
@@ -357,6 +364,7 @@ describe('runtime MCP facade', () => {
       'provider_tools',
       'provider_models',
       'providers_models',
+      'provider_advanced_models',
       'provider_diagnostics',
       'reprobe_provider_diagnostics',
       'list_provider_evolution_artifacts',
@@ -659,6 +667,47 @@ describe('runtime MCP facade', () => {
       claude: {
         source: 'config',
         models: [],
+      },
+    }));
+
+    const providerAdvancedModelsResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 3.7,
+        method: 'tools/call',
+        params: {
+          name: 'provider_advanced_models',
+          arguments: {
+            provider: 'claude',
+            instance: 'default',
+            forceRefresh: true,
+          },
+        },
+      }),
+    });
+    expect(providerAdvancedModelsResponse.status).toBe(200);
+    const providerAdvancedModels = await providerAdvancedModelsResponse.json() as {
+      result: {
+        structuredContent: {
+          source: string;
+          models: unknown[];
+          modelsPath: string;
+          resolution: {
+            strategy: string;
+          };
+        };
+      };
+    };
+    expect(providerAdvancedModels.result.structuredContent.modelsPath).toBe(
+      '/providers/claude/models/advanced?instance=default&refresh=1',
+    );
+    expect(providerAdvancedModels.result.structuredContent).toEqual(expect.objectContaining({
+      source: 'config',
+      models: [],
+      resolution: {
+        strategy: 'provider_default',
       },
     }));
 
