@@ -144,6 +144,10 @@ tags, delivery hints, additive `sortBy` / `sortDirection`, and additive
 contract as `GET /diagnostics/providers`, including additive `probe` (`light`
 or `live`), `provider` / `backend` / `instance` / `defaultOnly` target
 filters, and `forceRefresh` semantics for cached compatibility assessments.
+`list_sessions` and `observe_session` also reuse the same additive session
+`providerTarget` read model exposed by the direct HTTP session/history/observe
+surfaces, so MCP hosts can inspect backend continuity/tooling semantics without
+joining `/providers/config`.
 
 Example `tools/call` request:
 

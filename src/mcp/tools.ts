@@ -330,7 +330,10 @@ async function listSessions(
     summary: `Returned ${sessions.length} session(s).`,
     structuredContent: {
       sessions: sessions.map((session) =>
-        buildMcpSessionSummary(ctx, session, { includeInspection }),
+        buildMcpSessionSummary(ctx, session, {
+          includeInspection,
+          expensiveCliCapabilities: false,
+        }),
       ),
     },
   };

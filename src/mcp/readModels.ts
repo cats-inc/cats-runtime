@@ -6,12 +6,14 @@ import {
   getRuntimeSessionManager,
   type AppContext,
 } from '../http/app.js';
+import { buildSessionProviderTargetSummary } from '../http/sessionProviderTarget.js';
 
 export function buildMcpSessionSummary(
   ctx: AppContext,
   session: SessionInfo,
   options: {
     includeInspection?: boolean;
+    expensiveCliCapabilities?: boolean;
   } = {},
 ) {
   const runtime = getRuntimeSessionManager(ctx);
@@ -24,6 +26,9 @@ export function buildMcpSessionSummary(
   return {
     ...view,
     ...(wakeup ? { wakeup } : {}),
+    providerTarget: buildSessionProviderTargetSummary(ctx, session, {
+      expensiveCliCapabilities: options.expensiveCliCapabilities,
+    }),
     ...(options.includeInspection
       ? {
           inspection: buildSessionInspection({
@@ -54,6 +59,7 @@ export function buildMcpObserveSessionPayload(
     session: {
       ...view,
       ...(wakeup ? { wakeup } : {}),
+      providerTarget: buildSessionProviderTargetSummary(ctx, session),
       inspection: buildSessionInspection({
         session,
         view,

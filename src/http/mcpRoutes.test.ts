@@ -368,6 +368,51 @@ describe('runtime MCP facade', () => {
         defaultTarget: true,
       }),
     ]);
+    vi.mocked(pool.getCapabilities).mockClear();
+
+    const listSessionsResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 31,
+        method: 'tools/call',
+        params: {
+          name: 'list_sessions',
+          arguments: {},
+        },
+      }),
+    });
+    expect(listSessionsResponse.status).toBe(200);
+    const listedSessions = await listSessionsResponse.json() as {
+      result: {
+        structuredContent: {
+          sessions: Array<{
+            id: string;
+            providerTarget: {
+              provider: string;
+              backend: string;
+              instance: string;
+              target: string;
+              resolved: boolean;
+            };
+          }>;
+        };
+      };
+    };
+    expect(listedSessions.result.structuredContent.sessions).toEqual([
+      expect.objectContaining({
+        id: 'session-1',
+        providerTarget: expect.objectContaining({
+          provider: 'claude',
+          backend: 'cli',
+          instance: 'default',
+          target: 'cli/default',
+          resolved: true,
+        }),
+      }),
+    ]);
+    expect(pool.getCapabilities).not.toHaveBeenCalled();
 
     const observeResponse = await app.request('/mcp', {
       method: 'POST',
@@ -390,6 +435,13 @@ describe('runtime MCP facade', () => {
         structuredContent: {
           session: {
             id: string;
+            providerTarget: {
+              provider: string;
+              backend: string;
+              instance: string;
+              target: string;
+              resolved: boolean;
+            };
             inspection: {
               state: string;
             };
@@ -399,8 +451,18 @@ describe('runtime MCP facade', () => {
       };
     };
     expect(observe.result.structuredContent.session.id).toBe('session-1');
+    expect(observe.result.structuredContent.session.providerTarget).toEqual(
+      expect.objectContaining({
+        provider: 'claude',
+        backend: 'cli',
+        instance: 'default',
+        target: 'cli/default',
+        resolved: true,
+      }),
+    );
     expect(observe.result.structuredContent.session.inspection.state).toBe('idle');
     expect(observe.result.structuredContent.observePath).toBe('/sessions/session-1/observe');
+    expect(pool.getCapabilities).toHaveBeenCalledWith('claude', 'default');
   });
 
   it('exposes the runtime skill catalog through MCP with the same lightweight filters as HTTP', async () => {
