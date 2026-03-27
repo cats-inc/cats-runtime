@@ -1,5 +1,12 @@
 import type { ProviderTargetDescriptor } from '../../../../core/providerCatalog.js';
-import type { RuntimeExecutionStrategyRequest, StreamEvent } from '../../../../core/types.js';
+import type {
+  InitStreamEvent,
+  ProgressStreamEvent,
+  RuntimeExecutionStrategyRequest,
+  TextStreamEvent,
+  ToolResultStreamEvent,
+  ToolUseStreamEvent,
+} from '../../../../core/types.js';
 import type { RuntimeExecutionStrategyResolution } from '../../../../core/runtime/strategies/resolution.js';
 import type { SessionRegistry } from '../../../cli/pool/SessionRegistry.js';
 import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
@@ -39,15 +46,15 @@ export interface ApiStrategyExecutionContextOptions {
 }
 
 export interface ApiCompletedModelStep {
-  initEvent?: StreamEvent;
-  progressEvents: StreamEvent[];
-  textEvents: StreamEvent[];
+  initEvent?: InitStreamEvent;
+  progressEvents: ProgressStreamEvent[];
+  textEvents: TextStreamEvent[];
   toolCalls: ApiToolCallPart[];
 }
 
 export interface ApiExecutedToolBatch {
-  toolUseEvents: StreamEvent[];
-  toolResultEvents: StreamEvent[];
+  toolUseEvents: ToolUseStreamEvent[];
+  toolResultEvents: ToolResultStreamEvent[];
   signatures: string[];
 }
 

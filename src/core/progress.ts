@@ -1,10 +1,10 @@
 import type {
   ProviderBackend,
+  ProgressStreamEvent,
   RuntimeGuardrailResult,
   RuntimeProgressKind,
   RuntimeProgressStatus,
   RuntimeRateLimitIncident,
-  StreamEvent,
 } from './types.js';
 
 interface CreateRuntimeProgressEventInput {
@@ -26,7 +26,7 @@ interface CreateRuntimeProgressEventInput {
 
 export function createRuntimeProgressEvent(
   input: CreateRuntimeProgressEventInput,
-): StreamEvent {
+): ProgressStreamEvent {
   return {
     type: 'progress',
     sessionId: input.sessionId,
@@ -45,5 +45,5 @@ export function createRuntimeProgressEvent(
       ...(input.guardrail ? { guardrail: input.guardrail } : {}),
       ...input.details,
     },
-  };
+  } satisfies ProgressStreamEvent;
 }

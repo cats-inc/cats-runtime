@@ -4,10 +4,17 @@ import {
   readRuntimeExecutionStrategyState,
 } from '../../../../core/runtime/strategies/state.js';
 import type {
+  ErrorStreamEvent,
+  InitStreamEvent,
+  ProgressStreamEvent,
+  ResultStreamEvent,
   RuntimeExecutionStrategyState,
   RuntimeExecutionStrategySummary,
   RuntimeProgressStatus,
   StreamEvent,
+  TextStreamEvent,
+  ToolResultStreamEvent,
+  ToolUseStreamEvent,
 } from '../../../../core/types.js';
 import type { SessionProviderState } from '../../../../core/types.js';
 import type { ApiConversationMessage, ApiProgressEvent, ApiToolCallPart } from '../../types.js';
@@ -109,7 +116,7 @@ export class ApiStrategyExecutionContext {
           type: 'init',
           sessionId: this.state.responseId,
           raw: completion.raw,
-        } satisfies StreamEvent
+        } satisfies InitStreamEvent
       : undefined;
     this.state.initialized = true;
 
@@ -122,7 +129,7 @@ export class ApiStrategyExecutionContext {
         type: 'text',
         text,
         raw: completion.raw,
-      })),
+      } satisfies TextStreamEvent)),
       toolCalls: extractToolCalls(completion.assistant),
     };
   }
@@ -162,15 +169,15 @@ export class ApiStrategyExecutionContext {
       parts: [],
     };
 
-    const toolUseEvents: StreamEvent[] = toolCalls.map((toolCall) => ({
+    const toolUseEvents: ToolUseStreamEvent[] = toolCalls.map((toolCall) => ({
       type: 'tool_use',
       toolName: toolCall.name,
       toolId: toolCall.id,
       text: JSON.stringify(toolCall.arguments),
       toolArgs: toolCall.arguments,
       raw: toolCall.raw,
-    }));
-    const toolResultEvents: StreamEvent[] = [];
+    } satisfies ToolUseStreamEvent));
+    const toolResultEvents: ToolResultStreamEvent[] = [];
     const signatures: string[] = [];
 
     for (const toolCall of toolCalls) {
@@ -201,7 +208,7 @@ export class ApiStrategyExecutionContext {
         toolId: toolResult.callId,
         text: toolResult.output,
         isError: toolResult.isError,
-      });
+      } satisfies ToolResultStreamEvent);
       signatures.push(`${toolResult.name}:${JSON.stringify(toolCall.arguments)}`);
     }
 
@@ -221,7 +228,7 @@ export class ApiStrategyExecutionContext {
     });
   }
 
-  createResultEvent(): StreamEvent {
+  createResultEvent(): ResultStreamEvent {
     return {
       type: 'result',
       sessionId: this.state.responseId,
@@ -230,7 +237,7 @@ export class ApiStrategyExecutionContext {
         outputTokens: this.state.totalOutputTokens,
       },
       raw: this.state.lastRaw,
-    };
+    } satisfies ResultStreamEvent;
   }
 
   updateStrategy(
@@ -365,7 +372,7 @@ export class ApiStrategyExecutionContext {
           ? { strategySummary: structuredClone(strategyState.summary) }
           : {}),
       },
-    });
+    } satisfies ErrorStreamEvent);
     return events;
   }
 
@@ -461,7 +468,7 @@ export class ApiStrategyExecutionContext {
 
   private toProgressStreamEvent(
     progress: ApiProgressEvent,
-  ): StreamEvent {
+  ): ProgressStreamEvent {
     return createRuntimeProgressEvent({
       text: progress.message,
       providerSessionId: this.providerSessionId,

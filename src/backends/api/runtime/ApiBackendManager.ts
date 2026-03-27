@@ -1,4 +1,5 @@
 import type {
+  ErrorStreamEvent,
   ExecutionHandle,
   RuntimeExecutionStrategyId,
   RuntimeExecutionStrategyRequest,
@@ -132,7 +133,7 @@ function toErrorStreamEvent(
   error: unknown,
   target: ProviderTargetDescriptor,
   providerSessionId?: string,
-): StreamEvent {
+): ErrorStreamEvent {
   if (error instanceof ApiTransportError) {
     return {
       type: 'error',
@@ -148,7 +149,7 @@ function toErrorStreamEvent(
           body: error.responseBody,
         },
       },
-    };
+    } satisfies ErrorStreamEvent;
   }
 
   return {
@@ -160,7 +161,7 @@ function toErrorStreamEvent(
       backend: target.backend,
       instance: target.instanceId,
     },
-  };
+  } satisfies ErrorStreamEvent;
 }
 
 function buildStrategyInstructionOverlay(
