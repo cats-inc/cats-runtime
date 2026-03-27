@@ -359,6 +359,7 @@ describe('runtime MCP facade', () => {
       'runtime_summary',
       'runtime_diagnostics',
       'list_sessions',
+      'read_session',
       'health_diagnostics',
       'providers_config',
       'provider_tools',
@@ -1431,6 +1432,55 @@ describe('runtime MCP facade', () => {
       }),
     ]);
     expect(pool.getCapabilities).not.toHaveBeenCalled();
+
+    const readSessionResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 31.5,
+        method: 'tools/call',
+        params: {
+          name: 'read_session',
+          arguments: {
+            sessionId: 'session-1',
+          },
+        },
+      }),
+    });
+    expect(readSessionResponse.status).toBe(200);
+    const readSession = await readSessionResponse.json() as {
+      result: {
+        structuredContent: {
+          sessionPath: string;
+          observePath: string;
+          historyPath: string;
+          session: {
+            id: string;
+            providerTarget: {
+              provider: string;
+              backend: string;
+              instance: string;
+              target: string;
+              resolved: boolean;
+            };
+          };
+        };
+      };
+    };
+    expect(readSession.result.structuredContent.sessionPath).toBe('/sessions/session-1');
+    expect(readSession.result.structuredContent.observePath).toBe('/sessions/session-1/observe');
+    expect(readSession.result.structuredContent.historyPath).toBe('/sessions/session-1/history');
+    expect(readSession.result.structuredContent.session).toEqual(expect.objectContaining({
+      id: 'session-1',
+      providerTarget: expect.objectContaining({
+        provider: 'claude',
+        backend: 'cli',
+        instance: 'default',
+        target: 'cli/default',
+        resolved: true,
+      }),
+    }));
 
     const observeResponse = await app.request('/mcp', {
       method: 'POST',

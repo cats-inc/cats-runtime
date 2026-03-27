@@ -1072,6 +1072,10 @@ evidence bundles and does not force hosts to invent their own report format.
   exposed through MCP as `provider_advanced_models`, so orchestrator-style
   hosts can inspect richer resolution/readiness metadata without inventing a
   second advanced-catalog contract
+- the same runtime-owned session detail surface is now also exposed through MCP
+  as `read_session`, so orchestrator-style hosts can inspect additive
+  provider-target, strategy, wakeup, and inspection metadata without
+  bypassing the existing session read contract
 - `GET /setup-state` now exposes a shared repair read model with preferred-scan,
   next-action, actionable repair actions, ready-to-apply provider lists,
   remediation previews, and latest-setup-report summary metadata including a

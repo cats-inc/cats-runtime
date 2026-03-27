@@ -1194,6 +1194,25 @@ async function observeSession(
   };
 }
 
+async function readSession(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const sessionId = readRequiredString(args, 'sessionId');
+  const path = `/sessions/${encodeURIComponent(sessionId)}`;
+  const result = await requestRuntimeJson(ctx, path, { method: 'GET' });
+  ensureRouteSuccess('read_session', result.status, result.body);
+
+  const payload = ensureObject(result.body, 'read_session result');
+  return {
+    summary: `Read session ${sessionId}.`,
+    structuredContent: {
+      session: payload,
+      ...buildSessionPaths(sessionId),
+    },
+  };
+}
+
 async function listRuntimeSkills(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -2151,6 +2170,22 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: listSessions,
+  },
+  {
+    definition: {
+      name: 'read_session',
+      title: 'Read Session',
+      description: 'Return the runtime-owned session detail payload exposed by the existing session read route.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          sessionId: { type: 'string' },
+        },
+        required: ['sessionId'],
+        additionalProperties: false,
+      },
+    },
+    execute: readSession,
   },
   {
     definition: {

@@ -101,6 +101,7 @@ Current curated tools:
 - `runtime_summary`
 - `runtime_diagnostics`
 - `list_sessions`
+- `read_session`
 - `health_diagnostics`
 - `providers_config`
 - `provider_tools`
@@ -224,6 +225,10 @@ surface as `GET /providers/{provider}/models/advanced`, including additive
 `instance` selection and bounded `forceRefresh` semantics, so MCP hosts can
 inspect richer model-resolution metadata without needing a separate MCP-only
 catalog contract.
+`read_session` reuses the same runtime-owned session detail surface as
+`GET /sessions/{id}`, so MCP hosts can inspect the additive session
+provider-target, strategy, inspection, and wakeup metadata without bypassing
+the existing session read contract.
 `list_sessions` and `observe_session` also reuse the same additive session
 `providerTarget` read model exposed by the direct HTTP session/history/observe
 surfaces, so MCP hosts can inspect backend continuity/tooling semantics without
