@@ -36,7 +36,9 @@ import {
   getProviderEvolutionProbeProfile,
   summarizeProviderEvolutionProbeArtifact,
   type ProviderEvolutionExternalReference,
+  type ProviderEvolutionProbeArtifactQuery,
   type ProviderEvolutionReviewClassification,
+  type ProviderEvolutionProbeReviewUpdate,
   type ProviderEvolutionProbeArtifactSummary,
   ProviderEvolutionProbeService,
   type ProviderEvolutionProbeProfile,
@@ -190,6 +192,28 @@ export async function readProviderEvolutionProbeArtifact(
   return artifact;
 }
 
+export async function reviewProviderEvolutionProbeArtifact(
+  cliOptions: RuntimeCliOptions,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<ProviderEvolutionProbeStoredArtifact> {
+  const artifactId = cliOptions.reviewProviderEvolutionArtifact?.trim();
+  if (!artifactId) {
+    throw new Error('Missing --review-provider-evolution-artifact value');
+  }
+
+  const update = resolveProbeReviewUpdate(cliOptions);
+  const context = resolveProviderEvolutionEntryContext(env);
+  const artifact = await context.probeService.updateArtifactReviewById(
+    artifactId,
+    update,
+    resolveProbeArtifactIdentityQuery(cliOptions),
+  );
+  if (!artifact) {
+    throw new Error(`Provider-evolution artifact '${artifactId}' was not found.`);
+  }
+  return artifact;
+}
+
 export function resolveProviderEvolutionEntryContext(
   env: NodeJS.ProcessEnv = process.env,
 ): ProviderEvolutionEntryContext {
@@ -235,6 +259,23 @@ export function formatProviderEvolutionProbeArtifactReadSummary(
   const summary = summarizeProviderEvolutionProbeArtifact(artifact);
   const lines = [
     `Loaded provider-evolution artifact ${summary.artifactId}: ${summary.review.summary}`,
+    ...summary.review.highlights.map((highlight) => `- ${highlight}`),
+    ...(summary.reviewContext?.references.length
+      ? [`- External references: ${summary.reviewContext.references
+          .map((reference) => `${reference.kind}=${reference.url}`)
+          .join(', ')}`]
+      : []),
+    `Artifact: ${artifact.artifactPath}`,
+  ];
+  return `${lines.join('\n')}\n`;
+}
+
+export function formatProviderEvolutionProbeArtifactReviewSummary(
+  artifact: ProviderEvolutionProbeStoredArtifact,
+): string {
+  const summary = summarizeProviderEvolutionProbeArtifact(artifact);
+  const lines = [
+    `Updated provider-evolution artifact ${summary.artifactId}: ${summary.review.summary}`,
     ...summary.review.highlights.map((highlight) => `- ${highlight}`),
     ...(summary.reviewContext?.references.length
       ? [`- External references: ${summary.reviewContext.references
@@ -456,26 +497,51 @@ export function parseProviderEvolutionProbeCliOptions(argv: string[]): RuntimeCl
 
 function resolveProbeArtifactQuery(
   cliOptions: RuntimeCliOptions,
-): {
-  provider?: string;
-  instance?: string;
-  parserId?: string;
-  probeProfile?: string;
-  transport?: ProviderEvolutionTransport;
-  limit?: number;
-} {
-  const provider = parseOptionalProbeProviderName(cliOptions.probeProvider);
+): ProviderEvolutionProbeArtifactQuery {
+  const query = resolveProbeArtifactIdentityQuery(cliOptions);
   const limit = parseOptionalProbeLimit(cliOptions.probeLimit);
-  const transport = parseOptionalProbeTransport(cliOptions.probeTransport);
   const reviewClassifications = parseOptionalProbeClassifications(cliOptions.probeClassifications);
+  return {
+    ...query,
+    ...(reviewClassifications ? { reviewClassifications } : {}),
+    ...(typeof limit === 'number' ? { limit } : {}),
+  };
+}
+
+function resolveProbeArtifactIdentityQuery(
+  cliOptions: RuntimeCliOptions,
+): ProviderEvolutionProbeArtifactQuery {
+  const provider = parseOptionalProbeProviderName(cliOptions.probeProvider);
+  const transport = parseOptionalProbeTransport(cliOptions.probeTransport);
   return {
     ...(provider ? { provider } : {}),
     ...(cliOptions.probeInstance ? { instance: cliOptions.probeInstance.trim() } : {}),
     ...(cliOptions.probeParser ? { parserId: cliOptions.probeParser.trim() } : {}),
     ...(cliOptions.probeProfile ? { probeProfile: cliOptions.probeProfile.trim() } : {}),
     ...(transport ? { transport } : {}),
-    ...(reviewClassifications ? { reviewClassifications } : {}),
-    ...(typeof limit === 'number' ? { limit } : {}),
+  };
+}
+
+function resolveProbeReviewUpdate(
+  cliOptions: RuntimeCliOptions,
+): ProviderEvolutionProbeReviewUpdate {
+  const classifications = parseOptionalProbeClassifications(cliOptions.probeClassifications);
+  const summary = parseOptionalProbeReviewSummary(cliOptions.probeReviewSummary);
+  const highlights = parseOptionalProbeHighlights(cliOptions.probeHighlights);
+  const references = resolveProbeReferences(cliOptions);
+
+  if (!classifications && !summary && !highlights && !references) {
+    throw new Error(
+      'Manual provider-evolution review updates require at least one of '
+      + '--probe-classification, --probe-review-summary, --probe-highlight, or --probe-reference.',
+    );
+  }
+
+  return {
+    ...(classifications ? { classifications } : {}),
+    ...(summary ? { summary } : {}),
+    ...(highlights ? { highlights } : {}),
+    ...(references ? { references } : {}),
   };
 }
 
@@ -525,6 +591,31 @@ function parseOptionalProbeClassifications(
 
   const classifications = Array.from(new Set(values.map(parseProbeClassification)));
   return classifications.length > 0 ? classifications : undefined;
+}
+
+function parseOptionalProbeReviewSummary(
+  value: string | undefined,
+): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  return trimmed;
+}
+
+function parseOptionalProbeHighlights(
+  values: string[] | undefined,
+): string[] | undefined {
+  if (!values?.length) {
+    return undefined;
+  }
+
+  const highlights = Array.from(new Set(
+    values
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0),
+  ));
+  return highlights.length > 0 ? highlights : undefined;
 }
 
 function resolveProbeReferences(

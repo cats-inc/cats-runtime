@@ -112,6 +112,28 @@ interface ProviderEvolutionArtifactReadCliOutput {
   };
 }
 
+interface ProviderEvolutionArtifactReviewCliOutput {
+  status: 'reviewed';
+  artifactPath: string;
+  artifact: {
+    id: string;
+    provider: string;
+    instance: string;
+    probeProfile: string;
+    review: {
+      classifications: string[];
+      summary: string;
+      highlights: string[];
+    };
+    reviewContext?: {
+      references: Array<{
+        kind: string;
+        url: string;
+      }>;
+    };
+  };
+}
+
 const testsDir = dirname(fileURLToPath(import.meta.url));
 const runtimeRoot = resolve(testsDir, '..');
 const runtimeEntry = join(runtimeRoot, 'dist', 'index.js');
@@ -1286,6 +1308,77 @@ describe('runtime process startup contract', () => {
       expect(output.stderr).toContain('Loaded provider-evolution artifact artifact-2');
       expect(output.stderr).toContain(
         'External references: release_notes=https://docs.example.com/releases/codex-cli-1-2-3',
+      );
+      expect(output.stderr).toContain(`Artifact: ${artifactPath}`);
+    } finally {
+      cleanup();
+    }
+  }, 20000);
+
+  it('can update retained provider-evolution artifact review metadata without starting the HTTP server', async () => {
+    const { env, cleanup } = createRuntimeProcessEnv(3214);
+    const artifactPath = writeProviderEvolutionArtifact(env, 'codex', 'artifact-review', {
+      reviewContext: {
+        references: [
+          {
+            kind: 'release_notes',
+            url: 'https://docs.example.com/releases/codex-cli-1-2-3',
+          },
+        ],
+      },
+    });
+    const child = spawnSetupDiagnostic([
+      '--review-provider-evolution-artifact',
+      'artifact-review',
+      '--probe-provider',
+      'codex',
+      '--probe-classification',
+      'regression',
+      '--probe-classification',
+      'schema_change',
+      '--probe-review-summary',
+      'Manual review flagged a regression with schema changes.',
+      '--probe-highlight',
+      'Removed event types: tool_result',
+      '--probe-highlight',
+      'Schema changes observed for tool_result.',
+      '--probe-reference',
+      'issue=https://docs.example.com/issues/codex-cli-regression',
+    ], env);
+
+    try {
+      const output = await waitForProcessOutput(child);
+      expect(output.code).toBe(0);
+
+      const payload = JSON.parse(output.stdout.trim()) as ProviderEvolutionArtifactReviewCliOutput;
+      expect(payload.status).toBe('reviewed');
+      expect(payload.artifactPath).toBe(artifactPath);
+      expect(payload.artifact).toMatchObject({
+        id: 'artifact-review',
+        provider: 'codex',
+        instance: 'default',
+        probeProfile: 'manual_smoke',
+        review: {
+          classifications: ['regression', 'schema_change'],
+          summary: 'Manual review flagged a regression with schema changes.',
+          highlights: [
+            'Removed event types: tool_result',
+            'Schema changes observed for tool_result.',
+          ],
+        },
+        reviewContext: {
+          references: [
+            {
+              kind: 'issue',
+              url: 'https://docs.example.com/issues/codex-cli-regression',
+            },
+          ],
+        },
+      });
+      expect(output.stderr).toContain('Updated provider-evolution artifact artifact-review');
+      expect(output.stderr).toContain('- Removed event types: tool_result');
+      expect(output.stderr).toContain(
+        'External references: issue=https://docs.example.com/issues/codex-cli-regression',
       );
       expect(output.stderr).toContain(`Artifact: ${artifactPath}`);
     } finally {

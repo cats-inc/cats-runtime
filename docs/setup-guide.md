@@ -156,6 +156,7 @@ node dist/index.js --list-provider-evolution-artifacts --probe-provider claude -
 node dist/index.js --list-provider-evolution-artifacts --probe-provider claude --probe-parser agent_sdk_http_v1 --probe-transport agent
 node dist/index.js --list-provider-evolution-artifacts --probe-provider codex --probe-classification regression
 node dist/index.js --read-provider-evolution-artifact artifact-id --probe-provider codex
+node dist/index.js --review-provider-evolution-artifact artifact-id --probe-provider codex --probe-classification regression --probe-review-summary "Manual review flagged a regression." --probe-highlight "Removed event types: tool_result" --probe-reference issue=https://docs.example.com/issues/codex-cli-regression
 ```
 
 The probe path is intentionally manual-first and currently supports the
@@ -182,6 +183,9 @@ opening any public HTTP surface:
   machine-readable stdout JSON with newest-first retained artifact summaries
 - `--read-provider-evolution-artifact <artifactId>` re-reads one retained
   artifact and prints the full stored artifact JSON to stdout
+- `--review-provider-evolution-artifact <artifactId>` updates one retained
+  artifact's review metadata in place and prints the updated artifact JSON to
+  stdout
 - `--probe-provider`, `--probe-instance`, `--probe-parser`,
   `--probe-transport`, and `--probe-profile` can scope the retained-artifact
   listing, and `--probe-limit <count>` caps list output
@@ -189,6 +193,10 @@ opening any public HTTP surface:
   flows to focus triage on artifacts whose review already includes
   `baseline`, `stable`, `upgrade`, `regression`, `schema_change`, or
   `semantic_drift_suspected`
+- the same `--probe-classification`, `--probe-review-summary <text>`,
+  `--probe-highlight <text>`, and `--probe-reference <kind=url>` flags can be
+  used with `--review-provider-evolution-artifact` to write back manual review
+  decisions without rerunning a probe or opening a public write route
 - `--probe-reference <kind=url>` can be repeated during probe generation to
   attach manual release-note or changelog context without mixing that material
   into the runtime-owned evidence bundle

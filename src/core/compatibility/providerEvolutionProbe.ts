@@ -93,6 +93,13 @@ export interface ProviderEvolutionProbeReviewSummary {
   highlights: string[];
 }
 
+export interface ProviderEvolutionProbeReviewUpdate {
+  classifications?: ProviderEvolutionReviewClassification[];
+  summary?: string;
+  highlights?: string[];
+  references?: ProviderEvolutionExternalReference[];
+}
+
 export interface ProviderEvolutionProbeExecutionSummary {
   status: 'completed' | 'failed';
   durationMs: number;
@@ -366,6 +373,25 @@ export class ProviderEvolutionProbeService {
     artifacts.sort((left, right) => Date.parse(right.capturedAt) - Date.parse(left.capturedAt));
     const limit = Math.max(1, Math.trunc(query.limit ?? artifacts.length));
     return artifacts.slice(0, limit);
+  }
+
+  async updateArtifactReviewById(
+    artifactId: string,
+    update: ProviderEvolutionProbeReviewUpdate,
+    query: ProviderEvolutionProbeArtifactQuery = {},
+  ): Promise<ProviderEvolutionProbeStoredArtifact | null> {
+    const stored = await this.readArtifactById(artifactId, query);
+    if (!stored) {
+      return null;
+    }
+
+    const artifact = applyProviderEvolutionReviewUpdate(stored.artifact, update);
+    await writeFile(stored.artifactPath, `${JSON.stringify(artifact, null, 2)}\n`, 'utf8');
+
+    return {
+      ...stored,
+      artifact,
+    };
   }
 
   private async findLatestBaseline(
@@ -703,6 +729,44 @@ function hydrateProviderEvolutionProbeArtifact(
   };
 }
 
+function applyProviderEvolutionReviewUpdate(
+  artifact: ProviderEvolutionProbeArtifact,
+  update: ProviderEvolutionProbeReviewUpdate,
+): ProviderEvolutionProbeArtifact {
+  const nextClassifications = update.classifications
+    ? Array.from(new Set(update.classifications))
+    : artifact.review.classifications;
+  const nextHighlights = update.highlights
+    ? normalizeProviderEvolutionReviewHighlights(update.highlights)
+    : artifact.review.highlights;
+  const nextReview: ProviderEvolutionProbeReviewSummary = {
+    classifications: nextClassifications,
+    summary: update.summary?.trim()
+      || (update.classifications ? buildManualProviderEvolutionReviewSummary(nextClassifications) : artifact.review.summary),
+    highlights: nextHighlights,
+  };
+  const nextReviewContext = update.references !== undefined
+    ? normalizeProviderEvolutionReviewContext({ references: update.references })
+    : normalizeProviderEvolutionReviewContext(artifact.reviewContext);
+  const { reviewContext: _previousReviewContext, ...artifactWithoutReviewContext } = artifact;
+
+  return hydrateProviderEvolutionProbeArtifact({
+    ...artifactWithoutReviewContext,
+    review: nextReview,
+    ...(nextReviewContext ? { reviewContext: nextReviewContext } : {}),
+  });
+}
+
+function normalizeProviderEvolutionReviewHighlights(
+  highlights: string[],
+): string[] {
+  return Array.from(new Set(
+    highlights
+      .map((highlight) => highlight.trim())
+      .filter((highlight) => highlight.length > 0),
+  ));
+}
+
 function normalizeProviderEvolutionReviewContext(
   value: { references?: ProviderEvolutionExternalReference[] } | undefined,
 ): { references: ProviderEvolutionExternalReference[] } | undefined {
@@ -812,6 +876,13 @@ function summarizeProviderEvolutionProbeReview(
     summary: `Detected ${classifications.map(formatReviewClassification).join(', ')} relative to the latest baseline.`,
     highlights,
   };
+}
+
+function buildManualProviderEvolutionReviewSummary(
+  classifications: ProviderEvolutionReviewClassification[],
+): string {
+  const labels = classifications.map(formatReviewClassification);
+  return `Manual review classified this artifact as ${labels.join(', ')}.`;
 }
 
 function formatReviewClassification(value: ProviderEvolutionReviewClassification): string {

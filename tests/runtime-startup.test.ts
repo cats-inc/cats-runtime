@@ -38,6 +38,8 @@ describe('runtime startup helpers', () => {
       '--probe-provider-evolution',
       '--list-provider-evolution-artifacts',
       '--read-provider-evolution-artifact=artifact-1',
+      '--review-provider-evolution-artifact',
+      'artifact-2',
       '--probe-provider=codex',
       '--probe-instance',
       'default',
@@ -47,6 +49,9 @@ describe('runtime startup helpers', () => {
       '--probe-profile',
       'manual_smoke',
       '--probe-model=gpt-5',
+      '--probe-review-summary',
+      'Manual review flagged an upgrade.',
+      '--probe-highlight=Added event types: tool_result',
       '--probe-reference',
       'release_notes=https://docs.example.com/releases/codex-cli-1-2-3',
       '--probe-reference=changelog=https://docs.example.com/changelog/codex-cli',
@@ -73,12 +78,17 @@ describe('runtime startup helpers', () => {
       probeProviderEvolution: true,
       listProviderEvolutionArtifacts: true,
       readProviderEvolutionArtifact: 'artifact-1',
+      reviewProviderEvolutionArtifact: 'artifact-2',
       probeProvider: 'codex',
       probeInstance: 'default',
       probeParser: 'codex-json-rpc',
       probeTransport: 'cli',
       probeProfile: 'manual_smoke',
       probeModel: 'gpt-5',
+      probeReviewSummary: 'Manual review flagged an upgrade.',
+      probeHighlights: [
+        'Added event types: tool_result',
+      ],
       probeReferences: [
         'release_notes=https://docs.example.com/releases/codex-cli-1-2-3',
         'changelog=https://docs.example.com/changelog/codex-cli',
@@ -389,10 +399,13 @@ describe('runtime startup helpers', () => {
     expect(help).toContain('--probe-provider-evolution');
     expect(help).toContain('--list-provider-evolution-artifacts');
     expect(help).toContain('--read-provider-evolution-artifact <artifactId>');
+    expect(help).toContain('--review-provider-evolution-artifact <artifactId>');
     expect(help).toContain('--probe-provider <provider>');
     expect(help).toContain('--probe-parser <parserId>');
     expect(help).toContain('--probe-transport <cli|agent|api|unknown>');
     expect(help).toContain('--probe-profile <manual_smoke|manual_text>');
+    expect(help).toContain('--probe-review-summary <text>');
+    expect(help).toContain('--probe-highlight <text>');
     expect(help).toContain('--probe-reference <kind=url>');
     expect(help).toContain('--probe-classification <classification>');
     expect(help).toContain('--probe-limit <count>');

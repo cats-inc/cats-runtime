@@ -7,10 +7,12 @@ import { loadConfig } from './core/config.js';
 import {
   formatProviderEvolutionProbeArtifactListSummary,
   formatProviderEvolutionProbeArtifactReadSummary,
+  formatProviderEvolutionProbeArtifactReviewSummary,
   formatProviderEvolutionProbeSummary,
   generateProviderEvolutionProbeArtifact,
   listProviderEvolutionProbeArtifacts,
   readProviderEvolutionProbeArtifact,
+  reviewProviderEvolutionProbeArtifact,
 } from './core/compatibility/providerEvolutionEntry.js';
 import {
   formatSetupDiagnosticReportListSummary,
@@ -118,6 +120,17 @@ async function main(): Promise<void> {
     process.stderr.write(formatProviderEvolutionProbeArtifactReadSummary(result));
     process.stdout.write(`${JSON.stringify({
       status: 'loaded',
+      artifactPath: result.artifactPath,
+      artifact: result.artifact,
+    })}\n`);
+    return;
+  }
+
+  if (cliOptions.reviewProviderEvolutionArtifact) {
+    const result = await reviewProviderEvolutionProbeArtifact(cliOptions, process.env);
+    process.stderr.write(formatProviderEvolutionProbeArtifactReviewSummary(result));
+    process.stdout.write(`${JSON.stringify({
+      status: 'reviewed',
       artifactPath: result.artifactPath,
       artifact: result.artifact,
     })}\n`);

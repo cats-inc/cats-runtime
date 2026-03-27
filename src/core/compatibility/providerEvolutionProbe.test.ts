@@ -427,6 +427,52 @@ describe('ProviderEvolutionProbeService', () => {
       artifactId: baseline.artifact.id,
     }));
 
+    const reviewed = await service.updateArtifactReviewById(
+      current.artifact.id,
+      {
+        classifications: ['regression', 'schema_change'],
+        summary: 'Manual review flagged a regression with schema changes.',
+        highlights: [
+          'Removed event types: future.event',
+          'Schema changes observed for tool_result.',
+        ],
+        references: [
+          {
+            kind: 'issue',
+            url: 'https://docs.example.com/issues/codex-cli-regression',
+          },
+        ],
+      },
+      {
+        provider: 'codex',
+      },
+    );
+    expect(reviewed?.artifact.review).toEqual({
+      classifications: ['regression', 'schema_change'],
+      summary: 'Manual review flagged a regression with schema changes.',
+      highlights: [
+        'Removed event types: future.event',
+        'Schema changes observed for tool_result.',
+      ],
+    });
+    expect(reviewed?.artifact.reviewContext).toEqual({
+      references: [
+        {
+          kind: 'issue',
+          url: 'https://docs.example.com/issues/codex-cli-regression',
+        },
+      ],
+    });
+    await expect(service.readLatestArtifact({
+      provider: 'codex',
+      reviewClassifications: ['regression'],
+    })).resolves.toEqual(expect.objectContaining({
+      artifactId: current.artifact.id,
+      review: expect.objectContaining({
+        classifications: ['regression', 'schema_change'],
+      }),
+    }));
+
     rmSync(root, { recursive: true, force: true });
   });
 });

@@ -70,12 +70,15 @@ export interface RuntimeCliOptions {
   probeProviderEvolution?: boolean;
   listProviderEvolutionArtifacts?: boolean;
   readProviderEvolutionArtifact?: string;
+  reviewProviderEvolutionArtifact?: string;
   probeProvider?: string;
   probeInstance?: string;
   probeParser?: string;
   probeTransport?: string;
   probeProfile?: string;
   probeModel?: string;
+  probeReviewSummary?: string;
+  probeHighlights?: string[];
   probeReferences?: string[];
   probeClassifications?: string[];
   probeLimit?: string;
@@ -236,6 +239,17 @@ export function parseRuntimeCliOptions(argv: string[]): RuntimeCliOptions {
       continue;
     }
 
+    if (arg === '--review-provider-evolution-artifact') {
+      options.reviewProviderEvolutionArtifact = readOptionValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--review-provider-evolution-artifact=')) {
+      options.reviewProviderEvolutionArtifact = arg.slice('--review-provider-evolution-artifact='.length);
+      continue;
+    }
+
     if (arg === '--probe-provider') {
       options.probeProvider = readOptionValue(argv, index, arg);
       index += 1;
@@ -299,6 +313,32 @@ export function parseRuntimeCliOptions(argv: string[]): RuntimeCliOptions {
 
     if (arg.startsWith('--probe-model=')) {
       options.probeModel = arg.slice('--probe-model='.length);
+      continue;
+    }
+
+    if (arg === '--probe-review-summary') {
+      options.probeReviewSummary = readOptionValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--probe-review-summary=')) {
+      options.probeReviewSummary = arg.slice('--probe-review-summary='.length);
+      continue;
+    }
+
+    if (arg === '--probe-highlight') {
+      const value = readOptionValue(argv, index, arg);
+      options.probeHighlights = [...(options.probeHighlights || []), value];
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--probe-highlight=')) {
+      options.probeHighlights = [
+        ...(options.probeHighlights || []),
+        arg.slice('--probe-highlight='.length),
+      ];
       continue;
     }
 
@@ -752,12 +792,15 @@ export function getRuntimeHelpText(): string {
     '  --probe-provider-evolution             Run a manual provider-evolution probe and exit',
     '  --list-provider-evolution-artifacts    List retained provider-evolution probe artifacts and exit',
     '  --read-provider-evolution-artifact <artifactId>',
+    '  --review-provider-evolution-artifact <artifactId>',
     '  --probe-provider <provider>',
     '  --probe-instance <instance>',
     '  --probe-parser <parserId>',
     '  --probe-transport <cli|agent|api|unknown>',
     '  --probe-profile <manual_smoke|manual_text>',
     '  --probe-model <model>',
+    '  --probe-review-summary <text>',
+    '  --probe-highlight <text>',
     '  --probe-reference <kind=url>',
     '  --probe-classification <classification>',
     '  --probe-limit <count>',

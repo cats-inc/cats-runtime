@@ -1102,6 +1102,7 @@ always-on self-adapting parser system.
 - the CLI/manual-first flow can now also:
   - list retained provider-evolution artifacts newest-first
   - re-read a retained artifact by id without starting the HTTP server
+  - update retained artifact review metadata in place without rerunning a probe
   - filter retained artifacts by review classification for narrower triage
   - filter retained artifacts by parser id and transport for narrower
     operator review
@@ -1135,8 +1136,8 @@ always-on self-adapting parser system.
 - keep provider-specific parsing inside adapters while reusing the shared
   collector across future agent/A2A transports
 - refine semantic-drift heuristics and broaden operator workflows around the
-  now-landed manual `reviewContext.references[]` attachment path without
-  introducing automatic release-note scraping
+  now-landed retained review update path for classifications / highlights /
+  references without introducing automatic release-note scraping
 
 #### Deferred Scope
 

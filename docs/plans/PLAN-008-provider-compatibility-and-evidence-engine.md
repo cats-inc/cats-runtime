@@ -158,7 +158,7 @@ bundle structure.
       refresh
 - [ ] Revisit whether compatibility knowledge should move from TypeScript-owned
       manifests into runtime-owned config assets or a hybrid split
-- [ ] Add offline evidence triage tooling and review workflow helpers
+- [x] Add offline evidence triage tooling and review workflow helpers
 - [ ] Layer future rate-limit/metering detection onto the same compatibility
       knowledge base without coupling the initial slice
 
@@ -233,6 +233,7 @@ bundle structure.
 | 2026-03-23 | Second slice deepened CLI `live` probes, expanded first-class family coverage, exposed stale-cache/reprobe metadata to hosts, and tightened cross-platform remediation hints without turning the runtime into a full setup wizard |
 | 2026-03-27 | Core compatibility delivery is now complemented by manual provider-evolution follow-through: transport-neutral evidence collection, retained baseline-compare artifacts with review summaries, CLI/manual artifact list-read flows, and additive latest-artifact summaries on `/diagnostics/providers` and `/providers/config` all reuse the same runtime-owned compatibility substrate |
 | 2026-03-27 | Offline evidence triage follow-through landed for retained provider-evolution artifacts: repeated `--probe-classification` filters now let operators focus list/read flows on `upgrade`, `regression`, `schema_change`, or `semantic_drift_suspected` review classes without adding a new host-facing probe route |
+| 2026-03-27 | Manual review workflow helpers now let operators update retained provider-evolution artifact classifications, summary text, highlights, and external references in place via CLI without rerunning a probe or adding a public write route |
 
 ---
 

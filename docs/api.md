@@ -2669,9 +2669,9 @@ snapshot/review without making a second provider diagnostics call.
 
 The same retained summary now also carries optional
 `reviewContext.references[]` when a maintainer attached external release-note
-or changelog URLs during manual probe generation. These references are
-additive review context and are kept separate from the runtime-owned evidence
-bundle itself.
+or changelog URLs during manual probe generation or later retained-artifact
+review updates. These references are additive review context and are kept
+separate from the runtime-owned evidence bundle itself.
 
 Each instance entry also exposes additive `tooling` metadata:
 
