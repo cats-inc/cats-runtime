@@ -647,6 +647,9 @@ tightening and cleanup steps are intentionally deferred.
 - that same v1 surface now also accepts additive `refresh=1|true` query
   semantics so hosts can manually bypass a still-fresh catalog cache after
   model/runtime changes without waiting for the TTL window
+- `GET /providers/models` now exists as an additive aggregate default-target
+  read surface so hosts can fetch one runtime-owned catalog per configured
+  provider without doing their own per-provider fan-out
 - `GET /providers/:provider/models/advanced` exists as the additive advanced
   catalog surface
 - session create/read contracts now support additive `modelSelection` and

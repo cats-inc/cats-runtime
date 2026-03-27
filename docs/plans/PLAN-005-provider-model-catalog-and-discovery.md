@@ -117,7 +117,7 @@ semantics.
 
 ### Phase 5: Deferred Follow-Ons
 
-- [ ] Revisit whether a runtime aggregate endpoint is still useful after
+- [x] Revisit whether a runtime aggregate endpoint is still useful after
       `cats` server integration is real
 - [x] Revisit whether an explicit refresh endpoint is needed after cache
       behavior is exercised
@@ -188,6 +188,7 @@ slice.
 | 2026-03-26 | Core catalog delivery shipped: `ProviderModelCatalogService`, `GET /providers/{provider}/models`, TTL caching, dynamic `ollama` and agent-backed `listModels()` discovery, Kiro/static fallback unification, and route/service regression coverage all landed; later aggregate/refresh follow-ons remain intentionally deferred |
 | 2026-03-27 | Follow-through hardening landed: HTTP-backed remote model discovery now has explicit timeout/abort degradation, and later refresh failures reuse the last cached dynamic catalog with additive `cache.stale` metadata instead of immediately dropping to config/static fallback |
 | 2026-03-27 | Manual refresh follow-through landed: `GET /providers/{provider}/models` and `/models/advanced` now accept additive `refresh=1|true` cache-bypass semantics so hosts can re-read dynamic catalogs after model/runtime changes without waiting for TTL expiry |
+| 2026-03-27 | Aggregate follow-through landed: `GET /providers/models` now returns one runtime-owned catalog per configured provider default target, reusing the same service and refresh semantics instead of forcing hosts to fan out one request per provider |
 
 ---
 

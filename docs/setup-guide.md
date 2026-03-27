@@ -852,6 +852,9 @@ For host-side setup or Settings surfaces, use:
 - `GET /providers/{provider}/models` when a setup or repair flow needs the
   runtime-owned resolved model catalog; auth-ready API targets now use remote
   vendor model listing before falling back to configured/default metadata
+- `GET /providers/models` when a host or repair flow wants the same resolved
+  model-catalog contract for every configured provider default target in one
+  read instead of fanning out per-provider requests
 
 To inspect the publish payload locally without using the global npm cache:
 

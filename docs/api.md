@@ -2343,6 +2343,7 @@ GET /diagnostics/peers
 GET /pool/status
 GET /discovery/status
 GET /providers/config
+GET /providers/models
 GET /providers/{provider}/tools
 GET /providers/{provider}/models
 GET /skills/catalog
@@ -2916,6 +2917,11 @@ Goose-specific and returns:
 This metadata is additive. It does not replace setup/compatibility diagnostics,
 but it gives hosts and playgrounds a runtime-owned hint about the provider's
 current local default selection without reviving a sample-only shim route.
+
+`GET /providers/models` is the runtime-owned aggregate default-target catalog
+route. It accepts additive `?refresh=1|true|refresh|force` semantics and
+returns the same catalog payload shape keyed by configured provider name, using
+each provider's default resolved target.
 
 `GET /providers/{provider}/models` is the runtime-owned per-provider model
 catalog route. It accepts optional `?instance=<instance-id>` plus additive

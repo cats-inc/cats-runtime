@@ -175,6 +175,37 @@ providerRoutes.get('/providers/config', async (c) => {
   });
 });
 
+providerRoutes.get('/providers/models', async (c) => {
+  const ctx = c.get('ctx' as never) as AppContext;
+
+  try {
+    const forceRefresh = parseModelCatalogRefreshQuery(c.req.query('refresh'));
+    const providers = await Promise.all(
+      listConfiguredProviders(ctx.config).map(async (providerName) => [
+        providerName,
+        await ctx.providerModelCatalog.getCatalog(providerName, undefined, {
+          forceRefresh,
+        }),
+      ] as const),
+    );
+
+    return c.json({
+      providers: Object.fromEntries(providers),
+    });
+  } catch (err) {
+    if (err instanceof ProviderCatalogQueryError) {
+      return c.json({ error: err.message }, 400);
+    }
+
+    return c.json(
+      {
+        error: `Failed to inspect configured provider models: ${err}`,
+      },
+      getRouteErrorStatus(err),
+    );
+  }
+});
+
 providerRoutes.get('/providers/:provider/models', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
   const providerName = c.req.param('provider');

@@ -2931,6 +2931,45 @@ providers:
     });
   });
 
+  it('GET /providers/models returns default-target catalogs for configured providers', async () => {
+    await withRuntime({}, {}, async (runtime) => {
+      const response = await runtime.app.request('/providers/models');
+      expect(response.status).toBe(200);
+
+      const payload = await response.json() as {
+        providers: Record<string, {
+          provider: string;
+          backend: string;
+          instance: string;
+          source: string;
+          models: Array<{ id: string }>;
+        }>;
+      };
+      expect(payload.providers.codex).toMatchObject({
+        provider: 'codex',
+        backend: 'cli',
+        instance: 'default',
+        source: 'static',
+      });
+      expect(payload.providers.codex.models[0]?.id).toBe('gpt-5.4');
+      expect(payload.providers.claude).toMatchObject({
+        provider: 'claude',
+        backend: 'cli',
+        instance: 'default',
+      });
+    });
+  });
+
+  it('GET /providers/models returns 400 for invalid refresh query values', async () => {
+    await withRuntime({}, {}, async (runtime) => {
+      const response = await runtime.app.request('/providers/models?refresh=maybe');
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: "Invalid refresh query value 'maybe'. Use true/false or 1/0.",
+      });
+    });
+  });
+
   it('GET /providers/:provider/models/advanced adds a runtime-owned advanced catalog without changing v1', async () => {
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/providers/codex/models/advanced');
