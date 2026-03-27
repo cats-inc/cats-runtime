@@ -64,7 +64,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 | [PLAN-007](./PLAN-007-stream-event-discriminated-union.md) | StreamEvent Discriminated Union Cleanup | Completed | N/A |
 | [PLAN-005](./PLAN-005-provider-model-catalog-and-discovery.md) | Provider Model Catalog and Discovery | Completed | [SPEC-004](../specs/SPEC-004-provider-model-catalog-and-discovery.md) |
 | [PLAN-006](./PLAN-006-standalone-and-app-managed-startup-contract.md) | Standalone and App-Managed Startup Contract | Completed | N/A |
-| [PLAN-004](./PLAN-004-agent-backend.md) | Agent Backend for OpenClaw and Future Agent SDK Runtimes | In Progress (Core Agent Backend Landed) | [SPEC-003](../specs/SPEC-003-agent-backend.md) |
+| [PLAN-004](./PLAN-004-agent-backend.md) | Agent Backend for OpenClaw and Future Agent SDK Runtimes | Completed | [SPEC-003](../specs/SPEC-003-agent-backend.md) |
 | [PLAN-003](./PLAN-003-api-backend.md) | API and Ollama Backend for Claude, OpenAI, Gemini, and Ollama | In Progress (Major API/Local Slices Landed) | N/A |
 | [PLAN-002](./PLAN-002-provider-instance-review-followups.md) | Provider Instance Review Follow-ups | Completed | N/A |
 | [PLAN-001](./PLAN-001-wsl-discovery-policy.md) | WSL Discovery Policy and Dashboard Visibility | Completed | [SPEC-001](../specs/SPEC-001-wsl-discovery-policy.md) |

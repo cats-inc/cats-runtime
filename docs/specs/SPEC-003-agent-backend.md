@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Approved |
+| **Status** | Implemented |
 | **Owner** | Codex |
 | **Reviewer** | User-approved via planning request |
 

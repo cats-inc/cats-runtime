@@ -318,6 +318,29 @@ src/
   such as OpenAI background/body flags or Ollama `keep_alive` warm-state hints
 - Also hosts the current execution machinery for `local` targets such as
   Ollama. `local` remains a distinct backend kind in config/routing/public
+
+### Adding a Third-Party Agent Adapter
+
+When a future external runtime belongs in `src/backends/agent`, the extension
+path is intentionally narrow:
+
+- keep the transport-specific connect/auth/run/event parsing inside a new
+  adapter under `src/backends/agent/adapters/<name>/`
+- implement the shared `AgentAdapter` contract only:
+  `invoke()` is required, while `probe()`, `listModels()`, `listTools()`,
+  `inspect()`, and `cancel()` stay optional capability hooks
+- register the new transport in
+  `src/backends/agent/adapters/registry.ts` instead of branching in
+  `RuntimeSessionManager` or HTTP routes
+- preserve runtime-owned contracts: `sessionKey`, provider-managed
+  `providerSessionId`/`providerState`, normalized `StreamEvent` output, and
+  optional `ProviderEvolutionEvidenceObserver` instrumentation
+- surface truthful inspection/probe/tool-catalog semantics through the existing
+  provider diagnostics/config routes rather than inventing adapter-specific
+  host routes
+- prove the adapter through focused unit coverage plus
+  `AgentBackendManager`/route integration tests before broadening host-visible
+  documentation
   payloads because its product semantics differ from pay-as-you-go remote APIs,
   but it does not currently justify a separate `src/backends/local` runtime
   manager
