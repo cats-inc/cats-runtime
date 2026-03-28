@@ -65,6 +65,14 @@ function readConfiguredProviderNativeTools(
       continue;
     }
 
+    if (transport === 'anthropic') {
+      const type = typeof entry.type === 'string' ? entry.type.trim() : '';
+      if (type) {
+        configured.add(type);
+      }
+      continue;
+    }
+
     if (transport === 'google' || transport === 'gemini') {
       for (const key of ['googleSearch', 'urlContext', 'codeExecution']) {
         if (entry[key] && typeof entry[key] === 'object') {
@@ -90,6 +98,16 @@ export function inspectApiTarget(
     target.remoteInstance.payloadTemplate,
   );
   if (transport === 'anthropic') {
+    const providerNativeTools = configuredProviderNativeTools.length > 0
+      ? {
+          state: 'provider_native_configured' as const,
+          configuredTools: configuredProviderNativeTools,
+          summary: `Runtime-local tools remain primary, and Anthropic server tools are preconfigured via payload template (${configuredProviderNativeTools.join(', ')}).`,
+        }
+      : {
+          state: 'deferred' as const,
+          summary: 'Runtime-local tools remain primary; Anthropic server-tool follow-through is still deferred.',
+        };
     return {
       family: 'api_runtime',
       transport,
@@ -102,10 +120,7 @@ export function inspectApiTarget(
         active: true,
         summary: 'Anthropic prompt caching is runtime-managed for reusable prompt prefixes.',
       },
-      providerNativeTools: {
-        state: 'deferred',
-        summary: 'Runtime-local tools remain primary; Anthropic server-tool follow-through is still deferred.',
-      },
+      providerNativeTools,
     };
   }
 

@@ -39,7 +39,20 @@ describe('inspectApiTarget', () => {
     }));
   });
 
-  it('surfaces configured OpenAI and Gemini provider-native tools from payload templates', () => {
+  it('surfaces configured Anthropic, OpenAI, and Gemini provider-native tools from payload templates', () => {
+    const anthropic = inspectApiTarget(createTarget('anthropic', {
+      tools: [
+        { type: 'web_search_20250305', name: 'server-web-search' },
+      ],
+    }));
+    expect(anthropic).toEqual(expect.objectContaining({
+      transport: 'anthropic',
+      providerNativeTools: expect.objectContaining({
+        state: 'provider_native_configured',
+        configuredTools: ['web_search_20250305'],
+      }),
+    }));
+
     const openai = inspectApiTarget(createTarget('openai', {
       tools: [
         { type: 'web_search_preview' },

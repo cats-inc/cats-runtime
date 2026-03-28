@@ -648,6 +648,40 @@ describe('API backend integration', () => {
     }
   });
 
+  it('surfaces configured Anthropic server tools on API runtime inspection routes', async () => {
+    const { config, cleanup } = createApiConfigRoot({}, (contents) =>
+      contents.replace(
+        "model: claude-sonnet-4-6\n",
+        "model: claude-sonnet-4-6\n            payload_template:\n              tools:\n                - type: web_search_20250305\n                  name: server-web-search\n",
+      ));
+    const runtime = createRuntimeServer(config);
+
+    try {
+      const response = await runtime.app.request('/providers/config');
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(expect.objectContaining({
+        providers: expect.objectContaining({
+          claude: expect.objectContaining({
+            instances: expect.arrayContaining([
+              expect.objectContaining({
+                id: 'sonnet',
+                apiRuntime: expect.objectContaining({
+                  providerNativeTools: expect.objectContaining({
+                    state: 'provider_native_configured',
+                    configuredTools: ['web_search_20250305'],
+                  }),
+                }),
+              }),
+            ]),
+          }),
+        }),
+      }));
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
   it('runs local tools through Codex/OpenAI sessions and supports read_only mode', async () => {
     const { config, env, cleanup } = createApiConfigRoot();
     let openAiCalls = 0;
