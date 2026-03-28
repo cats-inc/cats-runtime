@@ -1,12 +1,16 @@
 # Research Log: CLI Provider Event Capability Audit
 
 Date: 2026-03-27
-Topic: What each CLI-backed provider can already emit vs what cats-runtime still leaves unused
-Last updated: 2026-03-27
+Topic: Current-truth audit of what each CLI-backed provider now emits into `cats-runtime`, and what `cats` currently consumes
+Last updated: 2026-03-29
 
 ## Sources
 
-- Internal adapter audit:
+- Provider registration and shared contract:
+  - `cats-runtime/src/backends/cli/providers/types.ts`
+  - `cats-runtime/src/backends/cli/pool/WorkerPool.ts`
+  - `cats-runtime/src/core/types.ts`
+- CLI provider adapters and parser layers:
   - `cats-runtime/src/backends/cli/providers/claude.ts`
   - `cats-runtime/src/backends/cli/providers/codex.ts`
   - `cats-runtime/src/backends/cli/providers/copilot.ts`
@@ -18,358 +22,395 @@ Last updated: 2026-03-27
   - `cats-runtime/src/backends/cli/providers/opencode.ts`
   - `cats-runtime/src/backends/cli/providers/pi.ts`
   - `cats-runtime/src/backends/cli/providers/auggie.ts`
-- Provider-specific parsers:
   - `cats-runtime/src/backends/cli/goose/parser.ts`
   - `cats-runtime/src/backends/cli/junie/parser.ts`
   - `cats-runtime/src/backends/cli/pi/parser.ts`
-- Existing runtime contract:
-  - `cats-runtime/src/core/types.ts`
+- Adapter tests and instrumentation:
+  - `cats-runtime/src/backends/cli/providers/claude.test.ts`
+  - `cats-runtime/src/backends/cli/providers/codex.test.ts`
+  - `cats-runtime/src/backends/cli/providers/copilot.test.ts`
+  - `cats-runtime/src/backends/cli/providers/cursor.test.ts`
+  - `cats-runtime/src/backends/cli/providers/gemini.test.ts`
+  - `cats-runtime/src/backends/cli/providers/goose.test.ts`
+  - `cats-runtime/src/backends/cli/providers/junie.test.ts`
+  - `cats-runtime/src/backends/cli/providers/kiro.test.ts`
+  - `cats-runtime/src/backends/cli/providers/opencode.test.ts`
+  - `cats-runtime/src/backends/cli/providers/pi.test.ts`
+  - `cats-runtime/src/backends/cli/providers/auggie.test.ts`
+  - `cats-runtime/src/backends/cli/providers/providerEvolutionInstrumentation.test.ts`
+- Runtime streaming surface:
   - `cats-runtime/src/http/routes/messages.ts`
   - `cats-runtime/src/http/routes/observe.ts`
-- Existing roadmap / progress framing:
-  - `cats-runtime/ROADMAP.md`
-  - `cats-runtime/PROGRESS.md`
+  - `cats-runtime/src/http/streaming.ts`
+- `cats` host consumption:
+  - `cats/src/products/chat/api/resources/channelRoutes.ts`
+  - `cats/src/products/chat/renderer/hooks/useLiveIndicator.ts`
+  - `cats/src/products/chat/renderer/components/ChatView.tsx`
+  - `cats/src/runtime/client.ts`
+
+## Verification
+
+The current provider-suite verification run used:
+
+```bash
+npm test -- src/backends/cli/providers
+```
+
+Result on 2026-03-29:
+
+- 13 test files passed
+- 200 tests passed
 
 ## Summary
 
-`cats-runtime` already normalizes CLI output into a shared event envelope:
+The March 27 exploration is now partially stale.
 
-- `init`
-- `text`
-- `tool_use`
-- `tool_result`
-- `progress`
-- `result`
-- `error`
-- `raw`
+The current truth is:
 
-The gap is not that all providers are equally poor. The gap is that provider
-capability is highly uneven, and `cats-runtime` still leaves useful mid-turn
-signals on the floor for several major providers.
+1. All 11 CLI providers are wired into `cats-runtime`.
+2. The shared runtime event contract already supports:
+   - `init`
+   - `text`
+   - `tool_use`
+   - `tool_result`
+   - `progress`
+   - `result`
+   - `error`
+   - `raw`
+3. `Claude`, `Cursor`, and `Gemini` are now materially richer than the earlier audit claimed.
+4. `Codex` still has the highest-value "official CLI feel" upside, but it is no longer just text plus tool-start. It already mines plan, reasoning, command, diff, thread-status, and model-reroute progress.
+5. `Goose`, `Pi`, `Copilot`, and `Junie` already provide enough normalized signal for a good live operator UX.
+6. `Kiro`, `OpenCode`, and `Auggie` remain the shallow providers for different reasons.
+7. The main remaining gap is now higher-layer consumption, not basic adapter wiring.
 
-The most important findings are:
+## Scope and Definitions
 
-1. `Pi` and `Goose` are already rich enough for a good live progress UX.
-2. `Copilot` and `Junie` already expose meaningful progress, but hosts are not
-   taking advantage of it yet.
-3. `Codex` is the biggest missed opportunity: the upstream CLI clearly emits
-   more mid-turn structure than `cats-runtime` currently preserves.
-4. `Claude`, `Gemini`, and `Cursor` do stream text progressively, but their
-   non-text middle layers are still thin or under-normalized in the current
-   adapter.
-5. `Auggie`, `Kiro`, and `OpenCode` remain relatively shallow for live
-   step-by-step UX, though each has a different reason.
+This note is a code-truth audit, not a vendor-marketing summary.
 
-## Scope and Confidence
+Definitions used in the matrix:
 
-This note audits the code that exists in this repo today. It is **not** a
-vendor-claims document.
+- "Stepwise text" means `cats-runtime` can emit one or more non-terminal `text` events before the turn ends.
+- "`tool_use`" means the runtime emits a normalized `tool_use` event.
+- "`tool_result`" means the runtime emits a normalized `tool_result` event.
+- "`progress`" means the runtime emits a normalized `progress` event with provider metadata.
+- "Current host surface" means what `cats` actually uses today, not what the runtime could theoretically expose.
 
-That means:
+## Shared Contract vs Product Reality
 
-- "Available" means `cats-runtime` currently emits it, or the adapter
-  definitely sees it.
-- "Unused" means either:
-  - the adapter currently drops the signal, or
-  - the runtime normalizes it, but upper layers still do not consume it.
-- When a capability is only inferred from raw passthrough or comments, it is
-  called out explicitly as lower-confidence.
+There are three separate layers:
 
-## Shared Event Contract vs Product UX
+1. Provider-native output shape
+2. `cats-runtime` normalized `StreamEvent` surface
+3. `cats` product/UI consumption
 
-There are two different questions:
+Layer 2 is now in better shape than the earlier exploration suggested.
 
-1. What raw or structured events the CLI/provider emits.
-2. What product-layer experience upper apps can build from those events.
+Layer 3 is still intentionally thin:
 
-This note is about question 1, with special attention to where question 2 is
-still leaving value unused.
+- `cats-runtime` already streams via SSE and NDJSON.
+- `cats` chat currently listens to `progress`, `text`, `tool_use`, `tool_result`, `result`, `error`, and `session_closed`.
+- The UI still collapses that into a typing indicator with:
+  - one progress line
+  - a few outstanding tool chips
+- `cats` does not yet render a first-class content-block transcript or rich live event tape.
 
-## Audit Matrix
+So "can the provider emit it?" and "does the current UI show it richly?" are different questions.
 
-### Current Adapter Output
+## Updated Matrix
 
-| Provider | Stepwise text today | `tool_use` today | `tool_result` today | `progress` today | `result` today | Notes |
-|----------|---------------------|------------------|---------------------|------------------|----------------|-------|
-| Claude | Yes | No | No | No | Yes | Text chunks are preserved via `content_block_delta`; non-text events are only passed through as `raw` |
-| Codex | Yes | Yes | No | No | Yes | Mid-turn text is preserved, but many rich notifications are explicitly ignored |
-| Copilot | Yes | Yes | No | Yes | Yes | Already one of the more useful adapters for progress UX |
-| Cursor | Yes | No | No | No | Yes | Timestamp-based partial assistant chunks are preserved |
-| Gemini | Partially | Yes | No | No | Yes | Assistant message text is preserved, but message parts are flattened |
-| Goose | Yes | Yes | Yes | Yes | Yes | Already rich and close to a CLI event tape |
-| Junie | Final result text + polled progress | No | No | Yes | Yes | Progress comes from session event polling, not tool-level stream events |
-| Kiro | Yes (line-based) | No | No | No | Yes | Very shallow live semantics today |
-| OpenCode | Post-call text only | Yes | No | No | Yes | Uses a native service path, not `parseStreamLine` JSONL |
-| Pi | Yes | Yes | Yes | Yes | Yes | Richest adapter in the current CLI family |
-| Auggie | No live text; only final text/result | No | No | No | Yes | Print mode is effectively "wait, then emit one structured result" |
+### Current Runtime Truth
 
-### Unused or Underused Capability
+| Provider | Runtime wiring | Stepwise text in runtime today | `tool_use` | `tool_result` | `progress` | `result` | Current truth |
+|----------|----------------|--------------------------------|------------|---------------|------------|----------|---------------|
+| Claude | Yes | Yes, via `assistant` blocks and `content_block_delta` | Yes | Yes | Yes | Yes | Much richer than the earlier audit; still no first-class content-block model |
+| Codex | Yes | Yes, via `item/agentMessage/delta` | Yes | No | Yes | Yes | Major progress mining now exists; normalized `tool_result` is still missing |
+| Copilot | Yes | Yes, via `assistant.message_delta` or final-message fallback | Yes | Yes | Yes | Yes | Strong runtime signal set already exists |
+| Cursor | Yes | Yes, via timestamped partial assistant chunks | Yes | Yes | Yes | Yes | No longer just text-only; tool/reasoning normalization now exists |
+| Gemini | Yes | Partial, not token delta but assistant/message text is stepwise enough for the shared contract | Yes | Yes | Yes | Yes | Multipart tool blocks are normalized, but block structure is flattened into shared events |
+| Goose | Yes | Yes, message-by-message | Yes | Yes | Yes | Yes | Already a good event-tape candidate |
+| Junie | Yes | Final stdout text plus polled session-driven progress | Yes | Yes | Yes | Yes | Tool lifecycle and progress are reconstructed from session-event polling |
+| Kiro | Yes | Yes, line-based stdout | No | No | No | Yes | Still shallow and mostly plain-text |
+| OpenCode | Yes | No incremental text; post-call text only | Yes | No | No | Yes | Native service path works, but live event richness is still low |
+| Pi | Yes | Yes, via RPC updates and message updates | Yes | Yes | Yes | Yes | Still the richest overall adapter family |
+| Auggie | Yes | No live text; only final structured text/result | No | No | No | Yes | Still effectively post-turn only |
 
-| Provider | What exists but is not being fully used | Confidence | Why it matters |
-|----------|------------------------------------------|------------|----------------|
-| Claude | The adapter runs in `stream-json` mode with `--verbose` and `--include-partial-messages`, but only text and final result are normalized; non-text events are left as `raw` | Medium | Best path to block-level output and possibly richer visible middle steps without redesigning the protocol |
-| Codex | The adapter explicitly ignores `item/completed`, `item/commandExecution/outputDelta`, `item/plan/delta`, `item/reasoning/summaryTextDelta`, `item/reasoning/textDelta`, `turn/diff/updated`, `turn/plan/updated`, `thread/status/changed`, `model/rerouted`, and more | High | This is the highest-value provider to mine further if the goal is "feel like the official CLI" |
-| Copilot | Reasoning and tool-start progress are already normalized, but there is no matching tool-result surface and no higher-level transcript/operator UX consuming the current `progress` events | High | A product-level win is available without a large runtime refactor |
-| Cursor | Partial assistant chunks are already preserved, but `thinking` is dropped and no middle-layer structure is normalized | Medium | Cursor can at least support smoother block/text streaming even if tool-level traces stay absent |
-| Gemini | The adapter keeps `tool_use` but intentionally drops `tool_result`; assistant content arrays are flattened into plain text | High | The provider can at least support a better block model than today's plain text flattening |
-| Goose | `tool_use`, `tool_result`, and synthetic progress are already normalized, but upper layers do not yet expose them as a visible event tape | High | Low-risk win for products that want to show "someone is doing work" |
-| Junie | Multiple progress kinds are already mapped (`status`, `terminal`, `file_changes`, `view_files`, `tool`, `plan`, `thought`), but they remain mostly operator-only / unused by hosts | High | Junie already has the bones for a high-signal progress pane |
-| Kiro | The runtime currently treats Kiro as plain line output plus post-turn result; richer mid-turn structure is not modeled at all | Medium | Kiro likely needs a different strategy than other CLIs, but the current path is especially thin |
-| OpenCode | Pending permission/question handling exists, but is only auto-handled internally; there is no live surface for those pending states or any incremental part stream | Medium | OpenCode could still feel alive even before true token/block streaming exists |
-| Pi | `thinking`, `tool_use`, `tool_result`, and result metadata are already normalized, but upper layers still collapse most sessions to final-message UX | High | Fastest path to better product UX because the runtime part is already good |
-| Auggie | The adapter can resolve session updates and usage after the turn, but there is no live mid-turn path; the runtime only sees the final print-mode JSON | High | Best treated as a post-hoc inspection provider unless Auggie itself exposes a richer stream later |
+### Current `cats` Host Surface
+
+| Provider bucket | What `cats` can currently show | What it still does not show |
+|-----------------|--------------------------------|-----------------------------|
+| Rich providers (`Pi`, `Goose`, `Copilot`, `Junie`, `Claude`, `Cursor`, `Gemini`, `Codex`) | Progress text, a limited live indicator, and outstanding tool chips | A first-class event tape, persistent tool transcript, block-level rendering, or full streaming content blocks |
+| Shallow providers (`Kiro`, `OpenCode`, `Auggie`) | Basic waiting/finalizing behavior and whatever final text/result reaches the shared stream | A convincing live trace because the runtime itself still has limited signal to work with |
+
+## Corrections vs the Earlier Exploration
+
+The most important corrections are:
+
+- `Claude` should no longer be classified as "text only, non-text left as raw".
+  - It now normalizes `tool_use`, `tool_result`, and reasoning/progress from assistant blocks, content-block start frames, and thinking deltas.
+- `Cursor` should no longer be classified as "timestamp text only".
+  - It now normalizes `thinking`, `tool_use`, and `tool_result`.
+- `Gemini` should no longer be classified as "full message only, no tool-result surface".
+  - It now normalizes multipart assistant tool calls, multipart function responses, top-level `tool_result`, and provider progress.
+- `Goose` should no longer be treated as a final-message-only provider.
+  - The parser already exposes `text`, `tool_use`, `tool_result`, `progress`, and `result`.
+- `Junie` should no longer be described as "progress only, no tool events".
+  - The polling parser reconstructs `tool_use` and `tool_result` from session events.
+- `Codex` should no longer be described as "mid-turn text preserved, rich notifications explicitly ignored".
+  - Many of the previously ignored notifications are now normalized into `progress`.
 
 ## Provider-by-Provider Notes
 
 ### Claude
 
-What is already true today:
+What is true today:
 
-- Progressive text is preserved from `content_block_delta`
-- Full assistant text blocks are preserved
+- Progressive text is preserved from assistant blocks and `content_block_delta`
+- Tool-start is normalized into `progress` plus `tool_use`
+- Tool-completion is normalized into `progress` plus `tool_result`
+- Thinking/reasoning is normalized into `progress`
 - Final result and usage are preserved
-- Unknown events are passed through as `raw`
 
-What is still unused:
+What is still missing:
 
-- The current adapter does not normalize any non-text structure beyond the
-  final result.
-- If Claude CLI emits richer stream-json events in practice, they currently
-  stay trapped in `raw`.
+- The runtime does not preserve a first-class Claude-specific content-block tree
+- Upper layers only see the shared event projection
 
 Implication:
 
-- Claude is already good enough for text streaming UX.
-- Claude is not yet good enough for a convincing "tool trace" UX.
+- Claude is now good enough for a meaningful live operator UX
+- Claude is not yet modeled as a true block-native provider in the shared contract
 
 ### Codex
 
-What is already true today:
+What is true today:
 
 - Progressive text is preserved
-- Tool start (`tool_use`) is preserved
-- Final result and errors are preserved
-
-What is still unused:
-
-- The adapter explicitly silences many interesting notifications:
+- Tool-start is preserved
+- Progress now includes:
   - command output deltas
   - plan deltas
   - reasoning deltas
+  - item completion
   - diff updates
+  - plan updates
   - thread status changes
   - model reroute notices
+- Final result and errors are preserved
+
+What is still missing:
+
+- There is still no normalized `tool_result`
+- The shared contract still collapses Codex richness into generic `progress`
 
 Implication:
 
-- Codex is the single biggest "we already have more upstream than we surface"
-  provider.
-- If the goal is to narrow the gap with official CLI feel, this is the best
-  first adapter to deepen.
+- Codex remains the best place to invest if the goal is "feel like the official CLI"
+- The gap is now narrower than the earlier audit claimed
 
 ### Copilot
 
-What is already true today:
+What is true today:
 
-- Progressive text is preserved
-- Tool start is preserved
-- Reasoning/progress is preserved via normalized `progress` events
+- Stepwise text is preserved
+- Tool requests become `progress` plus `tool_use`
+- Tool results become `progress` plus `tool_result`
+- Reasoning and model-change events become `progress`
 - Final result is preserved
 
-What is still unused:
+What is still missing:
 
-- There is no `tool_result` mapping
-- Upper layers still do not meaningfully surface the existing progress feed
+- Host layers still do not present Copilot as a rich event tape
 
 Implication:
 
-- Copilot already supports a better UX than products currently expose.
+- Runtime-side work is already good
+- Product-side consumption is the main remaining gap
 
 ### Cursor
 
-What is already true today:
+What is true today:
 
 - Partial assistant chunks are preserved
+- Top-level `thinking` becomes reasoning progress
+- Assistant reasoning blocks become reasoning progress
+- Assistant tool blocks become `tool_use` / `tool_result`
 - Final result is preserved
 
-What is still unused:
+What is still missing:
 
-- `thinking` is dropped
-- No structured middle-layer events are normalized
+- No first-class block model
+- Runtime output is still a shared event projection, not a provider-native transcript
 
 Implication:
 
-- Cursor can support better streaming text UX now
-- It remains weak for tool/progress UX
+- Cursor is now a viable live-progress provider, not merely a smoother text-stream provider
 
 ### Gemini
 
-What is already true today:
+What is true today:
 
 - Assistant message text is preserved
-- `tool_use` is preserved
+- Assistant multipart `functionCall` blocks become `progress` plus `tool_use`
+- Assistant multipart `functionResponse` blocks become `progress` plus `tool_result`
+- Top-level `tool_result` is normalized
 - Final result and errors are preserved
 
-What is still unused:
+What is still missing:
 
-- `tool_result` is intentionally dropped
-- Multi-part message content is flattened into plain text
+- The runtime flattens multipart content into shared events instead of preserving Gemini-specific block structure
+- It still does not offer token-by-token text delta semantics
 
 Implication:
 
-- Gemini should be treated as a block-capable provider, not just a final-text
-  provider, even if it is not as rich as Pi/Goose
+- Gemini is now block-capable enough for a reasonable operator UX
+- It is still not a first-class block-transcript provider inside the shared contract
 
 ### Goose
 
-What is already true today:
+What is true today:
 
 - Assistant text is preserved
-- `tool_use` and `tool_result` are preserved
-- Synthetic provider-agnostic `progress` is already generated
+- Tool requests become `progress` plus `tool_use`
+- Tool responses become `progress` plus `tool_result`
 - Final result is preserved
 
-What is still unused:
+What is still missing:
 
-- The runtime side is mostly fine; the missing layer is host/product
-  consumption
+- The main missing layer is host presentation, not adapter depth
 
 Implication:
 
-- Goose is already a strong candidate for a CLI-style live event tape
+- Goose is already one of the easiest providers to surface as a rich live event tape
 
 ### Junie
 
-What is already true today:
+What is true today:
 
-- Final result text is preserved
-- Rich progress is reconstructed from session file polling
-- Progress kinds already include:
-  - status
+- The CLI stdout result is still final-blob oriented
+- Session polling reconstructs:
+  - status updates
   - terminal activity
-  - file changes
-  - file review
-  - tool status text
+  - file-change activity
+  - file-review activity
   - plan updates
   - thought updates
+  - tool lifecycle
+- Tool lifecycle can emit `tool_use` and `tool_result`
+- Final result and aggregated usage are preserved
 
-What is still unused:
+What is still missing:
 
-- The host layer still does not benefit much from these progress events
-- There is no tool-granular `tool_use` / `tool_result` contract today
+- This is reconstructed progress, not native token streaming
+- Host layers still mostly use it as a thin live indicator
 
 Implication:
 
-- Junie is not rich in the same way as Pi/Goose, but it already has useful
-  work-progress semantics
+- Junie is richer than it first appears
+- It is a good operator-progress provider even without native token streaming
 
 ### Kiro
 
-What is already true today:
+What is true today:
 
 - Text arrives line-by-line
 - Final result is reconstructed after the turn
 
-What is still unused:
+What is still missing:
 
-- No structured tool or progress model exists in the current adapter
+- No normalized `tool_use`
+- No normalized `tool_result`
+- No normalized `progress`
 
 Implication:
 
-- Kiro currently behaves more like "plain live stdout plus a final checkpoint"
-  than a modern structured event source
+- Kiro remains a plain live-stdout provider with a final checkpoint
 
 ### OpenCode
 
-What is already true today:
+What is true today:
 
+- The runtime integrates it through a native service path rather than JSONL parsing
 - Tool uses are preserved
 - Final text and result are preserved
-- Runtime auto-handles pending permissions/questions behind the scenes
+- Pending permissions/questions are auto-handled internally
 
-What is still unused:
+What is still missing:
 
-- No incremental text or event stream is surfaced
-- Permission/question pending states are not surfaced as progress
+- No incremental text stream
+- No normalized `tool_result`
+- No normalized live progress for pending states
 
 Implication:
 
-- OpenCode has enough structure for a better status UX, but not yet enough for
-  a rich live trace in the current runtime path
+- OpenCode is integrated, but still not a rich live-trace provider
 
 ### Pi
 
-What is already true today:
+What is true today:
 
 - Progressive text is preserved
-- Thinking is normalized into `progress`
-- `tool_use` and `tool_result` are preserved
+- Thinking is normalized into reasoning progress
+- Tool execution start becomes `progress` plus `tool_use`
+- Tool execution end becomes `tool_result`
 - Final usage/result metadata is preserved
 
-What is still unused:
+What is still missing:
 
-- Very little is missing in the runtime adapter itself
-- Most remaining value is blocked by host/product UX not consuming what the
-  runtime already emits
+- Very little in the adapter itself
+- The main gap is still host/UI presentation
 
 Implication:
 
-- Pi is the easiest path to a high-signal live progress experience
+- Pi remains the strongest baseline for a high-signal live progress experience
 
 ### Auggie
 
-What is already true today:
+What is true today:
 
 - Final structured result is preserved
+- Final text is preserved if the print-mode JSON includes it
 - Post-turn session updates and usage can be resolved
 
-What is still unused:
+What is still missing:
 
-- There is no meaningful live mid-turn signal in the current adapter path
+- No meaningful live mid-turn signal
+- No normalized tool/progress lifecycle
 
 Implication:
 
-- Auggie should be treated as a post-turn inspection provider until it offers
-  a richer live stream
+- Auggie should still be treated as a post-turn inspection provider
 
-## What Upper Layers Are Currently Leaving on the Table
+## What `cats` Is Still Leaving on the Table
 
-Even when the runtime already normalizes useful mid-turn events, upper layers
-still tend to collapse them into a final-message UX.
+Even after the adapter improvements, `cats` still uses the stream conservatively.
 
-The clearest examples are:
+Current `cats` behavior:
 
-- `Pi`
-- `Goose`
-- `Copilot`
-- `Junie`
-
-That means there are two separate follow-up slices:
-
-1. **Runtime mining**
-   - promote more upstream signals into normalized events
-   - especially for `Codex`, `Claude`, and `Gemini`
-2. **Host consumption**
-   - expose the normalized events already present today
-   - especially for `Pi`, `Goose`, `Copilot`, and `Junie`
-
-## Best Next Slices
-
-### Slice 1: Codex Event Mining
-
-Highest return on effort.
-
-- Normalize some currently-dropped Codex notifications into:
+- The chat channel proxy streams runtime SSE through `/api/channels/:id/stream`
+- The renderer listens to:
   - `progress`
+  - `text`
+  - `tool_use`
   - `tool_result`
-  - maybe a bounded `content_block` or `activity` model later
+  - `result`
+  - `error`
+  - `session_closed`
+- The visible UI currently renders:
+  - one progress line
+  - a set of unfinished tool chips
 
-This is the best path to reducing the "official CLI feels much more alive"
-gap.
+Important limitation:
 
-### Slice 2: Host-Facing Event Tape for Existing Rich Providers
+- `text` updates only advance the indicator while it is still in the "waiting" phase
+- Once the indicator is already in streaming mode, the UI does not become a full live transcript
 
-No deep provider refactor required.
+So the runtime is already ahead of the current product presentation.
+
+## Recommended Follow-Up Slices
+
+### Slice 1: Host-Level Event Tape
+
+Highest immediate product value.
 
 Use already-normalized events from:
 
@@ -377,56 +418,77 @@ Use already-normalized events from:
 - `Goose`
 - `Copilot`
 - `Junie`
+- `Claude`
+- `Cursor`
+- `Gemini`
+- `Codex`
 
-This closes a large product feel gap quickly.
+Build:
 
-### Slice 3: Gemini and Claude Block/Tool Enrichment
+- a persistent live event list
+- tool lifecycle rows
+- progress history rather than one mutable line
 
-Medium difficulty.
+### Slice 2: Capability Truth Surface
 
-- Preserve more structure than plain text flattening
-- Stop treating all non-text middle layers as `raw` or ignorable
-
-### Slice 4: Capability Truth Surface
-
-Add provider-target capability truth for:
+Add explicit provider capability truth for upper layers, for example:
 
 - stepwise text
 - tool use
 - tool result
 - progress
-- block-level structure confidence
+- block-model confidence
+- native-vs-derived progress confidence
 
-This would help products adapt per provider instead of pretending every target
-is equally rich.
+This lets products adapt honestly per provider instead of pretending all providers are equally rich.
 
-## Relationship to Roadmap and Gap Closure
+### Slice 3: Codex-Specific Deepening
 
-This audit sharpens the remaining gap behind `OPT-2: Provider-Agnostic Progress
-Events`.
+Still the highest-value adapter refinement area.
 
-That roadmap item is correctly marked as delivered at the event-contract level,
-but not at the provider-depth level.
+Most likely next improvements:
 
-What remains is:
+- normalized `tool_result`
+- better grouping of command / plan / reasoning progress
+- possibly a higher-level activity model on top of raw `progress`
 
-- deeper mining for high-value providers (`Codex`, `Claude`, `Gemini`)
-- product/host consumption of already-normalized rich providers
-- capability truth so products can make honest UX decisions per provider
+### Slice 4: Block-Oriented Contract Work
 
-That work is directly relevant to narrowing the "official CLI feels alive,
-while cats products mostly wait for a big final reply" gap seen against
-Paperclip/OpenClaw/OpenManus-style expectations.
+Only do this after the event-tape UI proves insufficient.
 
-## Suggested Follow-Up Questions
+Today the shared contract is event-first, not content-block-first.
 
-1. Which providers should `cats` treat as rich enough for a live event tape
-   today?
-2. Which providers should stay on final-message UX for now?
-3. Should `cats-runtime` add explicit provider capability metadata so upper
-   layers stop guessing?
+That is good enough for:
+
+- progress indicators
+- tool chips
+- operator timelines
+
+It is not yet good enough for:
+
+- faithful provider-native content blocks
+- a transcript that mirrors each CLI's native structure
+
+## Bottom Line
+
+The integration question for the 11 CLI providers is mostly solved at the runtime layer.
+
+The current state is:
+
+- provider registration: solved
+- normalized shared streaming events: mostly solved
+- provider richness: highly uneven but now better than the old audit claimed
+- `cats` rich live transcript / content-block UX: not solved yet
+
+So the honest current reading is not "are the providers connected yet?"
+
+It is:
+
+- "Yes, they are connected."
+- "Several of them are already rich enough for a better live UX."
+- "The next bottleneck is host presentation and capability truth, not basic adapter wiring."
 
 ---
 
-*Research completed: 2026-03-27*
+*Research completed: 2026-03-29*
 *Author: Codex*
