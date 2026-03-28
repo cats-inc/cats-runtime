@@ -1471,6 +1471,84 @@ describe('provider diagnostics HTTP contract', () => {
     }
   });
 
+  it('surfaces configured provider-native tool posture on diagnostics routes', async () => {
+    const app = createTestApp(makeConfig({
+      providerDefaultTargets: {
+        claude: { backend: 'api', instance: 'sonnet' },
+        codex: { backend: 'api', instance: 'default' },
+      },
+      remoteProviderCatalog: {
+        api: {
+          claude: {
+            sonnet: {
+              id: 'sonnet',
+              providerName: 'claude',
+              backend: 'api',
+              transport: 'anthropic',
+              apiKeyEnv: 'ANTHROPIC_API_KEY',
+              model: 'claude-sonnet-4-6',
+              payloadTemplate: {
+                tools: [
+                  { type: 'web_search_20250305', name: 'server-web-search' },
+                ],
+              },
+            },
+          },
+          codex: {
+            default: {
+              id: 'default',
+              providerName: 'codex',
+              backend: 'api',
+              transport: 'openai',
+              apiKeyEnv: 'OPENAI_API_KEY',
+              model: 'gpt-5',
+              payloadTemplate: {
+                tools: [
+                  { type: 'web_search_preview' },
+                ],
+              },
+            },
+          },
+        },
+        local: {},
+        agent: {},
+      },
+    }));
+
+    const response = await app.request('/diagnostics/providers?backend=api');
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      providers: expect.arrayContaining([
+        expect.objectContaining({
+          provider: 'claude',
+          backend: 'api',
+          instance: 'sonnet',
+          config: expect.objectContaining({
+            apiRuntime: expect.objectContaining({
+              providerNativeTools: expect.objectContaining({
+                state: 'provider_native_configured',
+                configuredTools: ['web_search_20250305'],
+              }),
+            }),
+          }),
+        }),
+        expect.objectContaining({
+          provider: 'codex',
+          backend: 'api',
+          instance: 'default',
+          config: expect.objectContaining({
+            apiRuntime: expect.objectContaining({
+              providerNativeTools: expect.objectContaining({
+                state: 'provider_native_configured',
+                configuredTools: ['web_search_preview'],
+              }),
+            }),
+          }),
+        }),
+      ]),
+    }));
+  });
+
   it('surfaces dynamic Pi model catalog details during live CLI diagnostics', async () => {
     const config = makeConfig({
       providerCommands: {
