@@ -60,11 +60,9 @@ async function runNativePythonScript(
   options: RunPythonJsonScriptOptions,
 ): Promise<string> {
   const tempDir = await mkdtemp(join(tmpdir(), 'cats-runtime-python-'));
-  const scriptPath = join(tempDir, 'script.py');
-
-  await writeFile(scriptPath, options.script, 'utf8');
-
   try {
+    const scriptPath = join(tempDir, 'script.py');
+    await writeFile(scriptPath, options.script, 'utf8');
     const command = process.platform === 'win32'
       ? await resolveWindowsPythonCommand(options.runner)
       : {
