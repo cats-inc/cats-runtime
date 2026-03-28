@@ -125,7 +125,7 @@ So "can the provider emit it?" and "does the current UI show it richly?" are dif
 | Claude | Yes | Yes, via `assistant` blocks and `content_block_delta` | Yes | Yes | Yes | Yes | Much richer than the earlier audit; still no first-class content-block model |
 | Codex | Yes | Yes, via `item/agentMessage/delta` | Yes | No | Yes | Yes | Major progress mining now exists; normalized `tool_result` is still missing |
 | Copilot | Yes | Yes, via `assistant.message_delta` or final-message fallback | Yes | Yes | Yes | Yes | Strong runtime signal set already exists |
-| Cursor | Yes | Yes, via timestamped partial assistant chunks | Yes | Yes | Yes | Yes | No longer just text-only; tool/reasoning normalization now exists |
+| Cursor | Yes | Yes, via timestamped partial assistant chunks | Yes | Yes | Yes | Yes | No longer just text-only; assistant-content tool/reasoning normalization now exists |
 | Gemini | Yes | Partial, not token delta but assistant/message text is stepwise enough for the shared contract | Yes | Yes | Yes | Yes | Multipart tool blocks are normalized, but block structure is flattened into shared events |
 | Goose | Yes | Yes, message-by-message | Yes | Yes | Yes | Yes | Already a good event-tape candidate |
 | Junie | Yes | Final stdout text plus polled session-driven progress | Yes | Yes | Yes | Yes | Tool lifecycle and progress are reconstructed from session-event polling |
@@ -148,7 +148,7 @@ The most important corrections are:
 - `Claude` should no longer be classified as "text only, non-text left as raw".
   - It now normalizes `tool_use`, `tool_result`, and reasoning/progress from assistant blocks, content-block start frames, and thinking deltas.
 - `Cursor` should no longer be classified as "timestamp text only".
-  - It now normalizes `thinking`, `tool_use`, and `tool_result`.
+  - It now normalizes `thinking`, assistant-content `tool_use`, and assistant-content `tool_result`.
 - `Gemini` should no longer be classified as "full message only, no tool-result surface".
   - It now normalizes multipart assistant tool calls, multipart function responses, top-level `tool_result`, and provider progress.
 - `Goose` should no longer be treated as a final-message-only provider.
@@ -233,12 +233,13 @@ What is true today:
 - Partial assistant chunks are preserved
 - Top-level `thinking` becomes reasoning progress
 - Assistant reasoning blocks become reasoning progress
-- Assistant tool blocks become `tool_use` / `tool_result`
+- Assistant content tool blocks become `tool_use` / `tool_result`
 - Final result is preserved
 
 What is still missing:
 
 - No first-class block model
+- No separate top-level Cursor `tool_result` channel outside assistant-content blocks
 - Runtime output is still a shared event projection, not a provider-native transcript
 
 Implication:
