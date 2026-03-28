@@ -34,7 +34,9 @@ function expectIdleMeteringSummary() {
   });
 }
 
-function createApiConfigRoot() {
+function createApiConfigRoot(
+  envOverrides: Record<string, string> = {},
+) {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-api-test-'));
   const configPath = join(root, 'providers.yaml');
   writeFileSync(configPath, `
@@ -103,6 +105,7 @@ backends:
     CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
     CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
     CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
+    ...envOverrides,
   };
 
   mkdirSync(env.CATS_RUNTIME_DATA_DIR, { recursive: true });
@@ -1327,6 +1330,124 @@ describe('API backend integration', () => {
           usage: { inputTokens: 3, outputTokens: 5 },
         }),
       ]);
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
+  it('records API rate-limit incidents and blocks the next turn during cooldown', async () => {
+    const { config, env, cleanup } = createApiConfigRoot({
+      CATS_RUNTIME_RATE_LIMIT_COOLDOWN_MS: '5000',
+    });
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (!url.includes('/v1/responses')) {
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      }
+
+      return new Response(JSON.stringify({
+        error: {
+          message: 'rate limited',
+        },
+      }), {
+        status: 429,
+        headers: {
+          'content-type': 'application/json',
+          'retry-after': '2',
+        },
+      });
+    });
+
+    const runtime = createRuntimeServer(config, {
+      apiBackend: {
+        fetch: fetchMock,
+        env: {
+          ...env,
+          OPENAI_API_KEY: 'openai-test-key',
+          ANTHROPIC_API_KEY: 'anthropic-test-key',
+          GEMINI_API_KEY: 'gemini-test-key',
+        },
+      },
+    });
+
+    try {
+      const sessionResponse = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'codex',
+          instance: 'api/main',
+          cwd: join(env.HOME, 'repo'),
+          workspaceMode: 'shared',
+        }),
+      });
+      expect(sessionResponse.status).toBe(201);
+      const session = await sessionResponse.json() as Record<string, unknown>;
+
+      const firstResponse = await runtime.app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({ message: 'first try' }),
+      });
+      expect(firstResponse.status).toBe(200);
+      expect(parseNdjson(await firstResponse.text())).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          type: 'error',
+          metadata: expect.objectContaining({
+            incident: expect.objectContaining({
+              classification: 'rate_limited',
+              retryAfterMs: 2000,
+            }),
+            guardrail: expect.objectContaining({
+              outcome: 'cooldown',
+            }),
+          }),
+        }),
+      ]));
+
+      const diagnosticsResponse = await runtime.app.request('/diagnostics/runtime');
+      expect(diagnosticsResponse.status).toBe(200);
+      expect(await diagnosticsResponse.json()).toEqual(expect.objectContaining({
+        metering: expect.objectContaining({
+          summary: expect.objectContaining({
+            status: 'degraded',
+            incidents: 1,
+            activeCooldowns: 1,
+          }),
+          incidents: expect.objectContaining({
+            recent: expect.arrayContaining([
+              expect.objectContaining({
+                classification: 'rate_limited',
+                retryAfterMs: 2000,
+              }),
+            ]),
+          }),
+        }),
+      }));
+
+      const secondResponse = await runtime.app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({ message: 'second try' }),
+      });
+      expect(secondResponse.status).toBe(429);
+      expect(await secondResponse.json()).toEqual({
+        error: expect.stringContaining('cooled down'),
+        code: 'guardrail_cooldown',
+        guardrail: expect.objectContaining({
+          outcome: 'cooldown',
+          scope: 'provider_instance',
+        }),
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     } finally {
       await runtime.close();
       cleanup();
