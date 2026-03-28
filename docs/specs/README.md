@@ -52,7 +52,7 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 | [SPEC-020](./SPEC-020-pluggable-execution-strategy-substrate.md) | Pluggable Execution Strategy Substrate | Implemented | [PLAN-020](../plans/PLAN-020-pluggable-execution-strategy-substrate.md) |
 | [SPEC-019](./SPEC-019-runtime-owned-management-adapters-for-forge-and-deployment-control-planes.md) | Runtime-Owned Management Adapters for Forge and Deployment Control Planes | Implemented (Slice 1) | [PLAN-016](../plans/PLAN-016-management-adapter-subsystem.md) |
 | [SPEC-018](./SPEC-018-advanced-provider-model-catalog-and-selection-schema.md) | Advanced Provider Model Catalog and Selection Schema | Implemented | [PLAN-018](../plans/PLAN-018-advanced-provider-model-catalog-and-selection-schema.md) |
-| [SPEC-017](./SPEC-017-standalone-provider-bootstrap-and-generated-config.md) | Standalone Provider Bootstrap and Generated Config | Draft | TBD |
+| [SPEC-017](./SPEC-017-standalone-provider-bootstrap-and-generated-config.md) | Standalone Provider Bootstrap and Generated Config | Approved (Core Bootstrap Slice Landed; UI Shell Follow-Through Pending) | [PLAN-019](../plans/PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md) |
 | [SPEC-016](./SPEC-016-lan-peer-discovery-and-execution-routing-v0.md) | LAN Peer Discovery and Execution Routing v0 | Implemented | [PLAN-017](../plans/PLAN-017-lan-peer-discovery-and-execution-routing-v0.md) |
 | [SPEC-015](./SPEC-015-runtime-setup-diagnostic-report.md) | Runtime Setup Diagnostic Report | Implemented (Slice 1) | TBD |
 | [SPEC-014](./SPEC-014-session-maintenance-worktree-isolation-and-compaction-hooks.md) | Session Maintenance, Worktree Isolation, and Compaction Hooks | Implemented (Maintenance and Runtime Compaction Slices) | [PLAN-012](../plans/PLAN-012-session-maintenance-hooks-and-cleanup-discipline.md), [PLAN-014](../plans/PLAN-014-worktree-isolation-execution-layer.md) |
@@ -81,4 +81,4 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 ---
 
 *See also: [plans/](../plans/) for implementation plans*
-*Last updated: 2026-03-27*
+*Last updated: 2026-03-29*

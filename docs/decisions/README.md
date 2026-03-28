@@ -38,6 +38,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
+| [027-adopt-a-playground-derived-dark-runtime-ui-shell-with-sidebar-surface-switching](./027-adopt-a-playground-derived-dark-runtime-ui-shell-with-sidebar-surface-switching.md) | Adopt a playground-derived dark runtime UI shell with sidebar surface switching | Accepted | 2026-03-29 |
 | [026-model-a2a-as-an-agent-backend-adapter](./026-model-a2a-as-an-agent-backend-adapter.md) | Model A2A as an agent backend adapter | Proposed | 2026-03-27 |
 | [025-keep-provider-evolution-detection-manual-first-and-evidence-driven](./025-keep-provider-evolution-detection-manual-first-and-evidence-driven.md) | Keep provider evolution detection manual-first and evidence-driven | Accepted | 2026-03-27 |
 | [024-own-pluggable-execution-strategies-as-runtime-session-local-substrate](./024-own-pluggable-execution-strategies-as-runtime-session-local-substrate.md) | Own pluggable execution strategies as a runtime session-local substrate | Accepted | 2026-03-26 |
@@ -76,6 +77,6 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 ---
 
-*Last updated: 2026-03-27*
+*Last updated: 2026-03-29*
 
 *See also: [AGENTS.md](../../../AGENTS.md) for decision-making protocols*

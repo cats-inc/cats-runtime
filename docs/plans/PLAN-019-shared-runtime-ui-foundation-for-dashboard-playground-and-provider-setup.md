@@ -4,14 +4,15 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft (UI Follow-Through Not Started) |
+| **Status** | Approved (Direction Locked; Implementation Not Started) |
 | **Owner** | Codex |
-| **Assigned To** | TBD |
+| **Assigned To** | Codex |
 | **Reviewer** | User / runtime setup workstream |
 
 ## Related Spec
 
 - [SPEC-017](../specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md)
+- [ADR-027](../decisions/027-adopt-a-playground-derived-dark-runtime-ui-shell-with-sidebar-surface-switching.md)
 
 ## Related Context
 
@@ -27,7 +28,15 @@
   - `GET /dashboard` and `GET /playground` already exist
   - provider setup APIs already exist
 - The remaining gap is that the runtime-owned UI is still three mostly isolated static pages with duplicated CSS/JS, inconsistent visual language, and no shared bootstrap discovery read seam.
-- The goal is to converge `dashboard`, `playground`, and `provider-setup` onto one lightweight runtime-owned UI foundation while preserving static HTML artifacts, existing route behavior, and the current non-SPA runtime model.
+- The user-approved direction is now explicit:
+  - keep the runtime UI dark
+  - treat the current playground surface as the canonical shell/layout baseline
+  - adopt a shared sidebar brand-row surface switcher for `Dashboard`,
+    `Playground`, and `Setup`
+  - keep bootstrap gating by locking surfaces rather than replacing the shell
+- The goal is to converge `dashboard`, `playground`, and `provider-setup` onto
+  one lightweight runtime-owned UI foundation while preserving static HTML
+  artifacts, existing route behavior, and the current non-SPA runtime model.
 - The plan is still intentionally not started: runtime-owned bootstrap/setup read
   seams are already in place, so the remaining work here is primarily shared
   UI/build-layer follow-through rather than missing runtime core substrate.
@@ -35,11 +44,17 @@
 ## Scope
 
 - In scope:
+  - a shared dark runtime shell derived from the current playground visual
+    architecture
   - shared design tokens and CSS theme variables for the three runtime-owned surfaces
   - shared runtime fetch and error-handling helpers for same-origin runtime APIs
   - shared provider badge and provider status rendering helpers
   - a shared bootstrap discovery read seam that both dashboard and provider-setup can consume
-  - a lightweight build substrate that still emits static HTML artifacts
+  - a lightweight Tailwind-based build substrate that still emits static HTML
+    artifacts
+  - a sidebar brand-row surface switcher for `Dashboard`, `Playground`, and
+    `Setup`
+  - explicit bootstrap locked-state behavior for `Dashboard` and `Playground`
   - dashboard secondary manual scan and repair entry required by `SPEC-017`
   - additive refactor only; existing runtime routes and bootstrap behavior stay intact
 - Out of scope:
@@ -55,12 +70,22 @@
 
 - `public/index.html` and `public/provider-setup.html` each define their own theme tokens and component styling inline.
 - `public/playground.html` uses a separate Tailwind CDN-driven styling path and a different visual language from the dashboard and provider-setup page.
+- The three pages do not share one shell model:
+  - dashboard uses a top header + left sidebar session shell
+  - playground uses a different left rail + top status bar structure
+  - provider-setup is a standalone centered single-column page
+- Cross-surface navigation appears in different places:
+  - dashboard uses top-level links
+  - playground uses a back-link
+  - provider-setup uses footer links
 - Provider badge and provider color logic are duplicated between dashboard and playground, while provider-setup uses a third status-badge style with different semantics.
 - Runtime fetch/auth/error handling is duplicated:
   - dashboard uses `headers()` plus direct `fetch`
   - playground uses `RuntimeClient` plus separate ad-hoc fetches for provider catalog and models
   - provider-setup uses raw `fetch` calls with page-local error handling
 - There is no shared lightweight build substrate today; `src/http/app.ts` serves handwritten static HTML files directly from `public/`.
+- Playground's current visual direction is the strongest baseline, but it is
+  implemented as an isolated page rather than the canonical runtime shell.
 - `BootstrapService` already persists both `provider-scan.json` and `provider-manual-scan.json`, but the UI layer does not expose one shared runtime-owned read model over those snapshots.
 - `GET /setup-state` returns only a summary of the latest scan, so `public/provider-setup.html` currently re-triggers `POST /setup-scan` on load to obtain full scan data instead of reusing persisted scan snapshots.
 - Dashboard currently lacks the secondary manual scan and repair entry called out by `SPEC-017`.
@@ -68,8 +93,15 @@
 
 ## Recommended Direction
 
-- Converge on one shared runtime UI foundation with four reusable layers:
-  - shared theme tokens and base CSS primitives
+- Converge on one shared runtime UI foundation with the current playground
+  surface as the canonical shell baseline.
+- Use one shared sidebar-led shell across the three runtime-owned surfaces:
+  - brand row with runtime surface switcher
+  - consistent sidebar width/chrome
+  - consistent page header/action row structure
+  - consistent modal/form/button hierarchy
+- Converge on four reusable layers:
+  - shared Tailwind-backed theme tokens and shell primitives
   - shared runtime API and fetch helpers
   - shared provider badge and provider-status rendering helpers
   - shared bootstrap discovery read-model helper
@@ -77,11 +109,21 @@
   - dashboard keeps its session-centric layout and behavior
   - playground keeps its same-origin direct API orchestration model
   - provider-setup keeps bootstrap-first selection and apply flow
-- Introduce a lightweight build step. Recommended first choice: `esbuild`.
+- Introduce a lightweight build step that includes build-time Tailwind support.
+  Recommended first choice: `esbuild` plus Tailwind CLI or equivalent
+  post-processing.
   - bundle page-owned entry modules plus shared helpers
   - emit static HTML artifacts for `public/index.html`, `public/playground.html`, and `public/provider-setup.html`
   - prefer self-contained emitted HTML in the first slice so the runtime can keep serving static artifacts without needing a broad new static asset router
   - allow a narrowly scoped emitted asset directory only if bundle size or maintainability makes inline output too costly
+- Reuse the `cats` suite switcher interaction model only as navigation
+  inspiration:
+  - use the sidebar brand-row switcher pattern
+  - do not copy the `cats` suite palette
+- Bootstrap shell direction:
+  - keep the same surface switcher visible during bootstrap
+  - mark `Dashboard` and `Playground` as locked/disabled until setup completes
+  - keep `Setup` active during bootstrap
 - Use the existing setup surface as the canonical read seam rather than inventing a second runtime bootstrap API.
   - recommended first slice: evolve `GET /setup-state` into the shared runtime-owned read model for setup state, latest auto-scan snapshot, latest manual-scan snapshot, and operator-facing action metadata
   - the provider-setup page and dashboard should consume the same shape
@@ -96,11 +138,13 @@
 
 ### Phase 1: Shared UI Foundation Contract
 
-- [ ] Define the shared CSS/theme token contract for dashboard, playground, and provider-setup.
+- [ ] Define the shared shell contract using playground as the canonical layout/visual baseline.
+- [ ] Define the shared Tailwind token/component contract for dashboard, playground, and provider-setup.
 - [ ] Define the shared runtime fetch/error helper contract for same-origin runtime APIs and optional bearer token use.
 - [ ] Define the shared provider badge and provider-status rendering helpers.
 - [ ] Define the shared bootstrap scan snapshot read model, centered on `GET /setup-state`.
 - [ ] Define the runtime-owned UI source layout separately from emitted `public/*.html` artifacts.
+- [ ] Define the sidebar brand-row surface switcher contract, including bootstrap locked-state behavior.
 - [ ] Keep bootstrap logic in runtime-owned services and thin HTTP/UI adapters only.
 
 Deliverables:
@@ -109,11 +153,13 @@ Deliverables:
 - A shared JS helper contract for runtime API access and error normalization
 - A shared provider badge/provider-status rendering contract
 - A canonical setup read-model contract centered on `GET /setup-state`
+- A locked-state navigation contract for bootstrap vs non-bootstrap
 - Clear page-entry ownership boundaries for dashboard, playground, and provider-setup
 
 ### Phase 2: Lightweight Static Build Substrate
 
 - [ ] Add a lightweight build pipeline, preferably `esbuild`, for runtime UI sources.
+- [ ] Add build-time Tailwind support for the shared runtime shell and page entries.
 - [ ] Bundle page-specific entry modules against the shared UI foundation without introducing a framework runtime or client router.
 - [ ] Emit static HTML artifacts that remain directly serveable by the runtime and packagable in npm/Electron flows.
 - [ ] Wire the packaging/build lifecycle so runtime UI artifacts are generated before release packaging.
@@ -125,16 +171,19 @@ Deliverables:
 - Generated `public/playground.html`
 - Generated `public/provider-setup.html`
 - A decision on inline bundled HTML versus a narrowly scoped emitted asset folder
+- A shared runtime Tailwind build path instead of page-local CSS / Tailwind CDN divergence
 - Planned script/package touchpoints such as `package.json` build hooks
 
 ### Phase 3: Migrate Provider Setup onto the Shared Foundation
 
 - [ ] Migrate provider-setup first as the thinnest UI adapter over bootstrap services.
+- [ ] Move provider-setup into the shared sidebar shell instead of a standalone centered page.
 - [ ] Replace page-local fetch logic with shared runtime fetch helpers.
 - [ ] Replace page-local badge/status rendering with shared provider-status helpers.
 - [ ] Stop forcing an auto-scan just to render existing scan results.
 - [ ] Render persisted auto-scan and manual-scan snapshots from the shared setup read model.
 - [ ] Keep bootstrap-mode availability and `POST /setup-apply` behavior unchanged.
+- [ ] Render bootstrap locked-state navigation for dashboard/playground from the shared switcher.
 
 Deliverables:
 
@@ -146,7 +195,7 @@ Deliverables:
 
 ### Phase 4: Migrate Dashboard and Add Manual Scan / Repair Entry
 
-- [ ] Move dashboard theme usage onto the shared token layer without rewriting the session UI into components.
+- [ ] Move dashboard onto the shared shell primitives without rewriting the session UI into components.
 - [ ] Add a secondary manual scan and repair entry in the dashboard.
 - [ ] Use the shared setup read model so the dashboard can show latest scan state, latest manual scan state, and next repair action without owning bootstrap logic.
 - [ ] Implement the first slice as a direct manual scan trigger plus inline result rendering.
@@ -164,8 +213,9 @@ Deliverables:
 
 - [ ] Preserve playground behavior as a same-origin direct runtime API surface.
 - [ ] Keep the existing `RuntimeClient` and orchestration logic mostly intact; extract only the shared pieces that reduce duplication safely.
+- [ ] Replace the current Tailwind CDN dependency with the shared build-time Tailwind path.
 - [ ] Replace duplicated provider badge styling and ad-hoc runtime fetch/auth seams with shared helpers where that does not destabilize streaming behavior.
-- [ ] Align playground visual tokens with the shared runtime UI foundation without collapsing it into the dashboard layout.
+- [ ] Preserve playground as the canonical shell reference while moving its implementation onto the shared runtime UI foundation.
 
 Deliverables:
 
@@ -221,6 +271,7 @@ Deliverables:
   - `GET /`
   - `GET /dashboard`
   - `GET /playground`
+  - `GET /setup`
   - `GET /setup-state`
   - `POST /setup-scan`
   - `POST /setup-apply`
@@ -230,6 +281,8 @@ Deliverables:
 - `/dashboard` must remain always accessible regardless of bootstrap mode.
 - `playground` must keep its same-origin direct API behavior and optional bearer-token flow.
 - Provider-setup must remain usable during bootstrap mode and must not depend on a product host or a heavy frontend runtime.
+- Bootstrap mode must preserve the shared shell and surface switcher while
+  locking `Dashboard` and `Playground`.
 - Static-served runtime artifacts must remain shippable in `public/`.
 - Existing API contracts must not be broken by the UI refactor; any added read-model fields should be additive.
 
@@ -239,6 +292,8 @@ Deliverables:
   - verify `GET /` still switches between provider-setup and dashboard correctly
   - verify `GET /dashboard` remains accessible in bootstrap mode
   - verify `GET /playground` remains accessible and unchanged in bootstrap mode
+  - verify the shared surface switcher shows `Dashboard` and `Playground` as
+    locked during bootstrap
 - Provider-setup flow coverage:
   - verify `GET /setup-state` exposes the shared snapshot fields needed for UI rendering
   - verify persisted auto-scan and manual-scan snapshots can be rendered without forcing a new scan
@@ -256,7 +311,9 @@ Deliverables:
 - Visual and DOM smoke coverage:
   - confirm emitted HTML artifacts still include the expected shared entry markers
   - confirm dashboard, playground, and provider-setup still expose expected IDs and route-linked controls
-  - if the build stops using Tailwind CDN on playground, add smoke coverage that the generated output still renders required classes or extracted CSS hooks
+  - confirm the shared surface switcher renders consistent navigation affordances
+  - confirm build output no longer relies on Tailwind CDN while still exposing
+    the required shell/layout hooks
 
 ## Risks / Mitigations
 
