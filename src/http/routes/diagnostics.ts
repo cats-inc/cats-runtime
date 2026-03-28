@@ -1520,6 +1520,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
     probeMode,
     env,
     forceRefresh,
+    { defaultOnly: true },
   );
   const peers = getPeerDiscoverySnapshot(ctx);
   const wakeups = getRuntimeWakeupSnapshot(ctx);

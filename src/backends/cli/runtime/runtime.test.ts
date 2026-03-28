@@ -161,6 +161,25 @@ describe('runtime adapters', () => {
     expect(spawnConfig.shell).toBe(process.platform === 'win32');
   });
 
+  it('keeps Copilot auto runner on the standard native shell path', () => {
+    const spawnConfig = buildProcessSpawnConfig(
+      {
+        path: 'copilot',
+        runner: 'auto',
+        runtime: {
+          mode: 'native',
+        },
+      },
+      'copilot',
+      ['--help'],
+      'C:\\Users\\kenne\\repo',
+    );
+
+    expect(spawnConfig.command.toLowerCase()).toContain('copilot');
+    expect(spawnConfig.args).toEqual(['--help']);
+    expect(spawnConfig.shell).toBe(process.platform === 'win32');
+  });
+
   it('normalizes backslashes in Docker runtime paths', () => {
     const runtime = createRuntimeAdapter({
       mode: 'docker',

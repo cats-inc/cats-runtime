@@ -116,6 +116,96 @@ describe('ProviderCompatibilityService', () => {
     expect(assessment.evidence).toBeUndefined();
   });
 
+  it('accepts current 0.x CLI families when their compatibility signature matches', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-current-zero-major-'));
+    tempDirs.push(root);
+
+    const cases: Array<{
+      providerName: ProviderName;
+      versionOutput: string;
+      helpOutput: string;
+    }> = [
+      {
+        providerName: 'gemini',
+        versionOutput: '0.35.3\n',
+        helpOutput: 'Usage: gemini --output-format --resume\n',
+      },
+      {
+        providerName: 'pi',
+        versionOutput: '0.63.1\n',
+        helpOutput: 'Usage: pi --mode rpc --session <path>\n',
+      },
+      {
+        providerName: 'auggie',
+        versionOutput: '0.21.0\n',
+        helpOutput: 'Usage: auggie --output-format json --workspace-root . --resume\n',
+      },
+    ];
+
+    for (const currentCase of cases) {
+      const service = new ProviderCompatibilityService({
+        dataDir: join(root, 'data'),
+        sessionBaseDir: join(root, 'sessions'),
+      }, {
+        runner: {
+          run: vi.fn(async (_providerName, _commandConfig, args: string[]) => ({
+            exitCode: 0,
+            stdout: args[0] === '--version'
+              ? currentCase.versionOutput
+              : currentCase.helpOutput,
+            stderr: '',
+            timedOut: false,
+            durationMs: 4,
+          })),
+        },
+        installCheckRunner: createInstallCheckRunner(),
+        now: () => Date.parse('2026-03-23T00:00:01.000Z'),
+      });
+
+      const assessment = await service.assessCliTarget(createCliTarget(currentCase.providerName));
+      expect(assessment.classification).toBe('ready');
+      expect(assessment.status).toBe('ok');
+    }
+  });
+
+  it('treats timed-out probes with usable version/help output as command-available', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-timeout-output-'));
+    tempDirs.push(root);
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      runner: {
+        run: vi.fn(async (_providerName, _commandConfig, args: string[]) => ({
+          exitCode: null,
+          stdout: args[0] === '--version'
+            ? 'codex-cli 0.117.0\n'
+            : 'Codex CLI\n\nCommands:\n  app-server  [experimental] Run the app server or related tooling\n',
+          stderr: '',
+          timedOut: true,
+          durationMs: 3_500,
+          error: 'Timed out after 3000ms',
+        })),
+      },
+      installCheckRunner: createInstallCheckRunner(),
+      now: () => Date.parse('2026-03-23T00:00:02.000Z'),
+    });
+
+    const assessment = await service.assessCliTarget(createCliTarget('codex'));
+    expect(assessment.classification).toBe('ready');
+    expect(assessment.status).toBe('ok');
+    expect(assessment.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'command_available',
+        status: 'ok',
+      }),
+      expect.objectContaining({
+        code: 'profile_selected',
+        status: 'ok',
+      }),
+    ]));
+  });
+
   it('returns cached assessments until the ttl expires', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-cache-'));
     tempDirs.push(root);
@@ -145,6 +235,63 @@ describe('ProviderCompatibilityService', () => {
     expect(first.cache.hit).toBe(false);
     expect(second.cache.hit).toBe(true);
     expect(runner.run).toHaveBeenCalledTimes(2);
+  });
+
+  it('limits concurrent compatibility assessments to the configured slot count', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-limit-'));
+    tempDirs.push(root);
+    const pendingRuns = new Map<string, () => void>();
+    const startedProviders: string[] = [];
+    const runner = {
+      run: vi.fn((providerName: ProviderName, _commandConfig, args: string[]) => new Promise((resolve) => {
+        startedProviders.push(`${providerName}:${args[0]}`);
+        pendingRuns.set(`${providerName}:${args[0]}`, () => resolve({
+          exitCode: 0,
+          stdout: args[0] === '--version'
+            ? `${providerName} 1.2.3\n`
+            : 'Usage: command --output-format --resume app-server --include-partial-messages\n',
+          stderr: '',
+          timedOut: false,
+          durationMs: 2,
+        }));
+      })),
+    };
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      maxConcurrentAssessments: 1,
+      runner,
+      installCheckRunner: createInstallCheckRunner(),
+      now: () => Date.parse('2026-03-23T00:00:05.000Z'),
+    });
+
+    const firstAssessment = service.assessCliTarget(createCliTarget('claude'));
+    await Promise.resolve();
+    const secondAssessment = service.assessCliTarget(createCliTarget('codex'));
+    await Promise.resolve();
+
+    expect(startedProviders).toEqual([
+      'claude:--version',
+      'claude:--help',
+    ]);
+
+    pendingRuns.get('claude:--version')?.();
+    pendingRuns.get('claude:--help')?.();
+    await firstAssessment;
+    await Promise.resolve();
+
+    expect(startedProviders).toEqual([
+      'claude:--version',
+      'claude:--help',
+      'codex:--version',
+      'codex:--help',
+    ]);
+
+    pendingRuns.get('codex:--version')?.();
+    pendingRuns.get('codex:--help')?.();
+
+    await Promise.all([firstAssessment, secondAssessment]);
   });
 
   it('captures replay-friendly evidence for degraded compatibility paths', async () => {
@@ -428,6 +575,36 @@ describe('ProviderCompatibilityService', () => {
     });
 
     const assessment = await service.assessCliTarget(createCliTarget('claude'));
+    expect(assessment.setup.auth.status).toBe('unknown');
+    expect(assessment.checks.find((check) => check.code === 'auth_missing')).toBeUndefined();
+  });
+
+  it('does not infer missing auth from help text that mentions provider env vars', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-auth-help-'));
+    tempDirs.push(root);
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      runner: {
+        run: vi.fn(async (_providerName, _commandConfig, args: string[]) => ({
+          exitCode: args[0] === '--version' ? 0 : null,
+          stdout: args[0] === '--version'
+            ? '2026.03.25-933d5a6\n'
+            : 'Usage: cursor-agent --output-format --stream-partial-output --resume\n'
+              + '--api-key <key> (can also use CURSOR_API_KEY env var)\n',
+          stderr: '',
+          timedOut: args[0] !== '--version',
+          durationMs: 4,
+          ...(args[0] !== '--version' ? { error: 'Timed out after 5000ms' } : {}),
+        })),
+      },
+      installCheckRunner: createInstallCheckRunner(),
+      now: () => Date.parse('2026-03-23T00:00:33.000Z'),
+    });
+
+    const assessment = await service.assessCliTarget(createCliTarget('cursor'));
+    expect(assessment.classification).toBe('ready');
     expect(assessment.setup.auth.status).toBe('unknown');
     expect(assessment.checks.find((check) => check.code === 'auth_missing')).toBeUndefined();
   });

@@ -48,8 +48,9 @@ import type {
 } from './types.js';
 
 const DEFAULT_CACHE_TTL_MS = 5 * 60_000;
-const DEFAULT_PROBE_TIMEOUT_MS = 3_000;
+const DEFAULT_PROBE_TIMEOUT_MS = 5_000;
 const DEFAULT_SAMPLE_LIMIT = 2_048;
+const DEFAULT_MAX_CONCURRENT_ASSESSMENTS = 4;
 const EVIDENCE_SCHEMA_VERSION = 3;
 interface ProbeResult {
   exitCode: number | null;
@@ -78,6 +79,7 @@ interface CompatibilityRunner {
 interface ProviderCompatibilityServiceOptions {
   cacheTtlMs?: number;
   probeTimeoutMs?: number;
+  maxConcurrentAssessments?: number;
   evidenceDir?: string;
   runner?: CompatibilityRunner;
   installCheckRunner?: ProviderInstallCheckRunner;
@@ -88,10 +90,13 @@ export class ProviderCompatibilityService {
   private readonly cache = new Map<string, CacheEntry>();
   private readonly cacheTtlMs: number;
   private readonly probeTimeoutMs: number;
+  private readonly maxConcurrentAssessments: number;
   private readonly evidenceDir: string;
   private readonly runner: CompatibilityRunner;
   private readonly installCheckRunner: ProviderInstallCheckRunner;
   private readonly now: () => number;
+  private activeAssessments = 0;
+  private readonly assessmentWaiters: Array<() => void> = [];
 
   constructor(
     private readonly config: Pick<CliRuntimeConfig, 'dataDir' | 'sessionBaseDir'>,
@@ -99,6 +104,9 @@ export class ProviderCompatibilityService {
   ) {
     this.cacheTtlMs = options.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS;
     this.probeTimeoutMs = options.probeTimeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS;
+    this.maxConcurrentAssessments = normalizeConcurrentAssessmentLimit(
+      options.maxConcurrentAssessments,
+    );
     this.evidenceDir = options.evidenceDir
       || join(config.dataDir || join(config.sessionBaseDir, '..', 'data'), 'compatibility');
     this.runner = options.runner || { run: runCompatibilityProbe };
@@ -199,15 +207,43 @@ export class ProviderCompatibilityService {
       };
     }
 
-    const assessment = await this.buildAssessment(target, {
-      purpose: options.purpose || 'diagnostics',
-      probeMode,
-    });
+    await this.acquireAssessmentSlot();
+    let assessment: CompatibilityAssessment;
+    try {
+      assessment = await this.buildAssessment(target, {
+        purpose: options.purpose || 'diagnostics',
+        probeMode,
+      });
+    } finally {
+      this.releaseAssessmentSlot();
+    }
     this.cache.set(cacheKey, {
       assessment,
       cachedAtMs: this.now(),
     });
     return assessment;
+  }
+
+  private async acquireAssessmentSlot(): Promise<void> {
+    if (this.activeAssessments < this.maxConcurrentAssessments) {
+      this.activeAssessments += 1;
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      this.assessmentWaiters.push(() => {
+        this.activeAssessments += 1;
+        resolve();
+      });
+    });
+  }
+
+  private releaseAssessmentSlot(): void {
+    this.activeAssessments = Math.max(0, this.activeAssessments - 1);
+    const next = this.assessmentWaiters.shift();
+    if (next) {
+      next();
+    }
   }
 
   private async buildAssessment(
@@ -271,7 +307,19 @@ export class ProviderCompatibilityService {
     const helpProbeRecord = helpProbe
       ? toProbeRecord('help', helpArgs || [], helpProbe)
       : undefined;
-    const commandAvailable = didExecuteProbe(versionProbeRecord) || didExecuteProbe(helpProbeRecord);
+    const parsedVersion = parseVersion(
+      versionProbe?.stdout || versionProbe?.stderr,
+    );
+    const helpText = `${helpProbe?.stdout || ''}\n${helpProbe?.stderr || ''}`;
+    const detectedFeatures = (compatibilityKnowledge?.primaryProfile.helpTokens || [])
+      .filter((token) => helpText.includes(token))
+      .map((token) => `token:${token}`);
+    const missingHelpTokens = (compatibilityKnowledge?.primaryProfile.helpTokens || [])
+      .filter((token) => !helpText.includes(token));
+    const commandAvailable = didExecuteProbe(versionProbeRecord)
+      || didExecuteProbe(helpProbeRecord)
+      || Boolean(parsedVersion)
+      || detectedFeatures.length > 0;
     const configuredLookupPromise = this.installCheckRunner.lookupCommand(
       instance.commandConfig.path,
       instance.commandConfig.runtime,
@@ -432,9 +480,6 @@ export class ProviderCompatibilityService {
       ));
     }
 
-    const parsedVersion = parseVersion(
-      versionProbe?.stdout || versionProbe?.stderr,
-    );
     if (parsedVersion) {
       checks.push(createCheck(
         'version_detected',
@@ -456,13 +501,6 @@ export class ProviderCompatibilityService {
         `${target.providerName} version could not be determined`,
       ));
     }
-
-    const helpText = `${helpProbe?.stdout || ''}\n${helpProbe?.stderr || ''}`;
-    const detectedFeatures = (compatibilityKnowledge?.primaryProfile.helpTokens || [])
-      .filter((token) => helpText.includes(token))
-      .map((token) => `token:${token}`);
-    const missingHelpTokens = (compatibilityKnowledge?.primaryProfile.helpTokens || [])
-      .filter((token) => !helpText.includes(token));
 
     if (compatibilityKnowledge?.primaryProfile.helpTokens?.length) {
       checks.push(createCheck(
@@ -1251,11 +1289,11 @@ function detectAuthFailure(
   envVars: string[],
   ...probes: Array<CompatibilityProbeRecord | undefined>
 ): boolean {
-  const authPatterns = [
+  const envVarPatterns = envVars.map((envVar) => envVar.toLowerCase());
+  const explicitAuthPatterns = [
     ...GENERIC_AUTH_ERROR_PATTERNS,
     ...(patterns || []).map((pattern) => pattern.toLowerCase()),
-    ...envVars.map((envVar) => envVar.toLowerCase()),
-  ];
+  ].filter((pattern) => !envVarPatterns.includes(pattern));
   return probes.some((probe) => {
     if (!probe) {
       return false;
@@ -1270,8 +1308,13 @@ function detectAuthFailure(
       .join('\n')
       .toLowerCase();
 
-    const hasAuthPattern = authPatterns.some((pattern) => haystack.includes(pattern));
-    if (!hasAuthPattern) {
+    const hasExplicitAuthPattern = explicitAuthPatterns.some((pattern) => haystack.includes(pattern));
+    const hasEnvVarPattern = envVarPatterns.some((pattern) => haystack.includes(pattern));
+    if (!hasExplicitAuthPattern && !hasEnvVarPattern) {
+      return false;
+    }
+
+    if (!hasExplicitAuthPattern && hasEnvVarPattern && looksLikeUsageOutput(probe)) {
       return false;
     }
 
@@ -1279,6 +1322,20 @@ function detectAuthFailure(
       || probe.timedOut
       || (probe.exitCode !== null && probe.exitCode !== 0);
   });
+}
+
+function looksLikeUsageOutput(probe: CompatibilityProbeRecord): boolean {
+  const sample = [
+    probe.stdoutSample,
+    probe.stderrSample,
+  ]
+    .filter(Boolean)
+    .join('\n')
+    .toLowerCase();
+
+  return sample.includes('usage:')
+    || sample.includes('\noptions:')
+    || sample.includes('\ncommands:');
 }
 
 type ProfileSelectionReason =
@@ -1683,6 +1740,14 @@ function redactText(text: string | undefined): string | undefined {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeConcurrentAssessmentLimit(value: number | undefined): number {
+  if (!Number.isFinite(value)) {
+    return DEFAULT_MAX_CONCURRENT_ASSESSMENTS;
+  }
+
+  return Math.max(1, Math.trunc(value as number));
 }
 
 async function runCompatibilityProbe(

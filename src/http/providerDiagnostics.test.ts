@@ -265,6 +265,103 @@ describe('provider diagnostics HTTP contract', () => {
     rmSync(rootDir, { recursive: true, force: true });
   });
 
+  it('limits health diagnostics probes to default provider targets', async () => {
+    const config = makeConfig({
+      providerCommands: {
+        claude: { path: 'claude-default', runner: 'auto', runtime: { mode: 'native' } },
+      } as CliRuntimeConfig['providerCommands'],
+      providerDefaultInstances: {
+        claude: 'default',
+      },
+      providerInstances: {
+        auggie: {},
+        claude: {
+          default: {
+            id: 'default',
+            providerName: 'claude',
+            commandConfig: {
+              path: 'claude-default',
+              runner: 'auto',
+              runtime: { mode: 'native' },
+            },
+          },
+          mirror: {
+            id: 'mirror',
+            providerName: 'claude',
+            commandConfig: {
+              path: 'claude-mirror',
+              runner: 'auto',
+              runtime: { mode: 'native' },
+            },
+          },
+        },
+        codex: {},
+        copilot: {},
+        cursor: {},
+        gemini: {},
+        goose: {},
+        junie: {},
+        kiro: {},
+        opencode: {},
+        pi: {},
+      },
+    });
+    const runner = {
+      run: vi.fn(async (_providerName, commandConfig: { path: string }, args: string[]) => ({
+        exitCode: 0,
+        stdout: args[0] === '--version'
+          ? `${commandConfig.path} 1.2.3\n`
+          : 'Usage: claude --input-format --output-format --include-partial-messages\n',
+        stderr: '',
+        timedOut: false,
+        durationMs: 3,
+      })),
+    };
+    const compatibility = new ProviderCompatibilityService(config, {
+      runner,
+      installCheckRunner: createInstallCheckRunner(),
+      now: () => Date.parse('2026-03-23T00:02:00.000Z'),
+    });
+    const providerModelCatalog = new ProviderModelCatalogService(config, {
+      fetch: globalThis.fetch,
+      env: process.env,
+    });
+    const app = createApp({
+      config,
+      startup: createRuntimeStartupState(),
+      registry,
+      pool,
+      compatibility,
+      cursorNative: {} as never,
+      gooseNative: {} as never,
+      kiroNative: {} as never,
+      auggieSessions: {} as never,
+      opencodeNative: {} as never,
+      providerModelCatalog,
+    });
+
+    const response = await app.request('/diagnostics/health?force=1');
+    expect(response.status).toBe(200);
+    const payload = await response.json() as {
+      providers: {
+        defaults: Array<{
+          instance: string;
+        }>;
+      };
+    };
+
+    expect(payload.providers.defaults).toEqual([
+      expect.objectContaining({
+        instance: 'default',
+      }),
+    ]);
+    expect(runner.run.mock.calls.map(([, commandConfig, args]) => `${commandConfig.path}:${args[0]}`))
+      .toEqual([
+        'claude-default:--version',
+        'claude-default:--help',
+      ]);
+  });
+
   it('returns machine-readable reprobe and compatibility cache metadata', async () => {
     const app = createTestApp();
 

@@ -450,19 +450,6 @@ function buildNativeSpawnConfig(
     commandConfig.runner,
   );
 
-  if (
-    process.platform === 'win32'
-    && providerName === 'copilot'
-    && commandConfig.runner === 'auto'
-  ) {
-    return buildPowerShellSpawnConfig(
-      commandPath,
-      args,
-      commandConfig.runnerPath || process.env.PWSH_PATH || 'pwsh.exe',
-      cwd,
-    );
-  }
-
   switch (commandConfig.runner) {
     case 'auto':
       if (process.platform !== 'win32') {
