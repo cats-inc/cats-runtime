@@ -48,6 +48,8 @@ This spec defines a standalone bootstrap flow for `cats-runtime` that:
 - turning the runtime dashboard or setup flow into a product-grade onboarding
   wizard
 - replacing the embedded runtime pages with a full SPA rewrite in this slice
+  - a lightweight build-time Tailwind pipeline for emitted static runtime pages
+    remains in scope and is not considered a SPA rewrite
 - owning `cats` product bootstrap concerns such as owner identity or Boss Cat
   initialization
 - copying the `cats` suite palette or product branding directly into
