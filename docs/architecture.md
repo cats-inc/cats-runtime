@@ -206,6 +206,10 @@ src/
   `/providers/config`, `/providers/{provider}/tools`, and
   `/diagnostics/providers` so hosts can read session ownership semantics
   without inferring them from backend names
+- Exposes runtime-owned host-facing `eventCapabilities` truth on
+  `/providers/config` so products can choose final-message, event-tape, or
+  future content-block rendering without re-deriving provider behavior from
+  names or research notes
 - Exposes additive agent-target inspection read models on `/providers/config`
   and `/diagnostics/providers` so operators can read adapter family, transport
   semantics, auth surface, provider-managed continuity, and bounded capability

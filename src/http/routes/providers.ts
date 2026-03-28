@@ -24,6 +24,7 @@ import {
   buildProviderToolingSummary,
   loadProviderRemoteToolCatalog,
 } from '../../core/tools/providerTooling.js';
+import { buildProviderEventCapabilityTruth } from '../../core/providerEventCapabilities.js';
 import type { AppContext } from '../app.js';
 import {
   getProviderCompatibilityService,
@@ -94,6 +95,9 @@ providerRoutes.get('/providers/config', async (c) => {
           provider: instance.providerName,
           instance: resolveProviderEvolutionArtifactInstance(instance),
         });
+        const latestProbeArtifactSummary = latestProbeArtifact
+          ? summarizeProviderEvolutionArtifactForReadModel(latestProbeArtifact)
+          : null;
         const latestCompatibilityEvidence = instance.backend === 'cli'
           ? await compatibilityEvidence.readLatestArtifact({
               provider: instance.providerName,
@@ -132,6 +136,10 @@ providerRoutes.get('/providers/config', async (c) => {
           metering: metering.summary,
           modelCatalog,
           tooling: buildProviderToolingSummary(instance, { agentRuntime }),
+          eventCapabilities: buildProviderEventCapabilityTruth(
+            instance,
+            latestProbeArtifactSummary,
+          ),
           install: instance.backend === 'cli' && instance.cliInstance
             ? buildProviderInstallCatalogView(
               instance.providerName as ProviderName,
@@ -151,9 +159,9 @@ providerRoutes.get('/providers/config', async (c) => {
               ),
             },
           } : {}),
-          ...(latestProbeArtifact ? {
+          ...(latestProbeArtifactSummary ? {
             providerEvolution: {
-              latestArtifact: summarizeProviderEvolutionArtifactForReadModel(latestProbeArtifact),
+              latestArtifact: latestProbeArtifactSummary,
             },
           } : {}),
         };

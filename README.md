@@ -36,6 +36,9 @@ Current capabilities:
 - provider-specific helpers such as Kiro model inspection
 - runtime-owned usage metering, incident surfacing, and additive execution guardrails for warn / block / cooldown flows
 - shared CLI compatibility probing with `light` / `live` validation, degraded profile selection, stale-cache-aware summaries, machine-readable reprobe metadata, and replay-friendly evidence capture across first-party CLI provider families
+- runtime-owned provider event capability truth on `/providers/config`, so
+  hosts can inspect normalized text/tool/progress/block posture without
+  hard-coding provider behavior
 
 ## Current Status
 
@@ -59,6 +62,8 @@ Current capabilities:
 - [x] Add the first browser/preview substrate with manual driver validation and normalized `browser_page` surfaces
 - [x] Add a usable runtime-owned MCP facade with stdio transport and curated mutation tools without replacing direct HTTP APIs
 - [x] Add LAN peer discovery, diagnostics, trust-gated execution routing, and caller-owned peer turn relay for PLAN-017 v0
+- [x] Publish host-facing provider event capability truth on `/providers/config`
+      for provider selection and future rendering contracts
 
 ## Design Rules
 

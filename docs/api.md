@@ -3072,6 +3072,30 @@ This reuses the same runtime-owned metering service behind
 selector/provider-topology reads can show temporary cooldown pressure without a
 second diagnostics request.
 
+Each instance entry also exposes additive `eventCapabilities` metadata for
+host-side rendering decisions. This is runtime-owned capability truth for the
+normalized event surface, not a raw upstream provider schema dump. The bounded
+shape includes:
+
+- `normalizedStream.text.mode`: `none`, `final`, `chunk`, `line`, `token`, or
+  `unknown`
+- `normalizedStream.text.stepwise`: whether the runtime expects incremental
+  text updates rather than only a final message
+- `normalizedStream.toolUse`, `toolResult`, `progress`, `reasoning`: whether
+  the normalized runtime stream exposes those milestones as `none`, `derived`,
+  `native`, or `unknown`
+- `transcript.contentBlocks`: whether block-level transcript structure is
+  absent, runtime-derived, native, or still unclassified
+- `presentation.recommended`: runtime guidance for host rendering posture
+  (`final_message`, `event_tape`, `content_blocks`, or `unknown`)
+- `notes`: bounded operator/host-facing caveats for the target
+- optional `validation`: latest retained provider-evolution probe validation
+  metadata when such an artifact exists for the same target
+
+Hosts can now decide whether to stay on a final-message UI, show an event tape,
+or later opt into content-block rendering without hard-coding provider-name
+heuristics.
+
 Each instance entry now also exposes additive compact `modelCatalog` summary
 metadata:
 

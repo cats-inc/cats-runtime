@@ -473,6 +473,23 @@ describe('provider diagnostics HTTP contract', () => {
               cache: { stale: boolean };
               attentionCodes: string[];
             } | null;
+            eventCapabilities?: {
+              normalizedStream?: {
+                text?: {
+                  mode?: string;
+                  stepwise?: boolean;
+                };
+                toolUse?: string;
+                toolResult?: string;
+                progress?: string;
+              };
+              transcript?: {
+                contentBlocks?: string;
+              };
+              presentation?: {
+                recommended?: string;
+              };
+            };
           }>;
         };
       };
@@ -487,6 +504,23 @@ describe('provider diagnostics HTTP contract', () => {
         stale: false,
       }),
       attentionCodes: [],
+    }));
+    expect(configBody.providers.claude.instances[0]?.eventCapabilities).toEqual(expect.objectContaining({
+      normalizedStream: expect.objectContaining({
+        text: expect.objectContaining({
+          mode: 'token',
+          stepwise: true,
+        }),
+        toolUse: 'native',
+        toolResult: 'native',
+        progress: 'derived',
+      }),
+      transcript: {
+        contentBlocks: 'native',
+      },
+      presentation: {
+        recommended: 'event_tape',
+      },
     }));
   });
 
@@ -600,6 +634,31 @@ describe('provider diagnostics HTTP contract', () => {
           },
         }),
       ],
+    }));
+
+    const configResponse = await app.request('/providers/config');
+    expect(configResponse.status).toBe(200);
+    await expect(configResponse.json()).resolves.toEqual(expect.objectContaining({
+      providers: expect.objectContaining({
+        claude: expect.objectContaining({
+          instances: expect.arrayContaining([
+            expect.objectContaining({
+              id: 'default',
+              eventCapabilities: expect.objectContaining({
+                validation: expect.objectContaining({
+                  artifactId: current.artifact.id,
+                  transport: 'cli',
+                  executionStatus: 'completed',
+                  observed: expect.objectContaining({
+                    incrementalText: true,
+                    finalResult: true,
+                  }),
+                }),
+              }),
+            }),
+          ]),
+        }),
+      }),
     }));
   });
 
