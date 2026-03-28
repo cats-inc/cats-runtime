@@ -164,10 +164,11 @@ if ($Verify) {
     Write-Host ""
     if ($allGood) {
         Write-Host "All good" -ForegroundColor Green
+        exit 0
     } else {
         Write-Host "Some issues found, see above" -ForegroundColor Yellow
+        exit 1
     }
-    exit 0
 }
 
 if ($Remove) {

@@ -135,10 +135,11 @@ if [[ "$VERIFY" == "true" ]]; then
   echo ""
   if [[ "$all_good" == "true" ]]; then
     echo "All good"
+    exit 0
   else
     echo "Some issues found"
+    exit 1
   fi
-  exit 0
 fi
 
 if [[ "$REMOVE" == "true" ]]; then
@@ -210,8 +211,19 @@ Environment=NODE_ENV=production
 WantedBy=default.target
 EOF
 
+was_active=false
+if systemctl --user is-active "$SERVICE_NAME" >/dev/null 2>&1; then
+  was_active=true
+fi
+
 systemctl --user daemon-reload
-systemctl --user enable --now "$SERVICE_NAME"
+systemctl --user enable "$SERVICE_NAME" >/dev/null 2>&1 || true
+
+if [[ "$was_active" == "true" ]]; then
+  systemctl --user restart "$SERVICE_NAME"
+else
+  systemctl --user start "$SERVICE_NAME"
+fi
 
 echo ""
 echo "Setup complete!"

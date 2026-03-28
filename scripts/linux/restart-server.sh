@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Restart cats-runtime on Linux/macOS
+# Restart cats-runtime on Linux
 # Usage: ./restart-server.sh [--stop] [--port PORT]
 
 set -euo pipefail
@@ -8,6 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 ENV_FILE="$REPO_ROOT/.env"
 LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/cats-runtime"
+SYSTEMD_SERVICE_NAME="cats-runtime.service"
 STOP_ONLY=false
 PORT=""
 
@@ -109,8 +110,42 @@ health_check() {
   fi
 }
 
+has_systemd_managed_service() {
+  command -v systemctl >/dev/null 2>&1 || return 1
+  systemctl --user cat "$SYSTEMD_SERVICE_NAME" >/dev/null 2>&1
+}
+
+stop_systemd_service() {
+  if systemctl --user is-active "$SYSTEMD_SERVICE_NAME" >/dev/null 2>&1; then
+    echo "  Stopping $SYSTEMD_SERVICE_NAME"
+    systemctl --user stop "$SYSTEMD_SERVICE_NAME"
+  else
+    echo "  $SYSTEMD_SERVICE_NAME not active"
+  fi
+}
+
+start_systemd_service() {
+  systemctl --user daemon-reload
+  systemctl --user enable "$SYSTEMD_SERVICE_NAME" >/dev/null 2>&1 || true
+
+  if systemctl --user is-active "$SYSTEMD_SERVICE_NAME" >/dev/null 2>&1; then
+    systemctl --user restart "$SYSTEMD_SERVICE_NAME"
+  else
+    systemctl --user start "$SYSTEMD_SERVICE_NAME"
+  fi
+}
+
+MANAGED_BY_SYSTEMD=false
+if has_systemd_managed_service; then
+  MANAGED_BY_SYSTEMD=true
+fi
+
 echo "Stopping cats-runtime..."
-stop_service_on_port "$PORT"
+if [[ "$MANAGED_BY_SYSTEMD" == "true" ]]; then
+  stop_systemd_service
+else
+  stop_service_on_port "$PORT"
+fi
 
 if [[ "$STOP_ONLY" == "true" ]]; then
   echo "Done."
@@ -132,16 +167,25 @@ npm run build
 popd >/dev/null
 echo "  Build OK"
 
-mkdir -p "$LOG_DIR"
-STDOUT_LOG="$LOG_DIR/cats-runtime.out.log"
-STDERR_LOG="$LOG_DIR/cats-runtime.err.log"
+if [[ "$MANAGED_BY_SYSTEMD" == "true" ]]; then
+  echo "Starting cats-runtime via systemd..."
+  if ! start_systemd_service; then
+    echo "  Failed to start $SYSTEMD_SERVICE_NAME" >&2
+    systemctl --user status "$SYSTEMD_SERVICE_NAME" --no-pager || true
+    exit 1
+  fi
+else
+  mkdir -p "$LOG_DIR"
+  STDOUT_LOG="$LOG_DIR/cats-runtime.out.log"
+  STDERR_LOG="$LOG_DIR/cats-runtime.err.log"
 
-echo "Starting cats-runtime..."
-pushd "$REPO_ROOT" >/dev/null
-nohup node dist/index.js >"$STDOUT_LOG" 2>"$STDERR_LOG" < /dev/null &
-CATS_RUNTIME_PID=$!
-popd >/dev/null
-disown "$CATS_RUNTIME_PID" 2>/dev/null || true
+  echo "Starting cats-runtime..."
+  pushd "$REPO_ROOT" >/dev/null
+  nohup node dist/index.js >"$STDOUT_LOG" 2>"$STDERR_LOG" < /dev/null &
+  CATS_RUNTIME_PID=$!
+  popd >/dev/null
+  disown "$CATS_RUNTIME_PID" 2>/dev/null || true
+fi
 
 echo "Waiting for health check..."
 sleep 3
@@ -152,12 +196,22 @@ if HEALTH_JSON="$(health_check "$PORT")"; then
   if printf '%s' "$HEALTH_JSON" | grep -q '"bootstrapRequired"[[:space:]]*:[[:space:]]*true'; then
     echo "  Setup: bootstrap mode active, open http://localhost:$PORT/ to configure providers"
   fi
-  echo "  PID: $CATS_RUNTIME_PID"
-  echo "  Logs: $STDOUT_LOG / $STDERR_LOG"
+  if [[ "$MANAGED_BY_SYSTEMD" == "true" ]]; then
+    echo "  Unit: $SYSTEMD_SERVICE_NAME"
+    echo "  Logs: journalctl --user -u $SYSTEMD_SERVICE_NAME -f"
+  else
+    echo "  PID: $CATS_RUNTIME_PID"
+    echo "  Logs: $STDOUT_LOG / $STDERR_LOG"
+  fi
 else
   echo "  Not responding on port $PORT" >&2
-  echo "  Check logs:" >&2
-  echo "    stdout: $STDOUT_LOG" >&2
-  echo "    stderr: $STDERR_LOG" >&2
+  if [[ "$MANAGED_BY_SYSTEMD" == "true" ]]; then
+    echo "  Check unit status: systemctl --user status $SYSTEMD_SERVICE_NAME --no-pager" >&2
+    systemctl --user status "$SYSTEMD_SERVICE_NAME" --no-pager || true
+  else
+    echo "  Check logs:" >&2
+    echo "    stdout: $STDOUT_LOG" >&2
+    echo "    stderr: $STDERR_LOG" >&2
+  fi
   exit 1
 fi

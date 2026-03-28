@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import type { RuntimeAdapter } from './runtime/runtime.js';
@@ -30,6 +30,9 @@ interface RunPythonJsonScriptOptions {
   parseLabel: string;
 }
 
+const PYTHON_TEMP_PREFIX = 'cats-runtime-python-';
+let stalePythonTempCleanup: Promise<void> | null = null;
+
 export async function runPythonJsonScript<T>(
   options: RunPythonJsonScriptOptions,
 ): Promise<T> {
@@ -59,7 +62,9 @@ async function runPythonScript(
 async function runNativePythonScript(
   options: RunPythonJsonScriptOptions,
 ): Promise<string> {
-  const tempDir = await mkdtemp(join(tmpdir(), 'cats-runtime-python-'));
+  await ensureStalePythonTempDirsCleaned();
+
+  const tempDir = await mkdtemp(join(tmpdir(), buildPythonTempPrefix(process.pid)));
   try {
     const scriptPath = join(tempDir, 'script.py');
     await writeFile(scriptPath, options.script, 'utf8');
@@ -82,6 +87,24 @@ async function runNativePythonScript(
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
+}
+
+export async function cleanupStalePythonTempDirs(
+  rootDir: string = tmpdir(),
+  currentPid: number = process.pid,
+): Promise<void> {
+  const entries = await readdir(rootDir, { withFileTypes: true });
+
+  await Promise.all(entries
+    .filter((entry) => entry.name.startsWith(PYTHON_TEMP_PREFIX))
+    .filter((entry) => shouldRemovePythonTempEntry(entry.name, currentPid))
+    .map(async (entry) => {
+      try {
+        await rm(join(rootDir, entry.name), { recursive: true, force: true });
+      } catch {
+        // Best-effort cleanup for temp dirs orphaned by previous process exits.
+      }
+    }));
 }
 
 async function runCommand(
@@ -107,6 +130,47 @@ function buildEmbeddedPythonCommand(script: string, args: string[]): string {
   const python = `import base64; exec(base64.b64decode("${encoded}"))`;
   const quotedArgs = args.map(quoteForBash).join(' ');
   return `python3 -c ${quoteForBash(python)}${quotedArgs ? ` ${quotedArgs}` : ''}`;
+}
+
+async function ensureStalePythonTempDirsCleaned(): Promise<void> {
+  stalePythonTempCleanup ??= cleanupStalePythonTempDirs().catch(() => undefined);
+  await stalePythonTempCleanup;
+}
+
+function buildPythonTempPrefix(pid: number): string {
+  return `${PYTHON_TEMP_PREFIX}${pid}-`;
+}
+
+function shouldRemovePythonTempEntry(name: string, currentPid: number): boolean {
+  const pid = parsePythonTempPid(name);
+  if (pid === null) {
+    return true;
+  }
+
+  if (pid === currentPid) {
+    return false;
+  }
+
+  return !isProcessAlive(pid);
+}
+
+function parsePythonTempPid(name: string): number | null {
+  const match = /^cats-runtime-python-(\d+)-/.exec(name);
+  if (!match) {
+    return null;
+  }
+
+  return Number.parseInt(match[1], 10);
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    return code !== 'ESRCH';
+  }
 }
 
 async function resolveWindowsPythonCommand(

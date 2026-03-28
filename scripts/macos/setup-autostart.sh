@@ -8,14 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 ENV_FILE="$REPO_ROOT/.env"
 ENV_EXAMPLE="$REPO_ROOT/.env.example"
-CATS_RUNTIME_SUPPORT_DIR="$HOME/Library/Application Support/cats-runtime"
-RUNNER_SCRIPT="$CATS_RUNTIME_SUPPORT_DIR/start-cats-runtime.sh"
-PLIST_DIR="$HOME/Library/LaunchAgents"
-PLIST_FILE="$PLIST_DIR/io.sammykenny2.cats-runtime.plist"
-LOG_DIR="$HOME/Library/Logs/cats-runtime"
-STDOUT_LOG="$LOG_DIR/stdout.log"
-STDERR_LOG="$LOG_DIR/stderr.log"
-LABEL="io.sammykenny2.cats-runtime"
+source "$SCRIPT_DIR/launchd-config.sh"
 INSTALL=false
 REMOVE=false
 VERIFY=false
@@ -144,10 +137,11 @@ if [[ "$VERIFY" == "true" ]]; then
   echo ""
   if [[ "$all_good" == "true" ]]; then
     echo "All good"
+    exit 0
   else
     echo "Some issues found"
+    exit 1
   fi
-  exit 0
 fi
 
 if [[ "$REMOVE" == "true" ]]; then

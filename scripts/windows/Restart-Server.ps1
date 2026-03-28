@@ -277,4 +277,5 @@ try {
         Write-Host "        $stderrLog" -ForegroundColor DarkGray
     }
     Write-Host "  Check logs or run: npm run build; node dist/index.js" -ForegroundColor Yellow
+    exit 1
 }
