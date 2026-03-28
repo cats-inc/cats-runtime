@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { pathToFileURL } from 'node:url';
 import { loadDotEnv } from '../core/dotenv.js';
+import { isDirectCliEntrypoint } from '../core/cliEntrypoint.js';
 import { loadConfig } from '../core/config.js';
 import {
   formatSetupDiagnosticEntrySummary,
@@ -73,7 +73,7 @@ async function main(): Promise<void> {
   process.on('SIGTERM', requestShutdown);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectCliEntrypoint(import.meta.url, process.argv[1])) {
   main().catch((error) => {
     process.stderr.write(`${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
     process.exitCode = 1;
