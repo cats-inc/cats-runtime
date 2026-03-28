@@ -556,6 +556,7 @@ The phase ordering above is based on the current vendor API surfaces reviewed on
 | 2026-03-28 | Operator/config follow-through landed: `.env.example` now includes placeholders for Anthropic/OpenAI/Gemini API credentials, and `docs/setup-guide.md` now makes the env-vs-YAML secret boundary explicit for API/local instances. |
 | 2026-03-28 | Security/testing follow-through landed in docs: `docs/security-guidelines.md` now documents API/local secret and TLS boundaries, and `docs/testing.md` now carries a concrete API/local regression matrix covering transports, diagnostics, model-selection request patches, resume/fork continuity, abort, and retry behavior. |
 | 2026-03-28 | Regression follow-through landed in tests: `tests/api-backend.test.ts` now verifies that API transport `429` responses with `Retry-After` are recorded as runtime cooldown incidents, surfaced through `/diagnostics/runtime`, and cause the next turn to fail fast through the shared guardrail path instead of re-hitting the provider immediately. |
+| 2026-03-28 | Abort/cancel regression follow-through landed: API transport aborts are now normalized into the stable shared `Request aborted.` error event, `src/backends/api/runtime/ApiBackendManager.test.ts` verifies direct handle cancellation, and `tests/api-backend.test.ts` verifies that `POST /sessions/{id}/cancel` can unwind an in-flight API turn without a second provider request before the session returns to `ready`. |
 
 ---
 

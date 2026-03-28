@@ -134,6 +134,19 @@ function toErrorStreamEvent(
   target: ProviderTargetDescriptor,
   providerSessionId?: string,
 ): ErrorStreamEvent {
+  if (isAbortLikeError(error)) {
+    return {
+      type: 'error',
+      providerSessionId,
+      text: 'Request aborted.',
+      metadata: {
+        provider: target.providerName,
+        backend: target.backend,
+        instance: target.instanceId,
+      },
+    } satisfies ErrorStreamEvent;
+  }
+
   if (error instanceof ApiTransportError) {
     return {
       type: 'error',
@@ -162,6 +175,11 @@ function toErrorStreamEvent(
       instance: target.instanceId,
     },
   } satisfies ErrorStreamEvent;
+}
+
+function isAbortLikeError(error: unknown): boolean {
+  return error instanceof Error
+    && (error.name === 'AbortError' || /abort|aborted/i.test(error.message));
 }
 
 function buildStrategyInstructionOverlay(

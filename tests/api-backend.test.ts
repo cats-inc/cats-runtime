@@ -22,6 +22,12 @@ function jsonResponse(body: Record<string, unknown>): Response {
   });
 }
 
+function createAbortError(message = 'The operation was aborted.'): Error {
+  const error = new Error(message);
+  error.name = 'AbortError';
+  return error;
+}
+
 function expectIdleMeteringSummary() {
   return expect.objectContaining({
     status: 'ok',
@@ -1447,6 +1453,95 @@ describe('API backend integration', () => {
         }),
       });
 
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
+  it('cancels an in-flight API turn through the shared session cancel route', async () => {
+    const { config, env, cleanup } = createApiConfigRoot();
+    const fetchMock = vi.fn<typeof fetch>(async (_input, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        const signal = init?.signal;
+        if (signal?.aborted) {
+          reject(createAbortError());
+          return;
+        }
+
+        signal?.addEventListener('abort', () => reject(createAbortError()), { once: true });
+      }));
+
+    const runtime = createRuntimeServer(config, {
+      apiBackend: {
+        fetch: fetchMock,
+        env: {
+          ...env,
+          OPENAI_API_KEY: 'openai-test-key',
+          ANTHROPIC_API_KEY: 'anthropic-test-key',
+          GEMINI_API_KEY: 'gemini-test-key',
+        },
+      },
+    });
+
+    try {
+      const sessionResponse = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'codex',
+          instance: 'api/main',
+          cwd: join(env.HOME, 'repo'),
+          workspaceMode: 'shared',
+        }),
+      });
+      expect(sessionResponse.status).toBe(201);
+      const session = await sessionResponse.json() as Record<string, unknown>;
+
+      const messagePromise = runtime.app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({ message: 'cancel me' }),
+      });
+
+      await vi.waitFor(() => {
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(runtime.context.runtime?.get(String(session.id))?.busy).toBe(true);
+      });
+
+      const cancelResponse = await runtime.app.request(`/sessions/${session.id}/cancel`, {
+        method: 'POST',
+      });
+      expect(cancelResponse.status).toBe(200);
+      expect(await cancelResponse.json()).toEqual(expect.objectContaining({
+        action: 'cancel',
+        status: 'busy',
+        attached: true,
+        inspection: expect.objectContaining({
+          state: 'canceling',
+        }),
+      }));
+
+      const messageResponse = await messagePromise;
+      expect(messageResponse.status).toBe(200);
+      expect(parseNdjson(await messageResponse.text())).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          type: 'error',
+          text: 'Request aborted.',
+        }),
+      ]));
+
+      expect(runtime.context.registry.get(String(session.id))?.status).toBe('ready');
+      expect(runtime.context.runtime?.getTrackedState(String(session.id))?.lastRun).toEqual(
+        expect.objectContaining({
+          status: 'canceled',
+          error: 'Request aborted.',
+        }),
+      );
       expect(fetchMock).toHaveBeenCalledTimes(1);
     } finally {
       await runtime.close();

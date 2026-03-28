@@ -18,6 +18,12 @@ async function collectEvents(stream: AsyncGenerator<StreamEvent>): Promise<Strea
   return events;
 }
 
+function createAbortError(message = 'The operation was aborted.'): Error {
+  const error = new Error(message);
+  error.name = 'AbortError';
+  return error;
+}
+
 function createTarget(): ProviderTargetDescriptor {
   return {
     providerName: 'codex',
@@ -265,6 +271,60 @@ describe('ApiBackendManager', () => {
     expect(String(capturedBody?.instructions)).toMatch(
       /Session-level instructions\.\s+Turn-level instructions\./,
     );
+  });
+
+  it('normalizes aborted API turns into a stable shared error event', async () => {
+    const registry = new SessionRegistry();
+    const session = registry.create({
+      id: 'api-session-abort',
+      providerName: 'codex',
+      providerBackend: 'api',
+      providerInstanceId: 'gateway',
+      cwd: '/repo',
+    });
+
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        const signal = init?.signal;
+        if (signal?.aborted) {
+          reject(createAbortError());
+          return;
+        }
+
+        signal?.addEventListener('abort', () => reject(createAbortError()), { once: true });
+      }));
+
+    const manager = new ApiBackendManager(
+      { sessionBaseDir: '/tmp/cats-runtime-tests' },
+      registry,
+      {
+        fetch: fetchMock as typeof fetch,
+        env: {
+          OPENAI_API_KEY: 'test-key',
+        },
+      },
+    );
+
+    const handle = manager.spawn(session.id, createTarget());
+    const eventsPromise = collectEvents(handle.streamMessage({
+      message: 'hello',
+    }));
+
+    await vi.waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(handle.busy).toBe(true);
+    });
+
+    await manager.cancel(session.id, 'cancel');
+
+    await expect(eventsPromise).resolves.toEqual([
+      expect.objectContaining({
+        type: 'error',
+        text: 'Request aborted.',
+      }),
+    ]);
+    expect(handle.active).toBe(true);
+    expect(handle.busy).toBe(false);
   });
 
   it('applies resolved advanced model controls as provider request patches', async () => {
