@@ -59,6 +59,8 @@ cats-runtime
 
 Supported startup flags:
 
+- `--cleanup-temp-dirs` — remove stale `cats-runtime-*` temp directories and exit without starting the HTTP server
+- `--cleanup-temp-age-hours <hours>` — override the stale-age threshold used by `--cleanup-temp-dirs` (default: `12`)
 - `--bootstrap` — force bootstrap/setup mode even with a valid config
 - `--diagnose-setup` — generate a setup diagnostic report and exit without starting the HTTP server
 - `--list-setup-diagnostic-reports` — list retained setup diagnostic reports and exit without starting the HTTP server
@@ -140,6 +142,18 @@ and prints a concise operator summary to stderr plus the machine-readable JSON
 payload to stdout with `status`, `artifactPath`, and `report`. Use this path
 when port conflicts or other startup failures make the running HTTP action
 unavailable.
+
+When you need to clean up stale temp workspaces left by interrupted tests or
+helper processes without starting the HTTP server, use:
+
+```powershell
+node dist/index.js --cleanup-temp-dirs
+node dist/index.js --cleanup-temp-dirs --cleanup-temp-age-hours 24
+```
+
+This command scans the system temp root for known transient `cats-runtime-*`
+directories, removes stale candidates, prints a concise operator summary to
+stderr, and emits machine-readable JSON to stdout.
 
 The same manual CLI seam can now inspect retained setup-report history without
 starting the HTTP server:
@@ -748,6 +762,10 @@ you need to relocate local state.
 ```powershell
 .\scripts\windows\Restart-Server.ps1
 ```
+
+The restart helpers now run the same stale-temp cleanup seam before rebuilding
+and relaunching the runtime. That cleanup is best-effort and only targets known
+transient `cats-runtime-*` temp directories.
 
 ### Stop only
 

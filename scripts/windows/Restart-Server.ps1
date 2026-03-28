@@ -117,6 +117,29 @@ function Stop-ServiceOnPort($port) {
     Write-Host "  Not running on port $port" -ForegroundColor Gray
 }
 
+function Invoke-StaleTempCleanup($repoRoot) {
+    $entry = Join-Path $repoRoot "dist\\index.js"
+    if (!(Test-Path $entry)) {
+        Write-Host "  Skipping stale temp cleanup (dist/index.js not built yet)" -ForegroundColor DarkGray
+        return
+    }
+
+    Write-Host "Cleaning stale cats-runtime temp directories..." -ForegroundColor Cyan
+    Push-Location $repoRoot
+    try {
+        $null = & node $entry --cleanup-temp-dirs 1>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "  Stale temp cleanup completed" -ForegroundColor Green
+        } else {
+            Write-Host "  Stale temp cleanup skipped (exit $LASTEXITCODE)" -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "  Stale temp cleanup skipped: $($_.Exception.Message)" -ForegroundColor Yellow
+    } finally {
+        Pop-Location
+    }
+}
+
 Write-Host "Stopping cats-runtime..." -ForegroundColor Cyan
 Stop-ServiceOnPort $Port
 
@@ -124,6 +147,8 @@ if ($Stop) {
     Write-Host "Done." -ForegroundColor Green
     exit 0
 }
+
+Invoke-StaleTempCleanup $repoRoot
 
 Write-Host "Building TypeScript..." -ForegroundColor Cyan
 Push-Location $repoRoot

@@ -110,6 +110,20 @@ health_check() {
   fi
 }
 
+cleanup_stale_temp_dirs() {
+  if [[ ! -f "$REPO_ROOT/dist/index.js" ]]; then
+    echo "  Skipping stale temp cleanup (dist/index.js not built yet)"
+    return 0
+  fi
+
+  echo "Cleaning stale cats-runtime temp directories..."
+  if (cd "$REPO_ROOT" && node dist/index.js --cleanup-temp-dirs >/dev/null); then
+    echo "  Stale temp cleanup completed"
+  else
+    echo "  Stale temp cleanup skipped" >&2
+  fi
+}
+
 has_systemd_managed_service() {
   command -v systemctl >/dev/null 2>&1 || return 1
   systemctl --user cat "$SERVICE_NAME" >/dev/null 2>&1
@@ -151,6 +165,8 @@ if [[ "$STOP_ONLY" == "true" ]]; then
   echo "Done."
   exit 0
 fi
+
+cleanup_stale_temp_dirs
 
 command -v node >/dev/null 2>&1 || {
   echo "Node.js not found in PATH" >&2

@@ -30,6 +30,9 @@ import {
 describe('runtime startup helpers', () => {
   it('parses startup CLI options including inline values', () => {
     expect(parseRuntimeCliOptions([
+      '--cleanup-temp-dirs',
+      '--cleanup-temp-age-hours',
+      '6',
       '--diagnose-setup',
       '--list-setup-diagnostic-reports',
       '--read-setup-diagnostic-report=setup-report-1',
@@ -75,6 +78,8 @@ describe('runtime startup helpers', () => {
       '--config',
       'config/providers.yaml',
     ])).toEqual({
+      cleanupTempDirs: true,
+      cleanupTempAgeHours: '6',
       diagnoseSetup: true,
       listSetupDiagnosticReports: true,
       readSetupDiagnosticReport: 'setup-report-1',
@@ -399,6 +404,8 @@ describe('runtime startup helpers', () => {
   it('renders help text with supported flags', () => {
     const help = getRuntimeHelpText();
     expect(help).toContain('Usage: cats-runtime [options]');
+    expect(help).toContain('--cleanup-temp-dirs');
+    expect(help).toContain('--cleanup-temp-age-hours <hours>');
     expect(help).toContain('--diagnose-setup');
     expect(help).toContain('--list-setup-diagnostic-reports');
     expect(help).toContain('--read-setup-diagnostic-report <artifactId>');

@@ -5,6 +5,11 @@ import { pathToFileURL } from 'node:url';
 import { loadDotEnv } from './core/dotenv.js';
 import { loadConfig } from './core/config.js';
 import {
+  cleanupStaleRuntimeTempDirs,
+  DEFAULT_STALE_RUNTIME_TEMP_MAX_AGE_HOURS,
+  formatRuntimeTempCleanupSummary,
+} from './core/runtimeTempDirs.js';
+import {
   formatCompatibilityEvidenceArtifactListSummary,
   formatCompatibilityEvidenceArtifactReadSummary,
   listCompatibilityEvidenceArtifacts,
@@ -51,10 +56,37 @@ export { createRuntimeApp } from './http/app.js';
 
 let startup = createRuntimeStartupState();
 
+function resolveCleanupTempAgeHours(raw: string | undefined): number {
+  if (!raw) {
+    return DEFAULT_STALE_RUNTIME_TEMP_MAX_AGE_HOURS;
+  }
+
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`Invalid --cleanup-temp-age-hours value '${raw}'`);
+  }
+
+  return parsed;
+}
+
 async function main(): Promise<void> {
   const cliOptions = parseRuntimeCliOptions(process.argv.slice(2));
   if (cliOptions.help) {
     process.stdout.write(`${getRuntimeHelpText()}\n`);
+    return;
+  }
+
+  if (cliOptions.cleanupTempDirs) {
+    const maxAgeHours = resolveCleanupTempAgeHours(cliOptions.cleanupTempAgeHours);
+    const summary = await cleanupStaleRuntimeTempDirs({
+      maxAgeMs: maxAgeHours * 60 * 60 * 1000,
+    });
+    process.stderr.write(formatRuntimeTempCleanupSummary(summary));
+    process.stdout.write(`${JSON.stringify({
+      status: 'cleaned',
+      maxAgeHours,
+      summary,
+    })}\n`);
     return;
   }
 

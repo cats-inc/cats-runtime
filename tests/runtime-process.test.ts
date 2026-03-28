@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -47,6 +47,23 @@ interface SetupDiagnosticCliOutput {
       port: {
         status: 'available' | 'active_listener' | 'in_use' | 'ephemeral' | 'probe_failed';
       };
+    };
+  };
+}
+
+interface RuntimeTempCleanupCliOutput {
+  status: 'cleaned';
+  maxAgeHours: number;
+  summary: {
+    rootDir: string;
+    removedCount: number;
+    keptCount: number;
+    candidateCount: number;
+    removedByPrefix: Record<string, number>;
+    keptByReason: {
+      recent: number;
+      livePid: number;
+      failed: number;
     };
   };
 }
@@ -1200,6 +1217,47 @@ describe('runtime process startup contract', () => {
         });
       });
       cleanup();
+    }
+  }, 20000);
+
+  it('can clean stale runtime temp directories without starting the HTTP server', async () => {
+    const isolatedTempRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-temp-root-'));
+    const staleDir = join(isolatedTempRoot, 'cats-runtime-peer-config-stale');
+    const recentDir = join(isolatedTempRoot, 'cats-runtime-agent-test-recent');
+    mkdirSync(staleDir);
+    mkdirSync(recentDir);
+    const staleAt = new Date('2026-03-27T00:00:00.000Z');
+    const recentAt = new Date();
+    writeFileSync(join(staleDir, 'marker.txt'), 'stale', 'utf8');
+    writeFileSync(join(recentDir, 'marker.txt'), 'recent', 'utf8');
+    utimesSync(staleDir, staleAt, staleAt);
+    utimesSync(recentDir, recentAt, recentAt);
+
+    const { env, cleanup } = createRuntimeProcessEnv(3220);
+    env.TEMP = isolatedTempRoot;
+    env.TMP = isolatedTempRoot;
+    const child = spawnSetupDiagnostic([
+      '--cleanup-temp-dirs',
+      '--cleanup-temp-age-hours',
+      '1',
+    ], env);
+
+    try {
+      const output = await waitForProcessOutput(child);
+      expect(output.code).toBe(0);
+
+      const payload = JSON.parse(output.stdout.trim()) as RuntimeTempCleanupCliOutput;
+      expect(payload.status).toBe('cleaned');
+      expect(payload.maxAgeHours).toBe(1);
+      expect(payload.summary.rootDir).toBe(isolatedTempRoot);
+      expect(payload.summary.removedCount).toBe(1);
+      expect(payload.summary.keptCount).toBe(1);
+      expect(payload.summary.removedByPrefix['cats-runtime-peer-']).toBe(1);
+      expect(payload.summary.keptByReason.recent).toBe(1);
+      expect(output.stderr).toContain('Cleaned 1 stale cats-runtime temp directory');
+    } finally {
+      cleanup();
+      rmSync(isolatedTempRoot, { recursive: true, force: true });
     }
   }, 20000);
 

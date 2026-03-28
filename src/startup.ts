@@ -62,6 +62,8 @@ export type RuntimeShutdownReason = typeof RUNTIME_SHUTDOWN_REASONS[number];
 
 export interface RuntimeCliOptions {
   help?: boolean;
+  cleanupTempDirs?: boolean;
+  cleanupTempAgeHours?: string;
   bootstrap?: boolean;
   diagnoseSetup?: boolean;
   listSetupDiagnosticReports?: boolean;
@@ -181,6 +183,22 @@ export function parseRuntimeCliOptions(argv: string[]): RuntimeCliOptions {
 
     if (arg === '--help' || arg === '-h') {
       options.help = true;
+      continue;
+    }
+
+    if (arg === '--cleanup-temp-dirs') {
+      options.cleanupTempDirs = true;
+      continue;
+    }
+
+    if (arg === '--cleanup-temp-age-hours') {
+      options.cleanupTempAgeHours = readOptionValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--cleanup-temp-age-hours=')) {
+      options.cleanupTempAgeHours = arg.slice('--cleanup-temp-age-hours='.length);
       continue;
     }
 
@@ -814,6 +832,8 @@ export function getRuntimeHelpText(): string {
     'Usage: cats-runtime [options]',
     '',
     'Options:',
+    '  --cleanup-temp-dirs                    Remove stale cats-runtime temp directories and exit',
+    '  --cleanup-temp-age-hours <hours>      Age threshold for stale temp cleanup (default: 12)',
     '  --bootstrap                            Force bootstrap/setup mode',
     '  --diagnose-setup                       Generate a setup diagnostic report and exit',
     '  --list-setup-diagnostic-reports        List retained setup diagnostic reports and exit',
