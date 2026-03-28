@@ -52,8 +52,17 @@ export interface ApiCompletionInput {
 }
 
 export interface ApiProgressEvent {
-  kind: 'provider_cache' | 'model_state';
-  status: 'created' | 'reused' | 'fallback' | 'hinted';
+  kind: 'provider_cache' | 'model_state' | 'tool';
+  status:
+    | 'started'
+    | 'running'
+    | 'updated'
+    | 'created'
+    | 'reused'
+    | 'fallback'
+    | 'hinted'
+    | 'completed'
+    | 'failed';
   message: string;
   metadata?: Record<string, unknown>;
 }

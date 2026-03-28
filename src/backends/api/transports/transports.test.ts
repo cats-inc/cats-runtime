@@ -171,6 +171,73 @@ describe('API transports', () => {
     expect(result.usage).toEqual({ inputTokens: 5, outputTokens: 9 });
   });
 
+  it('surfaces OpenAI built-in tool output as shared progress events', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        id: 'resp_provider_tool',
+        output: [
+          {
+            type: 'web_search_call',
+            id: 'ws_1',
+            status: 'completed',
+          },
+          {
+            type: 'code_interpreter_call',
+            id: 'ci_1',
+            status: 'in_progress',
+          },
+          {
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: 'I checked the web.' }],
+          },
+        ],
+        usage: { input_tokens: 5, output_tokens: 9 },
+      }),
+    );
+
+    const transport = new OpenAiTransport(fetchMock, {
+      OPENAI_API_KEY: 'test-key',
+    });
+    const instance: RemoteProviderInstanceConfig = {
+      id: 'main',
+      providerName: 'codex',
+      backend: 'api',
+      transport: 'openai',
+      apiKeyEnv: 'OPENAI_API_KEY',
+      model: 'gpt-5',
+    };
+
+    const result = await transport.completeTurn(makeInput(instance));
+    expect(result.assistant.parts).toEqual([
+      { type: 'text', text: 'I checked the web.' },
+    ]);
+    expect(result.progress).toEqual([
+      {
+        kind: 'tool',
+        status: 'completed',
+        message: "OpenAI provider tool 'web search' completed.",
+        metadata: {
+          providerNative: true,
+          providerToolType: 'web_search_call',
+          providerToolId: 'ws_1',
+          providerToolStatus: 'completed',
+        },
+      },
+      {
+        kind: 'tool',
+        status: 'running',
+        message: "OpenAI provider tool 'code interpreter' running.",
+        metadata: {
+          providerNative: true,
+          providerToolType: 'code_interpreter_call',
+          providerToolId: 'ci_1',
+          providerToolStatus: 'in_progress',
+        },
+      },
+    ]);
+  });
+
   it('uses OpenAI previous_response_id for continuation when available', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       jsonResponse({

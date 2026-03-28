@@ -2509,6 +2509,9 @@ Current normalized progress kinds:
 - `reasoning`: provider-reported reasoning or thinking updates
 - `strategy`: runtime-owned execution-strategy lifecycle checkpoints
 - `tool`: tool execution lifecycle
+  This now also includes provider-native tool checkpoints that the runtime can
+  observe without owning the tool loop, such as OpenAI built-in tool response
+  items like `web_search_call`.
 - `command`: command execution lifecycle
 - `files`: file edit/read milestone
 - `provider_cache`: provider-native continuation or cache lifecycle such as

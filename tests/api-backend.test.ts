@@ -842,6 +842,98 @@ describe('API backend integration', () => {
     }
   });
 
+  it('surfaces OpenAI provider-native tool output as shared progress events', async () => {
+    const { config, env, cleanup } = createApiConfigRoot();
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (!url.includes('/v1/responses')) {
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      }
+
+      return jsonResponse({
+        id: 'resp_native_tool_1',
+        output: [
+          {
+            type: 'web_search_call',
+            id: 'ws_1',
+            status: 'completed',
+          },
+          {
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: 'I checked the web result.' }],
+          },
+        ],
+        usage: { input_tokens: 7, output_tokens: 3 },
+      });
+    });
+
+    const runtime = createRuntimeServer(config, {
+      apiBackend: {
+        fetch: fetchMock,
+        env: {
+          ...env,
+          OPENAI_API_KEY: 'openai-test-key',
+          ANTHROPIC_API_KEY: 'anthropic-test-key',
+          GEMINI_API_KEY: 'gemini-test-key',
+        },
+      },
+    });
+
+    try {
+      const createResponse = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'codex',
+          instance: 'api/main',
+          cwd: join(env.HOME, 'repo'),
+          workspaceMode: 'shared',
+        }),
+      });
+      expect(createResponse.status).toBe(201);
+      const session = await createResponse.json() as Record<string, unknown>;
+
+      const messageResponse = await runtime.app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({ message: 'Search the web and summarize the result.' }),
+      });
+      expect(messageResponse.status).toBe(200);
+      expect(parseNdjson(await messageResponse.text())).toEqual([
+        expect.objectContaining({ type: 'init', sessionId: 'resp_native_tool_1' }),
+        expect.objectContaining({
+          type: 'progress',
+          text: "OpenAI provider tool 'web search' completed.",
+          metadata: expect.objectContaining({
+            kind: 'tool',
+            status: 'completed',
+            provider: 'codex',
+            backend: 'api',
+            instance: 'main',
+            providerNative: true,
+            providerToolType: 'web_search_call',
+            providerToolId: 'ws_1',
+            providerToolStatus: 'completed',
+            transport: 'openai',
+          }),
+        }),
+        expect.objectContaining({ type: 'text', text: 'I checked the web result.' }),
+        expect.objectContaining({
+          type: 'result',
+          sessionId: 'resp_native_tool_1',
+          usage: { inputTokens: 7, outputTokens: 3 },
+        }),
+      ]);
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
   it('runs tool loops for Claude and Gemini API sessions', async () => {
     const { config, env, cleanup } = createApiConfigRoot();
     let anthropicCalls = 0;

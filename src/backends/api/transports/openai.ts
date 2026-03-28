@@ -167,6 +167,69 @@ function extractAssistantParts(payload: Record<string, unknown>): ApiConversatio
   return parts;
 }
 
+function readProviderToolProgressStatus(
+  value: unknown,
+): ApiProgressEvent['status'] {
+  switch (value) {
+    case 'in_progress':
+    case 'running':
+      return 'running';
+    case 'failed':
+      return 'failed';
+    case 'started':
+      return 'started';
+    case 'updated':
+      return 'updated';
+    case 'completed':
+      return 'completed';
+    default:
+      return 'completed';
+  }
+}
+
+function humanizeProviderToolType(type: string): string {
+  return type
+    .replace(/_call$/, '')
+    .replace(/_/g, ' ');
+}
+
+function extractProviderToolProgress(payload: Record<string, unknown>): ApiProgressEvent[] {
+  const output = Array.isArray(payload.output) ? payload.output : [];
+  const progress: ApiProgressEvent[] = [];
+
+  for (const item of output) {
+    if (!item || typeof item !== 'object') {
+      continue;
+    }
+
+    const entry = item as Record<string, unknown>;
+    if (typeof entry.type !== 'string') {
+      continue;
+    }
+
+    if (!entry.type.endsWith('_call') || entry.type === 'function_call') {
+      continue;
+    }
+
+    const normalizedStatus = readProviderToolProgressStatus(entry.status);
+    const toolType = entry.type;
+    const toolName = humanizeProviderToolType(toolType);
+    progress.push({
+      kind: 'tool',
+      status: normalizedStatus,
+      message: `OpenAI provider tool '${toolName}' ${normalizedStatus}.`,
+      metadata: {
+        providerNative: true,
+        providerToolType: toolType,
+        ...(typeof entry.id === 'string' ? { providerToolId: entry.id } : {}),
+        ...(typeof entry.status === 'string' ? { providerToolStatus: entry.status } : {}),
+      },
+    });
+  }
+
+  return progress;
+}
+
 function toOpenAiTools(input: ApiCompletionInput): Array<Record<string, unknown>> {
   return input.tools.map((tool) => ({
     type: 'function',
@@ -269,6 +332,7 @@ export class OpenAiTransport implements ApiTransportClient {
       const usage = payload.usage && typeof payload.usage === 'object'
         ? payload.usage as Record<string, unknown>
         : {};
+      const providerToolProgress = extractProviderToolProgress(payload);
 
       return {
         responseId: typeof payload.id === 'string' ? payload.id : undefined,
@@ -280,7 +344,9 @@ export class OpenAiTransport implements ApiTransportClient {
           inputTokens: typeof usage.input_tokens === 'number' ? usage.input_tokens : 0,
           outputTokens: typeof usage.output_tokens === 'number' ? usage.output_tokens : 0,
         },
-        progress: progress.length > 0 ? [...progress] : undefined,
+        progress: progress.length > 0 || providerToolProgress.length > 0
+          ? [...progress, ...providerToolProgress]
+          : undefined,
         raw: payload,
       };
     };
