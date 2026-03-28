@@ -179,6 +179,9 @@ src/
   with `manual: true` and view provider status inline without editing YAML
 - Applies optional bearer auth
 - Streams turn output as SSE or NDJSON
+- Projects additive runtime-owned `content_block` snapshots on streamed turn
+  routes so hosts can render stable live transcripts without parsing
+  provider-native raw block schemas
 - Applies additive metering observation and execution guardrail preflight on
   streamed message turns
 - Exposes additive peer registry and diagnostics reads at `GET /peers`,

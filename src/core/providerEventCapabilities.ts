@@ -95,7 +95,7 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
       contentBlocks: 'native',
     },
     presentation: {
-      recommended: 'event_tape',
+      recommended: 'content_blocks',
     },
     notes: [
       'Native content blocks and tool blocks arrive mid-turn.',
@@ -114,7 +114,7 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
       contentBlocks: 'none',
     },
     presentation: {
-      recommended: 'event_tape',
+      recommended: 'content_blocks',
     },
     notes: [
       'Rich mid-turn progress is available, including plan/reasoning-style updates.',
@@ -133,7 +133,7 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
       contentBlocks: 'none',
     },
     presentation: {
-      recommended: 'event_tape',
+      recommended: 'content_blocks',
     },
     notes: [
       'Assistant deltas stream mid-turn and explicit tool requests/results are exposed.',
@@ -151,7 +151,7 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
       contentBlocks: 'native',
     },
     presentation: {
-      recommended: 'event_tape',
+      recommended: 'content_blocks',
     },
     notes: [
       'Assistant content blocks include tool_use/tool_result payloads.',
@@ -170,7 +170,7 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
       contentBlocks: 'none',
     },
     presentation: {
-      recommended: 'event_tape',
+      recommended: 'content_blocks',
     },
     notes: [
       'Text typically arrives as a full message rather than stepwise deltas.',
@@ -189,7 +189,7 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
       contentBlocks: 'native',
     },
     presentation: {
-      recommended: 'event_tape',
+      recommended: 'content_blocks',
     },
     notes: [
       'The runtime can reconstruct tool milestones from Goose content blocks.',
@@ -208,7 +208,7 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
       contentBlocks: 'none',
     },
     presentation: {
-      recommended: 'event_tape',
+      recommended: 'content_blocks',
     },
     notes: [
       'Tool and progress milestones are reconstructed from session-state polling.',
@@ -263,7 +263,7 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
       contentBlocks: 'none',
     },
     presentation: {
-      recommended: 'event_tape',
+      recommended: 'content_blocks',
     },
     notes: [
       'OpenCode exposes live tool milestones but still resolves assistant text as final output.',
@@ -281,7 +281,7 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
       contentBlocks: 'none',
     },
     presentation: {
-      recommended: 'event_tape',
+      recommended: 'content_blocks',
     },
     notes: [
       'Pi exposes the richest normalized CLI stream, including reasoning and tool results.',

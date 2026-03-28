@@ -15,6 +15,8 @@ Current capabilities:
 - additive `cancel` / `reset` lifecycle primitives plus stronger remote-agent close/delete cleanup
 - worktree-backed session isolation with deterministic prepare/recreate/cleanup semantics and explicit discard/merge/preserve reset/delete policies
 - streamed turns over SSE or NDJSON
+- additive runtime-owned `content_block` projections on streamed turn routes
+  for host transcript rendering
 - machine-readable session/run inspection payloads over `/sessions`, `/sessions/{id}/history`, and `/sessions/{id}/observe`
 - runtime-owned maintenance metadata for reset boundaries, compaction readiness, pending memory-flush hooks, additive `pre_flush` seams, persisted maintenance trigger requests, and delete cleanup summaries
 - public external-only compaction-preparation coordination over `POST /sessions/{id}/compact`
@@ -64,6 +66,8 @@ Current capabilities:
 - [x] Add LAN peer discovery, diagnostics, trust-gated execution routing, and caller-owned peer turn relay for PLAN-017 v0
 - [x] Publish host-facing provider event capability truth on `/providers/config`
       for provider selection and future rendering contracts
+- [x] Publish a runtime-owned streamed `content_block` contract for live host
+      transcript rendering
 
 ## Design Rules
 

@@ -8,6 +8,7 @@ import {
 } from '../app.js';
 import { buildSessionProviderTargetSummary } from '../sessionProviderTarget.js';
 import { toSessionView } from '../../backends/cli/pool/sessionView.js';
+import { createRuntimeContentBlockProjector } from '../../core/runtime/contentBlocks.js';
 import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
 import type { StreamEvent } from '../../core/types.js';
 
@@ -76,15 +77,24 @@ observeRoutes.get('/sessions/:id/stream', async (c) => {
 
   return streamSSE(c, async (stream) => {
     let closed = false;
+    const contentBlocks = createRuntimeContentBlockProjector();
+    let writeQueue = Promise.resolve();
 
     const onEvent = (event: StreamEvent) => {
       if (closed) return;
-      stream.writeSSE({
-        data: JSON.stringify(event),
-        event: event.type,
-      }).catch(() => {
-        closed = true;
-      });
+      const outputEvents = [event, ...contentBlocks.project(event)];
+      writeQueue = writeQueue
+        .then(async () => {
+          for (const outputEvent of outputEvents) {
+            await stream.writeSSE({
+              data: JSON.stringify(outputEvent),
+              event: outputEvent.type,
+            });
+          }
+        })
+        .catch(() => {
+          closed = true;
+        });
     };
 
     const onExit = () => {

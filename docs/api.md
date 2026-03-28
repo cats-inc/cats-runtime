@@ -2468,8 +2468,40 @@ specific instance with `instance: "<backend>/<instance>"`, for example
 `GET /sessions` accepts `?instance=<instance-id>` to filter registry results.
 `?instance=default` matches each provider's configured default instance.
 
-Streamed message output may include `tool_use`, `tool_result`, and `progress`
-events in addition to `init`, `text`, `result`, and `error`.
+Streamed message output may include `tool_use`, `tool_result`, `progress`, and
+additive `content_block` events in addition to `init`, `text`, `result`, and
+`error`.
+
+`content_block` is a runtime-owned host contract layered over the normalized
+stream. It lets hosts render a stable live transcript without depending on
+provider-native raw block schemas. Each event carries a full block snapshot
+under `block`, including:
+
+- `id`: stable block id within the current streamed turn
+- `index`: append order
+- `kind`: `text`, `tool`, or `status`
+- `status`: `streaming`, `complete`, or `error`
+- optional `title`, `text`, `toolName`, `toolId`, and bounded `metadata`
+
+The runtime emits new snapshots for the same block id as text/tool state
+evolves, so hosts should update blocks in place rather than append duplicates.
+Example:
+
+```json
+{
+  "type": "content_block",
+  "block": {
+    "id": "tool:1",
+    "index": 1,
+    "kind": "tool",
+    "status": "complete",
+    "title": "read_file",
+    "toolName": "read_file",
+    "toolId": "tool-1",
+    "text": "Loaded src/app.ts"
+  }
+}
+```
 
 `progress` is now the runtime-owned provider-agnostic mid-turn status contract
 across CLI and API/local transports. It is intended for upper layers that
@@ -3093,8 +3125,8 @@ shape includes:
   metadata when such an artifact exists for the same target
 
 Hosts can now decide whether to stay on a final-message UI, show an event tape,
-or later opt into content-block rendering without hard-coding provider-name
-heuristics.
+or adopt the runtime-owned `content_block` transcript contract without
+hard-coding provider-name heuristics.
 
 Each instance entry now also exposes additive compact `modelCatalog` summary
 metadata:

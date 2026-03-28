@@ -1641,6 +1641,28 @@ export type StreamEvent =
   | RawStreamEvent
   | ProgressStreamEvent;
 
+export type RuntimeContentBlockKind = 'text' | 'tool' | 'status';
+export type RuntimeContentBlockStatus = 'streaming' | 'complete' | 'error';
+
+export interface RuntimeContentBlock {
+  id: string;
+  index: number;
+  kind: RuntimeContentBlockKind;
+  status: RuntimeContentBlockStatus;
+  title?: string;
+  text?: string;
+  toolName?: string;
+  toolId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ContentBlockStreamEvent extends StreamEventBase {
+  type: 'content_block';
+  block: RuntimeContentBlock;
+}
+
+export type RuntimeStreamOutputEvent = StreamEvent | ContentBlockStreamEvent;
+
 export interface HealthStatus {
   status: 'ok' | 'degraded' | 'unavailable';
   checkedAt: string;

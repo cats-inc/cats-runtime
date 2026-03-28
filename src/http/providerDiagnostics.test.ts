@@ -519,7 +519,7 @@ describe('provider diagnostics HTTP contract', () => {
         contentBlocks: 'native',
       },
       presentation: {
-        recommended: 'event_tape',
+        recommended: 'content_blocks',
       },
     }));
   });

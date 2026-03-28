@@ -21,6 +21,7 @@ import type {
 } from '../../core/types.js';
 import { hydrateSessionState } from '../../core/hydration/sessionHydration.js';
 import { ManagedExecutionHandle } from '../../core/runtime/ManagedExecutionHandle.js';
+import { createRuntimeContentBlockProjector } from '../../core/runtime/contentBlocks.js';
 import { buildRuntimeExecutionStrategySessionPatch } from '../../core/runtime/strategies/state.js';
 import { parsePeerMessageRoutingInput } from '../../core/peers/PeerRoutingService.js';
 import { toPeerExecutionErrorEvent } from '../../core/peers/errors.js';
@@ -129,6 +130,13 @@ function flushAssistantText(
   });
 
   return '';
+}
+
+function toStreamOutputEvents(
+  projector: ReturnType<typeof createRuntimeContentBlockProjector>,
+  event: StreamEvent,
+) {
+  return [event, ...projector.project(event)];
 }
 
 function restoreReadyIfSessionStillInteractive(
@@ -629,10 +637,13 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
         let assistantText = '';
         let completed = false;
         const turnStartedAt = Date.now();
+        const contentBlocks = createRuntimeContentBlockProjector();
         try {
           if (warningEvent) {
             runtime.observeEvent(id, warningEvent);
-            controller.enqueue(new TextEncoder().encode(JSON.stringify(warningEvent) + '\n'));
+            for (const outputEvent of toStreamOutputEvents(contentBlocks, warningEvent)) {
+              controller.enqueue(new TextEncoder().encode(JSON.stringify(outputEvent) + '\n'));
+            }
           }
           const eventStream = peerRouted
             ? worker!.streamMessage(turnInput)
@@ -642,8 +653,10 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
           for await (const event of eventStream) {
             const observedEvent = metering.observeEvent(executionSession, event, { turnStartedAt });
             runtime.observeEvent(id, observedEvent);
-            const line = JSON.stringify(observedEvent) + '\n';
-            controller.enqueue(new TextEncoder().encode(line));
+            for (const outputEvent of toStreamOutputEvents(contentBlocks, observedEvent)) {
+              const line = JSON.stringify(outputEvent) + '\n';
+              controller.enqueue(new TextEncoder().encode(line));
+            }
 
             applyObservedEventToSession(ctx, id, session, observedEvent, {
               peerRouted,
@@ -705,9 +718,11 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
           } satisfies ErrorStreamEvent, { turnStartedAt });
           runtime.observeEvent(id, errorEvent);
           assistantText = flushAssistantText(historyState.sourcePath, assistantText);
-          controller.enqueue(
-            new TextEncoder().encode(JSON.stringify(errorEvent) + '\n'),
-          );
+          for (const outputEvent of toStreamOutputEvents(contentBlocks, errorEvent)) {
+            controller.enqueue(
+              new TextEncoder().encode(JSON.stringify(outputEvent) + '\n'),
+            );
+          }
           restoreReadyIfSessionStillInteractive(ctx.registry, id);
         } finally {
           await closeManagedHandle(peerHandle);
@@ -739,13 +754,16 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     let assistantText = '';
     let completed = false;
     const turnStartedAt = Date.now();
+    const contentBlocks = createRuntimeContentBlockProjector();
     try {
       if (warningEvent) {
         runtime.observeEvent(id, warningEvent);
-        await stream.writeSSE({
-          data: JSON.stringify(warningEvent),
-          event: warningEvent.type,
-        });
+        for (const outputEvent of toStreamOutputEvents(contentBlocks, warningEvent)) {
+          await stream.writeSSE({
+            data: JSON.stringify(outputEvent),
+            event: outputEvent.type,
+          });
+        }
       }
       const eventStream = peerRouted
         ? worker!.streamMessage(turnInput)
@@ -755,10 +773,12 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
       for await (const event of eventStream) {
         const observedEvent = metering.observeEvent(executionSession, event, { turnStartedAt });
         runtime.observeEvent(id, observedEvent);
-        await stream.writeSSE({
-          data: JSON.stringify(observedEvent),
-          event: observedEvent.type,
-        });
+        for (const outputEvent of toStreamOutputEvents(contentBlocks, observedEvent)) {
+          await stream.writeSSE({
+            data: JSON.stringify(outputEvent),
+            event: outputEvent.type,
+          });
+        }
 
         applyObservedEventToSession(ctx, id, session, observedEvent, {
           peerRouted,
@@ -820,10 +840,12 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
         text: String(err),
       } satisfies ErrorStreamEvent, { turnStartedAt });
       runtime.observeEvent(id, errorEvent);
-      await stream.writeSSE({
-        data: JSON.stringify(errorEvent),
-        event: errorEvent.type,
-      });
+      for (const outputEvent of toStreamOutputEvents(contentBlocks, errorEvent)) {
+        await stream.writeSSE({
+          data: JSON.stringify(outputEvent),
+          event: outputEvent.type,
+        });
+      }
       restoreReadyIfSessionStillInteractive(ctx.registry, id);
     } finally {
       await closeManagedHandle(peerHandle);
