@@ -148,8 +148,6 @@ if ($Stop) {
     exit 0
 }
 
-Invoke-StaleTempCleanup $repoRoot
-
 Write-Host "Building TypeScript..." -ForegroundColor Cyan
 Push-Location $repoRoot
 try {
@@ -164,6 +162,8 @@ try {
 } finally {
     Pop-Location
 }
+
+Invoke-StaleTempCleanup $repoRoot
 
 Write-Host "Starting cats-runtime..." -ForegroundColor Cyan
 

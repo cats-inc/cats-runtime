@@ -166,8 +166,6 @@ if [[ "$STOP_ONLY" == "true" ]]; then
   exit 0
 fi
 
-cleanup_stale_temp_dirs
-
 command -v node >/dev/null 2>&1 || {
   echo "Node.js not found in PATH" >&2
   exit 1
@@ -183,6 +181,8 @@ pushd "$REPO_ROOT" >/dev/null
 npm run build
 popd >/dev/null
 echo "  Build OK"
+
+cleanup_stale_temp_dirs
 
 if [[ "$MANAGED_BY_SYSTEMD" == "true" ]]; then
   echo "Starting cats-runtime via systemd..."
