@@ -28,6 +28,18 @@ function createAbortError(message = 'The operation was aborted.'): Error {
   return error;
 }
 
+function jsonErrorResponse(
+  status: number,
+  body: Record<string, unknown>,
+): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      'content-type': 'application/json',
+    },
+  });
+}
+
 function expectIdleMeteringSummary() {
   return expect.objectContaining({
     status: 'ok',
@@ -1336,6 +1348,149 @@ describe('API backend integration', () => {
           usage: { inputTokens: 3, outputTokens: 5 },
         }),
       ]);
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
+  it('falls back to full transcript replay when OpenAI rejects previous_response_id continuation', async () => {
+    const { config, env, cleanup } = createApiConfigRoot();
+    let openAiCalls = 0;
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (!url.includes('/v1/responses')) {
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      }
+
+      openAiCalls += 1;
+      const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
+      const inputItems = Array.isArray(body.input) ? body.input : [];
+
+      if (openAiCalls === 1) {
+        expect(body.previous_response_id).toBeUndefined();
+        return jsonResponse({
+          id: 'resp_fallback_1',
+          output: [{
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text: 'First answer.' }],
+          }],
+          usage: { input_tokens: 6, output_tokens: 3 },
+        });
+      }
+
+      if (openAiCalls === 2) {
+        expect(body.previous_response_id).toBe('resp_fallback_1');
+        expect(inputItems).toEqual([
+          { role: 'user', content: 'Follow up after the first answer.' },
+        ]);
+        return jsonErrorResponse(400, {
+          error: {
+            message: 'previous_response_id not found',
+          },
+        });
+      }
+
+      expect(body.previous_response_id).toBeUndefined();
+      expect(inputItems).toEqual([
+        { role: 'user', content: 'Give me a first answer.' },
+        { role: 'assistant', content: 'First answer.' },
+        { role: 'user', content: 'Follow up after the first answer.' },
+      ]);
+
+      return jsonResponse({
+        id: 'resp_fallback_2',
+        output: [{
+          type: 'message',
+          role: 'assistant',
+          content: [{ type: 'output_text', text: 'Fallback answer.' }],
+        }],
+        usage: { input_tokens: 9, output_tokens: 4 },
+      });
+    });
+
+    const runtime = createRuntimeServer(config, {
+      apiBackend: {
+        fetch: fetchMock,
+        env: {
+          ...env,
+          OPENAI_API_KEY: 'openai-test-key',
+          ANTHROPIC_API_KEY: 'anthropic-test-key',
+          GEMINI_API_KEY: 'gemini-test-key',
+        },
+      },
+    });
+
+    try {
+      const createResponse = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'codex',
+          instance: 'api/main',
+          cwd: join(env.HOME, 'repo'),
+          workspaceMode: 'shared',
+        }),
+      });
+      expect(createResponse.status).toBe(201);
+      const session = await createResponse.json() as Record<string, unknown>;
+
+      const firstResponse = await runtime.app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({ message: 'Give me a first answer.' }),
+      });
+      expect(firstResponse.status).toBe(200);
+      expect(parseNdjson(await firstResponse.text())).toEqual([
+        expect.objectContaining({ type: 'init', sessionId: 'resp_fallback_1' }),
+        expect.objectContaining({ type: 'text', text: 'First answer.' }),
+        expect.objectContaining({
+          type: 'result',
+          sessionId: 'resp_fallback_1',
+          usage: { inputTokens: 6, outputTokens: 3 },
+        }),
+      ]);
+
+      const secondResponse = await runtime.app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({ message: 'Follow up after the first answer.' }),
+      });
+      expect(secondResponse.status).toBe(200);
+      expect(parseNdjson(await secondResponse.text())).toEqual([
+        expect.objectContaining({
+          type: 'init',
+          sessionId: 'resp_fallback_2',
+        }),
+        expect.objectContaining({
+          type: 'progress',
+          text: 'OpenAI previous_response_id continuation was rejected; retried with full transcript.',
+          metadata: expect.objectContaining({
+            kind: 'provider_cache',
+            status: 'fallback',
+            provider: 'codex',
+            backend: 'api',
+            instance: 'main',
+            strategy: 'previous_response_id',
+            previousResponseId: 'resp_fallback_1',
+          }),
+        }),
+        expect.objectContaining({ type: 'text', text: 'Fallback answer.' }),
+        expect.objectContaining({
+          type: 'result',
+          sessionId: 'resp_fallback_2',
+          usage: { inputTokens: 9, outputTokens: 4 },
+        }),
+      ]);
+
+      expect(openAiCalls).toBe(3);
     } finally {
       await runtime.close();
       cleanup();
