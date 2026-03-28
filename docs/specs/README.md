@@ -48,6 +48,7 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 
 | Spec | Title | Status | Related Plan |
 |------|-------|--------|--------------|
+| [SPEC-022](./SPEC-022-stdio-mcp-proxy-to-primary-runtime.md) | Stdio MCP Proxy to the Primary Runtime | Draft | [PLAN-022](../plans/PLAN-022-stdio-mcp-proxy-to-primary-runtime.md) |
 | [SPEC-021](./SPEC-021-provider-evolution-evidence-and-capability-probes.md) | Provider Evolution Evidence and Capability Probes | In Progress (Core Manual-First Slices Landed) | [PLAN-021](../plans/PLAN-021-provider-evolution-evidence-and-capability-probes.md) |
 | [SPEC-020](./SPEC-020-pluggable-execution-strategy-substrate.md) | Pluggable Execution Strategy Substrate | Implemented | [PLAN-020](../plans/PLAN-020-pluggable-execution-strategy-substrate.md) |
 | [SPEC-019](./SPEC-019-runtime-owned-management-adapters-for-forge-and-deployment-control-planes.md) | Runtime-Owned Management Adapters for Forge and Deployment Control Planes | Implemented (Slice 1) | [PLAN-016](../plans/PLAN-016-management-adapter-subsystem.md) |

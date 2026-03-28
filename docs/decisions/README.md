@@ -38,6 +38,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
+| [028-proxy-stdio-mcp-to-the-primary-runtime-http-surface](./028-proxy-stdio-mcp-to-the-primary-runtime-http-surface.md) | Proxy stdio MCP to the primary runtime HTTP surface | Proposed | 2026-03-29 |
 | [027-adopt-a-playground-derived-dark-runtime-ui-shell-with-sidebar-surface-switching](./027-adopt-a-playground-derived-dark-runtime-ui-shell-with-sidebar-surface-switching.md) | Adopt a playground-derived dark runtime UI shell with sidebar surface switching | Accepted | 2026-03-29 |
 | [026-model-a2a-as-an-agent-backend-adapter](./026-model-a2a-as-an-agent-backend-adapter.md) | Model A2A as an agent backend adapter | Proposed | 2026-03-27 |
 | [025-keep-provider-evolution-detection-manual-first-and-evidence-driven](./025-keep-provider-evolution-detection-manual-first-and-evidence-driven.md) | Keep provider evolution detection manual-first and evidence-driven | Accepted | 2026-03-27 |
