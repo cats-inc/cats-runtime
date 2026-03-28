@@ -1132,6 +1132,179 @@ describe('API backend integration', () => {
     }
   });
 
+  it('falls back to full conversation when Gemini rejects cached content reuse', async () => {
+    const { config, env, cleanup } = createApiConfigRoot();
+    const largePrompt = 'B'.repeat(18000);
+    let cacheCreateCalls = 0;
+    let generateCalls = 0;
+
+    const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.includes('/v1beta/cachedContents')) {
+        cacheCreateCalls += 1;
+        return jsonResponse({
+          name: 'cachedContents/gemini-fallback',
+          expireTime: '2026-03-16T03:00:00Z',
+        });
+      }
+
+      if (!url.includes(':generateContent')) {
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      }
+
+      generateCalls += 1;
+      const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
+      const contents = Array.isArray(body.contents) ? body.contents : [];
+
+      if (generateCalls === 1) {
+        expect(body.cachedContent).toBeUndefined();
+        return jsonResponse({
+          candidates: [{
+            content: {
+              parts: [{ text: 'Stored a reusable context.' }],
+            },
+          }],
+          usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 4 },
+        });
+      }
+
+      if (generateCalls === 2) {
+        expect(body.cachedContent).toBe('cachedContents/gemini-fallback');
+        expect(contents).toEqual([
+          {
+            role: 'user',
+            parts: [{ text: 'What still applies?' }],
+          },
+        ]);
+        return jsonErrorResponse(400, {
+          error: {
+            message: 'cachedContent not found',
+          },
+        });
+      }
+
+      expect(body.cachedContent).toBeUndefined();
+      expect(contents).toEqual([
+        {
+          role: 'user',
+          parts: [{ text: largePrompt }],
+        },
+        {
+          role: 'model',
+          parts: [{ text: 'Stored a reusable context.' }],
+        },
+        {
+          role: 'user',
+          parts: [{ text: 'What still applies?' }],
+        },
+      ]);
+      return jsonResponse({
+        candidates: [{
+          content: {
+            parts: [{ text: 'Fallback Gemini answer.' }],
+          },
+        }],
+        usageMetadata: { promptTokenCount: 12, candidatesTokenCount: 5 },
+      });
+    });
+
+    const runtime = createRuntimeServer(config, {
+      apiBackend: {
+        fetch: fetchMock,
+        env: {
+          ...env,
+          OPENAI_API_KEY: 'openai-test-key',
+          ANTHROPIC_API_KEY: 'anthropic-test-key',
+          GEMINI_API_KEY: 'gemini-test-key',
+        },
+      },
+    });
+
+    try {
+      const createResponse = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'gemini',
+          instance: 'api/pro',
+          cwd: join(env.HOME, 'repo'),
+          workspaceMode: 'shared',
+        }),
+      });
+      expect(createResponse.status).toBe(201);
+      const session = await createResponse.json() as Record<string, unknown>;
+
+      const firstMessage = await runtime.app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({ message: largePrompt }),
+      });
+      expect(firstMessage.status).toBe(200);
+      expect(parseNdjson(await firstMessage.text())).toEqual([
+        expect.objectContaining({ type: 'init' }),
+        expect.objectContaining({ type: 'text', text: 'Stored a reusable context.' }),
+        expect.objectContaining({
+          type: 'result',
+          usage: { inputTokens: 10, outputTokens: 4 },
+        }),
+      ]);
+
+      const secondMessage = await runtime.app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({ message: 'What still applies?' }),
+      });
+      expect(secondMessage.status).toBe(200);
+      expect(parseNdjson(await secondMessage.text())).toEqual([
+        expect.objectContaining({ type: 'init' }),
+        expect.objectContaining({
+          type: 'progress',
+          text: 'Created Gemini cached context for the reusable prompt prefix.',
+          metadata: expect.objectContaining({
+            kind: 'provider_cache',
+            status: 'created',
+            provider: 'gemini',
+            backend: 'api',
+            instance: 'pro',
+            strategy: 'cached_content',
+            cachedContent: 'cachedContents/gemini-fallback',
+          }),
+        }),
+        expect.objectContaining({
+          type: 'progress',
+          text: 'Gemini cached context was rejected; retried with full conversation.',
+          metadata: expect.objectContaining({
+            kind: 'provider_cache',
+            status: 'fallback',
+            provider: 'gemini',
+            backend: 'api',
+            instance: 'pro',
+            strategy: 'cached_content',
+            cachedContent: 'cachedContents/gemini-fallback',
+          }),
+        }),
+        expect.objectContaining({ type: 'text', text: 'Fallback Gemini answer.' }),
+        expect.objectContaining({
+          type: 'result',
+          usage: { inputTokens: 12, outputTokens: 5 },
+        }),
+      ]);
+
+      expect(cacheCreateCalls).toBe(1);
+      expect(generateCalls).toBe(3);
+      expect(runtime.context.registry.get(String(session.id))?.providerState).toEqual({});
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
   it('replays multi-tool Claude turns after resume without splitting the batch', async () => {
     const { root, config, env, cleanup } = createApiConfigRoot();
     writeFileSync(join(root, 'repo', 'src', 'other.ts'), 'export const other = 9;\n');
