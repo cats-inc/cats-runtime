@@ -54,10 +54,11 @@ function expectIdleMeteringSummary() {
 
 function createApiConfigRoot(
   envOverrides: Record<string, string> = {},
+  mutateConfig?: (contents: string) => string,
 ) {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-api-test-'));
   const configPath = join(root, 'providers.yaml');
-  writeFileSync(configPath, `
+  const configContents = `
 version: 1
 routing:
   providers:
@@ -111,7 +112,8 @@ backends:
             transport: ollama
             base_url: http://127.0.0.1:11434
             model: qwen3:latest
-`.trimStart());
+`.trimStart();
+  writeFileSync(configPath, mutateConfig ? mutateConfig(configContents) : configContents);
 
   const env = {
     HOME: root,
@@ -604,6 +606,40 @@ describe('API backend integration', () => {
         },
         policy: expect.objectContaining({
           profile: 'standard',
+        }),
+      }));
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
+  it('surfaces configured provider-native tools on API runtime inspection routes', async () => {
+    const { config, cleanup } = createApiConfigRoot({}, (contents) =>
+      contents.replace(
+        "model: gpt-5\n",
+        "model: gpt-5\n            payload_template:\n              tools:\n                - type: web_search_preview\n",
+      ));
+    const runtime = createRuntimeServer(config);
+
+    try {
+      const response = await runtime.app.request('/providers/config');
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual(expect.objectContaining({
+        providers: expect.objectContaining({
+          codex: expect.objectContaining({
+            instances: expect.arrayContaining([
+              expect.objectContaining({
+                id: 'main',
+                apiRuntime: expect.objectContaining({
+                  providerNativeTools: expect.objectContaining({
+                    state: 'provider_native_configured',
+                    configuredTools: ['web_search_preview'],
+                  }),
+                }),
+              }),
+            ]),
+          }),
         }),
       }));
     } finally {
