@@ -6,7 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-ENV_FILE="$REPO_ROOT/.env"
+ENV_FILE="${ENV_FILE:-$REPO_ROOT/.env}"
 LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/cats-runtime"
 source "$SCRIPT_DIR/systemd-config.sh"
 STOP_ONLY=false

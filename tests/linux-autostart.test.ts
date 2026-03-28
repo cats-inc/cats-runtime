@@ -14,6 +14,8 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
 interface LinuxScriptTestContext {
+  envFile: string;
+  managedNodeBin: string;
   env: NodeJS.ProcessEnv;
   nodeBin: string;
   root: string;
@@ -43,22 +45,36 @@ function createLinuxScriptTestContext(): LinuxScriptTestContext {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-linux-'));
   const binDir = join(root, 'bin');
   const homeDir = join(root, 'home');
+  const envFile = join(root, 'cats-runtime.env');
   const unitDir = join(root, 'systemd-user');
   const systemctlLog = join(root, 'systemctl.log');
   const npmLog = join(root, 'npm.log');
   const nodeBin = join(binDir, 'node');
+  const managedNodeBin = join(root, 'managed-node', 'node');
   const npmBin = join(binDir, 'npm');
   const systemctlBin = join(binDir, 'systemctl');
   const curlBin = join(binDir, 'curl');
 
   mkdirSync(binDir, { recursive: true });
   mkdirSync(homeDir, { recursive: true });
+  mkdirSync(dirname(managedNodeBin), { recursive: true });
 
   writeExecutable(
     nodeBin,
     `
 if [[ "\${1:-}" == "--version" ]]; then
   echo "v24.99.0"
+  exit 0
+fi
+
+printf '%s\\n' "$*" >>"\${NODE_LOG_PATH:?}"
+`,
+  );
+  writeExecutable(
+    managedNodeBin,
+    `
+if [[ "\${1:-}" == "--version" ]]; then
+  echo "v24.98.0"
   exit 0
 fi
 
@@ -98,6 +114,8 @@ printf '%s\\n' '{"status":"ok","bootstrapRequired":false}'
 
   return {
     root,
+    envFile,
+    managedNodeBin,
     nodeBin,
     systemctlLog,
     unitFile: join(unitDir, 'cats-runtime.service'),
@@ -105,6 +123,7 @@ printf '%s\\n' '{"status":"ok","bootstrapRequired":false}'
       ...process.env,
       HOME: homeDir,
       PATH: `${binDir}:${process.env.PATH ?? ''}`,
+      ENV_FILE: envFile,
       CATS_RUNTIME_SYSTEMD_UNIT_DIR: unitDir,
       SYSTEMCTL_LOG_PATH: systemctlLog,
       SYSTEMCTL_CAT_STATUS: '0',
@@ -118,6 +137,10 @@ printf '%s\\n' '{"status":"ok","bootstrapRequired":false}'
 
 function readText(path: string): string {
   return readFileSync(path, 'utf8');
+}
+
+function writeEnvFile(path: string, body: string): void {
+  writeFileSync(path, body, 'utf8');
 }
 
 function seedStaleSystemdInstall(context: LinuxScriptTestContext): void {
@@ -221,5 +244,29 @@ describe('Linux autostart scripts', () => {
     const systemctlLog = readText(context.systemctlLog);
     expect(systemctlLog).toContain('--user daemon-reload');
     expect(systemctlLog).toContain('--user start cats-runtime.service');
+  });
+
+  runIfPosix('reads CATS_RUNTIME_NODE_BIN from .env when the shell env does not export it', () => {
+    const context = createLinuxScriptTestContext();
+    writeEnvFile(
+      context.envFile,
+      `CATS_RUNTIME_PORT=3110
+CATS_RUNTIME_NODE_BIN=${context.managedNodeBin}
+`,
+    );
+
+    const result = spawnSync(
+      'bash',
+      [setupAutostartScript, '--install'],
+      {
+        cwd: runtimeRoot,
+        encoding: 'utf8',
+        env: context.env,
+      },
+    );
+
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(readText(context.unitFile)).toContain(`ExecStart=${context.managedNodeBin} dist/index.js`);
+    expect(result.stdout).toContain(`Node binary: ${context.managedNodeBin}`);
   });
 });

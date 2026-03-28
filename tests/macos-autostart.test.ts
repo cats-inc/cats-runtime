@@ -14,8 +14,10 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
 interface MacosScriptTestContext {
+  envFile: string;
   env: NodeJS.ProcessEnv;
   launchctlLog: string;
+  managedNodeBin: string;
   nodeBin: string;
   npmLog: string;
   plistFile: string;
@@ -45,24 +47,38 @@ function createMacosScriptTestContext(): MacosScriptTestContext {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-macos-'));
   const binDir = join(root, 'bin');
   const homeDir = join(root, 'home');
+  const envFile = join(root, 'cats-runtime.env');
   const supportDir = join(root, 'support');
   const plistDir = join(root, 'LaunchAgents');
   const logDir = join(root, 'logs');
   const launchctlLog = join(root, 'launchctl.log');
   const npmLog = join(root, 'npm.log');
   const nodeBin = join(binDir, 'node');
+  const managedNodeBin = join(root, 'managed-node', 'node');
   const npmBin = join(binDir, 'npm');
   const launchctlBin = join(binDir, 'launchctl');
   const curlBin = join(binDir, 'curl');
 
   mkdirSync(binDir, { recursive: true });
   mkdirSync(homeDir, { recursive: true });
+  mkdirSync(dirname(managedNodeBin), { recursive: true });
 
   writeExecutable(
     nodeBin,
     `
 if [[ "\${1:-}" == "--version" ]]; then
   echo "v24.99.0"
+  exit 0
+fi
+
+printf '%s\\n' "$*" >>"\${NODE_LOG_PATH:?}"
+`,
+  );
+  writeExecutable(
+    managedNodeBin,
+    `
+if [[ "\${1:-}" == "--version" ]]; then
+  echo "v24.98.0"
   exit 0
 fi
 
@@ -100,6 +116,8 @@ printf '%s\\n' '{"status":"ok","bootstrapRequired":false}'
 
   return {
     root,
+    envFile,
+    managedNodeBin,
     nodeBin,
     runnerScript: join(supportDir, 'start-cats-runtime.sh'),
     plistFile: join(plistDir, 'io.sammykenny2.cats-runtime.plist'),
@@ -109,6 +127,7 @@ printf '%s\\n' '{"status":"ok","bootstrapRequired":false}'
       ...process.env,
       HOME: homeDir,
       PATH: `${binDir}:${process.env.PATH ?? ''}`,
+      ENV_FILE: envFile,
       CATS_RUNTIME_SUPPORT_DIR: supportDir,
       CATS_RUNTIME_LAUNCHD_PLIST_DIR: plistDir,
       CATS_RUNTIME_LOG_DIR: logDir,
@@ -122,6 +141,10 @@ printf '%s\\n' '{"status":"ok","bootstrapRequired":false}'
 
 function readText(path: string): string {
   return readFileSync(path, 'utf8');
+}
+
+function writeEnvFile(path: string, body: string): void {
+  writeFileSync(path, body, 'utf8');
 }
 
 function seedStaleLaunchdInstall(context: MacosScriptTestContext): void {
@@ -232,5 +255,29 @@ describe('macOS autostart scripts', () => {
     const launchctlLog = readText(context.launchctlLog);
     expect(launchctlLog).toContain(`bootstrap gui/${process.getuid?.()} ${context.plistFile}`);
     expect(readText(context.npmLog)).toContain('run build');
+  });
+
+  runIfPosix('reads CATS_RUNTIME_NODE_BIN from .env when the shell env does not export it', () => {
+    const context = createMacosScriptTestContext();
+    writeEnvFile(
+      context.envFile,
+      `CATS_RUNTIME_PORT=3110
+CATS_RUNTIME_NODE_BIN=${context.managedNodeBin}
+`,
+    );
+
+    const result = spawnSync(
+      'bash',
+      [setupAutostartScript, '--install'],
+      {
+        cwd: runtimeRoot,
+        encoding: 'utf8',
+        env: context.env,
+      },
+    );
+
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(readText(context.runnerScript)).toContain(`exec ${context.managedNodeBin} dist/index.js`);
+    expect(result.stdout).toContain(`Node binary: ${context.managedNodeBin}`);
   });
 });

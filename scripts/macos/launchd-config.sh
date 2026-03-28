@@ -1,8 +1,26 @@
 #!/usr/bin/env bash
 
+read_autostart_override() {
+  local key="$1"
+  local value="${!key-}"
+
+  if [[ -n "$value" ]]; then
+    printf '%s\n' "$value"
+    return 0
+  fi
+
+  if [[ -n "${ENV_FILE:-}" && -f "$ENV_FILE" ]]; then
+    grep -E "^${key}[[:space:]]*=" "$ENV_FILE" | tail -n 1 | sed -E 's/^[^=]+=[[:space:]]*//' || true
+  fi
+}
+
+CATS_RUNTIME_LAUNCHD_LABEL="$(read_autostart_override CATS_RUNTIME_LAUNCHD_LABEL)"
 CATS_RUNTIME_LAUNCHD_LABEL="${CATS_RUNTIME_LAUNCHD_LABEL:-io.sammykenny2.cats-runtime}"
+CATS_RUNTIME_LAUNCHD_PLIST_DIR="$(read_autostart_override CATS_RUNTIME_LAUNCHD_PLIST_DIR)"
 CATS_RUNTIME_LAUNCHD_PLIST_DIR="${CATS_RUNTIME_LAUNCHD_PLIST_DIR:-$HOME/Library/LaunchAgents}"
+CATS_RUNTIME_LOG_DIR="$(read_autostart_override CATS_RUNTIME_LOG_DIR)"
 CATS_RUNTIME_LOG_DIR="${CATS_RUNTIME_LOG_DIR:-$HOME/Library/Logs/cats-runtime}"
+CATS_RUNTIME_SUPPORT_DIR="$(read_autostart_override CATS_RUNTIME_SUPPORT_DIR)"
 CATS_RUNTIME_SUPPORT_DIR="${CATS_RUNTIME_SUPPORT_DIR:-$HOME/Library/Application Support/cats-runtime}"
 
 LABEL="$CATS_RUNTIME_LAUNCHD_LABEL"
@@ -14,7 +32,8 @@ STDERR_LOG="$LOG_DIR/stderr.log"
 RUNNER_SCRIPT="$CATS_RUNTIME_SUPPORT_DIR/start-cats-runtime.sh"
 
 resolve_node_binary() {
-  local node_bin="${CATS_RUNTIME_NODE_BIN:-}"
+  local node_bin
+  node_bin="$(read_autostart_override CATS_RUNTIME_NODE_BIN)"
 
   if [[ -z "$node_bin" ]]; then
     node_bin="$(command -v node || true)"

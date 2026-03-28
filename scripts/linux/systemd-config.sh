@@ -1,6 +1,22 @@
 #!/usr/bin/env bash
 
+read_autostart_override() {
+  local key="$1"
+  local value="${!key-}"
+
+  if [[ -n "$value" ]]; then
+    printf '%s\n' "$value"
+    return 0
+  fi
+
+  if [[ -n "${ENV_FILE:-}" && -f "$ENV_FILE" ]]; then
+    grep -E "^${key}[[:space:]]*=" "$ENV_FILE" | tail -n 1 | sed -E 's/^[^=]+=[[:space:]]*//' || true
+  fi
+}
+
+CATS_RUNTIME_SYSTEMD_SERVICE_NAME="$(read_autostart_override CATS_RUNTIME_SYSTEMD_SERVICE_NAME)"
 CATS_RUNTIME_SYSTEMD_SERVICE_NAME="${CATS_RUNTIME_SYSTEMD_SERVICE_NAME:-cats-runtime.service}"
+CATS_RUNTIME_SYSTEMD_UNIT_DIR="$(read_autostart_override CATS_RUNTIME_SYSTEMD_UNIT_DIR)"
 CATS_RUNTIME_SYSTEMD_UNIT_DIR="${CATS_RUNTIME_SYSTEMD_UNIT_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user}"
 
 SERVICE_NAME="$CATS_RUNTIME_SYSTEMD_SERVICE_NAME"
@@ -8,7 +24,8 @@ UNIT_DIR="$CATS_RUNTIME_SYSTEMD_UNIT_DIR"
 UNIT_FILE="$UNIT_DIR/$SERVICE_NAME"
 
 resolve_node_binary() {
-  local node_bin="${CATS_RUNTIME_NODE_BIN:-}"
+  local node_bin
+  node_bin="$(read_autostart_override CATS_RUNTIME_NODE_BIN)"
 
   if [[ -z "$node_bin" ]]; then
     node_bin="$(command -v node || true)"
