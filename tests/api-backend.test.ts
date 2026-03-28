@@ -682,6 +682,52 @@ describe('API backend integration', () => {
     }
   });
 
+  it('surfaces configured provider-native tools on API tooling routes', async () => {
+    const { config, cleanup } = createApiConfigRoot({}, (contents) => contents
+      .replace(
+        "model: claude-sonnet-4-6\n",
+        "model: claude-sonnet-4-6\n            payload_template:\n              tools:\n                - type: web_search_20250305\n                  name: server-web-search\n",
+      )
+      .replace(
+        "model: gpt-5\n",
+        "model: gpt-5\n            payload_template:\n              tools:\n                - type: web_search_preview\n",
+      ));
+    const runtime = createRuntimeServer(config);
+
+    try {
+      const anthropicResponse = await runtime.app.request('/providers/claude/tools?instance=api/sonnet');
+      expect(anthropicResponse.status).toBe(200);
+      await expect(anthropicResponse.json()).resolves.toEqual(expect.objectContaining({
+        provider: 'claude',
+        backend: 'api',
+        instance: 'sonnet',
+        apiRuntime: expect.objectContaining({
+          providerNativeTools: expect.objectContaining({
+            state: 'provider_native_configured',
+            configuredTools: ['web_search_20250305'],
+          }),
+        }),
+      }));
+
+      const openAiResponse = await runtime.app.request('/providers/codex/tools?instance=api/main');
+      expect(openAiResponse.status).toBe(200);
+      await expect(openAiResponse.json()).resolves.toEqual(expect.objectContaining({
+        provider: 'codex',
+        backend: 'api',
+        instance: 'main',
+        apiRuntime: expect.objectContaining({
+          providerNativeTools: expect.objectContaining({
+            state: 'provider_native_configured',
+            configuredTools: ['web_search_preview'],
+          }),
+        }),
+      }));
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
   it('runs local tools through Codex/OpenAI sessions and supports read_only mode', async () => {
     const { config, env, cleanup } = createApiConfigRoot();
     let openAiCalls = 0;
