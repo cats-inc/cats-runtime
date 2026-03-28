@@ -1,14 +1,17 @@
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ExecutionHandle, StreamEvent } from '../types.js';
 import { loadConfig } from '../config.js';
 import { PeerExecutionService } from './PeerExecutionService.js';
 import type { PeerExecutionRequest } from './types.js';
 
+const createdRoots: string[] = [];
+
 function createConfig() {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-peer-exec-service-'));
+  createdRoots.push(root);
   return {
     ...loadConfig({
       HOME: root,
@@ -104,6 +107,15 @@ function createHandle(
 }
 
 describe('PeerExecutionService', () => {
+  afterEach(() => {
+    while (createdRoots.length > 0) {
+      const root = createdRoots.pop();
+      if (root) {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+  });
+
   it('ignores remote workspace cwd values outside the local session base dir', async () => {
     const config = createConfig();
     const { handle, kill } = createHandle();

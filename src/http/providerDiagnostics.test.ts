@@ -1683,173 +1683,177 @@ describe('provider diagnostics HTTP contract', () => {
 
   it('surfaces OpenCode live compatibility against the models subcommand seam', async () => {
     const rootDir = mkdtempSync(join(tmpdir(), 'cats-runtime-provider-opencode-live-'));
-    const registry = new SessionRegistry();
-    const pool = {
-      getCapabilities: vi.fn(() => ({
-        resume: true,
-        fork: false,
-        permissions: true,
-      })),
-    } as unknown as WorkerPool;
-    const config = makeConfig({
-      sessionBaseDir: join(rootDir, 'sessions'),
-      dataDir: join(rootDir, 'data'),
-      providerCommands: {
-        claude: {
-          path: 'claude',
-          runner: 'auto',
-          runtime: { mode: 'native' },
+    try {
+      const registry = new SessionRegistry();
+      const pool = {
+        getCapabilities: vi.fn(() => ({
+          resume: true,
+          fork: false,
+          permissions: true,
+        })),
+      } as unknown as WorkerPool;
+      const config = makeConfig({
+        sessionBaseDir: join(rootDir, 'sessions'),
+        dataDir: join(rootDir, 'data'),
+        providerCommands: {
+          claude: {
+            path: 'claude',
+            runner: 'auto',
+            runtime: { mode: 'native' },
+          },
+          opencode: {
+            path: 'opencode',
+            runner: 'auto',
+            runtime: { mode: 'native' },
+          },
+        } as CliRuntimeConfig['providerCommands'],
+        providerDefaultInstances: {
+          claude: 'default',
+          opencode: 'default',
         },
-        opencode: {
-          path: 'opencode',
-          runner: 'auto',
-          runtime: { mode: 'native' },
-        },
-      } as CliRuntimeConfig['providerCommands'],
-      providerDefaultInstances: {
-        claude: 'default',
-        opencode: 'default',
-      },
-      providerInstances: {
-        auggie: {},
-        claude: {
-          default: {
-            id: 'default',
-            providerName: 'claude',
-            commandConfig: {
-              path: 'claude',
-              runner: 'auto',
-              runtime: { mode: 'native' },
+        providerInstances: {
+          auggie: {},
+          claude: {
+            default: {
+              id: 'default',
+              providerName: 'claude',
+              commandConfig: {
+                path: 'claude',
+                runner: 'auto',
+                runtime: { mode: 'native' },
+              },
             },
           },
-        },
-        codex: {},
-        copilot: {},
-        cursor: {},
-        gemini: {},
-        goose: {},
-        junie: {},
-        kiro: {},
-        opencode: {
-          default: {
-            id: 'default',
-            providerName: 'opencode',
-            commandConfig: {
-              path: 'opencode',
-              runner: 'auto',
-              runtime: { mode: 'native' },
+          codex: {},
+          copilot: {},
+          cursor: {},
+          gemini: {},
+          goose: {},
+          junie: {},
+          kiro: {},
+          opencode: {
+            default: {
+              id: 'default',
+              providerName: 'opencode',
+              commandConfig: {
+                path: 'opencode',
+                runner: 'auto',
+                runtime: { mode: 'native' },
+              },
+              opencodeServerHost: '127.0.0.1',
+              opencodeServerPort: 4097,
+              opencodeServerStartupTimeoutMs: 10_000,
             },
-            opencodeServerHost: '127.0.0.1',
-            opencodeServerPort: 4097,
-            opencodeServerStartupTimeoutMs: 10_000,
           },
+          pi: {},
         },
-        pi: {},
-      },
-      providerDefaultTargets: {
-        opencode: { backend: 'cli', instance: 'default' },
-      },
-    });
-    const compatibility = new ProviderCompatibilityService(config, {
-      runner: {
-        run: vi.fn(async (_providerName, _commandConfig, args: string[]) => {
-          if (args[0] === '--version') {
+        providerDefaultTargets: {
+          opencode: { backend: 'cli', instance: 'default' },
+        },
+      });
+      const compatibility = new ProviderCompatibilityService(config, {
+        runner: {
+          run: vi.fn(async (_providerName, _commandConfig, args: string[]) => {
+            if (args[0] === '--version') {
+              return {
+                exitCode: 0,
+                stdout: 'opencode 1.1.0\n',
+                stderr: '',
+                timedOut: false,
+                durationMs: 3,
+              };
+            }
+
+            if (args[0] === 'models') {
+              return {
+                exitCode: 0,
+                stdout: 'Usage: opencode models [provider]\n  --refresh\n  --verbose\n',
+                stderr: '',
+                timedOut: false,
+                durationMs: 3,
+              };
+            }
+
             return {
               exitCode: 0,
-              stdout: 'opencode 1.1.0\n',
+              stdout: 'Usage: opencode serve\n  models\n  serve\n',
               stderr: '',
               timedOut: false,
               durationMs: 3,
             };
-          }
-
-          if (args[0] === 'models') {
-            return {
-              exitCode: 0,
-              stdout: 'Usage: opencode models [provider]\n  --refresh\n  --verbose\n',
-              stderr: '',
-              timedOut: false,
-              durationMs: 3,
-            };
-          }
-
-          return {
+          }),
+        },
+        installCheckRunner: createInstallCheckRunner(),
+        now: () => Date.parse('2026-03-23T00:02:10.000Z'),
+      });
+      const providerModelCatalog = new ProviderModelCatalogService(config, {
+        opencodeModelDiscoveryRunner: {
+          run: vi.fn(async () => ({
             exitCode: 0,
-            stdout: 'Usage: opencode serve\n  models\n  serve\n',
+            stdout: [
+              'anthropic/claude-sonnet-4-5',
+              'opencode-go/glm-5',
+            ].join('\n'),
             stderr: '',
             timedOut: false,
             durationMs: 3,
-          };
-        }),
-      },
-      installCheckRunner: createInstallCheckRunner(),
-      now: () => Date.parse('2026-03-23T00:02:10.000Z'),
-    });
-    const providerModelCatalog = new ProviderModelCatalogService(config, {
-      opencodeModelDiscoveryRunner: {
-        run: vi.fn(async () => ({
-          exitCode: 0,
-          stdout: [
-            'anthropic/claude-sonnet-4-5',
-            'opencode-go/glm-5',
-          ].join('\n'),
-          stderr: '',
-          timedOut: false,
-          durationMs: 3,
-        })),
-      },
-    });
-    const app = createApp({
-      config,
-      startup: createRuntimeStartupState(),
-      registry,
-      pool,
-      compatibility,
-      cursorNative: {} as never,
-      gooseNative: {} as never,
-      kiroNative: {} as never,
-      auggieSessions: {} as never,
-      opencodeNative: {} as never,
-      providerModelCatalog,
-    });
-
-    const response = await app.request(
-      '/diagnostics/providers?probe=live&provider=opencode&backend=cli&instance=default',
-    );
-    expect(response.status).toBe(200);
-    const payload = await response.json();
-    const provider = payload.providers.find((entry: { provider: string; backend: string; instance: string }) =>
-      entry.provider === 'opencode' && entry.backend === 'cli' && entry.instance === 'default',
-    );
-    expect(provider).toBeTruthy();
-    expect(provider).toEqual(expect.objectContaining({
-      availability: expect.objectContaining({
-        probe: 'live',
-      }),
-      compatibility: expect.objectContaining({
-        classification: 'ready',
-        probe: {
-          mode: 'live',
-          supportsLive: true,
-          liveValidated: true,
+          })),
         },
-      }),
-      config: expect.objectContaining({
-        modelCatalog: expect.objectContaining({
-          source: 'dynamic',
-          defaultModel: 'opencode-go/glm-5',
-          defaultModelStatus: 'available',
-          modelCount: 2,
-          warnings: [],
+      });
+      const app = createApp({
+        config,
+        startup: createRuntimeStartupState(),
+        registry,
+        pool,
+        compatibility,
+        cursorNative: {} as never,
+        gooseNative: {} as never,
+        kiroNative: {} as never,
+        auggieSessions: {} as never,
+        opencodeNative: {} as never,
+        providerModelCatalog,
+      });
+
+      const response = await app.request(
+        '/diagnostics/providers?probe=live&provider=opencode&backend=cli&instance=default',
+      );
+      expect(response.status).toBe(200);
+      const payload = await response.json();
+      const provider = payload.providers.find((entry: { provider: string; backend: string; instance: string }) =>
+        entry.provider === 'opencode' && entry.backend === 'cli' && entry.instance === 'default',
+      );
+      expect(provider).toBeTruthy();
+      expect(provider).toEqual(expect.objectContaining({
+        availability: expect.objectContaining({
+          probe: 'live',
         }),
-      }),
-    }));
-    expect(provider.checks).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        code: 'model_catalog_loaded',
-        status: 'ok',
-      }),
-    ]));
+        compatibility: expect.objectContaining({
+          classification: 'ready',
+          probe: {
+            mode: 'live',
+            supportsLive: true,
+            liveValidated: true,
+          },
+        }),
+        config: expect.objectContaining({
+          modelCatalog: expect.objectContaining({
+            source: 'dynamic',
+            defaultModel: 'opencode-go/glm-5',
+            defaultModelStatus: 'available',
+            modelCount: 2,
+            warnings: [],
+          }),
+        }),
+      }));
+      expect(provider.checks).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          code: 'model_catalog_loaded',
+          status: 'ok',
+        }),
+      ]));
+    } finally {
+      rmSync(rootDir, { recursive: true, force: true });
+    }
   });
 
   it('returns 400 for invalid provider diagnostics query filters', async () => {

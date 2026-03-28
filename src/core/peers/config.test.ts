@@ -1,12 +1,15 @@
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { loadConfig } from '../config.js';
 import { loadPeerRuntimeConfig } from './config.js';
 
+const createdRoots: string[] = [];
+
 function createEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-peer-config-'));
+  createdRoots.push(root);
   return {
     HOME: root,
     USERPROFILE: root,
@@ -17,6 +20,15 @@ function createEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
 }
 
 describe('peer runtime config', () => {
+  afterEach(() => {
+    while (createdRoots.length > 0) {
+      const root = createdRoots.pop();
+      if (root) {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+  });
+
   it('defaults to disabled discovery with no static peers', () => {
     const config = loadConfig(createEnv());
     expect(loadPeerRuntimeConfig(config)).toEqual({
