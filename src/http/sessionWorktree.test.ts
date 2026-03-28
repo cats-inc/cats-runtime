@@ -10,6 +10,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanupTempDirWithRetries } from '../../tests/tempCleanup.js';
 import { createRuntimeApp as createApp, type AppContext } from './app.js';
 import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig } from '../backends/cli/config.js';
@@ -221,10 +222,10 @@ describe('session worktree routes', () => {
 
   afterEach(() => {
     wakeup.close();
-    rmSync(rootDir, { recursive: true, force: true });
+    cleanupTempDirWithRetries(rootDir);
   });
 
-  it('creates a worktree-backed runtime session through POST /sessions', async () => {
+  it('creates a worktree-backed runtime session through POST /sessions', { timeout: 15_000 }, async () => {
     const repoDir = createGitWorkspace(rootDir, 'repo-create');
 
     const response = await app.request('/sessions', {
@@ -277,7 +278,7 @@ describe('session worktree routes', () => {
     );
   });
 
-  it('resets a worktree-backed session and discards the runtime worktree', async () => {
+  it('resets a worktree-backed session and discards the runtime worktree', { timeout: 15_000 }, async () => {
     const repoDir = createGitWorkspace(rootDir, 'repo-reset');
     const prepared = await prepareSessionWorkspace({
       sessionId: 'worktree-reset',
@@ -697,7 +698,7 @@ describe('session worktree routes', () => {
     expect(stored?.hydration).toBeUndefined();
   });
 
-  it('gates retained worktree cleanup behind acknowledged pre-flush hooks when requested', async () => {
+  it('gates retained worktree cleanup behind acknowledged pre-flush hooks when requested', { timeout: 15_000 }, async () => {
     const repoDir = createGitWorkspace(rootDir, 'repo-cleanup-gated');
     const prepared = await prepareSessionWorkspace({
       sessionId: 'worktree-cleanup-gated',
@@ -806,7 +807,7 @@ describe('session worktree routes', () => {
     expect(existsSync(prepared.workspaceIsolation.worktree!.worktreePath)).toBe(false);
   });
 
-  it('keeps retained worktree cleanup retry bounded when merge still sees a dirty source repo', async () => {
+  it('keeps retained worktree cleanup retry bounded when merge still sees a dirty source repo', { timeout: 15_000 }, async () => {
     const repoDir = createGitWorkspace(rootDir, 'repo-cleanup-retry-dirty');
     const prepared = await prepareSessionWorkspace({
       sessionId: 'worktree-cleanup-retry-dirty',

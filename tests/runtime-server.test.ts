@@ -5,6 +5,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import { cleanupTempDirWithRetries } from './tempCleanup.js';
 
 import { loadConfig } from '../src/core/config.js';
 import { getRuntimeManagementService } from '../src/http/app.js';
@@ -175,7 +176,7 @@ function createTestConfig(overrides = {}) {
     );
   }
 
-  return { root, config, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+  return { root, config, cleanup: () => cleanupTempDirWithRetries(root) };
 }
 
 async function withRuntime(

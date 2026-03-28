@@ -19,6 +19,8 @@ export const STALE_RUNTIME_TEMP_PREFIXES = [
   'cats-runtime-process-',
   'cats-runtime-worktree-',
   'cats-runtime-browser-',
+  'cats-runtime-branch-',
+  'cats-runtime-debug-',
   'cats-runtime-health-',
   'cats-runtime-diagnostics-',
   'cats-runtime-mcp-',

@@ -76,6 +76,24 @@ describe('cleanupStaleRuntimeTempDirs', () => {
     expect(() => rmSync(legacyPythonDir, { recursive: true, force: false })).toThrow();
   });
 
+  it('treats branch and debug workspaces as stale runtime temp candidates', async () => {
+    const root = createRoot();
+    const branchDir = join(root, 'cats-runtime-branch-old');
+    const debugDir = join(root, 'cats-runtime-debug-old');
+    mkdirSync(branchDir);
+    mkdirSync(debugDir);
+
+    const staleTime = new Date(Date.now() - (DEFAULT_STALE_RUNTIME_TEMP_MAX_AGE_MS + 60_000));
+    utimesSync(branchDir, staleTime, staleTime);
+    utimesSync(debugDir, staleTime, staleTime);
+
+    const summary = await cleanupStaleRuntimeTempDirs({ rootDir: root });
+
+    expect(summary.removedCount).toBe(2);
+    expect(summary.removedByPrefix['cats-runtime-branch-']).toBe(1);
+    expect(summary.removedByPrefix['cats-runtime-debug-']).toBe(1);
+  });
+
   it('formats a concise operator summary', () => {
     const summary = formatRuntimeTempCleanupSummary({
       rootDir: '/tmp/cats-runtime-tests',
