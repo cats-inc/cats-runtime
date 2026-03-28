@@ -26,6 +26,7 @@
   html,
   body {
     min-height: 100%;
+    height: 100%;
   }
 
   body {
@@ -44,13 +45,13 @@
   }
 
   .runtime-frame {
-    @apply min-h-screen flex flex-col lg:flex-row;
+    @apply min-h-screen flex flex-col lg:h-screen lg:min-h-0 lg:flex-row lg:overflow-hidden;
   }
 
   .runtime-sidebar {
     width: 100%;
     min-width: 0;
-    @apply border-b border-slate-800 bg-slate-900/95 backdrop-blur-xl lg:min-h-screen lg:border-b-0 lg:border-r;
+    @apply border-b border-slate-800 bg-slate-900/95 backdrop-blur-xl lg:h-screen lg:overflow-hidden lg:border-b-0 lg:border-r;
   }
 
   @media (min-width: 1024px) {
@@ -61,7 +62,7 @@
   }
 
   .runtime-sidebar-inner {
-    @apply flex h-full flex-col;
+    @apply flex h-full min-h-0 flex-col;
   }
 
   .runtime-brand-row {
@@ -85,15 +86,56 @@
   }
 
   .runtime-sidebar-surface {
-    @apply flex-1 min-h-0;
+    @apply flex-1 min-h-0 overflow-y-auto;
+  }
+
+  .runtime-sidebar-footer {
+    @apply shrink-0 border-t border-slate-800/80 px-4 py-4;
+  }
+
+  .runtime-shell-health {
+    @apply rounded-2xl border border-slate-800 bg-slate-950/70 px-3 py-3;
+  }
+
+  .runtime-shell-health-row {
+    @apply flex items-center gap-2;
+  }
+
+  .runtime-shell-health-dot {
+    @apply h-2.5 w-2.5 rounded-full bg-slate-500;
+  }
+
+  .runtime-shell-health-dot[data-state="active"] {
+    @apply bg-emerald-400 shadow-[0_0_0_4px_rgba(74,222,128,0.12)];
+  }
+
+  .runtime-shell-health-dot[data-state="skipped"] {
+    @apply bg-amber-400 shadow-[0_0_0_4px_rgba(250,204,21,0.12)];
+  }
+
+  .runtime-shell-health-dot[data-state="failed"] {
+    @apply bg-red-400 shadow-[0_0_0_4px_rgba(248,113,113,0.12)];
+  }
+
+  .runtime-shell-health-dot[data-state="idle"],
+  .runtime-shell-health-dot[data-state="running"] {
+    @apply bg-slate-400;
+  }
+
+  .runtime-shell-health-state {
+    @apply text-xs font-semibold uppercase tracking-widest text-slate-300;
+  }
+
+  .runtime-shell-health-summary {
+    @apply mt-2 text-sm leading-6 text-slate-400;
   }
 
   .runtime-page {
-    @apply min-w-0 flex-1;
+    @apply min-w-0 flex-1 lg:overflow-hidden;
   }
 
   .runtime-page-stack {
-    @apply flex min-h-screen flex-col;
+    @apply flex min-h-screen flex-col lg:h-full lg:min-h-0;
   }
 
   .runtime-page-header {

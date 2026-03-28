@@ -50,6 +50,45 @@ const DASHBOARD_HEALTH_OVERLAY = `
     }
   }
 
+  function runtimeHealthDisplay(status, startup) {
+    if (startup && startup.phase !== 'ready') {
+      return 'Bootstrap';
+    }
+    switch (status) {
+      case 'ok':
+        return 'Healthy';
+      case 'degraded':
+        return 'Degraded';
+      case 'unavailable':
+        return 'Unavailable';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  function renderRuntimeShellHealth(label, tooltip) {
+    var root = document.querySelector('[data-runtime-shell-health]');
+    if (!root) return;
+
+    var dot = root.querySelector('[data-runtime-shell-health-dot]');
+    var stateEl = root.querySelector('[data-runtime-shell-health-state]');
+    var summaryEl = root.querySelector('[data-runtime-shell-health-summary]');
+
+    if (dot) {
+      dot.dataset.state = mapRuntimeHealthState(runtimeHealthPayload.status);
+    }
+    if (stateEl) {
+      stateEl.textContent = runtimeHealthDisplay(
+        runtimeHealthPayload.status,
+        runtimeHealthPayload.runtime?.startup,
+      );
+    }
+    if (summaryEl) {
+      summaryEl.textContent = label;
+    }
+    root.title = tooltip;
+  }
+
   function renderRuntimeHealthOverlay() {
     if (!runtimeHealthPayload) return;
 
@@ -57,22 +96,28 @@ const DASHBOARD_HEALTH_OVERLAY = `
     const dot = document.getElementById('runtimeStatusDot');
     const titleEl = document.getElementById('runtimeStatusTitle');
     const labelEl = document.getElementById('runtimeStatusLabel');
-    if (!group || !dot || !titleEl || !labelEl) return;
 
     const providerSummary = runtimeHealthPayload.providers?.summary || {};
     const runtimeSummary = runtimeHealthPayload.runtime?.summary || 'Runtime diagnostics unavailable';
     const defaults = Array.isArray(runtimeHealthPayload.providers?.defaults)
       ? runtimeHealthPayload.providers.defaults
       : [];
-    const discoveryTooltip = group.dataset.discoveryTooltip || '';
-
-    dot.dataset.state = mapRuntimeHealthState(runtimeHealthPayload.status);
-    titleEl.textContent = 'Runtime / providers';
-    labelEl.textContent = formatRuntimeHealthLabel(
+    const discoveryTooltip = group?.dataset.discoveryTooltip || '';
+    const label = formatRuntimeHealthLabel(
       runtimeHealthPayload.runtime?.status,
       runtimeSummary,
       providerSummary,
     );
+
+    if (dot) {
+      dot.dataset.state = mapRuntimeHealthState(runtimeHealthPayload.status);
+    }
+    if (titleEl) {
+      titleEl.textContent = 'Runtime / providers';
+    }
+    if (labelEl) {
+      labelEl.textContent = label;
+    }
 
     const tooltipLines = [
       'Runtime: ' + (runtimeHealthPayload.runtime?.status || 'unknown') + ' - ' + runtimeSummary,
@@ -88,7 +133,11 @@ const DASHBOARD_HEALTH_OVERLAY = `
       tooltipLines.push('', 'Discovery:', discoveryTooltip);
     }
 
-    group.title = tooltipLines.join('\\n');
+    var tooltip = tooltipLines.join('\\n');
+    if (group) {
+      group.title = tooltip;
+    }
+    renderRuntimeShellHealth(label, tooltip);
   }
 
   async function refreshRuntimeHealthStatus() {
