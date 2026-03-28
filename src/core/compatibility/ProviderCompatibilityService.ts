@@ -33,6 +33,8 @@ import {
   getDefaultCompatibilityProfile,
   getProviderCompatibilityKnowledge,
 } from './knowledge.js';
+import { DEFAULT_COMPATIBILITY_EVIDENCE_RETENTION_LIMIT } from './compatibilityEvidence.js';
+import { pruneProviderArtifacts } from './retainedArtifacts.js';
 import type {
   CompatibilityAssessment,
   CompatibilityAssessmentOptions,
@@ -51,7 +53,9 @@ const DEFAULT_CACHE_TTL_MS = 5 * 60_000;
 const DEFAULT_PROBE_TIMEOUT_MS = 5_000;
 const DEFAULT_SAMPLE_LIMIT = 2_048;
 const DEFAULT_MAX_CONCURRENT_ASSESSMENTS = 4;
+const DEFAULT_MAX_CONCURRENT_HEALTH_ASSESSMENTS = 8;
 const EVIDENCE_SCHEMA_VERSION = 3;
+type CompatibilityCachePurpose = 'standard' | 'health';
 interface ProbeResult {
   exitCode: number | null;
   stdout: string;
@@ -80,7 +84,9 @@ interface ProviderCompatibilityServiceOptions {
   cacheTtlMs?: number;
   probeTimeoutMs?: number;
   maxConcurrentAssessments?: number;
+  maxConcurrentHealthAssessments?: number;
   evidenceDir?: string;
+  evidenceRetentionLimit?: number;
   runner?: CompatibilityRunner;
   installCheckRunner?: ProviderInstallCheckRunner;
   now?: () => number;
@@ -91,12 +97,17 @@ export class ProviderCompatibilityService {
   private readonly cacheTtlMs: number;
   private readonly probeTimeoutMs: number;
   private readonly maxConcurrentAssessments: number;
+  private readonly maxConcurrentHealthAssessments: number;
   private readonly evidenceDir: string;
+  private readonly evidenceRetentionLimit: number;
   private readonly runner: CompatibilityRunner;
   private readonly installCheckRunner: ProviderInstallCheckRunner;
   private readonly now: () => number;
   private activeAssessments = 0;
-  private readonly assessmentWaiters: Array<() => void> = [];
+  private readonly assessmentWaiters: Array<{
+    limit: number;
+    resolve: () => void;
+  }> = [];
 
   constructor(
     private readonly config: Pick<CliRuntimeConfig, 'dataDir' | 'sessionBaseDir'>,
@@ -107,8 +118,18 @@ export class ProviderCompatibilityService {
     this.maxConcurrentAssessments = normalizeConcurrentAssessmentLimit(
       options.maxConcurrentAssessments,
     );
+    this.maxConcurrentHealthAssessments = Math.max(
+      this.maxConcurrentAssessments,
+      normalizeConcurrentAssessmentLimit(
+        options.maxConcurrentHealthAssessments ?? DEFAULT_MAX_CONCURRENT_HEALTH_ASSESSMENTS,
+      ),
+    );
     this.evidenceDir = options.evidenceDir
       || join(config.dataDir || join(config.sessionBaseDir, '..', 'data'), 'compatibility');
+    this.evidenceRetentionLimit = Math.max(
+      1,
+      Math.trunc(options.evidenceRetentionLimit ?? DEFAULT_COMPATIBILITY_EVIDENCE_RETENTION_LIMIT),
+    );
     this.runner = options.runner || { run: runCompatibilityProbe };
     this.installCheckRunner = options.installCheckRunner || defaultProviderInstallCheckRunner;
     this.now = options.now || (() => Date.now());
@@ -121,9 +142,12 @@ export class ProviderCompatibilityService {
   private getBestCachedEntry(
     providerName: ProviderName,
     instanceId: string,
+    cachePurposes: readonly CompatibilityCachePurpose[] = ['standard'],
   ): CacheEntry | undefined {
-    const entries = (['light', 'live'] as const)
-      .map((probeMode) => this.cache.get(createCacheKey(providerName, instanceId, probeMode)))
+    const entries = cachePurposes.flatMap((cachePurpose) => (['light', 'live'] as const)
+      .map((probeMode) => this.cache.get(
+        createCacheKey(providerName, instanceId, probeMode, cachePurpose),
+      )))
       .filter((entry): entry is CacheEntry => Boolean(entry));
 
     if (entries.length === 0) {
@@ -165,7 +189,7 @@ export class ProviderCompatibilityService {
     instanceId: string,
     probeMode: CompatibilityProbeMode = 'light',
   ): CompatibilityAssessment | undefined {
-    return this.cache.get(createCacheKey(providerName, instanceId, probeMode))?.assessment;
+    return this.getCachedEntry(providerName, instanceId, probeMode)?.assessment;
   }
 
   getCachedSummary(
@@ -192,22 +216,27 @@ export class ProviderCompatibilityService {
     }
 
     const probeMode = options.probeMode || 'light';
-    const cacheKey = createCacheKey(
-      target.providerName as ProviderName,
-      target.instanceId,
-      probeMode,
-    );
-    const cached = this.cache.get(cacheKey);
-    const ageMs = cached ? this.now() - cached.cachedAtMs : Number.POSITIVE_INFINITY;
-    const stale = ageMs > this.cacheTtlMs;
-    if (!options.force && cached && !stale) {
+    const cachePurpose = resolveCompatibilityCachePurpose(options.purpose);
+    const cached = !options.force
+      ? this.getFreshCachedEntry(
+          target.providerName as ProviderName,
+          target.instanceId,
+          probeMode,
+          resolveReadableCachePurposes(cachePurpose),
+        )
+      : undefined;
+    if (cached) {
       return {
         ...cached.assessment,
         cache: this.buildCacheState(cached.cachedAtMs, true),
       };
     }
 
-    await this.acquireAssessmentSlot();
+    await this.acquireAssessmentSlot(
+      cachePurpose === 'health'
+        ? this.maxConcurrentHealthAssessments
+        : this.maxConcurrentAssessments,
+    );
     let assessment: CompatibilityAssessment;
     try {
       assessment = await this.buildAssessment(target, {
@@ -217,39 +246,79 @@ export class ProviderCompatibilityService {
     } finally {
       this.releaseAssessmentSlot();
     }
-    this.cache.set(cacheKey, {
+    this.cache.set(createCacheKey(
+      target.providerName as ProviderName,
+      target.instanceId,
+      probeMode,
+      cachePurpose,
+    ), {
       assessment,
       cachedAtMs: this.now(),
     });
     return assessment;
   }
 
-  private async acquireAssessmentSlot(): Promise<void> {
-    if (this.activeAssessments < this.maxConcurrentAssessments) {
+  private getFreshCachedEntry(
+    providerName: ProviderName,
+    instanceId: string,
+    probeMode: CompatibilityProbeMode,
+    cachePurposes: readonly CompatibilityCachePurpose[] = ['standard'],
+  ): CacheEntry | undefined {
+    return cachePurposes
+      .map((cachePurpose) => this.cache.get(
+        createCacheKey(providerName, instanceId, probeMode, cachePurpose),
+      ))
+      .filter((entry): entry is CacheEntry => Boolean(entry))
+      .find((entry) => !this.buildCacheState(entry.cachedAtMs).stale);
+  }
+
+  private getCachedEntry(
+    providerName: ProviderName,
+    instanceId: string,
+    probeMode: CompatibilityProbeMode,
+    cachePurposes: readonly CompatibilityCachePurpose[] = ['standard'],
+  ): CacheEntry | undefined {
+    return cachePurposes
+      .map((cachePurpose) => this.cache.get(
+        createCacheKey(providerName, instanceId, probeMode, cachePurpose),
+      ))
+      .find((entry): entry is CacheEntry => Boolean(entry));
+  }
+
+  private async acquireAssessmentSlot(limit: number): Promise<void> {
+    if (this.activeAssessments < limit) {
       this.activeAssessments += 1;
       return;
     }
 
     await new Promise<void>((resolve) => {
-      this.assessmentWaiters.push(() => {
-        this.activeAssessments += 1;
-        resolve();
+      this.assessmentWaiters.push({
+        limit,
+        resolve: () => {
+          this.activeAssessments += 1;
+          resolve();
+        },
       });
     });
   }
 
   private releaseAssessmentSlot(): void {
     this.activeAssessments = Math.max(0, this.activeAssessments - 1);
-    const next = this.assessmentWaiters.shift();
-    if (next) {
-      next();
+    const nextIndex = this.assessmentWaiters.findIndex((waiter) => (
+      this.activeAssessments < waiter.limit
+    ));
+    if (nextIndex === -1) {
+      return;
     }
+
+    const [next] = this.assessmentWaiters.splice(nextIndex, 1);
+    next?.resolve();
   }
 
   private async buildAssessment(
     target: ProviderTargetDescriptor,
     options: {
-      purpose: 'diagnostics' | 'execution' | 'setup';
+      purpose: 'diagnostics' | 'execution' | 'setup' | 'health';
       probeMode: CompatibilityProbeMode;
     },
   ): Promise<CompatibilityAssessment> {
@@ -262,7 +331,12 @@ export class ProviderCompatibilityService {
       instance.commandConfig.runtime,
     );
     const defaultProfile = getDefaultCompatibilityProfile(target.providerName as ProviderName);
-    const key = createCacheKey(providerName, target.instanceId, options.probeMode);
+    const key = createCacheKey(
+      providerName,
+      target.instanceId,
+      options.probeMode,
+      resolveCompatibilityCachePurpose(options.purpose),
+    );
     const checks: CompatibilityCheck[] = [];
     const probeCwd = this.config.dataDir || this.config.sessionBaseDir;
     const versionArgs = compatibilityKnowledge?.versionArgs?.length
@@ -278,6 +352,7 @@ export class ProviderCompatibilityService {
     const nowMs = this.now();
     const checkedAt = new Date(nowMs).toISOString();
     const baseCacheState = this.buildCacheState(nowMs, false);
+    const healthOnly = options.purpose === 'health';
     const versionProbePromise = versionArgs.length
       ? this.runner.run(
         providerName,
@@ -320,57 +395,6 @@ export class ProviderCompatibilityService {
       || didExecuteProbe(helpProbeRecord)
       || Boolean(parsedVersion)
       || detectedFeatures.length > 0;
-    const configuredLookupPromise = this.installCheckRunner.lookupCommand(
-      instance.commandConfig.path,
-      instance.commandConfig.runtime,
-      this.probeTimeoutMs,
-    );
-    const binaryLookupPromise = instance.commandConfig.path === installKnowledge.binaryName
-      ? configuredLookupPromise
-      : this.installCheckRunner.lookupCommand(
-        installKnowledge.binaryName,
-        instance.commandConfig.runtime,
-        this.probeTimeoutMs,
-      );
-    const expectedPath = installView.path.expectedPath;
-    const expectedPathCheckPromise = expectedPath
-      ? this.installCheckRunner.checkPath(
-        expectedPath,
-        instance.commandConfig.runtime,
-        this.probeTimeoutMs,
-      )
-      : Promise.resolve(undefined);
-    const packageCheckPromise = installKnowledge.check.npmPackage
-      ? this.installCheckRunner.checkNpmPackage(
-        installKnowledge.check.npmPackage,
-        instance.commandConfig.runtime,
-        this.probeTimeoutMs,
-      )
-      : Promise.resolve(undefined);
-    const pathPersistenceCheckPromise = installView.path.shellRcPath && installView.path.persistenceEntry
-      ? this.installCheckRunner.checkShellRcEntry(
-        installView.path.shellRcPath,
-        installView.path.persistenceEntry,
-        instance.commandConfig.runtime,
-        this.probeTimeoutMs,
-      )
-      : Promise.resolve(undefined);
-    const npmPrefixPromise = installView.npm?.expectedPrefix
-      ? this.installCheckRunner.getNpmPrefix(
-        instance.commandConfig.runtime,
-        this.probeTimeoutMs,
-      )
-      : Promise.resolve(undefined);
-    const prerequisiteLookupsPromise = Promise.all(
-      installView.prerequisites.map(async (prerequisite) => ({
-        prerequisite,
-        lookup: await this.installCheckRunner.lookupCommand(
-          prerequisite.command,
-          instance.commandConfig.runtime,
-          this.probeTimeoutMs,
-        ),
-      })),
-    );
     const [
       configuredLookup,
       binaryLookup,
@@ -379,15 +403,72 @@ export class ProviderCompatibilityService {
       prerequisiteLookups,
       pathPersistenceCheck,
       npmPrefix,
-    ] = await Promise.all([
-      configuredLookupPromise,
-      binaryLookupPromise,
-      expectedPathCheckPromise,
-      packageCheckPromise,
-      prerequisiteLookupsPromise,
-      pathPersistenceCheckPromise,
-      npmPrefixPromise,
-    ]);
+    ] = healthOnly
+      ? [
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          [],
+          undefined,
+          undefined,
+        ] as const
+      : await Promise.all([
+          this.installCheckRunner.lookupCommand(
+            instance.commandConfig.path,
+            instance.commandConfig.runtime,
+            this.probeTimeoutMs,
+          ),
+          instance.commandConfig.path === installKnowledge.binaryName
+            ? this.installCheckRunner.lookupCommand(
+              instance.commandConfig.path,
+              instance.commandConfig.runtime,
+              this.probeTimeoutMs,
+            )
+            : this.installCheckRunner.lookupCommand(
+              installKnowledge.binaryName,
+              instance.commandConfig.runtime,
+              this.probeTimeoutMs,
+            ),
+          installView.path.expectedPath
+            ? this.installCheckRunner.checkPath(
+              installView.path.expectedPath,
+              instance.commandConfig.runtime,
+              this.probeTimeoutMs,
+            )
+            : Promise.resolve(undefined),
+          installKnowledge.check.npmPackage
+            ? this.installCheckRunner.checkNpmPackage(
+              installKnowledge.check.npmPackage,
+              instance.commandConfig.runtime,
+              this.probeTimeoutMs,
+            )
+            : Promise.resolve(undefined),
+          Promise.all(
+            installView.prerequisites.map(async (prerequisite) => ({
+              prerequisite,
+              lookup: await this.installCheckRunner.lookupCommand(
+                prerequisite.command,
+                instance.commandConfig.runtime,
+                this.probeTimeoutMs,
+              ),
+            })),
+          ),
+          installView.path.shellRcPath && installView.path.persistenceEntry
+            ? this.installCheckRunner.checkShellRcEntry(
+              installView.path.shellRcPath,
+              installView.path.persistenceEntry,
+              instance.commandConfig.runtime,
+              this.probeTimeoutMs,
+            )
+            : Promise.resolve(undefined),
+          installView.npm?.expectedPrefix
+            ? this.installCheckRunner.getNpmPrefix(
+              instance.commandConfig.runtime,
+              this.probeTimeoutMs,
+            )
+            : Promise.resolve(undefined),
+        ]);
 
     checks.push(createCheck(
       'command_available',
@@ -401,16 +482,22 @@ export class ProviderCompatibilityService {
       },
     ));
 
-    const commandSummary = buildCommandSummary({
-      configuredCommand: instance.commandConfig.path,
-      installView,
-      commandAvailable,
-      configuredLookup,
-      binaryLookup,
-      expectedPathCheck,
-      packageCheck,
-    });
-    if (commandSummary.status !== 'ready') {
+    const commandSummary = healthOnly
+      ? buildHealthCommandSummary({
+          configuredCommand: instance.commandConfig.path,
+          installView,
+          commandAvailable,
+        })
+      : buildCommandSummary({
+          configuredCommand: instance.commandConfig.path,
+          installView,
+          commandAvailable,
+          configuredLookup: configuredLookup!,
+          binaryLookup: binaryLookup!,
+          expectedPathCheck,
+          packageCheck,
+        });
+    if (!healthOnly && commandSummary.status !== 'ready') {
       checks.push(createCheck(
         mapCommandStatusToCode(commandSummary.status),
         mapCommandStatusToHealth(commandSummary.status),
@@ -425,32 +512,38 @@ export class ProviderCompatibilityService {
         },
       ));
     }
-    const prerequisiteSummaries = prerequisiteLookups.map(({ prerequisite, lookup }) => (
-      buildPrerequisiteSummary(prerequisite, lookup)
-    ));
-    for (const prerequisiteSummary of prerequisiteSummaries) {
-      if (prerequisiteSummary.status !== 'missing') {
-        continue;
-      }
+    const prerequisiteSummaries = healthOnly
+      ? buildHealthPrerequisiteSummaries(installView)
+      : prerequisiteLookups.map(({ prerequisite, lookup }) => (
+          buildPrerequisiteSummary(prerequisite, lookup)
+        ));
+    if (!healthOnly) {
+      for (const prerequisiteSummary of prerequisiteSummaries) {
+        if (prerequisiteSummary.status !== 'missing') {
+          continue;
+        }
 
-      checks.push(createCheck(
-        'prerequisite_missing',
-        'unavailable',
-        prerequisiteSummary.summary,
-        {
-          prerequisiteId: prerequisiteSummary.id,
-          prerequisite: prerequisiteSummary.label,
-          command: prerequisiteSummary.command,
-        },
-      ));
+        checks.push(createCheck(
+          'prerequisite_missing',
+          'unavailable',
+          prerequisiteSummary.summary,
+          {
+            prerequisiteId: prerequisiteSummary.id,
+            prerequisite: prerequisiteSummary.label,
+            command: prerequisiteSummary.command,
+          },
+        ));
+      }
     }
 
-    const pathPersistenceSummary = buildPathPersistenceSummary({
-      installView,
-      commandSummary,
-      pathPersistenceCheck,
-    });
-    if (pathPersistenceSummary.status === 'missing') {
+    const pathPersistenceSummary = healthOnly
+      ? buildHealthPathPersistenceSummary(installView)
+      : buildPathPersistenceSummary({
+          installView,
+          commandSummary,
+          pathPersistenceCheck,
+        });
+    if (!healthOnly && pathPersistenceSummary.status === 'missing') {
       checks.push(createCheck(
         'path_persistence_missing',
         'degraded',
@@ -462,12 +555,14 @@ export class ProviderCompatibilityService {
       ));
     }
 
-    const npmSummary = buildNpmConfigSummary({
-      installView,
-      commandSummary,
-      npmPrefix,
-    });
-    if (npmSummary.status === 'missing_prefix') {
+    const npmSummary = healthOnly
+      ? buildHealthNpmConfigSummary(installView)
+      : buildNpmConfigSummary({
+          installView,
+          commandSummary,
+          npmPrefix,
+        });
+    if (!healthOnly && npmSummary.status === 'missing_prefix') {
       checks.push(createCheck(
         'npm_prefix_missing',
         'degraded',
@@ -616,17 +711,19 @@ export class ProviderCompatibilityService {
       npm: npmSummary,
       auth: authSummary,
       version: versionSummary,
-      remediation: buildRemediationSteps({
-        providerName,
-        installView,
-        prerequisiteSummaries,
-        commandSummary,
-        pathPersistenceSummary,
-        npmSummary,
-        authSummary,
-        versionSummary,
-        classification,
-      }),
+      remediation: healthOnly
+        ? []
+        : buildRemediationSteps({
+            providerName,
+            installView,
+            prerequisiteSummaries,
+            commandSummary,
+            pathPersistenceSummary,
+            npmSummary,
+            authSummary,
+            versionSummary,
+            classification,
+          }),
     };
 
     const assessment: CompatibilityAssessment = {
@@ -678,7 +775,7 @@ export class ProviderCompatibilityService {
       },
     };
 
-    if (classification !== 'ready') {
+    if (classification !== 'ready' && options.purpose !== 'health') {
       assessment.evidence = await this.captureEvidenceBundle(assessment, instance.commandConfig);
       if (assessment.evidence) {
         assessment.checks.push(createCheck(
@@ -730,6 +827,15 @@ export class ProviderCompatibilityService {
     try {
       await mkdir(join(this.evidenceDir, assessment.provider), { recursive: true });
       await writeFile(outputPath, JSON.stringify(payload, null, 2), 'utf8');
+      try {
+        await pruneProviderArtifacts(
+          this.evidenceDir,
+          this.evidenceRetentionLimit,
+          assessment.provider,
+        );
+      } catch {
+        // Preserve the newly captured artifact even if best-effort retention cleanup fails.
+      }
       return {
         id: captureId,
         relativePath: relativePath.replace(/\\/g, '/'),
@@ -873,6 +979,22 @@ function buildCommandSummary(input: {
   };
 }
 
+function buildHealthCommandSummary(input: {
+  configuredCommand: string;
+  installView: ProviderInstallCatalogView;
+  commandAvailable: boolean;
+}): ProviderSetupSummary['command'] {
+  return {
+    configuredCommand: input.configuredCommand,
+    binaryName: input.installView.binaryName,
+    status: input.commandAvailable ? 'ready' : 'probe_failed',
+    summary: input.commandAvailable
+      ? `Health probe executed ${input.installView.familyLabel} in the configured runtime.`
+      : `Health probe could not execute ${input.installView.familyLabel} in the configured runtime.`,
+    expectedPath: input.installView.path.expectedPath,
+  };
+}
+
 function buildPrerequisiteSummary(
   prerequisite: ProviderSetupSummary['install']['prerequisites'][number],
   lookup: RuntimeCommandLookupResult,
@@ -905,6 +1027,18 @@ function buildPrerequisiteSummary(
     status: 'missing',
     summary: prerequisite.summary,
   };
+}
+
+function buildHealthPrerequisiteSummaries(
+  installView: ProviderInstallCatalogView,
+): ProviderSetupSummary['prerequisites'] {
+  return installView.prerequisites.map((prerequisite) => ({
+    id: prerequisite.id,
+    label: prerequisite.label,
+    command: prerequisite.command,
+    status: 'unknown',
+    summary: `Health probe skipped the detailed prerequisite check for ${prerequisite.label}.`,
+  }));
 }
 
 function buildPathPersistenceSummary(input: {
@@ -955,6 +1089,25 @@ function buildPathPersistenceSummary(input: {
     shellRcPath: input.installView.path.shellRcPath,
     expectedEntry: input.installView.path.persistenceEntry,
     exportCommand: input.installView.path.exportCommand,
+  };
+}
+
+function buildHealthPathPersistenceSummary(
+  installView: ProviderInstallCatalogView,
+): ProviderSetupSummary['pathPersistence'] {
+  if (!installView.path.persistenceEntry || !installView.path.shellRcPath) {
+    return {
+      status: 'not_applicable',
+      summary: `No shell PATH persistence hint is defined for ${installView.familyLabel}.`,
+    };
+  }
+
+  return {
+    status: 'unknown',
+    summary: `Health probe skipped PATH persistence checks for ${installView.familyLabel}.`,
+    shellRcPath: installView.path.shellRcPath,
+    expectedEntry: installView.path.persistenceEntry,
+    exportCommand: installView.path.exportCommand,
   };
 }
 
@@ -1017,6 +1170,24 @@ function buildNpmConfigSummary(input: {
     packageName: input.installView.npm.packageName,
     expectedPrefix: input.installView.npm.expectedPrefix,
     detectedPrefix: input.npmPrefix?.value,
+  };
+}
+
+function buildHealthNpmConfigSummary(
+  installView: ProviderInstallCatalogView,
+): ProviderSetupSummary['npm'] {
+  if (!installView.npm) {
+    return {
+      status: 'not_applicable',
+      summary: `${installView.familyLabel} does not use npm-global install metadata.`,
+    };
+  }
+
+  return {
+    status: 'unknown',
+    summary: `Health probe skipped npm prefix checks for ${installView.familyLabel}.`,
+    packageName: installView.npm.packageName,
+    expectedPrefix: installView.npm.expectedPrefix,
   };
 }
 
@@ -1577,8 +1748,21 @@ function createCacheKey(
   providerName: ProviderName,
   instanceId: string,
   probeMode: CompatibilityProbeMode,
+  cachePurpose: CompatibilityCachePurpose,
 ): string {
-  return `${providerName}:${instanceId}:${probeMode}`;
+  return `${providerName}:${instanceId}:${probeMode}:${cachePurpose}`;
+}
+
+function resolveCompatibilityCachePurpose(
+  purpose: CompatibilityAssessmentOptions['purpose'] | undefined,
+): CompatibilityCachePurpose {
+  return purpose === 'health' ? 'health' : 'standard';
+}
+
+function resolveReadableCachePurposes(
+  cachePurpose: CompatibilityCachePurpose,
+): readonly CompatibilityCachePurpose[] {
+  return cachePurpose === 'health' ? ['standard', 'health'] : ['standard'];
 }
 
 function buildEvidenceId(assessment: CompatibilityAssessment): string {

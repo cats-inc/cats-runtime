@@ -10,6 +10,7 @@ import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
 import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
 import { getRuntimeResolvedPaths } from '../core/config.js';
 import { ProviderCompatibilityService } from '../core/compatibility/ProviderCompatibilityService.js';
+import { CompatibilityEvidenceService } from '../core/compatibility/compatibilityEvidence.js';
 import { RuntimeMeteringService } from '../core/usage/RuntimeMeteringService.js';
 import {
   ProviderEvolutionProbeService,
@@ -196,6 +197,7 @@ describe('provider diagnostics HTTP contract', () => {
     config: CliRuntimeConfig = makeConfig(),
     options: {
       metering?: RuntimeMeteringService;
+      installCheckRunner?: ProviderInstallCheckRunner;
     } = {},
   ) {
     const compatibility = new ProviderCompatibilityService(config, {
@@ -220,7 +222,7 @@ describe('provider diagnostics HTTP contract', () => {
           };
         }),
       },
-      installCheckRunner: createInstallCheckRunner(),
+      installCheckRunner: options.installCheckRunner || createInstallCheckRunner(),
       now: () => Date.parse('2026-03-23T00:02:00.000Z'),
     });
     const providerModelCatalog = new ProviderModelCatalogService(config, {
@@ -360,6 +362,47 @@ describe('provider diagnostics HTTP contract', () => {
         'claude-default:--version',
         'claude-default:--help',
       ]);
+  });
+
+  it('skips retained artifact reads on health diagnostics', async () => {
+    const evidenceSpy = vi.spyOn(
+      CompatibilityEvidenceService.prototype,
+      'readLatestArtifact',
+    ).mockImplementation(async () => {
+      throw new Error('health diagnostics should not read retained compatibility evidence');
+    });
+    const probeSpy = vi.spyOn(
+      ProviderEvolutionProbeService.prototype,
+      'readLatestArtifact',
+    ).mockImplementation(async () => {
+      throw new Error('health diagnostics should not read retained provider-evolution artifacts');
+    });
+
+    try {
+      const app = createTestApp();
+      const response = await app.request('/diagnostics/health?force=1');
+      expect(response.status).toBe(200);
+      expect(evidenceSpy).not.toHaveBeenCalled();
+      expect(probeSpy).not.toHaveBeenCalled();
+    } finally {
+      evidenceSpy.mockRestore();
+      probeSpy.mockRestore();
+    }
+  });
+
+  it('uses the lightweight compatibility path on health diagnostics', async () => {
+    const installCheckRunner = createInstallCheckRunner();
+    const app = createTestApp(makeConfig(), {
+      installCheckRunner,
+    });
+
+    const response = await app.request('/diagnostics/health?force=1');
+    expect(response.status).toBe(200);
+    expect(installCheckRunner.lookupCommand).not.toHaveBeenCalled();
+    expect(installCheckRunner.checkPath).not.toHaveBeenCalled();
+    expect(installCheckRunner.checkNpmPackage).not.toHaveBeenCalled();
+    expect(installCheckRunner.checkShellRcEntry).not.toHaveBeenCalled();
+    expect(installCheckRunner.getNpmPrefix).not.toHaveBeenCalled();
   });
 
   it('returns machine-readable reprobe and compatibility cache metadata', async () => {

@@ -1,4 +1,4 @@
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { RuntimeMode } from '../../backends/cli/config.js';
 import type {
@@ -6,6 +6,12 @@ import type {
   CompatibilityClassification,
   CompatibilityProfileSelection,
 } from './types.js';
+import {
+  listProviderArtifactRelativePaths,
+  pruneProviderArtifacts,
+} from './retainedArtifacts.js';
+
+export const DEFAULT_COMPATIBILITY_EVIDENCE_RETENTION_LIMIT = 50;
 
 interface CompatibilityEvidenceArtifactRecord extends Pick<
   CompatibilityAssessment,
@@ -55,17 +61,25 @@ export interface CompatibilityEvidenceArtifactQuery {
 
 export interface CompatibilityEvidenceServiceOptions {
   rootDir: string;
+  retentionLimit?: number;
 }
 
 export class CompatibilityEvidenceService {
-  constructor(private readonly options: CompatibilityEvidenceServiceOptions) {}
+  private readonly retentionLimit: number;
+
+  constructor(private readonly options: CompatibilityEvidenceServiceOptions) {
+    this.retentionLimit = Math.max(
+      1,
+      Math.trunc(options.retentionLimit ?? DEFAULT_COMPATIBILITY_EVIDENCE_RETENTION_LIMIT),
+    );
+  }
 
   async readArtifactById(
     artifactId: string,
     query: CompatibilityEvidenceArtifactQuery = {},
   ): Promise<CompatibilityEvidenceStoredArtifact | null> {
-    const relativePaths = await this.listArtifactRelativePaths(query.provider);
-    for (const relativePath of relativePaths) {
+    const artifactPaths = await this.listArtifactRelativePaths(query.provider);
+    for (const relativePath of artifactPaths.relativePaths) {
       if (!relativePath.endsWith(`${artifactId}.json`)) {
         continue;
       }
@@ -81,6 +95,22 @@ export class CompatibilityEvidenceService {
   async readLatestArtifact(
     query: CompatibilityEvidenceArtifactQuery = {},
   ): Promise<CompatibilityEvidenceArtifactSummary | null> {
+    if (query.provider) {
+      const artifactPaths = await this.listArtifactRelativePaths(query.provider, {
+        newestFirst: true,
+      });
+      if (artifactPaths.orderedByRecency) {
+        for (const relativePath of artifactPaths.relativePaths) {
+          const stored = await this.readStoredArtifact(relativePath);
+          if (stored && matchesCompatibilityEvidenceQuery(stored.artifact, query)) {
+            return summarizeCompatibilityEvidenceArtifact(stored);
+          }
+        }
+
+        return null;
+      }
+    }
+
     const summaries = await this.listArtifacts({
       ...query,
       limit: 1,
@@ -91,55 +121,38 @@ export class CompatibilityEvidenceService {
   async listArtifacts(
     query: CompatibilityEvidenceArtifactQuery = {},
   ): Promise<CompatibilityEvidenceArtifactSummary[]> {
-    const relativePaths = await this.listArtifactRelativePaths(query.provider);
+    const limit = normalizeArtifactListLimit(query.limit);
+    const artifactPaths = await this.listArtifactRelativePaths(query.provider, {
+      newestFirst: Boolean(query.provider && limit),
+    });
     const artifacts: CompatibilityEvidenceArtifactSummary[] = [];
 
-    for (const relativePath of relativePaths) {
+    for (const relativePath of artifactPaths.relativePaths) {
       const stored = await this.readStoredArtifact(relativePath);
       if (!stored || !matchesCompatibilityEvidenceQuery(stored.artifact, query)) {
         continue;
       }
       artifacts.push(summarizeCompatibilityEvidenceArtifact(stored));
+      if (artifactPaths.orderedByRecency && limit && artifacts.length >= limit) {
+        return artifacts;
+      }
     }
 
     artifacts.sort((left, right) => Date.parse(right.capturedAt) - Date.parse(left.capturedAt));
-    const limit = Math.max(1, Math.trunc(query.limit ?? artifacts.length));
-    return artifacts.slice(0, limit);
+    return limit ? artifacts.slice(0, limit) : artifacts;
   }
 
-  private async listArtifactRelativePaths(provider?: string): Promise<string[]> {
-    const providerSegments = provider
-      ? [sanitizePathSegment(provider)]
-      : await this.listProviderDirectories();
-    const relativePaths: string[] = [];
-
-    for (const providerSegment of providerSegments) {
-      const providerDir = join(this.options.rootDir, providerSegment);
-      let names: string[];
-      try {
-        names = await readdir(providerDir);
-      } catch {
-        continue;
-      }
-      for (const name of names) {
-        if (name.endsWith('.json')) {
-          relativePaths.push(join(providerSegment, name));
-        }
-      }
-    }
-
-    return relativePaths;
+  async pruneRetainedArtifacts(provider?: string): Promise<number> {
+    return pruneProviderArtifacts(this.options.rootDir, this.retentionLimit, provider);
   }
 
-  private async listProviderDirectories(): Promise<string[]> {
-    try {
-      const entries = await readdir(this.options.rootDir, { withFileTypes: true });
-      return entries
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => entry.name);
-    } catch {
-      return [];
-    }
+  private async listArtifactRelativePaths(
+    provider?: string,
+    options: {
+      newestFirst?: boolean;
+    } = {},
+  ) {
+    return listProviderArtifactRelativePaths(this.options.rootDir, provider, options);
   }
 
   private async readStoredArtifact(
@@ -194,10 +207,6 @@ export function summarizeCompatibilityEvidenceArtifact(
   };
 }
 
-function sanitizePathSegment(value: string): string {
-  return value.replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '') || 'default';
-}
-
 function matchesCompatibilityEvidenceQuery(
   artifact: CompatibilityEvidenceArtifactRecord,
   query: CompatibilityEvidenceArtifactQuery,
@@ -232,4 +241,12 @@ function resolveRuntimeMode(
 ): RuntimeMode | undefined {
   const mode = artifact.fingerprint?.runtime?.mode;
   return typeof mode === 'string' ? mode as RuntimeMode : undefined;
+}
+
+function normalizeArtifactListLimit(value: number | undefined): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined;
+  }
+
+  return Math.max(1, Math.trunc(value));
 }

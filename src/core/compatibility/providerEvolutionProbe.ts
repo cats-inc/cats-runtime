@@ -1,11 +1,17 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { RuntimeMode } from '../../backends/cli/config.js';
 import type { ProviderEvolutionEvidenceObserver, ProviderEvolutionEvidenceBundle, ProviderEvolutionTransport } from './providerEvolution.js';
 import { ProviderEvolutionEvidenceCollector } from './providerEvolution.js';
+import {
+  listProviderArtifactRelativePaths,
+  pruneProviderArtifacts,
+  sanitizeArtifactProviderSegment,
+} from './retainedArtifacts.js';
 
 export const PROVIDER_EVOLUTION_PROBE_ARTIFACT_SCHEMA_VERSION = 1;
+export const DEFAULT_PROVIDER_EVOLUTION_PROBE_RETENTION_LIMIT = 50;
 
 export interface ProviderEvolutionProbeTurn {
   id: string;
@@ -203,6 +209,7 @@ export interface ProviderEvolutionProbeRequest {
 
 export interface ProviderEvolutionProbeServiceOptions {
   rootDir: string;
+  retentionLimit?: number;
   now?: () => number;
 }
 
@@ -244,9 +251,14 @@ export const PROVIDER_EVOLUTION_PROBE_PROFILES: Record<string, ProviderEvolution
 
 export class ProviderEvolutionProbeService {
   private readonly now: () => number;
+  private readonly retentionLimit: number;
 
   constructor(private readonly options: ProviderEvolutionProbeServiceOptions) {
     this.now = options.now ?? Date.now;
+    this.retentionLimit = Math.max(
+      1,
+      Math.trunc(options.retentionLimit ?? DEFAULT_PROVIDER_EVOLUTION_PROBE_RETENTION_LIMIT),
+    );
   }
 
   async run(request: ProviderEvolutionProbeRequest): Promise<ProviderEvolutionProbeStoredArtifact> {
@@ -319,14 +331,15 @@ export class ProviderEvolutionProbeService {
     };
 
     const relativePath = join(
-      sanitizePathSegment(request.target.provider),
+      sanitizeArtifactProviderSegment(request.target.provider),
       `${artifact.id}.json`,
     );
     const artifactPath = join(this.options.rootDir, relativePath);
-    await mkdir(join(this.options.rootDir, sanitizePathSegment(request.target.provider)), {
+    await mkdir(join(this.options.rootDir, sanitizeArtifactProviderSegment(request.target.provider)), {
       recursive: true,
     });
     await writeFile(artifactPath, `${JSON.stringify(artifact, null, 2)}\n`, 'utf8');
+    await this.pruneRetainedArtifacts(request.target.provider);
 
     return {
       artifact,
@@ -339,8 +352,8 @@ export class ProviderEvolutionProbeService {
     artifactId: string,
     query: ProviderEvolutionProbeArtifactQuery = {},
   ): Promise<ProviderEvolutionProbeStoredArtifact | null> {
-    const relativePaths = await this.listArtifactRelativePaths(query.provider);
-    for (const relativePath of relativePaths) {
+    const artifactPaths = await this.listArtifactRelativePaths(query.provider);
+    for (const relativePath of artifactPaths.relativePaths) {
       if (!relativePath.endsWith(`${artifactId}.json`)) {
         continue;
       }
@@ -355,6 +368,22 @@ export class ProviderEvolutionProbeService {
   async readLatestArtifact(
     query: ProviderEvolutionProbeArtifactQuery = {},
   ): Promise<ProviderEvolutionProbeArtifactSummary | null> {
+    if (query.provider) {
+      const artifactPaths = await this.listArtifactRelativePaths(query.provider, {
+        newestFirst: true,
+      });
+      if (artifactPaths.orderedByRecency) {
+        for (const relativePath of artifactPaths.relativePaths) {
+          const stored = await this.readStoredArtifact(relativePath);
+          if (stored && matchesProviderEvolutionArtifactQuery(stored.artifact, query)) {
+            return summarizeProviderEvolutionProbeArtifact(stored);
+          }
+        }
+
+        return null;
+      }
+    }
+
     const summaries = await this.listArtifacts({
       ...query,
       limit: 1,
@@ -365,20 +394,25 @@ export class ProviderEvolutionProbeService {
   async listArtifacts(
     query: ProviderEvolutionProbeArtifactQuery = {},
   ): Promise<ProviderEvolutionProbeArtifactSummary[]> {
-    const relativePaths = await this.listArtifactRelativePaths(query.provider);
+    const limit = normalizeArtifactListLimit(query.limit);
+    const artifactPaths = await this.listArtifactRelativePaths(query.provider, {
+      newestFirst: Boolean(query.provider && limit),
+    });
     const artifacts: ProviderEvolutionProbeArtifactSummary[] = [];
 
-    for (const relativePath of relativePaths) {
+    for (const relativePath of artifactPaths.relativePaths) {
       const stored = await this.readStoredArtifact(relativePath);
       if (!stored || !matchesProviderEvolutionArtifactQuery(stored.artifact, query)) {
         continue;
       }
       artifacts.push(summarizeProviderEvolutionProbeArtifact(stored));
+      if (artifactPaths.orderedByRecency && limit && artifacts.length >= limit) {
+        return artifacts;
+      }
     }
 
     artifacts.sort((left, right) => Date.parse(right.capturedAt) - Date.parse(left.capturedAt));
-    const limit = Math.max(1, Math.trunc(query.limit ?? artifacts.length));
-    return artifacts.slice(0, limit);
+    return limit ? artifacts.slice(0, limit) : artifacts;
   }
 
   async updateArtifactReviewById(
@@ -400,13 +434,41 @@ export class ProviderEvolutionProbeService {
     };
   }
 
+  async pruneRetainedArtifacts(provider?: string): Promise<number> {
+    return pruneProviderArtifacts(this.options.rootDir, this.retentionLimit, provider);
+  }
+
   private async findLatestBaseline(
     target: ProviderEvolutionProbeRequest['target'],
     profileId: string,
   ): Promise<ProviderEvolutionProbeStoredArtifact | undefined> {
+    const latestCandidatePaths = await this.listArtifactRelativePaths(target.provider, {
+      newestFirst: true,
+    });
+    if (latestCandidatePaths.orderedByRecency) {
+      for (const relativePath of latestCandidatePaths.relativePaths) {
+        const stored = await this.readStoredArtifact(relativePath);
+        if (!stored) {
+          continue;
+        }
+        const parsed = stored.artifact;
+        if (
+          parsed.provider === target.provider
+          && parsed.instance === target.instance
+          && parsed.parserId === target.parserId
+          && parsed.probeProfile === profileId
+          && matchesBaselineRuntimeMode(parsed.runtimeMode, target.runtimeMode)
+        ) {
+          return stored;
+        }
+      }
+
+      return undefined;
+    }
+
     const artifacts: ProviderEvolutionProbeStoredArtifact[] = [];
-    const relativePaths = await this.listArtifactRelativePaths(target.provider);
-    for (const relativePath of relativePaths) {
+    const artifactPaths = await this.listArtifactRelativePaths(target.provider);
+    for (const relativePath of artifactPaths.relativePaths) {
       const stored = await this.readStoredArtifact(relativePath);
       if (!stored) {
         continue;
@@ -427,39 +489,13 @@ export class ProviderEvolutionProbeService {
       .sort((left, right) => Date.parse(right.artifact.capturedAt) - Date.parse(left.artifact.capturedAt))[0];
   }
 
-  private async listArtifactRelativePaths(provider?: string): Promise<string[]> {
-    const providerSegments = provider
-      ? [sanitizePathSegment(provider)]
-      : await this.listProviderDirectories();
-    const relativePaths: string[] = [];
-
-    for (const providerSegment of providerSegments) {
-      const providerDir = join(this.options.rootDir, providerSegment);
-      let names: string[];
-      try {
-        names = await readdir(providerDir);
-      } catch {
-        continue;
-      }
-      for (const name of names) {
-        if (name.endsWith('.json')) {
-          relativePaths.push(join(providerSegment, name));
-        }
-      }
-    }
-
-    return relativePaths;
-  }
-
-  private async listProviderDirectories(): Promise<string[]> {
-    try {
-      const entries = await readdir(this.options.rootDir, { withFileTypes: true });
-      return entries
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => entry.name);
-    } catch {
-      return [];
-    }
+  private async listArtifactRelativePaths(
+    provider?: string,
+    options: {
+      newestFirst?: boolean;
+    } = {},
+  ) {
+    return listProviderArtifactRelativePaths(this.options.rootDir, provider, options);
   }
 
   private async readStoredArtifact(
@@ -719,10 +755,6 @@ function buildArtifactId(
   return `${new Date(now).toISOString().replace(/[:.]/g, '-')}-${digest}-${randomUUID().slice(0, 8)}`;
 }
 
-function sanitizePathSegment(value: string): string {
-  return value.replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '') || 'default';
-}
-
 function formatObserved(signal: ProviderEvolutionCapabilitySignal): string {
   return signal.observed ? `yes(${signal.count})` : 'no';
 }
@@ -898,6 +930,14 @@ function summarizeProviderEvolutionProbeReview(
     summary: `Detected ${classifications.map(formatReviewClassification).join(', ')} relative to the latest baseline.`,
     highlights,
   };
+}
+
+function normalizeArtifactListLimit(value: number | undefined): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined;
+  }
+
+  return Math.max(1, Math.trunc(value));
 }
 
 function buildManualProviderEvolutionReviewSummary(

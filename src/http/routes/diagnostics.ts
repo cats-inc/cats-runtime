@@ -27,7 +27,10 @@ import {
 import { summarizeProviderModelCatalog } from '../../core/models/providerModelCatalog.js';
 import { inspectProviderActiveConfig } from '../../core/providerActiveConfig.js';
 import { toCompatibilitySummaryView } from '../../core/compatibility/ProviderCompatibilityService.js';
-import type { CompatibilitySummaryView } from '../../core/compatibility/types.js';
+import type {
+  CompatibilityAssessmentOptions,
+  CompatibilitySummaryView,
+} from '../../core/compatibility/types.js';
 import {
   createCompatibilityEvidenceService,
   summarizeCompatibilityEvidenceArtifactForReadModel,
@@ -145,6 +148,11 @@ interface ProviderDiagnosticsFilters {
   backend?: BackendKind;
   instance?: string;
   defaultOnly: boolean;
+}
+
+interface ProviderDiagnosticsCollectionOptions {
+  includeArtifacts?: boolean;
+  compatibilityPurpose?: CompatibilityAssessmentOptions['purpose'];
 }
 
 interface RuntimeSetupDiagnosticsSummary {
@@ -557,6 +565,7 @@ async function diagnoseCliTarget(
   target: ProviderTargetDescriptor,
   probeMode: DiagnosticsProbeMode,
   forceRefresh = false,
+  compatibilityPurpose: CompatibilityAssessmentOptions['purpose'] = 'diagnostics',
 ): Promise<{
     checks: DiagnosticCheck[];
     config: Record<string, unknown>;
@@ -619,7 +628,7 @@ async function diagnoseCliTarget(
 
   const assessment = await getProviderCompatibilityService(ctx).assessCliTarget(target, {
     force: forceRefresh,
-    purpose: 'diagnostics',
+    purpose: compatibilityPurpose,
     probeMode,
   });
   const checks: DiagnosticCheck[] = assessment.checks.map((check) => ({
@@ -1056,6 +1065,7 @@ async function diagnoseTarget(
   forceRefresh = false,
   compatibilityEvidenceService?: ReturnType<typeof createCompatibilityEvidenceService>,
   probeService?: ReturnType<typeof createProviderEvolutionProbeService>,
+  options: ProviderDiagnosticsCollectionOptions = {},
 ): Promise<ProviderDiagnosticResult> {
   let result: {
     checks: DiagnosticCheck[];
@@ -1064,7 +1074,13 @@ async function diagnoseTarget(
     compatibility?: CompatibilitySummaryView;
   };
   if (target.backend === 'cli') {
-    result = await diagnoseCliTarget(ctx, target, probeMode, forceRefresh);
+    result = await diagnoseCliTarget(
+      ctx,
+      target,
+      probeMode,
+      forceRefresh,
+      options.compatibilityPurpose,
+    );
   } else if (target.backend === 'agent') {
     result = await diagnoseAgentTarget(ctx, target, probeMode, env);
   } else {
@@ -1082,13 +1098,16 @@ async function diagnoseTarget(
     summary: pickAvailabilitySummary(result.checks),
     attentionCodes,
   };
-  const latestProbeArtifact = probeService
+  const includeArtifacts = options.includeArtifacts !== false;
+  const latestProbeArtifact = includeArtifacts && probeService
     ? await probeService.readLatestArtifact({
         provider: target.providerName,
         instance: resolveProviderEvolutionArtifactInstance(target),
       })
     : null;
-  const latestCompatibilityEvidence = target.backend === 'cli' && compatibilityEvidenceService
+  const latestCompatibilityEvidence = includeArtifacts
+    && target.backend === 'cli'
+    && compatibilityEvidenceService
     ? await compatibilityEvidenceService.readLatestArtifact({
         provider: target.providerName,
         instance: target.instanceId,
@@ -1159,14 +1178,19 @@ async function collectProviderDiagnostics(
   env: Readonly<NodeJS.ProcessEnv>,
   forceRefresh = false,
   filters: ProviderDiagnosticsFilters = { defaultOnly: false },
+  options: ProviderDiagnosticsCollectionOptions = {},
 ): Promise<{
   catalog: ReturnType<typeof listProviderCatalog>;
   providers: ProviderDiagnosticResult[];
 }> {
   const fullCatalog = listProviderCatalog(ctx.config);
   const catalog = filterProviderDiagnosticsCatalog(fullCatalog, filters);
-  const compatibilityEvidenceService = createCompatibilityEvidenceService(ctx.config);
-  const probeService = createProviderEvolutionProbeService(ctx.config);
+  const compatibilityEvidenceService = options.includeArtifacts !== false
+    ? createCompatibilityEvidenceService(ctx.config)
+    : undefined;
+  const probeService = options.includeArtifacts !== false
+    ? createProviderEvolutionProbeService(ctx.config)
+    : undefined;
   const providers = await Promise.all(
     Object.values(catalog)
       .flatMap((entry) => entry.instances)
@@ -1178,6 +1202,7 @@ async function collectProviderDiagnostics(
         forceRefresh,
         compatibilityEvidenceService,
         probeService,
+        options,
       )),
   );
 
@@ -1521,6 +1546,10 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
     env,
     forceRefresh,
     { defaultOnly: true },
+    {
+      includeArtifacts: false,
+      compatibilityPurpose: 'health',
+    },
   );
   const peers = getPeerDiscoverySnapshot(ctx);
   const wakeups = getRuntimeWakeupSnapshot(ctx);
@@ -1640,6 +1669,10 @@ async function buildProviderDiagnosticsPayload(
     env,
     forceRefresh,
     filters,
+    {
+      includeArtifacts: true,
+      compatibilityPurpose: 'diagnostics',
+    },
   );
   const summary = summarizeProviderDiagnostics(catalog, providers, {
     queryHasFilters: hasProviderDiagnosticsFilters(filters),

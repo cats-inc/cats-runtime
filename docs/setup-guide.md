@@ -696,6 +696,10 @@ When those retained artifacts exist, the latest bounded summary is also reused
 by `GET /diagnostics/providers` and `/providers/config` under
 `compatibilityEvidence.latestArtifact`, so hosts can inspect recent degraded
 compatibility evidence without starting the CLI helper flow.
+The runtime also owns retention for these stores: compatibility evidence and
+provider-evolution artifacts are pruned automatically to the newest 50 entries
+per provider whenever a new artifact is written, so operators do not need a
+separate manual GC loop just to keep the retained store bounded.
 The same bounded summary now also flows into setup diagnostic report artifacts
 under `report.references.compatibilityEvidenceArtifacts[]`, so one generated
 setup/debug bundle can point operators at the most recent retained degraded
@@ -877,7 +881,9 @@ For host-side setup or Settings surfaces, use:
   immediately usable, needs user action, is running in a degraded profile, or
   failed to probe after an install/update
 - `GET /diagnostics/health` when a lighter host poll also needs aggregate
-  wakeup counts/status without fetching `/wakeups`
+  wakeup counts/status without fetching `/wakeups`; this path now skips the
+  heavier install/path/npm diagnostics and retained-artifact hydration so it
+  stays suitable for polling
 - `GET /providers/config` to read the runtime-owned static `install` metadata
   for each configured CLI target before or between probes, plus any additive
   runtime-owned `activeConfig` hints such as Goose's detected local

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -497,5 +497,68 @@ describe('ProviderEvolutionProbeService', () => {
     }));
 
     rmSync(root, { recursive: true, force: true });
+  });
+
+  it('prunes older retained provider-evolution artifacts per provider', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-provider-evolution-'));
+    let now = Date.parse('2026-03-27T00:00:00.000Z');
+    const service = new ProviderEvolutionProbeService({
+      rootDir: root,
+      retentionLimit: 2,
+      now: () => now,
+    });
+
+    const runProbe = async () => service.run({
+      target: {
+        provider: 'codex',
+        instance: 'default',
+        parserId: 'codex-json-rpc',
+        probeProfile: 'manual_text',
+        transport: 'cli',
+      },
+      profile: PROVIDER_EVOLUTION_PROBE_PROFILES.manual_text,
+      run: async ({ observer }) => {
+        observer.recordNormalized({
+          rawEventType: 'assistant',
+          events: { type: 'text', text: 'alpha' },
+        });
+        observer.recordNormalized({
+          rawEventType: 'result',
+          events: { type: 'result' },
+        });
+        return {
+          status: 'completed',
+          turnsCompleted: 1,
+          emittedEventCount: 2,
+        };
+      },
+    });
+
+    try {
+      const first = await runProbe();
+      now += 1000;
+      const second = await runProbe();
+      now += 1000;
+      const third = await runProbe();
+
+      expect(readdirSync(join(root, 'codex'))
+        .filter((name) => name.endsWith('.json'))
+        .sort())
+        .toEqual([
+          `${second.artifact.id}.json`,
+          `${third.artifact.id}.json`,
+        ].sort());
+      await expect(service.readArtifactById(first.artifact.id, {
+        provider: 'codex',
+      })).resolves.toBeNull();
+      await expect(service.listArtifacts({
+        provider: 'codex',
+      })).resolves.toEqual([
+        expect.objectContaining({ artifactId: third.artifact.id }),
+        expect.objectContaining({ artifactId: second.artifact.id }),
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

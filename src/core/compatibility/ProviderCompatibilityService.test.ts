@@ -116,6 +116,61 @@ describe('ProviderCompatibilityService', () => {
     expect(assessment.evidence).toBeUndefined();
   });
 
+  it('uses a lightweight health assessment without polluting the standard cache', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-health-'));
+    tempDirs.push(root);
+    const runner = {
+      run: vi.fn(async (_providerName, _commandConfig, args: string[]) => ({
+        exitCode: 0,
+        stdout: args[0] === '--version'
+          ? 'claude 1.2.3\n'
+          : 'Usage: claude --input-format --output-format --include-partial-messages\n',
+        stderr: '',
+        timedOut: false,
+        durationMs: 5,
+      })),
+    };
+    const installCheckRunner = createInstallCheckRunner();
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      runner,
+      installCheckRunner,
+      now: () => Date.parse('2026-03-23T00:00:00.500Z'),
+    });
+
+    const firstHealthAssessment = await service.assessCliTarget(createCliTarget('claude'), {
+      purpose: 'health',
+    });
+    const cachedHealthAssessment = await service.assessCliTarget(createCliTarget('claude'), {
+      purpose: 'health',
+    });
+
+    expect(firstHealthAssessment.status).toBe('ok');
+    expect(firstHealthAssessment.setup.command.status).toBe('ready');
+    expect(firstHealthAssessment.setup.prerequisites).toEqual([]);
+    expect(firstHealthAssessment.setup.pathPersistence.status).not.toBe('missing');
+    expect(firstHealthAssessment.setup.npm.status).not.toBe('missing_prefix');
+    expect(firstHealthAssessment.setup.remediation).toEqual([]);
+    expect(firstHealthAssessment.evidence).toBeUndefined();
+    expect(cachedHealthAssessment.cache.hit).toBe(true);
+    expect(service.getCachedAssessment('claude', 'default')).toBeUndefined();
+    expect(installCheckRunner.lookupCommand).not.toHaveBeenCalled();
+    expect(installCheckRunner.checkPath).not.toHaveBeenCalled();
+    expect(installCheckRunner.checkNpmPackage).not.toHaveBeenCalled();
+    expect(installCheckRunner.checkShellRcEntry).not.toHaveBeenCalled();
+    expect(installCheckRunner.getNpmPrefix).not.toHaveBeenCalled();
+    expect(runner.run).toHaveBeenCalledTimes(2);
+
+    const diagnosticsAssessment = await service.assessCliTarget(createCliTarget('claude'));
+
+    expect(diagnosticsAssessment.cache.hit).toBe(false);
+    expect(service.getCachedAssessment('claude', 'default')).toBeDefined();
+    expect(installCheckRunner.lookupCommand).toHaveBeenCalled();
+    expect(runner.run).toHaveBeenCalledTimes(4);
+  });
+
   it('accepts current 0.x CLI families when their compatibility signature matches', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-current-zero-major-'));
     tempDirs.push(root);

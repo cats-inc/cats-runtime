@@ -132,7 +132,7 @@ export interface CompatibilityAssessment {
 
 export interface CompatibilityAssessmentOptions {
   force?: boolean;
-  purpose?: 'diagnostics' | 'execution' | 'setup';
+  purpose?: 'diagnostics' | 'execution' | 'setup' | 'health';
   probeMode?: CompatibilityProbeMode;
 }
 

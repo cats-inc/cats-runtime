@@ -642,7 +642,10 @@ desktop shells, and the embedded dashboard. It combines:
 
 `GET /diagnostics/health?force=1` refreshes cached CLI compatibility assessments
 for default targets before recomputing the aggregate summary. `true` and
-`refresh` are accepted aliases for `1`.
+`refresh` are accepted aliases for `1`. This health-only refresh intentionally
+uses the lightweight compatibility path: it reruns provider command probes, but
+it skips install/path/npm persistence checks and does not hydrate retained
+artifact summaries.
 
 `GET /diagnostics/runtime` returns the frozen startup contract that hosts should
 integrate against:
@@ -932,6 +935,14 @@ compatibility artifact, not a new re-probe route. The summary includes:
 - `parserId`
 - `profileId`
 - `relativePath`
+
+The runtime owns retention for these retained artifact stores. Compatibility
+evidence bundles and provider-evolution artifacts are automatically pruned to
+the newest 50 entries per provider when new artifacts are written. The lighter
+`GET /diagnostics/health` surface does not hydrate these latest-artifact
+summaries; use `GET /diagnostics/providers` or `GET /providers/config` when the
+retained artifact metadata itself is required. In other words, the runtime now
+owns GC for these stores rather than depending on an external cleanup pass.
 
 `GET /diagnostics/providers/evidence` exposes the retained compatibility
 evidence family directly for host/operator workflows that need more than the

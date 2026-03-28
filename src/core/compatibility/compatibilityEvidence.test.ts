@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -232,6 +232,67 @@ describe('CompatibilityEvidenceService', () => {
         provider: 'codex',
         runtimeMode: 'docker',
       })).resolves.toBeNull();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves the latest matching provider artifact from timestamp-ordered filenames', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-evidence-'));
+    const service = new CompatibilityEvidenceService({ rootDir: root });
+
+    try {
+      writeCompatibilityEvidenceArtifact(root, 'codex', '2026-03-27T00-00-00-000Z-old-default', {
+        capturedAt: '2026-03-27T00:00:00.000Z',
+        instanceId: 'default',
+      });
+      writeCompatibilityEvidenceArtifact(root, 'codex', '2026-03-27T00-00-01-000Z-newer-mirror', {
+        capturedAt: '2026-03-27T00:00:01.000Z',
+        instanceId: 'mirror',
+      });
+      writeCompatibilityEvidenceArtifact(root, 'codex', '2026-03-27T00-00-02-000Z-newest-default', {
+        capturedAt: '2026-03-27T00:00:02.000Z',
+        instanceId: 'default',
+      });
+
+      await expect(service.readLatestArtifact({
+        provider: 'codex',
+        instance: 'default',
+      })).resolves.toEqual(expect.objectContaining({
+        artifactId: '2026-03-27T00-00-02-000Z-newest-default',
+        instance: 'default',
+      }));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('prunes older retained compatibility evidence per provider', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-evidence-'));
+    const service = new CompatibilityEvidenceService({
+      rootDir: root,
+      retentionLimit: 2,
+    });
+
+    try {
+      writeCompatibilityEvidenceArtifact(root, 'codex', '2026-03-27T00-00-00-000Z-old', {
+        capturedAt: '2026-03-27T00:00:00.000Z',
+      });
+      writeCompatibilityEvidenceArtifact(root, 'codex', '2026-03-27T00-00-01-000Z-current', {
+        capturedAt: '2026-03-27T00:00:01.000Z',
+      });
+      writeCompatibilityEvidenceArtifact(root, 'codex', '2026-03-27T00-00-02-000Z-newest', {
+        capturedAt: '2026-03-27T00:00:02.000Z',
+      });
+
+      await expect(service.pruneRetainedArtifacts('codex')).resolves.toBe(1);
+      expect(readdirSync(join(root, 'codex'))
+        .filter((name) => name.endsWith('.json'))
+        .sort())
+        .toEqual([
+          '2026-03-27T00-00-01-000Z-current.json',
+          '2026-03-27T00-00-02-000Z-newest.json',
+        ]);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
