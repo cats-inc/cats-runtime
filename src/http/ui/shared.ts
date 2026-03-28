@@ -8,38 +8,13 @@
 // page before serving.
 // ---------------------------------------------------------------------------
 
+import { GENERATED_RUNTIME_TAILWIND_CSS } from './generated/runtimeTailwind.js';
+
 // ---------------------------------------------------------------------------
 // CSS: Design Tokens
 // ---------------------------------------------------------------------------
 
-export const SHARED_TOKENS_CSS = `
-:root {
-  --bg: #0f1117;
-  --surface: #1a1d27;
-  --surface2: #242836;
-  --border: #2e3345;
-  --text: #e1e4ed;
-  --text2: #8b90a0;
-  --accent: #6c8cff;
-  --accent-dim: #4a62b3;
-  --green: #4ade80;
-  --yellow: #facc15;
-  --red: #f87171;
-  --orange: #fb923c;
-  --auggie: #06b6d4;
-  --claude: #e09145;
-  --codex: #22c55e;
-  --copilot: #a371f7;
-  --cursorp: #f97316;
-  --gemini: #4285f4;
-  --kiro: #14b8a6;
-  --opencode: #f472b6;
-  --pi: #a8a29e;
-  --goose: #8b5cf6;
-  --junie: #fc801d;
-  --radius: 8px;
-}
-`.trim();
+export const SHARED_TOKENS_CSS = GENERATED_RUNTIME_TAILWIND_CSS;
 
 // ---------------------------------------------------------------------------
 // CSS: Provider Badge Styles
@@ -134,12 +109,89 @@ export const SHARED_UI_SCRIPT = `
     return '<span class="' + escapeAttr(cls) + '">' + escapeAttr(label || status || 'Unknown') + '</span>';
   }
 
+  function closeRuntimeSurfaceMenus() {
+    var roots = document.querySelectorAll('[data-runtime-surface-switcher]');
+    for (var i = 0; i < roots.length; i++) {
+      var root = roots[i];
+      root.setAttribute('data-open', 'false');
+      var trigger = root.querySelector('[data-runtime-surface-trigger]');
+      if (trigger) trigger.setAttribute('aria-expanded', 'false');
+      var menu = root.querySelector('[data-runtime-surface-menu]');
+      if (menu) menu.classList.add('hidden');
+    }
+  }
+
+  function initRuntimeSurfaceSwitchers() {
+    var roots = document.querySelectorAll('[data-runtime-surface-switcher]');
+    for (var i = 0; i < roots.length; i++) {
+      var root = roots[i];
+      if (root.getAttribute('data-bound') === 'true') continue;
+      root.setAttribute('data-bound', 'true');
+      var trigger = root.querySelector('[data-runtime-surface-trigger]');
+      var menu = root.querySelector('[data-runtime-surface-menu]');
+      if (!trigger || !menu) continue;
+
+      trigger.addEventListener('click', function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        var currentRoot = this.closest('[data-runtime-surface-switcher]');
+        if (!currentRoot) return;
+        var currentMenu = currentRoot.querySelector('[data-runtime-surface-menu]');
+        var isOpen = currentRoot.getAttribute('data-open') === 'true';
+        closeRuntimeSurfaceMenus();
+        if (!isOpen) {
+          currentRoot.setAttribute('data-open', 'true');
+          this.setAttribute('aria-expanded', 'true');
+          if (currentMenu) currentMenu.classList.remove('hidden');
+        }
+      });
+
+      var links = root.querySelectorAll('[data-runtime-surface-menu] a');
+      for (var j = 0; j < links.length; j++) {
+        links[j].addEventListener('click', function() {
+          closeRuntimeSurfaceMenus();
+        });
+      }
+    }
+
+    if (document.documentElement.getAttribute('data-runtime-surface-switchers-ready') === 'true') {
+      return;
+    }
+    document.documentElement.setAttribute('data-runtime-surface-switchers-ready', 'true');
+    document.addEventListener('click', function(event) {
+      var target = event.target;
+      if (!(target instanceof Node)) {
+        closeRuntimeSurfaceMenus();
+        return;
+      }
+      var roots = document.querySelectorAll('[data-runtime-surface-switcher]');
+      for (var i = 0; i < roots.length; i++) {
+        if (roots[i].contains(target)) {
+          return;
+        }
+      }
+      closeRuntimeSurfaceMenus();
+    });
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape') {
+        closeRuntimeSurfaceMenus();
+      }
+    });
+  }
+
   window.CatsUI = {
     getApiKey: getApiKey,
     authHeaders: authHeaders,
     apiFetch: apiFetch,
     renderProviderBadge: renderProviderBadge,
     renderStatusBadge: renderStatusBadge,
+    initRuntimeSurfaceSwitchers: initRuntimeSurfaceSwitchers,
   };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initRuntimeSurfaceSwitchers, { once: true });
+  } else {
+    queueMicrotask(initRuntimeSurfaceSwitchers);
+  }
 })();
 `.trim();

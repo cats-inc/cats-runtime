@@ -4,185 +4,115 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cats Runtime - Provider Setup</title>
-<style>
-  /* Canonical tokens live in src/http/ui/shared.ts and are injected at
-     serve-time by uiInjector.ts.  This inline copy is the static fallback
-     so the HTML file remains usable when opened outside the runtime. */
-  :root {
-    --bg: #0f1117;
-    --surface: #1a1d27;
-    --surface2: #242836;
-    --border: #2e3345;
-    --text: #e1e4ed;
-    --text2: #8b90a0;
-    --accent: #6c8cff;
-    --accent-dim: #4a62b3;
-    --green: #4ade80;
-    --yellow: #facc15;
-    --red: #f87171;
-    --orange: #fb923c;
-    --radius: 8px;
-  }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 2rem;
-  }
-  .container { max-width: 800px; width: 100%; }
-  header {
-    text-align: center;
-    margin-bottom: 2rem;
-  }
-  header h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
-  header p { color: var(--text2); font-size: 0.9rem; }
-  .status-bar {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 0.75rem 1rem;
-    margin-bottom: 1.5rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.85rem;
-  }
-  .status-bar .badge {
-    padding: 0.2rem 0.6rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
-  }
-  .badge-bootstrap { background: var(--orange); color: #000; }
-  .badge-ready { background: var(--green); color: #000; }
-  .badge-ok { background: var(--green); color: #000; }
-  .badge-degraded { background: var(--yellow); color: #000; }
-  .badge-unavailable { background: var(--red); color: #fff; }
-  .badge-unknown { background: var(--text2); color: #000; }
-
-  .actions {
-    display: flex;
-    gap: 0.75rem;
-    margin-bottom: 1.5rem;
-  }
-  button {
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    padding: 0.6rem 1.2rem;
-    border-radius: var(--radius);
-    cursor: pointer;
-    font-size: 0.85rem;
-    font-weight: 500;
-  }
-  button:hover { background: var(--accent-dim); }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
-  button.secondary {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-  }
-  button.secondary:hover { background: var(--border); }
-
-  .provider-list {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-    margin-bottom: 1.5rem;
-  }
-  .provider-item {
-    display: flex;
-    align-items: center;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--border);
-    gap: 0.75rem;
-  }
-  .provider-item:last-child { border-bottom: none; }
-  .provider-item input[type="checkbox"] {
-    width: 1rem; height: 1rem;
-    accent-color: var(--accent);
-  }
-  .provider-info { flex: 1; }
-  .provider-name { font-weight: 600; font-size: 0.9rem; }
-  .provider-detail {
-    font-size: 0.75rem;
-    color: var(--text2);
-    margin-top: 0.15rem;
-  }
-  .provider-status { text-align: right; min-width: 80px; }
-  .provider-remediation {
-    font-size: 0.75rem;
-    color: var(--orange);
-    margin-top: 0.15rem;
-  }
-  .provider-remediation code {
-    background: var(--surface2);
-    padding: 0.1rem 0.3rem;
-    border-radius: 3px;
-    font-size: 0.7rem;
-  }
-
-  .result-panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1rem;
-    margin-bottom: 1rem;
-    display: none;
-  }
-  .result-panel.visible { display: block; }
-  .result-panel h3 { font-size: 0.95rem; margin-bottom: 0.5rem; }
-  .result-panel p { font-size: 0.85rem; color: var(--text2); }
-  .result-panel a { color: var(--accent); text-decoration: none; }
-  .result-panel a:hover { text-decoration: underline; }
-
-  .loading { color: var(--text2); font-size: 0.85rem; padding: 2rem; text-align: center; }
-  footer { margin-top: auto; padding-top: 2rem; color: var(--text2); font-size: 0.75rem; text-align: center; }
-</style>
 </head>
-<body>
-<div class="container">
-  <header>
-    <h1>Cats Runtime - Provider Setup</h1>
-    <p>Configure which AI providers are available for this runtime instance.</p>
-  </header>
+<body class="runtime-shell" data-runtime-surface="__CATS_RUNTIME_SURFACE__" data-bootstrap-required="__CATS_RUNTIME_BOOTSTRAP_REQUIRED__">
+<div class="runtime-frame">
+  <aside class="runtime-sidebar">
+    <div class="runtime-sidebar-inner">
+      <div class="runtime-brand-row">
+        <!-- CATS_RUNTIME_SURFACE_SWITCHER -->
+      </div>
 
-  <div class="api-key-bar" style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;font-size:0.85rem;">
-    <label for="apiKeyInput" style="color:var(--text2);white-space:nowrap;">API Key</label>
-    <input type="password" id="apiKeyInput" placeholder="Bearer token (if configured)"
-           style="flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:0.4rem 0.75rem;border-radius:var(--radius);font-size:0.8rem;" />
-  </div>
+      <div class="runtime-sidebar-section">
+        <p class="runtime-sidebar-title">Bootstrap Mode</p>
+        <div class="mt-3 runtime-note">
+          <p class="text-sm font-semibold text-slate-100">Provider-first runtime setup</p>
+          <p class="mt-2 text-sm leading-6 text-slate-400">
+            Scan what this machine can actually use, then generate a minimal
+            runtime config from the providers you enable.
+          </p>
+        </div>
+        <p class="runtime-sidebar-copy">
+          The shared runtime shell stays visible during bootstrap. Dashboard and
+          Playground remain locked in the switcher until setup completes.
+        </p>
+      </div>
 
-  <div class="status-bar">
-    <span id="statusText">Loading...</span>
-    <span id="statusBadge" class="badge badge-bootstrap">Bootstrap</span>
-  </div>
+      <div class="runtime-sidebar-section runtime-sidebar-surface">
+        <p class="runtime-sidebar-title">Operator Notes</p>
+        <div class="mt-3 space-y-3">
+          <div class="runtime-note">
+            <p class="text-sm font-medium text-slate-200">Scan before apply</p>
+            <p class="mt-2 text-sm leading-6 text-slate-400">
+              Auto Scan reuses the runtime's conservative discovery posture.
+              Manual Scan is for explicit repair and remediation follow-through.
+            </p>
+          </div>
+          <div class="runtime-note">
+            <p class="text-sm font-medium text-slate-200">Config generation</p>
+            <p class="mt-2 text-sm leading-6 text-slate-400">
+              Apply writes a minimal <code class="rounded bg-slate-950 px-1.5 py-0.5 text-xs text-slate-300">providers.yaml</code>
+              from the checked providers, rather than forcing hand-editing first.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
 
-  <div class="actions">
-    <button id="scanBtn" onclick="runScan(false)">Auto Scan</button>
-    <button id="manualScanBtn" class="secondary" onclick="runScan(true)">Manual Scan</button>
-    <button id="applyBtn" onclick="applyConfig()" disabled>Apply Selected</button>
-  </div>
+  <main class="runtime-page">
+    <div class="runtime-page-stack">
+      <header class="runtime-page-header">
+        <div class="runtime-page-header-row">
+          <div>
+            <p class="runtime-page-kicker">Runtime Surface</p>
+            <h1 class="runtime-page-title">Setup &amp; Repair</h1>
+            <p class="runtime-page-subtitle">
+              Configure which AI providers are available for this runtime
+              instance and inspect readiness before normal session workflows.
+            </p>
+          </div>
 
-  <div id="providerList" class="provider-list">
-    <div class="loading">Scanning providers...</div>
-  </div>
+          <div class="runtime-page-toolbar">
+            <div class="runtime-field min-w-[18rem]">
+              <label for="apiKeyInput" class="runtime-field-label">API Key</label>
+              <input type="password" id="apiKeyInput" class="runtime-input" placeholder="Bearer token (if configured)" />
+            </div>
+            <div class="runtime-page-toolbar-row">
+              <button id="scanBtn" class="runtime-btn runtime-btn-secondary" onclick="runScan(false)">Auto Scan</button>
+              <button id="manualScanBtn" class="runtime-btn runtime-btn-secondary" onclick="runScan(true)">Manual Scan</button>
+              <button id="applyBtn" class="runtime-btn runtime-btn-primary" onclick="applyConfig()" disabled>Apply Selected</button>
+            </div>
+          </div>
+        </div>
+      </header>
 
-  <div id="resultPanel" class="result-panel">
-    <h3 id="resultTitle"></h3>
-    <p id="resultBody"></p>
-  </div>
+      <div class="runtime-page-content overflow-y-auto p-6">
+        <div class="mx-auto flex max-w-6xl flex-col gap-6">
+          <section class="runtime-card">
+            <div class="runtime-card-header">
+              <div>
+                <h2 class="runtime-card-title">Runtime Setup State</h2>
+                <p class="runtime-card-copy">
+                  The setup surface reuses persisted scan snapshots when they
+                  exist, then lets you rescan and apply configuration from the
+                  same runtime-owned read model.
+                </p>
+              </div>
+              <div class="flex flex-wrap items-center gap-3">
+                <span id="statusText" class="text-sm text-slate-400">Loading runtime setup state...</span>
+                <span id="statusBadge" class="status-badge status-badge-bootstrap">Bootstrap</span>
+              </div>
+            </div>
+            <div class="p-4 sm:p-5">
+              <div id="providerList" class="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950/50">
+                <div class="px-6 py-12 text-center text-sm text-slate-500">Scanning providers...</div>
+              </div>
+            </div>
+          </section>
 
-  <footer>
-    <a href="/dashboard" style="color: var(--accent);">Open Dashboard</a>
-    &nbsp;|&nbsp;
-    <a href="/playground" style="color: var(--accent);">Open Playground</a>
-  </footer>
+          <section id="resultPanel" class="runtime-card hidden">
+            <div class="runtime-card-header">
+              <div>
+                <h2 id="resultTitle" class="runtime-card-title">Result</h2>
+                <p id="resultBody" class="runtime-card-copy"></p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </main>
 </div>
 
 <script>
@@ -226,11 +156,11 @@ function updateStatusBar(data) {
   const badge = document.getElementById('statusBadge');
   const text = document.getElementById('statusText');
   if (data.bootstrapRequired) {
-    badge.className = 'badge badge-bootstrap';
+    badge.className = 'status-badge status-badge-bootstrap';
     badge.textContent = 'Bootstrap';
     text.textContent = 'Provider setup required before normal operation.';
   } else {
-    badge.className = 'badge badge-ready';
+    badge.className = 'status-badge status-badge-ready';
     badge.textContent = 'Ready';
     text.textContent = 'Runtime is configured and ready.';
   }
@@ -239,20 +169,20 @@ function updateStatusBar(data) {
 function renderUniverse(universe) {
   const list = document.getElementById('providerList');
   if (!universe.length) {
-    list.innerHTML = '<div class="loading">No providers found.</div>';
+    list.innerHTML = '<div class="px-6 py-12 text-center text-sm text-slate-500">No providers found.</div>';
     return;
   }
   list.innerHTML = universe.map(p => `
-    <div class="provider-item">
-      <input type="checkbox" value="${escapeHtml(p.provider)}" class="provider-check" />
-      <div class="provider-info">
-        <div class="provider-name">${escapeHtml(p.familyLabel)}</div>
-        <div class="provider-detail">${escapeHtml(p.provider)} &mdash; ${escapeHtml(p.binaryName)}</div>
+    <label class="flex cursor-pointer items-start gap-4 border-b border-slate-800 px-4 py-4 last:border-b-0 hover:bg-slate-900/40">
+      <input type="checkbox" value="${escapeHtml(p.provider)}" class="provider-check mt-1 h-4 w-4 rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-blue-500" />
+      <div class="min-w-0 flex-1">
+        <div class="text-sm font-semibold text-slate-100">${escapeHtml(p.familyLabel)}</div>
+        <div class="mt-1 text-xs text-slate-500">${escapeHtml(p.provider)} &mdash; ${escapeHtml(p.binaryName)}</div>
       </div>
-      <div class="provider-status">
-        <span class="badge badge-unknown">Not scanned</span>
+      <div class="shrink-0">
+        <span class="status-badge status-badge-unknown">Not scanned</span>
       </div>
-    </div>
+    </label>
   `).join('');
   bindCheckboxes();
 }
@@ -261,25 +191,29 @@ function renderScanResults(scan) {
   scanData = scan;
   const list = document.getElementById('providerList');
   list.innerHTML = scan.providers.map(p => {
-    const statusClass = p.available ? 'badge-ok' : p.commandStatus === 'probe_failed' ? 'badge-unavailable' : 'badge-degraded';
+    const statusClass = p.available
+      ? 'status-badge status-badge-ready'
+      : p.commandStatus === 'probe_failed'
+        ? 'status-badge status-badge-unavailable'
+        : 'status-badge status-badge-degraded';
     const statusText = p.available ? 'Ready' : p.commandStatus === 'missing_install' ? 'Not installed' : p.commandStatus;
     const remediation = (p.remediation || []).map(r =>
-      `<div class="provider-remediation">${escapeHtml(r.summary)}${r.command ? ' <code>' + escapeHtml(r.command) + '</code>' : ''}</div>`
+      `<div class="mt-2 text-xs text-amber-300">${escapeHtml(r.summary)}${r.command ? ' <code class="rounded bg-slate-950 px-1.5 py-0.5 text-[11px] text-slate-300">' + escapeHtml(r.command) + '</code>' : ''}</div>`
     ).join('');
     return `
-      <div class="provider-item">
-        <input type="checkbox" value="${escapeHtml(p.provider)}" class="provider-check" ${p.available ? 'checked' : ''} />
-        <div class="provider-info">
-          <div class="provider-name">${escapeHtml(p.family)}</div>
-          <div class="provider-detail">
+      <label class="flex cursor-pointer items-start gap-4 border-b border-slate-800 px-4 py-4 last:border-b-0 hover:bg-slate-900/40">
+        <input type="checkbox" value="${escapeHtml(p.provider)}" class="provider-check mt-1 h-4 w-4 rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-blue-500" ${p.available ? 'checked' : ''} />
+        <div class="min-w-0 flex-1">
+          <div class="text-sm font-semibold text-slate-100">${escapeHtml(p.family)}</div>
+          <div class="mt-1 text-xs text-slate-500">
             ${escapeHtml(p.provider)}${p.version ? ' v' + escapeHtml(p.version) : ''}${p.commandPath ? ' &mdash; ' + escapeHtml(p.commandPath) : ''}
           </div>
           ${remediation}
         </div>
-        <div class="provider-status">
-          <span class="badge ${statusClass}">${escapeHtml(statusText)}</span>
+        <div class="shrink-0">
+          <span class="${statusClass}">${escapeHtml(statusText)}</span>
         </div>
-      </div>
+      </label>
     `;
   }).join('');
   bindCheckboxes();
@@ -302,7 +236,7 @@ async function runScan(manual) {
   const manualScanBtn = document.getElementById('manualScanBtn');
   scanBtn.disabled = true;
   manualScanBtn.disabled = true;
-  document.getElementById('providerList').innerHTML = '<div class="loading">Scanning providers...</div>';
+  document.getElementById('providerList').innerHTML = '<div class="px-6 py-12 text-center text-sm text-slate-500">Scanning providers...</div>';
   hideResult();
 
   try {
@@ -319,7 +253,7 @@ async function runScan(manual) {
     }
   } catch (err) {
     document.getElementById('providerList').innerHTML =
-      '<div class="loading" style="color:var(--red)">Scan failed: ' + escapeHtml(err.message) + '</div>';
+      '<div class="px-6 py-12 text-center text-sm text-red-300">Scan failed: ' + escapeHtml(err.message) + '</div>';
   } finally {
     scanBtn.disabled = false;
     manualScanBtn.disabled = false;
@@ -350,11 +284,10 @@ async function applyConfig() {
         'Setup Complete',
         `Configuration written to ${data.configPath}. ` +
         (data.restart ? 'Please restart the runtime.' : 'Runtime is now active.') +
-        ' <a href="/dashboard">Go to Dashboard</a>',
+        ' <a class="runtime-link" href="/dashboard">Go to Dashboard</a>',
         false,
         true
       );
-      // Refresh status
       const stateRes = await fetchFn('/setup-state');
       if (!stateRes.ok) throw new Error(`HTTP ${stateRes.status}`);
       const stateData = await stateRes.json();
@@ -372,22 +305,22 @@ async function applyConfig() {
 
 function showResult(title, body, isError, allowHtml) {
   const panel = document.getElementById('resultPanel');
-  document.getElementById('resultTitle').textContent = title;
+  const titleEl = document.getElementById('resultTitle');
+  const bodyEl = document.getElementById('resultBody');
+  titleEl.textContent = title;
   if (allowHtml === true) {
-    document.getElementById('resultBody').innerHTML = body;
+    bodyEl.innerHTML = body;
   } else {
-    document.getElementById('resultBody').textContent = body;
+    bodyEl.textContent = body;
   }
-  panel.className = 'result-panel visible';
-  if (isError) {
-    panel.style.borderColor = 'var(--red)';
-  } else {
-    panel.style.borderColor = 'var(--green)';
-  }
+  panel.classList.remove('hidden');
+  panel.style.borderColor = isError ? 'var(--red)' : 'var(--green)';
 }
 
 function hideResult() {
-  document.getElementById('resultPanel').className = 'result-panel';
+  const panel = document.getElementById('resultPanel');
+  panel.classList.add('hidden');
+  panel.style.borderColor = '';
 }
 
 document.addEventListener('DOMContentLoaded', function() {

@@ -43,6 +43,7 @@ import { bearerAuth } from './auth.js';
 import { injectRuntimeDashboardHealthOverlay } from './dashboardHealthOverlay.js';
 import { injectSharedUI } from './uiInjector.js';
 import { injectDashboardScanPanel } from './dashboardScanPanel.js';
+import { injectRuntimeShellState, type RuntimeSurface } from './ui/runtimeShell.js';
 import { bootstrapGuard } from './routes/bootstrapGuard.js';
 import { discoveryRoutes } from './routes/discovery.js';
 import { browserRoutes } from './routes/browser.js';
@@ -230,43 +231,56 @@ export function createRuntimeApp(ctx: AppContext) {
   const app = new Hono<{ Variables: { ctx: AppContext } }>();
   const __dirname = dirname(fileURLToPath(import.meta.url));
 
+  function renderRuntimePage(
+    relativePath: string,
+    surface: RuntimeSurface,
+    options: {
+      includeHealthOverlay?: boolean;
+      includeDashboardScanPanel?: boolean;
+    } = {},
+  ): string {
+    let html = readFileSync(resolve(__dirname, relativePath), 'utf-8');
+    html = injectRuntimeShellState(html, {
+      surface,
+      bootstrapRequired: ctx.startup?.bootstrapRequired === true,
+    });
+    html = injectSharedUI(html);
+    if (options.includeHealthOverlay) {
+      html = injectRuntimeDashboardHealthOverlay(html);
+    }
+    if (options.includeDashboardScanPanel) {
+      html = injectDashboardScanPanel(html);
+    }
+    return html;
+  }
+
   // Serve the root page: setup page in bootstrap mode, dashboard otherwise.
   app.get('/', (c) => {
     if (ctx.startup?.bootstrapRequired) {
-      const htmlPath = resolve(__dirname, '../../public/provider-setup.html');
-      const html = injectSharedUI(readFileSync(htmlPath, 'utf-8'));
-      return c.html(html);
+      return c.html(renderRuntimePage('../../public/provider-setup.html', 'setup'));
     }
-    const htmlPath = resolve(__dirname, '../../public/index.html');
-    let html = readFileSync(htmlPath, 'utf-8');
-    html = injectSharedUI(html);
-    html = injectRuntimeDashboardHealthOverlay(html);
-    html = injectDashboardScanPanel(html);
-    return c.html(html);
+    return c.html(renderRuntimePage('../../public/index.html', 'dashboard', {
+      includeHealthOverlay: true,
+      includeDashboardScanPanel: true,
+    }));
   });
 
   // Dashboard always accessible regardless of bootstrap mode.
   app.get('/dashboard', (c) => {
-    const htmlPath = resolve(__dirname, '../../public/index.html');
-    let html = readFileSync(htmlPath, 'utf-8');
-    html = injectSharedUI(html);
-    html = injectRuntimeDashboardHealthOverlay(html);
-    html = injectDashboardScanPanel(html);
-    return c.html(html);
+    return c.html(renderRuntimePage('../../public/index.html', 'dashboard', {
+      includeHealthOverlay: true,
+      includeDashboardScanPanel: true,
+    }));
   });
 
   // Provider setup page — always accessible regardless of bootstrap mode.
   app.get('/setup', (c) => {
-    const htmlPath = resolve(__dirname, '../../public/provider-setup.html');
-    const html = injectSharedUI(readFileSync(htmlPath, 'utf-8'));
-    return c.html(html);
+    return c.html(renderRuntimePage('../../public/provider-setup.html', 'setup'));
   });
 
   // Serve the playground (multi-agent chat) without auth.
   app.get('/playground', (c) => {
-    const htmlPath = resolve(__dirname, '../../public/playground.html');
-    const html = injectSharedUI(readFileSync(htmlPath, 'utf-8'));
-    return c.html(html);
+    return c.html(renderRuntimePage('../../public/playground.html', 'playground'));
   });
 
   app.use('*', async (c, next) => {
