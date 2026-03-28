@@ -116,18 +116,25 @@ describe('ProviderCompatibilityService', () => {
     expect(assessment.evidence).toBeUndefined();
   });
 
-  it('retries native compatibility probes through a shell when direct spawn exits without output', async () => {
+  const shellFallbackIt = process.platform === 'win32' ? it.skip : it;
+
+  shellFallbackIt('retries native compatibility probes through a shell when direct spawn exits without output', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-shell-fallback-'));
     tempDirs.push(root);
     mkdirSync(join(root, 'data'), { recursive: true });
     mkdirSync(join(root, 'sessions'), { recursive: true });
     const fakeGemini = join(root, 'fake-gemini');
-    const shellFallbackThreshold = Math.max(1, Number(process.env.SHLVL || '0') + 2);
+    const originalHome = process.env.HOME;
+    writeFileSync(
+      join(root, '.bash_profile'),
+      'export CATS_RUNTIME_SHELL_FALLBACK_READY=1\n',
+      'utf8',
+    );
     writeFileSync(
       fakeGemini,
       `#!/usr/bin/env bash
 set -euo pipefail
-if (( \${SHLVL:-0} < ${shellFallbackThreshold} )); then
+if [[ "\${CATS_RUNTIME_SHELL_FALLBACK_READY:-0}" != "1" ]]; then
   exit 0
 fi
 if [[ "\${1:-}" == "--version" ]]; then
@@ -143,26 +150,35 @@ printf 'Usage: gemini --output-format --resume\\n'
     const target = createCliTarget('gemini');
     target.cliInstance!.commandConfig.path = fakeGemini;
 
-    const service = new ProviderCompatibilityService({
-      dataDir: join(root, 'data'),
-      sessionBaseDir: join(root, 'sessions'),
-    }, {
-      installCheckRunner: createInstallCheckRunner({
-        lookupCommand: vi.fn(async (command: string) => ({
-          available: command === fakeGemini || command === 'gemini' || command === 'node' || command === 'npm',
-          resolvedPath: command === fakeGemini ? fakeGemini : `/runtime/bin/${command}`,
-          timedOut: false,
-        })),
-      }),
-      now: () => Date.parse('2026-03-23T00:00:00.250Z'),
-    });
+    process.env.HOME = root;
+    try {
+      const service = new ProviderCompatibilityService({
+        dataDir: join(root, 'data'),
+        sessionBaseDir: join(root, 'sessions'),
+      }, {
+        installCheckRunner: createInstallCheckRunner({
+          lookupCommand: vi.fn(async (command: string) => ({
+            available: command === fakeGemini || command === 'gemini' || command === 'node' || command === 'npm',
+            resolvedPath: command === fakeGemini ? fakeGemini : `/runtime/bin/${command}`,
+            timedOut: false,
+          })),
+        }),
+        now: () => Date.parse('2026-03-23T00:00:00.250Z'),
+      });
 
-    const assessment = await service.assessCliTarget(target);
-    expect(assessment.classification).toBe('ready');
-    expect(assessment.profile.id).toBe('gemini-cli-stream-json-v1');
-    expect(assessment.fingerprint.version.normalized).toBe('0.35.3');
-    expect(assessment.fingerprint.features).toContain('token:--output-format');
-    expect(assessment.setup.command.status).toBe('ready');
+      const assessment = await service.assessCliTarget(target);
+      expect(assessment.classification).toBe('ready');
+      expect(assessment.profile.id).toBe('gemini-cli-stream-json-v1');
+      expect(assessment.fingerprint.version.normalized).toBe('0.35.3');
+      expect(assessment.fingerprint.features).toContain('token:--output-format');
+      expect(assessment.setup.command.status).toBe('ready');
+    } finally {
+      if (originalHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = originalHome;
+      }
+    }
   });
 
   it('infers Gemini compatibility from npm metadata when macOS headless probes time out', async () => {
