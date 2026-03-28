@@ -31,6 +31,7 @@ const DASHBOARD_HEALTH_OVERLAY = `
   const formatRuntimeHealthLabel = ${formatRuntimeHealthLabel.toString()};
   const summaryPath = ${JSON.stringify(RUNTIME_DIAGNOSTICS_PATHS.health)};
   let runtimeHealthPayload = null;
+  let refreshInFlight = false;
 
   function healthHeaders() {
     return typeof window.headers === 'function' ? window.headers() : {};
@@ -91,6 +92,11 @@ const DASHBOARD_HEALTH_OVERLAY = `
   }
 
   async function refreshRuntimeHealthStatus() {
+    if (refreshInFlight) {
+      return;
+    }
+
+    refreshInFlight = true;
     try {
       const response = await fetch(window.location.origin + summaryPath, {
         headers: healthHeaders(),
@@ -143,6 +149,8 @@ const DASHBOARD_HEALTH_OVERLAY = `
         },
       };
       renderRuntimeHealthOverlay();
+    } finally {
+      refreshInFlight = false;
     }
   }
 

@@ -1,12 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type {
   CliRuntimeConfig,
   ProviderCommandConfig,
   ProviderInstanceConfig,
 } from '../../backends/cli/config.js';
-import { buildProcessSpawnConfig } from '../../backends/cli/runtime/runtime.js';
+import { buildProcessSpawnConfig, quoteForBash } from '../../backends/cli/runtime/runtime.js';
 import type { ProviderName } from '../../backends/cli/providers/types.js';
 import type { ProviderTargetDescriptor } from '../providerCatalog.js';
 import {
@@ -50,7 +50,7 @@ import type {
 } from './types.js';
 
 const DEFAULT_CACHE_TTL_MS = 5 * 60_000;
-const DEFAULT_PROBE_TIMEOUT_MS = 5_000;
+const DEFAULT_PROBE_TIMEOUT_MS = 10_000;
 const DEFAULT_SAMPLE_LIMIT = 2_048;
 const DEFAULT_MAX_CONCURRENT_ASSESSMENTS = 4;
 const DEFAULT_MAX_CONCURRENT_HEALTH_ASSESSMENTS = 8;
@@ -382,16 +382,16 @@ export class ProviderCompatibilityService {
     const helpProbeRecord = helpProbe
       ? toProbeRecord('help', helpArgs || [], helpProbe)
       : undefined;
-    const parsedVersion = parseVersion(
+    let parsedVersion = parseVersion(
       versionProbe?.stdout || versionProbe?.stderr,
     );
     const helpText = `${helpProbe?.stdout || ''}\n${helpProbe?.stderr || ''}`;
     const detectedFeatures = (compatibilityKnowledge?.primaryProfile.helpTokens || [])
       .filter((token) => helpText.includes(token))
       .map((token) => `token:${token}`);
-    const missingHelpTokens = (compatibilityKnowledge?.primaryProfile.helpTokens || [])
+    let missingHelpTokens = (compatibilityKnowledge?.primaryProfile.helpTokens || [])
       .filter((token) => !helpText.includes(token));
-    const commandAvailable = didExecuteProbe(versionProbeRecord)
+    let commandAvailable = didExecuteProbe(versionProbeRecord)
       || didExecuteProbe(helpProbeRecord)
       || Boolean(parsedVersion)
       || detectedFeatures.length > 0;
@@ -470,18 +470,6 @@ export class ProviderCompatibilityService {
             : Promise.resolve(undefined),
         ]);
 
-    checks.push(createCheck(
-      'command_available',
-      commandAvailable ? 'ok' : 'unavailable',
-      commandAvailable
-        ? `Executed compatibility probe for '${target.providerName}/${target.instanceId}'`
-        : `Failed to execute compatibility probe for '${target.providerName}/${target.instanceId}'`,
-      {
-        command: instance.commandConfig.path,
-        runtime: instance.commandConfig.runtime,
-      },
-    ));
-
     const commandSummary = healthOnly
       ? buildHealthCommandSummary({
           configuredCommand: instance.commandConfig.path,
@@ -535,6 +523,39 @@ export class ProviderCompatibilityService {
         ));
       }
     }
+
+    const metadataFallback = await maybeInferCompatibilityFromInstallMetadata({
+      providerName,
+      runtime: instance.commandConfig.runtime,
+      commandSummary,
+      versionProbe,
+      helpProbe,
+      installView,
+      compatibilityKnowledge,
+    });
+    if (metadataFallback) {
+      parsedVersion = metadataFallback.parsedVersion;
+      missingHelpTokens = [];
+      detectedFeatures.push(...metadataFallback.detectedFeatures);
+      commandAvailable = true;
+      checks.push(createCheck(
+        'metadata_probe_inference',
+        'ok',
+        metadataFallback.summary,
+      ));
+    }
+
+    checks.push(createCheck(
+      'command_available',
+      commandAvailable ? 'ok' : 'unavailable',
+      commandAvailable
+        ? `Executed compatibility probe for '${target.providerName}/${target.instanceId}'`
+        : `Failed to execute compatibility probe for '${target.providerName}/${target.instanceId}'`,
+      {
+        command: instance.commandConfig.path,
+        runtime: instance.commandConfig.runtime,
+      },
+    ));
 
     const pathPersistenceSummary = healthOnly
       ? buildHealthPathPersistenceSummary(installView)
@@ -1845,6 +1866,71 @@ function parseVersion(text: string | undefined): ParsedVersion | undefined {
   };
 }
 
+async function maybeInferCompatibilityFromInstallMetadata(input: {
+  providerName: ProviderName;
+  runtime: ProviderCommandConfig['runtime'];
+  commandSummary: ProviderSetupSummary['command'];
+  versionProbe?: ProbeResult;
+  helpProbe?: ProbeResult;
+  installView: ProviderInstallCatalogView;
+  compatibilityKnowledge: ReturnType<typeof getProviderCompatibilityKnowledge>;
+}): Promise<{
+  parsedVersion: ParsedVersion;
+  detectedFeatures: string[];
+  summary: string;
+} | undefined> {
+  if (
+    input.providerName !== 'gemini'
+    || process.platform !== 'darwin'
+    || input.runtime.mode !== 'native'
+    || input.commandSummary.status !== 'ready'
+    || !input.commandSummary.resolvedCommand
+    || (!input.versionProbe?.timedOut && !input.helpProbe?.timedOut)
+  ) {
+    return undefined;
+  }
+
+  const packageJsonPath = resolveGeminiPackageJsonPath(input.commandSummary.resolvedCommand);
+  if (!packageJsonPath) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(await readFile(packageJsonPath, 'utf8')) as {
+      version?: unknown;
+    };
+    const versionText = typeof parsed.version === 'string' ? parsed.version : '';
+    const parsedVersion = parseVersion(versionText);
+    if (!parsedVersion) {
+      return undefined;
+    }
+
+    const helpTokens = input.compatibilityKnowledge?.primaryProfile.helpTokens || [];
+    return {
+      parsedVersion,
+      detectedFeatures: helpTokens.map((token) => `metadata:${token}`),
+      summary: 'Inferred Gemini CLI compatibility from npm metadata after headless macOS probes timed out.',
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function resolveGeminiPackageJsonPath(resolvedCommand: string): string | undefined {
+  const marker = `${join('bin', 'gemini')}`;
+  const normalizedCommand = resolvedCommand.replace(/\\/g, '/');
+  if (!normalizedCommand.endsWith(marker.replace(/\\/g, '/'))) {
+    return undefined;
+  }
+
+  const prefixDir = normalizedCommand.slice(0, -marker.length);
+  if (!prefixDir) {
+    return undefined;
+  }
+
+  return join(prefixDir, 'lib', 'node_modules', '@google', 'gemini-cli', 'package.json');
+}
+
 function toProbeRecord(
   kind: CompatibilityProbeRecord['kind'],
   args: string[],
@@ -1966,12 +2052,66 @@ async function runCompatibilityProbe(
     },
   );
 
+  const fallbackResult = shouldRetryCompatibilityProbeViaShell(commandConfig, result)
+    ? await runSpawnedCommand(
+        'bash',
+        ['-lc', buildShellFallbackInvocation(spawnConfig.command, spawnConfig.args)],
+        {
+          cwd: spawnConfig.cwd ?? cwd,
+          shell: false,
+          env,
+          stdio: ['ignore', 'pipe', 'pipe'],
+          windowsHide: true,
+          timeoutMs,
+        },
+      )
+    : undefined;
+  const selectedResult = pickCompatibilityProbeResult(result, fallbackResult);
+
   return {
-    exitCode: result.exitCode,
-    stdout: result.stdout,
-    stderr: result.stderr,
-    timedOut: result.timedOut,
-    durationMs: result.durationMs,
-    ...(result.error ? { error: result.error } : {}),
+    exitCode: selectedResult.exitCode,
+    stdout: selectedResult.stdout,
+    stderr: selectedResult.stderr,
+    timedOut: selectedResult.timedOut,
+    durationMs: selectedResult.durationMs,
+    ...(selectedResult.error ? { error: selectedResult.error } : {}),
   };
+}
+
+function shouldRetryCompatibilityProbeViaShell(
+  commandConfig: ProviderCommandConfig,
+  result: ProbeResult,
+): boolean {
+  return commandConfig.runtime.mode === 'native'
+    && process.platform !== 'win32'
+    && (result.timedOut || (result.exitCode === 0 && !hasCompatibilityProbeOutput(result)));
+}
+
+function buildShellFallbackInvocation(command: string, args: string[]): string {
+  return [command, ...args].map((part) => quoteForBash(part)).join(' ');
+}
+
+function hasCompatibilityProbeOutput(
+  result: Pick<ProbeResult, 'stdout' | 'stderr'>,
+): boolean {
+  return result.stdout.trim().length > 0 || result.stderr.trim().length > 0;
+}
+
+function pickCompatibilityProbeResult(
+  directResult: ProbeResult,
+  fallbackResult?: ProbeResult,
+): ProbeResult {
+  if (!fallbackResult) {
+    return directResult;
+  }
+
+  if (hasCompatibilityProbeOutput(fallbackResult)) {
+    return fallbackResult;
+  }
+
+  if (directResult.timedOut && !fallbackResult.timedOut) {
+    return fallbackResult;
+  }
+
+  return directResult;
 }

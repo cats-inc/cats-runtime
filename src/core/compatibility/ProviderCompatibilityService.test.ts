@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -116,6 +116,130 @@ describe('ProviderCompatibilityService', () => {
     expect(assessment.evidence).toBeUndefined();
   });
 
+  it('retries native compatibility probes through a shell when direct spawn exits without output', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-shell-fallback-'));
+    tempDirs.push(root);
+    mkdirSync(join(root, 'data'), { recursive: true });
+    mkdirSync(join(root, 'sessions'), { recursive: true });
+    const fakeGemini = join(root, 'fake-gemini');
+    const shellFallbackThreshold = Math.max(1, Number(process.env.SHLVL || '0') + 2);
+    writeFileSync(
+      fakeGemini,
+      `#!/usr/bin/env bash
+set -euo pipefail
+if (( \${SHLVL:-0} < ${shellFallbackThreshold} )); then
+  exit 0
+fi
+if [[ "\${1:-}" == "--version" ]]; then
+  printf '0.35.3\\n'
+  exit 0
+fi
+printf 'Usage: gemini --output-format --resume\\n'
+`,
+      'utf8',
+    );
+    chmodSync(fakeGemini, 0o755);
+
+    const target = createCliTarget('gemini');
+    target.cliInstance!.commandConfig.path = fakeGemini;
+
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+    }, {
+      installCheckRunner: createInstallCheckRunner({
+        lookupCommand: vi.fn(async (command: string) => ({
+          available: command === fakeGemini || command === 'gemini' || command === 'node' || command === 'npm',
+          resolvedPath: command === fakeGemini ? fakeGemini : `/runtime/bin/${command}`,
+          timedOut: false,
+        })),
+      }),
+      now: () => Date.parse('2026-03-23T00:00:00.250Z'),
+    });
+
+    const assessment = await service.assessCliTarget(target);
+    expect(assessment.classification).toBe('ready');
+    expect(assessment.profile.id).toBe('gemini-cli-stream-json-v1');
+    expect(assessment.fingerprint.version.normalized).toBe('0.35.3');
+    expect(assessment.fingerprint.features).toContain('token:--output-format');
+    expect(assessment.setup.command.status).toBe('ready');
+  });
+
+  it('infers Gemini compatibility from npm metadata when macOS headless probes time out', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-gemini-metadata-'));
+    tempDirs.push(root);
+    const prefixDir = join(root, 'prefix');
+    const binDir = join(prefixDir, 'bin');
+    const packageJsonPath = join(
+      prefixDir,
+      'lib',
+      'node_modules',
+      '@google',
+      'gemini-cli',
+      'package.json',
+    );
+    mkdirSync(binDir, { recursive: true });
+    mkdirSync(join(prefixDir, 'lib', 'node_modules', '@google', 'gemini-cli'), { recursive: true });
+    writeFileSync(join(binDir, 'gemini'), '#!/usr/bin/env node\n', 'utf8');
+    writeFileSync(packageJsonPath, JSON.stringify({ version: '0.35.3' }), 'utf8');
+
+    const originalPlatform = process.platform;
+    Object.defineProperty(process, 'platform', {
+      configurable: true,
+      value: 'darwin',
+    });
+    try {
+      const target = createCliTarget('gemini');
+      target.cliInstance!.commandConfig.path = 'gemini';
+      const service = new ProviderCompatibilityService({
+        dataDir: join(root, 'data'),
+        sessionBaseDir: join(root, 'sessions'),
+      }, {
+        runner: {
+          run: vi.fn(async () => ({
+            exitCode: null,
+            stdout: '',
+            stderr: '',
+            timedOut: true,
+            durationMs: 5_500,
+            error: 'Timed out after 5000ms',
+          })),
+        },
+        installCheckRunner: createInstallCheckRunner({
+          lookupCommand: vi.fn(async (command: string) => ({
+            available: command === 'gemini' || command === 'node' || command === 'npm',
+            resolvedPath: command === 'gemini' ? join(binDir, 'gemini') : `/runtime/bin/${command}`,
+            timedOut: false,
+          })),
+          checkNpmPackage: vi.fn(async () => ({
+            exists: true,
+            timedOut: false,
+          })),
+        }),
+        now: () => Date.parse('2026-03-23T00:00:00.750Z'),
+      });
+
+      const assessment = await service.assessCliTarget(target);
+      expect(assessment.classification).toBe('ready');
+      expect(assessment.status).toBe('ok');
+      expect(assessment.profile.id).toBe('gemini-cli-stream-json-v1');
+      expect(assessment.summary).toBe("Gemini CLI matched compatibility profile 'gemini-cli-stream-json-v1'.");
+      expect(assessment.fingerprint.version.normalized).toBe('0.35.3');
+      expect(assessment.fingerprint.features).toContain('metadata:--output-format');
+      expect(assessment.checks).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          code: 'metadata_probe_inference',
+          status: 'ok',
+        }),
+      ]));
+    } finally {
+      Object.defineProperty(process, 'platform', {
+        configurable: true,
+        value: originalPlatform,
+      });
+    }
+  });
+
   it('uses a lightweight health assessment without polluting the standard cache', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-health-'));
     tempDirs.push(root);
@@ -149,7 +273,22 @@ describe('ProviderCompatibilityService', () => {
 
     expect(firstHealthAssessment.status).toBe('ok');
     expect(firstHealthAssessment.setup.command.status).toBe('ready');
-    expect(firstHealthAssessment.setup.prerequisites).toEqual([]);
+    expect(firstHealthAssessment.setup.prerequisites).toEqual([
+      {
+        id: 'bash',
+        label: 'Bash',
+        command: 'bash',
+        status: 'unknown',
+        summary: 'Health probe skipped the detailed prerequisite check for Bash.',
+      },
+      {
+        id: 'curl',
+        label: 'curl',
+        command: 'curl',
+        status: 'unknown',
+        summary: 'Health probe skipped the detailed prerequisite check for curl.',
+      },
+    ]);
     expect(firstHealthAssessment.setup.pathPersistence.status).not.toBe('missing');
     expect(firstHealthAssessment.setup.npm.status).not.toBe('missing_prefix');
     expect(firstHealthAssessment.setup.remediation).toEqual([]);

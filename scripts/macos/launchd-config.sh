@@ -50,9 +50,12 @@ resolve_node_binary() {
 render_runner_script() {
   local repo_root="$1"
   local node_bin="$2"
+  local node_dir
+  node_dir="$(dirname "$node_bin")"
 
   printf '%s\n' '#!/usr/bin/env bash'
   printf '%s\n' 'set -euo pipefail'
+  printf 'export PATH=%q:"$HOME/.npm-global/bin":"$HOME/.local/bin":"$HOME/.pyenv/shims":"$HOME/.pyenv/bin":/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/usr/bin:/bin:/usr/sbin:/sbin${PATH:+:$PATH}\n' "$node_dir"
   printf 'cd %q\n' "$repo_root"
   printf 'exec %q dist/index.js\n' "$node_bin"
 }

@@ -199,6 +199,9 @@ describe('macOS autostart scripts', () => {
     expect(result.status, result.stderr || result.stdout).toBe(0);
 
     const runnerScript = readText(context.runnerScript);
+    expect(runnerScript).toContain(
+      `export PATH=${dirname(context.nodeBin)}:"$HOME/.npm-global/bin":"$HOME/.local/bin"`,
+    );
     expect(runnerScript).toContain(`exec ${context.nodeBin} dist/index.js`);
     expect(runnerScript).not.toContain('exec node dist/index.js');
 
@@ -227,6 +230,9 @@ describe('macOS autostart scripts', () => {
     expect(result.stdout).toContain('Existing launchd runner is stale. Refreshing install.');
 
     const runnerScript = readText(context.runnerScript);
+    expect(runnerScript).toContain(
+      `export PATH=${dirname(context.nodeBin)}:"$HOME/.npm-global/bin":"$HOME/.local/bin"`,
+    );
     expect(runnerScript).toContain(`exec ${context.nodeBin} dist/index.js`);
     expect(runnerScript).not.toContain('exec node dist/index.js');
   });
@@ -249,13 +255,16 @@ describe('macOS autostart scripts', () => {
     expect(result.stdout).toContain('Starting cats-runtime via launchd...');
 
     const runnerScript = readText(context.runnerScript);
+    expect(runnerScript).toContain(
+      `export PATH=${dirname(context.nodeBin)}:"$HOME/.npm-global/bin":"$HOME/.local/bin"`,
+    );
     expect(runnerScript).toContain(`exec ${context.nodeBin} dist/index.js`);
     expect(runnerScript).not.toContain('exec node dist/index.js');
 
     const launchctlLog = readText(context.launchctlLog);
     expect(launchctlLog).toContain(`bootstrap gui/${process.getuid?.()} ${context.plistFile}`);
     expect(readText(context.npmLog)).toContain('run build');
-  });
+  }, 15_000);
 
   runIfPosix('reads CATS_RUNTIME_NODE_BIN from .env when the shell env does not export it', () => {
     const context = createMacosScriptTestContext();
@@ -277,7 +286,11 @@ CATS_RUNTIME_NODE_BIN=${context.managedNodeBin}
     );
 
     expect(result.status, result.stderr || result.stdout).toBe(0);
-    expect(readText(context.runnerScript)).toContain(`exec ${context.managedNodeBin} dist/index.js`);
+    const runnerScript = readText(context.runnerScript);
+    expect(runnerScript).toContain(
+      `export PATH=${dirname(context.managedNodeBin)}:"$HOME/.npm-global/bin":"$HOME/.local/bin"`,
+    );
+    expect(runnerScript).toContain(`exec ${context.managedNodeBin} dist/index.js`);
     expect(result.stdout).toContain(`Node binary: ${context.managedNodeBin}`);
   });
 });

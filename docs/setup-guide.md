@@ -837,6 +837,10 @@ Install launchd agent:
 ./scripts/macos/setup-autostart.sh --install
 ```
 
+The generated launchd runner prepends the managed Node binary directory plus
+common user CLI locations such as `~/.npm-global/bin` and `~/.local/bin`,
+because launchd does not inherit your interactive shell PATH.
+
 Verify setup:
 
 ```bash
