@@ -164,6 +164,7 @@ command -v npm >/dev/null 2>&1 || {
   echo "npm not found in PATH" >&2
   exit 1
 }
+NODE_BIN="$(resolve_node_binary)"
 
 echo "Building TypeScript..."
 pushd "$REPO_ROOT" >/dev/null
@@ -175,6 +176,7 @@ mkdir -p "$LOG_DIR"
 
 if [[ "$MANAGED_BY_LAUNCHD" == "true" ]]; then
   echo "Starting cats-runtime via launchd..."
+  write_runner_script "$REPO_ROOT" "$NODE_BIN"
   if ! start_launchd_agent; then
     echo "  Failed to start $LABEL" >&2
     launchctl print "gui/$UID/$LABEL" || true
@@ -183,7 +185,7 @@ if [[ "$MANAGED_BY_LAUNCHD" == "true" ]]; then
 else
   echo "Starting cats-runtime..."
   pushd "$REPO_ROOT" >/dev/null
-  nohup node dist/index.js >"$STDOUT_LOG" 2>"$STDERR_LOG" < /dev/null &
+  nohup "$NODE_BIN" dist/index.js >"$STDOUT_LOG" 2>"$STDERR_LOG" < /dev/null &
   CATS_RUNTIME_PID=$!
   popd >/dev/null
   disown "$CATS_RUNTIME_PID" 2>/dev/null || true

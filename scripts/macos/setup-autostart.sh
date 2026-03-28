@@ -165,7 +165,9 @@ command -v npm >/dev/null 2>&1 || {
   echo "   npm not found" >&2
   exit 1
 }
+NODE_BIN="$(resolve_node_binary)"
 echo "   Node.js $(node --version)"
+echo "   Node binary: $NODE_BIN"
 
 if [[ ! -d "$REPO_ROOT/node_modules" ]]; then
   echo "   node_modules missing, running npm install..."
@@ -182,11 +184,16 @@ fi
 echo "   Port: $PORT"
 
 if [[ -f "$PLIST_FILE" && "$FORCE" != "true" ]]; then
+  if runner_script_matches "$REPO_ROOT" "$NODE_BIN"; then
+    echo ""
+    echo "Already installed. Use --force to reconfigure."
+    echo "  Plist:  $PLIST_FILE"
+    echo "  Runner: $RUNNER_SCRIPT"
+    exit 0
+  fi
+
   echo ""
-  echo "Already installed. Use --force to reconfigure."
-  echo "  Plist:  $PLIST_FILE"
-  echo "  Runner: $RUNNER_SCRIPT"
-  exit 0
+  echo "Existing launchd runner is stale. Refreshing install."
 fi
 
 echo "2. Building TypeScript..."
@@ -197,13 +204,6 @@ echo "   Build OK"
 
 echo "3. Creating runner script and launchd plist..."
 mkdir -p "$CATS_RUNTIME_SUPPORT_DIR" "$PLIST_DIR" "$LOG_DIR"
-
-cat >"$RUNNER_SCRIPT" <<EOF
-#!/usr/bin/env bash
-set -euo pipefail
-cd "$REPO_ROOT"
-exec node dist/index.js
-EOF
 
 cat >"$PLIST_FILE" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -230,7 +230,7 @@ cat >"$PLIST_FILE" <<EOF
 </plist>
 EOF
 
-chmod +x "$RUNNER_SCRIPT"
+write_runner_script "$REPO_ROOT" "$NODE_BIN"
 
 launchctl bootout "gui/$UID" "$PLIST_FILE" >/dev/null 2>&1 || true
 launchctl bootstrap "gui/$UID" "$PLIST_FILE"

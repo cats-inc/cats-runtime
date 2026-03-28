@@ -8,9 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 ENV_FILE="$REPO_ROOT/.env"
 ENV_EXAMPLE="$REPO_ROOT/.env.example"
-UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
-UNIT_FILE="$UNIT_DIR/cats-runtime.service"
-SERVICE_NAME="cats-runtime.service"
+source "$SCRIPT_DIR/systemd-config.sh"
 INSTALL=false
 REMOVE=false
 VERIFY=false
@@ -162,7 +160,9 @@ command -v npm >/dev/null 2>&1 || {
   echo "   npm not found" >&2
   exit 1
 }
+NODE_BIN="$(resolve_node_binary)"
 echo "   Node.js $(node --version)"
+echo "   Node binary: $NODE_BIN"
 
 if [[ ! -d "$REPO_ROOT/node_modules" ]]; then
   echo "   node_modules missing, running npm install..."
@@ -179,10 +179,15 @@ fi
 echo "   Port: $PORT"
 
 if [[ -f "$UNIT_FILE" && "$FORCE" != "true" ]]; then
+  if unit_file_matches "$REPO_ROOT" "$NODE_BIN"; then
+    echo ""
+    echo "Already installed. Use --force to reconfigure."
+    echo "  Unit: $UNIT_FILE"
+    exit 0
+  fi
+
   echo ""
-  echo "Already installed. Use --force to reconfigure."
-  echo "  Unit: $UNIT_FILE"
-  exit 0
+  echo "Existing systemd unit is stale. Refreshing install."
 fi
 
 echo "2. Building TypeScript..."
@@ -192,24 +197,7 @@ popd >/dev/null
 echo "   Build OK"
 
 echo "3. Creating systemd user unit..."
-mkdir -p "$UNIT_DIR"
-
-cat >"$UNIT_FILE" <<EOF
-[Unit]
-Description=Cats Runtime - embedded runtime service
-After=network.target
-
-[Service]
-Type=simple
-WorkingDirectory=$REPO_ROOT
-ExecStart=/usr/bin/env node dist/index.js
-Restart=always
-RestartSec=5
-Environment=NODE_ENV=production
-
-[Install]
-WantedBy=default.target
-EOF
+write_unit_file "$REPO_ROOT" "$NODE_BIN"
 
 was_active=false
 if systemctl --user is-active "$SERVICE_NAME" >/dev/null 2>&1; then

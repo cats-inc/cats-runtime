@@ -12,3 +12,51 @@ LOG_DIR="$CATS_RUNTIME_LOG_DIR"
 STDOUT_LOG="$LOG_DIR/stdout.log"
 STDERR_LOG="$LOG_DIR/stderr.log"
 RUNNER_SCRIPT="$CATS_RUNTIME_SUPPORT_DIR/start-cats-runtime.sh"
+
+resolve_node_binary() {
+  local node_bin="${CATS_RUNTIME_NODE_BIN:-}"
+
+  if [[ -z "$node_bin" ]]; then
+    node_bin="$(command -v node || true)"
+  fi
+
+  if [[ -z "$node_bin" ]]; then
+    echo "Node.js not found in PATH" >&2
+    return 1
+  fi
+
+  printf '%s\n' "$node_bin"
+}
+
+render_runner_script() {
+  local repo_root="$1"
+  local node_bin="$2"
+
+  printf '%s\n' '#!/usr/bin/env bash'
+  printf '%s\n' 'set -euo pipefail'
+  printf 'cd %q\n' "$repo_root"
+  printf 'exec %q dist/index.js\n' "$node_bin"
+}
+
+runner_script_matches() {
+  local repo_root="$1"
+  local node_bin="$2"
+  local expected_runner
+  local current_runner
+
+  [[ -f "$RUNNER_SCRIPT" ]] || return 1
+
+  expected_runner="$(render_runner_script "$repo_root" "$node_bin")"
+  current_runner="$(<"$RUNNER_SCRIPT")"
+
+  [[ "$current_runner" == "$expected_runner" ]]
+}
+
+write_runner_script() {
+  local repo_root="$1"
+  local node_bin="$2"
+
+  mkdir -p "$CATS_RUNTIME_SUPPORT_DIR"
+  render_runner_script "$repo_root" "$node_bin" >"$RUNNER_SCRIPT"
+  chmod +x "$RUNNER_SCRIPT"
+}
