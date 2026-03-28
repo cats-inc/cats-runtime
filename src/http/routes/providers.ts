@@ -187,13 +187,11 @@ providerRoutes.get('/providers/models', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
 
   try {
-    const forceRefresh = parseModelCatalogRefreshQuery(c.req.query('refresh'));
+    parseModelCatalogRefreshQuery(c.req.query('refresh'));
     const providers = await Promise.all(
       listConfiguredProviders(ctx.config).map(async (providerName) => [
         providerName,
-        await ctx.providerModelCatalog.getCatalog(providerName, undefined, {
-          forceRefresh,
-        }),
+        ctx.providerModelCatalog.getImmediateCatalog(providerName),
       ] as const),
     );
 

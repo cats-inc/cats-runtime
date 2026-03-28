@@ -433,6 +433,14 @@ export class ProviderModelCatalogService {
     return this.getCatalogForTarget(target, options);
   }
 
+  getImmediateCatalog(
+    providerName: string,
+    requestedInstance?: string,
+  ): ProviderModelCatalogResult {
+    const target = resolveProviderTarget(this.config, providerName, requestedInstance);
+    return this.getImmediateCatalogForTarget(target);
+  }
+
   async getAdvancedKnowledge(
     providerName: string,
     requestedInstance?: string,
@@ -470,11 +478,17 @@ export class ProviderModelCatalogService {
   inspectSummaryForTarget(
     target: ProviderTargetDescriptor,
   ): ProviderModelCatalogSummary {
+    return summarizeProviderModelCatalog(this.getImmediateCatalogForTarget(target));
+  }
+
+  private getImmediateCatalogForTarget(
+    target: ProviderTargetDescriptor,
+  ): ProviderModelCatalogResult {
     const defaultModel = resolveDefaultModel(target, this.env);
     const warnings: string[] = [];
     const cachedDynamic = this.getCachedDynamicCatalog(target, defaultModel, warnings);
     if (cachedDynamic) {
-      return summarizeProviderModelCatalog(cachedDynamic);
+      return cachedDynamic;
     }
 
     const discoverySkipWarning = this.getDynamicDiscoverySkipWarning(target);
@@ -485,10 +499,10 @@ export class ProviderModelCatalogService {
     appendKnownStaticCatalogWarnings(target, warnings);
     const configCatalog = this.tryConfigCatalog(target, defaultModel, warnings);
     if (configCatalog) {
-      return summarizeProviderModelCatalog(configCatalog);
+      return configCatalog;
     }
 
-    return summarizeProviderModelCatalog(this.buildStaticCatalog(target, defaultModel, warnings));
+    return this.buildStaticCatalog(target, defaultModel, warnings);
   }
 
   private async getCatalogForTarget(

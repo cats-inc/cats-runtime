@@ -421,6 +421,10 @@ describe('runtime MCP facade', () => {
         source: 'config',
         models: [],
       })),
+      getImmediateCatalog: vi.fn(() => ({
+        source: 'config',
+        models: [],
+      })),
       getAdvancedCatalog: vi.fn(async () => ({
         source: 'config',
         resolution: {

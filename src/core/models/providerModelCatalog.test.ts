@@ -647,6 +647,69 @@ describe('ProviderModelCatalogService', () => {
     );
   });
 
+  it('returns an immediate snapshot without invoking slow dynamic discovery runners', () => {
+    const piModelDiscoveryRunner = {
+      run: vi.fn(async () => {
+        throw new Error('dynamic discovery should not run');
+      }),
+    };
+    const opencodeModelDiscoveryRunner = {
+      run: vi.fn(async () => {
+        throw new Error('dynamic discovery should not run');
+      }),
+    };
+
+    const service = new ProviderModelCatalogService(createCatalogConfig() as never, {
+      piModelDiscoveryRunner,
+      opencodeModelDiscoveryRunner,
+    });
+
+    expect(service.getImmediateCatalog('pi')).toEqual({
+      provider: 'pi',
+      backend: 'cli',
+      instance: 'default',
+      defaultModel: 'openai-codex/gpt-5.4',
+      source: 'static',
+      cache: null,
+      models: [
+        {
+          id: 'openai-codex/gpt-5.4',
+          label: 'openai-codex/gpt-5.4',
+          default: true,
+        },
+      ],
+      warnings: [],
+    });
+    expect(service.getImmediateCatalog('opencode')).toEqual({
+      provider: 'opencode',
+      backend: 'cli',
+      instance: 'default',
+      defaultModel: 'opencode-go/glm-5',
+      source: 'static',
+      cache: null,
+      models: [
+        {
+          id: 'opencode-go/glm-5',
+          label: 'glm-5',
+          default: true,
+        },
+        {
+          id: 'opencode-go/kimi-k2.5',
+          label: 'kimi k2.5',
+          default: false,
+        },
+        {
+          id: 'opencode-go/minimax-m2.5',
+          label: 'minimax m2.5',
+          default: false,
+        },
+      ],
+      warnings: [],
+    });
+    expect(piModelDiscoveryRunner.run).not.toHaveBeenCalled();
+    expect(opencodeModelDiscoveryRunner.run).not.toHaveBeenCalled();
+  });
+
   it('loads a dynamic OpenAI catalog when auth is configured and caches the result', async () => {
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       const url = typeof input === 'string' ? input : input.url;

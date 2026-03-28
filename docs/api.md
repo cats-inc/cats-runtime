@@ -3306,7 +3306,11 @@ current local default selection without reviving a sample-only shim route.
 `GET /providers/models` is the runtime-owned aggregate default-target catalog
 route. It accepts additive `?refresh=1|true|refresh|force` semantics and
 returns the same catalog payload shape keyed by configured provider name, using
-each provider's default resolved target.
+each provider's default resolved target. This aggregate route serves the
+current runtime snapshot, including cached/config/static truth when available,
+and intentionally avoids forcing a slow live-discovery fan-out across every
+configured provider. Use `GET /providers/{provider}/models` when you need
+per-provider live discovery or explicit refresh behavior.
 
 `GET /providers/{provider}/models` is the runtime-owned per-provider model
 catalog route. It accepts optional `?instance=<instance-id>` plus additive
