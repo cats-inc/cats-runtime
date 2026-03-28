@@ -1641,7 +1641,6 @@ function renderDiscoveryStatus(payload) {
     : runtimeEntries.length > 0
       ? 'active'
       : (providerCatalog?.providers ? 'not_applicable' : 'idle');
-  const providers = wsl.providers || {};
 
   dot.dataset.state = state;
   policyEl.textContent = 'CLI runtimes';
@@ -1679,16 +1678,6 @@ function renderDiscoveryStatus(payload) {
     tooltipLines.push(
       `Docker ${docker.policy || 'if_running'} - ${docker.summary?.message || 'No Docker discovery status'}`,
     );
-  }
-
-  for (const [providerName, provider] of Object.entries(providers).sort(([left], [right]) => left.localeCompare(right))) {
-    const bits = [
-      `${providerName}: ${formatDiscoveryState(provider.state)}`,
-      provider.runtimeMode ? `[${provider.runtimeMode}]` : '',
-      provider.distro ? `(${provider.distro})` : '',
-    ].filter(Boolean);
-    const suffix = provider.message ? ` - ${provider.message}` : '';
-    tooltipLines.push(`${bits.join(' ')}${suffix}`);
   }
 
   group.title = tooltipLines.join('\n');

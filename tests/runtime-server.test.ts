@@ -223,6 +223,10 @@ describe('runtime server', () => {
       expect(html).not.toContain("{ id: 'default', runtime: { mode: 'native' } }");
       expect(html).toContain(RUNTIME_DIAGNOSTICS_PATHS.health);
       expect(html).toContain('refreshRuntimeHealthStatus');
+      expect(html).not.toContain('const providers = wsl.providers || {};');
+      expect(html).not.toContain(
+        'for (const [providerName, provider] of Object.entries(providers)',
+      );
     });
   });
 

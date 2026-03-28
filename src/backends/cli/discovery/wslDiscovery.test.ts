@@ -20,7 +20,7 @@ describe('WslDiscoveryStatusStore', () => {
 
     expect(payload.wsl.summary).toEqual({
       state: 'not_applicable',
-      message: 'Cursor and Kiro are not using WSL runtime',
+      message: 'No WSL-backed native discovery targets configured',
     });
     expect(payload.wsl.providers.cursor.state).toBe('not_applicable');
     expect(payload.wsl.providers.kiro.state).toBe('not_applicable');

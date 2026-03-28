@@ -484,7 +484,7 @@ function summarizeProviders(
   if (relevant.length === 0) {
     return {
       state: 'not_applicable',
-      message: 'Cursor and Kiro are not using WSL runtime',
+      message: 'No WSL-backed native discovery targets configured',
     };
   }
 
