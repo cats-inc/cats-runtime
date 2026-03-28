@@ -28,8 +28,9 @@ export interface ApiRuntimeInspection {
     keepAlive?: string;
   };
   providerNativeTools: {
-    state: 'runtime_local_only' | 'deferred';
+    state: 'runtime_local_only' | 'provider_native_configured' | 'deferred';
     summary: string;
+    configuredTools?: string[];
   };
   localModelLifecycle?: {
     source: 'runtime_model_catalog';
@@ -40,6 +41,42 @@ export interface ApiRuntimeInspection {
   };
 }
 
+function readConfiguredProviderNativeTools(
+  transport: string,
+  payloadTemplate: Record<string, unknown> | undefined,
+): string[] {
+  if (!payloadTemplate) {
+    return [];
+  }
+
+  const configured = new Set<string>();
+  const rawTools = Array.isArray(payloadTemplate.tools) ? payloadTemplate.tools : [];
+  for (const tool of rawTools) {
+    if (!tool || typeof tool !== 'object') {
+      continue;
+    }
+
+    const entry = tool as Record<string, unknown>;
+    if (transport === 'openai') {
+      const type = typeof entry.type === 'string' ? entry.type.trim() : '';
+      if (type && type !== 'function') {
+        configured.add(type);
+      }
+      continue;
+    }
+
+    if (transport === 'google' || transport === 'gemini') {
+      for (const key of ['googleSearch', 'urlContext', 'codeExecution']) {
+        if (entry[key] && typeof entry[key] === 'object') {
+          configured.add(key);
+        }
+      }
+    }
+  }
+
+  return Array.from(configured);
+}
+
 export function inspectApiTarget(
   target: ProviderTargetDescriptor,
 ): ApiRuntimeInspection | undefined {
@@ -48,6 +85,10 @@ export function inspectApiTarget(
   }
 
   const transport = target.remoteInstance.transport || 'unknown';
+  const configuredProviderNativeTools = readConfiguredProviderNativeTools(
+    transport,
+    target.remoteInstance.payloadTemplate,
+  );
   if (transport === 'anthropic') {
     return {
       family: 'api_runtime',
@@ -69,6 +110,16 @@ export function inspectApiTarget(
   }
 
   if (transport === 'openai') {
+    const providerNativeTools = configuredProviderNativeTools.length > 0
+      ? {
+          state: 'provider_native_configured' as const,
+          configuredTools: configuredProviderNativeTools,
+          summary: `Runtime-local tools remain primary, and OpenAI provider-native tools are preconfigured via payload template (${configuredProviderNativeTools.join(', ')}).`,
+        }
+      : {
+          state: 'deferred' as const,
+          summary: 'Runtime-local tools remain primary; OpenAI built-in tool follow-through is still deferred.',
+        };
     return {
       family: 'api_runtime',
       transport,
@@ -81,10 +132,7 @@ export function inspectApiTarget(
         active: false,
         summary: 'No separate cache layer is configured beyond provider-managed response continuation reuse.',
       },
-      providerNativeTools: {
-        state: 'deferred',
-        summary: 'Runtime-local tools remain primary; OpenAI built-in tool follow-through is still deferred.',
-      },
+      providerNativeTools,
     };
   }
 
@@ -96,6 +144,16 @@ export function inspectApiTarget(
       'contextCacheTtl',
       'context_cache_ttl',
     ) || DEFAULT_GEMINI_CACHE_TTL;
+    const providerNativeTools = configuredProviderNativeTools.length > 0
+      ? {
+          state: 'provider_native_configured' as const,
+          configuredTools: configuredProviderNativeTools,
+          summary: `Runtime-local tools remain primary, and Gemini provider-native tools are preconfigured via payload template (${configuredProviderNativeTools.join(', ')}).`,
+        }
+      : {
+          state: 'deferred' as const,
+          summary: 'Runtime-local tools remain primary; selective Google Search and URL-context follow-through are still deferred.',
+        };
     return {
       family: 'api_runtime',
       transport,
@@ -109,10 +167,7 @@ export function inspectApiTarget(
         ttl,
         summary: 'Gemini cached-content context reuse is runtime-managed for reusable prompt prefixes.',
       },
-      providerNativeTools: {
-        state: 'deferred',
-        summary: 'Runtime-local tools remain primary; selective Google Search and URL-context follow-through are still deferred.',
-      },
+      providerNativeTools,
     };
   }
 

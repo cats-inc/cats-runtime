@@ -3119,8 +3119,9 @@ object includes:
   such as Anthropic prompt caching, Gemini cached-content reuse, or Ollama
   `keep_alive`
 - `providerNativeTools` state/summary describing whether hosted provider tools
-  remain deferred or whether the target stays runtime-local-only for tool
-  execution
+  remain deferred, are preconfigured through the payload template, or whether
+  the target stays runtime-local-only for tool execution; when the runtime can
+  see configured hosted tools it also returns bounded `configuredTools`
 - optional `localModelLifecycle` for Ollama targets, describing the
   runtime-owned installed/running-model inspection seam while local pull/manage
   operations remain deferred

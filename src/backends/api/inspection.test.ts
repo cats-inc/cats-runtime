@@ -39,6 +39,36 @@ describe('inspectApiTarget', () => {
     }));
   });
 
+  it('surfaces configured OpenAI and Gemini provider-native tools from payload templates', () => {
+    const openai = inspectApiTarget(createTarget('openai', {
+      tools: [
+        { type: 'web_search_preview' },
+        { type: 'function', name: 'ignored_runtime_local_tool' },
+      ],
+    }));
+    expect(openai).toEqual(expect.objectContaining({
+      transport: 'openai',
+      providerNativeTools: expect.objectContaining({
+        state: 'provider_native_configured',
+        configuredTools: ['web_search_preview'],
+      }),
+    }));
+
+    const gemini = inspectApiTarget(createTarget('google', {
+      tools: [
+        { googleSearch: {} },
+        { urlContext: {} },
+      ],
+    }));
+    expect(gemini).toEqual(expect.objectContaining({
+      transport: 'google',
+      providerNativeTools: expect.objectContaining({
+        state: 'provider_native_configured',
+        configuredTools: ['googleSearch', 'urlContext'],
+      }),
+    }));
+  });
+
   it('describes Gemini cache TTL and Ollama keep_alive hints', () => {
     const gemini = inspectApiTarget(createTarget('google', {
       context_cache_ttl: '1800s',
