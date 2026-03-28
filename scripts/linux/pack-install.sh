@@ -42,6 +42,7 @@ fi
 printf '\n\033[36m=== Packing... ===\033[0m\n'
 TGZ_NAME="$(npm_config_ignore_scripts=true npm pack --silent)"
 TGZ="$ROOT/$TGZ_NAME"
+printf -v TGZ_QUOTED '%q' "$TGZ"
 
 if [ ! -f "$TGZ" ]; then
   echo "Expected $TGZ but file not found" >&2
@@ -52,8 +53,9 @@ printf '\n\033[32mPackage created: %s\033[0m\n' "$TGZ"
 
 if [ "$PACK_ONLY" = true ]; then
   printf '\033[90mPack only mode. Package at: %s\033[0m\n' "$TGZ"
-  printf '\033[90mYou can install later with: npm install -g %s\033[0m\n' "$TGZ"
-  printf '\033[90mYou can run via npx with: npx --yes -p %s cats-runtime --help\033[0m\n' "$TGZ"
+  printf '\033[90mYou can install later with: npm install -g %s\033[0m\n' "$TGZ_QUOTED"
+  printf '\033[90mAfter installing, try: cats-runtime --help\033[0m\n'
+  printf '\033[90mAfter installing, try: cats-runtime-mcp --help\033[0m\n'
   exit 0
 fi
 
@@ -71,8 +73,9 @@ fi
 
 if [ "$SHOULD_INSTALL" = false ]; then
   printf '\033[90mSkipped install. Package at: %s\033[0m\n' "$TGZ"
-  printf '\033[90mYou can install later with: npm install -g %s\033[0m\n' "$TGZ"
-  printf '\033[90mYou can run via npx with: npx --yes -p %s cats-runtime --help\033[0m\n' "$TGZ"
+  printf '\033[90mYou can install later with: npm install -g %s\033[0m\n' "$TGZ_QUOTED"
+  printf '\033[90mAfter installing, try: cats-runtime --help\033[0m\n'
+  printf '\033[90mAfter installing, try: cats-runtime-mcp --help\033[0m\n'
   exit 0
 fi
 
@@ -98,5 +101,5 @@ if [ "$SHOULD_DELETE" = true ]; then
   printf '\033[33mDeleted.\033[0m\n'
 else
   printf '\033[90mKept at: %s\033[0m\n' "$TGZ"
-  printf '\033[90mYou can reinstall later with: npm install -g %s\033[0m\n' "$TGZ"
+  printf '\033[90mYou can reinstall later with: npm install -g %s\033[0m\n' "$TGZ_QUOTED"
 fi
