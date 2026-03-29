@@ -165,6 +165,10 @@ follow-on tasks include:
 - `docs/AGENT-GUIDE.md`, `docs/README.md`, `docs/terminology.md`,
   `docs/specs/README.md`, and `docs/plans/README.md` now reflect the explicit
   protocol/project-memory/skill split.
+- The repo-owned workspace substrate helper now also seeds the minimum starter
+  family for `docs/README.md`, docs index readmes, `skills/README.md`, and
+  `scripts/README.md`, so the split-safe collaboration baseline is no longer
+  limited to AGENT/A2A files only.
 - Second-wave validation against `project-bootstrap` tooling has been recorded
   in a dedicated research note; merge-back remains deferred.
 - A follow-on slice under `PLAN-023` remains open to extract and rewrite the

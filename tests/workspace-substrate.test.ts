@@ -56,6 +56,7 @@ describe('WorkspaceSubstrateService', () => {
           diffStats: expect.objectContaining({ changed: true }),
         }),
         expect.objectContaining({ type: 'create', path: 'docs/AGENT-GUIDE.md' }),
+        expect.objectContaining({ type: 'create', path: 'docs/README.md' }),
       ]));
       expect(result.plan.changedPaths).toEqual(expect.arrayContaining([
         'AGENTS.md',
@@ -361,6 +362,41 @@ describe('WorkspaceSubstrateService', () => {
       expect(existsSync(join(root, 'docs', 'a2a', 'task.json.example'))).toBe(false);
       expect(readFileSync(join(root, 'docs', 'a2a', 'README.md'), 'utf-8'))
         .toContain('agent-card.public.json.example');
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('seeds collaboration starter indexes and readmes for the standard profile', async () => {
+    const { root, cleanup } = createWorkspace();
+    const service = new WorkspaceSubstrateService();
+
+    try {
+      const result = await service.execute({
+        operation: 'init-workspace',
+        workspacePath: root,
+        profile: 'standard',
+        enabledAgents: ['codex'],
+        apply: true,
+        authorization: {
+          actorRole: 'boss_cat',
+        },
+      });
+
+      expect(result.applied).toBe(true);
+      expect(existsSync(join(root, 'docs', 'README.md'))).toBe(true);
+      expect(existsSync(join(root, 'docs', 'specs', 'README.md'))).toBe(true);
+      expect(existsSync(join(root, 'docs', 'plans', 'README.md'))).toBe(true);
+      expect(existsSync(join(root, 'docs', 'research', 'README.md'))).toBe(true);
+      expect(existsSync(join(root, 'docs', 'decisions', 'README.md'))).toBe(true);
+      expect(existsSync(join(root, 'skills', 'README.md'))).toBe(true);
+      expect(existsSync(join(root, 'scripts', 'README.md'))).toBe(true);
+      expect(readFileSync(join(root, 'docs', 'README.md'), 'utf-8'))
+        .toContain('Documentation Index');
+      expect(readFileSync(join(root, 'skills', 'README.md'), 'utf-8'))
+        .toContain('SKILL.md');
+      expect(readFileSync(join(root, 'scripts', 'README.md'), 'utf-8'))
+        .toContain('repo-owned helper entrypoints');
     } finally {
       cleanup();
     }

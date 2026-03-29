@@ -344,6 +344,7 @@ collaboration/bootstrap baseline rather than a submodule dependency.
 | 2026-03-29 | Added a dedicated extraction inventory for the remaining `project-bootstrap` template families and initialize/update semantics that still need a repo-owned rewrite before split |
 | 2026-03-29 | Landed the first repo-owned helper surface via `cats-runtime-workspace`, exposing current workspace substrate audit/init/update semantics as a local CLI instead of only through runtime tools/tests |
 | 2026-03-29 | Added platform wrapper scripts so the repo-owned workspace substrate helper has first-party Windows/Linux/macOS entrypoints under `scripts/` |
+| 2026-03-30 | Landed the first repo-owned starter-family rewrite for Phase 5 by teaching workspace substrate to seed `docs/README.md`, the docs index readmes, `skills/README.md`, and `scripts/README.md`, reducing reliance on `project-bootstrap/templates/base` for the minimum collaboration baseline |
 
 ---
 

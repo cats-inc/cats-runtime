@@ -83,6 +83,8 @@ describe('cats-runtime-workspace bin', () => {
       const payload = JSON.parse(result.stdout);
       expect(payload.applied).toBe(true);
       expect(existsSync(join(root, 'AGENTS.md'))).toBe(true);
+      expect(existsSync(join(root, 'docs', 'README.md'))).toBe(true);
+      expect(existsSync(join(root, 'skills', 'README.md'))).toBe(true);
       expect(existsSync(join(root, 'docs', 'a2a', 'agent-card.public.json.example'))).toBe(true);
     } finally {
       cleanup();

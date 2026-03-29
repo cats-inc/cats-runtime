@@ -251,6 +251,95 @@ function buildProgress(profile: WorkspaceSubstrateProfileId): string {
   ].join('\n');
 }
 
+function buildDocsReadme(profile: WorkspaceSubstrateProfileId): string {
+  return [
+    markdownMarker(profile, 'docs/README.md'),
+    '# Documentation Index',
+    '',
+    '- `docs/AGENT-GUIDE.md`: local operating rules for same-environment agents.',
+    '- `docs/terminology.md`: shared vocabulary for protocol, memory, and skills.',
+    '- `docs/specs/`: requirements and implementation-tracking truth.',
+    '- `docs/plans/`: execution sequencing and progress logs.',
+    '- `docs/decisions/`: accepted architecture and governance decisions.',
+    '- `docs/research/`: evidence, validation notes, and external source logs.',
+    '',
+    'Keep these indexes updated when adding durable project-memory artifacts.',
+    '',
+  ].join('\n');
+}
+
+function buildSpecsReadme(profile: WorkspaceSubstrateProfileId): string {
+  return [
+    markdownMarker(profile, 'docs/specs/README.md'),
+    '# Specs',
+    '',
+    '- Use `SPEC-NNN-title.md` for scoped requirements documents.',
+    '- Keep each spec aligned with the related plan or implementation stage.',
+    '- Update this index when new specs become durable project memory.',
+    '',
+  ].join('\n');
+}
+
+function buildPlansReadme(profile: WorkspaceSubstrateProfileId): string {
+  return [
+    markdownMarker(profile, 'docs/plans/README.md'),
+    '# Plans',
+    '',
+    '- Use `PLAN-NNN-title.md` for execution sequencing and checklists.',
+    '- Keep plan status and progress logs truthful to the current repo state.',
+    '- Update this index when new plans become durable project memory.',
+    '',
+  ].join('\n');
+}
+
+function buildResearchReadme(profile: WorkspaceSubstrateProfileId): string {
+  return [
+    markdownMarker(profile, 'docs/research/README.md'),
+    '# Research',
+    '',
+    '- Capture protocol comparisons, pilot validation notes, and external-source evidence here.',
+    '- Prefer dated filenames for research notes so follow-up validation stays traceable.',
+    '- Update this index when research becomes durable project memory.',
+    '',
+  ].join('\n');
+}
+
+function buildDecisionsReadme(profile: WorkspaceSubstrateProfileId): string {
+  return [
+    markdownMarker(profile, 'docs/decisions/README.md'),
+    '# Decisions',
+    '',
+    '- Record accepted architecture or governance decisions as ADR-style markdown files.',
+    '- Prefer one durable decision per file so future agents can trace rationale cleanly.',
+    '- Update this index when a new decision is accepted.',
+    '',
+  ].join('\n');
+}
+
+function buildSkillsReadme(profile: WorkspaceSubstrateProfileId): string {
+  return [
+    markdownMarker(profile, 'skills/README.md'),
+    '# Skills',
+    '',
+    '- Keep procedural agent instructions in `skills/**/SKILL.md`.',
+    '- Do not treat skills as a second project-memory system; durable state belongs in docs and root memory files.',
+    '- Update this README when runtime-owned skills are added or retired.',
+    '',
+  ].join('\n');
+}
+
+function buildScriptsReadme(profile: WorkspaceSubstrateProfileId): string {
+  return [
+    markdownMarker(profile, 'scripts/README.md'),
+    '# Scripts',
+    '',
+    '- Keep platform wrappers under `scripts/windows/`, `scripts/linux/`, and `scripts/macos/`.',
+    '- Prefer repo-owned helper entrypoints over external bootstrap script dependencies.',
+    '- Document significant script contracts here when they become part of durable repo behavior.',
+    '',
+  ].join('\n');
+}
+
 function buildA2aReadme(profile: WorkspaceSubstrateProfileId): string {
   return [
     markdownMarker(profile, 'docs/a2a/README.md'),
@@ -370,8 +459,36 @@ function buildTemplates(input: {
       content: buildTerminology(input.profile),
     },
     {
+      path: 'docs/README.md',
+      content: buildDocsReadme(input.profile),
+    },
+    {
+      path: 'docs/specs/README.md',
+      content: buildSpecsReadme(input.profile),
+    },
+    {
+      path: 'docs/plans/README.md',
+      content: buildPlansReadme(input.profile),
+    },
+    {
+      path: 'docs/research/README.md',
+      content: buildResearchReadme(input.profile),
+    },
+    {
+      path: 'docs/decisions/README.md',
+      content: buildDecisionsReadme(input.profile),
+    },
+    {
       path: 'PROGRESS.md',
       content: buildProgress(input.profile),
+    },
+    {
+      path: 'skills/README.md',
+      content: buildSkillsReadme(input.profile),
+    },
+    {
+      path: 'scripts/README.md',
+      content: buildScriptsReadme(input.profile),
     },
   ];
 

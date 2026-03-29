@@ -121,6 +121,19 @@ This does **not** mean importing the generic template files wholesale. It means
 rewriting the subset that these repos still need to maintain their own
 collaboration baseline after split.
 
+That first rewrite slice is now landed in `cats-runtime` workspace substrate:
+
+- `docs/README.md`
+- `docs/specs/README.md`
+- `docs/plans/README.md`
+- `docs/research/README.md`
+- `docs/decisions/README.md`
+- `skills/README.md`
+- `scripts/README.md`
+
+The remaining P1 work is now about mirrored sibling consumption and any later
+refinement, not the first repo-owned baseline itself.
+
 ### P2: Flavor / Preset Matrix
 
 The full preset/flavor system is not an immediate split blocker for
