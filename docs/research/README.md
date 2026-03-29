@@ -9,6 +9,7 @@
 | [2026-03-29-project-bootstrap-collaboration-extraction-inventory](./2026-03-29-project-bootstrap-collaboration-extraction-inventory.md) | Project-bootstrap collaboration extraction inventory | Which template families and initialize/update semantics still need a repo-owned rewrite before `cats-runtime` and `cats` split into separate repos |
 | [2026-03-29-a2a-pilot-second-wave-validation](./2026-03-29-a2a-pilot-second-wave-validation.md) | A2A pilot second-wave validation | What `project-bootstrap` actually generated/updated in a throwaway repo, which A2A v1 template behaviors were real, and which collaboration semantics still required pilot-owned adaptation |
 | [2026-03-30-repo-owned-collaboration-split-safety-validation](./2026-03-30-repo-owned-collaboration-split-safety-validation.md) | Repo-owned collaboration split-safety validation | Evidence that the extracted workspace substrate and cross-platform skill-sync baseline now work without direct `project-bootstrap` shell-outs |
+| [2026-03-30-sibling-collaboration-baseline-alignment](./2026-03-30-sibling-collaboration-baseline-alignment.md) | Sibling collaboration baseline alignment | Which repo-owned collaboration artifacts now align between `cats-runtime` and `cats`, and which A2A pilot differences are deliberate repo-identity divergences |
 | [2026-03-19-aaif-a2a-and-skills-layering](./2026-03-19-aaif-a2a-and-skills-layering.md) | AAIF, A2A v1, and skill layering | Why `cats-runtime` should separate protocol artifacts, markdown project memory, and `SKILL.md` capability packages |
 | [2026-03-17-paperclip-openclaw-pi-alignment](./2026-03-17-paperclip-openclaw-pi-alignment.md) | Paperclip alignment for OpenClaw and Pi | Why OpenClaw should push a new `agent` backend while Pi should remain a `cli` integration track |
 | [2026-03-19-paperclip-gap-assessment](./2026-03-19-paperclip-gap-assessment.md) | Paperclip maturity-gap assessment | What lower-layer capabilities `cats-runtime` has already closed and what still lags in control plane, lifecycle, Pi depth, and observability |
@@ -33,4 +34,4 @@ Action Items:
 
 ---
 
-*Last updated: 2026-03-29*
+*Last updated: 2026-03-30*

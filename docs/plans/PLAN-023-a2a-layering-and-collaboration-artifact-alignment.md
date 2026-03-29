@@ -181,15 +181,15 @@ merge-back into `project-bootstrap` or production adoption in `cats` /
 
 ### Phase 5: Repo-Owned Bootstrap Extraction and Rewrite
 
-- [ ] Extract the minimum collaboration-related template knowledge from
+- [x] Extract the minimum collaboration-related template knowledge from
       `project-bootstrap/templates/base` into repo-owned starter/update assets
       for `cats-runtime` and mirrored sibling consumption in `cats`
-- [ ] Rewrite repo-owned initialize/update helpers or equivalent local
+- [x] Rewrite repo-owned initialize/update helpers or equivalent local
       modules/scripts so this collaboration baseline no longer relies on
       `project-bootstrap/scripts/*`
-- [ ] Preserve the important review/diff semantics for template-like updates
+- [x] Preserve the important review/diff semantics for template-like updates
       without requiring the upstream bootstrap repo to remain present
-- [ ] Document exactly which upstream behaviors were intentionally retained,
+- [x] Document exactly which upstream behaviors were intentionally retained,
       simplified, or dropped in the local rewrite
 
 **Deliverables**: `cats-runtime` and its sibling pilot repo have a repo-owned
@@ -199,9 +199,9 @@ collaboration/bootstrap baseline rather than a submodule dependency.
 
 - [x] Validate the repo-owned starter/update flow without shelling out to
       `project-bootstrap`
-- [ ] Confirm `cats` can consume the same extracted collaboration baseline
+- [x] Confirm `cats` can consume the same extracted collaboration baseline
       after the split without monorepo-local bootstrap access
-- [ ] Record what still diverges intentionally from upstream bootstrap so
+- [x] Record what still diverges intentionally from upstream bootstrap so
       merge-back remains evidence-led rather than accidental
 - [ ] Keep production-default rollout deferred until the repo-owned rewrite has
       survived more than one pilot loop
@@ -350,6 +350,8 @@ collaboration/bootstrap baseline rather than a submodule dependency.
 | 2026-03-30 | Landed the first repo-owned starter-family rewrite for Phase 5 by teaching workspace substrate to seed `docs/README.md`, the docs index readmes, `skills/README.md`, and `scripts/README.md`, reducing reliance on `project-bootstrap/templates/base` for the minimum collaboration baseline |
 | 2026-03-30 | Landed the next Phase 5 starter-family slice by internalizing the bootstrap `Sync-AgentSkills` input: `cats-runtime` now ships repo-owned Linux/macOS skill-sync scripts, `scripts/README.md` documents the cross-platform contract, and workspace substrate seeds the Windows/Linux/macOS skill-sync entrypoints into initialized workspaces instead of leaving that collaboration behavior trapped in bootstrap templates |
 | 2026-03-30 | Completed the first Phase 6 split-safety validation loop: `cats-runtime-workspace` successfully seeded a throwaway A2A-enabled workspace without any direct `project-bootstrap` references, the repo-owned workspace substrate tests stayed green, and the sibling `cats` repo now carries matching cross-platform skill-sync entrypoints validated by a local smoke test |
+| 2026-03-30 | Closed the main Phase 5 rewrite gate: the repo-owned workspace substrate helper stack now covers local init/update behavior, preserves `*.bootstrap` review-copy semantics for customized files, and keeps legacy A2A retirement guidance local instead of relying on `project-bootstrap/scripts/*` |
+| 2026-03-30 | Closed the next Phase 6 sibling-alignment gate with `docs/research/2026-03-30-sibling-collaboration-baseline-alignment.md`, recording that `cats` already consumes the mirrored A2A file set plus byte-identical cross-platform skill-sync scripts from repo-owned copies and that the remaining A2A content diffs are intentional repo-identity divergences |
 
 ---
 
