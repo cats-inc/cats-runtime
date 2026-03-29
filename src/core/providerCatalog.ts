@@ -12,19 +12,19 @@ import {
 } from '../backends/cli/providers/types.js';
 
 const PROVIDER_ORDER = [
-  'openclaw',
   'claude',
   'codex',
   'gemini',
-  'pi',
-  'goose',
-  'junie',
-  'ollama',
-  'copilot',
   'cursor',
-  'kiro',
-  'auggie',
+  'copilot',
   'opencode',
+  'goose',
+  'pi',
+  'auggie',
+  'junie',
+  'kiro',
+  'ollama',
+  'openclaw',
 ] as const;
 
 export interface ProviderTargetDescriptor {

@@ -306,6 +306,8 @@ describe('bootstrap mode server', () => {
         expect(response.status).toBe(200);
         const html = await response.text();
         expect(html).toContain('Provider Setup');
+        expect(html).toContain('Configured Target Capabilities');
+        expect(html).toContain('setupCapabilityProvider');
       } finally {
         await runtime.close();
       }
@@ -327,7 +329,7 @@ describe('bootstrap mode server', () => {
         expect(response.status).toBe(200);
         const html = await response.text();
         expect(html).toContain('Cats Runtime Dashboard');
-        expect(html).toContain('id="providerCapabilityPreview"');
+        expect(html).not.toContain('id="providerCapabilityPreview"');
         expect(html).toContain('id="chatSessionInsights"');
       } finally {
         await runtime.close();
@@ -1020,7 +1022,7 @@ describe('bootstrap mode server', () => {
         expect(html).toContain('data-active-surface="dashboard"');
         expect(html).toContain('Runtime Health');
         expect(html).toContain('runtimeAuthStatus');
-        expect(html).toContain('providerCapabilityPreview');
+        expect(html).not.toContain('providerCapabilityPreview');
         expect(html).toContain('chatSessionInsights');
         expect(html).toContain('id="inputWorkspaceKind"');
         expect(html).toContain('id="inputWorkspaceAccess"');

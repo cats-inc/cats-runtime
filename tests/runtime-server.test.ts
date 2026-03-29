@@ -205,8 +205,16 @@ describe('runtime server', () => {
         .toBeLessThan(html.indexOf('<option value="codex">codex</option>'));
       expect(html.indexOf('<option value="codex">codex</option>'))
         .toBeLessThan(html.indexOf('<option value="gemini">gemini</option>'));
-      expect(html.indexOf('<option value="kiro">kiro</option>'))
+      expect(html.indexOf('<option value="gemini">gemini</option>'))
+        .toBeLessThan(html.indexOf('<option value="cursor">cursor</option>'));
+      expect(html.indexOf('<option value="cursor">cursor</option>'))
+        .toBeLessThan(html.indexOf('<option value="copilot">copilot</option>'));
+      expect(html.indexOf('<option value="copilot">copilot</option>'))
+        .toBeLessThan(html.indexOf('<option value="opencode">opencode</option>'));
+      expect(html.indexOf('<option value="opencode">opencode</option>'))
         .toBeLessThan(html.indexOf('<option value="auggie">auggie</option>'));
+      expect(html.indexOf('<option value="auggie">auggie</option>'))
+        .toBeLessThan(html.indexOf('<option value="kiro">kiro</option>'));
 
       const openCreateModalMatch = html.match(
         /async function openCreateModal\(\) \{([\s\S]*?)\n\}/,
@@ -216,7 +224,7 @@ describe('runtime server', () => {
       expect(openCreateModalBody.indexOf("classList.add('open')"))
         .toBeLessThan(openCreateModalBody.indexOf('await refreshProviderCatalog()'));
       expect(html).toContain('id="createSessionBtn"');
-      expect(html).toContain('id="providerCapabilityPreview"');
+      expect(html).not.toContain('id="providerCapabilityPreview"');
       expect(html).toContain('id="chatSessionInsights"');
       expect(html).toContain('id="inputWorkspaceKind"');
       expect(html).toContain('id="inputWorkspaceAccess"');
@@ -224,11 +232,12 @@ describe('runtime server', () => {
       expect(html).toContain('id="inputRoutingMode"');
       expect(html).toContain('id="inputPresetChoice"');
       expect(html).toContain('id="inputEntryChoice"');
+      expect(html).toContain('grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));');
       expect(html).not.toContain('id="inputModelChoice"');
       expect(html).not.toContain('id="inputWorkspaceMode"');
       expect(html).toContain('data-runtime-surface-switcher');
       expect(html).toContain('data-active-surface="dashboard"');
-      expect(html).toContain('refreshProviderCapabilityPreview');
+      expect(html).not.toContain('refreshProviderCapabilityPreview');
       expect(html).toContain('renderSessionInsights');
       expect(html).toContain('setLegacyCreateModelRouting');
       expect(html).toContain('getCreateRoutingChoiceId');
@@ -284,6 +293,12 @@ describe('runtime server', () => {
         expect(html).toContain('apiKeyInput');
         expect(html).toContain("window.CatsUI && window.CatsUI.apiFetch");
         expect(html).toContain('validateApiKeyInput');
+        expect(html).toContain('Configured Target Capabilities');
+        expect(html).toContain('setupCapabilityProvider');
+        expect(html).toContain('setupCapabilityInstance');
+        expect(html).toContain('loadConfiguredTargetCapabilities');
+        expect(html).toContain('/providers/config');
+        expect(html).toContain('/providers/${encodeURIComponent(providerName)}/tools?instance=${encodeURIComponent(instanceTarget)}');
         expect(html).toContain("document.addEventListener('DOMContentLoaded'");
         expect(html).toContain('escapeHtml(r.summary)');
         expect(html).toContain('escapeHtml(p.commandPath)');
