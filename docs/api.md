@@ -3210,6 +3210,8 @@ Each instance entry also exposes additive `tooling` metadata:
 - `observability`: bounded runtime truth about tool-catalog ownership plus
   whether the runtime can still observe tool-call events or runtime service
   updates for that target
+- `profiles`: for API/local targets only, the runtime-local tool-profile catalog
+  (`defaultProfile`, additive available-profile counts, and summary)
 - `policy`: for API/local targets only, the bounded runtime tool-profile
   inspection (`profile`, counts, and per-tool access classification) before any
   session-level permission narrowing
@@ -3276,11 +3278,35 @@ full provider topology:
   "source": "runtime_local",
   "discoverable": true,
   "sessionScopedOverrides": true,
-  "summary": "Runtime-managed local tools default to the 'standard' profile (28 tool(s)) before per-session permission narrowing.",
+  "summary": "Runtime-managed local tools default to the 'standard' profile (29 tool(s)) before per-session permission narrowing.",
   "observability": {
     "catalog": "runtime_enumerated",
     "toolCallEvents": true,
     "runtimeServices": false
+  },
+  "profiles": {
+    "defaultProfile": "standard",
+    "availableProfiles": [
+      {
+        "profile": "standard",
+        "totalTools": 29,
+        "mutatingTools": 12,
+        "readOnlyCompatibleTools": 22
+      },
+      {
+        "profile": "extended",
+        "totalTools": 32,
+        "mutatingTools": 15,
+        "readOnlyCompatibleTools": 22
+      },
+      {
+        "profile": "read_only",
+        "totalTools": 17,
+        "mutatingTools": 0,
+        "readOnlyCompatibleTools": 17
+      }
+    ],
+    "summary": "Runtime-local tooling currently exposes 3 selectable profiles; the default target uses 'standard'."
   },
   "policy": {
     "profile": "standard",
@@ -3298,9 +3324,9 @@ full provider topology:
 
 API/local targets now also include the same additive `apiRuntime` inspection
 object used by `GET /providers/config` and `GET /diagnostics/providers`, so
-hosts can inspect continuation, cache/warm-state, and provider-native-tool
-posture alongside the tooling policy without fetching a second provider read
-model.
+hosts can inspect continuation, cache/warm-state, provider-native-tool posture,
+and the runtime-local tool profile catalog alongside the tooling policy without
+fetching a second provider read model.
 
 For CLI targets the route stays honest: it still returns `200`, but `source`
 becomes `provider_native`, `discoverable` stays `false`, and no synthetic

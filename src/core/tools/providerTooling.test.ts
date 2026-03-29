@@ -35,6 +35,30 @@ describe('buildProviderToolingSummary', () => {
           blocked: 0,
         },
       }),
+      profiles: {
+        defaultProfile: 'read_only',
+        availableProfiles: [
+          {
+            profile: 'standard',
+            totalTools: 29,
+            mutatingTools: 12,
+            readOnlyCompatibleTools: 22,
+          },
+          {
+            profile: 'extended',
+            totalTools: 32,
+            mutatingTools: 15,
+            readOnlyCompatibleTools: 22,
+          },
+          {
+            profile: 'read_only',
+            totalTools: 17,
+            mutatingTools: 0,
+            readOnlyCompatibleTools: 17,
+          },
+        ],
+        summary: "Runtime-local tooling currently exposes 3 selectable profiles; the default target uses 'read_only'.",
+      },
       observability: {
         catalog: 'runtime_enumerated',
         toolCallEvents: true,
