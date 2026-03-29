@@ -1375,6 +1375,9 @@ proxy slice is still intentionally minimal:
 - the proxy now applies a conservative upstream timeout by default, accepts
   `CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS` as an override, and classifies
   proxy-side timeouts separately as `upstream_timeout`
+- `cats-runtime-mcp --inspect-proxy` now provides a local preflight exit that
+  resolves the target, reports auth/timeout posture, and runs a `ping`
+  reachability check without starting stdio serving
 - generic shell `PORT` values are intentionally ignored so hosted shells do
   not accidentally retarget the stdio MCP proxy away from the runtime
 - `cats-runtime-mcp` no longer calls `createRuntimeServer(...)` on the normal
@@ -1386,9 +1389,6 @@ proxy slice is still intentionally minimal:
 
 - evaluate a later CLI convergence slice that can expose
   `cats-runtime mcp` while keeping `cats-runtime-mcp` as a compatibility alias
-- add an operator-facing preflight or inspect mode that confirms the current
-  proxy target and timeout posture before a stdio host starts sending tool
-  traffic
 - keep the proxy transport-thin; do not reintroduce a second independent local
   runtime core or hidden runtime auto-start in the name of convenience
 

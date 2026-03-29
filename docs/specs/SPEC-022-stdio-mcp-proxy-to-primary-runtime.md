@@ -181,6 +181,9 @@ documented.
 - [x] The proxy now supports configurable upstream timeout values through
       `CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS`, with a conservative default request
       window for long-running MCP tool calls.
+- [x] `cats-runtime-mcp --inspect-proxy` now provides a local preflight exit
+      for resolving the current target, timeout, and `ping` reachability
+      without starting the stdio MCP server.
 - [ ] Should future `cats-runtime mcp` CLI convergence happen in the same
       follow-up slice or later?
 - [ ] Should the proxy ever offer opt-in auto-start for the primary runtime, or
@@ -194,6 +197,9 @@ documented.
 - `CATS_RUNTIME_API_KEY` is forwarded as bearer auth to the primary runtime
 - `CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS` now overrides the proxy request timeout;
   default proxy timeout is `1800000` ms (30 minutes)
+- `cats-runtime-mcp --inspect-proxy` now emits JSON describing the resolved
+  target, whether bearer auth is configured, timeout posture, and the current
+  `ping` preflight result
 - normal stdio MCP serving no longer calls `createRuntimeServer(...)`
 - stdio framing remains local in `src/mcp/stdio.ts`; only JSON-RPC execution is proxied
 

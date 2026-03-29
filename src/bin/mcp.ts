@@ -10,8 +10,29 @@ import {
   applyRuntimeCliEnvOverrides,
   parseRuntimeCliOptions,
 } from '../startup.js';
-import { createHttpMcpProxyHandler } from '../mcp/proxy.js';
+import { createHttpMcpProxyHandler, inspectMcpProxy } from '../mcp/proxy.js';
 import { startMcpStdioServer } from '../mcp/stdio.js';
+
+function parseMcpCliOptions(argv: string[]): {
+  inspectProxy: boolean;
+  passthroughArgv: string[];
+} {
+  let inspectProxy = false;
+  const passthroughArgv: string[] = [];
+
+  for (const arg of argv) {
+    if (arg === '--inspect-proxy') {
+      inspectProxy = true;
+      continue;
+    }
+    passthroughArgv.push(arg);
+  }
+
+  return {
+    inspectProxy,
+    passthroughArgv,
+  };
+}
 
 function getHelpText(): string {
   return [
@@ -24,6 +45,7 @@ function getHelpText(): string {
     '  --port <port>          Override the target runtime port when deriving the proxy URL',
     '  --config <path>        Use an explicit providers config file for local diagnostics',
     '  --diagnose-setup       Generate a local setup diagnostic report and exit',
+    '  --inspect-proxy        Resolve the MCP proxy target, run a ping preflight, and exit',
     '  --refresh-setup-scan   Refresh the shared setup scan before generating a diagnostic report',
     '  --managed-by <name>    Accepted for compatibility; ignored in proxy mode',
     '  --help, -h             Show this help text',
@@ -36,7 +58,8 @@ function getHelpText(): string {
 }
 
 async function main(): Promise<void> {
-  const cliOptions = parseRuntimeCliOptions(process.argv.slice(2));
+  const mcpCliOptions = parseMcpCliOptions(process.argv.slice(2));
+  const cliOptions = parseRuntimeCliOptions(mcpCliOptions.passthroughArgv);
   if (cliOptions.help) {
     process.stdout.write(`${getHelpText()}\n`);
     return;
@@ -52,6 +75,20 @@ async function main(): Promise<void> {
       artifactPath: result.artifactPath,
       report: result.report,
     })}\n`);
+    return;
+  }
+  if (mcpCliOptions.inspectProxy) {
+    const inspection = await inspectMcpProxy({
+      env: process.env,
+    });
+    const statusLine = inspection.probe.status === 'ok'
+      ? `cats-runtime-mcp proxy target ${inspection.target.url} is reachable (timeout ${inspection.target.timeoutMs}ms).\n`
+      : `cats-runtime-mcp proxy preflight failed: ${inspection.probe.message}\n`;
+    process.stderr.write(statusLine);
+    process.stdout.write(`${JSON.stringify(inspection)}\n`);
+    if (inspection.probe.status !== 'ok') {
+      process.exitCode = 1;
+    }
     return;
   }
   const server = startMcpStdioServer({

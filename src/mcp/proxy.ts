@@ -20,6 +20,20 @@ export interface McpHttpProxyOptions {
   fetchImpl?: typeof fetch;
 }
 
+export interface McpProxyInspection {
+  target: {
+    url: string | null;
+    authorizationConfigured: boolean;
+    timeoutMs: number | null;
+  };
+  probe: {
+    status: 'ok' | 'error';
+    reason: string;
+    message: string;
+    httpStatus?: number;
+  };
+}
+
 interface JsonRpcResponseRecord {
   jsonrpc: '2.0';
   id: string | number | null;
@@ -143,6 +157,16 @@ function createProxyError(
   };
 }
 
+function isProxyTimeoutConfigurationError(message: string): boolean {
+  return message.includes(PROXY_TIMEOUT_ENV);
+}
+
+function toProxyConfigurationReason(message: string): string {
+  return isProxyTimeoutConfigurationError(message)
+    ? 'invalid_proxy_timeout'
+    : 'invalid_proxy_target';
+}
+
 async function parseResponseBody(response: Response): Promise<unknown> {
   const text = await response.text();
   if (!text.trim()) {
@@ -192,13 +216,10 @@ export function createHttpMcpProxyHandler(
       timeoutMs = resolveMcpProxyTimeoutMs(env);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Invalid MCP proxy target';
-      const reason = typeof message === 'string' && message.includes(PROXY_TIMEOUT_ENV)
-        ? 'invalid_proxy_timeout'
-        : 'invalid_proxy_target';
       return createProxyError(
         requestId,
         message,
-        reason,
+        toProxyConfigurationReason(message),
       );
     }
 
@@ -288,5 +309,76 @@ export function createHttpMcpProxyHandler(
         upstreamBody: body,
       },
     );
+  };
+}
+
+export async function inspectMcpProxy(
+  options: McpHttpProxyOptions = {},
+): Promise<McpProxyInspection> {
+  const env = options.env ?? process.env;
+  const authorizationConfigured = Boolean(resolveAuthorizationHeader(env));
+  let target: McpProxyTarget | undefined;
+  let timeoutMs: number | undefined;
+
+  try {
+    target = resolveMcpProxyTarget(env);
+    timeoutMs = resolveMcpProxyTimeoutMs(env);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Invalid MCP proxy configuration';
+    return {
+      target: {
+        url: target?.url ?? null,
+        authorizationConfigured,
+        timeoutMs: timeoutMs ?? null,
+      },
+      probe: {
+        status: 'error',
+        reason: toProxyConfigurationReason(message),
+        message,
+      },
+    };
+  }
+
+  const response = await createHttpMcpProxyHandler(options)({
+    jsonrpc: '2.0',
+    id: 'proxy-preflight',
+    method: 'ping',
+  });
+  if (response && 'result' in response) {
+    return {
+      target: {
+        url: target.url,
+        authorizationConfigured,
+        timeoutMs,
+      },
+      probe: {
+        status: 'ok',
+        reason: 'reachable',
+        message: `Primary cats-runtime MCP endpoint responded to ping at ${target.url}.`,
+      },
+    };
+  }
+
+  const proxyErrorData = response?.error?.data && typeof response.error.data === 'object'
+    ? response.error.data as Record<string, unknown>
+    : undefined;
+  const httpStatus = typeof proxyErrorData?.httpStatus === 'number'
+    ? proxyErrorData.httpStatus
+    : undefined;
+
+  return {
+    target: {
+      url: target.url,
+      authorizationConfigured,
+      timeoutMs,
+    },
+    probe: {
+      status: 'error',
+      reason: typeof proxyErrorData?.reason === 'string'
+        ? proxyErrorData.reason
+        : 'proxy_probe_failed',
+      message: response?.error?.message ?? 'Primary cats-runtime MCP endpoint did not return a usable preflight response.',
+      ...(typeof httpStatus === 'number' ? { httpStatus } : {}),
+    },
   };
 }

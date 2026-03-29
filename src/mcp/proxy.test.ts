@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   createHttpMcpProxyHandler,
+  inspectMcpProxy,
   resolveMcpProxyTarget,
   resolveMcpProxyTimeoutMs,
 } from './proxy.js';
@@ -306,6 +307,63 @@ describe('MCP HTTP proxy', () => {
           httpStatus: 504,
           timeoutMs: 2500,
         },
+      },
+    });
+  });
+
+  it('inspects proxy target and reports successful ping preflight', async () => {
+    const inspection = await inspectMcpProxy({
+      env: {
+        CATS_RUNTIME_MCP_PROXY_URL: 'http://127.0.0.1:4110/mcp',
+        CATS_RUNTIME_API_KEY: 'secret',
+        CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS: '1234',
+      },
+      fetchImpl: vi.fn(async () => new Response(JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'proxy-preflight',
+        result: { ok: true },
+      }), {
+        status: 200,
+        headers: {
+          'content-type': 'application/json',
+        },
+      })) as typeof fetch,
+    });
+
+    expect(inspection).toEqual({
+      target: {
+        url: 'http://127.0.0.1:4110/mcp',
+        authorizationConfigured: true,
+        timeoutMs: 1234,
+      },
+      probe: {
+        status: 'ok',
+        reason: 'reachable',
+        message: 'Primary cats-runtime MCP endpoint responded to ping at http://127.0.0.1:4110/mcp.',
+      },
+    });
+  });
+
+  it('inspects proxy target and preserves classified preflight failures', async () => {
+    const inspection = await inspectMcpProxy({
+      env: {
+        CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS: '5',
+      },
+      fetchImpl: vi.fn(async () => {
+        throw new TypeError('connect ECONNREFUSED');
+      }) as typeof fetch,
+    });
+
+    expect(inspection).toEqual({
+      target: {
+        url: 'http://127.0.0.1:3110/mcp',
+        authorizationConfigured: false,
+        timeoutMs: 5,
+      },
+      probe: {
+        status: 'error',
+        reason: 'upstream_unavailable',
+        message: 'Primary cats-runtime MCP endpoint is unavailable at http://127.0.0.1:3110/mcp. Start cats-runtime and retry.',
       },
     });
   });

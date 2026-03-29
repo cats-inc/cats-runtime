@@ -363,6 +363,9 @@ Operational notes:
 - `cats-runtime-mcp` applies a conservative upstream timeout by default; set
   `CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS` to override it, and timeout failures now
   surface as `reason: "upstream_timeout"` instead of generic unavailability
+- `cats-runtime-mcp --inspect-proxy` resolves the current proxy target, runs a
+  local `ping` preflight against the primary runtime, emits JSON to stdout, and
+  exits without starting the stdio MCP server
 
 ### Health
 

@@ -238,6 +238,9 @@ Operational notes:
 - the proxy now applies a conservative upstream timeout by default and returns
   a dedicated `upstream_timeout` MCP error when the primary runtime does not
   answer in time
+- `cats-runtime-mcp --inspect-proxy` is a local utility exit that resolves the
+  current proxy target, runs a `ping` preflight against the primary runtime,
+  emits JSON to stdout, and exits without starting the stdio MCP server
 
 Proxy target resolution order:
 

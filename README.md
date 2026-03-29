@@ -104,6 +104,8 @@ MCP usage:
   and does not start a second independent runtime core
 - set `CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS` to override the stdio proxy timeout
   when a stdio-only host needs a different upstream request window
+- run `cats-runtime-mcp --inspect-proxy` when you want a local JSON preflight
+  of the current proxy target, auth posture, timeout, and `ping` reachability
 
 ## Package-Ready Startup
 
