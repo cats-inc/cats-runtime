@@ -22,7 +22,8 @@
   },
   "bin": {
     "cats-runtime": "./dist/index.js",
-    "cats-runtime-mcp": "./dist/bin/mcp.js"
+    "cats-runtime-mcp": "./dist/bin/mcp.js",
+    "cats-runtime-workspace": "./dist/bin/workspaceSubstrate.js"
   },
   "files": [
     "dist",

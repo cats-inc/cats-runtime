@@ -235,6 +235,8 @@ collaboration/bootstrap baseline rather than a submodule dependency.
 | `tests/workspace-substrate.test.ts` | Modify | Cover the updated pilot A2A starter artifacts |
 | `docs/research/2026-03-29-a2a-pilot-second-wave-validation.md` | Create | Record second-wave bootstrap validation findings |
 | `docs/research/2026-03-29-project-bootstrap-collaboration-extraction-inventory.md` | Create | Freeze the minimum template/script semantics that still need a repo-owned rewrite |
+| `src/bin/workspaceSubstrate.ts` | Create | Repo-owned CLI helper for current workspace substrate audit/init/update semantics |
+| `tests/workspace-substrate-bin.test.ts` | Create | Lock the CLI helper behavior for preview/apply/review-copy flows |
 | `scripts/windows/*` | Later | Repo-owned collaboration/bootstrap helper rewrite replacing external initialize/update reliance |
 | `scripts/linux/*` | Later | Repo-owned non-Windows collaboration/bootstrap helper rewrite |
 | `docs/research/README.md` | Modify | Index the new validation note |
@@ -339,6 +341,7 @@ collaboration/bootstrap baseline rather than a submodule dependency.
 | 2026-03-29 | Completed one second-wave validation pass with `project-bootstrap` initialize/update tooling in a throwaway repo and recorded the resulting drift notes under `docs/research/` |
 | 2026-03-29 | Reopened the plan for pilot slice 2 so `project-bootstrap/templates/base` and initialize/update semantics are extracted and rewritten into repo-owned collaboration helpers before the repo split |
 | 2026-03-29 | Added a dedicated extraction inventory for the remaining `project-bootstrap` template families and initialize/update semantics that still need a repo-owned rewrite before split |
+| 2026-03-29 | Landed the first repo-owned helper surface via `cats-runtime-workspace`, exposing current workspace substrate audit/init/update semantics as a local CLI instead of only through runtime tools/tests |
 
 ---
 

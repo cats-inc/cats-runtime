@@ -107,6 +107,17 @@ MCP usage:
 - run `cats-runtime-mcp --inspect-proxy` when you want a local JSON preflight
   of the current proxy target, auth posture, timeout, and `ping` reachability
 
+Workspace substrate helper:
+
+- use `cats-runtime-workspace` when you need a repo-owned CLI helper for
+  `audit-workspace`, `init-workspace`, or `update-workspace`
+- the helper prints JSON to stdout and uses the same conservative
+  create/update/review-copy semantics as the runtime-owned workspace substrate
+- example preview:
+  `cats-runtime-workspace --operation audit --workspace-path . --profile standard --agent codex`
+- example apply:
+  `cats-runtime-workspace --operation update --workspace-path . --profile a2a-enabled --agent codex --apply --actor-role boss_cat`
+
 ## Package-Ready Startup
 
 `cats-runtime` is now shaped for repo-local executable package verification, and
