@@ -1604,6 +1604,9 @@ backends:
               extended: expect.objectContaining({
                 totalTools: 31,
               }),
+              readOnly: expect.objectContaining({
+                totalTools: 16,
+              }),
             }),
             summary: expect.stringContaining('Runtime tooling exposes'),
           }),
@@ -2317,8 +2320,22 @@ backends:
                   deployment: 4,
                 },
               },
+              readOnly: {
+                totalTools: 16,
+                mutatingTools: 0,
+                readOnlyCompatibleTools: 16,
+                domains: {
+                  filesystem: 5,
+                  search: 2,
+                  shell: 0,
+                  workspace: 1,
+                  delivery: 2,
+                  review: 3,
+                  deployment: 3,
+                },
+              },
             },
-            summary: 'Runtime tooling exposes 28 tools in the standard profile and 31 in the extended profile.',
+            summary: 'Runtime tooling exposes 28 tools in the standard profile, 31 in the extended profile, and 16 in the read_only profile.',
           },
         },
         skills: {

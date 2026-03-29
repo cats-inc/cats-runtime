@@ -706,9 +706,9 @@ integrate against:
 - runtime skill catalog metadata under `runtime.skills`, including the resolved
   root path, loaded/empty/missing state, package counts by family/package kind,
   and delivery-hint totals
-- runtime tooling metadata under `runtime.tools`, including bounded standard
-  and extended profile summaries with total-tool, mutating-tool,
-  read-only-compatible, and broad domain counts
+- runtime tooling metadata under `runtime.tools`, including bounded
+  `standard`, `extended`, and `read_only` profile summaries with total-tool,
+  mutating-tool, read-only-compatible, and broad domain counts
 - runtime delivery metadata under `runtime.delivery`, including the bounded
   action catalog, preview-default/approval posture, capability keys, and
   preview-surface kinds

@@ -78,6 +78,7 @@ export interface RuntimeToolCatalogSummary {
   profiles: {
     standard: RuntimeToolProfileSummary;
     extended: RuntimeToolProfileSummary;
+    readOnly: RuntimeToolProfileSummary;
   };
   summary: string;
 }
@@ -813,7 +814,9 @@ export function buildToolPolicyInspection(input: {
 }
 
 export function buildRuntimeToolCatalogSummary(): RuntimeToolCatalogSummary {
-  const summarizeProfile = (toolProfile: 'standard' | 'extended'): RuntimeToolProfileSummary => {
+  const summarizeProfile = (
+    toolProfile: 'standard' | 'extended' | 'read_only',
+  ): RuntimeToolProfileSummary => {
     const inspection = buildToolPolicyInspection({
       toolProfile,
       permissionMode: 'skip',
@@ -850,12 +853,14 @@ export function buildRuntimeToolCatalogSummary(): RuntimeToolCatalogSummary {
 
   const standard = summarizeProfile('standard');
   const extended = summarizeProfile('extended');
+  const readOnly = summarizeProfile('read_only');
   return {
     profiles: {
       standard,
       extended,
+      readOnly,
     },
-    summary: `Runtime tooling exposes ${standard.totalTools} tools in the standard profile and ${extended.totalTools} in the extended profile.`,
+    summary: `Runtime tooling exposes ${standard.totalTools} tools in the standard profile, ${extended.totalTools} in the extended profile, and ${readOnly.totalTools} in the read_only profile.`,
   };
 }
 
