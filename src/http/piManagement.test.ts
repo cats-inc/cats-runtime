@@ -8,14 +8,7 @@ import type { CliRuntimeConfig } from '../backends/cli/config.js';
 import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
 import { resolvePiResumeTarget } from '../backends/cli/pi/resume.js';
 import { resolveRuntimeSkillManifest } from '../core/skills/catalog.js';
-
-function parseNdjson(text: string): Array<Record<string, unknown>> {
-  return text
-    .trim()
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => JSON.parse(line));
-}
+import { parseCoreNdjson as parseNdjson } from '../../tests/streamEventTestUtils.js';
 
 describe('Pi session management', () => {
   let rootDir: string;

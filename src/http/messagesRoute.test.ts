@@ -14,14 +14,7 @@ import type { OpencodeNativeSessionService } from '../backends/cli/opencode/Open
 import type { ProviderModelCatalogService } from '../core/models/providerModelCatalog.js';
 import type { StreamEvent, TurnInput } from '../core/types.js';
 import { createRuntimeStartupState } from '../startup.js';
-
-function parseNdjson(text: string): Array<Record<string, unknown>> {
-  return text
-    .trim()
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => JSON.parse(line));
-}
+import { parseCoreNdjson as parseNdjson } from '../../tests/streamEventTestUtils.js';
 
 function makeConfig(
   sessionBaseDir: string,

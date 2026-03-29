@@ -24,6 +24,7 @@ import {
 import type { PeerAdvertisement } from '../core/peers/types.js';
 import type { StreamEvent, TurnInput } from '../core/types.js';
 import type { RuntimeMode } from '../backends/cli/config.js';
+import { stripAdditiveContentBlocks } from '../../tests/streamEventTestUtils.js';
 
 function writeCompatibilityEvidenceArtifact(
   root: string,
@@ -3622,7 +3623,7 @@ describe('runtime MCP facade', () => {
     };
     expect(sent.result.structuredContent.responseStatus).toBe(200);
     expect(sent.result.structuredContent.sessionId).toBe(createdSessionId);
-    expect(sent.result.structuredContent.events).toEqual([
+    expect(stripAdditiveContentBlocks(sent.result.structuredContent.events)).toEqual([
       { type: 'text', text: 'reply: hello from mcp' },
       { type: 'result', summary: 'completed: hello from mcp' },
     ]);

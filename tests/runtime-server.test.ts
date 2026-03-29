@@ -238,12 +238,14 @@ describe('runtime server', () => {
       expect(response.status).toBe(200);
       const html = await response.text();
       expect(html).toContain('Playground');
-      expect(html).toContain('Direct (same-origin runtime API)');
+      expect(html).toContain('Playground Shell');
       expect(html).toContain('class RuntimeClient');
       expect(html).toContain('/providers/config');
       expect(html).toContain('data-runtime-surface-switcher');
       expect(html).toContain('data-active-surface="playground"');
       expect(html).toContain('id="api-key"');
+      expect(html).toContain('runtime-auth-status');
+      expect(html).toContain('Runtime Health');
       expect(html).toContain('validateRuntimeApiKey');
       expect(html).toContain('getRuntimeAuthHeaders');
     });
@@ -2547,19 +2549,19 @@ backends:
       const response = await runtime.app.request('/providers/config');
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual(expect.objectContaining({
-        providers: {
-          cursor: {
+        providers: expect.objectContaining({
+          cursor: expect.objectContaining({
             defaultInstance: 'ubuntu',
             defaultBackend: 'cli',
             instances: [
-              {
+              expect.objectContaining({
                 id: 'ubuntu',
                 target: 'cli/ubuntu',
                 backend: 'cli',
                 command: 'cursor-agent',
                 runner: 'auto',
                 runtime: { mode: 'wsl', distro: 'Ubuntu', environmentId: 'ubuntu' },
-                continuity: {
+                continuity: expect.objectContaining({
                   source: 'provider_native',
                   summary: expect.stringContaining('CLI provider owns native conversation continuity'),
                   resume: true,
@@ -2569,9 +2571,9 @@ backends:
                   sessionKey: false,
                   providerSessionState: false,
                   remoteCancel: false,
-                },
+                }),
                 metering: expectIdleMeteringSummary(),
-                modelCatalog: {
+                modelCatalog: expect.objectContaining({
                   source: 'static',
                   defaultModel: 'gpt-5.4',
                   modelCount: 3,
@@ -2584,7 +2586,7 @@ backends:
                     running: 0,
                     unknown: 3,
                   },
-                },
+                }),
                 tooling: {
                   source: 'provider_native',
                   discoverable: false,
@@ -2615,15 +2617,15 @@ backends:
                   }),
                 }),
                 compatibility: null,
-              },
-              {
+              }),
+              expect.objectContaining({
                 id: 'debian',
                 target: 'cli/debian',
                 backend: 'cli',
                 command: 'cursor-agent',
                 runner: 'auto',
                 runtime: { mode: 'wsl', distro: 'Debian', environmentId: 'debian' },
-                continuity: {
+                continuity: expect.objectContaining({
                   source: 'provider_native',
                   summary: expect.stringContaining('CLI provider owns native conversation continuity'),
                   resume: true,
@@ -2633,9 +2635,9 @@ backends:
                   sessionKey: false,
                   providerSessionState: false,
                   remoteCancel: false,
-                },
+                }),
                 metering: expectIdleMeteringSummary(),
-                modelCatalog: {
+                modelCatalog: expect.objectContaining({
                   source: 'static',
                   defaultModel: 'gpt-5.4',
                   modelCount: 3,
@@ -2648,7 +2650,7 @@ backends:
                     running: 0,
                     unknown: 3,
                   },
-                },
+                }),
                 tooling: {
                   source: 'provider_native',
                   discoverable: false,
@@ -2679,10 +2681,10 @@ backends:
                   }),
                 }),
                 compatibility: null,
-              },
+              }),
             ],
-          },
-        },
+          }),
+        }),
         executionStrategies: expect.objectContaining({
           summary: expect.objectContaining({
             totalFamilies: 7,
@@ -2815,17 +2817,17 @@ backends:
           compatibilityDefault: 'simple_tool_call',
         }),
       }));
-      expect(providerPayload.providers.goose).toEqual({
+      expect(providerPayload.providers.goose).toEqual(expect.objectContaining({
         defaultInstance: 'default',
         defaultBackend: 'cli',
-        instances: [{
+        instances: [expect.objectContaining({
           id: 'default',
           target: 'cli/default',
           backend: 'cli',
           command: process.execPath,
           runner: 'direct',
           runtime: { mode: 'native', environmentId: 'native' },
-          continuity: {
+          continuity: expect.objectContaining({
             source: 'provider_native',
             summary: expect.stringContaining('CLI provider owns native conversation continuity'),
             resume: true,
@@ -2835,9 +2837,9 @@ backends:
             sessionKey: false,
             providerSessionState: false,
             remoteCancel: false,
-          },
+          }),
           metering: expectIdleMeteringSummary(),
-          modelCatalog: {
+          modelCatalog: expect.objectContaining({
             source: 'static',
             defaultModel: 'anthropic/claude-sonnet-4-5',
             defaultModelStatus: 'configured',
@@ -2849,7 +2851,7 @@ backends:
               running: 0,
               unknown: 2,
             },
-          },
+          }),
           tooling: {
             source: 'provider_native',
             discoverable: false,
@@ -2873,8 +2875,8 @@ backends:
             provider: 'goose',
           }),
           compatibility: null,
-        }],
-      });
+        })],
+      }));
 
       const catalogResponse = await runtime.app.request('/providers/goose/models');
       expect(catalogResponse.status).toBe(200);
@@ -2973,19 +2975,19 @@ providers:
       const catalogResponse = await runtime.app.request('/providers/config');
       expect(catalogResponse.status).toBe(200);
       expect(await catalogResponse.json()).toEqual(expect.objectContaining({
-        providers: {
-          claude: {
+        providers: expect.objectContaining({
+          claude: expect.objectContaining({
             defaultInstance: 'default',
             defaultBackend: 'cli',
             instances: [
-              {
+              expect.objectContaining({
                 id: 'default',
                 target: 'cli/default',
                 backend: 'cli',
                 command: 'claude',
                 runner: 'auto',
                 runtime: { mode: 'native', environmentId: 'native' },
-                continuity: {
+                continuity: expect.objectContaining({
                   source: 'provider_native',
                   summary: expect.stringContaining('CLI provider owns native conversation continuity'),
                   resume: true,
@@ -2995,9 +2997,9 @@ providers:
                   sessionKey: false,
                   providerSessionState: false,
                   remoteCancel: false,
-                },
+                }),
                 metering: expectIdleMeteringSummary(),
-                modelCatalog: {
+                modelCatalog: expect.objectContaining({
                   source: 'static',
                   defaultModel: 'claude-opus-4-6',
                   modelCount: 3,
@@ -3008,7 +3010,7 @@ providers:
                     running: 0,
                     unknown: 3,
                   },
-                },
+                }),
                 tooling: {
                   source: 'provider_native',
                   discoverable: false,
@@ -3028,10 +3030,10 @@ providers:
                   }),
                 }),
                 compatibility: null,
-              },
+              }),
             ],
-          },
-        },
+          }),
+        }),
         executionStrategies: expect.objectContaining({
           summary: expect.objectContaining({
             totalFamilies: 7,

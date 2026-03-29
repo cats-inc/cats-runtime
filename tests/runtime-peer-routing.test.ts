@@ -4,14 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../src/core/config.js';
 import { createRuntimeServer } from '../src/server.js';
-
-function parseNdjson(text: string): Array<Record<string, unknown>> {
-  return text
-    .trim()
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => JSON.parse(line));
-}
+import { parseCoreNdjson as parseNdjson } from './streamEventTestUtils.js';
 
 function parseSse(text: string): Array<Record<string, unknown>> {
   return text

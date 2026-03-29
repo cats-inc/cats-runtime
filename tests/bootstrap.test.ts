@@ -1002,7 +1002,7 @@ describe('bootstrap mode server', () => {
     }
   });
 
-  it('GET /dashboard includes shared UI and scan panel', async () => {
+  it('GET /dashboard includes the shared runtime shell', async () => {
     const { root, cleanup } = createTestRoot();
     try {
       const env = createTestEnv(root);
@@ -1016,10 +1016,10 @@ describe('bootstrap mode server', () => {
         const html = await response.text();
         expect(html).toContain('Cats Runtime Dashboard');
         expect(html).toContain('data-cats-ui');
-        expect(html).toContain('data-cats-scan-panel');
         expect(html).toContain('data-runtime-surface-switcher');
         expect(html).toContain('data-active-surface="dashboard"');
-        expect(html).toContain('scanPanelManualBtn');
+        expect(html).toContain('Runtime Health');
+        expect(html).toContain('runtimeAuthStatus');
         expect(html).toContain('providerCapabilityPreview');
         expect(html).toContain('chatSessionInsights');
       } finally {

@@ -54,6 +54,7 @@ export interface PlaywrightBrowserDriverOptions {
 }
 
 const DEFAULT_NAVIGATION_TIMEOUT_MS = 15_000;
+const WINDOWS_ABSOLUTE_PATH_PATTERN = /^[a-zA-Z]:[\\/]/;
 
 export class PlaywrightBrowserDriver implements RuntimeBrowserDriver {
   readonly descriptor: RuntimeBrowserDriverDescriptor;
@@ -260,6 +261,10 @@ function resolveNavigationTarget(input: RuntimeBrowserDriverOpenPageInput): stri
     return input.target.url;
   }
   if (input.target.path) {
+    if (WINDOWS_ABSOLUTE_PATH_PATTERN.test(input.target.path)) {
+      const normalizedPath = input.target.path.replace(/\\/g, '/');
+      return new URL(`file:///${normalizedPath}`).href;
+    }
     return pathToFileURL(input.target.path).href;
   }
   throw new RuntimeBrowserValidationError('Playwright browser pages require a url or path.');

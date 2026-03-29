@@ -16,7 +16,21 @@
     --yellow: #facc15;
     --red: #f87171;
     --orange: #fb923c;
+    --radius: 1rem;
     --sidebar-width: 20rem;
+    --auggie: #f97316;
+    --claude: #c084fc;
+    --codex: #60a5fa;
+    --copilot: #38bdf8;
+    --cursor: #f472b6;
+    --cursorp: #f472b6;
+    --gemini: #facc15;
+    --kiro: #4ade80;
+    --opencode: #fb7185;
+    --pi: #22d3ee;
+    --goose: #a3e635;
+    --junie: #fb923c;
+    --ollama: #94a3b8;
   }
 
   * {

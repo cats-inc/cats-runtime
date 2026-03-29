@@ -9,14 +9,7 @@ import {
   PROVIDER_EVOLUTION_PROBE_PROFILES,
 } from '../src/core/compatibility/providerEvolutionProbe.js';
 import { createRuntimeServer } from '../src/server.js';
-
-function parseNdjson(text: string): Array<Record<string, unknown>> {
-  return text
-    .trim()
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => JSON.parse(line));
-}
+import { parseCoreNdjson as parseNdjson } from './streamEventTestUtils.js';
 
 function createAgentConfigRoot(options: { model?: string } = {}) {
   const model = options.model || 'openclaw-coder';

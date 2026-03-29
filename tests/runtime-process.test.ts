@@ -1236,6 +1236,7 @@ describe('runtime process startup contract', () => {
     const { env, cleanup } = createRuntimeProcessEnv(3220);
     env.TEMP = isolatedTempRoot;
     env.TMP = isolatedTempRoot;
+    env.TMPDIR = isolatedTempRoot;
     const child = spawnSetupDiagnostic([
       '--cleanup-temp-dirs',
       '--cleanup-temp-age-hours',
