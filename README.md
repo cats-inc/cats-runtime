@@ -103,6 +103,16 @@ Embedded UIs:
 - `npm install -g cats-runtime` then `cats-runtime`
 - `npx cats-runtime` once the package is published
 
+For local packaged-flow verification before publish, use the platform helper
+scripts:
+
+- Linux: `./scripts/linux/pack-install.sh`
+- macOS: `./scripts/macos/pack-install.sh`
+- Windows: `.\scripts\windows\Pack-Install.ps1`
+
+Each helper supports interactive install/delete prompts plus explicit
+`--pack-only`, `--install`, `--clean`, and `--skip-build` modes.
+
 The executable package starts the same runtime entrypoint as `npm start` and
 supports either bootstrap-first startup with no preexisting `providers.yaml`,
 or a preseeded valid config / equivalent environment overrides.
@@ -125,7 +135,7 @@ The executable entry also supports:
 - `--port <bind-port>`
 - `--config <providers-config-path>`
 
-For packaged-style local verification before publish:
+For direct packaged-style local verification before publish:
 
 ```powershell
 npm run build
