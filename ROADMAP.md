@@ -465,7 +465,7 @@ schemas.
 ### OPT-6: Runtime Skill Catalog Cache and Discovery Hardening
 
 **Priority**: P2
-**Status**: In Progress
+**Status**: Completed
 
 #### Problem
 
@@ -480,8 +480,8 @@ small cache/discovery hardening gaps were:
   normal skill-package edits but can miss ultra-fast same-second rewrites on
   low-resolution filesystems
 
-These are not correctness blockers for the current skill library rollout, but
-they are worth cleaning up before the library grows further.
+Those were not correctness blockers for the current skill library rollout, but
+they were worth cleaning up before the library grew further.
 
 #### Direction
 
@@ -493,6 +493,12 @@ skill execution contract.
   rules
 - Keep this follow-up internal to `cats-runtime`; do not change the public
   requested/resolved/applied skill contract just to service cache maintenance
+
+#### Outcome
+
+This optimization is now landed. Later skill-library work should treat cache
+and discovery hardening as baseline and focus on publish/lint discipline,
+reference-authoring workflow, and bundle/composition follow-through instead.
 
 #### Current Implementation Status
 
@@ -569,10 +575,12 @@ execution/materialization engine.
   - no automatic shadow sync into `skills/`
 - Add bundle/composition metadata once Team 6 is ready to consume grouped role
   packages without pushing product-specific profile logic into runtime
-- Harden recursive catalog discovery before treating the library root as
-  anything broader than versioned runtime-owned content
 - Keep requested skill ids stable while improving library discovery,
   observability, and publish discipline
+
+The discovery/cache hardening prerequisite is now complete through `OPT-6`, so
+the remaining work here is explicitly about authoring, publishing, and later
+composition semantics rather than another round of catalog traversal safety.
 
 #### Current Implementation Status
 
@@ -590,9 +598,15 @@ execution/materialization engine.
   plus Pi/API/agent execution paths instead of stopping at catalog resolution
 - `npm run verify:skills` now provides a dedicated runtime-owned verification
   command for shipped skill packages
+- `npm run verify:skills` now also enforces explicit richer metadata on shipped
+  runtime-owned `skills/` packages instead of silently accepting catalog-derived
+  defaults for required fields
 - recursive discovery hardening now rejects symbolic-link/junction entries and
   enforces a bounded traversal depth instead of assuming a perfectly
   well-formed repo-owned tree forever
+- runtime diagnostics now also expose compact shipped-library truth through
+  `runtime.skills`, including the catalog fingerprint, cache-size summaries,
+  and discovery-guard metadata (`maxDepth`, `symbolicLinksAllowed`)
 - richer publish/lint discipline, reference-authoring workflow, and
   bundle/composition metadata still remain deferred
 
@@ -1137,14 +1151,19 @@ evidence bundles and does not force hosts to invent their own report format.
 - setup reports now also carry bounded `references.providerEvolutionArtifacts[]`
   metadata so operators can jump from a shareable setup report to the latest
   retained provider-evolution artifacts without embedding full evidence payloads
+- persisted setup reports now also reuse the same shared repair summary as
+  `GET /setup-state`, so preferred scan source, next-action guidance, and
+  ordered repair actions no longer drift between the two read surfaces
+- the non-server CLI summary path now surfaces the same repair and next-action
+  guidance on stderr while preserving stdout JSON for automation
 - first-slice retention keeps only a bounded number of recent report artifacts
 
 #### Follow-through Direction
 
-- decide whether later host/CLI entry points should also emit a concise
-  human-readable summary alongside the JSON artifact
 - extend the report only through shared bootstrap/setup services rather than
   creating a second standalone setup detection stack
+- keep later shared-UI/bootstrap work coordinated with, but not a blocker for,
+  report-service truth and operator guidance improvements
 - keep broad repair flows additive and runtime-owned rather than scattering
   setup heuristics across dashboard/setup page scripts
 

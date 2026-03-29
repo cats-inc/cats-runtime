@@ -8,6 +8,7 @@ import {
   listRuntimeSkillCatalog,
   mergeRuntimeSkillInstructions,
   resolveRuntimeSkillManifest,
+  verifyRuntimeSkillCatalog,
 } from './catalog.js';
 
 describe('runtime skill catalog', () => {
@@ -75,6 +76,34 @@ describe('runtime skill catalog', () => {
     ];
     writeFileSync(join(skillDir, 'SKILL.md'), lines.join('\n'), 'utf8');
     return skillDir;
+  }
+
+  function writeRuntimeOwnedSkillPackage(
+    skillsRoot: string,
+    skillId: string,
+    options: {
+      family: string;
+      role?: string;
+      packageKind?: string;
+      capabilityTags?: string[];
+      productTags?: string[];
+      deliveryHints?: string[];
+      recommendedCompanions?: string[];
+    },
+  ) {
+    return writeSkillPackage(skillsRoot, skillId, {
+      family: options.family,
+      slug: skillId,
+      role: options.role ?? skillId.replace(/-/g, '_'),
+      packageKind: options.packageKind ?? 'role',
+      version: '1.0.0',
+      capabilityTags: options.capabilityTags ?? [`${skillId}-capability`],
+      productTags: options.productTags ?? [`${options.family}-product`],
+      deliveryHints: options.deliveryHints ?? ['instructions'],
+      ...(options.recommendedCompanions
+        ? { recommendedCompanions: options.recommendedCompanions }
+        : {}),
+    });
   }
 
   it('materializes filesystem skills for Codex isolated workspaces', () => {
@@ -527,6 +556,51 @@ describe('runtime skill catalog', () => {
       },
       summary: '2 runtime skill(s) across 2 families are available.',
     });
+  });
+
+  it('verifies shipped runtime-owned skill metadata without requiring recommended companions', () => {
+    const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
+    cleanupPaths.push(sessionBaseDir);
+    const skillsRoot = join(sessionBaseDir, 'skills');
+    writeRuntimeOwnedSkillPackage(skillsRoot, 'coordinator', {
+      family: 'orchestration',
+      recommendedCompanions: ['companion'],
+    });
+    writeRuntimeOwnedSkillPackage(skillsRoot, 'repo-maintainer', {
+      family: 'code',
+    });
+
+    expect(verifyRuntimeSkillCatalog(skillsRoot)).toEqual({
+      rootPath: skillsRoot,
+      totalSkills: 2,
+      requiredFields: [
+        'family',
+        'slug',
+        'role',
+        'packageKind',
+        'version',
+        'capabilityTags',
+        'productTags',
+        'deliveryHints',
+      ],
+      optionalFields: ['recommendedCompanions'],
+    });
+  });
+
+  it('fails verification when a runtime-owned skill relies on derived metadata defaults', () => {
+    const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
+    cleanupPaths.push(sessionBaseDir);
+    const skillsRoot = join(sessionBaseDir, 'skills');
+    writeSkillPackage(skillsRoot, 'coordinator', {
+      family: 'orchestration',
+      capabilityTags: ['coordination'],
+      productTags: ['ops'],
+      deliveryHints: ['instructions'],
+    });
+
+    expect(() => verifyRuntimeSkillCatalog(skillsRoot)).toThrowError(
+      "Runtime-owned skill 'coordinator' must explicitly declare frontmatter fields: 'slug', 'role', 'packageKind', 'version'.",
+    );
   });
 
   it('resolves nested family packages by requested skill id', () => {

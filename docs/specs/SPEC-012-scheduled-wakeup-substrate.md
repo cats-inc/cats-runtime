@@ -188,6 +188,9 @@ creation.
 - The latest follow-through slice adds bounded due/failed request samples on
   runtime-wide wakeup diagnostics so operators can inspect backlog hotspots
   without first listing every retained request.
+- Remaining follow-through is explicitly substrate-only: broader retry/backoff,
+  future bootstrap-owned wake targets, and richer diagnostics may still land,
+  but product workflow/orchestration policy remains out of scope for this spec.
 
 ## Dependencies
 

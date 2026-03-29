@@ -32,6 +32,19 @@ const SKILLS_ROOT = path.resolve(fileURLToPath(new URL('../../../skills/', impor
 const CODER_SKILLS_ROOT = path.join('.agents', 'skills');
 const RUNTIME_SKILL_STATE_ROOT = '.runtime-skills';
 const MAX_RUNTIME_SKILL_DISCOVERY_DEPTH = 6;
+const REQUIRED_RUNTIME_LIBRARY_FRONTMATTER_FIELDS = [
+  'family',
+  'slug',
+  'role',
+  'packageKind',
+  'version',
+  'capabilityTags',
+  'productTags',
+  'deliveryHints',
+] as const;
+const OPTIONAL_RUNTIME_LIBRARY_FRONTMATTER_FIELDS = [
+  'recommendedCompanions',
+] as const;
 const INSTRUCTION_DELIVERY_CLI_PROVIDERS = new Set([
   'claude',
   'gemini',
@@ -60,6 +73,7 @@ interface RuntimeSkillPackage {
   entryFile: string;
   body: string;
   fingerprint: string;
+  frontmatter: RuntimeSkillFrontmatter;
   library: RuntimeSkillLibraryMetadata;
 }
 
@@ -193,6 +207,13 @@ export interface RuntimeSkillCatalogInspection {
     symbolicLinksAllowed: false;
   };
   summary: string;
+}
+
+export interface RuntimeSkillCatalogVerification {
+  rootPath: string;
+  totalSkills: number;
+  requiredFields: string[];
+  optionalFields: string[];
 }
 
 function normalizeOptionalToken(value: string | undefined): string | undefined {
@@ -536,8 +557,30 @@ function parseSkillMarkdown(
     entryFile,
     body,
     fingerprint: computeFingerprint(raw),
+    frontmatter,
     library: buildRuntimeSkillLibraryMetadata(skillId, frontmatter, entryFile, skillsRoot),
   };
+}
+
+function hasOwnFrontmatterField(
+  frontmatter: RuntimeSkillFrontmatter,
+  fieldName: keyof RuntimeSkillFrontmatter,
+): boolean {
+  return Object.prototype.hasOwnProperty.call(frontmatter, fieldName);
+}
+
+function verifyRuntimeOwnedSkillPackageFrontmatter(skillPackage: RuntimeSkillPackage): void {
+  const missingFields = REQUIRED_RUNTIME_LIBRARY_FRONTMATTER_FIELDS.filter(
+    (fieldName) => !hasOwnFrontmatterField(skillPackage.frontmatter, fieldName),
+  );
+  if (missingFields.length > 0) {
+    throw new RuntimeSkillError(
+      `Runtime-owned skill '${skillPackage.id}' must explicitly declare frontmatter fields: ${
+        missingFields.map((fieldName) => `'${fieldName}'`).join(', ')
+      }.`,
+      'invalid_skill_package',
+    );
+  }
 }
 
 function readRuntimeSkillEntrySource(entryFile: string): RuntimeSkillEntrySource {
@@ -821,6 +864,36 @@ export function inspectRuntimeSkillCatalog(
       symbolicLinksAllowed: false,
     },
     summary: `${skills.length} runtime skill(s) across ${familyCount} famil${familyCount === 1 ? 'y' : 'ies'} are available.`,
+  };
+}
+
+export function verifyRuntimeSkillCatalog(
+  skillsRoot: string = SKILLS_ROOT,
+): RuntimeSkillCatalogVerification {
+  if (!existsSync(skillsRoot)) {
+    throw new RuntimeSkillError(
+      'Runtime skills root is missing.',
+      'invalid_skill_package',
+    );
+  }
+
+  const skillPackages = buildRuntimeSkillCatalogPackages(skillsRoot);
+  if (skillPackages.length === 0) {
+    throw new RuntimeSkillError(
+      'Runtime skills root is present but no runtime skill packages were discovered.',
+      'invalid_skill_package',
+    );
+  }
+
+  for (const skillPackage of skillPackages) {
+    verifyRuntimeOwnedSkillPackageFrontmatter(skillPackage);
+  }
+
+  return {
+    rootPath: skillsRoot,
+    totalSkills: skillPackages.length,
+    requiredFields: [...REQUIRED_RUNTIME_LIBRARY_FRONTMATTER_FIELDS],
+    optionalFields: [...OPTIONAL_RUNTIME_LIBRARY_FRONTMATTER_FIELDS],
   };
 }
 

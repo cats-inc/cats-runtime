@@ -224,6 +224,12 @@ The setup report should not become the new canonical evidence fixture format.
   [PLAN-024](../plans/PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md),
   while `PROGRESS.md` / `ROADMAP.md` still carry the broader bootstrap/setup
   status.
+- Setup reports and `GET /setup-state` now reuse the same repair-summary truth,
+  and the non-server CLI path now surfaces that same next-action guidance
+  without inventing a second setup stack.
+- Remaining follow-through stays additive and coordinated with broader
+  bootstrap/UI work; it does not depend on a shared-UI redesign to keep setup
+  report truth accurate.
 
 ## Dependencies
 

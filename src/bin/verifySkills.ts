@@ -1,11 +1,11 @@
 import process from 'node:process';
 
-import { listRuntimeSkillCatalog } from '../core/skills/catalog.js';
+import { verifyRuntimeSkillCatalog } from '../core/skills/catalog.js';
 
 try {
-  const skills = listRuntimeSkillCatalog();
+  const verification = verifyRuntimeSkillCatalog();
   process.stdout.write(
-    `[cats-runtime] verified ${skills.length} runtime skill packages\n`,
+    `[cats-runtime] verified ${verification.totalSkills} runtime-owned skill packages with ${verification.requiredFields.length} explicit metadata fields\n`,
   );
 } catch (error) {
   const message = error instanceof Error ? error.stack ?? error.message : String(error);

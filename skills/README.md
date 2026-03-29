@@ -90,6 +90,26 @@ Field notes:
 Custom local skills may omit the richer metadata and still pass the baseline
 runtime-managed skills validator, but runtime-owned library packages should not.
 
+## Verification Gate
+
+`npm run verify:skills` is the runtime-owned publish gate for shipped
+`cats-runtime/skills/` packages.
+
+It now requires every shipped runtime-owned skill to explicitly declare these
+frontmatter fields instead of relying on catalog-derived defaults:
+
+- `family`
+- `slug`
+- `role`
+- `packageKind`
+- `version`
+- `capabilityTags`
+- `productTags`
+- `deliveryHints`
+
+`recommendedCompanions` remains optional. When a shipped skill has no pairing
+hints, it may omit the field or declare an empty array explicitly.
+
 ## Families
 
 ### `orchestration`

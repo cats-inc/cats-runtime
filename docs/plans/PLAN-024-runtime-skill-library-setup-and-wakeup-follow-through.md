@@ -78,7 +78,10 @@ Priority is re-evaluated as:
 - [x] Strengthen runtime-owned skill catalog diagnostics and verification only
       where they improve shipped-library truth by surfacing catalog
       fingerprint/cache/guard metadata through runtime diagnostics
-- [ ] Update skill-library docs and implementation tracking so the remaining
+- [x] Add a runtime-owned publish gate that requires shipped `skills/` packages
+      to explicitly declare the richer metadata promised in `skills/README.md`
+      instead of relying on catalog-derived defaults
+- [x] Update skill-library docs and implementation tracking so the remaining
       work no longer hides only in roadmap bullets
 
 **Deliverables**: runtime skill discovery is harder to break accidentally, and
@@ -91,7 +94,7 @@ Priority is re-evaluated as:
       drifting on preferred-scan, next-action, and ordered follow-up actions
 - [x] Prefer bounded operator summary/report improvements over broad setup UI
       rewrites
-- [ ] Keep setup-report follow-through coordinated with, but not blocked on,
+- [x] Keep setup-report follow-through coordinated with, but not blocked on,
       larger bootstrap/UI work
 
 **Deliverables**: setup diagnostics gain clearer operator follow-through
@@ -102,8 +105,8 @@ without inventing a second setup stack.
 - [x] Land a bounded wakeup diagnostics slice that keeps runtime-wide
       scheduling/backlog truth additive by exposing sampled due/failed requests
       alongside the existing aggregate summary
-- [ ] Keep later product workflow/orchestration policy explicitly out of scope
-- [ ] Update wakeup docs/spec tracking so remaining work is separated from
+- [x] Keep later product workflow/orchestration policy explicitly out of scope
+- [x] Update wakeup docs/spec tracking so remaining work is separated from
       already-landed substrate behavior
 
 **Deliverables**: wakeup follow-through becomes easier to reason about without
@@ -162,9 +165,11 @@ turning the runtime into a full scheduler/orchestrator.
 | 2026-03-29 | Plan created to consolidate important follow-through previously tracked only in `PROGRESS.md` / `ROADMAP.md` |
 | 2026-03-29 | Phase 1 slice 1 landed: runtime skill catalog discovery now enforces bounded traversal depth and rejects symbolic-link/junction entries instead of assuming a perfectly well-formed checked-in tree |
 | 2026-03-29 | Phase 1 slice 2 landed: runtime skill diagnostics now expose a compact catalog fingerprint plus cache/discovery-guard metadata so hosts can inspect shipped-library truth without importing the skill catalog internals |
+| 2026-03-29 | Phase 1 slice 3 landed: `npm run verify:skills` now fails when shipped runtime-owned skills rely on derived defaults for required metadata fields (`family`, `slug`, `role`, `packageKind`, `version`, `capabilityTags`, `productTags`, `deliveryHints`) instead of declaring them explicitly in frontmatter |
 | 2026-03-29 | Phase 2 slice 1 landed: persisted setup diagnostic reports now reuse the same shared repair-summary builder as `GET /setup-state`, so setup artifacts carry preferred-scan, next-action, and ordered follow-up actions instead of stopping at issue lists |
 | 2026-03-29 | Phase 2 slice 2 landed: non-server setup-diagnostic stderr summaries now reuse the persisted report's repair summary and next-action guidance instead of stopping at the report headline alone |
 | 2026-03-29 | Phase 3 slice 1 landed: runtime wakeup diagnostics snapshots now expose bounded due/failed request samples alongside the aggregate summary so operators can inspect backlog hotspots without first listing every wakeup |
+| 2026-03-29 | Governance follow-through landed: roadmap/spec tracking now reflects that skill-library discovery hardening is complete, setup-report truth is coordinated with but not blocked on larger bootstrap/UI work, and wakeup follow-through remains substrate-only rather than product orchestration |
 
 ---
 

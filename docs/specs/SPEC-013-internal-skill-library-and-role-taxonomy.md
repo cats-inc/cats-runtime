@@ -262,6 +262,12 @@ runtime-managed skill execution flow
 - Follow-through now also projects catalog fingerprint/cache/guard truth through
   runtime diagnostics so hosts and operators can inspect shipped-library state
   without importing the catalog internals directly.
+- The shipped-library verification gate now also requires runtime-owned
+  `skills/` packages to explicitly declare the richer frontmatter promised in
+  `skills/README.md` instead of relying on catalog-derived defaults.
+- Remaining follow-through is now explicitly limited to publish/lint
+  discipline, reference-authoring workflow, and later bundle/composition
+  metadata rather than more discovery-safety work.
 
 ## Dependencies
 
