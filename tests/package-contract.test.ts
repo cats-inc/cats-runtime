@@ -139,6 +139,7 @@ describe('package contract', () => {
     expect(manifest.bin).toEqual({
       'cats-runtime': './dist/index.js',
       'cats-runtime-mcp': './dist/bin/mcp.js',
+      'cats-runtime-workspace': './dist/bin/workspaceSubstrate.js',
     });
     expect(manifest.exports?.['.']).toEqual({
       import: './dist/index.js',
@@ -165,6 +166,7 @@ describe('package contract', () => {
       'dist/index.d.ts',
       'dist/bin/mcp.js',
       'dist/bin/verifySkills.js',
+      'dist/bin/workspaceSubstrate.js',
       'public/index.html',
       'public/playground.html',
       'public/provider-setup.html',
@@ -244,5 +246,34 @@ describe('package contract', () => {
         message: 'Primary cats-runtime MCP endpoint is unavailable at http://127.0.0.1:9/mcp. Start cats-runtime and retry.',
       },
     });
+
+    const workspaceDir = join(installRoot, 'workspace');
+    mkdirSync(join(workspaceDir, 'src'), { recursive: true });
+    writeFileSync(join(workspaceDir, 'src', 'index.ts'), 'export const value = 1;\n', 'utf8');
+
+    const workspaceAudit = runNodeCommand([
+      join(installedRoot, 'dist', 'bin', 'workspaceSubstrate.js'),
+      '--operation',
+      'audit',
+      '--workspace-path',
+      workspaceDir,
+      '--profile',
+      'standard',
+      '--agent',
+      'codex',
+    ], {
+      cwd: consumerDir,
+    });
+    expect(workspaceAudit.status).toBe(0);
+    expect(JSON.parse(workspaceAudit.stdout)).toEqual(expect.objectContaining({
+      operation: 'audit-workspace',
+      status: 'missing',
+      actions: expect.arrayContaining([
+        expect.objectContaining({
+          type: 'create',
+          path: 'AGENTS.md',
+        }),
+      ]),
+    }));
   }, 120000);
 });
