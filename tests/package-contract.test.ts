@@ -1,8 +1,9 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 interface PackageManifest {
   bin?: Record<string, string>;
@@ -23,6 +24,7 @@ interface NpmPackDryRunEntry {
 interface NpmPackDryRunResult {
   name: string;
   version: string;
+  filename?: string;
   files: NpmPackDryRunEntry[];
 }
 
@@ -34,7 +36,10 @@ function readPackageManifest(): PackageManifest {
   return JSON.parse(readFileSync(packageJsonPath, 'utf8')) as PackageManifest;
 }
 
-function runNpmCommand(args: string[]): string {
+function runNpmCommand(args: string[], options: {
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+} = {}): string {
   const npmExecPath = process.env.npm_execpath;
   const command = npmExecPath ? process.execPath : (process.platform === 'win32' ? 'npm.cmd' : 'npm');
   const commandArgs = npmExecPath
@@ -44,11 +49,12 @@ function runNpmCommand(args: string[]): string {
     command,
     commandArgs,
     {
-      cwd: runtimeRoot,
+      cwd: options.cwd ?? runtimeRoot,
       encoding: 'utf8',
       windowsHide: true,
       env: {
         ...process.env,
+        ...options.env,
         npm_config_loglevel: 'silent',
       },
     },
@@ -81,10 +87,49 @@ function runPackDryRun(): NpmPackDryRunResult {
   return payload[0]!;
 }
 
+function runPack(): { packed: NpmPackDryRunResult; tarballPath: string } {
+  const stdout = runNpmCommand(['pack', '--json', '--ignore-scripts']);
+  const payload = JSON.parse(stdout.trim()) as NpmPackDryRunResult[];
+  if (!Array.isArray(payload) || payload.length !== 1 || !payload[0]?.filename) {
+    throw new Error(`Unexpected npm pack payload: ${stdout}`);
+  }
+
+  return {
+    packed: payload[0],
+    tarballPath: join(runtimeRoot, payload[0].filename),
+  };
+}
+
+function runNodeCommand(args: string[], options: {
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+} = {}) {
+  return spawnSync(process.execPath, args, {
+    cwd: options.cwd ?? runtimeRoot,
+    encoding: 'utf8',
+    windowsHide: true,
+    env: {
+      ...process.env,
+      ...options.env,
+    },
+  });
+}
+
 describe('package contract', () => {
+  const cleanupPaths: string[] = [];
+
+  afterEach(() => {
+    while (cleanupPaths.length > 0) {
+      const target = cleanupPaths.pop();
+      if (target) {
+        rmSync(target, { recursive: true, force: true });
+      }
+    }
+  });
+
   beforeAll(() => {
     runBuild();
-  }, 40000);
+  }, 90000);
 
   it('keeps executable bin entries and curated publish contents aligned', () => {
     const manifest = readPackageManifest();
@@ -147,5 +192,57 @@ describe('package contract', () => {
     const packed = runPackDryRun();
     const packedPaths = new Set(packed.files.map((entry) => entry.path));
     expect(packedPaths.has('dist/stale/old-artifact.txt')).toBe(false);
-  }, 40000);
+  }, 90000);
+
+  it('smokes installed packaged executables from a local tarball', () => {
+    const installRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-pack-install-'));
+    cleanupPaths.push(installRoot);
+    const npmCache = join(installRoot, '.npm-cache');
+    const consumerDir = join(installRoot, 'consumer');
+    mkdirSync(consumerDir, { recursive: true });
+    writeFileSync(join(consumerDir, 'package.json'), JSON.stringify({
+      name: 'cats-runtime-pack-smoke',
+      private: true,
+    }, null, 2), 'utf8');
+
+    const { tarballPath } = runPack();
+    cleanupPaths.push(tarballPath);
+
+    runNpmCommand(['install', '--no-package-lock', '--ignore-scripts', tarballPath], {
+      cwd: consumerDir,
+      env: {
+        npm_config_cache: npmCache,
+      },
+    });
+
+    const installedRoot = join(consumerDir, 'node_modules', 'cats-runtime');
+
+    const runtimeHelp = runNodeCommand([join(installedRoot, 'dist', 'index.js'), '--help'], {
+      cwd: consumerDir,
+    });
+    expect(runtimeHelp.status).toBe(0);
+    expect(runtimeHelp.stdout).toContain('Usage: cats-runtime [options]');
+
+    const mcpInspect = runNodeCommand([join(installedRoot, 'dist', 'bin', 'mcp.js'), '--inspect-proxy'], {
+      cwd: consumerDir,
+      env: {
+        CATS_RUNTIME_MCP_PROXY_URL: 'http://127.0.0.1:9/mcp',
+        CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS: '25',
+      },
+    });
+    expect(mcpInspect.status).toBe(1);
+    expect(mcpInspect.stderr).toContain('cats-runtime-mcp proxy preflight failed:');
+    expect(JSON.parse(mcpInspect.stdout)).toEqual({
+      target: {
+        url: 'http://127.0.0.1:9/mcp',
+        authorizationConfigured: false,
+        timeoutMs: 25,
+      },
+      probe: {
+        status: 'error',
+        reason: 'upstream_unavailable',
+        message: 'Primary cats-runtime MCP endpoint is unavailable at http://127.0.0.1:9/mcp. Start cats-runtime and retry.',
+      },
+    });
+  }, 120000);
 });

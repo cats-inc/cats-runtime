@@ -72,9 +72,9 @@ repo-ready versus what still depends on a first public release.
 
 ### Phase 2: Local Package Smoke Coverage
 
-- [ ] Add a bounded repo-local smoke slice that verifies packaged executable
+- [x] Add a bounded repo-local smoke slice that verifies packaged executable
       behavior beyond static tarball contents when that can run reliably in CI
-- [ ] Keep the smoke slice focused on executable/package behavior rather than
+- [x] Keep the smoke slice focused on executable/package behavior rather than
       provider availability or long-lived runtime startup policy
 
 **Deliverables**: local package regressions become easier to catch before a
@@ -124,6 +124,7 @@ without claiming publish infrastructure that is not actually configured yet.
 |------|--------|
 | 2026-03-29 | Plan created to turn `OPT-15` from roadmap-only follow-through into a tracked packaging/release workstream |
 | 2026-03-29 | Phase 1 slice landed: deployment/release/package docs now distinguish repo-local executable package readiness from not-yet-proven public npm publication, and `SPEC-017` now points shared UI follow-through to `PLAN-019` while keeping packaging follow-through under `PLAN-025` |
+| 2026-03-29 | Phase 2 slice landed: `tests/package-contract.test.ts` now installs the locally packed tarball into a temporary consumer workspace and smokes both `dist/index.js --help` and `dist/bin/mcp.js --inspect-proxy`, so executable package regressions are no longer limited to static tarball-content checks |
 
 ---
 

@@ -27,6 +27,8 @@ The first public npm release has not happened yet. Before publishing,
 - a local release gate via `npm run release:check`
 - local pack/install smoke helpers under `scripts/linux/`, `scripts/macos/`,
   and `scripts/windows/`
+- package-contract coverage that now goes beyond tarball contents and also
+  smokes installed executable entrypoints from the locally packed artifact
 
 That means repo-local package verification is ready now, while registry
 publication and trusted publishing are still future follow-through.

@@ -1449,6 +1449,9 @@ remaining work is follow-through and publication discipline:
   and clean-build packaging hooks
 - `tests/package-contract.test.ts` now verifies curated publish contents and
   protects against stale `dist/` artifacts leaking into the tarball
+- the same package-contract suite now also installs the locally packed tarball
+  into a temporary consumer workspace and smokes the packaged
+  `dist/index.js --help` plus `dist/bin/mcp.js --inspect-proxy` entrypoints
 - `scripts/linux/pack-install.sh`, `scripts/macos/pack-install.sh`, and
   `scripts/windows/Pack-Install.ps1` now provide aligned local pack/install
   helpers
