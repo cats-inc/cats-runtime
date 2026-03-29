@@ -88,7 +88,7 @@ Priority is re-evaluated as:
 - [x] Reuse the shared setup repair-summary builder inside persisted setup
       diagnostic reports so report artifacts and `GET /setup-state` stop
       drifting on preferred-scan, next-action, and ordered follow-up actions
-- [ ] Prefer bounded operator summary/report improvements over broad setup UI
+- [x] Prefer bounded operator summary/report improvements over broad setup UI
       rewrites
 - [ ] Keep setup-report follow-through coordinated with, but not blocked on,
       larger bootstrap/UI work
@@ -160,6 +160,7 @@ turning the runtime into a full scheduler/orchestrator.
 | 2026-03-29 | Plan created to consolidate important follow-through previously tracked only in `PROGRESS.md` / `ROADMAP.md` |
 | 2026-03-29 | Phase 1 slice 1 landed: runtime skill catalog discovery now enforces bounded traversal depth and rejects symbolic-link/junction entries instead of assuming a perfectly well-formed checked-in tree |
 | 2026-03-29 | Phase 2 slice 1 landed: persisted setup diagnostic reports now reuse the same shared repair-summary builder as `GET /setup-state`, so setup artifacts carry preferred-scan, next-action, and ordered follow-up actions instead of stopping at issue lists |
+| 2026-03-29 | Phase 2 slice 2 landed: non-server setup-diagnostic stderr summaries now reuse the persisted report's repair summary and next-action guidance instead of stopping at the report headline alone |
 
 ---
 

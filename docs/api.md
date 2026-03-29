@@ -545,6 +545,11 @@ Request options:
   - when set, the runtime first triggers an explicit shared setup scan through
     the bootstrap service and then embeds the refreshed snapshot into the report
 
+The non-server `--diagnose-setup` and `--read-setup-diagnostic-report`
+entrypoints now reuse the same report payload to emit a concise stderr summary
+that includes the report headline plus any shared repair-summary / next-action
+guidance when that repair model is available.
+
 The report currently includes:
 
 - runtime/platform facts such as Node version, platform, arch, and resolved

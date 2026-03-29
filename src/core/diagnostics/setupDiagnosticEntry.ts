@@ -98,6 +98,7 @@ export function formatSetupDiagnosticEntrySummary(
 ): string {
   const lines = [
     `Setup diagnostic report generated: ${artifact.report.summary.headline}`,
+    ...formatSetupRepairSummaryLines(artifact.report),
     ...artifact.report.summary.highlights.map((highlight) => `- ${highlight}`),
     `Artifact: ${artifact.artifactPath}`,
   ];
@@ -125,10 +126,35 @@ export function formatSetupDiagnosticReportReadSummary(
 ): string {
   const lines = [
     `Loaded setup diagnostic report ${artifact.report.artifactId}: ${artifact.report.summary.headline}`,
+    ...formatSetupRepairSummaryLines(artifact.report),
     ...artifact.report.summary.highlights.map((highlight) => `- ${highlight}`),
     `Artifact: ${artifact.artifactPath}`,
   ];
   return `${lines.join('\n')}\n`;
+}
+
+function formatSetupRepairSummaryLines(
+  report: SetupDiagnosticArtifact['report'],
+): string[] {
+  const repair = report.setup?.repair;
+  if (!repair) {
+    return [];
+  }
+
+  const lines = [`Repair: ${repair.summary}`];
+  if (repair.nextAction.kind === 'none') {
+    return lines;
+  }
+
+  lines.push(`Next action: ${repair.nextAction.label} (${repair.nextAction.kind})`);
+  if (repair.nextAction.summary) {
+    lines.push(`Action summary: ${repair.nextAction.summary}`);
+  }
+  if (repair.nextAction.method && repair.nextAction.path) {
+    lines.push(`Action route: ${repair.nextAction.method} ${repair.nextAction.path}`);
+  }
+
+  return lines;
 }
 
 function createSetupDiagnosticEntryService(
