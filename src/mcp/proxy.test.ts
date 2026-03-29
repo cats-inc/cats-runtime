@@ -35,6 +35,15 @@ describe('MCP HTTP proxy', () => {
     });
   });
 
+  it('ignores a generic PORT env when no runtime-specific port is configured', () => {
+    expect(resolveMcpProxyTarget({
+      PORT: '9999',
+    })).toEqual({
+      url: 'http://127.0.0.1:3110/mcp',
+      authorizationHeader: undefined,
+    });
+  });
+
   it('returns an MCP error when the proxy target is invalid', async () => {
     const handler = createHttpMcpProxyHandler({
       env: {

@@ -7,7 +7,6 @@ const PROXY_URL_ENV = 'CATS_RUNTIME_MCP_PROXY_URL';
 const API_KEY_ENV = 'CATS_RUNTIME_API_KEY';
 const HOST_ENV = 'CATS_RUNTIME_HOST';
 const PORT_ENV = 'CATS_RUNTIME_PORT';
-const FALLBACK_PORT_ENV = 'PORT';
 
 export interface McpProxyTarget {
   url: string;
@@ -150,7 +149,7 @@ export function resolveMcpProxyTarget(
   }
 
   const host = normalizeHost(env[HOST_ENV]);
-  const port = parsePort(env[PORT_ENV] ?? env[FALLBACK_PORT_ENV]);
+  const port = parsePort(env[PORT_ENV]);
   return {
     url: `http://${host}:${port}/mcp`,
     authorizationHeader,
