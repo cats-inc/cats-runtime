@@ -83,10 +83,13 @@ public, but the user must enter a bearer token in the playground UI before it
 can call protected routes such as `GET /providers/{provider}/models` or session
 mutation endpoints.
 
-`POST /mcp` exposes the runtime-owned MCP facade over HTTP JSON-RPC.
-`cats-runtime-mcp` exposes the same tool plane over stdio for external MCP
-hosts. This slice is additive: direct runtime APIs remain the primary app
-boundary, while MCP is the curated tool surface for orchestrator-style agents.
+`POST /mcp` exposes the runtime-owned MCP facade over HTTP JSON-RPC and is the
+authoritative MCP execution owner because it runs inside the primary
+`cats-runtime` process. `cats-runtime-mcp` exposes the same tool plane over
+stdio for external MCP hosts, but it now proxies to that existing `POST /mcp`
+surface instead of creating a second independent runtime core. This slice is
+additive: direct runtime APIs remain the primary app boundary, while MCP is
+the curated tool surface for orchestrator-style agents.
 
 Supported JSON-RPC methods:
 
@@ -348,6 +351,15 @@ or for an unpackaged local build:
 ```text
 node dist/bin/mcp.js
 ```
+
+Operational notes:
+
+- start the primary `cats-runtime` before launching `cats-runtime-mcp`
+- prefer direct `POST /mcp` when the host can use HTTP JSON-RPC
+- `cats-runtime-mcp` resolves its target from `CATS_RUNTIME_MCP_PROXY_URL`, or
+  from `CATS_RUNTIME_HOST` / `CATS_RUNTIME_PORT` when no explicit proxy URL is set
+- if `CATS_RUNTIME_API_KEY` is configured, `cats-runtime-mcp` forwards the same
+  bearer token to the primary runtime
 
 ### Health
 

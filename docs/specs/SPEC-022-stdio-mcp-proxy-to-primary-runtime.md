@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | Completed |
 | **Owner** | Codex |
 | **Reviewer** | User |
 
@@ -176,14 +176,23 @@ documented.
 
 ## Open Questions
 
-- [ ] Should the first slice keep `--diagnose-setup` as a local utility on
-      `cats-runtime-mcp`, or should stdio mode become transport-only?
+- [x] `--diagnose-setup` remains a documented local utility exit on
+      `cats-runtime-mcp`; normal MCP serving mode is proxy-only.
 - [ ] Should the proxy support configurable upstream timeout values in the
-      first slice, or just use a conservative default?
+      next slice, or is the current request lifetime acceptable?
 - [ ] Should future `cats-runtime mcp` CLI convergence happen in the same
-      implementation slice or later?
+      follow-up slice or later?
 - [ ] Should the proxy ever offer opt-in auto-start for the primary runtime, or
       should lifecycle ownership remain out of scope permanently?
+
+## Implementation Notes
+
+- `cats-runtime-mcp` now uses `src/mcp/proxy.ts` to resolve
+  `CATS_RUNTIME_MCP_PROXY_URL` first, then derive
+  `http://<CATS_RUNTIME_HOST|127.0.0.1>:<CATS_RUNTIME_PORT|3110>/mcp`
+- `CATS_RUNTIME_API_KEY` is forwarded as bearer auth to the primary runtime
+- normal stdio MCP serving no longer calls `createRuntimeServer(...)`
+- stdio framing remains local in `src/mcp/stdio.ts`; only JSON-RPC execution is proxied
 
 ## References
 

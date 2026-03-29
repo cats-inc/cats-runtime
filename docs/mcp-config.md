@@ -11,8 +11,13 @@ POST /mcp
 cats-runtime-mcp
 ```
 
-This route is additive. It does not replace the direct runtime HTTP API used by
-`cats`, the dashboard, or the playground.
+`POST /mcp` is the authoritative MCP execution surface because it runs inside
+the primary `cats-runtime` process. `cats-runtime-mcp` remains for stdio-only
+hosts, but it now acts as a thin stdio-to-HTTP proxy to that existing
+`POST /mcp` route instead of creating a second runtime core.
+
+This MCP facade is additive. It does not replace the direct runtime HTTP API
+used by `cats`, the dashboard, or the playground.
 
 ## Current Stance
 
@@ -133,7 +138,8 @@ not need to pass `action` and `phase` explicitly.
 
 `POST /mcp` uses the same runtime auth policy as the direct HTTP API. If
 `cats-runtime` is configured with an API key, MCP clients must send the same
-Bearer token.
+Bearer token. `cats-runtime-mcp` forwards that same bearer token to the primary
+runtime when `CATS_RUNTIME_API_KEY` is set.
 
 ## HTTP Usage
 
@@ -222,6 +228,24 @@ Local build entrypoint:
 node dist/bin/mcp.js
 ```
 
+Operational notes:
+
+- start the primary `cats-runtime` first; `cats-runtime-mcp` does not auto-start it
+- prefer direct `POST /mcp` when the host supports HTTP MCP
+- use `cats-runtime-mcp` only when the host is stdio-only
+- if the proxy cannot reach the primary runtime, stdio clients receive an MCP
+  error instead of silently falling back to a second local runtime
+
+Proxy target resolution order:
+
+1. `CATS_RUNTIME_MCP_PROXY_URL`
+2. derived local URL from `CATS_RUNTIME_HOST` / `CATS_RUNTIME_PORT`
+
+Notes:
+
+- when deriving the local URL, `0.0.0.0` / `::` normalize to `127.0.0.1`
+- `CATS_RUNTIME_API_KEY` is forwarded as `Authorization: Bearer <token>`
+
 Example host config:
 
 ```json
@@ -232,7 +256,7 @@ Example host config:
       "args": ["./dist/bin/mcp.js"],
       "cwd": "cats-runtime",
       "env": {
-        "CATS_RUNTIME_CONFIG_PATH": "./config/providers.yaml"
+        "CATS_RUNTIME_MCP_PROXY_URL": "http://127.0.0.1:3110/mcp"
       }
     }
   }

@@ -27,7 +27,7 @@ Current capabilities:
 - file-based provider topology with separated `routing` / `backends` sections
 - dashboard-side provider instance selection for session creation
 - embedded multi-agent playground sample at `/playground`
-- runtime-owned MCP facade over `POST /mcp` and the `cats-runtime-mcp` stdio binary for orchestrator-style agents
+- runtime-owned MCP facade with authoritative execution on `POST /mcp` plus a `cats-runtime-mcp` stdio proxy for stdio-only hosts
 - curated MCP mutation tools for `create_session`, `send_message`, `fork_session`, `init_workspace`, and `commit_changes`
 - runtime-managed skills with session-level requested/resolved/applied metadata plus a family-aware internal skill library
 - additive workspace/skill hydration metadata that distinguishes runtime cwd from the authoritative workspace source
@@ -95,6 +95,13 @@ Embedded UIs:
 
 - dashboard: `http://127.0.0.1:3110/`
 - playground: `http://127.0.0.1:3110/playground`
+
+MCP usage:
+
+- use `POST /mcp` when the host can speak HTTP JSON-RPC directly
+- use `cats-runtime-mcp` only for stdio-only MCP hosts such as MCP Studio
+- `cats-runtime-mcp` now proxies to an already-running primary `cats-runtime`
+  and does not start a second independent runtime core
 
 ## Package-Ready Startup
 

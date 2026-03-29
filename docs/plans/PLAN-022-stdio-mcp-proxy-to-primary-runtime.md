@@ -7,7 +7,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | Completed |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User |
@@ -32,29 +32,29 @@ stdio clients.
 
 ### Phase 1: Freeze the Proxy Contract
 
-- [ ] Define proxy target resolution rules and environment/config knobs
-- [ ] Decide which `cats-runtime-mcp` CLI flags remain local utility exits
-- [ ] Freeze first-slice error semantics for upstream unavailable/auth/invalid response cases
+- [x] Define proxy target resolution rules and environment/config knobs
+- [x] Decide which `cats-runtime-mcp` CLI flags remain local utility exits
+- [x] Freeze first-slice error semantics for upstream unavailable/auth/invalid response cases
 
 **Deliverables**: A locked transport contract for stdio proxy behavior without
 reopening MCP tool schemas.
 
 ### Phase 2: Implement Thin Stdio-to-HTTP Forwarding
 
-- [ ] Add a small MCP proxy client layer that forwards JSON-RPC requests to `POST /mcp`
-- [ ] Update `src/bin/mcp.ts` to use proxy mode instead of creating a local runtime core
-- [ ] Preserve stdio framing/parser behavior while removing normal-path local runtime ownership
-- [ ] Keep help text and any approved local utility exits explicit and documented
+- [x] Add a small MCP proxy client layer that forwards JSON-RPC requests to `POST /mcp`
+- [x] Update `src/bin/mcp.ts` to use proxy mode instead of creating a local runtime core
+- [x] Preserve stdio framing/parser behavior while removing normal-path local runtime ownership
+- [x] Keep help text and any approved local utility exits explicit and documented
 
 **Deliverables**: `cats-runtime-mcp` serves stdio MCP by forwarding to the
 primary runtime instead of instantiating a competing runtime context.
 
 ### Phase 3: Verification and Documentation
 
-- [ ] Add unit coverage for target URL resolution, auth forwarding, and upstream error mapping
-- [ ] Add integration coverage for stdio-to-HTTP MCP forwarding against a real runtime app
-- [ ] Update docs to explain when to use `cats-runtime`, `POST /mcp`, and `cats-runtime-mcp`
-- [ ] Record operational guidance for MCP Studio and other stdio-only hosts
+- [x] Add unit coverage for target URL resolution, auth forwarding, and upstream error mapping
+- [x] Add integration coverage for stdio-to-HTTP MCP forwarding against a real runtime app
+- [x] Update docs to explain when to use `cats-runtime`, `POST /mcp`, and `cats-runtime-mcp`
+- [x] Record operational guidance for MCP Studio and other stdio-only hosts
 
 **Deliverables**: Tested proxy behavior, updated operator docs, and clear
 transport/runtime ownership guidance.
@@ -114,6 +114,7 @@ transport/runtime ownership guidance.
 | Date | Update |
 |------|--------|
 | 2026-03-29 | Plan created from user direction after validating that the current stdio entrypoint creates a second independent runtime core |
+| 2026-03-29 | Completed first implementation slice: `cats-runtime-mcp` now proxies stdio MCP JSON-RPC to the primary runtime `POST /mcp` surface, with unit/integration coverage and updated operator docs |
 
 ---
 
