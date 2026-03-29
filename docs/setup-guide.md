@@ -753,6 +753,11 @@ In that mode:
 - the published `cats-runtime` / `cats-runtime-mcp` binaries remain the
   supported package entrypoints; root-module imports are still treated as
   internal/dev-oriented helpers
+- `cats-runtime-mcp` now acts as a stdio MCP proxy to the primary runtime's
+  `POST /mcp` route; it does not start a second independent runtime core
+- stdio-only MCP hosts should either set `CATS_RUNTIME_MCP_PROXY_URL`
+  explicitly or keep `CATS_RUNTIME_HOST` / `CATS_RUNTIME_PORT` aligned with the
+  primary runtime
 - graceful shutdown may be triggered by `SIGINT`, `SIGTERM`, or by closing the
   child stdin stream from the host process
 
@@ -954,4 +959,4 @@ status, registry counts, and discovery adapters.
 
 ---
 
-*Last updated: 2026-03-25*
+*Last updated: 2026-03-29*

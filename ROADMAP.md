@@ -1315,4 +1315,81 @@ always-on self-adapting parser system.
 - `docs/decisions/026-model-a2a-as-an-agent-backend-adapter.md`
 
 ---
-*Last updated: 2026-03-27*
+### OPT-14: MCP Proxy Hardening and CLI Convergence
+
+**Priority**: P2
+**Status**: Planned
+
+#### Problem
+
+`cats-runtime` now has the correct MCP ownership split:
+
+- `POST /mcp` is the authoritative MCP execution surface inside the primary
+  runtime process
+- `cats-runtime-mcp` remains available for stdio-only hosts such as MCP Studio
+  but now proxies to that primary runtime instead of creating a second
+  independent runtime core
+
+That correction removes the state-divergence problem, but the first shipped
+proxy slice is still intentionally minimal:
+
+- no explicit upstream timeout policy yet
+- no dedicated timeout classification separate from general upstream
+  unavailability
+- no CLI convergence yet from `cats-runtime-mcp` to a later
+  `cats-runtime mcp` shape
+- no operator-facing preflight that confirms the primary runtime target before
+  the stdio host starts sending tool traffic
+
+#### Current Baseline
+
+- `src/mcp/proxy.ts` now owns target resolution and auth forwarding for
+  stdio-to-HTTP MCP forwarding
+- the proxy target resolves from:
+  - `CATS_RUNTIME_MCP_PROXY_URL`
+  - or derived local `CATS_RUNTIME_HOST` / `CATS_RUNTIME_PORT`
+- generic shell `PORT` values are intentionally ignored so hosted shells do
+  not accidentally retarget the stdio MCP proxy away from the runtime
+- `cats-runtime-mcp` no longer calls `createRuntimeServer(...)` on the normal
+  MCP-serving path
+- `--diagnose-setup` remains a local utility exit, not a shared-runtime MCP
+  serving path
+
+#### Follow-through Direction
+
+- add an explicit upstream timeout strategy that remains safe for long-running
+  MCP tool calls such as `send_message`
+- classify timeout failures separately from generic upstream-unavailable
+  failures so stdio hosts can surface clearer operator guidance
+- decide whether the timeout should be configurable through a dedicated
+  runtime/MCP env var or remain a fixed conservative default
+- evaluate a later CLI convergence slice that can expose
+  `cats-runtime mcp` while keeping `cats-runtime-mcp` as a compatibility alias
+- keep the proxy transport-thin; do not reintroduce a second independent local
+  runtime core or hidden runtime auto-start in the name of convenience
+
+#### Deferred Scope
+
+- do not auto-start the primary runtime from the stdio proxy by default
+- do not invent a second MCP execution surface beyond the authoritative
+  `POST /mcp` route
+- do not add streaming-specific protocol complexity until the MCP tool plane
+  actually needs it
+
+#### Affected Areas
+
+- `src/mcp/proxy.ts`
+- `src/bin/mcp.ts`
+- `src/mcp/stdio.ts`
+- `docs/mcp-config.md`
+- `docs/api.md`
+- `README.md`
+
+#### References
+
+- `docs/decisions/028-proxy-stdio-mcp-to-the-primary-runtime-http-surface.md`
+- `docs/specs/SPEC-022-stdio-mcp-proxy-to-primary-runtime.md`
+- `docs/plans/PLAN-022-stdio-mcp-proxy-to-primary-runtime.md`
+
+---
+*Last updated: 2026-03-29*

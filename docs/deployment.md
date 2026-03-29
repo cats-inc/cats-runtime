@@ -75,6 +75,11 @@ an Electron host. In that mode:
 - the runtime remains a separate process, not an in-process product import
 - `cats-runtime` / `cats-runtime-mcp` are the supported package entrypoints;
   root-module imports remain internal/dev-oriented helpers
+- `cats-runtime-mcp` is the stdio MCP proxy entrypoint, not a second
+  standalone runtime server; start the primary `cats-runtime` first when using
+  stdio-only MCP hosts
+- stdio proxy target resolution uses `CATS_RUNTIME_MCP_PROXY_URL` first, then
+  falls back to `CATS_RUNTIME_HOST` / `CATS_RUNTIME_PORT`
 
 Recommended child-process invocation:
 
@@ -184,4 +189,4 @@ assets. Use `npm pack --dry-run` to inspect the payload.
 
 ---
 
-*Last updated: 2026-03-23*
+*Last updated: 2026-03-29*

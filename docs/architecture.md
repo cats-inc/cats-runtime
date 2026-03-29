@@ -238,7 +238,8 @@ src/
 - Exposes runtime-owned scheduled wakeup routes, including UTC cron-like
   recurrence, without pretending the runtime already owns full product workflow
   or heartbeat scheduling
-- Exposes the additive MCP facade over `POST /mcp` plus the `cats-runtime-mcp` stdio binary
+- Exposes the additive MCP facade with authoritative execution on `POST /mcp`
+  plus the `cats-runtime-mcp` stdio proxy for stdio-only hosts
 
 ### `src/mcp`
 
@@ -249,7 +250,11 @@ src/
   inspection instead of inventing a second skills surface
 - Reuses existing session inspection, session mutation, workspace substrate,
   and delivery primitives instead of inventing a second execution stack
-- Supports both HTTP JSON-RPC and Content-Length framed stdio transport
+- Keeps `POST /mcp` as the authoritative execution owner inside the primary
+  runtime process
+- Supports Content-Length framed stdio transport through a thin proxy path so
+  `cats-runtime-mcp` can serve stdio-only hosts without constructing a second
+  runtime core
 - Keeps MCP additive so direct HTTP routes remain the primary product boundary
 
 ### `src/startup.ts`
@@ -653,8 +658,10 @@ path is intentionally narrow:
    `GET /providers/{provider}/tools` for agent targets that support it, and additive
    model-catalog/configured-model readiness checks for
    API/local/agent targets when requested
-14. `POST /mcp` reuses those same runtime-owned services as an additive
-    orchestrator/tool surface
+14. `POST /mcp` reuses those same runtime-owned services as the authoritative
+    additive orchestrator/tool surface, while `cats-runtime-mcp` proxies stdio
+    JSON-RPC to that same route instead of creating a second competing runtime
+    execution owner
 15. Optional machine-readable process output emits startup and shutdown
    lifecycle events for app-managed local hosts
 16. Session branch inspection is available over session payload `branching`
@@ -764,4 +771,4 @@ the only durable memory surface for the Cats suite.
 
 ---
 
-*Last updated: 2026-03-27*
+*Last updated: 2026-03-29*
