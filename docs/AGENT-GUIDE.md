@@ -45,6 +45,7 @@
 - `GET /sessions/:id`
 - `GET /sessions/:id/lineage`
 - `POST /sessions`
+- `POST /sessions/discover`
 - `POST /sessions/:id/messages`
 - `POST /peer/executions`
 - `POST /sessions/:id/close`

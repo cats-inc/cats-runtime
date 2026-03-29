@@ -76,6 +76,10 @@ import {
   canRuntimeCompactSessionTranscript,
   compactRuntimeManagedTranscript,
 } from '../../core/runtime/sessionCompaction.js';
+import {
+  runManualSessionDiscovery,
+  type ManualSessionDiscoveryTarget,
+} from '../../core/runtime/manualSessionDiscovery.js';
 import type { ProviderModelSelection } from '../../core/models/providerSelectionResolution.js';
 import {
   canonicalizeProviderModelSelection,
@@ -318,6 +322,28 @@ function serializeSessions(
       ...(lineage ? { lineage } : {}),
     };
   });
+}
+
+async function listManualDiscoverySessions(
+  ctx: AppContext,
+  target: ManualSessionDiscoveryTarget,
+) {
+  switch (target.provider) {
+    case 'cursor':
+      return getCursorNative(ctx, target.instanceId).listAllSessions({
+        startIfNeeded: true,
+      });
+    case 'kiro':
+      return getKiroNative(ctx, target.instanceId).listAllSessions({
+        startIfNeeded: true,
+      });
+    case 'opencode':
+      return getOpencodeNative(ctx, target.instanceId).listAllSessions({
+        startIfNeeded: true,
+      });
+    case 'goose':
+      return getGooseNative(ctx, target.instanceId).listAllSessions();
+  }
 }
 
 function resolveRequestedProviderTarget(
@@ -2631,6 +2657,24 @@ sessionRoutes.get('/sessions', (c) => {
   return c.json({
     sessions: serializeSessions(ctx, sessions, { includeBranchCapabilities }),
     count: sessions.length,
+  });
+});
+
+/** POST /sessions/discover — manually scan configured WSL/Docker session targets */
+sessionRoutes.post('/sessions/discover', async (c) => {
+  const ctx = c.get('ctx');
+  const result = await runManualSessionDiscovery({
+    config: ctx.config,
+    registry: ctx.registry,
+    runner: {
+      listSessions: (target) => listManualDiscoverySessions(ctx, target),
+    },
+  });
+
+  return c.json({
+    status: result.summary.status,
+    summary: result.summary,
+    targets: result.targets,
   });
 });
 

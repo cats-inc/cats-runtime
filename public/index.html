@@ -121,9 +121,15 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 8px;
     margin-bottom: 4px;
   }
   .session-card .sc-id {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-size: 13px;
     font-weight: 600;
     font-family: 'Cascadia Code', 'Fira Code', monospace;
@@ -139,7 +145,7 @@
   .project-header {
     display: flex;
     align-items: center;
-    padding: 6px 10px;
+    padding: 6px 12px 6px 10px;
     cursor: pointer;
     border-radius: var(--radius);
     font-size: 13px;
@@ -224,8 +230,13 @@
     font-weight: 400;
     margin-left: 6px;
   }
-  .project-header .project-dots {
+  .project-header .project-actions {
     margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .project-header .project-dots {
     display: flex;
     gap: 3px;
     align-items: center;
@@ -235,13 +246,15 @@
     border: none;
     color: var(--text2);
     cursor: pointer;
-    font-size: 13px;
-    padding: 2px 5px;
-    border-radius: 4px;
-    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border-radius: 6px;
     opacity: 0;
     transition: all 0.15s;
-    margin-left: 6px;
   }
   .project-header:hover .project-delete { opacity: 1; }
   .project-delete:hover { color: var(--red); background: rgba(248,113,113,0.15); }
@@ -275,10 +288,14 @@
     border: none;
     color: var(--text2);
     cursor: pointer;
-    font-size: 14px;
-    padding: 2px 4px;
-    border-radius: 4px;
-    line-height: 1;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border-radius: 6px;
     opacity: 0;
     transition: all 0.15s;
   }
@@ -649,12 +666,27 @@
       </div>
 
       <div class="runtime-sidebar-section">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <p class="runtime-sidebar-title">Sessions <span id="sessionCount" class="ml-1 text-slate-500"></span></p>
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            <p class="runtime-sidebar-title">Sessions</p>
+            <span id="sessionCount" class="runtime-auth-badge" data-state="idle">0</span>
           </div>
           <div class="flex gap-2">
-            <button class="runtime-btn runtime-btn-danger !h-9 !w-9 !rounded-xl !px-0 !py-0" onclick="deleteAllSessions()" title="Delete all sessions &amp; projects" aria-label="Delete all sessions">
+            <button class="runtime-btn runtime-btn-secondary !h-8 !w-8 !rounded-lg !px-0 !py-0" id="scanSessionsBtn" onclick="manualScanSessions()" title="Scan WSL and Docker sessions" aria-label="Scan WSL and Docker sessions">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 12a9 9 0 0 1 15.5-6.36L21 8" />
+                <path d="M21 3v5h-5" />
+                <path d="M21 12a9 9 0 0 1-15.5 6.36L3 16" />
+                <path d="M8 16H3v5" />
+              </svg>
+            </button>
+            <button class="runtime-btn runtime-btn-secondary !h-8 !w-8 !rounded-lg !px-0 !py-0" id="newSessionBtn" onclick="openCreateModal()" title="Create session" aria-label="Create session">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+            </button>
+            <button class="runtime-btn runtime-btn-danger !h-8 !w-8 !rounded-lg !px-0 !py-0" id="deleteAllSessionsBtn" onclick="deleteAllSessions()" title="Delete all sessions &amp; projects" aria-label="Delete all sessions">
               <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M3 6h18" />
                 <path d="M8 6V4h8v2" />
@@ -663,12 +695,15 @@
                 <path d="M14 11v6" />
               </svg>
             </button>
-            <button class="runtime-btn runtime-btn-primary !h-9 !w-9 !rounded-xl !px-0 !py-0" onclick="openCreateModal()" title="Create session" aria-label="Create session">
-              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M12 5v14" />
-                <path d="M5 12h14" />
-              </svg>
-            </button>
+          </div>
+        </div>
+        <div id="sessionScanStatus" class="mt-3 hidden rounded-2xl border border-slate-800 bg-slate-950/60 px-3 py-3">
+          <div class="flex items-center gap-2">
+            <span id="sessionScanStatusDot" class="runtime-shell-health-dot !h-2 !w-2" data-state="idle"></span>
+            <span id="sessionScanStatusText" class="text-xs font-medium text-slate-300">Scanning sessions...</span>
+          </div>
+          <div id="sessionScanProgress" class="mt-3 hidden h-1 overflow-hidden rounded-full bg-slate-800">
+            <div class="h-full w-1/2 animate-pulse rounded-full bg-blue-500/80"></div>
           </div>
         </div>
       </div>
@@ -898,6 +933,7 @@ let providerCatalog = null;
 let discoveryStatusPayload = null;
 const providerToolingCache = new Map();
 const providerToolingInFlight = new Map();
+let sessionScanInFlight = false;
 
 function apiKey() {
   return document.getElementById('apiKeyInput').value;
@@ -1046,6 +1082,17 @@ function configuredCliRuntimeInstances() {
 
       return (left.instance.id || '').localeCompare(right.instance.id || '');
     });
+}
+
+function manualSessionDiscoveryTargets() {
+  return configuredCliRuntimeInstances().filter((entry) => (
+    entry.providerName === 'cursor'
+    || entry.providerName === 'goose'
+    || entry.providerName === 'kiro'
+    || entry.providerName === 'opencode'
+  ) && (
+    entry.runtime?.mode === 'wsl' || entry.runtime?.mode === 'docker'
+  ));
 }
 
 function summarizeCliRuntimes(entries) {
@@ -1540,6 +1587,9 @@ function renderDiscoveryStatus(payload) {
   const dot = document.getElementById('runtimeStatusDot');
   const policyEl = document.getElementById('runtimeStatusTitle');
   const labelEl = document.getElementById('runtimeStatusLabel');
+  if (!group || !dot || !policyEl || !labelEl) {
+    return;
+  }
   const runtimeEntries = configuredCliRuntimeInstances();
   const runtimeSummary = summarizeCliRuntimes(runtimeEntries);
   const wsl = payload?.wsl || {};
@@ -1638,6 +1688,146 @@ async function refreshDiscoveryStatus() {
   }
 }
 
+function renderSessionScanStatus(input) {
+  const root = document.getElementById('sessionScanStatus');
+  const dot = document.getElementById('sessionScanStatusDot');
+  const text = document.getElementById('sessionScanStatusText');
+  const progress = document.getElementById('sessionScanProgress');
+  if (!root || !dot || !text || !progress) return;
+
+  const visible = input?.visible === true;
+  root.classList.toggle('hidden', !visible);
+  if (!visible) {
+    root.title = '';
+    return;
+  }
+
+  text.textContent = input.text || '';
+  dot.dataset.state = input.state || 'idle';
+  progress.classList.toggle('hidden', input.running !== true);
+  root.title = input.title || '';
+}
+
+function setSessionScanBusy(isBusy) {
+  sessionScanInFlight = isBusy;
+  for (const id of ['scanSessionsBtn', 'deleteAllSessionsBtn', 'newSessionBtn']) {
+    const button = document.getElementById(id);
+    if (button) {
+      button.disabled = isBusy;
+    }
+  }
+  const sessionList = document.getElementById('sessionList');
+  if (sessionList) {
+    sessionList.classList.toggle('pointer-events-none', isBusy);
+    sessionList.classList.toggle('opacity-60', isBusy);
+  }
+}
+
+function clearCurrentSessionSelection() {
+  disconnectObserver();
+  currentSessionId = null;
+  document.getElementById('chatContainer').style.display = 'none';
+  document.getElementById('chatPlaceholder').style.display = '';
+  renderSessionInsights(null);
+}
+
+async function revalidateCurrentSessionSelection() {
+  if (!currentSessionId) return;
+  try {
+    const res = await fetch(`${API_BASE}/sessions/${currentSessionId}`, { headers: headers() });
+    if (res.status === 404) {
+      clearCurrentSessionSelection();
+      return;
+    }
+    if (res.ok && !isStreaming) {
+      await refreshSession();
+    }
+  } catch {}
+}
+
+function summarizeManualSessionDiscovery(result) {
+  const summary = result?.summary || {};
+  const scanned = summary.scannedTargets || 0;
+  const failed = summary.failedTargets || 0;
+  const imported = summary.importedCount || 0;
+  const discovered = summary.discoveredCount || 0;
+  if ((summary.totalTargets || 0) === 0) {
+    return {
+      state: 'idle',
+      text: 'No WSL/Docker session targets configured.',
+      title: 'No configured CLI provider instances use WSL or Docker runtime mode.',
+    };
+  }
+
+  const text = failed > 0
+    ? `Scanned ${scanned}/${summary.totalTargets} targets. Imported ${imported} session(s).`
+    : `Scanned ${summary.totalTargets} targets. Imported ${imported} session(s).`;
+  const titleLines = [
+    `Discovered sessions: ${discovered}`,
+    `Imported new sessions: ${imported}`,
+  ];
+  for (const target of result?.targets || []) {
+    const runtimeParts = [target.runtime?.mode];
+    if (target.runtime?.distro) runtimeParts.push(target.runtime.distro);
+    if (target.runtime?.container) runtimeParts.push(target.runtime.container);
+    titleLines.push(
+      `${target.provider}@${target.instanceId} (${runtimeParts.filter(Boolean).join(' / ')}) - ${target.status}: ${target.message}`,
+    );
+  }
+  return {
+    state: failed > 0 ? 'failed' : 'active',
+    text,
+    title: titleLines.join('\n'),
+  };
+}
+
+async function manualScanSessions() {
+  if (sessionScanInFlight) return;
+
+  const targetCount = manualSessionDiscoveryTargets().length;
+  setSessionScanBusy(true);
+  renderSessionScanStatus({
+    visible: true,
+    running: true,
+    state: 'running',
+    text: targetCount > 0
+      ? `Scanning ${targetCount} WSL/Docker target(s)...`
+      : 'Scanning WSL/Docker session targets...',
+    title: '',
+  });
+
+  try {
+    const res = await fetch(`${API_BASE}/sessions/discover`, {
+      method: 'POST',
+      headers: headers(),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(body.error || `HTTP ${res.status}`);
+    }
+
+    const summary = summarizeManualSessionDiscovery(body);
+    renderSessionScanStatus({
+      visible: true,
+      running: false,
+      ...summary,
+    });
+    await refreshSessions();
+    await revalidateCurrentSessionSelection();
+    await refreshDiscoveryStatus();
+  } catch (error) {
+    renderSessionScanStatus({
+      visible: true,
+      running: false,
+      state: 'failed',
+      text: `Session scan failed: ${error.message}`,
+      title: error.message,
+    });
+  } finally {
+    setSessionScanBusy(false);
+  }
+}
+
 // --- Sessions ---
 async function refreshSessions() {
   try {
@@ -1645,17 +1835,18 @@ async function refreshSessions() {
     if (!res.ok) {
       const el = document.getElementById('sessionList');
       if (res.status === 401 || res.status === 403) {
-        el.innerHTML = '<div class="runtime-empty !rounded-2xl !px-4 !py-10"><div class="runtime-empty-icon">🔒</div><div>API Key required — enter it above</div></div>';
-        document.getElementById('sessionCount').textContent = '';
+        el.innerHTML = '<div class="runtime-empty !rounded-2xl !px-4 !py-10"><div class="runtime-empty-icon">🔒</div><div>API Key required</div></div>';
+        document.getElementById('sessionCount').textContent = '0';
       }
       return;
     }
     const data = await res.json();
-    document.getElementById('sessionCount').textContent = `(${data.count})`;
+    document.getElementById('sessionCount').textContent = String(data.count || 0);
     renderSessionList(data.sessions);
   } catch (e) {
     const el = document.getElementById('sessionList');
     el.innerHTML = `<div class="runtime-empty !rounded-2xl !px-4 !py-10"><div class="runtime-empty-icon">!</div><div>Connection error: ${e.message}</div></div>`;
+    document.getElementById('sessionCount').textContent = '0';
   }
 }
 
@@ -1747,7 +1938,15 @@ function renderSessionList(sessions) {
               ${activity === 'interactive' ? `<span class="sc-dot ${s.status === 'busy' ? 'sc-dot-busy' : 'sc-dot-ready'}"></span>` : ''}
               ${summaryText || s.id.slice(0, 8)}
             </span>
-            ${controls.canDelete ? `<button class="sc-delete" onclick="event.stopPropagation();deleteSession('${s.id}')" title="Delete">&times;</button>` : ''}
+            ${controls.canDelete ? `<button class="sc-delete" onclick="event.stopPropagation();deleteSession('${s.id}')" title="Delete session" aria-label="Delete session">
+              <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 6h18" />
+                <path d="M8 6V4h8v2" />
+                <path d="M19 6l-1 14H6L5 6" />
+                <path d="M10 11v6" />
+                <path d="M14 11v6" />
+              </svg>
+            </button>` : ''}
           </div>
           <div class="sc-meta">
             <span class="provider-badge" data-p="${prov}">${prov}</span>
@@ -1766,12 +1965,21 @@ function renderSessionList(sessions) {
           <span class="chevron">&#9660;</span>
           ${projectName}
           <span class="project-count">(${items.length})</span>
-          <span class="project-dots">${dots}</span>
-          <button class="project-delete" ${(isDeleting || deletableCount === 0) ? 'disabled' : ''}
-            onclick="event.stopPropagation();deleteGroup('${groupKey}', '${groupLabel}')"
-            title="${deletableCount === 0 ? 'No deletable sessions in this project right now' : 'Delete all sessions in this project'}">
-            ${isDeleting ? '<span class="spinner"></span>' : '&#128465;'}
-          </button>
+          <span class="project-actions">
+            <span class="project-dots">${dots}</span>
+            <button class="project-delete" ${(isDeleting || deletableCount === 0) ? 'disabled' : ''}
+              onclick="event.stopPropagation();deleteGroup('${groupKey}', '${groupLabel}')"
+              title="${deletableCount === 0 ? 'No deletable sessions in this project right now' : 'Delete all sessions in this project'}"
+              aria-label="Delete project sessions">
+              ${isDeleting ? '<span class="spinner"></span>' : `<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 6h18" />
+                <path d="M8 6V4h8v2" />
+                <path d="M19 6l-1 14H6L5 6" />
+                <path d="M10 11v6" />
+                <path d="M14 11v6" />
+              </svg>`}
+            </button>
+          </span>
         </div>
         <div class="project-sessions">${cards}</div>
       </div>`;

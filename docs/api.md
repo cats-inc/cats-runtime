@@ -1808,6 +1808,28 @@ can opt in with `?branching=full`. Detail surfaces such as
 `POST /sessions/{id}/fork` responses still include full capability truth.
 Other `branching` query values are ignored.
 
+`POST /sessions/discover` is the runtime-owned manual session scan entry for
+configured WSL- and Docker-backed CLI targets. It scans the configured
+`cursor`, `goose`, `kiro`, and `opencode` CLI instances whose runtime mode is
+currently `wsl` or `docker`, imports any discovered sessions into the embedded
+registry, and returns a bounded per-target summary:
+
+- `status`: `idle`, `completed`, `completed_with_errors`, or `failed`
+- `summary.totalTargets`: how many configured WSL/Docker targets were scanned
+- `summary.scannedTargets`: how many targets completed a scan successfully
+- `summary.failedTargets`: how many targets failed
+- `summary.discoveredCount`: total sessions returned by successful scans
+- `summary.importedCount`: newly imported registry sessions
+- `summary.syncedCount`: sessions merged into the registry across successful targets
+- `targets[]`: per-target result entries including `provider`, `instanceId`,
+  runtime metadata (`mode`, optional `distro`, optional `container`), bounded
+  counts, and an operator-facing `message`
+
+The route does not permanently override background discovery policy. Manual
+scan may wake WSL or Docker targets during the request, but later background
+discovery still follows `CATS_RUNTIME_WSL_DISCOVERY_POLICY` and
+`CATS_RUNTIME_DOCKER_DISCOVERY_POLICY`.
+
 When runtime-managed skills are requested, session payloads also include a
 `skills` block with:
 
