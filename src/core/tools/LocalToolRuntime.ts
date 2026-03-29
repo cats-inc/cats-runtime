@@ -110,6 +110,7 @@ interface ShellResult {
 const MAX_TEXT_OUTPUT = 12_000;
 const MAX_DIFF_PREVIEW_OUTPUT = 8_000;
 const MAX_BATCH_READ_OUTPUT = 16_000;
+const MAX_BATCH_INSPECT_PATHS = 50;
 const DEFAULT_READ_LINE_LIMIT = 400;
 const DEFAULT_LIST_ENTRIES = 200;
 const DEFAULT_GLOB_RESULTS = 200;
@@ -184,6 +185,28 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         },
         max_children: { type: 'integer', minimum: 1, maximum: 200 },
       },
+    },
+  },
+  {
+    name: 'inspect_paths',
+    description: 'Inspect multiple workspace paths and return a bounded JSON payload for planning.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        paths: {
+          type: 'array',
+          description: 'Relative workspace paths to inspect.',
+          items: { type: 'string' },
+          minItems: 1,
+          maxItems: MAX_BATCH_INSPECT_PATHS,
+        },
+        include_children: {
+          type: 'boolean',
+          description: 'Include bounded child listings for directories. Defaults to false.',
+        },
+        max_children: { type: 'integer', minimum: 1, maximum: 50 },
+      },
+      required: ['paths'],
     },
   },
   {
@@ -634,6 +657,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
 const READ_ONLY_TOOLS = new Set([
   'list_files',
   'inspect_path',
+  'inspect_paths',
   'read_file',
   'read_files',
   'diff_file',
@@ -659,7 +683,7 @@ const PREVIEW_ONLY_TOOLS = new Set([
 const TOOL_ORDER = new Map(TOOL_DEFINITIONS.map((tool, index) => [tool.name, index]));
 
 const STANDARD_TOOLS = new Set([
-  'list_files', 'inspect_path', 'read_file', 'read_files', 'diff_file', 'write_file', 'create_directory', 'edit_file',
+  'list_files', 'inspect_path', 'inspect_paths', 'read_file', 'read_files', 'diff_file', 'write_file', 'create_directory', 'edit_file',
   'apply_patch', 'grep', 'glob', 'run_shell',
   'audit-workspace', 'init-workspace', 'update-workspace',
   'audit-delivery-target', 'publish-artifacts', 'inspect-repo-status', 'create-commit', 'push-branch',
@@ -679,6 +703,7 @@ const PROFILE_TOOLS: Record<string, Set<string>> = {
 const TOOL_CAPABILITY_METADATA: Record<string, ToolCapabilityMetadata> = {
   list_files: { domain: 'filesystem', mutating: false },
   inspect_path: { domain: 'filesystem', mutating: false },
+  inspect_paths: { domain: 'filesystem', mutating: false },
   read_file: { domain: 'filesystem', mutating: false },
   read_files: { domain: 'filesystem', mutating: false },
   diff_file: { domain: 'filesystem', mutating: false },
@@ -1260,6 +1285,59 @@ async function readTextFile(
   return lines.slice(offsetLine, offsetLine + limitLines).join('\n');
 }
 
+async function inspectWorkspacePath(
+  root: string,
+  inputPath: string,
+  options: {
+    includeChildren: boolean;
+    maxChildren: number;
+  },
+): Promise<Record<string, unknown>> {
+  const normalizedInput = typeof inputPath === 'string' && inputPath.trim() ? inputPath : '.';
+  const { fullPath, displayPath } = await resolveSafeWorkspacePath(root, normalizedInput);
+
+  try {
+    const info = await stat(fullPath);
+    const payload: Record<string, unknown> = {
+      path: displayPath,
+      exists: true,
+      kind: info.isDirectory() ? 'directory' : info.isFile() ? 'file' : 'other',
+      sizeBytes: info.isFile() ? info.size : undefined,
+      modifiedAt: info.mtime.toISOString(),
+      extension: info.isFile() ? extname(displayPath) || undefined : undefined,
+    };
+
+    if (info.isDirectory() && options.includeChildren) {
+      const entries = await readdir(fullPath, { withFileTypes: true });
+      const sorted = [...entries].sort((left, right) => left.name.localeCompare(right.name));
+      const limited = sorted.slice(0, options.maxChildren);
+      payload.childCount = entries.length;
+      payload.childrenTruncated = entries.length > limited.length;
+      payload.children = limited.map((entry) => ({
+        name: entry.name,
+        path: toRelativeDisplay(root, resolve(fullPath, entry.name)),
+        kind: entry.isDirectory()
+          ? 'directory'
+          : entry.isFile()
+            ? 'file'
+            : entry.isSymbolicLink()
+              ? 'symlink'
+              : 'other',
+      }));
+    }
+
+    return payload;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return {
+        path: displayPath,
+        exists: false,
+      };
+    }
+    throw error;
+  }
+}
+
 async function collectTextFiles(
   root: string,
   targetPath: string,
@@ -1371,6 +1449,8 @@ export class LocalToolRuntime {
           return await this.listFiles(context, call.id, args);
         case 'inspect_path':
           return await this.inspectPath(context, call.id, args);
+        case 'inspect_paths':
+          return await this.inspectPaths(context, call.id, args);
         case 'read_file':
           return await this.readFile(context, call.id, args);
         case 'read_files':
@@ -1499,60 +1579,65 @@ export class LocalToolRuntime {
     callId: string,
     args: Record<string, unknown>,
   ): Promise<ToolResult> {
-    const inputPath = typeof args.path === 'string' && args.path.trim() ? args.path : '.';
-    const { fullPath, displayPath } = await resolveSafeWorkspacePath(context.cwd, inputPath);
     const includeChildren = readOptionalBoolean(args, 'include_children', true);
     const maxChildren = readOptionalInteger(args, 'max_children', 50, 1, 200);
+    const inputPath = typeof args.path === 'string' && args.path.trim() ? args.path : '.';
+    const payload = await inspectWorkspacePath(context.cwd, inputPath, {
+      includeChildren,
+      maxChildren,
+    });
 
-    try {
-      const info = await stat(fullPath);
-      const payload: Record<string, unknown> = {
-        path: displayPath,
-        exists: true,
-        kind: info.isDirectory() ? 'directory' : info.isFile() ? 'file' : 'other',
-        sizeBytes: info.isFile() ? info.size : undefined,
-        modifiedAt: info.mtime.toISOString(),
-        extension: info.isFile() ? extname(displayPath) || undefined : undefined,
-      };
+    return {
+      callId,
+      name: 'inspect_path',
+      output: JSON.stringify(payload, null, 2),
+    };
+  }
 
-      if (info.isDirectory() && includeChildren) {
-        const entries = await readdir(fullPath, { withFileTypes: true });
-        const sorted = [...entries].sort((left, right) => left.name.localeCompare(right.name));
-        const limited = sorted.slice(0, maxChildren);
-        payload.childCount = entries.length;
-        payload.childrenTruncated = entries.length > limited.length;
-        payload.children = limited.map((entry) => ({
-          name: entry.name,
-          path: toRelativeDisplay(context.cwd, resolve(fullPath, entry.name)),
-          kind: entry.isDirectory()
-            ? 'directory'
-            : entry.isFile()
-              ? 'file'
-              : entry.isSymbolicLink()
-                ? 'symlink'
-                : 'other',
-        }));
-      }
-
-      return {
-        callId,
-        name: 'inspect_path',
-        output: JSON.stringify(payload, null, 2),
-      };
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        throw error;
-      }
-
-      return {
-        callId,
-        name: 'inspect_path',
-        output: JSON.stringify({
-          path: displayPath,
-          exists: false,
-        }, null, 2),
-      };
+  private async inspectPaths(
+    context: ToolExecutionContext,
+    callId: string,
+    args: Record<string, unknown>,
+  ): Promise<ToolResult> {
+    const requestedPaths = readOptionalStringArray(args, 'paths');
+    if (!requestedPaths || requestedPaths.length === 0) {
+      throw new Error(`Argument 'paths' must be a non-empty string array`);
     }
+    if (requestedPaths.length > MAX_BATCH_INSPECT_PATHS) {
+      throw new Error(`Argument 'paths' must contain at most ${MAX_BATCH_INSPECT_PATHS} entries`);
+    }
+
+    const uniquePaths = Array.from(new Set(requestedPaths));
+    const includeChildren = readOptionalBoolean(args, 'include_children');
+    const maxChildren = readOptionalInteger(args, 'max_children', 20, 1, 50);
+    const entries: Array<Record<string, unknown>> = [];
+
+    for (const inputPath of uniquePaths) {
+      try {
+        entries.push(await inspectWorkspacePath(context.cwd, inputPath, {
+          includeChildren,
+          maxChildren,
+        }));
+      } catch (error) {
+        entries.push({
+          path: inputPath,
+          exists: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return {
+      callId,
+      name: 'inspect_paths',
+      output: JSON.stringify({
+        requestedCount: requestedPaths.length,
+        uniqueCount: uniquePaths.length,
+        includeChildren,
+        maxChildren,
+        entries,
+      }, null, 2),
+    };
   }
 
   private async readFile(

@@ -29,8 +29,8 @@ describe('buildProviderToolingSummary', () => {
       policy: expect.objectContaining({
         profile: 'read_only',
         counts: {
-          total: 16,
-          fullAccess: 16,
+          total: 17,
+          fullAccess: 17,
           previewOnly: 0,
           blocked: 0,
         },

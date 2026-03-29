@@ -83,7 +83,7 @@ requests into calls into this shared runtime.
   structured patch application, so `apply_patch` cannot bypass the same
   boundary rules as `read_file` / `write_file`.
 - The shared tool surface now includes machine-readable path inspection,
-  bounded multi-file read inspection, and proposed-file diff inspection plus
+  bounded batch path/file inspection, proposed-file diff inspection plus
   explicit directory materialization helpers so hosts do not need ad hoc shell
   fallbacks for common
   navigation/setup/planning tasks.

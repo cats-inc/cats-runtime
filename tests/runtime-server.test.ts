@@ -726,10 +726,10 @@ describe('runtime server', () => {
           tools: expect.objectContaining({
             profiles: expect.objectContaining({
               standard: expect.objectContaining({
-                totalTools: 28,
+                totalTools: 29,
               }),
               extended: expect.objectContaining({
-                totalTools: 31,
+                totalTools: 32,
               }),
             }),
             summary: expect.stringContaining('Runtime tooling exposes'),
@@ -1599,13 +1599,13 @@ backends:
           summary: expect.objectContaining({
             profiles: expect.objectContaining({
               standard: expect.objectContaining({
-                totalTools: 28,
+                totalTools: 29,
               }),
               extended: expect.objectContaining({
-                totalTools: 31,
+                totalTools: 32,
               }),
               readOnly: expect.objectContaining({
-                totalTools: 16,
+                totalTools: 17,
               }),
             }),
             summary: expect.stringContaining('Runtime tooling exposes'),
@@ -2293,11 +2293,11 @@ backends:
           summary: {
             profiles: {
               standard: {
-                totalTools: 28,
+                totalTools: 29,
                 mutatingTools: 12,
-                readOnlyCompatibleTools: 21,
+                readOnlyCompatibleTools: 22,
                 domains: {
-                  filesystem: 9,
+                  filesystem: 10,
                   search: 2,
                   shell: 1,
                   workspace: 3,
@@ -2307,11 +2307,11 @@ backends:
                 },
               },
               extended: {
-                totalTools: 31,
+                totalTools: 32,
                 mutatingTools: 15,
-                readOnlyCompatibleTools: 21,
+                readOnlyCompatibleTools: 22,
                 domains: {
-                  filesystem: 12,
+                  filesystem: 13,
                   search: 2,
                   shell: 1,
                   workspace: 3,
@@ -2321,11 +2321,11 @@ backends:
                 },
               },
               readOnly: {
-                totalTools: 16,
+                totalTools: 17,
                 mutatingTools: 0,
-                readOnlyCompatibleTools: 16,
+                readOnlyCompatibleTools: 17,
                 domains: {
-                  filesystem: 5,
+                  filesystem: 6,
                   search: 2,
                   shell: 0,
                   workspace: 1,
@@ -2335,7 +2335,7 @@ backends:
                 },
               },
             },
-            summary: 'Runtime tooling exposes 28 tools in the standard profile, 31 in the extended profile, and 16 in the read_only profile.',
+            summary: 'Runtime tooling exposes 29 tools in the standard profile, 32 in the extended profile, and 17 in the read_only profile.',
           },
         },
         skills: {
@@ -3850,14 +3850,15 @@ providers:
           permissionMode: 'default',
           whitelistActive: false,
           counts: {
-            total: 31,
-            fullAccess: 16,
+            total: 32,
+            fullAccess: 17,
             previewOnly: 5,
             blocked: 10,
           },
           fullAccessTools: expect.arrayContaining([
             'list_files',
             'inspect_path',
+            'inspect_paths',
             'read_file',
             'grep',
             'audit-workspace',
@@ -3943,7 +3944,7 @@ providers:
           policy: expect.objectContaining({
             profile: 'extended',
             counts: expect.objectContaining({
-              total: 31,
+              total: 32,
             }),
           }),
           observability: {
@@ -3976,8 +3977,8 @@ providers:
             permissionMode: 'default',
             previewOnlyTools: expect.arrayContaining(['push-branch']),
             counts: {
-              total: 31,
-              fullAccess: 16,
+              total: 32,
+              fullAccess: 17,
               previewOnly: 5,
               blocked: 10,
             },

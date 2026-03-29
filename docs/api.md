@@ -2120,6 +2120,12 @@ It surfaces the resolved shared-local-tool policy for the current session:
   `deployment`), its current access bucket, whether it remains read-only
   compatible, and whether the tool is mutating by design
 
+The read-oriented planning helpers now include both single-path and bounded
+batch-path inspection. `inspect_path` remains the detailed one-off view, while
+`inspect_paths` lets callers fetch machine-readable metadata for multiple
+candidate files/directories in one tool turn without falling back to shell
+loops.
+
 `inspection.maintenance` is also runtime-owned and additive. It gives hosts one
 machine-readable place to read:
 
@@ -2615,6 +2621,7 @@ The shared local tool runtime now also exposes headless workspace substrate
 operations for API/local sessions:
 
 - `inspect_path`
+- `inspect_paths`
 - `diff_file`
 - `create_directory`
 
@@ -3280,8 +3287,8 @@ full provider topology:
     "permissionMode": "skip",
     "whitelistActive": false,
     "counts": {
-      "total": 28,
-      "fullAccess": 28,
+      "total": 29,
+      "fullAccess": 29,
       "previewOnly": 0,
       "blocked": 0
     }
