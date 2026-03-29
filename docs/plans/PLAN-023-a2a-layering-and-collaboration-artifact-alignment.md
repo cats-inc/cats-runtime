@@ -197,7 +197,7 @@ collaboration/bootstrap baseline rather than a submodule dependency.
 
 ### Phase 6: Post-Extraction Validation and Split Gate
 
-- [ ] Validate the repo-owned starter/update flow without shelling out to
+- [x] Validate the repo-owned starter/update flow without shelling out to
       `project-bootstrap`
 - [ ] Confirm `cats` can consume the same extracted collaboration baseline
       after the split without monorepo-local bootstrap access
@@ -349,6 +349,7 @@ collaboration/bootstrap baseline rather than a submodule dependency.
 | 2026-03-29 | Added platform wrapper scripts so the repo-owned workspace substrate helper has first-party Windows/Linux/macOS entrypoints under `scripts/` |
 | 2026-03-30 | Landed the first repo-owned starter-family rewrite for Phase 5 by teaching workspace substrate to seed `docs/README.md`, the docs index readmes, `skills/README.md`, and `scripts/README.md`, reducing reliance on `project-bootstrap/templates/base` for the minimum collaboration baseline |
 | 2026-03-30 | Landed the next Phase 5 starter-family slice by internalizing the bootstrap `Sync-AgentSkills` input: `cats-runtime` now ships repo-owned Linux/macOS skill-sync scripts, `scripts/README.md` documents the cross-platform contract, and workspace substrate seeds the Windows/Linux/macOS skill-sync entrypoints into initialized workspaces instead of leaving that collaboration behavior trapped in bootstrap templates |
+| 2026-03-30 | Completed the first Phase 6 split-safety validation loop: `cats-runtime-workspace` successfully seeded a throwaway A2A-enabled workspace without any direct `project-bootstrap` references, the repo-owned workspace substrate tests stayed green, and the sibling `cats` repo now carries matching cross-platform skill-sync entrypoints validated by a local smoke test |
 
 ---
 
