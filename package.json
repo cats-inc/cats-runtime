@@ -34,14 +34,15 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build:ui": "node scripts/build-runtime-ui-css.mjs",
+    "build": "npm run build:ui && tsc -p tsconfig.json",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "prepack": "npm run build",
     "release:check": "npm run verify:skills && npm test && npm pack --dry-run",
     "test": "npm run build && vitest run --pool=threads --poolOptions.threads.singleThread",
     "test:watch": "vitest --pool=threads --poolOptions.threads.singleThread",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "npm run build:ui && tsc --noEmit -p tsconfig.json",
     "verify:skills": "npm run build && node dist/bin/verifySkills.js"
   },
   "keywords": [
@@ -62,6 +63,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "tailwindcss": "^3.4.17",
     "tsx": "^4.19.0",
     "typescript": "^5.0.0",
     "vitest": "^3.0.0"

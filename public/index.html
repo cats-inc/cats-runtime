@@ -38,33 +38,9 @@
     --junie: #fc801d;
     --radius: 8px;
   }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+  .runtime-shell {
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
-
-  /* Header */
-  header {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 12px 20px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-  }
-  header h1 {
-    font-size: 18px;
-    font-weight: 600;
-    white-space: nowrap;
-  }
-  header h1 span { color: var(--accent); }
   .runtime-status-group {
     display: flex;
     align-items: center;
@@ -120,75 +96,8 @@
     text-overflow: ellipsis;
   }
   .api-key-group {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    min-width: 18rem;
   }
-  .api-key-group label { font-size: 12px; color: var(--text2); }
-  .api-key-group input {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 5px 10px;
-    border-radius: var(--radius);
-    font-size: 13px;
-    width: 200px;
-  }
-
-  /* Layout */
-  .main {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-  }
-
-  /* Sidebar */
-  .sidebar {
-    width: 340px;
-    min-width: 280px;
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    background: var(--surface);
-  }
-  .sidebar-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border);
-  }
-  .sidebar-header h2 { font-size: 14px; font-weight: 600; }
-  .btn {
-    padding: 6px 12px;
-    border-radius: var(--radius);
-    border: none;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    transition: background 0.15s;
-  }
-  .btn-primary {
-    background: var(--accent);
-    color: #fff;
-  }
-  .btn-primary:hover { background: var(--accent-dim); }
-  .btn-danger {
-    background: transparent;
-    color: var(--red);
-    border: 1px solid var(--red);
-    padding: 4px 8px;
-    font-size: 12px;
-  }
-  .btn-danger:hover { background: rgba(248,113,113,0.15); }
-  .btn-ghost {
-    background: transparent;
-    color: var(--text2);
-    padding: 4px 8px;
-    font-size: 12px;
-  }
-  .btn-ghost:hover { background: var(--surface2); color: var(--text); }
 
   .session-list {
     flex: 1;
@@ -384,13 +293,6 @@
     white-space: nowrap;
   }
 
-  /* Chat area */
-  .chat-area {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    background: var(--bg);
-  }
   .chat-header {
     display: flex;
     align-items: center;
@@ -607,18 +509,6 @@
     font-style: italic;
   }
 
-  .empty-state {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text2);
-    font-size: 14px;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .empty-state .big { font-size: 32px; opacity: 0.3; }
-
   .chat-input-area {
     padding: 12px 20px;
     border-top: 1px solid var(--border);
@@ -655,47 +545,8 @@
   /* Modal */
   .modal-overlay {
     display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.6);
-    z-index: 100;
-    align-items: center;
-    justify-content: center;
   }
   .modal-overlay.open { display: flex; }
-  .modal {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 24px;
-    width: 440px;
-    max-width: 90vw;
-  }
-  .modal h3 { margin-bottom: 16px; font-size: 16px; }
-  .form-group {
-    margin-bottom: 12px;
-  }
-  .form-group label {
-    display: block;
-    font-size: 12px;
-    color: var(--text2);
-    margin-bottom: 4px;
-  }
-  .form-group input, .form-group select {
-    width: 100%;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 8px 12px;
-    border-radius: var(--radius);
-    font-size: 13px;
-  }
-  .modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 20px;
-  }
   .provider-capability-card {
     border: 1px solid var(--border);
     border-radius: 10px;
@@ -788,95 +639,135 @@
   }
 </style>
 </head>
-<body>
+<body class="runtime-shell" data-runtime-surface="__CATS_RUNTIME_SURFACE__" data-bootstrap-required="__CATS_RUNTIME_BOOTSTRAP_REQUIRED__">
 
-<header>
-  <h1><span>Cats Runtime</span> Dashboard</h1>
-  <div class="runtime-status-group" id="runtimeStatus" title="Loading runtime summary">
-    <span class="runtime-status-dot" id="runtimeStatusDot" data-state="idle"></span>
-    <div class="runtime-status-copy">
-      <div class="runtime-status-title" id="runtimeStatusTitle">CLI runtimes</div>
-      <div class="runtime-status-meta" id="runtimeStatusLabel">Loading runtime config...</div>
-    </div>
-  </div>
-  <div style="margin-left:auto;display:flex;align-items:center;gap:14px;">
-    <a href="/setup" style="color:var(--text2);text-decoration:none;font-size:13px;white-space:nowrap;" title="Provider setup &amp; configuration">&#x2699; Provider Setup</a>
-    <a href="/playground" style="color:var(--accent);text-decoration:none;font-size:13px;white-space:nowrap;" title="Multi-agent group chat playground">&#x1f3ae; Playground</a>
-  </div>
-  <div class="api-key-group">
-    <label>API Key</label>
-    <input type="password" id="apiKeyInput" placeholder="Bearer token" />
-  </div>
-</header>
-
-<div class="main">
-  <div class="sidebar">
-    <div class="sidebar-header">
-      <h2>Sessions <span id="sessionCount" style="color:var(--text2);font-weight:400;font-size:13px;"></span></h2>
-      <div style="display:flex;gap:6px;align-items:center;">
-        <button class="btn btn-danger" onclick="deleteAllSessions()" title="Delete all sessions &amp; projects">&#128465; All</button>
-        <button class="btn btn-primary" onclick="openCreateModal()">+ New</button>
+<div class="runtime-frame">
+  <aside class="runtime-sidebar">
+    <div class="runtime-sidebar-inner">
+      <div class="runtime-brand-row">
+        <!-- CATS_RUNTIME_SURFACE_SWITCHER -->
       </div>
-    </div>
-    <div class="session-list" id="sessionList">
-      <div class="empty-state">
-        <div class="big">~</div>
-        <div>No sessions yet</div>
-      </div>
-    </div>
-  </div>
 
-  <div class="chat-area">
-    <div id="chatPlaceholder" class="empty-state">
-      <div class="big">&gt;_</div>
-      <div>Select or create a session to start</div>
-    </div>
-    <div id="chatContainer" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
-      <div class="chat-header">
-        <div>
-          <span id="chatSessionId" style="font-weight:600;font-size:14px;"></span>
-          <span id="chatSessionStatus" class="badge" style="margin-left:8px;"></span>
-          <div class="chat-header-info" id="chatSessionMeta"></div>
+      <div class="runtime-sidebar-section">
+        <p class="runtime-sidebar-title">Runtime Summary</p>
+        <div class="mt-3 runtime-status-group" id="runtimeStatus" title="Loading runtime summary">
+          <span class="runtime-status-dot" id="runtimeStatusDot" data-state="idle"></span>
+          <div class="runtime-status-copy">
+            <div class="runtime-status-title" id="runtimeStatusTitle">CLI runtimes</div>
+            <div class="runtime-status-meta" id="runtimeStatusLabel">Loading runtime config...</div>
+          </div>
         </div>
-        <div class="chat-header-actions">
-          <button class="btn btn-ghost" id="btnRefresh" onclick="reloadCurrentSession()">Refresh</button>
-          <button class="btn btn-primary" id="btnResume" onclick="resumeCurrentSession()" style="display:none;">Resume</button>
-          <button class="btn btn-danger" id="btnClose" onclick="closeSession()">Close</button>
+        <p class="runtime-sidebar-copy">
+          Group sessions by workspace, inspect provider capabilities, and keep
+          runtime health visible without leaving the dashboard shell.
+        </p>
+      </div>
+
+      <div class="runtime-sidebar-section">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <p class="runtime-sidebar-title">Sessions <span id="sessionCount" class="ml-1 text-slate-500"></span></p>
+            <p class="mt-2 text-sm text-slate-500">Workspace-grouped runtime sessions and provider targets.</p>
+          </div>
+          <div class="flex gap-2">
+            <button class="runtime-btn runtime-btn-danger !px-3 !py-1.5 text-xs" onclick="deleteAllSessions()" title="Delete all sessions &amp; projects">&#128465; All</button>
+            <button class="runtime-btn runtime-btn-primary !px-3 !py-1.5 text-xs" onclick="openCreateModal()">+ New</button>
+          </div>
         </div>
       </div>
-      <div class="chat-session-insights" id="chatSessionInsights" style="display:none;"></div>
-      <div class="chat-messages" id="chatMessages"></div>
-      <div class="chat-input-area" id="chatInputArea">
-        <textarea id="msgInput" placeholder="Send a message..." rows="1"
-          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
-        <button class="btn btn-primary" id="btnSend" onclick="sendMessage()">Send</button>
+
+      <div id="sessionList" class="session-list runtime-sidebar-surface min-h-0 overflow-y-auto px-3 pb-4">
+        <div class="runtime-empty !rounded-2xl !px-4 !py-10">
+          <div class="runtime-empty-icon">~</div>
+          <div>No sessions yet</div>
+        </div>
       </div>
     </div>
-  </div>
+  </aside>
+
+  <main class="runtime-page">
+    <div class="runtime-page-stack">
+      <header class="runtime-page-header">
+        <div class="runtime-page-header-row">
+          <div>
+            <p class="runtime-page-kicker">Runtime Surface</p>
+            <h1 class="runtime-page-title">Dashboard</h1>
+            <p class="runtime-page-subtitle">
+              Session-centric operator view for provider selection, runtime
+              health, inspection insights, and live transcript follow-through.
+            </p>
+          </div>
+
+          <div class="runtime-page-toolbar">
+            <div class="api-key-group runtime-field min-w-[18rem]">
+              <label class="runtime-field-label">API Key</label>
+              <input type="password" id="apiKeyInput" class="runtime-input" placeholder="Bearer token" />
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div class="runtime-page-content min-h-0 overflow-hidden p-6">
+        <div class="flex h-full flex-col">
+          <div id="chatPlaceholder" class="runtime-empty flex-1">
+            <div class="runtime-empty-icon">&gt;_</div>
+            <div>Select or create a session to start</div>
+          </div>
+          <div id="chatContainer" class="runtime-card flex-1" style="display:none;flex-direction:column;overflow:hidden;">
+            <div class="chat-header">
+              <div>
+                <span id="chatSessionId" style="font-weight:600;font-size:14px;"></span>
+                <span id="chatSessionStatus" class="badge" style="margin-left:8px;"></span>
+                <div class="chat-header-info" id="chatSessionMeta"></div>
+              </div>
+              <div class="chat-header-actions">
+                <button class="runtime-btn runtime-btn-ghost" id="btnRefresh" onclick="reloadCurrentSession()">Refresh</button>
+                <button class="runtime-btn runtime-btn-primary" id="btnResume" onclick="resumeCurrentSession()" style="display:none;">Resume</button>
+                <button class="runtime-btn runtime-btn-danger" id="btnClose" onclick="closeSession()">Close</button>
+              </div>
+            </div>
+            <div class="chat-session-insights" id="chatSessionInsights" style="display:none;"></div>
+            <div class="chat-messages" id="chatMessages"></div>
+            <div class="chat-input-area" id="chatInputArea">
+              <textarea id="msgInput" class="runtime-textarea" placeholder="Send a message..." rows="1"
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
+              <button class="runtime-btn runtime-btn-primary" id="btnSend" onclick="sendMessage()">Send</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
 </div>
 
 <!-- Create Session Modal -->
-<div class="modal-overlay" id="createModal">
-  <div class="modal">
-    <h3>Create New Session</h3>
-    <div class="form-group">
-      <label>Workspace Mode</label>
-      <select id="inputWorkspaceMode" onchange="onWorkspaceModeChange()">
-        <option value="isolated">isolated (sandbox)</option>
-        <option value="shared">shared (use cwd)</option>
-        <option value="read_only">read_only (use cwd, permission prompts required)</option>
-      </select>
-    </div>
-    <div class="form-group" id="cwdGroup" style="display:none;">
-      <label>Working Directory</label>
-      <div style="display:flex;gap:6px;">
-        <input type="text" id="inputCwd" placeholder="C:/Users/sammy/Source/my-project" style="flex:1;" />
-        <button type="button" class="btn btn-ghost" onclick="browseDir('inputCwd')" title="Browse">Browse</button>
+<div class="modal-overlay fixed inset-0 z-50 items-center justify-center bg-slate-950/80 p-4" id="createModal">
+  <div class="runtime-card w-full max-w-[36rem] overflow-hidden">
+    <div class="runtime-card-header">
+      <div>
+        <h3 class="runtime-card-title">Create New Session</h3>
+        <p class="runtime-card-copy">Choose the provider target, workspace mode, and optional model routing for a new runtime session.</p>
       </div>
     </div>
-    <div class="form-group">
-      <label>Provider</label>
-        <select id="inputProvider" onchange="onProviderChange()">
+    <div class="space-y-4 p-5">
+      <div class="runtime-field">
+        <label class="runtime-field-label">Workspace Mode</label>
+        <select id="inputWorkspaceMode" class="runtime-select" onchange="onWorkspaceModeChange()">
+          <option value="isolated">isolated (sandbox)</option>
+          <option value="shared">shared (use cwd)</option>
+          <option value="read_only">read_only (use cwd, permission prompts required)</option>
+        </select>
+      </div>
+      <div class="runtime-field" id="cwdGroup" style="display:none;">
+        <label class="runtime-field-label">Working Directory</label>
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="inputCwd" class="runtime-input" placeholder="C:/Users/sammy/Source/my-project" style="flex:1;" />
+          <button type="button" class="runtime-btn runtime-btn-secondary !px-3" onclick="browseDir('inputCwd')" title="Browse">Browse</button>
+        </div>
+      </div>
+      <div class="runtime-field">
+        <label class="runtime-field-label">Provider</label>
+        <select id="inputProvider" class="runtime-select" onchange="onProviderChange()">
           <option value="claude">claude</option>
           <option value="codex">codex</option>
           <option value="gemini">gemini</option>
@@ -886,61 +777,69 @@
           <option value="auggie">auggie</option>
           <option value="opencode">opencode</option>
         </select>
-    </div>
-    <div class="form-group" id="instanceGroup">
-      <label>Provider Instance</label>
-      <select id="inputInstance" onchange="refreshProviderCapabilityPreview()"></select>
-    </div>
-    <div class="provider-capability-card" id="providerCapabilityPreview">
-      <div class="provider-capability-card-header">
-        <h4 class="provider-capability-card-title">Provider Capability Preview</h4>
-        <span class="badge" id="providerCapabilityBadge">Loading</span>
       </div>
-      <div class="provider-capability-summary" id="providerCapabilitySummary">
-        Choose a provider target to inspect runtime/tool visibility.
+      <div class="runtime-field" id="instanceGroup">
+        <label class="runtime-field-label">Provider Instance</label>
+        <select id="inputInstance" class="runtime-select" onchange="refreshProviderCapabilityPreview()"></select>
       </div>
-      <div class="provider-capability-grid" id="providerCapabilityGrid"></div>
-      <div class="insight-tags" id="providerCapabilityTags"></div>
-      <ul class="insight-list" id="providerCapabilityCatalog"></ul>
-    </div>
-    <div class="form-group">
-      <label>Model (optional)</label>
-      <input type="text" id="inputModel" placeholder="e.g. claude-sonnet-4-6" />
-    </div>
-    <div class="form-group">
-      <label>Group (optional)</label>
-      <input type="text" id="inputGroup" placeholder="e.g. backend" />
-    </div>
-    <div class="form-group" id="permissionGroup" style="display:none;">
-      <label>Permission Mode</label>
-      <select id="inputPermission">
-        <option value="skip">skip (dangerously skip)</option>
-        <option value="default">default (interactive)</option>
-        <option value="whitelist">whitelist</option>
-      </select>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeCreateModal()">Cancel</button>
-      <button class="btn btn-primary" id="createSessionBtn" onclick="createSession()">Create</button>
+      <div class="provider-capability-card" id="providerCapabilityPreview">
+        <div class="provider-capability-card-header">
+          <h4 class="provider-capability-card-title">Provider Capability Preview</h4>
+          <span class="badge" id="providerCapabilityBadge">Loading</span>
+        </div>
+        <div class="provider-capability-summary" id="providerCapabilitySummary">
+          Choose a provider target to inspect runtime/tool visibility.
+        </div>
+        <div class="provider-capability-grid" id="providerCapabilityGrid"></div>
+        <div class="insight-tags" id="providerCapabilityTags"></div>
+        <ul class="insight-list" id="providerCapabilityCatalog"></ul>
+      </div>
+      <div class="runtime-field">
+        <label class="runtime-field-label">Model (optional)</label>
+        <input type="text" id="inputModel" class="runtime-input" placeholder="e.g. claude-sonnet-4-6" />
+      </div>
+      <div class="runtime-field">
+        <label class="runtime-field-label">Group (optional)</label>
+        <input type="text" id="inputGroup" class="runtime-input" placeholder="e.g. backend" />
+      </div>
+      <div class="runtime-field" id="permissionGroup" style="display:none;">
+        <label class="runtime-field-label">Permission Mode</label>
+        <select id="inputPermission" class="runtime-select">
+          <option value="skip">skip (dangerously skip)</option>
+          <option value="default">default (interactive)</option>
+          <option value="whitelist">whitelist</option>
+        </select>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button class="runtime-btn runtime-btn-ghost" onclick="closeCreateModal()">Cancel</button>
+        <button class="runtime-btn runtime-btn-primary" id="createSessionBtn" onclick="createSession()">Create</button>
+      </div>
     </div>
   </div>
 </div>
 
 <!-- Browse Directory Modal -->
-<div class="modal-overlay" id="browseModal">
-  <div class="modal" style="width:520px;">
-    <h3>Select Directory</h3>
-    <div class="form-group">
-      <label>Path</label>
-      <div style="display:flex;gap:6px;">
-        <input type="text" id="browsePath" style="flex:1;" onkeydown="if(event.key==='Enter'){loadBrowse(this.value);}" />
-        <button class="btn btn-ghost" onclick="loadBrowse(document.getElementById('browsePath').value)">Go</button>
+<div class="modal-overlay fixed inset-0 z-50 items-center justify-center bg-slate-950/80 p-4" id="browseModal">
+  <div class="runtime-card w-full max-w-[32rem] overflow-hidden">
+    <div class="runtime-card-header">
+      <div>
+        <h3 class="runtime-card-title">Select Directory</h3>
+        <p class="runtime-card-copy">Choose the working directory used to create or resume runtime sessions.</p>
       </div>
     </div>
-    <div class="browse-list" id="browseList"></div>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeBrowseModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="selectBrowsePath()">Select</button>
+    <div class="space-y-4 p-5">
+      <div class="runtime-field">
+        <label class="runtime-field-label">Path</label>
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="browsePath" class="runtime-input" style="flex:1;" onkeydown="if(event.key==='Enter'){loadBrowse(this.value);}" />
+          <button class="runtime-btn runtime-btn-secondary !px-3" onclick="loadBrowse(document.getElementById('browsePath').value)">Go</button>
+        </div>
+      </div>
+      <div class="browse-list max-h-[320px] overflow-y-auto rounded-2xl border border-slate-800 bg-slate-950 p-2" id="browseList"></div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button class="runtime-btn runtime-btn-ghost" onclick="closeBrowseModal()">Cancel</button>
+        <button class="runtime-btn runtime-btn-primary" onclick="selectBrowsePath()">Select</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1736,7 +1635,7 @@ async function refreshSessions() {
     if (!res.ok) {
       const el = document.getElementById('sessionList');
       if (res.status === 401 || res.status === 403) {
-        el.innerHTML = '<div class="empty-state"><div class="big">🔒</div><div>API Key required — enter it above</div></div>';
+        el.innerHTML = '<div class="runtime-empty !rounded-2xl !px-4 !py-10"><div class="runtime-empty-icon">🔒</div><div>API Key required — enter it above</div></div>';
         document.getElementById('sessionCount').textContent = '';
       }
       return;
@@ -1746,7 +1645,7 @@ async function refreshSessions() {
     renderSessionList(data.sessions);
   } catch (e) {
     const el = document.getElementById('sessionList');
-    el.innerHTML = `<div class="empty-state"><div class="big">!</div><div>Connection error: ${e.message}</div></div>`;
+    el.innerHTML = `<div class="runtime-empty !rounded-2xl !px-4 !py-10"><div class="runtime-empty-icon">!</div><div>Connection error: ${e.message}</div></div>`;
   }
 }
 
@@ -1780,7 +1679,7 @@ function pickWorkspaceLabel(current, candidate) {
 function renderSessionList(sessions) {
   const el = document.getElementById('sessionList');
   if (!sessions || sessions.length === 0) {
-    el.innerHTML = '<div class="empty-state"><div class="big">~</div><div>No sessions yet</div></div>';
+    el.innerHTML = '<div class="runtime-empty !rounded-2xl !px-4 !py-10"><div class="runtime-empty-icon">~</div><div>No sessions yet</div></div>';
     return;
   }
 

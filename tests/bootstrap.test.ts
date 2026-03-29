@@ -990,6 +990,10 @@ describe('bootstrap mode server', () => {
         expect(html).toContain('Provider Setup');
         expect(html).toContain('data-cats-ui');
         expect(html).toContain('window.CatsUI');
+        expect(html).toContain('data-runtime-surface-switcher');
+        expect(html).toContain('data-active-surface="setup"');
+        expect(html).toContain('data-bootstrap-required="true"');
+        expect((html.match(/>Locked</g) || []).length).toBe(2);
       } finally {
         await runtime.close();
       }
@@ -1013,6 +1017,8 @@ describe('bootstrap mode server', () => {
         expect(html).toContain('Cats Runtime Dashboard');
         expect(html).toContain('data-cats-ui');
         expect(html).toContain('data-cats-scan-panel');
+        expect(html).toContain('data-runtime-surface-switcher');
+        expect(html).toContain('data-active-surface="dashboard"');
         expect(html).toContain('scanPanelManualBtn');
         expect(html).toContain('providerCapabilityPreview');
         expect(html).toContain('chatSessionInsights');
@@ -1039,6 +1045,8 @@ describe('bootstrap mode server', () => {
         expect(html).toContain('Playground');
         expect(html).toContain('data-cats-ui');
         expect(html).toContain('window.CatsUI');
+        expect(html).toContain('data-runtime-surface-switcher');
+        expect(html).toContain('data-active-surface="playground"');
         expect(html).toContain('id="api-key"');
         expect(html).toContain('validateRuntimeApiKey');
       } finally {

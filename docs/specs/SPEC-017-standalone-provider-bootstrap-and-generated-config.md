@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | Approved (Core Bootstrap Slice Landed; UI Shell Follow-Through Pending) |
 | **Owner** | Codex |
 | **Reviewer** | User / runtime setup workstream |
 
@@ -38,6 +38,8 @@ This spec defines a standalone bootstrap flow for `cats-runtime` that:
 - make auto-scan safe on machines where WSL/Docker startup has high overhead
 - preserve an expert path that can skip bootstrap when a valid config is
   already supplied
+- make dashboard, playground, and setup feel like one runtime shell rather
+  than three unrelated operator pages
 
 ## Non-Goals
 
@@ -46,8 +48,12 @@ This spec defines a standalone bootstrap flow for `cats-runtime` that:
 - turning the runtime dashboard or setup flow into a product-grade onboarding
   wizard
 - replacing the embedded runtime pages with a full SPA rewrite in this slice
+  - a lightweight build-time Tailwind pipeline for emitted static runtime pages
+    remains in scope and is not considered a SPA rewrite
 - owning `cats` product bootstrap concerns such as owner identity or Boss Cat
   initialization
+- copying the `cats` suite palette or product branding directly into
+  `cats-runtime`
 
 ## User Stories
 
@@ -176,6 +182,37 @@ and-egg problem instead of preserving it.
 30. Any future CLI setup surface should be implemented later as another thin
     adapter over the same shared services.
 31. Defining the future CLI command surface is out of scope for this slice.
+32. The runtime-owned UI shell shall converge on the current playground surface
+    as the canonical visual/layout baseline for dashboard, playground, and
+    provider setup.
+33. That shared shell shall keep a dark runtime/operator visual posture and
+    shall not depend on the `cats` suite palette or product-brand styling.
+34. The runtime-owned UI target styling path should converge on build-time
+    Tailwind rather than a long-term mix of:
+    - page-local handwritten CSS
+    - injected token fragments only
+    - Tailwind CDN on a single page
+35. The runtime shell shall expose one canonical cross-surface navigation
+    affordance in the sidebar brand row for:
+    - `Dashboard`
+    - `Playground`
+    - `Setup`
+36. Bootstrap mode shall preserve that same surface-switcher affordance, but
+    `Dashboard` and `Playground` must be shown as locked/disabled until setup
+    completes.
+37. Shared shell chrome should converge across the three runtime-owned pages,
+    including:
+    - sidebar width and top chrome
+    - page header/action row structure
+    - button hierarchy
+    - form controls
+    - modal treatment
+    - empty states
+38. The three pages may keep workflow-specific inner layouts inside that shared
+    shell:
+    - dashboard remains session-centric
+    - playground remains multi-agent chat-centric
+    - setup remains provider-first and repair-oriented
 
 ### Non-Functional Requirements
 
@@ -186,6 +223,8 @@ and-egg problem instead of preserving it.
   without requiring a full frontend framework rewrite
 - **Compatibility**: advanced operators may still hand-author or preseed
   `providers.yaml`
+- **Coherence**: runtime-owned pages should read as one operator shell even
+  when they serve different workflows
 
 ## Design Overview
 
@@ -210,6 +249,31 @@ bootstrap mode
       v
 normal runtime mode
 ```
+
+## Runtime UI Shell Direction
+
+The runtime UI should converge on one shared shell with three surface pages
+inside it:
+
+- `Dashboard`
+- `Playground`
+- `Setup`
+
+The current playground surface is the canonical layout/visual reference for
+that shell:
+
+- dark runtime/operator tone
+- sidebar-led shell chrome
+- shared modals and form treatment
+- one stable place for surface switching
+
+That shell direction should remain additive:
+
+- `/` stays mode-sensitive
+- `/dashboard`, `/playground`, and `/setup` stay stable
+- bootstrap still gates usable workflows, but it should do so by locking the
+  shared surface switcher rather than replacing the shell with a separate
+  navigation model
 
 ## Setup Artifact Model
 

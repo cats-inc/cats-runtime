@@ -1,18 +1,17 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cats Runtime — Playground</title>
-  <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
   <style>
     ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: #1e293b; }
-    ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 999px; }
     @keyframes pulse-dot {
       0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
       40% { opacity: 1; transform: scale(1.2); }
@@ -26,167 +25,187 @@
     .msg-content p { margin: 0.25rem 0; }
     .msg-content ul, .msg-content ol { margin: 0.25rem 0; padding-left: 1.5rem; }
     .msg-content li { margin: 0.1rem 0; }
-    .msg-content code { background: #1e293b; padding: 0.15rem 0.35rem; border-radius: 0.25rem; font-size: 0.85em; }
+    .msg-content code { background: #0f172a; padding: 0.15rem 0.35rem; border-radius: 0.25rem; font-size: 0.85em; }
     .msg-content pre { margin: 0.5rem 0; border-radius: 0.5rem; overflow-x: auto; }
     .msg-content pre code { background: transparent; padding: 0; display: block; }
     .msg-content blockquote { border-left: 3px solid #475569; padding-left: 0.75rem; margin: 0.5rem 0; opacity: 0.8; }
-    .msg-content a { color: #60a5fa; text-decoration: underline; }
+    .msg-content a { color: #93c5fd; text-decoration: underline; }
     .msg-content table { border-collapse: collapse; margin: 0.5rem 0; }
-    .msg-content th, .msg-content td { border: 1px solid #475569; padding: 0.35rem 0.75rem; }
-    .msg-content th { background: #1e293b; }
+    .msg-content th, .msg-content td { border: 1px solid #334155; padding: 0.35rem 0.75rem; }
+    .msg-content th { background: #0f172a; }
     .tag-pill { display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 9999px; border: 1px solid; opacity: 0.8; }
     .role-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 9999px; border: 1px solid; letter-spacing: 0.25px; }
-    /* Canonical badge styles in src/http/ui/shared.ts, injected at serve-time.
-       Static fallback kept here so the file works standalone. */
-    .provider-badge { font-size: 10px; font-weight: 500; padding: 1px 5px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.3px; }
-    .provider-badge[data-p="claude"] { background: rgba(224,145,69,0.2); color: #e09145; }
-    .provider-badge[data-p="codex"]  { background: rgba(34,197,94,0.2);  color: #22c55e; }
-    .provider-badge[data-p="copilot"] { background: rgba(163,113,247,0.2); color: #a371f7; }
-    .provider-badge[data-p="cursor"] { background: rgba(249,115,22,0.2); color: #f97316; }
-    .provider-badge[data-p="gemini"] { background: rgba(66,133,244,0.2); color: #4285f4; }
-    .provider-badge[data-p="kiro"] { background: rgba(20,184,166,0.2); color: #14b8a6; }
-    .provider-badge[data-p="auggie"] { background: rgba(6,182,212,0.2); color: #06b6d4; }
-    .provider-badge[data-p="opencode"] { background: rgba(244,114,182,0.2); color: #f472b6; }
-    .provider-badge[data-p="pi"]       { background: rgba(168,162,158,0.2); color: #a8a29e; }
-    .provider-badge[data-p="junie"]    { background: rgba(252,128,29,0.2);  color: #fc801d; }
-    .provider-badge[data-p="goose"]    { background: rgba(139,92,246,0.2);  color: #8b5cf6; }
-    .provider-badge[data-p="ollama"]   { background: rgba(100,116,139,0.2); color: #64748b; }
   </style>
 </head>
-<body class="h-full bg-slate-900 text-slate-200 font-sans">
-  <div class="flex h-full">
-    <!-- LEFT PANEL -->
-    <aside id="left-panel" class="w-96 flex-shrink-0 bg-slate-800 border-r border-slate-700 flex flex-col overflow-y-auto">
-      <div class="p-4 border-b border-slate-700">
-        <div class="flex items-center justify-between">
-          <div>
-            <h1 class="text-lg font-bold text-white">Playground</h1>
-            <p class="text-xs text-slate-400 mt-1">Agent Group Chat</p>
+<body class="runtime-shell" data-runtime-surface="__CATS_RUNTIME_SURFACE__" data-bootstrap-required="__CATS_RUNTIME_BOOTSTRAP_REQUIRED__">
+  <div class="runtime-frame">
+    <aside id="left-panel" class="runtime-sidebar">
+      <div class="runtime-sidebar-inner">
+        <div class="runtime-brand-row">
+          <!-- CATS_RUNTIME_SURFACE_SWITCHER -->
+        </div>
+
+        <div class="runtime-sidebar-section">
+          <p class="runtime-sidebar-title">Playground Shell</p>
+          <p class="runtime-sidebar-copy">
+            Multi-agent runtime demo surface with orchestration, delegation, and
+            same-origin streaming directly against this runtime instance.
+          </p>
+        </div>
+
+        <div id="setup-section" class="runtime-sidebar-section runtime-sidebar-surface space-y-4 overflow-y-auto">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <h2 class="text-sm font-semibold uppercase tracking-widest text-slate-300">Agents</h2>
+              <button onclick="openPromptsModal()" class="runtime-btn runtime-btn-ghost !h-8 !w-8 !rounded-full !px-0 !py-0" title="View role prompts">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              </button>
+            </div>
+            <button onclick="addAgent()" class="runtime-btn runtime-btn-secondary !px-3 !py-1.5 text-xs">+ Add</button>
           </div>
-          <a href="/" class="text-xs text-slate-400 hover:text-slate-200 transition">&larr; Dashboard</a>
-        </div>
-        <div class="mt-3">
-          <label class="block text-xs text-slate-400 mb-1">API Key <span class="text-slate-500">(optional)</span></label>
-          <input id="api-key" type="password" placeholder="Bearer token"
-                 class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500" />
-        </div>
-      </div>
-      <!-- Setup Mode -->
-      <div id="setup-section" class="p-4 flex-1 space-y-4">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Agents</h2>
-            <button onclick="openPromptsModal()" class="text-slate-400 hover:text-slate-200 transition" title="View role prompts">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            </button>
+
+          <div class="runtime-note">
+            One orchestrator is required. The rest of the team can be shaped as
+            PM, architect, coder, tester, reviewer, QA, and marketer roles.
           </div>
-          <button onclick="addAgent()" class="text-xs bg-blue-600 hover:bg-blue-500 px-2 py-1 rounded">+ Add</button>
+
+          <div id="agents-list" class="space-y-3"></div>
+
+          <div class="space-y-3 pt-2">
+            <h2 class="text-sm font-semibold uppercase tracking-widest text-slate-300">Session Settings</h2>
+            <div class="runtime-field">
+              <label class="runtime-field-label">Work Directory</label>
+              <div class="flex gap-2">
+                <input id="work-dir" type="text" placeholder="/path/to/repo" class="runtime-input" />
+                <button type="button" onclick="openBrowseModal()" class="runtime-btn runtime-btn-secondary !px-3">Browse</button>
+              </div>
+            </div>
+            <div class="runtime-field">
+              <label class="runtime-field-label">Response Language</label>
+              <select id="response-lang" class="runtime-select">
+                <option value="en">English</option>
+                <option value="zh-TW">Traditional Chinese</option>
+              </select>
+            </div>
+          </div>
+
+          <button id="btn-start-chat" onclick="startChat()" class="runtime-btn runtime-btn-primary mt-4 w-full justify-center">
+            Start Chat
+          </button>
         </div>
-        <div id="agents-list" class="space-y-3"></div>
-        <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider pt-2">Settings</h2>
-        <div>
-          <label class="block text-xs text-slate-400 mb-1">Work Directory <span class="text-slate-500">(optional)</span></label>
-          <div class="flex gap-2">
-            <input id="work-dir" type="text" placeholder="/path/to/repo"
-                   class="flex-1 bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
-            <button type="button" onclick="openBrowseModal()" class="bg-slate-600 hover:bg-slate-500 text-slate-300 text-sm px-3 py-2 rounded transition">Browse</button>
+
+        <div id="participants-section" class="runtime-sidebar-section runtime-sidebar-surface hidden flex-col">
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="text-sm font-semibold uppercase tracking-widest text-slate-300">Participants</h2>
+            <span class="runtime-chip runtime-chip-muted">Live room</span>
+          </div>
+          <div id="participant-list" class="mt-3 flex-1 space-y-2"></div>
+          <button id="btn-stop-chat" onclick="stopChat()" class="runtime-btn runtime-btn-danger mt-4 w-full justify-center">
+            Stop Chat
+          </button>
+        </div>
+
+        <div class="runtime-sidebar-section">
+          <div class="flex items-center gap-2 text-xs text-slate-400">
+            <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+            <span>Direct (same-origin runtime API)</span>
           </div>
         </div>
-        <div>
-          <label class="block text-xs text-slate-400 mb-1">Response Language</label>
-          <select id="response-lang" class="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
-            <option value="en">English</option>
-            <option value="zh-TW">Traditional Chinese</option>
-          </select>
-        </div>
-        <button id="btn-start-chat" onclick="startChat()"
-                class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-4 rounded transition mt-4">
-          Start Chat
-        </button>
-      </div>
-      <!-- Participants Mode -->
-      <div id="participants-section" class="hidden p-4 flex-1 flex flex-col">
-        <h2 class="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-3">Participants</h2>
-        <div id="participant-list" class="space-y-2 flex-1"></div>
-        <button id="btn-stop-chat" onclick="stopChat()"
-                class="w-full bg-red-600 hover:bg-red-500 text-white font-medium py-2 px-4 rounded transition mt-4">
-          Stop Chat
-        </button>
-      </div>
-      <!-- Status -->
-      <div class="p-3 border-t border-slate-700 flex items-center gap-2 text-xs">
-        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-        <span class="text-slate-400">Direct (same-origin API)</span>
       </div>
     </aside>
-    <!-- RIGHT: Chat Area -->
-    <main class="flex-1 flex flex-col min-w-0">
-      <div id="status-bar" class="bg-slate-800 border-b border-slate-700 px-4 py-2 flex items-center gap-4 text-sm flex-shrink-0">
-        <div class="flex items-center gap-2">
-          <span class="text-slate-400">Tokens:</span>
-          <span id="tokens-display" class="font-mono text-white">0</span>
+
+    <main class="runtime-page">
+      <div class="runtime-page-stack">
+        <header class="runtime-page-header">
+          <div class="runtime-page-header-row">
+            <div>
+              <p class="runtime-page-kicker">Runtime Surface</p>
+              <h1 class="runtime-page-title">Playground</h1>
+              <p class="runtime-page-subtitle">
+                A shared shell for orchestrated agent collaboration, provider
+                comparison, and live runtime streaming behavior.
+              </p>
+            </div>
+
+            <div class="runtime-page-toolbar">
+              <div class="runtime-field min-w-[18rem]">
+                <label for="api-key" class="runtime-field-label">API Key</label>
+                <input id="api-key" type="password" placeholder="Bearer token" class="runtime-input" />
+              </div>
+              <div id="status-bar" class="runtime-page-toolbar-row text-sm">
+                <div class="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1.5">
+                  <span class="text-slate-500">Tokens</span>
+                  <span id="tokens-display" class="font-mono text-white">0</span>
+                </div>
+                <div id="agent-statuses" class="flex flex-wrap gap-2"></div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div id="chat-area" class="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+          <div class="runtime-empty">
+            <div class="runtime-empty-icon">&#x1f4ac;</div>
+            <p class="text-lg font-medium text-slate-300">Set up your agents and start chatting</p>
+            <p class="text-sm text-slate-500">The orchestrator will coordinate the team</p>
+          </div>
         </div>
-        <div id="agent-statuses" class="flex gap-3 ml-auto"></div>
-      </div>
-      <div id="chat-area" class="flex-1 overflow-y-auto p-4 space-y-4">
-        <div class="text-center text-slate-500 py-12">
-          <div class="text-4xl mb-3">&#x1f4ac;</div>
-          <p class="text-lg font-medium">Set up your agents and start chatting</p>
-          <p class="text-sm mt-1">The orchestrator will coordinate the team</p>
-        </div>
-      </div>
-      <div id="thinking-bar" class="hidden bg-slate-900/50 backdrop-blur-sm border-t border-slate-700 px-4 py-2 flex gap-4 flex-shrink-0"></div>
-      <div id="input-area" class="hidden bg-slate-800 border-t border-slate-700 p-4 flex-shrink-0">
-        <div class="flex gap-2">
-          <textarea id="chat-input" rows="2" placeholder="Type your message..."
-                    class="flex-1 bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm resize-none focus:outline-none focus:border-blue-500"
-                    onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
-          <div class="flex flex-col gap-2">
-            <button id="btn-send" onclick="sendMessage()"
-                    class="bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 px-4 rounded transition text-sm">Send</button>
-            <button id="btn-stop" onclick="stopAgents()" title="Interrupt the current turn"
-                    class="bg-red-600 hover:bg-red-500 text-white font-medium py-2 px-4 rounded transition text-sm disabled:opacity-40 disabled:cursor-not-allowed" disabled>Stop</button>
+
+        <div id="thinking-bar" class="hidden border-t border-slate-800 bg-slate-950/80 px-6 py-3 backdrop-blur-xl"></div>
+
+        <div id="input-area" class="hidden border-t border-slate-800 bg-slate-950/90 px-6 py-5">
+          <div class="flex gap-3">
+            <textarea id="chat-input" rows="2" placeholder="Type your message..." class="runtime-textarea flex-1" onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
+            <div class="flex flex-col gap-2">
+              <button id="btn-send" onclick="sendMessage()" class="runtime-btn runtime-btn-primary justify-center">Send</button>
+              <button id="btn-stop" onclick="stopAgents()" title="Interrupt the current turn" class="runtime-btn runtime-btn-danger justify-center disabled:opacity-40 disabled:cursor-not-allowed" disabled>Stop</button>
+            </div>
           </div>
         </div>
       </div>
     </main>
   </div>
 
-<!-- Browse Modal -->
-<div id="browseModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
-  <div class="bg-slate-800 border border-slate-600 rounded-xl p-5 w-[480px] max-w-[90vw]">
-    <h3 class="text-base font-semibold mb-3">Select Directory</h3>
-    <div class="mb-2">
-      <label class="block text-xs text-slate-400 mb-1">Path</label>
-      <div class="flex gap-2">
-        <input id="browse-path" type="text"
-               class="flex-1 bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-               onkeydown="if(event.key==='Enter')loadBrowse(this.value)" />
-        <button onclick="loadBrowse(document.getElementById('browse-path').value)"
-                class="bg-slate-600 hover:bg-slate-500 text-sm px-3 py-2 rounded transition">Go</button>
+  <div id="browseModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
+    <div class="runtime-card w-full max-w-[560px] overflow-hidden">
+      <div class="runtime-card-header">
+        <div>
+          <h3 class="runtime-card-title">Select Directory</h3>
+          <p class="runtime-card-copy">Browse a working directory to share with the playground team.</p>
+        </div>
+      </div>
+      <div class="space-y-3 p-5">
+        <div class="runtime-field">
+          <label class="runtime-field-label">Path</label>
+          <div class="flex gap-2">
+            <input id="browse-path" type="text" class="runtime-input flex-1" onkeydown="if(event.key==='Enter')loadBrowse(this.value)" />
+            <button onclick="loadBrowse(document.getElementById('browse-path').value)" class="runtime-btn runtime-btn-secondary !px-3">Go</button>
+          </div>
+        </div>
+        <div id="browse-list" class="max-h-[300px] overflow-y-auto rounded-2xl border border-slate-800 bg-slate-950 p-2"></div>
+        <div class="flex justify-end gap-2">
+          <button onclick="closeBrowseModal()" class="runtime-btn runtime-btn-ghost">Cancel</button>
+          <button onclick="selectBrowsePath()" class="runtime-btn runtime-btn-primary">Select</button>
+        </div>
       </div>
     </div>
-    <div id="browse-list" class="max-h-[300px] overflow-y-auto bg-slate-900 border border-slate-700 rounded my-2"></div>
-    <div class="flex justify-end gap-2 mt-3">
-      <button onclick="closeBrowseModal()" class="bg-slate-600 hover:bg-slate-500 text-sm px-4 py-2 rounded transition">Cancel</button>
-      <button onclick="selectBrowsePath()" class="bg-blue-600 hover:bg-blue-500 text-white text-sm px-4 py-2 rounded transition">Select</button>
-    </div>
   </div>
-</div>
 
-<!-- Role Prompts Modal -->
-<div id="promptsModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center">
-  <div class="bg-slate-800 border border-slate-600 rounded-xl p-5 w-[600px] max-w-[90vw] max-h-[80vh] flex flex-col">
-    <div class="flex items-center justify-between mb-4">
-      <h3 class="text-base font-semibold">Role Prompts</h3>
-      <button onclick="closePromptsModal()" class="text-slate-400 hover:text-slate-200 text-lg">&times;</button>
-    </div>
-    <div id="prompts-content" class="flex-1 overflow-y-auto space-y-3"></div>
-    <div class="flex justify-end mt-4">
-      <button onclick="closePromptsModal()" class="bg-slate-600 hover:bg-slate-500 text-sm px-4 py-2 rounded transition">Close</button>
+  <div id="promptsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
+    <div class="runtime-card flex max-h-[80vh] w-full max-w-[720px] flex-col overflow-hidden">
+      <div class="runtime-card-header">
+        <div>
+          <h3 class="runtime-card-title">Role Prompts</h3>
+          <p class="runtime-card-copy">Inspect the current role prompt scaffolding used for each agent tag.</p>
+        </div>
+        <button onclick="closePromptsModal()" class="runtime-btn runtime-btn-ghost !h-9 !w-9 !rounded-full !px-0 !py-0 text-lg">&times;</button>
+      </div>
+      <div id="prompts-content" class="flex-1 overflow-y-auto space-y-3 p-5"></div>
+      <div class="flex justify-end border-t border-slate-800 px-5 py-4">
+        <button onclick="closePromptsModal()" class="runtime-btn runtime-btn-secondary">Close</button>
+      </div>
     </div>
   </div>
-</div>
 
 <script>
 // ============================================================

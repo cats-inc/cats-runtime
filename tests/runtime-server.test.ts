@@ -218,6 +218,8 @@ describe('runtime server', () => {
       expect(html).toContain('id="createSessionBtn"');
       expect(html).toContain('id="providerCapabilityPreview"');
       expect(html).toContain('id="chatSessionInsights"');
+      expect(html).toContain('data-runtime-surface-switcher');
+      expect(html).toContain('data-active-surface="dashboard"');
       expect(html).toContain('refreshProviderCapabilityPreview');
       expect(html).toContain('renderSessionInsights');
       expect(html).not.toContain("{ id: 'default', runtime: { mode: 'native' } }");
@@ -236,9 +238,11 @@ describe('runtime server', () => {
       expect(response.status).toBe(200);
       const html = await response.text();
       expect(html).toContain('Playground');
-      expect(html).toContain('Direct (same-origin API)');
+      expect(html).toContain('Direct (same-origin runtime API)');
       expect(html).toContain('class RuntimeClient');
       expect(html).toContain('/providers/config');
+      expect(html).toContain('data-runtime-surface-switcher');
+      expect(html).toContain('data-active-surface="playground"');
       expect(html).toContain('id="api-key"');
       expect(html).toContain('validateRuntimeApiKey');
       expect(html).toContain('getRuntimeAuthHeaders');
@@ -255,6 +259,8 @@ describe('runtime server', () => {
         const html = await response.text();
         expect(html).toContain('Provider Setup');
         expect(html).toContain('data-cats-ui');
+        expect(html).toContain('data-runtime-surface-switcher');
+        expect(html).toContain('data-active-surface="setup"');
         expect(html).toContain('apiKeyInput');
         expect(html).toContain("window.CatsUI && window.CatsUI.apiFetch");
         expect(html).toContain('validateApiKeyInput');

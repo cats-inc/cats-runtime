@@ -6,6 +6,7 @@ import {
   mkdir,
   readdir,
   readFile,
+  realpath,
   rename,
   rm,
   stat,
@@ -172,7 +173,7 @@ export async function prepareSessionWorkspace(
 
   const sourceCwd = input.cwd;
   const sourceRepoRoot = await resolveGitRepoRoot(sourceCwd);
-  const relativeCwd = resolveRelativeRepoPath(sourceRepoRoot, sourceCwd);
+  const relativeCwd = await resolveRelativeRepoPath(sourceRepoRoot, sourceCwd);
   const worktreePath = buildWorktreePath(input.sessionBaseDir, sourceRepoRoot, input.sessionId);
 
   if (!(await pathExists(worktreePath))) {
@@ -682,14 +683,25 @@ async function resolveGitRepoRoot(cwd: string): Promise<string> {
   return result.stdout.trim();
 }
 
-function resolveRelativeRepoPath(sourceRepoRoot: string, cwd: string): string | undefined {
-  const repoRoot = resolve(sourceRepoRoot);
-  const target = resolve(cwd);
+async function resolveRelativeRepoPath(
+  sourceRepoRoot: string,
+  cwd: string,
+): Promise<string | undefined> {
+  const repoRoot = await resolveComparablePath(sourceRepoRoot);
+  const target = await resolveComparablePath(cwd);
   const relativePath = relative(repoRoot, target);
   if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
     throw new Error(`cwd '${cwd}' is not inside repo root '${sourceRepoRoot}'`);
   }
   return relativePath.length > 0 ? relativePath : undefined;
+}
+
+async function resolveComparablePath(value: string): Promise<string> {
+  try {
+    return await realpath(value);
+  } catch {
+    return resolve(value);
+  }
 }
 
 async function readGitValue(cwd: string, args: string[]): Promise<string | undefined> {
