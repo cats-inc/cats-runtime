@@ -1,4 +1,4 @@
-import { existsSync, linkSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, linkSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { chmod as chmodAsync, rename as renameAsync, stat as statAsync, unlink as unlinkAsync, writeFile as writeFileAsync } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -1619,6 +1619,33 @@ describe('LocalToolRuntime', () => {
         const destinationStat = statSync(destinationPath);
         expect(destinationStat.mtime.toISOString()).toBe(sourceStat.mtime.toISOString());
         expect(destinationStat.atime.toISOString()).toBe(sourceStat.atime.toISOString());
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('preserves source file modes when the platform supports chmod metadata', async () => {
+      if (process.platform === 'win32') {
+        return;
+      }
+
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+      const sourcePath = join(cwd, 'src', 'app.ts');
+      const destinationPath = join(cwd, 'backup', 'app.ts');
+      chmodSync(sourcePath, 0o744);
+
+      try {
+        const result = await runtime.execute(extendedCtx(cwd), {
+          id: 'cp-1c',
+          name: 'copy_file',
+          arguments: { source: 'src/app.ts', destination: 'backup/app.ts' },
+        });
+        expect(result.isError).toBeUndefined();
+
+        const sourceStat = statSync(sourcePath);
+        const destinationStat = statSync(destinationPath);
+        expect(destinationStat.mode & 0o777).toBe(sourceStat.mode & 0o777);
       } finally {
         cleanup();
       }
