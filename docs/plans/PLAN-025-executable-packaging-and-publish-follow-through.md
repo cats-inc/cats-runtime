@@ -62,9 +62,9 @@ publish is attempted.
 
 ### Phase 1: Documentation and Governance Truth
 
-- [ ] Align deployment/release/package docs with the current repo reality:
+- [x] Align deployment/release/package docs with the current repo reality:
       local package execution is ready, registry publication is still pending
-- [ ] Keep packaging follow-through clearly separated from unfinished shared UI
+- [x] Keep packaging follow-through clearly separated from unfinished shared UI
       work tracked under `PLAN-019`
 
 **Deliverables**: operators and future contributors can tell what is already
@@ -123,6 +123,7 @@ without claiming publish infrastructure that is not actually configured yet.
 | Date | Update |
 |------|--------|
 | 2026-03-29 | Plan created to turn `OPT-15` from roadmap-only follow-through into a tracked packaging/release workstream |
+| 2026-03-29 | Phase 1 slice landed: deployment/release/package docs now distinguish repo-local executable package readiness from not-yet-proven public npm publication, and `SPEC-017` now points shared UI follow-through to `PLAN-019` while keeping packaging follow-through under `PLAN-025` |
 
 ---
 

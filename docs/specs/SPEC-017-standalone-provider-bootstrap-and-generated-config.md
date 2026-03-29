@@ -368,6 +368,16 @@ Cats SPA.
 - packaged desktop/Electron setup may compose both flows into one host-owned
   experience, but that does not remove the standalone runtime bootstrap need
 
+## Implementation Tracking
+
+- The core bootstrap/setup slice is landed and the shared runtime UI
+  follow-through remains under
+  [PLAN-019](../plans/PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md).
+- Executable packaging and npm publish follow-through now also has a separate
+  track under
+  [PLAN-025](../plans/PLAN-025-executable-packaging-and-publish-follow-through.md)
+  so package/release truth does not stay mixed into the shared UI plan.
+
 ## Dependencies
 
 - [ADR-014](../decisions/014-keep-lightweight-provider-setup-and-diagnostics-in-cats-runtime.md)
@@ -400,4 +410,4 @@ Cats SPA.
 
 *Created: 2026-03-25*
 *Author: Codex*
-*Related Plan: TBD*
+*Related Plan: [PLAN-019](../plans/PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md), [PLAN-025](../plans/PLAN-025-executable-packaging-and-publish-follow-through.md)*

@@ -9,7 +9,7 @@
 |-------------|-----|---------|
 | Development | `http://127.0.0.1:3110` | Local development with source checkout |
 | Built local | `http://127.0.0.1:3110` | Production-style local run from built assets |
-| npm package (planned publish path) | `http://127.0.0.1:3110` by default | Executable package run via `cats-runtime` / `npx cats-runtime` |
+| npm package (repo-ready local path; registry publish pending) | `http://127.0.0.1:3110` by default | Executable package run via `cats-runtime` / `npx cats-runtime` once published |
 | App-managed local | Host-assigned | Started and supervised by a local product app such as `cats` |
 
 ## Deployment Modes
@@ -34,7 +34,20 @@ node dist/index.js
 
 ### 3. Executable npm package
 
-Once published, the intended package flow is:
+The executable packaging contract is already repo-ready locally, even though
+the first public npm release is still pending.
+
+For local packaged-flow verification before publish, use the platform helper
+scripts:
+
+```powershell
+.\scripts\windows\Pack-Install.ps1
+```
+
+or the equivalent Linux/macOS helpers under `scripts/linux/` and
+`scripts/macos/`.
+
+Once published, the public package flow is expected to be:
 
 ```powershell
 npm install -g cats-runtime
@@ -64,6 +77,9 @@ Supported startup flags:
 - `--host <bind-host>`
 - `--port <bind-port>`
 - `--config <providers-config-path>`
+
+The companion stdio entrypoint remains `cats-runtime-mcp`, which now proxies to
+the primary runtime rather than starting a second runtime core.
 
 ### 4. App-managed local startup
 
@@ -158,7 +174,7 @@ npm test
 Invoke-WebRequest http://127.0.0.1:3110/health -UseBasicParsing
 ```
 
-To verify publish contents locally:
+To verify publish contents locally before a real npm publish:
 
 ```powershell
 $env:npm_config_cache = "$PWD/.npm-cache"
@@ -184,7 +200,7 @@ configured targets.
 ### Issue 3: Dashboard fails in packaged mode
 
 **Symptoms**: `GET /` cannot find the embedded dashboard  
-**Solution**: confirm the published package includes both `dist/` and `public/`
+**Solution**: confirm the packaged artifact includes both `dist/` and `public/`
 assets. Use `npm pack --dry-run` to inspect the payload.
 
 ---

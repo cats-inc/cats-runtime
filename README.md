@@ -109,7 +109,9 @@ MCP usage:
 
 ## Package-Ready Startup
 
-`cats-runtime` is now shaped to publish as an executable npm package:
+`cats-runtime` is now shaped for repo-local executable package verification, and
+is intended to publish as an executable npm package once the first registry
+release is ready:
 
 - `npm install -g cats-runtime` then `cats-runtime`
 - `npx cats-runtime` once the package is published

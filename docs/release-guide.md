@@ -16,13 +16,20 @@ This guide documents the release path that matches that packaging direction.
 
 ## Current Package Posture
 
-Before publishing, `cats-runtime` already has:
+The first public npm release has not happened yet. Before publishing,
+`cats-runtime` already has:
 
 - a package entry at `dist/index.js`
 - an executable `bin` entry for `cats-runtime`
+- an executable `bin` entry for `cats-runtime-mcp`
 - curated publish contents via `files`
 - a `prepack` build step
 - a local release gate via `npm run release:check`
+- local pack/install smoke helpers under `scripts/linux/`, `scripts/macos/`,
+  and `scripts/windows/`
+
+That means repo-local package verification is ready now, while registry
+publication and trusted publishing are still future follow-through.
 
 ## Decide the Published Package Name
 
@@ -49,7 +56,8 @@ If npm returns `404 Not Found`, the unscoped name is currently available.
 
 ### Manual beta release
 
-Use this for the first external trial release.
+Use this for the first external trial release once the package name, npm owner,
+and release operator are actually ready.
 
 1. Ensure you can log in to npm with the account that will own the package.
 2. Run the local release gate:
@@ -114,7 +122,7 @@ the HTTP server is ready.
 
 ## Post-Publish Validation
 
-After publish, validate the actual registry artifact:
+After the first publish, validate the actual registry artifact:
 
 ```powershell
 npx cats-runtime@latest --help
