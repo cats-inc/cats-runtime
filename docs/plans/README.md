@@ -46,6 +46,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 
 | Plan | Title | Status | Related Spec |
 |------|-------|--------|--------------|
+| [PLAN-025](./PLAN-025-executable-packaging-and-publish-follow-through.md) | Executable Packaging and Publish Follow-Through | In Progress | [ROADMAP OPT-15](../../ROADMAP.md), [SPEC-017](../specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md), [PLAN-019](./PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md) |
 | [PLAN-024](./PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md) | Runtime Skill Library, Setup Diagnostics, and Wakeup Follow-Through | In Progress | [SPEC-013](../specs/SPEC-013-internal-skill-library-and-role-taxonomy.md), [SPEC-015](../specs/SPEC-015-runtime-setup-diagnostic-report.md), [SPEC-012](../specs/SPEC-012-scheduled-wakeup-substrate.md) |
 | [PLAN-023](./PLAN-023-a2a-layering-and-collaboration-artifact-alignment.md) | A2A Layering and Collaboration Artifact Alignment | Completed (Pilot Slice 1) | [SPEC-006](../specs/SPEC-006-a2a-protocol-project-memory-and-skill-layering.md), [ADR-010](../decisions/010-separate-a2a-protocol-project-memory-and-skill-packages.md) |
 | [PLAN-022](./PLAN-022-stdio-mcp-proxy-to-primary-runtime.md) | Stdio MCP Proxy to the Primary Runtime | Draft | [SPEC-022](../specs/SPEC-022-stdio-mcp-proxy-to-primary-runtime.md), [ADR-028](../decisions/028-proxy-stdio-mcp-to-the-primary-runtime-http-surface.md) |
