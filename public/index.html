@@ -863,17 +863,26 @@
     <div class="runtime-card-header">
       <div>
         <h3 class="runtime-card-title">Create New Session</h3>
-        <p class="runtime-card-copy">Choose the provider target, workspace mode, and optional model routing for a new runtime session.</p>
+        <p class="runtime-card-copy">Choose the provider target, workspace kind/access, and optional model routing for a new runtime session.</p>
       </div>
     </div>
     <div class="space-y-4 p-5">
-      <div class="runtime-field">
-        <label class="runtime-field-label">Workspace Mode</label>
-        <select id="inputWorkspaceMode" class="runtime-select" onchange="onWorkspaceModeChange()">
-          <option value="isolated">isolated (sandbox)</option>
-          <option value="shared">shared (use cwd)</option>
-          <option value="read_only">read_only (use cwd, permission prompts required)</option>
-        </select>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="runtime-field">
+          <label class="runtime-field-label">Workspace Kind</label>
+          <select id="inputWorkspaceKind" class="runtime-select" onchange="onWorkspaceContractChange()">
+            <option value="sandbox">sandbox (runtime-owned)</option>
+            <option value="source">source (use cwd)</option>
+            <option value="worktree">worktree (git worktree)</option>
+          </select>
+        </div>
+        <div class="runtime-field">
+          <label class="runtime-field-label">Workspace Access</label>
+          <select id="inputWorkspaceAccess" class="runtime-select" onchange="onWorkspaceContractChange()">
+            <option value="read_write">read_write</option>
+            <option value="read_only">read_only</option>
+          </select>
+        </div>
       </div>
       <div class="runtime-field" id="cwdGroup" style="display:none;">
         <label class="runtime-field-label">Working Directory</label>
@@ -2550,7 +2559,10 @@ async function refreshSession() {
     if (s.resumeStrategy && s.resumeStrategy !== 'none') meta.push(`resume: ${humanizeToken(s.resumeStrategy)}`);
     if (!s.attached && activity === 'interactive') meta.push('external active');
     if (shouldShowInstance(s)) meta.push(`instance: ${formatSessionInstance(s)}`);
-    if (s.workspaceMode) meta.push(s.workspaceMode);
+    const workspaceBits = [];
+    if (s.workspaceKind) workspaceBits.push(s.workspaceKind);
+    if (s.workspaceAccess) workspaceBits.push(s.workspaceAccess);
+    if (workspaceBits.length > 0) meta.push(workspaceBits.join(' · '));
     if (s.cwd) meta.push(s.cwd.replace(/\\/g, '/'));
     if (s.model) meta.push(s.model);
     meta.push(`${s.messageCount || 0} msgs`);
@@ -3060,8 +3072,8 @@ async function openCreateModal() {
   syncProviderSelect();
   onProviderChange();
   document.getElementById('createModal').classList.add('open');
-  onWorkspaceModeChange();
-  document.getElementById('inputWorkspaceMode').focus();
+  onWorkspaceContractChange();
+  document.getElementById('inputWorkspaceKind').focus();
   await refreshProviderCatalog();
   await refreshProviderCapabilityPreview();
   await refreshCreateModelRouting();
@@ -3071,20 +3083,34 @@ function closeCreateModal() {
   document.getElementById('createModal').classList.remove('open');
 }
 
-function onWorkspaceModeChange() {
-  const mode = document.getElementById('inputWorkspaceMode').value;
-  const needsCwd = mode === 'shared' || mode === 'read_only';
+function onWorkspaceContractChange() {
+  const kind = document.getElementById('inputWorkspaceKind').value;
+  const accessEl = document.getElementById('inputWorkspaceAccess');
+  if (kind === 'sandbox') {
+    accessEl.value = 'read_write';
+    accessEl.disabled = true;
+  } else {
+    accessEl.disabled = false;
+  }
+  const access = accessEl.value;
+  const needsCwd = kind === 'source' || kind === 'worktree';
   document.getElementById('cwdGroup').style.display = needsCwd ? '' : 'none';
-  document.getElementById('permissionGroup').style.display = mode === 'shared' ? '' : 'none';
+  document.getElementById('permissionGroup').style.display = needsCwd && access === 'read_write' ? '' : 'none';
 }
 
 async function createSession() {
-  const workspaceMode = document.getElementById('inputWorkspaceMode').value;
+  const workspaceKind = document.getElementById('inputWorkspaceKind').value;
+  const workspaceAccess = document.getElementById('inputWorkspaceAccess').value;
+  const workspaceIsolation = workspaceKind === 'sandbox'
+    ? 'isolated'
+    : workspaceKind === 'worktree'
+      ? 'worktree'
+      : 'shared';
   const cwd = document.getElementById('inputCwd').value.trim();
   const provider = document.getElementById('inputProvider').value;
 
-  if ((workspaceMode === 'shared' || workspaceMode === 'read_only') && !cwd) {
-    alert('Working directory is required for ' + workspaceMode + ' mode');
+  if (workspaceKind !== 'sandbox' && !cwd) {
+    alert('Working directory is required for workspaceKind=' + workspaceKind);
     return;
   }
 
@@ -3094,13 +3120,15 @@ async function createSession() {
   }
 
   const body = {
-    workspaceMode,
+    workspaceKind,
+    workspaceAccess,
+    workspaceIsolation,
     provider,
   };
   const instance = document.getElementById('inputInstance').value;
   if (instance) body.instance = instance;
   if (cwd) body.cwd = cwd;
-  if (workspaceMode === 'shared') {
+  if (workspaceKind !== 'sandbox' && workspaceAccess === 'read_write') {
     body.permissionMode = document.getElementById('inputPermission').value;
   }
   Object.assign(body, buildCreateModelPayload());

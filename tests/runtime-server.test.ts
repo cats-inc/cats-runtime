@@ -218,6 +218,9 @@ describe('runtime server', () => {
       expect(html).toContain('id="createSessionBtn"');
       expect(html).toContain('id="providerCapabilityPreview"');
       expect(html).toContain('id="chatSessionInsights"');
+      expect(html).toContain('id="inputWorkspaceKind"');
+      expect(html).toContain('id="inputWorkspaceAccess"');
+      expect(html).not.toContain('id="inputWorkspaceMode"');
       expect(html).toContain('data-runtime-surface-switcher');
       expect(html).toContain('data-active-surface="dashboard"');
       expect(html).toContain('refreshProviderCapabilityPreview');
@@ -251,6 +254,9 @@ describe('runtime server', () => {
       expect(html).toContain('/providers/${name}/models/advanced');
       expect(html).toContain('modelSelection');
       expect(html).toContain('getAdvancedCatalogChoices');
+      expect(html).toContain('workspaceKind');
+      expect(html).toContain('workspaceAccess');
+      expect(html).not.toContain('workspaceMode');
     });
   });
 

@@ -427,10 +427,12 @@ class RuntimeClient {
     if (window.CatsUI) return CatsUI.authHeaders();
     return h;
   }
-  async createSession({ provider, model, modelSelection, cwd, workspaceMode }) {
+  async createSession({ provider, model, modelSelection, cwd, workspaceKind, workspaceAccess, workspaceIsolation }) {
     const payload = { provider, permissionMode: 'skip' };
     if (cwd) payload.cwd = cwd;
-    if (workspaceMode) payload.workspaceMode = workspaceMode;
+    if (workspaceKind) payload.workspaceKind = workspaceKind;
+    if (workspaceAccess) payload.workspaceAccess = workspaceAccess;
+    if (workspaceIsolation) payload.workspaceIsolation = workspaceIsolation;
     if (model) payload.model = model;
     if (modelSelection) payload.modelSelection = modelSelection;
     const r = await fetch(`${this.baseUrl}/sessions`, { method:'POST', headers:this._headers(), body:JSON.stringify(payload) });
@@ -498,8 +500,21 @@ class ChatRoom {
           model: agent.model,
           modelSelection: agent.modelSelection,
         };
-        if (sharedCwd && !this.workDir) { opts.cwd = sharedCwd; opts.workspaceMode = 'shared'; }
-        else { opts.cwd = this.workDir || ''; if (!this.workDir) delete opts.cwd; }
+        if (sharedCwd && !this.workDir) {
+          opts.cwd = sharedCwd;
+          opts.workspaceKind = 'source';
+          opts.workspaceAccess = 'read_write';
+          opts.workspaceIsolation = 'shared';
+        } else {
+          opts.cwd = this.workDir || '';
+          if (this.workDir) {
+            opts.workspaceKind = 'source';
+            opts.workspaceAccess = 'read_write';
+            opts.workspaceIsolation = 'shared';
+          } else {
+            delete opts.cwd;
+          }
+        }
         const info = await this.client.createSession(opts);
         if (!this.workDir && info.cwd && !sharedCwd) { sharedCwd = info.cwd; this._sharedCwd = info.cwd; }
         agent.sessionId = info.id;
@@ -625,7 +640,9 @@ class ChatRoom {
       model:agent.model,
       modelSelection:agent.modelSelection,
       cwd:this._sharedCwd||'',
-      workspaceMode:this._sharedCwd?'shared':undefined,
+      workspaceKind:this._sharedCwd?'source':undefined,
+      workspaceAccess:this._sharedCwd?'read_write':undefined,
+      workspaceIsolation:this._sharedCwd?'shared':undefined,
     });
     agent.sessionId = info.id;
     await this._emit({ type:'session_created', agent:agent.name, provider:agent.provider, session_id:info.id });
