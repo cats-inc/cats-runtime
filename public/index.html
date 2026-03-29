@@ -863,17 +863,26 @@
     <div class="runtime-card-header">
       <div>
         <h3 class="runtime-card-title">Create New Session</h3>
-        <p class="runtime-card-copy">Choose the provider target, workspace mode, and optional model routing for a new runtime session.</p>
+        <p class="runtime-card-copy">Choose the provider target, workspace kind/access, and optional model routing for a new runtime session.</p>
       </div>
     </div>
     <div class="space-y-4 p-5">
-      <div class="runtime-field">
-        <label class="runtime-field-label">Workspace Mode</label>
-        <select id="inputWorkspaceMode" class="runtime-select" onchange="onWorkspaceModeChange()">
-          <option value="isolated">isolated (sandbox)</option>
-          <option value="shared">shared (use cwd)</option>
-          <option value="read_only">read_only (use cwd, permission prompts required)</option>
-        </select>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="runtime-field">
+          <label class="runtime-field-label">Workspace Kind</label>
+          <select id="inputWorkspaceKind" class="runtime-select" onchange="onWorkspaceContractChange()">
+            <option value="sandbox">sandbox (runtime-owned)</option>
+            <option value="source">source (use cwd)</option>
+            <option value="worktree">worktree (git worktree)</option>
+          </select>
+        </div>
+        <div class="runtime-field">
+          <label class="runtime-field-label">Workspace Access</label>
+          <select id="inputWorkspaceAccess" class="runtime-select" onchange="onWorkspaceContractChange()">
+            <option value="read_write">read_write</option>
+            <option value="read_only">read_only</option>
+          </select>
+        </div>
       </div>
       <div class="runtime-field" id="cwdGroup" style="display:none;">
         <label class="runtime-field-label">Working Directory</label>
@@ -897,7 +906,7 @@
       </div>
       <div class="runtime-field" id="instanceGroup">
         <label class="runtime-field-label">Provider Instance</label>
-        <select id="inputInstance" class="runtime-select" onchange="refreshProviderCapabilityPreview()"></select>
+        <select id="inputInstance" class="runtime-select" onchange="onInstanceChange()"></select>
       </div>
       <div class="provider-capability-card" id="providerCapabilityPreview">
         <div class="provider-capability-card-header">
@@ -912,8 +921,14 @@
         <ul class="insight-list" id="providerCapabilityCatalog"></ul>
       </div>
       <div class="runtime-field">
-        <label class="runtime-field-label">Model (optional)</label>
-        <input type="text" id="inputModel" class="runtime-input" placeholder="e.g. claude-sonnet-4-6" />
+        <div class="flex items-center justify-between gap-2">
+          <label class="runtime-field-label">Model Routing</label>
+          <span id="inputModelSupportBadge" class="runtime-auth-badge" data-state="idle">Loading</span>
+        </div>
+        <select id="inputModelChoice" class="runtime-select" onchange="onCreateModelChoiceChange()"></select>
+        <input type="text" id="inputModel" class="runtime-input hidden" placeholder="e.g. claude-sonnet-4-6" />
+        <div id="inputModelControls" class="space-y-2"></div>
+        <p id="inputModelHint" class="text-xs text-slate-500"></p>
       </div>
       <div class="runtime-field">
         <label class="runtime-field-label">Group (optional)</label>
@@ -1003,6 +1018,10 @@ let observeFullText = '';
 let observeAssistantEl = null;
 let providerCatalog = null;
 let discoveryStatusPayload = null;
+const providerAdvancedCatalogCache = new Map();
+const providerAdvancedCatalogInFlight = new Map();
+let currentCreateModelCatalog = null;
+let createModelCatalogRequestId = 0;
 const providerToolingCache = new Map();
 const providerToolingInFlight = new Map();
 let sessionScanInFlight = false;
@@ -1216,6 +1235,10 @@ function providerToolingCacheKey(providerName, instanceTarget) {
   return `${providerName || ''}::${instanceTarget || ''}`;
 }
 
+function providerAdvancedCatalogCacheKey(providerName, instanceTarget) {
+  return `${providerName || ''}::${instanceTarget || ''}`;
+}
+
 function toolingCatalogMethodLabel(method) {
   switch (method) {
     case 'tools_catalog':
@@ -1283,6 +1306,279 @@ function currentProviderSelection() {
   ) || instanceMeta(providerName, instanceTarget, undefined);
 
   return { providerName, instanceTarget, provider, instance };
+}
+
+async function fetchProviderAdvancedCatalog(providerName, instanceTarget) {
+  if (!providerName || !instanceTarget) {
+    return null;
+  }
+
+  const key = providerAdvancedCatalogCacheKey(providerName, instanceTarget);
+  if (providerAdvancedCatalogCache.has(key)) {
+    return providerAdvancedCatalogCache.get(key);
+  }
+  if (providerAdvancedCatalogInFlight.has(key)) {
+    return providerAdvancedCatalogInFlight.get(key);
+  }
+
+  const task = fetch(
+    `${API_BASE}/providers/${encodeURIComponent(providerName)}/models/advanced?instance=${encodeURIComponent(instanceTarget)}`,
+    { headers: headers() },
+  )
+    .then(async (response) => {
+      if (!response.ok) {
+        const detail = await response.text().catch(() => '');
+        throw new Error(detail || `HTTP ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((payload) => {
+      const normalized = window.CatsUI?.normalizeAdvancedCatalog
+        ? window.CatsUI.normalizeAdvancedCatalog(payload)
+        : payload;
+      providerAdvancedCatalogCache.set(key, normalized);
+      providerAdvancedCatalogInFlight.delete(key);
+      return normalized;
+    })
+    .catch((error) => {
+      providerAdvancedCatalogInFlight.delete(key);
+      throw error;
+    });
+
+  providerAdvancedCatalogInFlight.set(key, task);
+  return task;
+}
+
+function setCreateModelSupportBadge(text, state) {
+  const badge = document.getElementById('inputModelSupportBadge');
+  if (!badge) return;
+  badge.textContent = text;
+  badge.dataset.state = state || 'idle';
+}
+
+function resetCreateModelControls() {
+  const controlsEl = document.getElementById('inputModelControls');
+  if (controlsEl) {
+    controlsEl.innerHTML = '';
+  }
+}
+
+function renderCreateModelControlField(control, value) {
+  const safeKey = escapeHtml(control.key);
+  const label = escapeHtml(control.label || control.key);
+  const description = control.description
+    ? `<p class="text-[11px] leading-4 text-slate-500">${escapeHtml(control.description)}</p>`
+    : '';
+
+  if (control.kind === 'enum') {
+    const options = (control.values || [])
+      .map((option) => `<option value="${escapeHtml(option)}" ${String(value) === String(option) ? 'selected' : ''}>${escapeHtml(option)}</option>`)
+      .join('');
+    return `
+      <label class="runtime-field">
+        <span class="runtime-field-label !tracking-[0.16em]">${label}</span>
+        <select class="runtime-select !py-2 text-xs" data-model-control-kind="enum" data-model-control-key="${safeKey}">
+          ${options}
+        </select>
+        ${description}
+      </label>
+    `;
+  }
+
+  if (control.kind === 'boolean') {
+    return `
+      <label class="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-sm text-slate-200">
+        <div class="min-w-0">
+          <span class="block text-xs font-medium uppercase tracking-[0.16em] text-slate-500">${label}</span>
+          ${description}
+        </div>
+        <input
+          type="checkbox"
+          class="h-4 w-4 rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-blue-500"
+          data-model-control-kind="boolean"
+          data-model-control-key="${safeKey}"
+          ${value === true ? 'checked' : ''}
+        />
+      </label>
+    `;
+  }
+
+  const inputType = control.kind === 'number' ? 'number' : 'text';
+  const extraAttrs = control.kind === 'number'
+    ? [
+      control.minimum !== undefined ? `min="${escapeHtml(control.minimum)}"` : '',
+      control.maximum !== undefined ? `max="${escapeHtml(control.maximum)}"` : '',
+      control.step !== undefined ? `step="${escapeHtml(control.step)}"` : '',
+    ].filter(Boolean).join(' ')
+    : '';
+  return `
+    <label class="runtime-field">
+      <span class="runtime-field-label !tracking-[0.16em]">${label}</span>
+      <input
+        type="${inputType}"
+        class="runtime-input !py-2 text-xs"
+        data-model-control-kind="${escapeHtml(control.kind)}"
+        data-model-control-key="${safeKey}"
+        value="${value === undefined || value === null ? '' : escapeHtml(value)}"
+        ${extraAttrs}
+      />
+      ${description}
+    </label>
+  `;
+}
+
+function renderCreateModelChoice() {
+  const choiceEl = document.getElementById('inputModelChoice');
+  const hintEl = document.getElementById('inputModelHint');
+  const customInput = document.getElementById('inputModel');
+  const controlsEl = document.getElementById('inputModelControls');
+  if (!choiceEl || !hintEl || !customInput || !controlsEl) {
+    return;
+  }
+
+  const choiceId = choiceEl.value || 'custom';
+  const catalog = currentCreateModelCatalog;
+  const resolved = window.CatsUI?.resolveAdvancedCatalogChoice
+    ? window.CatsUI.resolveAdvancedCatalogChoice(catalog, choiceId)
+    : null;
+
+  resetCreateModelControls();
+  customInput.classList.add('hidden');
+
+  if (!catalog || !resolved) {
+    hintEl.textContent = 'Enter a model id manually.';
+    customInput.classList.remove('hidden');
+    return;
+  }
+
+  if (resolved.kind === 'legacy') {
+    hintEl.textContent = 'Manual model id passthrough.';
+    customInput.classList.remove('hidden');
+    return;
+  }
+
+  const entry = (catalog.entries || []).find((candidate) => candidate.id === resolved.entryId) || null;
+  const preset = resolved.modelSelection?.presetId
+    ? (catalog.presets || []).find((candidate) => candidate.id === resolved.modelSelection.presetId) || null
+    : null;
+  const controls = window.CatsUI?.listStoredAdvancedControls
+    ? window.CatsUI.listStoredAdvancedControls(catalog, choiceId)
+    : [];
+  const defaultValues = window.CatsUI?.getAdvancedChoiceControlDefaults
+    ? window.CatsUI.getAdvancedChoiceControlDefaults(catalog, choiceId)
+    : {};
+
+  const bits = [];
+  if (preset?.label) bits.push(preset.label);
+  if (entry) bits.push(entry.label || entry.id);
+  if (catalog.support?.tier) bits.push(`tier: ${catalog.support.tier}`);
+  hintEl.textContent = bits.join(' · ') || 'Advanced catalog selection';
+
+  if (controls.length > 0) {
+    controlsEl.innerHTML = controls
+      .map((control) => renderCreateModelControlField(control, defaultValues[control.key]))
+      .join('');
+  }
+}
+
+function onCreateModelChoiceChange() {
+  renderCreateModelChoice();
+}
+
+function readCreateModelControlValues() {
+  const values = {};
+  const controls = document.querySelectorAll('#inputModelControls [data-model-control-key]');
+  for (const el of controls) {
+    const key = el.getAttribute('data-model-control-key');
+    const kind = el.getAttribute('data-model-control-kind');
+    if (!key || !kind) continue;
+    if (kind === 'boolean') {
+      values[key] = Boolean(el.checked);
+      continue;
+    }
+    const raw = typeof el.value === 'string' ? el.value.trim() : '';
+    if (!raw) continue;
+    values[key] = kind === 'number' ? Number(raw) : raw;
+  }
+  return values;
+}
+
+function buildCreateModelPayload() {
+  const choiceEl = document.getElementById('inputModelChoice');
+  const customInput = document.getElementById('inputModel');
+  const choiceId = choiceEl?.value || 'custom';
+  const catalog = currentCreateModelCatalog;
+  const resolved = window.CatsUI?.resolveAdvancedCatalogChoice
+    ? window.CatsUI.resolveAdvancedCatalogChoice(catalog, choiceId)
+    : null;
+
+  if (!catalog || !resolved || resolved.kind === 'legacy') {
+    const legacyModel = customInput?.value.trim();
+    return legacyModel ? { model: legacyModel } : {};
+  }
+
+  const modelSelection = JSON.parse(JSON.stringify(resolved.modelSelection || {}));
+  const controls = readCreateModelControlValues();
+  if (Object.keys(controls).length > 0) {
+    modelSelection.controls = controls;
+  } else if (!modelSelection.controls) {
+    delete modelSelection.controls;
+  }
+  return { modelSelection };
+}
+
+async function refreshCreateModelRouting() {
+  const choiceEl = document.getElementById('inputModelChoice');
+  const hintEl = document.getElementById('inputModelHint');
+  const customInput = document.getElementById('inputModel');
+  if (!choiceEl || !hintEl || !customInput) {
+    return;
+  }
+
+  const { providerName, instanceTarget } = currentProviderSelection();
+  const requestId = ++createModelCatalogRequestId;
+  currentCreateModelCatalog = null;
+  setCreateModelSupportBadge('Loading', 'idle');
+  choiceEl.innerHTML = '<option value="custom">Loading advanced catalog...</option>';
+  choiceEl.disabled = true;
+  customInput.classList.add('hidden');
+  hintEl.textContent = 'Loading model catalog...';
+  resetCreateModelControls();
+
+  try {
+    const catalog = await fetchProviderAdvancedCatalog(providerName, instanceTarget);
+    if (requestId !== createModelCatalogRequestId) return;
+
+    currentCreateModelCatalog = catalog;
+    const choices = window.CatsUI?.getAdvancedCatalogChoices
+      ? window.CatsUI.getAdvancedCatalogChoices(catalog)
+      : [];
+    choiceEl.innerHTML = choices
+      .map((choice) => `<option value="${escapeHtml(choice.id)}">${escapeHtml(choice.label)}</option>`)
+      .join('');
+    choiceEl.disabled = choices.length === 0;
+    choiceEl.value = window.CatsUI?.getAdvancedCatalogDefaultChoice
+      ? window.CatsUI.getAdvancedCatalogDefaultChoice(catalog)
+      : 'custom';
+
+    const tier = catalog?.support?.tier || 'read_only';
+    setCreateModelSupportBadge(
+      tier === 'full' ? 'Advanced' : (tier === 'entry_only' ? 'Catalog' : 'Read-only'),
+      tier === 'read_only' ? 'idle' : 'active',
+    );
+    renderCreateModelChoice();
+  } catch (error) {
+    if (requestId !== createModelCatalogRequestId) return;
+
+    currentCreateModelCatalog = null;
+    choiceEl.innerHTML = '<option value="custom">Custom legacy model</option>';
+    choiceEl.value = 'custom';
+    choiceEl.disabled = false;
+    setCreateModelSupportBadge('Legacy', 'idle');
+    hintEl.textContent = error instanceof Error ? error.message : 'Advanced catalog unavailable.';
+    customInput.classList.remove('hidden');
+    resetCreateModelControls();
+  }
 }
 
 function extractProviderTooling(payload, fallbackInstance) {
@@ -1591,6 +1887,14 @@ function onProviderChange() {
     instanceGroup.style.display = 'none';
     setCreateModalEnabled(false);
     refreshProviderCapabilityPreview();
+    currentCreateModelCatalog = null;
+    document.getElementById('inputModelChoice').innerHTML = '<option value="custom">Custom legacy model</option>';
+    document.getElementById('inputModelChoice').value = 'custom';
+    document.getElementById('inputModelChoice').disabled = false;
+    document.getElementById('inputModel').classList.remove('hidden');
+    document.getElementById('inputModelHint').textContent = 'Enter a model id manually.';
+    setCreateModelSupportBadge('Legacy', 'idle');
+    resetCreateModelControls();
     return;
   }
 
@@ -1606,6 +1910,12 @@ function onProviderChange() {
   instanceGroup.style.display = '';
   setCreateModalEnabled(true);
   refreshProviderCapabilityPreview();
+  void refreshCreateModelRouting();
+}
+
+function onInstanceChange() {
+  refreshProviderCapabilityPreview();
+  void refreshCreateModelRouting();
 }
 
 async function refreshProviderCatalog() {
@@ -2249,7 +2559,10 @@ async function refreshSession() {
     if (s.resumeStrategy && s.resumeStrategy !== 'none') meta.push(`resume: ${humanizeToken(s.resumeStrategy)}`);
     if (!s.attached && activity === 'interactive') meta.push('external active');
     if (shouldShowInstance(s)) meta.push(`instance: ${formatSessionInstance(s)}`);
-    if (s.workspaceMode) meta.push(s.workspaceMode);
+    const workspaceBits = [];
+    if (s.workspaceKind) workspaceBits.push(s.workspaceKind);
+    if (s.workspaceAccess) workspaceBits.push(s.workspaceAccess);
+    if (workspaceBits.length > 0) meta.push(workspaceBits.join(' · '));
     if (s.cwd) meta.push(s.cwd.replace(/\\/g, '/'));
     if (s.model) meta.push(s.model);
     meta.push(`${s.messageCount || 0} msgs`);
@@ -2759,30 +3072,45 @@ async function openCreateModal() {
   syncProviderSelect();
   onProviderChange();
   document.getElementById('createModal').classList.add('open');
-  onWorkspaceModeChange();
-  document.getElementById('inputWorkspaceMode').focus();
+  onWorkspaceContractChange();
+  document.getElementById('inputWorkspaceKind').focus();
   await refreshProviderCatalog();
   await refreshProviderCapabilityPreview();
+  await refreshCreateModelRouting();
 }
 
 function closeCreateModal() {
   document.getElementById('createModal').classList.remove('open');
 }
 
-function onWorkspaceModeChange() {
-  const mode = document.getElementById('inputWorkspaceMode').value;
-  const needsCwd = mode === 'shared' || mode === 'read_only';
+function onWorkspaceContractChange() {
+  const kind = document.getElementById('inputWorkspaceKind').value;
+  const accessEl = document.getElementById('inputWorkspaceAccess');
+  if (kind === 'sandbox') {
+    accessEl.value = 'read_write';
+    accessEl.disabled = true;
+  } else {
+    accessEl.disabled = false;
+  }
+  const access = accessEl.value;
+  const needsCwd = kind === 'source' || kind === 'worktree';
   document.getElementById('cwdGroup').style.display = needsCwd ? '' : 'none';
-  document.getElementById('permissionGroup').style.display = mode === 'shared' ? '' : 'none';
+  document.getElementById('permissionGroup').style.display = needsCwd && access === 'read_write' ? '' : 'none';
 }
 
 async function createSession() {
-  const workspaceMode = document.getElementById('inputWorkspaceMode').value;
+  const workspaceKind = document.getElementById('inputWorkspaceKind').value;
+  const workspaceAccess = document.getElementById('inputWorkspaceAccess').value;
+  const workspaceIsolation = workspaceKind === 'sandbox'
+    ? 'isolated'
+    : workspaceKind === 'worktree'
+      ? 'worktree'
+      : 'shared';
   const cwd = document.getElementById('inputCwd').value.trim();
   const provider = document.getElementById('inputProvider').value;
 
-  if ((workspaceMode === 'shared' || workspaceMode === 'read_only') && !cwd) {
-    alert('Working directory is required for ' + workspaceMode + ' mode');
+  if (workspaceKind !== 'sandbox' && !cwd) {
+    alert('Working directory is required for workspaceKind=' + workspaceKind);
     return;
   }
 
@@ -2792,17 +3120,18 @@ async function createSession() {
   }
 
   const body = {
-    workspaceMode,
+    workspaceKind,
+    workspaceAccess,
+    workspaceIsolation,
     provider,
   };
   const instance = document.getElementById('inputInstance').value;
   if (instance) body.instance = instance;
   if (cwd) body.cwd = cwd;
-  if (workspaceMode === 'shared') {
+  if (workspaceKind !== 'sandbox' && workspaceAccess === 'read_write') {
     body.permissionMode = document.getElementById('inputPermission').value;
   }
-  const model = document.getElementById('inputModel').value.trim();
-  if (model) body.model = model;
+  Object.assign(body, buildCreateModelPayload());
   const group = document.getElementById('inputGroup').value.trim();
   if (group) body.group = group;
 

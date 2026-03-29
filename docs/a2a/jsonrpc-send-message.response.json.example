@@ -1,0 +1,60 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "task": {
+      "id": "pilot-task-001",
+      "contextId": "pilot-context-001",
+      "status": {
+        "state": "TASK_STATE_COMPLETED",
+        "message": {
+          "messageId": "pilot-agent-message-001",
+          "contextId": "pilot-context-001",
+          "taskId": "pilot-task-001",
+          "role": "ROLE_AGENT",
+          "parts": [
+            {
+              "text": "Runtime health is up, but provider diagnostics remain degraded because the latest compatibility probe timed out for one configured target. Reprobe diagnostics first, then inspect the most recent retained evidence artifact before changing config.",
+              "mediaType": "text/plain"
+            }
+          ]
+        },
+        "timestamp": "2026-03-29T12:00:00Z"
+      },
+      "artifacts": [
+        {
+          "artifactId": "runtime-summary",
+          "name": "runtime-summary",
+          "description": "Structured runtime triage summary.",
+          "parts": [
+            {
+              "data": {
+                "health": "ready",
+                "providerStatus": "degraded",
+                "nextAction": "POST /diagnostics/providers/reprobe then inspect the latest evidence artifact."
+              },
+              "mediaType": "application/json"
+            }
+          ]
+        },
+        {
+          "artifactId": "project-memory-references",
+          "name": "project-memory-references",
+          "description": "Durable references relevant to the recommended follow-through.",
+          "parts": [
+            {
+              "data": {
+                "references": [
+                  "docs/specs/SPEC-007-provider-compatibility-and-evidence-engine.md",
+                  "docs/plans/PLAN-008-provider-compatibility-and-evidence-engine.md",
+                  "PROGRESS.md"
+                ]
+              },
+              "mediaType": "application/json"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

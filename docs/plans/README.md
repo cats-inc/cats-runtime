@@ -46,7 +46,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 
 | Plan | Title | Status | Related Spec |
 |------|-------|--------|--------------|
-| [PLAN-023](./PLAN-023-a2a-layering-and-collaboration-artifact-alignment.md) | A2A Layering and Collaboration Artifact Alignment | Approved (Pilot Run) | [SPEC-006](../specs/SPEC-006-a2a-protocol-project-memory-and-skill-layering.md), [ADR-010](../decisions/010-separate-a2a-protocol-project-memory-and-skill-packages.md) |
+| [PLAN-023](./PLAN-023-a2a-layering-and-collaboration-artifact-alignment.md) | A2A Layering and Collaboration Artifact Alignment | Completed (Pilot Slice 1) | [SPEC-006](../specs/SPEC-006-a2a-protocol-project-memory-and-skill-layering.md), [ADR-010](../decisions/010-separate-a2a-protocol-project-memory-and-skill-packages.md) |
 | [PLAN-022](./PLAN-022-stdio-mcp-proxy-to-primary-runtime.md) | Stdio MCP Proxy to the Primary Runtime | Draft | [SPEC-022](../specs/SPEC-022-stdio-mcp-proxy-to-primary-runtime.md), [ADR-028](../decisions/028-proxy-stdio-mcp-to-the-primary-runtime-http-surface.md) |
 | [PLAN-021](./PLAN-021-provider-evolution-evidence-and-capability-probes.md) | Provider Evolution Evidence and Capability Probes | Completed | [SPEC-021](../specs/SPEC-021-provider-evolution-evidence-and-capability-probes.md), [ADR-025](../decisions/025-keep-provider-evolution-detection-manual-first-and-evidence-driven.md), [ADR-026](../decisions/026-model-a2a-as-an-agent-backend-adapter.md) |
 | [PLAN-020](./PLAN-020-pluggable-execution-strategy-substrate.md) | Pluggable Execution Strategy Substrate | Completed | [SPEC-020](../specs/SPEC-020-pluggable-execution-strategy-substrate.md), [ADR-024](../decisions/024-own-pluggable-execution-strategies-as-runtime-session-local-substrate.md) |
@@ -80,8 +80,9 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 - `SPEC-012`, `SPEC-013`, and `SPEC-015` currently have no dedicated plan
   documents because their landed slices were implemented directly and are
   tracked via `PROGRESS.md` and `ROADMAP.md`.
-- `SPEC-006` now has a dedicated implementation plan in `PLAN-023`, but the
-  repo state is still groundwork only; implementation has not started yet.
+- `PLAN-023` is now complete for the first pilot slice of `SPEC-006`; future
+  follow-through should treat the current A2A layering artifacts and
+  collaboration skills as a validated pilot, not yet a production default.
 
 ## For AI Agents
 

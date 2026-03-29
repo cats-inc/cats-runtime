@@ -96,11 +96,20 @@ runtime-managed skills validator, but runtime-owned library packages should not.
 
 | Skill | Package Kind | Focus |
 |-------|--------------|-------|
+| `a2a-handoff` | `role` | bounded handoff preparation across protocol, project-memory, and skill layers |
+| `project-memory-sync` | `role` | durable markdown-state synchronization during collaboration |
 | `orchestrator` | `role` | high-level decomposition and delegation |
 | `coordinator` | `role` | sequencing and dependency management |
 | `dispatcher` | `role` | work routing and capability matching |
 | `incident-commander` | `role` | degraded-state stabilization and evidence-first triage |
 | `delivery-auditor` | `base` | delivery/readiness verification |
+
+Collaboration note:
+
+- these two skills are procedural helpers for same-environment repo work
+- they must point agents back to `AGENTS.md`, `docs/AGENT-GUIDE.md`, and
+  durable markdown memory
+- they must not become a second hidden state store
 
 ### `work`
 

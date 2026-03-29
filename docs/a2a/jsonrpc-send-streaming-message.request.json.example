@@ -1,0 +1,24 @@
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "SendStreamingMessage",
+  "params": {
+    "message": {
+      "messageId": "pilot-message-002",
+      "role": "ROLE_USER",
+      "parts": [
+        {
+          "text": "Investigate the current runtime issue and stream status updates plus any partial handoff artifacts.",
+          "mediaType": "text/plain"
+        }
+      ]
+    },
+    "configuration": {
+      "acceptedOutputModes": [
+        "text/plain",
+        "application/json"
+      ],
+      "historyLength": 5
+    }
+  }
+}

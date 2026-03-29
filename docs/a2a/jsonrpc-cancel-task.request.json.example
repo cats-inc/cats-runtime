@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "CancelTask",
+  "params": {
+    "id": "pilot-task-002",
+    "metadata": {
+      "reason": "Operator approved cancellation after the runtime returned to a healthy state."
+    }
+  }
+}

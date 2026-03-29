@@ -269,6 +269,7 @@ const PROVIDER_MODELS = {
   goose:[{value:'chatgpt_codex/gpt-5.2-codex',label:'chatgpt_codex/gpt-5.2-codex (default)'}],
   ollama:[{value:'qwen2.5-coder:7b',label:'qwen2.5-coder:7b (default)'}],
 };
+const PROVIDER_ADVANCED_CATALOGS = {};
 const PROVIDERS = ['claude','codex','gemini','cursor','copilot','opencode','goose','pi','auggie','junie','kiro','ollama'];
 function getDefaultModel(p) { return (PROVIDER_MODELS[p]||[])[0]?.value || ''; }
 
@@ -426,11 +427,14 @@ class RuntimeClient {
     if (window.CatsUI) return CatsUI.authHeaders();
     return h;
   }
-  async createSession({ provider, model, cwd, workspaceMode }) {
+  async createSession({ provider, model, modelSelection, cwd, workspaceKind, workspaceAccess, workspaceIsolation }) {
     const payload = { provider, permissionMode: 'skip' };
     if (cwd) payload.cwd = cwd;
-    if (workspaceMode) payload.workspaceMode = workspaceMode;
+    if (workspaceKind) payload.workspaceKind = workspaceKind;
+    if (workspaceAccess) payload.workspaceAccess = workspaceAccess;
+    if (workspaceIsolation) payload.workspaceIsolation = workspaceIsolation;
     if (model) payload.model = model;
+    if (modelSelection) payload.modelSelection = modelSelection;
     const r = await fetch(`${this.baseUrl}/sessions`, { method:'POST', headers:this._headers(), body:JSON.stringify(payload) });
     if (!r.ok) throw new RuntimeError(`Failed to create session: ${await r.text()}`, r.status);
     const d = await r.json();
@@ -491,9 +495,26 @@ class ChatRoom {
     for (const agent of this.agents) {
       if (agent.sessionId) continue;
       try {
-        const opts = { provider: agent.provider, model: agent.model };
-        if (sharedCwd && !this.workDir) { opts.cwd = sharedCwd; opts.workspaceMode = 'shared'; }
-        else { opts.cwd = this.workDir || ''; if (!this.workDir) delete opts.cwd; }
+        const opts = {
+          provider: agent.provider,
+          model: agent.model,
+          modelSelection: agent.modelSelection,
+        };
+        if (sharedCwd && !this.workDir) {
+          opts.cwd = sharedCwd;
+          opts.workspaceKind = 'source';
+          opts.workspaceAccess = 'read_write';
+          opts.workspaceIsolation = 'shared';
+        } else {
+          opts.cwd = this.workDir || '';
+          if (this.workDir) {
+            opts.workspaceKind = 'source';
+            opts.workspaceAccess = 'read_write';
+            opts.workspaceIsolation = 'shared';
+          } else {
+            delete opts.cwd;
+          }
+        }
         const info = await this.client.createSession(opts);
         if (!this.workDir && info.cwd && !sharedCwd) { sharedCwd = info.cwd; this._sharedCwd = info.cwd; }
         agent.sessionId = info.id;
@@ -614,7 +635,15 @@ class ChatRoom {
   }
   async _restartSingleAgent(agent) {
     if (agent.sessionId) { try { await this.client.closeSession(agent.sessionId); } catch {} agent.sessionId = null; }
-    const info = await this.client.createSession({ provider:agent.provider, model:agent.model, cwd:this._sharedCwd||'', workspaceMode:this._sharedCwd?'shared':undefined });
+    const info = await this.client.createSession({
+      provider:agent.provider,
+      model:agent.model,
+      modelSelection:agent.modelSelection,
+      cwd:this._sharedCwd||'',
+      workspaceKind:this._sharedCwd?'source':undefined,
+      workspaceAccess:this._sharedCwd?'read_write':undefined,
+      workspaceIsolation:this._sharedCwd?'shared':undefined,
+    });
     agent.sessionId = info.id;
     await this._emit({ type:'session_created', agent:agent.name, provider:agent.provider, session_id:info.id });
   }
@@ -823,19 +852,113 @@ function updateAgentStatus(agent, status) {
 let agentCounter=0, nextAgentNumber=1;
 function syncNextAgentNumber(name){const m=/^Agent-(\d+)$/i.exec((name||'').trim());if(!m)return;const v=parseInt(m[1],10);if(Number.isFinite(v)&&v>=nextAgentNumber)nextAgentNumber=v+1;}
 function allocateAgentName(){const n=`Agent-${nextAgentNumber}`;nextAgentNumber++;return n;}
-function buildModelOptions(provider,selected=''){return(PROVIDER_MODELS[provider]||[]).map(m=>`<option value="${m.value}" ${m.value===selected?'selected':''}>${m.label}</option>`).join('');}
+function getProviderAdvancedCatalog(provider){return PROVIDER_ADVANCED_CATALOGS[provider]||null;}
+function getDefaultModelChoice(provider){
+  const catalog=getProviderAdvancedCatalog(provider);
+  if(catalog&&window.CatsUI?.getAdvancedCatalogDefaultChoice){
+    return window.CatsUI.getAdvancedCatalogDefaultChoice(catalog)||'custom';
+  }
+  const fallback=(PROVIDER_MODELS[provider]||[])[0]?.value||'';
+  return fallback?`legacy:${fallback}`:'custom';
+}
+function findAdvancedCatalogEntryChoice(catalog,model){
+  const target=String(model||'').trim();
+  if(!target)return null;
+  const entries=Array.isArray(catalog?.entries)?catalog.entries:[];
+  const match=entries.find(entry=>entry?.id===target);
+  return match?.id?`entry:${match.id}`:null;
+}
+function getInitialAgentModelChoice(provider,model='',modelSelection=null){
+  const catalog=getProviderAdvancedCatalog(provider);
+  if(catalog&&window.CatsUI){
+    if(modelSelection&&typeof modelSelection==='object'){
+      if(modelSelection.entryMode==='explicit'&&modelSelection.entryId){
+        return `entry:${modelSelection.entryId}`;
+      }
+      if(modelSelection.presetId){
+        return `preset:${modelSelection.presetId}`;
+      }
+      return getDefaultModelChoice(provider);
+    }
+    if(model){
+      return findAdvancedCatalogEntryChoice(catalog,model)||'custom';
+    }
+    return getDefaultModelChoice(provider);
+  }
+  if(model){
+    const fallback=(PROVIDER_MODELS[provider]||[]).find(entry=>entry.value===model);
+    return fallback?`legacy:${fallback.value}`:'custom';
+  }
+  return getDefaultModelChoice(provider);
+}
+function buildModelOptions(provider,selected=''){
+  const catalog=getProviderAdvancedCatalog(provider);
+  if(catalog&&window.CatsUI?.getAdvancedCatalogChoices){
+    return window.CatsUI.getAdvancedCatalogChoices(catalog)
+      .map(choice=>`<option value="${choice.id}" ${choice.id===selected?'selected':''}>${escapeHtml(choice.label)}</option>`)
+      .join('');
+  }
+  const legacyOptions=(PROVIDER_MODELS[provider]||[])
+    .map(m=>`<option value="legacy:${m.value}" ${`legacy:${m.value}`===selected?'selected':''}>${escapeHtml(m.label)}</option>`)
+    .join('');
+  return `${legacyOptions}<option value="custom" ${selected==='custom'?'selected':''}>Custom legacy model</option>`;
+}
+function optionExists(select,value){return[...select.options].some(option=>option.value===value);}
+function readAgentModelState(div){
+  const provider=div.querySelector('.agent-provider')?.value||'';
+  const choiceId=div.querySelector('.agent-model-choice')?.value||'custom';
+  const customInput=div.querySelector('.agent-model-custom');
+  const customModel=customInput?.value.trim()||'';
+  const catalog=getProviderAdvancedCatalog(provider);
+  if(catalog&&window.CatsUI?.resolveAdvancedCatalogChoice){
+    const resolved=window.CatsUI.resolveAdvancedCatalogChoice(catalog,choiceId);
+    if(resolved&&resolved.kind==='structured'){
+      return { model:'', modelSelection:JSON.parse(JSON.stringify(resolved.modelSelection||{})) };
+    }
+    return { model:customModel, modelSelection:null };
+  }
+  if(choiceId.startsWith('legacy:')){
+    return { model:choiceId.slice('legacy:'.length), modelSelection:null };
+  }
+  return { model:customModel, modelSelection:null };
+}
+function syncAgentModelField(div,options={}){
+  const provider=div.querySelector('.agent-provider')?.value||'';
+  const select=div.querySelector('.agent-model-choice');
+  const customInput=div.querySelector('.agent-model-custom');
+  if(!select||!customInput)return;
+  const preserveCurrent=options.preserve!==false;
+  const currentState=preserveCurrent?readAgentModelState(div):{ model:'', modelSelection:null };
+  const model=Object.prototype.hasOwnProperty.call(options,'model')?options.model:currentState.model;
+  const modelSelection=Object.prototype.hasOwnProperty.call(options,'modelSelection')?options.modelSelection:currentState.modelSelection;
+  const nextChoice=getInitialAgentModelChoice(provider,model,modelSelection);
+  select.innerHTML=buildModelOptions(provider,nextChoice);
+  select.value=optionExists(select,nextChoice)?nextChoice:(select.options[0]?.value||'custom');
+  const shouldShowCustom=select.value==='custom';
+  customInput.classList.toggle('hidden',!shouldShowCustom);
+  if(shouldShowCustom){
+    customInput.value=model||customInput.value||'';
+  } else if(options.preserve===false) {
+    customInput.value='';
+  }
+}
 function buildTagCheckboxes(id,selectedTags=[]){return AVAILABLE_TAGS.map(tag=>{const ch=selectedTags.includes(tag)?'checked':'';return`<label class="flex items-center gap-1 text-xs cursor-pointer"><input type="checkbox" value="${tag}" ${ch} class="agent-tag rounded border-slate-500" /><span>${tag}</span></label>`;}).join('');}
 
-function addAgent(name='',provider='claude',model='',tags=[]) {
+function refreshAllAgentModelFields(){
+  document.querySelectorAll('#agents-list > div').forEach(div=>syncAgentModelField(div,{preserve:true}));
+}
+
+function addAgent(name='',provider='claude',model='',tags=[],modelSelection=null) {
   const list=document.getElementById('agents-list'); const id=agentCounter++;
   if(!name) name=allocateAgentName(); else syncNextAgentNumber(name);
-  if(!model) model=getDefaultModel(provider);
   const div=document.createElement('div'); div.id=`agent-${id}`;
   div.className='bg-slate-700/50 rounded-lg p-3 space-y-2 border border-slate-600';
-  div.innerHTML=`<div class="flex items-center justify-between"><input type="text" value="${escapeHtml(name)}" placeholder="Agent name" class="agent-name bg-transparent font-semibold text-white text-sm focus:outline-none w-2/3" /><button onclick="removeAgent(${id})" class="text-xs text-slate-400 hover:text-red-400">&times; Remove</button></div><div class="grid grid-cols-2 gap-2"><div><label class="block text-xs text-slate-400">Provider</label><select class="agent-provider w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none">${PROVIDERS.map(p=>`<option value="${p}" ${p===provider?'selected':''}>${p}</option>`).join('')}</select></div><div><label class="block text-xs text-slate-400">Model</label><select class="agent-model w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none">${buildModelOptions(provider,model)}</select></div></div><div><label class="block text-xs text-slate-400 mb-1">Tags</label><div class="flex flex-wrap gap-x-3 gap-y-1 agent-tags">${buildTagCheckboxes(id,tags)}</div></div>`;
+  div.innerHTML=`<div class="flex items-center justify-between"><input type="text" value="${escapeHtml(name)}" placeholder="Agent name" class="agent-name bg-transparent font-semibold text-white text-sm focus:outline-none w-2/3" /><button onclick="removeAgent(${id})" class="text-xs text-slate-400 hover:text-red-400">&times; Remove</button></div><div class="grid grid-cols-2 gap-2"><div><label class="block text-xs text-slate-400">Provider</label><select class="agent-provider w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none">${PROVIDERS.map(p=>`<option value="${p}" ${p===provider?'selected':''}>${p}</option>`).join('')}</select></div><div><label class="block text-xs text-slate-400">Model</label><div class="space-y-2"><select class="agent-model-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select><input type="text" placeholder="custom model id" class="agent-model-custom hidden w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none" /></div></div></div><div><label class="block text-xs text-slate-400 mb-1">Tags</label><div class="flex flex-wrap gap-x-3 gap-y-1 agent-tags">${buildTagCheckboxes(id,tags)}</div></div>`;
   list.appendChild(div);
-  const pSel=div.querySelector('.agent-provider'), mSel=div.querySelector('.agent-model');
-  pSel.addEventListener('change',()=>{mSel.innerHTML=buildModelOptions(pSel.value);});
+  syncAgentModelField(div,{preserve:false,model,modelSelection});
+  const pSel=div.querySelector('.agent-provider'), mSel=div.querySelector('.agent-model-choice');
+  pSel.addEventListener('change',()=>{syncAgentModelField(div,{preserve:false});});
+  mSel.addEventListener('change',()=>{syncAgentModelField(div,{preserve:true});});
   div.querySelectorAll('.agent-tag').forEach(cb=>{cb.addEventListener('change',()=>{
     if(cb.value==='orchestrator'&&cb.checked) document.querySelectorAll('#agents-list .agent-tag').forEach(o=>{if(o!==cb&&o.value==='orchestrator')o.checked=false;});
     validateStartChat();
@@ -846,7 +969,7 @@ function addAgent(name='',provider='claude',model='',tags=[]) {
 function removeAgent(id){const el=document.getElementById(`agent-${id}`);if(el)el.remove();validateStartChat();}
 function validateStartChat(){const a=getAgents();const oc=a.filter(x=>x.tags.includes('orchestrator')).length;const v=a.length>0&&oc===1;const b=document.getElementById('btn-start-chat');b.disabled=!v;b.classList.toggle('opacity-40',!v);b.classList.toggle('cursor-not-allowed',!v);}
 function resetStartButton(){const b=document.getElementById('btn-start-chat');b.textContent='Start Chat';validateStartChat();}
-function getAgents(){return[...document.querySelectorAll('#agents-list > div')].map(div=>{const tags=[...div.querySelectorAll('.agent-tags input:checked')].map(cb=>cb.value);return{name:div.querySelector('.agent-name').value.trim(),provider:div.querySelector('.agent-provider').value,model:div.querySelector('.agent-model').value.trim(),tags};}).filter(a=>a.name);}
+function getAgents(){return[...document.querySelectorAll('#agents-list > div')].map(div=>{const tags=[...div.querySelectorAll('.agent-tags input:checked')].map(cb=>cb.value);const modelState=readAgentModelState(div);return{name:div.querySelector('.agent-name').value.trim(),provider:div.querySelector('.agent-provider').value,model:modelState.model,modelSelection:modelState.modelSelection,tags};}).filter(a=>a.name);}
 
 // ============================================================
 // Mode switching
@@ -888,7 +1011,7 @@ async function startChat() {
   const workDir=document.getElementById('work-dir').value.trim();
   const responseLang=document.getElementById('response-lang').value;
   const client=new RuntimeClient(location.origin,apiKey);
-  const agentDefs=agentsList.map(a=>({name:a.name,provider:a.provider,model:a.model,tags:a.tags,systemPrompt:'',sessionId:null}));
+  const agentDefs=agentsList.map(a=>({name:a.name,provider:a.provider,model:a.model,modelSelection:a.modelSelection,tags:a.tags,systemPrompt:'',sessionId:null}));
   chatRoom=new ChatRoom({client,agents:agentDefs,onEvent:handleEvent,workDir:workDir||undefined,responseLang});
   try{await chatRoom.start();switchToChatMode(agentsList);addSystemMessage('Chat room ready. Type a message to begin.');}
   catch(err){addErrorMessage(authAwareMessage(err, err.message));resetStartButton();}
@@ -974,9 +1097,29 @@ async function loadProviderOptions() {
     if (!res.ok) return;
     const data = await res.json();
     const providers = data.providers || {};
-    for (const [name, info] of Object.entries(providers)) {
+    for (const [name] of Object.entries(providers)) {
       if (!PROVIDER_MODELS[name]) continue;
-      // Try to fetch model catalog for this provider
+      try {
+        const advancedRes = await fetch(`/providers/${name}/models/advanced`, { headers });
+        if (advancedRes.ok) {
+          const advancedData = await advancedRes.json();
+          const normalized = window.CatsUI?.normalizeAdvancedCatalog
+            ? window.CatsUI.normalizeAdvancedCatalog(advancedData)
+            : advancedData;
+          if (normalized) {
+            PROVIDER_ADVANCED_CATALOGS[name] = normalized;
+            const entries = Array.isArray(normalized.entries) ? normalized.entries : [];
+            if (entries.length > 0) {
+              PROVIDER_MODELS[name] = entries.map((entry, index) => ({
+                value: entry.id,
+                label: entry.label || (index === 0 ? `${entry.id} (default)` : entry.id),
+              }));
+            }
+            continue;
+          }
+        }
+      } catch {}
+      delete PROVIDER_ADVANCED_CATALOGS[name];
       try {
         const mRes = await fetch(`/providers/${name}/models`, { headers });
         if (mRes.ok) {
@@ -1005,6 +1148,7 @@ async function loadProviderOptions() {
         }
       } catch {}
     }
+    refreshAllAgentModelFields();
   } catch {}
 }
 
@@ -1042,14 +1186,14 @@ async function initApp() {
   });
   updateRuntimeAuthState();
   await loadProviderOptions();
-  addAgent('Agent-1','auggie',getDefaultModel('auggie'),['orchestrator']);
-  addAgent('Agent-2','kiro',getDefaultModel('kiro'),['pm']);
-  addAgent('Agent-3','codex',getDefaultModel('codex'),['architect']);
-  addAgent('Agent-4','claude',getDefaultModel('claude'),['coder']);
-  addAgent('Agent-5','cursor',getDefaultModel('cursor'),['tester']);
-  addAgent('Agent-6','copilot',getDefaultModel('copilot'),['reviewer']);
-  addAgent('Agent-7','gemini',getDefaultModel('gemini'),['qa']);
-  addAgent('Agent-8','opencode',getDefaultModel('opencode'),['marketer']);
+  addAgent('Agent-1','auggie','',['orchestrator']);
+  addAgent('Agent-2','kiro','',['pm']);
+  addAgent('Agent-3','codex','',['architect']);
+  addAgent('Agent-4','claude','',['coder']);
+  addAgent('Agent-5','cursor','',['tester']);
+  addAgent('Agent-6','copilot','',['reviewer']);
+  addAgent('Agent-7','gemini','',['qa']);
+  addAgent('Agent-8','opencode','',['marketer']);
 }
 void initApp();
 </script>

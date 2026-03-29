@@ -94,6 +94,7 @@ export type WorkspaceSubstrateFindingStatus =
 export type WorkspaceSubstrateActionType =
   | 'create'
   | 'update'
+  | 'remove'
   | 'skip'
   | 'warn'
   | 'write_sidecar';
@@ -106,6 +107,7 @@ export type WorkspaceSubstrateApplyDecision =
 export type WorkspaceSubstrateMergeStrategy =
   | 'create'
   | 'update_managed'
+  | 'remove_managed'
   | 'review_copy'
   | 'noop';
 export type WorkspaceSubstrateActorRole =

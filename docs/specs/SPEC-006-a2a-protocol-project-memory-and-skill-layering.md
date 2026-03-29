@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Approved |
+| **Status** | Implemented (Pilot Slice 1) |
 | **Owner** | Codex |
 | **Reviewer** | User |
 
@@ -34,6 +34,8 @@ away from standards.
   agents
 - Give skills a precise role in handoff and collaboration workflows
 - Create a clear follow-on path for upgrading `docs/a2a/` examples
+- Validate `project-bootstrap` A2A inputs through real pilot repos before
+  treating them as defaults
 
 ## Non-Goals
 
@@ -86,6 +88,15 @@ away from standards.
 11. When external standards research materially influences protocol direction,
     the project should log the finding under `docs/research/` before or along
     with the resulting ADR/spec updates.
+12. Same-environment CLI agents shall all read `AGENTS.md` and their own
+    agent-specific file before performing project work.
+13. Same-environment CLI agents shall consult `docs/AGENT-GUIDE.md` before
+    applying repo-specific collaboration rules.
+14. The repo shall document when to use `docs/research/`, `docs/decisions/`,
+    `docs/specs/`, and `docs/plans/` so durable state is not misplaced into
+    protocol examples or skills.
+15. Candidate A2A inputs imported from `project-bootstrap` shall be treated as
+    pilot inputs until validated in real repos.
 
 ### Non-Functional Requirements
 
@@ -129,6 +140,7 @@ follow-on tasks include:
   `project-memory-sync`
 - clarify which runtime capabilities should eventually be reflected in an
   external Agent Card
+- validate bootstrap-generated second-wave repos before considering merge-back
 
 ## Dependencies
 
@@ -140,9 +152,14 @@ follow-on tasks include:
 
 - A dedicated implementation plan now exists in
   [PLAN-023](../plans/PLAN-023-a2a-layering-and-collaboration-artifact-alignment.md).
-- The repo currently still contains groundwork only: terminology, ADRs,
-  research, A2A examples, and workspace-substrate starter artifacts.
-- Implementation under that plan has not started yet.
+- `cats-runtime` now ships a pilot-owned A2A v1.0 example set under
+  `docs/a2a/`, plus runtime-owned collaboration skills for `a2a-handoff` and
+  `project-memory-sync`.
+- `docs/AGENT-GUIDE.md`, `docs/README.md`, `docs/terminology.md`,
+  `docs/specs/README.md`, and `docs/plans/README.md` now reflect the explicit
+  protocol/project-memory/skill split.
+- Second-wave validation against `project-bootstrap` tooling has been recorded
+  in a dedicated research note; merge-back remains deferred.
 
 ## Open Questions
 
@@ -153,6 +170,8 @@ follow-on tasks include:
       Card endpoint, or keep versioned docs/examples first?
 - [ ] Which collaboration skills belong in `cats-runtime` itself versus
       higher-level products such as `cats`?
+- [ ] When should the first-wave pilot be mirrored into `cats` so the sibling
+      repo validates the same collaboration contract directly?
 
 ## References
 

@@ -3,6 +3,7 @@ import {
   mkdir,
   readFile,
   stat,
+  unlink,
   writeFile,
 } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -27,6 +28,16 @@ const MANAGED_MARKER = 'cats-runtime:workspace-substrate';
 const REVIEW_COPY_SUFFIX = '.bootstrap';
 const DEFAULT_STANDARD_AGENTS = ['claude', 'gemini', 'codex'] as const;
 const PRIVILEGED_ACTOR_ROLES = ['boss_cat', 'system', 'owner'] as const;
+const LEGACY_A2A_STARTER_FILES = [
+  {
+    path: 'docs/a2a/agent-card.json.example',
+    replacementPath: 'docs/a2a/agent-card.public.json.example',
+  },
+  {
+    path: 'docs/a2a/task.json.example',
+    replacementPath: 'docs/a2a/jsonrpc-send-message.request.json.example',
+  },
+] as const;
 type PrivilegedActorRole = (typeof PRIVILEGED_ACTOR_ROLES)[number];
 
 interface WorkspaceTemplateFile {
@@ -36,6 +47,7 @@ interface WorkspaceTemplateFile {
 
 interface PlannedAction extends WorkspaceSubstrateAction {
   writePath?: string;
+  deletePath?: string;
   content?: string;
 }
 
@@ -242,42 +254,98 @@ function buildProgress(profile: WorkspaceSubstrateProfileId): string {
 function buildA2aReadme(profile: WorkspaceSubstrateProfileId): string {
   return [
     markdownMarker(profile, 'docs/a2a/README.md'),
-    '# A2A Workspace Starter',
+    '# A2A v1.0 Workspace Starter',
     '',
-    'Use these example files as the initial contract when this workspace exposes agent-to-agent interfaces.',
+    'Use these pilot-owned example files as the initial protocol-layer starter',
+    'set when this workspace needs A2A-facing artifacts.',
     '',
     '## Files',
     '',
-    '- `agent-card.json.example`',
-    '- `task.json.example`',
+    '- `agent-card.public.json.example`',
+    '- `agent-card.authenticated.json.example`',
+    '- `jsonrpc-send-message.request.json.example`',
+    '- `jsonrpc-get-task.request.json.example`',
     '',
     '## Notes',
     '',
-    '- Keep examples aligned with the actual runtime surface.',
-    '- Treat these files as coordination artifacts, not product workflow policy.',
+    '- Keep these files standards-aligned and truthful to the repo\'s real capabilities.',
+    '- Keep durable handoff and project status in markdown project-memory docs, not here.',
+    '- `update-workspace` retires managed legacy JSON starter files from older substrate versions.',
+    '- Do not reintroduce the retired generic standalone `task.json.example` model.',
     '',
   ].join('\n');
 }
 
-function buildAgentCardExample(profile: WorkspaceSubstrateProfileId): string {
+function buildPublicAgentCardExample(profile: WorkspaceSubstrateProfileId): string {
   return JSON.stringify({
-    xCatsRuntimeSubstrate: jsonMarker(profile, 'docs/a2a/agent-card.json.example'),
+    xCatsRuntimeSubstrate: jsonMarker(profile, 'docs/a2a/agent-card.public.json.example'),
     name: 'workspace-agent',
-    description: 'Example A2A agent card for this workspace.',
-    capabilities: ['execute', 'observe'],
-    endpoint: 'http://127.0.0.1:3110',
+    description: 'Pilot public Agent Card starter for this workspace.',
+    supportedInterfaces: [
+      {
+        url: 'https://agent.example.com/a2a/jsonrpc',
+        protocolBinding: 'JSONRPC',
+        protocolVersion: '1.0',
+      },
+    ],
+    capabilities: {
+      streaming: true,
+      pushNotifications: false,
+      extendedAgentCard: true,
+    },
   }, null, 2) + '\n';
 }
 
-function buildTaskExample(profile: WorkspaceSubstrateProfileId): string {
+function buildAuthenticatedAgentCardExample(profile: WorkspaceSubstrateProfileId): string {
   return JSON.stringify({
-    xCatsRuntimeSubstrate: jsonMarker(profile, 'docs/a2a/task.json.example'),
-    task: {
-      id: 'task-example',
-      intent: 'inspect_workspace',
-      input: {
-        workspacePath: '.',
+    xCatsRuntimeSubstrate: jsonMarker(profile, 'docs/a2a/agent-card.authenticated.json.example'),
+    name: 'workspace-agent',
+    description: 'Pilot authenticated Agent Card starter for this workspace.',
+    supportedInterfaces: [
+      {
+        url: 'https://agent.example.com/a2a/jsonrpc',
+        protocolBinding: 'JSONRPC',
+        protocolVersion: '1.0',
       },
+    ],
+    capabilities: {
+      streaming: true,
+      pushNotifications: false,
+      extendedAgentCard: true,
+    },
+  }, null, 2) + '\n';
+}
+
+function buildSendMessageExample(profile: WorkspaceSubstrateProfileId): string {
+  return JSON.stringify({
+    xCatsRuntimeSubstrate: jsonMarker(profile, 'docs/a2a/jsonrpc-send-message.request.json.example'),
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'SendMessage',
+    params: {
+      message: {
+        messageId: 'starter-message-001',
+        role: 'ROLE_USER',
+        parts: [
+          {
+            text: 'Describe the next operator action for this workspace task.',
+            mediaType: 'text/plain',
+          },
+        ],
+      },
+    },
+  }, null, 2) + '\n';
+}
+
+function buildGetTaskExample(profile: WorkspaceSubstrateProfileId): string {
+  return JSON.stringify({
+    xCatsRuntimeSubstrate: jsonMarker(profile, 'docs/a2a/jsonrpc-get-task.request.json.example'),
+    jsonrpc: '2.0',
+    id: 2,
+    method: 'GetTask',
+    params: {
+      id: 'starter-task-001',
+      historyLength: 5,
     },
   }, null, 2) + '\n';
 }
@@ -321,12 +389,20 @@ function buildTemplates(input: {
         content: buildA2aReadme(input.profile),
       },
       {
-        path: 'docs/a2a/agent-card.json.example',
-        content: buildAgentCardExample(input.profile),
+        path: 'docs/a2a/agent-card.public.json.example',
+        content: buildPublicAgentCardExample(input.profile),
       },
       {
-        path: 'docs/a2a/task.json.example',
-        content: buildTaskExample(input.profile),
+        path: 'docs/a2a/agent-card.authenticated.json.example',
+        content: buildAuthenticatedAgentCardExample(input.profile),
+      },
+      {
+        path: 'docs/a2a/jsonrpc-send-message.request.json.example',
+        content: buildSendMessageExample(input.profile),
+      },
+      {
+        path: 'docs/a2a/jsonrpc-get-task.request.json.example',
+        content: buildGetTaskExample(input.profile),
       },
     );
   }
@@ -488,10 +564,74 @@ function createActionCounts(): Record<WorkspaceSubstrateActionType, number> {
   return {
     create: 0,
     update: 0,
+    remove: 0,
     skip: 0,
     warn: 0,
     write_sidecar: 0,
   };
+}
+
+async function collectLegacyA2aActions(input: {
+  workspacePath: string;
+  readOnly: boolean;
+  canApply: boolean;
+}): Promise<{
+  findings: WorkspaceSubstrateFinding[];
+  actions: PlannedAction[];
+}> {
+  const findings: WorkspaceSubstrateFinding[] = [];
+  const actions: PlannedAction[] = [];
+
+  for (const legacyFile of LEGACY_A2A_STARTER_FILES) {
+    const fullPath = join(input.workspacePath, legacyFile.path);
+    const existing = await readExistingContent(fullPath);
+    if (existing === undefined) {
+      continue;
+    }
+
+    const actualHash = hashContent(existing);
+    if (isManagedContent(existing)) {
+      findings.push({
+        path: legacyFile.path,
+        status: 'drifted',
+        reason: `Obsolete runtime-managed legacy A2A starter file should be retired in favor of ${legacyFile.replacementPath}.`,
+        managed: true,
+        actualHash,
+      });
+      actions.push({
+        type: 'remove',
+        path: legacyFile.path,
+        outputPath: legacyFile.path,
+        mergeStrategy: 'remove_managed',
+        reason: `Remove obsolete runtime-managed legacy A2A starter file. Use ${legacyFile.replacementPath} instead.`,
+        managed: true,
+        actualHash,
+        requiresApproval: !input.readOnly && !input.canApply,
+        deletePath: fullPath,
+      });
+      continue;
+    }
+
+    findings.push({
+      path: legacyFile.path,
+      status: 'conflicting',
+      reason: `Legacy A2A starter file is no longer runtime-managed and should be reviewed manually. Current starter uses ${legacyFile.replacementPath}.`,
+      managed: false,
+      actualHash,
+    });
+    actions.push({
+      type: 'warn',
+      path: legacyFile.path,
+      outputPath: legacyFile.path,
+      mergeStrategy: 'noop',
+      reason: `Legacy A2A starter file is obsolete. Remove or replace it manually with ${legacyFile.replacementPath}.`,
+      managed: false,
+      actualHash,
+      requiresApproval: false,
+    });
+  }
+
+  return { findings, actions };
 }
 
 export class WorkspaceSubstrateService {
@@ -642,6 +782,16 @@ export class WorkspaceSubstrateService {
       });
     }
 
+    if (includeA2A) {
+      const legacyA2a = await collectLegacyA2aActions({
+        workspacePath,
+        readOnly,
+        canApply: eligibility.canApply,
+      });
+      findings.push(...legacyA2a.findings);
+      actions.push(...legacyA2a.actions);
+    }
+
     const status = classifyAuditStatus(findings);
     const publicActions = actions.map((action) => ({
       type: action.type,
@@ -660,7 +810,12 @@ export class WorkspaceSubstrateService {
     }));
     const changedPaths = Array.from(new Set(
       publicActions
-        .filter((action) => action.type === 'create' || action.type === 'update' || action.type === 'write_sidecar')
+        .filter((action) => (
+          action.type === 'create'
+          || action.type === 'update'
+          || action.type === 'remove'
+          || action.type === 'write_sidecar'
+        ))
         .map((action) => action.outputPath || action.reviewCopyPath || action.path),
     ));
     const reviewCopyPaths = Array.from(new Set(
@@ -771,6 +926,17 @@ export class WorkspaceSubstrateService {
 
     await ensureWorkspaceDirectory(workspacePath);
     for (const action of actions) {
+      if (action.deletePath) {
+        try {
+          await unlink(action.deletePath);
+        } catch (error) {
+          if (!isMissingError(error)) {
+            throw error;
+          }
+        }
+        continue;
+      }
+
       if (!action.writePath || action.content === undefined) {
         continue;
       }
@@ -785,8 +951,11 @@ export class WorkspaceSubstrateService {
       summary: {
         ...result.summary,
         changedPaths: actions
-          .filter((action) => action.writePath)
-          .map((action) => toWorkspaceRelative(workspacePath, action.writePath!)),
+          .filter((action) => action.writePath || action.deletePath)
+          .map((action) => toWorkspaceRelative(
+            workspacePath,
+            action.writePath ?? action.deletePath!,
+          )),
       },
     };
   }

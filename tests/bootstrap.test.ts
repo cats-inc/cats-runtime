@@ -1022,6 +1022,9 @@ describe('bootstrap mode server', () => {
         expect(html).toContain('runtimeAuthStatus');
         expect(html).toContain('providerCapabilityPreview');
         expect(html).toContain('chatSessionInsights');
+        expect(html).toContain('id="inputWorkspaceKind"');
+        expect(html).toContain('id="inputWorkspaceAccess"');
+        expect(html).not.toContain('id="inputWorkspaceMode"');
       } finally {
         await runtime.close();
       }
@@ -1049,6 +1052,11 @@ describe('bootstrap mode server', () => {
         expect(html).toContain('data-active-surface="playground"');
         expect(html).toContain('id="api-key"');
         expect(html).toContain('validateRuntimeApiKey');
+        expect(html).toContain('/providers/${name}/models/advanced');
+        expect(html).toContain('modelSelection');
+        expect(html).toContain('workspaceKind');
+        expect(html).toContain('workspaceAccess');
+        expect(html).not.toContain('workspaceMode');
       } finally {
         await runtime.close();
       }

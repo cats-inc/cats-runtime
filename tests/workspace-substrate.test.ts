@@ -335,4 +335,107 @@ describe('WorkspaceSubstrateService', () => {
       cleanup();
     }
   });
+
+  it('seeds pilot A2A v1 starter artifacts for the a2a-enabled profile', async () => {
+    const { root, cleanup } = createWorkspace();
+    const service = new WorkspaceSubstrateService();
+
+    try {
+      const result = await service.execute({
+        operation: 'init-workspace',
+        workspacePath: root,
+        profile: 'a2a-enabled',
+        enabledAgents: ['codex'],
+        apply: true,
+        authorization: {
+          actorRole: 'boss_cat',
+        },
+      });
+
+      expect(result.applied).toBe(true);
+      expect(existsSync(join(root, 'docs', 'a2a', 'README.md'))).toBe(true);
+      expect(existsSync(join(root, 'docs', 'a2a', 'agent-card.public.json.example'))).toBe(true);
+      expect(existsSync(join(root, 'docs', 'a2a', 'agent-card.authenticated.json.example'))).toBe(true);
+      expect(existsSync(join(root, 'docs', 'a2a', 'jsonrpc-send-message.request.json.example'))).toBe(true);
+      expect(existsSync(join(root, 'docs', 'a2a', 'jsonrpc-get-task.request.json.example'))).toBe(true);
+      expect(existsSync(join(root, 'docs', 'a2a', 'task.json.example'))).toBe(false);
+      expect(readFileSync(join(root, 'docs', 'a2a', 'README.md'), 'utf-8'))
+        .toContain('agent-card.public.json.example');
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('retires obsolete managed legacy A2A starter files during update-workspace', async () => {
+    const { root, cleanup } = createWorkspace();
+    const service = new WorkspaceSubstrateService();
+
+    try {
+      mkdirSync(join(root, 'docs', 'a2a'), { recursive: true });
+      writeFileSync(
+        join(root, 'docs', 'a2a', 'agent-card.json.example'),
+        JSON.stringify({
+          xCatsRuntimeSubstrate:
+            'cats-runtime:workspace-substrate profile=a2a-enabled file=docs/a2a/agent-card.json.example',
+          name: 'workspace-agent',
+        }, null, 2) + '\n',
+      );
+      writeFileSync(
+        join(root, 'docs', 'a2a', 'task.json.example'),
+        JSON.stringify({
+          xCatsRuntimeSubstrate:
+            'cats-runtime:workspace-substrate profile=a2a-enabled file=docs/a2a/task.json.example',
+          task: {
+            id: 'task-example',
+          },
+        }, null, 2) + '\n',
+      );
+
+      const preview = await service.execute({
+        operation: 'update-workspace',
+        workspacePath: root,
+        profile: 'a2a-enabled',
+        enabledAgents: ['codex'],
+        authorization: {
+          actorRole: 'specialist_cat',
+        },
+      });
+
+      expect(preview.actions).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          type: 'remove',
+          path: 'docs/a2a/agent-card.json.example',
+          mergeStrategy: 'remove_managed',
+        }),
+        expect.objectContaining({
+          type: 'remove',
+          path: 'docs/a2a/task.json.example',
+          mergeStrategy: 'remove_managed',
+        }),
+      ]));
+
+      const applied = await service.execute({
+        operation: 'update-workspace',
+        workspacePath: root,
+        profile: 'a2a-enabled',
+        enabledAgents: ['codex'],
+        apply: true,
+        authorization: {
+          actorRole: 'boss_cat',
+        },
+      });
+
+      expect(applied.applied).toBe(true);
+      expect(existsSync(join(root, 'docs', 'a2a', 'agent-card.json.example'))).toBe(false);
+      expect(existsSync(join(root, 'docs', 'a2a', 'task.json.example'))).toBe(false);
+      expect(existsSync(join(root, 'docs', 'a2a', 'agent-card.public.json.example'))).toBe(true);
+      expect(existsSync(join(root, 'docs', 'a2a', 'jsonrpc-send-message.request.json.example'))).toBe(true);
+      expect(applied.summary.changedPaths).toEqual(expect.arrayContaining([
+        'docs/a2a/agent-card.json.example',
+        'docs/a2a/task.json.example',
+      ]));
+    } finally {
+      cleanup();
+    }
+  });
 });

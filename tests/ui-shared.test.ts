@@ -68,6 +68,9 @@ describe('shared UI script', () => {
     expect(SHARED_UI_SCRIPT).toContain('apiFetch');
     expect(SHARED_UI_SCRIPT).toContain('renderProviderBadge');
     expect(SHARED_UI_SCRIPT).toContain('renderStatusBadge');
+    expect(SHARED_UI_SCRIPT).toContain('normalizeAdvancedCatalog');
+    expect(SHARED_UI_SCRIPT).toContain('getAdvancedCatalogChoices');
+    expect(SHARED_UI_SCRIPT).toContain('resolveAdvancedCatalogChoice');
   });
 
   it('reads API keys only from the current page inputs', () => {
