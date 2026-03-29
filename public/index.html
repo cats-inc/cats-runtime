@@ -1147,6 +1147,19 @@ function configuredProviderNames() {
   return [...ordered, ...extras];
 }
 
+function configuredProviderNamesRaw() {
+  if (!providerCatalog?.providers) return [];
+
+  return Object.keys(providerCatalog.providers).filter(
+    (providerName) => (providerCatalog.providers[providerName]?.instances?.length || 0) > 0,
+  );
+}
+
+function rawInstanceTargetValue(instance) {
+  if (!instance) return 'default';
+  return instance.target || instance.id || 'default';
+}
+
 function runtimeModeOrder(mode) {
   const index = CLI_RUNTIME_ORDER.indexOf(mode || 'native');
   return index >= 0 ? index : CLI_RUNTIME_ORDER.length;
@@ -2007,7 +2020,7 @@ function syncProviderSelect() {
   }
 
   const current = providerSelect.value || 'claude';
-  const providers = configuredProviderNames();
+  const providers = configuredProviderNamesRaw();
 
   if (providers.length === 0) {
     providerSelect.innerHTML = '<option value="">No configured providers</option>';
@@ -2048,13 +2061,15 @@ function onProviderChange() {
   }
 
   instanceSelect.innerHTML = instances
-    .map((instance) => `<option value="${instance.target || instance.id}">${formatInstanceOptionLabel(providerName, instance)}</option>`)
+    .map((instance) => `<option value="${rawInstanceTargetValue(instance)}">${rawInstanceTargetValue(instance)}</option>`)
     .join('');
+  const defaultInstance = instances.find((instance) => (
+    instance.id === provider?.defaultInstance
+    && (!provider?.defaultBackend || instance.backend === provider.defaultBackend)
+  ));
   instanceSelect.value = instances.some((instance) => (instance.target || instance.id) === selected)
     ? selected
-    : ((provider?.defaultBackend && provider?.defaultInstance)
-      ? `${provider.defaultBackend}/${provider.defaultInstance}`
-      : (provider?.defaultInstance || instances[0]?.target || instances[0]?.id || ''));
+    : rawInstanceTargetValue(defaultInstance || instances[0]);
   instanceSelect.disabled = instances.length <= 1;
   instanceGroup.style.display = '';
   setCreateModalEnabled(true);
@@ -3235,12 +3250,7 @@ function closeCreateModal() {
 function onWorkspaceContractChange() {
   const kind = document.getElementById('inputWorkspaceKind').value;
   const accessEl = document.getElementById('inputWorkspaceAccess');
-  if (kind === 'sandbox') {
-    accessEl.value = 'read_write';
-    accessEl.disabled = true;
-  } else {
-    accessEl.disabled = false;
-  }
+  accessEl.disabled = false;
   const access = accessEl.value;
   const needsCwd = kind === 'source' || kind === 'worktree';
   document.getElementById('cwdGroup').style.display = needsCwd ? '' : 'none';

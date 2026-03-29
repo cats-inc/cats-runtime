@@ -220,6 +220,7 @@ describe('runtime server', () => {
       expect(html).toContain('id="chatSessionInsights"');
       expect(html).toContain('id="inputWorkspaceKind"');
       expect(html).toContain('id="inputWorkspaceAccess"');
+      expect(html).not.toContain("accessEl.value = 'read_write';");
       expect(html).toContain('id="inputRoutingMode"');
       expect(html).toContain('id="inputPresetChoice"');
       expect(html).toContain('id="inputEntryChoice"');
@@ -231,6 +232,8 @@ describe('runtime server', () => {
       expect(html).toContain('renderSessionInsights');
       expect(html).toContain('setLegacyCreateModelRouting');
       expect(html).toContain('getCreateRoutingChoiceId');
+      expect(html).toContain('configuredProviderNamesRaw');
+      expect(html).toContain('rawInstanceTargetValue');
       expect(html).not.toContain("{ id: 'default', runtime: { mode: 'native' } }");
       expect(html).toContain(RUNTIME_DIAGNOSTICS_PATHS.health);
       expect(html).toContain('refreshRuntimeHealthStatus');
