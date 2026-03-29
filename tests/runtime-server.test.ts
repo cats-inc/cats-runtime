@@ -248,6 +248,9 @@ describe('runtime server', () => {
       expect(html).toContain('Runtime Health');
       expect(html).toContain('validateRuntimeApiKey');
       expect(html).toContain('getRuntimeAuthHeaders');
+      expect(html).toContain('/providers/${name}/models/advanced');
+      expect(html).toContain('modelSelection');
+      expect(html).toContain('getAdvancedCatalogChoices');
     });
   });
 

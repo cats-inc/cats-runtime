@@ -1049,6 +1049,8 @@ describe('bootstrap mode server', () => {
         expect(html).toContain('data-active-surface="playground"');
         expect(html).toContain('id="api-key"');
         expect(html).toContain('validateRuntimeApiKey');
+        expect(html).toContain('/providers/${name}/models/advanced');
+        expect(html).toContain('modelSelection');
       } finally {
         await runtime.close();
       }
