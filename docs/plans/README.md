@@ -46,6 +46,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 
 | Plan | Title | Status | Related Spec |
 |------|-------|--------|--------------|
+| [PLAN-024](./PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md) | Runtime Skill Library, Setup Diagnostics, and Wakeup Follow-Through | In Progress | [SPEC-013](../specs/SPEC-013-internal-skill-library-and-role-taxonomy.md), [SPEC-015](../specs/SPEC-015-runtime-setup-diagnostic-report.md), [SPEC-012](../specs/SPEC-012-scheduled-wakeup-substrate.md) |
 | [PLAN-023](./PLAN-023-a2a-layering-and-collaboration-artifact-alignment.md) | A2A Layering and Collaboration Artifact Alignment | Completed (Pilot Slice 1) | [SPEC-006](../specs/SPEC-006-a2a-protocol-project-memory-and-skill-layering.md), [ADR-010](../decisions/010-separate-a2a-protocol-project-memory-and-skill-packages.md) |
 | [PLAN-022](./PLAN-022-stdio-mcp-proxy-to-primary-runtime.md) | Stdio MCP Proxy to the Primary Runtime | Draft | [SPEC-022](../specs/SPEC-022-stdio-mcp-proxy-to-primary-runtime.md), [ADR-028](../decisions/028-proxy-stdio-mcp-to-the-primary-runtime-http-surface.md) |
 | [PLAN-021](./PLAN-021-provider-evolution-evidence-and-capability-probes.md) | Provider Evolution Evidence and Capability Probes | Completed | [SPEC-021](../specs/SPEC-021-provider-evolution-evidence-and-capability-probes.md), [ADR-025](../decisions/025-keep-provider-evolution-detection-manual-first-and-evidence-driven.md), [ADR-026](../decisions/026-model-a2a-as-an-agent-backend-adapter.md) |
@@ -77,9 +78,9 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 
 - `PLAN-003` is broader than `SPEC-002`, but it is the canonical delivery
   track for the shared local tool runtime slice that `SPEC-002` describes.
-- `SPEC-012`, `SPEC-013`, and `SPEC-015` currently have no dedicated plan
-  documents because their landed slices were implemented directly and are
-  tracked via `PROGRESS.md` and `ROADMAP.md`.
+- `PLAN-024` now collects the important follow-through for `SPEC-012`,
+  `SPEC-013`, and `SPEC-015`, whose first landed slices were implemented
+  directly before they had a dedicated follow-through plan.
 - `PLAN-023` is now complete for the first pilot slice of `SPEC-006`; future
   follow-through should treat the current A2A layering artifacts and
   collaboration skills as a validated pilot, not yet a production default.

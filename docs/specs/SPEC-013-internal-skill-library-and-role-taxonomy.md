@@ -255,10 +255,10 @@ runtime-managed skill execution flow
 ## Implementation Tracking
 
 - The internal skill-library taxonomy landed directly through the runtime
-  skills workstream without a separate dedicated plan document.
-- Current implementation status and remaining documentation follow-through are
-  tracked through [PROGRESS.md](../../PROGRESS.md) rather than a plan backfill
-  doc.
+  skills workstream before a dedicated follow-through plan existed.
+- Current implementation status and remaining follow-through now live under
+  [PLAN-024](../plans/PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md),
+  with `PROGRESS.md` still carrying the broader runtime truth.
 
 ## Dependencies
 
@@ -284,4 +284,4 @@ runtime-managed skill execution flow
 *Created: 2026-03-24*
 *Author: Codex*
 *Last updated: 2026-03-29*
-*Related Plan: No dedicated plan (implemented directly; tracked in PROGRESS.md)*
+*Related Plan: [PLAN-024](../plans/PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md) (follow-through plan; initial slice was implemented directly)*

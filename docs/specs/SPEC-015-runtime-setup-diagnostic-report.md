@@ -219,10 +219,11 @@ The setup report should not become the new canonical evidence fixture format.
 ## Implementation Tracking
 
 - Slice 1 of this spec landed directly through the bootstrap/setup workstream
-  without a separate dedicated plan document.
-- Current follow-through is tracked through [PROGRESS.md](../../PROGRESS.md)
-  and [ROADMAP.md](../../ROADMAP.md), especially the bootstrap/setup and setup
-  diagnostic follow-on slices.
+  before a dedicated follow-through plan existed.
+- Current follow-through is now collected under
+  [PLAN-024](../plans/PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md),
+  while `PROGRESS.md` / `ROADMAP.md` still carry the broader bootstrap/setup
+  status.
 
 ## Dependencies
 
@@ -255,4 +256,4 @@ The setup report should not become the new canonical evidence fixture format.
 *Created: 2026-03-25*
 *Author: Codex*
 *Last updated: 2026-03-29*
-*Related Plan: No dedicated plan (slice 1 implemented directly; tracked in PROGRESS.md and ROADMAP.md)*
+*Related Plan: [PLAN-024](../plans/PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md) (follow-through plan; slice 1 was implemented directly)*

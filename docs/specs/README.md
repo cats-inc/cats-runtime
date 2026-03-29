@@ -55,10 +55,10 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 | [SPEC-018](./SPEC-018-advanced-provider-model-catalog-and-selection-schema.md) | Advanced Provider Model Catalog and Selection Schema | Implemented | [PLAN-018](../plans/PLAN-018-advanced-provider-model-catalog-and-selection-schema.md) |
 | [SPEC-017](./SPEC-017-standalone-provider-bootstrap-and-generated-config.md) | Standalone Provider Bootstrap and Generated Config | Approved (Core Bootstrap Slice Landed; UI Shell Follow-Through Pending) | [PLAN-019](../plans/PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md) |
 | [SPEC-016](./SPEC-016-lan-peer-discovery-and-execution-routing-v0.md) | LAN Peer Discovery and Execution Routing v0 | Implemented | [PLAN-017](../plans/PLAN-017-lan-peer-discovery-and-execution-routing-v0.md) |
-| [SPEC-015](./SPEC-015-runtime-setup-diagnostic-report.md) | Runtime Setup Diagnostic Report | Implemented (Slice 1) | No dedicated plan (implemented directly; tracked in `PROGRESS.md` / `ROADMAP.md`) |
+| [SPEC-015](./SPEC-015-runtime-setup-diagnostic-report.md) | Runtime Setup Diagnostic Report | Implemented (Slice 1; Follow-Through In Progress) | [PLAN-024](../plans/PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md) |
 | [SPEC-014](./SPEC-014-session-maintenance-worktree-isolation-and-compaction-hooks.md) | Session Maintenance, Worktree Isolation, and Compaction Hooks | Implemented (Maintenance and Runtime Compaction Slices) | [PLAN-012](../plans/PLAN-012-session-maintenance-hooks-and-cleanup-discipline.md), [PLAN-014](../plans/PLAN-014-worktree-isolation-execution-layer.md) |
-| [SPEC-013](./SPEC-013-internal-skill-library-and-role-taxonomy.md) | Internal Skill Library and Role Taxonomy | Implemented | No dedicated plan (implemented directly; tracked in `PROGRESS.md`) |
-| [SPEC-012](./SPEC-012-scheduled-wakeup-substrate.md) | Scheduled Wakeup Substrate | Implemented (Recurring Slice) | No dedicated plan (implemented directly; tracked in `PROGRESS.md` / `ROADMAP.md`) |
+| [SPEC-013](./SPEC-013-internal-skill-library-and-role-taxonomy.md) | Internal Skill Library and Role Taxonomy | Implemented (Follow-Through In Progress) | [PLAN-024](../plans/PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md) |
+| [SPEC-012](./SPEC-012-scheduled-wakeup-substrate.md) | Scheduled Wakeup Substrate | Implemented (Recurring Slice; Follow-Through In Progress) | [PLAN-024](../plans/PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md) |
 | [SPEC-011](./SPEC-011-session-fork-and-context-transplant-primitives.md) | Session Fork and Context-Transplant Primitives | Implemented (Slice 1) | [PLAN-010](../plans/PLAN-010-session-discipline-and-run-inspector.md), [PLAN-012](../plans/PLAN-012-session-maintenance-hooks-and-cleanup-discipline.md) |
 | [SPEC-010](./SPEC-010-usage-metering-rate-limit-detection-and-execution-guardrails.md) | Usage Metering, Rate-Limit Detection, and Execution Guardrails | In Progress (First Slice Landed) | [PLAN-009](../plans/PLAN-009-usage-metering-progress-and-guardrails.md) |
 | [SPEC-009](./SPEC-009-executable-delivery-and-governance-primitives.md) | Executable Delivery and Governance Primitives | Implemented (Slice 1) | [PLAN-015](../plans/PLAN-015-mcp-mutation-tools-and-stdio-facade.md) |
@@ -77,9 +77,9 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 
 - `SPEC-002` is delivered through the shared local tool runtime slice inside
   `PLAN-003`; the plan remains broader than this one spec.
-- `SPEC-012`, `SPEC-013`, and `SPEC-015` were implemented directly without
-  separate dedicated plan documents. Their follow-through remains tracked in
-  `PROGRESS.md` and, where relevant, `ROADMAP.md`.
+- `SPEC-012`, `SPEC-013`, and `SPEC-015` were implemented directly in their
+  first slices and are now collected under `PLAN-024` for follow-through
+  instead of living only in `PROGRESS.md` / `ROADMAP.md`.
 - `SPEC-006` now has its first implemented pilot slice through `PLAN-023`;
   future follow-through should treat the resulting A2A layering artifacts and
   collaboration skills as validated pilot output, not yet a production

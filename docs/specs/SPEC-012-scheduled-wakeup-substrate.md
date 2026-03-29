@@ -181,10 +181,10 @@ creation.
 ## Implementation Tracking
 
 - The delivered wakeup substrate was implemented directly as runtime slices
-  without a separate dedicated plan document.
-- Ongoing follow-through for recurring wakeups and diagnostics is tracked in
-  [PROGRESS.md](../../PROGRESS.md) and [ROADMAP.md](../../ROADMAP.md) rather
-  than a plan backfill doc.
+  before a follow-through plan existed.
+- Ongoing follow-through is now collected under
+  [PLAN-024](../plans/PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md),
+  with `PROGRESS.md` / `ROADMAP.md` still carrying the broader runtime status.
 
 ## Dependencies
 
@@ -203,4 +203,4 @@ creation.
 ---
 
 *Last updated: 2026-03-24*
-*Related Plan: No dedicated plan (implemented directly; tracked in PROGRESS.md and ROADMAP.md)*
+*Related Plan: [PLAN-024](../plans/PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md) (follow-through plan; initial substrate slice was implemented directly)*
