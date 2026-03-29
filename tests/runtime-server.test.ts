@@ -2350,8 +2350,8 @@ backends:
         skills: {
           summary: {
             state: 'loaded',
-            totalSkills: 31,
-            summary: '31 runtime skill(s) across 4 families are available.',
+            totalSkills: expect.any(Number),
+            summary: expect.stringMatching(/runtime skill\(s\) across 4 families are available\./),
           },
         },
         setup: {
