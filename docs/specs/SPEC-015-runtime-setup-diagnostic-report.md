@@ -216,6 +216,14 @@ The setup report may contain:
 
 The setup report should not become the new canonical evidence fixture format.
 
+## Implementation Tracking
+
+- Slice 1 of this spec landed directly through the bootstrap/setup workstream
+  without a separate dedicated plan document.
+- Current follow-through is tracked through [PROGRESS.md](../../PROGRESS.md)
+  and [ROADMAP.md](../../ROADMAP.md), especially the bootstrap/setup and setup
+  diagnostic follow-on slices.
+
 ## Dependencies
 
 - [ADR-014](../decisions/014-keep-lightweight-provider-setup-and-diagnostics-in-cats-runtime.md)
@@ -246,4 +254,5 @@ The setup report should not become the new canonical evidence fixture format.
 
 *Created: 2026-03-25*
 *Author: Codex*
-*Related Plan: TBD*
+*Last updated: 2026-03-29*
+*Related Plan: No dedicated plan (slice 1 implemented directly; tracked in PROGRESS.md and ROADMAP.md)*

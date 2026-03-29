@@ -13,8 +13,10 @@
 
 ## Related Spec
 
-N/A. This plan is the delivery blueprint for the next major backend track already
-called out in the README, ADR 002, and PROGRESS.
+This plan is the delivery blueprint for the broader API/local backend track and
+also serves as the implementation track for
+[SPEC-002](../specs/SPEC-002-local-tool-runtime.md)'s shared local tool runtime
+slice. There is no separate dedicated plan document for `SPEC-002`.
 
 ## Overview
 

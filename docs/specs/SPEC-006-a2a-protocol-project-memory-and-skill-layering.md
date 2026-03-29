@@ -136,6 +136,14 @@ follow-on tasks include:
 - [SPEC-005: Runtime-Managed Skills v0](./SPEC-005-runtime-managed-skills-v0.md)
 - existing `docs/a2a/` templates and `skills/` directory layout
 
+## Implementation Tracking
+
+- No dedicated implementation plan exists yet for this spec.
+- The repo currently contains groundwork only: terminology, ADRs, research,
+  A2A examples, and workspace-substrate starter artifacts.
+- Future runtime behavior changes under this spec should create a dedicated
+  plan before implementation begins.
+
 ## Open Questions
 
 - [ ] Which exact A2A v1 example set should replace the current generic
@@ -159,5 +167,5 @@ follow-on tasks include:
 
 *Created: 2026-03-19*
 *Author: Codex*
-*Related Plan: TBD*
-
+*Last updated: 2026-03-29*
+*Related Plan: No dedicated plan yet (groundwork only)*

@@ -252,6 +252,14 @@ resolved library package(s)
 runtime-managed skill execution flow
 ```
 
+## Implementation Tracking
+
+- The internal skill-library taxonomy landed directly through the runtime
+  skills workstream without a separate dedicated plan document.
+- Current implementation status and remaining documentation follow-through are
+  tracked through [PROGRESS.md](../../PROGRESS.md) rather than a plan backfill
+  doc.
+
 ## Dependencies
 
 - [SPEC-005](./SPEC-005-runtime-managed-skills-v0.md)
@@ -275,3 +283,5 @@ runtime-managed skill execution flow
 
 *Created: 2026-03-24*
 *Author: Codex*
+*Last updated: 2026-03-29*
+*Related Plan: No dedicated plan (implemented directly; tracked in PROGRESS.md)*

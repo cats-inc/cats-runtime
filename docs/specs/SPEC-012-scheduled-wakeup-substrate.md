@@ -178,6 +178,14 @@ creation.
 - Session/history payloads expose additive `wakeup` metadata rather than
   synthesizing transcript messages.
 
+## Implementation Tracking
+
+- The delivered wakeup substrate was implemented directly as runtime slices
+  without a separate dedicated plan document.
+- Ongoing follow-through for recurring wakeups and diagnostics is tracked in
+  [PROGRESS.md](../../PROGRESS.md) and [ROADMAP.md](../../ROADMAP.md) rather
+  than a plan backfill doc.
+
 ## Dependencies
 
 - `cats/docs/specs/SPEC-016-chat-session-sleep-wake-lifecycle.md`
@@ -195,3 +203,4 @@ creation.
 ---
 
 *Last updated: 2026-03-24*
+*Related Plan: No dedicated plan (implemented directly; tracked in PROGRESS.md and ROADMAP.md)*

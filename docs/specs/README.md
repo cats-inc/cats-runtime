@@ -55,23 +55,33 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 | [SPEC-018](./SPEC-018-advanced-provider-model-catalog-and-selection-schema.md) | Advanced Provider Model Catalog and Selection Schema | Implemented | [PLAN-018](../plans/PLAN-018-advanced-provider-model-catalog-and-selection-schema.md) |
 | [SPEC-017](./SPEC-017-standalone-provider-bootstrap-and-generated-config.md) | Standalone Provider Bootstrap and Generated Config | Approved (Core Bootstrap Slice Landed; UI Shell Follow-Through Pending) | [PLAN-019](../plans/PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md) |
 | [SPEC-016](./SPEC-016-lan-peer-discovery-and-execution-routing-v0.md) | LAN Peer Discovery and Execution Routing v0 | Implemented | [PLAN-017](../plans/PLAN-017-lan-peer-discovery-and-execution-routing-v0.md) |
-| [SPEC-015](./SPEC-015-runtime-setup-diagnostic-report.md) | Runtime Setup Diagnostic Report | Implemented (Slice 1) | TBD |
+| [SPEC-015](./SPEC-015-runtime-setup-diagnostic-report.md) | Runtime Setup Diagnostic Report | Implemented (Slice 1) | No dedicated plan (implemented directly; tracked in `PROGRESS.md` / `ROADMAP.md`) |
 | [SPEC-014](./SPEC-014-session-maintenance-worktree-isolation-and-compaction-hooks.md) | Session Maintenance, Worktree Isolation, and Compaction Hooks | Implemented (Maintenance and Runtime Compaction Slices) | [PLAN-012](../plans/PLAN-012-session-maintenance-hooks-and-cleanup-discipline.md), [PLAN-014](../plans/PLAN-014-worktree-isolation-execution-layer.md) |
-| [SPEC-013](./SPEC-013-internal-skill-library-and-role-taxonomy.md) | Internal Skill Library and Role Taxonomy | Implemented | TBD |
-| [SPEC-012](./SPEC-012-scheduled-wakeup-substrate.md) | Scheduled Wakeup Substrate | Implemented (Recurring Slice) | TBD |
+| [SPEC-013](./SPEC-013-internal-skill-library-and-role-taxonomy.md) | Internal Skill Library and Role Taxonomy | Implemented | No dedicated plan (implemented directly; tracked in `PROGRESS.md`) |
+| [SPEC-012](./SPEC-012-scheduled-wakeup-substrate.md) | Scheduled Wakeup Substrate | Implemented (Recurring Slice) | No dedicated plan (implemented directly; tracked in `PROGRESS.md` / `ROADMAP.md`) |
 | [SPEC-011](./SPEC-011-session-fork-and-context-transplant-primitives.md) | Session Fork and Context-Transplant Primitives | Implemented (Slice 1) | [PLAN-010](../plans/PLAN-010-session-discipline-and-run-inspector.md), [PLAN-012](../plans/PLAN-012-session-maintenance-hooks-and-cleanup-discipline.md) |
 | [SPEC-010](./SPEC-010-usage-metering-rate-limit-detection-and-execution-guardrails.md) | Usage Metering, Rate-Limit Detection, and Execution Guardrails | In Progress (First Slice Landed) | [PLAN-009](../plans/PLAN-009-usage-metering-progress-and-guardrails.md) |
 | [SPEC-009](./SPEC-009-executable-delivery-and-governance-primitives.md) | Executable Delivery and Governance Primitives | Implemented (Slice 1) | [PLAN-015](../plans/PLAN-015-mcp-mutation-tools-and-stdio-facade.md) |
 | [SPEC-008](./SPEC-008-workspace-substrate-init-audit-and-update.md) | Workspace Substrate Init, Audit, and Update | Implemented (First Slice) | [PLAN-014](../plans/PLAN-014-worktree-isolation-execution-layer.md) |
 | [SPEC-007](./SPEC-007-provider-compatibility-and-evidence-engine.md) | Provider Compatibility and Evidence Engine | In Progress (Second Slice Landed) | [PLAN-008-provider-compatibility-and-evidence-engine](../plans/PLAN-008-provider-compatibility-and-evidence-engine.md) |
-| [SPEC-006](./SPEC-006-a2a-protocol-project-memory-and-skill-layering.md) | A2A Protocol, Project Memory, and Skill Layering | Approved | TBD |
+| [SPEC-006](./SPEC-006-a2a-protocol-project-memory-and-skill-layering.md) | A2A Protocol, Project Memory, and Skill Layering | Approved | No dedicated plan yet (groundwork only) |
 | [SPEC-005](./SPEC-005-runtime-managed-skills-v0.md) | Runtime-Managed Skills v0 | In Progress (Execution Delivery Slice Landed) | [PLAN-008-runtime-managed-skills-v0](../plans/PLAN-008-runtime-managed-skills-v0.md) |
 | [SPEC-004](./SPEC-004-provider-model-catalog-and-discovery.md) | Provider Model Catalog and Discovery | Implemented (Core Slice) | [PLAN-005](../plans/PLAN-005-provider-model-catalog-and-discovery.md) |
 | [SPEC-003](./SPEC-003-agent-backend.md) | Agent Backend for External Agent Runtimes | Implemented | [PLAN-004](../plans/PLAN-004-agent-backend.md) |
-| [SPEC-002](./SPEC-002-local-tool-runtime.md) | Shared Local Tool Runtime | Approved | [PLAN-003](../plans/PLAN-003-api-backend.md) |
+| [SPEC-002](./SPEC-002-local-tool-runtime.md) | Shared Local Tool Runtime | Implemented (Shared Tool Runtime Slice) | [PLAN-003](../plans/PLAN-003-api-backend.md) (shared local tool runtime slice) |
 | [SPEC-001](./SPEC-001-wsl-discovery-policy.md) | WSL Discovery Policy and Dashboard Status | Implemented | [PLAN-001](../plans/PLAN-001-wsl-discovery-policy.md) |
 | [000-template](./000-template.md) | Template | - | - |
 <!-- Add new specs above this line -->
+
+## Governance Notes
+
+- `SPEC-002` is delivered through the shared local tool runtime slice inside
+  `PLAN-003`; the plan remains broader than this one spec.
+- `SPEC-012`, `SPEC-013`, and `SPEC-015` were implemented directly without
+  separate dedicated plan documents. Their follow-through remains tracked in
+  `PROGRESS.md` and, where relevant, `ROADMAP.md`.
+- `SPEC-006` remains approved but still lacks a dedicated implementation plan.
+  The current repo state is groundwork only, not active implementation.
 
 ## For AI Agents
 

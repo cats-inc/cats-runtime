@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Approved |
+| **Status** | Implemented (Shared Tool Runtime Slice) |
 | **Owner** | Codex |
 | **Reviewer** | User-approved via implementation kickoff |
 
@@ -132,4 +132,5 @@ requests into calls into this shared runtime.
 
 *Created: 2026-03-16*
 *Author: Codex*
-*Related Plan: [PLAN-003](../plans/PLAN-003-api-backend.md)*
+*Last updated: 2026-03-29*
+*Related Plan: [PLAN-003](../plans/PLAN-003-api-backend.md) (shared local tool runtime slice)*
