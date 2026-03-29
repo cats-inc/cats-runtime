@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Implemented (Pilot Slice 1) |
+| **Status** | In Progress (Pilot Slice 1 Landed; Bootstrap Extraction Open) |
 | **Owner** | Codex |
 | **Reviewer** | User |
 
@@ -36,6 +36,9 @@ away from standards.
 - Create a clear follow-on path for upgrading `docs/a2a/` examples
 - Validate `project-bootstrap` A2A inputs through real pilot repos before
   treating them as defaults
+- Ensure any collaboration-template or update behavior still needed after repo
+  split has a repo-owned equivalent rather than an upstream bootstrap
+  dependency
 
 ## Non-Goals
 
@@ -97,6 +100,10 @@ away from standards.
     protocol examples or skills.
 15. Candidate A2A inputs imported from `project-bootstrap` shall be treated as
     pilot inputs until validated in real repos.
+16. Any collaboration-template or update flow that `cats-runtime` still needs
+    after repo split shall have a repo-owned implementation or asset baseline;
+    `project-bootstrap` templates and initialize/update scripts shall not
+    remain required dependencies.
 
 ### Non-Functional Requirements
 
@@ -160,6 +167,9 @@ follow-on tasks include:
   protocol/project-memory/skill split.
 - Second-wave validation against `project-bootstrap` tooling has been recorded
   in a dedicated research note; merge-back remains deferred.
+- A follow-on slice under `PLAN-023` remains open to extract and rewrite the
+  remaining collaboration-template and initialize/update semantics into
+  repo-owned helpers before repo split.
 
 ## Open Questions
 
@@ -170,8 +180,9 @@ follow-on tasks include:
       Card endpoint, or keep versioned docs/examples first?
 - [ ] Which collaboration skills belong in `cats-runtime` itself versus
       higher-level products such as `cats`?
-- [ ] When should the first-wave pilot be mirrored into `cats` so the sibling
-      repo validates the same collaboration contract directly?
+- [ ] Which minimum subset of `project-bootstrap/templates/base` and
+      initialize/update semantics must become runtime-owned or sibling-shared
+      before the repo split?
 
 ## References
 

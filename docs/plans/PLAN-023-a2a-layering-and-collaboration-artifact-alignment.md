@@ -6,7 +6,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Completed (Pilot Slice 1) |
+| **Status** | In Progress (Pilot Slice 2: Repo-Owned Bootstrap Extraction) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User / runtime collaboration workstream |
@@ -35,60 +35,74 @@ submodule history:
 
 But those artifacts have not yet been validated through real repo operation.
 
-This plan therefore treats `SPEC-006` as a pilot run:
+This plan therefore treats `SPEC-006` as a pilot run with two slices:
 
-- `project-bootstrap` is an input source, not an accepted baseline
-- `cats-runtime` is the primary first-wave implementation repo for this slice
-- `cats` remains a sibling first-wave pilot repo, but is not modified in this
-  slice
-- repos generated after that are the second-wave validation repos
-- merge-back into `project-bootstrap` and production use in `cats` /
-  `cats-runtime` happen only after several optimization loops
+- Slice 1 already landed the pilot-owned A2A v1.0 examples, layering docs, and
+  collaboration skills
+- Slice 2 now expands scope to extract and rewrite the remaining collaboration
+  template/update knowledge that cannot stay as a `project-bootstrap`
+  dependency once `cats-runtime` and `cats` split into separate repos
+- `project-bootstrap` stays an input source, not an accepted baseline
+- `cats-runtime` remains the primary implementation repo for the runtime-owned
+  collaboration baseline
+- `cats` remains a sibling pilot repo that should consume mirrored outcomes
+  where the shared collaboration contract must stay aligned
+- merge-back into `project-bootstrap` and production defaults happen only after
+  several optimization loops
 
 The key rule is:
 
-- take candidate protocol-layer knowledge and example shapes from
-  `project-bootstrap`
+- take candidate protocol-layer and repo-shape knowledge from
+  `project-bootstrap/templates/base` and `project-bootstrap/scripts/*`
 - do **not** bulk-import bootstrap's broader repo/process documentation
-- use `SKILL.md` plus bootstrap tooling (`Initialize-Project` /
-  `Update-Project`) as the intended collaboration operating model
+- rewrite repo-owned starter/update helpers and collaboration artifacts inside
+  `cats-runtime` / `cats` instead of keeping bootstrap as an external tool
+- use `SKILL.md` plus repo-owned collaboration/update helpers as the intended
+  operating model
 - keep runtime-owned collaboration skills local instead of treating bootstrap
   as a runtime dependency or skill source
 
 ## Adoption Boundary
 
-### Adopt from `project-bootstrap`
+### Extract and Rewrite from `project-bootstrap`
 
 - the March 2026 A2A v1.0 example-set structure
 - public vs authenticated Agent Card split
 - JSON-RPC method example naming and README guidance
 - released-protocol terminology and upgrade notes
-- `Initialize-Project` / `Update-Project` as style-enforcement tools for
-  second-wave repo validation
+- the minimum repo-shape template knowledge needed for collaboration artifacts
+  and update discipline
+- `Initialize-Project` / `Update-Project` semantics as candidate inputs for a
+  repo-owned rewrite, not as a lasting dependency
 
 ### Do Not Adopt Wholesale
 
 - generic bootstrap repo-memory docs such as template-wide process guidance
 - bootstrap `AGENTS.md` / agent-specific instruction systems
 - placeholder capability content that does not match `cats-runtime`
-- bootstrap as a runtime dependency for skills or A2A docs
+- bootstrap as a runtime dependency for skills, A2A docs, or collaboration
+  update flows
 - bootstrap's March 2026 refresh as if it were already production-proven
 - merge-back to bootstrap or production rollout before pilot validation
 
 ## Goals
 
 1. Verify and freeze which parts of the March 2026 `project-bootstrap` A2A v1.0
-   refresh are suitable as pilot inputs for `cats` / `cats-runtime`.
+   refresh and base-template collaboration artifacts are suitable as pilot
+   inputs for `cats` / `cats-runtime`.
 2. Define the first-wave pilot operating contract for same-environment CLI
    agents, including when they should read `AGENTS.md`, follow
    `docs/AGENT-GUIDE.md`, and update repo memory such as research/ADR/spec/plan
    artifacts.
-3. Use runtime-owned `SKILL.md` packages plus bootstrap scripts together:
-   skills teach agents how to collaborate; scripts enforce consistent repo
-   shape.
-4. Validate the pattern in generated repos only after the first-wave
+3. Extract the minimum collaboration-oriented template knowledge from
+   `project-bootstrap/templates/base` that `cats-runtime` and `cats` still need
+   after the repo split.
+4. Replace external `Initialize-Project` / `Update-Project` reliance with
+   repo-owned starter/update helpers or equivalent local modules/scripts that
+   preserve the required collaboration semantics.
+5. Validate the repo-owned flow in generated repos only after the first-wave
    `cats` / `cats-runtime` pilot proves workable.
-5. Defer merge-back into `project-bootstrap` and production rollout until the
+6. Defer merge-back into `project-bootstrap` and production rollout until the
    pilot has gone through several optimization loops.
 
 ## Non-Goals
@@ -99,6 +113,8 @@ The key rule is:
 - Treating external A2A `AgentSkill` metadata as the same artifact as local
   `SKILL.md` packages
 - Treating the March 2026 bootstrap refresh as already proven in real repos
+- Keeping `project-bootstrap` scripts or templates as required dependencies
+  after the repo split
 - Merging pilot learnings back into `project-bootstrap` in the first slice
 
 ## Implementation Phases
@@ -163,6 +179,36 @@ into a second memory system.
 merge-back into `project-bootstrap` or production adoption in `cats` /
 `cats-runtime`.
 
+### Phase 5: Repo-Owned Bootstrap Extraction and Rewrite
+
+- [ ] Extract the minimum collaboration-related template knowledge from
+      `project-bootstrap/templates/base` into repo-owned starter/update assets
+      for `cats-runtime` and mirrored sibling consumption in `cats`
+- [ ] Rewrite repo-owned initialize/update helpers or equivalent local
+      modules/scripts so this collaboration baseline no longer relies on
+      `project-bootstrap/scripts/*`
+- [ ] Preserve the important review/diff semantics for template-like updates
+      without requiring the upstream bootstrap repo to remain present
+- [ ] Document exactly which upstream behaviors were intentionally retained,
+      simplified, or dropped in the local rewrite
+
+**Deliverables**: `cats-runtime` and its sibling pilot repo have a repo-owned
+collaboration/bootstrap baseline rather than a submodule dependency.
+
+### Phase 6: Post-Extraction Validation and Split Gate
+
+- [ ] Validate the repo-owned starter/update flow without shelling out to
+      `project-bootstrap`
+- [ ] Confirm `cats` can consume the same extracted collaboration baseline
+      after the split without monorepo-local bootstrap access
+- [ ] Record what still diverges intentionally from upstream bootstrap so
+      merge-back remains evidence-led rather than accidental
+- [ ] Keep production-default rollout deferred until the repo-owned rewrite has
+      survived more than one pilot loop
+
+**Deliverables**: the collaboration stack is split-safe before
+`cats-runtime` / `cats` stop having local access to the bootstrap submodule.
+
 ## Files to Create/Modify
 
 | File | Action | Description |
@@ -188,6 +234,9 @@ merge-back into `project-bootstrap` or production adoption in `cats` /
 | `src/core/runtime/WorkspaceSubstrateService.ts` | Modify | Retire legacy A2A starter file paths in runtime workspace substrate output |
 | `tests/workspace-substrate.test.ts` | Modify | Cover the updated pilot A2A starter artifacts |
 | `docs/research/2026-03-29-a2a-pilot-second-wave-validation.md` | Create | Record second-wave bootstrap validation findings |
+| `docs/research/2026-03-29-project-bootstrap-collaboration-extraction-inventory.md` | Create | Freeze the minimum template/script semantics that still need a repo-owned rewrite |
+| `scripts/windows/*` | Later | Repo-owned collaboration/bootstrap helper rewrite replacing external initialize/update reliance |
+| `scripts/linux/*` | Later | Repo-owned non-Windows collaboration/bootstrap helper rewrite |
 | `docs/research/README.md` | Modify | Index the new validation note |
 | `PROGRESS.md` | Modify | Reflect the pilot collaboration slice if governance truth changes |
 
@@ -199,12 +248,16 @@ merge-back into `project-bootstrap` or production adoption in `cats` /
 - Decision 2: Run validation in waves: `cats` / `cats-runtime` first, freshly
   generated repos second, because bootstrap merge-back should follow evidence
   rather than precede it.
-- Decision 3: Use runtime-owned `SKILL.md` packages plus bootstrap scripts
-  together, because skills teach agent behavior while scripts constrain repo
-  shape and reduce free-form interpretation.
+- Decision 3: Use runtime-owned `SKILL.md` packages plus repo-owned
+  collaboration/update helpers, because skills teach agent behavior while local
+  helpers constrain repo shape without preserving an external bootstrap
+  dependency.
 - Decision 4: Create runtime-owned collaboration skills locally instead of
   importing from another repo, because shipped `cats-runtime` skills must stay
   repo-owned and truthful to this runtime's workflow.
+- Decision 5: Treat `project-bootstrap` templates and initialize/update scripts
+  as one-time source knowledge only; any collaboration baseline still required
+  after repo split must have a repo-owned equivalent.
 
 ## Testing Strategy
 
@@ -219,8 +272,9 @@ merge-back into `project-bootstrap` or production adoption in `cats` /
   - confirm agents follow the same research / ADR / spec / plan writing norms
   - compare the resulting pilot `docs/a2a/` set against
     `project-bootstrap/docs/a2a/`
-  - validate second-wave repos produced through bootstrap tooling after the
-    first-wave pilot is working
+  - validate repo-owned starter/update helpers after the first-wave pilot is
+    working
+  - validate split-safe operation without shelling out to bootstrap tooling
 - **Required commands**:
   - `npm run verify:skills`
   - `git diff --check`
@@ -233,7 +287,9 @@ merge-back into `project-bootstrap` or production adoption in `cats` /
 | Over-copying bootstrap placeholders into runtime docs | High | Treat bootstrap as a reference candidate, then rewrite capability content to match `cats-runtime` and `cats` |
 | Mixing protocol examples with repo-memory guidance again | Medium | Keep the three-layer split explicit in both the plan and the updated docs and skills |
 | Collaboration skills duplicate durable state instead of referencing docs | Medium | Keep new skills procedural and point them at canonical markdown memory sources |
-| Scripts enforce repo shape but agents still diverge in behavior | Medium | Pair bootstrap tooling with explicit collaboration skills and pilot validation scenarios |
+| Repo split happens before the template/update semantics are internalized | High | Expand this plan to produce repo-owned starter/update helpers before split |
+| Local helper rewrite loses the useful conservative-review semantics from bootstrap | Medium | Preserve review/diff behavior explicitly and lock it with validation notes/tests |
+| Scripts enforce repo shape but agents still diverge in behavior | Medium | Pair local collaboration helpers with explicit collaboration skills and pilot validation scenarios |
 
 ## Reference Inputs
 
@@ -255,7 +311,7 @@ merge-back into `project-bootstrap` or production adoption in `cats` /
   - released A2A v1.0 JSON-RPC method example naming
   - retirement of the generic standalone `task.*.example` model
 - `Initialize-Project` and `Update-Project` are valid repo-shape candidate
-  inputs for second-wave validation:
+  inputs for a repo-owned rewrite:
   - `Initialize-Project` copies the base template into a new repo
   - `Update-Project` stages `*.bootstrap` review copies for diverged files
   - `Update-Project` stages legacy A2A review copies for retired filenames
@@ -268,8 +324,8 @@ merge-back into `project-bootstrap` or production adoption in `cats` /
   or auth model are represented truthfully
 - bootstrap scripts shape files, but they do not teach agents when to update
   `docs/research/`, `docs/decisions/`, `docs/specs/`, or `docs/plans/`
-- bootstrap is not treated as a runtime dependency or a production-default
-  collaboration source
+- bootstrap is not treated as a runtime dependency, a required post-split
+  helper, or a production-default collaboration source
 
 ## Progress Log
 
@@ -281,6 +337,8 @@ merge-back into `project-bootstrap` or production adoption in `cats` /
 | 2026-03-29 | Replaced legacy `docs/a2a/agent-card.*` and `task.*` examples with a pilot-owned A2A v1.0 example set rewritten for `cats-runtime` |
 | 2026-03-29 | Added `a2a-handoff` and `project-memory-sync` collaboration skills, aligned runtime docs/indexes, and updated workspace substrate starter artifacts away from retired legacy A2A filenames |
 | 2026-03-29 | Completed one second-wave validation pass with `project-bootstrap` initialize/update tooling in a throwaway repo and recorded the resulting drift notes under `docs/research/` |
+| 2026-03-29 | Reopened the plan for pilot slice 2 so `project-bootstrap/templates/base` and initialize/update semantics are extracted and rewritten into repo-owned collaboration helpers before the repo split |
+| 2026-03-29 | Added a dedicated extraction inventory for the remaining `project-bootstrap` template families and initialize/update semantics that still need a repo-owned rewrite before split |
 
 ---
 
