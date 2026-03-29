@@ -444,9 +444,14 @@ Keep `.env` for runtime-wide values and secrets:
 - `CATS_RUNTIME_PEER_TRUSTED_IDS=`
 - `CATS_RUNTIME_PEER_REJECTED_IDS=`
 - `CATS_RUNTIME_PEER_STATIC_PEERS=`
+- `CATS_RUNTIME_MCP_PROXY_URL=`
+- `CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS=1800000`
+- `CATS_RUNTIME_STARTUP_MODE=`
+- `CATS_RUNTIME_MANAGED_BY=`
+- `CATS_RUNTIME_READY_OUTPUT=`
 - `AUGGIE_MAX_TURNS=50`
 - `PWSH_PATH=...`
-- `OPENCLAW_URL=ws://127.0.0.1:8787/ws`
+- `OPENCLAW_URL=ws://127.0.0.1:18789/ws`
 - `OPENCLAW_TOKEN=`
 - `AGENT_SDK_URL=http://127.0.0.1:8082`
 - `AGENT_SDK_TOKEN=`
@@ -574,7 +579,8 @@ backends:
         client_id: cats-runtime
         instances:
           gateway:
-            model: openclaw-coder
+            # Use a model id exposed by your OpenClaw deployment.
+            model: openai-codex/gpt-5.4
       claude:
         default_instance: sdk
         transport: agent_sdk_bridge
