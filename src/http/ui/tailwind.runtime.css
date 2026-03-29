@@ -93,6 +93,34 @@
     @apply shrink-0 space-y-4 border-t border-slate-800/80 px-4 py-4;
   }
 
+  .runtime-auth-block {
+    @apply space-y-2;
+  }
+
+  .runtime-auth-row {
+    @apply flex items-center justify-between gap-3;
+  }
+
+  .runtime-auth-copy {
+    @apply flex min-w-0 items-center gap-2;
+  }
+
+  .runtime-auth-badge {
+    @apply inline-flex items-center rounded-full border px-2 py-1 text-[0.65rem] font-semibold uppercase tracking-widest;
+  }
+
+  .runtime-auth-badge[data-state="active"] {
+    @apply border-emerald-500/40 bg-emerald-500/10 text-emerald-200;
+  }
+
+  .runtime-auth-badge[data-state="idle"] {
+    @apply border-slate-700 bg-slate-900 text-slate-400;
+  }
+
+  .runtime-auth-editor {
+    @apply space-y-2;
+  }
+
   .runtime-shell-health {
     @apply rounded-2xl border border-slate-800 bg-slate-950/70 px-3 py-3;
   }
