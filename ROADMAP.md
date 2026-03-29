@@ -548,9 +548,9 @@ Current gaps:
 - runtime-managed skills still resolve only explicit leaf ids; bundle
   composition and richer library grouping remain outside the contract even
   though the first taxonomy is now broad enough to need them
-- recursive skill-library discovery still assumes a checked-in, well-formed
-  tree; there is no explicit cycle/depth hardening yet if the catalog root ever
-  grows beyond today's repo-owned `skills/` layout
+- richer publish/lint discipline and bundle/composition metadata still remain
+  deferred even after the recursive discovery layer gained explicit bounded
+  depth plus symlink/junction hardening
 
 #### Direction
 
@@ -590,9 +590,11 @@ execution/materialization engine.
   plus Pi/API/agent execution paths instead of stopping at catalog resolution
 - `npm run verify:skills` now provides a dedicated runtime-owned verification
   command for shipped skill packages
-- richer publish/lint discipline, reference-authoring workflow,
-  bundle/composition metadata, and recursive discovery hardening remain
-  deferred
+- recursive discovery hardening now rejects symbolic-link/junction entries and
+  enforces a bounded traversal depth instead of assuming a perfectly
+  well-formed repo-owned tree forever
+- richer publish/lint discipline, reference-authoring workflow, and
+  bundle/composition metadata still remain deferred
 
 #### Why This Is Required
 

@@ -31,6 +31,7 @@ import type {
 const SKILLS_ROOT = path.resolve(fileURLToPath(new URL('../../../skills/', import.meta.url)));
 const CODER_SKILLS_ROOT = path.join('.agents', 'skills');
 const RUNTIME_SKILL_STATE_ROOT = '.runtime-skills';
+const MAX_RUNTIME_SKILL_DISCOVERY_DEPTH = 6;
 const INSTRUCTION_DELIVERY_CLI_PROVIDERS = new Set([
   'claude',
   'gemini',
@@ -569,11 +570,32 @@ function loadRuntimeSkillPackage(
   );
 }
 
+function toSkillDiscoveryRelativePath(skillsRoot: string, targetPath: string): string {
+  const relativePath = path.relative(skillsRoot, targetPath).replace(/\\/g, '/');
+  return relativePath || '.';
+}
+
 function discoverRuntimeSkillEntryFiles(
   rootPath: string,
+  options: {
+    skillsRoot: string;
+    depth: number;
+  } = {
+    skillsRoot: rootPath,
+    depth: 0,
+  },
 ): string[] {
   if (!existsSync(rootPath)) {
     return [];
+  }
+
+  if (options.depth > MAX_RUNTIME_SKILL_DISCOVERY_DEPTH) {
+    throw new RuntimeSkillError(
+      `Runtime skill discovery exceeded max depth ${MAX_RUNTIME_SKILL_DISCOVERY_DEPTH} at '${
+        toSkillDiscoveryRelativePath(options.skillsRoot, rootPath)
+      }'.`,
+      'invalid_skill_package',
+    );
   }
 
   const entries = readdirSync(rootPath, { withFileTypes: true });
@@ -584,10 +606,21 @@ function discoverRuntimeSkillEntryFiles(
 
   const discovered: string[] = [];
   for (const entry of entries) {
+    if (entry.isSymbolicLink()) {
+      throw new RuntimeSkillError(
+        `Runtime skill discovery does not allow symbolic-link or junction entries: '${
+          toSkillDiscoveryRelativePath(options.skillsRoot, path.join(rootPath, entry.name))
+        }'.`,
+        'invalid_skill_package',
+      );
+    }
     if (!entry.isDirectory()) {
       continue;
     }
-    discovered.push(...discoverRuntimeSkillEntryFiles(path.join(rootPath, entry.name)));
+    discovered.push(...discoverRuntimeSkillEntryFiles(path.join(rootPath, entry.name), {
+      skillsRoot: options.skillsRoot,
+      depth: options.depth + 1,
+    }));
   }
   return discovered;
 }

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -308,6 +308,57 @@ describe('runtime skill catalog', () => {
     const overlay = mergeRuntimeSkillInstructions(undefined, rewrittenSkillState);
     expect(overlay).toContain(updatedBody);
     expect(overlay).not.toContain(originalBody);
+  });
+
+  it('rejects skill trees that exceed the bounded discovery depth', () => {
+    const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
+    cleanupPaths.push(sessionBaseDir);
+    const skillsRoot = join(sessionBaseDir, 'skills');
+    const tooDeepSkillDir = join(
+      skillsRoot,
+      'level-1',
+      'level-2',
+      'level-3',
+      'level-4',
+      'level-5',
+      'level-6',
+      'level-7',
+      'too-deep-skill',
+    );
+    mkdirSync(tooDeepSkillDir, { recursive: true });
+    writeFileSync(join(tooDeepSkillDir, 'SKILL.md'), [
+      '---',
+      'name: too-deep-skill',
+      'description: Too deep for runtime discovery.',
+      'family: code',
+      '---',
+      '',
+      'Depth-bounded skill body.',
+      '',
+    ].join('\n'), 'utf8');
+
+    expect(() => listRuntimeSkillCatalog(skillsRoot)).toThrowError(
+      "Runtime skill discovery exceeded max depth 6 at 'level-1/level-2/level-3/level-4/level-5/level-6/level-7'.",
+    );
+  });
+
+  it('rejects symbolic-link or junction entries during skill discovery', () => {
+    const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));
+    cleanupPaths.push(sessionBaseDir);
+    const skillsRoot = join(sessionBaseDir, 'skills');
+    const linkedTarget = join(sessionBaseDir, 'external-skill-dir');
+    mkdirSync(linkedTarget, { recursive: true });
+    const linkedEntry = join(skillsRoot, 'linked-skill-dir');
+    mkdirSync(skillsRoot, { recursive: true });
+    symlinkSync(
+      linkedTarget,
+      linkedEntry,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+
+    expect(() => listRuntimeSkillCatalog(skillsRoot)).toThrowError(
+      "Runtime skill discovery does not allow symbolic-link or junction entries: 'linked-skill-dir'.",
+    );
   });
 
   it('lists a family-aware runtime skill catalog with normalized metadata', () => {

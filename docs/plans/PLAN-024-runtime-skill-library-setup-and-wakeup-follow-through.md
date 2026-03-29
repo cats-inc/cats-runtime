@@ -72,7 +72,7 @@ Priority is re-evaluated as:
 
 ### Phase 1: Skill Library Hardening and Publish Discipline
 
-- [ ] Add explicit recursive discovery guards for the runtime skill catalog
+- [x] Add explicit recursive discovery guards for the runtime skill catalog
       (depth/cycle/path-shape hardening) so the library root can grow without
       assuming a perfectly well-formed tree forever
 - [ ] Strengthen runtime-owned skill catalog diagnostics and verification only
@@ -158,6 +158,7 @@ turning the runtime into a full scheduler/orchestrator.
 | Date | Update |
 |------|--------|
 | 2026-03-29 | Plan created to consolidate important follow-through previously tracked only in `PROGRESS.md` / `ROADMAP.md` |
+| 2026-03-29 | Phase 1 slice 1 landed: runtime skill catalog discovery now enforces bounded traversal depth and rejects symbolic-link/junction entries instead of assuming a perfectly well-formed checked-in tree |
 
 ---
 
