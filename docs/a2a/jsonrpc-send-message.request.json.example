@@ -1,0 +1,34 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "SendMessage",
+  "params": {
+    "message": {
+      "messageId": "pilot-message-001",
+      "role": "ROLE_USER",
+      "parts": [
+        {
+          "text": "Review runtime health, provider diagnostics, and the latest setup posture. Explain the next operator action and keep references to the most relevant project-memory artifacts.",
+          "mediaType": "text/plain"
+        }
+      ],
+      "metadata": {
+        "conversationId": "pilot-conversation-001",
+        "desiredReferences": [
+          "docs/decisions",
+          "docs/specs",
+          "docs/plans",
+          "PROGRESS.md"
+        ]
+      }
+    },
+    "configuration": {
+      "acceptedOutputModes": [
+        "text/plain",
+        "application/json"
+      ],
+      "historyLength": 10,
+      "returnImmediately": false
+    }
+  }
+}

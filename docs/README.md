@@ -50,7 +50,7 @@ Add your project-specific automation scripts here.
 |----------|--------|-------------|
 | [AGENT-GUIDE.md](./AGENT-GUIDE.md) | Complete | Project-specific agent notes |
 | [terminology.md](./terminology.md) | Complete | AAIF, A2A, skills, compatibility, evidence, control-plane adapter, and runtime-project-memory terminology |
-| [a2a/](./a2a/) | Template | A2A protocol examples and templates; some current examples still need A2A v1 alignment |
+| [a2a/](./a2a/) | Complete | Pilot-owned A2A v1.0 example set for future adapter work; standards-aligned docs, not a claim of a live A2A endpoint today |
 | [specs/](./specs/) | Complete | Feature specifications for runtime capabilities and future delivery tracks; see `specs/README.md` for the full list |
 | [plans/](./plans/) | Complete | Implementation plans for WSL discovery, API/backend expansion, startup contract, runtime-managed skills, browser-preview substrate, provider compatibility/evidence, and metering/progress/guardrails |
 | [decisions/](./decisions/) | Complete | Architecture Decision Records for packaging, install/check metadata, diagnostics, workspace substrate, delivery policy boundaries, runtime-owned metering/guardrails, LAN peer-sharing scope, standalone bootstrap/config boundaries, advanced model-selection ownership, management-adapter boundaries, and provider-evolution evidence boundaries |
@@ -90,7 +90,8 @@ later passes:
 - deeper browser-driver persistence, cleanup, and real-driver follow-ons beyond the current manual-driver substrate
 - deeper API/local live-probe and model-discovery follow-ons
 - project-specific security and MCP configuration docs beyond the inherited templates
-- A2A examples once runtime-to-runtime collaboration surfaces stabilize
+- a live A2A server/Agent Card surface; the current A2A files are still pilot-owned examples rather than active endpoints
+- `cats`-side follow-through so the first-wave pilot exists in both flagship repos instead of `cats-runtime` alone
 
 ## Document Standards
 
@@ -101,4 +102,4 @@ later passes:
 
 ---
 
-*Last updated: 2026-03-27*
+*Last updated: 2026-03-29*

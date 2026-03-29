@@ -335,4 +335,34 @@ describe('WorkspaceSubstrateService', () => {
       cleanup();
     }
   });
+
+  it('seeds pilot A2A v1 starter artifacts for the a2a-enabled profile', async () => {
+    const { root, cleanup } = createWorkspace();
+    const service = new WorkspaceSubstrateService();
+
+    try {
+      const result = await service.execute({
+        operation: 'init-workspace',
+        workspacePath: root,
+        profile: 'a2a-enabled',
+        enabledAgents: ['codex'],
+        apply: true,
+        authorization: {
+          actorRole: 'boss_cat',
+        },
+      });
+
+      expect(result.applied).toBe(true);
+      expect(existsSync(join(root, 'docs', 'a2a', 'README.md'))).toBe(true);
+      expect(existsSync(join(root, 'docs', 'a2a', 'agent-card.public.json.example'))).toBe(true);
+      expect(existsSync(join(root, 'docs', 'a2a', 'agent-card.authenticated.json.example'))).toBe(true);
+      expect(existsSync(join(root, 'docs', 'a2a', 'jsonrpc-send-message.request.json.example'))).toBe(true);
+      expect(existsSync(join(root, 'docs', 'a2a', 'jsonrpc-get-task.request.json.example'))).toBe(true);
+      expect(existsSync(join(root, 'docs', 'a2a', 'task.json.example'))).toBe(false);
+      expect(readFileSync(join(root, 'docs', 'a2a', 'README.md'), 'utf-8'))
+        .toContain('agent-card.public.json.example');
+    } finally {
+      cleanup();
+    }
+  });
 });

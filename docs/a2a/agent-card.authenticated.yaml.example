@@ -1,0 +1,105 @@
+name: "cats-runtime"
+description: "Pilot authenticated extended Agent Card example for a future cats-runtime A2A adapter. It expands the public discovery card with operational workflows that should only be exposed after authentication and policy checks."
+supportedInterfaces:
+  - url: "https://runtime.example.com/a2a/jsonrpc"
+    protocolBinding: "JSONRPC"
+    protocolVersion: "1.0"
+  - url: "https://runtime.example.com/a2a/http"
+    protocolBinding: "HTTP+JSON"
+    protocolVersion: "1.0"
+provider:
+  organization: "cats-runtime maintainers"
+  url: "https://example.com/cats-runtime"
+version: "0.1.0-pilot"
+documentationUrl: "https://example.com/cats-runtime/docs/a2a/internal"
+capabilities:
+  streaming: true
+  pushNotifications: false
+  extendedAgentCard: true
+  extensions:
+    - uri: "https://example.com/extensions/project-memory-references/v1"
+      description: "Adds durable project-memory references to long-running task artifacts and handoff summaries."
+      required: false
+      params:
+        referenceScopes:
+          - "research"
+          - "decision"
+          - "spec"
+          - "plan"
+securitySchemes:
+  runtimeBearer:
+    httpAuthSecurityScheme:
+      description: "Bearer token used when a future A2A adapter shares the runtime's protected host boundary."
+      scheme: "Bearer"
+      bearerFormat: "API key or JWT"
+defaultInputModes:
+  - "text/plain"
+  - "application/json"
+defaultOutputModes:
+  - "text/plain"
+  - "application/json"
+skills:
+  - id: "runtime-reads"
+    name: "Runtime Reads"
+    description: "Read runtime health, provider diagnostics, setup posture, and session inspection truth."
+    tags:
+      - "runtime"
+      - "diagnostics"
+      - "read-only"
+    examples:
+      - "Summarize runtime health and identify the strongest degraded signal."
+      - "List the active provider-readiness blockers and propose the next repair step."
+    inputModes:
+      - "text/plain"
+      - "application/json"
+    outputModes:
+      - "text/plain"
+      - "application/json"
+  - id: "session-orchestration"
+    name: "Session Orchestration"
+    description: "Model future task execution over the session/message runtime boundary."
+    tags:
+      - "sessions"
+      - "execution"
+      - "runtime"
+    examples:
+      - "Create a session, send a task message, and report the resulting session id and provider target."
+      - "Resume the current task, continue execution, and summarize the resulting state."
+    inputModes:
+      - "text/plain"
+      - "application/json"
+    outputModes:
+      - "text/plain"
+      - "application/json"
+  - id: "project-memory-governance"
+    name: "Project Memory Governance"
+    description: "Produce reviewable updates to research, ADR, spec, and plan artifacts without collapsing durable state into transient protocol messages."
+    tags:
+      - "documentation"
+      - "handoff"
+      - "governance"
+    examples:
+      - "Record the external protocol finding in docs/research and note the resulting spec impact."
+      - "Update the active plan and progress log after a validated pilot slice lands."
+    inputModes:
+      - "text/plain"
+      - "application/json"
+    outputModes:
+      - "text/plain"
+      - "application/json"
+  - id: "delivery-actions"
+    name: "Delivery Actions"
+    description: "Model authenticated delivery primitives such as repo status, commit, push, and artifact publication behind explicit approval policy."
+    tags:
+      - "delivery"
+      - "governance"
+      - "authenticated"
+    examples:
+      - "Inspect repo status and explain whether the change is ready for commit."
+      - "Publish an approved artifact manifest and report the output references."
+    inputModes:
+      - "text/plain"
+      - "application/json"
+    outputModes:
+      - "text/plain"
+      - "application/json"

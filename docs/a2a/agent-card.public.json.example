@@ -1,0 +1,90 @@
+{
+  "name": "cats-runtime",
+  "description": "Pilot public Agent Card example for a future A2A adapter over the cats-runtime boundary. This example is standards-aligned documentation, not a claim that the current repo already exposes a live A2A endpoint.",
+  "supportedInterfaces": [
+    {
+      "url": "https://runtime.example.com/a2a/jsonrpc",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+    },
+    {
+      "url": "https://runtime.example.com/a2a/http",
+      "protocolBinding": "HTTP+JSON",
+      "protocolVersion": "1.0"
+    }
+  ],
+  "provider": {
+    "organization": "cats-runtime maintainers",
+    "url": "https://example.com/cats-runtime"
+  },
+  "version": "0.1.0-pilot",
+  "documentationUrl": "https://example.com/cats-runtime/docs/a2a",
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false,
+    "extendedAgentCard": true
+  },
+  "securitySchemes": {
+    "runtimeBearer": {
+      "httpAuthSecurityScheme": {
+        "description": "Bearer token used when a future A2A adapter is fronted by the same operator credential boundary as the runtime's protected HTTP routes.",
+        "scheme": "Bearer",
+        "bearerFormat": "API key or JWT"
+      }
+    }
+  },
+  "defaultInputModes": [
+    "text/plain",
+    "application/json"
+  ],
+  "defaultOutputModes": [
+    "text/plain",
+    "application/json"
+  ],
+  "skills": [
+    {
+      "id": "runtime-reads",
+      "name": "Runtime Reads",
+      "description": "Read runtime health, setup posture, provider diagnostics, and session inspection truth without mutating repo state.",
+      "tags": [
+        "runtime",
+        "diagnostics",
+        "read-only"
+      ],
+      "examples": [
+        "Explain why provider diagnostics are degraded and suggest the next operator action.",
+        "Summarize runtime health, setup posture, and current provider readiness."
+      ],
+      "inputModes": [
+        "text/plain",
+        "application/json"
+      ],
+      "outputModes": [
+        "text/plain",
+        "application/json"
+      ]
+    },
+    {
+      "id": "session-orchestration",
+      "name": "Session Orchestration",
+      "description": "Model future session-level request handling over the cats-runtime boundary, including create, resume, inspect, and message execution flows.",
+      "tags": [
+        "sessions",
+        "orchestration",
+        "runtime"
+      ],
+      "examples": [
+        "Open a new runtime session for this task and explain the selected provider target.",
+        "Continue the current task and summarize the resulting session state."
+      ],
+      "inputModes": [
+        "text/plain",
+        "application/json"
+      ],
+      "outputModes": [
+        "text/plain",
+        "application/json"
+      ]
+    }
+  ]
+}

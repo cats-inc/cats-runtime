@@ -242,42 +242,97 @@ function buildProgress(profile: WorkspaceSubstrateProfileId): string {
 function buildA2aReadme(profile: WorkspaceSubstrateProfileId): string {
   return [
     markdownMarker(profile, 'docs/a2a/README.md'),
-    '# A2A Workspace Starter',
+    '# A2A v1.0 Workspace Starter',
     '',
-    'Use these example files as the initial contract when this workspace exposes agent-to-agent interfaces.',
+    'Use these pilot-owned example files as the initial protocol-layer starter',
+    'set when this workspace needs A2A-facing artifacts.',
     '',
     '## Files',
     '',
-    '- `agent-card.json.example`',
-    '- `task.json.example`',
+    '- `agent-card.public.json.example`',
+    '- `agent-card.authenticated.json.example`',
+    '- `jsonrpc-send-message.request.json.example`',
+    '- `jsonrpc-get-task.request.json.example`',
     '',
     '## Notes',
     '',
-    '- Keep examples aligned with the actual runtime surface.',
-    '- Treat these files as coordination artifacts, not product workflow policy.',
+    '- Keep these files standards-aligned and truthful to the repo\'s real capabilities.',
+    '- Keep durable handoff and project status in markdown project-memory docs, not here.',
+    '- Do not reintroduce the retired generic standalone `task.json.example` model.',
     '',
   ].join('\n');
 }
 
-function buildAgentCardExample(profile: WorkspaceSubstrateProfileId): string {
+function buildPublicAgentCardExample(profile: WorkspaceSubstrateProfileId): string {
   return JSON.stringify({
-    xCatsRuntimeSubstrate: jsonMarker(profile, 'docs/a2a/agent-card.json.example'),
+    xCatsRuntimeSubstrate: jsonMarker(profile, 'docs/a2a/agent-card.public.json.example'),
     name: 'workspace-agent',
-    description: 'Example A2A agent card for this workspace.',
-    capabilities: ['execute', 'observe'],
-    endpoint: 'http://127.0.0.1:3110',
+    description: 'Pilot public Agent Card starter for this workspace.',
+    supportedInterfaces: [
+      {
+        url: 'https://agent.example.com/a2a/jsonrpc',
+        protocolBinding: 'JSONRPC',
+        protocolVersion: '1.0',
+      },
+    ],
+    capabilities: {
+      streaming: true,
+      pushNotifications: false,
+      extendedAgentCard: true,
+    },
   }, null, 2) + '\n';
 }
 
-function buildTaskExample(profile: WorkspaceSubstrateProfileId): string {
+function buildAuthenticatedAgentCardExample(profile: WorkspaceSubstrateProfileId): string {
   return JSON.stringify({
-    xCatsRuntimeSubstrate: jsonMarker(profile, 'docs/a2a/task.json.example'),
-    task: {
-      id: 'task-example',
-      intent: 'inspect_workspace',
-      input: {
-        workspacePath: '.',
+    xCatsRuntimeSubstrate: jsonMarker(profile, 'docs/a2a/agent-card.authenticated.json.example'),
+    name: 'workspace-agent',
+    description: 'Pilot authenticated Agent Card starter for this workspace.',
+    supportedInterfaces: [
+      {
+        url: 'https://agent.example.com/a2a/jsonrpc',
+        protocolBinding: 'JSONRPC',
+        protocolVersion: '1.0',
       },
+    ],
+    capabilities: {
+      streaming: true,
+      pushNotifications: false,
+      extendedAgentCard: true,
+    },
+  }, null, 2) + '\n';
+}
+
+function buildSendMessageExample(profile: WorkspaceSubstrateProfileId): string {
+  return JSON.stringify({
+    xCatsRuntimeSubstrate: jsonMarker(profile, 'docs/a2a/jsonrpc-send-message.request.json.example'),
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'SendMessage',
+    params: {
+      message: {
+        messageId: 'starter-message-001',
+        role: 'ROLE_USER',
+        parts: [
+          {
+            text: 'Describe the next operator action for this workspace task.',
+            mediaType: 'text/plain',
+          },
+        ],
+      },
+    },
+  }, null, 2) + '\n';
+}
+
+function buildGetTaskExample(profile: WorkspaceSubstrateProfileId): string {
+  return JSON.stringify({
+    xCatsRuntimeSubstrate: jsonMarker(profile, 'docs/a2a/jsonrpc-get-task.request.json.example'),
+    jsonrpc: '2.0',
+    id: 2,
+    method: 'GetTask',
+    params: {
+      id: 'starter-task-001',
+      historyLength: 5,
     },
   }, null, 2) + '\n';
 }
@@ -321,12 +376,20 @@ function buildTemplates(input: {
         content: buildA2aReadme(input.profile),
       },
       {
-        path: 'docs/a2a/agent-card.json.example',
-        content: buildAgentCardExample(input.profile),
+        path: 'docs/a2a/agent-card.public.json.example',
+        content: buildPublicAgentCardExample(input.profile),
       },
       {
-        path: 'docs/a2a/task.json.example',
-        content: buildTaskExample(input.profile),
+        path: 'docs/a2a/agent-card.authenticated.json.example',
+        content: buildAuthenticatedAgentCardExample(input.profile),
+      },
+      {
+        path: 'docs/a2a/jsonrpc-send-message.request.json.example',
+        content: buildSendMessageExample(input.profile),
+      },
+      {
+        path: 'docs/a2a/jsonrpc-get-task.request.json.example',
+        content: buildGetTaskExample(input.profile),
       },
     );
   }
