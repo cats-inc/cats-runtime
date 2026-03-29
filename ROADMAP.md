@@ -1392,4 +1392,102 @@ proxy slice is still intentionally minimal:
 - `docs/plans/PLAN-022-stdio-mcp-proxy-to-primary-runtime.md`
 
 ---
+### OPT-15: Executable Packaging and npm Publish Follow-through
+
+**Priority**: P1
+**Status**: Planned
+
+#### Problem
+
+`cats-runtime` now has the core executable packaging contract in-repo:
+
+- `cats-runtime` and `cats-runtime-mcp` both ship through npm `bin` entries
+- `npm run build` is now a clean build that clears stale `dist/` artifacts
+- `prepack`, `release:check`, curated `files`, and package-contract coverage all
+  exist
+- Linux/macOS/Windows helper scripts now support local pack/install smoke tests
+
+That means the local packaging baseline is no longer the main gap. The
+remaining work is follow-through and publication discipline:
+
+- some plan/spec tracking around runtime UI packaging still reflects an older
+  "not started" state even though `build:ui` and package-safe static artifact
+  generation already exist
+- deployment docs still describe the npm package path as a planned publish path
+  instead of a repo-ready local package plus not-yet-published registry path
+- the package is not yet proven through a first real npm release
+- trusted publishing automation and post-publish validation are still manual
+
+#### Current Baseline
+
+- `package.json` now includes executable `bin` entries for `cats-runtime` and
+  `cats-runtime-mcp`, curated `files`, `prepack`, `release:check`, `build:ui`,
+  and clean-build packaging hooks
+- `tests/package-contract.test.ts` now verifies curated publish contents and
+  protects against stale `dist/` artifacts leaking into the tarball
+- `scripts/linux/pack-install.sh`, `scripts/macos/pack-install.sh`, and
+  `scripts/windows/Pack-Install.ps1` now provide aligned local pack/install
+  helpers
+- `docs/release-guide.md` documents a manual first-release path plus a future
+  trusted-publishing direction
+- `docs/deployment.md` still labels npm package startup as a planned publish
+  path, which is now only partially true: local package execution is ready, but
+  public registry publication remains outstanding
+
+#### Follow-through Checklist
+
+- align `PLAN-019` packaging/build notes with current repo reality:
+  - mark the now-landed runtime UI build/package wiring as delivered where
+    appropriate
+  - leave the still-unshipped shared UI foundation migration work clearly
+    deferred instead of mixing it with already-landed package mechanics
+- tighten packaging docs so they distinguish:
+  - repo-local package readiness
+  - first public npm release
+  - later trusted-publishing automation
+- decide and freeze the public package naming posture before first release:
+  - keep `cats-runtime`
+  - or move to a scoped public package
+- execute the first real npm publish trial:
+  - run `npm run release:check`
+  - publish a prerelease under `next`
+  - validate `npx cats-runtime@next --help` and install flow against the actual
+    registry artifact
+- add GitHub Actions trusted publishing once the manual release path is proven:
+  - dedicated publish workflow
+  - `id-token: write`
+  - npm trusted publisher configuration
+  - publish trigger discipline from tags or protected manual release workflow
+- update deployment/release docs after the first publish so they stop describing
+  package execution as only a planned path
+
+#### Deferred Scope
+
+- do not treat packaged desktop onboarding or provider installation UX as part
+  of this packaging follow-through
+- do not reopen the MCP proxy ownership decision under the name of packaging
+- do not broaden the executable package surface into a source-import contract
+  for product hosts
+
+#### Affected Areas
+
+- `package.json`
+- `tests/package-contract.test.ts`
+- `scripts/linux/pack-install.sh`
+- `scripts/macos/pack-install.sh`
+- `scripts/windows/Pack-Install.ps1`
+- `docs/deployment.md`
+- `docs/release-guide.md`
+- `docs/specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md`
+- `docs/plans/PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md`
+- `PROGRESS.md`
+
+#### References
+
+- `docs/release-guide.md`
+- `docs/deployment.md`
+- `docs/specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md`
+- `docs/plans/PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md`
+
+---
 *Last updated: 2026-03-29*
