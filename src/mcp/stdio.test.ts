@@ -312,4 +312,59 @@ describe('MCP stdio transport', () => {
     await server.close();
     expect(closeSpy).toHaveBeenCalledTimes(1);
   });
+
+  it('supports an injected JSON-RPC handler without a local runtime context', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const handleJsonRpc = vi.fn(async (message: unknown) => ({
+      jsonrpc: '2.0' as const,
+      id: (message as { id?: number }).id ?? null,
+      result: {
+        echoed: message,
+      },
+    }));
+
+    const server = startMcpStdioServer({
+      input,
+      output,
+      handleJsonRpc,
+    });
+
+    const chunks: Buffer[] = [];
+    output.on('data', (chunk) => {
+      chunks.push(Buffer.from(chunk));
+    });
+
+    input.write(encodeMessage({
+      jsonrpc: '2.0',
+      id: 7,
+      method: 'ping',
+      params: {},
+    }));
+
+    await vi.waitFor(() => {
+      expect(decodeMessages(Buffer.concat(chunks))).toHaveLength(1);
+    });
+
+    expect(handleJsonRpc).toHaveBeenCalledWith({
+      jsonrpc: '2.0',
+      id: 7,
+      method: 'ping',
+      params: {},
+    });
+    expect(decodeMessages(Buffer.concat(chunks))).toEqual([{
+      jsonrpc: '2.0',
+      id: 7,
+      result: {
+        echoed: {
+          jsonrpc: '2.0',
+          id: 7,
+          method: 'ping',
+          params: {},
+        },
+      },
+    }]);
+
+    await server.close();
+  });
 });

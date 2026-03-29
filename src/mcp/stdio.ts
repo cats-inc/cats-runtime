@@ -1,11 +1,17 @@
 import type { Writable } from 'node:stream';
 import type { AppContext } from '../http/app.js';
 import { handleMcpJsonRpc } from './server.js';
+import type { McpJsonRpcError, McpJsonRpcSuccess } from './types.js';
 
 const HEADER_DELIMITER = '\r\n\r\n';
 
+export type McpJsonRpcHandler = (
+  message: unknown,
+) => Promise<McpJsonRpcSuccess | McpJsonRpcError | null>;
+
 export interface McpStdioServerOptions {
-  ctx: AppContext;
+  ctx?: AppContext;
+  handleJsonRpc?: McpJsonRpcHandler;
   input?: NodeJS.ReadableStream;
   output?: Writable;
   errorOutput?: Writable;
@@ -91,10 +97,24 @@ function parseErrorResponse(message: string) {
   };
 }
 
+function resolveJsonRpcHandler(
+  options: McpStdioServerOptions,
+): McpJsonRpcHandler {
+  if (options.handleJsonRpc) {
+    return options.handleJsonRpc;
+  }
+  if (options.ctx) {
+    return (message) => handleMcpJsonRpc(options.ctx as AppContext, message);
+  }
+
+  throw new Error('MCP stdio server requires either ctx or handleJsonRpc');
+}
+
 export function startMcpStdioServer(options: McpStdioServerOptions): McpStdioServerHandle {
   const input = options.input ?? process.stdin;
   const output = options.output ?? process.stdout;
   const errorOutput = options.errorOutput ?? process.stderr;
+  const handleJsonRpc = resolveJsonRpcHandler(options);
   let buffer: Buffer = Buffer.alloc(0);
   let closed = false;
   let processing = Promise.resolve();
@@ -126,7 +146,7 @@ export function startMcpStdioServer(options: McpStdioServerOptions): McpStdioSer
       buffer = parsed.remainder;
       for (const message of parsed.messages) {
         processing = processing.then(async () => {
-          const response = await handleMcpJsonRpc(options.ctx, message);
+          const response = await handleJsonRpc(message);
           if (response !== null) {
             writeResponse(response);
           }
