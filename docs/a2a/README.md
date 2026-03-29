@@ -29,6 +29,10 @@ As of this pilot slice:
   - project-memory docs such as ADRs, specs, plans, and research notes
   - runtime-owned procedural `SKILL.md` packages
 
+Treat these examples as pilot wire snapshots for discussion, validation, and
+future implementation planning. They are not an already-approved public
+runtime contract.
+
 ## Contents
 
 - `agent-card.public.json.example` / `agent-card.public.yaml.example`
@@ -51,6 +55,10 @@ As of this pilot slice:
 - `jsonrpc-get-extended-agent-card.request.json.example`
   Pilot authenticated extended-card lookup example.
 
+JSON files are the canonical examples for this pilot. YAML files are mirrors
+for readability and should be updated in the same change when the Agent Card
+examples move.
+
 ## Layering Rules
 
 - `docs/a2a/` is the protocol layer. Keep standards-aligned discovery, auth,
@@ -72,6 +80,12 @@ Legacy `agent-card.json.example`, `agent-card.yaml.example`,
 
 - Do not reintroduce the generic standalone `task.*.example` shape as if it
   were normative A2A v1 guidance.
+- `update-workspace` retires runtime-managed legacy JSON starter files from
+  older workspace substrate versions. Customized legacy files are left in place
+  for manual review.
+- Legacy YAML files were never workspace-substrate-managed starter artifacts in
+  `cats-runtime`; if they exist, treat them as manual repo content and review
+  them conservatively.
 - If another repo still carries those files, replace them conservatively and
   explain the migration in that repo's local A2A README.
 

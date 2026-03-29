@@ -25,6 +25,15 @@ recommendedCompanions:
 
 Update durable repo memory when implementation truth changes.
 
+## Authority Boundary
+
+`AGENTS.md` and `docs/AGENT-GUIDE.md` remain the baseline authority for
+mandatory collaboration rules.
+
+Use this skill as a focused workflow wrapper for syncing durable markdown
+project memory after implementation or validation changes. It is not a second
+governance source of truth.
+
 ## When To Use
 
 - You finished a slice that changed the real status of a spec, plan, ADR, or
