@@ -3376,6 +3376,13 @@ hosts can inspect continuation, cache/warm-state, provider-native-tool posture,
 and the runtime-local tool profile catalog alongside the tooling policy without
 fetching a second provider read model.
 
+For runtime-local filesystem mutation tools, `overwrite: true` is also
+runtime-owned behavior rather than a raw passthrough to platform defaults.
+`rename_file` and `copy_file` stage a bounded same-directory destination backup
+before replacement, restore that backup if the replacement fails, and discard
+the backup on success so hosts do not need to infer cross-platform overwrite
+semantics from Node or OS behavior alone.
+
 For CLI targets the route stays honest: it still returns `200`, but `source`
 becomes `provider_native`, `discoverable` stays `false`, and no synthetic
 runtime tool catalog is invented.
