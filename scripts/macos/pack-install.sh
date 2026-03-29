@@ -2,9 +2,9 @@
 # Pack cats-runtime as .tgz and optionally install it globally.
 #
 # Usage:
-#   ./scripts/macos/pack-install.sh                   # Interactive (prompts for install/delete)
+#   ./scripts/macos/pack-install.sh                   # Interactive (install defaults to yes; delete defaults to yes after install)
 #   ./scripts/macos/pack-install.sh --pack-only       # Build + pack, skip install
-#   ./scripts/macos/pack-install.sh --install         # Build + pack + install (no prompt)
+#   ./scripts/macos/pack-install.sh --install         # Build + pack + install + delete tgz (no prompt)
 #   ./scripts/macos/pack-install.sh --install --clean # Build + pack + install + delete tgz
 #   ./scripts/macos/pack-install.sh --skip-build      # Pack only (assumes already built)
 
@@ -88,11 +88,14 @@ printf '\033[90mTry: cats-runtime-mcp --help\033[0m\n'
 SHOULD_DELETE=false
 if [ "$CLEAN" = true ]; then
   SHOULD_DELETE=true
-elif [ "$INSTALL" = false ]; then
-  printf '\nDelete %s? (y/N) ' "$TGZ_NAME"
+elif [ "$INSTALL" = true ]; then
+  SHOULD_DELETE=true
+else
+  printf '\nDelete %s? (Y/n) ' "$TGZ_NAME"
   read -r ANSWER
   case "$ANSWER" in
-    [yY]*) SHOULD_DELETE=true ;;
+    [nN]*) ;;
+    *)     SHOULD_DELETE=true ;;
   esac
 fi
 

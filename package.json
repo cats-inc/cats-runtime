@@ -34,8 +34,9 @@
     "LICENSE"
   ],
   "scripts": {
+    "clean:dist": "node scripts/clean-dist.mjs",
     "build:ui": "node scripts/build-runtime-ui-css.mjs",
-    "build": "npm run build:ui && tsc -p tsconfig.json",
+    "build": "npm run clean:dist && npm run build:ui && tsc -p tsconfig.json",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "prepack": "npm run build",

@@ -2,9 +2,9 @@
 # Pack cats-runtime as .tgz and optionally install it globally.
 #
 # Usage:
-#   .\scripts\windows\Pack-Install.ps1                 # Interactive (prompts for install/delete)
+#   .\scripts\windows\Pack-Install.ps1                 # Interactive (install defaults to yes; delete defaults to yes after install)
 #   .\scripts\windows\Pack-Install.ps1 -PackOnly       # Build + pack, skip install
-#   .\scripts\windows\Pack-Install.ps1 -Install        # Build + pack + install (no prompt)
+#   .\scripts\windows\Pack-Install.ps1 -Install        # Build + pack + install + delete tgz (no prompt)
 #   .\scripts\windows\Pack-Install.ps1 -Install -Clean # Build + pack + install + delete tgz
 #   .\scripts\windows\Pack-Install.ps1 -SkipBuild      # Pack only (assumes already built)
 
@@ -101,9 +101,11 @@ try {
     $shouldDelete = $false
     if ($Clean) {
         $shouldDelete = $true
-    } elseif (-not $Install) {
-        $deleteAnswer = Read-Host "`nDelete $tgzName? (y/N)"
-        if ($deleteAnswer -match '^[yY]') {
+    } elseif ($Install) {
+        $shouldDelete = $true
+    } else {
+        $deleteAnswer = Read-Host "`nDelete $tgzName? (Y/n)"
+        if ($deleteAnswer -notmatch '^[nN]') {
             $shouldDelete = $true
         }
     }
