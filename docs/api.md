@@ -695,6 +695,9 @@ integrate against:
   - `summary`: aggregate wakeup counts/status for polling and dashboards
   - `timer`: whether the due-wakeup loop is active plus bounded processing limits
   - `retention`: retained terminal-history limits
+  - `samples`: bounded operator-facing `due[]` and `failed[]` request samples
+    including request id, session id, schedule timestamp, recurrence flag, and
+    the last failure text when available
 - runtime execution-strategy catalog metadata under `runtime.executionStrategies`
   including:
   - `summary`: supported-family counts, fallback-only counts, compatibility

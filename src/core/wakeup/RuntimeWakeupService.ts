@@ -20,6 +20,7 @@ const DEFAULT_TICK_INTERVAL_MS = 1_000;
 const DEFAULT_MAX_DUE_PER_TICK = 8;
 const DEFAULT_MAX_TERMINAL_REQUESTS = 256;
 const DEFAULT_MAX_TERMINAL_REQUESTS_PER_SESSION = 16;
+const DEFAULT_DIAGNOSTIC_SAMPLE_LIMIT = 3;
 
 const OPEN_WAKEUP_STATUSES = new Set<RuntimeWakeupStatus>([
   'scheduled',
@@ -99,6 +100,20 @@ export interface RuntimeWakeupDiagnosticsSnapshot {
     maxTerminalRequests: number;
     maxTerminalRequestsPerSession: number;
   };
+  samples: {
+    due: RuntimeWakeupDiagnosticsSample[];
+    failed: RuntimeWakeupDiagnosticsSample[];
+  };
+}
+
+export interface RuntimeWakeupDiagnosticsSample {
+  id: string;
+  sessionId: string;
+  status: RuntimeWakeupStatus;
+  scheduleAt: string;
+  updatedAt: string;
+  recurring: boolean;
+  lastError?: string;
 }
 
 export class RuntimeWakeupValidationError extends Error {
@@ -661,6 +676,7 @@ export class RuntimeWakeupService {
   }
 
   buildDiagnosticsSnapshot(): RuntimeWakeupDiagnosticsSnapshot {
+    const nowMs = this.now().getTime();
     return {
       summary: this.buildDiagnosticsSummary(),
       timer: {
@@ -672,6 +688,17 @@ export class RuntimeWakeupService {
       retention: {
         maxTerminalRequests: this.maxTerminalRequests,
         maxTerminalRequestsPerSession: this.maxTerminalRequestsPerSession,
+      },
+      samples: {
+        due: this.buildDiagnosticsSamples({
+          filter: (request) =>
+            request.status === 'scheduled' && Date.parse(request.scheduleAt) <= nowMs,
+          sort: sortRequests,
+        }),
+        failed: this.buildDiagnosticsSamples({
+          filter: (request) => request.status === 'failed',
+          sort: (left, right) => this.compareRecency(left, right),
+        }),
       },
     };
   }
@@ -852,5 +879,24 @@ export class RuntimeWakeupService {
     }
 
     return Date.parse(right.createdAt) - Date.parse(left.createdAt);
+  }
+
+  private buildDiagnosticsSamples(options: {
+    filter: (request: RuntimeWakeupRequest) => boolean;
+    sort: (left: RuntimeWakeupRequest, right: RuntimeWakeupRequest) => number;
+  }): RuntimeWakeupDiagnosticsSample[] {
+    return Array.from(this.requests.values())
+      .filter(options.filter)
+      .sort(options.sort)
+      .slice(0, DEFAULT_DIAGNOSTIC_SAMPLE_LIMIT)
+      .map((request) => ({
+        id: request.id,
+        sessionId: request.target.sessionId,
+        status: request.status,
+        scheduleAt: request.scheduleAt,
+        updatedAt: request.updatedAt,
+        recurring: Boolean(request.recurrence),
+        ...(request.lastExecution?.error ? { lastError: request.lastExecution.error } : {}),
+      }));
   }
 }

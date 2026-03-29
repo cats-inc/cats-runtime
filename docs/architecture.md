@@ -243,6 +243,9 @@ src/
 - Exposes runtime-owned scheduled wakeup routes, including UTC cron-like
   recurrence, without pretending the runtime already owns full product workflow
   or heartbeat scheduling
+- Reuses the same wakeup substrate for runtime diagnostics, exposing the
+  aggregate summary plus bounded due/failed request samples on
+  `GET /diagnostics/runtime`
 - Exposes the additive MCP facade with authoritative execution on `POST /mcp`
   plus the `cats-runtime-mcp` stdio proxy for stdio-only hosts
 

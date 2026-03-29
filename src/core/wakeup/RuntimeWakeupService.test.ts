@@ -317,6 +317,27 @@ describe('RuntimeWakeupService', () => {
         maxTerminalRequests: 256,
         maxTerminalRequestsPerSession: 16,
       },
+      samples: {
+        due: [
+          expect.objectContaining({
+            id: expect.any(String),
+            sessionId: 'session-due',
+            status: 'scheduled',
+            scheduleAt: '2026-03-22T23:59:00.000Z',
+            recurring: false,
+          }),
+        ],
+        failed: [
+          expect.objectContaining({
+            id: failed.request.id,
+            sessionId: 'session-failed',
+            status: 'failed',
+            scheduleAt: '2026-03-23T00:00:00.000Z',
+            recurring: false,
+            lastError: 'wake failed',
+          }),
+        ],
+      },
     });
   });
 });

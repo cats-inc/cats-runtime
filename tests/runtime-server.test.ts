@@ -789,6 +789,10 @@ describe('runtime server', () => {
               maxTerminalRequests: 256,
               maxTerminalRequestsPerSession: 16,
             },
+            samples: {
+              due: [],
+              failed: [],
+            },
           },
           process: {
             pid: process.pid,

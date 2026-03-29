@@ -225,6 +225,10 @@ function getRuntimeWakeupSnapshot(ctx: AppContext) {
       maxTerminalRequests: 0,
       maxTerminalRequestsPerSession: 0,
     },
+    samples: {
+      due: [],
+      failed: [],
+    },
   };
 }
 

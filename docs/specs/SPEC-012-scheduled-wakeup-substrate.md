@@ -185,6 +185,9 @@ creation.
 - Ongoing follow-through is now collected under
   [PLAN-024](../plans/PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md),
   with `PROGRESS.md` / `ROADMAP.md` still carrying the broader runtime status.
+- The latest follow-through slice adds bounded due/failed request samples on
+  runtime-wide wakeup diagnostics so operators can inspect backlog hotspots
+  without first listing every retained request.
 
 ## Dependencies
 
@@ -197,10 +200,10 @@ creation.
 
 - provider/bootstrap wake targets for not-yet-created sessions
 - richer retry/backoff policy and broader recurrence semantics
-- richer diagnostics summary for runtime-wide wakeup counts
+- broader diagnostics beyond the current aggregate summary plus bounded due/failed request samples
 - product-owned orchestration rules built on top of wakeup primitives
 
 ---
 
-*Last updated: 2026-03-24*
+*Last updated: 2026-03-29*
 *Related Plan: [PLAN-024](../plans/PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md) (follow-through plan; initial substrate slice was implemented directly)*
