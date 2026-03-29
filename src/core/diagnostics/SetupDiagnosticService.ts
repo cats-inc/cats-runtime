@@ -35,6 +35,7 @@ import type {
   ProviderUniverseEntry,
   SetupState,
 } from '../bootstrap/BootstrapService.js';
+import { buildRepairSummary, type SetupRepairSummary } from '../bootstrap/setupRepair.js';
 
 const DEFAULT_REPORT_RETENTION_LIMIT = 5;
 const DEFAULT_COMPATIBILITY_EVIDENCE_REFERENCE_LIMIT = 3;
@@ -148,6 +149,7 @@ export interface SetupDiagnosticReport {
       latest: BootstrapScanResult | null;
       manual: BootstrapScanResult | null;
     };
+    repair: SetupRepairSummary | null;
   };
   references: {
     latestScanPath: string;
@@ -290,6 +292,13 @@ export class SetupDiagnosticService {
           binaryName: entry.binaryName,
         }))
       : [];
+    const repair = this.bootstrapService
+      ? buildRepairSummary({
+          bootstrapRequired: this.startup?.bootstrapRequired ?? false,
+          scan: latestScan,
+          manualScan: latestManualScan,
+        })
+      : null;
 
     const report: SetupDiagnosticReport = redactReport({
       service: RUNTIME_SERVICE_NAME,
@@ -355,6 +364,7 @@ export class SetupDiagnosticService {
           latest: latestScan,
           manual: latestManualScan,
         },
+        repair,
       },
       references: {
         latestScanPath: join(paths.dataDir, 'setup', 'provider-scan.json'),

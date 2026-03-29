@@ -557,6 +557,9 @@ The report currently includes:
   - provider universe summary
   - configured provider/target counts
   - latest setup scan and latest manual scan snapshots
+  - `report.setup.repair` — the same shared runtime-owned repair summary used by
+    `GET /setup-state`, including `preferredScan`, `providersReadyToApply`,
+    `providersNeedingAttention`, `nextAction`, and ordered `actions`
 - references to the compatibility evidence directory and shared setup scan paths
 - bounded `report.references.compatibilityEvidenceArtifacts[]` metadata for the
   latest retained CLI compatibility evidence (`artifactId`, provider/instance,

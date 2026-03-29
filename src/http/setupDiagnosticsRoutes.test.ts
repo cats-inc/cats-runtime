@@ -195,7 +195,15 @@ describe('setup diagnostics routes', () => {
         artifactPath: string;
         report: {
           artifactId: string;
-          setup: { scan: { source: string } };
+          setup: {
+            scan: { source: string };
+            repair: {
+              status: string;
+              nextAction: {
+                kind: string;
+              };
+            };
+          };
           references: {
             compatibilityEvidenceArtifacts: Array<{
               provider: string;
@@ -211,6 +219,12 @@ describe('setup diagnostics routes', () => {
       };
       expect(postBody.status).toBe('generated');
       expect(postBody.report.setup.scan.source).toBe('refreshed');
+      expect(postBody.report.setup.repair).toEqual(expect.objectContaining({
+        status: 'ready',
+        nextAction: expect.objectContaining({
+          kind: 'none',
+        }),
+      }));
       expect(postBody.report.references.compatibilityEvidenceArtifacts).toEqual(
         expect.arrayContaining([
           expect.objectContaining({

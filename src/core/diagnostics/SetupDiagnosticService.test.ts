@@ -185,6 +185,52 @@ describe('SetupDiagnosticService', () => {
     }
   });
 
+  it('embeds the shared setup repair summary for operator follow-through', async () => {
+    const { root, cleanup } = createTestRoot();
+
+    try {
+      const service = new SetupDiagnosticService({
+        config: loadConfig(createTestEnv(root)),
+        startup: {
+          phase: 'ready',
+          ready: true,
+          bootstrapRequired: true,
+        } as never,
+        bootstrapService: createBootstrapStub(),
+        now: () => new Date('2026-03-26T00:00:00.000Z'),
+      });
+
+      const artifact = await service.generateReport();
+      expect(artifact.report.setup.repair).toEqual(expect.objectContaining({
+        status: 'ready',
+        nextAction: expect.objectContaining({
+          kind: 'apply_config',
+          path: '/setup-apply',
+          method: 'POST',
+          providers: ['claude'],
+          body: {
+            providers: ['claude'],
+          },
+        }),
+        actions: expect.arrayContaining([
+          expect.objectContaining({
+            kind: 'apply_config',
+            providers: ['claude'],
+          }),
+          expect.objectContaining({
+            kind: 'generate_setup_report',
+            path: '/diagnostics/setup-report',
+            body: {
+              refreshScan: false,
+            },
+          }),
+        ]),
+      }));
+    } finally {
+      cleanup();
+    }
+  });
+
   it('references recent provider-evolution artifacts without embedding full evidence', async () => {
     const { root, cleanup } = createTestRoot();
 

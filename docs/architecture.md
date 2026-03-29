@@ -59,6 +59,11 @@ Setup artifacts:
   provider-manual-scan.json
 ```
 
+`SetupDiagnosticService` now also reuses the same shared repair-summary builder
+behind `GET /setup-state`, so persisted setup reports and live setup-state reads
+carry the same operator-facing preferred-scan, next-action, and action-list
+truth instead of drifting into separate bootstrap follow-through models.
+
 Runtime-managed skills now sit at the shared runtime layer rather than inside
 product shells or ad-hoc prompt helpers. The runtime:
 

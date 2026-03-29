@@ -85,9 +85,9 @@ Priority is re-evaluated as:
 
 ### Phase 2: Setup Diagnostic Operator Follow-Through
 
-- [ ] Tighten setup diagnostic report/operator seams that are still scattered
-      across bootstrap/setup work, keeping the read model additive and
-      runtime-owned
+- [x] Reuse the shared setup repair-summary builder inside persisted setup
+      diagnostic reports so report artifacts and `GET /setup-state` stop
+      drifting on preferred-scan, next-action, and ordered follow-up actions
 - [ ] Prefer bounded operator summary/report improvements over broad setup UI
       rewrites
 - [ ] Keep setup-report follow-through coordinated with, but not blocked on,
@@ -159,6 +159,7 @@ turning the runtime into a full scheduler/orchestrator.
 |------|--------|
 | 2026-03-29 | Plan created to consolidate important follow-through previously tracked only in `PROGRESS.md` / `ROADMAP.md` |
 | 2026-03-29 | Phase 1 slice 1 landed: runtime skill catalog discovery now enforces bounded traversal depth and rejects symbolic-link/junction entries instead of assuming a perfectly well-formed checked-in tree |
+| 2026-03-29 | Phase 2 slice 1 landed: persisted setup diagnostic reports now reuse the same shared repair-summary builder as `GET /setup-state`, so setup artifacts carry preferred-scan, next-action, and ordered follow-up actions instead of stopping at issue lists |
 
 ---
 
