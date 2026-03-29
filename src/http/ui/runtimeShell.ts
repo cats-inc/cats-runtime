@@ -5,7 +5,7 @@ interface RuntimeSurfaceDescriptor {
   label: string;
   subtitle: string;
   href: string;
-  swatchClass: string;
+  swatchStyle: string;
 }
 
 interface RuntimeShellStateInput {
@@ -19,21 +19,21 @@ const SURFACES: readonly RuntimeSurfaceDescriptor[] = [
     label: 'Dashboard',
     subtitle: 'Sessions, provider health, and runtime diagnostics',
     href: '/dashboard',
-    swatchClass: 'runtime-surface-swatch-dashboard',
-  },
-  {
-    id: 'playground',
-    label: 'Playground',
-    subtitle: 'Multi-agent group chat and orchestration demo surface',
-    href: '/playground',
-    swatchClass: 'runtime-surface-swatch-playground',
+    swatchStyle: 'background:#facc15;box-shadow:0 0 0 4px rgba(250,204,21,0.12);',
   },
   {
     id: 'setup',
     label: 'Setup',
     subtitle: 'Provider bootstrap, repair, and readiness follow-through',
     href: '/setup',
-    swatchClass: 'runtime-surface-swatch-setup',
+    swatchStyle: 'background:#4ade80;box-shadow:0 0 0 4px rgba(74,222,128,0.12);',
+  },
+  {
+    id: 'playground',
+    label: 'Playground',
+    subtitle: 'Multi-agent group chat and orchestration demo surface',
+    href: '/playground',
+    swatchStyle: 'background:#60a5fa;box-shadow:0 0 0 4px rgba(96,165,250,0.12);',
   },
 ] as const;
 
@@ -53,17 +53,16 @@ function renderRuntimeSurfaceSwitcher(input: RuntimeShellStateInput): string {
 
   return `
     <div class="runtime-surface-switcher" data-runtime-surface-switcher data-active-surface="${escapeAttr(active.id)}" data-bootstrap-required="${input.bootstrapRequired ? 'true' : 'false'}" data-open="false">
-      <button type="button" class="runtime-surface-trigger" data-runtime-surface-trigger aria-haspopup="menu" aria-expanded="false">
+      <button type="button" class="runtime-surface-trigger" data-runtime-surface-trigger aria-haspopup="menu" aria-expanded="false" aria-label="Switch runtime surface">
         <span class="runtime-surface-trigger-copy">
-          <span class="runtime-surface-trigger-eyebrow">Cats Runtime</span>
           <span class="runtime-surface-trigger-label">${escapeHtml(active.label)}</span>
         </span>
         <svg class="runtime-surface-chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M4 6.25 8 10l4-3.75" />
         </svg>
       </button>
-      <div class="runtime-surface-menu hidden" data-runtime-surface-menu role="menu" aria-label="Switch runtime surface">
-        <p class="runtime-surface-menu-heading">Runtime Surfaces</p>
+      <div class="runtime-surface-menu hidden" data-runtime-surface-menu role="menu" aria-label="Switch runtime surface" style="width:31.5rem;">
+        <p class="runtime-surface-menu-heading" style="color:#C4653A;">CATS INC</p>
         <div class="runtime-surface-menu-list">
           ${menuItems}
         </div>
@@ -89,20 +88,20 @@ function renderSurfaceItem(
       ? '<span class="runtime-surface-item-badge">Current</span>'
       : '';
   const check = isCurrent
-    ? `<span class="runtime-surface-item-check" aria-hidden="true">
+    ? `<span class="runtime-surface-item-check" style="background:rgba(196,101,58,0.12);color:#C4653A;" aria-hidden="true">
          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
            <path d="m2.4 6.3 2.1 2.1 5.1-5.1" />
          </svg>
        </span>`
     : '';
   const content = `
-    <span class="runtime-surface-swatch ${surface.swatchClass}" aria-hidden="true"></span>
+    <span class="runtime-surface-swatch" style="${escapeAttr(surface.swatchStyle)}" aria-hidden="true"></span>
     <span class="runtime-surface-item-copy">
       <span class="runtime-surface-item-title-row">
         <span class="runtime-surface-item-title">${escapeHtml(surface.label)}</span>
         ${badge}
       </span>
-      <span class="runtime-surface-item-subtitle">${escapeHtml(surface.subtitle)}</span>
+      <span class="runtime-surface-item-subtitle" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(surface.subtitle)}</span>
     </span>
     ${check}
   `.trim();

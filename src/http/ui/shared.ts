@@ -117,8 +117,176 @@ export const SHARED_UI_SCRIPT = `
       var trigger = root.querySelector('[data-runtime-surface-trigger]');
       if (trigger) trigger.setAttribute('aria-expanded', 'false');
       var menu = root.querySelector('[data-runtime-surface-menu]');
-      if (menu) menu.classList.add('hidden');
+      if (menu) {
+        menu.classList.add('hidden');
+        menu.style.position = '';
+        menu.style.left = '';
+        menu.style.top = '';
+      }
     }
+  }
+
+  function positionRuntimeSurfaceMenu(root) {
+    if (!(root instanceof Element)) return;
+    var trigger = root.querySelector('[data-runtime-surface-trigger]');
+    var menu = root.querySelector('[data-runtime-surface-menu]');
+    if (!(trigger instanceof Element) || !(menu instanceof HTMLElement)) return;
+    menu.style.position = 'fixed';
+    var triggerRect = trigger.getBoundingClientRect();
+    var menuRect = menu.getBoundingClientRect();
+    var gap = 12;
+    var left = triggerRect.left;
+    var maxLeft = window.innerWidth - menuRect.width - 12;
+    left = Math.min(Math.max(12, left), Math.max(12, maxLeft));
+    var top = triggerRect.bottom + gap;
+    var maxTop = window.innerHeight - menuRect.height - 12;
+    if (top > maxTop) {
+      top = Math.max(12, triggerRect.top - menuRect.height - gap);
+    }
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+  }
+
+  var runtimeTooltip = null;
+  var runtimeTooltipTarget = null;
+
+  function ensureRuntimeTooltip() {
+    if (runtimeTooltip) return runtimeTooltip;
+    var el = document.createElement('div');
+    el.className = 'runtime-tooltip hidden';
+    el.setAttribute('role', 'tooltip');
+    document.body.appendChild(el);
+    runtimeTooltip = el;
+    return el;
+  }
+
+  function getRuntimeTooltipContent(target) {
+    if (!(target instanceof Element)) return '';
+    return (target.getAttribute('data-runtime-tooltip') || '').trim();
+  }
+
+  function setRuntimeTooltip(target, text) {
+    if (!(target instanceof Element)) return;
+    var value = String(text || '').trim();
+    if (value) {
+      target.setAttribute('data-runtime-tooltip', value);
+    } else {
+      target.removeAttribute('data-runtime-tooltip');
+    }
+    target.removeAttribute('title');
+    if (runtimeTooltipTarget === target) {
+      if (value) {
+        showRuntimeTooltip(target);
+      } else {
+        hideRuntimeTooltip();
+      }
+    }
+  }
+
+  function findRuntimeTooltipTarget(node) {
+    if (!node) return null;
+    var element = node instanceof Element
+      ? node
+      : (node.parentElement || null);
+    if (!(element instanceof Element)) return null;
+    return element.closest('[data-runtime-tooltip]');
+  }
+
+  function positionRuntimeTooltip(target) {
+    if (!runtimeTooltip || !target) return;
+    var rect = target.getBoundingClientRect();
+    var tooltipRect = runtimeTooltip.getBoundingClientRect();
+    var gap = 10;
+    var top = rect.top - tooltipRect.height - gap;
+    if (top < 12) {
+      top = rect.bottom + gap;
+    }
+    var left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+    var maxLeft = window.innerWidth - tooltipRect.width - 12;
+    left = Math.min(Math.max(12, left), Math.max(12, maxLeft));
+    var maxTop = window.innerHeight - tooltipRect.height - 12;
+    top = Math.min(Math.max(12, top), Math.max(12, maxTop));
+    runtimeTooltip.style.left = left + 'px';
+    runtimeTooltip.style.top = top + 'px';
+  }
+
+  function showRuntimeTooltip(target) {
+    var content = getRuntimeTooltipContent(target);
+    if (!content) {
+      hideRuntimeTooltip();
+      return;
+    }
+    var tooltip = ensureRuntimeTooltip();
+    runtimeTooltipTarget = target;
+    tooltip.textContent = content;
+    tooltip.classList.remove('hidden');
+    positionRuntimeTooltip(target);
+  }
+
+  function hideRuntimeTooltip() {
+    if (runtimeTooltip) {
+      runtimeTooltip.classList.add('hidden');
+    }
+    runtimeTooltipTarget = null;
+  }
+
+  function initRuntimeTooltips() {
+    if (document.documentElement.getAttribute('data-runtime-tooltips-ready') === 'true') {
+      return;
+    }
+    document.documentElement.setAttribute('data-runtime-tooltips-ready', 'true');
+
+    document.addEventListener('mouseover', function(event) {
+      var target = findRuntimeTooltipTarget(event.target);
+      if (!target) {
+        hideRuntimeTooltip();
+        return;
+      }
+      if (runtimeTooltipTarget !== target) {
+        showRuntimeTooltip(target);
+      }
+    });
+
+    document.addEventListener('mouseout', function(event) {
+      if (!runtimeTooltipTarget) return;
+      var related = event.relatedTarget;
+      if (related instanceof Node && runtimeTooltipTarget.contains(related)) {
+        return;
+      }
+      var nextTarget = findRuntimeTooltipTarget(related);
+      if (nextTarget === runtimeTooltipTarget) {
+        return;
+      }
+      hideRuntimeTooltip();
+    });
+
+    document.addEventListener('focusin', function(event) {
+      var target = findRuntimeTooltipTarget(event.target);
+      if (target) {
+        showRuntimeTooltip(target);
+      }
+    });
+
+    document.addEventListener('focusout', function(event) {
+      if (!runtimeTooltipTarget) return;
+      var related = event.relatedTarget;
+      if (related instanceof Node && runtimeTooltipTarget.contains(related)) {
+        return;
+      }
+      hideRuntimeTooltip();
+    });
+
+    window.addEventListener('scroll', function() {
+      if (runtimeTooltipTarget) {
+        positionRuntimeTooltip(runtimeTooltipTarget);
+      }
+    }, true);
+
+    window.addEventListener('resize', function() {
+      if (runtimeTooltipTarget) {
+        positionRuntimeTooltip(runtimeTooltipTarget);
+      }
+    });
   }
 
   function initRuntimeSurfaceSwitchers() {
@@ -127,6 +295,10 @@ export const SHARED_UI_SCRIPT = `
       var root = roots[i];
       if (root.getAttribute('data-bound') === 'true') continue;
       root.setAttribute('data-bound', 'true');
+      var sidebar = root.closest('.runtime-sidebar');
+      if (sidebar instanceof HTMLElement) {
+        sidebar.style.overflow = 'visible';
+      }
       var trigger = root.querySelector('[data-runtime-surface-trigger]');
       var menu = root.querySelector('[data-runtime-surface-menu]');
       if (!trigger || !menu) continue;
@@ -142,7 +314,10 @@ export const SHARED_UI_SCRIPT = `
         if (!isOpen) {
           currentRoot.setAttribute('data-open', 'true');
           this.setAttribute('aria-expanded', 'true');
-          if (currentMenu) currentMenu.classList.remove('hidden');
+          if (currentMenu) {
+            currentMenu.classList.remove('hidden');
+            positionRuntimeSurfaceMenu(currentRoot);
+          }
         }
       });
 
@@ -177,6 +352,18 @@ export const SHARED_UI_SCRIPT = `
         closeRuntimeSurfaceMenus();
       }
     });
+    window.addEventListener('resize', function() {
+      var roots = document.querySelectorAll('[data-runtime-surface-switcher][data-open="true"]');
+      for (var i = 0; i < roots.length; i++) {
+        positionRuntimeSurfaceMenu(roots[i]);
+      }
+    });
+    window.addEventListener('scroll', function() {
+      var roots = document.querySelectorAll('[data-runtime-surface-switcher][data-open="true"]');
+      for (var i = 0; i < roots.length; i++) {
+        positionRuntimeSurfaceMenu(roots[i]);
+      }
+    }, true);
   }
 
   window.CatsUI = {
@@ -185,13 +372,22 @@ export const SHARED_UI_SCRIPT = `
     apiFetch: apiFetch,
     renderProviderBadge: renderProviderBadge,
     renderStatusBadge: renderStatusBadge,
+    setRuntimeTooltip: setRuntimeTooltip,
+    hideRuntimeTooltip: hideRuntimeTooltip,
+    initRuntimeTooltips: initRuntimeTooltips,
     initRuntimeSurfaceSwitchers: initRuntimeSurfaceSwitchers,
   };
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initRuntimeSurfaceSwitchers, { once: true });
+    document.addEventListener('DOMContentLoaded', function() {
+      initRuntimeTooltips();
+      initRuntimeSurfaceSwitchers();
+    }, { once: true });
   } else {
-    queueMicrotask(initRuntimeSurfaceSwitchers);
+    queueMicrotask(function() {
+      initRuntimeTooltips();
+      initRuntimeSurfaceSwitchers();
+    });
   }
 })();
 `.trim();

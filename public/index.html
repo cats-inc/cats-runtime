@@ -148,8 +148,10 @@
 
   .project-group { margin-bottom: 2px; }
   .project-header {
-    display: flex;
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr) auto;
     align-items: center;
+    column-gap: 8px;
     padding: 6px 12px 6px 10px;
     cursor: pointer;
     border-radius: var(--radius);
@@ -226,26 +228,37 @@
   .project-header .chevron {
     font-size: 10px;
     color: var(--text2);
-    margin-right: 8px;
     transition: transform 0.15s;
     display: inline-block;
     width: 14px;
   }
   .project-group.collapsed .chevron { transform: rotate(-90deg); }
   .project-group.collapsed .project-sessions { display: none; }
+  .project-header .project-label {
+    min-width: 0;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .project-header .project-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .project-header .project-count {
     font-size: 10.5px;
     line-height: 1.2;
     letter-spacing: 0.01em;
     color: var(--text2);
     font-weight: 500;
-    margin-left: 6px;
+    flex-shrink: 0;
   }
   .project-header .project-actions {
-    margin-left: auto;
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    justify-self: end;
   }
   .project-header .project-dots {
     display: flex;
@@ -791,7 +804,7 @@
           </div>
         </div>
         <p class="runtime-sidebar-title">Runtime Health</p>
-        <div class="mt-3 runtime-shell-health" data-runtime-shell-health title="Loading runtime diagnostics...">
+        <div class="mt-3 runtime-shell-health" data-runtime-shell-health data-runtime-tooltip="Loading runtime diagnostics...">
           <div class="runtime-shell-health-row">
             <span class="runtime-shell-health-dot" data-runtime-shell-health-dot data-state="idle"></span>
             <span class="runtime-shell-health-state" data-runtime-shell-health-state>Loading</span>
@@ -804,8 +817,11 @@
 
   <main class="runtime-page">
     <div class="runtime-page-stack">
-      <header class="runtime-page-header">
-        <h1 class="text-2xl font-semibold tracking-tight text-white">Dashboard</h1>
+      <header class="runtime-page-header" style="padding-top:0.75rem;padding-bottom:0.75rem;">
+        <div>
+          <p class="runtime-page-kicker" style="font-size:0.58rem;letter-spacing:0.18em;">Cats Runtime</p>
+          <h1 class="font-semibold tracking-tight text-white" style="margin-top:0.125rem;font-size:21px;line-height:1.15;">Dashboard</h1>
+        </div>
       </header>
 
       <div class="runtime-page-content min-h-0 overflow-hidden p-6">
@@ -1636,35 +1652,12 @@ function formatDiscoveryState(state) {
   }
 }
 
-function renderDiscoveryStatus(payload) {
-  discoveryStatusPayload = payload || discoveryStatusPayload;
-
-  const group = document.getElementById('runtimeStatus');
-  const dot = document.getElementById('runtimeStatusDot');
-  const policyEl = document.getElementById('runtimeStatusTitle');
-  const labelEl = document.getElementById('runtimeStatusLabel');
-  if (!group || !dot || !policyEl || !labelEl) {
-    return;
-  }
+function buildDiscoveryTooltip(payload) {
   const runtimeEntries = configuredCliRuntimeInstances();
   const runtimeSummary = summarizeCliRuntimes(runtimeEntries);
   const wsl = payload?.wsl || {};
   const docker = payload?.docker || {};
   const summary = wsl.summary || {};
-  const state = summary.state === 'failed'
-    ? 'failed'
-    : runtimeEntries.length > 0
-      ? 'active'
-      : (providerCatalog?.providers ? 'not_applicable' : 'idle');
-
-  dot.dataset.state = state;
-  policyEl.textContent = 'CLI runtimes';
-  labelEl.textContent = runtimeEntries.length > 0
-    ? runtimeSummary
-    : (providerCatalog?.providers
-      ? 'No CLI runtimes configured'
-      : 'Loading runtime config...');
-
   const tooltipLines = [];
 
   if (runtimeEntries.length > 0) {
@@ -1695,7 +1688,40 @@ function renderDiscoveryStatus(payload) {
     );
   }
 
-  group.title = tooltipLines.join('\n');
+  return tooltipLines.join('\n');
+}
+
+function renderDiscoveryStatus(payload) {
+  discoveryStatusPayload = payload || discoveryStatusPayload;
+
+  const tooltip = buildDiscoveryTooltip(discoveryStatusPayload);
+  window.__runtimeDiscoveryTooltip = tooltip;
+
+  const group = document.getElementById('runtimeStatus');
+  const dot = document.getElementById('runtimeStatusDot');
+  const policyEl = document.getElementById('runtimeStatusTitle');
+  const labelEl = document.getElementById('runtimeStatusLabel');
+  if (!group || !dot || !policyEl || !labelEl) {
+    return;
+  }
+  const runtimeEntries = configuredCliRuntimeInstances();
+  const runtimeSummary = summarizeCliRuntimes(runtimeEntries);
+  const wsl = payload?.wsl || {};
+  const summary = wsl.summary || {};
+  const state = summary.state === 'failed'
+    ? 'failed'
+    : runtimeEntries.length > 0
+      ? 'active'
+      : (providerCatalog?.providers ? 'not_applicable' : 'idle');
+
+  dot.dataset.state = state;
+  policyEl.textContent = 'CLI runtimes';
+  labelEl.textContent = runtimeEntries.length > 0
+    ? runtimeSummary
+      : (providerCatalog?.providers
+      ? 'No CLI runtimes configured'
+      : 'Loading runtime config...');
+  group.title = tooltip;
 }
 
 async function refreshDiscoveryStatus() {
@@ -1753,15 +1779,26 @@ function renderSessionScanStatus(input) {
 
   const visible = input?.visible === true;
   root.classList.toggle('hidden', !visible);
+  const setTooltip = (value) => {
+    if (window.CatsUI && typeof window.CatsUI.setRuntimeTooltip === 'function') {
+      window.CatsUI.setRuntimeTooltip(root, value || '');
+    } else if (value) {
+      root.setAttribute('data-runtime-tooltip', value);
+      root.removeAttribute('title');
+    } else {
+      root.removeAttribute('data-runtime-tooltip');
+      root.removeAttribute('title');
+    }
+  };
   if (!visible) {
-    root.title = '';
+    setTooltip('');
     return;
   }
 
   text.textContent = input.text || '';
   dot.dataset.state = input.state || 'idle';
   progress.classList.toggle('hidden', input.running !== true);
-  root.title = input.title || '';
+  setTooltip(input.title || '');
 }
 
 function dismissSessionScanStatus() {
@@ -2043,8 +2080,10 @@ function renderSessionList(sessions) {
       <div class="project-group ${isCollapsed ? 'collapsed' : ''}">
         <div class="project-header" data-provider="${providerAttr}" onclick="toggleGroup('${groupKey}')">
           <span class="chevron">&#9660;</span>
-          ${projectName}
-          <span class="project-count">(${items.length})</span>
+          <span class="project-label">
+            <span class="project-name">${escapeHtml(projectName)}</span>
+            <span class="project-count">(${items.length})</span>
+          </span>
           <span class="project-actions">
             <span class="project-dots">${dots}</span>
             <button class="project-delete" ${(isDeleting || deletableCount === 0) ? 'disabled' : ''}

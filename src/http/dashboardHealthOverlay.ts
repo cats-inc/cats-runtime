@@ -66,6 +66,33 @@ const DASHBOARD_HEALTH_OVERLAY = `
     }
   }
 
+  function setTooltip(target, tooltip) {
+    if (!target) return;
+    if (window.CatsUI && typeof window.CatsUI.setRuntimeTooltip === 'function') {
+      window.CatsUI.setRuntimeTooltip(target, tooltip);
+      return;
+    }
+    if (tooltip) {
+      target.setAttribute('data-runtime-tooltip', tooltip);
+    } else {
+      target.removeAttribute('data-runtime-tooltip');
+    }
+    target.removeAttribute('title');
+  }
+
+  function readTooltip(target) {
+    if (!target) return '';
+    return target.getAttribute('data-runtime-tooltip') || target.title || '';
+  }
+
+  function readDiscoveryTooltip() {
+    if (typeof window.__runtimeDiscoveryTooltip === 'string') {
+      return window.__runtimeDiscoveryTooltip;
+    }
+    const group = document.getElementById('runtimeStatus');
+    return group?.dataset.discoveryTooltip || readTooltip(group) || '';
+  }
+
   function renderRuntimeShellHealth(label, tooltip) {
     var root = document.querySelector('[data-runtime-shell-health]');
     if (!root) return;
@@ -86,7 +113,7 @@ const DASHBOARD_HEALTH_OVERLAY = `
     if (summaryEl) {
       summaryEl.textContent = label;
     }
-    root.title = tooltip;
+    setTooltip(root, tooltip);
   }
 
   function renderRuntimeHealthOverlay() {
@@ -102,7 +129,7 @@ const DASHBOARD_HEALTH_OVERLAY = `
     const defaults = Array.isArray(runtimeHealthPayload.providers?.defaults)
       ? runtimeHealthPayload.providers.defaults
       : [];
-    const discoveryTooltip = group?.dataset.discoveryTooltip || '';
+    const discoveryTooltip = readDiscoveryTooltip();
     const label = formatRuntimeHealthLabel(
       runtimeHealthPayload.runtime?.status,
       runtimeSummary,
@@ -135,7 +162,7 @@ const DASHBOARD_HEALTH_OVERLAY = `
 
     var tooltip = tooltipLines.join('\\n');
     if (group) {
-      group.title = tooltip;
+      setTooltip(group, tooltip);
     }
     renderRuntimeShellHealth(label, tooltip);
   }
@@ -209,7 +236,7 @@ const DASHBOARD_HEALTH_OVERLAY = `
       const result = originalRenderDiscoveryStatus.apply(this, arguments);
       const group = document.getElementById('runtimeStatus');
       if (group) {
-        group.dataset.discoveryTooltip = group.title || '';
+        group.dataset.discoveryTooltip = readDiscoveryTooltip();
       }
       renderRuntimeHealthOverlay();
       return result;
@@ -229,7 +256,7 @@ const DASHBOARD_HEALTH_OVERLAY = `
   queueMicrotask(() => {
     const group = document.getElementById('runtimeStatus');
     if (group) {
-      group.dataset.discoveryTooltip = group.title || '';
+      group.dataset.discoveryTooltip = readDiscoveryTooltip();
     }
     void refreshRuntimeHealthStatus();
   });
