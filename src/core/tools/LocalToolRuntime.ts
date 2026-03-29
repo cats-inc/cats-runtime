@@ -1109,6 +1109,50 @@ async function preserveCopiedFileMetadata(
   await utimes(destinationPath, sourceInfo.atime, sourceInfo.mtime).catch(() => undefined);
 }
 
+function buildOverwriteBackupPath(destinationPath: string): string {
+  return `${destinationPath}.cats-runtime-overwrite-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+async function stageOverwriteBackup(destinationPath: string): Promise<string | undefined> {
+  try {
+    await stat(destinationPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return undefined;
+    }
+    throw error;
+  }
+
+  const backupPath = buildOverwriteBackupPath(destinationPath);
+  await rename(destinationPath, backupPath);
+  return backupPath;
+}
+
+async function restoreOverwriteBackup(
+  destinationPath: string,
+  backupPath: string | undefined,
+): Promise<void> {
+  if (!backupPath) {
+    return;
+  }
+
+  try {
+    await unlink(destinationPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error;
+    }
+  }
+  await rename(backupPath, destinationPath);
+}
+
+async function discardOverwriteBackup(backupPath: string | undefined): Promise<void> {
+  if (!backupPath) {
+    return;
+  }
+  await unlink(backupPath).catch(() => undefined);
+}
+
 function requireString(args: Record<string, unknown>, key: string): string {
   const value = args[key];
   if (typeof value !== 'string' || value.trim() === '') {
@@ -2229,8 +2273,18 @@ export class LocalToolRuntime {
       }
     }
 
-    await mkdir(dirname(fullDest), { recursive: true });
-    await rename(fullSource, fullDest);
+    let overwriteBackupPath: string | undefined;
+    try {
+      if (overwrite) {
+        overwriteBackupPath = await stageOverwriteBackup(fullDest);
+      }
+      await mkdir(dirname(fullDest), { recursive: true });
+      await rename(fullSource, fullDest);
+    } catch (error) {
+      await restoreOverwriteBackup(fullDest, overwriteBackupPath).catch(() => undefined);
+      throw error;
+    }
+    await discardOverwriteBackup(overwriteBackupPath);
 
     return {
       callId,
@@ -2280,9 +2334,19 @@ export class LocalToolRuntime {
       }
     }
 
-    await mkdir(dirname(fullDest), { recursive: true });
-    await copyFile(fullSource, fullDest);
-    await preserveCopiedFileMetadata(sourceInfo, fullDest);
+    let overwriteBackupPath: string | undefined;
+    try {
+      if (overwrite) {
+        overwriteBackupPath = await stageOverwriteBackup(fullDest);
+      }
+      await mkdir(dirname(fullDest), { recursive: true });
+      await copyFile(fullSource, fullDest);
+      await preserveCopiedFileMetadata(sourceInfo, fullDest);
+    } catch (error) {
+      await restoreOverwriteBackup(fullDest, overwriteBackupPath).catch(() => undefined);
+      throw error;
+    }
+    await discardOverwriteBackup(overwriteBackupPath);
 
     return {
       callId,

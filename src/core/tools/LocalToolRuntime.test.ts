@@ -62,6 +62,10 @@ function listAtomicWriteArtifacts(dir: string): string[] {
     name.includes('.cats-runtime-write-') || name.includes('.cats-runtime-backup-'));
 }
 
+function listOverwriteArtifacts(dir: string): string[] {
+  return readdirSync(dir).filter((name) => name.includes('.cats-runtime-overwrite-'));
+}
+
 describe('LocalToolRuntime', () => {
   it('lists, reads, and writes files inside the workspace', async () => {
     const { cwd, cleanup } = createWorkspace();
@@ -1571,6 +1575,7 @@ describe('LocalToolRuntime', () => {
         expect(result.isError).toBeUndefined();
         expect(existsSync(join(cwd, 'src', 'utils', 'format.js'))).toBe(false);
         expect(readFileSync(join(cwd, 'src', 'app.ts'), 'utf-8')).toContain('module.exports');
+        expect(listOverwriteArtifacts(join(cwd, 'src'))).toEqual([]);
       } finally {
         cleanup();
       }
@@ -1697,6 +1702,7 @@ describe('LocalToolRuntime', () => {
         });
         expect(result.isError).toBeUndefined();
         expect(readFileSync(join(cwd, 'src', 'app.ts'), 'utf-8')).toContain('module.exports');
+        expect(listOverwriteArtifacts(join(cwd, 'src'))).toEqual([]);
       } finally {
         cleanup();
       }
