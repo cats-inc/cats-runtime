@@ -59,6 +59,31 @@ describe('buildProviderToolingSummary', () => {
         ],
         summary: "Runtime-local tooling currently exposes 3 selectable profiles; the default target uses 'read_only'.",
       },
+      catalog: expect.objectContaining({
+        source: 'runtime_local',
+        toolCount: 32,
+        summary: expect.stringContaining("Per-tool defaultAccess reflects the 'read_only' profile"),
+        tools: expect.arrayContaining([
+          expect.objectContaining({
+            name: 'inspect_paths',
+            defaultAccess: 'full_access',
+            profileAccess: {
+              standard: 'full_access',
+              extended: 'full_access',
+              read_only: 'full_access',
+            },
+          }),
+          expect.objectContaining({
+            name: 'copy_file',
+            defaultAccess: 'blocked',
+            profileAccess: {
+              standard: 'blocked',
+              extended: 'full_access',
+              read_only: 'blocked',
+            },
+          }),
+        ]),
+      }),
       observability: {
         catalog: 'runtime_enumerated',
         toolCallEvents: true,

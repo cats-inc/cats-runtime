@@ -3212,6 +3212,13 @@ Each instance entry also exposes additive `tooling` metadata:
   updates for that target
 - `profiles`: for API/local targets only, the runtime-local tool-profile catalog
   (`defaultProfile`, additive available-profile counts, and summary)
+- `catalog`
+  - for API/local targets, the runtime-local per-tool capability/access catalog
+    (`toolCount`, bounded per-tool domain/mutating/read-only-compatible truth,
+    full profile-access matrix, and resolved `defaultAccess` for the target's
+    default profile)
+  - for agent targets with remote discovery support, the bounded remote tool
+    catalog advertised by the upstream runtime
 - `policy`: for API/local targets only, the bounded runtime tool-profile
   inspection (`profile`, counts, and per-tool access classification) before any
   session-level permission narrowing
@@ -3307,6 +3314,37 @@ full provider topology:
       }
     ],
     "summary": "Runtime-local tooling currently exposes 3 selectable profiles; the default target uses 'standard'."
+  },
+  "catalog": {
+    "source": "runtime_local",
+    "toolCount": 32,
+    "summary": "Runtime-local tooling exposes 32 unique tools across the standard, extended, and read_only profiles. Per-tool defaultAccess reflects the 'standard' profile for this target.",
+    "tools": [
+      {
+        "name": "inspect_paths",
+        "domain": "filesystem",
+        "mutating": false,
+        "readOnlyCompatible": true,
+        "defaultAccess": "full_access",
+        "profileAccess": {
+          "standard": "full_access",
+          "extended": "full_access",
+          "read_only": "full_access"
+        }
+      },
+      {
+        "name": "copy_file",
+        "domain": "filesystem",
+        "mutating": true,
+        "readOnlyCompatible": false,
+        "defaultAccess": "blocked",
+        "profileAccess": {
+          "standard": "blocked",
+          "extended": "full_access",
+          "read_only": "blocked"
+        }
+      }
+    ]
   },
   "policy": {
     "profile": "standard",

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { ToolExecutionContext } from './LocalToolRuntime.js';
 import {
+  buildRuntimeToolCatalogInspection,
   buildRuntimeToolCatalogSummary,
   buildToolPolicyInspection,
   LocalToolRuntime,
@@ -1661,6 +1662,37 @@ describe('LocalToolRuntime', () => {
         },
         summary: 'Runtime tooling exposes 29 tools in the standard profile, 32 in the extended profile, and 17 in the read_only profile.',
       });
+    });
+
+    it('builds per-tool profile access inspection for runtime-owned tooling', () => {
+      expect(buildRuntimeToolCatalogInspection()).toEqual(expect.objectContaining({
+        toolCount: 32,
+        summary: 'Runtime-local tooling exposes 32 unique tools across the standard, extended, and read_only profiles.',
+        tools: expect.arrayContaining([
+          {
+            name: 'inspect_paths',
+            domain: 'filesystem',
+            mutating: false,
+            readOnlyCompatible: true,
+            profileAccess: {
+              standard: 'full_access',
+              extended: 'full_access',
+              read_only: 'full_access',
+            },
+          },
+          {
+            name: 'copy_file',
+            domain: 'filesystem',
+            mutating: true,
+            readOnlyCompatible: false,
+            profileAccess: {
+              standard: 'blocked',
+              extended: 'full_access',
+              read_only: 'blocked',
+            },
+          },
+        ]),
+      }));
     });
 
     it('read_only profile lists 17 tools', () => {

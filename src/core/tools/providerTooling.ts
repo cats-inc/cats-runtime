@@ -1,6 +1,7 @@
 import type { ProviderTargetDescriptor } from '../providerCatalog.js';
 import type { RuntimeToolPolicyInspection } from '../types.js';
 import {
+  buildRuntimeToolCatalogInspection,
   buildRuntimeToolCatalogSummary,
   buildToolPolicyInspection,
 } from './LocalToolRuntime.js';
@@ -28,7 +29,7 @@ export interface ProviderToolingSummary {
   summary: string;
   policy?: RuntimeToolPolicyInspection;
   profiles?: ProviderLocalToolProfileCatalog;
-  catalog?: ProviderRemoteToolCatalog;
+  catalog?: ProviderLocalToolCatalog | ProviderRemoteToolCatalog;
   observability: {
     catalog: 'runtime_enumerated' | 'provider_remote_enumerated' | 'not_enumerated';
     toolCallEvents: boolean;
@@ -45,6 +46,24 @@ export interface ProviderLocalToolProfileCatalog {
     readOnlyCompatibleTools: number;
   }>;
   summary: string;
+}
+
+export interface ProviderLocalToolCatalog {
+  source: 'runtime_local';
+  toolCount: number;
+  summary: string;
+  tools: Array<{
+    name: string;
+    domain: RuntimeToolPolicyInspection['capabilities'][number]['domain'];
+    mutating: boolean;
+    readOnlyCompatible: boolean;
+    defaultAccess: 'full_access' | 'blocked';
+    profileAccess: {
+      standard: 'full_access' | 'blocked';
+      extended: 'full_access' | 'blocked';
+      read_only: 'full_access' | 'blocked';
+    };
+  }>;
 }
 
 interface ProviderToolingSummaryOptions {
@@ -137,6 +156,7 @@ export function buildProviderToolingSummary(
       toolProfile: target.remoteInstance?.toolProfile,
     });
     const profiles = buildProviderLocalToolProfileCatalog(policy.profile);
+    const catalog = buildProviderLocalToolCatalog(policy.profile);
 
     return {
       source: 'runtime_local',
@@ -146,6 +166,7 @@ export function buildProviderToolingSummary(
         + `(${policy.counts.total} tool(s)) before per-session permission narrowing.`,
       policy,
       profiles,
+      catalog,
       observability: {
         catalog: 'runtime_enumerated',
         toolCallEvents: true,
@@ -232,5 +253,29 @@ function buildProviderLocalToolProfileCatalog(
     ],
     summary: `Runtime-local tooling currently exposes 3 selectable profiles; `
       + `the default target uses '${defaultProfile}'.`,
+  };
+}
+
+function buildProviderLocalToolCatalog(
+  defaultProfile: RuntimeToolPolicyInspection['profile'],
+): ProviderLocalToolCatalog {
+  const inspection = buildRuntimeToolCatalogInspection();
+  const resolvedDefaultProfile = defaultProfile === 'extended' || defaultProfile === 'read_only'
+    ? defaultProfile
+    : 'standard';
+
+  return {
+    source: 'runtime_local',
+    toolCount: inspection.toolCount,
+    summary: `${inspection.summary} Per-tool defaultAccess reflects the `
+      + `'${resolvedDefaultProfile}' profile for this target.`,
+    tools: inspection.tools.map((tool) => ({
+      name: tool.name,
+      domain: tool.domain,
+      mutating: tool.mutating,
+      readOnlyCompatible: tool.readOnlyCompatible,
+      defaultAccess: tool.profileAccess[resolvedDefaultProfile],
+      profileAccess: tool.profileAccess,
+    })),
   };
 }

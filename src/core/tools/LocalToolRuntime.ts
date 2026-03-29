@@ -91,6 +91,22 @@ export interface RuntimeToolCatalogSummary {
   summary: string;
 }
 
+export type RuntimeToolCatalogProfile = 'standard' | 'extended' | 'read_only';
+
+export interface RuntimeToolCatalogEntry {
+  name: string;
+  domain: ToolCapabilityMetadata['domain'];
+  mutating: boolean;
+  readOnlyCompatible: boolean;
+  profileAccess: Record<RuntimeToolCatalogProfile, 'full_access' | 'blocked'>;
+}
+
+export interface RuntimeToolCatalogInspection {
+  toolCount: number;
+  tools: RuntimeToolCatalogEntry[];
+  summary: string;
+}
+
 export interface ToolExecutionContext {
   sessionId: string;
   cwd: string;
@@ -894,6 +910,34 @@ export function buildRuntimeToolCatalogSummary(): RuntimeToolCatalogSummary {
       readOnly,
     },
     summary: `Runtime tooling exposes ${standard.totalTools} tools in the standard profile, ${extended.totalTools} in the extended profile, and ${readOnly.totalTools} in the read_only profile.`,
+  };
+}
+
+export function buildRuntimeToolCatalogInspection(): RuntimeToolCatalogInspection {
+  const tools = TOOL_DEFINITIONS
+    .map((tool) => {
+      const metadata = TOOL_CAPABILITY_METADATA[tool.name] || {
+        domain: 'filesystem' as const,
+        mutating: !isReadOnlyCompatibleDefinition(tool.name),
+      };
+      return {
+        name: tool.name,
+        domain: metadata.domain,
+        mutating: metadata.mutating,
+        readOnlyCompatible: isReadOnlyCompatibleDefinition(tool.name),
+        profileAccess: {
+          standard: STANDARD_TOOLS.has(tool.name) ? 'full_access' : 'blocked',
+          extended: EXTENDED_TOOLS.has(tool.name) ? 'full_access' : 'blocked',
+          read_only: READ_ONLY_TOOLS.has(tool.name) ? 'full_access' : 'blocked',
+        },
+      } satisfies RuntimeToolCatalogEntry;
+    })
+    .sort((left, right) => (TOOL_ORDER.get(left.name) ?? 0) - (TOOL_ORDER.get(right.name) ?? 0));
+
+  return {
+    toolCount: tools.length,
+    tools,
+    summary: `Runtime-local tooling exposes ${tools.length} unique tools across the standard, extended, and read_only profiles.`,
   };
 }
 

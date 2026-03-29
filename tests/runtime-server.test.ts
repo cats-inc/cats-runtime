@@ -2523,6 +2523,69 @@ backends:
     });
   });
 
+  it('GET /providers/:provider/tools exposes runtime-local per-tool catalog truth for API targets', async () => {
+    await withRuntime({
+      providerDefaultTargets: {
+        codex: { backend: 'api', instance: 'main' },
+      },
+      remoteProviderCatalog: {
+        api: {
+          codex: {
+            main: {
+              id: 'main',
+              providerName: 'codex',
+              backend: 'api',
+              transport: 'openai',
+              apiKeyEnv: 'OPENAI_API_KEY',
+              baseUrl: 'https://example.test',
+              model: 'gpt-5.4',
+              toolProfile: 'extended',
+            },
+          },
+        },
+        local: {},
+        agent: {},
+      },
+    }, {}, async (runtime) => {
+      const response = await runtime.app.request('/providers/codex/tools?instance=api/main');
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual(expect.objectContaining({
+        provider: 'codex',
+        backend: 'api',
+        instance: 'main',
+        target: 'api/main',
+        source: 'runtime_local',
+        discoverable: true,
+        sessionScopedOverrides: true,
+        catalog: expect.objectContaining({
+          source: 'runtime_local',
+          toolCount: 32,
+          summary: expect.stringContaining("Per-tool defaultAccess reflects the 'extended' profile"),
+          tools: expect.arrayContaining([
+            expect.objectContaining({
+              name: 'copy_file',
+              defaultAccess: 'full_access',
+              profileAccess: {
+                standard: 'blocked',
+                extended: 'full_access',
+                read_only: 'blocked',
+              },
+            }),
+            expect.objectContaining({
+              name: 'inspect_paths',
+              defaultAccess: 'full_access',
+              profileAccess: {
+                standard: 'full_access',
+                extended: 'full_access',
+                read_only: 'full_access',
+              },
+            }),
+          ]),
+        }),
+      }));
+    });
+  });
+
   it('GET /providers/config returns configured provider instances for the dashboard', async () => {
     await withRuntime({
       providerDefaultInstances: {
@@ -3965,6 +4028,22 @@ providers:
             ],
             summary: "Runtime-local tooling currently exposes 3 selectable profiles; the default target uses 'extended'.",
           },
+          catalog: expect.objectContaining({
+            source: 'runtime_local',
+            toolCount: 32,
+            summary: expect.stringContaining("Per-tool defaultAccess reflects the 'extended' profile"),
+            tools: expect.arrayContaining([
+              expect.objectContaining({
+                name: 'copy_file',
+                defaultAccess: 'full_access',
+                profileAccess: {
+                  standard: 'blocked',
+                  extended: 'full_access',
+                  read_only: 'blocked',
+                },
+              }),
+            ]),
+          }),
           policy: expect.objectContaining({
             profile: 'extended',
             counts: expect.objectContaining({

@@ -648,7 +648,8 @@ path is intentionally narrow:
    surface, including runtime maintenance snapshots plus transport-native
    API/local auth/model probe requests, additive provider-tooling ownership /
    baseline-profile summaries plus additive runtime-local tool profile catalog
-   truth and bounded tooling observability truth,
+   truth, per-tool capability/access catalog truth for runtime-local tool
+   surfaces, and bounded tooling observability truth,
    additive backend-neutral continuity summaries describing runtime-stateful
    versus provider-native versus provider-managed session semantics,
    additive runtime execution-strategy catalog/summary truth for implemented
