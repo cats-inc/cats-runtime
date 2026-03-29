@@ -46,7 +46,10 @@ Current implementation status:
 - Implemented `CATS_RUNTIME_WSL_DISCOVERY_POLICY`
 - Implemented `GET /discovery/status`
 - Implemented dashboard header visibility for WSL discovery state
-- Deferred manual discovery overrides such as `startIfNeeded`
+- Implemented bounded manual discovery overrides such as `startIfNeeded` on
+  provider-native manual discovery routes and matching MCP entry points, so
+  operators can skip waking stopped WSL-backed sessions during explicit
+  discovery runs
 
 #### Deferred Optimization
 
