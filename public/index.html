@@ -649,29 +649,26 @@
       </div>
 
       <div class="runtime-sidebar-section">
-        <p class="runtime-sidebar-title">Runtime Summary</p>
-        <div class="mt-3 runtime-status-group" id="runtimeStatus" title="Loading runtime summary">
-          <span class="runtime-status-dot" id="runtimeStatusDot" data-state="idle"></span>
-          <div class="runtime-status-copy">
-            <div class="runtime-status-title" id="runtimeStatusTitle">CLI runtimes</div>
-            <div class="runtime-status-meta" id="runtimeStatusLabel">Loading runtime config...</div>
-          </div>
-        </div>
-        <p class="runtime-sidebar-copy">
-          Group sessions by workspace, inspect provider capabilities, and keep
-          runtime health visible without leaving the dashboard shell.
-        </p>
-      </div>
-
-      <div class="runtime-sidebar-section">
         <div class="flex items-start justify-between gap-3">
           <div>
             <p class="runtime-sidebar-title">Sessions <span id="sessionCount" class="ml-1 text-slate-500"></span></p>
-            <p class="mt-2 text-sm text-slate-500">Workspace-grouped runtime sessions and provider targets.</p>
           </div>
           <div class="flex gap-2">
-            <button class="runtime-btn runtime-btn-danger !px-3 !py-1.5 text-xs" onclick="deleteAllSessions()" title="Delete all sessions &amp; projects">&#128465; All</button>
-            <button class="runtime-btn runtime-btn-primary !px-3 !py-1.5 text-xs" onclick="openCreateModal()">+ New</button>
+            <button class="runtime-btn runtime-btn-danger !h-9 !w-9 !rounded-xl !px-0 !py-0" onclick="deleteAllSessions()" title="Delete all sessions &amp; projects" aria-label="Delete all sessions">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 6h18" />
+                <path d="M8 6V4h8v2" />
+                <path d="M19 6l-1 14H6L5 6" />
+                <path d="M10 11v6" />
+                <path d="M14 11v6" />
+              </svg>
+            </button>
+            <button class="runtime-btn runtime-btn-primary !h-9 !w-9 !rounded-xl !px-0 !py-0" onclick="openCreateModal()" title="Create session" aria-label="Create session">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
@@ -684,6 +681,10 @@
       </div>
 
       <div class="runtime-sidebar-footer">
+        <div class="runtime-field">
+          <label for="apiKeyInput" class="runtime-field-label">API Key</label>
+          <input type="password" id="apiKeyInput" class="runtime-input" placeholder="Bearer token" />
+        </div>
         <p class="runtime-sidebar-title">Runtime Health</p>
         <div class="mt-3 runtime-shell-health" data-runtime-shell-health title="Loading runtime diagnostics...">
           <div class="runtime-shell-health-row">
@@ -699,23 +700,7 @@
   <main class="runtime-page">
     <div class="runtime-page-stack">
       <header class="runtime-page-header">
-        <div class="runtime-page-header-row">
-          <div>
-            <p class="runtime-page-kicker">Runtime Surface</p>
-            <h1 class="runtime-page-title">Dashboard</h1>
-            <p class="runtime-page-subtitle">
-              Session-centric operator view for provider selection, runtime
-              health, inspection insights, and live transcript follow-through.
-            </p>
-          </div>
-
-          <div class="runtime-page-toolbar">
-            <div class="api-key-group runtime-field min-w-[18rem]">
-              <label class="runtime-field-label">API Key</label>
-              <input type="password" id="apiKeyInput" class="runtime-input" placeholder="Bearer token" />
-            </div>
-          </div>
-        </div>
+        <h1 class="text-2xl font-semibold tracking-tight text-white">Dashboard</h1>
       </header>
 
       <div class="runtime-page-content min-h-0 overflow-hidden p-6">
