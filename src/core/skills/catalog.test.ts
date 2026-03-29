@@ -432,6 +432,7 @@ describe('runtime skill catalog', () => {
       rootPath: join(sessionBaseDir, 'missing-skills'),
       state: 'missing',
       totalSkills: 0,
+      catalogFingerprint: null,
       families: {
         base: 0,
         orchestration: 0,
@@ -448,6 +449,14 @@ describe('runtime skill catalog', () => {
         filesystem: 0,
         instructions: 0,
         none: 0,
+      },
+      cache: {
+        catalogRoots: expect.any(Number),
+        packages: expect.any(Number),
+      },
+      discovery: {
+        maxDepth: 6,
+        symbolicLinksAllowed: false,
       },
       summary: 'Runtime skills root is missing.',
     });
@@ -457,6 +466,7 @@ describe('runtime skill catalog', () => {
       rootPath: join(sessionBaseDir, 'empty-skills'),
       state: 'empty',
       totalSkills: 0,
+      catalogFingerprint: expect.stringMatching(/^[a-f0-9]{16}$/),
       families: {
         base: 0,
         orchestration: 0,
@@ -474,6 +484,14 @@ describe('runtime skill catalog', () => {
         instructions: 0,
         none: 0,
       },
+      cache: {
+        catalogRoots: expect.any(Number),
+        packages: expect.any(Number),
+      },
+      discovery: {
+        maxDepth: 6,
+        symbolicLinksAllowed: false,
+      },
       summary: 'Runtime skills root is present but no runtime skill packages were discovered.',
     });
 
@@ -481,6 +499,7 @@ describe('runtime skill catalog', () => {
       rootPath: skillsRoot,
       state: 'loaded',
       totalSkills: 2,
+      catalogFingerprint: expect.stringMatching(/^[a-f0-9]{16}$/),
       families: {
         base: 0,
         orchestration: 1,
@@ -497,6 +516,14 @@ describe('runtime skill catalog', () => {
         filesystem: 1,
         instructions: 2,
         none: 0,
+      },
+      cache: {
+        catalogRoots: expect.any(Number),
+        packages: expect.any(Number),
+      },
+      discovery: {
+        maxDepth: 6,
+        symbolicLinksAllowed: false,
       },
       summary: '2 runtime skill(s) across 2 families are available.',
     });

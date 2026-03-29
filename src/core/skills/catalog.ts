@@ -180,9 +180,18 @@ export interface RuntimeSkillCatalogInspection {
   rootPath: string;
   state: 'loaded' | 'empty' | 'missing';
   totalSkills: number;
+  catalogFingerprint: string | null;
   families: Record<RuntimeSkillFamily, number>;
   packageKinds: Record<RuntimeSkillPackageKind, number>;
   deliveryHints: Record<RuntimeSkillDeliveryMode, number>;
+  cache: {
+    catalogRoots: number;
+    packages: number;
+  };
+  discovery: {
+    maxDepth: number;
+    symbolicLinksAllowed: false;
+  };
   summary: string;
 }
 
@@ -733,6 +742,7 @@ export function inspectRuntimeSkillCatalog(
   skillsRoot: string = SKILLS_ROOT,
 ): RuntimeSkillCatalogInspection {
   const skills = listRuntimeSkillCatalog(skillsRoot);
+  const watchKey = runtimeSkillCatalogCache.get(skillsRoot)?.watchKey;
   const families = Object.fromEntries(
     RUNTIME_SKILL_FAMILY_VALUES.map((family) => [family, 0]),
   ) as Record<RuntimeSkillFamily, number>;
@@ -756,9 +766,18 @@ export function inspectRuntimeSkillCatalog(
       rootPath: skillsRoot,
       state: 'missing',
       totalSkills: 0,
+      catalogFingerprint: null,
       families,
       packageKinds,
       deliveryHints,
+      cache: {
+        catalogRoots: runtimeSkillCatalogCache.size,
+        packages: runtimeSkillPackageCache.size,
+      },
+      discovery: {
+        maxDepth: MAX_RUNTIME_SKILL_DISCOVERY_DEPTH,
+        symbolicLinksAllowed: false,
+      },
       summary: 'Runtime skills root is missing.',
     };
   }
@@ -768,9 +787,18 @@ export function inspectRuntimeSkillCatalog(
       rootPath: skillsRoot,
       state: 'empty',
       totalSkills: 0,
+      catalogFingerprint: summarizeRuntimeSkillCatalogFingerprint(watchKey),
       families,
       packageKinds,
       deliveryHints,
+      cache: {
+        catalogRoots: runtimeSkillCatalogCache.size,
+        packages: runtimeSkillPackageCache.size,
+      },
+      discovery: {
+        maxDepth: MAX_RUNTIME_SKILL_DISCOVERY_DEPTH,
+        symbolicLinksAllowed: false,
+      },
       summary: 'Runtime skills root is present but no runtime skill packages were discovered.',
     };
   }
@@ -780,11 +808,28 @@ export function inspectRuntimeSkillCatalog(
     rootPath: skillsRoot,
     state: 'loaded',
     totalSkills: skills.length,
+    catalogFingerprint: summarizeRuntimeSkillCatalogFingerprint(watchKey),
     families,
     packageKinds,
     deliveryHints,
+    cache: {
+      catalogRoots: runtimeSkillCatalogCache.size,
+      packages: runtimeSkillPackageCache.size,
+    },
+    discovery: {
+      maxDepth: MAX_RUNTIME_SKILL_DISCOVERY_DEPTH,
+      symbolicLinksAllowed: false,
+    },
     summary: `${skills.length} runtime skill(s) across ${familyCount} famil${familyCount === 1 ? 'y' : 'ies'} are available.`,
   };
+}
+
+function summarizeRuntimeSkillCatalogFingerprint(watchKey: string | undefined): string | null {
+  if (!watchKey || watchKey === 'missing') {
+    return null;
+  }
+
+  return computeFingerprint(watchKey).slice(0, 16);
 }
 
 function toResolvedSkill(skillPackage: RuntimeSkillPackage): ResolvedRuntimeSkill {

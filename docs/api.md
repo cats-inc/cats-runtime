@@ -715,8 +715,10 @@ integrate against:
   `bootstrapRequired` plus the latest retained setup-report headline,
   highlights, and issue counts when a setup diagnostic artifact exists
 - runtime skill catalog metadata under `runtime.skills`, including the resolved
-  root path, loaded/empty/missing state, package counts by family/package kind,
-  and delivery-hint totals
+  root path, loaded/empty/missing state, a compact `catalogFingerprint`,
+  package counts by family/package kind, delivery-hint totals, additive cache
+  counts for loaded catalog roots/packages, and the discovery-guard truth
+  (`maxDepth`, `symbolicLinksAllowed`)
 - runtime tooling metadata under `runtime.tools`, including bounded
   `standard`, `extended`, and `read_only` profile summaries with total-tool,
   mutating-tool, read-only-compatible, and broad domain counts

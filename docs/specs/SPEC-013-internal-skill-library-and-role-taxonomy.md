@@ -259,6 +259,9 @@ runtime-managed skill execution flow
 - Current implementation status and remaining follow-through now live under
   [PLAN-024](../plans/PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md),
   with `PROGRESS.md` still carrying the broader runtime truth.
+- Follow-through now also projects catalog fingerprint/cache/guard truth through
+  runtime diagnostics so hosts and operators can inspect shipped-library state
+  without importing the catalog internals directly.
 
 ## Dependencies
 

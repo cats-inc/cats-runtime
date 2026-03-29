@@ -76,6 +76,9 @@ product shells or ad-hoc prompt helpers. The runtime:
   history surfaces
 - exposes a standalone runtime-owned versioned filterable library read seam at
   `GET /skills/catalog`
+- projects compact skill-library diagnostics truth including a catalog
+  fingerprint, cache counts, and the active bounded discovery guards through
+  runtime diagnostics
 
 ## Architecture Diagram
 
