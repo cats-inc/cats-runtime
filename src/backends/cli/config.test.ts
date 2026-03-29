@@ -5,11 +5,12 @@ import { describe, expect, it } from 'vitest';
 import {
   defaultAuggieMaxTurns,
   defaultAuggieSessionsDir,
-  defaultCursorAndKiroRuntimeMode,
   defaultCursorChatsDir,
+  defaultCursorRuntimeMode,
   defaultExternalSessionLiveWindowMs,
   defaultNativeDiscoveryIntervalMs,
   defaultKiroDbPath,
+  defaultKiroRuntimeMode,
   defaultOpencodeServerHost,
   defaultOpencodeServerPort,
   defaultOpencodeServerStartupTimeoutMs,
@@ -40,10 +41,13 @@ function loadConfigWithoutProviderFile(env: NodeJS.ProcessEnv = {}) {
 }
 
 describe('config platform defaults', () => {
-  it('defaults Cursor and Kiro to WSL only on Windows', () => {
-    expect(defaultCursorAndKiroRuntimeMode('win32')).toBe('wsl');
-    expect(defaultCursorAndKiroRuntimeMode('darwin')).toBe('native');
-    expect(defaultCursorAndKiroRuntimeMode('linux')).toBe('native');
+  it('defaults Cursor to native on every platform and Kiro to WSL only on Windows', () => {
+    expect(defaultCursorRuntimeMode('win32')).toBe('native');
+    expect(defaultCursorRuntimeMode('darwin')).toBe('native');
+    expect(defaultCursorRuntimeMode('linux')).toBe('native');
+    expect(defaultKiroRuntimeMode('win32')).toBe('wsl');
+    expect(defaultKiroRuntimeMode('darwin')).toBe('native');
+    expect(defaultKiroRuntimeMode('linux')).toBe('native');
   });
 
   it('defaults provider runtimes explicitly for all CLIs', () => {
@@ -54,7 +58,7 @@ describe('config platform defaults', () => {
     expect(defaultProviderRuntimeMode('opencode', 'win32')).toBe('native');
     expect(defaultProviderRuntimeMode('auggie', 'win32')).toBe('native');
     expect(defaultProviderRuntimeMode('pi', 'win32')).toBe('native');
-    expect(defaultProviderRuntimeMode('cursor', 'win32')).toBe('wsl');
+    expect(defaultProviderRuntimeMode('cursor', 'win32')).toBe('native');
     expect(defaultProviderRuntimeMode('kiro', 'win32')).toBe('wsl');
     expect(defaultProviderRuntimeMode('cursor', 'darwin')).toBe('native');
     expect(defaultProviderRuntimeMode('kiro', 'linux')).toBe('native');

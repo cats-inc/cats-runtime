@@ -227,7 +227,14 @@ interface ParsedRemoteBackendsResult {
   defaults: Record<string, ProviderDefaultTarget[]>;
 }
 
-export function defaultCursorAndKiroRuntimeMode(
+export function defaultCursorRuntimeMode(
+  platform: NodeJS.Platform = process.platform,
+): RuntimeMode {
+  void platform;
+  return 'native';
+}
+
+export function defaultKiroRuntimeMode(
   platform: NodeJS.Platform = process.platform,
 ): RuntimeMode {
   return platform === 'win32' ? 'wsl' : 'native';
@@ -237,8 +244,12 @@ export function defaultProviderRuntimeMode(
   provider: ProviderName,
   platform: NodeJS.Platform = process.platform,
 ): RuntimeMode {
-  if (provider === 'cursor' || provider === 'kiro') {
-    return defaultCursorAndKiroRuntimeMode(platform);
+  if (provider === 'cursor') {
+    return defaultCursorRuntimeMode(platform);
+  }
+
+  if (provider === 'kiro') {
+    return defaultKiroRuntimeMode(platform);
   }
 
   return 'native';
