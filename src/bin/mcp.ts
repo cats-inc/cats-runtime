@@ -2,31 +2,35 @@
 
 import { loadDotEnv } from '../core/dotenv.js';
 import { isDirectCliEntrypoint } from '../core/cliEntrypoint.js';
-import { loadConfig } from '../core/config.js';
 import {
   formatSetupDiagnosticEntrySummary,
   generateSetupDiagnosticEntryArtifact,
 } from '../core/diagnostics/setupDiagnosticEntry.js';
-import { createRuntimeServer } from '../server.js';
 import {
   applyRuntimeCliEnvOverrides,
-  createRuntimeStartupState,
   parseRuntimeCliOptions,
 } from '../startup.js';
+import { createHttpMcpProxyHandler } from '../mcp/proxy.js';
 import { startMcpStdioServer } from '../mcp/stdio.js';
 
 function getHelpText(): string {
   return [
     'cats-runtime-mcp',
     '',
-    'Start the cats-runtime MCP facade over stdio.',
+    'Proxy stdio MCP requests to the primary cats-runtime HTTP /mcp endpoint.',
     '',
     'Options:',
-    '  --config <path>       Use an explicit providers config file',
-    '  --managed-by <name>   Record the supervising host name',
-    '  --diagnose-setup      Generate a setup diagnostic report and exit',
-    '  --refresh-setup-scan  Refresh the shared setup scan before generating a diagnostic report',
-    '  --help, -h            Show this help text',
+    '  --host <host>          Override the target runtime host when deriving the proxy URL',
+    '  --port <port>          Override the target runtime port when deriving the proxy URL',
+    '  --config <path>        Use an explicit providers config file for local diagnostics',
+    '  --diagnose-setup       Generate a local setup diagnostic report and exit',
+    '  --refresh-setup-scan   Refresh the shared setup scan before generating a diagnostic report',
+    '  --managed-by <name>    Accepted for compatibility; ignored in proxy mode',
+    '  --help, -h             Show this help text',
+    '',
+    'Proxy target resolution:',
+    '  1. CATS_RUNTIME_MCP_PROXY_URL',
+    '  2. http://<CATS_RUNTIME_HOST|127.0.0.1>:<CATS_RUNTIME_PORT|3110>/mcp',
   ].join('\n');
 }
 
@@ -49,18 +53,10 @@ async function main(): Promise<void> {
     })}\n`);
     return;
   }
-  const config = loadConfig();
-  const startup = createRuntimeStartupState({
-    mode: 'app-managed',
-    managedBy: cliOptions.managedBy ?? 'mcp-host',
-    readyOutput: 'silent',
-  });
-  const runtime = createRuntimeServer(config, { startup });
   const server = startMcpStdioServer({
-    ctx: runtime.context,
-    onClose: async () => {
-      await runtime.close();
-    },
+    handleJsonRpc: createHttpMcpProxyHandler({
+      env: process.env,
+    }),
   });
 
   const requestShutdown = () => {

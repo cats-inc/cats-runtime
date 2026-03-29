@@ -1,15 +1,20 @@
+import { once } from 'node:events';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import type { Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
+import { createAdaptorServer } from '@hono/node-server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { WorkerPool } from '../backends/cli/pool/WorkerPool.js';
 import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig } from '../backends/cli/config.js';
 import type { AppContext } from '../http/app.js';
+import { createRuntimeApp } from '../http/app.js';
 import { createRuntimeStartupState } from '../startup.js';
 import type { StreamEvent, TurnInput } from '../core/types.js';
+import { createHttpMcpProxyHandler } from './proxy.js';
 import { startMcpStdioServer } from './stdio.js';
 
 function encodeMessage(message: unknown): Buffer {
@@ -65,6 +70,26 @@ function makeConfig(rootDir: string): CliRuntimeConfig {
     externalSessionLiveWindowMs: 0,
     maxSessions: 10,
   } as unknown as CliRuntimeConfig;
+}
+
+async function listenApp(ctx: AppContext): Promise<{
+  server: Server;
+  url: string;
+}> {
+  const app = createRuntimeApp(ctx);
+  const server = createAdaptorServer({ fetch: app.fetch }) as Server;
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('Expected a TCP address for the test runtime app');
+  }
+
+  return {
+    server,
+    url: `http://127.0.0.1:${address.port}/mcp`,
+  };
 }
 
 describe('MCP stdio transport', () => {
@@ -366,5 +391,143 @@ describe('MCP stdio transport', () => {
     }]);
 
     await server.close();
+  });
+
+  it('forwards stdio MCP requests to the primary runtime HTTP /mcp route', async () => {
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const workerStream = async function* (turn: string | TurnInput): AsyncGenerator<StreamEvent> {
+      const message = typeof turn === 'string' ? turn : turn.message;
+      yield { type: 'text', text: `reply: ${message}` };
+      yield { type: 'result', summary: `completed: ${message}` };
+    };
+
+    const pool = {
+      getCapabilities: vi.fn(() => ({ resume: true, fork: true, permissions: true })),
+      get: vi.fn((sessionId: string) => workers.get(sessionId)),
+      spawn: vi.fn((sessionId: string) => {
+        const worker = {
+          alive: true,
+          busy: false,
+          streamMessage: workerStream,
+        };
+        workers.set(sessionId, worker);
+        return worker;
+      }),
+      kill: vi.fn((sessionId: string) => {
+        workers.delete(sessionId);
+      }),
+      killAll: vi.fn(() => {
+        workers.clear();
+      }),
+      status: vi.fn(() => ({ active: workers.size, busy: 0, idle: workers.size, providers: { claude: workers.size } })),
+    } as unknown as WorkerPool;
+
+    const ctx: AppContext = {
+      config: makeConfig(rootDir),
+      startup: createRuntimeStartupState(),
+      registry,
+      pool,
+      cursorNative: {} as never,
+      gooseNative: {} as never,
+      kiroNative: {} as never,
+      auggieSessions: {} as never,
+      opencodeNative: {} as never,
+      providerModelCatalog: {} as never,
+    };
+
+    const { server: appServer, url } = await listenApp(ctx);
+    const server = startMcpStdioServer({
+      input,
+      output,
+      handleJsonRpc: createHttpMcpProxyHandler({
+        env: {
+          CATS_RUNTIME_MCP_PROXY_URL: url,
+        },
+      }),
+    });
+
+    try {
+      const chunks: Buffer[] = [];
+      output.on('data', (chunk) => {
+        chunks.push(Buffer.from(chunk));
+      });
+
+      input.write(Buffer.concat([
+        encodeMessage({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'initialize',
+          params: {},
+        }),
+        encodeMessage({
+          jsonrpc: '2.0',
+          id: 2,
+          method: 'tools/list',
+          params: {},
+        }),
+        encodeMessage({
+          jsonrpc: '2.0',
+          id: 3,
+          method: 'tools/call',
+          params: {
+            name: 'create_session',
+            arguments: {
+              provider: 'claude',
+              cwd: join(rootDir, 'workspace-proxy'),
+            },
+          },
+        }),
+      ]));
+
+      await vi.waitFor(() => {
+        expect(decodeMessages(Buffer.concat(chunks))).toHaveLength(3);
+      });
+
+      const messages = decodeMessages(Buffer.concat(chunks)) as Array<Record<string, unknown>>;
+      expect(messages[0]).toMatchObject({
+        jsonrpc: '2.0',
+        id: 1,
+        result: {
+          capabilities: {
+            tools: {},
+          },
+        },
+      });
+      expect(messages[1]).toMatchObject({
+        jsonrpc: '2.0',
+        id: 2,
+        result: {
+          tools: expect.arrayContaining([
+            expect.objectContaining({ name: 'create_session' }),
+            expect.objectContaining({ name: 'send_message' }),
+          ]),
+        },
+      });
+      expect(messages[2]).toMatchObject({
+        jsonrpc: '2.0',
+        id: 3,
+        result: {
+          content: expect.any(Array),
+          structuredContent: expect.objectContaining({
+            session: expect.objectContaining({
+              providerName: 'claude',
+              cwd: join(rootDir, 'workspace-proxy'),
+            }),
+          }),
+        },
+      });
+    } finally {
+      await server.close();
+      await new Promise<void>((resolve, reject) => {
+        appServer.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve();
+        });
+      });
+    }
   });
 });
