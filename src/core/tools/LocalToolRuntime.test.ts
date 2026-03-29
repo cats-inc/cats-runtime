@@ -559,6 +559,44 @@ describe('LocalToolRuntime', () => {
         cleanup();
       }
     });
+
+    it('supports bounded recursive child expansion for planning', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const result = await runtime.execute(sharedCtx(cwd), {
+          id: 'inspect-4',
+          name: 'inspect_path',
+          arguments: { path: 'src', max_children: 5, max_depth: 2 },
+        });
+        expect(result.isError).toBeUndefined();
+        expect(JSON.parse(result.output)).toEqual(expect.objectContaining({
+          path: 'src',
+          exists: true,
+          kind: 'directory',
+          maxDepth: 2,
+          children: expect.arrayContaining([
+            expect.objectContaining({
+              name: 'utils',
+              path: 'src/utils',
+              kind: 'directory',
+              childCount: 2,
+              childrenTruncated: false,
+              children: expect.arrayContaining([
+                expect.objectContaining({
+                  name: 'format.js',
+                  path: 'src/utils/format.js',
+                  kind: 'file',
+                }),
+              ]),
+            }),
+          ]),
+        }));
+      } finally {
+        cleanup();
+      }
+    });
   });
 
   describe('inspect_paths', () => {
@@ -644,6 +682,58 @@ describe('LocalToolRuntime', () => {
               path: '../outside.txt',
               exists: false,
               error: expect.stringContaining('outside the workspace'),
+            }),
+          ],
+        });
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('supports bounded recursive inspection for directory batches', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const result = await runtime.execute(sharedCtx(cwd), {
+          id: 'inspect-many-3',
+          name: 'inspect_paths',
+          arguments: {
+            paths: ['src'],
+            include_children: true,
+            max_children: 5,
+            max_depth: 2,
+          },
+        });
+
+        expect(result.isError).toBeUndefined();
+        expect(JSON.parse(result.output)).toEqual({
+          requestedCount: 1,
+          uniqueCount: 1,
+          includeChildren: true,
+          maxChildren: 5,
+          maxDepth: 2,
+          entries: [
+            expect.objectContaining({
+              path: 'src',
+              exists: true,
+              kind: 'directory',
+              children: expect.arrayContaining([
+                expect.objectContaining({
+                  name: 'utils',
+                  path: 'src/utils',
+                  kind: 'directory',
+                  childCount: 2,
+                  childrenTruncated: false,
+                  children: expect.arrayContaining([
+                    expect.objectContaining({
+                      name: 'format.js',
+                      path: 'src/utils/format.js',
+                      kind: 'file',
+                    }),
+                  ]),
+                }),
+              ]),
             }),
           ],
         });

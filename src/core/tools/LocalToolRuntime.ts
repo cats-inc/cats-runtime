@@ -127,6 +127,8 @@ const MAX_TEXT_OUTPUT = 12_000;
 const MAX_DIFF_PREVIEW_OUTPUT = 8_000;
 const MAX_BATCH_READ_OUTPUT = 16_000;
 const MAX_BATCH_INSPECT_PATHS = 50;
+const MAX_INSPECT_TREE_DEPTH = 5;
+const MAX_INSPECT_TREE_NODES = 400;
 const DEFAULT_READ_LINE_LIMIT = 400;
 const DEFAULT_LIST_ENTRIES = 200;
 const DEFAULT_GLOB_RESULTS = 200;
@@ -200,6 +202,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
           description: 'Include a bounded child listing for directories. Defaults to true.',
         },
         max_children: { type: 'integer', minimum: 1, maximum: 200 },
+        max_depth: {
+          type: 'integer',
+          minimum: 1,
+          maximum: MAX_INSPECT_TREE_DEPTH,
+          description: 'When including children, recursively expand nested directories up to this depth.',
+        },
       },
     },
   },
@@ -221,6 +229,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
           description: 'Include bounded child listings for directories. Defaults to false.',
         },
         max_children: { type: 'integer', minimum: 1, maximum: 50 },
+        max_depth: {
+          type: 'integer',
+          minimum: 1,
+          maximum: MAX_INSPECT_TREE_DEPTH,
+          description: 'When including children, recursively expand nested directories up to this depth.',
+        },
       },
       required: ['paths'],
     },
@@ -1335,6 +1349,7 @@ async function inspectWorkspacePath(
   options: {
     includeChildren: boolean;
     maxChildren: number;
+    maxDepth: number;
   },
 ): Promise<Record<string, unknown>> {
   const normalizedInput = typeof inputPath === 'string' && inputPath.trim() ? inputPath : '.';
@@ -1352,22 +1367,11 @@ async function inspectWorkspacePath(
     };
 
     if (info.isDirectory() && options.includeChildren) {
-      const entries = await readdir(fullPath, { withFileTypes: true });
-      const sorted = [...entries].sort((left, right) => left.name.localeCompare(right.name));
-      const limited = sorted.slice(0, options.maxChildren);
-      payload.childCount = entries.length;
-      payload.childrenTruncated = entries.length > limited.length;
-      payload.children = limited.map((entry) => ({
-        name: entry.name,
-        path: toRelativeDisplay(root, resolve(fullPath, entry.name)),
-        kind: entry.isDirectory()
-          ? 'directory'
-          : entry.isFile()
-            ? 'file'
-            : entry.isSymbolicLink()
-              ? 'symlink'
-              : 'other',
-      }));
+      const childBudget = { remaining: MAX_INSPECT_TREE_NODES };
+      const childInspection = await inspectWorkspaceChildren(root, fullPath, 1, options, childBudget);
+      payload.childCount = childInspection.childCount;
+      payload.childrenTruncated = childInspection.childrenTruncated;
+      payload.children = childInspection.children;
     }
 
     return payload;
@@ -1380,6 +1384,72 @@ async function inspectWorkspacePath(
     }
     throw error;
   }
+}
+
+function describeDirectoryEntryKind(
+  entry: { isDirectory(): boolean; isFile(): boolean; isSymbolicLink(): boolean },
+): 'directory' | 'file' | 'symlink' | 'other' {
+  if (entry.isDirectory()) {
+    return 'directory';
+  }
+  if (entry.isFile()) {
+    return 'file';
+  }
+  if (entry.isSymbolicLink()) {
+    return 'symlink';
+  }
+  return 'other';
+}
+
+async function inspectWorkspaceChildren(
+  root: string,
+  currentPath: string,
+  depth: number,
+  options: {
+    maxChildren: number;
+    maxDepth: number;
+  },
+  budget: { remaining: number },
+): Promise<{
+  childCount: number;
+  childrenTruncated: boolean;
+  children: Array<Record<string, unknown>>;
+}> {
+  const entries = await readdir(currentPath, { withFileTypes: true });
+  const sorted = [...entries].sort((left, right) => left.name.localeCompare(right.name));
+  const limited = sorted.slice(0, options.maxChildren);
+  const children: Array<Record<string, unknown>> = [];
+  let childrenTruncated = entries.length > limited.length;
+
+  for (const entry of limited) {
+    if (budget.remaining <= 0) {
+      childrenTruncated = true;
+      break;
+    }
+
+    budget.remaining -= 1;
+    const fullPath = resolve(currentPath, entry.name);
+    const child: Record<string, unknown> = {
+      name: entry.name,
+      path: toRelativeDisplay(root, fullPath),
+      kind: describeDirectoryEntryKind(entry),
+    };
+
+    if (entry.isDirectory() && depth < options.maxDepth && !entry.isSymbolicLink()) {
+      const nested = await inspectWorkspaceChildren(root, fullPath, depth + 1, options, budget);
+      child.childCount = nested.childCount;
+      child.childrenTruncated = nested.childrenTruncated;
+      child.children = nested.children;
+    }
+
+    children.push(child);
+  }
+
+  return {
+    childCount: entries.length,
+    childrenTruncated,
+    children,
+  };
 }
 
 async function collectTextFiles(
@@ -1625,16 +1695,22 @@ export class LocalToolRuntime {
   ): Promise<ToolResult> {
     const includeChildren = readOptionalBoolean(args, 'include_children', true);
     const maxChildren = readOptionalInteger(args, 'max_children', 50, 1, 200);
+    const maxDepthRequested = args.max_depth !== undefined;
+    const maxDepth = readOptionalInteger(args, 'max_depth', 1, 1, MAX_INSPECT_TREE_DEPTH);
     const inputPath = typeof args.path === 'string' && args.path.trim() ? args.path : '.';
     const payload = await inspectWorkspacePath(context.cwd, inputPath, {
       includeChildren,
       maxChildren,
+      maxDepth,
     });
 
     return {
       callId,
       name: 'inspect_path',
-      output: JSON.stringify(payload, null, 2),
+      output: JSON.stringify({
+        ...payload,
+        ...(includeChildren && maxDepthRequested ? { maxDepth } : {}),
+      }, null, 2),
     };
   }
 
@@ -1654,6 +1730,8 @@ export class LocalToolRuntime {
     const uniquePaths = Array.from(new Set(requestedPaths));
     const includeChildren = readOptionalBoolean(args, 'include_children');
     const maxChildren = readOptionalInteger(args, 'max_children', 20, 1, 50);
+    const maxDepthRequested = args.max_depth !== undefined;
+    const maxDepth = readOptionalInteger(args, 'max_depth', 1, 1, MAX_INSPECT_TREE_DEPTH);
     const entries: Array<Record<string, unknown>> = [];
 
     for (const inputPath of uniquePaths) {
@@ -1661,6 +1739,7 @@ export class LocalToolRuntime {
         entries.push(await inspectWorkspacePath(context.cwd, inputPath, {
           includeChildren,
           maxChildren,
+          maxDepth,
         }));
       } catch (error) {
         entries.push({
@@ -1679,6 +1758,7 @@ export class LocalToolRuntime {
         uniqueCount: uniquePaths.length,
         includeChildren,
         maxChildren,
+        ...(includeChildren && maxDepthRequested ? { maxDepth } : {}),
         entries,
       }, null, 2),
     };

@@ -2124,7 +2124,9 @@ The read-oriented planning helpers now include both single-path and bounded
 batch-path inspection. `inspect_path` remains the detailed one-off view, while
 `inspect_paths` lets callers fetch machine-readable metadata for multiple
 candidate files/directories in one tool turn without falling back to shell
-loops.
+loops. Both tools now also accept optional bounded `max_depth` expansion so a
+host can inspect a small recursive directory tree without switching to
+`list_files`/shell loops or asking for an unbounded subtree dump.
 
 `inspection.maintenance` is also runtime-owned and additive. It gives hosts one
 machine-readable place to read:
