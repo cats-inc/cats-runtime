@@ -138,11 +138,11 @@ follow-on tasks include:
 
 ## Implementation Tracking
 
-- No dedicated implementation plan exists yet for this spec.
-- The repo currently contains groundwork only: terminology, ADRs, research,
-  A2A examples, and workspace-substrate starter artifacts.
-- Future runtime behavior changes under this spec should create a dedicated
-  plan before implementation begins.
+- A dedicated implementation plan now exists in
+  [PLAN-023](../plans/PLAN-023-a2a-layering-and-collaboration-artifact-alignment.md).
+- The repo currently still contains groundwork only: terminology, ADRs,
+  research, A2A examples, and workspace-substrate starter artifacts.
+- Implementation under that plan has not started yet.
 
 ## Open Questions
 
@@ -168,4 +168,4 @@ follow-on tasks include:
 *Created: 2026-03-19*
 *Author: Codex*
 *Last updated: 2026-03-29*
-*Related Plan: No dedicated plan yet (groundwork only)*
+*Related Plan: [PLAN-023](../plans/PLAN-023-a2a-layering-and-collaboration-artifact-alignment.md)*

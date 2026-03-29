@@ -64,7 +64,7 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 | [SPEC-009](./SPEC-009-executable-delivery-and-governance-primitives.md) | Executable Delivery and Governance Primitives | Implemented (Slice 1) | [PLAN-015](../plans/PLAN-015-mcp-mutation-tools-and-stdio-facade.md) |
 | [SPEC-008](./SPEC-008-workspace-substrate-init-audit-and-update.md) | Workspace Substrate Init, Audit, and Update | Implemented (First Slice) | [PLAN-014](../plans/PLAN-014-worktree-isolation-execution-layer.md) |
 | [SPEC-007](./SPEC-007-provider-compatibility-and-evidence-engine.md) | Provider Compatibility and Evidence Engine | In Progress (Second Slice Landed) | [PLAN-008-provider-compatibility-and-evidence-engine](../plans/PLAN-008-provider-compatibility-and-evidence-engine.md) |
-| [SPEC-006](./SPEC-006-a2a-protocol-project-memory-and-skill-layering.md) | A2A Protocol, Project Memory, and Skill Layering | Approved | No dedicated plan yet (groundwork only) |
+| [SPEC-006](./SPEC-006-a2a-protocol-project-memory-and-skill-layering.md) | A2A Protocol, Project Memory, and Skill Layering | Approved | [PLAN-023](../plans/PLAN-023-a2a-layering-and-collaboration-artifact-alignment.md) |
 | [SPEC-005](./SPEC-005-runtime-managed-skills-v0.md) | Runtime-Managed Skills v0 | In Progress (Execution Delivery Slice Landed) | [PLAN-008-runtime-managed-skills-v0](../plans/PLAN-008-runtime-managed-skills-v0.md) |
 | [SPEC-004](./SPEC-004-provider-model-catalog-and-discovery.md) | Provider Model Catalog and Discovery | Implemented (Core Slice) | [PLAN-005](../plans/PLAN-005-provider-model-catalog-and-discovery.md) |
 | [SPEC-003](./SPEC-003-agent-backend.md) | Agent Backend for External Agent Runtimes | Implemented | [PLAN-004](../plans/PLAN-004-agent-backend.md) |
@@ -80,8 +80,8 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 - `SPEC-012`, `SPEC-013`, and `SPEC-015` were implemented directly without
   separate dedicated plan documents. Their follow-through remains tracked in
   `PROGRESS.md` and, where relevant, `ROADMAP.md`.
-- `SPEC-006` remains approved but still lacks a dedicated implementation plan.
-  The current repo state is groundwork only, not active implementation.
+- `SPEC-006` now has a dedicated implementation plan in `PLAN-023`, but the
+  repo state is still groundwork only; implementation has not started yet.
 
 ## For AI Agents
 
