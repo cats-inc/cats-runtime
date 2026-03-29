@@ -109,6 +109,254 @@ export const SHARED_UI_SCRIPT = `
     return '<span class="' + escapeAttr(cls) + '">' + escapeAttr(label || status || 'Unknown') + '</span>';
   }
 
+  function cloneJson(value) {
+    if (value === undefined || value === null) return value;
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function normalizeAdvancedCatalog(catalog) {
+    if (!catalog || typeof catalog !== 'object' || Array.isArray(catalog)) {
+      return null;
+    }
+    return {
+      provider: typeof catalog.provider === 'string' ? catalog.provider : '',
+      backend: typeof catalog.backend === 'string' ? catalog.backend : '',
+      instance: typeof catalog.instance === 'string' ? catalog.instance : '',
+      defaultModel: typeof catalog.defaultModel === 'string' ? catalog.defaultModel : null,
+      source: typeof catalog.source === 'string' ? catalog.source : 'static',
+      cache: catalog.cache && typeof catalog.cache === 'object' ? cloneJson(catalog.cache) : null,
+      entries: Array.isArray(catalog.entries) ? cloneJson(catalog.entries) : [],
+      presets: Array.isArray(catalog.presets) ? cloneJson(catalog.presets) : [],
+      controls: Array.isArray(catalog.controls) ? cloneJson(catalog.controls) : [],
+      defaultSelection: catalog.defaultSelection && typeof catalog.defaultSelection === 'object'
+        ? cloneJson(catalog.defaultSelection)
+        : null,
+      support: catalog.support && typeof catalog.support === 'object'
+        ? cloneJson(catalog.support)
+        : { tier: 'read_only' },
+      warnings: Array.isArray(catalog.warnings) ? cloneJson(catalog.warnings) : [],
+    };
+  }
+
+  function findAdvancedCatalogEntry(catalog, entryId) {
+    var entries = catalog && Array.isArray(catalog.entries) ? catalog.entries : [];
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i] && entries[i].id === entryId) {
+        return entries[i];
+      }
+    }
+    return null;
+  }
+
+  function findAdvancedCatalogPreset(catalog, presetId) {
+    var presets = catalog && Array.isArray(catalog.presets) ? catalog.presets : [];
+    for (var i = 0; i < presets.length; i++) {
+      if (presets[i] && presets[i].id === presetId) {
+        return presets[i];
+      }
+    }
+    return null;
+  }
+
+  function getDefaultAdvancedEntryId(catalog) {
+    if (!catalog) return null;
+    var selection = catalog.defaultSelection;
+    if (selection && typeof selection.entryId === 'string' && selection.entryId) {
+      return selection.entryId;
+    }
+    var entries = Array.isArray(catalog.entries) ? catalog.entries : [];
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i] && entries[i]['default'] === true && entries[i].id) {
+        return entries[i].id;
+      }
+    }
+    return entries[0] && entries[0].id ? entries[0].id : null;
+  }
+
+  function resolveAdvancedChoiceEntryId(catalog, choiceId) {
+    if (!catalog || !choiceId || choiceId === 'custom') return null;
+    if (choiceId === 'default') {
+      var selection = catalog.defaultSelection;
+      if (selection && selection.entryMode === 'explicit' && selection.entryId) {
+        return selection.entryId;
+      }
+      if (selection && selection.presetId) {
+        var defaultPreset = findAdvancedCatalogPreset(catalog, selection.presetId);
+        if (defaultPreset && defaultPreset.preferredEntryId) {
+          return defaultPreset.preferredEntryId;
+        }
+      }
+      return getDefaultAdvancedEntryId(catalog);
+    }
+    if (choiceId.indexOf('preset:') === 0) {
+      var preset = findAdvancedCatalogPreset(catalog, choiceId.slice('preset:'.length));
+      return preset && preset.preferredEntryId ? preset.preferredEntryId : getDefaultAdvancedEntryId(catalog);
+    }
+    if (choiceId.indexOf('entry:') === 0) {
+      return choiceId.slice('entry:'.length) || null;
+    }
+    return null;
+  }
+
+  function getAdvancedCatalogChoices(catalog) {
+    var normalized = normalizeAdvancedCatalog(catalog);
+    if (!normalized) return [];
+    var choices = [];
+    var defaultSelection = normalized.defaultSelection;
+    var defaultEntryId = resolveAdvancedChoiceEntryId(normalized, 'default');
+    var defaultEntry = defaultEntryId ? findAdvancedCatalogEntry(normalized, defaultEntryId) : null;
+    var defaultPreset = defaultSelection && defaultSelection.presetId
+      ? findAdvancedCatalogPreset(normalized, defaultSelection.presetId)
+      : null;
+    if (defaultSelection) {
+      choices.push({
+        id: 'default',
+        kind: 'default',
+        label: defaultPreset
+          ? ('Recommended · ' + (defaultPreset.label || defaultPreset.id))
+          : ('Recommended · ' + ((defaultEntry && (defaultEntry.label || defaultEntry.id)) || 'Default')),
+        description: defaultPreset
+          ? 'Default preset'
+          : ((defaultEntry && (defaultEntry.label || defaultEntry.id)) || 'Default entry'),
+      });
+    }
+
+    var presets = Array.isArray(normalized.presets) ? normalized.presets : [];
+    for (var i = 0; i < presets.length; i++) {
+      var preset = presets[i];
+      if (!preset || preset.availability === 'unavailable' || !preset.id) continue;
+      choices.push({
+        id: 'preset:' + preset.id,
+        kind: 'preset',
+        label: 'Preset · ' + (preset.label || preset.id),
+        description: preset.description || preset.id,
+      });
+    }
+
+    var entries = Array.isArray(normalized.entries) ? normalized.entries : [];
+    for (var j = 0; j < entries.length; j++) {
+      var entry = entries[j];
+      if (!entry || !entry.id) continue;
+      choices.push({
+        id: 'entry:' + entry.id,
+        kind: 'entry',
+        label: 'Model · ' + (entry.label || entry.id),
+        description: entry.id,
+      });
+    }
+
+    choices.push({
+      id: 'custom',
+      kind: 'custom',
+      label: 'Custom legacy model',
+      description: 'Manual override',
+    });
+    return choices;
+  }
+
+  function getAdvancedCatalogDefaultChoice(catalog) {
+    var choices = getAdvancedCatalogChoices(catalog);
+    return choices.length > 0 ? choices[0].id : 'custom';
+  }
+
+  function resolveAdvancedCatalogChoice(catalog, choiceId) {
+    var normalized = normalizeAdvancedCatalog(catalog);
+    if (!normalized || !choiceId) return null;
+    if (choiceId === 'custom') {
+      return {
+        kind: 'legacy',
+        entryId: null,
+        modelSelection: null,
+      };
+    }
+    if (choiceId === 'default') {
+      var defaultSelection = normalized.defaultSelection
+        ? cloneJson(normalized.defaultSelection)
+        : null;
+      if (!defaultSelection) {
+        var fallbackEntryId = getDefaultAdvancedEntryId(normalized);
+        if (!fallbackEntryId) return null;
+        defaultSelection = {
+          entryMode: 'explicit',
+          entryId: fallbackEntryId,
+        };
+      }
+      return {
+        kind: 'structured',
+        entryId: resolveAdvancedChoiceEntryId(normalized, choiceId),
+        modelSelection: defaultSelection,
+      };
+    }
+    if (choiceId.indexOf('preset:') === 0) {
+      var presetId = choiceId.slice('preset:'.length);
+      return {
+        kind: 'structured',
+        entryId: resolveAdvancedChoiceEntryId(normalized, choiceId),
+        modelSelection: {
+          entryMode: 'auto',
+          presetId: presetId,
+        },
+      };
+    }
+    if (choiceId.indexOf('entry:') === 0) {
+      var entryId = choiceId.slice('entry:'.length);
+      return {
+        kind: 'structured',
+        entryId: entryId || null,
+        modelSelection: {
+          entryMode: 'explicit',
+          entryId: entryId,
+        },
+      };
+    }
+    return null;
+  }
+
+  function getAdvancedChoiceControlDefaults(catalog, choiceId) {
+    var normalized = normalizeAdvancedCatalog(catalog);
+    var resolved = resolveAdvancedCatalogChoice(normalized, choiceId);
+    if (!normalized || !resolved || resolved.kind !== 'structured') {
+      return {};
+    }
+    var defaults = {};
+    var presetId = resolved.modelSelection && resolved.modelSelection.presetId;
+    var preset = presetId ? findAdvancedCatalogPreset(normalized, presetId) : null;
+    if (preset && preset.controlDefaults && typeof preset.controlDefaults === 'object') {
+      for (var presetKey in preset.controlDefaults) {
+        defaults[presetKey] = preset.controlDefaults[presetKey];
+      }
+    }
+    var controls = resolved.modelSelection && resolved.modelSelection.controls;
+    if (controls && typeof controls === 'object') {
+      for (var controlKey in controls) {
+        defaults[controlKey] = controls[controlKey];
+      }
+    }
+    return defaults;
+  }
+
+  function listStoredAdvancedControls(catalog, choiceId) {
+    var normalized = normalizeAdvancedCatalog(catalog);
+    if (!normalized) return [];
+    var entryId = resolveAdvancedChoiceEntryId(normalized, choiceId);
+    var controls = Array.isArray(normalized.controls) ? normalized.controls : [];
+    var visible = [];
+    for (var i = 0; i < controls.length; i++) {
+      var control = controls[i];
+      if (!control || control.scope === 'request') continue;
+      if (
+        entryId
+        && Array.isArray(control.applicableEntryIds)
+        && control.applicableEntryIds.length > 0
+        && control.applicableEntryIds.indexOf(entryId) < 0
+      ) {
+        continue;
+      }
+      visible.push(control);
+    }
+    return visible;
+  }
+
   function closeRuntimeSurfaceMenus() {
     var roots = document.querySelectorAll('[data-runtime-surface-switcher]');
     for (var i = 0; i < roots.length; i++) {
@@ -372,6 +620,12 @@ export const SHARED_UI_SCRIPT = `
     apiFetch: apiFetch,
     renderProviderBadge: renderProviderBadge,
     renderStatusBadge: renderStatusBadge,
+    normalizeAdvancedCatalog: normalizeAdvancedCatalog,
+    getAdvancedCatalogChoices: getAdvancedCatalogChoices,
+    getAdvancedCatalogDefaultChoice: getAdvancedCatalogDefaultChoice,
+    resolveAdvancedCatalogChoice: resolveAdvancedCatalogChoice,
+    getAdvancedChoiceControlDefaults: getAdvancedChoiceControlDefaults,
+    listStoredAdvancedControls: listStoredAdvancedControls,
     setRuntimeTooltip: setRuntimeTooltip,
     hideRuntimeTooltip: hideRuntimeTooltip,
     initRuntimeTooltips: initRuntimeTooltips,
