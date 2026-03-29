@@ -26,6 +26,7 @@ const matchesGlob: (filePath: string, pattern: string) => boolean = (path as any
 const DEFAULT_ATOMIC_WRITE_OPS: AtomicWriteOps = {
   chmod,
   stat,
+  utimes,
   writeFile,
   rename,
   unlink,
@@ -44,10 +45,17 @@ interface ToolCapabilityMetadata {
 
 interface AtomicWriteOps {
   chmod(path: string, mode: number): Promise<void>;
-  stat(path: string): Promise<{ mode: number }>;
+  stat(path: string): Promise<{ mode: number; atime: Date; mtime: Date }>;
+  utimes(path: string, atime: Date, mtime: Date): Promise<void>;
   writeFile(path: string, content: string, encoding: BufferEncoding): Promise<void>;
   rename(from: string, to: string): Promise<void>;
   unlink(path: string): Promise<void>;
+}
+
+interface AtomicWriteExistingMetadata {
+  mode: number;
+  atime: Date;
+  mtime: Date;
 }
 
 export interface LocalToolRuntimeOptions {
@@ -928,17 +936,29 @@ export async function writeTextFileAtomically(
   fullPath: string,
   content: string,
   ops: AtomicWriteOps = DEFAULT_ATOMIC_WRITE_OPS,
+  existingMetadata?: AtomicWriteExistingMetadata,
 ): Promise<void> {
   const tempPath = createAtomicWritePath(fullPath, 'write');
   const backupPath = createAtomicWritePath(fullPath, 'backup');
   let backupCreated = false;
   let existingMode: number | undefined;
+  let existingAtime: Date | undefined;
+  let existingMtime: Date | undefined;
 
-  try {
-    existingMode = (await ops.stat(fullPath)).mode;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-      throw error;
+  if (existingMetadata) {
+    existingMode = existingMetadata.mode;
+    existingAtime = existingMetadata.atime;
+    existingMtime = existingMetadata.mtime;
+  } else {
+    try {
+      const existing = await ops.stat(fullPath);
+      existingMode = existing.mode;
+      existingAtime = existing.atime;
+      existingMtime = existing.mtime;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
     }
   }
 
@@ -959,6 +979,9 @@ export async function writeTextFileAtomically(
     }
 
     await ops.rename(tempPath, fullPath);
+    if (existingAtime && existingMtime) {
+      await ops.utimes(fullPath, existingAtime, existingMtime).catch(() => undefined);
+    }
   } catch (error) {
     await unlinkBestEffort(tempPath, ops);
     if (backupCreated) {
@@ -1767,6 +1790,7 @@ export class LocalToolRuntime {
     const allowMultiple = readOptionalBoolean(args, 'allow_multiple');
 
     await assertSafeExistingFileMutation(fullPath, displayPath);
+    const existingInfo = await stat(fullPath);
     const content = await readFile(fullPath, 'utf-8');
 
     let count = 0;
@@ -1792,7 +1816,11 @@ export class LocalToolRuntime {
       ? content.replace(oldString, newString)
       : content.replaceAll(oldString, newString);
 
-    await writeTextFileAtomically(fullPath, updated, this.atomicWriteOps);
+    await writeTextFileAtomically(fullPath, updated, this.atomicWriteOps, {
+      mode: existingInfo.mode,
+      atime: existingInfo.atime,
+      mtime: existingInfo.mtime,
+    });
 
     return {
       callId,

@@ -96,8 +96,9 @@ requests into calls into this shared runtime.
 - Single-file `write_file` and `edit_file` now stage sibling temp files and
   atomically replace the target so failed commit paths restore the previous
   file contents instead of leaving partially written text behind, preserve the
-  previous file mode when replacing an existing file, and clean up newly
-  created empty parent directories when a new-file commit path aborts.
+  previous file mode plus preserved `atime` / `mtime` timestamps when
+  replacing an existing file, and clean up newly created empty parent
+  directories when a new-file commit path aborts.
 - Extended-profile `copy_file` now also preserves source timestamps on the
   copied destination (and source mode where the host platform permits) so the
   shared runtime does not silently drop basic file metadata on workspace-local
@@ -109,7 +110,8 @@ requests into calls into this shared runtime.
   default runtime tool profile before any per-session permission narrowing.
 - The safety model still does **not** yet guarantee full transactional
   rollback for general `write_file` / `edit_file` operations or broader
-  metadata restoration such as ownership or other inode-level attributes.
+  metadata restoration such as ownership or other inode-level attributes
+  beyond the current mode/timestamp preservation.
 
 ## Dependencies
 

@@ -11,6 +11,9 @@ import {
   writeTextFileAtomically,
 } from './LocalToolRuntime.js';
 
+const PRESERVED_ATIME = new Date('2024-01-02T03:04:05.000Z');
+const PRESERVED_MTIME = new Date('2024-02-03T04:05:06.000Z');
+
 function createWorkspace() {
   const cwd = mkdtempSync(join(tmpdir(), 'cats-runtime-tools-'));
   mkdirSync(join(cwd, 'src'), { recursive: true });
@@ -142,8 +145,8 @@ describe('LocalToolRuntime', () => {
   describe('writeTextFileAtomically', () => {
     it('restores the original file when the staged replacement fails', async () => {
       const target = '/virtual/workspace/app.ts';
-      const files = new Map<string, { content: string; mode: number }>([
-        [target, { content: 'before', mode: 0o644 }],
+      const files = new Map<string, { content: string; mode: number; atime: Date; mtime: Date }>([
+        [target, { content: 'before', mode: 0o644, atime: PRESERVED_ATIME, mtime: PRESERVED_MTIME }],
       ]);
       let failCommit = true;
 
@@ -162,10 +165,19 @@ describe('LocalToolRuntime', () => {
             const error = Object.assign(new Error(`Missing path ${path}`), { code: 'ENOENT' });
             throw error;
           }
-          return { mode: entry.mode };
+          return { mode: entry.mode, atime: entry.atime, mtime: entry.mtime };
+        },
+        async utimes(path, atime, mtime) {
+          const entry = files.get(path);
+          if (!entry) {
+            const error = Object.assign(new Error(`Missing path ${path}`), { code: 'ENOENT' });
+            throw error;
+          }
+          entry.atime = atime;
+          entry.mtime = mtime;
         },
         async writeFile(path, content) {
-          files.set(path, { content, mode: 0o600 });
+          files.set(path, { content, mode: 0o600, atime: PRESERVED_ATIME, mtime: PRESERVED_MTIME });
         },
         async rename(from, to) {
           const entry = files.get(from);
@@ -185,14 +197,19 @@ describe('LocalToolRuntime', () => {
         },
       })).rejects.toThrow('simulated commit failure');
 
-      expect(files.get(target)).toEqual({ content: 'before', mode: 0o644 });
+      expect(files.get(target)).toEqual({
+        content: 'before',
+        mode: 0o644,
+        atime: PRESERVED_ATIME,
+        mtime: PRESERVED_MTIME,
+      });
       expect(Array.from(files.keys()).filter((path) => path.includes('.cats-runtime-'))).toEqual([]);
     });
 
-    it('preserves the existing file mode when a staged replacement succeeds', async () => {
+    it('preserves the existing file mode and timestamps when a staged replacement succeeds', async () => {
       const target = '/virtual/workspace/script.sh';
-      const files = new Map<string, { content: string; mode: number }>([
-        [target, { content: '#!/bin/sh\necho before\n', mode: 0o755 }],
+      const files = new Map<string, { content: string; mode: number; atime: Date; mtime: Date }>([
+        [target, { content: '#!/bin/sh\necho before\n', mode: 0o755, atime: PRESERVED_ATIME, mtime: PRESERVED_MTIME }],
       ]);
 
       await writeTextFileAtomically(target, '#!/bin/sh\necho after\n', {
@@ -210,10 +227,19 @@ describe('LocalToolRuntime', () => {
             const error = Object.assign(new Error(`Missing path ${path}`), { code: 'ENOENT' });
             throw error;
           }
-          return { mode: entry.mode };
+          return { mode: entry.mode, atime: entry.atime, mtime: entry.mtime };
+        },
+        async utimes(path, atime, mtime) {
+          const entry = files.get(path);
+          if (!entry) {
+            const error = Object.assign(new Error(`Missing path ${path}`), { code: 'ENOENT' });
+            throw error;
+          }
+          entry.atime = atime;
+          entry.mtime = mtime;
         },
         async writeFile(path, content) {
-          files.set(path, { content, mode: 0o600 });
+          files.set(path, { content, mode: 0o600, atime: new Date('2026-01-01T00:00:00.000Z'), mtime: new Date('2026-01-01T00:00:00.000Z') });
         },
         async rename(from, to) {
           const entry = files.get(from);
@@ -232,8 +258,58 @@ describe('LocalToolRuntime', () => {
       expect(files.get(target)).toEqual({
         content: '#!/bin/sh\necho after\n',
         mode: 0o755,
+        atime: PRESERVED_ATIME,
+        mtime: PRESERVED_MTIME,
       });
       expect(Array.from(files.keys()).filter((path) => path.includes('.cats-runtime-'))).toEqual([]);
+    });
+
+    it('preserves timestamps when write_file replaces an existing file', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const target = join(cwd, 'src', 'app.ts');
+      const runtime = new LocalToolRuntime();
+      utimesSync(target, PRESERVED_ATIME, PRESERVED_MTIME);
+
+      try {
+        const result = await runtime.execute(sharedCtx(cwd), {
+          id: 'tool-preserve-write-timestamps',
+          name: 'write_file',
+          arguments: { path: 'src/app.ts', content: 'export const value = 2;\n' },
+        });
+
+        expect(result.isError).toBeUndefined();
+        const info = statSync(target);
+        expect(info.atime.getTime()).toBe(PRESERVED_ATIME.getTime());
+        expect(info.mtime.getTime()).toBe(PRESERVED_MTIME.getTime());
+      } finally {
+        cleanup();
+      }
+    });
+
+    it('preserves timestamps when edit_file replaces an existing file', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const target = join(cwd, 'src', 'app.ts');
+      const runtime = new LocalToolRuntime();
+      utimesSync(target, PRESERVED_ATIME, PRESERVED_MTIME);
+
+      try {
+        const result = await runtime.execute(sharedCtx(cwd), {
+          id: 'tool-preserve-edit-timestamps',
+          name: 'edit_file',
+          arguments: {
+            path: 'src/app.ts',
+            old_string: 'const value = 1',
+            new_string: 'const value = 2',
+          },
+        });
+
+        expect(result.isError).toBeUndefined();
+        const info = statSync(target);
+        expect(info.atime.getTime()).toBe(PRESERVED_ATIME.getTime());
+        expect(info.mtime.getTime()).toBe(PRESERVED_MTIME.getTime());
+      } finally {
+        cleanup();
+      }
     });
   });
 
