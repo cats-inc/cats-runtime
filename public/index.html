@@ -130,15 +130,20 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 13px;
+    font-size: 12.5px;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
     font-weight: 600;
-    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-family: inherit;
   }
   .session-card .sc-meta {
-    font-size: 11px;
+    font-size: 10.5px;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
     color: var(--text2);
     display: flex;
-    gap: 10px;
+    gap: 8px;
+    flex-wrap: wrap;
   }
 
   .project-group { margin-bottom: 2px; }
@@ -148,7 +153,9 @@
     padding: 6px 12px 6px 10px;
     cursor: pointer;
     border-radius: var(--radius);
-    font-size: 13px;
+    font-size: 12.5px;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
     font-weight: 600;
     color: var(--text);
     user-select: none;
@@ -186,12 +193,13 @@
   /* Canonical badge styles in src/http/ui/shared.ts, injected at serve-time.
      Static fallback kept here so the file works standalone. */
   .provider-badge {
-    font-size: 10px;
-    font-weight: 500;
+    font-size: 9.5px;
+    line-height: 1.1;
+    font-weight: 600;
     padding: 1px 5px;
     border-radius: 3px;
     text-transform: uppercase;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.04em;
   }
   .provider-badge[data-p="claude"] { background: rgba(224,145,69,0.2); color: var(--claude); }
   .provider-badge[data-p="codex"] { background: rgba(34,197,94,0.2); color: var(--codex); }
@@ -211,7 +219,8 @@
     border-radius: 999px;
     background: rgba(255,255,255,0.08);
     color: var(--text2);
-    font-size: 10px;
+    font-size: 9.5px;
+    line-height: 1.1;
     letter-spacing: 0.02em;
   }
   .project-header .chevron {
@@ -225,9 +234,11 @@
   .project-group.collapsed .chevron { transform: rotate(-90deg); }
   .project-group.collapsed .project-sessions { display: none; }
   .project-header .project-count {
-    font-size: 11px;
+    font-size: 10.5px;
+    line-height: 1.2;
+    letter-spacing: 0.01em;
     color: var(--text2);
-    font-weight: 400;
+    font-weight: 500;
     margin-left: 6px;
   }
   .project-header .project-actions {
@@ -308,6 +319,43 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .session-scan-status-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .session-scan-status-copy {
+    flex: 1;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .session-scan-status-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .session-scan-status-dismiss {
+    background: none;
+    border: none;
+    color: var(--text2);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border-radius: 6px;
+    flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  .session-scan-status-dismiss:hover {
+    color: var(--text);
+    background: rgba(255,255,255,0.08);
   }
 
   .chat-header {
@@ -698,9 +746,17 @@
           </div>
         </div>
         <div id="sessionScanStatus" class="mt-3 hidden rounded-2xl border border-slate-800 bg-slate-950/60 px-3 py-3">
-          <div class="flex items-center gap-2">
-            <span id="sessionScanStatusDot" class="runtime-shell-health-dot !h-2 !w-2" data-state="idle"></span>
-            <span id="sessionScanStatusText" class="text-xs font-medium text-slate-300">Scanning sessions...</span>
+          <div class="session-scan-status-header">
+            <span class="session-scan-status-copy">
+              <span id="sessionScanStatusDot" class="runtime-shell-health-dot !h-2 !w-2" data-state="idle"></span>
+              <span id="sessionScanStatusText" class="session-scan-status-text text-xs font-medium text-slate-300">Scanning sessions...</span>
+            </span>
+            <button class="session-scan-status-dismiss" type="button" onclick="dismissSessionScanStatus()" title="Dismiss" aria-label="Dismiss session scan status">
+              <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
           </div>
           <div id="sessionScanProgress" class="mt-3 hidden h-1 overflow-hidden rounded-full bg-slate-800">
             <div class="h-full w-1/2 animate-pulse rounded-full bg-blue-500/80"></div>
@@ -1708,6 +1764,10 @@ function renderSessionScanStatus(input) {
   root.title = input.title || '';
 }
 
+function dismissSessionScanStatus() {
+  renderSessionScanStatus({ visible: false });
+}
+
 function setSessionScanBusy(isBusy) {
   sessionScanInFlight = isBusy;
   for (const id of ['scanSessionsBtn', 'deleteAllSessionsBtn', 'newSessionBtn']) {
@@ -1754,7 +1814,7 @@ function summarizeManualSessionDiscovery(result) {
   if ((summary.totalTargets || 0) === 0) {
     return {
       state: 'idle',
-      text: 'No WSL/Docker session targets configured.',
+      text: 'No WSL/Docker targets configured.',
       title: 'No configured CLI provider instances use WSL or Docker runtime mode.',
     };
   }
@@ -1877,6 +1937,26 @@ function pickWorkspaceLabel(current, candidate) {
   return current;
 }
 
+function sessionPreviewText(session) {
+  const inspection = session?.inspection;
+  const currentInput = inspection?.currentRun?.inputPreview;
+  if (typeof currentInput === 'string' && currentInput.trim()) {
+    return currentInput.trim();
+  }
+
+  const lastInput = inspection?.lastRun?.inputPreview;
+  if (typeof lastInput === 'string' && lastInput.trim()) {
+    return lastInput.trim();
+  }
+
+  const summary = session?.summary;
+  if (typeof summary === 'string' && summary.trim()) {
+    return summary.trim();
+  }
+
+  return session?.id ? String(session.id).slice(0, 8) : '';
+}
+
 function renderSessionList(sessions) {
   const el = document.getElementById('sessionList');
   if (!sessions || sessions.length === 0) {
@@ -1923,7 +2003,7 @@ function renderSessionList(sessions) {
     const isDeleting = groupDeleteState.has(workspaceKey);
 
     const cards = items.map(s => {
-      const summaryText = s.summary || '';
+      const summaryText = sessionPreviewText(s);
       const isActive = s.id === currentSessionId;
       const activity = sessionActivity(s);
       const controls = sessionControls(s);
@@ -1936,7 +2016,7 @@ function renderSessionList(sessions) {
           <div class="sc-top">
             <span class="sc-id">
               ${activity === 'interactive' ? `<span class="sc-dot ${s.status === 'busy' ? 'sc-dot-busy' : 'sc-dot-ready'}"></span>` : ''}
-              ${summaryText || s.id.slice(0, 8)}
+              ${escapeHtml(summaryText)}
             </span>
             ${controls.canDelete ? `<button class="sc-delete" onclick="event.stopPropagation();deleteSession('${s.id}')" title="Delete session" aria-label="Delete session">
               <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -2214,7 +2294,6 @@ async function resumeSession(id) {
 }
 
 async function deleteSession(id) {
-  if (!confirm('Permanently delete this session and its conversation history?')) return;
   if (id === currentSessionId) disconnectObserver();
   try {
     const res = await fetch(`${API_BASE}/sessions/${id}`, {
