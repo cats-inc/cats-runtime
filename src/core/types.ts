@@ -1432,6 +1432,9 @@ export interface RuntimeExecutionStrategyInspection {
 export interface RuntimeToolPolicyInspection {
   profile: string;
   permissionMode: PermissionMode;
+  workspaceMode?: WorkspaceMode;
+  workspaceOverlayActive?: boolean;
+  workspaceRestrictedTools?: string[];
   whitelistActive: boolean;
   allowedTools?: string[];
   fullAccessTools: string[];

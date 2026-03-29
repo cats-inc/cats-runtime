@@ -2105,7 +2105,15 @@ For API/local sessions, `inspection.tools` is also additive and runtime-owned.
 It surfaces the resolved shared-local-tool policy for the current session:
 
 - `profile`: the resolved provider-instance tool profile (or `standard` fallback)
-- `permissionMode`: the effective runtime permission mode
+- `permissionMode`: the effective runtime permission mode after workspace access
+  overlays are applied
+- `workspaceMode`: the current session workspace mode when the runtime is
+  enforcing source/sandbox/worktree access through the shared local tool layer
+- `workspaceOverlayActive`: whether the runtime applied an additional
+  read-only workspace overlay on top of the underlying permission mode
+- `workspaceRestrictedTools`: tools that would otherwise have been callable
+  under the selected permission mode but were blocked because the current
+  workspace is read-only
 - `whitelistActive`: whether a session-level whitelist is constraining tools
 - `allowedTools`: normalized whitelist entries when present
 - `fullAccessTools`: tools currently callable without preview-only restrictions

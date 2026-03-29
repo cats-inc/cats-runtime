@@ -1972,6 +1972,89 @@ describe('LocalToolRuntime', () => {
         }),
       ]));
     });
+
+    it('derives read-only workspace policy overlays when permission mode is omitted', () => {
+      const policy = buildToolPolicyInspection({
+        toolProfile: 'extended',
+        workspaceMode: 'read_only',
+      });
+
+      expect(policy).toEqual(expect.objectContaining({
+        profile: 'extended',
+        permissionMode: 'default',
+        workspaceMode: 'read_only',
+        workspaceOverlayActive: true,
+        whitelistActive: false,
+        counts: {
+          total: 32,
+          fullAccess: 17,
+          previewOnly: 5,
+          blocked: 10,
+        },
+      }));
+      expect(policy.workspaceRestrictedTools).toBeUndefined();
+      expect(policy.previewOnlyTools).toEqual(expect.arrayContaining([
+        'init-workspace',
+        'publish-artifacts',
+        'create-commit',
+      ]));
+      expect(policy.blockedTools).toEqual(expect.arrayContaining([
+        'write_file',
+        'edit_file',
+        'copy_file',
+      ]));
+    });
+
+    it('blocks non-read-only-compatible tools when skip mode runs in a read-only workspace', () => {
+      const policy = buildToolPolicyInspection({
+        toolProfile: 'extended',
+        workspaceMode: 'read_only',
+        permissionMode: 'skip',
+      });
+
+      expect(policy).toEqual(expect.objectContaining({
+        profile: 'extended',
+        permissionMode: 'skip',
+        workspaceMode: 'read_only',
+        workspaceOverlayActive: true,
+        whitelistActive: false,
+        counts: {
+          total: 32,
+          fullAccess: 22,
+          previewOnly: 0,
+          blocked: 10,
+        },
+        workspaceRestrictedTools: expect.arrayContaining([
+          'write_file',
+          'edit_file',
+          'copy_file',
+        ]),
+      }));
+      expect(policy.fullAccessTools).toEqual(expect.arrayContaining([
+        'read_files',
+        'init-workspace',
+        'publish-artifacts',
+        'create-commit',
+      ]));
+      expect(policy.previewOnlyTools).toEqual([]);
+      expect(policy.blockedTools).toEqual(expect.arrayContaining([
+        'write_file',
+        'delete_file',
+        'copy_file',
+      ]));
+      expect(policy.capabilities).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          name: 'publish-artifacts',
+          access: 'full_access',
+          readOnlyCompatible: true,
+        }),
+        expect.objectContaining({
+          name: 'copy_file',
+          access: 'blocked',
+          readOnlyCompatible: false,
+        }),
+      ]));
+    });
   });
 
   describe('workspace substrate tools', () => {

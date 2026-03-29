@@ -4168,7 +4168,73 @@ providers:
             "Legacy model 'custom-preview-model' is not present in the advanced catalog; preserving it as a compatibility passthrough.",
           ],
         },
+        });
+    });
+  });
+
+  it('surfaces read-only workspace overlays in API-backed session inspection', async () => {
+    await withRuntime({
+      providerDefaultTargets: {
+        codex: { backend: 'api', instance: 'main' },
+      },
+      remoteProviderCatalog: {
+        api: {
+          codex: {
+            main: {
+              id: 'main',
+              providerName: 'codex',
+              backend: 'api',
+              transport: 'openai',
+              apiKeyEnv: 'OPENAI_API_KEY',
+              baseUrl: 'https://example.test',
+              model: 'gpt-5.4',
+              toolProfile: 'extended',
+            },
+          },
+        },
+        local: {},
+        agent: {},
+      },
+    }, {}, async (runtime) => {
+      const createResponse = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider: 'codex',
+          cwd: '/tmp/cats-runtime-repo',
+          workspaceMode: 'read_only',
+        }),
       });
+
+      expect(createResponse.status).toBe(201);
+      const created = await createResponse.json() as Record<string, unknown>;
+      expect(created.inspection).toEqual(expect.objectContaining({
+        tools: expect.objectContaining({
+          profile: 'extended',
+          permissionMode: 'default',
+          workspaceMode: 'read_only',
+          workspaceOverlayActive: true,
+          whitelistActive: false,
+          counts: {
+            total: 32,
+            fullAccess: 17,
+            previewOnly: 5,
+            blocked: 10,
+          },
+          previewOnlyTools: expect.arrayContaining([
+            'init-workspace',
+            'publish-artifacts',
+            'create-commit',
+          ]),
+          blockedTools: expect.arrayContaining([
+            'write_file',
+            'edit_file',
+            'copy_file',
+          ]),
+        }),
+      }));
     });
   });
 

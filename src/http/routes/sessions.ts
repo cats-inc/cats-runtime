@@ -206,11 +206,13 @@ function resolveSessionToolPolicyInspection(
     );
     return buildToolPolicyInspection({
       toolProfile: target.remoteInstance?.toolProfile,
+      workspaceMode: session.workspaceMode,
       permissionMode: session.permissionMode,
       allowedTools: session.allowedTools,
     });
   } catch {
     return buildToolPolicyInspection({
+      workspaceMode: session.workspaceMode,
       permissionMode: session.permissionMode,
       allowedTools: session.allowedTools,
     });

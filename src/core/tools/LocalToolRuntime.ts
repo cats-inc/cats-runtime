@@ -796,10 +796,11 @@ function isReadOnlyCompatibleDefinition(name: string): boolean {
 export function buildToolPolicyInspection(input: {
   toolProfile?: string;
   permissionMode?: PermissionMode;
+  workspaceMode?: WorkspaceMode;
   allowedTools?: string[];
 }): RuntimeToolPolicyInspection {
   const profile = normalizeProfile(input.toolProfile);
-  const permissionMode = input.permissionMode ?? 'skip';
+  const permissionMode = input.permissionMode ?? (input.workspaceMode === 'read_only' ? 'default' : 'skip');
   const profileTools = listToolDefinitionsForProfile(profile).map((tool) => tool.name);
   const normalizedAllowedTools = Array.from(new Set(
     (input.allowedTools || [])
@@ -807,60 +808,57 @@ export function buildToolPolicyInspection(input: {
       .map(normalizeToolName),
   ));
   const whitelist = new Set(normalizedAllowedTools);
-
-  const fullAccessTools: string[] = [];
-  const previewOnlyTools: string[] = [];
-  const blockedTools: string[] = [];
-
-  for (const toolName of profileTools) {
-    if (permissionMode === 'skip') {
-      fullAccessTools.push(toolName);
-      continue;
-    }
-
-    if (permissionMode === 'whitelist') {
-      if (whitelist.has(toolName)) {
-        fullAccessTools.push(toolName);
-      } else {
-        blockedTools.push(toolName);
-      }
-      continue;
-    }
-
-    if (READ_ONLY_TOOLS.has(toolName)) {
-      fullAccessTools.push(toolName);
-    } else if (PREVIEW_ONLY_TOOLS.has(toolName)) {
-      previewOnlyTools.push(toolName);
-    } else {
-      blockedTools.push(toolName);
-    }
-  }
-
-  const fullAccessToolSet = new Set(fullAccessTools);
-  const previewOnlyToolSet = new Set(previewOnlyTools);
+  const workspaceRestrictedTools: string[] = [];
 
   const capabilities = profileTools.map((toolName) => {
     const metadata = TOOL_CAPABILITY_METADATA[toolName] || {
       domain: 'filesystem' as const,
       mutating: !isReadOnlyCompatibleDefinition(toolName),
     };
-    const access: RuntimeToolPolicyInspection['capabilities'][number]['access'] = fullAccessToolSet.has(toolName)
-      ? 'full_access'
-      : previewOnlyToolSet.has(toolName)
-        ? 'preview_only'
-        : 'blocked';
+    let access: RuntimeToolPolicyInspection['capabilities'][number]['access'];
+    if (permissionMode === 'skip') {
+      access = 'full_access';
+    } else if (permissionMode === 'whitelist') {
+      access = whitelist.has(toolName) ? 'full_access' : 'blocked';
+    } else if (READ_ONLY_TOOLS.has(toolName)) {
+      access = 'full_access';
+    } else if (PREVIEW_ONLY_TOOLS.has(toolName)) {
+      access = 'preview_only';
+    } else {
+      access = 'blocked';
+    }
+
+    const readOnlyCompatible = isReadOnlyCompatibleDefinition(toolName);
+    if (input.workspaceMode === 'read_only' && access !== 'blocked' && !readOnlyCompatible) {
+      access = 'blocked';
+      workspaceRestrictedTools.push(toolName);
+    }
+
     return {
       name: toolName,
       domain: metadata.domain,
       access,
-      readOnlyCompatible: isReadOnlyCompatibleDefinition(toolName),
+      readOnlyCompatible,
       mutating: metadata.mutating,
     };
   });
 
+  const fullAccessTools = capabilities
+    .filter((capability) => capability.access === 'full_access')
+    .map((capability) => capability.name);
+  const previewOnlyTools = capabilities
+    .filter((capability) => capability.access === 'preview_only')
+    .map((capability) => capability.name);
+  const blockedTools = capabilities
+    .filter((capability) => capability.access === 'blocked')
+    .map((capability) => capability.name);
+
   return {
     profile,
     permissionMode,
+    ...(input.workspaceMode ? { workspaceMode: input.workspaceMode } : {}),
+    ...(input.workspaceMode === 'read_only' ? { workspaceOverlayActive: true } : {}),
+    ...(workspaceRestrictedTools.length > 0 ? { workspaceRestrictedTools } : {}),
     whitelistActive: permissionMode === 'whitelist',
     ...(normalizedAllowedTools.length > 0 ? { allowedTools: normalizedAllowedTools } : {}),
     fullAccessTools,
