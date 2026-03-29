@@ -235,6 +235,9 @@ Operational notes:
 - use `cats-runtime-mcp` only when the host is stdio-only
 - if the proxy cannot reach the primary runtime, stdio clients receive an MCP
   error instead of silently falling back to a second local runtime
+- the proxy now applies a conservative upstream timeout by default and returns
+  a dedicated `upstream_timeout` MCP error when the primary runtime does not
+  answer in time
 
 Proxy target resolution order:
 
@@ -245,6 +248,8 @@ Notes:
 
 - when deriving the local URL, `0.0.0.0` / `::` normalize to `127.0.0.1`
 - `CATS_RUNTIME_API_KEY` is forwarded as `Authorization: Bearer <token>`
+- `CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS` overrides the proxy timeout in
+  milliseconds; default is `1800000` (30 minutes)
 
 Example host config:
 

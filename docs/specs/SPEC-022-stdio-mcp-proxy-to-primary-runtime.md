@@ -178,8 +178,9 @@ documented.
 
 - [x] `--diagnose-setup` remains a documented local utility exit on
       `cats-runtime-mcp`; normal MCP serving mode is proxy-only.
-- [ ] Should the proxy support configurable upstream timeout values in the
-      next slice, or is the current request lifetime acceptable?
+- [x] The proxy now supports configurable upstream timeout values through
+      `CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS`, with a conservative default request
+      window for long-running MCP tool calls.
 - [ ] Should future `cats-runtime mcp` CLI convergence happen in the same
       follow-up slice or later?
 - [ ] Should the proxy ever offer opt-in auto-start for the primary runtime, or
@@ -191,6 +192,8 @@ documented.
   `CATS_RUNTIME_MCP_PROXY_URL` first, then derive
   `http://<CATS_RUNTIME_HOST|127.0.0.1>:<CATS_RUNTIME_PORT|3110>/mcp`
 - `CATS_RUNTIME_API_KEY` is forwarded as bearer auth to the primary runtime
+- `CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS` now overrides the proxy request timeout;
+  default proxy timeout is `1800000` ms (30 minutes)
 - normal stdio MCP serving no longer calls `createRuntimeServer(...)`
 - stdio framing remains local in `src/mcp/stdio.ts`; only JSON-RPC execution is proxied
 

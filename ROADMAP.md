@@ -1342,7 +1342,7 @@ always-on self-adapting parser system.
 ### OPT-14: MCP Proxy Hardening and CLI Convergence
 
 **Priority**: P2
-**Status**: Planned
+**Status**: In Progress
 
 #### Problem
 
@@ -1372,6 +1372,9 @@ proxy slice is still intentionally minimal:
 - the proxy target resolves from:
   - `CATS_RUNTIME_MCP_PROXY_URL`
   - or derived local `CATS_RUNTIME_HOST` / `CATS_RUNTIME_PORT`
+- the proxy now applies a conservative upstream timeout by default, accepts
+  `CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS` as an override, and classifies
+  proxy-side timeouts separately as `upstream_timeout`
 - generic shell `PORT` values are intentionally ignored so hosted shells do
   not accidentally retarget the stdio MCP proxy away from the runtime
 - `cats-runtime-mcp` no longer calls `createRuntimeServer(...)` on the normal
@@ -1381,14 +1384,11 @@ proxy slice is still intentionally minimal:
 
 #### Follow-through Direction
 
-- add an explicit upstream timeout strategy that remains safe for long-running
-  MCP tool calls such as `send_message`
-- classify timeout failures separately from generic upstream-unavailable
-  failures so stdio hosts can surface clearer operator guidance
-- decide whether the timeout should be configurable through a dedicated
-  runtime/MCP env var or remain a fixed conservative default
 - evaluate a later CLI convergence slice that can expose
   `cats-runtime mcp` while keeping `cats-runtime-mcp` as a compatibility alias
+- add an operator-facing preflight or inspect mode that confirms the current
+  proxy target and timeout posture before a stdio host starts sending tool
+  traffic
 - keep the proxy transport-thin; do not reintroduce a second independent local
   runtime core or hidden runtime auto-start in the name of convenience
 

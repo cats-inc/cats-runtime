@@ -3,7 +3,9 @@ import type { McpJsonRpcHandler } from './stdio.js';
 
 const DEFAULT_RUNTIME_HOST = '127.0.0.1';
 const DEFAULT_RUNTIME_PORT = 3110;
+const DEFAULT_PROXY_TIMEOUT_MS = 30 * 60 * 1000;
 const PROXY_URL_ENV = 'CATS_RUNTIME_MCP_PROXY_URL';
+const PROXY_TIMEOUT_ENV = 'CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS';
 const API_KEY_ENV = 'CATS_RUNTIME_API_KEY';
 const HOST_ENV = 'CATS_RUNTIME_HOST';
 const PORT_ENV = 'CATS_RUNTIME_PORT';
@@ -64,6 +66,24 @@ function resolveAuthorizationHeader(env: NodeJS.ProcessEnv): string | undefined 
     return undefined;
   }
   return `Bearer ${apiKey}`;
+}
+
+export function resolveMcpProxyTimeoutMs(
+  env: NodeJS.ProcessEnv = process.env,
+): number {
+  const rawTimeout = env[PROXY_TIMEOUT_ENV]?.trim();
+  if (!rawTimeout) {
+    return DEFAULT_PROXY_TIMEOUT_MS;
+  }
+
+  const timeoutMs = Number.parseInt(rawTimeout, 10);
+  if (!Number.isInteger(timeoutMs) || timeoutMs <= 0) {
+    throw new Error(
+      `Set ${PROXY_TIMEOUT_ENV} to a positive integer number of milliseconds for MCP proxying.`,
+    );
+  }
+
+  return timeoutMs;
 }
 
 function resolveExplicitProxyUrl(rawUrl: string): string {
@@ -165,14 +185,20 @@ export function createHttpMcpProxyHandler(
   return async (message) => {
     const requestId = resolveRequestId(message);
     let target: McpProxyTarget;
+    let timeoutMs: number;
 
     try {
       target = resolveMcpProxyTarget(env);
+      timeoutMs = resolveMcpProxyTimeoutMs(env);
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Invalid MCP proxy target';
+      const reason = typeof message === 'string' && message.includes(PROXY_TIMEOUT_ENV)
+        ? 'invalid_proxy_timeout'
+        : 'invalid_proxy_target';
       return createProxyError(
         requestId,
-        error instanceof Error ? error.message : 'Invalid MCP proxy target',
-        'invalid_proxy_target',
+        message,
+        reason,
       );
     }
 
@@ -183,14 +209,28 @@ export function createHttpMcpProxyHandler(
       headers.set('authorization', target.authorizationHeader);
     }
 
+    const timeoutSignal = AbortSignal.timeout(timeoutMs);
     let response: Response;
     try {
       response = await fetchImpl(target.url, {
         method: 'POST',
         headers,
         body: JSON.stringify(message),
+        signal: timeoutSignal,
       });
     } catch (error) {
+      if (timeoutSignal.aborted) {
+        return createProxyError(
+          requestId,
+          `Primary cats-runtime MCP endpoint timed out after ${timeoutMs}ms at ${target.url}.`,
+          'upstream_timeout',
+          {
+            targetUrl: target.url,
+            timeoutMs,
+            detail: error instanceof Error ? error.message : String(error),
+          },
+        );
+      }
       return createProxyError(
         requestId,
         `Primary cats-runtime MCP endpoint is unavailable at ${target.url}. Start cats-runtime and retry.`,
@@ -209,6 +249,20 @@ export function createHttpMcpProxyHandler(
     const body = await parseResponseBody(response);
     if (isJsonRpcResponse(body)) {
       return body as McpJsonRpcSuccess | McpJsonRpcError;
+    }
+
+    if (response.status === 408 || response.status === 504) {
+      return createProxyError(
+        requestId,
+        `Primary cats-runtime MCP endpoint timed out after ${timeoutMs}ms at ${target.url}.`,
+        'upstream_timeout',
+        {
+          targetUrl: target.url,
+          timeoutMs,
+          httpStatus: response.status,
+          upstreamBody: body,
+        },
+      );
     }
 
     if (response.status === 401 || response.status === 403) {

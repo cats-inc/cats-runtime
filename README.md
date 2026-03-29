@@ -102,6 +102,8 @@ MCP usage:
 - use `cats-runtime-mcp` only for stdio-only MCP hosts such as MCP Studio
 - `cats-runtime-mcp` now proxies to an already-running primary `cats-runtime`
   and does not start a second independent runtime core
+- set `CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS` to override the stdio proxy timeout
+  when a stdio-only host needs a different upstream request window
 
 ## Package-Ready Startup
 

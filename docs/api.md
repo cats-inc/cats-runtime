@@ -360,6 +360,9 @@ Operational notes:
   from `CATS_RUNTIME_HOST` / `CATS_RUNTIME_PORT` when no explicit proxy URL is set
 - if `CATS_RUNTIME_API_KEY` is configured, `cats-runtime-mcp` forwards the same
   bearer token to the primary runtime
+- `cats-runtime-mcp` applies a conservative upstream timeout by default; set
+  `CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS` to override it, and timeout failures now
+  surface as `reason: "upstream_timeout"` instead of generic unavailability
 
 ### Health
 

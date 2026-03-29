@@ -31,6 +31,7 @@ function getHelpText(): string {
     'Proxy target resolution:',
     '  1. CATS_RUNTIME_MCP_PROXY_URL',
     '  2. http://<CATS_RUNTIME_HOST|127.0.0.1>:<CATS_RUNTIME_PORT|3110>/mcp',
+    '  Timeout: CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS (default 1800000)',
   ].join('\n');
 }
 

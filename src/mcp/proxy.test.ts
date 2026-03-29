@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createHttpMcpProxyHandler, resolveMcpProxyTarget } from './proxy.js';
+import {
+  createHttpMcpProxyHandler,
+  resolveMcpProxyTarget,
+  resolveMcpProxyTimeoutMs,
+} from './proxy.js';
 
 describe('MCP HTTP proxy', () => {
   it('prefers an explicit proxy URL override', () => {
@@ -44,6 +48,13 @@ describe('MCP HTTP proxy', () => {
     });
   });
 
+  it('uses a conservative default proxy timeout and accepts explicit overrides', () => {
+    expect(resolveMcpProxyTimeoutMs({})).toBe(30 * 60 * 1000);
+    expect(resolveMcpProxyTimeoutMs({
+      CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS: '45000',
+    })).toBe(45000);
+  });
+
   it('returns an MCP error when the proxy target is invalid', async () => {
     const handler = createHttpMcpProxyHandler({
       env: {
@@ -64,6 +75,31 @@ describe('MCP HTTP proxy', () => {
         code: -32603,
         data: {
           reason: 'invalid_proxy_target',
+        },
+      },
+    });
+  });
+
+  it('returns an MCP error when the proxy timeout env is invalid', async () => {
+    const handler = createHttpMcpProxyHandler({
+      env: {
+        CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS: '0',
+      },
+      fetchImpl: vi.fn(),
+    });
+
+    await expect(handler({
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'initialize',
+      params: {},
+    })).resolves.toMatchObject({
+      jsonrpc: '2.0',
+      id: 2,
+      error: {
+        code: -32603,
+        data: {
+          reason: 'invalid_proxy_timeout',
         },
       },
     });
@@ -137,6 +173,44 @@ describe('MCP HTTP proxy', () => {
     });
   });
 
+  it('maps proxy-side request timeouts to MCP errors', async () => {
+    vi.useFakeTimers();
+    const fetchImpl = vi.fn((input: string | URL | Request, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(new Error('The operation was aborted due to timeout'));
+        });
+      })) as typeof fetch;
+    const handler = createHttpMcpProxyHandler({
+      env: {
+        CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS: '5',
+      },
+      fetchImpl,
+    });
+
+    const responsePromise = handler({
+      jsonrpc: '2.0',
+      id: 'req-timeout',
+      method: 'tools/list',
+    });
+    await vi.advanceTimersByTimeAsync(10);
+
+    await expect(responsePromise).resolves.toMatchObject({
+      jsonrpc: '2.0',
+      id: 'req-timeout',
+      error: {
+        code: -32603,
+        data: {
+          reason: 'upstream_timeout',
+          targetUrl: 'http://127.0.0.1:3110/mcp',
+          timeoutMs: 5,
+        },
+      },
+    });
+
+    vi.useRealTimers();
+  });
+
   it('maps upstream auth failures to MCP errors when the body is not JSON-RPC', async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
       error: 'Missing or invalid Authorization header',
@@ -198,6 +272,39 @@ describe('MCP HTTP proxy', () => {
         data: {
           reason: 'invalid_upstream_response',
           httpStatus: 200,
+        },
+      },
+    });
+  });
+
+  it('maps timeout-like upstream HTTP statuses to timeout errors', async () => {
+    const fetchImpl = vi.fn(async () => new Response('gateway timeout', {
+      status: 504,
+      headers: {
+        'content-type': 'text/plain',
+      },
+    })) as typeof fetch;
+    const handler = createHttpMcpProxyHandler({
+      env: {
+        CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS: '2500',
+      },
+      fetchImpl,
+    });
+
+    await expect(handler({
+      jsonrpc: '2.0',
+      id: 15,
+      method: 'initialize',
+      params: {},
+    })).resolves.toMatchObject({
+      jsonrpc: '2.0',
+      id: 15,
+      error: {
+        code: -32603,
+        data: {
+          reason: 'upstream_timeout',
+          httpStatus: 504,
+          timeoutMs: 2500,
         },
       },
     });
