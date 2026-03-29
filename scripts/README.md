@@ -29,6 +29,14 @@ Local npm package smoke tests are available on each desktop platform:
 | `scripts/linux/workspace-substrate.sh` | Linux | Wrap the repo-owned workspace substrate helper for audit/init/update preview or apply flows |
 | `scripts/macos/workspace-substrate.sh` | macOS | Wrap the repo-owned workspace substrate helper for audit/init/update preview or apply flows |
 
+## Collaboration Helpers
+
+| Script | Platform | Purpose |
+|--------|----------|---------|
+| `scripts/windows/Sync-AgentSkills.ps1` | Windows | Sync `skills/` into `.claude/skills`, `.agents/skills`, and `.gemini/skills` |
+| `scripts/linux/sync-agent-skills.sh` | Linux | Sync `skills/` into the same agent discovery paths on POSIX hosts |
+| `scripts/macos/sync-agent-skills.sh` | macOS | Sync `skills/` into the same agent discovery paths on POSIX hosts |
+
 Shared behavior:
 
 - interactive mode prompts for global install with a default of yes; if install proceeds, tarball deletion also defaults to yes

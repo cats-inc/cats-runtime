@@ -86,6 +86,9 @@ describe('cats-runtime-workspace bin', () => {
       expect(existsSync(join(root, 'docs', 'README.md'))).toBe(true);
       expect(existsSync(join(root, 'skills', 'README.md'))).toBe(true);
       expect(existsSync(join(root, 'docs', 'a2a', 'agent-card.public.json.example'))).toBe(true);
+      expect(existsSync(join(root, 'scripts', 'windows', 'Sync-AgentSkills.ps1'))).toBe(true);
+      expect(existsSync(join(root, 'scripts', 'linux', 'sync-agent-skills.sh'))).toBe(true);
+      expect(existsSync(join(root, 'scripts', 'macos', 'sync-agent-skills.sh'))).toBe(true);
     } finally {
       cleanup();
     }

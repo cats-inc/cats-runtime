@@ -240,6 +240,9 @@ collaboration/bootstrap baseline rather than a submodule dependency.
 | `scripts/windows/Invoke-WorkspaceSubstrate.ps1` | Create | Windows wrapper for the repo-owned substrate helper |
 | `scripts/linux/workspace-substrate.sh` | Create | Linux wrapper for the repo-owned substrate helper |
 | `scripts/macos/workspace-substrate.sh` | Create | macOS wrapper for the repo-owned substrate helper |
+| `scripts/windows/Sync-AgentSkills.ps1` | Modify | Keep the repo-owned Windows skill-sync entrypoint aligned with the extracted collaboration baseline |
+| `scripts/linux/sync-agent-skills.sh` | Create | Repo-owned POSIX skill-sync helper replacing the bootstrap-only shell variant |
+| `scripts/macos/sync-agent-skills.sh` | Create | Repo-owned macOS skill-sync helper aligned with the extracted collaboration baseline |
 | `docs/research/README.md` | Modify | Index the new validation note |
 | `PROGRESS.md` | Modify | Reflect the pilot collaboration slice if governance truth changes |
 
@@ -345,6 +348,7 @@ collaboration/bootstrap baseline rather than a submodule dependency.
 | 2026-03-29 | Landed the first repo-owned helper surface via `cats-runtime-workspace`, exposing current workspace substrate audit/init/update semantics as a local CLI instead of only through runtime tools/tests |
 | 2026-03-29 | Added platform wrapper scripts so the repo-owned workspace substrate helper has first-party Windows/Linux/macOS entrypoints under `scripts/` |
 | 2026-03-30 | Landed the first repo-owned starter-family rewrite for Phase 5 by teaching workspace substrate to seed `docs/README.md`, the docs index readmes, `skills/README.md`, and `scripts/README.md`, reducing reliance on `project-bootstrap/templates/base` for the minimum collaboration baseline |
+| 2026-03-30 | Landed the next Phase 5 starter-family slice by internalizing the bootstrap `Sync-AgentSkills` input: `cats-runtime` now ships repo-owned Linux/macOS skill-sync scripts, `scripts/README.md` documents the cross-platform contract, and workspace substrate seeds the Windows/Linux/macOS skill-sync entrypoints into initialized workspaces instead of leaving that collaboration behavior trapped in bootstrap templates |
 
 ---
 

@@ -57,6 +57,9 @@ describe('WorkspaceSubstrateService', () => {
         }),
         expect.objectContaining({ type: 'create', path: 'docs/AGENT-GUIDE.md' }),
         expect.objectContaining({ type: 'create', path: 'docs/README.md' }),
+        expect.objectContaining({ type: 'create', path: 'scripts/windows/Sync-AgentSkills.ps1' }),
+        expect.objectContaining({ type: 'create', path: 'scripts/linux/sync-agent-skills.sh' }),
+        expect.objectContaining({ type: 'create', path: 'scripts/macos/sync-agent-skills.sh' }),
       ]));
       expect(result.plan.changedPaths).toEqual(expect.arrayContaining([
         'AGENTS.md',
@@ -359,9 +362,14 @@ describe('WorkspaceSubstrateService', () => {
       expect(existsSync(join(root, 'docs', 'a2a', 'agent-card.authenticated.json.example'))).toBe(true);
       expect(existsSync(join(root, 'docs', 'a2a', 'jsonrpc-send-message.request.json.example'))).toBe(true);
       expect(existsSync(join(root, 'docs', 'a2a', 'jsonrpc-get-task.request.json.example'))).toBe(true);
+      expect(existsSync(join(root, 'scripts', 'windows', 'Sync-AgentSkills.ps1'))).toBe(true);
+      expect(existsSync(join(root, 'scripts', 'linux', 'sync-agent-skills.sh'))).toBe(true);
+      expect(existsSync(join(root, 'scripts', 'macos', 'sync-agent-skills.sh'))).toBe(true);
       expect(existsSync(join(root, 'docs', 'a2a', 'task.json.example'))).toBe(false);
       expect(readFileSync(join(root, 'docs', 'a2a', 'README.md'), 'utf-8'))
         .toContain('agent-card.public.json.example');
+      expect(readFileSync(join(root, 'scripts', 'README.md'), 'utf-8'))
+        .toContain('Sync-AgentSkills.ps1');
     } finally {
       cleanup();
     }

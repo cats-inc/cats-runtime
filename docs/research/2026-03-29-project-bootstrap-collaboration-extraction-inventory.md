@@ -130,6 +130,9 @@ That first rewrite slice is now landed in `cats-runtime` workspace substrate:
 - `docs/decisions/README.md`
 - `skills/README.md`
 - `scripts/README.md`
+- `scripts/windows/Sync-AgentSkills.ps1`
+- `scripts/linux/sync-agent-skills.sh`
+- `scripts/macos/sync-agent-skills.sh`
 
 The remaining P1 work is now about mirrored sibling consumption and any later
 refinement, not the first repo-owned baseline itself.
