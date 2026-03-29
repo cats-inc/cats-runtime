@@ -25,6 +25,9 @@ Local npm package smoke tests are available on each desktop platform:
 | `scripts/linux/pack-install.sh` | Linux | Build, pack, and optionally install the local `.tgz` globally |
 | `scripts/macos/pack-install.sh` | macOS | Build, pack, and optionally install the local `.tgz` globally |
 | `scripts/windows/Pack-Install.ps1` | Windows | Build, pack, and optionally install the local `.tgz` globally |
+| `scripts/windows/Invoke-WorkspaceSubstrate.ps1` | Windows | Wrap the repo-owned workspace substrate helper for audit/init/update preview or apply flows |
+| `scripts/linux/workspace-substrate.sh` | Linux | Wrap the repo-owned workspace substrate helper for audit/init/update preview or apply flows |
+| `scripts/macos/workspace-substrate.sh` | macOS | Wrap the repo-owned workspace substrate helper for audit/init/update preview or apply flows |
 
 Shared behavior:
 
@@ -33,3 +36,15 @@ Shared behavior:
 - `--install` skips prompts, installs the tarball globally, and deletes it afterward
 - `--clean` explicitly forces tarball deletion after a successful install
 - `--skip-build` assumes `npm run build` has already been run
+
+## Workspace Substrate Wrappers
+
+The repo-owned workspace substrate helper is also available through
+platform-specific wrapper scripts:
+
+- Windows:
+  `.\scripts\windows\Invoke-WorkspaceSubstrate.ps1 -Operation audit -WorkspacePath .`
+- Linux:
+  `./scripts/linux/workspace-substrate.sh --operation audit --workspace-path .`
+- macOS:
+  `./scripts/macos/workspace-substrate.sh --operation audit --workspace-path .`

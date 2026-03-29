@@ -237,8 +237,9 @@ collaboration/bootstrap baseline rather than a submodule dependency.
 | `docs/research/2026-03-29-project-bootstrap-collaboration-extraction-inventory.md` | Create | Freeze the minimum template/script semantics that still need a repo-owned rewrite |
 | `src/bin/workspaceSubstrate.ts` | Create | Repo-owned CLI helper for current workspace substrate audit/init/update semantics |
 | `tests/workspace-substrate-bin.test.ts` | Create | Lock the CLI helper behavior for preview/apply/review-copy flows |
-| `scripts/windows/*` | Later | Repo-owned collaboration/bootstrap helper rewrite replacing external initialize/update reliance |
-| `scripts/linux/*` | Later | Repo-owned non-Windows collaboration/bootstrap helper rewrite |
+| `scripts/windows/Invoke-WorkspaceSubstrate.ps1` | Create | Windows wrapper for the repo-owned substrate helper |
+| `scripts/linux/workspace-substrate.sh` | Create | Linux wrapper for the repo-owned substrate helper |
+| `scripts/macos/workspace-substrate.sh` | Create | macOS wrapper for the repo-owned substrate helper |
 | `docs/research/README.md` | Modify | Index the new validation note |
 | `PROGRESS.md` | Modify | Reflect the pilot collaboration slice if governance truth changes |
 
@@ -342,6 +343,7 @@ collaboration/bootstrap baseline rather than a submodule dependency.
 | 2026-03-29 | Reopened the plan for pilot slice 2 so `project-bootstrap/templates/base` and initialize/update semantics are extracted and rewritten into repo-owned collaboration helpers before the repo split |
 | 2026-03-29 | Added a dedicated extraction inventory for the remaining `project-bootstrap` template families and initialize/update semantics that still need a repo-owned rewrite before split |
 | 2026-03-29 | Landed the first repo-owned helper surface via `cats-runtime-workspace`, exposing current workspace substrate audit/init/update semantics as a local CLI instead of only through runtime tools/tests |
+| 2026-03-29 | Added platform wrapper scripts so the repo-owned workspace substrate helper has first-party Windows/Linux/macOS entrypoints under `scripts/` |
 
 ---
 
