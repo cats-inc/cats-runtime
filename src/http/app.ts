@@ -42,7 +42,6 @@ import { createRuntimeBrowserDrivers } from '../backends/browser/createDrivers.j
 import { bearerAuth } from './auth.js';
 import { injectRuntimeDashboardHealthOverlay } from './dashboardHealthOverlay.js';
 import { injectSharedUI } from './uiInjector.js';
-import { injectDashboardScanPanel } from './dashboardScanPanel.js';
 import { injectRuntimeShellState, type RuntimeSurface } from './ui/runtimeShell.js';
 import { bootstrapGuard } from './routes/bootstrapGuard.js';
 import { discoveryRoutes } from './routes/discovery.js';
@@ -236,7 +235,6 @@ export function createRuntimeApp(ctx: AppContext) {
     surface: RuntimeSurface,
     options: {
       includeHealthOverlay?: boolean;
-      includeDashboardScanPanel?: boolean;
     } = {},
   ): string {
     let html = readFileSync(resolve(__dirname, relativePath), 'utf-8');
@@ -247,9 +245,6 @@ export function createRuntimeApp(ctx: AppContext) {
     html = injectSharedUI(html);
     if (options.includeHealthOverlay) {
       html = injectRuntimeDashboardHealthOverlay(html);
-    }
-    if (options.includeDashboardScanPanel) {
-      html = injectDashboardScanPanel(html);
     }
     return html;
   }
@@ -263,7 +258,6 @@ export function createRuntimeApp(ctx: AppContext) {
     }
     return c.html(renderRuntimePage('../../public/index.html', 'dashboard', {
       includeHealthOverlay: true,
-      includeDashboardScanPanel: true,
     }));
   });
 
@@ -271,7 +265,6 @@ export function createRuntimeApp(ctx: AppContext) {
   app.get('/dashboard', (c) => {
     return c.html(renderRuntimePage('../../public/index.html', 'dashboard', {
       includeHealthOverlay: true,
-      includeDashboardScanPanel: true,
     }));
   });
 
