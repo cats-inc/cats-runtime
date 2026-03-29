@@ -891,41 +891,39 @@
           <button type="button" class="runtime-btn runtime-btn-secondary !px-3" onclick="browseDir('inputCwd')" title="Browse">Browse</button>
         </div>
       </div>
-      <div class="runtime-field">
-        <label class="runtime-field-label">Provider</label>
-        <select id="inputProvider" class="runtime-select" onchange="onProviderChange()">
-          <option value="claude">claude</option>
-          <option value="codex">codex</option>
-          <option value="gemini">gemini</option>
-          <option value="copilot">copilot</option>
-          <option value="cursor">cursor</option>
-          <option value="kiro">kiro</option>
-          <option value="auggie">auggie</option>
-          <option value="opencode">opencode</option>
-        </select>
-      </div>
-      <div class="runtime-field" id="instanceGroup">
-        <label class="runtime-field-label">Provider Instance</label>
-        <select id="inputInstance" class="runtime-select" onchange="onInstanceChange()"></select>
-      </div>
-      <div class="provider-capability-card" id="providerCapabilityPreview">
-        <div class="provider-capability-card-header">
-          <h4 class="provider-capability-card-title">Provider Capability Preview</h4>
-          <span class="badge" id="providerCapabilityBadge">Loading</span>
+      <div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));">
+        <div class="runtime-field">
+          <label class="runtime-field-label">Provider</label>
+          <select id="inputProvider" class="runtime-select" onchange="onProviderChange()">
+            <option value="claude">claude</option>
+            <option value="codex">codex</option>
+            <option value="gemini">gemini</option>
+            <option value="cursor">cursor</option>
+            <option value="copilot">copilot</option>
+            <option value="opencode">opencode</option>
+            <option value="auggie">auggie</option>
+            <option value="kiro">kiro</option>
+          </select>
         </div>
-        <div class="provider-capability-summary" id="providerCapabilitySummary">
-          Choose a provider target to inspect runtime/tool visibility.
+        <div class="runtime-field" id="instanceGroup">
+          <label class="runtime-field-label">Provider Instance</label>
+          <select id="inputInstance" class="runtime-select" onchange="onInstanceChange()"></select>
         </div>
-        <div class="provider-capability-grid" id="providerCapabilityGrid"></div>
-        <div class="insight-tags" id="providerCapabilityTags"></div>
-        <ul class="insight-list" id="providerCapabilityCatalog"></ul>
       </div>
       <div class="runtime-field">
         <div class="flex items-center justify-between gap-2">
           <label class="runtime-field-label">Model Routing</label>
           <span id="inputModelSupportBadge" class="runtime-auth-badge" data-state="idle">Loading</span>
         </div>
-        <select id="inputModelChoice" class="runtime-select" onchange="onCreateModelChoiceChange()"></select>
+        <select id="inputRoutingMode" class="runtime-select" onchange="onCreateRoutingModeChange()"></select>
+        <div class="runtime-field hidden" id="inputPresetGroup">
+          <label class="runtime-field-label">Preset</label>
+          <select id="inputPresetChoice" class="runtime-select" onchange="onCreateRoutingPresetChange()"></select>
+        </div>
+        <div class="runtime-field hidden" id="inputEntryGroup">
+          <label class="runtime-field-label">Model</label>
+          <select id="inputEntryChoice" class="runtime-select" onchange="onCreateRoutingEntryChange()"></select>
+        </div>
         <input type="text" id="inputModel" class="runtime-input hidden" placeholder="e.g. claude-sonnet-4-6" />
         <div id="inputModelControls" class="space-y-2"></div>
         <p id="inputModelHint" class="text-xs text-slate-500"></p>
@@ -1009,7 +1007,7 @@ function escapeHtml(value) {
 }
 
 const API_BASE = window.location.origin;
-const PROVIDER_ORDER = ['openclaw', 'claude', 'codex', 'gemini', 'pi', 'goose', 'junie', 'ollama', 'copilot', 'cursor', 'kiro', 'auggie', 'opencode'];
+const PROVIDER_ORDER = ['claude', 'codex', 'gemini', 'cursor', 'copilot', 'opencode', 'goose', 'pi', 'auggie', 'junie', 'kiro', 'ollama', 'openclaw'];
 const CLI_RUNTIME_ORDER = ['native', 'wsl', 'docker'];
 let currentSessionId = null;
 let isStreaming = false;
@@ -1022,8 +1020,6 @@ const providerAdvancedCatalogCache = new Map();
 const providerAdvancedCatalogInFlight = new Map();
 let currentCreateModelCatalog = null;
 let createModelCatalogRequestId = 0;
-const providerToolingCache = new Map();
-const providerToolingInFlight = new Map();
 let sessionScanInFlight = false;
 
 function apiKey() {
@@ -1139,6 +1135,19 @@ function configuredProviderNames() {
   return [...ordered, ...extras];
 }
 
+function configuredProviderNamesRaw() {
+  if (!providerCatalog?.providers) return [];
+
+  return Object.keys(providerCatalog.providers).filter(
+    (providerName) => (providerCatalog.providers[providerName]?.instances?.length || 0) > 0,
+  );
+}
+
+function rawInstanceTargetValue(instance) {
+  if (!instance) return 'default';
+  return instance.target || instance.id || 'default';
+}
+
 function runtimeModeOrder(mode) {
   const index = CLI_RUNTIME_ORDER.indexOf(mode || 'native');
   return index >= 0 ? index : CLI_RUNTIME_ORDER.length;
@@ -1231,25 +1240,8 @@ function formatRuntimeDescriptor(entry) {
   return bits.join(' ');
 }
 
-function providerToolingCacheKey(providerName, instanceTarget) {
-  return `${providerName || ''}::${instanceTarget || ''}`;
-}
-
 function providerAdvancedCatalogCacheKey(providerName, instanceTarget) {
   return `${providerName || ''}::${instanceTarget || ''}`;
-}
-
-function toolingCatalogMethodLabel(method) {
-  switch (method) {
-    case 'tools_catalog':
-      return 'remote catalog';
-    case 'tools_effective':
-      return 'effective tools';
-    case 'providers_get':
-      return 'provider config';
-    default:
-      return method || 'unknown';
-  }
 }
 
 function renderInsightTags(tags) {
@@ -1257,44 +1249,6 @@ function renderInsightTags(tags) {
     .filter(Boolean)
     .map((tag) => `<span class="insight-tag">${escapeHtml(tag)}</span>`)
     .join('');
-}
-
-async function fetchProviderTooling(providerName, instanceTarget) {
-  if (!providerName || !instanceTarget) {
-    return null;
-  }
-
-  const key = providerToolingCacheKey(providerName, instanceTarget);
-  if (providerToolingCache.has(key)) {
-    return providerToolingCache.get(key);
-  }
-  if (providerToolingInFlight.has(key)) {
-    return providerToolingInFlight.get(key);
-  }
-
-  const task = fetch(
-    `${API_BASE}/providers/${encodeURIComponent(providerName)}/tools?instance=${encodeURIComponent(instanceTarget)}`,
-    { headers: headers() },
-  )
-    .then(async (response) => {
-      if (!response.ok) {
-        const detail = await response.text().catch(() => '');
-        throw new Error(detail || `HTTP ${response.status}`);
-      }
-      return response.json();
-    })
-    .then((payload) => {
-      providerToolingCache.set(key, payload);
-      providerToolingInFlight.delete(key);
-      return payload;
-    })
-    .catch((error) => {
-      providerToolingInFlight.delete(key);
-      throw error;
-    });
-
-  providerToolingInFlight.set(key, task);
-  return task;
 }
 
 function currentProviderSelection() {
@@ -1363,6 +1317,149 @@ function resetCreateModelControls() {
   }
 }
 
+function renderCreateRoutingSelectOptions(selectEl, options, selectedValue) {
+  if (!selectEl) {
+    return '';
+  }
+
+  selectEl.innerHTML = options
+    .map((option) => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`)
+    .join('');
+  selectEl.disabled = options.length === 0;
+  const nextValue = options.some((option) => option.value === selectedValue)
+    ? selectedValue
+    : (options[0]?.value || '');
+  selectEl.value = nextValue;
+  return nextValue;
+}
+
+function describeCreateRoutingCatalog(catalog) {
+  const presets = Array.isArray(catalog?.presets)
+    ? catalog.presets.filter((preset) => preset && preset.id && preset.availability !== 'unavailable')
+    : [];
+  const entries = Array.isArray(catalog?.entries)
+    ? catalog.entries.filter((entry) => entry && entry.id)
+    : [];
+  const hasRecommended = Boolean(
+    window.CatsUI?.resolveAdvancedCatalogChoice
+      ? window.CatsUI.resolveAdvancedCatalogChoice(catalog, 'default')
+      : null,
+  );
+  const modes = [];
+  if (hasRecommended) modes.push({ value: 'recommended', label: 'Recommended' });
+  if (presets.length > 0) modes.push({ value: 'preset', label: 'Preset' });
+  if (entries.length > 0) modes.push({ value: 'model', label: 'Pin model' });
+  modes.push({ value: 'custom', label: 'Custom legacy model' });
+  return { modes, presets, entries };
+}
+
+function getDefaultCreatePresetId(catalog, presets) {
+  const defaultPresetId = catalog?.defaultSelection?.presetId;
+  if (defaultPresetId && presets.some((preset) => preset.id === defaultPresetId)) {
+    return defaultPresetId;
+  }
+  return presets[0]?.id || '';
+}
+
+function getDefaultCreateEntryId(catalog, entries) {
+  const resolved = window.CatsUI?.resolveAdvancedCatalogChoice
+    ? window.CatsUI.resolveAdvancedCatalogChoice(catalog, 'default')
+    : null;
+  if (resolved?.entryId && entries.some((entry) => entry.id === resolved.entryId)) {
+    return resolved.entryId;
+  }
+  const defaultEntry = entries.find((entry) => entry.default);
+  return defaultEntry?.id || entries[0]?.id || '';
+}
+
+function getCreateRoutingChoiceId() {
+  const modeEl = document.getElementById('inputRoutingMode');
+  const presetEl = document.getElementById('inputPresetChoice');
+  const entryEl = document.getElementById('inputEntryChoice');
+  const mode = modeEl?.value || 'custom';
+
+  if (mode === 'recommended') {
+    return 'default';
+  }
+  if (mode === 'preset') {
+    const presetId = presetEl?.value || '';
+    return presetId ? `preset:${presetId}` : 'default';
+  }
+  if (mode === 'model') {
+    const entryId = entryEl?.value || '';
+    return entryId ? `entry:${entryId}` : 'default';
+  }
+  return 'custom';
+}
+
+function syncCreateRoutingSelectors(catalog, preserveCurrent = false) {
+  const modeEl = document.getElementById('inputRoutingMode');
+  const presetEl = document.getElementById('inputPresetChoice');
+  const entryEl = document.getElementById('inputEntryChoice');
+  if (!modeEl || !presetEl || !entryEl) {
+    return;
+  }
+
+  const { modes, presets, entries } = describeCreateRoutingCatalog(catalog);
+  renderCreateRoutingSelectOptions(
+    modeEl,
+    modes,
+    preserveCurrent ? modeEl.value : '',
+  );
+
+  const presetOptions = presets.map((preset) => ({
+    value: preset.id,
+    label: preset.label || preset.id,
+  }));
+  const entryOptions = entries.map((entry) => ({
+    value: entry.id,
+    label: entry.label || entry.id,
+  }));
+
+  renderCreateRoutingSelectOptions(
+    presetEl,
+    presetOptions,
+    preserveCurrent && presetEl.value
+      ? presetEl.value
+      : getDefaultCreatePresetId(catalog, presets),
+  );
+  renderCreateRoutingSelectOptions(
+    entryEl,
+    entryOptions,
+    preserveCurrent && entryEl.value
+      ? entryEl.value
+      : getDefaultCreateEntryId(catalog, entries),
+  );
+
+  modeEl.disabled = modes.length <= 1;
+  presetEl.disabled = presetOptions.length <= 1;
+  entryEl.disabled = entryOptions.length <= 1;
+}
+
+function setLegacyCreateModelRouting(message) {
+  const modeEl = document.getElementById('inputRoutingMode');
+  const presetEl = document.getElementById('inputPresetChoice');
+  const entryEl = document.getElementById('inputEntryChoice');
+  const presetGroup = document.getElementById('inputPresetGroup');
+  const entryGroup = document.getElementById('inputEntryGroup');
+  const customInput = document.getElementById('inputModel');
+  const hintEl = document.getElementById('inputModelHint');
+
+  currentCreateModelCatalog = null;
+  renderCreateRoutingSelectOptions(modeEl, [
+    { value: 'custom', label: 'Custom legacy model' },
+  ], 'custom');
+  renderCreateRoutingSelectOptions(presetEl, [], '');
+  renderCreateRoutingSelectOptions(entryEl, [], '');
+  if (modeEl) modeEl.disabled = false;
+  if (presetGroup) presetGroup.classList.add('hidden');
+  if (entryGroup) entryGroup.classList.add('hidden');
+  if (customInput) customInput.classList.remove('hidden');
+  if (hintEl) hintEl.textContent = message;
+  setCreateModelSupportBadge('Legacy', 'idle');
+  resetCreateModelControls();
+}
+
 function renderCreateModelControlField(control, value) {
   const safeKey = escapeHtml(control.key);
   const label = escapeHtml(control.label || control.key);
@@ -1428,15 +1525,20 @@ function renderCreateModelControlField(control, value) {
 }
 
 function renderCreateModelChoice() {
-  const choiceEl = document.getElementById('inputModelChoice');
+  const modeEl = document.getElementById('inputRoutingMode');
+  const presetGroup = document.getElementById('inputPresetGroup');
+  const entryGroup = document.getElementById('inputEntryGroup');
   const hintEl = document.getElementById('inputModelHint');
   const customInput = document.getElementById('inputModel');
   const controlsEl = document.getElementById('inputModelControls');
-  if (!choiceEl || !hintEl || !customInput || !controlsEl) {
+  if (!modeEl || !presetGroup || !entryGroup || !hintEl || !customInput || !controlsEl) {
     return;
   }
 
-  const choiceId = choiceEl.value || 'custom';
+  const mode = modeEl.value || 'custom';
+  presetGroup.classList.toggle('hidden', mode !== 'preset');
+  entryGroup.classList.toggle('hidden', mode !== 'model');
+  const choiceId = getCreateRoutingChoiceId();
   const catalog = currentCreateModelCatalog;
   const resolved = window.CatsUI?.resolveAdvancedCatalogChoice
     ? window.CatsUI.resolveAdvancedCatalogChoice(catalog, choiceId)
@@ -1469,6 +1571,7 @@ function renderCreateModelChoice() {
     : {};
 
   const bits = [];
+  if (mode === 'recommended') bits.push('Recommended');
   if (preset?.label) bits.push(preset.label);
   if (entry) bits.push(entry.label || entry.id);
   if (catalog.support?.tier) bits.push(`tier: ${catalog.support.tier}`);
@@ -1481,7 +1584,15 @@ function renderCreateModelChoice() {
   }
 }
 
-function onCreateModelChoiceChange() {
+function onCreateRoutingModeChange() {
+  renderCreateModelChoice();
+}
+
+function onCreateRoutingPresetChange() {
+  renderCreateModelChoice();
+}
+
+function onCreateRoutingEntryChange() {
   renderCreateModelChoice();
 }
 
@@ -1504,9 +1615,8 @@ function readCreateModelControlValues() {
 }
 
 function buildCreateModelPayload() {
-  const choiceEl = document.getElementById('inputModelChoice');
   const customInput = document.getElementById('inputModel');
-  const choiceId = choiceEl?.value || 'custom';
+  const choiceId = getCreateRoutingChoiceId();
   const catalog = currentCreateModelCatalog;
   const resolved = window.CatsUI?.resolveAdvancedCatalogChoice
     ? window.CatsUI.resolveAdvancedCatalogChoice(catalog, choiceId)
@@ -1528,10 +1638,12 @@ function buildCreateModelPayload() {
 }
 
 async function refreshCreateModelRouting() {
-  const choiceEl = document.getElementById('inputModelChoice');
+  const modeEl = document.getElementById('inputRoutingMode');
+  const presetGroup = document.getElementById('inputPresetGroup');
+  const entryGroup = document.getElementById('inputEntryGroup');
   const hintEl = document.getElementById('inputModelHint');
   const customInput = document.getElementById('inputModel');
-  if (!choiceEl || !hintEl || !customInput) {
+  if (!modeEl || !presetGroup || !entryGroup || !hintEl || !customInput) {
     return;
   }
 
@@ -1539,8 +1651,12 @@ async function refreshCreateModelRouting() {
   const requestId = ++createModelCatalogRequestId;
   currentCreateModelCatalog = null;
   setCreateModelSupportBadge('Loading', 'idle');
-  choiceEl.innerHTML = '<option value="custom">Loading advanced catalog...</option>';
-  choiceEl.disabled = true;
+  renderCreateRoutingSelectOptions(modeEl, [
+    { value: '', label: 'Loading routing...' },
+  ], '');
+  modeEl.disabled = true;
+  presetGroup.classList.add('hidden');
+  entryGroup.classList.add('hidden');
   customInput.classList.add('hidden');
   hintEl.textContent = 'Loading model catalog...';
   resetCreateModelControls();
@@ -1550,16 +1666,7 @@ async function refreshCreateModelRouting() {
     if (requestId !== createModelCatalogRequestId) return;
 
     currentCreateModelCatalog = catalog;
-    const choices = window.CatsUI?.getAdvancedCatalogChoices
-      ? window.CatsUI.getAdvancedCatalogChoices(catalog)
-      : [];
-    choiceEl.innerHTML = choices
-      .map((choice) => `<option value="${escapeHtml(choice.id)}">${escapeHtml(choice.label)}</option>`)
-      .join('');
-    choiceEl.disabled = choices.length === 0;
-    choiceEl.value = window.CatsUI?.getAdvancedCatalogDefaultChoice
-      ? window.CatsUI.getAdvancedCatalogDefaultChoice(catalog)
-      : 'custom';
+    syncCreateRoutingSelectors(catalog, true);
 
     const tier = catalog?.support?.tier || 'read_only';
     setCreateModelSupportBadge(
@@ -1570,155 +1677,10 @@ async function refreshCreateModelRouting() {
   } catch (error) {
     if (requestId !== createModelCatalogRequestId) return;
 
-    currentCreateModelCatalog = null;
-    choiceEl.innerHTML = '<option value="custom">Custom legacy model</option>';
-    choiceEl.value = 'custom';
-    choiceEl.disabled = false;
-    setCreateModelSupportBadge('Legacy', 'idle');
-    hintEl.textContent = error instanceof Error ? error.message : 'Advanced catalog unavailable.';
-    customInput.classList.remove('hidden');
-    resetCreateModelControls();
-  }
-}
-
-function extractProviderTooling(payload, fallbackInstance) {
-  if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'summary')) {
-    return payload;
-  }
-  return fallbackInstance?.tooling || null;
-}
-
-function providerCapabilityGridRows({ providerName, instance, agentRuntime, tooling }) {
-  const rows = [
-    ['Target', `${providerName}/${instance?.id || 'default'}`],
-    ['Backend', instance?.backend || 'unknown'],
-  ];
-
-  if (instance?.transport) {
-    rows.push(['Transport', instance.transport]);
-  }
-
-  if (agentRuntime?.transport) {
-    rows.push(['Protocol', `${agentRuntime.transport.kind} · ${humanizeToken(agentRuntime.transport.protocol)}`]);
-    rows.push(['Continuity', agentRuntime.continuity?.providerManagedSessions ? 'provider-managed' : 'runtime-managed']);
-  }
-
-  if (tooling?.observability?.catalog) {
-    rows.push(['Tooling', humanizeToken(tooling.observability.catalog)]);
-  }
-
-  if (tooling?.policy?.profile) {
-    rows.push(['Tool profile', tooling.policy.profile]);
-  }
-
-  return rows
-    .map(([label, value]) => (
-      `<div class="provider-capability-kv"><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`
-    ))
-    .join('');
-}
-
-function providerCapabilityCatalogItems(tooling) {
-  const catalog = tooling?.catalog;
-  if (!catalog) {
-    return '';
-  }
-
-  if (catalog.status === 'unavailable') {
-    return `<li><strong>Remote tools unavailable</strong><span class="insight-secondary">${escapeHtml(catalog.error || catalog.summary)}</span></li>`;
-  }
-
-  const topTools = (catalog.tools || []).slice(0, 5);
-  const toolItems = topTools.map((tool) => {
-    const detailBits = [];
-    if (tool.title && tool.title !== tool.name) {
-      detailBits.push(tool.title);
-    }
-    if (tool.groupId) {
-      detailBits.push(`group:${tool.groupId}`);
-    }
-    if (tool.pluginId) {
-      detailBits.push(`plugin:${tool.pluginId}`);
-    }
-    detailBits.push(tool.source || 'unknown');
-    return `<li><strong>${escapeHtml(tool.name)}</strong><span class="insight-secondary">${escapeHtml(detailBits.join(' · '))}</span></li>`;
-  });
-  if ((catalog.toolCount || 0) > topTools.length) {
-    toolItems.push(
-      `<li><strong>${escapeHtml(String(catalog.toolCount - topTools.length))} more tool(s)</strong><span class="insight-secondary">${escapeHtml(toolingCatalogMethodLabel(catalog.method))}</span></li>`,
+    setLegacyCreateModelRouting(
+      error instanceof Error ? error.message : 'Advanced catalog unavailable.',
     );
   }
-  return toolItems.join('');
-}
-
-async function refreshProviderCapabilityPreview() {
-  const summaryEl = document.getElementById('providerCapabilitySummary');
-  const badgeEl = document.getElementById('providerCapabilityBadge');
-  const gridEl = document.getElementById('providerCapabilityGrid');
-  const tagsEl = document.getElementById('providerCapabilityTags');
-  const catalogEl = document.getElementById('providerCapabilityCatalog');
-  const { providerName, instanceTarget, instance } = currentProviderSelection();
-
-  if (!providerName || !instance) {
-    badgeEl.textContent = 'Unavailable';
-    summaryEl.textContent = 'Choose a configured provider target to inspect capabilities.';
-    gridEl.innerHTML = '';
-    tagsEl.innerHTML = '';
-    catalogEl.innerHTML = '';
-    return;
-  }
-
-  badgeEl.textContent = instance.backend || 'unknown';
-  summaryEl.textContent = 'Loading capability preview...';
-  gridEl.innerHTML = '';
-  tagsEl.innerHTML = '';
-  catalogEl.innerHTML = '';
-
-  let toolingPayload = null;
-  try {
-    toolingPayload = await fetchProviderTooling(providerName, instanceTarget);
-  } catch (error) {
-    const fallbackTooling = extractProviderTooling(null, instance) || {};
-    toolingPayload = {
-      ...fallbackTooling,
-      catalog: {
-        status: 'unavailable',
-        method: 'providers_get',
-        error: error instanceof Error ? error.message : String(error),
-        summary: 'Provider tool summary could not be loaded.',
-      },
-    };
-  }
-
-  const { providerName: currentProviderName, instanceTarget: currentInstanceTarget } = currentProviderSelection();
-  if (providerName !== currentProviderName || instanceTarget !== currentInstanceTarget) {
-    return;
-  }
-
-  const tooling = extractProviderTooling(toolingPayload, instance);
-  const agentRuntime = toolingPayload?.agentRuntime || instance?.agentRuntime;
-  const tags = [];
-  if (tooling?.source) {
-    tags.push(`tools: ${humanizeToken(tooling.source)}`);
-  }
-  if (tooling?.observability?.toolCallEvents) {
-    tags.push('tool events');
-  }
-  if (tooling?.observability?.runtimeServices) {
-    tags.push('runtime services');
-  }
-  if (tooling?.catalog?.status === 'ready') {
-    tags.push(`${tooling.catalog.toolCount} remote tools`);
-  }
-  if (agentRuntime?.capabilities?.modelDiscovery) {
-    tags.push('live models');
-  }
-
-  summaryEl.textContent = tooling?.summary
-    || 'No additional runtime capability summary is available for this target yet.';
-  gridEl.innerHTML = providerCapabilityGridRows({ providerName, instance, agentRuntime, tooling });
-  tagsEl.innerHTML = renderInsightTags(tags);
-  catalogEl.innerHTML = providerCapabilityCatalogItems(tooling);
 }
 
 function sessionInsightCard(title, summary, tags, items) {
@@ -1846,19 +1808,17 @@ function syncProviderSelect() {
   if (!providerCatalog?.providers) {
     providerSelect.disabled = true;
     setCreateModalEnabled(false);
-    refreshProviderCapabilityPreview();
     return;
   }
 
   const current = providerSelect.value || 'claude';
-  const providers = configuredProviderNames();
+  const providers = configuredProviderNamesRaw();
 
   if (providers.length === 0) {
     providerSelect.innerHTML = '<option value="">No configured providers</option>';
     providerSelect.value = '';
     providerSelect.disabled = true;
     setCreateModalEnabled(false);
-    refreshProviderCapabilityPreview();
     return;
   }
 
@@ -1886,35 +1846,27 @@ function onProviderChange() {
     instanceSelect.disabled = true;
     instanceGroup.style.display = 'none';
     setCreateModalEnabled(false);
-    refreshProviderCapabilityPreview();
-    currentCreateModelCatalog = null;
-    document.getElementById('inputModelChoice').innerHTML = '<option value="custom">Custom legacy model</option>';
-    document.getElementById('inputModelChoice').value = 'custom';
-    document.getElementById('inputModelChoice').disabled = false;
-    document.getElementById('inputModel').classList.remove('hidden');
-    document.getElementById('inputModelHint').textContent = 'Enter a model id manually.';
-    setCreateModelSupportBadge('Legacy', 'idle');
-    resetCreateModelControls();
+    setLegacyCreateModelRouting('Enter a model id manually.');
     return;
   }
 
   instanceSelect.innerHTML = instances
-    .map((instance) => `<option value="${instance.target || instance.id}">${formatInstanceOptionLabel(providerName, instance)}</option>`)
+    .map((instance) => `<option value="${rawInstanceTargetValue(instance)}">${rawInstanceTargetValue(instance)}</option>`)
     .join('');
+  const defaultInstance = instances.find((instance) => (
+    instance.id === provider?.defaultInstance
+    && (!provider?.defaultBackend || instance.backend === provider.defaultBackend)
+  ));
   instanceSelect.value = instances.some((instance) => (instance.target || instance.id) === selected)
     ? selected
-    : ((provider?.defaultBackend && provider?.defaultInstance)
-      ? `${provider.defaultBackend}/${provider.defaultInstance}`
-      : (provider?.defaultInstance || instances[0]?.target || instances[0]?.id || ''));
+    : rawInstanceTargetValue(defaultInstance || instances[0]);
   instanceSelect.disabled = instances.length <= 1;
   instanceGroup.style.display = '';
   setCreateModalEnabled(true);
-  refreshProviderCapabilityPreview();
   void refreshCreateModelRouting();
 }
 
 function onInstanceChange() {
-  refreshProviderCapabilityPreview();
   void refreshCreateModelRouting();
 }
 
@@ -3075,7 +3027,6 @@ async function openCreateModal() {
   onWorkspaceContractChange();
   document.getElementById('inputWorkspaceKind').focus();
   await refreshProviderCatalog();
-  await refreshProviderCapabilityPreview();
   await refreshCreateModelRouting();
 }
 
@@ -3086,12 +3037,7 @@ function closeCreateModal() {
 function onWorkspaceContractChange() {
   const kind = document.getElementById('inputWorkspaceKind').value;
   const accessEl = document.getElementById('inputWorkspaceAccess');
-  if (kind === 'sandbox') {
-    accessEl.value = 'read_write';
-    accessEl.disabled = true;
-  } else {
-    accessEl.disabled = false;
-  }
+  accessEl.disabled = false;
   const access = accessEl.value;
   const needsCwd = kind === 'source' || kind === 'worktree';
   document.getElementById('cwdGroup').style.display = needsCwd ? '' : 'none';

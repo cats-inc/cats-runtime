@@ -254,7 +254,7 @@ backends:
         client_id: cats-runtime
         instances:
           gateway:
-            model: openclaw-coder
+            model: openai-codex/gpt-5.4
 
       # An Agent SDK bridge can also front an existing product family such as
       # Claude. Keep CLI/API/agent routing independent; this block only makes
