@@ -270,6 +270,17 @@ difference between logical session identity and provider-managed resume tokens.
 
 - proof that `src/backends/agent` is a real category, not a one-off folder
 
+## Follow-through Notes
+
+- OpenClaw remote tool discovery now covers both provider-level
+  `tools.catalog` and session-scoped `tools.effective` through the existing
+  `GET /providers/{provider}/tools` surface via `scope=effective` plus
+  `sessionId` / `sessionKey`.
+- The remaining gap for this plan family is no longer basic OpenClaw adapter
+  breadth; it is stronger later-target semantic probing and broader non-OpenClaw
+  remote-tool evidence, especially for Agent SDK bridge targets that still stop
+  at provider-registry depth.
+
 ## Files to Create/Modify
 
 | File | Action | Description |

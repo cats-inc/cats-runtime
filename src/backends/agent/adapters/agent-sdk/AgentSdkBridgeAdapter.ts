@@ -23,6 +23,7 @@ import type {
   AgentAdapterInspection,
   AgentAdapterToolCatalog,
   AgentAdapterToolCatalogEntry,
+  AgentAdapterToolCatalogRequest,
   AgentBackendOptions,
   AgentAdapterProbeCheck,
   AgentInvokeInput,
@@ -126,6 +127,7 @@ function buildInspection(
       probe: true,
       modelDiscovery: true,
       toolCatalog: true,
+      effectiveToolCatalog: false,
       cancel: true,
       runtimeServices: true,
       toolCallEvents: true,
@@ -827,7 +829,17 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
       .map((entry) => ({ id: entry, label: entry }));
   }
 
-  async listTools(instance: RemoteProviderInstanceConfig): Promise<AgentAdapterToolCatalog> {
+  async listTools(
+    instance: RemoteProviderInstanceConfig,
+    request: AgentAdapterToolCatalogRequest = {},
+  ): Promise<AgentAdapterToolCatalog> {
+    if (request.scope === 'effective') {
+      throw new Error(
+        `Agent SDK bridge does not support session-effective remote tool discovery for `
+        + `${instance.providerName}/${instance.id}`,
+      );
+    }
+
     const env = this.options.env || process.env;
     const baseUrl = resolveBaseUrl(instance, env).replace(/\/$/, '');
     const response = await this.fetchImpl(`${baseUrl}/api/v1/providers`, {

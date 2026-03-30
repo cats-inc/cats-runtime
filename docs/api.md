@@ -3293,10 +3293,16 @@ The object includes:
 - bounded `auth` inspection (`mechanisms`, configured credential slots)
 - `continuity` truth for provider-managed session state and remote cancel support
 - additive capability flags such as `probe`, `modelDiscovery`, `toolCatalog`,
-  `cancel`, `runtimeServices`, and `toolCallEvents`
+  `effectiveToolCatalog`, `cancel`, `runtimeServices`, and `toolCallEvents`
 
 `GET /providers/{provider}/tools` is the standalone runtime-owned tooling read
-surface for one resolved target. It accepts optional `?instance=<backend/id>`
+surface for one resolved target. It accepts:
+
+- optional `?instance=<backend/id>`
+- optional `?scope=catalog|effective` (`catalog` is the default)
+- for `scope=effective`, either `?sessionId=<runtime-session-id>` or
+  `?sessionKey=<logical-session-key>`
+
 and returns the same bounded tooling summary without forcing hosts to fetch the
 full provider topology:
 
@@ -3406,8 +3412,8 @@ Agent targets now split into two cases:
 - adapters without remote tool discovery support still return the bounded
   `provider_managed` summary only
 - adapters with bounded discovery support (the first slices are OpenClaw
-  `tools.catalog` and Agent SDK bridge provider-registry catalogs) return
-  `discoverable: true`, set
+  `tools.catalog`, OpenClaw session-scoped `tools.effective`, and Agent SDK
+  bridge provider-registry catalogs) return `discoverable: true`, set
   `observability.catalog: "provider_remote_enumerated"`, and may include an
   additive `catalog` object
 
@@ -3438,6 +3444,40 @@ machine-readable remote inventory:
   ]
 }
 ```
+
+When `scope=effective` is requested and the target supports session-scoped
+effective tool inspection, the route also returns a `catalogContext` block and
+switches the remote catalog method to `tools_effective`:
+
+```json
+{
+  "catalogContext": {
+    "scope": "effective",
+    "sessionId": "runtime-session-1",
+    "sessionKey": "task-123"
+  },
+  "catalog": {
+    "source": "provider_remote",
+    "status": "ready",
+    "method": "tools_effective",
+    "summary": "2 tool(s) across 2 group(s) available to the current OpenClaw session.",
+    "toolCount": 2,
+    "groupCount": 2,
+    "groups": [
+      { "id": "channel", "toolCount": 1 },
+      { "id": "core", "toolCount": 1 }
+    ],
+    "tools": [
+      { "name": "exec", "source": "core", "groupId": "core" },
+      { "name": "send_message", "source": "channel", "groupId": "channel" }
+    ]
+  }
+}
+```
+
+This session-effective slice is currently OpenClaw-specific. It depends on an
+existing logical session context, so `scope=effective` requires a runtime
+`sessionId` or caller-supplied `sessionKey`.
 
 If a remote catalog probe is supported but temporarily fails, the route still
 returns `200` and includes `catalog.status: "unavailable"` plus a bounded

@@ -26,6 +26,7 @@ import type {
   AgentAdapterToolCatalog,
   AgentAdapterToolCatalogEntry,
   AgentAdapterToolCatalogGroup,
+  AgentAdapterToolCatalogRequest,
 } from '../../types.js';
 import { parseRecord, parseServices, prependInstructions, readString } from '../../utils.js';
 
@@ -190,6 +191,7 @@ function buildInspection(
       probe: true,
       modelDiscovery: true,
       toolCatalog: true,
+      effectiveToolCatalog: true,
       cancel: false,
       runtimeServices: true,
       toolCallEvents: false,
@@ -511,6 +513,16 @@ function parseGatewayToolCatalog(payload: unknown): AgentAdapterToolCatalog {
     groupCount: groups.length,
     groups,
     tools,
+  };
+}
+
+function parseGatewayEffectiveToolCatalog(payload: unknown): AgentAdapterToolCatalog {
+  const catalog = parseGatewayToolCatalog(payload);
+  return {
+    ...catalog,
+    method: 'tools_effective',
+    summary: `${catalog.toolCount} tool(s) across ${catalog.groupCount} group(s) `
+      + 'available to the current OpenClaw session.',
   };
 }
 
@@ -1047,7 +1059,10 @@ export class OpenClawAdapter implements AgentAdapter {
     }
   }
 
-  async listTools(instance: RemoteProviderInstanceConfig): Promise<AgentAdapterToolCatalog> {
+  async listTools(
+    instance: RemoteProviderInstanceConfig,
+    request: AgentAdapterToolCatalogRequest = {},
+  ): Promise<AgentAdapterToolCatalog> {
     const env = this.options.env || process.env;
     const factory = this.options.webSocketFactory
       || ((url: string | URL, init?: WebSocketInit) => new WebSocket(url, init));
@@ -1058,11 +1073,23 @@ export class OpenClawAdapter implements AgentAdapter {
 
     try {
       await client.connect(buildConnectParams(instance, env), controller.signal);
-      const payload = await client.request(
-        'tools.catalog',
-        {},
-        DEFAULT_CONNECT_TIMEOUT_MS,
-      );
+      if (request.scope === 'effective') {
+        if (!request.sessionKey) {
+          throw new Error(
+            `OpenClaw effective tool discovery requires a sessionKey for `
+            + `${instance.providerName}/${instance.id}`,
+          );
+        }
+
+        const payload = await client.request(
+          'tools.effective',
+          { sessionKey: request.sessionKey },
+          DEFAULT_CONNECT_TIMEOUT_MS,
+        );
+        return parseGatewayEffectiveToolCatalog(payload);
+      }
+
+      const payload = await client.request('tools.catalog', {}, DEFAULT_CONNECT_TIMEOUT_MS);
       return parseGatewayToolCatalog(payload);
     } finally {
       controller.abort();

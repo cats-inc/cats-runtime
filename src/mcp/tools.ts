@@ -824,8 +824,22 @@ async function providerTools(
   args: Record<string, unknown>,
 ): Promise<McpToolCallResult> {
   const provider = readRequiredString(args, 'provider');
+  const scope = readOptionalString(args, 'scope');
+  if (scope && scope !== 'catalog' && scope !== 'effective') {
+    throw new Error(`provider_tools scope must be 'catalog' or 'effective', got '${scope}'.`);
+  }
+
+  const sessionId = readOptionalString(args, 'sessionId');
+  const sessionKey = readOptionalString(args, 'sessionKey');
+  if (scope === 'effective' && !sessionId && !sessionKey) {
+    throw new Error("provider_tools scope='effective' requires sessionId or sessionKey.");
+  }
+
   const searchParams = new URLSearchParams();
   appendSingleQueryValue(searchParams, 'instance', readOptionalString(args, 'instance'));
+  appendSingleQueryValue(searchParams, 'scope', scope);
+  appendSingleQueryValue(searchParams, 'sessionId', sessionId);
+  appendSingleQueryValue(searchParams, 'sessionKey', sessionKey);
   const path = searchParams.size > 0
     ? `/providers/${encodeURIComponent(provider)}/tools?${searchParams.toString()}`
     : `/providers/${encodeURIComponent(provider)}/tools`;
@@ -3004,6 +3018,12 @@ const TOOL_HANDLERS: McpToolHandler[] = [
         properties: {
           provider: { type: 'string' },
           instance: { type: 'string' },
+          scope: {
+            type: 'string',
+            enum: ['catalog', 'effective'],
+          },
+          sessionId: { type: 'string' },
+          sessionKey: { type: 'string' },
         },
         required: ['provider'],
         additionalProperties: false,

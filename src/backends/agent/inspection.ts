@@ -52,6 +52,7 @@ function buildGenericInspection(
       probe: false,
       modelDiscovery: false,
       toolCatalog: false,
+      effectiveToolCatalog: false,
       cancel: false,
       runtimeServices: false,
       toolCallEvents: false,

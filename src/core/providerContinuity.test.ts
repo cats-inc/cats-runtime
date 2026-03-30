@@ -119,6 +119,7 @@ describe('buildProviderContinuitySummary', () => {
           probe: true,
           modelDiscovery: true,
           toolCatalog: false,
+          effectiveToolCatalog: false,
           cancel: true,
           runtimeServices: true,
           toolCallEvents: true,

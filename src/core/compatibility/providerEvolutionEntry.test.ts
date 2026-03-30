@@ -181,6 +181,7 @@ backends:
             probe: true,
             modelDiscovery: true,
             toolCatalog: false,
+            effectiveToolCatalog: false,
             cancel: true,
             runtimeServices: false,
             toolCallEvents: true,

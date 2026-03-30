@@ -246,8 +246,9 @@ timer/callback integrations.
 
 ## Open Questions
 
-- [ ] How should agent-managed runtime services or preview URLs surface in the
-      dashboard session model?
+- [ ] How much further beyond the current session/browser preview surfaces
+      should agent-managed runtime services or preview URLs be harvested into
+      broader work-product and governance read models?
 - [ ] Should agent backends expose a stronger typed event taxonomy beyond the
       current `StreamEvent` union, or is `raw` sufficient for the first phase?
 

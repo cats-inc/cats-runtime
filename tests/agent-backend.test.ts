@@ -235,6 +235,33 @@ class FakeOpenClawSocket extends EventTarget {
       return;
     }
 
+    if (method === 'tools.effective') {
+      this.emitFrame({
+        type: 'res',
+        id: frame.id,
+        ok: true,
+        payload: {
+          groups: [
+            {
+              id: 'core',
+              source: 'core',
+              tools: [
+                { id: 'exec', source: 'core' },
+              ],
+            },
+            {
+              id: 'channel',
+              source: 'channel',
+              tools: [
+                { id: 'send_message', source: 'channel' },
+              ],
+            },
+          ],
+        },
+      });
+      return;
+    }
+
     if (method === 'agent') {
       const params = frame.params as Record<string, unknown>;
       const script = this.scripts.shift() || {
@@ -520,6 +547,7 @@ describe('agent backend integration', () => {
                   probe: true,
                   modelDiscovery: true,
                   toolCatalog: true,
+                  effectiveToolCatalog: true,
                   cancel: false,
                   runtimeServices: true,
                   toolCallEvents: false,
@@ -1179,6 +1207,9 @@ describe('agent backend integration', () => {
         backend: 'agent',
         instance: 'gateway',
         target: 'agent/gateway',
+        catalogContext: {
+          scope: 'catalog',
+        },
         continuity: {
           source: 'provider_managed',
           summary: expect.stringContaining('external agent runtime owns provider-managed session continuity'),
@@ -1223,6 +1254,7 @@ describe('agent backend integration', () => {
             probe: true,
             modelDiscovery: true,
             toolCatalog: true,
+            effectiveToolCatalog: true,
             cancel: false,
             runtimeServices: true,
             toolCallEvents: false,
@@ -1255,6 +1287,76 @@ describe('agent backend integration', () => {
           runtimeServices: true,
         },
       });
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
+  it('supports session-effective OpenClaw tool discovery on the provider tooling route', async () => {
+    const { config, env, cleanup } = createAgentConfigRoot();
+    const sentFrames: Array<Record<string, unknown>> = [];
+    const runtime = createRuntimeServer(config, {
+      agentBackend: {
+        env,
+        webSocketFactory: createFakeWebSocketFactory([], sentFrames),
+      },
+    });
+
+    try {
+      const createResponse = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'openclaw',
+          cwd: config.sessionBaseDir,
+          sessionKey: 'openclaw-effective-tools',
+        }),
+      });
+      expect(createResponse.status).toBe(201);
+      const created = await createResponse.json() as { id: string; sessionKey: string };
+
+      const messageResponse = await runtime.app.request(`/sessions/${created.id}/messages`, {
+        method: 'POST',
+        headers: { accept: 'application/x-ndjson', 'content-type': 'application/json' },
+        body: JSON.stringify({
+          message: 'Prime the remote OpenClaw session',
+        }),
+      });
+      expect(messageResponse.status).toBe(200);
+      await parseNdjson(await messageResponse.text());
+
+      const response = await runtime.app.request(
+        `/providers/openclaw/tools?instance=agent/gateway&scope=effective&sessionId=${created.id}`,
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual(expect.objectContaining({
+        provider: 'openclaw',
+        backend: 'agent',
+        instance: 'gateway',
+        catalogContext: {
+          scope: 'effective',
+          sessionId: created.id,
+          sessionKey: 'openclaw-effective-tools',
+        },
+        catalog: expect.objectContaining({
+          source: 'provider_remote',
+          status: 'ready',
+          method: 'tools_effective',
+          summary: '2 tool(s) across 2 group(s) available to the current OpenClaw session.',
+          toolCount: 2,
+          groupCount: 2,
+          groups: [
+            { id: 'channel', toolCount: 1 },
+            { id: 'core', toolCount: 1 },
+          ],
+          tools: [
+            { name: 'exec', source: 'core', groupId: 'core' },
+            { name: 'send_message', source: 'channel', groupId: 'channel' },
+          ],
+        }),
+      }));
+      expect(sentFrames.filter((frame) => frame.method === 'tools.effective')).toHaveLength(1);
     } finally {
       await runtime.close();
       cleanup();
@@ -1558,6 +1660,7 @@ describe('agent backend integration', () => {
                   probe: true,
                   modelDiscovery: true,
                   toolCatalog: true,
+                  effectiveToolCatalog: false,
                   cancel: true,
                   runtimeServices: true,
                   toolCallEvents: true,

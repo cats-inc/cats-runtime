@@ -13,6 +13,7 @@ import type {
   AgentBackendOptions,
   AgentAdapterProbeResult,
   AgentAdapterToolCatalog,
+  AgentAdapterToolCatalogRequest,
   AgentBackendStatus,
   AgentAdapter,
   AgentAdapterInspection,
@@ -191,7 +192,10 @@ export class AgentBackendManager {
     return adapter.listModels(instance);
   }
 
-  async listTools(target: ProviderTargetDescriptor): Promise<AgentAdapterToolCatalog> {
+  async listTools(
+    target: ProviderTargetDescriptor,
+    request?: AgentAdapterToolCatalogRequest,
+  ): Promise<AgentAdapterToolCatalog> {
     const instance = ensureAgentTarget(target);
     const adapter = this.buildAdapter(instance);
     if (!adapter.listTools) {
@@ -201,7 +205,7 @@ export class AgentBackendManager {
       );
     }
 
-    return adapter.listTools(instance);
+    return adapter.listTools(instance, request);
   }
 
   async probe(

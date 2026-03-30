@@ -668,8 +668,9 @@ path is intentionally narrow:
    versus compatibility-fallback-only families, including per-family
    request-support and strategy-context schema metadata,
    additive HTTP semantic classifications, additive OpenClaw
-   `tools.catalog`-backed remote tool discovery on
-   `GET /providers/{provider}/tools` for agent targets that support it, and additive
+   `tools.catalog`-backed remote tool discovery plus session-scoped
+   `tools.effective` follow-through on `GET /providers/{provider}/tools` for
+   agent targets that support it, and additive
    model-catalog/configured-model readiness checks for
    API/local/agent targets when requested
 14. `POST /mcp` reuses those same runtime-owned services as the authoritative

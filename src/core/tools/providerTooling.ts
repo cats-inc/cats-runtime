@@ -8,6 +8,7 @@ import {
 import type {
   AgentAdapterInspection,
   AgentAdapterToolCatalog,
+  AgentAdapterToolCatalogRequest,
 } from '../../backends/agent/types.js';
 
 export interface ProviderRemoteToolCatalog {
@@ -72,17 +73,25 @@ interface ProviderToolingSummaryOptions {
 }
 
 interface ProviderRemoteToolCatalogLoader {
-  listTools(target: ProviderTargetDescriptor): Promise<AgentAdapterToolCatalog>;
+  listTools(
+    target: ProviderTargetDescriptor,
+    request?: AgentAdapterToolCatalogRequest,
+  ): Promise<AgentAdapterToolCatalog>;
 }
 
 interface ProviderRemoteToolCatalogLoadOptions {
   agentRuntime?: AgentAdapterInspection;
   agentBackend?: ProviderRemoteToolCatalogLoader;
+  request?: AgentAdapterToolCatalogRequest;
 }
 
 export function getProviderRemoteToolDiscoveryMethod(
   agentRuntime?: AgentAdapterInspection,
+  request?: AgentAdapterToolCatalogRequest,
 ): ProviderRemoteToolCatalog['method'] {
+  if (request?.scope === 'effective') {
+    return 'tools_effective';
+  }
   return agentRuntime?.transport.toolDiscovery
     && agentRuntime.transport.toolDiscovery !== 'none'
     ? agentRuntime.transport.toolDiscovery
@@ -129,7 +138,24 @@ export async function loadProviderRemoteToolCatalog(
     return undefined;
   }
 
-  const method = getProviderRemoteToolDiscoveryMethod(options.agentRuntime);
+  const method = getProviderRemoteToolDiscoveryMethod(options.agentRuntime, options.request);
+  if (options.request?.scope === 'effective') {
+    if (!options.request.sessionKey) {
+      return buildUnavailableProviderRemoteToolCatalog(
+        method,
+        'Session-effective remote tool discovery requires a sessionKey.',
+      );
+    }
+
+    if (options.agentRuntime?.capabilities.effectiveToolCatalog !== true) {
+      return buildUnavailableProviderRemoteToolCatalog(
+        method,
+        `Agent target '${target.providerName}/${target.instanceId}' does not support `
+          + 'session-effective remote tool discovery.',
+      );
+    }
+  }
+
   if (!options.agentBackend) {
     return buildUnavailableProviderRemoteToolCatalog(
       method,
@@ -138,7 +164,9 @@ export async function loadProviderRemoteToolCatalog(
   }
 
   try {
-    return buildProviderRemoteToolCatalog(await options.agentBackend.listTools(target));
+    return buildProviderRemoteToolCatalog(
+      await options.agentBackend.listTools(target, options.request),
+    );
   } catch (error) {
     return buildUnavailableProviderRemoteToolCatalog(
       method,
@@ -179,6 +207,7 @@ export function buildProviderToolingSummary(
     const remoteCatalogCapable = options.agentRuntime?.capabilities.toolCatalog === true;
     const toolCallEvents = options.agentRuntime?.capabilities.toolCallEvents === true;
     const runtimeServices = options.agentRuntime?.capabilities.runtimeServices === true;
+    const effectiveToolCatalog = options.agentRuntime?.capabilities.effectiveToolCatalog === true;
     const observationSummary = (() => {
       if (toolCallEvents && runtimeServices) {
         return 'The runtime can still observe remote tool-call events and runtime service updates.';
@@ -192,7 +221,9 @@ export function buildProviderToolingSummary(
       return 'The runtime currently does not expose bounded remote tool-call or service-update observation.';
     })();
     const discoverySummary = remoteCatalogCapable
-      ? 'The runtime can query a bounded remote tool catalog from the external agent runtime.'
+      ? effectiveToolCatalog
+        ? 'The runtime can query a bounded remote tool catalog from the external agent runtime and a session-effective inventory for active sessions.'
+        : 'The runtime can query a bounded remote tool catalog from the external agent runtime.'
       : 'cats-runtime does not enumerate a remote tool catalog.';
 
     return {

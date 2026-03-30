@@ -63,6 +63,11 @@ export interface AgentAdapterToolCatalog {
   tools: AgentAdapterToolCatalogEntry[];
 }
 
+export interface AgentAdapterToolCatalogRequest {
+  scope?: 'catalog' | 'effective';
+  sessionKey?: string;
+}
+
 export interface AgentAdapterInspection {
   adapter: string;
   family: 'gateway' | 'bridge' | 'generic';
@@ -93,6 +98,7 @@ export interface AgentAdapterInspection {
     probe: boolean;
     modelDiscovery: boolean;
     toolCatalog: boolean;
+    effectiveToolCatalog: boolean;
     cancel: boolean;
     runtimeServices: boolean;
     toolCallEvents: boolean;
@@ -104,7 +110,10 @@ export interface AgentAdapter {
   invoke(input: AgentInvokeInput): AsyncGenerator<StreamEvent>;
   probe?(instance: RemoteProviderInstanceConfig): Promise<AgentAdapterProbeResult>;
   listModels?(instance: RemoteProviderInstanceConfig): Promise<Array<{ id: string; label: string }>>;
-  listTools?(instance: RemoteProviderInstanceConfig): Promise<AgentAdapterToolCatalog>;
+  listTools?(
+    instance: RemoteProviderInstanceConfig,
+    request?: AgentAdapterToolCatalogRequest,
+  ): Promise<AgentAdapterToolCatalog>;
   inspect?(instance: RemoteProviderInstanceConfig): AgentAdapterInspection;
   cancel?(
     sessionId: string,

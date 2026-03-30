@@ -175,6 +175,15 @@ describe('AgentSdkBridgeAdapter', () => {
     );
   });
 
+  it('rejects session-effective tool discovery on the bridge adapter', async () => {
+    const adapter = new AgentSdkBridgeAdapter();
+
+    await expect(adapter.listTools(createInstance(), {
+      scope: 'effective',
+      sessionKey: 'session-1',
+    })).rejects.toThrow(/does not support session-effective remote tool discovery/i);
+  });
+
   it('records dropped and unknown bridge events for provider-evolution evidence while preserving tool_result output', async () => {
     const encoder = new TextEncoder();
     const adapter = new AgentSdkBridgeAdapter({

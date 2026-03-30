@@ -164,6 +164,7 @@ describe('buildProviderToolingSummary', () => {
           probe: true,
           modelDiscovery: true,
           toolCatalog: true,
+          effectiveToolCatalog: true,
           cancel: false,
           runtimeServices: true,
           toolCallEvents: false,
@@ -175,7 +176,7 @@ describe('buildProviderToolingSummary', () => {
       source: 'provider_managed',
       discoverable: true,
       sessionScopedOverrides: false,
-      summary: expect.stringContaining('can query a bounded remote tool catalog'),
+      summary: expect.stringContaining('session-effective inventory for active sessions'),
       observability: {
         catalog: 'provider_remote_enumerated',
         toolCallEvents: false,
@@ -228,6 +229,7 @@ describe('buildProviderToolingSummary', () => {
           probe: true,
           modelDiscovery: true,
           toolCatalog: true,
+          effectiveToolCatalog: true,
           cancel: false,
           runtimeServices: true,
           toolCallEvents: false,
@@ -315,6 +317,7 @@ describe('buildProviderToolingSummary', () => {
           probe: true,
           modelDiscovery: true,
           toolCatalog: true,
+          effectiveToolCatalog: true,
           cancel: false,
           runtimeServices: true,
           toolCallEvents: false,
@@ -337,6 +340,92 @@ describe('buildProviderToolingSummary', () => {
       groups: [],
       tools: [],
       error: 'remote tools unavailable',
+    });
+  });
+
+  it('loads a session-effective remote tool catalog when the agent target supports it', async () => {
+    const target = {
+      providerName: 'openclaw',
+      backend: 'agent',
+      instanceId: 'gateway',
+      defaultTarget: true,
+      remoteInstance: {
+        id: 'gateway',
+        providerName: 'openclaw',
+        backend: 'agent',
+        transport: 'openclaw_gateway',
+      },
+    } as ProviderTargetDescriptor;
+
+    const catalog = await loadProviderRemoteToolCatalog(target, {
+      agentRuntime: {
+        adapter: 'openclaw',
+        family: 'gateway',
+        summary: 'OpenClaw gateway',
+        transport: {
+          kind: 'websocket',
+          protocol: 'openclaw_gateway_v3',
+          liveProbe: 'rpc_health',
+          modelDiscovery: 'models_list',
+          toolDiscovery: 'tools_catalog',
+          streaming: 'agent_event_frames',
+        },
+        request: {
+          headerNames: [],
+        },
+        auth: {
+          mechanisms: [],
+          credentials: [],
+        },
+        continuity: {
+          providerManagedSessions: true,
+          sessionKey: true,
+          providerSessionState: true,
+          cancel: false,
+        },
+        capabilities: {
+          probe: true,
+          modelDiscovery: true,
+          toolCatalog: true,
+          effectiveToolCatalog: true,
+          cancel: false,
+          runtimeServices: true,
+          toolCallEvents: false,
+        },
+      },
+      agentBackend: {
+        listTools: vi.fn(async (_target, request) => ({
+          method: 'tools_effective',
+          summary: `effective for ${request?.sessionKey}`,
+          toolCount: 1,
+          groupCount: 1,
+          groups: [
+            { id: 'core', label: 'Core', toolCount: 1 },
+          ],
+          tools: [
+            { name: 'exec', source: 'core', groupId: 'core' },
+          ],
+        })),
+      },
+      request: {
+        scope: 'effective',
+        sessionKey: 'session-1',
+      },
+    });
+
+    expect(catalog).toEqual({
+      source: 'provider_remote',
+      status: 'ready',
+      method: 'tools_effective',
+      summary: 'effective for session-1',
+      toolCount: 1,
+      groupCount: 1,
+      groups: [
+        { id: 'core', label: 'Core', toolCount: 1 },
+      ],
+      tools: [
+        { name: 'exec', source: 'core', groupId: 'core' },
+      ],
     });
   });
 });

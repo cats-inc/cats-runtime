@@ -30,6 +30,7 @@ import {
   getProviderCompatibilityService,
   getRuntimeMeteringService,
 } from '../app.js';
+import { resolveSessionProviderTarget } from '../providerTargets.js';
 import { getRouteErrorStatus } from '../routeErrors.js';
 
 export const providerRoutes = new Hono();
@@ -52,6 +53,84 @@ function parseModelCatalogRefreshQuery(value: string | undefined): boolean {
   throw new ProviderCatalogQueryError(
     `Invalid refresh query value '${value}'. Use true/false or 1/0.`,
   );
+}
+
+function parseToolCatalogScopeQuery(
+  value: string | undefined,
+): 'catalog' | 'effective' {
+  if (!value) {
+    return 'catalog';
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'catalog') {
+    return 'catalog';
+  }
+  if (normalized === 'effective') {
+    return 'effective';
+  }
+
+  throw new ProviderCatalogQueryError(
+    `Invalid tools scope '${value}'. Use 'catalog' or 'effective'.`,
+  );
+}
+
+function resolveProviderToolsSessionContext(
+  ctx: AppContext,
+  target: ReturnType<typeof resolveProviderTarget>,
+  options: {
+    scope: 'catalog' | 'effective';
+    sessionId?: string;
+    sessionKey?: string;
+  },
+): { sessionId?: string; sessionKey?: string } | undefined {
+  if (options.scope !== 'effective') {
+    return undefined;
+  }
+
+  if (!options.sessionId && !options.sessionKey) {
+    throw new ProviderCatalogQueryError(
+      "Effective tool inspection requires 'sessionId' or 'sessionKey'.",
+    );
+  }
+
+  if (!options.sessionId) {
+    return {
+      sessionKey: options.sessionKey,
+    };
+  }
+
+  const session = ctx.registry.get(options.sessionId);
+  if (!session) {
+    throw new ProviderCatalogQueryError(
+      `Session '${options.sessionId}' was not found for effective tool inspection.`,
+    );
+  }
+
+  const resolvedTarget = resolveSessionProviderTarget(ctx.config, session);
+  if (
+    resolvedTarget.providerName !== target.providerName
+    || resolvedTarget.backend !== target.backend
+    || resolvedTarget.instanceId !== target.instanceId
+  ) {
+    throw new ProviderCatalogQueryError(
+      `Session '${options.sessionId}' does not belong to `
+      + `${target.providerName}/${target.backend}/${target.instanceId}.`,
+    );
+  }
+
+  const resolvedSessionKey = session.sessionKey || options.sessionId;
+  if (options.sessionKey && options.sessionKey !== resolvedSessionKey) {
+    throw new ProviderCatalogQueryError(
+      `Session '${options.sessionId}' resolved sessionKey '${resolvedSessionKey}', `
+      + `which does not match the requested sessionKey '${options.sessionKey}'.`,
+    );
+  }
+
+  return {
+    sessionId: options.sessionId,
+    sessionKey: resolvedSessionKey,
+  };
 }
 
 providerRoutes.get('/providers/config', async (c) => {
@@ -255,6 +334,7 @@ providerRoutes.get('/providers/:provider/tools', async (c) => {
   const instance = c.req.query('instance') || undefined;
 
   try {
+    const scope = parseToolCatalogScopeQuery(c.req.query('scope'));
     const target = resolveProviderTarget(ctx.config, providerName, instance);
     const apiRuntime = inspectApiTarget(target);
     const agentRuntime = target.backend === 'agent' && target.remoteInstance
@@ -262,15 +342,29 @@ providerRoutes.get('/providers/:provider/tools', async (c) => {
         ? ctx.agentBackend.inspect(target)
         : inspectAgentTarget(target.remoteInstance, { env: process.env })
       : undefined;
+    const catalogContext = resolveProviderToolsSessionContext(ctx, target, {
+      scope,
+      sessionId: c.req.query('sessionId') || undefined,
+      sessionKey: c.req.query('sessionKey') || undefined,
+    });
     const remoteCatalog = await loadProviderRemoteToolCatalog(target, {
       agentRuntime,
       agentBackend: ctx.agentBackend,
+      request: {
+        scope,
+        sessionKey: catalogContext?.sessionKey,
+      },
     });
     return c.json({
       provider: target.providerName,
       backend: target.backend,
       instance: target.instanceId,
       target: `${target.backend}/${target.instanceId}`,
+      catalogContext: {
+        scope,
+        ...(catalogContext?.sessionId ? { sessionId: catalogContext.sessionId } : {}),
+        ...(catalogContext?.sessionKey ? { sessionKey: catalogContext.sessionKey } : {}),
+      },
       ...(apiRuntime ? { apiRuntime } : {}),
       ...(agentRuntime ? { agentRuntime } : {}),
       continuity: buildProviderContinuitySummary(target, {
@@ -295,6 +389,9 @@ providerRoutes.get('/providers/:provider/tools', async (c) => {
     const payload: Record<string, unknown> = {
       error: `Failed to inspect provider tools: ${err}`,
     };
+    if (err instanceof ProviderCatalogQueryError) {
+      return c.json({ error: err.message }, 400);
+    }
     if (isProviderTargetResolutionError(err)) {
       payload.code = err.code;
     }
