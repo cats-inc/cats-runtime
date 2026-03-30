@@ -101,7 +101,7 @@ try {
     } elseif ($Install) {
         $shouldDelete = $true
     } else {
-        $deleteAnswer = Read-Host "`nDelete $tgzName? (Y/n)"
+        $deleteAnswer = Read-Host "`nDelete ${tgzName}? (Y/n)"
         if ($deleteAnswer -notmatch '^[nN]') {
             $shouldDelete = $true
         }
