@@ -17,30 +17,52 @@ function createInstance(): RemoteProviderInstanceConfig {
 describe('AgentSdkBridgeAdapter', () => {
   it('keeps probe health ok when the target provider is listed, the model is visible, and streaming is advertised', async () => {
     const adapter = new AgentSdkBridgeAdapter({
-      fetch: async () => new Response(JSON.stringify({
-        providers: [
-          {
-            name: 'claude',
-            default_model: 'sonnet',
-            models: ['sonnet', 'haiku'],
-            capabilities: {
-              streaming: true,
-              mcp: true,
-              vision: false,
-            },
-          },
-        ],
-      }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
+      fetch: async (input, init) => {
+        const url = String(input);
+        const method = init?.method || 'GET';
+
+        if (url === 'http://agent-sdk.test/api/v1/providers' && method === 'GET') {
+          return new Response(JSON.stringify({
+            providers: [
+              {
+                name: 'claude',
+                default_model: 'sonnet',
+                models: ['sonnet', 'haiku'],
+                capabilities: {
+                  streaming: true,
+                  mcp: true,
+                  vision: false,
+                },
+              },
+            ],
+          }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+
+        if (url === 'http://agent-sdk.test/api/v1/sessions' && method === 'POST') {
+          return new Response(JSON.stringify({
+            id: 'probe-session-1',
+          }), {
+            status: 201,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+
+        if (url === 'http://agent-sdk.test/api/v1/sessions/probe-session-1' && method === 'DELETE') {
+          return new Response(null, { status: 204 });
+        }
+
+        throw new Error(`Unexpected fetch: ${method} ${url}`);
+      },
     });
 
     const result = await adapter.probe(createInstance());
 
     expect(result.health).toEqual(expect.objectContaining({
       status: 'ok',
-      details: 'claude available via Agent SDK bridge',
+      details: 'claude available via Agent SDK bridge and session lifecycle validated',
     }));
     expect(result.checks).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -59,7 +81,24 @@ describe('AgentSdkBridgeAdapter', () => {
         mcp: true,
         vision: false,
       },
+      sessionLifecycle: {
+        createChecked: true,
+        createStatus: 'ok',
+        cleanupChecked: true,
+        cleanupStatus: 'ok',
+        probeModel: 'sonnet',
+      },
     }));
+    expect(result.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'bridge_probe_session_create',
+        status: 'ok',
+      }),
+      expect.objectContaining({
+        code: 'bridge_probe_session_cleanup',
+        status: 'ok',
+      }),
+    ]));
   });
 
   it('degrades probe health when the bridge registry does not advertise streaming support', async () => {
@@ -107,6 +146,71 @@ describe('AgentSdkBridgeAdapter', () => {
         vision: false,
       },
     }));
+  });
+
+  it('degrades probe health when the bridge cannot create a bounded probe session', async () => {
+    const adapter = new AgentSdkBridgeAdapter({
+      fetch: async (input, init) => {
+        const url = String(input);
+        const method = init?.method || 'GET';
+
+        if (url === 'http://agent-sdk.test/api/v1/providers' && method === 'GET') {
+          return new Response(JSON.stringify({
+            providers: [
+              {
+                name: 'claude',
+                default_model: 'sonnet',
+                models: ['sonnet', 'haiku'],
+                capabilities: {
+                  streaming: true,
+                  mcp: true,
+                  vision: false,
+                },
+              },
+            ],
+          }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+
+        if (url === 'http://agent-sdk.test/api/v1/sessions' && method === 'POST') {
+          return new Response(JSON.stringify({
+            error: {
+              message: 'bridge session create failed',
+            },
+          }), {
+            status: 500,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+
+        throw new Error(`Unexpected fetch: ${method} ${url}`);
+      },
+    });
+
+    const result = await adapter.probe(createInstance());
+
+    expect(result.health).toEqual(expect.objectContaining({
+      status: 'degraded',
+      details: 'Agent SDK bridge probe session create failed: {"error":{"message":"bridge session create failed"}}',
+    }));
+    expect(result.liveProbe).toEqual(expect.objectContaining({
+      semanticStatus: 'degraded',
+      sessionLifecycle: {
+        createChecked: true,
+        createStatus: 'degraded',
+        cleanupChecked: false,
+        cleanupStatus: 'degraded',
+        probeModel: 'sonnet',
+      },
+    }));
+    expect(result.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'bridge_probe_session_create',
+        status: 'degraded',
+      }),
+    ]));
   });
 
   it('derives a bounded tool catalog from the bridge provider registry when tools are listed', async () => {

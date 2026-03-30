@@ -906,11 +906,14 @@ describe('agent backend integration', () => {
 
   it('surfaces Agent SDK provider-registry semantics in live provider diagnostics', async () => {
     const { config, env, cleanup } = createAgentSdkConfigRoot();
-    const fetchCalls: Array<{ url: string; method: string }> = [];
+    const fetchCalls: Array<{ url: string; method: string; body?: Record<string, unknown> }> = [];
     const fakeFetch: typeof fetch = async (input, init) => {
       const url = String(input);
       const method = init?.method || 'GET';
-      fetchCalls.push({ url, method });
+      const body = typeof init?.body === 'string'
+        ? JSON.parse(init.body) as Record<string, unknown>
+        : undefined;
+      fetchCalls.push({ url, method, body });
 
       if (url === 'http://agent-sdk.test/api/v1/providers' && method === 'GET') {
         return new Response(JSON.stringify({
@@ -930,6 +933,19 @@ describe('agent backend integration', () => {
           status: 200,
           headers: { 'content-type': 'application/json' },
         });
+      }
+
+      if (url === 'http://agent-sdk.test/api/v1/sessions' && method === 'POST') {
+        return new Response(JSON.stringify({
+          id: 'probe-session-1',
+        }), {
+          status: 201,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
+      if (url === 'http://agent-sdk.test/api/v1/sessions/probe-session-1' && method === 'DELETE') {
+        return new Response(null, { status: 204 });
       }
 
       throw new Error(`Unexpected fetch: ${method} ${url}`);
@@ -1009,6 +1025,24 @@ describe('agent backend integration', () => {
                 }),
               }),
               expect.objectContaining({
+                code: 'bridge_probe_session_create',
+                status: 'ok',
+                details: expect.objectContaining({
+                  endpoint: 'http://agent-sdk.test/api/v1/sessions',
+                  targetProvider: 'claude',
+                  probeModel: 'sonnet',
+                }),
+              }),
+              expect.objectContaining({
+                code: 'bridge_probe_session_cleanup',
+                status: 'ok',
+                details: expect.objectContaining({
+                  endpoint: 'http://agent-sdk.test/api/v1/sessions',
+                  targetProvider: 'claude',
+                  probeModel: 'sonnet',
+                }),
+              }),
+              expect.objectContaining({
                 code: 'model_catalog_loaded',
                 status: 'ok',
                 details: expect.objectContaining({
@@ -1057,6 +1091,13 @@ describe('agent backend integration', () => {
                   mcp: true,
                   vision: false,
                 },
+                sessionLifecycle: {
+                  createChecked: true,
+                  createStatus: 'ok',
+                  cleanupChecked: true,
+                  cleanupStatus: 'ok',
+                  probeModel: 'sonnet',
+                },
               },
               modelCatalog: expect.objectContaining({
                 source: 'dynamic',
@@ -1072,9 +1113,22 @@ describe('agent backend integration', () => {
         ],
       }));
       expect(fetchCalls).toEqual([
-        { url: 'http://agent-sdk.test/api/v1/providers', method: 'GET' },
-        { url: 'http://agent-sdk.test/api/v1/providers', method: 'GET' },
-        { url: 'http://agent-sdk.test/api/v1/providers', method: 'GET' },
+        { url: 'http://agent-sdk.test/api/v1/providers', method: 'GET', body: undefined },
+        {
+          url: 'http://agent-sdk.test/api/v1/sessions',
+          method: 'POST',
+          body: {
+            provider: 'claude',
+            model: 'sonnet',
+          },
+        },
+        {
+          url: 'http://agent-sdk.test/api/v1/sessions/probe-session-1',
+          method: 'DELETE',
+          body: undefined,
+        },
+        { url: 'http://agent-sdk.test/api/v1/providers', method: 'GET', body: undefined },
+        { url: 'http://agent-sdk.test/api/v1/providers', method: 'GET', body: undefined },
       ]);
     } finally {
       await runtime.close();

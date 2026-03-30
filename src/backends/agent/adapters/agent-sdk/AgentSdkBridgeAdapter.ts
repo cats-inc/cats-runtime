@@ -441,6 +441,74 @@ function buildBridgeProbeChecks(
   ];
 }
 
+interface BridgeSessionLifecycleProbe {
+  createChecked: boolean;
+  createStatus: AgentAdapterProbeCheck['status'];
+  createMessage: string;
+  cleanupChecked: boolean;
+  cleanupStatus: AgentAdapterProbeCheck['status'];
+  cleanupMessage: string;
+  probeModel?: string;
+}
+
+function buildBridgeSessionLifecycleChecks(
+  lifecycle: BridgeSessionLifecycleProbe,
+  endpoint: string,
+  expectedProvider: string,
+): AgentAdapterProbeCheck[] {
+  return [
+    {
+      code: 'bridge_probe_session_create',
+      status: lifecycle.createStatus,
+      message: lifecycle.createMessage,
+      details: {
+        endpoint,
+        targetProvider: expectedProvider,
+        createChecked: lifecycle.createChecked,
+        ...(lifecycle.probeModel ? { probeModel: lifecycle.probeModel } : {}),
+      },
+    },
+    ...(lifecycle.cleanupChecked
+      ? [{
+          code: 'bridge_probe_session_cleanup',
+          status: lifecycle.cleanupStatus,
+          message: lifecycle.cleanupMessage,
+          details: {
+            endpoint,
+            targetProvider: expectedProvider,
+            cleanupChecked: lifecycle.cleanupChecked,
+            ...(lifecycle.probeModel ? { probeModel: lifecycle.probeModel } : {}),
+          },
+        }]
+      : []),
+  ];
+}
+
+function summarizeBridgeProbeHealth(
+  registry: ReturnType<typeof parseBridgeProviderRegistry>,
+  lifecycle: BridgeSessionLifecycleProbe | undefined,
+  expectedProvider: string,
+  configuredModel: string | undefined,
+): string {
+  if (!isBridgeProviderSemanticallyReady(registry)) {
+    return summarizeBridgeRegistryHealth(registry, expectedProvider, configuredModel);
+  }
+
+  if (!lifecycle) {
+    return `${expectedProvider} available via Agent SDK bridge`;
+  }
+
+  if (lifecycle.createStatus !== 'ok') {
+    return lifecycle.createMessage;
+  }
+
+  if (lifecycle.cleanupChecked && lifecycle.cleanupStatus !== 'ok') {
+    return lifecycle.cleanupMessage;
+  }
+
+  return `${expectedProvider} available via Agent SDK bridge and session lifecycle validated`;
+}
+
 function buildProviderState(
   input: AgentInvokeInput,
   bridgeSessionId: string,
@@ -770,12 +838,82 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
       const registry = parseBridgeProviderRegistry(payload, expected, configuredModel);
       const checks = buildBridgeProbeChecks(registry, endpoint, expected, configuredModel);
       const semanticallyReady = isBridgeProviderSemanticallyReady(registry);
+      const lifecycleEndpoint = `${baseUrl}/api/v1/sessions`;
+      let lifecycle: BridgeSessionLifecycleProbe | undefined;
+
+      if (semanticallyReady) {
+        const probeModel = configuredModel || registry.defaultModel;
+        const createResponse = await this.fetchImpl(lifecycleEndpoint, {
+          method: 'POST',
+          headers: buildHeaders(instance, env),
+          body: JSON.stringify({
+            provider: expected,
+            ...(probeModel ? { model: probeModel } : {}),
+          }),
+        });
+
+        if (!createResponse.ok) {
+          lifecycle = {
+            createChecked: true,
+            createStatus: 'degraded',
+            createMessage: `Agent SDK bridge probe session create failed: ${await readErrorBody(createResponse)}`,
+            cleanupChecked: false,
+            cleanupStatus: 'degraded',
+            cleanupMessage: 'Probe session cleanup skipped because creation failed.',
+            ...(probeModel ? { probeModel } : {}),
+          };
+        } else {
+          const created = await createResponse.json() as Record<string, unknown>;
+          const probeSessionId = readString(created.id);
+
+          if (!probeSessionId) {
+            lifecycle = {
+              createChecked: true,
+              createStatus: 'degraded',
+              createMessage: 'Agent SDK bridge probe session create returned no session id.',
+              cleanupChecked: false,
+              cleanupStatus: 'degraded',
+              cleanupMessage: 'Probe session cleanup skipped because creation returned no session id.',
+              ...(probeModel ? { probeModel } : {}),
+            };
+          } else {
+            const cleanupResponse = await this.fetchImpl(
+              `${lifecycleEndpoint}/${encodeURIComponent(probeSessionId)}`,
+              {
+                method: 'DELETE',
+                headers: buildHeaders(instance, env),
+              },
+            );
+            lifecycle = {
+              createChecked: true,
+              createStatus: 'ok',
+              createMessage: `Agent SDK bridge probe session create succeeded for ${expected}.`,
+              cleanupChecked: true,
+              cleanupStatus: cleanupResponse.ok || cleanupResponse.status === 204
+                ? 'ok'
+                : 'degraded',
+              cleanupMessage: cleanupResponse.ok || cleanupResponse.status === 204
+                ? 'Agent SDK bridge probe session cleanup succeeded.'
+                : `Agent SDK bridge probe session cleanup failed: ${await readErrorBody(cleanupResponse)}`,
+              ...(probeModel ? { probeModel } : {}),
+            };
+          }
+        }
+
+        checks.push(...buildBridgeSessionLifecycleChecks(lifecycle, lifecycleEndpoint, expected));
+      }
+
+      const probeHealthy = semanticallyReady
+        && (!lifecycle || (
+          lifecycle.createStatus === 'ok'
+          && (!lifecycle.cleanupChecked || lifecycle.cleanupStatus === 'ok')
+        ));
 
       return {
         health: {
-          status: semanticallyReady ? 'ok' : 'degraded',
+          status: probeHealthy ? 'ok' : 'degraded',
           checkedAt,
-          details: summarizeBridgeRegistryHealth(registry, expected, configuredModel),
+          details: summarizeBridgeProbeHealth(registry, lifecycle, expected, configuredModel),
         },
         liveProbe: {
           endpoint,
@@ -783,13 +921,24 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
           providerCount: registry.providerCount,
           providerListed: registry.providerListed,
           modelCount: registry.modelCount,
-          semanticStatus: semanticallyReady ? 'ok' : 'degraded',
+          semanticStatus: probeHealthy ? 'ok' : 'degraded',
           ...(registry.defaultModel ? { defaultModel: registry.defaultModel } : {}),
           ...(configuredModel ? { configuredModel } : {}),
           ...(registry.configuredModelListed !== undefined
             ? { configuredModelListed: registry.configuredModelListed }
             : {}),
           capabilities: registry.capabilities,
+          ...(lifecycle
+            ? {
+                sessionLifecycle: {
+                  createChecked: lifecycle.createChecked,
+                  createStatus: lifecycle.createStatus,
+                  cleanupChecked: lifecycle.cleanupChecked,
+                  cleanupStatus: lifecycle.cleanupStatus,
+                  ...(lifecycle.probeModel ? { probeModel: lifecycle.probeModel } : {}),
+                },
+              }
+            : {}),
         },
         checks,
       };

@@ -209,7 +209,8 @@ src/
 - Exposes provider availability plus CLI compatibility diagnostics at
   `GET /diagnostics/providers`, including live API/local transport-native
   auth/model probes, additive OpenClaw gateway health-snapshot details, and
-  Agent SDK provider-registry/model-visibility checks when `probe=live`
+  Agent SDK provider-registry/model-visibility checks plus bounded probe-session
+  lifecycle validation when `probe=live`
 - Reuses the same agent-backend runtime options for OpenClaw gateway
   `models.list` discovery, so provider model catalogs and diagnostics can
   expose canonical `provider/model` refs instead of config-only fallback data

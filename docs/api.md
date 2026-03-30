@@ -792,7 +792,8 @@ surface for hosts and dashboards. The response includes:
   agent targets; API/local targets include the semantic probe target, redacted
   request URL, auth application summary, and request header names, while agent
   targets now expose adapter-specific bounded truth such as OpenClaw gateway
-  health snapshot counts or Agent SDK provider-registry/model visibility
+  health snapshot counts or Agent SDK provider-registry/model visibility plus
+  bounded session-lifecycle validation
 - additive `config.toolCatalog` summary metadata for live agent probes when the
   resolved adapter exposes bounded remote tool discovery, including method,
   summary, tool/group counts, bounded group metadata, and any temporary load
@@ -820,8 +821,12 @@ snapshot fields such as advertised agent/channel/session counts. Agent SDK
 bridge targets now use the same live diagnostics surface to validate
 `GET /api/v1/providers` semantically, adding bounded checks for target-provider
 listing, configured-model visibility, and registry-declared streaming support,
-and surfacing the same provider registry summary under `config.liveProbe`
-including `semanticStatus`. Those same runtime-managed options
+and then attempt a bounded probe-session create/delete cycle so operators can
+see whether the bridge can actually honor basic session lifecycle semantics.
+The same provider registry plus probe-session summary now surfaces under
+`config.liveProbe`, including `semanticStatus` and additive
+`sessionLifecycle` fields (`createChecked`, `createStatus`, `cleanupChecked`,
+`cleanupStatus`, and `probeModel`). Those same runtime-managed options
 also back OpenClaw `models.list` and Agent SDK bridge provider-registry model
 loading, so live diagnostics and `GET /providers/{provider}/models` can report
 runtime-derived model truth instead of a config-only fallback when the remote
