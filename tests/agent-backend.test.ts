@@ -1495,6 +1495,189 @@ describe('agent backend integration', () => {
     }
   });
 
+  it('scopes live OpenClaw provider diagnostics to session-effective tool context', async () => {
+    const { config, env, cleanup } = createAgentConfigRoot();
+    const sentFrames: Array<Record<string, unknown>> = [];
+    const runtime = createRuntimeServer(config, {
+      agentBackend: {
+        env,
+        webSocketFactory: createFakeWebSocketFactory([], sentFrames),
+      },
+    });
+
+    try {
+      const createResponse = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'openclaw',
+          cwd: config.sessionBaseDir,
+          sessionKey: 'openclaw-effective-diagnostics',
+        }),
+      });
+      expect(createResponse.status).toBe(201);
+      const created = await createResponse.json() as { id: string };
+
+      const messageResponse = await runtime.app.request(`/sessions/${created.id}/messages`, {
+        method: 'POST',
+        headers: { accept: 'application/x-ndjson', 'content-type': 'application/json' },
+        body: JSON.stringify({
+          message: 'Prime diagnostics effective tool inspection',
+        }),
+      });
+      expect(messageResponse.status).toBe(200);
+      await parseNdjson(await messageResponse.text());
+
+      const response = await runtime.app.request(
+        `/diagnostics/providers?probe=live&sessionId=${created.id}`,
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual(expect.objectContaining({
+        probe: 'live',
+        query: {
+          hasFilters: true,
+          filters: {
+            provider: 'openclaw',
+            backend: 'agent',
+            instance: 'gateway',
+            toolCatalogScope: 'effective',
+            sessionId: created.id,
+            sessionKey: 'openclaw-effective-diagnostics',
+          },
+        },
+        summary: expect.objectContaining({
+          targets: 1,
+        }),
+        providers: [
+          expect.objectContaining({
+            provider: 'openclaw',
+            backend: 'agent',
+            instance: 'gateway',
+            config: expect.objectContaining({
+              toolCatalog: expect.objectContaining({
+                method: 'tools_effective',
+                toolCount: 2,
+                groupCount: 2,
+              }),
+              toolCatalogContext: {
+                scope: 'effective',
+                sessionId: created.id,
+                sessionKey: 'openclaw-effective-diagnostics',
+              },
+            }),
+            checks: expect.arrayContaining([
+              expect.objectContaining({
+                code: 'tool_catalog_loaded',
+                status: 'ok',
+                details: expect.objectContaining({
+                  method: 'tools_effective',
+                  toolCount: 2,
+                  groupCount: 2,
+                }),
+              }),
+            ]),
+          }),
+        ],
+      }));
+      expect(sentFrames.filter((frame) => frame.method === 'tools.effective')).toHaveLength(1);
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
+  it('exposes session-effective provider diagnostics through the MCP provider_diagnostics tool', async () => {
+    const { config, env, cleanup } = createAgentConfigRoot();
+    const sentFrames: Array<Record<string, unknown>> = [];
+    const runtime = createRuntimeServer(config, {
+      agentBackend: {
+        env,
+        webSocketFactory: createFakeWebSocketFactory([], sentFrames),
+      },
+    });
+
+    try {
+      const createResponse = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'openclaw',
+          cwd: config.sessionBaseDir,
+          sessionKey: 'openclaw-mcp-effective-diagnostics',
+        }),
+      });
+      expect(createResponse.status).toBe(201);
+      const created = await createResponse.json() as { id: string };
+
+      const messageResponse = await runtime.app.request(`/sessions/${created.id}/messages`, {
+        method: 'POST',
+        headers: { accept: 'application/x-ndjson', 'content-type': 'application/json' },
+        body: JSON.stringify({
+          message: 'Prime MCP diagnostics effective tool inspection',
+        }),
+      });
+      expect(messageResponse.status).toBe(200);
+      await parseNdjson(await messageResponse.text());
+
+      const mcpResponse = await runtime.app.request('/mcp', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'effective-diagnostics',
+          method: 'tools/call',
+          params: {
+            name: 'provider_diagnostics',
+            arguments: {
+              probe: 'live',
+              sessionId: created.id,
+            },
+          },
+        }),
+      });
+      expect(mcpResponse.status).toBe(200);
+      await expect(mcpResponse.json()).resolves.toEqual(expect.objectContaining({
+        result: expect.objectContaining({
+          structuredContent: expect.objectContaining({
+            providersPath: `/diagnostics/providers?probe=live&sessionId=${created.id}`,
+            query: {
+              hasFilters: true,
+              filters: {
+                provider: 'openclaw',
+                backend: 'agent',
+                instance: 'gateway',
+                toolCatalogScope: 'effective',
+                sessionId: created.id,
+                sessionKey: 'openclaw-mcp-effective-diagnostics',
+              },
+            },
+            providers: [
+              expect.objectContaining({
+                provider: 'openclaw',
+                backend: 'agent',
+                instance: 'gateway',
+                config: expect.objectContaining({
+                  toolCatalog: expect.objectContaining({
+                    method: 'tools_effective',
+                  }),
+                  toolCatalogContext: {
+                    scope: 'effective',
+                    sessionId: created.id,
+                    sessionKey: 'openclaw-mcp-effective-diagnostics',
+                  },
+                }),
+              }),
+            ],
+          }),
+        }),
+      }));
+      expect(sentFrames.filter((frame) => frame.method === 'tools.effective')).toHaveLength(1);
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
   it('loads a dynamic OpenClaw model catalog through the provider models route', async () => {
     const { config, env, cleanup } = createAgentConfigRoot({
       model: 'anthropic/claude-test-a',

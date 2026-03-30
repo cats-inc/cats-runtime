@@ -1078,7 +1078,8 @@ evidence bundles and does not force hosts to invent their own report format.
 - the same provider tooling inspection surface is now also exposed through MCP
   as `provider_tools`, so orchestrator-style hosts can inspect runtime-local,
   provider-native, or remote-discovered tool ownership without inventing a
-  second tooling contract
+  second tooling contract, including session-effective agent tool inspection
+  via shared `sessionId` / `sessionKey` context when the target supports it
 - the same per-target provider model catalog surface is now also exposed
   through MCP as `provider_models`, so orchestrator-style hosts can inspect
   model availability, discovery warnings, and bounded refresh semantics without
@@ -1288,6 +1289,10 @@ always-on self-adapting parser system.
   because runtime-owned cooldowns, recent rate-limit incidents, or active
   blocks are in effect instead of assuming every warning came from setup or
   compatibility drift
+- the same live provider diagnostics surface now also accepts shared
+  `sessionId` / `sessionKey` context for agent targets, so OpenClaw
+  session-effective `tools.effective` evidence can be inspected through the
+  same diagnostics read model instead of a tooling-only side path
 - `/providers/config` instance entries now reuse the same retained artifact
   read model, so host/provider-selection flows can fetch provider topology and
   latest provider-evolution summary in one call

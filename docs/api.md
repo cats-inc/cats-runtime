@@ -197,7 +197,9 @@ tags, delivery hints, additive `sortBy` / `sortDirection`, and additive
 `provider_diagnostics` reuses the same runtime-owned readiness/remediation
 contract as `GET /diagnostics/providers`, including additive `probe` (`light`
 or `live`), `provider` / `backend` / `instance` / `defaultOnly` target
-filters, and `forceRefresh` semantics for cached compatibility assessments.
+filters, additive `sessionId` / `sessionKey` context for session-effective
+agent tool diagnostics, and `forceRefresh` semantics for cached compatibility
+assessments.
 `reprobe_provider_diagnostics` reuses the same explicit bounded refresh seam as
 `POST /diagnostics/providers/reprobe`, so MCP hosts can request a fresh
 compatibility assessment without overloading the read-only diagnostics tool.
@@ -799,6 +801,10 @@ surface for hosts and dashboards. The response includes:
   resolved adapter exposes bounded remote tool discovery, including method,
   summary, tool/group counts, bounded group metadata, and any temporary load
   error
+- additive `config.toolCatalogContext` metadata when live agent diagnostics are
+  scoped to a specific runtime session, so hosts can see whether the current
+  remote tool evidence came from provider-wide catalog discovery or
+  session-effective inspection
 - target-level diagnostics details for CLI, API/local, and agent backends
 
 Agent targets now also include an additive `agent_runtime_contract` check. It
@@ -857,6 +863,8 @@ that cache-bypass flow. It accepts a JSON body with optional:
 - `provider`
 - `backend`
 - `instance`
+- `sessionId`
+- `sessionKey`
 - `defaultOnly`
 - `probe: "light" | "live"`
 
@@ -871,6 +879,8 @@ values return `400`.
 - `provider`
 - `backend=cli|api|local|agent`
 - `instance`
+- `sessionId`
+- `sessionKey`
 - `defaultOnly=true|false`
 
 These filters narrow the provider catalog before diagnostics run, so host tools
@@ -879,6 +889,17 @@ re-filtering the full response client-side. The response now also includes:
 
 - `query.hasFilters`
 - `query.filters`
+
+When `sessionId` or `sessionKey` is supplied, the diagnostics route upgrades
+agent tool validation from provider-level `tools.catalog` to session-effective
+inspection. `sessionId` auto-resolves the matching provider target from the
+runtime registry, while `sessionKey` requires an explicit
+`provider` + `backend` + `instance` target. The response then echoes:
+
+- `query.filters.toolCatalogScope: "effective"`
+- normalized `query.filters.sessionId` / `query.filters.sessionKey`
+- `providers[].config.toolCatalog.method: "tools_effective"`
+- `providers[].config.toolCatalogContext`
 
 Invalid `backend` values or malformed boolean filters such as
 `defaultOnly=maybe` return `400` with a client-safe `error` string.
@@ -3492,7 +3513,10 @@ error string instead of collapsing the entire tooling inspection surface.
 For the same catalog-capable agent targets, `GET /diagnostics/providers?probe=live`
 now also adds bounded remote tool-catalog validation under
 `providers[].config.toolCatalog` plus a matching `tool_catalog_loaded` or
-`tool_catalog_unavailable` diagnostic check. This keeps the heavier semantic
+`tool_catalog_unavailable` diagnostic check. When session context is supplied
+for a compatible target such as OpenClaw, the same diagnostics surface switches
+that validation to session-scoped `tools_effective` instead of the broader
+provider catalog. This keeps the heavier semantic
 probe on the diagnostics surface while leaving `GET /providers/{provider}/tools`
 as the full remote inventory read route.
 

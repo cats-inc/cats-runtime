@@ -243,6 +243,9 @@ timer/callback integrations.
       HTTP layer
 - [x] The contract can also host a future `Agent SDK` adapter
 - [x] Pi remains documented as a `cli` integration, not an `agent` integration
+- [x] Session-effective remote tool discovery can surface through the shared
+      provider tooling and provider diagnostics read models without requiring
+      adapter-specific inspection routes
 
 ## Open Questions
 

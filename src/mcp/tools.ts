@@ -970,6 +970,8 @@ async function providerDiagnostics(
     ),
   );
   appendSingleQueryValue(searchParams, 'instance', readOptionalString(args, 'instance'));
+  appendSingleQueryValue(searchParams, 'sessionId', readOptionalString(args, 'sessionId'));
+  appendSingleQueryValue(searchParams, 'sessionKey', readOptionalString(args, 'sessionKey'));
   if (readOptionalBoolean(args, 'defaultOnly') === true) {
     searchParams.set('defaultOnly', 'true');
   }
@@ -1029,6 +1031,16 @@ async function reprobeProviderDiagnostics(
   const instance = readOptionalString(args, 'instance');
   if (instance) {
     body.instance = instance;
+  }
+
+  const sessionId = readOptionalString(args, 'sessionId');
+  if (sessionId) {
+    body.sessionId = sessionId;
+  }
+
+  const sessionKey = readOptionalString(args, 'sessionKey');
+  if (sessionKey) {
+    body.sessionKey = sessionKey;
   }
 
   if (readOptionalBoolean(args, 'defaultOnly') === true) {
@@ -3094,6 +3106,8 @@ const TOOL_HANDLERS: McpToolHandler[] = [
           provider: { type: 'string' },
           backend: { type: 'string', enum: PROVIDER_BACKENDS },
           instance: { type: 'string' },
+          sessionId: { type: 'string' },
+          sessionKey: { type: 'string' },
           defaultOnly: { type: 'boolean' },
           forceRefresh: { type: 'boolean' },
         },
@@ -3114,6 +3128,8 @@ const TOOL_HANDLERS: McpToolHandler[] = [
           provider: { type: 'string' },
           backend: { type: 'string', enum: PROVIDER_BACKENDS },
           instance: { type: 'string' },
+          sessionId: { type: 'string' },
+          sessionKey: { type: 'string' },
           defaultOnly: { type: 'boolean' },
         },
         additionalProperties: false,

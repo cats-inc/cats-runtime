@@ -276,6 +276,10 @@ difference between logical session identity and provider-managed resume tokens.
   `tools.catalog` and session-scoped `tools.effective` through the existing
   `GET /providers/{provider}/tools` surface via `scope=effective` plus
   `sessionId` / `sessionKey`.
+- The same session-effective OpenClaw tool truth now also projects through
+  live `GET /diagnostics/providers` plus MCP `provider_diagnostics`, using
+  shared `sessionId` / `sessionKey` resolution instead of a diagnostics-only
+  adapter seam.
 - The remaining gap for this plan family is no longer basic OpenClaw adapter
   breadth; it is broader non-OpenClaw remote-tool evidence and richer later-target
   semantic probing beyond the current Agent SDK provider-registry plus bounded
@@ -369,6 +373,7 @@ difference between logical session identity and provider-managed resume tokens.
 | 2026-03-27 | Agent SDK bridge adapter now derives bounded remote tool catalogs from the shared provider registry, and the same tool-discovery truth is surfaced on `/providers/{provider}/tools` plus live provider diagnostics alongside the existing bridge model/streaming checks |
 | 2026-03-27 | Third-party adapter plug-in guidance is now documented in `docs/architecture.md`, so the plan scope is fully delivered: future agent runtimes can add transport-local adapters and registry wiring without reshaping routes or runtime-owned session contracts. |
 | 2026-03-30 | OpenClaw tool discovery now also supports session-scoped `tools.effective`, and Agent SDK live diagnostics now validate a bounded probe-session create/delete lifecycle instead of stopping at provider-registry visibility alone |
+| 2026-03-30 | Live `/diagnostics/providers` and MCP `provider_diagnostics` now also accept shared session context so OpenClaw session-effective `tools.effective` evidence can flow through the same diagnostics read model as provider-wide tool catalogs |
 
 ---
 

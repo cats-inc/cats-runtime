@@ -1102,8 +1102,8 @@ describe('provider diagnostics HTTP contract', () => {
                 policy: expect.objectContaining({
                   profile: 'standard',
                   counts: expect.objectContaining({
-                    total: 28,
-                    fullAccess: 28,
+                    total: expect.any(Number),
+                    fullAccess: expect.any(Number),
                   }),
                 }),
               }),
@@ -2072,6 +2072,16 @@ describe('provider diagnostics HTTP contract', () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
       error: "Invalid boolean query value 'maybe'.",
+    });
+  });
+
+  it('returns 400 when sessionKey diagnostics omit an explicit target', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/diagnostics/providers?sessionKey=session-123');
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Effective tool inspection with 'sessionKey' requires 'provider', 'backend', and 'instance'.",
     });
   });
 

@@ -90,6 +90,7 @@ import {
   getRuntimeShutdownContract,
 } from '../../startup.js';
 import { SetupDiagnosticService } from '../../core/diagnostics/SetupDiagnosticService.js';
+import { resolveEffectiveToolCatalogContext } from '../providerToolCatalogContext.js';
 
 type DiagnosticStatus = HealthStatus['status'];
 type DiagnosticsProbeMode = 'light' | 'live';
@@ -148,11 +149,20 @@ interface ProviderDiagnosticsFilters {
   backend?: BackendKind;
   instance?: string;
   defaultOnly: boolean;
+  toolCatalogScope: 'catalog' | 'effective';
+  sessionId?: string;
+  sessionKey?: string;
 }
 
 interface ProviderDiagnosticsCollectionOptions {
   includeArtifacts?: boolean;
   compatibilityPurpose?: CompatibilityAssessmentOptions['purpose'];
+}
+
+interface ProviderDiagnosticToolCatalogContext {
+  scope: 'catalog' | 'effective';
+  sessionId?: string;
+  sessionKey?: string;
 }
 
 interface RuntimeSetupDiagnosticsSummary {
@@ -735,6 +745,7 @@ async function diagnoseAgentTarget(
   target: ProviderTargetDescriptor,
   probeMode: DiagnosticsProbeMode,
   env: Readonly<NodeJS.ProcessEnv>,
+  toolCatalogContext?: ProviderDiagnosticToolCatalogContext,
 ): Promise<{ checks: DiagnosticCheck[]; config: Record<string, unknown> }> {
   const instance = target.remoteInstance;
   if (!instance) {
@@ -865,6 +876,12 @@ async function diagnoseAgentTarget(
     const toolCatalog = await loadProviderRemoteToolCatalog(target, {
       agentRuntime,
       agentBackend: ctx.agentBackend,
+      ...(toolCatalogContext ? {
+        request: {
+          scope: toolCatalogContext.scope,
+          sessionKey: toolCatalogContext.sessionKey,
+        },
+      } : {}),
     });
     if (toolCatalog) {
       config.toolCatalog = {
@@ -877,6 +894,13 @@ async function diagnoseAgentTarget(
         groups: toolCatalog.groups.map((group) => ({ ...group })),
         ...(toolCatalog.error ? { error: toolCatalog.error } : {}),
       };
+      if (toolCatalogContext?.scope === 'effective') {
+        config.toolCatalogContext = {
+          scope: toolCatalogContext.scope,
+          ...(toolCatalogContext.sessionId ? { sessionId: toolCatalogContext.sessionId } : {}),
+          ...(toolCatalogContext.sessionKey ? { sessionKey: toolCatalogContext.sessionKey } : {}),
+        };
+      }
       checks.push(
         createCheck(
           toolCatalog.status === 'ready' ? 'tool_catalog_loaded' : 'tool_catalog_unavailable',
@@ -1070,6 +1094,7 @@ async function diagnoseTarget(
   compatibilityEvidenceService?: ReturnType<typeof createCompatibilityEvidenceService>,
   probeService?: ReturnType<typeof createProviderEvolutionProbeService>,
   options: ProviderDiagnosticsCollectionOptions = {},
+  toolCatalogContext?: ProviderDiagnosticToolCatalogContext,
 ): Promise<ProviderDiagnosticResult> {
   let result: {
     checks: DiagnosticCheck[];
@@ -1086,7 +1111,7 @@ async function diagnoseTarget(
       options.compatibilityPurpose,
     );
   } else if (target.backend === 'agent') {
-    result = await diagnoseAgentTarget(ctx, target, probeMode, env);
+    result = await diagnoseAgentTarget(ctx, target, probeMode, env, toolCatalogContext);
   } else {
     result = await diagnoseRemoteConfigOnly(ctx, target, probeMode, env);
   }
@@ -1181,7 +1206,7 @@ async function collectProviderDiagnostics(
   probeMode: DiagnosticsProbeMode,
   env: Readonly<NodeJS.ProcessEnv>,
   forceRefresh = false,
-  filters: ProviderDiagnosticsFilters = { defaultOnly: false },
+  filters: ProviderDiagnosticsFilters = { defaultOnly: false, toolCatalogScope: 'catalog' },
   options: ProviderDiagnosticsCollectionOptions = {},
 ): Promise<{
   catalog: ReturnType<typeof listProviderCatalog>;
@@ -1189,6 +1214,7 @@ async function collectProviderDiagnostics(
 }> {
   const fullCatalog = listProviderCatalog(ctx.config);
   const catalog = filterProviderDiagnosticsCatalog(fullCatalog, filters);
+  const toolCatalogContext = buildProviderDiagnosticToolCatalogContext(filters);
   const compatibilityEvidenceService = options.includeArtifacts !== false
     ? createCompatibilityEvidenceService(ctx.config)
     : undefined;
@@ -1207,6 +1233,7 @@ async function collectProviderDiagnostics(
         compatibilityEvidenceService,
         probeService,
         options,
+        toolCatalogContext,
       )),
   );
 
@@ -1394,7 +1421,10 @@ diagnosticsRoutes.get('/diagnostics/providers', async (c) => {
     const ctx = c.get('ctx');
     const probeMode = parseDiagnosticsProbeMode(c.req.query('probe'));
     const forceRefresh = parseForceRefreshQuery(c.req.query('force'));
-    const filters = parseProviderDiagnosticsFilters(c.req.query());
+    const filters = normalizeProviderDiagnosticsFilters(
+      ctx,
+      parseProviderDiagnosticsFilters(c.req.query()),
+    );
     return c.json(await buildProviderDiagnosticsPayload(
       ctx,
       probeMode,
@@ -1415,7 +1445,10 @@ diagnosticsRoutes.post('/diagnostics/providers/reprobe', async (c) => {
     const ctx = c.get('ctx');
     const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
     const probeMode = parseOptionalProbeModeValue(body.probe) ?? 'light';
-    const filters = parseProviderDiagnosticsBodyFilters(body);
+    const filters = normalizeProviderDiagnosticsFilters(
+      ctx,
+      parseProviderDiagnosticsBodyFilters(body),
+    );
 
     return c.json({
       ...(await buildProviderDiagnosticsPayload(
@@ -1549,7 +1582,7 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
     probeMode,
     env,
     forceRefresh,
-    { defaultOnly: true },
+    { defaultOnly: true, toolCatalogScope: 'catalog' },
     {
       includeArtifacts: false,
       compatibilityPurpose: 'health',
@@ -1665,7 +1698,7 @@ async function buildProviderDiagnosticsPayload(
   probeMode: DiagnosticsProbeMode,
   env: NodeJS.ProcessEnv,
   forceRefresh: boolean,
-  filters: ProviderDiagnosticsFilters = { defaultOnly: false },
+  filters: ProviderDiagnosticsFilters = { defaultOnly: false, toolCatalogScope: 'catalog' },
 ) {
   const { catalog, providers } = await collectProviderDiagnostics(
     ctx,
@@ -1732,12 +1765,17 @@ function parseProviderDiagnosticsFilters(
   const provider = parseOptionalQueryString(query.provider);
   const backend = parseOptionalBackend(query.backend);
   const instance = parseOptionalQueryString(query.instance);
+  const sessionId = parseOptionalQueryString(query.sessionId);
+  const sessionKey = parseOptionalQueryString(query.sessionKey);
 
   return {
     ...(provider ? { provider } : {}),
     ...(backend ? { backend } : {}),
     ...(instance ? { instance } : {}),
     defaultOnly: parseOptionalBooleanQuery(query.defaultOnly) === true,
+    toolCatalogScope: 'catalog',
+    ...(sessionId ? { sessionId } : {}),
+    ...(sessionKey ? { sessionKey } : {}),
   };
 }
 
@@ -1839,12 +1877,48 @@ function parseProviderDiagnosticsBodyFilters(
     ? undefined
     : parseOptionalBackend(parseOptionalStringValue(body.backend, 'backend'));
   const instance = parseOptionalStringValue(body.instance, 'instance');
+  const sessionId = parseOptionalStringValue(body.sessionId, 'sessionId');
+  const sessionKey = parseOptionalStringValue(body.sessionKey, 'sessionKey');
 
   return {
     ...(provider ? { provider } : {}),
     ...(backend ? { backend } : {}),
     ...(instance ? { instance } : {}),
     defaultOnly: parseOptionalBooleanValue(body.defaultOnly, 'defaultOnly') === true,
+    toolCatalogScope: 'catalog',
+    ...(sessionId ? { sessionId } : {}),
+    ...(sessionKey ? { sessionKey } : {}),
+  };
+}
+
+function normalizeProviderDiagnosticsFilters(
+  ctx: AppContext,
+  filters: ProviderDiagnosticsFilters,
+): ProviderDiagnosticsFilters {
+  if (!filters.sessionId && !filters.sessionKey) {
+    return filters;
+  }
+
+  const effectiveContext = resolveEffectiveToolCatalogContext(
+    ctx,
+    {
+      provider: filters.provider,
+      backend: filters.backend,
+      instance: filters.instance,
+      sessionId: filters.sessionId,
+      sessionKey: filters.sessionKey,
+    },
+    (message) => new DiagnosticsQueryError(message),
+  );
+
+  return {
+    ...filters,
+    provider: effectiveContext.target.providerName,
+    backend: effectiveContext.target.backend,
+    instance: effectiveContext.target.instanceId,
+    sessionId: effectiveContext.sessionId,
+    sessionKey: effectiveContext.sessionKey,
+    toolCatalogScope: 'effective',
   };
 }
 
@@ -2092,7 +2166,9 @@ function hasProviderDiagnosticsFilters(filters: ProviderDiagnosticsFilters): boo
     filters.provider
     || filters.backend
     || filters.instance
-    || filters.defaultOnly,
+    || filters.defaultOnly
+    || filters.sessionId
+    || filters.sessionKey,
   );
 }
 
@@ -2102,11 +2178,30 @@ function buildProviderDiagnosticsQuery(filters: ProviderDiagnosticsFilters) {
     ...(filters.backend ? { backend: filters.backend } : {}),
     ...(filters.instance ? { instance: filters.instance } : {}),
     ...(filters.defaultOnly ? { defaultOnly: true } : {}),
+    ...(filters.toolCatalogScope === 'effective'
+      ? { toolCatalogScope: filters.toolCatalogScope }
+      : {}),
+    ...(filters.sessionId ? { sessionId: filters.sessionId } : {}),
+    ...(filters.sessionKey ? { sessionKey: filters.sessionKey } : {}),
   };
 
   return {
     hasFilters: Object.keys(appliedFilters).length > 0,
     filters: appliedFilters,
+  };
+}
+
+function buildProviderDiagnosticToolCatalogContext(
+  filters: ProviderDiagnosticsFilters,
+): ProviderDiagnosticToolCatalogContext | undefined {
+  if (filters.toolCatalogScope !== 'effective') {
+    return undefined;
+  }
+
+  return {
+    scope: filters.toolCatalogScope,
+    ...(filters.sessionId ? { sessionId: filters.sessionId } : {}),
+    ...(filters.sessionKey ? { sessionKey: filters.sessionKey } : {}),
   };
 }
 
