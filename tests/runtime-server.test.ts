@@ -3832,35 +3832,9 @@ providers:
             capabilityTags: ['tool_use'],
           },
         ],
-        presets: [
-          {
-            id: 'balanced',
-            label: 'Balanced',
-            availability: 'supported',
-            applicableEntryIds: ['gpt-5.4'],
-            preferredEntryId: 'gpt-5.4',
-          },
-          {
-            id: 'fast',
-            label: 'Fast',
-            availability: 'supported',
-            applicableEntryIds: ['gpt-5.3-codex'],
-            preferredEntryId: 'gpt-5.3-codex',
-          },
-          {
-            id: 'deep_reasoning',
-            label: 'Deep reasoning',
-            availability: 'supported',
-            applicableEntryIds: ['gpt-5.4'],
-            preferredEntryId: 'gpt-5.4',
-          },
-        ],
+        presets: [],
         controls: [],
-        defaultSelection: {
-          entryId: 'gpt-5.4',
-          entryMode: 'auto',
-          presetId: 'balanced',
-        },
+        defaultSelection: null,
         support: {
           tier: 'entry_only',
         },

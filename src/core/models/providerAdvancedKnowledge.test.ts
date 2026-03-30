@@ -114,6 +114,39 @@ describe('buildProviderAdvancedKnowledge', () => {
     });
   });
 
+  it('keeps unverified CLI targets entry-only without guessed presets or controls', () => {
+    const target: ProviderTargetDescriptor = {
+      providerName: 'codex',
+      backend: 'cli',
+      instanceId: 'default',
+      defaultTarget: true,
+      cliInstance: {
+        id: 'default',
+        providerName: 'codex',
+        backend: 'cli',
+        command: 'codex',
+      },
+    };
+
+    const knowledge = buildProviderAdvancedKnowledge(target, createCatalog({
+      provider: 'codex',
+      backend: 'cli',
+      instance: 'default',
+      defaultModel: 'gpt-5.4',
+      models: [
+        { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
+        { id: 'gpt-5.3-codex', label: 'gpt-5.3-codex' },
+      ],
+    }));
+
+    expect(knowledge.supportTier).toBe('entry_only');
+    expect(knowledge.catalog.controls).toEqual([]);
+    expect(knowledge.catalog.presets).toEqual([]);
+    expect(knowledge.catalog.defaultSelection).toBeNull();
+    expect(knowledge.entryDefaults).toEqual({});
+    expect(knowledge.controlsByKey).toEqual({});
+  });
+
   it('keeps Ollama controls runtime-owned without leaking raw vendor payloads', () => {
     const target: ProviderTargetDescriptor = {
       providerName: 'ollama',

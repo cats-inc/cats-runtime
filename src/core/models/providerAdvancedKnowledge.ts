@@ -98,6 +98,12 @@ function inferSupportTier(
   return 'entry_only';
 }
 
+function hasVerifiedAdvancedMetadata(
+  target: ProviderTargetDescriptor,
+): boolean {
+  return inferSupportTier(target) === 'full';
+}
+
 function buildOpenAiControls(
   entries: ProviderAdvancedCatalogEntry[],
 ): {
@@ -304,9 +310,16 @@ export function buildProviderAdvancedKnowledge(
 ): ProviderAdvancedKnowledgeContext {
   const entries = toAdvancedEntries(target, modelCatalog);
   const supportTier = inferSupportTier(target);
-  const { controls, entryDefaults } = buildControls(target, entries);
-  const presets = buildPresetCatalog(target, entries, controls);
-  const defaultSelection = buildDefaultSelection(entries, presets);
+  const verifiedAdvancedMetadata = hasVerifiedAdvancedMetadata(target);
+  const { controls, entryDefaults } = verifiedAdvancedMetadata
+    ? buildControls(target, entries)
+    : { controls: [], entryDefaults: {} };
+  const presets = verifiedAdvancedMetadata
+    ? buildPresetCatalog(target, entries, controls)
+    : [];
+  const defaultSelection = verifiedAdvancedMetadata
+    ? buildDefaultSelection(entries, presets)
+    : null;
   const catalog: ProviderAdvancedCatalogResult = {
     provider: modelCatalog.provider,
     backend: modelCatalog.backend,
