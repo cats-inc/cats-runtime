@@ -45,7 +45,7 @@ This plan therefore treats `SPEC-006` as a pilot run with two slices:
 - `project-bootstrap` stays an input source, not an accepted baseline
 - `cats-runtime` remains the primary implementation repo for the runtime-owned
   collaboration baseline
-- `cats` remains a sibling pilot repo that should consume mirrored outcomes
+- `cats-platform` remains a sibling pilot repo that should consume mirrored outcomes
   where the shared collaboration contract must stay aligned
 - merge-back into `project-bootstrap` and production defaults happen only after
   several optimization loops
@@ -89,13 +89,13 @@ The key rule is:
 
 1. Verify and freeze which parts of the March 2026 `project-bootstrap` A2A v1.0
    refresh and base-template collaboration artifacts are suitable as pilot
-   inputs for `cats` / `cats-runtime`.
+   inputs for `cats-platform` / `cats-runtime`.
 2. Define the first-wave pilot operating contract for same-environment CLI
    agents, including when they should read `AGENTS.md`, follow
    `docs/AGENT-GUIDE.md`, and update repo memory such as research/ADR/spec/plan
    artifacts.
 3. Extract the minimum collaboration-oriented template knowledge from
-   `project-bootstrap/templates/base` that `cats-runtime` and `cats` still need
+   `project-bootstrap/templates/base` that `cats-runtime` and `cats-platform` still need
    after the repo split.
 4. Replace external `Initialize-Project` / `Update-Project` reliance with
    repo-owned starter/update helpers or equivalent local modules/scripts that
@@ -146,7 +146,7 @@ before implementation starts.
 - [x] Record the intentional divergence directly in the plan/spec/docs because
       this slice did not introduce a new architectural boundary beyond ADR-010
 
-**Deliverables**: `cats` / `cats-runtime` become the first-wave repos validating
+**Deliverables**: `cats-platform` / `cats-runtime` become the first-wave repos validating
 whether the A2A-first collaboration model actually works in a real codebase.
 
 ### Phase 3: Add Collaboration Skills and Tooling Posture
@@ -199,15 +199,15 @@ collaboration/bootstrap baseline rather than a submodule dependency.
 
 - [x] Validate the repo-owned starter/update flow without shelling out to
       `project-bootstrap`
-- [x] Confirm `cats` can consume the same extracted collaboration baseline
+- [x] Confirm `cats-platform` can consume the same extracted collaboration baseline
       after the split without monorepo-local bootstrap access
 - [x] Record what still diverges intentionally from upstream bootstrap so
       merge-back remains evidence-led rather than accidental
-- [ ] Keep production-default rollout deferred until the repo-owned rewrite has
+- [x] Keep production-default rollout deferred until the repo-owned rewrite has
       survived more than one pilot loop
 
 **Deliverables**: the collaboration stack is split-safe before
-`cats-runtime` / `cats` stop having local access to the bootstrap submodule.
+`cats-runtime` / `cats-platform` stop having local access to the bootstrap submodule.
 
 ## Files to Create/Modify
 
@@ -338,7 +338,7 @@ collaboration/bootstrap baseline rather than a submodule dependency.
 | Date | Update |
 |------|--------|
 | 2026-03-29 | Plan created for the first `SPEC-006` implementation track |
-| 2026-03-29 | Reframed as a pilot run with bootstrap input validation, first-wave `cats` / `cats-runtime` verification, second-wave generated-repo verification, and deferred merge-back |
+| 2026-03-29 | Reframed as a pilot run with bootstrap input validation, first-wave `cats-platform` / `cats-runtime` verification, second-wave generated-repo verification, and deferred merge-back |
 | 2026-03-29 | Confirmed `project-bootstrap` March 2026 A2A refresh commits (`e4518e8`, `569ba7a`, `6d98881`) as candidate pilot inputs rather than baseline truth |
 | 2026-03-29 | Replaced legacy `docs/a2a/agent-card.*` and `task.*` examples with a pilot-owned A2A v1.0 example set rewritten for `cats-runtime` |
 | 2026-03-29 | Added `a2a-handoff` and `project-memory-sync` collaboration skills, aligned runtime docs/indexes, and updated workspace substrate starter artifacts away from retired legacy A2A filenames |
@@ -349,9 +349,10 @@ collaboration/bootstrap baseline rather than a submodule dependency.
 | 2026-03-29 | Added platform wrapper scripts so the repo-owned workspace substrate helper has first-party Windows/Linux/macOS entrypoints under `scripts/` |
 | 2026-03-30 | Landed the first repo-owned starter-family rewrite for Phase 5 by teaching workspace substrate to seed `docs/README.md`, the docs index readmes, `skills/README.md`, and `scripts/README.md`, reducing reliance on `project-bootstrap/templates/base` for the minimum collaboration baseline |
 | 2026-03-30 | Landed the next Phase 5 starter-family slice by internalizing the bootstrap `Sync-AgentSkills` input: `cats-runtime` now ships repo-owned Linux/macOS skill-sync scripts, `scripts/README.md` documents the cross-platform contract, and workspace substrate seeds the Windows/Linux/macOS skill-sync entrypoints into initialized workspaces instead of leaving that collaboration behavior trapped in bootstrap templates |
-| 2026-03-30 | Completed the first Phase 6 split-safety validation loop: `cats-runtime-workspace` successfully seeded a throwaway A2A-enabled workspace without any direct `project-bootstrap` references, the repo-owned workspace substrate tests stayed green, and the sibling `cats` repo now carries matching cross-platform skill-sync entrypoints validated by a local smoke test |
+| 2026-03-30 | Completed the first Phase 6 split-safety validation loop: `cats-runtime-workspace` successfully seeded a throwaway A2A-enabled workspace without any direct `project-bootstrap` references, the repo-owned workspace substrate tests stayed green, and the sibling `cats-platform` repo now carries matching cross-platform skill-sync entrypoints validated by a local smoke test |
 | 2026-03-30 | Closed the main Phase 5 rewrite gate: the repo-owned workspace substrate helper stack now covers local init/update behavior, preserves `*.bootstrap` review-copy semantics for customized files, and keeps legacy A2A retirement guidance local instead of relying on `project-bootstrap/scripts/*` |
-| 2026-03-30 | Closed the next Phase 6 sibling-alignment gate with `docs/research/2026-03-30-sibling-collaboration-baseline-alignment.md`, recording that `cats` already consumes the mirrored A2A file set plus byte-identical cross-platform skill-sync scripts from repo-owned copies and that the remaining A2A content diffs are intentional repo-identity divergences |
+| 2026-03-30 | Closed the next Phase 6 sibling-alignment gate with `docs/research/2026-03-30-sibling-collaboration-baseline-alignment.md`, recording that `cats-platform` already consumes the mirrored A2A file set plus byte-identical cross-platform skill-sync scripts from repo-owned copies and that the remaining A2A content diffs are intentional repo-identity divergences |
+| 2026-03-30 | Closed the final Phase 6 governance tail: the repo-owned collaboration rewrite has now survived more than one pilot loop across the first-wave repos, generated-repo validation, and sibling alignment checks, but production-default rollout still remains explicitly deferred pending a separate evidence-led adoption decision |
 
 ---
 
