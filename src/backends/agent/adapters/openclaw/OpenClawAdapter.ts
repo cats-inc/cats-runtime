@@ -518,10 +518,17 @@ class GatewayWsClient {
   private readonly pending = new Map<string, PendingRequest>();
   private challengeResolve!: (nonce: string) => void;
   private challengeReject!: (error: Error) => void;
-  private readonly challengePromise = new Promise<string>((resolve, reject) => {
-    this.challengeResolve = resolve;
-    this.challengeReject = reject;
-  });
+  private readonly challengePromise = (() => {
+    const promise = new Promise<string>((resolve, reject) => {
+      this.challengeResolve = resolve;
+      this.challengeReject = reject;
+    });
+    // The socket can close before connect() reaches the challenge await path.
+    // Attach a sink so that early rejections do not surface as unhandled
+    // promise rejections and crash the runtime during startup probes.
+    void promise.catch(() => {});
+    return promise;
+  })();
   private socket?: WebSocket;
 
   constructor(

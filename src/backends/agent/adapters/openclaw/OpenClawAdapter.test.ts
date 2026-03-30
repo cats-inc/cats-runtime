@@ -143,7 +143,42 @@ class FakeOpenClawSocket extends EventTarget {
   }
 }
 
+class FailingOpenClawSocket extends EventTarget {
+  readyState = WebSocket.CONNECTING;
+
+  constructor() {
+    super();
+    queueMicrotask(() => {
+      this.readyState = WebSocket.CLOSED;
+      const closeEvent = new Event('close') as Event & { code?: number };
+      closeEvent.code = 1006;
+      this.dispatchEvent(closeEvent);
+    });
+  }
+
+  send(): void {
+    throw new Error('send should not be called when the socket closes before open');
+  }
+
+  close(): void {
+    this.readyState = WebSocket.CLOSED;
+  }
+}
+
 describe('OpenClawAdapter', () => {
+  it('returns an unavailable probe result when the gateway closes before open without crashing the process', async () => {
+    const adapter = new OpenClawAdapter({
+      webSocketFactory: () => new FailingOpenClawSocket() as unknown as WebSocket,
+    });
+
+    await expect(adapter.probe(createInstance())).resolves.toEqual({
+      health: expect.objectContaining({
+        status: 'unavailable',
+        details: 'OpenClaw websocket closed before open (1006)',
+      }),
+    });
+  });
+
   it('records dropped and unknown gateway frames for provider-evolution evidence while preserving artifact output', async () => {
     const adapter = new OpenClawAdapter({
       webSocketFactory: () => new FakeOpenClawSocket() as unknown as WebSocket,
