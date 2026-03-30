@@ -200,6 +200,9 @@ function cloneEvidence(
     artifacts: value.artifacts.map((artifact) => ({ ...artifact })),
     services: value.services.map((service) => ({ ...service })),
     previewSurfaces: value.previewSurfaces.map((surface) => ({ ...surface })),
-    browserSessions: value.browserSessions.map((browserSession) => ({ ...browserSession })),
+    browserSessions: value.browserSessions.map((browserSession) => ({
+      ...browserSession,
+      openPages: browserSession.openPages.map((page) => ({ ...page })),
+    })),
   };
 }

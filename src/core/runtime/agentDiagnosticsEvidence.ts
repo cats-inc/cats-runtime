@@ -63,6 +63,15 @@ export interface AgentDiagnosticSessionEvidenceSummary {
     status: string;
     openPageCount: number;
     previewSurfaceCount: number;
+    openPages: Array<{
+      id: string;
+      renderHint: string;
+      label?: string;
+      title?: string;
+      url?: string;
+      path?: string;
+      mediaType?: string;
+    }>;
   }>;
 }
 
@@ -232,6 +241,18 @@ export function buildAgentDiagnosticSessionEvidence(
       status: browserSession.status,
       openPageCount: browserSession.inspection.openPageCount,
       previewSurfaceCount: browserSession.inspection.previewSurfaces.length,
+      openPages: browserSession.pages
+        .filter((page) => page.status !== 'closed')
+        .slice(0, 2)
+        .map((page) => ({
+          id: page.id,
+          renderHint: page.previewSurface.renderHint,
+          ...(page.label ? { label: page.label } : {}),
+          ...(page.title ? { title: page.title } : {}),
+          ...(page.url ? { url: page.url } : {}),
+          ...(page.path ? { path: page.path } : {}),
+          ...(page.mediaType ? { mediaType: page.mediaType } : {}),
+        })),
     })),
   };
 }

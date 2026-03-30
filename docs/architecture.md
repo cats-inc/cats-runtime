@@ -503,7 +503,8 @@ path is intentionally narrow:
   surfaces, and browser-session evidence without issuing a second session-read
   call first; those summaries now also preserve source/freshness metadata such
   as `observedAt` plus bounded workspace locators such as `cwd` and
-  `outputDir`, and bounded semantic run summaries when `resultSummary` exists
+  `outputDir`, bounded semantic run summaries when `resultSummary` exists, and
+  bounded open browser-page samples instead of only browser session counts
 - Lets provider-only agent diagnostics fall back to bounded
   `config.latestSessionActivity` / `config.latestSessionEvidence` from the most
   recent retained runtime session or retained target-evidence store entry for

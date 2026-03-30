@@ -168,6 +168,12 @@ when it already exists, so the remaining gap is less about "can hosts see any
 semantic outcome at all?" and more about how much broader evidence breadth to
 harvest beyond the current run/session summaries.
 
+The runtime now also preserves bounded browser open-page samples instead of
+only browser session counts, so the remaining browser-backed gap is less about
+"is there any page context?" and more about how broadly the runtime should
+harvest externally owned preview/work-product surfaces beyond the current
+bounded sample set.
+
 That narrows the remaining gap again. The next missing depth is no longer
 "provider diagnostics cannot show work products"; it is broader harvesting and
 more durable evidence beyond what retained target evidence already knows.

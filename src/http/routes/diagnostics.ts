@@ -855,7 +855,10 @@ async function diagnoseAgentTarget(
       artifacts: sessionEvidence.artifacts.map((artifact) => ({ ...artifact })),
       services: sessionEvidence.services.map((service) => ({ ...service })),
       previewSurfaces: sessionEvidence.previewSurfaces.map((surface) => ({ ...surface })),
-      browserSessions: sessionEvidence.browserSessions.map((browserSession) => ({ ...browserSession })),
+      browserSessions: sessionEvidence.browserSessions.map((browserSession) => ({
+        ...browserSession,
+        openPages: browserSession.openPages.map((page) => ({ ...page })),
+      })),
     };
     checks.push(
       createCheck(
@@ -927,7 +930,10 @@ async function diagnoseAgentTarget(
       artifacts: fallbackLatestEvidence.artifacts.map((artifact) => ({ ...artifact })),
       services: fallbackLatestEvidence.services.map((service) => ({ ...service })),
       previewSurfaces: fallbackLatestEvidence.previewSurfaces.map((surface) => ({ ...surface })),
-      browserSessions: fallbackLatestEvidence.browserSessions.map((browserSession) => ({ ...browserSession })),
+      browserSessions: fallbackLatestEvidence.browserSessions.map((browserSession) => ({
+        ...browserSession,
+        openPages: browserSession.openPages.map((page) => ({ ...page })),
+      })),
     };
     checks.push(
       createCheck(

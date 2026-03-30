@@ -1322,6 +1322,9 @@ always-on self-adapting parser system.
 - the same bounded latest-session evidence summaries now also preserve
   `latestRun.resultSummary` when the runtime already has one, so host/operator
   reads can surface a semantic outcome hint without replaying a transcript
+- the same evidence summaries now also preserve bounded
+  `browserSessions[].openPages[]` samples, so browser-backed preview evidence
+  is not limited to aggregate page counts
 - session-aware provider diagnostics now also keep Agent SDK bridge targets on
   provider-wide tool catalogs while surfacing runtime session activity
   evidence, instead of treating unsupported effective-tool discovery as a

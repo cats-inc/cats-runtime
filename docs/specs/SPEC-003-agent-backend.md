@@ -123,6 +123,8 @@ current `api` backend or bury a second orchestration model inside it.
   context without reading a full session transcript. When the runtime already
   has a bounded run/result summary, the same evidence surface should preserve
   that semantic hint instead of forcing hosts to infer it from counts alone.
+  Browser-backed evidence should likewise preserve bounded open-page samples
+  instead of stopping at aggregate browser session counts.
 - **Extensibility**: The adapter contract shall support more than one external
   agent runtime.
 

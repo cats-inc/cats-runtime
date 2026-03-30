@@ -928,7 +928,9 @@ summaries now also carry freshness/provenance metadata such as `source`,
 bounded `workspace` locator (`cwd`, optional `outputDir`, optional
 `workspaceMode`) so operators can tell where the latest evidence came from.
 When the runtime already has a bounded run summary, the same evidence payload
-also preserves `latestRun.resultSummary`.
+also preserves `latestRun.resultSummary`. Browser-backed evidence summaries now
+also include bounded `browserSessions[].openPages[]` samples rather than only
+page counts.
 
 Even without `sessionId` / `sessionKey`, retained agent sessions can still
 surface bounded `providers[].config.latestSessionActivity` /
