@@ -912,17 +912,20 @@
       </div>
       <div class="runtime-field">
         <div class="flex items-center justify-between gap-2">
-          <label class="runtime-field-label">Model Routing</label>
+          <label class="runtime-field-label">Model</label>
           <span id="inputModelSupportBadge" class="runtime-auth-badge" data-state="idle">Loading</span>
         </div>
-        <select id="inputRoutingMode" class="runtime-select" onchange="onCreateRoutingModeChange()"></select>
-        <div class="runtime-field hidden" id="inputPresetGroup">
-          <label class="runtime-field-label">Preset</label>
-          <select id="inputPresetChoice" class="runtime-select" onchange="onCreateRoutingPresetChange()"></select>
-        </div>
         <div class="runtime-field hidden" id="inputEntryGroup">
-          <label class="runtime-field-label">Model</label>
           <select id="inputEntryChoice" class="runtime-select" onchange="onCreateRoutingEntryChange()"></select>
+        </div>
+        <div class="runtime-field hidden" id="inputPresetGroup">
+          <label class="runtime-field-label">Mode</label>
+          <select id="inputPresetChoice" class="runtime-select" onchange="onCreateRoutingPresetChange()"></select>
+          <div
+            id="inputPresetStaticLabel"
+            class="runtime-input hidden flex items-center text-sm text-slate-500"
+            aria-live="polite"
+          ></div>
         </div>
         <input type="text" id="inputModel" class="runtime-input hidden" placeholder="e.g. claude-sonnet-4-6" />
         <div id="inputModelControls" class="space-y-2"></div>
@@ -1020,6 +1023,7 @@ const providerAdvancedCatalogCache = new Map();
 const providerAdvancedCatalogInFlight = new Map();
 let currentCreateModelCatalog = null;
 let createModelCatalogRequestId = 0;
+const CUSTOM_CREATE_MODEL_VALUE = '__custom_legacy_model__';
 let sessionScanInFlight = false;
 
 function apiKey() {
@@ -1333,38 +1337,52 @@ function renderCreateRoutingSelectOptions(selectEl, options, selectedValue) {
   return nextValue;
 }
 
-function describeCreateRoutingCatalog(catalog) {
-  const presets = Array.isArray(catalog?.presets)
-    ? catalog.presets.filter((preset) => preset && preset.id && preset.availability !== 'unavailable')
-    : [];
-  const entries = Array.isArray(catalog?.entries)
+function listCreateCatalogEntries(catalog) {
+  return Array.isArray(catalog?.entries)
     ? catalog.entries.filter((entry) => entry && entry.id)
     : [];
-  const hasRecommended = Boolean(
-    window.CatsUI?.resolveAdvancedCatalogChoice
-      ? window.CatsUI.resolveAdvancedCatalogChoice(catalog, 'default')
-      : null,
-  );
-  const modes = [];
-  if (hasRecommended) modes.push({ value: 'recommended', label: 'Recommended' });
-  if (presets.length > 0) modes.push({ value: 'preset', label: 'Preset' });
-  if (entries.length > 0) modes.push({ value: 'model', label: 'Pin model' });
-  modes.push({ value: 'custom', label: 'Custom legacy model' });
-  return { modes, presets, entries };
 }
 
-function getDefaultCreatePresetId(catalog, presets) {
-  const defaultPresetId = catalog?.defaultSelection?.presetId;
-  if (defaultPresetId && presets.some((preset) => preset.id === defaultPresetId)) {
-    return defaultPresetId;
-  }
-  return presets[0]?.id || '';
+function listCreateCatalogPresets(catalog) {
+  return Array.isArray(catalog?.presets)
+    ? catalog.presets.filter((preset) => preset && preset.id && preset.availability !== 'unavailable')
+    : [];
+}
+
+function findCreateCatalogEntry(catalog, entryId) {
+  return listCreateCatalogEntries(catalog).find((entry) => entry.id === entryId) || null;
+}
+
+function createPresetAppliesToEntry(preset, entryId) {
+  return !Array.isArray(preset?.applicableEntryIds)
+    || preset.applicableEntryIds.length === 0
+    || preset.applicableEntryIds.includes(entryId);
+}
+
+function createControlAppliesToEntry(control, entryId) {
+  return !Array.isArray(control?.applicableEntryIds)
+    || control.applicableEntryIds.length === 0
+    || control.applicableEntryIds.includes(entryId);
+}
+
+function listCreateApplicablePresets(catalog, entryId) {
+  return listCreateCatalogPresets(catalog).filter((preset) =>
+    createPresetAppliesToEntry(preset, entryId),
+  );
+}
+
+function findCreateCatalogPreset(catalog, entryId, presetId) {
+  return listCreateApplicablePresets(catalog, entryId).find((preset) => preset.id === presetId) || null;
+}
+
+function getCreateDefaultSelection(catalog) {
+  return window.CatsUI?.resolveAdvancedCatalogChoice
+    ? window.CatsUI.resolveAdvancedCatalogChoice(catalog, 'default')
+    : null;
 }
 
 function getDefaultCreateEntryId(catalog, entries) {
-  const resolved = window.CatsUI?.resolveAdvancedCatalogChoice
-    ? window.CatsUI.resolveAdvancedCatalogChoice(catalog, 'default')
-    : null;
+  const resolved = getCreateDefaultSelection(catalog);
   if (resolved?.entryId && entries.some((entry) => entry.id === resolved.entryId)) {
     return resolved.entryId;
   }
@@ -1372,57 +1390,143 @@ function getDefaultCreateEntryId(catalog, entries) {
   return defaultEntry?.id || entries[0]?.id || '';
 }
 
-function getCreateRoutingChoiceId() {
-  const modeEl = document.getElementById('inputRoutingMode');
-  const presetEl = document.getElementById('inputPresetChoice');
-  const entryEl = document.getElementById('inputEntryChoice');
-  const mode = modeEl?.value || 'custom';
+function getDefaultCreatePresetId(catalog, entryId, presets) {
+  if (!entryId || !presets.length) {
+    return '';
+  }
 
-  if (mode === 'recommended') {
-    return 'default';
+  const entries = listCreateCatalogEntries(catalog);
+  const resolved = getCreateDefaultSelection(catalog);
+  const defaultEntryId = getDefaultCreateEntryId(catalog, entries);
+  const defaultPresetId = resolved?.modelSelection?.presetId || catalog?.defaultSelection?.presetId;
+  if (
+    entryId === defaultEntryId
+    && defaultPresetId
+    && presets.some((preset) => preset.id === defaultPresetId)
+  ) {
+    return defaultPresetId;
   }
-  if (mode === 'preset') {
-    const presetId = presetEl?.value || '';
-    return presetId ? `preset:${presetId}` : 'default';
-  }
-  if (mode === 'model') {
-    const entryId = entryEl?.value || '';
-    return entryId ? `entry:${entryId}` : 'default';
-  }
-  return 'custom';
+  return '';
 }
 
-function syncCreateRoutingSelectors(catalog, preserveCurrent = false) {
-  const modeEl = document.getElementById('inputRoutingMode');
-  const presetEl = document.getElementById('inputPresetChoice');
-  const entryEl = document.getElementById('inputEntryChoice');
-  if (!modeEl || !presetEl || !entryEl) {
-    return;
+function buildCreateControlDefaults(catalog, entryId, presetId) {
+  const defaults = {};
+  const preset = findCreateCatalogPreset(catalog, entryId, presetId);
+  if (preset?.controlDefaults && typeof preset.controlDefaults === 'object') {
+    Object.assign(defaults, preset.controlDefaults);
   }
 
-  const { modes, presets, entries } = describeCreateRoutingCatalog(catalog);
-  renderCreateRoutingSelectOptions(
-    modeEl,
-    modes,
-    preserveCurrent ? modeEl.value : '',
-  );
+  const resolved = getCreateDefaultSelection(catalog);
+  if (
+    resolved?.entryId === entryId
+    && (resolved.modelSelection?.presetId || '') === (presetId || '')
+    && resolved.modelSelection?.controls
+    && typeof resolved.modelSelection.controls === 'object'
+  ) {
+    Object.assign(defaults, resolved.modelSelection.controls);
+  }
 
-  const presetOptions = presets.map((preset) => ({
-    value: preset.id,
-    label: preset.label || preset.id,
-  }));
-  const entryOptions = entries.map((entry) => ({
-    value: entry.id,
-    label: entry.label || entry.id,
-  }));
+  const filtered = {};
+  const controls = Array.isArray(catalog?.controls) ? catalog.controls : [];
+  for (const control of controls) {
+    if (!control?.key || control.scope === 'request' || !createControlAppliesToEntry(control, entryId)) {
+      continue;
+    }
+    if (Object.prototype.hasOwnProperty.call(defaults, control.key)) {
+      filtered[control.key] = defaults[control.key];
+    }
+  }
+  return filtered;
+}
 
-  renderCreateRoutingSelectOptions(
+function setCreatePresetStaticLabel(label) {
+  const presetEl = document.getElementById('inputPresetChoice');
+  const presetGroup = document.getElementById('inputPresetGroup');
+  const staticLabelEl = document.getElementById('inputPresetStaticLabel');
+  if (!presetEl || !presetGroup || !staticLabelEl) {
+    return '';
+  }
+
+  renderCreateRoutingSelectOptions(presetEl, [], '');
+  presetEl.disabled = true;
+  presetEl.classList.add('hidden');
+  staticLabelEl.textContent = label || '\u00a0';
+  staticLabelEl.classList.remove('hidden');
+  presetGroup.classList.remove('hidden');
+  return label;
+}
+
+function syncCreatePresetSelector(catalog, preserveCurrent = false, allowDefaultPreset = true) {
+  const presetEl = document.getElementById('inputPresetChoice');
+  const presetGroup = document.getElementById('inputPresetGroup');
+  const entryEl = document.getElementById('inputEntryChoice');
+  const staticLabelEl = document.getElementById('inputPresetStaticLabel');
+  if (!presetEl || !presetGroup || !entryEl || !staticLabelEl) {
+    return '';
+  }
+
+  presetEl.classList.remove('hidden');
+  staticLabelEl.classList.add('hidden');
+  staticLabelEl.textContent = '';
+
+  const entryId = entryEl.value || '';
+  if (!catalog || !entryId) {
+    renderCreateRoutingSelectOptions(presetEl, [], '');
+    presetEl.disabled = true;
+    presetGroup.classList.add('hidden');
+    return '';
+  }
+
+  if (entryId === CUSTOM_CREATE_MODEL_VALUE) {
+    return setCreatePresetStaticLabel('');
+  }
+
+  const presets = listCreateApplicablePresets(catalog, entryId);
+  if (presets.length === 0) {
+    return setCreatePresetStaticLabel('');
+  }
+
+  const presetOptions = [
+    { value: '', label: 'Standard' },
+    ...presets.map((preset) => ({
+      value: preset.id,
+      label: preset.label || preset.id,
+    })),
+  ];
+  const nextValue = renderCreateRoutingSelectOptions(
     presetEl,
     presetOptions,
     preserveCurrent && presetEl.value
       ? presetEl.value
-      : getDefaultCreatePresetId(catalog, presets),
+      : (allowDefaultPreset ? getDefaultCreatePresetId(catalog, entryId, presets) : ''),
   );
+  presetEl.disabled = presetOptions.length <= 1;
+  presetGroup.classList.remove('hidden');
+  return nextValue;
+}
+
+function syncCreateRoutingSelectors(catalog, preserveCurrent = false) {
+  const presetEl = document.getElementById('inputPresetChoice');
+  const entryEl = document.getElementById('inputEntryChoice');
+  const entryGroup = document.getElementById('inputEntryGroup');
+  if (!presetEl || !entryEl || !entryGroup) {
+    return;
+  }
+
+  const entries = listCreateCatalogEntries(catalog);
+  if (entries.length === 0) {
+    setLegacyCreateModelRouting('Enter a model id manually.');
+    return;
+  }
+
+  const entryOptions = [
+    ...entries.map((entry) => ({
+      value: entry.id,
+      label: entry.label || entry.id,
+    })),
+    { value: CUSTOM_CREATE_MODEL_VALUE, label: 'Custom legacy model...' },
+  ];
+
   renderCreateRoutingSelectOptions(
     entryEl,
     entryOptions,
@@ -1430,28 +1534,28 @@ function syncCreateRoutingSelectors(catalog, preserveCurrent = false) {
       ? entryEl.value
       : getDefaultCreateEntryId(catalog, entries),
   );
-
-  modeEl.disabled = modes.length <= 1;
-  presetEl.disabled = presetOptions.length <= 1;
-  entryEl.disabled = entryOptions.length <= 1;
+  entryEl.disabled = false;
+  entryGroup.classList.remove('hidden');
+  syncCreatePresetSelector(catalog, preserveCurrent, true);
 }
 
 function setLegacyCreateModelRouting(message) {
-  const modeEl = document.getElementById('inputRoutingMode');
   const presetEl = document.getElementById('inputPresetChoice');
   const entryEl = document.getElementById('inputEntryChoice');
   const presetGroup = document.getElementById('inputPresetGroup');
   const entryGroup = document.getElementById('inputEntryGroup');
   const customInput = document.getElementById('inputModel');
   const hintEl = document.getElementById('inputModelHint');
+  const staticLabelEl = document.getElementById('inputPresetStaticLabel');
 
   currentCreateModelCatalog = null;
-  renderCreateRoutingSelectOptions(modeEl, [
-    { value: 'custom', label: 'Custom legacy model' },
-  ], 'custom');
   renderCreateRoutingSelectOptions(presetEl, [], '');
   renderCreateRoutingSelectOptions(entryEl, [], '');
-  if (modeEl) modeEl.disabled = false;
+  if (presetEl) presetEl.disabled = true;
+  if (presetEl) presetEl.classList.remove('hidden');
+  if (entryEl) entryEl.disabled = true;
+  if (staticLabelEl) staticLabelEl.classList.add('hidden');
+  if (staticLabelEl) staticLabelEl.textContent = '';
   if (presetGroup) presetGroup.classList.add('hidden');
   if (entryGroup) entryGroup.classList.add('hidden');
   if (customInput) customInput.classList.remove('hidden');
@@ -1525,55 +1629,51 @@ function renderCreateModelControlField(control, value) {
 }
 
 function renderCreateModelChoice() {
-  const modeEl = document.getElementById('inputRoutingMode');
+  const entryEl = document.getElementById('inputEntryChoice');
+  const presetEl = document.getElementById('inputPresetChoice');
   const presetGroup = document.getElementById('inputPresetGroup');
   const entryGroup = document.getElementById('inputEntryGroup');
   const hintEl = document.getElementById('inputModelHint');
   const customInput = document.getElementById('inputModel');
   const controlsEl = document.getElementById('inputModelControls');
-  if (!modeEl || !presetGroup || !entryGroup || !hintEl || !customInput || !controlsEl) {
+  if (!entryEl || !presetEl || !presetGroup || !entryGroup || !hintEl || !customInput || !controlsEl) {
     return;
   }
 
-  const mode = modeEl.value || 'custom';
-  presetGroup.classList.toggle('hidden', mode !== 'preset');
-  entryGroup.classList.toggle('hidden', mode !== 'model');
-  const choiceId = getCreateRoutingChoiceId();
   const catalog = currentCreateModelCatalog;
-  const resolved = window.CatsUI?.resolveAdvancedCatalogChoice
-    ? window.CatsUI.resolveAdvancedCatalogChoice(catalog, choiceId)
-    : null;
+  const entryId = entryEl.value || '';
 
   resetCreateModelControls();
   customInput.classList.add('hidden');
 
-  if (!catalog || !resolved) {
+  if (!catalog) {
     hintEl.textContent = 'Enter a model id manually.';
+    entryGroup.classList.add('hidden');
+    presetGroup.classList.add('hidden');
     customInput.classList.remove('hidden');
     return;
   }
 
-  if (resolved.kind === 'legacy') {
+  entryGroup.classList.remove('hidden');
+
+  if (!entryId || entryId === CUSTOM_CREATE_MODEL_VALUE) {
     hintEl.textContent = 'Manual model id passthrough.';
+    presetGroup.classList.remove('hidden');
     customInput.classList.remove('hidden');
     return;
   }
 
-  const entry = (catalog.entries || []).find((candidate) => candidate.id === resolved.entryId) || null;
-  const preset = resolved.modelSelection?.presetId
-    ? (catalog.presets || []).find((candidate) => candidate.id === resolved.modelSelection.presetId) || null
-    : null;
+  const entry = findCreateCatalogEntry(catalog, entryId);
+  const presetId = presetEl.value || '';
+  const preset = presetId ? findCreateCatalogPreset(catalog, entryId, presetId) : null;
   const controls = window.CatsUI?.listStoredAdvancedControls
-    ? window.CatsUI.listStoredAdvancedControls(catalog, choiceId)
+    ? window.CatsUI.listStoredAdvancedControls(catalog, `entry:${entryId}`)
     : [];
-  const defaultValues = window.CatsUI?.getAdvancedChoiceControlDefaults
-    ? window.CatsUI.getAdvancedChoiceControlDefaults(catalog, choiceId)
-    : {};
+  const defaultValues = buildCreateControlDefaults(catalog, entryId, presetId);
 
   const bits = [];
-  if (mode === 'recommended') bits.push('Recommended');
-  if (preset?.label) bits.push(preset.label);
   if (entry) bits.push(entry.label || entry.id);
+  bits.push(preset?.label || 'Standard');
   if (catalog.support?.tier) bits.push(`tier: ${catalog.support.tier}`);
   hintEl.textContent = bits.join(' · ') || 'Advanced catalog selection';
 
@@ -1584,15 +1684,12 @@ function renderCreateModelChoice() {
   }
 }
 
-function onCreateRoutingModeChange() {
-  renderCreateModelChoice();
-}
-
 function onCreateRoutingPresetChange() {
   renderCreateModelChoice();
 }
 
 function onCreateRoutingEntryChange() {
+  syncCreatePresetSelector(currentCreateModelCatalog, false, false);
   renderCreateModelChoice();
 }
 
@@ -1616,34 +1713,37 @@ function readCreateModelControlValues() {
 
 function buildCreateModelPayload() {
   const customInput = document.getElementById('inputModel');
-  const choiceId = getCreateRoutingChoiceId();
+  const entryEl = document.getElementById('inputEntryChoice');
+  const presetEl = document.getElementById('inputPresetChoice');
   const catalog = currentCreateModelCatalog;
-  const resolved = window.CatsUI?.resolveAdvancedCatalogChoice
-    ? window.CatsUI.resolveAdvancedCatalogChoice(catalog, choiceId)
-    : null;
+  const entryId = entryEl?.value || '';
 
-  if (!catalog || !resolved || resolved.kind === 'legacy') {
+  if (!catalog || !entryId || entryId === CUSTOM_CREATE_MODEL_VALUE) {
     const legacyModel = customInput?.value.trim();
     return legacyModel ? { model: legacyModel } : {};
   }
 
-  const modelSelection = JSON.parse(JSON.stringify(resolved.modelSelection || {}));
+  const presetId = presetEl?.value || '';
+  const modelSelection = {
+    entryId,
+    entryMode: 'explicit',
+    ...(presetId ? { presetId } : {}),
+  };
   const controls = readCreateModelControlValues();
   if (Object.keys(controls).length > 0) {
     modelSelection.controls = controls;
-  } else if (!modelSelection.controls) {
-    delete modelSelection.controls;
   }
   return { modelSelection };
 }
 
 async function refreshCreateModelRouting() {
-  const modeEl = document.getElementById('inputRoutingMode');
+  const entryEl = document.getElementById('inputEntryChoice');
+  const presetEl = document.getElementById('inputPresetChoice');
   const presetGroup = document.getElementById('inputPresetGroup');
   const entryGroup = document.getElementById('inputEntryGroup');
   const hintEl = document.getElementById('inputModelHint');
   const customInput = document.getElementById('inputModel');
-  if (!modeEl || !presetGroup || !entryGroup || !hintEl || !customInput) {
+  if (!entryEl || !presetEl || !presetGroup || !entryGroup || !hintEl || !customInput) {
     return;
   }
 
@@ -1651,12 +1751,14 @@ async function refreshCreateModelRouting() {
   const requestId = ++createModelCatalogRequestId;
   currentCreateModelCatalog = null;
   setCreateModelSupportBadge('Loading', 'idle');
-  renderCreateRoutingSelectOptions(modeEl, [
-    { value: '', label: 'Loading routing...' },
+  renderCreateRoutingSelectOptions(entryEl, [
+    { value: '', label: 'Loading models...' },
   ], '');
-  modeEl.disabled = true;
+  renderCreateRoutingSelectOptions(presetEl, [], '');
+  entryEl.disabled = true;
+  presetEl.disabled = true;
   presetGroup.classList.add('hidden');
-  entryGroup.classList.add('hidden');
+  entryGroup.classList.remove('hidden');
   customInput.classList.add('hidden');
   hintEl.textContent = 'Loading model catalog...';
   resetCreateModelControls();

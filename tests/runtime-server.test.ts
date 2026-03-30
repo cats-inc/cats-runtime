@@ -229,7 +229,7 @@ describe('runtime server', () => {
       expect(html).toContain('id="inputWorkspaceKind"');
       expect(html).toContain('id="inputWorkspaceAccess"');
       expect(html).not.toContain("accessEl.value = 'read_write';");
-      expect(html).toContain('id="inputRoutingMode"');
+      expect(html).not.toContain('id="inputRoutingMode"');
       expect(html).toContain('id="inputPresetChoice"');
       expect(html).toContain('id="inputEntryChoice"');
       expect(html).toContain('grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));');
@@ -240,7 +240,13 @@ describe('runtime server', () => {
       expect(html).not.toContain('refreshProviderCapabilityPreview');
       expect(html).toContain('renderSessionInsights');
       expect(html).toContain('setLegacyCreateModelRouting');
-      expect(html).toContain('getCreateRoutingChoiceId');
+      expect(html).toContain('syncCreatePresetSelector');
+      expect(html).toContain('id="inputPresetStaticLabel"');
+      expect(html).toContain('setCreatePresetStaticLabel');
+      expect(html).toContain("entryMode: 'explicit'");
+      expect(html).toContain('Custom legacy model...');
+      expect(html).not.toContain('Not available for custom legacy model.');
+      expect(html).not.toContain('Standard mode only.');
       expect(html).toContain('configuredProviderNamesRaw');
       expect(html).toContain('rawInstanceTargetValue');
       expect(html).not.toContain("{ id: 'default', runtime: { mode: 'native' } }");
