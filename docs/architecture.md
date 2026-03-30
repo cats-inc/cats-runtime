@@ -504,9 +504,9 @@ path is intentionally narrow:
   call first
 - Lets provider-only agent diagnostics fall back to bounded
   `config.latestSessionActivity` / `config.latestSessionEvidence` from the most
-  recent retained runtime session for that exact target, so operators can still
-  inspect known bridge activity and work-product evidence without already
-  knowing a specific `sessionId`
+  recent retained runtime session or retained target-evidence store entry for
+  that exact target, so operators can still inspect known bridge activity and
+  work-product evidence without already knowing a specific `sessionId`
 - Normalizes history provenance metadata, per-source transcript provenance, and
   Pi-native transcript parsing so provider-owned session files plus later
   runtime-managed fallback history can still feed the same runtime-owned

@@ -19,6 +19,7 @@ import type { OpencodeNativeSessionService } from '../backends/cli/opencode/Open
 import type { WslDiscoveryStatusStore } from '../backends/cli/discovery/wslDiscovery.js';
 import { ProviderModelCatalogService } from '../core/models/providerModelCatalog.js';
 import { ProviderCompatibilityService } from '../core/compatibility/ProviderCompatibilityService.js';
+import { AgentTargetEvidenceService } from '../core/diagnostics/AgentTargetEvidenceService.js';
 import { RuntimeDeliveryService } from '../core/runtime/RuntimeDeliveryService.js';
 import { RuntimeManagementService } from '../core/management/RuntimeManagementService.js';
 import { loadManagementConfig } from '../core/management/config.js';
@@ -88,6 +89,7 @@ export interface AppContext {
   wslDiscoveryStatus?: WslDiscoveryStatusStore;
   providerModelCatalog: ProviderModelCatalogService;
   compatibility?: ProviderCompatibilityService;
+  agentTargetEvidence?: AgentTargetEvidenceService;
   delivery?: RuntimeDeliveryService;
   management?: RuntimeManagementService;
   workspaceSubstrate?: WorkspaceSubstrateService;
@@ -171,6 +173,16 @@ export function getProviderCompatibilityService(ctx: AppContext): ProviderCompat
     );
   }
   return ctx.compatibility;
+}
+
+export function getAgentTargetEvidenceService(ctx: AppContext): AgentTargetEvidenceService {
+  if (!ctx.agentTargetEvidence) {
+    const storageFile = typeof ctx.config.dataDir === 'string' && ctx.config.dataDir.length > 0
+      ? join(ctx.config.dataDir, 'diagnostics', 'agent-target-evidence.json')
+      : undefined;
+    ctx.agentTargetEvidence = new AgentTargetEvidenceService(storageFile);
+  }
+  return ctx.agentTargetEvidence;
 }
 
 export function getRuntimeDeliveryService(ctx: AppContext): RuntimeDeliveryService {

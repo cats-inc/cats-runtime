@@ -1307,8 +1307,9 @@ always-on self-adapting parser system.
   evidence without first calling a separate session-read route
 - provider-only agent diagnostics now also fall back to bounded
   `latestSessionActivity` / `latestSessionEvidence` from the most recent
-  retained exact-target runtime session, so operator flows can inspect known
-  bridge activity and work products even before pinning a specific `sessionId`
+  retained exact-target runtime session or retained target-evidence store
+  entry, so operator flows can inspect known bridge activity and work products
+  even before pinning a specific `sessionId`
 - session-aware provider diagnostics now also keep Agent SDK bridge targets on
   provider-wide tool catalogs while surfacing runtime session activity
   evidence, instead of treating unsupported effective-tool discovery as a

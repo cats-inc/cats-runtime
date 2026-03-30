@@ -2324,6 +2324,186 @@ describe('agent backend integration', () => {
     }
   });
 
+  it('retains Agent SDK target evidence on provider diagnostics after deleting the runtime session', async () => {
+    const { config, env, cleanup } = createAgentSdkConfigRoot();
+    let createCallCount = 0;
+    const runtime = createRuntimeServer(config, {
+      agentBackend: {
+        env,
+        fetch: async (input, init) => {
+          const url = String(input);
+          const method = init?.method || 'GET';
+
+          if (url === 'http://agent-sdk.test/api/v1/providers' && method === 'GET') {
+            return new Response(JSON.stringify({
+              providers: [
+                {
+                  name: 'claude',
+                  default_model: 'sonnet',
+                  models: ['sonnet', 'haiku'],
+                  capabilities: {
+                    streaming: true,
+                    mcp: true,
+                    vision: false,
+                  },
+                  tool_groups: createAgentSdkBridgeToolGroups(),
+                },
+              ],
+            }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
+          }
+
+          if (url === 'http://agent-sdk.test/api/v1/sessions' && method === 'POST') {
+            createCallCount += 1;
+            return new Response(JSON.stringify({
+              id: createCallCount === 1 ? 'bridge-session-1' : 'probe-session-1',
+            }), {
+              status: 201,
+              headers: { 'content-type': 'application/json' },
+            });
+          }
+
+          if (
+            url === 'http://agent-sdk.test/api/v1/sessions/bridge-session-1/messages/stream'
+            && method === 'POST'
+          ) {
+            const sse = [
+              'data: {"type":"session_created","sessionId":"bridge-session-1","providerSessionId":"sdk-provider-1"}',
+              '',
+              'data: {"type":"tool_use","toolName":"grep","toolInput":{"pattern":"TODO"}}',
+              '',
+              'data: {"type":"tool_result","toolName":"grep","toolUseId":"tool-1","content":"1 match"}',
+              '',
+              'data: {"type":"service_update","services":[{"id":"preview","name":"preview","url":"https://preview.test/bridge-session-1"}]}',
+              '',
+              'data: {"type":"content","content":"done"}',
+              '',
+              'data: [DONE]',
+              '',
+            ].join('\n');
+            return new Response(sse, {
+              status: 200,
+              headers: { 'content-type': 'text/event-stream' },
+            });
+          }
+
+          if (url === 'http://agent-sdk.test/api/v1/sessions/probe-session-1' && method === 'GET') {
+            return new Response(JSON.stringify({
+              id: 'probe-session-1',
+              provider: 'claude',
+              provider_session_id: 'sdk-provider-probe',
+              model: 'sonnet',
+              status: 'idle',
+            }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
+          }
+
+          if (url === 'http://agent-sdk.test/api/v1/sessions/probe-session-1' && method === 'DELETE') {
+            return new Response(null, { status: 204 });
+          }
+
+          throw new Error(`Unexpected fetch: ${method} ${url}`);
+        },
+      },
+    });
+
+    try {
+      const createResponse = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'claude',
+          cwd: config.sessionBaseDir,
+          sessionKey: 'sdk-deleted-evidence',
+        }),
+      });
+      expect(createResponse.status).toBe(201);
+      const created = await createResponse.json() as { id: string };
+
+      const messageResponse = await runtime.app.request(`/sessions/${created.id}/messages`, {
+        method: 'POST',
+        headers: {
+          accept: 'application/x-ndjson',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: 'Prime durable target evidence',
+        }),
+      });
+      expect(messageResponse.status).toBe(200);
+      await parseNdjson(await messageResponse.text());
+
+      const deleteResponse = await runtime.app.request(`/sessions/${created.id}`, {
+        method: 'DELETE',
+      });
+      expect(deleteResponse.status).toBe(200);
+
+      const response = await runtime.app.request(
+        '/diagnostics/providers?probe=live&provider=claude&backend=agent&instance=sdk',
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual(expect.objectContaining({
+        providers: [
+          expect.objectContaining({
+            checks: expect.arrayContaining([
+              expect.objectContaining({
+                code: 'latest_session_activity_visible',
+                details: expect.objectContaining({
+                  sessionId: created.id,
+                  sessionKey: 'sdk-deleted-evidence',
+                }),
+              }),
+              expect.objectContaining({
+                code: 'latest_session_evidence_visible',
+                details: expect.objectContaining({
+                  sessionId: created.id,
+                  sessionKey: 'sdk-deleted-evidence',
+                }),
+              }),
+            ]),
+            config: expect.objectContaining({
+              latestSessionActivity: expect.objectContaining({
+                source: 'retained_target_evidence',
+                sessionId: created.id,
+                sessionKey: 'sdk-deleted-evidence',
+                activity: {
+                  toolUseCount: 1,
+                  toolResultCount: 1,
+                  serviceUpdateCount: 1,
+                  observedToolNames: ['grep'],
+                  observedServiceIds: ['preview'],
+                },
+              }),
+              latestSessionEvidence: expect.objectContaining({
+                source: 'retained_target_evidence',
+                sessionId: created.id,
+                sessionKey: 'sdk-deleted-evidence',
+                counts: expect.objectContaining({
+                  serviceCount: 1,
+                  previewSurfaceCount: 1,
+                }),
+                services: [
+                  {
+                    id: 'preview',
+                    name: 'preview',
+                    url: 'https://preview.test/bridge-session-1',
+                  },
+                ],
+              }),
+            }),
+          }),
+        ],
+      }));
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
   it('keeps agent tooling ownership honest on the provider tooling route', async () => {
     const { config, env, cleanup } = createAgentConfigRoot();
     const runtime = createRuntimeServer(config, {

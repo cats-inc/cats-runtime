@@ -380,6 +380,7 @@ difference between logical session identity and provider-managed resume tokens.
 | 2026-03-30 | Session-aware agent diagnostics now also project bounded runtime-session work-product evidence (`config.sessionEvidence`) from the shared session inspection read model, so hosts can inspect recent services/artifacts/preview surfaces on the provider diagnostics seam without a second session fetch |
 | 2026-03-30 | Provider-only agent diagnostics now also project bounded retained-session evidence (`config.latestSessionEvidence`) for the most recent exact-target runtime session, so operator flows can inspect known work products even without a caller-supplied `sessionId` |
 | 2026-03-30 | Provider-only agent diagnostics now also project bounded retained-session activity (`config.latestSessionActivity`) for the most recent exact-target runtime session, so operator flows can inspect known remote tool/service activity even before pinning one session |
+| 2026-03-30 | The runtime now retains target-level agent diagnostics evidence beyond session deletion through a repo-owned `AgentTargetEvidenceService`, so provider diagnostics can still surface the last known activity/work-product summary after the runtime session itself is gone |
 
 ---
 

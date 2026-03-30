@@ -149,11 +149,12 @@ The runtime now also has a third bounded answer for provider-only operator
 flows: when no caller-supplied `sessionId` exists, provider diagnostics can
 still project retained `providers[].config.latestSessionActivity` /
 `providers[].config.latestSessionEvidence` from the most recent exact-target
-runtime session.
+runtime session, and that same target-level evidence now survives session
+deletion through a repo-owned retained evidence store.
 
 That narrows the remaining gap again. The next missing depth is no longer
 "provider diagnostics cannot show work products"; it is broader harvesting and
-more durable evidence beyond what retained runtime sessions already know.
+more durable evidence beyond what retained target evidence already knows.
 
 ### 3. Work-product and runtime-service harvesting depth
 
@@ -178,7 +179,7 @@ longer the most urgent missing capability.
 
 1. Broaden later-target semantic probes beyond the current OpenClaw and Agent
    SDK bridge baseline.
-2. Extend work-product/runtime-service harvesting beyond retained runtime-session
+2. Extend work-product/runtime-service harvesting beyond retained target
    evidence.
 3. Reassess whether the next highest-value slice is:
    - richer Agent SDK bridge service/runtime evidence persistence, or
@@ -190,7 +191,7 @@ longer the most urgent missing capability.
 architecture. The biggest remaining gap is narrower and more concrete:
 
 - stronger later-target semantic probes
-- broader work-product/runtime-service harvesting beyond retained session state
+- broader work-product/runtime-service harvesting beyond retained target evidence
 - more durable operator evidence on top of that foundation
 
 That makes durable later-target evidence, not backend shape, the most

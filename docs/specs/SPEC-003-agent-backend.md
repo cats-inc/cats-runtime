@@ -253,7 +253,7 @@ timer/callback integrations.
 ## Open Questions
 
 - [ ] How much further beyond the current session/browser preview surfaces
-      plus the current session-aware / retained-session provider diagnostics
+      plus the current session-aware / retained-target provider diagnostics
       evidence should agent-managed runtime services or preview URLs be
       harvested into broader work-product and governance read models?
 - [ ] Should agent backends expose a stronger typed event taxonomy beyond the

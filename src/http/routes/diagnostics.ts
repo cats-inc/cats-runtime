@@ -54,6 +54,13 @@ import {
 import { buildProviderContinuitySummary } from '../../core/providerContinuity.js';
 import type { ProviderSetupSummary } from '../../core/provider-install/types.js';
 import {
+  buildAgentDiagnosticSessionActivity,
+  buildAgentDiagnosticSessionEvidence,
+  hasAgentSessionActivitySummary,
+  type AgentDiagnosticSessionActivitySummary,
+  type AgentDiagnosticSessionEvidenceSummary,
+} from '../../core/runtime/agentDiagnosticsEvidence.js';
+import {
   buildProviderToolingSummary,
   loadProviderRemoteToolCatalog,
 } from '../../core/tools/providerTooling.js';
@@ -64,6 +71,7 @@ import { inspectRuntimeSkillCatalog } from '../../core/skills/catalog.js';
 import type { HealthStatus } from '../../core/types.js';
 import type { AppContext } from '../app.js';
 import {
+  getAgentTargetEvidenceService,
   getProviderCompatibilityService,
   getRuntimeBrowserService,
   getRuntimeManagementService,
@@ -169,73 +177,6 @@ interface ProviderDiagnosticToolCatalogContext {
   sessionKey?: string;
 }
 
-interface ProviderDiagnosticSessionEvidenceSummary {
-  source: 'runtime_session_inspection' | 'runtime_registry_latest_session';
-  sessionId: string;
-  sessionKey?: string;
-  providerSessionId?: string;
-  status?: string;
-  latestRun?: {
-    id: string;
-    status: string;
-  };
-  counts: {
-    artifactCount: number;
-    serviceCount: number;
-    previewSurfaceCount: number;
-    readyPreviewSurfaceCount: number;
-    browserSessionCount: number;
-    openBrowserPageCount: number;
-  };
-  artifacts: Array<{
-    id: string;
-    kind?: string;
-    label?: string;
-    mediaType?: string;
-    hasPath: boolean;
-    hasUri: boolean;
-  }>;
-  services: Array<{
-    id: string;
-    name: string;
-    status?: string;
-    url?: string;
-  }>;
-  previewSurfaces: Array<{
-    id: string;
-    kind: string;
-    source: string;
-    status: string;
-    renderHint: string;
-    label?: string;
-    url?: string;
-    artifactId?: string;
-    mediaType?: string;
-  }>;
-  browserSessions: Array<{
-    id: string;
-    driverId: string;
-    status: string;
-    openPageCount: number;
-    previewSurfaceCount: number;
-  }>;
-}
-
-interface ProviderDiagnosticSessionActivitySummary {
-  source: 'runtime_session' | 'runtime_registry_latest_session';
-  sessionId: string;
-  sessionKey?: string;
-  providerSessionId?: string;
-  status?: string;
-  activity: {
-    toolUseCount: number;
-    toolResultCount: number;
-    serviceUpdateCount: number;
-    observedToolNames: string[];
-    observedServiceIds: string[];
-  };
-}
-
 interface RuntimeSetupDiagnosticsSummary {
   bootstrapRequired: boolean;
   latestReport: {
@@ -278,49 +219,13 @@ function pickAvailabilitySummary(checks: DiagnosticCheck[]): string {
   return checks[0]?.message || 'No diagnostics collected';
 }
 
-function hasAgentSessionActivitySummary(
-  value: unknown,
-): value is {
-  toolUseCount: number;
-  toolResultCount: number;
-  serviceUpdateCount: number;
-  observedToolNames: string[];
-  observedServiceIds: string[];
-} {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-
-  const record = value as Record<string, unknown>;
-  const observedToolNames = Array.isArray(record.observedToolNames)
-    ? record.observedToolNames.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
-    : [];
-  const observedServiceIds = Array.isArray(record.observedServiceIds)
-    ? record.observedServiceIds.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
-    : [];
-
-  return (
-    typeof record.toolUseCount === 'number'
-    && typeof record.toolResultCount === 'number'
-    && typeof record.serviceUpdateCount === 'number'
-    && (
-      record.toolUseCount > 0
-      || record.toolResultCount > 0
-      || record.serviceUpdateCount > 0
-      || observedToolNames.length > 0
-      || observedServiceIds.length > 0
-    )
-  );
-}
-
-function buildAgentDiagnosticSessionEvidence(
+function buildRuntimeSessionInspection(
   ctx: AppContext,
   session: SessionInfo,
-  source: ProviderDiagnosticSessionEvidenceSummary['source'] = 'runtime_session_inspection',
-): ProviderDiagnosticSessionEvidenceSummary | undefined {
+){
   const runtime = getRuntimeSessionManager(ctx);
   const wakeup = ctx.wakeup?.getSessionWakeState(session.id);
-  const inspection = buildSessionInspection({
+  return buildSessionInspection({
     session,
     view: toSessionView(session, {
       attached: runtime.isAttached(session.id),
@@ -333,79 +238,6 @@ function buildAgentDiagnosticSessionEvidence(
       runtimeSessionId: session.id,
     }),
   });
-
-  const browserSessions = inspection.browserSessions || [];
-  const counts = {
-    artifactCount: inspection.artifacts.length,
-    serviceCount: inspection.services.length,
-    previewSurfaceCount: inspection.previewSurfaces.length,
-    readyPreviewSurfaceCount: inspection.previewSurfaces.filter((surface) => surface.status === 'ready').length,
-    browserSessionCount: browserSessions.length,
-    openBrowserPageCount: browserSessions.reduce(
-      (total, browserSession) => total + browserSession.inspection.openPageCount,
-      0,
-    ),
-  };
-
-  if (
-    counts.artifactCount === 0
-    && counts.serviceCount === 0
-    && counts.previewSurfaceCount === 0
-    && counts.browserSessionCount === 0
-  ) {
-    return undefined;
-  }
-
-  const latestRun = inspection.currentRun || inspection.lastRun;
-
-  return {
-    source,
-    sessionId: session.id,
-    ...(session.sessionKey ? { sessionKey: session.sessionKey } : {}),
-    ...(inspection.agentSession?.providerSessionId
-      ? { providerSessionId: inspection.agentSession.providerSessionId }
-      : {}),
-    ...(inspection.agentSession?.status ? { status: inspection.agentSession.status } : {}),
-    ...(latestRun ? {
-      latestRun: {
-        id: latestRun.id,
-        status: latestRun.status,
-      },
-    } : {}),
-    counts,
-    artifacts: inspection.artifacts.slice(0, 3).map((artifact) => ({
-      id: artifact.id,
-      ...(artifact.kind ? { kind: artifact.kind } : {}),
-      ...(artifact.label ? { label: artifact.label } : {}),
-      ...(artifact.mediaType ? { mediaType: artifact.mediaType } : {}),
-      hasPath: Boolean(artifact.path),
-      hasUri: Boolean(artifact.uri),
-    })),
-    services: inspection.services.slice(0, 3).map((service) => ({
-      id: service.id,
-      name: service.name,
-      ...(service.status ? { status: service.status } : {}),
-      ...(service.url ? { url: service.url } : {}),
-    })),
-    previewSurfaces: inspection.previewSurfaces.slice(0, 3).map((surface) => ({
-      id: surface.id,
-      kind: surface.kind,
-      source: surface.source,
-      status: surface.status,
-      renderHint: surface.renderHint,
-      ...(surface.label ? { label: surface.label } : {}),
-      ...(surface.url ? { url: surface.url } : {}),
-      ...(surface.artifactId ? { artifactId: surface.artifactId } : {}),
-      ...(surface.mediaType ? { mediaType: surface.mediaType } : {}),
-    })),
-    browserSessions: browserSessions.slice(0, 2).map((browserSession) => ({
-      id: browserSession.id,
-      driverId: browserSession.driverId,
-      status: browserSession.status,
-      openPageCount: browserSession.inspection.openPageCount,
-      previewSurfaceCount: browserSession.inspection.previewSurfaces.length,
-    })),
-  };
 }
 
 function resolveSessionEvidenceRecency(session: SessionInfo): number {
@@ -416,11 +248,11 @@ function findLatestAgentDiagnosticSessionEvidence(
   ctx: AppContext,
   target: ProviderTargetDescriptor,
   excludeSessionId?: string,
-): ProviderDiagnosticSessionEvidenceSummary | undefined {
+): AgentDiagnosticSessionEvidenceSummary | undefined {
   let latest:
     | {
       recency: number;
-      evidence: ProviderDiagnosticSessionEvidenceSummary;
+      evidence: AgentDiagnosticSessionEvidenceSummary;
     }
     | undefined;
 
@@ -445,8 +277,8 @@ function findLatestAgentDiagnosticSessionEvidence(
     }
 
     const evidence = buildAgentDiagnosticSessionEvidence(
-      ctx,
       candidate,
+      buildRuntimeSessionInspection(ctx, candidate),
       'runtime_registry_latest_session',
     );
     if (!evidence) {
@@ -462,40 +294,15 @@ function findLatestAgentDiagnosticSessionEvidence(
   return latest?.evidence;
 }
 
-function buildAgentDiagnosticSessionActivity(
-  session: SessionInfo,
-  source: ProviderDiagnosticSessionActivitySummary['source'],
-): ProviderDiagnosticSessionActivitySummary | undefined {
-  const agentSession = session.providerState?.agentSession;
-  if (!hasAgentSessionActivitySummary(agentSession?.activity)) {
-    return undefined;
-  }
-
-  return {
-    source,
-    sessionId: session.id,
-    ...(session.sessionKey ? { sessionKey: session.sessionKey } : {}),
-    ...(agentSession?.providerSessionId ? { providerSessionId: agentSession.providerSessionId } : {}),
-    ...(agentSession?.status ? { status: agentSession.status } : {}),
-    activity: {
-      toolUseCount: agentSession.activity.toolUseCount,
-      toolResultCount: agentSession.activity.toolResultCount,
-      serviceUpdateCount: agentSession.activity.serviceUpdateCount,
-      observedToolNames: [...agentSession.activity.observedToolNames],
-      observedServiceIds: [...agentSession.activity.observedServiceIds],
-    },
-  };
-}
-
 function findLatestAgentDiagnosticSessionActivity(
   ctx: AppContext,
   target: ProviderTargetDescriptor,
   excludeSessionId?: string,
-): ProviderDiagnosticSessionActivitySummary | undefined {
+): AgentDiagnosticSessionActivitySummary | undefined {
   let latest:
     | {
       recency: number;
-      activity: ProviderDiagnosticSessionActivitySummary;
+      activity: AgentDiagnosticSessionActivitySummary;
     }
     | undefined;
 
@@ -1138,13 +945,20 @@ async function diagnoseAgentTarget(
     ? buildAgentDiagnosticSessionActivity(runtimeSession, 'runtime_session')
     : undefined;
   const sessionEvidence = runtimeSession
-    ? buildAgentDiagnosticSessionEvidence(ctx, runtimeSession)
+    ? buildAgentDiagnosticSessionEvidence(
+      runtimeSession,
+      buildRuntimeSessionInspection(ctx, runtimeSession),
+      'runtime_session_inspection',
+    )
     : undefined;
   const latestSessionActivity = !runtimeSession
     ? findLatestAgentDiagnosticSessionActivity(ctx, target)
     : undefined;
   const latestSessionEvidence = !runtimeSession
     ? findLatestAgentDiagnosticSessionEvidence(ctx, target)
+    : undefined;
+  const retainedTargetEvidence = !runtimeSession && !latestSessionActivity && !latestSessionEvidence
+    ? getAgentTargetEvidenceService(ctx).get(target)
     : undefined;
   if (runtimeSession && sessionEvidence) {
     config.sessionEvidence = {
@@ -1184,42 +998,43 @@ async function diagnoseAgentTarget(
       ),
     );
   }
-  if (!runtimeSession && latestSessionEvidence) {
+  const fallbackLatestEvidence = latestSessionEvidence || retainedTargetEvidence?.evidence;
+  if (!runtimeSession && fallbackLatestEvidence) {
     config.latestSessionEvidence = {
-      source: latestSessionEvidence.source,
-      sessionId: latestSessionEvidence.sessionId,
-      ...(latestSessionEvidence.sessionKey ? { sessionKey: latestSessionEvidence.sessionKey } : {}),
-      ...(latestSessionEvidence.providerSessionId
-        ? { providerSessionId: latestSessionEvidence.providerSessionId }
+      source: fallbackLatestEvidence.source,
+      sessionId: fallbackLatestEvidence.sessionId,
+      ...(fallbackLatestEvidence.sessionKey ? { sessionKey: fallbackLatestEvidence.sessionKey } : {}),
+      ...(fallbackLatestEvidence.providerSessionId
+        ? { providerSessionId: fallbackLatestEvidence.providerSessionId }
         : {}),
-      ...(latestSessionEvidence.status ? { status: latestSessionEvidence.status } : {}),
-      ...(latestSessionEvidence.latestRun
-        ? { latestRun: latestSessionEvidence.latestRun }
+      ...(fallbackLatestEvidence.status ? { status: fallbackLatestEvidence.status } : {}),
+      ...(fallbackLatestEvidence.latestRun
+        ? { latestRun: fallbackLatestEvidence.latestRun }
         : {}),
-      counts: { ...latestSessionEvidence.counts },
-      artifacts: latestSessionEvidence.artifacts.map((artifact) => ({ ...artifact })),
-      services: latestSessionEvidence.services.map((service) => ({ ...service })),
-      previewSurfaces: latestSessionEvidence.previewSurfaces.map((surface) => ({ ...surface })),
-      browserSessions: latestSessionEvidence.browserSessions.map((browserSession) => ({ ...browserSession })),
+      counts: { ...fallbackLatestEvidence.counts },
+      artifacts: fallbackLatestEvidence.artifacts.map((artifact) => ({ ...artifact })),
+      services: fallbackLatestEvidence.services.map((service) => ({ ...service })),
+      previewSurfaces: fallbackLatestEvidence.previewSurfaces.map((surface) => ({ ...surface })),
+      browserSessions: fallbackLatestEvidence.browserSessions.map((browserSession) => ({ ...browserSession })),
     };
     checks.push(
       createCheck(
         'latest_session_evidence_visible',
         'ok',
-        `Latest retained runtime session '${latestSessionEvidence.sessionId}' exposes bounded work-product evidence for ${target.providerName}/${target.instanceId}`,
+        `Latest retained runtime session '${fallbackLatestEvidence.sessionId}' exposes bounded work-product evidence for ${target.providerName}/${target.instanceId}`,
         {
-          sessionId: latestSessionEvidence.sessionId,
-          ...(latestSessionEvidence.sessionKey ? { sessionKey: latestSessionEvidence.sessionKey } : {}),
-          artifactCount: latestSessionEvidence.counts.artifactCount,
-          serviceCount: latestSessionEvidence.counts.serviceCount,
-          previewSurfaceCount: latestSessionEvidence.counts.previewSurfaceCount,
-          readyPreviewSurfaceCount: latestSessionEvidence.counts.readyPreviewSurfaceCount,
-          browserSessionCount: latestSessionEvidence.counts.browserSessionCount,
-          openBrowserPageCount: latestSessionEvidence.counts.openBrowserPageCount,
-          serviceIds: latestSessionEvidence.services.map((service) => service.id),
-          artifactIds: latestSessionEvidence.artifacts.map((artifact) => artifact.id),
-          previewSurfaceIds: latestSessionEvidence.previewSurfaces.map((surface) => surface.id),
-          browserSessionIds: latestSessionEvidence.browserSessions.map((browserSession) => browserSession.id),
+          sessionId: fallbackLatestEvidence.sessionId,
+          ...(fallbackLatestEvidence.sessionKey ? { sessionKey: fallbackLatestEvidence.sessionKey } : {}),
+          artifactCount: fallbackLatestEvidence.counts.artifactCount,
+          serviceCount: fallbackLatestEvidence.counts.serviceCount,
+          previewSurfaceCount: fallbackLatestEvidence.counts.previewSurfaceCount,
+          readyPreviewSurfaceCount: fallbackLatestEvidence.counts.readyPreviewSurfaceCount,
+          browserSessionCount: fallbackLatestEvidence.counts.browserSessionCount,
+          openBrowserPageCount: fallbackLatestEvidence.counts.openBrowserPageCount,
+          serviceIds: fallbackLatestEvidence.services.map((service) => service.id),
+          artifactIds: fallbackLatestEvidence.artifacts.map((artifact) => artifact.id),
+          previewSurfaceIds: fallbackLatestEvidence.previewSurfaces.map((surface) => surface.id),
+          browserSessionIds: fallbackLatestEvidence.browserSessions.map((browserSession) => browserSession.id),
         },
       ),
     );
@@ -1258,36 +1073,37 @@ async function diagnoseAgentTarget(
       ),
     );
   }
-  if (agentRuntime.family === 'bridge' && !runtimeSession && latestSessionActivity) {
+  const fallbackLatestActivity = latestSessionActivity || retainedTargetEvidence?.activity;
+  if (agentRuntime.family === 'bridge' && !runtimeSession && fallbackLatestActivity) {
     config.latestSessionActivity = {
-      source: latestSessionActivity.source,
-      sessionId: latestSessionActivity.sessionId,
-      ...(latestSessionActivity.sessionKey ? { sessionKey: latestSessionActivity.sessionKey } : {}),
-      ...(latestSessionActivity.providerSessionId
-        ? { providerSessionId: latestSessionActivity.providerSessionId }
+      source: fallbackLatestActivity.source,
+      sessionId: fallbackLatestActivity.sessionId,
+      ...(fallbackLatestActivity.sessionKey ? { sessionKey: fallbackLatestActivity.sessionKey } : {}),
+      ...(fallbackLatestActivity.providerSessionId
+        ? { providerSessionId: fallbackLatestActivity.providerSessionId }
         : {}),
-      ...(latestSessionActivity.status ? { status: latestSessionActivity.status } : {}),
+      ...(fallbackLatestActivity.status ? { status: fallbackLatestActivity.status } : {}),
       activity: {
-        toolUseCount: latestSessionActivity.activity.toolUseCount,
-        toolResultCount: latestSessionActivity.activity.toolResultCount,
-        serviceUpdateCount: latestSessionActivity.activity.serviceUpdateCount,
-        observedToolNames: [...latestSessionActivity.activity.observedToolNames],
-        observedServiceIds: [...latestSessionActivity.activity.observedServiceIds],
+        toolUseCount: fallbackLatestActivity.activity.toolUseCount,
+        toolResultCount: fallbackLatestActivity.activity.toolResultCount,
+        serviceUpdateCount: fallbackLatestActivity.activity.serviceUpdateCount,
+        observedToolNames: [...fallbackLatestActivity.activity.observedToolNames],
+        observedServiceIds: [...fallbackLatestActivity.activity.observedServiceIds],
       },
     };
     checks.push(
       createCheck(
         'latest_session_activity_visible',
         'ok',
-        `Latest retained runtime session '${latestSessionActivity.sessionId}' recorded recent remote bridge activity for ${target.providerName}/${target.instanceId}`,
+        `Latest retained runtime session '${fallbackLatestActivity.sessionId}' recorded recent remote bridge activity for ${target.providerName}/${target.instanceId}`,
         {
-          sessionId: latestSessionActivity.sessionId,
-          ...(latestSessionActivity.sessionKey ? { sessionKey: latestSessionActivity.sessionKey } : {}),
-          toolUseCount: latestSessionActivity.activity.toolUseCount,
-          toolResultCount: latestSessionActivity.activity.toolResultCount,
-          serviceUpdateCount: latestSessionActivity.activity.serviceUpdateCount,
-          observedToolNames: [...latestSessionActivity.activity.observedToolNames],
-          observedServiceIds: [...latestSessionActivity.activity.observedServiceIds],
+          sessionId: fallbackLatestActivity.sessionId,
+          ...(fallbackLatestActivity.sessionKey ? { sessionKey: fallbackLatestActivity.sessionKey } : {}),
+          toolUseCount: fallbackLatestActivity.activity.toolUseCount,
+          toolResultCount: fallbackLatestActivity.activity.toolResultCount,
+          serviceUpdateCount: fallbackLatestActivity.activity.serviceUpdateCount,
+          observedToolNames: [...fallbackLatestActivity.activity.observedToolNames],
+          observedServiceIds: [...fallbackLatestActivity.activity.observedServiceIds],
         },
       ),
     );

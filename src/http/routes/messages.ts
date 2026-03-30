@@ -3,10 +3,13 @@ import { join, dirname } from 'node:path';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import {
+  getAgentTargetEvidenceService,
+  getRuntimeBrowserService,
   getRuntimeMeteringService,
   getRuntimeSessionManager,
   type AppContext,
 } from '../app.js';
+import { toSessionView } from '../../backends/cli/pool/sessionView.js';
 import type { SessionInfo, SessionInvocationContext, TurnInput } from '../../backends/cli/pool/types.js';
 import type { SessionRegistry } from '../../backends/cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig } from '../../backends/cli/config.js';
@@ -21,7 +24,12 @@ import type {
 } from '../../core/types.js';
 import { hydrateSessionState } from '../../core/hydration/sessionHydration.js';
 import { ManagedExecutionHandle } from '../../core/runtime/ManagedExecutionHandle.js';
+import {
+  buildAgentDiagnosticSessionActivity,
+  buildAgentDiagnosticSessionEvidence,
+} from '../../core/runtime/agentDiagnosticsEvidence.js';
 import { createRuntimeContentBlockProjector } from '../../core/runtime/contentBlocks.js';
+import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
 import { buildRuntimeExecutionStrategySessionPatch } from '../../core/runtime/strategies/state.js';
 import { parsePeerMessageRoutingInput } from '../../core/peers/PeerRoutingService.js';
 import { toPeerExecutionErrorEvent } from '../../core/peers/errors.js';
@@ -353,6 +361,52 @@ function applyObservedEventToSession(
       summary: observedEvent.summary,
     });
   }
+}
+
+function persistAgentTargetEvidence(
+  ctx: AppContext,
+  sessionId: string,
+): void {
+  const session = ctx.registry.get(sessionId);
+  if (!session) {
+    return;
+  }
+
+  let providerTarget;
+  try {
+    providerTarget = resolveSessionProviderTarget(ctx.config, session);
+  } catch {
+    return;
+  }
+
+  if (providerTarget.backend !== 'agent') {
+    return;
+  }
+
+  const runtime = getRuntimeSessionManager(ctx);
+  const wakeup = ctx.wakeup?.getSessionWakeState(session.id);
+  const inspection = buildSessionInspection({
+    session,
+    view: toSessionView(session, {
+      attached: runtime.isAttached(session.id),
+      externalSessionLiveWindowMs: ctx.config.externalSessionLiveWindowMs,
+    }),
+    trackedState: runtime.getTrackedState(session.id),
+    metering: getRuntimeMeteringService(ctx).buildSessionSnapshot(session),
+    wakeupPending: Boolean(wakeup?.pending),
+    browserSessions: getRuntimeBrowserService(ctx).listSessions({
+      runtimeSessionId: session.id,
+    }),
+  });
+
+  getAgentTargetEvidenceService(ctx).record(providerTarget, {
+    activity: buildAgentDiagnosticSessionActivity(session, 'retained_target_evidence'),
+    evidence: buildAgentDiagnosticSessionEvidence(
+      session,
+      inspection,
+      'retained_target_evidence',
+    ),
+  });
 }
 
 /** POST /sessions/:id/messages — send a message, stream response as SSE */
@@ -726,6 +780,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
           restoreReadyIfSessionStillInteractive(ctx.registry, id);
         } finally {
           await closeManagedHandle(peerHandle);
+          persistAgentTargetEvidence(ctx, id);
           controller.close();
         }
       },
@@ -849,6 +904,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
       restoreReadyIfSessionStillInteractive(ctx.registry, id);
     } finally {
       await closeManagedHandle(peerHandle);
+      persistAgentTargetEvidence(ctx, id);
     }
   });
 });
