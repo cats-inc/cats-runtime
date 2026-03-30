@@ -921,6 +921,11 @@ preview-surface, or browser-session evidence for that target. This reuses the
 same session inspection truth as `/sessions/{id}/observe` instead of inventing
 a second work-product read model just for diagnostics.
 
+Even without `sessionId` / `sessionKey`, retained agent sessions can still
+surface a bounded `providers[].config.latestSessionEvidence` summary plus
+`latest_session_evidence_visible` when the runtime registry already holds the
+most recent known work-product evidence for that target.
+
 Invalid `backend` values or malformed boolean filters such as
 `defaultOnly=maybe` return `400` with a client-safe `error` string.
 

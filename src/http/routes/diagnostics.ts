@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { BackendKind, RemoteProviderInstanceConfig } from '../../backends/cli/config.js';
 import { inspectAgentTarget } from '../../backends/agent/inspection.js';
 import { toSessionView } from '../../backends/cli/pool/sessionView.js';
+import type { SessionInfo } from '../../backends/cli/pool/types.js';
 import { buildApiRuntimeExecutionStrategyCatalog } from '../../backends/api/runtime/strategies/catalog.js';
 import { inspectApiTarget } from '../../backends/api/inspection.js';
 import {
@@ -93,6 +94,7 @@ import {
 } from '../../startup.js';
 import { SetupDiagnosticService } from '../../core/diagnostics/SetupDiagnosticService.js';
 import { resolveEffectiveToolCatalogContext } from '../providerToolCatalogContext.js';
+import { resolveSessionProviderTarget } from '../providerTargets.js';
 
 type DiagnosticStatus = HealthStatus['status'];
 type DiagnosticsProbeMode = 'light' | 'live';
@@ -168,7 +170,7 @@ interface ProviderDiagnosticToolCatalogContext {
 }
 
 interface ProviderDiagnosticSessionEvidenceSummary {
-  source: 'runtime_session_inspection';
+  source: 'runtime_session_inspection' | 'runtime_registry_latest_session';
   sessionId: string;
   sessionKey?: string;
   providerSessionId?: string;
@@ -298,13 +300,9 @@ function hasAgentSessionActivitySummary(
 
 function buildAgentDiagnosticSessionEvidence(
   ctx: AppContext,
-  sessionId: string,
+  session: SessionInfo,
+  source: ProviderDiagnosticSessionEvidenceSummary['source'] = 'runtime_session_inspection',
 ): ProviderDiagnosticSessionEvidenceSummary | undefined {
-  const session = ctx.registry.get(sessionId);
-  if (!session) {
-    return undefined;
-  }
-
   const runtime = getRuntimeSessionManager(ctx);
   const wakeup = ctx.wakeup?.getSessionWakeState(session.id);
   const inspection = buildSessionInspection({
@@ -346,7 +344,7 @@ function buildAgentDiagnosticSessionEvidence(
   const latestRun = inspection.currentRun || inspection.lastRun;
 
   return {
-    source: 'runtime_session_inspection',
+    source,
     sessionId: session.id,
     ...(session.sessionKey ? { sessionKey: session.sessionKey } : {}),
     ...(inspection.agentSession?.providerSessionId
@@ -393,6 +391,60 @@ function buildAgentDiagnosticSessionEvidence(
       previewSurfaceCount: browserSession.inspection.previewSurfaces.length,
     })),
   };
+}
+
+function resolveSessionEvidenceRecency(session: SessionInfo): number {
+  return Date.parse(session.lastActivity || session.updatedAt || session.createdAt) || 0;
+}
+
+function findLatestAgentDiagnosticSessionEvidence(
+  ctx: AppContext,
+  target: ProviderTargetDescriptor,
+  excludeSessionId?: string,
+): ProviderDiagnosticSessionEvidenceSummary | undefined {
+  let latest:
+    | {
+      recency: number;
+      evidence: ProviderDiagnosticSessionEvidenceSummary;
+    }
+    | undefined;
+
+  for (const candidate of ctx.registry.list({ provider: target.providerName })) {
+    if (excludeSessionId && candidate.id === excludeSessionId) {
+      continue;
+    }
+
+    let candidateTarget: ProviderTargetDescriptor;
+    try {
+      candidateTarget = resolveSessionProviderTarget(ctx.config, candidate);
+    } catch {
+      continue;
+    }
+
+    if (
+      candidateTarget.providerName !== target.providerName
+      || candidateTarget.backend !== target.backend
+      || candidateTarget.instanceId !== target.instanceId
+    ) {
+      continue;
+    }
+
+    const evidence = buildAgentDiagnosticSessionEvidence(
+      ctx,
+      candidate,
+      'runtime_registry_latest_session',
+    );
+    if (!evidence) {
+      continue;
+    }
+
+    const recency = resolveSessionEvidenceRecency(candidate);
+    if (!latest || recency >= latest.recency) {
+      latest = { recency, evidence };
+    }
+  }
+
+  return latest?.evidence;
 }
 
 function getRuntimeWakeupSnapshot(ctx: AppContext) {
@@ -995,7 +1047,10 @@ async function diagnoseAgentTarget(
     : undefined;
   const runtimeAgentSession = runtimeSession?.providerState?.agentSession;
   const sessionEvidence = runtimeSession
-    ? buildAgentDiagnosticSessionEvidence(ctx, runtimeSession.id)
+    ? buildAgentDiagnosticSessionEvidence(ctx, runtimeSession)
+    : undefined;
+  const latestSessionEvidence = !runtimeSession
+    ? findLatestAgentDiagnosticSessionEvidence(ctx, target)
     : undefined;
   if (runtimeSession && sessionEvidence) {
     config.sessionEvidence = {
@@ -1031,6 +1086,46 @@ async function diagnoseAgentTarget(
           artifactIds: sessionEvidence.artifacts.map((artifact) => artifact.id),
           previewSurfaceIds: sessionEvidence.previewSurfaces.map((surface) => surface.id),
           browserSessionIds: sessionEvidence.browserSessions.map((browserSession) => browserSession.id),
+        },
+      ),
+    );
+  }
+  if (!runtimeSession && latestSessionEvidence) {
+    config.latestSessionEvidence = {
+      source: latestSessionEvidence.source,
+      sessionId: latestSessionEvidence.sessionId,
+      ...(latestSessionEvidence.sessionKey ? { sessionKey: latestSessionEvidence.sessionKey } : {}),
+      ...(latestSessionEvidence.providerSessionId
+        ? { providerSessionId: latestSessionEvidence.providerSessionId }
+        : {}),
+      ...(latestSessionEvidence.status ? { status: latestSessionEvidence.status } : {}),
+      ...(latestSessionEvidence.latestRun
+        ? { latestRun: latestSessionEvidence.latestRun }
+        : {}),
+      counts: { ...latestSessionEvidence.counts },
+      artifacts: latestSessionEvidence.artifacts.map((artifact) => ({ ...artifact })),
+      services: latestSessionEvidence.services.map((service) => ({ ...service })),
+      previewSurfaces: latestSessionEvidence.previewSurfaces.map((surface) => ({ ...surface })),
+      browserSessions: latestSessionEvidence.browserSessions.map((browserSession) => ({ ...browserSession })),
+    };
+    checks.push(
+      createCheck(
+        'latest_session_evidence_visible',
+        'ok',
+        `Latest retained runtime session '${latestSessionEvidence.sessionId}' exposes bounded work-product evidence for ${target.providerName}/${target.instanceId}`,
+        {
+          sessionId: latestSessionEvidence.sessionId,
+          ...(latestSessionEvidence.sessionKey ? { sessionKey: latestSessionEvidence.sessionKey } : {}),
+          artifactCount: latestSessionEvidence.counts.artifactCount,
+          serviceCount: latestSessionEvidence.counts.serviceCount,
+          previewSurfaceCount: latestSessionEvidence.counts.previewSurfaceCount,
+          readyPreviewSurfaceCount: latestSessionEvidence.counts.readyPreviewSurfaceCount,
+          browserSessionCount: latestSessionEvidence.counts.browserSessionCount,
+          openBrowserPageCount: latestSessionEvidence.counts.openBrowserPageCount,
+          serviceIds: latestSessionEvidence.services.map((service) => service.id),
+          artifactIds: latestSessionEvidence.artifacts.map((artifact) => artifact.id),
+          previewSurfaceIds: latestSessionEvidence.previewSurfaces.map((surface) => surface.id),
+          browserSessionIds: latestSessionEvidence.browserSessions.map((browserSession) => browserSession.id),
         },
       ),
     );

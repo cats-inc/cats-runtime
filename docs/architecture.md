@@ -502,6 +502,10 @@ path is intentionally narrow:
   host/operator workflows can inspect recent services, artifacts, preview
   surfaces, and browser-session evidence without issuing a second session-read
   call first
+- Lets provider-only agent diagnostics fall back to bounded
+  `config.latestSessionEvidence` from the most recent retained runtime session
+  for that exact target, so operators can still inspect known evidence without
+  already knowing a specific `sessionId`
 - Normalizes history provenance metadata, per-source transcript provenance, and
   Pi-native transcript parsing so provider-owned session files plus later
   runtime-managed fallback history can still feed the same runtime-owned

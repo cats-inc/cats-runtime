@@ -1885,6 +1885,405 @@ describe('agent backend integration', () => {
     }
   });
 
+  it('surfaces latest retained Agent SDK session evidence on live provider diagnostics without session filters', async () => {
+    const { config, env, cleanup } = createAgentSdkConfigRoot();
+    let createCallCount = 0;
+    const runtime = createRuntimeServer(config, {
+      agentBackend: {
+        env,
+        fetch: async (input, init) => {
+          const url = String(input);
+          const method = init?.method || 'GET';
+
+          if (url === 'http://agent-sdk.test/api/v1/providers' && method === 'GET') {
+            return new Response(JSON.stringify({
+              providers: [
+                {
+                  name: 'claude',
+                  default_model: 'sonnet',
+                  models: ['sonnet', 'haiku'],
+                  capabilities: {
+                    streaming: true,
+                    mcp: true,
+                    vision: false,
+                  },
+                  tool_groups: createAgentSdkBridgeToolGroups(),
+                },
+              ],
+            }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
+          }
+
+          if (url === 'http://agent-sdk.test/api/v1/sessions' && method === 'POST') {
+            createCallCount += 1;
+            return new Response(JSON.stringify({
+              id: createCallCount === 1 ? 'bridge-session-1' : 'probe-session-1',
+            }), {
+              status: 201,
+              headers: { 'content-type': 'application/json' },
+            });
+          }
+
+          if (
+            url === 'http://agent-sdk.test/api/v1/sessions/bridge-session-1/messages/stream'
+            && method === 'POST'
+          ) {
+            const sse = [
+              'data: {"type":"session_created","sessionId":"bridge-session-1","providerSessionId":"sdk-provider-1"}',
+              '',
+              'data: {"type":"tool_use","toolName":"grep","toolInput":{"pattern":"TODO"}}',
+              '',
+              'data: {"type":"tool_result","toolName":"grep","toolUseId":"tool-1","content":"1 match"}',
+              '',
+              'data: {"type":"service_update","services":[{"id":"preview","name":"preview","url":"https://preview.test/bridge-session-1"}]}',
+              '',
+              'data: {"type":"content","content":"done"}',
+              '',
+              'data: [DONE]',
+              '',
+            ].join('\n');
+            return new Response(sse, {
+              status: 200,
+              headers: { 'content-type': 'text/event-stream' },
+            });
+          }
+
+          if (url === 'http://agent-sdk.test/api/v1/sessions/probe-session-1' && method === 'GET') {
+            return new Response(JSON.stringify({
+              id: 'probe-session-1',
+              provider: 'claude',
+              provider_session_id: 'sdk-provider-probe',
+              model: 'sonnet',
+              status: 'idle',
+            }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
+          }
+
+          if (url === 'http://agent-sdk.test/api/v1/sessions/probe-session-1' && method === 'DELETE') {
+            return new Response(null, { status: 204 });
+          }
+
+          throw new Error(`Unexpected fetch: ${method} ${url}`);
+        },
+      },
+    });
+
+    try {
+      const createResponse = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'claude',
+          cwd: config.sessionBaseDir,
+          sessionKey: 'sdk-latest-evidence',
+        }),
+      });
+      expect(createResponse.status).toBe(201);
+
+      const created = await createResponse.json() as { id: string };
+      const messageResponse = await runtime.app.request(`/sessions/${created.id}/messages`, {
+        method: 'POST',
+        headers: {
+          accept: 'application/x-ndjson',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: 'Prime retained evidence',
+        }),
+      });
+      expect(messageResponse.status).toBe(200);
+      await parseNdjson(await messageResponse.text());
+
+      const response = await runtime.app.request(
+        '/diagnostics/providers?probe=live&provider=claude&backend=agent&instance=sdk',
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json() as {
+        query: { filters: Record<string, unknown> };
+        providers: Array<{
+          checks: Array<{ code: string; details?: Record<string, unknown> }>;
+          config: Record<string, unknown>;
+        }>;
+      };
+
+      expect(body).toEqual(expect.objectContaining({
+        query: expect.objectContaining({
+          filters: {
+            provider: 'claude',
+            backend: 'agent',
+            instance: 'sdk',
+          },
+        }),
+        providers: [
+          expect.objectContaining({
+            checks: expect.arrayContaining([
+              expect.objectContaining({
+                code: 'latest_session_evidence_visible',
+                details: expect.objectContaining({
+                  sessionId: created.id,
+                  sessionKey: 'sdk-latest-evidence',
+                  artifactCount: 0,
+                  serviceCount: 1,
+                  previewSurfaceCount: 1,
+                  readyPreviewSurfaceCount: 1,
+                  browserSessionCount: 0,
+                  openBrowserPageCount: 0,
+                  serviceIds: ['preview'],
+                }),
+              }),
+              expect.objectContaining({
+                code: 'tool_catalog_loaded',
+              }),
+            ]),
+            config: expect.objectContaining({
+              latestSessionEvidence: expect.objectContaining({
+                source: 'runtime_registry_latest_session',
+                sessionId: created.id,
+                sessionKey: 'sdk-latest-evidence',
+                providerSessionId: 'bridge-session-1',
+                status: 'idle',
+                latestRun: expect.objectContaining({
+                  id: expect.any(String),
+                  status: 'succeeded',
+                }),
+                counts: {
+                  artifactCount: 0,
+                  serviceCount: 1,
+                  previewSurfaceCount: 1,
+                  readyPreviewSurfaceCount: 1,
+                  browserSessionCount: 0,
+                  openBrowserPageCount: 0,
+                },
+                artifacts: [],
+                services: [
+                  {
+                    id: 'preview',
+                    name: 'preview',
+                    url: 'https://preview.test/bridge-session-1',
+                  },
+                ],
+                previewSurfaces: expect.arrayContaining([
+                  expect.objectContaining({
+                    kind: 'service',
+                    source: 'session_service',
+                    status: 'ready',
+                    renderHint: 'iframe',
+                    label: 'preview',
+                    url: 'https://preview.test/bridge-session-1',
+                  }),
+                ]),
+                browserSessions: [],
+              }),
+            }),
+          }),
+        ],
+      }));
+      expect(body.providers[0]?.checks.some((check) => check.code === 'bridge_session_activity_visible')).toBe(false);
+      expect(body.providers[0]?.config.sessionActivity).toBeUndefined();
+      expect(body.providers[0]?.config.sessionEvidence).toBeUndefined();
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
+  it('exposes latest retained Agent SDK session evidence through the MCP provider_diagnostics tool', async () => {
+    const { config, env, cleanup } = createAgentSdkConfigRoot();
+    let createCallCount = 0;
+    const runtime = createRuntimeServer(config, {
+      agentBackend: {
+        env,
+        fetch: async (input, init) => {
+          const url = String(input);
+          const method = init?.method || 'GET';
+
+          if (url === 'http://agent-sdk.test/api/v1/providers' && method === 'GET') {
+            return new Response(JSON.stringify({
+              providers: [
+                {
+                  name: 'claude',
+                  default_model: 'sonnet',
+                  models: ['sonnet', 'haiku'],
+                  capabilities: {
+                    streaming: true,
+                    mcp: true,
+                    vision: false,
+                  },
+                  tool_groups: createAgentSdkBridgeToolGroups(),
+                },
+              ],
+            }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
+          }
+
+          if (url === 'http://agent-sdk.test/api/v1/sessions' && method === 'POST') {
+            createCallCount += 1;
+            return new Response(JSON.stringify({
+              id: createCallCount === 1 ? 'bridge-session-1' : 'probe-session-1',
+            }), {
+              status: 201,
+              headers: { 'content-type': 'application/json' },
+            });
+          }
+
+          if (
+            url === 'http://agent-sdk.test/api/v1/sessions/bridge-session-1/messages/stream'
+            && method === 'POST'
+          ) {
+            const sse = [
+              'data: {"type":"session_created","sessionId":"bridge-session-1","providerSessionId":"sdk-provider-1"}',
+              '',
+              'data: {"type":"tool_use","toolName":"grep","toolInput":{"pattern":"TODO"}}',
+              '',
+              'data: {"type":"tool_result","toolName":"grep","toolUseId":"tool-1","content":"1 match"}',
+              '',
+              'data: {"type":"service_update","services":[{"id":"preview","name":"preview","url":"https://preview.test/bridge-session-1"}]}',
+              '',
+              'data: {"type":"content","content":"done"}',
+              '',
+              'data: [DONE]',
+              '',
+            ].join('\n');
+            return new Response(sse, {
+              status: 200,
+              headers: { 'content-type': 'text/event-stream' },
+            });
+          }
+
+          if (url === 'http://agent-sdk.test/api/v1/sessions/probe-session-1' && method === 'GET') {
+            return new Response(JSON.stringify({
+              id: 'probe-session-1',
+              provider: 'claude',
+              provider_session_id: 'sdk-provider-probe',
+              model: 'sonnet',
+              status: 'idle',
+            }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
+          }
+
+          if (url === 'http://agent-sdk.test/api/v1/sessions/probe-session-1' && method === 'DELETE') {
+            return new Response(null, { status: 204 });
+          }
+
+          throw new Error(`Unexpected fetch: ${method} ${url}`);
+        },
+      },
+    });
+
+    try {
+      const createResponse = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'claude',
+          cwd: config.sessionBaseDir,
+          sessionKey: 'sdk-mcp-latest-evidence',
+        }),
+      });
+      expect(createResponse.status).toBe(201);
+      const created = await createResponse.json() as { id: string };
+
+      const messageResponse = await runtime.app.request(`/sessions/${created.id}/messages`, {
+        method: 'POST',
+        headers: {
+          accept: 'application/x-ndjson',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: 'Prime retained MCP evidence',
+        }),
+      });
+      expect(messageResponse.status).toBe(200);
+      await parseNdjson(await messageResponse.text());
+
+      const mcpResponse = await runtime.app.request('/mcp', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'sdk-latest-evidence',
+          method: 'tools/call',
+          params: {
+            name: 'provider_diagnostics',
+            arguments: {
+              probe: 'live',
+              provider: 'claude',
+              backend: 'agent',
+              instance: 'sdk',
+            },
+          },
+        }),
+      });
+      expect(mcpResponse.status).toBe(200);
+      const mcpBody = await mcpResponse.json() as {
+        result?: {
+          structuredContent?: {
+            query?: { filters?: Record<string, unknown> };
+            providers?: Array<{ checks?: Array<{ code: string }>; config?: Record<string, unknown> }>;
+          };
+        };
+      };
+
+      expect(mcpBody).toEqual(expect.objectContaining({
+        result: expect.objectContaining({
+          structuredContent: expect.objectContaining({
+            providersPath: '/diagnostics/providers?probe=live&provider=claude&backend=agent&instance=sdk',
+            query: expect.objectContaining({
+              filters: {
+                provider: 'claude',
+                backend: 'agent',
+                instance: 'sdk',
+              },
+            }),
+            providers: [
+              expect.objectContaining({
+                checks: expect.arrayContaining([
+                  expect.objectContaining({
+                    code: 'latest_session_evidence_visible',
+                  }),
+                  expect.objectContaining({
+                    code: 'tool_catalog_loaded',
+                  }),
+                ]),
+                config: expect.objectContaining({
+                  latestSessionEvidence: expect.objectContaining({
+                    sessionId: created.id,
+                    sessionKey: 'sdk-mcp-latest-evidence',
+                    counts: expect.objectContaining({
+                      serviceCount: 1,
+                      previewSurfaceCount: 1,
+                    }),
+                    services: [
+                      {
+                        id: 'preview',
+                        name: 'preview',
+                        url: 'https://preview.test/bridge-session-1',
+                      },
+                    ],
+                  }),
+                }),
+              }),
+            ],
+          }),
+        }),
+      }));
+      const structuredProviders = mcpBody.result?.structuredContent?.providers || [];
+      expect(structuredProviders[0]?.config?.sessionActivity).toBeUndefined();
+      expect(structuredProviders[0]?.config?.sessionEvidence).toBeUndefined();
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
   it('keeps agent tooling ownership honest on the provider tooling route', async () => {
     const { config, env, cleanup } = createAgentConfigRoot();
     const runtime = createRuntimeServer(config, {

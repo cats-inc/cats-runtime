@@ -1305,6 +1305,10 @@ always-on self-adapting parser system.
   provider diagnostics with bounded `sessionEvidence`, so operator workflows
   can inspect recent services, artifacts, preview surfaces, and browser-session
   evidence without first calling a separate session-read route
+- provider-only agent diagnostics now also fall back to bounded
+  `latestSessionEvidence` from the most recent retained exact-target runtime
+  session, so operator flows can inspect known work products even before
+  pinning a specific `sessionId`
 - session-aware provider diagnostics now also keep Agent SDK bridge targets on
   provider-wide tool catalogs while surfacing runtime session activity
   evidence, instead of treating unsupported effective-tool discovery as a
