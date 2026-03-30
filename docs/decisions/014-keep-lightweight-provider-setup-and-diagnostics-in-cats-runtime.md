@@ -123,6 +123,14 @@ host-consumable:
 - `GET /diagnostics/health` is the aggregate host-facing summary for runtime +
   provider health, so packaged desktop shells and future product hosts do not
   need to stitch multiple diagnostics routes together
+- packaged hosts may aggregate these runtime-owned summaries and retained setup
+  reports into a higher-level recovery bundle, but that aggregation should
+  reference runtime truth rather than duplicate it as a second canonical raw
+  log store
+- that packaged aggregation follow-through does not itself require
+  `cats-runtime` to expose a new setup event/history route in the first slice;
+  host layers may derive chronology from existing runtime state transitions and
+  retained report metadata unless later evidence proves that insufficient
 - the embedded dashboard consumes the same runtime-owned diagnostics surface
   rather than inventing a separate product-only health contract
 
@@ -176,10 +184,11 @@ policy-heavy approval UX into `cats-runtime`.
 - [SPEC-007](../specs/SPEC-007-provider-compatibility-and-evidence-engine.md)
 - [cats ADR-021](../../../cats-platform/docs/decisions/021-keep-packaged-setup-and-provider-installation-in-the-host.md)
 - [cats SPEC-023](../../../cats-platform/docs/specs/SPEC-023-packaged-setup-wizard-and-provider-installation.md)
+- [cats ADR-047](../../../cats-platform/docs/decisions/047-separate-bootstrap-diagnostics-by-layer-and-aggregate-in-the-host.md)
+- [cats SPEC-045](../../../cats-platform/docs/specs/SPEC-045-cross-layer-bootstrap-and-onboarding-diagnostics.md)
 
 ---
 
 *Accepted: 2026-03-20*
-*Last updated: 2026-03-22*
+*Last updated: 2026-03-30*
 *Decision makers: user + Codex*
-

@@ -227,6 +227,16 @@ The setup report should not become the new canonical evidence fixture format.
 - Setup reports and `GET /setup-state` now reuse the same repair-summary truth,
   and the non-server CLI path now surfaces that same next-action guidance
   without inventing a second setup stack.
+- Packaged host aggregation work tracked in
+  [cats-platform ADR-047](../../../cats-platform/docs/decisions/047-separate-bootstrap-diagnostics-by-layer-and-aggregate-in-the-host.md)
+  and
+  [cats-platform SPEC-045](../../../cats-platform/docs/specs/SPEC-045-cross-layer-bootstrap-and-onboarding-diagnostics.md)
+  consumes these retained setup-report summaries and references as
+  runtime-owned truth.
+- That packaged aggregation direction does not currently require a new
+  runtime-owned event/history route for setup diagnostics; first-slice
+  chronology may still be derived by the host from existing runtime state
+  transitions plus retained report timestamps or summaries.
 - Remaining follow-through stays additive and coordinated with broader
   bootstrap/UI work; it does not depend on a shared-UI redesign to keep setup
   report truth accurate.
@@ -238,6 +248,8 @@ The setup report should not become the new canonical evidence fixture format.
 - [ADR-021](../decisions/021-treat-providers-yaml-as-generated-config-and-bootstrap-without-it.md)
 - [SPEC-007](./SPEC-007-provider-compatibility-and-evidence-engine.md)
 - [SPEC-017](./SPEC-017-standalone-provider-bootstrap-and-generated-config.md)
+- [cats-platform ADR-047](../../../cats-platform/docs/decisions/047-separate-bootstrap-diagnostics-by-layer-and-aggregate-in-the-host.md)
+- [cats-platform SPEC-045](../../../cats-platform/docs/specs/SPEC-045-cross-layer-bootstrap-and-onboarding-diagnostics.md)
 - [Research: First-Run Setup Diagnostic Report](../research/2026-03-24-setup-diagnostic-report.md)
 
 ## Open Questions
@@ -261,5 +273,5 @@ The setup report should not become the new canonical evidence fixture format.
 
 *Created: 2026-03-25*
 *Author: Codex*
-*Last updated: 2026-03-29*
+*Last updated: 2026-03-30*
 *Related Plan: [PLAN-024](../plans/PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md) (follow-through plan; slice 1 was implemented directly)*
