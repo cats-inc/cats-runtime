@@ -2391,6 +2391,11 @@ function sessionPreviewText(session) {
     return lastInput.trim();
   }
 
+  const persistedInput = session?.lastInputPreview;
+  if (typeof persistedInput === 'string' && persistedInput.trim()) {
+    return persistedInput.trim();
+  }
+
   const summary = session?.summary;
   if (typeof summary === 'string' && summary.trim()) {
     return summary.trim();

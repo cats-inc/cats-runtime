@@ -120,6 +120,55 @@ function makeApp(
 }
 
 describe('message route transcript persistence', () => {
+  it('persists the latest user input preview into session metadata and session list payloads', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-message-route-'));
+    const sessionBaseDir = join(root, 'sessions');
+    mkdirSync(sessionBaseDir, { recursive: true });
+
+    try {
+      const { app, registry, session } = makeApp(sessionBaseDir, async function* () {
+        yield { type: 'text', text: 'Stored.' };
+        yield { type: 'result' };
+      });
+      const message = [
+        'Investigate why the dashboard sidebar title is stale after sending a message.',
+        'Include the persistence boundary in the explanation.',
+      ].join('\n\n');
+
+      const response = await app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({ message }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(parseNdjson(await response.text())).toEqual([
+        { type: 'text', text: 'Stored.' },
+        { type: 'result' },
+      ]);
+
+      expect(registry.get(session.id)?.lastInputPreview).toBe(
+        'Investigate why the dashboard sidebar title is stale after sending a message. Include the persistence boundary in the explanation.',
+      );
+
+      const sessionsResponse = await app.request('/sessions');
+      expect(sessionsResponse.status).toBe(200);
+      await expect(sessionsResponse.json()).resolves.toEqual(expect.objectContaining({
+        sessions: expect.arrayContaining([
+          expect.objectContaining({
+            id: session.id,
+            lastInputPreview: 'Investigate why the dashboard sidebar title is stale after sending a message. Include the persistence boundary in the explanation.',
+          }),
+        ]),
+      }));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('flushes assistant text when a worker emits an error event', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-message-route-'));
     const sessionBaseDir = join(root, 'sessions');

@@ -75,6 +75,7 @@ interface DiscoveredSessionData {
   providerBackend?: 'cli' | 'api' | 'local' | 'agent';
   providerInstanceId?: string;
   summary?: string;
+  lastInputPreview?: string;
   messageCount?: number;
   lastActivity?: string;
   model?: string;
@@ -422,6 +423,7 @@ export class SessionRegistry {
       outputDir?: string;
       artifacts?: SessionArtifact[];
       summary?: string;
+      lastInputPreview?: string;
     },
   ): boolean {
     const session = this.sessions.get(id);
@@ -468,6 +470,9 @@ export class SessionRegistry {
     }
     if (patch.summary !== undefined) {
       session.summary = patch.summary;
+    }
+    if (patch.lastInputPreview !== undefined) {
+      session.lastInputPreview = patch.lastInputPreview;
     }
 
     session.updatedAt = new Date().toISOString();
@@ -779,6 +784,7 @@ export class SessionRegistry {
       outputDir: mergedData.outputDir,
       artifacts: cloneArtifacts(mergedData.artifacts),
       summary: mergedData.summary,
+      lastInputPreview: mergedData.lastInputPreview,
       sourcePath: mergedData.sourcePath,
       providerSourcePath: mergedData.sourcePath,
       messageCount: mergedData.messageCount ?? 0,
@@ -848,6 +854,7 @@ export class SessionRegistry {
       session.cwd = data.cwd;
     }
     if (data.summary) session.summary = data.summary;
+    if (data.lastInputPreview) session.lastInputPreview = data.lastInputPreview;
     if (data.group && !session.group) session.group = data.group;
     session.workspace = normalizeWorkspaceState({
       cwd: session.cwd,
@@ -907,6 +914,7 @@ export class SessionRegistry {
       providerBackend: incoming.providerBackend ?? existing.providerBackend,
       providerInstanceId: incoming.providerInstanceId ?? existing.providerInstanceId,
       summary: incoming.summary ?? existing.summary,
+      lastInputPreview: incoming.lastInputPreview ?? existing.lastInputPreview,
       messageCount: incoming.messageCount ?? existing.messageCount,
       lastActivity: incoming.lastActivity ?? existing.lastActivity,
       model: incoming.model ?? existing.model,

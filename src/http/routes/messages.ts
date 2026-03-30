@@ -363,6 +363,14 @@ function applyObservedEventToSession(
   }
 }
 
+function summarizeSessionInputPreview(message: string): string {
+  const normalized = message.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= 180) {
+    return normalized;
+  }
+  return `${normalized.slice(0, 177)}...`;
+}
+
 function persistAgentTargetEvidence(
   ctx: AppContext,
   sessionId: string,
@@ -499,6 +507,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
     strategyContext: strategyRequest?.strategyContext,
     correlation: strategyRequest?.correlation,
   };
+  const inputPreview = summarizeSessionInputPreview(message);
   const explicitSkillsMutation = body.skills !== undefined;
   const shouldRespawnPi = shouldRespawnPiWorkerForSkillMutation(
     session,
@@ -522,6 +531,11 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
       hydration,
       context: turnInput.context,
       outputDir: turnInput.outputDir,
+      lastInputPreview: inputPreview,
+    });
+  } else {
+    ctx.registry.updateSessionMetadata(id, {
+      lastInputPreview: inputPreview,
     });
   }
 

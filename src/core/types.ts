@@ -1527,6 +1527,7 @@ export interface SessionInfo {
   // Deprecated legacy flag kept only for backward-compat payload tolerance.
   managed?: boolean;
   summary?: string;
+  lastInputPreview?: string;
   sourcePath?: string;
   providerSourcePath?: string;
   messageCount: number;
