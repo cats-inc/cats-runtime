@@ -106,6 +106,10 @@ Evidence:
   probe-session validation are all in-repo.
 - What is still missing is stronger non-OpenClaw remote-tool/service evidence
   beyond what the provider registry reports.
+- The runtime no longer falsely degrades Agent SDK session-aware diagnostics
+  just because the bridge lacks OpenClaw-style effective tool catalogs; it now
+  falls back to provider-wide tool truth plus runtime session activity
+  evidence.
 
 Why this is the highest-value next slice:
 

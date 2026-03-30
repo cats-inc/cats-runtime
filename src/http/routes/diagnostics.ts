@@ -207,6 +207,41 @@ function pickAvailabilitySummary(checks: DiagnosticCheck[]): string {
   return checks[0]?.message || 'No diagnostics collected';
 }
 
+function hasAgentSessionActivitySummary(
+  value: unknown,
+): value is {
+  toolUseCount: number;
+  toolResultCount: number;
+  serviceUpdateCount: number;
+  observedToolNames: string[];
+  observedServiceIds: string[];
+} {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const record = value as Record<string, unknown>;
+  const observedToolNames = Array.isArray(record.observedToolNames)
+    ? record.observedToolNames.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
+    : [];
+  const observedServiceIds = Array.isArray(record.observedServiceIds)
+    ? record.observedServiceIds.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
+    : [];
+
+  return (
+    typeof record.toolUseCount === 'number'
+    && typeof record.toolResultCount === 'number'
+    && typeof record.serviceUpdateCount === 'number'
+    && (
+      record.toolUseCount > 0
+      || record.toolResultCount > 0
+      || record.serviceUpdateCount > 0
+      || observedToolNames.length > 0
+      || observedServiceIds.length > 0
+    )
+  );
+}
+
 function getRuntimeWakeupSnapshot(ctx: AppContext) {
   return ctx.wakeup?.buildDiagnosticsSnapshot() ?? {
     summary: {
@@ -802,6 +837,49 @@ async function diagnoseAgentTarget(
     ),
   );
 
+  const runtimeSession = toolCatalogContext?.sessionId
+    ? ctx.registry.get(toolCatalogContext.sessionId)
+    : undefined;
+  const runtimeAgentSession = runtimeSession?.providerState?.agentSession;
+  if (
+    agentRuntime.family === 'bridge'
+    && runtimeSession
+    && hasAgentSessionActivitySummary(runtimeAgentSession?.activity)
+  ) {
+    config.sessionActivity = {
+      source: 'runtime_session',
+      sessionId: runtimeSession.id,
+      ...(runtimeSession.sessionKey ? { sessionKey: runtimeSession.sessionKey } : {}),
+      ...(runtimeAgentSession?.providerSessionId
+        ? { providerSessionId: runtimeAgentSession.providerSessionId }
+        : {}),
+      ...(runtimeAgentSession?.status ? { status: runtimeAgentSession.status } : {}),
+      activity: {
+        toolUseCount: runtimeAgentSession.activity.toolUseCount,
+        toolResultCount: runtimeAgentSession.activity.toolResultCount,
+        serviceUpdateCount: runtimeAgentSession.activity.serviceUpdateCount,
+        observedToolNames: [...runtimeAgentSession.activity.observedToolNames],
+        observedServiceIds: [...runtimeAgentSession.activity.observedServiceIds],
+      },
+    };
+    checks.push(
+      createCheck(
+        'bridge_session_activity_visible',
+        'ok',
+        `Runtime session '${runtimeSession.id}' recorded recent remote bridge activity for ${target.providerName}/${target.instanceId}`,
+        {
+          sessionId: runtimeSession.id,
+          ...(runtimeSession.sessionKey ? { sessionKey: runtimeSession.sessionKey } : {}),
+          toolUseCount: runtimeAgentSession.activity.toolUseCount,
+          toolResultCount: runtimeAgentSession.activity.toolResultCount,
+          serviceUpdateCount: runtimeAgentSession.activity.serviceUpdateCount,
+          observedToolNames: [...runtimeAgentSession.activity.observedToolNames],
+          observedServiceIds: [...runtimeAgentSession.activity.observedServiceIds],
+        },
+      ),
+    );
+  }
+
   try {
     const shouldProbeLive = probeMode === 'live'
       || agentRuntime.transport.liveProbe === 'rpc_health';
@@ -873,12 +951,15 @@ async function diagnoseAgentTarget(
 
   if (probeMode === 'live') {
     await appendModelCatalogDiagnostics(ctx, target, checks, config);
+    const effectiveToolCatalogRequested = toolCatalogContext?.scope === 'effective';
+    const useEffectiveToolCatalog = effectiveToolCatalogRequested
+      && agentRuntime.capabilities.effectiveToolCatalog;
     const toolCatalog = await loadProviderRemoteToolCatalog(target, {
       agentRuntime,
       agentBackend: ctx.agentBackend,
-      ...(toolCatalogContext ? {
+      ...(toolCatalogContext && useEffectiveToolCatalog ? {
         request: {
-          scope: toolCatalogContext.scope,
+          scope: 'effective',
           sessionKey: toolCatalogContext.sessionKey,
         },
       } : {}),
@@ -894,9 +975,9 @@ async function diagnoseAgentTarget(
         groups: toolCatalog.groups.map((group) => ({ ...group })),
         ...(toolCatalog.error ? { error: toolCatalog.error } : {}),
       };
-      if (toolCatalogContext?.scope === 'effective') {
+      if (useEffectiveToolCatalog) {
         config.toolCatalogContext = {
-          scope: toolCatalogContext.scope,
+          scope: 'effective',
           ...(toolCatalogContext.sessionId ? { sessionId: toolCatalogContext.sessionId } : {}),
           ...(toolCatalogContext.sessionKey ? { sessionKey: toolCatalogContext.sessionKey } : {}),
         };

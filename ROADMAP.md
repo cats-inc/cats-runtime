@@ -1301,6 +1301,10 @@ always-on self-adapting parser system.
   `inspection.agentSession.activity` summaries for observed remote tools and
   runtime services, so hosts do not need to replay raw stream events just to
   inspect recent bridge activity
+- session-aware provider diagnostics now also keep Agent SDK bridge targets on
+  provider-wide tool catalogs while surfacing runtime session activity
+  evidence, instead of treating unsupported effective-tool discovery as a
+  degraded outcome
 - `/providers/config` instance entries now reuse the same retained artifact
   read model, so host/provider-selection flows can fetch provider topology and
   latest provider-evolution summary in one call

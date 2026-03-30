@@ -896,15 +896,25 @@ re-filtering the full response client-side. The response now also includes:
 - `query.filters`
 
 When `sessionId` or `sessionKey` is supplied, the diagnostics route upgrades
-agent tool validation from provider-level `tools.catalog` to session-effective
-inspection. `sessionId` auto-resolves the matching provider target from the
-runtime registry, while `sessionKey` requires an explicit
-`provider` + `backend` + `instance` target. The response then echoes:
+agent inspection from provider-only diagnostics to session-aware diagnostics.
+`sessionId` auto-resolves the matching provider target from the runtime
+registry, while `sessionKey` requires an explicit
+`provider` + `backend` + `instance` target.
+
+For adapters that support session-effective remote tool catalogs, such as
+OpenClaw, the response then echoes:
 
 - `query.filters.toolCatalogScope: "effective"`
 - normalized `query.filters.sessionId` / `query.filters.sessionKey`
 - `providers[].config.toolCatalog.method: "tools_effective"`
 - `providers[].config.toolCatalogContext`
+
+For adapters that do not support effective remote tool catalogs, such as the
+current Agent SDK bridge, the response keeps the provider-wide tool catalog
+(`providers[].config.toolCatalog.method: "providers_get"`) and instead adds
+`providers[].config.sessionActivity` plus a `bridge_session_activity_visible`
+check when the runtime session has already observed remote tool/service
+activity.
 
 Invalid `backend` values or malformed boolean filters such as
 `defaultOnly=maybe` return `400` with a client-safe `error` string.

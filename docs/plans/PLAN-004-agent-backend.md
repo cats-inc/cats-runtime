@@ -376,6 +376,7 @@ difference between logical session identity and provider-managed resume tokens.
 | 2026-03-30 | Live `/diagnostics/providers` and MCP `provider_diagnostics` now also accept shared session context so OpenClaw session-effective `tools.effective` evidence can flow through the same diagnostics read model as provider-wide tool catalogs |
 | 2026-03-30 | Agent SDK bridge live diagnostics now treat provider-registry tool metadata as part of semantic readiness, surfacing explicit `bridge_provider_tool_catalog_visible` checks plus `toolCatalogVisible` / `toolCount` / `toolGroupCount` truth before the bounded probe-session lifecycle runs |
 | 2026-03-30 | Agent SDK bridge session streams now persist bounded remote tool/service activity summaries into provider-managed session state, and session/history/observe inspection now reuses that `agentSession.activity` truth instead of making hosts replay raw stream events |
+| 2026-03-30 | Session-aware provider diagnostics now keep OpenClaw on `tools.effective`, but let Agent SDK bridge targets fall back to provider-wide tool catalogs plus runtime session activity evidence instead of degrading on unsupported effective-tool requests |
 
 ---
 
