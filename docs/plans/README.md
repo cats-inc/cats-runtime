@@ -46,6 +46,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 
 | Plan | Title | Status | Related Spec |
 |------|-------|--------|--------------|
+| [PLAN-026](./PLAN-026-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md) | Verified Advanced Provider Catalogs and Manual-Refresh Discovery | Draft | [SPEC-023](../specs/SPEC-023-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md), [ADR-029](../decisions/029-keep-advanced-provider-catalogs-verified-and-manual-refresh.md) |
 | [PLAN-025](./PLAN-025-executable-packaging-and-publish-follow-through.md) | Executable Packaging and Publish Follow-Through | In Progress | [ROADMAP OPT-15](../../ROADMAP.md), [SPEC-017](../specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md), [PLAN-019](./PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md) |
 | [PLAN-024](./PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md) | Runtime Skill Library, Setup Diagnostics, and Wakeup Follow-Through | In Progress | [SPEC-013](../specs/SPEC-013-internal-skill-library-and-role-taxonomy.md), [SPEC-015](../specs/SPEC-015-runtime-setup-diagnostic-report.md), [SPEC-012](../specs/SPEC-012-scheduled-wakeup-substrate.md) |
 | [PLAN-023](./PLAN-023-a2a-layering-and-collaboration-artifact-alignment.md) | A2A Layering and Collaboration Artifact Alignment | In Progress (Pilot Slice 2: Repo-Owned Bootstrap Extraction) | [SPEC-006](../specs/SPEC-006-a2a-protocol-project-memory-and-skill-layering.md), [ADR-010](../decisions/010-separate-a2a-protocol-project-memory-and-skill-packages.md) |
@@ -95,4 +96,4 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 ---
 
 *See also: [specs/](../specs/) for feature specifications*
-*Last updated: 2026-03-29*
+*Last updated: 2026-03-30*

@@ -51,9 +51,9 @@ Add your project-specific automation scripts here.
 | [AGENT-GUIDE.md](./AGENT-GUIDE.md) | Complete | Project-specific agent notes |
 | [terminology.md](./terminology.md) | Complete | AAIF, A2A, skills, compatibility, evidence, control-plane adapter, and runtime-project-memory terminology |
 | [a2a/](./a2a/) | Complete | Pilot-owned A2A v1.0 example set for future adapter work; standards-aligned docs, not a claim of a live A2A endpoint today |
-| [specs/](./specs/) | Complete | Feature specifications for runtime capabilities and future delivery tracks; see `specs/README.md` for the full list |
-| [plans/](./plans/) | Complete | Implementation plans for WSL discovery, API/backend expansion, startup contract, runtime-managed skills, browser-preview substrate, provider compatibility/evidence, and metering/progress/guardrails |
-| [decisions/](./decisions/) | Complete | Architecture Decision Records for packaging, install/check metadata, diagnostics, workspace substrate, delivery policy boundaries, runtime-owned metering/guardrails, LAN peer-sharing scope, standalone bootstrap/config boundaries, advanced model-selection ownership, management-adapter boundaries, and provider-evolution evidence boundaries |
+| [specs/](./specs/) | Complete | Feature specifications for runtime capabilities and future delivery tracks, including advanced provider-catalog truthfulness and manual-refresh discovery follow-through; see `specs/README.md` for the full list |
+| [plans/](./plans/) | Complete | Implementation plans for WSL discovery, API/backend expansion, startup contract, runtime-managed skills, browser-preview substrate, provider compatibility/evidence, metering/progress/guardrails, and provider advanced-catalog hardening |
+| [decisions/](./decisions/) | Complete | Architecture Decision Records for packaging, install/check metadata, diagnostics, workspace substrate, delivery policy boundaries, runtime-owned metering/guardrails, LAN peer-sharing scope, standalone bootstrap/config boundaries, advanced model-selection ownership, management-adapter boundaries, provider-evolution evidence boundaries, and conservative verified provider-catalog policy |
 
 **Legend**: Complete | Partial | Template
 
@@ -102,4 +102,4 @@ later passes:
 
 ---
 
-*Last updated: 2026-03-29*
+*Last updated: 2026-03-30*

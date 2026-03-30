@@ -38,6 +38,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
+| [029-keep-advanced-provider-catalogs-verified-and-manual-refresh](./029-keep-advanced-provider-catalogs-verified-and-manual-refresh.md) | Keep advanced provider catalogs verified and manual-refresh | Proposed | 2026-03-30 |
 | [028-proxy-stdio-mcp-to-the-primary-runtime-http-surface](./028-proxy-stdio-mcp-to-the-primary-runtime-http-surface.md) | Proxy stdio MCP to the primary runtime HTTP surface | Proposed | 2026-03-29 |
 | [027-adopt-a-playground-derived-dark-runtime-ui-shell-with-sidebar-surface-switching](./027-adopt-a-playground-derived-dark-runtime-ui-shell-with-sidebar-surface-switching.md) | Adopt a playground-derived dark runtime UI shell with sidebar surface switching | Accepted | 2026-03-29 |
 | [026-model-a2a-as-an-agent-backend-adapter](./026-model-a2a-as-an-agent-backend-adapter.md) | Model A2A as an agent backend adapter | Proposed | 2026-03-27 |
@@ -78,6 +79,6 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 ---
 
-*Last updated: 2026-03-29*
+*Last updated: 2026-03-30*
 
 *See also: [AGENTS.md](../../../AGENTS.md) for decision-making protocols*
