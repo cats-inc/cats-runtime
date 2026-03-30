@@ -675,6 +675,10 @@ describe('agent backend integration', () => {
                   cwd: config.sessionBaseDir,
                   outputDir: '/tmp/out',
                 }),
+                latestRun: expect.objectContaining({
+                  status: 'succeeded',
+                  resultSummary: 'completed run-1',
+                }),
                 counts: expect.objectContaining({
                   artifactCount: 1,
                   serviceCount: 1,

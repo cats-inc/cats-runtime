@@ -1319,6 +1319,9 @@ always-on self-adapting parser system.
   workspace locator metadata such as `cwd`, optional `outputDir`, and optional
   `workspaceMode`, so operators can locate the recent work-product context
   without opening the full session record
+- the same bounded latest-session evidence summaries now also preserve
+  `latestRun.resultSummary` when the runtime already has one, so host/operator
+  reads can surface a semantic outcome hint without replaying a transcript
 - session-aware provider diagnostics now also keep Agent SDK bridge targets on
   provider-wide tool catalogs while surfacing runtime session activity
   evidence, instead of treating unsupported effective-tool discovery as a

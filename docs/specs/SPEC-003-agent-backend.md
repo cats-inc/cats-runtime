@@ -120,7 +120,9 @@ current `api` backend or bury a second orchestration model inside it.
   host-facing provider topology reads instead of living only behind
   diagnostics-only routes, and those summaries should preserve bounded
   workspace locator metadata so operators can identify the recent work-product
-  context without reading a full session transcript.
+  context without reading a full session transcript. When the runtime already
+  has a bounded run/result summary, the same evidence surface should preserve
+  that semantic hint instead of forcing hosts to infer it from counts alone.
 - **Extensibility**: The adapter contract shall support more than one external
   agent runtime.
 

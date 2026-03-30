@@ -163,6 +163,11 @@ such as `cwd`, optional `outputDir`, and optional `workspaceMode`, so the
 remaining gap is less about "where did this work-product come from?" and more
 about deeper harvesting breadth beyond the current bounded samples.
 
+The runtime now also preserves bounded semantic `latestRun.resultSummary` text
+when it already exists, so the remaining gap is less about "can hosts see any
+semantic outcome at all?" and more about how much broader evidence breadth to
+harvest beyond the current run/session summaries.
+
 That narrows the remaining gap again. The next missing depth is no longer
 "provider diagnostics cannot show work products"; it is broader harvesting and
 more durable evidence beyond what retained target evidence already knows.

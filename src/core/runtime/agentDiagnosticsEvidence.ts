@@ -22,6 +22,7 @@ export interface AgentDiagnosticSessionEvidenceSummary {
   latestRun?: {
     id: string;
     status: string;
+    resultSummary?: string;
   };
   counts: {
     artifactCount: number;
@@ -196,6 +197,7 @@ export function buildAgentDiagnosticSessionEvidence(
       latestRun: {
         id: latestRun.id,
         status: latestRun.status,
+        ...(latestRun.resultSummary ? { resultSummary: latestRun.resultSummary } : {}),
       },
     } : {}),
     counts,

@@ -185,7 +185,17 @@ function cloneEvidence(
           },
         }
       : {}),
-    ...(value.latestRun ? { latestRun: { ...value.latestRun } } : {}),
+    ...(value.latestRun
+      ? {
+          latestRun: {
+            id: value.latestRun.id,
+            status: value.latestRun.status,
+            ...(value.latestRun.resultSummary
+              ? { resultSummary: value.latestRun.resultSummary }
+              : {}),
+          },
+        }
+      : {}),
     counts: { ...value.counts },
     artifacts: value.artifacts.map((artifact) => ({ ...artifact })),
     services: value.services.map((service) => ({ ...service })),

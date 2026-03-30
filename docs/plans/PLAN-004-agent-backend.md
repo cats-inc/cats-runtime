@@ -384,6 +384,7 @@ difference between logical session identity and provider-managed resume tokens.
 | 2026-03-30 | Agent diagnostics activity/work-product summaries now also preserve provenance/freshness metadata (`source`, `observedAt`, `retainedAt`) on both config payloads and matching checks, so operators can judge how recent retained evidence is without a second read surface |
 | 2026-03-30 | `/providers/config` now also reuses the same bounded latest-session agent evidence read model, so provider-selection surfaces can show recent exact-target work products and bridge activity without requiring a second `/diagnostics/providers` fetch |
 | 2026-03-30 | Agent evidence summaries now also preserve bounded workspace locator metadata (`cwd`, optional `outputDir`, optional `workspaceMode`) across diagnostics, provider topology reads, retained-target persistence, and MCP mirrors so operators can locate the most recent work-product context without re-reading the full session |
+| 2026-03-30 | Agent evidence `latestRun` summaries now also preserve bounded semantic `resultSummary` text when the runtime already has it, so operator read models can surface more than counts/locators without replaying a transcript |
 
 ---
 
