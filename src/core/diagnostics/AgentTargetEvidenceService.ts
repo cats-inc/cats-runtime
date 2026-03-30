@@ -34,8 +34,13 @@ export class AgentTargetEvidenceService {
       return;
     }
 
-    const activity = input.activity ? cloneActivity(input.activity) : undefined;
-    const evidence = input.evidence ? cloneEvidence(input.evidence) : undefined;
+    const retainedAt = new Date().toISOString();
+    const activity = input.activity
+      ? cloneActivity({ ...input.activity, retainedAt }, retainedAt)
+      : undefined;
+    const evidence = input.evidence
+      ? cloneEvidence({ ...input.evidence, retainedAt }, retainedAt)
+      : undefined;
     if (!activity && !evidence) {
       return;
     }
@@ -46,7 +51,7 @@ export class AgentTargetEvidenceService {
       backend: 'agent',
       instance: target.instanceId,
       target: `${target.backend}/${target.instanceId}`,
-      updatedAt: new Date().toISOString(),
+      updatedAt: retainedAt,
       ...(activity ? { activity } : {}),
       ...(evidence ? { evidence } : {}),
     });
@@ -94,8 +99,8 @@ export class AgentTargetEvidenceService {
           instance: record.instance,
           target: record.target,
           updatedAt: record.updatedAt,
-          ...(record.activity ? { activity: cloneActivity(record.activity) } : {}),
-          ...(record.evidence ? { evidence: cloneEvidence(record.evidence) } : {}),
+          ...(record.activity ? { activity: cloneActivity(record.activity, record.updatedAt) } : {}),
+          ...(record.evidence ? { evidence: cloneEvidence(record.evidence, record.updatedAt) } : {}),
         });
       }
     } catch {
@@ -122,6 +127,7 @@ function targetKey(target: ProviderTargetDescriptor): string {
 
 function cloneActivity(
   value: AgentDiagnosticSessionActivitySummary,
+  fallbackRetainedAt?: string,
 ): AgentDiagnosticSessionActivitySummary {
   return {
     source: value.source,
@@ -129,6 +135,12 @@ function cloneActivity(
     ...(value.sessionKey ? { sessionKey: value.sessionKey } : {}),
     ...(value.providerSessionId ? { providerSessionId: value.providerSessionId } : {}),
     ...(value.status ? { status: value.status } : {}),
+    ...(value.observedAt
+      ? { observedAt: value.observedAt }
+      : (fallbackRetainedAt ? { observedAt: fallbackRetainedAt } : {})),
+    ...(value.retainedAt
+      ? { retainedAt: value.retainedAt }
+      : (fallbackRetainedAt ? { retainedAt: fallbackRetainedAt } : {})),
     activity: {
       toolUseCount: value.activity.toolUseCount,
       toolResultCount: value.activity.toolResultCount,
@@ -141,6 +153,7 @@ function cloneActivity(
 
 function cloneEvidence(
   value: AgentDiagnosticSessionEvidenceSummary,
+  fallbackRetainedAt?: string,
 ): AgentDiagnosticSessionEvidenceSummary {
   return {
     source: value.source,
@@ -148,6 +161,12 @@ function cloneEvidence(
     ...(value.sessionKey ? { sessionKey: value.sessionKey } : {}),
     ...(value.providerSessionId ? { providerSessionId: value.providerSessionId } : {}),
     ...(value.status ? { status: value.status } : {}),
+    ...(value.observedAt
+      ? { observedAt: value.observedAt }
+      : (fallbackRetainedAt ? { observedAt: fallbackRetainedAt } : {})),
+    ...(value.retainedAt
+      ? { retainedAt: value.retainedAt }
+      : (fallbackRetainedAt ? { retainedAt: fallbackRetainedAt } : {})),
     ...(value.latestRun ? { latestRun: { ...value.latestRun } } : {}),
     counts: { ...value.counts },
     artifacts: value.artifacts.map((artifact) => ({ ...artifact })),

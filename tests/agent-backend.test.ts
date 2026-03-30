@@ -1569,8 +1569,10 @@ describe('agent backend integration', () => {
                 code: 'session_evidence_visible',
                 status: 'ok',
                 details: expect.objectContaining({
+                  source: 'runtime_session_inspection',
                   sessionId: created.id,
                   sessionKey: 'sdk-effective-diagnostics',
+                  observedAt: expect.any(String),
                   artifactCount: 0,
                   serviceCount: 1,
                   previewSurfaceCount: 1,
@@ -1584,8 +1586,10 @@ describe('agent backend integration', () => {
                 code: 'bridge_session_activity_visible',
                 status: 'ok',
                 details: expect.objectContaining({
+                  source: 'runtime_session',
                   sessionId: created.id,
                   sessionKey: 'sdk-effective-diagnostics',
+                  observedAt: expect.any(String),
                   toolUseCount: 1,
                   toolResultCount: 1,
                   serviceUpdateCount: 1,
@@ -1617,6 +1621,7 @@ describe('agent backend integration', () => {
                 sessionKey: 'sdk-effective-diagnostics',
                 providerSessionId: 'bridge-session-1',
                 status: 'idle',
+                observedAt: expect.any(String),
                 activity: {
                   toolUseCount: 1,
                   toolResultCount: 1,
@@ -1631,6 +1636,7 @@ describe('agent backend integration', () => {
                 sessionKey: 'sdk-effective-diagnostics',
                 providerSessionId: 'bridge-session-1',
                 status: 'idle',
+                observedAt: expect.any(String),
                 latestRun: expect.objectContaining({
                   id: expect.any(String),
                   status: 'succeeded',
@@ -2024,8 +2030,10 @@ describe('agent backend integration', () => {
               expect.objectContaining({
                 code: 'latest_session_activity_visible',
                 details: expect.objectContaining({
+                  source: 'runtime_registry_latest_session',
                   sessionId: created.id,
                   sessionKey: 'sdk-latest-evidence',
+                  observedAt: expect.any(String),
                   toolUseCount: 1,
                   toolResultCount: 1,
                   serviceUpdateCount: 1,
@@ -2036,8 +2044,10 @@ describe('agent backend integration', () => {
               expect.objectContaining({
                 code: 'latest_session_evidence_visible',
                 details: expect.objectContaining({
+                  source: 'runtime_registry_latest_session',
                   sessionId: created.id,
                   sessionKey: 'sdk-latest-evidence',
+                  observedAt: expect.any(String),
                   artifactCount: 0,
                   serviceCount: 1,
                   previewSurfaceCount: 1,
@@ -2058,6 +2068,7 @@ describe('agent backend integration', () => {
                 sessionKey: 'sdk-latest-evidence',
                 providerSessionId: 'bridge-session-1',
                 status: 'idle',
+                observedAt: expect.any(String),
                 activity: {
                   toolUseCount: 1,
                   toolResultCount: 1,
@@ -2072,6 +2083,7 @@ describe('agent backend integration', () => {
                 sessionKey: 'sdk-latest-evidence',
                 providerSessionId: 'bridge-session-1',
                 status: 'idle',
+                observedAt: expect.any(String),
                 latestRun: expect.objectContaining({
                   id: expect.any(String),
                   status: 'succeeded',
@@ -2453,15 +2465,21 @@ describe('agent backend integration', () => {
               expect.objectContaining({
                 code: 'latest_session_activity_visible',
                 details: expect.objectContaining({
+                  source: 'retained_target_evidence',
                   sessionId: created.id,
                   sessionKey: 'sdk-deleted-evidence',
+                  observedAt: expect.any(String),
+                  retainedAt: expect.any(String),
                 }),
               }),
               expect.objectContaining({
                 code: 'latest_session_evidence_visible',
                 details: expect.objectContaining({
+                  source: 'retained_target_evidence',
                   sessionId: created.id,
                   sessionKey: 'sdk-deleted-evidence',
+                  observedAt: expect.any(String),
+                  retainedAt: expect.any(String),
                 }),
               }),
             ]),
@@ -2470,6 +2488,8 @@ describe('agent backend integration', () => {
                 source: 'retained_target_evidence',
                 sessionId: created.id,
                 sessionKey: 'sdk-deleted-evidence',
+                observedAt: expect.any(String),
+                retainedAt: expect.any(String),
                 activity: {
                   toolUseCount: 1,
                   toolResultCount: 1,
@@ -2482,6 +2502,8 @@ describe('agent backend integration', () => {
                 source: 'retained_target_evidence',
                 sessionId: created.id,
                 sessionKey: 'sdk-deleted-evidence',
+                observedAt: expect.any(String),
+                retainedAt: expect.any(String),
                 counts: expect.objectContaining({
                   serviceCount: 1,
                   previewSurfaceCount: 1,
@@ -2660,11 +2682,15 @@ describe('agent backend integration', () => {
                     source: 'retained_target_evidence',
                     sessionId: created.id,
                     sessionKey: 'sdk-mcp-deleted-evidence',
+                    observedAt: expect.any(String),
+                    retainedAt: expect.any(String),
                   }),
                   latestSessionEvidence: expect.objectContaining({
                     source: 'retained_target_evidence',
                     sessionId: created.id,
                     sessionKey: 'sdk-mcp-deleted-evidence',
+                    observedAt: expect.any(String),
+                    retainedAt: expect.any(String),
                   }),
                 }),
               }),

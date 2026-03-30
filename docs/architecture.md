@@ -501,12 +501,15 @@ path is intentionally narrow:
   `config.sessionEvidence` summaries on session-aware provider diagnostics, so
   host/operator workflows can inspect recent services, artifacts, preview
   surfaces, and browser-session evidence without issuing a second session-read
-  call first
+  call first; those summaries now also preserve source/freshness metadata such
+  as `observedAt`
 - Lets provider-only agent diagnostics fall back to bounded
   `config.latestSessionActivity` / `config.latestSessionEvidence` from the most
   recent retained runtime session or retained target-evidence store entry for
   that exact target, so operators can still inspect known bridge activity and
-  work-product evidence without already knowing a specific `sessionId`
+  work-product evidence without already knowing a specific `sessionId`; retained
+  target-evidence fallbacks now also preserve `retainedAt` provenance on both
+  the config payload and matching diagnostic checks
 - Normalizes history provenance metadata, per-source transcript provenance, and
   Pi-native transcript parsing so provider-owned session files plus later
   runtime-managed fallback history can still feed the same runtime-owned

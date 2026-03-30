@@ -12,6 +12,8 @@ export interface AgentDiagnosticSessionEvidenceSummary {
   sessionKey?: string;
   providerSessionId?: string;
   status?: string;
+  observedAt?: string;
+  retainedAt?: string;
   latestRun?: {
     id: string;
     status: string;
@@ -64,6 +66,8 @@ export interface AgentDiagnosticSessionActivitySummary {
   sessionKey?: string;
   providerSessionId?: string;
   status?: string;
+  observedAt?: string;
+  retainedAt?: string;
   activity: {
     toolUseCount: number;
     toolResultCount: number;
@@ -123,6 +127,9 @@ export function buildAgentDiagnosticSessionActivity(
     ...(session.sessionKey ? { sessionKey: session.sessionKey } : {}),
     ...(agentSession?.providerSessionId ? { providerSessionId: agentSession.providerSessionId } : {}),
     ...(agentSession?.status ? { status: agentSession.status } : {}),
+    ...(resolveAgentDiagnosticObservedAt(session)
+      ? { observedAt: resolveAgentDiagnosticObservedAt(session) }
+      : {}),
     activity: {
       toolUseCount: agentSession.activity.toolUseCount,
       toolResultCount: agentSession.activity.toolResultCount,
@@ -170,6 +177,9 @@ export function buildAgentDiagnosticSessionEvidence(
       ? { providerSessionId: inspection.agentSession.providerSessionId }
       : {}),
     ...(inspection.agentSession?.status ? { status: inspection.agentSession.status } : {}),
+    ...(resolveAgentDiagnosticObservedAt(session)
+      ? { observedAt: resolveAgentDiagnosticObservedAt(session) }
+      : {}),
     ...(latestRun ? {
       latestRun: {
         id: latestRun.id,
@@ -210,4 +220,10 @@ export function buildAgentDiagnosticSessionEvidence(
       previewSurfaceCount: browserSession.inspection.previewSurfaces.length,
     })),
   };
+}
+
+function resolveAgentDiagnosticObservedAt(
+  session: SessionInfo,
+): string | undefined {
+  return session.lastActivity || session.updatedAt || session.createdAt || undefined;
 }

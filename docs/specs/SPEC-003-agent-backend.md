@@ -114,7 +114,8 @@ current `api` backend or bury a second orchestration model inside it.
   streaming APIs even when provider-managed state is authoritative, and the
   same shared runtime session inspection should remain reusable from
   session-aware provider diagnostics for bounded activity/work-product
-  evidence.
+  evidence, including source/freshness metadata that lets operators tell when
+  bounded retained evidence was observed and when it was last retained.
 - **Extensibility**: The adapter contract shall support more than one external
   agent runtime.
 

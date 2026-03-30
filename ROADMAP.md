@@ -1309,7 +1309,8 @@ always-on self-adapting parser system.
   `latestSessionActivity` / `latestSessionEvidence` from the most recent
   retained exact-target runtime session or retained target-evidence store
   entry, so operator flows can inspect known bridge activity and work products
-  even before pinning a specific `sessionId`
+  even before pinning a specific `sessionId`; those summaries now also preserve
+  freshness/provenance metadata such as `observedAt` and `retainedAt`
 - session-aware provider diagnostics now also keep Agent SDK bridge targets on
   provider-wide tool catalogs while surfacing runtime session activity
   evidence, instead of treating unsupported effective-tool discovery as a

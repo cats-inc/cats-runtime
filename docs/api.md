@@ -919,14 +919,18 @@ activity. Session-aware agent diagnostics also project a bounded
 when the shared runtime session inspection already has service, artifact,
 preview-surface, or browser-session evidence for that target. This reuses the
 same session inspection truth as `/sessions/{id}/observe` instead of inventing
-a second work-product read model just for diagnostics.
+a second work-product read model just for diagnostics. These activity/evidence
+summaries now also carry freshness/provenance metadata such as `source`,
+`observedAt`, and, for retained target-evidence entries, `retainedAt`.
 
 Even without `sessionId` / `sessionKey`, retained agent sessions can still
 surface bounded `providers[].config.latestSessionActivity` /
 `providers[].config.latestSessionEvidence` summaries plus
 `latest_session_activity_visible` / `latest_session_evidence_visible` when the
 runtime registry or retained target-evidence store already holds the most
-recent known activity or work-product evidence for that target.
+recent known activity or work-product evidence for that target. Matching check
+details now echo the same source/freshness metadata so operator logs do not
+need to cross-reference `providers[].config` just to understand provenance.
 
 Invalid `backend` values or malformed boolean filters such as
 `defaultOnly=maybe` return `400` with a client-safe `error` string.

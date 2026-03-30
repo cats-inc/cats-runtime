@@ -969,6 +969,8 @@ async function diagnoseAgentTarget(
         ? { providerSessionId: sessionEvidence.providerSessionId }
         : {}),
       ...(sessionEvidence.status ? { status: sessionEvidence.status } : {}),
+      ...(sessionEvidence.observedAt ? { observedAt: sessionEvidence.observedAt } : {}),
+      ...(sessionEvidence.retainedAt ? { retainedAt: sessionEvidence.retainedAt } : {}),
       ...(sessionEvidence.latestRun ? { latestRun: sessionEvidence.latestRun } : {}),
       counts: { ...sessionEvidence.counts },
       artifacts: sessionEvidence.artifacts.map((artifact) => ({ ...artifact })),
@@ -982,8 +984,11 @@ async function diagnoseAgentTarget(
         'ok',
         `Runtime session '${runtimeSession.id}' exposes bounded work-product evidence for ${target.providerName}/${target.instanceId}`,
         {
+          source: sessionEvidence.source,
           sessionId: runtimeSession.id,
           ...(sessionEvidence.sessionKey ? { sessionKey: sessionEvidence.sessionKey } : {}),
+          ...(sessionEvidence.observedAt ? { observedAt: sessionEvidence.observedAt } : {}),
+          ...(sessionEvidence.retainedAt ? { retainedAt: sessionEvidence.retainedAt } : {}),
           artifactCount: sessionEvidence.counts.artifactCount,
           serviceCount: sessionEvidence.counts.serviceCount,
           previewSurfaceCount: sessionEvidence.counts.previewSurfaceCount,
@@ -1008,6 +1013,8 @@ async function diagnoseAgentTarget(
         ? { providerSessionId: fallbackLatestEvidence.providerSessionId }
         : {}),
       ...(fallbackLatestEvidence.status ? { status: fallbackLatestEvidence.status } : {}),
+      ...(fallbackLatestEvidence.observedAt ? { observedAt: fallbackLatestEvidence.observedAt } : {}),
+      ...(fallbackLatestEvidence.retainedAt ? { retainedAt: fallbackLatestEvidence.retainedAt } : {}),
       ...(fallbackLatestEvidence.latestRun
         ? { latestRun: fallbackLatestEvidence.latestRun }
         : {}),
@@ -1023,8 +1030,15 @@ async function diagnoseAgentTarget(
         'ok',
         `Latest retained runtime session '${fallbackLatestEvidence.sessionId}' exposes bounded work-product evidence for ${target.providerName}/${target.instanceId}`,
         {
+          source: fallbackLatestEvidence.source,
           sessionId: fallbackLatestEvidence.sessionId,
           ...(fallbackLatestEvidence.sessionKey ? { sessionKey: fallbackLatestEvidence.sessionKey } : {}),
+          ...(fallbackLatestEvidence.observedAt
+            ? { observedAt: fallbackLatestEvidence.observedAt }
+            : {}),
+          ...(fallbackLatestEvidence.retainedAt
+            ? { retainedAt: fallbackLatestEvidence.retainedAt }
+            : {}),
           artifactCount: fallbackLatestEvidence.counts.artifactCount,
           serviceCount: fallbackLatestEvidence.counts.serviceCount,
           previewSurfaceCount: fallbackLatestEvidence.counts.previewSurfaceCount,
@@ -1048,6 +1062,8 @@ async function diagnoseAgentTarget(
         ? { providerSessionId: runtimeSessionActivity.providerSessionId }
         : {}),
       ...(runtimeSessionActivity.status ? { status: runtimeSessionActivity.status } : {}),
+      ...(runtimeSessionActivity.observedAt ? { observedAt: runtimeSessionActivity.observedAt } : {}),
+      ...(runtimeSessionActivity.retainedAt ? { retainedAt: runtimeSessionActivity.retainedAt } : {}),
       activity: {
         toolUseCount: runtimeSessionActivity.activity.toolUseCount,
         toolResultCount: runtimeSessionActivity.activity.toolResultCount,
@@ -1062,8 +1078,15 @@ async function diagnoseAgentTarget(
         'ok',
         `Runtime session '${runtimeSessionActivity.sessionId}' recorded recent remote bridge activity for ${target.providerName}/${target.instanceId}`,
         {
+          source: runtimeSessionActivity.source,
           sessionId: runtimeSessionActivity.sessionId,
           ...(runtimeSessionActivity.sessionKey ? { sessionKey: runtimeSessionActivity.sessionKey } : {}),
+          ...(runtimeSessionActivity.observedAt
+            ? { observedAt: runtimeSessionActivity.observedAt }
+            : {}),
+          ...(runtimeSessionActivity.retainedAt
+            ? { retainedAt: runtimeSessionActivity.retainedAt }
+            : {}),
           toolUseCount: runtimeSessionActivity.activity.toolUseCount,
           toolResultCount: runtimeSessionActivity.activity.toolResultCount,
           serviceUpdateCount: runtimeSessionActivity.activity.serviceUpdateCount,
@@ -1083,6 +1106,12 @@ async function diagnoseAgentTarget(
         ? { providerSessionId: fallbackLatestActivity.providerSessionId }
         : {}),
       ...(fallbackLatestActivity.status ? { status: fallbackLatestActivity.status } : {}),
+      ...(fallbackLatestActivity.observedAt
+        ? { observedAt: fallbackLatestActivity.observedAt }
+        : {}),
+      ...(fallbackLatestActivity.retainedAt
+        ? { retainedAt: fallbackLatestActivity.retainedAt }
+        : {}),
       activity: {
         toolUseCount: fallbackLatestActivity.activity.toolUseCount,
         toolResultCount: fallbackLatestActivity.activity.toolResultCount,
@@ -1097,8 +1126,15 @@ async function diagnoseAgentTarget(
         'ok',
         `Latest retained runtime session '${fallbackLatestActivity.sessionId}' recorded recent remote bridge activity for ${target.providerName}/${target.instanceId}`,
         {
+          source: fallbackLatestActivity.source,
           sessionId: fallbackLatestActivity.sessionId,
           ...(fallbackLatestActivity.sessionKey ? { sessionKey: fallbackLatestActivity.sessionKey } : {}),
+          ...(fallbackLatestActivity.observedAt
+            ? { observedAt: fallbackLatestActivity.observedAt }
+            : {}),
+          ...(fallbackLatestActivity.retainedAt
+            ? { retainedAt: fallbackLatestActivity.retainedAt }
+            : {}),
           toolUseCount: fallbackLatestActivity.activity.toolUseCount,
           toolResultCount: fallbackLatestActivity.activity.toolResultCount,
           serviceUpdateCount: fallbackLatestActivity.activity.serviceUpdateCount,
