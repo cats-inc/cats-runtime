@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-03-30-openclaw-paperclip-openmanus-gap-audit](./2026-03-30-openclaw-paperclip-openmanus-gap-audit.md) | OpenClaw / Paperclip / OpenManus gap audit | Which remaining `cats-runtime` gaps are still materially visible when compared against the local submodule reference points, and which one should be cut next |
 | [2026-03-29-project-bootstrap-collaboration-extraction-inventory](./2026-03-29-project-bootstrap-collaboration-extraction-inventory.md) | Project-bootstrap collaboration extraction inventory | Which template families and initialize/update semantics still need a repo-owned rewrite before `cats-runtime` and `cats` split into separate repos |
 | [2026-03-29-a2a-pilot-second-wave-validation](./2026-03-29-a2a-pilot-second-wave-validation.md) | A2A pilot second-wave validation | What `project-bootstrap` actually generated/updated in a throwaway repo, which A2A v1 template behaviors were real, and which collaboration semantics still required pilot-owned adaptation |
 | [2026-03-30-repo-owned-collaboration-split-safety-validation](./2026-03-30-repo-owned-collaboration-split-safety-validation.md) | Repo-owned collaboration split-safety validation | Evidence that the extracted workspace substrate and cross-platform skill-sync baseline now work without direct `project-bootstrap` shell-outs |
