@@ -710,6 +710,118 @@ describe('ProviderModelCatalogService', () => {
     expect(opencodeModelDiscoveryRunner.run).not.toHaveBeenCalled();
   });
 
+  it('builds an immediate advanced catalog without probing verified remote providers', () => {
+    const config = {
+      ...createCatalogConfig(),
+      providerDefaultTargets: {
+        ...createCatalogConfig().providerDefaultTargets,
+        codex: { backend: 'api', instance: 'main' },
+      },
+      remoteProviderCatalog: {
+        api: {
+          codex: {
+            main: {
+              id: 'main',
+              providerName: 'codex',
+              backend: 'api',
+              transport: 'openai',
+              apiKeyEnv: 'OPENAI_API_KEY',
+              baseUrl: 'https://example.test',
+              model: 'gpt-5.4',
+            },
+          },
+        },
+        local: createCatalogConfig().remoteProviderCatalog.local,
+        agent: {},
+      },
+    } as const;
+    const fetchMock = vi.fn<typeof fetch>(async () => {
+      throw new Error('dynamic discovery should not run');
+    });
+
+    const service = new ProviderModelCatalogService(config as never, {
+      fetch: fetchMock,
+      env: {
+        OPENAI_API_KEY: 'test-key',
+      },
+    });
+
+    expect(service.getImmediateAdvancedCatalog('codex')).toEqual({
+      provider: 'codex',
+      backend: 'api',
+      instance: 'main',
+      defaultModel: 'gpt-5.4',
+      source: 'config',
+      cache: null,
+      entries: [
+        {
+          id: 'gpt-5.4',
+          label: 'gpt-5.4',
+          default: true,
+          status: 'configured',
+          capabilityTags: ['tool_use', 'reasoning'],
+        },
+      ],
+      presets: [
+        {
+          id: 'balanced',
+          label: 'Balanced',
+          availability: 'supported',
+          applicableEntryIds: ['gpt-5.4'],
+          preferredEntryId: 'gpt-5.4',
+          controlDefaults: {
+            'openai.reasoning_effort': 'medium',
+          },
+        },
+        {
+          id: 'fast',
+          label: 'Fast',
+          availability: 'supported',
+          applicableEntryIds: ['gpt-5.4'],
+          preferredEntryId: 'gpt-5.4',
+          controlDefaults: {
+            'openai.reasoning_effort': 'low',
+          },
+        },
+        {
+          id: 'deep_reasoning',
+          label: 'Deep reasoning',
+          availability: 'supported',
+          applicableEntryIds: ['gpt-5.4'],
+          preferredEntryId: 'gpt-5.4',
+          controlDefaults: {
+            'openai.reasoning_effort': 'high',
+          },
+        },
+      ],
+      controls: [
+        {
+          key: 'openai.reasoning_effort',
+          label: 'Reasoning effort',
+          description: 'Controls OpenAI reasoning effort for supported GPT-5 entries.',
+          kind: 'enum',
+          scope: 'both',
+          values: ['low', 'medium', 'high'],
+          applicableEntryIds: ['gpt-5.4'],
+          semanticTags: ['reasoning_intensity'],
+        },
+      ],
+      defaultSelection: {
+        entryId: 'gpt-5.4',
+        entryMode: 'auto',
+        presetId: 'balanced',
+        controls: {
+          'openai.reasoning_effort': 'medium',
+        },
+      },
+      support: {
+        tier: 'full',
+      },
+      warnings: [],
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('loads a dynamic OpenAI catalog when auth is configured and caches the result', async () => {
     const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
       const url = typeof input === 'string' ? input : input.url;

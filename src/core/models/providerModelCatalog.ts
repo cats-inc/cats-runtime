@@ -450,11 +450,26 @@ export class ProviderModelCatalogService {
     return this.getAdvancedKnowledgeForTarget(target, options);
   }
 
+  getImmediateAdvancedKnowledge(
+    providerName: string,
+    requestedInstance?: string,
+  ): ProviderAdvancedKnowledgeContext {
+    const target = resolveProviderTarget(this.config, providerName, requestedInstance);
+    return this.getImmediateAdvancedKnowledgeForTarget(target);
+  }
+
   async getAdvancedKnowledgeForTarget(
     target: ProviderTargetDescriptor,
     options: ProviderModelCatalogRequestOptions = {},
   ): Promise<ProviderAdvancedKnowledgeContext> {
     const catalog = await this.getCatalogForTarget(target, options);
+    return buildProviderAdvancedKnowledge(target, catalog);
+  }
+
+  getImmediateAdvancedKnowledgeForTarget(
+    target: ProviderTargetDescriptor,
+  ): ProviderAdvancedKnowledgeContext {
+    const catalog = this.getImmediateCatalogForTarget(target);
     return buildProviderAdvancedKnowledge(target, catalog);
   }
 
@@ -464,6 +479,14 @@ export class ProviderModelCatalogService {
     options: ProviderModelCatalogRequestOptions = {},
   ) {
     const knowledge = await this.getAdvancedKnowledge(providerName, requestedInstance, options);
+    return knowledge.catalog;
+  }
+
+  getImmediateAdvancedCatalog(
+    providerName: string,
+    requestedInstance?: string,
+  ) {
+    const knowledge = this.getImmediateAdvancedKnowledge(providerName, requestedInstance);
     return knowledge.catalog;
   }
 

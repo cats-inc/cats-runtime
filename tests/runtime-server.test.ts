@@ -3843,6 +3843,213 @@ providers:
     });
   });
 
+  it('GET /providers/:provider/models/advanced only probes verified providers on explicit refresh', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      data: [
+        { id: 'gpt-5.4' },
+        { id: 'gpt-5.4-mini' },
+      ],
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
+
+    await withRuntime({
+      providerDefaultTargets: {
+        codex: { backend: 'api', instance: 'main' },
+      },
+      remoteProviderCatalog: {
+        api: {
+          codex: {
+            main: {
+              id: 'main',
+              providerName: 'codex',
+              backend: 'api',
+              transport: 'openai',
+              apiKeyEnv: 'OPENAI_API_KEY',
+              baseUrl: 'https://api.openai.test',
+              model: 'gpt-5.4',
+            },
+          },
+        },
+        local: {},
+        agent: {},
+      },
+    }, {
+      apiBackend: {
+        fetch: fetchMock,
+        env: {
+          OPENAI_API_KEY: 'route-openai-key',
+        },
+      },
+    }, async (runtime) => {
+      const immediate = await runtime.app.request('/providers/codex/models/advanced?instance=api/main');
+      expect(immediate.status).toBe(200);
+      expect(await immediate.json()).toEqual({
+        provider: 'codex',
+        backend: 'api',
+        instance: 'main',
+        defaultModel: 'gpt-5.4',
+        source: 'config',
+        cache: null,
+        entries: [
+          {
+            id: 'gpt-5.4',
+            label: 'gpt-5.4',
+            default: true,
+            status: 'configured',
+            capabilityTags: ['tool_use', 'reasoning'],
+          },
+        ],
+        presets: [
+          {
+            id: 'balanced',
+            label: 'Balanced',
+            availability: 'supported',
+            applicableEntryIds: ['gpt-5.4'],
+            preferredEntryId: 'gpt-5.4',
+            controlDefaults: {
+              'openai.reasoning_effort': 'medium',
+            },
+          },
+          {
+            id: 'fast',
+            label: 'Fast',
+            availability: 'supported',
+            applicableEntryIds: ['gpt-5.4'],
+            preferredEntryId: 'gpt-5.4',
+            controlDefaults: {
+              'openai.reasoning_effort': 'low',
+            },
+          },
+          {
+            id: 'deep_reasoning',
+            label: 'Deep reasoning',
+            availability: 'supported',
+            applicableEntryIds: ['gpt-5.4'],
+            preferredEntryId: 'gpt-5.4',
+            controlDefaults: {
+              'openai.reasoning_effort': 'high',
+            },
+          },
+        ],
+        controls: [
+          {
+            key: 'openai.reasoning_effort',
+            label: 'Reasoning effort',
+            description: 'Controls OpenAI reasoning effort for supported GPT-5 entries.',
+            kind: 'enum',
+            scope: 'both',
+            values: ['low', 'medium', 'high'],
+            applicableEntryIds: ['gpt-5.4'],
+            semanticTags: ['reasoning_intensity'],
+          },
+        ],
+        defaultSelection: {
+          entryId: 'gpt-5.4',
+          entryMode: 'auto',
+          presetId: 'balanced',
+          controls: {
+            'openai.reasoning_effort': 'medium',
+          },
+        },
+        support: {
+          tier: 'full',
+        },
+        warnings: [],
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      const refreshed = await runtime.app.request('/providers/codex/models/advanced?instance=api/main&refresh=1');
+      expect(refreshed.status).toBe(200);
+      expect(await refreshed.json()).toEqual({
+        provider: 'codex',
+        backend: 'api',
+        instance: 'main',
+        defaultModel: 'gpt-5.4',
+        source: 'dynamic',
+        cache: {
+          servedFromCache: false,
+          cachedAt: expect.any(String),
+          ttlSec: 60,
+        },
+        entries: [
+          {
+            id: 'gpt-5.4',
+            label: 'gpt-5.4',
+            default: true,
+            status: 'available',
+            capabilityTags: ['tool_use', 'reasoning'],
+          },
+          {
+            id: 'gpt-5.4-mini',
+            label: 'gpt-5.4-mini',
+            default: false,
+            status: 'available',
+            capabilityTags: ['tool_use', 'reasoning', 'latency_optimized'],
+          },
+        ],
+        presets: [
+          {
+            id: 'balanced',
+            label: 'Balanced',
+            availability: 'supported',
+            applicableEntryIds: ['gpt-5.4'],
+            preferredEntryId: 'gpt-5.4',
+            controlDefaults: {
+              'openai.reasoning_effort': 'medium',
+            },
+          },
+          {
+            id: 'fast',
+            label: 'Fast',
+            availability: 'supported',
+            applicableEntryIds: ['gpt-5.4'],
+            preferredEntryId: 'gpt-5.4',
+            controlDefaults: {
+              'openai.reasoning_effort': 'low',
+            },
+          },
+          {
+            id: 'deep_reasoning',
+            label: 'Deep reasoning',
+            availability: 'supported',
+            applicableEntryIds: ['gpt-5.4'],
+            preferredEntryId: 'gpt-5.4',
+            controlDefaults: {
+              'openai.reasoning_effort': 'high',
+            },
+          },
+        ],
+        controls: [
+          {
+            key: 'openai.reasoning_effort',
+            label: 'Reasoning effort',
+            description: 'Controls OpenAI reasoning effort for supported GPT-5 entries.',
+            kind: 'enum',
+            scope: 'both',
+            values: ['low', 'medium', 'high'],
+            applicableEntryIds: ['gpt-5.4', 'gpt-5.4-mini'],
+            semanticTags: ['reasoning_intensity'],
+          },
+        ],
+        defaultSelection: {
+          entryId: 'gpt-5.4',
+          entryMode: 'auto',
+          presetId: 'balanced',
+          controls: {
+            'openai.reasoning_effort': 'medium',
+          },
+        },
+        support: {
+          tier: 'full',
+        },
+        warnings: [],
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('POST /sessions accepts structured model selection additively and preserves legacy model snapshot', async () => {
     await withRuntime({
       providerDefaultTargets: {
@@ -4437,7 +4644,7 @@ providers:
     });
   });
 
-  it('GET /providers/:provider/models returns dynamic Ollama catalog with cache metadata', async () => {
+  it('GET /providers/:provider/models only probes Ollama on explicit refresh and then serves cached dynamic results', async () => {
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       if (url.endsWith('/api/tags')) {
@@ -4494,6 +4701,27 @@ providers:
         backend: 'local',
         instance: 'local',
         defaultModel: 'qwen2.5-coder:7b',
+        source: 'config',
+        cache: null,
+        models: [
+          {
+            id: 'qwen2.5-coder:7b',
+            label: 'qwen2.5-coder:7b',
+            default: true,
+            status: 'configured',
+          },
+        ],
+        warnings: [],
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      const refreshed = await runtime.app.request('/providers/ollama/models?refresh=1');
+      expect(refreshed.status).toBe(200);
+      expect(await refreshed.json()).toEqual({
+        provider: 'ollama',
+        backend: 'local',
+        instance: 'local',
+        defaultModel: 'qwen2.5-coder:7b',
         source: 'dynamic',
         cache: {
           servedFromCache: false,
@@ -4528,7 +4756,7 @@ providers:
     });
   });
 
-  it('GET /providers/:provider/models loads a dynamic OpenAI catalog when auth is configured', async () => {
+  it('GET /providers/:provider/models loads a dynamic OpenAI catalog only when refresh is requested', async () => {
     const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       expect(url).toBe('https://api.openai.test/v1/models');
@@ -4581,7 +4809,23 @@ providers:
         },
       },
     }, async (runtime) => {
-      const response = await runtime.app.request('/providers/codex/models?instance=api/main');
+      const immediate = await runtime.app.request('/providers/codex/models?instance=api/main');
+      expect(immediate.status).toBe(200);
+      expect(await immediate.json()).toEqual({
+        provider: 'codex',
+        backend: 'api',
+        instance: 'main',
+        defaultModel: 'gpt-5.4',
+        source: 'config',
+        cache: null,
+        models: [
+          { id: 'gpt-5.4', label: 'gpt-5.4', default: true, status: 'configured' },
+        ],
+        warnings: [],
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      const response = await runtime.app.request('/providers/codex/models?instance=api/main&refresh=1');
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({
         provider: 'codex',
@@ -4600,6 +4844,7 @@ providers:
         ],
         warnings: [],
       });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -4660,7 +4905,7 @@ providers:
     });
   });
 
-  it('GET /providers/:provider/models uses agent adapter model discovery when available', async () => {
+  it('GET /providers/:provider/models uses agent adapter model discovery only on refresh', async () => {
     const bridgeFetch = vi.fn(async () => new Response(JSON.stringify({
       providers: [
         { name: 'openai', models: ['gpt-5.4', 'gpt-5.3-codex'] },
@@ -4691,7 +4936,23 @@ providers:
         },
       },
     }, { agentBackend: { fetch: bridgeFetch } }, async (runtime) => {
-      const response = await runtime.app.request('/providers/codex/models?instance=agent/bridge');
+      const immediate = await runtime.app.request('/providers/codex/models?instance=agent/bridge');
+      expect(immediate.status).toBe(200);
+      expect(await immediate.json()).toEqual({
+        provider: 'codex',
+        backend: 'agent',
+        instance: 'bridge',
+        defaultModel: 'gpt-5.4',
+        source: 'config',
+        cache: null,
+        models: [
+          { id: 'gpt-5.4', label: 'gpt-5.4', default: true, status: 'configured' },
+        ],
+        warnings: [],
+      });
+      expect(bridgeFetch).not.toHaveBeenCalled();
+
+      const response = await runtime.app.request('/providers/codex/models?instance=agent/bridge&refresh=1');
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({
         provider: 'codex',
@@ -4710,10 +4971,11 @@ providers:
         ],
         warnings: [],
       });
+      expect(bridgeFetch).toHaveBeenCalledTimes(1);
     });
   });
 
-  it('GET /providers/:provider/models loads a dynamic Pi catalog through the CLI runtime helper', async () => {
+  it('GET /providers/:provider/models loads a dynamic Pi catalog through the CLI runtime helper only on refresh', async () => {
     const spawnMock = vi.spyOn(providerInstallRunner, 'runSpawnedCommand').mockResolvedValueOnce({
       exitCode: 0,
       stdout: [
@@ -4729,7 +4991,27 @@ providers:
 
     try {
       await withRuntime({}, {}, async (runtime) => {
-        const response = await runtime.app.request('/providers/pi/models');
+        const immediate = await runtime.app.request('/providers/pi/models');
+        expect(immediate.status).toBe(200);
+        expect(await immediate.json()).toEqual({
+          provider: 'pi',
+          backend: 'cli',
+          instance: 'default',
+          defaultModel: 'openai-codex/gpt-5.4',
+          source: 'static',
+          cache: null,
+          models: [
+            {
+              id: 'openai-codex/gpt-5.4',
+              label: 'openai-codex/gpt-5.4',
+              default: true,
+            },
+          ],
+          warnings: [],
+        });
+        expect(spawnMock).not.toHaveBeenCalled();
+
+        const response = await runtime.app.request('/providers/pi/models?refresh=1');
         expect(response.status).toBe(200);
         const payload = await response.json();
         expect(payload).toEqual(expect.objectContaining({
@@ -4766,7 +5048,7 @@ providers:
     }
   });
 
-  it('GET /providers/:provider/models loads a dynamic OpenCode catalog through the CLI runtime helper', async () => {
+  it('GET /providers/:provider/models loads a dynamic OpenCode catalog through the CLI runtime helper only on refresh', async () => {
     const spawnMock = vi.spyOn(providerInstallRunner, 'runSpawnedCommand')
       .mockResolvedValueOnce({
         exitCode: 0,
@@ -4799,6 +5081,35 @@ providers:
           backend: 'cli',
           instance: 'default',
           defaultModel: 'opencode-go/glm-5',
+          source: 'static',
+          cache: null,
+          models: [
+            {
+              id: 'opencode-go/glm-5',
+              label: 'glm-5',
+              default: true,
+            },
+            {
+              id: 'opencode-go/kimi-k2.5',
+              label: 'kimi k2.5',
+              default: false,
+            },
+            {
+              id: 'opencode-go/minimax-m2.5',
+              label: 'minimax m2.5',
+              default: false,
+            },
+          ],
+          warnings: [],
+        });
+
+        const refreshed = await runtime.app.request('/providers/opencode/models?refresh=1');
+        expect(refreshed.status).toBe(200);
+        expect(await refreshed.json()).toEqual({
+          provider: 'opencode',
+          backend: 'cli',
+          instance: 'default',
+          defaultModel: 'opencode-go/glm-5',
           source: 'dynamic',
           cache: {
             servedFromCache: false,
@@ -4822,9 +5133,9 @@ providers:
           warnings: [],
         });
 
-        const refreshed = await runtime.app.request('/providers/opencode/models?refresh=1');
-        expect(refreshed.status).toBe(200);
-        expect(await refreshed.json()).toEqual({
+        const refreshedAgain = await runtime.app.request('/providers/opencode/models?refresh=1');
+        expect(refreshedAgain.status).toBe(200);
+        expect(await refreshedAgain.json()).toEqual({
           provider: 'opencode',
           backend: 'cli',
           instance: 'default',
@@ -4862,7 +5173,7 @@ providers:
       expect(spawnMock).toHaveBeenNthCalledWith(
         1,
         expect.any(String),
-        expect.arrayContaining(['models']),
+        expect.arrayContaining(['models', '--refresh']),
         expect.objectContaining({
           timeoutMs: 20_000,
         }),
@@ -4880,7 +5191,7 @@ providers:
     }
   });
 
-  it('GET /providers/:provider/models falls back to static catalog when dynamic discovery fails', async () => {
+  it('GET /providers/:provider/models falls back to config/static when an explicit refresh fails', async () => {
     const fetchMock = vi.fn(async () => {
       throw new Error('connection refused');
     });
@@ -4906,7 +5217,7 @@ providers:
         agent: {},
       },
     }, { apiBackend: { fetch: fetchMock } }, async (runtime) => {
-      const response = await runtime.app.request('/providers/ollama/models');
+      const response = await runtime.app.request('/providers/ollama/models?refresh=1');
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({
         provider: 'ollama',
@@ -4932,7 +5243,7 @@ providers:
     });
   });
 
-  it('GET /providers/:provider/models reuses stale dynamic cache when refresh fails after TTL', async () => {
+  it('GET /providers/:provider/models reuses stale dynamic cache when an explicit refresh fails after TTL', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-27T00:00:00.000Z'));
 
@@ -4991,7 +5302,7 @@ providers:
           agent: {},
         },
       }, { apiBackend: { fetch: fetchMock } }, async (runtime) => {
-        const first = await runtime.app.request('/providers/ollama/models');
+        const first = await runtime.app.request('/providers/ollama/models?refresh=1');
         expect(first.status).toBe(200);
         expect(await first.json()).toEqual({
           provider: 'ollama',
@@ -5024,7 +5335,7 @@ providers:
         refreshFailed = true;
         vi.setSystemTime(new Date('2026-03-27T00:01:01.000Z'));
 
-        const second = await runtime.app.request('/providers/ollama/models');
+        const second = await runtime.app.request('/providers/ollama/models?refresh=1');
         expect(second.status).toBe(200);
         expect(await second.json()).toEqual({
           provider: 'ollama',
@@ -5110,7 +5421,7 @@ providers:
         agent: {},
       },
     }, { apiBackend: { fetch: fetchMock } }, async (runtime) => {
-      const first = await runtime.app.request('/providers/ollama/models');
+      const first = await runtime.app.request('/providers/ollama/models?refresh=1');
       expect(first.status).toBe(200);
       await expect(first.json()).resolves.toEqual(expect.objectContaining({
         source: 'dynamic',

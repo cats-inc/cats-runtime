@@ -226,11 +226,13 @@ providerRoutes.get('/providers/models', async (c) => {
   const ctx = c.get('ctx' as never) as AppContext;
 
   try {
-    parseModelCatalogRefreshQuery(c.req.query('refresh'));
+    const forceRefresh = parseModelCatalogRefreshQuery(c.req.query('refresh'));
     const providers = await Promise.all(
       listConfiguredProviders(ctx.config).map(async (providerName) => [
         providerName,
-        ctx.providerModelCatalog.getImmediateCatalog(providerName),
+        forceRefresh
+          ? await ctx.providerModelCatalog.getCatalog(providerName, undefined, { forceRefresh })
+          : ctx.providerModelCatalog.getImmediateCatalog(providerName),
       ] as const),
     );
 
@@ -258,9 +260,9 @@ providerRoutes.get('/providers/:provider/models', async (c) => {
 
   try {
     const forceRefresh = parseModelCatalogRefreshQuery(c.req.query('refresh'));
-    const catalog = await ctx.providerModelCatalog.getCatalog(providerName, instance, {
-      forceRefresh,
-    });
+    const catalog = forceRefresh
+      ? await ctx.providerModelCatalog.getCatalog(providerName, instance, { forceRefresh })
+      : ctx.providerModelCatalog.getImmediateCatalog(providerName, instance);
     return c.json(catalog);
   } catch (err) {
     const payload: Record<string, unknown> = {
@@ -368,9 +370,9 @@ providerRoutes.get('/providers/:provider/models/advanced', async (c) => {
 
   try {
     const forceRefresh = parseModelCatalogRefreshQuery(c.req.query('refresh'));
-    const catalog = await ctx.providerModelCatalog.getAdvancedCatalog(providerName, instance, {
-      forceRefresh,
-    });
+    const catalog = forceRefresh
+      ? await ctx.providerModelCatalog.getAdvancedCatalog(providerName, instance, { forceRefresh })
+      : ctx.providerModelCatalog.getImmediateAdvancedCatalog(providerName, instance);
     return c.json(catalog);
   } catch (err) {
     const payload: Record<string, unknown> = {
