@@ -383,8 +383,8 @@ Cats SPA.
 - [ADR-014](../decisions/014-keep-lightweight-provider-setup-and-diagnostics-in-cats-runtime.md)
 - [ADR-020](../decisions/020-keep-setup-diagnostic-reports-config-derived-and-separate-from-compatibility-evidence.md)
 - [SPEC-015](./SPEC-015-runtime-setup-diagnostic-report.md)
-- [cats ADR-021](../../../cats/docs/decisions/021-keep-packaged-setup-and-provider-installation-in-the-host.md)
-- [cats SPEC-023](../../../cats/docs/specs/SPEC-023-packaged-setup-wizard-and-provider-installation.md)
+- [cats ADR-021](../../../cats-platform/docs/decisions/021-keep-packaged-setup-and-provider-installation-in-the-host.md)
+- [cats SPEC-023](../../../cats-platform/docs/specs/SPEC-023-packaged-setup-wizard-and-provider-installation.md)
 
 ## Open Questions
 

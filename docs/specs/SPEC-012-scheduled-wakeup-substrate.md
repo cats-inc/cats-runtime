@@ -194,9 +194,9 @@ creation.
 
 ## Dependencies
 
-- `cats/docs/specs/SPEC-016-chat-session-sleep-wake-lifecycle.md`
-- `cats/docs/specs/SPEC-026-explicit-mentions-and-dynamic-room-workflow-orchestration.md`
-- `cats/docs/decisions/024-separate-explicit-mentions-from-dynamic-room-workflow.md`
+- `cats-platform/docs/specs/SPEC-016-chat-session-sleep-wake-lifecycle.md`
+- `cats-platform/docs/specs/SPEC-026-explicit-mentions-and-dynamic-room-workflow-orchestration.md`
+- `cats-platform/docs/decisions/024-separate-explicit-mentions-from-dynamic-room-workflow.md`
 - `cats-runtime/docs/research/2026-03-19-paperclip-gap-assessment.md`
 
 ## Deferred Follow-Ups

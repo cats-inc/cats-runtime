@@ -43,10 +43,10 @@ Last updated: 2026-03-29
   - `cats-runtime/src/http/routes/observe.ts`
   - `cats-runtime/src/http/streaming.ts`
 - `cats` host consumption:
-  - `cats/src/products/chat/api/resources/channelRoutes.ts`
-  - `cats/src/products/chat/renderer/hooks/useLiveIndicator.ts`
-  - `cats/src/products/chat/renderer/components/ChatView.tsx`
-  - `cats/src/runtime/client.ts`
+  - `cats-platform/src/products/chat/api/resources/channelRoutes.ts`
+  - `cats-platform/src/products/chat/renderer/hooks/useLiveIndicator.ts`
+  - `cats-platform/src/products/chat/renderer/components/ChatView.tsx`
+  - `cats-platform/src/runtime/client.ts`
 
 ## Verification
 

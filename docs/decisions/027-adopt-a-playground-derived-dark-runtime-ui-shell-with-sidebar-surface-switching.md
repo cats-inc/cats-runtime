@@ -158,7 +158,7 @@ layout primitives, route affordances, and bootstrap behavior.
 - [SPEC-017](../specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md)
 - [PLAN-019](../plans/PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md)
 - [ADR-014](./014-keep-lightweight-provider-setup-and-diagnostics-in-cats-runtime.md)
-- [cats SuiteSurfaceSwitcher](../../../cats/src/design/components/SuiteSurfaceSwitcher.tsx)
+- [cats SuiteSurfaceSwitcher](../../../cats-platform/src/design/components/SuiteSurfaceSwitcher.tsx)
 
 ---
 

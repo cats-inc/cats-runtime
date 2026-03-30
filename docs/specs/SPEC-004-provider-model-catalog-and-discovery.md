@@ -252,7 +252,7 @@ work, not a prerequisite for first product integration.
 - [ADR 003: Move provider execution topology into file-based provider instances](../decisions/003-provider-instance-config.md)
 - [ADR 006: Introduce an agent backend and shared runtime contracts](../decisions/006-agent-backend-and-shared-runtime-contracts.md)
 - [API](../api.md)
-- [cats ADR-008: Expose cats-runtime via Direct API and MCP Facade](../../../cats/docs/decisions/008-expose-cats-runtime-via-direct-api-and-mcp-facade.md)
+- [cats ADR-008: Expose cats-runtime via Direct API and MCP Facade](../../../cats-platform/docs/decisions/008-expose-cats-runtime-via-direct-api-and-mcp-facade.md)
 
 ---
 

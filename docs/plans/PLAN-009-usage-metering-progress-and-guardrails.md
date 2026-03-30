@@ -16,7 +16,7 @@
 ## Related Specs
 
 - [SPEC-010: Usage Metering, Rate-Limit Detection, and Execution Guardrails](../specs/SPEC-010-usage-metering-rate-limit-detection-and-execution-guardrails.md)
-- [SPEC-025: Budget Policy, Override Flows, and War-Room Dashboard](../../../cats/docs/specs/SPEC-025-budget-policy-override-flows-and-war-room-dashboard.md)
+- [SPEC-025: Budget Policy, Override Flows, and War-Room Dashboard](../../../cats-platform/docs/specs/SPEC-025-budget-policy-override-flows-and-war-room-dashboard.md)
 
 ## Overview
 

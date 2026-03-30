@@ -134,9 +134,9 @@ runtime
 
 - [ADR-011](./011-runtime-owned-browser-and-preview-subsystem-with-pluggable-drivers.md)
 - [ADR-015](./015-own-workspace-substrate-tools-in-cats-runtime.md)
-- [cats ADR-019](../../../cats/docs/decisions/019-normalize-runtime-previews-as-surfaces-not-provider-iframes.md)
-- [cats ADR-020](../../../cats/docs/decisions/020-own-mcp-intent-in-product-and-tool-delivery-in-runtime.md)
-- [cats ADR-022](../../../cats/docs/decisions/022-own-workspace-delivery-policy-in-product.md)
+- [cats ADR-019](../../../cats-platform/docs/decisions/019-normalize-runtime-previews-as-surfaces-not-provider-iframes.md)
+- [cats ADR-020](../../../cats-platform/docs/decisions/020-own-mcp-intent-in-product-and-tool-delivery-in-runtime.md)
+- [cats ADR-022](../../../cats-platform/docs/decisions/022-own-workspace-delivery-policy-in-product.md)
 
 ---
 

@@ -179,7 +179,7 @@ remember raw filesystem paths in order to clean up correctly.
 
 ## References
 
-- [cats OpenClaw gap analysis](../../../cats/docs/research/2026-03-20-openclaw-chat-runtime-gap-analysis.md)
+- [cats OpenClaw gap analysis](../../../cats-platform/docs/research/2026-03-20-openclaw-chat-runtime-gap-analysis.md)
 - [SPEC-008: Workspace Substrate Init, Audit, and Update](./SPEC-008-workspace-substrate-init-audit-and-update.md)
 - [ADR-015: Own Workspace Substrate Tools in cats-runtime](../decisions/015-own-workspace-substrate-tools-in-cats-runtime.md)
 

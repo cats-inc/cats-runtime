@@ -2,7 +2,7 @@
 
 ## Goal
 
-Confirm that `cats` can consume the repo-owned collaboration baseline extracted
+Confirm that `cats-platform` can consume the repo-owned collaboration baseline extracted
 under `PLAN-023` without relying on `project-bootstrap` as a product-time
 dependency, while also recording the intentional divergences between the
 runtime-side and product-side pilot artifacts.
@@ -10,7 +10,7 @@ runtime-side and product-side pilot artifacts.
 ## Validation Performed
 
 Checked the following mirrored file families across `cats-runtime/` and
-`cats/`:
+`cats-platform/`:
 
 - `docs/a2a/*`
 - `scripts/windows/Sync-AgentSkills.ps1`
@@ -50,7 +50,7 @@ Both repos also ship the same cross-platform skill-sync entrypoints:
 
 ### Exact-match assets
 
-The skill-sync scripts are byte-identical between `cats-runtime` and `cats`.
+The skill-sync scripts are byte-identical between `cats-runtime` and `cats-platform`.
 This is the collaboration helper surface that most directly replaced the
 bootstrap-only `Sync-AgentSkills` dependency.
 
@@ -61,17 +61,17 @@ intentional.
 
 - `docs/a2a/README.md`
   - `cats-runtime` frames the pilot around a future runtime-boundary adapter.
-  - `cats` frames the same pilot around a future suite-host or orchestrator
+  - `cats-platform` frames the same pilot around a future suite-host or orchestrator
     boundary.
 - `docs/a2a/agent-card.public.json.example`
   - `cats-runtime` names runtime diagnostics/session orchestration skills.
-  - `cats` names suite/product/operator-oriented skills.
+  - `cats-platform` names suite/product/operator-oriented skills.
 - `docs/a2a/jsonrpc-send-message.request.json.example`
   - `cats-runtime` uses runtime-health/provider-diagnostics style prompts.
-  - `cats` uses operator-inbox/suite-recovery style prompts.
+  - `cats-platform` uses operator-inbox/suite-recovery style prompts.
 - `docs/a2a/jsonrpc-cancel-task.request.json.example`
   - `cats-runtime` still includes a pilot metadata reason.
-  - `cats` keeps the request simpler and only sends `id`.
+  - `cats-platform` keeps the request simpler and only sends `id`.
 
 These are repo-identity and product-surface differences, not evidence that the
 mirrored baseline still depends on `project-bootstrap`.

@@ -9,7 +9,7 @@ Last updated: 2026-03-26
 - Internal analysis: OpenManus ReActAgent / ToolCallAgent / PlanningFlow
   (`OpenManus/app/agent/`, `OpenManus/app/flow/`)
 - Internal gap analysis:
-  `cats/docs/research/2026-03-26-openmanus-killer-feature-gap-analysis.md`
+  `cats-platform/docs/research/2026-03-26-openmanus-killer-feature-gap-analysis.md`
 - Academic references: ReAct (Yao et al. 2022), Tree of Thoughts
   (Yao et al. 2023), Reflexion (Shinn et al. 2023), DEPS (Wang et al. 2023)
 - Internal discussion on PDCA applicability for agent execution loops

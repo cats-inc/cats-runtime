@@ -135,7 +135,7 @@ This decision includes:
 - [SPEC-018: Advanced Provider Model Catalog and Selection Schema](../specs/SPEC-018-advanced-provider-model-catalog-and-selection-schema.md)
 - [SPEC-004: Provider Model Catalog and Discovery](../specs/SPEC-004-provider-model-catalog-and-discovery.md)
 - [ADR 008: Keep Provider Model Catalog Discovery Runtime-Owned](./008-runtime-owned-provider-model-catalog.md)
-- [cats SPEC-013: Provider Catalog Consumption and UI Seam](../../../cats/docs/specs/SPEC-013-provider-catalog-consumption-and-ui-seam.md)
+- [cats SPEC-013: Provider Catalog Consumption and UI Seam](../../../cats-platform/docs/specs/SPEC-013-provider-catalog-consumption-and-ui-seam.md)
 
 ---
 

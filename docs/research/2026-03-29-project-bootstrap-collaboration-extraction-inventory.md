@@ -75,7 +75,7 @@ Those update semantics matter more than the exact script implementations.
 ## What Is Already Internalized
 
 - `cats-runtime/docs/a2a/*` now carries a repo-owned A2A v1.0 example set
-- `cats/docs/a2a/*` mirrors that pilot-owned example set
+- `cats-platform/docs/a2a/*` mirrors that pilot-owned example set
 - `cats-runtime/skills/orchestration/a2a-handoff/SKILL.md` and
   `cats-runtime/skills/orchestration/project-memory-sync/SKILL.md` now encode
   runtime-owned collaboration behavior

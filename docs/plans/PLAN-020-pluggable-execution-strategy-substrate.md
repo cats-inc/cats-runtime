@@ -24,7 +24,7 @@
 - Supporting baseline:
   [ADR 017](../decisions/017-own-usage-metering-rate-limit-detection-and-execution-guardrails.md)
 - Companion product work:
-  [cats PLAN-021](../../../cats/docs/plans/PLAN-021-cross-product-task-strategy-handoff-and-runtime-bridge.md)
+  [cats PLAN-021](../../../cats-platform/docs/plans/PLAN-021-cross-product-task-strategy-handoff-and-runtime-bridge.md)
 
 ## Runtime-First Framing
 

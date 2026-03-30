@@ -19,7 +19,7 @@
 - [SPEC-010: Usage Metering, Rate-Limit Detection, and Execution Guardrails](../specs/SPEC-010-usage-metering-rate-limit-detection-and-execution-guardrails.md)
 - [SPEC-011: Session Fork and Context Transplant Primitives](../specs/SPEC-011-session-fork-and-context-transplant-primitives.md)
 - [2026-03-19 Paperclip Gap Assessment](../research/2026-03-19-paperclip-gap-assessment.md)
-- [Cats Paperclip Killer Feature Gap Analysis](../../../cats/docs/research/2026-03-20-paperclip-killer-feature-gap-analysis.md)
+- [Cats Paperclip Killer Feature Gap Analysis](../../../cats-platform/docs/research/2026-03-20-paperclip-killer-feature-gap-analysis.md)
 
 ## Overview
 

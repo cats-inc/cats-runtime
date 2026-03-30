@@ -174,8 +174,8 @@ policy-heavy approval UX into `cats-runtime`.
 - [ADR-009](./009-keep-cats-runtime-separately-packageable-with-app-managed-local-startup.md)
 - [ADR-013](./013-extend-provider-manifests-with-install-and-check-metadata.md)
 - [SPEC-007](../specs/SPEC-007-provider-compatibility-and-evidence-engine.md)
-- [cats ADR-021](../../../cats/docs/decisions/021-keep-packaged-setup-and-provider-installation-in-the-host.md)
-- [cats SPEC-023](../../../cats/docs/specs/SPEC-023-packaged-setup-wizard-and-provider-installation.md)
+- [cats ADR-021](../../../cats-platform/docs/decisions/021-keep-packaged-setup-and-provider-installation-in-the-host.md)
+- [cats SPEC-023](../../../cats-platform/docs/specs/SPEC-023-packaged-setup-wizard-and-provider-installation.md)
 
 ---
 

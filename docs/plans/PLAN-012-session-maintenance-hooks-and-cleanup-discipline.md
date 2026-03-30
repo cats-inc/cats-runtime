@@ -18,8 +18,8 @@
 - [SPEC-010: Usage Metering, Rate-Limit Detection, and Execution Guardrails](../specs/SPEC-010-usage-metering-rate-limit-detection-and-execution-guardrails.md)
 - [SPEC-011: Session Fork and Context-Transplant Primitives](../specs/SPEC-011-session-fork-and-context-transplant-primitives.md)
 - [ADR-012: Separate Evidence, Durable Memory, and Retrieval Layers](../decisions/012-separate-evidence-memory-and-retrieval-layers.md)
-- [cats research: OpenClaw chat runtime gap analysis](../../../cats/docs/research/2026-03-20-openclaw-chat-runtime-gap-analysis.md)
-- [cats research: OpenClaw memory layering benchmark](../../../cats/docs/research/2026-03-19-openclaw-memory-layering-benchmark.md)
+- [cats research: OpenClaw chat runtime gap analysis](../../../cats-platform/docs/research/2026-03-20-openclaw-chat-runtime-gap-analysis.md)
+- [cats research: OpenClaw memory layering benchmark](../../../cats-platform/docs/research/2026-03-19-openclaw-memory-layering-benchmark.md)
 
 ## Overview
 

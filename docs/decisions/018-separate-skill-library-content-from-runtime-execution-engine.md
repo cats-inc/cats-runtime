@@ -110,7 +110,7 @@ This decision includes:
 
 - [SPEC-005](../specs/SPEC-005-runtime-managed-skills-v0.md)
 - [SPEC-013](../specs/SPEC-013-internal-skill-library-and-role-taxonomy.md)
-- [cats ADR-018](../../../cats/docs/decisions/018-separate-product-skill-intent-from-runtime-skill-hosting.md)
+- [cats ADR-018](../../../cats-platform/docs/decisions/018-separate-product-skill-intent-from-runtime-skill-hosting.md)
 
 ---
 

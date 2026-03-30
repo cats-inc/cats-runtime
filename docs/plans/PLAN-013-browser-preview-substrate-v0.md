@@ -16,8 +16,8 @@
 ## Related Specs / Research
 
 - [ADR-011: Add a Runtime-Owned Browser and Preview Subsystem with Pluggable Drivers](../decisions/011-runtime-owned-browser-and-preview-subsystem-with-pluggable-drivers.md)
-- [cats SPEC-020: Embedded Preview Surfaces for Runtime Artifacts and Services](../../../cats/docs/specs/SPEC-020-embedded-preview-surfaces-for-runtime-artifacts-and-services.md)
-- [cats ADR-019: Normalize Runtime Previews as Surfaces, Not Provider Iframes](../../../cats/docs/decisions/019-normalize-runtime-previews-as-surfaces-not-provider-iframes.md)
+- [cats SPEC-020: Embedded Preview Surfaces for Runtime Artifacts and Services](../../../cats-platform/docs/specs/SPEC-020-embedded-preview-surfaces-for-runtime-artifacts-and-services.md)
+- [cats ADR-019: Normalize Runtime Previews as Surfaces, Not Provider Iframes](../../../cats-platform/docs/decisions/019-normalize-runtime-previews-as-surfaces-not-provider-iframes.md)
 
 ## Overview
 

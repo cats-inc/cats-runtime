@@ -129,7 +129,7 @@ This decision includes:
 - [ADR 005: Introduce a backend-neutral runtime facade for CLI and API backends](./005-backend-neutral-runtime-and-api-backend.md)
 - [ADR 006: Introduce an agent backend and shared runtime contracts](./006-agent-backend-and-shared-runtime-contracts.md)
 - [SPEC-004: Provider Model Catalog and Discovery](../specs/SPEC-004-provider-model-catalog-and-discovery.md)
-- [cats ADR-008: Expose cats-runtime via Direct API and MCP Facade](../../../cats/docs/decisions/008-expose-cats-runtime-via-direct-api-and-mcp-facade.md)
+- [cats ADR-008: Expose cats-runtime via Direct API and MCP Facade](../../../cats-platform/docs/decisions/008-expose-cats-runtime-via-direct-api-and-mcp-facade.md)
 
 ---
 

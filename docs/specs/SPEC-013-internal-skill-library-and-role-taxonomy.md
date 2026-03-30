@@ -272,7 +272,7 @@ runtime-managed skill execution flow
 ## Dependencies
 
 - [SPEC-005](./SPEC-005-runtime-managed-skills-v0.md)
-- [cats SPEC-019](../../../cats/docs/specs/SPEC-019-product-skill-profiles-and-runtime-skill-manifests.md)
+- [cats SPEC-019](../../../cats-platform/docs/specs/SPEC-019-product-skill-profiles-and-runtime-skill-manifests.md)
 
 ## Open Questions
 
@@ -286,7 +286,7 @@ runtime-managed skill execution flow
 ## References
 
 - [SPEC-005: Runtime-Managed Skills v0](./SPEC-005-runtime-managed-skills-v0.md)
-- [cats SPEC-019: Product Skill Profiles and Runtime Skill Manifests](../../../cats/docs/specs/SPEC-019-product-skill-profiles-and-runtime-skill-manifests.md)
+- [cats SPEC-019: Product Skill Profiles and Runtime Skill Manifests](../../../cats-platform/docs/specs/SPEC-019-product-skill-profiles-and-runtime-skill-manifests.md)
 
 ---
 

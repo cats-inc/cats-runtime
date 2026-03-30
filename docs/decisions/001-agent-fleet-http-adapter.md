@@ -36,7 +36,7 @@ The immediate question was whether `cats-runtime` should:
 ### Positive
 
 - Cleaner backend boundary
-- Easier future extraction into `cats/cats-runtime`
+- Easier future extraction into sibling `cats-platform` and `cats-runtime`
 - Consumers can switch from `agent-fleet` to `cats-runtime` with a smaller diff
 
 ### Negative
@@ -48,4 +48,3 @@ The immediate question was whether `cats-runtime` should:
 
 - Migrate `crew-chat-poc` to `cats-runtime`
 - Add the future `api-runtime` backend under the same facade
-

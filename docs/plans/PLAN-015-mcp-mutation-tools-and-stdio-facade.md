@@ -13,9 +13,9 @@
 
 ## Related Spec
 
-- [cats ADR-008: Expose cats-runtime via Direct API and MCP Facade](../../../cats/docs/decisions/008-expose-cats-runtime-via-direct-api-and-mcp-facade.md)
-- [cats SPEC-015: Cat Capability Registry and Runtime Skill MCP Mapping](../../../cats/docs/specs/SPEC-015-cat-capability-registry-and-runtime-skill-mcp-mapping.md)
-- [cats SPEC-021: Contextual MCP Profiles and Lazy Tool Activation](../../../cats/docs/specs/SPEC-021-contextual-mcp-profiles-and-lazy-tool-activation.md)
+- [cats ADR-008: Expose cats-runtime via Direct API and MCP Facade](../../../cats-platform/docs/decisions/008-expose-cats-runtime-via-direct-api-and-mcp-facade.md)
+- [cats SPEC-015: Cat Capability Registry and Runtime Skill MCP Mapping](../../../cats-platform/docs/specs/SPEC-015-cat-capability-registry-and-runtime-skill-mcp-mapping.md)
+- [cats SPEC-021: Contextual MCP Profiles and Lazy Tool Activation](../../../cats-platform/docs/specs/SPEC-021-contextual-mcp-profiles-and-lazy-tool-activation.md)
 
 ## Overview
 
@@ -68,7 +68,7 @@ parallel runtime stack.
 | `cats-runtime/docs/architecture.md` | Modify | Note stdio transport and mutation plane |
 | `cats-runtime/README.md` | Modify | Update capability summary |
 | `cats-runtime/PROGRESS.md` | Modify | Mark the next MCP slice delivered |
-| `cats/docs/mcp-config.md` | Modify | Update external client guidance for runtime MCP |
+| `cats-platform/docs/mcp-config.md` | Modify | Update external client guidance for runtime MCP |
 
 ## Technical Decisions
 

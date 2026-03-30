@@ -116,8 +116,8 @@ This decision includes:
 - [ADR 005](./005-backend-neutral-runtime-and-api-backend.md)
 - [ADR 006](./006-agent-backend-and-shared-runtime-contracts.md)
 - [ADR 017](./017-own-usage-metering-rate-limit-detection-and-execution-guardrails.md)
-- [cats ADR-001](../../../cats/docs/decisions/001-use-cats-runtime-boundary.md)
-- [cats ADR-032](../../../cats/docs/decisions/032-own-task-substrate-in-core-not-runtime.md)
+- [cats ADR-001](../../../cats-platform/docs/decisions/001-use-cats-runtime-boundary.md)
+- [cats ADR-032](../../../cats-platform/docs/decisions/032-own-task-substrate-in-core-not-runtime.md)
 - [Research: Pluggable Execution Strategy Architecture](../research/2026-03-26-pluggable-execution-strategy-architecture.md)
 - [Research: Gemini Reasoning Strategy Substrate](../research/2026-03-26-gemini-reasoning-strategy-substrate.md)
 

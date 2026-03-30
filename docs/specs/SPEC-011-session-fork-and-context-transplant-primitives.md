@@ -201,8 +201,8 @@ Current first-slice contract intentionally remains minimal:
 
 - [SPEC-003](./SPEC-003-agent-backend.md)
 - [SPEC-005](./SPEC-005-runtime-managed-skills-v0.md)
-- [cats ADR-024](../../../cats/docs/decisions/024-separate-explicit-mentions-from-dynamic-room-workflow.md)
-- [cats SPEC-026](../../../cats/docs/specs/SPEC-026-explicit-mentions-and-dynamic-room-workflow-orchestration.md)
+- [cats ADR-024](../../../cats-platform/docs/decisions/024-separate-explicit-mentions-from-dynamic-room-workflow.md)
+- [cats SPEC-026](../../../cats-platform/docs/specs/SPEC-026-explicit-mentions-and-dynamic-room-workflow-orchestration.md)
 
 ## Open Questions
 

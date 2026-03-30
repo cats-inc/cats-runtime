@@ -175,7 +175,7 @@ runtime-owned.
 - [ADR 006](../decisions/006-agent-backend-and-shared-runtime-contracts.md)
 - [ADR 017](../decisions/017-own-usage-metering-rate-limit-detection-and-execution-guardrails.md)
 - companion product-side spec:
-  [cats SPEC-035](../../../cats/docs/specs/SPEC-035-cross-product-task-strategy-handoff-and-runtime-bridge.md)
+  [cats SPEC-035](../../../cats-platform/docs/specs/SPEC-035-cross-product-task-strategy-handoff-and-runtime-bridge.md)
 
 ## Open Questions
 
@@ -190,8 +190,8 @@ runtime-owned.
 
 - [Research: Pluggable Execution Strategy Architecture](../research/2026-03-26-pluggable-execution-strategy-architecture.md)
 - [Research: Gemini Reasoning Strategy Substrate](../research/2026-03-26-gemini-reasoning-strategy-substrate.md)
-- [cats ADR-032](../../../cats/docs/decisions/032-own-task-substrate-in-core-not-runtime.md)
-- [cats SPEC-032](../../../cats/docs/specs/SPEC-032-core-task-lifecycle-and-wakeup-integration.md)
+- [cats ADR-032](../../../cats-platform/docs/decisions/032-own-task-substrate-in-core-not-runtime.md)
+- [cats SPEC-032](../../../cats-platform/docs/specs/SPEC-032-core-task-lifecycle-and-wakeup-integration.md)
 
 ---
 

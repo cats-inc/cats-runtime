@@ -348,7 +348,7 @@ approval and merge step should remain reviewable by humans.
 - [ADR-013](../decisions/013-extend-provider-manifests-with-install-and-check-metadata.md)
 - [ADR-009](../decisions/009-keep-cats-runtime-separately-packageable-with-app-managed-local-startup.md)
 - [ADR-005](../decisions/005-backend-neutral-runtime-and-api-backend.md)
-- [cats SPEC-023](../../../cats/docs/specs/SPEC-023-packaged-setup-wizard-and-provider-installation.md)
+- [cats SPEC-023](../../../cats-platform/docs/specs/SPEC-023-packaged-setup-wizard-and-provider-installation.md)
 
 ## Open Questions
 

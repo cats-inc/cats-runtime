@@ -237,8 +237,8 @@ machine-readable runtime responses
 - [ADR-017](../decisions/017-own-usage-metering-rate-limit-detection-and-execution-guardrails.md)
 - [SPEC-007](./SPEC-007-provider-compatibility-and-evidence-engine.md)
 - [SPEC-003](./SPEC-003-agent-backend.md)
-- [cats ADR-023](../../../cats/docs/decisions/023-own-budget-policy-and-cost-control-in-product.md)
-- [cats SPEC-025](../../../cats/docs/specs/SPEC-025-budget-policy-override-flows-and-war-room-dashboard.md)
+- [cats ADR-023](../../../cats-platform/docs/decisions/023-own-budget-policy-and-cost-control-in-product.md)
+- [cats SPEC-025](../../../cats-platform/docs/specs/SPEC-025-budget-policy-override-flows-and-war-room-dashboard.md)
 
 ## Open Questions
 

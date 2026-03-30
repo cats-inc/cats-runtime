@@ -181,7 +181,7 @@ This decision includes:
 - [SPEC-005](../specs/SPEC-005-runtime-managed-skills-v0.md)
 - [SPEC-006](../specs/SPEC-006-a2a-protocol-project-memory-and-skill-layering.md)
 - [SPEC-008](../specs/SPEC-008-workspace-substrate-init-audit-and-update.md)
-- [cats SPEC-019](../../../cats/docs/specs/SPEC-019-product-skill-profiles-and-runtime-skill-manifests.md)
+- [cats SPEC-019](../../../cats-platform/docs/specs/SPEC-019-product-skill-profiles-and-runtime-skill-manifests.md)
 - [project-bootstrap README](../../../project-bootstrap/README.md)
 
 ---

@@ -262,8 +262,8 @@ structured delivery result
 - [ADR-016](../decisions/016-own-executable-delivery-primitives-not-delivery-policy.md)
 - [ADR-015](../decisions/015-own-workspace-substrate-tools-in-cats-runtime.md)
 - [ADR-011](../decisions/011-runtime-owned-browser-and-preview-subsystem-with-pluggable-drivers.md)
-- [cats ADR-022](../../../cats/docs/decisions/022-own-workspace-delivery-policy-in-product.md)
-- [cats SPEC-024](../../../cats/docs/specs/SPEC-024-chat-delivery-policy-and-governance-levels.md)
+- [cats ADR-022](../../../cats-platform/docs/decisions/022-own-workspace-delivery-policy-in-product.md)
+- [cats SPEC-024](../../../cats-platform/docs/specs/SPEC-024-chat-delivery-policy-and-governance-levels.md)
 
 ## Open Questions
 
@@ -281,7 +281,7 @@ structured delivery result
 - [Architecture](../architecture.md)
 - [API](../api.md)
 - [ADR-011](../decisions/011-runtime-owned-browser-and-preview-subsystem-with-pluggable-drivers.md)
-- [cats Paperclip Control-Plane Analysis](../../../cats/docs/research/paperclip-control-plane-analysis.md)
+- [cats Paperclip Control-Plane Analysis](../../../cats-platform/docs/research/paperclip-control-plane-analysis.md)
 
 ---
 

@@ -185,11 +185,11 @@ permanent foundation
 - [ADR 005: Introduce a backend-neutral runtime facade for CLI and API backends](./005-backend-neutral-runtime-and-api-backend.md)
 - [ADR 006: Introduce an agent backend and shared runtime contracts](./006-agent-backend-and-shared-runtime-contracts.md)
 - [ADR 009: Keep `cats-runtime` separately packageable with app-managed local startup](./009-keep-cats-runtime-separately-packageable-with-app-managed-local-startup.md)
-- [cats ADR-008: Expose `cats-runtime` via direct API and MCP facade](../../../cats/docs/decisions/008-expose-cats-runtime-via-direct-api-and-mcp-facade.md)
-- [cats ADR-019: Normalize runtime previews as surfaces, not provider iframes](../../../cats/docs/decisions/019-normalize-runtime-previews-as-surfaces-not-provider-iframes.md)
-- [cats ADR-020: Own MCP intent in product and tool delivery in runtime](../../../cats/docs/decisions/020-own-mcp-intent-in-product-and-tool-delivery-in-runtime.md)
-- [cats SPEC-020: Embedded preview surfaces for runtime artifacts and services](../../../cats/docs/specs/SPEC-020-embedded-preview-surfaces-for-runtime-artifacts-and-services.md)
-- [cats SPEC-021: Contextual MCP profiles and lazy tool activation](../../../cats/docs/specs/SPEC-021-contextual-mcp-profiles-and-lazy-tool-activation.md)
+- [cats ADR-008: Expose `cats-runtime` via direct API and MCP facade](../../../cats-platform/docs/decisions/008-expose-cats-runtime-via-direct-api-and-mcp-facade.md)
+- [cats ADR-019: Normalize runtime previews as surfaces, not provider iframes](../../../cats-platform/docs/decisions/019-normalize-runtime-previews-as-surfaces-not-provider-iframes.md)
+- [cats ADR-020: Own MCP intent in product and tool delivery in runtime](../../../cats-platform/docs/decisions/020-own-mcp-intent-in-product-and-tool-delivery-in-runtime.md)
+- [cats SPEC-020: Embedded preview surfaces for runtime artifacts and services](../../../cats-platform/docs/specs/SPEC-020-embedded-preview-surfaces-for-runtime-artifacts-and-services.md)
+- [cats SPEC-021: Contextual MCP profiles and lazy tool activation](../../../cats-platform/docs/specs/SPEC-021-contextual-mcp-profiles-and-lazy-tool-activation.md)
 
 ---
 

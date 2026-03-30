@@ -429,9 +429,9 @@ aligned once this direction is ratified or implemented:
 - `cats-runtime/docs/decisions/008-runtime-owned-provider-model-catalog.md`
 - `cats-runtime/docs/api.md`
 - `cats-runtime/docs/architecture.md`
-- `cats/docs/specs/SPEC-013-provider-catalog-consumption-and-ui-seam.md`
-- `cats/docs/api.md`
-- `cats/docs/architecture.md`
+- `cats-platform/docs/specs/SPEC-013-provider-catalog-consumption-and-ui-seam.md`
+- `cats-platform/docs/api.md`
+- `cats-platform/docs/architecture.md`
 
 ## Open Questions
 
@@ -450,7 +450,7 @@ aligned once this direction is ratified or implemented:
 ## References
 
 - [ADR 008: Keep Provider Model Catalog Discovery Runtime-Owned](../decisions/008-runtime-owned-provider-model-catalog.md)
-- [cats SPEC-013: Provider Catalog Consumption and UI Seam](../../../cats/docs/specs/SPEC-013-provider-catalog-consumption-and-ui-seam.md)
+- [cats SPEC-013: Provider Catalog Consumption and UI Seam](../../../cats-platform/docs/specs/SPEC-013-provider-catalog-consumption-and-ui-seam.md)
 - [API](../api.md)
 - [Architecture](../architecture.md)
 

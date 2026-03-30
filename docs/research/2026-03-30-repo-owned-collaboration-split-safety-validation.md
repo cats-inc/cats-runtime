@@ -7,10 +7,10 @@ Source:
 - `cats-runtime/dist/bin/workspaceSubstrate.js`
 - `cats-runtime/tests/workspace-substrate.test.ts`
 - `cats-runtime/tests/workspace-substrate-bin.test.ts`
-- `cats/scripts/windows/Sync-AgentSkills.ps1`
-- `cats/scripts/linux/sync-agent-skills.sh`
-- `cats/scripts/macos/sync-agent-skills.sh`
-- `cats/tests/skill-sync-scripts.test.js`
+- `cats-platform/scripts/windows/Sync-AgentSkills.ps1`
+- `cats-platform/scripts/linux/sync-agent-skills.sh`
+- `cats-platform/scripts/macos/sync-agent-skills.sh`
+- `cats-platform/tests/skill-sync-scripts.test.js`
 
 ## Validation Setup
 

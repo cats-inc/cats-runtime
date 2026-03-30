@@ -297,7 +297,7 @@ supports local skill directories.
 - [SPEC-013: Internal Skill Library and Role Taxonomy](./SPEC-013-internal-skill-library-and-role-taxonomy.md)
 - [cats-runtime gap assessment](../research/2026-03-19-paperclip-gap-assessment.md)
 - [Paperclip alignment research](../research/2026-03-17-paperclip-openclaw-pi-alignment.md)
-- [cats paperclip control-plane analysis](../../../cats/docs/research/paperclip-control-plane-analysis.md)
+- [cats paperclip control-plane analysis](../../../cats-platform/docs/research/paperclip-control-plane-analysis.md)
 - [skills README](../../skills/README.md)
 
 ---

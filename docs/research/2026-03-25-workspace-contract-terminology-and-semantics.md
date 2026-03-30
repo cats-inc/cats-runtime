@@ -13,7 +13,7 @@ Last updated: 2026-03-25
 - Internal workspace/session review: `src/core/workspace/sessionWorkspace.ts`, `src/core/runtime/RuntimeSessionManager.ts`, `src/core/runtime/sessionMaintenance.ts`
 - Internal CLI persistence/workspace review: `src/backends/cli/pool/SessionRegistry.ts`, `src/backends/cli/pool/workspace.ts`
 - Internal peer execution contract review: `src/core/peers/types.ts`
-- Product/runtime integration review: `cats/src/products/chat/state/runtime-session/`
+- Product/runtime integration review: `cats-platform/src/products/chat/state/runtime-session/`
 - Human review feedback from parallel agent discussion (Gemini, Claude, Codex)
 
 ## Summary

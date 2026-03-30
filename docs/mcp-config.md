@@ -340,7 +340,7 @@ This keeps the product/runtime ownership split explicit:
 
 - [api.md](./api.md)
 - [architecture.md](./architecture.md)
-- [cats ADR-008](../../cats/docs/decisions/008-expose-cats-runtime-via-direct-api-and-mcp-facade.md)
+- [cats ADR-008](../../cats-platform/docs/decisions/008-expose-cats-runtime-via-direct-api-and-mcp-facade.md)
 
 ---
 
