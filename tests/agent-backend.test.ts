@@ -1566,6 +1566,21 @@ describe('agent backend integration', () => {
             }),
             checks: expect.arrayContaining([
               expect.objectContaining({
+                code: 'session_evidence_visible',
+                status: 'ok',
+                details: expect.objectContaining({
+                  sessionId: created.id,
+                  sessionKey: 'sdk-effective-diagnostics',
+                  artifactCount: 0,
+                  serviceCount: 1,
+                  previewSurfaceCount: 1,
+                  readyPreviewSurfaceCount: 1,
+                  browserSessionCount: 0,
+                  openBrowserPageCount: 0,
+                  serviceIds: ['preview'],
+                }),
+              }),
+              expect.objectContaining({
                 code: 'bridge_session_activity_visible',
                 status: 'ok',
                 details: expect.objectContaining({
@@ -1609,6 +1624,44 @@ describe('agent backend integration', () => {
                   observedToolNames: ['grep'],
                   observedServiceIds: ['preview'],
                 },
+              }),
+              sessionEvidence: expect.objectContaining({
+                source: 'runtime_session_inspection',
+                sessionId: created.id,
+                sessionKey: 'sdk-effective-diagnostics',
+                providerSessionId: 'bridge-session-1',
+                status: 'idle',
+                latestRun: expect.objectContaining({
+                  id: expect.any(String),
+                  status: 'succeeded',
+                }),
+                counts: {
+                  artifactCount: 0,
+                  serviceCount: 1,
+                  previewSurfaceCount: 1,
+                  readyPreviewSurfaceCount: 1,
+                  browserSessionCount: 0,
+                  openBrowserPageCount: 0,
+                },
+                artifacts: [],
+                services: [
+                  {
+                    id: 'preview',
+                    name: 'preview',
+                    url: 'https://preview.test/bridge-session-1',
+                  },
+                ],
+                previewSurfaces: expect.arrayContaining([
+                  expect.objectContaining({
+                    kind: 'service',
+                    source: 'session_service',
+                    status: 'ready',
+                    renderHint: 'iframe',
+                    label: 'preview',
+                    url: 'https://preview.test/bridge-session-1',
+                  }),
+                ]),
+                browserSessions: [],
               }),
             }),
           }),
@@ -1779,6 +1832,9 @@ describe('agent backend integration', () => {
               expect.objectContaining({
                 checks: expect.arrayContaining([
                   expect.objectContaining({
+                    code: 'session_evidence_visible',
+                  }),
+                  expect.objectContaining({
                     code: 'bridge_session_activity_visible',
                   }),
                   expect.objectContaining({
@@ -1799,6 +1855,21 @@ describe('agent backend integration', () => {
                       observedToolNames: ['grep'],
                       observedServiceIds: ['preview'],
                     },
+                  }),
+                  sessionEvidence: expect.objectContaining({
+                    sessionId: created.id,
+                    sessionKey: 'sdk-mcp-effective-diagnostics',
+                    counts: expect.objectContaining({
+                      serviceCount: 1,
+                      previewSurfaceCount: 1,
+                    }),
+                    services: [
+                      {
+                        id: 'preview',
+                        name: 'preview',
+                        url: 'https://preview.test/bridge-session-1',
+                      },
+                    ],
                   }),
                 }),
               }),

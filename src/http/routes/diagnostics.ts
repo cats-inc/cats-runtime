@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { BackendKind, RemoteProviderInstanceConfig } from '../../backends/cli/config.js';
 import { inspectAgentTarget } from '../../backends/agent/inspection.js';
+import { toSessionView } from '../../backends/cli/pool/sessionView.js';
 import { buildApiRuntimeExecutionStrategyCatalog } from '../../backends/api/runtime/strategies/catalog.js';
 import { inspectApiTarget } from '../../backends/api/inspection.js';
 import {
@@ -57,6 +58,7 @@ import {
 } from '../../core/tools/providerTooling.js';
 import { buildRuntimeToolCatalogSummary } from '../../core/tools/LocalToolRuntime.js';
 import { inspectRuntimeDeliveryContract } from '../../core/runtime/RuntimeDeliveryService.js';
+import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
 import { inspectRuntimeSkillCatalog } from '../../core/skills/catalog.js';
 import type { HealthStatus } from '../../core/types.js';
 import type { AppContext } from '../app.js';
@@ -165,6 +167,58 @@ interface ProviderDiagnosticToolCatalogContext {
   sessionKey?: string;
 }
 
+interface ProviderDiagnosticSessionEvidenceSummary {
+  source: 'runtime_session_inspection';
+  sessionId: string;
+  sessionKey?: string;
+  providerSessionId?: string;
+  status?: string;
+  latestRun?: {
+    id: string;
+    status: string;
+  };
+  counts: {
+    artifactCount: number;
+    serviceCount: number;
+    previewSurfaceCount: number;
+    readyPreviewSurfaceCount: number;
+    browserSessionCount: number;
+    openBrowserPageCount: number;
+  };
+  artifacts: Array<{
+    id: string;
+    kind?: string;
+    label?: string;
+    mediaType?: string;
+    hasPath: boolean;
+    hasUri: boolean;
+  }>;
+  services: Array<{
+    id: string;
+    name: string;
+    status?: string;
+    url?: string;
+  }>;
+  previewSurfaces: Array<{
+    id: string;
+    kind: string;
+    source: string;
+    status: string;
+    renderHint: string;
+    label?: string;
+    url?: string;
+    artifactId?: string;
+    mediaType?: string;
+  }>;
+  browserSessions: Array<{
+    id: string;
+    driverId: string;
+    status: string;
+    openPageCount: number;
+    previewSurfaceCount: number;
+  }>;
+}
+
 interface RuntimeSetupDiagnosticsSummary {
   bootstrapRequired: boolean;
   latestReport: {
@@ -240,6 +294,105 @@ function hasAgentSessionActivitySummary(
       || observedServiceIds.length > 0
     )
   );
+}
+
+function buildAgentDiagnosticSessionEvidence(
+  ctx: AppContext,
+  sessionId: string,
+): ProviderDiagnosticSessionEvidenceSummary | undefined {
+  const session = ctx.registry.get(sessionId);
+  if (!session) {
+    return undefined;
+  }
+
+  const runtime = getRuntimeSessionManager(ctx);
+  const wakeup = ctx.wakeup?.getSessionWakeState(session.id);
+  const inspection = buildSessionInspection({
+    session,
+    view: toSessionView(session, {
+      attached: runtime.isAttached(session.id),
+      externalSessionLiveWindowMs: ctx.config.externalSessionLiveWindowMs,
+    }),
+    trackedState: runtime.getTrackedState(session.id),
+    metering: getRuntimeMeteringService(ctx).buildSessionSnapshot(session),
+    wakeupPending: Boolean(wakeup?.pending),
+    browserSessions: getRuntimeBrowserService(ctx).listSessions({
+      runtimeSessionId: session.id,
+    }),
+  });
+
+  const browserSessions = inspection.browserSessions || [];
+  const counts = {
+    artifactCount: inspection.artifacts.length,
+    serviceCount: inspection.services.length,
+    previewSurfaceCount: inspection.previewSurfaces.length,
+    readyPreviewSurfaceCount: inspection.previewSurfaces.filter((surface) => surface.status === 'ready').length,
+    browserSessionCount: browserSessions.length,
+    openBrowserPageCount: browserSessions.reduce(
+      (total, browserSession) => total + browserSession.inspection.openPageCount,
+      0,
+    ),
+  };
+
+  if (
+    counts.artifactCount === 0
+    && counts.serviceCount === 0
+    && counts.previewSurfaceCount === 0
+    && counts.browserSessionCount === 0
+  ) {
+    return undefined;
+  }
+
+  const latestRun = inspection.currentRun || inspection.lastRun;
+
+  return {
+    source: 'runtime_session_inspection',
+    sessionId: session.id,
+    ...(session.sessionKey ? { sessionKey: session.sessionKey } : {}),
+    ...(inspection.agentSession?.providerSessionId
+      ? { providerSessionId: inspection.agentSession.providerSessionId }
+      : {}),
+    ...(inspection.agentSession?.status ? { status: inspection.agentSession.status } : {}),
+    ...(latestRun ? {
+      latestRun: {
+        id: latestRun.id,
+        status: latestRun.status,
+      },
+    } : {}),
+    counts,
+    artifacts: inspection.artifacts.slice(0, 3).map((artifact) => ({
+      id: artifact.id,
+      ...(artifact.kind ? { kind: artifact.kind } : {}),
+      ...(artifact.label ? { label: artifact.label } : {}),
+      ...(artifact.mediaType ? { mediaType: artifact.mediaType } : {}),
+      hasPath: Boolean(artifact.path),
+      hasUri: Boolean(artifact.uri),
+    })),
+    services: inspection.services.slice(0, 3).map((service) => ({
+      id: service.id,
+      name: service.name,
+      ...(service.status ? { status: service.status } : {}),
+      ...(service.url ? { url: service.url } : {}),
+    })),
+    previewSurfaces: inspection.previewSurfaces.slice(0, 3).map((surface) => ({
+      id: surface.id,
+      kind: surface.kind,
+      source: surface.source,
+      status: surface.status,
+      renderHint: surface.renderHint,
+      ...(surface.label ? { label: surface.label } : {}),
+      ...(surface.url ? { url: surface.url } : {}),
+      ...(surface.artifactId ? { artifactId: surface.artifactId } : {}),
+      ...(surface.mediaType ? { mediaType: surface.mediaType } : {}),
+    })),
+    browserSessions: browserSessions.slice(0, 2).map((browserSession) => ({
+      id: browserSession.id,
+      driverId: browserSession.driverId,
+      status: browserSession.status,
+      openPageCount: browserSession.inspection.openPageCount,
+      previewSurfaceCount: browserSession.inspection.previewSurfaces.length,
+    })),
+  };
 }
 
 function getRuntimeWakeupSnapshot(ctx: AppContext) {
@@ -841,6 +994,47 @@ async function diagnoseAgentTarget(
     ? ctx.registry.get(toolCatalogContext.sessionId)
     : undefined;
   const runtimeAgentSession = runtimeSession?.providerState?.agentSession;
+  const sessionEvidence = runtimeSession
+    ? buildAgentDiagnosticSessionEvidence(ctx, runtimeSession.id)
+    : undefined;
+  if (runtimeSession && sessionEvidence) {
+    config.sessionEvidence = {
+      source: sessionEvidence.source,
+      sessionId: sessionEvidence.sessionId,
+      ...(sessionEvidence.sessionKey ? { sessionKey: sessionEvidence.sessionKey } : {}),
+      ...(sessionEvidence.providerSessionId
+        ? { providerSessionId: sessionEvidence.providerSessionId }
+        : {}),
+      ...(sessionEvidence.status ? { status: sessionEvidence.status } : {}),
+      ...(sessionEvidence.latestRun ? { latestRun: sessionEvidence.latestRun } : {}),
+      counts: { ...sessionEvidence.counts },
+      artifacts: sessionEvidence.artifacts.map((artifact) => ({ ...artifact })),
+      services: sessionEvidence.services.map((service) => ({ ...service })),
+      previewSurfaces: sessionEvidence.previewSurfaces.map((surface) => ({ ...surface })),
+      browserSessions: sessionEvidence.browserSessions.map((browserSession) => ({ ...browserSession })),
+    };
+    checks.push(
+      createCheck(
+        'session_evidence_visible',
+        'ok',
+        `Runtime session '${runtimeSession.id}' exposes bounded work-product evidence for ${target.providerName}/${target.instanceId}`,
+        {
+          sessionId: runtimeSession.id,
+          ...(sessionEvidence.sessionKey ? { sessionKey: sessionEvidence.sessionKey } : {}),
+          artifactCount: sessionEvidence.counts.artifactCount,
+          serviceCount: sessionEvidence.counts.serviceCount,
+          previewSurfaceCount: sessionEvidence.counts.previewSurfaceCount,
+          readyPreviewSurfaceCount: sessionEvidence.counts.readyPreviewSurfaceCount,
+          browserSessionCount: sessionEvidence.counts.browserSessionCount,
+          openBrowserPageCount: sessionEvidence.counts.openBrowserPageCount,
+          serviceIds: sessionEvidence.services.map((service) => service.id),
+          artifactIds: sessionEvidence.artifacts.map((artifact) => artifact.id),
+          previewSurfaceIds: sessionEvidence.previewSurfaces.map((surface) => surface.id),
+          browserSessionIds: sessionEvidence.browserSessions.map((browserSession) => browserSession.id),
+        },
+      ),
+    );
+  }
   if (
     agentRuntime.family === 'bridge'
     && runtimeSession

@@ -914,7 +914,12 @@ current Agent SDK bridge, the response keeps the provider-wide tool catalog
 (`providers[].config.toolCatalog.method: "providers_get"`) and instead adds
 `providers[].config.sessionActivity` plus a `bridge_session_activity_visible`
 check when the runtime session has already observed remote tool/service
-activity.
+activity. Session-aware agent diagnostics also project a bounded
+`providers[].config.sessionEvidence` summary plus `session_evidence_visible`
+when the shared runtime session inspection already has service, artifact,
+preview-surface, or browser-session evidence for that target. This reuses the
+same session inspection truth as `/sessions/{id}/observe` instead of inventing
+a second work-product read model just for diagnostics.
 
 Invalid `backend` values or malformed boolean filters such as
 `defaultOnly=maybe` return `400` with a client-safe `error` string.

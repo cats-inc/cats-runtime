@@ -497,6 +497,11 @@ path is intentionally narrow:
 - Reuses persisted provider-managed agent session state to expose bounded
   `inspection.agentSession.activity` summaries for remote tool/service evidence
   on the same session/history/observe surfaces
+- Reuses that same shared runtime session inspection to project bounded
+  `config.sessionEvidence` summaries on session-aware provider diagnostics, so
+  host/operator workflows can inspect recent services, artifacts, preview
+  surfaces, and browser-session evidence without issuing a second session-read
+  call first
 - Normalizes history provenance metadata, per-source transcript provenance, and
   Pi-native transcript parsing so provider-owned session files plus later
   runtime-managed fallback history can still feed the same runtime-owned

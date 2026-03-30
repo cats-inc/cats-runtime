@@ -111,7 +111,10 @@ current `api` backend or bury a second orchestration model inside it.
 - **Separation of concerns**: Company workflow and scheduling concerns shall
   stay outside `cats-runtime`.
 - **Observability**: Agent runs shall remain visible through session history and
-  streaming APIs even when provider-managed state is authoritative.
+  streaming APIs even when provider-managed state is authoritative, and the
+  same shared runtime session inspection should remain reusable from
+  session-aware provider diagnostics for bounded activity/work-product
+  evidence.
 - **Extensibility**: The adapter contract shall support more than one external
   agent runtime.
 

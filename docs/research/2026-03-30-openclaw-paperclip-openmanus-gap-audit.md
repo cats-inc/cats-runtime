@@ -139,6 +139,16 @@ tool/service evidence on session/history/observe surfaces. The remaining gap is
 no longer "no session-level evidence"; it is deeper service/work-product
 coverage beyond that summary.
 
+The runtime now also has a second bounded answer on the host/operator seam:
+session-aware provider diagnostics project `providers[].config.sessionEvidence`
+from the same shared runtime session inspection, so `/diagnostics/providers`
+and MCP `provider_diagnostics` can surface recent services, artifacts, preview
+surfaces, and browser-session evidence without a second session fetch.
+
+That narrows the remaining gap again. The next missing depth is no longer
+"provider diagnostics cannot show work products"; it is broader harvesting and
+more durable evidence beyond what one active runtime session already knows.
+
 ### 3. Work-product and runtime-service harvesting depth
 
 Compared with Paperclip, `cats-runtime` still keeps a narrower boundary around
@@ -160,12 +170,12 @@ longer the most urgent missing capability.
 
 ## Recommended Slice Order
 
-1. Strengthen non-OpenClaw remote-tool/service evidence beyond Agent SDK bridge
-   provider-registry truth.
-2. Deepen runtime-owned operator evidence for remote tools, services, and
-   work products on the existing diagnostics/session surfaces.
+1. Broaden later-target semantic probes beyond the current OpenClaw and Agent
+   SDK bridge baseline.
+2. Extend work-product/runtime-service harvesting beyond active runtime-session
+   evidence.
 3. Reassess whether the next highest-value slice is:
-   - richer Agent SDK bridge service/runtime evidence, or
+   - richer Agent SDK bridge service/runtime evidence persistence, or
    - broader work-product harvesting within the current runtime boundary.
 
 ## Bottom Line
@@ -173,9 +183,9 @@ longer the most urgent missing capability.
 `cats-runtime` no longer mainly lags OpenClaw/Paperclip/OpenManus on backend
 architecture. The biggest remaining gap is narrower and more concrete:
 
-- richer agent-backed remote tool truth
 - stronger later-target semantic probes
-- then deeper operator evidence on top of that foundation
+- broader work-product/runtime-service harvesting beyond active session state
+- more durable operator evidence on top of that foundation
 
-That makes OpenClaw-aligned `tools.effective` support the most defensible next
-runtime slice.
+That makes durable later-target evidence, not backend shape, the most
+defensible next runtime slice.

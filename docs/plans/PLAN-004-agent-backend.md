@@ -377,6 +377,7 @@ difference between logical session identity and provider-managed resume tokens.
 | 2026-03-30 | Agent SDK bridge live diagnostics now treat provider-registry tool metadata as part of semantic readiness, surfacing explicit `bridge_provider_tool_catalog_visible` checks plus `toolCatalogVisible` / `toolCount` / `toolGroupCount` truth before the bounded probe-session lifecycle runs |
 | 2026-03-30 | Agent SDK bridge session streams now persist bounded remote tool/service activity summaries into provider-managed session state, and session/history/observe inspection now reuses that `agentSession.activity` truth instead of making hosts replay raw stream events |
 | 2026-03-30 | Session-aware provider diagnostics now keep OpenClaw on `tools.effective`, but let Agent SDK bridge targets fall back to provider-wide tool catalogs plus runtime session activity evidence instead of degrading on unsupported effective-tool requests |
+| 2026-03-30 | Session-aware agent diagnostics now also project bounded runtime-session work-product evidence (`config.sessionEvidence`) from the shared session inspection read model, so hosts can inspect recent services/artifacts/preview surfaces on the provider diagnostics seam without a second session fetch |
 
 ---
 
