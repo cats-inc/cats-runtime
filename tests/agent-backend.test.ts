@@ -3799,6 +3799,159 @@ describe('agent backend integration', () => {
     }
   });
 
+  it('surfaces retained Agent SDK target evidence through the MCP providers_config tool after deleting the runtime session', async () => {
+    const { config, env, cleanup } = createAgentSdkConfigRoot();
+    let createCallCount = 0;
+    const runtime = createRuntimeServer(config, {
+      agentBackend: {
+        env,
+        fetch: async (input, init) => {
+          const url = String(input);
+          const method = init?.method || 'GET';
+
+          if (url === 'http://agent-sdk.test/api/v1/providers' && method === 'GET') {
+            return new Response(JSON.stringify({
+              providers: [
+                {
+                  name: 'claude',
+                  default_model: 'sonnet',
+                  models: ['sonnet', 'haiku'],
+                  capabilities: {
+                    streaming: true,
+                    mcp: true,
+                    vision: false,
+                  },
+                  tool_groups: createAgentSdkBridgeToolGroups(),
+                },
+              ],
+            }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
+          }
+
+          if (url === 'http://agent-sdk.test/api/v1/sessions' && method === 'POST') {
+            createCallCount += 1;
+            return new Response(JSON.stringify({
+              id: createCallCount === 1 ? 'bridge-session-1' : 'probe-session-1',
+            }), {
+              status: 201,
+              headers: { 'content-type': 'application/json' },
+            });
+          }
+
+          if (
+            url === 'http://agent-sdk.test/api/v1/sessions/bridge-session-1/messages/stream'
+            && method === 'POST'
+          ) {
+            const sse = [
+              'data: {"type":"session_created","sessionId":"bridge-session-1","providerSessionId":"sdk-provider-1"}',
+              '',
+              'data: {"type":"tool_use","toolName":"grep","toolInput":{"pattern":"TODO"}}',
+              '',
+              'data: {"type":"tool_result","toolName":"grep","toolUseId":"tool-1","content":"1 match"}',
+              '',
+              'data: {"type":"service_update","services":[{"id":"preview","name":"preview","url":"https://preview.test/bridge-session-1"}]}',
+              '',
+              'data: {"type":"content","content":"done"}',
+              '',
+              'data: [DONE]',
+              '',
+            ].join('\n');
+            return new Response(sse, {
+              status: 200,
+              headers: { 'content-type': 'text/event-stream' },
+            });
+          }
+
+          throw new Error(`Unexpected fetch: ${method} ${url}`);
+        },
+      },
+    });
+
+    try {
+      const createResponse = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'claude',
+          cwd: config.sessionBaseDir,
+          sessionKey: 'sdk-mcp-provider-config',
+        }),
+      });
+      expect(createResponse.status).toBe(201);
+      const created = await createResponse.json() as { id: string };
+
+      const messageResponse = await runtime.app.request(`/sessions/${created.id}/messages`, {
+        method: 'POST',
+        headers: {
+          accept: 'application/x-ndjson',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: 'Prime retained provider-config evidence',
+        }),
+      });
+      expect(messageResponse.status).toBe(200);
+      await parseNdjson(await messageResponse.text());
+
+      const deleteResponse = await runtime.app.request(`/sessions/${created.id}`, {
+        method: 'DELETE',
+      });
+      expect(deleteResponse.status).toBe(200);
+
+      const mcpResponse = await runtime.app.request('/mcp', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'sdk-provider-config-retained',
+          method: 'tools/call',
+          params: {
+            name: 'providers_config',
+            arguments: {},
+          },
+        }),
+      });
+      expect(mcpResponse.status).toBe(200);
+      await expect(mcpResponse.json()).resolves.toEqual(expect.objectContaining({
+        result: expect.objectContaining({
+          structuredContent: expect.objectContaining({
+            configPath: '/providers/config',
+            providers: expect.objectContaining({
+              claude: expect.objectContaining({
+                instances: [expect.objectContaining({
+                  id: 'sdk',
+                  latestSessionActivity: expect.objectContaining({
+                    source: 'retained_target_evidence',
+                    sessionId: created.id,
+                    sessionKey: 'sdk-mcp-provider-config',
+                    observedAt: expect.any(String),
+                    retainedAt: expect.any(String),
+                  }),
+                  latestSessionEvidence: expect.objectContaining({
+                    source: 'retained_target_evidence',
+                    sessionId: created.id,
+                    sessionKey: 'sdk-mcp-provider-config',
+                    observedAt: expect.any(String),
+                    retainedAt: expect.any(String),
+                    counts: expect.objectContaining({
+                      serviceCount: 1,
+                      previewSurfaceCount: 1,
+                    }),
+                  }),
+                })],
+              }),
+            }),
+          }),
+        }),
+      }));
+    } finally {
+      await runtime.close();
+      cleanup();
+    }
+  });
+
   it('recreates a missing Agent SDK bridge session on resume', async () => {
     const { config, env, cleanup } = createAgentSdkConfigRoot();
     const fetchCalls: Array<{ url: string; method: string; body?: Record<string, unknown> }> = [];
