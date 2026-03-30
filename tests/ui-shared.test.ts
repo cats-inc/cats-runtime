@@ -24,7 +24,7 @@ describe('shared tokens CSS', () => {
   it('contains all provider color custom properties', () => {
     const providers = [
       'auggie', 'claude', 'codex', 'copilot', 'cursorp',
-      'gemini', 'kiro', 'opencode', 'pi', 'goose', 'junie',
+      'gemini', 'kiro', 'kilo', 'opencode', 'pi', 'goose', 'junie',
     ];
     for (const p of providers) {
       expect(SHARED_TOKENS_CSS).toContain(`--${p}:`);
@@ -36,7 +36,7 @@ describe('provider badge CSS', () => {
   it('contains badge rules for all known providers', () => {
     const providers = [
       'claude', 'codex', 'copilot', 'cursor', 'gemini',
-      'kiro', 'auggie', 'opencode', 'pi', 'goose', 'junie', 'ollama',
+      'kiro', 'kilo', 'auggie', 'opencode', 'pi', 'goose', 'junie', 'ollama',
     ];
     for (const p of providers) {
       expect(PROVIDER_BADGE_CSS).toContain(`[data-p="${p}"]`);

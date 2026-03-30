@@ -36,6 +36,7 @@ export const PROVIDER_BADGE_CSS = `
 .provider-badge[data-p="cursor"]   { background: rgba(249,115,22,0.2);  color: var(--cursorp, #f97316); }
 .provider-badge[data-p="gemini"]   { background: rgba(66,133,244,0.2);  color: var(--gemini, #4285f4); }
 .provider-badge[data-p="kiro"]     { background: rgba(20,184,166,0.2);  color: var(--kiro, #14b8a6); }
+.provider-badge[data-p="kilo"]     { background: rgba(251,113,133,0.2); color: var(--kilo, #fb7185); }
 .provider-badge[data-p="auggie"]   { background: rgba(6,182,212,0.2);   color: var(--auggie, #06b6d4); }
 .provider-badge[data-p="opencode"] { background: rgba(244,114,182,0.2); color: var(--opencode, #f472b6); }
 .provider-badge[data-p="pi"]       { background: rgba(168,162,158,0.2); color: var(--pi, #a8a29e); }

@@ -246,6 +246,7 @@ const PROVIDER_COLORS = {
   cursor:  { bg:'bg-orange-900/40',border:'border-orange-500',text:'text-orange-400',dot:'bg-orange-400' },
   gemini:  { bg:'bg-blue-900/40',border:'border-blue-500',text:'text-blue-400',dot:'bg-blue-400' },
   kiro:    { bg:'bg-teal-900/40',border:'border-teal-500',text:'text-teal-400',dot:'bg-teal-400' },
+  kilo:    { bg:'bg-rose-900/40',border:'border-rose-500',text:'text-rose-400',dot:'bg-rose-400' },
   auggie:  { bg:'bg-cyan-900/40',border:'border-cyan-500',text:'text-cyan-400',dot:'bg-cyan-400' },
   opencode:{ bg:'bg-pink-900/40',border:'border-pink-500',text:'text-pink-400',dot:'bg-pink-400' },
   pi:      { bg:'bg-stone-800/60',border:'border-stone-400',text:'text-stone-300',dot:'bg-stone-300' },
@@ -261,6 +262,7 @@ const PROVIDER_MODELS = {
   gemini:[{value:'gemini-3.1-pro-preview',label:'gemini-3.1-pro-preview (default)'},{value:'gemini-3-flash-preview',label:'gemini-3-flash-preview'},{value:'gemini-2.5-pro',label:'gemini-2.5-pro'}],
   copilot:[{value:'gpt-5.4',label:'gpt-5.4 (default)'},{value:'claude-opus-4-6',label:'claude-opus-4-6'},{value:'gemini-3-pro-preview',label:'gemini-3-pro-preview'}],
   opencode:[{value:'opencode-go/glm-5',label:'opencode-go/glm-5 (default)'},{value:'opencode-go/kimi-k2.5',label:'opencode-go/kimi-k2.5'}],
+  kilo:[{value:'kilo/openai/gpt-5.4',label:'kilo/openai/gpt-5.4 (default)'},{value:'kilo/openai/gpt-5.4-mini',label:'kilo/openai/gpt-5.4-mini'},{value:'kilo/anthropic/claude-sonnet-4.6',label:'kilo/anthropic/claude-sonnet-4.6'}],
   auggie:[{value:'gpt-5.4',label:'gpt-5.4 (default)'},{value:'claude opus 4.6',label:'claude opus 4.6'},{value:'sonnet 4.6',label:'sonnet 4.6'}],
   pi:[{value:'openai-codex/gpt-5.4',label:'openai-codex/gpt-5.4 (default)'}],
   junie:[{value:'gpt-5.4',label:'gpt-5.4 (default)'}],
@@ -270,7 +272,7 @@ const PROVIDER_MODELS = {
   ollama:[{value:'qwen2.5-coder:7b',label:'qwen2.5-coder:7b (default)'}],
 };
 const PROVIDER_ADVANCED_CATALOGS = {};
-const PROVIDERS = ['claude','codex','gemini','cursor','copilot','opencode','goose','pi','auggie','junie','kiro','ollama'];
+const PROVIDERS = ['claude','codex','gemini','cursor','copilot','opencode','kilo','goose','pi','auggie','junie','kiro','ollama'];
 function getDefaultModel(p) { return (PROVIDER_MODELS[p]||[])[0]?.value || ''; }
 
 // ============================================================

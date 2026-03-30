@@ -32,6 +32,7 @@
     --cursorp: #f97316;
     --gemini: #4285f4;
     --kiro: #14b8a6;
+    --kilo: #fb7185;
     --opencode: #f472b6;
     --pi: #a8a29e;
     --goose: #8b5cf6;
@@ -172,6 +173,7 @@
   .project-header[data-provider="cursor"] { border-left-color: var(--cursorp); }
   .project-header[data-provider="gemini"] { border-left-color: var(--gemini); }
   .project-header[data-provider="kiro"] { border-left-color: var(--kiro); }
+  .project-header[data-provider="kilo"] { border-left-color: var(--kilo); }
   .project-header[data-provider="opencode"] { border-left-color: var(--opencode); }
   .project-header[data-provider="pi"] { border-left-color: var(--pi); }
   .project-header[data-provider="goose"] { border-left-color: var(--goose); }
@@ -187,6 +189,7 @@
       var(--gemini),
       var(--kiro),
       var(--opencode),
+      var(--kilo),
       var(--pi),
       var(--goose),
       var(--junie)
@@ -209,6 +212,7 @@
   .provider-badge[data-p="cursor"] { background: rgba(249,115,22,0.2); color: var(--cursorp); }
   .provider-badge[data-p="gemini"] { background: rgba(66,133,244,0.2); color: var(--gemini); }
   .provider-badge[data-p="kiro"] { background: rgba(20,184,166,0.2); color: var(--kiro); }
+  .provider-badge[data-p="kilo"] { background: rgba(251,113,133,0.2); color: var(--kilo); }
   .provider-badge[data-p="auggie"] { background: rgba(6,182,212,0.2); color: var(--auggie); }
   .provider-badge[data-p="opencode"] { background: rgba(244,114,182,0.2); color: var(--opencode); }
   .provider-badge[data-p="pi"] { background: rgba(168,162,158,0.2); color: var(--pi); }
@@ -901,6 +905,7 @@
             <option value="cursor">cursor</option>
             <option value="copilot">copilot</option>
             <option value="opencode">opencode</option>
+            <option value="kilo">kilo</option>
             <option value="auggie">auggie</option>
             <option value="kiro">kiro</option>
           </select>
@@ -1013,7 +1018,7 @@ function escapeHtml(value) {
 }
 
 const API_BASE = window.location.origin;
-const PROVIDER_ORDER = ['claude', 'codex', 'gemini', 'cursor', 'copilot', 'opencode', 'goose', 'pi', 'auggie', 'junie', 'kiro', 'ollama', 'openclaw'];
+const PROVIDER_ORDER = ['claude', 'codex', 'gemini', 'cursor', 'copilot', 'opencode', 'kilo', 'goose', 'pi', 'auggie', 'junie', 'kiro', 'ollama', 'openclaw'];
 const CLI_RUNTIME_ORDER = ['native', 'wsl', 'docker'];
 let currentSessionId = null;
 let isStreaming = false;
@@ -1043,7 +1048,7 @@ function apiKey() {
 
   function providerSupportsResume(provider) {
     const p = (provider || 'claude').toLowerCase();
-    return p === 'auggie' || p === 'claude' || p === 'copilot' || p === 'cursor' || p === 'gemini' || p === 'kiro';
+    return p === 'auggie' || p === 'claude' || p === 'copilot' || p === 'cursor' || p === 'gemini' || p === 'kiro' || p === 'kilo';
   }
 
   function sessionControls(session) {
@@ -1196,6 +1201,7 @@ function manualSessionDiscoveryTargets() {
     entry.providerName === 'cursor'
     || entry.providerName === 'goose'
     || entry.providerName === 'kiro'
+    || entry.providerName === 'kilo'
     || entry.providerName === 'opencode'
   ) && (
     entry.runtime?.mode === 'wsl' || entry.runtime?.mode === 'docker'
