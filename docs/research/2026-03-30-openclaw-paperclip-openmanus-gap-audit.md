@@ -147,8 +147,9 @@ surfaces, and browser-session evidence without a second session fetch.
 
 The runtime now also has a third bounded answer for provider-only operator
 flows: when no caller-supplied `sessionId` exists, provider diagnostics can
-still project `providers[].config.latestSessionEvidence` from the most recent
-retained exact-target runtime session.
+still project retained `providers[].config.latestSessionActivity` /
+`providers[].config.latestSessionEvidence` from the most recent exact-target
+runtime session.
 
 That narrows the remaining gap again. The next missing depth is no longer
 "provider diagnostics cannot show work products"; it is broader harvesting and

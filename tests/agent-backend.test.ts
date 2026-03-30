@@ -2022,6 +2022,18 @@ describe('agent backend integration', () => {
           expect.objectContaining({
             checks: expect.arrayContaining([
               expect.objectContaining({
+                code: 'latest_session_activity_visible',
+                details: expect.objectContaining({
+                  sessionId: created.id,
+                  sessionKey: 'sdk-latest-evidence',
+                  toolUseCount: 1,
+                  toolResultCount: 1,
+                  serviceUpdateCount: 1,
+                  observedToolNames: ['grep'],
+                  observedServiceIds: ['preview'],
+                }),
+              }),
+              expect.objectContaining({
                 code: 'latest_session_evidence_visible',
                 details: expect.objectContaining({
                   sessionId: created.id,
@@ -2040,6 +2052,20 @@ describe('agent backend integration', () => {
               }),
             ]),
             config: expect.objectContaining({
+              latestSessionActivity: {
+                source: 'runtime_registry_latest_session',
+                sessionId: created.id,
+                sessionKey: 'sdk-latest-evidence',
+                providerSessionId: 'bridge-session-1',
+                status: 'idle',
+                activity: {
+                  toolUseCount: 1,
+                  toolResultCount: 1,
+                  serviceUpdateCount: 1,
+                  observedToolNames: ['grep'],
+                  observedServiceIds: ['preview'],
+                },
+              },
               latestSessionEvidence: expect.objectContaining({
                 source: 'runtime_registry_latest_session',
                 sessionId: created.id,
@@ -2247,6 +2273,9 @@ describe('agent backend integration', () => {
               expect.objectContaining({
                 checks: expect.arrayContaining([
                   expect.objectContaining({
+                    code: 'latest_session_activity_visible',
+                  }),
+                  expect.objectContaining({
                     code: 'latest_session_evidence_visible',
                   }),
                   expect.objectContaining({
@@ -2254,6 +2283,17 @@ describe('agent backend integration', () => {
                   }),
                 ]),
                 config: expect.objectContaining({
+                  latestSessionActivity: expect.objectContaining({
+                    sessionId: created.id,
+                    sessionKey: 'sdk-mcp-latest-evidence',
+                    activity: {
+                      toolUseCount: 1,
+                      toolResultCount: 1,
+                      serviceUpdateCount: 1,
+                      observedToolNames: ['grep'],
+                      observedServiceIds: ['preview'],
+                    },
+                  }),
                   latestSessionEvidence: expect.objectContaining({
                     sessionId: created.id,
                     sessionKey: 'sdk-mcp-latest-evidence',

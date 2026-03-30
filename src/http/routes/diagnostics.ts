@@ -221,6 +221,21 @@ interface ProviderDiagnosticSessionEvidenceSummary {
   }>;
 }
 
+interface ProviderDiagnosticSessionActivitySummary {
+  source: 'runtime_session' | 'runtime_registry_latest_session';
+  sessionId: string;
+  sessionKey?: string;
+  providerSessionId?: string;
+  status?: string;
+  activity: {
+    toolUseCount: number;
+    toolResultCount: number;
+    serviceUpdateCount: number;
+    observedToolNames: string[];
+    observedServiceIds: string[];
+  };
+}
+
 interface RuntimeSetupDiagnosticsSummary {
   bootstrapRequired: boolean;
   latestReport: {
@@ -445,6 +460,80 @@ function findLatestAgentDiagnosticSessionEvidence(
   }
 
   return latest?.evidence;
+}
+
+function buildAgentDiagnosticSessionActivity(
+  session: SessionInfo,
+  source: ProviderDiagnosticSessionActivitySummary['source'],
+): ProviderDiagnosticSessionActivitySummary | undefined {
+  const agentSession = session.providerState?.agentSession;
+  if (!hasAgentSessionActivitySummary(agentSession?.activity)) {
+    return undefined;
+  }
+
+  return {
+    source,
+    sessionId: session.id,
+    ...(session.sessionKey ? { sessionKey: session.sessionKey } : {}),
+    ...(agentSession?.providerSessionId ? { providerSessionId: agentSession.providerSessionId } : {}),
+    ...(agentSession?.status ? { status: agentSession.status } : {}),
+    activity: {
+      toolUseCount: agentSession.activity.toolUseCount,
+      toolResultCount: agentSession.activity.toolResultCount,
+      serviceUpdateCount: agentSession.activity.serviceUpdateCount,
+      observedToolNames: [...agentSession.activity.observedToolNames],
+      observedServiceIds: [...agentSession.activity.observedServiceIds],
+    },
+  };
+}
+
+function findLatestAgentDiagnosticSessionActivity(
+  ctx: AppContext,
+  target: ProviderTargetDescriptor,
+  excludeSessionId?: string,
+): ProviderDiagnosticSessionActivitySummary | undefined {
+  let latest:
+    | {
+      recency: number;
+      activity: ProviderDiagnosticSessionActivitySummary;
+    }
+    | undefined;
+
+  for (const candidate of ctx.registry.list({ provider: target.providerName })) {
+    if (excludeSessionId && candidate.id === excludeSessionId) {
+      continue;
+    }
+
+    let candidateTarget: ProviderTargetDescriptor;
+    try {
+      candidateTarget = resolveSessionProviderTarget(ctx.config, candidate);
+    } catch {
+      continue;
+    }
+
+    if (
+      candidateTarget.providerName !== target.providerName
+      || candidateTarget.backend !== target.backend
+      || candidateTarget.instanceId !== target.instanceId
+    ) {
+      continue;
+    }
+
+    const activity = buildAgentDiagnosticSessionActivity(
+      candidate,
+      'runtime_registry_latest_session',
+    );
+    if (!activity) {
+      continue;
+    }
+
+    const recency = resolveSessionEvidenceRecency(candidate);
+    if (!latest || recency >= latest.recency) {
+      latest = { recency, activity };
+    }
+  }
+
+  return latest?.activity;
 }
 
 function getRuntimeWakeupSnapshot(ctx: AppContext) {
@@ -1045,9 +1134,14 @@ async function diagnoseAgentTarget(
   const runtimeSession = toolCatalogContext?.sessionId
     ? ctx.registry.get(toolCatalogContext.sessionId)
     : undefined;
-  const runtimeAgentSession = runtimeSession?.providerState?.agentSession;
+  const runtimeSessionActivity = runtimeSession
+    ? buildAgentDiagnosticSessionActivity(runtimeSession, 'runtime_session')
+    : undefined;
   const sessionEvidence = runtimeSession
     ? buildAgentDiagnosticSessionEvidence(ctx, runtimeSession)
+    : undefined;
+  const latestSessionActivity = !runtimeSession
+    ? findLatestAgentDiagnosticSessionActivity(ctx, target)
     : undefined;
   const latestSessionEvidence = !runtimeSession
     ? findLatestAgentDiagnosticSessionEvidence(ctx, target)
@@ -1130,40 +1224,70 @@ async function diagnoseAgentTarget(
       ),
     );
   }
-  if (
-    agentRuntime.family === 'bridge'
-    && runtimeSession
-    && hasAgentSessionActivitySummary(runtimeAgentSession?.activity)
-  ) {
+  if (agentRuntime.family === 'bridge' && runtimeSessionActivity) {
     config.sessionActivity = {
-      source: 'runtime_session',
-      sessionId: runtimeSession.id,
-      ...(runtimeSession.sessionKey ? { sessionKey: runtimeSession.sessionKey } : {}),
-      ...(runtimeAgentSession?.providerSessionId
-        ? { providerSessionId: runtimeAgentSession.providerSessionId }
+      source: runtimeSessionActivity.source,
+      sessionId: runtimeSessionActivity.sessionId,
+      ...(runtimeSessionActivity.sessionKey ? { sessionKey: runtimeSessionActivity.sessionKey } : {}),
+      ...(runtimeSessionActivity.providerSessionId
+        ? { providerSessionId: runtimeSessionActivity.providerSessionId }
         : {}),
-      ...(runtimeAgentSession?.status ? { status: runtimeAgentSession.status } : {}),
+      ...(runtimeSessionActivity.status ? { status: runtimeSessionActivity.status } : {}),
       activity: {
-        toolUseCount: runtimeAgentSession.activity.toolUseCount,
-        toolResultCount: runtimeAgentSession.activity.toolResultCount,
-        serviceUpdateCount: runtimeAgentSession.activity.serviceUpdateCount,
-        observedToolNames: [...runtimeAgentSession.activity.observedToolNames],
-        observedServiceIds: [...runtimeAgentSession.activity.observedServiceIds],
+        toolUseCount: runtimeSessionActivity.activity.toolUseCount,
+        toolResultCount: runtimeSessionActivity.activity.toolResultCount,
+        serviceUpdateCount: runtimeSessionActivity.activity.serviceUpdateCount,
+        observedToolNames: [...runtimeSessionActivity.activity.observedToolNames],
+        observedServiceIds: [...runtimeSessionActivity.activity.observedServiceIds],
       },
     };
     checks.push(
       createCheck(
         'bridge_session_activity_visible',
         'ok',
-        `Runtime session '${runtimeSession.id}' recorded recent remote bridge activity for ${target.providerName}/${target.instanceId}`,
+        `Runtime session '${runtimeSessionActivity.sessionId}' recorded recent remote bridge activity for ${target.providerName}/${target.instanceId}`,
         {
-          sessionId: runtimeSession.id,
-          ...(runtimeSession.sessionKey ? { sessionKey: runtimeSession.sessionKey } : {}),
-          toolUseCount: runtimeAgentSession.activity.toolUseCount,
-          toolResultCount: runtimeAgentSession.activity.toolResultCount,
-          serviceUpdateCount: runtimeAgentSession.activity.serviceUpdateCount,
-          observedToolNames: [...runtimeAgentSession.activity.observedToolNames],
-          observedServiceIds: [...runtimeAgentSession.activity.observedServiceIds],
+          sessionId: runtimeSessionActivity.sessionId,
+          ...(runtimeSessionActivity.sessionKey ? { sessionKey: runtimeSessionActivity.sessionKey } : {}),
+          toolUseCount: runtimeSessionActivity.activity.toolUseCount,
+          toolResultCount: runtimeSessionActivity.activity.toolResultCount,
+          serviceUpdateCount: runtimeSessionActivity.activity.serviceUpdateCount,
+          observedToolNames: [...runtimeSessionActivity.activity.observedToolNames],
+          observedServiceIds: [...runtimeSessionActivity.activity.observedServiceIds],
+        },
+      ),
+    );
+  }
+  if (agentRuntime.family === 'bridge' && !runtimeSession && latestSessionActivity) {
+    config.latestSessionActivity = {
+      source: latestSessionActivity.source,
+      sessionId: latestSessionActivity.sessionId,
+      ...(latestSessionActivity.sessionKey ? { sessionKey: latestSessionActivity.sessionKey } : {}),
+      ...(latestSessionActivity.providerSessionId
+        ? { providerSessionId: latestSessionActivity.providerSessionId }
+        : {}),
+      ...(latestSessionActivity.status ? { status: latestSessionActivity.status } : {}),
+      activity: {
+        toolUseCount: latestSessionActivity.activity.toolUseCount,
+        toolResultCount: latestSessionActivity.activity.toolResultCount,
+        serviceUpdateCount: latestSessionActivity.activity.serviceUpdateCount,
+        observedToolNames: [...latestSessionActivity.activity.observedToolNames],
+        observedServiceIds: [...latestSessionActivity.activity.observedServiceIds],
+      },
+    };
+    checks.push(
+      createCheck(
+        'latest_session_activity_visible',
+        'ok',
+        `Latest retained runtime session '${latestSessionActivity.sessionId}' recorded recent remote bridge activity for ${target.providerName}/${target.instanceId}`,
+        {
+          sessionId: latestSessionActivity.sessionId,
+          ...(latestSessionActivity.sessionKey ? { sessionKey: latestSessionActivity.sessionKey } : {}),
+          toolUseCount: latestSessionActivity.activity.toolUseCount,
+          toolResultCount: latestSessionActivity.activity.toolResultCount,
+          serviceUpdateCount: latestSessionActivity.activity.serviceUpdateCount,
+          observedToolNames: [...latestSessionActivity.activity.observedToolNames],
+          observedServiceIds: [...latestSessionActivity.activity.observedServiceIds],
         },
       ),
     );
