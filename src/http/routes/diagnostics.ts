@@ -1,8 +1,6 @@
 import { Hono } from 'hono';
 import type { BackendKind, RemoteProviderInstanceConfig } from '../../backends/cli/config.js';
 import { inspectAgentTarget } from '../../backends/agent/inspection.js';
-import { toSessionView } from '../../backends/cli/pool/sessionView.js';
-import type { SessionInfo } from '../../backends/cli/pool/types.js';
 import { buildApiRuntimeExecutionStrategyCatalog } from '../../backends/api/runtime/strategies/catalog.js';
 import { inspectApiTarget } from '../../backends/api/inspection.js';
 import {
@@ -56,9 +54,6 @@ import type { ProviderSetupSummary } from '../../core/provider-install/types.js'
 import {
   buildAgentDiagnosticSessionActivity,
   buildAgentDiagnosticSessionEvidence,
-  hasAgentSessionActivitySummary,
-  type AgentDiagnosticSessionActivitySummary,
-  type AgentDiagnosticSessionEvidenceSummary,
 } from '../../core/runtime/agentDiagnosticsEvidence.js';
 import {
   buildProviderToolingSummary,
@@ -66,18 +61,20 @@ import {
 } from '../../core/tools/providerTooling.js';
 import { buildRuntimeToolCatalogSummary } from '../../core/tools/LocalToolRuntime.js';
 import { inspectRuntimeDeliveryContract } from '../../core/runtime/RuntimeDeliveryService.js';
-import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
 import { inspectRuntimeSkillCatalog } from '../../core/skills/catalog.js';
 import type { HealthStatus } from '../../core/types.js';
 import type { AppContext } from '../app.js';
 import {
-  getAgentTargetEvidenceService,
   getProviderCompatibilityService,
   getRuntimeBrowserService,
   getRuntimeManagementService,
   getRuntimeMeteringService,
   getRuntimeSessionManager,
 } from '../app.js';
+import {
+  buildAgentRuntimeSessionInspection,
+  readLatestAgentTargetEvidence,
+} from '../agentDiagnosticsEvidenceReadModel.js';
 import type { RuntimeProviderTargetMeteringSnapshot } from '../../core/usage/RuntimeMeteringService.js';
 import {
   DEFAULT_RUNTIME_AGENT_PROBE_TIMEOUT_MS,
@@ -102,7 +99,6 @@ import {
 } from '../../startup.js';
 import { SetupDiagnosticService } from '../../core/diagnostics/SetupDiagnosticService.js';
 import { resolveEffectiveToolCatalogContext } from '../providerToolCatalogContext.js';
-import { resolveSessionProviderTarget } from '../providerTargets.js';
 
 type DiagnosticStatus = HealthStatus['status'];
 type DiagnosticsProbeMode = 'light' | 'live';
@@ -217,130 +213,6 @@ function pickAvailabilitySummary(checks: DiagnosticCheck[]): string {
   }
 
   return checks[0]?.message || 'No diagnostics collected';
-}
-
-function buildRuntimeSessionInspection(
-  ctx: AppContext,
-  session: SessionInfo,
-){
-  const runtime = getRuntimeSessionManager(ctx);
-  const wakeup = ctx.wakeup?.getSessionWakeState(session.id);
-  return buildSessionInspection({
-    session,
-    view: toSessionView(session, {
-      attached: runtime.isAttached(session.id),
-      externalSessionLiveWindowMs: ctx.config.externalSessionLiveWindowMs,
-    }),
-    trackedState: runtime.getTrackedState(session.id),
-    metering: getRuntimeMeteringService(ctx).buildSessionSnapshot(session),
-    wakeupPending: Boolean(wakeup?.pending),
-    browserSessions: getRuntimeBrowserService(ctx).listSessions({
-      runtimeSessionId: session.id,
-    }),
-  });
-}
-
-function resolveSessionEvidenceRecency(session: SessionInfo): number {
-  return Date.parse(session.lastActivity || session.updatedAt || session.createdAt) || 0;
-}
-
-function findLatestAgentDiagnosticSessionEvidence(
-  ctx: AppContext,
-  target: ProviderTargetDescriptor,
-  excludeSessionId?: string,
-): AgentDiagnosticSessionEvidenceSummary | undefined {
-  let latest:
-    | {
-      recency: number;
-      evidence: AgentDiagnosticSessionEvidenceSummary;
-    }
-    | undefined;
-
-  for (const candidate of ctx.registry.list({ provider: target.providerName })) {
-    if (excludeSessionId && candidate.id === excludeSessionId) {
-      continue;
-    }
-
-    let candidateTarget: ProviderTargetDescriptor;
-    try {
-      candidateTarget = resolveSessionProviderTarget(ctx.config, candidate);
-    } catch {
-      continue;
-    }
-
-    if (
-      candidateTarget.providerName !== target.providerName
-      || candidateTarget.backend !== target.backend
-      || candidateTarget.instanceId !== target.instanceId
-    ) {
-      continue;
-    }
-
-    const evidence = buildAgentDiagnosticSessionEvidence(
-      candidate,
-      buildRuntimeSessionInspection(ctx, candidate),
-      'runtime_registry_latest_session',
-    );
-    if (!evidence) {
-      continue;
-    }
-
-    const recency = resolveSessionEvidenceRecency(candidate);
-    if (!latest || recency >= latest.recency) {
-      latest = { recency, evidence };
-    }
-  }
-
-  return latest?.evidence;
-}
-
-function findLatestAgentDiagnosticSessionActivity(
-  ctx: AppContext,
-  target: ProviderTargetDescriptor,
-  excludeSessionId?: string,
-): AgentDiagnosticSessionActivitySummary | undefined {
-  let latest:
-    | {
-      recency: number;
-      activity: AgentDiagnosticSessionActivitySummary;
-    }
-    | undefined;
-
-  for (const candidate of ctx.registry.list({ provider: target.providerName })) {
-    if (excludeSessionId && candidate.id === excludeSessionId) {
-      continue;
-    }
-
-    let candidateTarget: ProviderTargetDescriptor;
-    try {
-      candidateTarget = resolveSessionProviderTarget(ctx.config, candidate);
-    } catch {
-      continue;
-    }
-
-    if (
-      candidateTarget.providerName !== target.providerName
-      || candidateTarget.backend !== target.backend
-      || candidateTarget.instanceId !== target.instanceId
-    ) {
-      continue;
-    }
-
-    const activity = buildAgentDiagnosticSessionActivity(
-      candidate,
-      'runtime_registry_latest_session',
-    );
-    if (!activity) {
-      continue;
-    }
-
-    const recency = resolveSessionEvidenceRecency(candidate);
-    if (!latest || recency >= latest.recency) {
-      latest = { recency, activity };
-    }
-  }
-
-  return latest?.activity;
 }
 
 function getRuntimeWakeupSnapshot(ctx: AppContext) {
@@ -947,18 +819,12 @@ async function diagnoseAgentTarget(
   const sessionEvidence = runtimeSession
     ? buildAgentDiagnosticSessionEvidence(
       runtimeSession,
-      buildRuntimeSessionInspection(ctx, runtimeSession),
+      buildAgentRuntimeSessionInspection(ctx, runtimeSession),
       'runtime_session_inspection',
     )
     : undefined;
-  const latestSessionActivity = !runtimeSession
-    ? findLatestAgentDiagnosticSessionActivity(ctx, target)
-    : undefined;
-  const latestSessionEvidence = !runtimeSession
-    ? findLatestAgentDiagnosticSessionEvidence(ctx, target)
-    : undefined;
-  const retainedTargetEvidence = !runtimeSession && !latestSessionActivity && !latestSessionEvidence
-    ? getAgentTargetEvidenceService(ctx).get(target)
+  const latestTargetEvidence = !runtimeSession
+    ? readLatestAgentTargetEvidence(ctx, target)
     : undefined;
   if (runtimeSession && sessionEvidence) {
     config.sessionEvidence = {
@@ -1003,7 +869,7 @@ async function diagnoseAgentTarget(
       ),
     );
   }
-  const fallbackLatestEvidence = latestSessionEvidence || retainedTargetEvidence?.evidence;
+  const fallbackLatestEvidence = latestTargetEvidence?.evidence;
   if (!runtimeSession && fallbackLatestEvidence) {
     config.latestSessionEvidence = {
       source: fallbackLatestEvidence.source,
@@ -1096,7 +962,7 @@ async function diagnoseAgentTarget(
       ),
     );
   }
-  const fallbackLatestActivity = latestSessionActivity || retainedTargetEvidence?.activity;
+  const fallbackLatestActivity = latestTargetEvidence?.activity;
   if (agentRuntime.family === 'bridge' && !runtimeSession && fallbackLatestActivity) {
     config.latestSessionActivity = {
       source: fallbackLatestActivity.source,

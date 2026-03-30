@@ -273,6 +273,9 @@ CLI providers without shelling out to a second discovery protocol.
 `GET /providers/config`, so MCP hosts can inspect configured backends,
 instance-level runtime/tooling/continuity summaries, model-catalog snapshots,
 and execution-strategy catalog metadata without joining multiple routes first.
+For agent targets, the same surface now also includes bounded latest-session
+activity/evidence summaries when the runtime already knows recent remote
+tool/service or work-product state for that exact target.
 `provider_tools` reuses the same provider-tooling inspection surface as
 `GET /providers/{provider}/tools`, so MCP hosts can inspect runtime-local,
 provider-native, or agent/API-discovered tool ownership without needing a
@@ -3238,6 +3241,19 @@ This reuses the same runtime-owned metering service behind
 `GET /diagnostics/providers`, but keeps the `/providers/config` copy compact so
 selector/provider-topology reads can show temporary cooldown pressure without a
 second diagnostics request.
+
+For agent-backed instances, the same instance entry now also reuses the bounded
+latest-session evidence read model from provider diagnostics:
+
+- `latestSessionEvidence`: bounded recent work-product evidence when the
+  runtime has a recent exact-target session or retained target-evidence entry
+- `latestSessionActivity`: bounded recent remote tool/service activity for
+  bridge-style targets that surface runtime-owned activity summaries
+
+These summaries are additive host/operator hints, not a new agent-specific
+inspection route. They reuse the same source/freshness fields as provider
+diagnostics, including `source`, `observedAt`, and retained-store
+`retainedAt` when the runtime had to fall back beyond a live session record.
 
 Each instance entry also exposes additive `eventCapabilities` metadata for
 host-side rendering decisions. This is runtime-owned capability truth for the

@@ -659,6 +659,41 @@ describe('agent backend integration', () => {
         label: 'Artifact run-1',
       }]);
 
+      const providerResponseAfterMessage = await runtime.app.request('/providers/config');
+      expect(providerResponseAfterMessage.status).toBe(200);
+      await expect(providerResponseAfterMessage.json()).resolves.toEqual(expect.objectContaining({
+        providers: {
+          openclaw: expect.objectContaining({
+            instances: [expect.objectContaining({
+              id: 'gateway',
+              latestSessionEvidence: expect.objectContaining({
+                source: 'runtime_registry_latest_session',
+                sessionId: created.id,
+                sessionKey: 'task-123',
+                observedAt: expect.any(String),
+                counts: expect.objectContaining({
+                  artifactCount: 1,
+                  serviceCount: 1,
+                  previewSurfaceCount: 2,
+                }),
+                artifacts: expect.arrayContaining([
+                  expect.objectContaining({
+                    id: 'run-1-artifact',
+                    hasPath: true,
+                  }),
+                ]),
+                services: expect.arrayContaining([
+                  expect.objectContaining({
+                    name: 'preview',
+                    url: 'https://preview.test/run-1',
+                  }),
+                ]),
+              }),
+            })],
+          }),
+        },
+      }));
+
       const historyResponse = await runtime.app.request(`/sessions/${created.id}/history`);
       expect(historyResponse.status).toBe(200);
       expect(await historyResponse.json()).toMatchObject({
@@ -3627,6 +3662,48 @@ describe('agent backend integration', () => {
           },
         },
       ]);
+
+      const providerResponseAfterMessage = await runtime.app.request('/providers/config');
+      expect(providerResponseAfterMessage.status).toBe(200);
+      await expect(providerResponseAfterMessage.json()).resolves.toEqual(expect.objectContaining({
+        providers: {
+          claude: expect.objectContaining({
+            instances: [expect.objectContaining({
+              id: 'sdk',
+              latestSessionActivity: expect.objectContaining({
+                source: 'runtime_registry_latest_session',
+                sessionId: created.id,
+                sessionKey: 'sdk-task-1',
+                observedAt: expect.any(String),
+                activity: {
+                  toolUseCount: 1,
+                  toolResultCount: 1,
+                  serviceUpdateCount: 1,
+                  observedToolNames: ['grep'],
+                  observedServiceIds: ['preview'],
+                },
+              }),
+              latestSessionEvidence: expect.objectContaining({
+                source: 'runtime_registry_latest_session',
+                sessionId: created.id,
+                sessionKey: 'sdk-task-1',
+                observedAt: expect.any(String),
+                counts: expect.objectContaining({
+                  serviceCount: 1,
+                  previewSurfaceCount: 1,
+                }),
+                services: [
+                  {
+                    id: 'preview',
+                    name: 'preview',
+                    url: 'https://preview.test/bridge-session-1',
+                  },
+                ],
+              }),
+            })],
+          }),
+        },
+      }));
 
       const observeResponse = await runtime.app.request(`/sessions/${created.id}/observe`);
       expect(observeResponse.status).toBe(200);

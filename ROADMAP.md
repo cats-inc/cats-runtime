@@ -1311,6 +1311,10 @@ always-on self-adapting parser system.
   entry, so operator flows can inspect known bridge activity and work products
   even before pinning a specific `sessionId`; those summaries now also preserve
   freshness/provenance metadata such as `observedAt` and `retainedAt`
+- `/providers/config` now also reuses the same bounded latest-session agent
+  evidence read model, so provider-selection flows can surface recent exact-
+  target work products and bridge activity without requiring a second
+  diagnostics-only fetch
 - session-aware provider diagnostics now also keep Agent SDK bridge targets on
   provider-wide tool catalogs while surfacing runtime session activity
   evidence, instead of treating unsupported effective-tool discovery as a

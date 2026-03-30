@@ -30,6 +30,7 @@ import {
   getProviderCompatibilityService,
   getRuntimeMeteringService,
 } from '../app.js';
+import { readLatestAgentTargetEvidence } from '../agentDiagnosticsEvidenceReadModel.js';
 import { resolveEffectiveToolCatalogContext } from '../providerToolCatalogContext.js';
 import { getRouteErrorStatus } from '../routeErrors.js';
 
@@ -135,6 +136,9 @@ providerRoutes.get('/providers/config', async (c) => {
           backend: instance.backend,
         });
         const apiRuntime = inspectApiTarget(instance);
+        const latestAgentTargetEvidence = instance.backend === 'agent'
+          ? readLatestAgentTargetEvidence(ctx, instance)
+          : undefined;
 
         return {
           ...(instance.backend === 'cli' && instance.cliInstance
@@ -153,6 +157,12 @@ providerRoutes.get('/providers/config', async (c) => {
           model: instance.remoteInstance?.model,
           ...(apiRuntime ? { apiRuntime } : {}),
           ...(agentRuntime ? { agentRuntime } : {}),
+          ...(latestAgentTargetEvidence?.evidence
+            ? { latestSessionEvidence: latestAgentTargetEvidence.evidence }
+            : {}),
+          ...(agentRuntime?.family === 'bridge' && latestAgentTargetEvidence?.activity
+            ? { latestSessionActivity: latestAgentTargetEvidence.activity }
+            : {}),
           continuity,
           metering: metering.summary,
           modelCatalog,

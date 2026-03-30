@@ -510,6 +510,10 @@ path is intentionally narrow:
   work-product evidence without already knowing a specific `sessionId`; retained
   target-evidence fallbacks now also preserve `retainedAt` provenance on both
   the config payload and matching diagnostic checks
+- Reuses that same bounded latest-session agent evidence read model on
+  `/providers/config`, so selector/provider-topology reads can surface recent
+  exact-target work products and, for bridge targets, recent remote
+  tool/service activity without requiring a second diagnostics-only fetch
 - Normalizes history provenance metadata, per-source transcript provenance, and
   Pi-native transcript parsing so provider-owned session files plus later
   runtime-managed fallback history can still feed the same runtime-owned

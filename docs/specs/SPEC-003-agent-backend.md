@@ -115,7 +115,10 @@ current `api` backend or bury a second orchestration model inside it.
   same shared runtime session inspection should remain reusable from
   session-aware provider diagnostics for bounded activity/work-product
   evidence, including source/freshness metadata that lets operators tell when
-  bounded retained evidence was observed and when it was last retained.
+  bounded retained evidence was observed and when it was last retained. The
+  same bounded latest-session evidence should remain reusable from broader
+  host-facing provider topology reads instead of living only behind
+  diagnostics-only routes.
 - **Extensibility**: The adapter contract shall support more than one external
   agent runtime.
 

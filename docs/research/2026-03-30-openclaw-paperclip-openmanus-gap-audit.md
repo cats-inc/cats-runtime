@@ -153,6 +153,11 @@ runtime session, and that same target-level evidence now survives session
 deletion through a repo-owned retained evidence store with bounded
 provenance/freshness metadata (`source`, `observedAt`, `retainedAt`).
 
+The runtime now also reuses that same bounded latest-session evidence on
+`/providers/config`, so broader host/provider-selection reads no longer have to
+call diagnostics first just to show the latest known agent work products or
+bridge activity for an exact target.
+
 That narrows the remaining gap again. The next missing depth is no longer
 "provider diagnostics cannot show work products"; it is broader harvesting and
 more durable evidence beyond what retained target evidence already knows.
