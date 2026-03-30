@@ -90,17 +90,22 @@ What the code already proves:
 
 ### 1. Agent remote-tool discovery breadth and later-target semantic probes
 
-This is the largest still-open gap cluster.
+This remains the largest still-open gap cluster, but it is narrower than it
+was earlier in the day.
 
 Evidence:
 
 - `PROGRESS.md` still explicitly calls out broader remote tool discovery and
   stronger later-target semantic validation.
 - OpenClaw exposes both `tools.catalog` and session-scoped `tools.effective`,
-  while `cats-runtime` currently only consumes the catalog path.
-- The Agent SDK bridge probe is still mostly registry-depth:
-  provider listed, configured model visible, streaming advertised, and
-  registry-embedded tool metadata when present.
+  and `cats-runtime` now consumes both on tooling and diagnostics read
+  surfaces when a runtime session context is available.
+- The Agent SDK bridge probe now goes beyond bare registry visibility:
+  provider listed, configured model visible, streaming advertised,
+  provider-registry tool metadata visible, and bounded create/read/delete
+  probe-session validation are all in-repo.
+- What is still missing is stronger non-OpenClaw remote-tool/service evidence
+  beyond what the provider registry reports.
 
 Why this is the highest-value next slice:
 
@@ -145,13 +150,13 @@ longer the most urgent missing capability.
 
 ## Recommended Slice Order
 
-1. Add OpenClaw session-scoped effective tool discovery to the existing
-   runtime-owned agent/tooling surface.
-2. Tighten `PROGRESS.md` and `SPEC-003` truth after that code slice lands.
+1. Strengthen non-OpenClaw remote-tool/service evidence beyond Agent SDK bridge
+   provider-registry truth.
+2. Deepen runtime-owned operator evidence for remote tools, services, and
+   work products on the existing diagnostics/session surfaces.
 3. Reassess whether the next highest-value slice is:
-   - stronger Agent SDK bridge semantic probing, or
-   - richer runtime-service / work-product observability within existing
-     session and diagnostics surfaces.
+   - richer Agent SDK bridge service/runtime evidence, or
+   - broader work-product harvesting within the current runtime boundary.
 
 ## Bottom Line
 

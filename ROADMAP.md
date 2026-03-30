@@ -1293,6 +1293,10 @@ always-on self-adapting parser system.
   `sessionId` / `sessionKey` context for agent targets, so OpenClaw
   session-effective `tools.effective` evidence can be inspected through the
   same diagnostics read model instead of a tooling-only side path
+- Agent SDK bridge live probes now also treat provider-registry tool metadata
+  as part of semantic readiness, surfacing explicit tool-catalog visibility
+  checks and tool/group counts before bounded probe-session lifecycle
+  validation runs
 - `/providers/config` instance entries now reuse the same retained artifact
   read model, so host/provider-selection flows can fetch provider topology and
   latest provider-evolution summary in one call

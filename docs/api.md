@@ -827,19 +827,22 @@ reporting config-only validation, and surface additive `config.liveProbe`
 snapshot fields such as advertised agent/channel/session counts. Agent SDK
 bridge targets now use the same live diagnostics surface to validate
 `GET /api/v1/providers` semantically, adding bounded checks for target-provider
-listing, configured-model visibility, and registry-declared streaming support,
-and then attempt a bounded probe-session create/read/delete cycle so operators
-can see whether the bridge can actually honor basic session lifecycle
-semantics.
+listing, configured-model visibility, registry-declared streaming support, and
+provider-registry tool metadata visibility before attempting a bounded
+probe-session create/read/delete cycle, so operators can see whether the
+bridge can actually honor both remote tool-catalog and basic session
+lifecycle semantics.
 The same provider registry plus probe-session summary now surfaces under
 `config.liveProbe`, including `semanticStatus` and additive
 `sessionLifecycle` fields (`createChecked`, `createStatus`, `readChecked`,
 `readStatus`, `cleanupChecked`, `cleanupStatus`, and `probeModel`, plus
-observed provider/model/status truth when the bridge returns it). Those same runtime-managed options
-also back OpenClaw `models.list` and Agent SDK bridge provider-registry model
-loading, so live diagnostics and `GET /providers/{provider}/models` can report
-runtime-derived model truth instead of a config-only fallback when the remote
-target exposes model discovery.
+observed provider/model/status truth when the bridge returns it), plus
+`toolCatalogVisible`, `toolCount`, and `toolGroupCount` for Agent SDK bridge
+targets. Those same runtime-managed options also back OpenClaw `models.list`
+and Agent SDK bridge provider-registry model loading, so live diagnostics and
+`GET /providers/{provider}/models` can report runtime-derived model truth
+instead of a config-only fallback when the remote target exposes model
+discovery.
 OpenAI and Anthropic probes use `GET /v1/models` against the resolved base URL,
 Gemini/Google probes use `GET /v1beta/models`, and Ollama probes use
 `GET /api/tags`.

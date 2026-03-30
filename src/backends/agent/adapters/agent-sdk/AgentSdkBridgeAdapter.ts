@@ -313,6 +313,9 @@ function parseBridgeProviderRegistry(
     defaultModel?: string;
     configuredModel?: string;
     configuredModelListed?: boolean;
+    toolCatalogVisible: boolean;
+    toolCount: number;
+    toolGroupCount: number;
     capabilities: {
       streaming: boolean;
       mcp: boolean;
@@ -329,6 +332,7 @@ function parseBridgeProviderRegistry(
   const defaultModel = typeof provider?.default_model === 'string' && provider.default_model.length > 0
     ? provider.default_model
     : undefined;
+  const toolCatalog = provider ? parseBridgeToolCatalog(provider) : undefined;
   const providerListed = Boolean(provider);
   const configuredModelListed = configuredModel
     ? models.includes(configuredModel)
@@ -341,6 +345,9 @@ function parseBridgeProviderRegistry(
     ...(defaultModel ? { defaultModel } : {}),
     ...(configuredModel ? { configuredModel } : {}),
     ...(configuredModelListed !== undefined ? { configuredModelListed } : {}),
+    toolCatalogVisible: Boolean(toolCatalog),
+    toolCount: toolCatalog?.toolCount ?? 0,
+    toolGroupCount: toolCatalog?.groupCount ?? 0,
     capabilities: parseBridgeProviderCapabilities(provider?.capabilities),
   };
 }
@@ -360,6 +367,7 @@ function isBridgeProviderSemanticallyReady(
 ): boolean {
   return registry.providerListed
     && registry.capabilities.streaming
+    && registry.toolCatalogVisible
     && (registry.configuredModelListed !== false);
 }
 
@@ -378,6 +386,10 @@ function summarizeBridgeRegistryHealth(
 
   if (!registry.capabilities.streaming) {
     return `${expectedProvider} is listed by Agent SDK bridge but does not advertise streaming support`;
+  }
+
+  if (!registry.toolCatalogVisible) {
+    return `${expectedProvider} is listed by Agent SDK bridge but did not expose provider-registry tool metadata`;
   }
 
   return `${expectedProvider} available via Agent SDK bridge`;
@@ -435,6 +447,22 @@ function buildBridgeProbeChecks(
             targetProvider: expectedProvider,
             streamingAdvertised: registry.capabilities.streaming,
             capabilities: registry.capabilities,
+          },
+        }]
+      : []),
+    ...(registry.providerListed
+      ? [{
+          code: 'bridge_provider_tool_catalog_visible',
+          status: registry.toolCatalogVisible ? ('ok' as const) : ('degraded' as const),
+          message: registry.toolCatalogVisible
+            ? `${providerLabel} exposes tool metadata in the bridge provider registry`
+            : `${providerLabel} did not expose tool metadata in the bridge provider registry`,
+          details: {
+            endpoint,
+            targetProvider: expectedProvider,
+            toolCatalogVisible: registry.toolCatalogVisible,
+            toolCount: registry.toolCount,
+            toolGroupCount: registry.toolGroupCount,
           },
         }]
       : []),
@@ -1008,6 +1036,9 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
             ? { configuredModelListed: registry.configuredModelListed }
             : {}),
           capabilities: registry.capabilities,
+          toolCatalogVisible: registry.toolCatalogVisible,
+          toolCount: registry.toolCount,
+          toolGroupCount: registry.toolGroupCount,
           ...(lifecycle
             ? {
                 sessionLifecycle: {

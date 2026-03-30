@@ -14,6 +14,19 @@ function createInstance(): RemoteProviderInstanceConfig {
   };
 }
 
+function createBridgeToolGroups() {
+  return [
+    {
+      id: 'core',
+      label: 'Core',
+      tools: [
+        { name: 'read_file', source: 'core' },
+        { name: 'write_file', source: 'core' },
+      ],
+    },
+  ];
+}
+
 describe('AgentSdkBridgeAdapter', () => {
   it('keeps probe health ok when the target provider is listed, the model is visible, and streaming is advertised', async () => {
     const adapter = new AgentSdkBridgeAdapter({
@@ -33,6 +46,7 @@ describe('AgentSdkBridgeAdapter', () => {
                   mcp: true,
                   vision: false,
                 },
+                tool_groups: createBridgeToolGroups(),
               },
             ],
           }), {
@@ -86,10 +100,22 @@ describe('AgentSdkBridgeAdapter', () => {
           streamingAdvertised: true,
         }),
       }),
+      expect.objectContaining({
+        code: 'bridge_provider_tool_catalog_visible',
+        status: 'ok',
+        details: expect.objectContaining({
+          toolCatalogVisible: true,
+          toolCount: 2,
+          toolGroupCount: 1,
+        }),
+      }),
     ]));
     expect(result.liveProbe).toEqual(expect.objectContaining({
       semanticStatus: 'ok',
       configuredModelListed: true,
+      toolCatalogVisible: true,
+      toolCount: 2,
+      toolGroupCount: 1,
       capabilities: {
         streaming: true,
         mcp: true,
@@ -142,6 +168,7 @@ describe('AgentSdkBridgeAdapter', () => {
               mcp: true,
               vision: false,
             },
+            tool_groups: createBridgeToolGroups(),
           },
         ],
       }), {
@@ -168,8 +195,63 @@ describe('AgentSdkBridgeAdapter', () => {
     expect(result.liveProbe).toEqual(expect.objectContaining({
       semanticStatus: 'degraded',
       configuredModelListed: true,
+      toolCatalogVisible: true,
+      toolCount: 2,
+      toolGroupCount: 1,
       capabilities: {
         streaming: false,
+        mcp: true,
+        vision: false,
+      },
+    }));
+  });
+
+  it('degrades probe health when the bridge registry omits tool metadata', async () => {
+    const adapter = new AgentSdkBridgeAdapter({
+      fetch: async () => new Response(JSON.stringify({
+        providers: [
+          {
+            name: 'claude',
+            default_model: 'sonnet',
+            models: ['sonnet', 'haiku'],
+            capabilities: {
+              streaming: true,
+              mcp: true,
+              vision: false,
+            },
+          },
+        ],
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    });
+
+    const result = await adapter.probe(createInstance());
+
+    expect(result.health).toEqual(expect.objectContaining({
+      status: 'degraded',
+      details: 'claude is listed by Agent SDK bridge but did not expose provider-registry tool metadata',
+    }));
+    expect(result.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'bridge_provider_tool_catalog_visible',
+        status: 'degraded',
+        details: expect.objectContaining({
+          toolCatalogVisible: false,
+          toolCount: 0,
+          toolGroupCount: 0,
+        }),
+      }),
+    ]));
+    expect(result.liveProbe).toEqual(expect.objectContaining({
+      semanticStatus: 'degraded',
+      configuredModelListed: true,
+      toolCatalogVisible: false,
+      toolCount: 0,
+      toolGroupCount: 0,
+      capabilities: {
+        streaming: true,
         mcp: true,
         vision: false,
       },
@@ -194,6 +276,7 @@ describe('AgentSdkBridgeAdapter', () => {
                   mcp: true,
                   vision: false,
                 },
+                tool_groups: createBridgeToolGroups(),
               },
             ],
           }), {
@@ -225,6 +308,9 @@ describe('AgentSdkBridgeAdapter', () => {
     }));
     expect(result.liveProbe).toEqual(expect.objectContaining({
       semanticStatus: 'degraded',
+      toolCatalogVisible: true,
+      toolCount: 2,
+      toolGroupCount: 1,
       sessionLifecycle: {
         createChecked: true,
         createStatus: 'degraded',
@@ -265,6 +351,7 @@ describe('AgentSdkBridgeAdapter', () => {
                   mcp: true,
                   vision: false,
                 },
+                tool_groups: createBridgeToolGroups(),
               },
             ],
           }), {
@@ -309,6 +396,9 @@ describe('AgentSdkBridgeAdapter', () => {
     }));
     expect(result.liveProbe).toEqual(expect.objectContaining({
       semanticStatus: 'degraded',
+      toolCatalogVisible: true,
+      toolCount: 2,
+      toolGroupCount: 1,
       sessionLifecycle: {
         createChecked: true,
         createStatus: 'ok',
