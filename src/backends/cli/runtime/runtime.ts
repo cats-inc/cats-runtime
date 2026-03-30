@@ -460,14 +460,12 @@ function buildNativeSpawnConfig(
           cwd,
         };
       }
-      return {
-        command: commandPath,
-        args,
-        shell: true,
-        cwd,
-      };
+      return buildWindowsShellProxySpawnConfig(commandPath, args, cwd);
 
     case 'shell':
+      if (process.platform === 'win32') {
+        return buildWindowsShellProxySpawnConfig(commandPath, args, cwd);
+      }
       return {
         command: commandPath,
         args,
@@ -484,12 +482,12 @@ function buildNativeSpawnConfig(
       };
 
     case 'cmd':
-      return {
-        command: commandPath,
+      return buildWindowsShellProxySpawnConfig(
+        commandPath,
         args,
-        shell: commandConfig.runnerPath || process.env.ComSpec || 'cmd.exe',
         cwd,
-      };
+        commandConfig.runnerPath || process.env.PWSH_PATH || 'powershell.exe',
+      );
 
     case 'pwsh':
       return buildPowerShellSpawnConfig(
@@ -507,6 +505,15 @@ function buildNativeSpawnConfig(
         cwd,
       );
   }
+}
+
+function buildWindowsShellProxySpawnConfig(
+  commandPath: string,
+  args: string[],
+  cwd: string,
+  shellPath: string = process.env.PWSH_PATH || 'powershell.exe',
+): ProcessSpawnConfig {
+  return buildPowerShellSpawnConfig(commandPath, args, shellPath, cwd);
 }
 
 function buildPowerShellSpawnConfig(

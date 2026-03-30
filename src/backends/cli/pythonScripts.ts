@@ -194,12 +194,12 @@ async function resolveWindowsPythonCommand(
     {
       command: 'python3',
       args: ['-c', probe],
-      runnerOptions: { shell: true },
+      runnerOptions: {},
     },
     {
       command: 'python',
       args: ['-c', probe],
-      runnerOptions: { shell: true },
+      runnerOptions: {},
     },
     {
       command: 'py',
@@ -231,7 +231,7 @@ async function resolveWindowsPythonCommand(
   return {
     command: 'python3',
     argsPrefix: [],
-    runnerOptions: { shell: true },
+    runnerOptions: {},
   };
 }
 

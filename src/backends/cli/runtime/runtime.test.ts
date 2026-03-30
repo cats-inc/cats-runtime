@@ -4,8 +4,27 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildProcessSpawnConfig,
+  buildPowerShellCommandScript,
   createRuntimeAdapter,
 } from './runtime.js';
+
+function decodePowerShellPayload(
+  env: Record<string, string> | undefined,
+): { command: string; args: string[] } | null {
+  if (!env) {
+    return null;
+  }
+
+  const encoded = env.CATS_RUNTIME_PWSH_EXEC_B64;
+  if (!encoded) {
+    return null;
+  }
+
+  return JSON.parse(Buffer.from(encoded, 'base64').toString('utf8')) as {
+    command: string;
+    args: string[];
+  };
+}
 
 describe('runtime adapters', () => {
   it('keeps native POSIX paths unchanged', () => {
@@ -137,7 +156,7 @@ describe('runtime adapters', () => {
     });
   });
 
-  it('passes native auto command arguments through without shell interpolation on POSIX', () => {
+  it('passes native auto command arguments through without shell interpolation', () => {
     const spawnConfig = buildProcessSpawnConfig(
       {
         path: 'kiro-cli',
@@ -151,17 +170,35 @@ describe('runtime adapters', () => {
       '/Users/kenne/repo',
     );
 
-    expect(spawnConfig.command).toBe('kiro-cli');
-    expect(spawnConfig.args).toEqual([
-      'chat',
-      '--no-interactive',
-      'Review ${summary}\n- **user** (stakeholder)',
-    ]);
+    if (process.platform === 'win32') {
+      expect(spawnConfig.command.toLowerCase()).toContain('powershell');
+      expect(spawnConfig.args).toEqual([
+        '-NoLogo',
+        '-NoProfile',
+        '-Command',
+        buildPowerShellCommandScript(),
+      ]);
+      expect(decodePowerShellPayload(spawnConfig.env)).toEqual({
+        command: 'kiro-cli',
+        args: [
+          'chat',
+          '--no-interactive',
+          'Review ${summary}\n- **user** (stakeholder)',
+        ],
+      });
+    } else {
+      expect(spawnConfig.command).toBe('kiro-cli');
+      expect(spawnConfig.args).toEqual([
+        'chat',
+        '--no-interactive',
+        'Review ${summary}\n- **user** (stakeholder)',
+      ]);
+    }
     expect(spawnConfig.cwd).toBe('/Users/kenne/repo');
-    expect(spawnConfig.shell).toBe(process.platform === 'win32');
+    expect(spawnConfig.shell).toBe(false);
   });
 
-  it('keeps Copilot auto runner on the standard native shell path', () => {
+  it('wraps the Windows Copilot auto runner in a PowerShell exec payload', () => {
     const spawnConfig = buildProcessSpawnConfig(
       {
         path: 'copilot',
@@ -175,9 +212,25 @@ describe('runtime adapters', () => {
       'C:\\Users\\kenne\\repo',
     );
 
+    if (process.platform === 'win32') {
+      expect(spawnConfig.command.toLowerCase()).toContain('powershell');
+      expect(spawnConfig.args).toEqual([
+        '-NoLogo',
+        '-NoProfile',
+        '-Command',
+        buildPowerShellCommandScript(),
+      ]);
+      expect(decodePowerShellPayload(spawnConfig.env)).toEqual({
+        command: expect.stringContaining('copilot'),
+        args: ['--help'],
+      });
+      expect(spawnConfig.shell).toBe(false);
+      return;
+    }
+
     expect(spawnConfig.command.toLowerCase()).toContain('copilot');
     expect(spawnConfig.args).toEqual(['--help']);
-    expect(spawnConfig.shell).toBe(process.platform === 'win32');
+    expect(spawnConfig.shell).toBe(false);
   });
 
   it('normalizes backslashes in Docker runtime paths', () => {
