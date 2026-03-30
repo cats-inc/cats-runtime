@@ -274,7 +274,8 @@ and execution-strategy catalog metadata without joining multiple routes first.
 `provider_tools` reuses the same provider-tooling inspection surface as
 `GET /providers/{provider}/tools`, so MCP hosts can inspect runtime-local,
 provider-native, or agent/API-discovered tool ownership without needing a
-parallel MCP-only contract.
+parallel MCP-only contract, including additive `scope`, `sessionId`, and
+`sessionKey` arguments for session-effective agent tool inspection.
 `provider_models` reuses the same provider-model catalog surface as
 `GET /providers/{provider}/models`, including additive `instance` selection and
 bounded `forceRefresh` semantics, so MCP hosts can inspect per-target model
