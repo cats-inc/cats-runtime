@@ -1297,6 +1297,10 @@ always-on self-adapting parser system.
   as part of semantic readiness, surfacing explicit tool-catalog visibility
   checks and tool/group counts before bounded probe-session lifecycle
   validation runs
+- Agent SDK bridge session/history/observe read models now also surface bounded
+  `inspection.agentSession.activity` summaries for observed remote tools and
+  runtime services, so hosts do not need to replay raw stream events just to
+  inspect recent bridge activity
 - `/providers/config` instance entries now reuse the same retained artifact
   read model, so host/provider-selection flows can fetch provider topology and
   latest provider-evolution summary in one call

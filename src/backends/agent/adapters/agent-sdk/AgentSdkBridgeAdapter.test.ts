@@ -562,9 +562,83 @@ describe('AgentSdkBridgeAdapter', () => {
     expect(events).toEqual([
       expect.objectContaining({ type: 'init', providerSessionId: 'bridge-session-1' }),
       expect.objectContaining({ type: 'text', text: 'alpha' }),
-      expect.objectContaining({ type: 'tool_use', toolName: 'read_file' }),
-      expect.objectContaining({ type: 'tool_result', toolName: 'read_file', toolId: 'tool-1', text: 'done' }),
-      expect.objectContaining({ type: 'result', providerSessionId: 'bridge-session-1' }),
+      expect.objectContaining({
+        type: 'tool_use',
+        toolName: 'read_file',
+        providerState: {
+          agentSession: {
+            providerSessionId: 'bridge-session-1',
+            sessionKey: 'probe-session',
+            status: 'active',
+            activity: {
+              toolUseCount: 1,
+              toolResultCount: 0,
+              serviceUpdateCount: 0,
+              observedToolNames: ['read_file'],
+              observedServiceIds: [],
+            },
+            adapterState: {
+              bridgeProvider: 'claude',
+              bridgeSessionId: 'bridge-session-1',
+              upstreamProviderSessionId: 'upstream-session-1',
+            },
+          },
+        },
+      }),
+      expect.objectContaining({
+        type: 'tool_result',
+        toolName: 'read_file',
+        toolId: 'tool-1',
+        text: 'done',
+        providerState: {
+          agentSession: {
+            providerSessionId: 'bridge-session-1',
+            sessionKey: 'probe-session',
+            status: 'active',
+            activity: {
+              toolUseCount: 1,
+              toolResultCount: 1,
+              serviceUpdateCount: 0,
+              observedToolNames: ['read_file'],
+              observedServiceIds: [],
+            },
+            adapterState: {
+              bridgeProvider: 'claude',
+              bridgeSessionId: 'bridge-session-1',
+              upstreamProviderSessionId: 'upstream-session-1',
+            },
+          },
+        },
+      }),
+      expect.objectContaining({
+        type: 'result',
+        providerSessionId: 'bridge-session-1',
+        services: [
+          { id: 'preview', name: 'preview', url: 'https://preview.test' },
+        ],
+        providerState: {
+          agentSession: {
+            providerSessionId: 'bridge-session-1',
+            sessionKey: 'probe-session',
+            status: 'idle',
+            services: [
+              { id: 'preview', name: 'preview', url: 'https://preview.test' },
+            ],
+            activity: {
+              toolUseCount: 1,
+              toolResultCount: 1,
+              serviceUpdateCount: 1,
+              observedToolNames: ['read_file'],
+              observedServiceIds: ['preview'],
+            },
+            adapterState: {
+              bridgeProvider: 'claude',
+              bridgeSessionId: 'bridge-session-1',
+              upstreamProviderSessionId: 'upstream-session-1',
+            },
+          },
+        },
+      }),
     ]);
 
     const bundle = collector.finalize();

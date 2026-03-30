@@ -1,8 +1,10 @@
 import { extname, isAbsolute, resolve } from 'node:path';
 import type {
+  AgentSessionActivitySummary,
   AgentRuntimeService,
   RuntimeBrowserSessionView,
   RuntimeExecutionStrategyInspection,
+  RuntimeAgentSessionInspection,
   RuntimeToolPolicyInspection,
   RuntimePreviewSurface,
   RuntimePreviewSurfaceRenderHint,
@@ -75,6 +77,7 @@ export function buildSessionInspection(
   const busy = input.session.status === 'busy'
     || input.trackedState?.state === 'running'
     || input.trackedState?.state === 'canceling';
+  const agentSession = buildAgentSessionInspection(input.session);
 
   return {
     state: resolveExecutionState(input),
@@ -95,6 +98,7 @@ export function buildSessionInspection(
       wakeupPending: input.wakeupPending,
       trackedMaintenance: input.trackedState?.maintenance ?? input.session.maintenanceState,
     }),
+    ...(agentSession ? { agentSession } : {}),
     ...(strategy ? { strategy } : {}),
     ...(input.toolPolicy ? { tools: structuredClone(input.toolPolicy) } : {}),
     ...(input.session.skills ? { skills: cloneSkillState(input.session.skills) } : {}),
@@ -117,6 +121,26 @@ export function buildSessionInspection(
       canRetry: Boolean(input.trackedState?.lastRun)
         && (input.view.controls.canSend || input.view.controls.canResume),
     },
+  };
+}
+
+function buildAgentSessionInspection(
+  session: SessionInfo,
+): RuntimeAgentSessionInspection | undefined {
+  const agentSession = session.providerState?.agentSession;
+  if (!agentSession) {
+    return undefined;
+  }
+
+  return {
+    ...(agentSession.providerSessionId ? { providerSessionId: agentSession.providerSessionId } : {}),
+    ...(agentSession.sessionKey ? { sessionKey: agentSession.sessionKey } : {}),
+    ...(agentSession.runId ? { runId: agentSession.runId } : {}),
+    ...(agentSession.status ? { status: agentSession.status } : {}),
+    ...(agentSession.summary ? { summary: agentSession.summary } : {}),
+    ...(agentSession.activity
+      ? { activity: cloneAgentSessionActivity(agentSession.activity) }
+      : {}),
   };
 }
 
@@ -184,6 +208,18 @@ function dedupeServices(services: AgentRuntimeService[]): AgentRuntimeService[] 
     });
   }
   return Array.from(deduped.values());
+}
+
+function cloneAgentSessionActivity(
+  activity: AgentSessionActivitySummary,
+): AgentSessionActivitySummary {
+  return {
+    toolUseCount: activity.toolUseCount,
+    toolResultCount: activity.toolResultCount,
+    serviceUpdateCount: activity.serviceUpdateCount,
+    observedToolNames: [...activity.observedToolNames],
+    observedServiceIds: [...activity.observedServiceIds],
+  };
 }
 
 function dedupePreviewSurfaces(

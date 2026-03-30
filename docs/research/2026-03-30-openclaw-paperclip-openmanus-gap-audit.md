@@ -129,6 +129,12 @@ Remaining runtime-scope differences include:
 This is a real gap, but it depends on closing gap group 1 first because better
 tool/service discovery creates the evidence foundation.
 
+The runtime now has a first bounded bridge-side answer here:
+`inspection.agentSession.activity` preserves recent Agent SDK remote
+tool/service evidence on session/history/observe surfaces. The remaining gap is
+no longer "no session-level evidence"; it is deeper service/work-product
+coverage beyond that summary.
+
 ### 3. Work-product and runtime-service harvesting depth
 
 Compared with Paperclip, `cats-runtime` still keeps a narrower boundary around

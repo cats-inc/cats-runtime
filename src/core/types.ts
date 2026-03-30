@@ -997,6 +997,14 @@ export interface AgentRuntimeService {
   metadata?: Record<string, unknown>;
 }
 
+export interface AgentSessionActivitySummary {
+  toolUseCount: number;
+  toolResultCount: number;
+  serviceUpdateCount: number;
+  observedToolNames: string[];
+  observedServiceIds: string[];
+}
+
 export interface AgentSessionState {
   providerSessionId?: string;
   sessionKey?: string;
@@ -1004,6 +1012,7 @@ export interface AgentSessionState {
   status?: string;
   summary?: string;
   services?: AgentRuntimeService[];
+  activity?: AgentSessionActivitySummary;
   adapterState?: Record<string, unknown>;
 }
 
@@ -1403,6 +1412,15 @@ export interface RuntimeRunInspection {
   previewSurfaces?: RuntimePreviewSurface[];
 }
 
+export interface RuntimeAgentSessionInspection {
+  providerSessionId?: string;
+  sessionKey?: string;
+  runId?: string;
+  status?: string;
+  summary?: string;
+  activity?: AgentSessionActivitySummary;
+}
+
 export interface RuntimeSessionMeteringSnapshot {
   usage?: RuntimeUsageAggregate;
   preflight: RuntimeGuardrailResult;
@@ -1466,6 +1484,7 @@ export interface RuntimeSessionInspection {
   recentEvents: RuntimeEventExcerpt[];
   metering: RuntimeSessionMeteringSnapshot;
   maintenance: RuntimeSessionMaintenance;
+  agentSession?: RuntimeAgentSessionInspection;
   strategy?: RuntimeExecutionStrategyInspection;
   tools?: RuntimeToolPolicyInspection;
   skills?: SessionSkillState;

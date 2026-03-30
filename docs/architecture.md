@@ -494,6 +494,9 @@ path is intentionally narrow:
 - Enriches current/last-run inspection with per-run preview surfaces derived
   from agent services and artifacts so hosts can render the output of one run
   without diffing whole-session state
+- Reuses persisted provider-managed agent session state to expose bounded
+  `inspection.agentSession.activity` summaries for remote tool/service evidence
+  on the same session/history/observe surfaces
 - Normalizes history provenance metadata, per-source transcript provenance, and
   Pi-native transcript parsing so provider-owned session files plus later
   runtime-managed fallback history can still feed the same runtime-owned

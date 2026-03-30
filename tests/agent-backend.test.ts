@@ -2065,6 +2065,10 @@ describe('agent backend integration', () => {
           '',
           'data: {"type":"tool_use","toolName":"grep","toolInput":{"pattern":"TODO"}}',
           '',
+          'data: {"type":"tool_result","toolName":"grep","toolUseId":"tool-1","content":"1 match"}',
+          '',
+          'data: {"type":"service_update","services":[{"id":"preview","name":"preview","url":"https://preview.test/bridge-session-1"}]}',
+          '',
           'data: {"type":"content","content":"world"}',
           '',
           'data: {"type":"token_usage","usage":{"prompt_tokens":12,"completion_tokens":5,"total_tokens":17}}',
@@ -2242,6 +2246,51 @@ describe('agent backend integration', () => {
           toolArgs: {
             pattern: 'TODO',
           },
+          providerState: {
+            agentSession: {
+              providerSessionId: 'bridge-session-1',
+              sessionKey: 'sdk-task-1',
+              status: 'active',
+              activity: {
+                toolUseCount: 1,
+                toolResultCount: 0,
+                serviceUpdateCount: 0,
+                observedToolNames: ['grep'],
+                observedServiceIds: [],
+              },
+              adapterState: {
+                bridgeProvider: 'claude',
+                bridgeSessionId: 'bridge-session-1',
+                upstreamProviderSessionId: 'sdk-provider-1',
+              },
+            },
+          },
+        },
+        {
+          type: 'tool_result',
+          providerSessionId: 'bridge-session-1',
+          toolName: 'grep',
+          toolId: 'tool-1',
+          text: '1 match',
+          providerState: {
+            agentSession: {
+              providerSessionId: 'bridge-session-1',
+              sessionKey: 'sdk-task-1',
+              status: 'active',
+              activity: {
+                toolUseCount: 1,
+                toolResultCount: 1,
+                serviceUpdateCount: 0,
+                observedToolNames: ['grep'],
+                observedServiceIds: [],
+              },
+              adapterState: {
+                bridgeProvider: 'claude',
+                bridgeSessionId: 'bridge-session-1',
+                upstreamProviderSessionId: 'sdk-provider-1',
+              },
+            },
+          },
         },
         {
           type: 'text',
@@ -2255,11 +2304,32 @@ describe('agent backend integration', () => {
             inputTokens: 12,
             outputTokens: 5,
           },
+          services: [
+            {
+              id: 'preview',
+              name: 'preview',
+              url: 'https://preview.test/bridge-session-1',
+            },
+          ],
           providerState: {
             agentSession: {
               providerSessionId: 'bridge-session-1',
               sessionKey: 'sdk-task-1',
               status: 'idle',
+              services: [
+                {
+                  id: 'preview',
+                  name: 'preview',
+                  url: 'https://preview.test/bridge-session-1',
+                },
+              ],
+              activity: {
+                toolUseCount: 1,
+                toolResultCount: 1,
+                serviceUpdateCount: 1,
+                observedToolNames: ['grep'],
+                observedServiceIds: ['preview'],
+              },
               adapterState: {
                 bridgeProvider: 'claude',
                 bridgeSessionId: 'bridge-session-1',
@@ -2277,6 +2347,52 @@ describe('agent backend integration', () => {
           },
         },
       ]);
+
+      const observeResponse = await runtime.app.request(`/sessions/${created.id}/observe`);
+      expect(observeResponse.status).toBe(200);
+      await expect(observeResponse.json()).resolves.toEqual(expect.objectContaining({
+        session: expect.objectContaining({
+          inspection: expect.objectContaining({
+            agentSession: {
+              providerSessionId: 'bridge-session-1',
+              sessionKey: 'sdk-task-1',
+              status: 'idle',
+              activity: {
+                toolUseCount: 1,
+                toolResultCount: 1,
+                serviceUpdateCount: 1,
+                observedToolNames: ['grep'],
+                observedServiceIds: ['preview'],
+              },
+            },
+            services: [
+              {
+                id: 'preview',
+                name: 'preview',
+                url: 'https://preview.test/bridge-session-1',
+              },
+            ],
+            previewSurfaces: expect.arrayContaining([
+              expect.objectContaining({
+                kind: 'service',
+                label: 'preview',
+                url: 'https://preview.test/bridge-session-1',
+              }),
+            ]),
+            recentEvents: expect.arrayContaining([
+              expect.objectContaining({
+                eventType: 'tool_use',
+                toolName: 'grep',
+              }),
+              expect.objectContaining({
+                eventType: 'tool_result',
+                toolName: 'grep',
+                toolId: 'tool-1',
+              }),
+            ]),
+          }),
+        }),
+      }));
 
       const closeResponse = await runtime.app.request(`/sessions/${created.id}/close`, {
         method: 'POST',

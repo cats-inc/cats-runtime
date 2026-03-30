@@ -2139,6 +2139,13 @@ intended for host/dashboard run inspectors:
 status when the runtime is actively canceling or closing a run. The block is
 additive: existing session fields remain stable.
 
+For agent-backed sessions, `inspection.agentSession` is also additive and
+runtime-owned. It re-surfaces the provider-managed session pointer plus a
+bounded `activity` summary (`toolUseCount`, `toolResultCount`,
+`serviceUpdateCount`, `observedToolNames`, `observedServiceIds`) so hosts can
+inspect actual remote tool/service activity without replaying the raw event
+tape.
+
 `inspection.strategy` is also runtime-owned and additive. It reports the latest
 requested/effective strategy plus strategy request metadata such as
 `acceptanceCriteria`, `strategyContext`, and `correlation`. Its nested
@@ -2799,6 +2806,9 @@ without forcing hosts to infer transcript semantics from provider names alone.
 The same session/history/observe surfaces now also carry additive
 runtime-owned strategy resolution/state metadata, so hosts do not need a
 separate task-status event bus just to inspect execution-strategy state.
+For agent-backed sessions, those same surfaces also reuse
+`inspection.agentSession.activity`, so completed or idle sessions still expose
+the last bounded remote tool/service evidence after the live stream is gone.
 `GET /sessions/{id}/history` also reuses the same additive `providerTarget`
 read model returned by `GET /sessions/{id}` so provider continuity/tooling
 semantics stay visible alongside transcript provenance.
@@ -2866,6 +2876,8 @@ The same `session.inspection.strategy` read-model is reused by
 `GET /sessions/{id}`, `GET /sessions/{id}/history`, and
 `GET /sessions/{id}/observe` so strategy-local state stays inspectable through
 existing surfaces.
+Agent-backed sessions also reuse the same `session.inspection.agentSession`
+summary across those three read surfaces.
 
 `POST /sessions/{id}/cancel` is additive and attempts to stop the current run
 without deleting the logical session. `POST /sessions/{id}/reset` clears

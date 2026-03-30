@@ -1,4 +1,5 @@
 import type {
+  AgentSessionActivitySummary,
   ErrorStreamEvent,
   InitStreamEvent,
   AgentRuntimeService,
@@ -565,12 +566,88 @@ function summarizeBridgeProbeHealth(
   return `${expectedProvider} available via Agent SDK bridge and session lifecycle validated`;
 }
 
+function restoreAgentSessionActivity(
+  state: SessionProviderState | undefined,
+): AgentSessionActivitySummary {
+  const activity = state?.agentSession?.activity;
+  return {
+    toolUseCount: typeof activity?.toolUseCount === 'number' ? activity.toolUseCount : 0,
+    toolResultCount: typeof activity?.toolResultCount === 'number' ? activity.toolResultCount : 0,
+    serviceUpdateCount: typeof activity?.serviceUpdateCount === 'number'
+      ? activity.serviceUpdateCount
+      : 0,
+    observedToolNames: Array.isArray(activity?.observedToolNames)
+      ? activity.observedToolNames
+        .filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
+      : [],
+    observedServiceIds: Array.isArray(activity?.observedServiceIds)
+      ? activity.observedServiceIds
+        .filter((entry): entry is string => typeof entry === 'string' && entry.length > 0)
+      : [],
+  };
+}
+
+function hasAgentSessionActivity(activity: AgentSessionActivitySummary): boolean {
+  return activity.toolUseCount > 0
+    || activity.toolResultCount > 0
+    || activity.serviceUpdateCount > 0
+    || activity.observedToolNames.length > 0
+    || activity.observedServiceIds.length > 0;
+}
+
+function cloneAgentSessionActivity(
+  activity: AgentSessionActivitySummary,
+): AgentSessionActivitySummary {
+  return {
+    toolUseCount: activity.toolUseCount,
+    toolResultCount: activity.toolResultCount,
+    serviceUpdateCount: activity.serviceUpdateCount,
+    observedToolNames: [...activity.observedToolNames],
+    observedServiceIds: [...activity.observedServiceIds],
+  };
+}
+
+function recordObservedTool(
+  activity: AgentSessionActivitySummary,
+  kind: 'tool_use' | 'tool_result',
+  toolName: string | undefined,
+): void {
+  if (kind === 'tool_use') {
+    activity.toolUseCount += 1;
+  } else {
+    activity.toolResultCount += 1;
+  }
+
+  if (toolName && !activity.observedToolNames.includes(toolName)) {
+    activity.observedToolNames.push(toolName);
+    activity.observedToolNames.sort((left, right) => left.localeCompare(right));
+  }
+}
+
+function recordObservedServices(
+  activity: AgentSessionActivitySummary,
+  services: AgentRuntimeService[] | undefined,
+): void {
+  if (!services) {
+    return;
+  }
+  activity.serviceUpdateCount += 1;
+  for (const service of services) {
+    if (!service.id || activity.observedServiceIds.includes(service.id)) {
+      continue;
+    }
+    activity.observedServiceIds.push(service.id);
+  }
+  activity.observedServiceIds.sort((left, right) => left.localeCompare(right));
+}
+
 function buildProviderState(
   input: AgentInvokeInput,
   bridgeSessionId: string,
   status: string,
   services?: AgentRuntimeService[],
   extra?: Record<string, unknown>,
+  activity?: AgentSessionActivitySummary,
 ): SessionProviderState {
   return {
     ...(input.sessionState || {}),
@@ -579,6 +656,9 @@ function buildProviderState(
       sessionKey: input.sessionKey,
       status,
       services,
+      ...(activity && hasAgentSessionActivity(activity)
+        ? { activity: cloneAgentSessionActivity(activity) }
+        : {}),
       adapterState: {
         bridgeProvider: mapBridgeProvider(input.providerName),
         bridgeSessionId,
@@ -676,12 +756,20 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
     yield {
       type: 'init',
       providerSessionId: bridgeSessionId,
-      providerState: buildProviderState(input, bridgeSessionId, 'active'),
+      providerState: buildProviderState(
+        input,
+        bridgeSessionId,
+        'active',
+        undefined,
+        undefined,
+        restoreAgentSessionActivity(input.sessionState),
+      ),
     } satisfies InitStreamEvent;
 
     let usage: StreamUsage | undefined;
     let services: AgentRuntimeService[] | undefined;
     let upstreamProviderSessionId: string | undefined;
+    const activity = restoreAgentSessionActivity(input.sessionState);
     const observer = input.evolutionObserver;
 
     for await (const event of parseSseEvents(messageResponse.body)) {
@@ -753,6 +841,7 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
           }, null);
           continue;
         }
+        recordObservedTool(activity, 'tool_use', payload.toolName);
         yield {
           type: 'tool_use',
           providerSessionId: bridgeSessionId,
@@ -760,6 +849,16 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
           toolArgs: payload.toolInput && typeof payload.toolInput === 'object'
             ? payload.toolInput as Record<string, unknown>
             : {},
+          providerState: buildProviderState(
+            input,
+            bridgeSessionId,
+            'active',
+            services,
+            {
+              ...(upstreamProviderSessionId ? { upstreamProviderSessionId } : {}),
+            },
+            activity,
+          ),
         } satisfies ToolUseStreamEvent;
         continue;
       }
@@ -792,6 +891,7 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
           }, null);
           continue;
         }
+        recordObservedTool(activity, 'tool_result', toolName);
         yield {
           type: 'tool_result',
           providerSessionId: bridgeSessionId,
@@ -799,6 +899,16 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
           ...(toolId ? { toolId } : {}),
           ...(text ? { text } : {}),
           ...(payload.isError === true ? { isError: true } : {}),
+          providerState: buildProviderState(
+            input,
+            bridgeSessionId,
+            'active',
+            services,
+            {
+              ...(upstreamProviderSessionId ? { upstreamProviderSessionId } : {}),
+            },
+            activity,
+          ),
         } satisfies ToolResultStreamEvent;
         continue;
       }
@@ -820,7 +930,11 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
       }
 
       if (type === 'service_update') {
-        services = parseServices(payload.services) || services;
+        const parsedServices = parseServices(payload.services);
+        if (parsedServices) {
+          services = parsedServices;
+        }
+        recordObservedServices(activity, parsedServices);
         observeIgnored(observer, {
           rawEventType: type,
           reason: 'service_update',
@@ -836,7 +950,7 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
           text: typeof payload.error === 'string' ? payload.error : 'Agent SDK bridge error',
           providerState: buildProviderState(input, bridgeSessionId, 'error', services, {
             upstreamProviderSessionId,
-          }),
+          }, activity),
         } satisfies ErrorStreamEvent;
         return;
       }
@@ -855,7 +969,7 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
       services,
       providerState: buildProviderState(input, bridgeSessionId, 'idle', services, {
         upstreamProviderSessionId,
-      }),
+      }, activity),
       metadata: {
         provider: bridgeProvider,
       },
