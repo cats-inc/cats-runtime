@@ -3193,7 +3193,7 @@ describe('agent backend integration', () => {
     }
   });
 
-  it('loads a dynamic OpenClaw model catalog through the provider models route', async () => {
+  it('loads a dynamic OpenClaw model catalog through the provider models route when refreshed', async () => {
     const { config, env, cleanup } = createAgentConfigRoot({
       model: 'anthropic/claude-test-a',
     });
@@ -3206,7 +3206,9 @@ describe('agent backend integration', () => {
     });
 
     try {
-      const response = await runtime.app.request('/providers/openclaw/models?instance=agent/gateway');
+      const response = await runtime.app.request(
+        '/providers/openclaw/models?instance=agent/gateway&refresh=1',
+      );
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
         provider: 'openclaw',

@@ -18,6 +18,7 @@ import {
 import {
   getAuggieSessions,
   getCursorNative,
+  getKiloNative,
   getKiroNative,
   getOpencodeNative,
 } from '../providerServices.js';
@@ -56,6 +57,7 @@ interface HistoryTranscriptMetadata {
   parser:
     | 'cursor_native'
     | 'kiro_native'
+    | 'kilo_native'
     | 'auggie_native'
     | 'opencode_native'
     | 'gemini_native'
@@ -333,6 +335,37 @@ historyRoutes.get('/sessions/:id/history', async (c) => {
       }));
     } catch (err) {
       return c.json({ error: `Failed to load Kiro history: ${err}` }, 500);
+    }
+  }
+
+  if (session.providerName === 'kilo') {
+    if (!session.providerSessionId) {
+      return c.json(buildHistoryResponse(ctx, session, [], {
+        ownership: 'provider',
+        source: 'none',
+        parser: 'kilo_native',
+      }));
+    }
+
+    try {
+      const messages = await getKiloNative(
+        ctx,
+        session.providerInstanceId,
+      ).loadHistory(session.cwd, session.providerSessionId);
+      return c.json(buildHistoryResponse(ctx, session, messages, {
+        ownership: 'provider',
+        source: 'service',
+        parser: 'kilo_native',
+        sources: [
+          buildTranscriptSource(undefined, messages.length, {
+            ownership: 'provider',
+            source: 'service',
+            parser: 'kilo_native',
+          }),
+        ],
+      }));
+    } catch (err) {
+      return c.json({ error: `Failed to load Kilo history: ${err}` }, 500);
     }
   }
 

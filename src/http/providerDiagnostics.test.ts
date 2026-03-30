@@ -110,8 +110,12 @@ describe('provider diagnostics HTTP contract', () => {
       goosePath: 'goose',
       juniePath: 'junie',
       kiroPath: 'kiro-cli',
+      kiloPath: 'kilo',
       opencodePath: 'opencode',
       piPath: 'pi',
+      kiloServerHost: '127.0.0.1',
+      kiloServerPort: 4313,
+      kiloServerStartupTimeoutMs: 10_000,
       opencodeServerHost: '127.0.0.1',
       opencodeServerPort: 4097,
       opencodeServerStartupTimeoutMs: 10_000,
@@ -156,6 +160,7 @@ describe('provider diagnostics HTTP contract', () => {
         goose: {},
         junie: {},
         kiro: {},
+        kilo: {},
         opencode: {},
         pi: {},
       },
@@ -164,6 +169,22 @@ describe('provider diagnostics HTTP contract', () => {
     return {
       ...config,
       ...overrides,
+      providerCommands: {
+        ...config.providerCommands,
+        ...(overrides.providerCommands as CliRuntimeConfig['providerCommands'] | undefined),
+      },
+      providerDefaultInstances: {
+        ...(config.providerDefaultInstances || {}),
+        ...(overrides.providerDefaultInstances as CliRuntimeConfig['providerDefaultInstances'] | undefined),
+      },
+      providerInstances: {
+        ...config.providerInstances,
+        ...(overrides.providerInstances as CliRuntimeConfig['providerInstances'] | undefined),
+      },
+      providerDefaultTargets: {
+        ...(config.providerDefaultTargets || {}),
+        ...(overrides.providerDefaultTargets as CliRuntimeConfig['providerDefaultTargets'] | undefined),
+      },
     };
   }
 
@@ -239,6 +260,7 @@ describe('provider diagnostics HTTP contract', () => {
       cursorNative: {} as never,
       gooseNative: {} as never,
       kiroNative: {} as never,
+      kiloNative: {} as never,
       auggieSessions: {} as never,
       opencodeNative: {} as never,
       providerModelCatalog,
@@ -337,6 +359,7 @@ describe('provider diagnostics HTTP contract', () => {
       cursorNative: {} as never,
       gooseNative: {} as never,
       kiroNative: {} as never,
+      kiloNative: {} as never,
       auggieSessions: {} as never,
       opencodeNative: {} as never,
       providerModelCatalog,
@@ -1836,6 +1859,7 @@ describe('provider diagnostics HTTP contract', () => {
       cursorNative: {} as never,
       gooseNative: {} as never,
       kiroNative: {} as never,
+      kiloNative: {} as never,
       auggieSessions: {} as never,
       opencodeNative: {} as never,
       providerModelCatalog,
@@ -2008,6 +2032,7 @@ describe('provider diagnostics HTTP contract', () => {
         cursorNative: {} as never,
         gooseNative: {} as never,
         kiroNative: {} as never,
+        kiloNative: {} as never,
         auggieSessions: {} as never,
         opencodeNative: {} as never,
         providerModelCatalog,

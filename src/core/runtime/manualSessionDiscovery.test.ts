@@ -19,6 +19,7 @@ function createConfig() {
       cursor: 'default',
       goose: 'docker-lab',
       kiro: 'default',
+      kilo: 'default',
       opencode: 'default',
     },
     providerInstances: {
@@ -60,6 +61,7 @@ function createConfig() {
           },
         },
       },
+      kilo: {},
       opencode: {
         default: {
           id: 'default',
@@ -78,6 +80,9 @@ function createConfig() {
     cursorChatsDir: '',
     geminiSessionsDir: '',
     kiroDbPath: '',
+    kiloServerHost: '',
+    kiloServerPort: 0,
+    kiloServerStartupTimeoutMs: 0,
     opencodeServerHost: '',
     opencodeServerPort: 0,
     opencodeServerStartupTimeoutMs: 0,

@@ -14,6 +14,7 @@ const MANUAL_SESSION_DISCOVERY_PROVIDERS = [
   'goose',
   'kiro',
   'opencode',
+  'kilo',
 ] as const;
 
 export type ManualSessionDiscoveryProviderName =
@@ -72,6 +73,9 @@ type ManualSessionDiscoveryConfig = Pick<
   | 'cursorChatsDir'
   | 'geminiSessionsDir'
   | 'kiroDbPath'
+  | 'kiloServerHost'
+  | 'kiloServerPort'
+  | 'kiloServerStartupTimeoutMs'
   | 'opencodeServerHost'
   | 'opencodeServerPort'
   | 'opencodeServerStartupTimeoutMs'

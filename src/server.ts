@@ -32,6 +32,7 @@ import {
 } from './backends/cli/discovery/wslDiscovery.js';
 import { CursorNativeSessionService } from './backends/cli/cursor/CursorNativeSessionService.js';
 import { KiroNativeSessionService } from './backends/cli/kiro/KiroNativeSessionService.js';
+import { KiloNativeSessionService } from './backends/cli/kilo/KiloNativeSessionService.js';
 import { OpencodeNativeSessionService } from './backends/cli/opencode/OpencodeNativeSessionService.js';
 import { createRuntimeAdapter } from './backends/cli/runtime/runtime.js';
 import { SessionRegistry } from './backends/cli/pool/SessionRegistry.js';
@@ -285,6 +286,14 @@ export function createDiscoveryController(
       ctx.resolveKiroNative,
       ctx.kiroNative,
     );
+  const resolveKiloNative = (instanceId?: string): KiloNativeSessionService =>
+    resolveContextService(
+      ctx.config,
+      'kilo',
+      instanceId,
+      ctx.resolveKiloNative,
+      ctx.kiloNative,
+    );
   const resolveGooseNative = (instanceId?: string): GooseNativeSessionService =>
     resolveContextService(
       ctx.config,
@@ -446,7 +455,7 @@ export function createDiscoveryController(
   const dockerDiscoveryPolicy = ctx.config.dockerDiscoveryPolicy ?? 'if_running';
 
   const shouldSkipBackgroundDockerDiscovery = (
-    provider: 'cursor' | 'goose' | 'kiro' | 'opencode',
+    provider: 'cursor' | 'goose' | 'kiro' | 'kilo' | 'opencode',
     instanceId: string,
   ): boolean => {
     if (dockerDiscoveryPolicy !== 'manual_only') {
@@ -458,10 +467,15 @@ export function createDiscoveryController(
   };
 
   const shouldSkipBackgroundWslDiscovery = (
-    provider: 'cursor' | 'goose' | 'kiro' | 'opencode',
+    provider: 'cursor' | 'goose' | 'kiro' | 'kilo' | 'opencode',
     instanceId: string,
   ): boolean => {
-    if (provider === 'goose' || provider === 'opencode' || wslDiscoveryPolicy !== 'manual_only') {
+    if (
+      provider === 'goose'
+      || provider === 'kilo'
+      || provider === 'opencode'
+      || wslDiscoveryPolicy !== 'manual_only'
+    ) {
       return false;
     }
 
@@ -474,7 +488,7 @@ export function createDiscoveryController(
   };
 
   const startNativeDiscovery = (
-    name: 'cursor' | 'goose' | 'kiro' | 'opencode',
+    name: 'cursor' | 'goose' | 'kiro' | 'kilo' | 'opencode',
     instanceId: string,
     listAllSessions: () => Promise<Array<{
       providerSessionId: string;
@@ -492,7 +506,9 @@ export function createDiscoveryController(
         ? 'Goose'
         : name === 'kiro'
           ? 'Kiro'
-          : 'OpenCode';
+          : name === 'kilo'
+            ? 'Kilo'
+            : 'OpenCode';
     const discoveryLabel = instanceId === getProviderDefaultInstanceId(ctx.config, name)
       ? name
       : `${name}@${instanceId}`;
@@ -628,6 +644,15 @@ export function createDiscoveryController(
         if (timer) timers.push(timer);
       }
 
+      for (const instance of listProviderInstances(ctx.config, 'kilo')) {
+        const timer = startNativeDiscovery(
+          'kilo',
+          instance.id,
+          () => resolveKiloNative(instance.id).listAllSessions({ startIfNeeded: false }),
+        );
+        if (timer) timers.push(timer);
+      }
+
       for (const instance of listProviderInstances(ctx.config, 'goose')) {
         const timer = startNativeDiscovery(
           'goose',
@@ -700,6 +725,19 @@ export function createRuntimeServer(
       }),
     ]),
   );
+  const kiloNativeByInstance = new Map(
+    listProviderInstances(config, 'kilo').map((instance) => [
+      instance.id,
+      new KiloNativeSessionService({
+        command: instance.commandConfig.path,
+        commandConfig: instance.commandConfig,
+        hostname: instance.kiloServerHost || config.kiloServerHost,
+        port: instance.kiloServerPort || config.kiloServerPort,
+        startupTimeoutMs: instance.kiloServerStartupTimeoutMs
+          || config.kiloServerStartupTimeoutMs,
+      }),
+    ]),
+  );
   const opencodeNativeByInstance = new Map(
     listProviderInstances(config, 'opencode').map((instance) => [
       instance.id,
@@ -722,6 +760,8 @@ export function createRuntimeServer(
     resolveServiceForInstance(config, 'cursor', instanceId, cursorNativeByInstance);
   const resolveKiroNative = (instanceId?: string): KiroNativeSessionService =>
     resolveServiceForInstance(config, 'kiro', instanceId, kiroNativeByInstance);
+  const resolveKiloNative = (instanceId?: string): KiloNativeSessionService =>
+    resolveServiceForInstance(config, 'kilo', instanceId, kiloNativeByInstance);
   const resolveOpencodeNative = (instanceId?: string): OpencodeNativeSessionService =>
     resolveServiceForInstance(config, 'opencode', instanceId, opencodeNativeByInstance);
 
@@ -759,6 +799,18 @@ export function createRuntimeServer(
       command: config.goosePath,
     }),
   );
+  const kiloNative = getDefaultService(
+    config,
+    'kilo',
+    kiloNativeByInstance,
+    () => new KiloNativeSessionService({
+      command: config.kiloPath,
+      commandConfig: config.providerCommands.kilo,
+      hostname: config.kiloServerHost,
+      port: config.kiloServerPort,
+      startupTimeoutMs: config.kiloServerStartupTimeoutMs,
+    }),
+  );
   const opencodeNative = getDefaultService(
     config,
     'opencode',
@@ -777,6 +829,7 @@ export function createRuntimeServer(
     registry,
     gooseNative,
     kiroNative,
+    kiloNative,
     auggieSessions,
     opencodeNative,
     compatibility,
@@ -784,6 +837,7 @@ export function createRuntimeServer(
       getAuggieSessions: resolveAuggieSessions,
       getGooseNative: resolveGooseNative,
       getKiroNative: resolveKiroNative,
+      getKiloNative: resolveKiloNative,
       getOpencodeNative: resolveOpencodeNative,
     },
   );
@@ -860,6 +914,7 @@ export function createRuntimeServer(
     cursorNative,
     gooseNative,
     kiroNative,
+    kiloNative,
     auggieSessions,
     opencodeNative,
     wslDiscoveryStatus,
@@ -879,6 +934,7 @@ export function createRuntimeServer(
     resolveCursorNative,
     resolveGooseNative,
     resolveKiroNative,
+    resolveKiloNative,
     resolveAuggieSessions,
     resolveOpencodeNative,
   };
@@ -1059,6 +1115,9 @@ export function createRuntimeServer(
         apiBackend.killAll();
         pool.killAll();
         registry.flush();
+        for (const service of new Set(kiloNativeByInstance.values())) {
+          await service.close();
+        }
         for (const service of new Set(opencodeNativeByInstance.values())) {
           await service.close();
         }

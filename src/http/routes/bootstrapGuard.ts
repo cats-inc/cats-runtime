@@ -10,6 +10,7 @@ const GUARDED_PREFIXES = [
   '/codex',
   '/cursor',
   '/kiro',
+  '/kilo',
   '/auggie',
   '/opencode',
   '/browse',

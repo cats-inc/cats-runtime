@@ -128,6 +128,11 @@ const NATIVE_SESSION_MCP_PROVIDERS = [
     label: 'OpenCode',
     supportsStartIfNeeded: false,
   },
+  {
+    provider: 'kilo',
+    label: 'Kilo',
+    supportsStartIfNeeded: false,
+  },
 ] as const;
 type NativeSessionMcpProvider = typeof NATIVE_SESSION_MCP_PROVIDERS[number];
 

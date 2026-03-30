@@ -47,6 +47,7 @@ import { buildToolPolicyInspection } from '../../core/tools/LocalToolRuntime.js'
 import {
   getCursorNative,
   getGooseNative,
+  getKiloNative,
   getKiroNative,
   getOpencodeNative,
 } from '../providerServices.js';
@@ -337,6 +338,10 @@ async function listManualDiscoverySessions(
       });
     case 'kiro':
       return getKiroNative(ctx, target.instanceId).listAllSessions({
+        startIfNeeded: true,
+      });
+    case 'kilo':
+      return getKiloNative(ctx, target.instanceId).listAllSessions({
         startIfNeeded: true,
       });
     case 'opencode':
@@ -1791,6 +1796,7 @@ function tracksNativeSessionState(session: SessionInfo): boolean {
     && (session.providerName === 'cursor'
       || session.providerName === 'goose'
       || session.providerName === 'kiro'
+      || session.providerName === 'kilo'
       || session.providerName === 'opencode'),
   );
 }
@@ -1834,6 +1840,14 @@ async function deleteNativeSessionState(
       const deleted = await opencodeNative.deleteSession(session.cwd, session.providerSessionId);
       if (!deleted) return false;
       const remaining = await opencodeNative.getSession(session.cwd, session.providerSessionId);
+      return remaining == null;
+    }
+
+    if (session.providerName === 'kilo') {
+      const kiloNative = getKiloNative(ctx, session.providerInstanceId);
+      const deleted = await kiloNative.deleteSession(session.cwd, session.providerSessionId);
+      if (!deleted) return false;
+      const remaining = await kiloNative.getSession(session.cwd, session.providerSessionId);
       return remaining == null;
     }
   } catch (error) {
@@ -2554,6 +2568,90 @@ sessionRoutes.post('/sessions', async (c) => {
         workspaceIsolation: resolved.workspaceIsolation,
       });
       return c.json({ error: `Failed to create OpenCode session: ${err}` }, 500);
+    }
+  }
+
+  if (providerName === 'kilo' && providerTarget.backend === 'cli') {
+    const caps = runtime.getCapabilities('kilo', providerInstance!.id, 'cli');
+    if (!caps.permissions && resolved.workspaceMode === 'read_only') {
+      await discardPreparedWorkspace(ctx, {
+        id: sessionId,
+        workspace: resolved.workspace,
+        workspaceMode: resolved.workspaceMode,
+        workspaceIsolation: resolved.workspaceIsolation,
+      });
+      return c.json({
+        error: `Provider '${providerName}' does not support permission enforcement required by read_only workspace`,
+      }, 400);
+    }
+
+    let nativeProviderSessionId: string | null = null;
+    try {
+      const native = await getKiloNative(ctx, providerInstance!.id).createSession(resolved.cwd);
+      nativeProviderSessionId = native.providerSessionId;
+      const session = ctx.registry.create({
+        id: sessionId,
+        providerName: 'kilo',
+        providerBackend: 'cli',
+        providerInstanceId: providerInstance!.id,
+        cwd: resolved.cwd,
+        workspace: resolved.workspace,
+        workspaceMode: resolved.workspaceMode,
+        workspaceIsolation: resolved.workspaceIsolation,
+        permissionMode: resolved.permissionMode,
+        allowedTools: body.allowedTools,
+        model: requestedModelState.model,
+        modelSelection: requestedModelState.modelSelection,
+        modelResolution: requestedModelState.modelResolution,
+        group: body.group,
+        sessionKey,
+        reusePolicy,
+        ...strategyPatch,
+        instructions,
+        skills,
+        context,
+        outputDir,
+      });
+      session.summary = native.summary;
+      session.messageCount = native.messageCount;
+      session.lastActivity = native.lastActivity;
+
+      ctx.registry.setProviderSessionId(session.id, native.providerSessionId);
+      await primeCliCompatibility(
+        ctx,
+        resolveCliProviderTarget(ctx, providerName, providerInstance!.id),
+      );
+      runtime.spawn(session.id, providerName, {
+        cwd: resolved.cwd,
+        workspaceMode: resolved.workspaceMode,
+        model: requestedModelState.model,
+        resumeSessionId: native.providerSessionId,
+        instructionsFile: skills?.delivery.instructions?.filePath,
+        permissionMode: resolved.permissionMode,
+        allowedTools: body.allowedTools,
+      }, providerInstance!.id, 'cli');
+      ctx.registry.updateStatus(session.id, 'ready');
+
+      return c.json(serializeSession(ctx, session), 201);
+    } catch (err) {
+      ctx.registry.remove(sessionId);
+      if (nativeProviderSessionId) {
+        try {
+          await getKiloNative(ctx, providerInstance!.id).deleteSession(
+            resolved.cwd,
+            nativeProviderSessionId,
+          );
+        } catch {
+          // Best effort rollback only.
+        }
+      }
+      await discardPreparedWorkspace(ctx, {
+        id: sessionId,
+        workspace: resolved.workspace,
+        workspaceMode: resolved.workspaceMode,
+        workspaceIsolation: resolved.workspaceIsolation,
+      });
+      return c.json({ error: `Failed to create Kilo session: ${err}` }, 500);
     }
   }
 

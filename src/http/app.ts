@@ -13,6 +13,7 @@ import type { ApiBackendManager } from '../backends/api/runtime/ApiBackendManage
 import type { AgentBackendManager } from '../backends/agent/runtime/AgentBackendManager.js';
 import type { CursorNativeSessionService } from '../backends/cli/cursor/CursorNativeSessionService.js';
 import type { KiroNativeSessionService } from '../backends/cli/kiro/KiroNativeSessionService.js';
+import type { KiloNativeSessionService } from '../backends/cli/kilo/KiloNativeSessionService.js';
 import type { AuggieSessionService } from '../backends/cli/auggie/AuggieSessionService.js';
 import type { GooseNativeSessionService } from '../backends/cli/goose/GooseNativeSessionService.js';
 import type { OpencodeNativeSessionService } from '../backends/cli/opencode/OpencodeNativeSessionService.js';
@@ -63,6 +64,7 @@ import { observeRoutes } from './routes/observe.js';
 import { codexRoutes } from './routes/codex.js';
 import { cursorRoutes } from './routes/cursor.js';
 import { kiroRoutes } from './routes/kiro.js';
+import { kiloRoutes } from './routes/kilo.js';
 import { auggieRoutes } from './routes/auggie.js';
 import { opencodeRoutes } from './routes/opencode.js';
 import { providerRoutes } from './routes/providers.js';
@@ -84,6 +86,7 @@ export interface AppContext {
   cursorNative: CursorNativeSessionService;
   gooseNative: GooseNativeSessionService;
   kiroNative: KiroNativeSessionService;
+  kiloNative: KiloNativeSessionService;
   auggieSessions: AuggieSessionService;
   opencodeNative: OpencodeNativeSessionService;
   wslDiscoveryStatus?: WslDiscoveryStatusStore;
@@ -112,6 +115,7 @@ export interface AppContext {
   resolveCursorNative?: (instanceId?: string) => CursorNativeSessionService;
   resolveGooseNative?: (instanceId?: string) => GooseNativeSessionService;
   resolveKiroNative?: (instanceId?: string) => KiroNativeSessionService;
+  resolveKiloNative?: (instanceId?: string) => KiloNativeSessionService;
   resolveAuggieSessions?: (instanceId?: string) => AuggieSessionService;
   resolveOpencodeNative?: (instanceId?: string) => OpencodeNativeSessionService;
 }
@@ -359,6 +363,7 @@ export function createRuntimeApp(ctx: AppContext) {
   app.route('/', codexRoutes);
   app.route('/', cursorRoutes);
   app.route('/', kiroRoutes);
+  app.route('/', kiloRoutes);
   app.route('/', auggieRoutes);
   app.route('/', opencodeRoutes);
   app.route('/', providerRoutes);

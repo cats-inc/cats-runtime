@@ -80,6 +80,7 @@ function buildFallbackCapabilities(
       };
     case 'auggie':
     case 'kiro':
+    case 'kilo':
     case 'opencode':
       return {
         resume: true,

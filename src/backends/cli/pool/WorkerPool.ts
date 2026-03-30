@@ -4,6 +4,7 @@ import {
 } from '../config.js';
 import { AuggieSessionService } from '../auggie/AuggieSessionService.js';
 import { KiroNativeSessionService } from '../kiro/KiroNativeSessionService.js';
+import { KiloNativeSessionService } from '../kilo/KiloNativeSessionService.js';
 import { GooseNativeSessionService } from '../goose/GooseNativeSessionService.js';
 import { OpencodeNativeSessionService } from '../opencode/OpencodeNativeSessionService.js';
 import type { Provider, ProviderCapabilities, ProviderName, ProviderSpawnOptions } from '../providers/types.js';
@@ -16,6 +17,7 @@ import { CopilotProvider } from '../providers/copilot.js';
 import { CursorProvider } from '../providers/cursor.js';
 import { GeminiProvider } from '../providers/gemini.js';
 import { KiroProvider } from '../providers/kiro.js';
+import { KiloProvider } from '../providers/kilo.js';
 import { OpencodeProvider } from '../providers/opencode.js';
 import { GooseProvider } from '../providers/goose.js';
 import { JunieProvider } from '../providers/junie.js';
@@ -27,6 +29,7 @@ interface ProviderServiceResolvers {
   getAuggieSessions?: (instanceId?: string) => AuggieSessionService;
   getGooseNative?: (instanceId?: string) => GooseNativeSessionService;
   getKiroNative?: (instanceId?: string) => KiroNativeSessionService;
+  getKiloNative?: (instanceId?: string) => KiloNativeSessionService;
   getOpencodeNative?: (instanceId?: string) => OpencodeNativeSessionService;
 }
 
@@ -36,6 +39,7 @@ export class WorkerPool {
   private registry: SessionRegistry;
   private gooseNative: GooseNativeSessionService;
   private kiroNative: KiroNativeSessionService;
+  private kiloNative: KiloNativeSessionService;
   private auggieSessions: AuggieSessionService;
   private opencodeNative: OpencodeNativeSessionService;
   private readonly compatibility: ProviderCompatibilityService;
@@ -46,6 +50,7 @@ export class WorkerPool {
     registry: SessionRegistry,
     gooseNative: GooseNativeSessionService,
     kiroNative: KiroNativeSessionService,
+    kiloNative: KiloNativeSessionService,
     auggieSessions: AuggieSessionService,
     opencodeNative: OpencodeNativeSessionService,
     compatibility: ProviderCompatibilityService,
@@ -55,6 +60,7 @@ export class WorkerPool {
     this.registry = registry;
     this.gooseNative = gooseNative;
     this.kiroNative = kiroNative;
+    this.kiloNative = kiloNative;
     this.auggieSessions = auggieSessions;
     this.opencodeNative = opencodeNative;
     this.compatibility = compatibility;
@@ -113,6 +119,13 @@ export class WorkerPool {
           ),
           commandConfig: instance.commandConfig,
         };
+      case 'kilo':
+        return {
+          provider: new KiloProvider(
+            this.resolvers.getKiloNative?.(instance.id) || this.kiloNative,
+          ),
+          commandConfig: instance.commandConfig,
+        };
       case 'opencode':
         return {
           provider: new OpencodeProvider(
@@ -140,7 +153,7 @@ export class WorkerPool {
           commandConfig: instance.commandConfig,
         };
       default:
-        throw new Error(`Unknown provider: '${name}'. Valid: claude, codex, gemini, copilot, cursor, kiro, auggie, opencode, pi, goose, junie`);
+        throw new Error(`Unknown provider: '${name}'. Valid: claude, codex, gemini, cursor, copilot, opencode, kilo, goose, pi, auggie, junie, kiro`);
     }
   }
 

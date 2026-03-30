@@ -36,6 +36,16 @@ export function getKiroNative(ctx: AppContext, instanceId?: string) {
   );
 }
 
+export function getKiloNative(ctx: AppContext, instanceId?: string) {
+  return resolveNativeService(
+    ctx,
+    'kilo',
+    instanceId,
+    ctx.resolveKiloNative,
+    ctx.kiloNative,
+  );
+}
+
 export function getAuggieSessions(ctx: AppContext, instanceId?: string) {
   return resolveNativeService(
     ctx,

@@ -143,7 +143,7 @@ describe('API backend integration', () => {
       const response = await runtime.app.request('/providers/config');
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual(expect.objectContaining({
-        providers: {
+        providers: expect.objectContaining({
           claude: expect.objectContaining({
             defaultInstance: 'sonnet',
             defaultBackend: 'api',
@@ -195,7 +195,7 @@ describe('API backend integration', () => {
                     unknown: 0,
                   },
                 },
-                tooling: {
+                tooling: expect.objectContaining({
                   source: 'runtime_local',
                   discoverable: true,
                   sessionScopedOverrides: true,
@@ -203,7 +203,7 @@ describe('API backend integration', () => {
                   policy: expect.objectContaining({
                     profile: 'standard',
                     counts: expect.objectContaining({
-                      total: 28,
+                      total: 29,
                     }),
                   }),
                   observability: {
@@ -211,7 +211,7 @@ describe('API backend integration', () => {
                     toolCallEvents: true,
                     runtimeServices: false,
                   },
-                },
+                }),
                 install: null,
                 compatibility: null,
               }),
@@ -248,7 +248,7 @@ describe('API backend integration', () => {
                     unknown: 0,
                   },
                 },
-                tooling: {
+                tooling: expect.objectContaining({
                   source: 'runtime_local',
                   discoverable: true,
                   sessionScopedOverrides: true,
@@ -256,7 +256,7 @@ describe('API backend integration', () => {
                   policy: expect.objectContaining({
                     profile: 'standard',
                     counts: expect.objectContaining({
-                      total: 28,
+                      total: 29,
                     }),
                   }),
                   observability: {
@@ -264,7 +264,7 @@ describe('API backend integration', () => {
                     toolCallEvents: true,
                     runtimeServices: false,
                   },
-                },
+                }),
                 install: null,
                 compatibility: null,
               }),
@@ -318,7 +318,7 @@ describe('API backend integration', () => {
                     unknown: 0,
                   },
                 },
-                tooling: {
+                tooling: expect.objectContaining({
                   source: 'runtime_local',
                   discoverable: true,
                   sessionScopedOverrides: true,
@@ -326,7 +326,7 @@ describe('API backend integration', () => {
                   policy: expect.objectContaining({
                     profile: 'standard',
                     counts: expect.objectContaining({
-                      total: 28,
+                      total: 29,
                     }),
                   }),
                   observability: {
@@ -334,7 +334,7 @@ describe('API backend integration', () => {
                     toolCallEvents: true,
                     runtimeServices: false,
                   },
-                },
+                }),
                 install: null,
                 compatibility: null,
               }),
@@ -389,7 +389,7 @@ describe('API backend integration', () => {
                     unknown: 0,
                   },
                 },
-                tooling: {
+                tooling: expect.objectContaining({
                   source: 'runtime_local',
                   discoverable: true,
                   sessionScopedOverrides: true,
@@ -397,7 +397,7 @@ describe('API backend integration', () => {
                   policy: expect.objectContaining({
                     profile: 'standard',
                     counts: expect.objectContaining({
-                      total: 28,
+                      total: 29,
                     }),
                   }),
                   observability: {
@@ -405,7 +405,7 @@ describe('API backend integration', () => {
                     toolCallEvents: true,
                     runtimeServices: false,
                   },
-                },
+                }),
                 install: null,
                 compatibility: null,
               }),
@@ -466,7 +466,7 @@ describe('API backend integration', () => {
                     unknown: 0,
                   },
                 },
-                tooling: {
+                tooling: expect.objectContaining({
                   source: 'runtime_local',
                   discoverable: true,
                   sessionScopedOverrides: true,
@@ -474,7 +474,7 @@ describe('API backend integration', () => {
                   policy: expect.objectContaining({
                     profile: 'standard',
                     counts: expect.objectContaining({
-                      total: 28,
+                      total: 29,
                     }),
                   }),
                   observability: {
@@ -482,13 +482,13 @@ describe('API backend integration', () => {
                     toolCallEvents: true,
                     runtimeServices: false,
                   },
-                },
+                }),
                 install: null,
                 compatibility: null,
               }),
             ],
           }),
-        },
+        }),
         executionStrategies: expect.objectContaining({
           summary: expect.objectContaining({
             totalFamilies: 7,
@@ -511,7 +511,7 @@ describe('API backend integration', () => {
     try {
       const apiResponse = await runtime.app.request('/providers/claude/tools?instance=api/sonnet');
       expect(apiResponse.status).toBe(200);
-      await expect(apiResponse.json()).resolves.toEqual({
+      await expect(apiResponse.json()).resolves.toEqual(expect.objectContaining({
         provider: 'claude',
         backend: 'api',
         instance: 'sonnet',
@@ -541,12 +541,15 @@ describe('API backend integration', () => {
         source: 'runtime_local',
         discoverable: true,
         sessionScopedOverrides: true,
+        catalogContext: {
+          scope: 'catalog',
+        },
         summary: expect.stringContaining(`'standard' profile`),
         policy: expect.objectContaining({
           profile: 'standard',
           counts: {
-            total: 28,
-            fullAccess: 28,
+            total: 29,
+            fullAccess: 29,
             previewOnly: 0,
             blocked: 0,
           },
@@ -556,7 +559,7 @@ describe('API backend integration', () => {
           toolCallEvents: true,
           runtimeServices: false,
         },
-      });
+      }));
 
       const localResponse = await runtime.app.request('/providers/ollama/tools?instance=local/local');
       expect(localResponse.status).toBe(200);

@@ -18,6 +18,7 @@ const PROVIDER_ORDER = [
   'cursor',
   'copilot',
   'opencode',
+  'kilo',
   'goose',
   'pi',
   'auggie',
@@ -111,6 +112,9 @@ export function getProviderDefaultTarget(
     | 'cursorChatsDir'
     | 'geminiSessionsDir'
     | 'kiroDbPath'
+    | 'kiloServerHost'
+    | 'kiloServerPort'
+    | 'kiloServerStartupTimeoutMs'
     | 'opencodeServerHost'
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
@@ -197,6 +201,9 @@ export function listConfiguredProviders(
     | 'cursorChatsDir'
     | 'geminiSessionsDir'
     | 'kiroDbPath'
+    | 'kiloServerHost'
+    | 'kiloServerPort'
+    | 'kiloServerStartupTimeoutMs'
     | 'opencodeServerHost'
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
@@ -242,6 +249,9 @@ export function listProviderCatalog(
     | 'cursorChatsDir'
     | 'geminiSessionsDir'
     | 'kiroDbPath'
+    | 'kiloServerHost'
+    | 'kiloServerPort'
+    | 'kiloServerStartupTimeoutMs'
     | 'opencodeServerHost'
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
@@ -318,6 +328,9 @@ export function resolveProviderTarget(
     | 'cursorChatsDir'
     | 'geminiSessionsDir'
     | 'kiroDbPath'
+    | 'kiloServerHost'
+    | 'kiloServerPort'
+    | 'kiloServerStartupTimeoutMs'
     | 'opencodeServerHost'
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'

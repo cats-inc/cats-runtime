@@ -55,6 +55,7 @@ const INSTRUCTION_DELIVERY_CLI_PROVIDERS = new Set([
   'goose',
   'junie',
   'opencode',
+  'kilo',
 ]);
 // Keep the process-local skill-package cache bounded so long-lived runtimes do not
 // accumulate unbounded entries across many distinct session skill combinations.

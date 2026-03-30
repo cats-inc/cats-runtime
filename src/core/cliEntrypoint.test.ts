@@ -1,22 +1,29 @@
+import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { isDirectCliEntrypoint } from './cliEntrypoint.js';
 
 describe('isDirectCliEntrypoint', () => {
   it('matches when argv path already equals the module path', () => {
+    const argvPath = process.platform === 'win32'
+      ? 'C:\\tmp\\cats-runtime\\dist\\index.js'
+      : '/tmp/cats-runtime/dist/index.js';
     expect(isDirectCliEntrypoint(
-      'file:///tmp/cats-runtime/dist/index.js',
-      '/tmp/cats-runtime/dist/index.js',
+      pathToFileURL(argvPath).href,
+      argvPath,
     )).toBe(true);
   });
 
   it('matches when argv path resolves through a symlink', () => {
+    const resolvedPath = process.platform === 'win32'
+      ? 'C:\\opt\\cats-runtime\\dist\\index.js'
+      : '/opt/cats-runtime/dist/index.js';
     expect(isDirectCliEntrypoint(
-      'file:///opt/cats-runtime/dist/index.js',
+      pathToFileURL(resolvedPath).href,
       '/usr/local/bin/cats-runtime',
       (path) => {
         expect(path).toBe('/usr/local/bin/cats-runtime');
-        return '/opt/cats-runtime/dist/index.js';
+        return resolvedPath;
       },
     )).toBe(true);
   });

@@ -483,6 +483,15 @@ const INSTALL_KNOWLEDGE: Record<ProviderName, ProviderInstallKnowledge> = {
     'opencode-ai',
     'Complete the OpenCode CLI authentication flow after install.',
   ),
+  kilo: createGenericNpmKnowledge(
+    'kilo',
+    'Kilo Code CLI',
+    '@kilocode/cli',
+    'Run kilo auth or complete the Kilo Code authentication flow after install.',
+    {
+      docsUrl: 'https://kilo.ai/docs',
+    },
+  ),
   auggie: createGenericNpmKnowledge(
     'auggie',
     'Auggie CLI',

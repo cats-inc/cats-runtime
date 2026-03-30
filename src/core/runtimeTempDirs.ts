@@ -35,6 +35,7 @@ export const STALE_RUNTIME_TEMP_PREFIXES = [
   'cats-runtime-hydration-',
   'cats-runtime-http-skills-',
   'cats-runtime-opencode-',
+  'cats-runtime-kilo-',
   'cats-runtime-cli-prompt-',
   'cats-runtime-skill-catalog-',
   'cats-runtime-provider-evolution-',

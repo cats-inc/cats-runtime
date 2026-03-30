@@ -54,6 +54,10 @@ routing:
       default_target:
         backend: cli
         instance: native
+    kilo:
+      default_target:
+        backend: cli
+        instance: native
     goose:
       default_target:
         backend: cli
@@ -155,6 +159,17 @@ backends:
             server:
               host: 127.0.0.1
               port: 4097
+              startup_timeout_ms: 10000
+
+      kilo:
+        instances:
+          native:
+            environment: native
+            command: kilo
+            runner: auto
+            server:
+              host: 127.0.0.1
+              port: 4313
               startup_timeout_ms: 10000
 
       goose:

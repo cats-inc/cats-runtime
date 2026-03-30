@@ -427,6 +427,35 @@ const KNOWLEDGE: Partial<Record<ProviderName, ProviderCompatibilityKnowledge>> =
       liveProbeTokens: ['--refresh'],
     },
   ),
+  kilo: buildKnowledge(
+    'kilo',
+    'Kilo Code CLI',
+    {
+      id: 'kilo-cli-native-v1',
+      label: 'Kilo native session service',
+      provider: 'kilo',
+      protocolFamily: 'native-session-service',
+      parserId: 'kilo-native',
+      spawnBaseArgs: [],
+      minVersionMajor: 1,
+      allowUnknownVersion: true,
+      helpTokens: ['serve', 'models'],
+      liveProbeArgs: ['models', '--help'],
+      liveProbeTokens: ['--refresh'],
+    },
+    {
+      id: 'kilo-cli-native-best-fit',
+      label: 'Kilo native session service best-fit',
+      provider: 'kilo',
+      protocolFamily: 'native-session-service',
+      parserId: 'kilo-native',
+      spawnBaseArgs: [],
+      allowUnknownVersion: true,
+      helpTokens: ['models'],
+      liveProbeArgs: ['models', '--help'],
+      liveProbeTokens: ['--refresh'],
+    },
+  ),
 };
 
 export function getProviderCompatibilityKnowledge(

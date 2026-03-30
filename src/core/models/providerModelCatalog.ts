@@ -22,6 +22,10 @@ import {
   type OpencodeModelDiscoveryRunner,
 } from '../../backends/cli/opencode/models.js';
 import {
+  discoverKiloModels,
+  type KiloModelDiscoveryRunner,
+} from '../../backends/cli/kilo/models.js';
+import {
   buildRemoteModelDiscoveryRequest,
   DEFAULT_REMOTE_MODEL_DISCOVERY_TIMEOUT_MS,
   fetchRemoteModelDiscovery,
@@ -81,6 +85,7 @@ interface ProviderModelCatalogServiceOptions {
   ttlMs?: number;
   piModelDiscoveryRunner?: PiModelDiscoveryRunner;
   opencodeModelDiscoveryRunner?: OpencodeModelDiscoveryRunner;
+  kiloModelDiscoveryRunner?: KiloModelDiscoveryRunner;
   remoteDiscoveryTimeoutMs?: number;
 }
 
@@ -139,6 +144,14 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
     { id: 'opencode-go/glm-5', label: 'glm-5', default: true },
     { id: 'opencode-go/kimi-k2.5', label: 'kimi k2.5' },
     { id: 'opencode-go/minimax-m2.5', label: 'minimax m2.5' },
+  ],
+  kilo: [
+    { id: 'kilo/openai/gpt-5.4', label: 'gpt-5.4', default: true },
+    { id: 'kilo/openai/gpt-5.4-mini', label: 'gpt-5.4-mini' },
+    { id: 'kilo/anthropic/claude-opus-4.6', label: 'claude-opus-4.6' },
+    { id: 'kilo/anthropic/claude-sonnet-4.6', label: 'claude-sonnet-4.6' },
+    { id: 'kilo/google/gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview' },
+    { id: 'kilo/z-ai/glm-5', label: 'glm-5' },
   ],
   auggie: [
     { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
@@ -696,6 +709,19 @@ export class ProviderModelCatalogService {
           cwd: this.config.sessionBaseDir,
           refresh: options.forceRefresh,
           runner: this.options.opencodeModelDiscoveryRunner,
+        })).map((model) => ({
+          ...model,
+          status: 'available' as const,
+        })),
+      };
+    }
+
+    if (target.backend === 'cli' && target.providerName === 'kilo' && target.cliInstance) {
+      return {
+        models: (await discoverKiloModels(target.cliInstance, {
+          cwd: this.config.sessionBaseDir,
+          refresh: options.forceRefresh,
+          runner: this.options.kiloModelDiscoveryRunner,
         })).map((model) => ({
           ...model,
           status: 'available' as const,

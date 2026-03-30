@@ -11,7 +11,7 @@ export interface NativeSessionSummary {
 
 export function syncNativeSessions(
   registry: SessionRegistry,
-  providerName: 'cursor' | 'goose' | 'kiro' | 'opencode',
+  providerName: 'cursor' | 'goose' | 'kiro' | 'kilo' | 'opencode',
   sessions: NativeSessionSummary[],
   providerInstanceId?: string,
 ): { newCount: number; syncedCount: number } {

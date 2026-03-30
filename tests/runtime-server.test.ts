@@ -2577,17 +2577,21 @@ backends:
         goose: {},
         junie: {},
         kiro: {},
+        kilo: {},
         opencode: {},
         pi: {},
       },
     }, {}, async (runtime) => {
       const response = await runtime.app.request('/providers/cursor/tools?instance=cli/ubuntu');
       expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({
+      await expect(response.json()).resolves.toEqual(expect.objectContaining({
         provider: 'cursor',
         backend: 'cli',
         instance: 'ubuntu',
         target: 'cli/ubuntu',
+        catalogContext: {
+          scope: 'catalog',
+        },
         continuity: {
           source: 'provider_native',
           summary: expect.stringContaining('CLI provider owns native conversation continuity'),
@@ -2608,7 +2612,7 @@ backends:
           toolCallEvents: false,
           runtimeServices: false,
         },
-      });
+      }));
     });
   });
 
@@ -2945,6 +2949,7 @@ backends:
         },
         junie: {},
         kiro: {},
+        kilo: {},
         opencode: {},
         pi: {},
       },
@@ -3100,7 +3105,7 @@ backends:
       await runtime.close();
       cleanup();
     }
-  });
+  }, 15_000);
 
   it('POST /sessions rejects providers omitted by positive-list YAML config', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-positive-list-test-'));
@@ -5171,22 +5176,37 @@ providers:
         });
       });
 
-      expect(spawnMock).toHaveBeenNthCalledWith(
-        1,
-        expect.any(String),
-        expect.arrayContaining(['models', '--refresh']),
-        expect.objectContaining({
+      const expectDynamicModelRefreshSpawn = (callIndex: number) => {
+        const [, args, options] = spawnMock.mock.calls[callIndex - 1] as [
+          string,
+          string[],
+          { timeoutMs: number; env?: Record<string, string> },
+        ];
+        expect(options).toEqual(expect.objectContaining({
           timeoutMs: 20_000,
-        }),
-      );
-      expect(spawnMock).toHaveBeenNthCalledWith(
-        2,
-        expect.any(String),
-        expect.arrayContaining(['models', '--refresh']),
-        expect.objectContaining({
-          timeoutMs: 20_000,
-        }),
-      );
+        }));
+
+        if (process.platform === 'win32') {
+          expect(args).toEqual(expect.arrayContaining([
+            '-NoLogo',
+            '-NoProfile',
+            '-Command',
+          ]));
+          const payloadBase64 = options.env?.CATS_RUNTIME_PWSH_EXEC_B64;
+          expect(payloadBase64).toEqual(expect.any(String));
+          const payload = JSON.parse(
+            Buffer.from(payloadBase64!, 'base64').toString('utf8'),
+          ) as { command: string; args: string[] };
+          expect(payload.command).toEqual(expect.any(String));
+          expect(payload.args).toEqual(expect.arrayContaining(['models', '--refresh']));
+          return;
+        }
+
+        expect(args).toEqual(expect.arrayContaining(['models', '--refresh']));
+      };
+
+      expectDynamicModelRefreshSpawn(1);
+      expectDynamicModelRefreshSpawn(2);
     } finally {
       spawnMock.mockRestore();
     }

@@ -135,6 +135,9 @@ export interface ProviderInstanceConfig {
   cursorChatsDir?: string;
   geminiSessionsDir?: string;
   kiroDbPath?: string;
+  kiloServerHost?: string;
+  kiloServerPort?: number;
+  kiloServerStartupTimeoutMs?: number;
   opencodeServerHost?: string;
   opencodeServerPort?: number;
   opencodeServerStartupTimeoutMs?: number;
@@ -162,10 +165,14 @@ export interface CliRuntimeConfig {
   cursorPath: string;
   geminiPath: string;
   kiroPath: string;
+  kiloPath: string;
   opencodePath: string;
   goosePath: string;
   juniePath: string;
   piPath: string;
+  kiloServerHost: string;
+  kiloServerPort: number;
+  kiloServerStartupTimeoutMs: number;
   opencodeServerHost: string;
   opencodeServerPort: number;
   opencodeServerStartupTimeoutMs: number;
@@ -208,6 +215,9 @@ interface LegacyRuntimeShape {
   geminiSessionsDir: string;
   kiroDbPath: string;
   kiroRuntime: ProviderRuntimeConfig;
+  kiloServerHost: string;
+  kiloServerPort: number;
+  kiloServerStartupTimeoutMs: number;
   opencodeServerHost: string;
   opencodeServerPort: number;
   opencodeServerStartupTimeoutMs: number;
@@ -293,6 +303,18 @@ export function defaultOpencodeServerStartupTimeoutMs(): number {
   return 10000;
 }
 
+export function defaultKiloServerHost(): string {
+  return '127.0.0.1';
+}
+
+export function defaultKiloServerPort(): number {
+  return 4313;
+}
+
+export function defaultKiloServerStartupTimeoutMs(): number {
+  return 10000;
+}
+
 export function defaultNativeDiscoveryIntervalMs(): number {
   return 5000;
 }
@@ -363,10 +385,14 @@ export function loadConfig(
     cursorPath: configured.providerCommands.cursor.path,
     geminiPath: configured.providerCommands.gemini.path,
     kiroPath: configured.providerCommands.kiro.path,
+    kiloPath: configured.providerCommands.kilo.path,
     opencodePath: configured.providerCommands.opencode.path,
     piPath: configured.providerCommands.pi.path,
     goosePath: configured.providerCommands.goose.path,
     juniePath: configured.providerCommands.junie.path,
+    kiloServerHost: configured.kiloServerHost,
+    kiloServerPort: configured.kiloServerPort,
+    kiloServerStartupTimeoutMs: configured.kiloServerStartupTimeoutMs,
     opencodeServerHost: configured.opencodeServerHost,
     opencodeServerPort: configured.opencodeServerPort,
     opencodeServerStartupTimeoutMs: configured.opencodeServerStartupTimeoutMs,
@@ -459,6 +485,9 @@ export function listProviderInstances(
     | 'cursorChatsDir'
     | 'geminiSessionsDir'
     | 'kiroDbPath'
+    | 'kiloServerHost'
+    | 'kiloServerPort'
+    | 'kiloServerStartupTimeoutMs'
     | 'opencodeServerHost'
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
@@ -500,6 +529,9 @@ export function resolveProviderInstance(
     | 'cursorChatsDir'
     | 'geminiSessionsDir'
     | 'kiroDbPath'
+    | 'kiloServerHost'
+    | 'kiloServerPort'
+    | 'kiloServerStartupTimeoutMs'
     | 'opencodeServerHost'
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
@@ -560,11 +592,12 @@ function buildLegacyRuntimeShape(
     copilot: 'default',
     cursor: 'default',
     gemini: 'default',
-    kiro: 'default',
     opencode: 'default',
-    pi: 'default',
+    kilo: 'default',
     goose: 'default',
+    pi: 'default',
     junie: 'default',
+    kiro: 'default',
   } satisfies Record<ProviderName, string>;
   const providerDefaultTargets = Object.fromEntries(
     Object.entries(providerDefaultInstances).map(([provider, instance]) => [provider, {
@@ -576,6 +609,17 @@ function buildLegacyRuntimeShape(
   const auggieSessionsDir = env.AUGGIE_SESSIONS_DIR || defaultAuggieSessionsDir();
   const cursorChatsDir = env.CURSOR_CHATS_DIR || defaultCursorChatsDir();
   const kiroDbPath = env.KIRO_DB_PATH || defaultKiroDbPath();
+  const kiloServerHost = env.KILO_SERVER_HOST || defaultKiloServerHost();
+  const kiloServerPort = parsePositiveInt(
+    env.KILO_SERVER_PORT,
+    defaultKiloServerPort(),
+    'KILO_SERVER_PORT',
+  );
+  const kiloServerStartupTimeoutMs = parsePositiveInt(
+    env.KILO_SERVER_STARTUP_TIMEOUT_MS,
+    defaultKiloServerStartupTimeoutMs(),
+    'KILO_SERVER_STARTUP_TIMEOUT_MS',
+  );
   const opencodeServerHost = env.OPENCODE_SERVER_HOST || defaultOpencodeServerHost();
   const opencodeServerPort = parsePositiveInt(
     env.OPENCODE_SERVER_PORT,
@@ -645,6 +689,16 @@ function buildLegacyRuntimeShape(
         kiroDbPath,
       },
     },
+    kilo: {
+      default: {
+        id: 'default',
+        providerName: 'kilo',
+        commandConfig: providerCommands.kilo,
+        kiloServerHost,
+        kiloServerPort,
+        kiloServerStartupTimeoutMs,
+      },
+    },
     opencode: {
       default: {
         id: 'default',
@@ -692,6 +746,9 @@ function buildLegacyRuntimeShape(
     geminiSessionsDir: env.GEMINI_SESSIONS_DIR || `${home}/.gemini/tmp`,
     kiroDbPath,
     kiroRuntime: providerCommands.kiro.runtime,
+    kiloServerHost,
+    kiloServerPort,
+    kiloServerStartupTimeoutMs,
     opencodeServerHost,
     opencodeServerPort,
     opencodeServerStartupTimeoutMs,
@@ -715,6 +772,7 @@ function buildLegacyProviderCommands(
   const cursorPath = env.CURSOR_PATH || 'cursor-agent';
   const geminiPath = env.GEMINI_PATH || 'gemini';
   const kiroPath = env.KIRO_PATH || 'kiro-cli';
+  const kiloPath = env.KILO_PATH || 'kilo';
   const opencodePath = env.OPENCODE_PATH || 'opencode';
   const piPath = env.PI_PATH || 'pi';
   const goosePath = env.GOOSE_PATH || 'goose';
@@ -763,6 +821,12 @@ function buildLegacyProviderCommands(
       defaultProviderRuntimeMode('kiro'),
       env,
     ),
+    kilo: readProviderCommandConfig(
+      'KILO',
+      kiloPath,
+      defaultProviderRuntimeMode('kilo'),
+      env,
+    ),
     opencode: readProviderCommandConfig(
       'OPENCODE',
       opencodePath,
@@ -803,6 +867,9 @@ function buildLegacyProviderInstance(
     | 'cursorChatsDir'
     | 'geminiSessionsDir'
     | 'kiroDbPath'
+    | 'kiloServerHost'
+    | 'kiloServerPort'
+    | 'kiloServerStartupTimeoutMs'
     | 'opencodeServerHost'
     | 'opencodeServerPort'
     | 'opencodeServerStartupTimeoutMs'
@@ -820,6 +887,11 @@ function buildLegacyProviderInstance(
     cursorChatsDir: provider === 'cursor' ? config.cursorChatsDir : undefined,
     geminiSessionsDir: provider === 'gemini' ? config.geminiSessionsDir : undefined,
     kiroDbPath: provider === 'kiro' ? config.kiroDbPath : undefined,
+    kiloServerHost: provider === 'kilo' ? config.kiloServerHost : undefined,
+    kiloServerPort: provider === 'kilo' ? config.kiloServerPort : undefined,
+    kiloServerStartupTimeoutMs: provider === 'kilo'
+      ? config.kiloServerStartupTimeoutMs
+      : undefined,
     opencodeServerHost: provider === 'opencode' ? config.opencodeServerHost : undefined,
     opencodeServerPort: provider === 'opencode' ? config.opencodeServerPort : undefined,
     opencodeServerStartupTimeoutMs: provider === 'opencode'
@@ -855,6 +927,9 @@ function applyFileBasedProviderConfig(
   let geminiSessionsDir = legacy.geminiSessionsDir;
   let kiroDbPath = legacy.kiroDbPath;
   let kiroRuntime = legacy.kiroRuntime;
+  let kiloServerHost = legacy.kiloServerHost;
+  let kiloServerPort = legacy.kiloServerPort;
+  let kiloServerStartupTimeoutMs = legacy.kiloServerStartupTimeoutMs;
   let opencodeServerHost = legacy.opencodeServerHost;
   let opencodeServerPort = legacy.opencodeServerPort;
   let opencodeServerStartupTimeoutMs = legacy.opencodeServerStartupTimeoutMs;
@@ -1003,6 +1078,28 @@ function applyFileBasedProviderConfig(
               || fallback.kiroDbPath
               || kiroDbPath
             : undefined,
+          kiloServerHost: provider === 'kilo'
+            ? readString(asOptionalObject(instanceDoc.server)?.host)
+              || readString(instanceDoc.server_host)
+              || fallback.kiloServerHost
+              || kiloServerHost
+            : undefined,
+          kiloServerPort: provider === 'kilo'
+            ? parseOptionalPositiveInt(
+              asOptionalObject(instanceDoc.server)?.port
+                ?? instanceDoc.server_port,
+              fallback.kiloServerPort || kiloServerPort,
+              `${provider}.instances.${instanceId}.server.port`,
+            )
+            : undefined,
+          kiloServerStartupTimeoutMs: provider === 'kilo'
+            ? parseOptionalPositiveInt(
+              asOptionalObject(instanceDoc.server)?.startup_timeout_ms
+                ?? instanceDoc.server_startup_timeout_ms,
+              fallback.kiloServerStartupTimeoutMs || kiloServerStartupTimeoutMs,
+              `${provider}.instances.${instanceId}.server.startup_timeout_ms`,
+            )
+            : undefined,
           opencodeServerHost: provider === 'opencode'
             ? readString(asOptionalObject(instanceDoc.server)?.host)
               || readString(instanceDoc.server_host)
@@ -1078,6 +1175,12 @@ function applyFileBasedProviderConfig(
       if (provider === 'kiro') {
         kiroDbPath = nextInstances[defaultInstance].kiroDbPath || kiroDbPath;
         kiroRuntime = nextInstances[defaultInstance].commandConfig.runtime;
+      }
+      if (provider === 'kilo') {
+        kiloServerHost = nextInstances[defaultInstance].kiloServerHost || kiloServerHost;
+        kiloServerPort = nextInstances[defaultInstance].kiloServerPort || kiloServerPort;
+        kiloServerStartupTimeoutMs = nextInstances[defaultInstance].kiloServerStartupTimeoutMs
+          || kiloServerStartupTimeoutMs;
       }
       if (provider === 'opencode') {
         opencodeServerHost = nextInstances[defaultInstance].opencodeServerHost || opencodeServerHost;
@@ -1160,6 +1263,12 @@ function applyFileBasedProviderConfig(
       kiroDbPath = instance.kiroDbPath || kiroDbPath;
       kiroRuntime = instance.commandConfig.runtime;
     }
+    if (provider === 'kilo') {
+      kiloServerHost = instance.kiloServerHost || kiloServerHost;
+      kiloServerPort = instance.kiloServerPort || kiloServerPort;
+      kiloServerStartupTimeoutMs = instance.kiloServerStartupTimeoutMs
+        || kiloServerStartupTimeoutMs;
+    }
     if (provider === 'opencode') {
       opencodeServerHost = instance.opencodeServerHost || opencodeServerHost;
       opencodeServerPort = instance.opencodeServerPort || opencodeServerPort;
@@ -1187,6 +1296,9 @@ function applyFileBasedProviderConfig(
     geminiSessionsDir,
     kiroDbPath,
     kiroRuntime,
+    kiloServerHost,
+    kiloServerPort,
+    kiloServerStartupTimeoutMs,
     opencodeServerHost,
     opencodeServerPort,
     opencodeServerStartupTimeoutMs,
@@ -1394,6 +1506,7 @@ function cloneProviderCommands(
     cursor: cloneProviderCommandConfig(commands.cursor),
     gemini: cloneProviderCommandConfig(commands.gemini),
     kiro: cloneProviderCommandConfig(commands.kiro),
+    kilo: cloneProviderCommandConfig(commands.kilo),
     opencode: cloneProviderCommandConfig(commands.opencode),
     pi: cloneProviderCommandConfig(commands.pi),
     goose: cloneProviderCommandConfig(commands.goose),
@@ -1412,6 +1525,7 @@ function cloneProviderInstances(
     cursor: cloneInstanceMap(instances.cursor),
     gemini: cloneInstanceMap(instances.gemini),
     kiro: cloneInstanceMap(instances.kiro),
+    kilo: cloneInstanceMap(instances.kilo),
     opencode: cloneInstanceMap(instances.opencode),
     pi: cloneInstanceMap(instances.pi),
     goose: cloneInstanceMap(instances.goose),

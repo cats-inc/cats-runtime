@@ -286,25 +286,28 @@ printf 'Usage: gemini --output-format --resume\\n'
     const cachedHealthAssessment = await service.assessCliTarget(createCliTarget('claude'), {
       purpose: 'health',
     });
+    const expectedPrerequisites = process.platform === 'win32'
+      ? []
+      : [
+        {
+          id: 'bash',
+          label: 'Bash',
+          command: 'bash',
+          status: 'unknown',
+          summary: 'Health probe skipped the detailed prerequisite check for Bash.',
+        },
+        {
+          id: 'curl',
+          label: 'curl',
+          command: 'curl',
+          status: 'unknown',
+          summary: 'Health probe skipped the detailed prerequisite check for curl.',
+        },
+      ];
 
     expect(firstHealthAssessment.status).toBe('ok');
     expect(firstHealthAssessment.setup.command.status).toBe('ready');
-    expect(firstHealthAssessment.setup.prerequisites).toEqual([
-      {
-        id: 'bash',
-        label: 'Bash',
-        command: 'bash',
-        status: 'unknown',
-        summary: 'Health probe skipped the detailed prerequisite check for Bash.',
-      },
-      {
-        id: 'curl',
-        label: 'curl',
-        command: 'curl',
-        status: 'unknown',
-        summary: 'Health probe skipped the detailed prerequisite check for curl.',
-      },
-    ]);
+    expect(firstHealthAssessment.setup.prerequisites).toEqual(expectedPrerequisites);
     expect(firstHealthAssessment.setup.pathPersistence.status).not.toBe('missing');
     expect(firstHealthAssessment.setup.npm.status).not.toBe('missing_prefix');
     expect(firstHealthAssessment.setup.remediation).toEqual([]);

@@ -269,6 +269,24 @@ const CLI_PROVIDER_EVENT_CAPABILITIES: Record<string, ProviderEventCapabilityTem
       'OpenCode exposes live tool milestones but still resolves assistant text as final output.',
     ],
   },
+  kilo: {
+    normalizedStream: {
+      text: { mode: 'final', stepwise: false },
+      toolUse: 'native',
+      toolResult: 'none',
+      progress: 'none',
+      reasoning: 'none',
+    },
+    transcript: {
+      contentBlocks: 'none',
+    },
+    presentation: {
+      recommended: 'content_blocks',
+    },
+    notes: [
+      'Kilo exposes live tool milestones but still resolves assistant text as final output.',
+    ],
+  },
   pi: {
     normalizedStream: {
       text: { mode: 'chunk', stepwise: true },
