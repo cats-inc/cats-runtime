@@ -21,14 +21,15 @@ The first public npm release has not happened yet. Before publishing,
 
 - a package entry at `dist/index.js`
 - an executable `bin` entry for `cats-runtime`
-- an executable `bin` entry for `cats-runtime-mcp`
+- bundled repo-local helper scripts under `dist/bin/`
 - curated publish contents via `files`
 - a `prepack` build step
 - a local release gate via `npm run release:check`
 - local pack/install smoke helpers under `scripts/linux/`, `scripts/macos/`,
   and `scripts/windows/`
 - package-contract coverage that now goes beyond tarball contents and also
-  smokes installed executable entrypoints from the locally packed artifact
+  smokes the installed runtime entrypoint plus bundled helper scripts from the
+  locally packed artifact
 
 That means repo-local package verification is ready now, while registry
 publication and trusted publishing are still future follow-through.
@@ -201,4 +202,4 @@ That keeps the package aligned with the process-boundary ADRs.
 
 ---
 
-*Last updated: 2026-03-23*
+*Last updated: 2026-03-30*

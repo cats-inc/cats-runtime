@@ -66,7 +66,6 @@ try {
         Write-Host "Pack only mode. Package at: $tgz" -ForegroundColor Gray
         Write-Host "You can install later with: npm install -g $tgzQuoted" -ForegroundColor Gray
         Write-Host "After installing, try: cats-runtime --help" -ForegroundColor Gray
-        Write-Host "After installing, try: cats-runtime-mcp --help" -ForegroundColor Gray
         return
     }
 
@@ -84,7 +83,6 @@ try {
         Write-Host "Skipped install. Package at: $tgz" -ForegroundColor Gray
         Write-Host "You can install later with: npm install -g $tgzQuoted" -ForegroundColor Gray
         Write-Host "After installing, try: cats-runtime --help" -ForegroundColor Gray
-        Write-Host "After installing, try: cats-runtime-mcp --help" -ForegroundColor Gray
         return
     }
 
@@ -96,7 +94,6 @@ try {
 
     Write-Host "Installed successfully!" -ForegroundColor Green
     Write-Host "Try: cats-runtime --help" -ForegroundColor Gray
-    Write-Host "Try: cats-runtime-mcp --help" -ForegroundColor Gray
 
     $shouldDelete = $false
     if ($Clean) {

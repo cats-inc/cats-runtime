@@ -36,9 +36,10 @@ function parseMcpCliOptions(argv: string[]): {
 
 function getHelpText(): string {
   return [
-    'cats-runtime-mcp',
+    'cats-runtime MCP proxy helper',
     '',
     'Proxy stdio MCP requests to the primary cats-runtime HTTP /mcp endpoint.',
+    'This helper is repo-local and is not published as a package bin alias.',
     '',
     'Options:',
     '  --host <host>          Override the target runtime host when deriving the proxy URL',
@@ -82,8 +83,8 @@ async function main(): Promise<void> {
       env: process.env,
     });
     const statusLine = inspection.probe.status === 'ok'
-      ? `cats-runtime-mcp proxy target ${inspection.target.url} is reachable (timeout ${inspection.target.timeoutMs}ms).\n`
-      : `cats-runtime-mcp proxy preflight failed: ${inspection.probe.message}\n`;
+      ? `cats-runtime MCP proxy target ${inspection.target.url} is reachable (timeout ${inspection.target.timeoutMs}ms).\n`
+      : `cats-runtime MCP proxy preflight failed: ${inspection.probe.message}\n`;
     process.stderr.write(statusLine);
     process.stdout.write(`${JSON.stringify(inspection)}\n`);
     if (inspection.probe.status !== 'ok') {

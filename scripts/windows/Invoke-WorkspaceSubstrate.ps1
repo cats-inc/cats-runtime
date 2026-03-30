@@ -4,7 +4,7 @@
     Invoke the repo-owned cats-runtime workspace substrate helper.
 
 .DESCRIPTION
-    Wraps `cats-runtime-workspace` / `dist/bin/workspaceSubstrate.js` so
+    Wraps `dist/bin/workspaceSubstrate.js` so
     Windows users can audit, initialize, or update collaboration substrate
     files without depending on external bootstrap repos.
 

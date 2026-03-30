@@ -756,11 +756,12 @@ In that mode:
   machine-readable integration surface beyond raw stdout parsing
 - the process stays a separate HTTP service rather than being source-imported
   into the host app
-- the published `cats-runtime` / `cats-runtime-mcp` binaries remain the
-  supported package entrypoints; root-module imports are still treated as
-  internal/dev-oriented helpers
-- `cats-runtime-mcp` now acts as a stdio MCP proxy to the primary runtime's
-  `POST /mcp` route; it does not start a second independent runtime core
+- the published `cats-runtime` binary remains the supported package entrypoint;
+  root-module imports and `dist/bin/*` helpers are still treated as
+  internal/dev-oriented surfaces
+- `node dist/bin/mcp.js` remains available as a repo-local stdio MCP proxy to
+  the primary runtime's `POST /mcp` route; it does not start a second
+  independent runtime core
 - stdio-only MCP hosts should either set `CATS_RUNTIME_MCP_PROXY_URL`
   explicitly or keep `CATS_RUNTIME_HOST` / `CATS_RUNTIME_PORT` aligned with the
   primary runtime

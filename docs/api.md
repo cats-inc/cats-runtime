@@ -71,7 +71,7 @@ Peer auth/trust notes:
 GET /
 GET /playground
 POST /mcp
-stdio: cats-runtime-mcp
+stdio: node dist/bin/mcp.js (repo-local helper)
 ```
 
 `GET /` returns the embedded `cats-runtime` dashboard HTML.
@@ -85,8 +85,8 @@ mutation endpoints.
 
 `POST /mcp` exposes the runtime-owned MCP facade over HTTP JSON-RPC and is the
 authoritative MCP execution owner because it runs inside the primary
-`cats-runtime` process. `cats-runtime-mcp` exposes the same tool plane over
-stdio for external MCP hosts, but it now proxies to that existing `POST /mcp`
+`cats-runtime` process. `node dist/bin/mcp.js` exposes the same tool plane over
+stdio for repo-local MCP hosts, but it now proxies to that existing `POST /mcp`
 surface instead of creating a second independent runtime core. This slice is
 additive: direct runtime APIs remain the primary app boundary, while MCP is
 the curated tool surface for orchestrator-style agents.
@@ -340,13 +340,7 @@ Successful tool calls return short human `content` plus machine-readable
 contracts already exposed over direct HTTP. `init_workspace` remains preview by
 default unless callers explicitly request `apply: true`.
 
-For stdio hosts, start:
-
-```text
-cats-runtime-mcp
-```
-
-or for an unpackaged local build:
+For repo-local stdio hosts, start:
 
 ```text
 node dist/bin/mcp.js
@@ -354,18 +348,19 @@ node dist/bin/mcp.js
 
 Operational notes:
 
-- start the primary `cats-runtime` before launching `cats-runtime-mcp`
+- `node dist/bin/mcp.js` is a repo-local helper, not a published npm `bin`
+- start the primary `cats-runtime` before launching the stdio MCP helper
 - prefer direct `POST /mcp` when the host can use HTTP JSON-RPC
-- `cats-runtime-mcp` resolves its target from `CATS_RUNTIME_MCP_PROXY_URL`, or
-  from `CATS_RUNTIME_HOST` / `CATS_RUNTIME_PORT` when no explicit proxy URL is set
-- if `CATS_RUNTIME_API_KEY` is configured, `cats-runtime-mcp` forwards the same
-  bearer token to the primary runtime
-- `cats-runtime-mcp` applies a conservative upstream timeout by default; set
+- the helper resolves its target from `CATS_RUNTIME_MCP_PROXY_URL`, or from
+  `CATS_RUNTIME_HOST` / `CATS_RUNTIME_PORT` when no explicit proxy URL is set
+- if `CATS_RUNTIME_API_KEY` is configured, the helper forwards the same bearer
+  token to the primary runtime
+- the helper applies a conservative upstream timeout by default; set
   `CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS` to override it, and timeout failures now
   surface as `reason: "upstream_timeout"` instead of generic unavailability
-- `cats-runtime-mcp --inspect-proxy` resolves the current proxy target, runs a
-  local `ping` preflight against the primary runtime, emits JSON to stdout, and
-  exits without starting the stdio MCP server
+- `node dist/bin/mcp.js --inspect-proxy` resolves the current proxy target,
+  runs a local `ping` preflight against the primary runtime, emits JSON to
+  stdout, and exits without starting the stdio MCP server
 
 ### Health
 

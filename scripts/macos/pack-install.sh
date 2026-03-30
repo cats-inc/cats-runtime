@@ -55,7 +55,6 @@ if [ "$PACK_ONLY" = true ]; then
   printf '\033[90mPack only mode. Package at: %s\033[0m\n' "$TGZ"
   printf '\033[90mYou can install later with: npm install -g %s\033[0m\n' "$TGZ_QUOTED"
   printf '\033[90mAfter installing, try: cats-runtime --help\033[0m\n'
-  printf '\033[90mAfter installing, try: cats-runtime-mcp --help\033[0m\n'
   exit 0
 fi
 
@@ -75,7 +74,6 @@ if [ "$SHOULD_INSTALL" = false ]; then
   printf '\033[90mSkipped install. Package at: %s\033[0m\n' "$TGZ"
   printf '\033[90mYou can install later with: npm install -g %s\033[0m\n' "$TGZ_QUOTED"
   printf '\033[90mAfter installing, try: cats-runtime --help\033[0m\n'
-  printf '\033[90mAfter installing, try: cats-runtime-mcp --help\033[0m\n'
   exit 0
 fi
 
@@ -83,7 +81,6 @@ printf '\n\033[36m=== Installing globally... ===\033[0m\n'
 npm install -g "$TGZ"
 printf '\033[32mInstalled successfully!\033[0m\n'
 printf '\033[90mTry: cats-runtime --help\033[0m\n'
-printf '\033[90mTry: cats-runtime-mcp --help\033[0m\n'
 
 SHOULD_DELETE=false
 if [ "$CLEAN" = true ]; then

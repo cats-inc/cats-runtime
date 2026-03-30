@@ -78,8 +78,9 @@ Supported startup flags:
 - `--port <bind-port>`
 - `--config <providers-config-path>`
 
-The companion stdio entrypoint remains `cats-runtime-mcp`, which now proxies to
-the primary runtime rather than starting a second runtime core.
+The companion stdio MCP helper remains `node dist/bin/mcp.js` for repo-local
+stdio-only hosts. It proxies to the primary runtime rather than starting a
+second runtime core.
 
 ### 4. App-managed local startup
 
@@ -89,11 +90,11 @@ an Electron host. In that mode:
 - the host process owns process supervision
 - readiness should be checked over the runtime HTTP boundary
 - the runtime remains a separate process, not an in-process product import
-- `cats-runtime` / `cats-runtime-mcp` are the supported package entrypoints;
-  root-module imports remain internal/dev-oriented helpers
-- `cats-runtime-mcp` is the stdio MCP proxy entrypoint, not a second
-  standalone runtime server; start the primary `cats-runtime` first when using
-  stdio-only MCP hosts
+- `cats-runtime` is the supported package entrypoint; root-module imports and
+  `dist/bin/*` helpers remain internal/dev-oriented surfaces
+- `node dist/bin/mcp.js` is the repo-local stdio MCP proxy helper, not a
+  second standalone runtime server; start the primary `cats-runtime` first
+  when using stdio-only MCP hosts
 - stdio proxy target resolution uses `CATS_RUNTIME_MCP_PROXY_URL` first, then
   falls back to `CATS_RUNTIME_HOST` / `CATS_RUNTIME_PORT`
 

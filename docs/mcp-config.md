@@ -8,13 +8,14 @@
 
 ```text
 POST /mcp
-cats-runtime-mcp
+node dist/bin/mcp.js
 ```
 
 `POST /mcp` is the authoritative MCP execution surface because it runs inside
-the primary `cats-runtime` process. `cats-runtime-mcp` remains for stdio-only
-hosts, but it now acts as a thin stdio-to-HTTP proxy to that existing
-`POST /mcp` route instead of creating a second runtime core.
+the primary `cats-runtime` process. `node dist/bin/mcp.js` remains as a
+repo-local helper for stdio-only hosts, but it now acts as a thin
+stdio-to-HTTP proxy to that existing `POST /mcp` route instead of creating a
+second runtime core.
 
 This MCP facade is additive. It does not replace the direct runtime HTTP API
 used by `cats`, the dashboard, or the playground.
@@ -138,8 +139,8 @@ not need to pass `action` and `phase` explicitly.
 
 `POST /mcp` uses the same runtime auth policy as the direct HTTP API. If
 `cats-runtime` is configured with an API key, MCP clients must send the same
-Bearer token. `cats-runtime-mcp` forwards that same bearer token to the primary
-runtime when `CATS_RUNTIME_API_KEY` is set.
+Bearer token. `node dist/bin/mcp.js` forwards that same bearer token to the
+primary runtime when `CATS_RUNTIME_API_KEY` is set.
 
 ## HTTP Usage
 
@@ -216,13 +217,7 @@ the short human summary.
 
 ## Stdio Usage
 
-Packaged entrypoint:
-
-```text
-cats-runtime-mcp
-```
-
-Local build entrypoint:
+Repo-local entrypoint:
 
 ```text
 node dist/bin/mcp.js
@@ -230,17 +225,20 @@ node dist/bin/mcp.js
 
 Operational notes:
 
-- start the primary `cats-runtime` first; `cats-runtime-mcp` does not auto-start it
+- `node dist/bin/mcp.js` is a repo-local helper, not a published npm `bin`
+- start the primary `cats-runtime` first; the stdio MCP helper does not
+  auto-start it
 - prefer direct `POST /mcp` when the host supports HTTP MCP
-- use `cats-runtime-mcp` only when the host is stdio-only
+- use the helper only when the host is stdio-only
 - if the proxy cannot reach the primary runtime, stdio clients receive an MCP
   error instead of silently falling back to a second local runtime
 - the proxy now applies a conservative upstream timeout by default and returns
   a dedicated `upstream_timeout` MCP error when the primary runtime does not
   answer in time
-- `cats-runtime-mcp --inspect-proxy` is a local utility exit that resolves the
-  current proxy target, runs a `ping` preflight against the primary runtime,
-  emits JSON to stdout, and exits without starting the stdio MCP server
+- `node dist/bin/mcp.js --inspect-proxy` is a local utility exit that resolves
+  the current proxy target, runs a `ping` preflight against the primary
+  runtime, emits JSON to stdout, and exits without starting the stdio MCP
+  server
 
 Proxy target resolution order:
 

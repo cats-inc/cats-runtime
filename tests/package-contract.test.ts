@@ -138,8 +138,6 @@ describe('package contract', () => {
 
     expect(manifest.bin).toEqual({
       'cats-runtime': './dist/index.js',
-      'cats-runtime-mcp': './dist/bin/mcp.js',
-      'cats-runtime-workspace': './dist/bin/workspaceSubstrate.js',
     });
     expect(manifest.exports?.['.']).toEqual({
       import: './dist/index.js',
@@ -164,9 +162,7 @@ describe('package contract', () => {
       'config/providers.yaml.example',
       'dist/index.js',
       'dist/index.d.ts',
-      'dist/bin/mcp.js',
       'dist/bin/verifySkills.js',
-      'dist/bin/workspaceSubstrate.js',
       'public/index.html',
       'public/playground.html',
       'public/provider-setup.html',
@@ -196,7 +192,7 @@ describe('package contract', () => {
     expect(packedPaths.has('dist/stale/old-artifact.txt')).toBe(false);
   }, 90000);
 
-  it('smokes installed packaged executables from a local tarball', () => {
+  it('smokes the installed runtime entrypoint plus bundled helper scripts from a local tarball', () => {
     const installRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-pack-install-'));
     cleanupPaths.push(installRoot);
     const npmCache = join(installRoot, '.npm-cache');
@@ -233,7 +229,7 @@ describe('package contract', () => {
       },
     });
     expect(mcpInspect.status).toBe(1);
-    expect(mcpInspect.stderr).toContain('cats-runtime-mcp proxy preflight failed:');
+    expect(mcpInspect.stderr).toContain('cats-runtime MCP proxy preflight failed:');
     expect(JSON.parse(mcpInspect.stdout)).toEqual({
       target: {
         url: 'http://127.0.0.1:9/mcp',

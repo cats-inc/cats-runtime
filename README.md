@@ -27,7 +27,7 @@ Current capabilities:
 - file-based provider topology with separated `routing` / `backends` sections
 - dashboard-side provider instance selection for session creation
 - embedded multi-agent playground sample at `/playground`
-- runtime-owned MCP facade with authoritative execution on `POST /mcp` plus a `cats-runtime-mcp` stdio proxy for stdio-only hosts
+- runtime-owned MCP facade with authoritative execution on `POST /mcp` plus a repo-local stdio proxy helper at `node dist/bin/mcp.js` for stdio-only hosts
 - curated MCP mutation tools for `create_session`, `send_message`, `fork_session`, `init_workspace`, and `commit_changes`
 - runtime-managed skills with session-level requested/resolved/applied metadata plus a family-aware internal skill library
 - additive workspace/skill hydration metadata that distinguishes runtime cwd from the authoritative workspace source
@@ -99,24 +99,27 @@ Embedded UIs:
 MCP usage:
 
 - use `POST /mcp` when the host can speak HTTP JSON-RPC directly
-- use `cats-runtime-mcp` only for stdio-only MCP hosts such as MCP Studio
-- `cats-runtime-mcp` now proxies to an already-running primary `cats-runtime`
-  and does not start a second independent runtime core
+- use `node dist/bin/mcp.js` only for repo-local stdio-only MCP hosts such as
+  MCP Studio
+- the stdio MCP helper now proxies to an already-running primary
+  `cats-runtime` and does not start a second independent runtime core
 - set `CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS` to override the stdio proxy timeout
   when a stdio-only host needs a different upstream request window
-- run `cats-runtime-mcp --inspect-proxy` when you want a local JSON preflight
-  of the current proxy target, auth posture, timeout, and `ping` reachability
+- run `node dist/bin/mcp.js --inspect-proxy` when you want a local JSON
+  preflight of the current proxy target, auth posture, timeout, and `ping`
+  reachability
 
 Workspace substrate helper:
 
-- use `cats-runtime-workspace` when you need a repo-owned CLI helper for
-  `audit-workspace`, `init-workspace`, or `update-workspace`
+- use `node dist/bin/workspaceSubstrate.js` or the wrapper scripts under
+  `scripts/` when you need a repo-owned CLI helper for `audit-workspace`,
+  `init-workspace`, or `update-workspace`
 - the helper prints JSON to stdout and uses the same conservative
   create/update/review-copy semantics as the runtime-owned workspace substrate
 - example preview:
-  `cats-runtime-workspace --operation audit --workspace-path . --profile standard --agent codex`
+  `node dist/bin/workspaceSubstrate.js --operation audit --workspace-path . --profile standard --agent codex`
 - example apply:
-  `cats-runtime-workspace --operation update --workspace-path . --profile a2a-enabled --agent codex --apply --actor-role boss_cat`
+  `node dist/bin/workspaceSubstrate.js --operation update --workspace-path . --profile a2a-enabled --agent codex --apply --actor-role boss_cat`
 
 ## Package-Ready Startup
 

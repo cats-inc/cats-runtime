@@ -37,10 +37,10 @@ const VALID_ACTOR_ROLES = new Set<WorkspaceSubstrateActorRole>([
 ]);
 
 function printUsage(): void {
-  process.stdout.write(`cats-runtime-workspace
+  process.stdout.write(`cats-runtime workspace substrate helper
 
 Usage:
-  cats-runtime-workspace --operation <audit|init|update> [options]
+  node dist/bin/workspaceSubstrate.js --operation <audit|init|update> [options]
 
 Options:
   --workspace-path <path>         Target workspace path (default: current dir)
@@ -235,6 +235,6 @@ try {
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`[cats-runtime-workspace] ${message}\n`);
+  process.stderr.write(`[cats-runtime workspace] ${message}\n`);
   process.exitCode = 1;
 }

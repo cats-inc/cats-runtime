@@ -29,7 +29,7 @@ function runCli(args: string[]) {
   );
 }
 
-describe('cats-runtime-workspace bin', () => {
+describe('workspace substrate helper', () => {
   it('returns JSON preview output for audit mode', () => {
     const { root, cleanup } = createWorkspace();
 
