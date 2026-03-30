@@ -828,12 +828,14 @@ snapshot fields such as advertised agent/channel/session counts. Agent SDK
 bridge targets now use the same live diagnostics surface to validate
 `GET /api/v1/providers` semantically, adding bounded checks for target-provider
 listing, configured-model visibility, and registry-declared streaming support,
-and then attempt a bounded probe-session create/delete cycle so operators can
-see whether the bridge can actually honor basic session lifecycle semantics.
+and then attempt a bounded probe-session create/read/delete cycle so operators
+can see whether the bridge can actually honor basic session lifecycle
+semantics.
 The same provider registry plus probe-session summary now surfaces under
 `config.liveProbe`, including `semanticStatus` and additive
-`sessionLifecycle` fields (`createChecked`, `createStatus`, `cleanupChecked`,
-`cleanupStatus`, and `probeModel`). Those same runtime-managed options
+`sessionLifecycle` fields (`createChecked`, `createStatus`, `readChecked`,
+`readStatus`, `cleanupChecked`, `cleanupStatus`, and `probeModel`, plus
+observed provider/model/status truth when the bridge returns it). Those same runtime-managed options
 also back OpenClaw `models.list` and Agent SDK bridge provider-registry model
 loading, so live diagnostics and `GET /providers/{provider}/models` can report
 runtime-derived model truth instead of a config-only fallback when the remote

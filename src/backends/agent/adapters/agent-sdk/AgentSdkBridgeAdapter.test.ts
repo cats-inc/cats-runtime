@@ -50,6 +50,20 @@ describe('AgentSdkBridgeAdapter', () => {
           });
         }
 
+        if (url === 'http://agent-sdk.test/api/v1/sessions/probe-session-1' && method === 'GET') {
+          return new Response(JSON.stringify({
+            id: 'probe-session-1',
+            provider: 'claude',
+            provider_session_id: 'sdk-provider-1',
+            model: 'sonnet',
+            status: 'idle',
+            metadata: {},
+          }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+
         if (url === 'http://agent-sdk.test/api/v1/sessions/probe-session-1' && method === 'DELETE') {
           return new Response(null, { status: 204 });
         }
@@ -84,15 +98,29 @@ describe('AgentSdkBridgeAdapter', () => {
       sessionLifecycle: {
         createChecked: true,
         createStatus: 'ok',
+        readChecked: true,
+        readStatus: 'ok',
         cleanupChecked: true,
         cleanupStatus: 'ok',
         probeModel: 'sonnet',
+        observedStatus: 'idle',
+        observedProvider: 'claude',
+        observedModel: 'sonnet',
+        providerSessionIdPresent: true,
       },
     }));
     expect(result.checks).toEqual(expect.arrayContaining([
       expect.objectContaining({
         code: 'bridge_probe_session_create',
         status: 'ok',
+      }),
+      expect.objectContaining({
+        code: 'bridge_probe_session_read',
+        status: 'ok',
+        details: expect.objectContaining({
+          observedStatus: 'idle',
+          providerSessionIdPresent: true,
+        }),
       }),
       expect.objectContaining({
         code: 'bridge_probe_session_cleanup',
@@ -200,6 +228,8 @@ describe('AgentSdkBridgeAdapter', () => {
       sessionLifecycle: {
         createChecked: true,
         createStatus: 'degraded',
+        readChecked: false,
+        readStatus: 'degraded',
         cleanupChecked: false,
         cleanupStatus: 'degraded',
         probeModel: 'sonnet',
@@ -208,6 +238,90 @@ describe('AgentSdkBridgeAdapter', () => {
     expect(result.checks).toEqual(expect.arrayContaining([
       expect.objectContaining({
         code: 'bridge_probe_session_create',
+        status: 'degraded',
+      }),
+      expect.objectContaining({
+        code: 'bridge_probe_session_read',
+        status: 'degraded',
+      }),
+    ]));
+  });
+
+  it('degrades probe health when the bridge cannot read a bounded probe session after create', async () => {
+    const adapter = new AgentSdkBridgeAdapter({
+      fetch: async (input, init) => {
+        const url = String(input);
+        const method = init?.method || 'GET';
+
+        if (url === 'http://agent-sdk.test/api/v1/providers' && method === 'GET') {
+          return new Response(JSON.stringify({
+            providers: [
+              {
+                name: 'claude',
+                default_model: 'sonnet',
+                models: ['sonnet', 'haiku'],
+                capabilities: {
+                  streaming: true,
+                  mcp: true,
+                  vision: false,
+                },
+              },
+            ],
+          }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+
+        if (url === 'http://agent-sdk.test/api/v1/sessions' && method === 'POST') {
+          return new Response(JSON.stringify({
+            id: 'probe-session-1',
+          }), {
+            status: 201,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+
+        if (url === 'http://agent-sdk.test/api/v1/sessions/probe-session-1' && method === 'GET') {
+          return new Response(JSON.stringify({
+            error: {
+              message: 'probe session read failed',
+            },
+          }), {
+            status: 500,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+
+        if (url === 'http://agent-sdk.test/api/v1/sessions/probe-session-1' && method === 'DELETE') {
+          return new Response(null, { status: 204 });
+        }
+
+        throw new Error(`Unexpected fetch: ${method} ${url}`);
+      },
+    });
+
+    const result = await adapter.probe(createInstance());
+
+    expect(result.health).toEqual(expect.objectContaining({
+      status: 'degraded',
+      details: 'Agent SDK bridge probe session read failed: {"error":{"message":"probe session read failed"}}',
+    }));
+    expect(result.liveProbe).toEqual(expect.objectContaining({
+      semanticStatus: 'degraded',
+      sessionLifecycle: {
+        createChecked: true,
+        createStatus: 'ok',
+        readChecked: true,
+        readStatus: 'degraded',
+        cleanupChecked: true,
+        cleanupStatus: 'ok',
+        probeModel: 'sonnet',
+      },
+    }));
+    expect(result.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'bridge_probe_session_read',
         status: 'degraded',
       }),
     ]));

@@ -445,10 +445,17 @@ interface BridgeSessionLifecycleProbe {
   createChecked: boolean;
   createStatus: AgentAdapterProbeCheck['status'];
   createMessage: string;
+  readChecked: boolean;
+  readStatus: AgentAdapterProbeCheck['status'];
+  readMessage: string;
   cleanupChecked: boolean;
   cleanupStatus: AgentAdapterProbeCheck['status'];
   cleanupMessage: string;
   probeModel?: string;
+  observedStatus?: string;
+  observedProvider?: string;
+  observedModel?: string;
+  providerSessionIdPresent?: boolean;
 }
 
 function buildBridgeSessionLifecycleChecks(
@@ -466,6 +473,23 @@ function buildBridgeSessionLifecycleChecks(
         targetProvider: expectedProvider,
         createChecked: lifecycle.createChecked,
         ...(lifecycle.probeModel ? { probeModel: lifecycle.probeModel } : {}),
+      },
+    },
+    {
+      code: 'bridge_probe_session_read',
+      status: lifecycle.readStatus,
+      message: lifecycle.readMessage,
+      details: {
+        endpoint,
+        targetProvider: expectedProvider,
+        readChecked: lifecycle.readChecked,
+        ...(lifecycle.probeModel ? { probeModel: lifecycle.probeModel } : {}),
+        ...(lifecycle.observedStatus ? { observedStatus: lifecycle.observedStatus } : {}),
+        ...(lifecycle.observedProvider ? { observedProvider: lifecycle.observedProvider } : {}),
+        ...(lifecycle.observedModel ? { observedModel: lifecycle.observedModel } : {}),
+        ...(lifecycle.providerSessionIdPresent !== undefined
+          ? { providerSessionIdPresent: lifecycle.providerSessionIdPresent }
+          : {}),
       },
     },
     ...(lifecycle.cleanupChecked
@@ -500,6 +524,10 @@ function summarizeBridgeProbeHealth(
 
   if (lifecycle.createStatus !== 'ok') {
     return lifecycle.createMessage;
+  }
+
+  if (lifecycle.readStatus !== 'ok') {
+    return lifecycle.readMessage;
   }
 
   if (lifecycle.cleanupChecked && lifecycle.cleanupStatus !== 'ok') {
@@ -857,6 +885,9 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
             createChecked: true,
             createStatus: 'degraded',
             createMessage: `Agent SDK bridge probe session create failed: ${await readErrorBody(createResponse)}`,
+            readChecked: false,
+            readStatus: 'degraded',
+            readMessage: 'Probe session read skipped because creation failed.',
             cleanupChecked: false,
             cleanupStatus: 'degraded',
             cleanupMessage: 'Probe session cleanup skipped because creation failed.',
@@ -871,12 +902,51 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
               createChecked: true,
               createStatus: 'degraded',
               createMessage: 'Agent SDK bridge probe session create returned no session id.',
+              readChecked: false,
+              readStatus: 'degraded',
+              readMessage: 'Probe session read skipped because creation returned no session id.',
               cleanupChecked: false,
               cleanupStatus: 'degraded',
               cleanupMessage: 'Probe session cleanup skipped because creation returned no session id.',
               ...(probeModel ? { probeModel } : {}),
             };
           } else {
+            const readResponse = await this.fetchImpl(
+              `${lifecycleEndpoint}/${encodeURIComponent(probeSessionId)}`,
+              {
+                headers: buildHeaders(instance, env),
+              },
+            );
+            let readStatus: BridgeSessionLifecycleProbe['readStatus'] = 'ok';
+            let readMessage = 'Agent SDK bridge probe session read succeeded.';
+            let observedStatus: string | undefined;
+            let observedProvider: string | undefined;
+            let observedModel: string | undefined;
+            let providerSessionIdPresent: boolean | undefined;
+
+            if (!readResponse.ok) {
+              readStatus = 'degraded';
+              readMessage = `Agent SDK bridge probe session read failed: ${await readErrorBody(readResponse)}`;
+            } else {
+              const readPayload = await readResponse.json() as Record<string, unknown>;
+              const observedSessionId = readString(readPayload.id);
+              observedStatus = readString(readPayload.status);
+              observedProvider = readString(readPayload.provider);
+              observedModel = readString(readPayload.model);
+              providerSessionIdPresent = Boolean(readString(readPayload.provider_session_id));
+
+              if (!observedSessionId || observedSessionId !== probeSessionId) {
+                readStatus = 'degraded';
+                readMessage = 'Agent SDK bridge probe session read returned an unexpected session id.';
+              } else if (observedProvider && observedProvider !== expected) {
+                readStatus = 'degraded';
+                readMessage = `Agent SDK bridge probe session read returned unexpected provider '${observedProvider}'.`;
+              } else if (probeModel && observedModel && observedModel !== probeModel) {
+                readStatus = 'degraded';
+                readMessage = `Agent SDK bridge probe session read returned unexpected model '${observedModel}'.`;
+              }
+            }
+
             const cleanupResponse = await this.fetchImpl(
               `${lifecycleEndpoint}/${encodeURIComponent(probeSessionId)}`,
               {
@@ -888,6 +958,9 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
               createChecked: true,
               createStatus: 'ok',
               createMessage: `Agent SDK bridge probe session create succeeded for ${expected}.`,
+              readChecked: true,
+              readStatus,
+              readMessage,
               cleanupChecked: true,
               cleanupStatus: cleanupResponse.ok || cleanupResponse.status === 204
                 ? 'ok'
@@ -896,6 +969,12 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
                 ? 'Agent SDK bridge probe session cleanup succeeded.'
                 : `Agent SDK bridge probe session cleanup failed: ${await readErrorBody(cleanupResponse)}`,
               ...(probeModel ? { probeModel } : {}),
+              ...(observedStatus ? { observedStatus } : {}),
+              ...(observedProvider ? { observedProvider } : {}),
+              ...(observedModel ? { observedModel } : {}),
+              ...(providerSessionIdPresent !== undefined
+                ? { providerSessionIdPresent }
+                : {}),
             };
           }
         }
@@ -906,6 +985,7 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
       const probeHealthy = semanticallyReady
         && (!lifecycle || (
           lifecycle.createStatus === 'ok'
+          && lifecycle.readStatus === 'ok'
           && (!lifecycle.cleanupChecked || lifecycle.cleanupStatus === 'ok')
         ));
 
@@ -933,9 +1013,17 @@ export class AgentSdkBridgeAdapter implements AgentAdapter {
                 sessionLifecycle: {
                   createChecked: lifecycle.createChecked,
                   createStatus: lifecycle.createStatus,
+                  readChecked: lifecycle.readChecked,
+                  readStatus: lifecycle.readStatus,
                   cleanupChecked: lifecycle.cleanupChecked,
                   cleanupStatus: lifecycle.cleanupStatus,
                   ...(lifecycle.probeModel ? { probeModel: lifecycle.probeModel } : {}),
+                  ...(lifecycle.observedStatus ? { observedStatus: lifecycle.observedStatus } : {}),
+                  ...(lifecycle.observedProvider ? { observedProvider: lifecycle.observedProvider } : {}),
+                  ...(lifecycle.observedModel ? { observedModel: lifecycle.observedModel } : {}),
+                  ...(lifecycle.providerSessionIdPresent !== undefined
+                    ? { providerSessionIdPresent: lifecycle.providerSessionIdPresent }
+                    : {}),
                 },
               }
             : {}),

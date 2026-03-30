@@ -944,6 +944,20 @@ describe('agent backend integration', () => {
         });
       }
 
+      if (url === 'http://agent-sdk.test/api/v1/sessions/probe-session-1' && method === 'GET') {
+        return new Response(JSON.stringify({
+          id: 'probe-session-1',
+          provider: 'claude',
+          provider_session_id: 'sdk-provider-1',
+          model: 'sonnet',
+          status: 'idle',
+          metadata: {},
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
       if (url === 'http://agent-sdk.test/api/v1/sessions/probe-session-1' && method === 'DELETE') {
         return new Response(null, { status: 204 });
       }
@@ -1034,6 +1048,17 @@ describe('agent backend integration', () => {
                 }),
               }),
               expect.objectContaining({
+                code: 'bridge_probe_session_read',
+                status: 'ok',
+                details: expect.objectContaining({
+                  endpoint: 'http://agent-sdk.test/api/v1/sessions',
+                  targetProvider: 'claude',
+                  probeModel: 'sonnet',
+                  observedStatus: 'idle',
+                  providerSessionIdPresent: true,
+                }),
+              }),
+              expect.objectContaining({
                 code: 'bridge_probe_session_cleanup',
                 status: 'ok',
                 details: expect.objectContaining({
@@ -1094,9 +1119,15 @@ describe('agent backend integration', () => {
                 sessionLifecycle: {
                   createChecked: true,
                   createStatus: 'ok',
+                  readChecked: true,
+                  readStatus: 'ok',
                   cleanupChecked: true,
                   cleanupStatus: 'ok',
                   probeModel: 'sonnet',
+                  observedStatus: 'idle',
+                  observedProvider: 'claude',
+                  observedModel: 'sonnet',
+                  providerSessionIdPresent: true,
                 },
               },
               modelCatalog: expect.objectContaining({
@@ -1121,6 +1152,11 @@ describe('agent backend integration', () => {
             provider: 'claude',
             model: 'sonnet',
           },
+        },
+        {
+          url: 'http://agent-sdk.test/api/v1/sessions/probe-session-1',
+          method: 'GET',
+          body: undefined,
         },
         {
           url: 'http://agent-sdk.test/api/v1/sessions/probe-session-1',
