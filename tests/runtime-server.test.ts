@@ -223,6 +223,47 @@ describe('runtime server', () => {
       const openCreateModalBody = openCreateModalMatch![1];
       expect(openCreateModalBody.indexOf("classList.add('open')"))
         .toBeLessThan(openCreateModalBody.indexOf('await refreshProviderCatalog()'));
+      const syncCreatePresetSelectorMatch = html.match(
+        /function syncCreatePresetSelector\(catalog, preserveCurrent = false, allowDefaultPreset = true\) \{([\s\S]*?)\n\}/,
+      );
+      expect(syncCreatePresetSelectorMatch?.[1]).toBeTruthy();
+      expect(syncCreatePresetSelectorMatch![1]).toContain(
+        "if (entryId === CUSTOM_CREATE_MODEL_VALUE) {\n"
+          + "    renderCreateRoutingSelectOptions(presetEl, [], '');\n"
+          + "    presetEl.disabled = true;\n"
+          + "    setCreatePresetGroupDisplay('hidden');\n"
+          + "    return '';\n"
+          + '  }',
+      );
+      expect(syncCreatePresetSelectorMatch![1]).toContain(
+        "if (presets.length === 0) {\n"
+          + "    return setCreatePresetStaticLabel('Standard only');\n"
+          + '  }',
+      );
+      const setCreatePresetStaticLabelMatch = html.match(
+        /function setCreatePresetStaticLabel\(label\) \{([\s\S]*?)\n\}/,
+      );
+      expect(setCreatePresetStaticLabelMatch?.[1]).toBeTruthy();
+      expect(setCreatePresetStaticLabelMatch![1]).toContain("const optionLabel = label || 'Standard only';");
+      expect(setCreatePresetStaticLabelMatch![1]).toContain("setCreatePresetGroupDisplay('visible');");
+      const setCreatePresetGroupDisplayMatch = html.match(
+        /function setCreatePresetGroupDisplay\(mode\) \{([\s\S]*?)\n\}/,
+      );
+      expect(setCreatePresetGroupDisplayMatch?.[1]).toBeTruthy();
+      expect(setCreatePresetGroupDisplayMatch![1]).toContain("if (mode === 'reserved') {");
+      expect(setCreatePresetGroupDisplayMatch![1]).toContain("presetGroup.style.visibility = 'hidden';");
+      const renderCreateModelChoiceMatch = html.match(
+        /function renderCreateModelChoice\(\) \{([\s\S]*?)\n\}/,
+      );
+      expect(renderCreateModelChoiceMatch?.[1]).toBeTruthy();
+      expect(renderCreateModelChoiceMatch![1]).toContain(
+        "if (!entryId || entryId === CUSTOM_CREATE_MODEL_VALUE) {\n"
+          + "    hintEl.textContent = 'Manual model id passthrough.';\n"
+          + "    setCreatePresetGroupDisplay('hidden');\n"
+          + "    setCreateManualModelGroup(true, 'Legacy Model ID');\n"
+          + '    return;\n'
+          + '  }',
+      );
       expect(html).toContain('id="createSessionBtn"');
       expect(html).not.toContain('id="providerCapabilityPreview"');
       expect(html).toContain('id="chatSessionInsights"');
@@ -232,6 +273,8 @@ describe('runtime server', () => {
       expect(html).not.toContain('id="inputRoutingMode"');
       expect(html).toContain('id="inputPresetChoice"');
       expect(html).toContain('id="inputEntryChoice"');
+      expect(html).toContain('id="inputModelGroup"');
+      expect(html).toContain('id="inputModelLabel"');
       expect(html).toContain('grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));');
       expect(html).not.toContain('id="inputModelChoice"');
       expect(html).not.toContain('id="inputWorkspaceMode"');
@@ -240,6 +283,8 @@ describe('runtime server', () => {
       expect(html).not.toContain('refreshProviderCapabilityPreview');
       expect(html).toContain('renderSessionInsights');
       expect(html).toContain('setLegacyCreateModelRouting');
+      expect(html).toContain('setCreatePresetGroupDisplay');
+      expect(html).toContain('setCreateManualModelGroup');
       expect(html).toContain('syncCreatePresetSelector');
       expect(html).toContain('id="inputPresetStaticLabel"');
       expect(html).toContain('setCreatePresetStaticLabel');

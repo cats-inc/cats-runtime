@@ -927,7 +927,10 @@
             aria-live="polite"
           ></div>
         </div>
-        <input type="text" id="inputModel" class="runtime-input hidden" placeholder="e.g. claude-sonnet-4-6" />
+        <div class="runtime-field hidden" id="inputModelGroup">
+          <label class="runtime-field-label" id="inputModelLabel">Model ID</label>
+          <input type="text" id="inputModel" class="runtime-input" placeholder="e.g. claude-sonnet-4-6" />
+        </div>
         <div id="inputModelControls" class="space-y-2"></div>
         <p id="inputModelHint" class="text-xs text-slate-500"></p>
       </div>
@@ -1439,29 +1442,54 @@ function buildCreateControlDefaults(catalog, entryId, presetId) {
   return filtered;
 }
 
+function setCreatePresetGroupDisplay(mode) {
+  const presetGroup = document.getElementById('inputPresetGroup');
+  if (!presetGroup) {
+    return;
+  }
+
+  presetGroup.classList.remove('hidden');
+  presetGroup.style.visibility = '';
+  presetGroup.style.pointerEvents = '';
+  presetGroup.setAttribute('aria-hidden', 'false');
+
+  if (mode === 'hidden') {
+    presetGroup.classList.add('hidden');
+    presetGroup.setAttribute('aria-hidden', 'true');
+    return;
+  }
+
+  if (mode === 'reserved') {
+    presetGroup.style.visibility = 'hidden';
+    presetGroup.style.pointerEvents = 'none';
+    presetGroup.setAttribute('aria-hidden', 'true');
+  }
+}
+
 function setCreatePresetStaticLabel(label) {
   const presetEl = document.getElementById('inputPresetChoice');
-  const presetGroup = document.getElementById('inputPresetGroup');
   const staticLabelEl = document.getElementById('inputPresetStaticLabel');
-  if (!presetEl || !presetGroup || !staticLabelEl) {
+  if (!presetEl || !staticLabelEl) {
     return '';
   }
 
-  renderCreateRoutingSelectOptions(presetEl, [], '');
+  const optionLabel = label || 'Standard only';
+  renderCreateRoutingSelectOptions(presetEl, [
+    { value: '', label: optionLabel },
+  ], '');
   presetEl.disabled = true;
-  presetEl.classList.add('hidden');
-  staticLabelEl.textContent = label || '\u00a0';
-  staticLabelEl.classList.remove('hidden');
-  presetGroup.classList.remove('hidden');
-  return label;
+  presetEl.classList.remove('hidden');
+  staticLabelEl.textContent = '';
+  staticLabelEl.classList.add('hidden');
+  setCreatePresetGroupDisplay('visible');
+  return optionLabel;
 }
 
 function syncCreatePresetSelector(catalog, preserveCurrent = false, allowDefaultPreset = true) {
   const presetEl = document.getElementById('inputPresetChoice');
-  const presetGroup = document.getElementById('inputPresetGroup');
   const entryEl = document.getElementById('inputEntryChoice');
   const staticLabelEl = document.getElementById('inputPresetStaticLabel');
-  if (!presetEl || !presetGroup || !entryEl || !staticLabelEl) {
+  if (!presetEl || !entryEl || !staticLabelEl) {
     return '';
   }
 
@@ -1473,17 +1501,20 @@ function syncCreatePresetSelector(catalog, preserveCurrent = false, allowDefault
   if (!catalog || !entryId) {
     renderCreateRoutingSelectOptions(presetEl, [], '');
     presetEl.disabled = true;
-    presetGroup.classList.add('hidden');
+    setCreatePresetGroupDisplay('hidden');
     return '';
   }
 
   if (entryId === CUSTOM_CREATE_MODEL_VALUE) {
-    return setCreatePresetStaticLabel('');
+    renderCreateRoutingSelectOptions(presetEl, [], '');
+    presetEl.disabled = true;
+    setCreatePresetGroupDisplay('hidden');
+    return '';
   }
 
   const presets = listCreateApplicablePresets(catalog, entryId);
   if (presets.length === 0) {
-    return setCreatePresetStaticLabel('');
+    return setCreatePresetStaticLabel('Standard only');
   }
 
   const presetOptions = [
@@ -1501,7 +1532,7 @@ function syncCreatePresetSelector(catalog, preserveCurrent = false, allowDefault
       : (allowDefaultPreset ? getDefaultCreatePresetId(catalog, entryId, presets) : ''),
   );
   presetEl.disabled = presetOptions.length <= 1;
-  presetGroup.classList.remove('hidden');
+  setCreatePresetGroupDisplay('visible');
   return nextValue;
 }
 
@@ -1542,9 +1573,7 @@ function syncCreateRoutingSelectors(catalog, preserveCurrent = false) {
 function setLegacyCreateModelRouting(message) {
   const presetEl = document.getElementById('inputPresetChoice');
   const entryEl = document.getElementById('inputEntryChoice');
-  const presetGroup = document.getElementById('inputPresetGroup');
   const entryGroup = document.getElementById('inputEntryGroup');
-  const customInput = document.getElementById('inputModel');
   const hintEl = document.getElementById('inputModelHint');
   const staticLabelEl = document.getElementById('inputPresetStaticLabel');
 
@@ -1556,12 +1585,28 @@ function setLegacyCreateModelRouting(message) {
   if (entryEl) entryEl.disabled = true;
   if (staticLabelEl) staticLabelEl.classList.add('hidden');
   if (staticLabelEl) staticLabelEl.textContent = '';
-  if (presetGroup) presetGroup.classList.add('hidden');
+  setCreatePresetGroupDisplay('hidden');
   if (entryGroup) entryGroup.classList.add('hidden');
-  if (customInput) customInput.classList.remove('hidden');
+  setCreateManualModelGroup(true, 'Model ID');
   if (hintEl) hintEl.textContent = message;
   setCreateModelSupportBadge('Legacy', 'idle');
   resetCreateModelControls();
+}
+
+function setCreateManualModelGroup(visible, label = 'Model ID') {
+  const customGroup = document.getElementById('inputModelGroup');
+  const customLabel = document.getElementById('inputModelLabel');
+  if (!customGroup || !customLabel) {
+    return;
+  }
+
+  customLabel.textContent = label;
+  if (visible) {
+    customGroup.classList.remove('hidden');
+    return;
+  }
+
+  customGroup.classList.add('hidden');
 }
 
 function renderCreateModelControlField(control, value) {
@@ -1631,12 +1676,10 @@ function renderCreateModelControlField(control, value) {
 function renderCreateModelChoice() {
   const entryEl = document.getElementById('inputEntryChoice');
   const presetEl = document.getElementById('inputPresetChoice');
-  const presetGroup = document.getElementById('inputPresetGroup');
   const entryGroup = document.getElementById('inputEntryGroup');
   const hintEl = document.getElementById('inputModelHint');
-  const customInput = document.getElementById('inputModel');
   const controlsEl = document.getElementById('inputModelControls');
-  if (!entryEl || !presetEl || !presetGroup || !entryGroup || !hintEl || !customInput || !controlsEl) {
+  if (!entryEl || !presetEl || !entryGroup || !hintEl || !controlsEl) {
     return;
   }
 
@@ -1644,13 +1687,13 @@ function renderCreateModelChoice() {
   const entryId = entryEl.value || '';
 
   resetCreateModelControls();
-  customInput.classList.add('hidden');
+  setCreateManualModelGroup(false);
 
   if (!catalog) {
     hintEl.textContent = 'Enter a model id manually.';
     entryGroup.classList.add('hidden');
-    presetGroup.classList.add('hidden');
-    customInput.classList.remove('hidden');
+    setCreatePresetGroupDisplay('hidden');
+    setCreateManualModelGroup(true, 'Model ID');
     return;
   }
 
@@ -1658,8 +1701,8 @@ function renderCreateModelChoice() {
 
   if (!entryId || entryId === CUSTOM_CREATE_MODEL_VALUE) {
     hintEl.textContent = 'Manual model id passthrough.';
-    presetGroup.classList.remove('hidden');
-    customInput.classList.remove('hidden');
+    setCreatePresetGroupDisplay('hidden');
+    setCreateManualModelGroup(true, 'Legacy Model ID');
     return;
   }
 
@@ -1739,11 +1782,9 @@ function buildCreateModelPayload() {
 async function refreshCreateModelRouting() {
   const entryEl = document.getElementById('inputEntryChoice');
   const presetEl = document.getElementById('inputPresetChoice');
-  const presetGroup = document.getElementById('inputPresetGroup');
   const entryGroup = document.getElementById('inputEntryGroup');
   const hintEl = document.getElementById('inputModelHint');
-  const customInput = document.getElementById('inputModel');
-  if (!entryEl || !presetEl || !presetGroup || !entryGroup || !hintEl || !customInput) {
+  if (!entryEl || !presetEl || !entryGroup || !hintEl) {
     return;
   }
 
@@ -1757,9 +1798,9 @@ async function refreshCreateModelRouting() {
   renderCreateRoutingSelectOptions(presetEl, [], '');
   entryEl.disabled = true;
   presetEl.disabled = true;
-  presetGroup.classList.add('hidden');
+  setCreatePresetGroupDisplay('hidden');
   entryGroup.classList.remove('hidden');
-  customInput.classList.add('hidden');
+  setCreateManualModelGroup(false);
   hintEl.textContent = 'Loading model catalog...';
   resetCreateModelControls();
 
