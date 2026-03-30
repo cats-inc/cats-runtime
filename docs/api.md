@@ -924,7 +924,9 @@ preview-surface, or browser-session evidence for that target. This reuses the
 same session inspection truth as `/sessions/{id}/observe` instead of inventing
 a second work-product read model just for diagnostics. These activity/evidence
 summaries now also carry freshness/provenance metadata such as `source`,
-`observedAt`, and, for retained target-evidence entries, `retainedAt`.
+`observedAt`, and, for retained target-evidence entries, `retainedAt`, plus a
+bounded `workspace` locator (`cwd`, optional `outputDir`, optional
+`workspaceMode`) so operators can tell where the latest evidence came from.
 
 Even without `sessionId` / `sessionKey`, retained agent sessions can still
 surface bounded `providers[].config.latestSessionActivity` /
@@ -3253,7 +3255,8 @@ latest-session evidence read model from provider diagnostics:
 These summaries are additive host/operator hints, not a new agent-specific
 inspection route. They reuse the same source/freshness fields as provider
 diagnostics, including `source`, `observedAt`, and retained-store
-`retainedAt` when the runtime had to fall back beyond a live session record.
+`retainedAt` when the runtime had to fall back beyond a live session record,
+and they now also preserve the same bounded `workspace` locator metadata.
 
 Each instance entry also exposes additive `eventCapabilities` metadata for
 host-side rendering decisions. This is runtime-owned capability truth for the

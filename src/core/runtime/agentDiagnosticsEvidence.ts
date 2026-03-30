@@ -14,6 +14,11 @@ export interface AgentDiagnosticSessionEvidenceSummary {
   status?: string;
   observedAt?: string;
   retainedAt?: string;
+  workspace?: {
+    cwd: string;
+    outputDir?: string;
+    workspaceMode?: string;
+  };
   latestRun?: {
     id: string;
     status: string;
@@ -68,6 +73,11 @@ export interface AgentDiagnosticSessionActivitySummary {
   status?: string;
   observedAt?: string;
   retainedAt?: string;
+  workspace?: {
+    cwd: string;
+    outputDir?: string;
+    workspaceMode?: string;
+  };
   activity: {
     toolUseCount: number;
     toolResultCount: number;
@@ -130,6 +140,7 @@ export function buildAgentDiagnosticSessionActivity(
     ...(resolveAgentDiagnosticObservedAt(session)
       ? { observedAt: resolveAgentDiagnosticObservedAt(session) }
       : {}),
+    workspace: buildAgentDiagnosticWorkspace(session),
     activity: {
       toolUseCount: agentSession.activity.toolUseCount,
       toolResultCount: agentSession.activity.toolResultCount,
@@ -180,6 +191,7 @@ export function buildAgentDiagnosticSessionEvidence(
     ...(resolveAgentDiagnosticObservedAt(session)
       ? { observedAt: resolveAgentDiagnosticObservedAt(session) }
       : {}),
+    workspace: buildAgentDiagnosticWorkspace(session),
     ...(latestRun ? {
       latestRun: {
         id: latestRun.id,
@@ -226,4 +238,18 @@ function resolveAgentDiagnosticObservedAt(
   session: SessionInfo,
 ): string | undefined {
   return session.lastActivity || session.updatedAt || session.createdAt || undefined;
+}
+
+function buildAgentDiagnosticWorkspace(
+  session: SessionInfo,
+): {
+  cwd: string;
+  outputDir?: string;
+  workspaceMode?: string;
+} {
+  return {
+    cwd: session.cwd,
+    ...(session.outputDir ? { outputDir: session.outputDir } : {}),
+    ...(session.workspaceMode ? { workspaceMode: session.workspaceMode } : {}),
+  };
 }

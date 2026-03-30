@@ -502,7 +502,8 @@ path is intentionally narrow:
   host/operator workflows can inspect recent services, artifacts, preview
   surfaces, and browser-session evidence without issuing a second session-read
   call first; those summaries now also preserve source/freshness metadata such
-  as `observedAt`
+  as `observedAt` plus bounded workspace locators such as `cwd` and
+  `outputDir`
 - Lets provider-only agent diagnostics fall back to bounded
   `config.latestSessionActivity` / `config.latestSessionEvidence` from the most
   recent retained runtime session or retained target-evidence store entry for
@@ -513,7 +514,9 @@ path is intentionally narrow:
 - Reuses that same bounded latest-session agent evidence read model on
   `/providers/config`, so selector/provider-topology reads can surface recent
   exact-target work products and, for bridge targets, recent remote
-  tool/service activity without requiring a second diagnostics-only fetch
+  tool/service activity without requiring a second diagnostics-only fetch;
+  those summaries now preserve the same bounded workspace locator metadata as
+  the diagnostics copy
 - Normalizes history provenance metadata, per-source transcript provenance, and
   Pi-native transcript parsing so provider-owned session files plus later
   runtime-managed fallback history can still feed the same runtime-owned

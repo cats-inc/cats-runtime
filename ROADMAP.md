@@ -1315,6 +1315,10 @@ always-on self-adapting parser system.
   evidence read model, so provider-selection flows can surface recent exact-
   target work products and bridge activity without requiring a second
   diagnostics-only fetch
+- the same bounded latest-session agent evidence summaries now also preserve
+  workspace locator metadata such as `cwd`, optional `outputDir`, and optional
+  `workspaceMode`, so operators can locate the recent work-product context
+  without opening the full session record
 - session-aware provider diagnostics now also keep Agent SDK bridge targets on
   provider-wide tool catalogs while surfacing runtime session activity
   evidence, instead of treating unsupported effective-tool discovery as a

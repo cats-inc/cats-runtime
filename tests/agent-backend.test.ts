@@ -671,6 +671,10 @@ describe('agent backend integration', () => {
                 sessionId: created.id,
                 sessionKey: 'task-123',
                 observedAt: expect.any(String),
+                workspace: expect.objectContaining({
+                  cwd: config.sessionBaseDir,
+                  outputDir: '/tmp/out',
+                }),
                 counts: expect.objectContaining({
                   artifactCount: 1,
                   serviceCount: 1,
@@ -2097,13 +2101,16 @@ describe('agent backend integration', () => {
               }),
             ]),
             config: expect.objectContaining({
-              latestSessionActivity: {
+              latestSessionActivity: expect.objectContaining({
                 source: 'runtime_registry_latest_session',
                 sessionId: created.id,
                 sessionKey: 'sdk-latest-evidence',
                 providerSessionId: 'bridge-session-1',
                 status: 'idle',
                 observedAt: expect.any(String),
+                workspace: expect.objectContaining({
+                  cwd: config.sessionBaseDir,
+                }),
                 activity: {
                   toolUseCount: 1,
                   toolResultCount: 1,
@@ -2111,7 +2118,7 @@ describe('agent backend integration', () => {
                   observedToolNames: ['grep'],
                   observedServiceIds: ['preview'],
                 },
-              },
+              }),
               latestSessionEvidence: expect.objectContaining({
                 source: 'runtime_registry_latest_session',
                 sessionId: created.id,
@@ -2119,6 +2126,9 @@ describe('agent backend integration', () => {
                 providerSessionId: 'bridge-session-1',
                 status: 'idle',
                 observedAt: expect.any(String),
+                workspace: expect.objectContaining({
+                  cwd: config.sessionBaseDir,
+                }),
                 latestRun: expect.objectContaining({
                   id: expect.any(String),
                   status: 'succeeded',
@@ -2525,6 +2535,9 @@ describe('agent backend integration', () => {
                 sessionKey: 'sdk-deleted-evidence',
                 observedAt: expect.any(String),
                 retainedAt: expect.any(String),
+                workspace: expect.objectContaining({
+                  cwd: config.sessionBaseDir,
+                }),
                 activity: {
                   toolUseCount: 1,
                   toolResultCount: 1,
@@ -2539,6 +2552,9 @@ describe('agent backend integration', () => {
                 sessionKey: 'sdk-deleted-evidence',
                 observedAt: expect.any(String),
                 retainedAt: expect.any(String),
+                workspace: expect.objectContaining({
+                  cwd: config.sessionBaseDir,
+                }),
                 counts: expect.objectContaining({
                   serviceCount: 1,
                   previewSurfaceCount: 1,
@@ -3675,6 +3691,9 @@ describe('agent backend integration', () => {
                 sessionId: created.id,
                 sessionKey: 'sdk-task-1',
                 observedAt: expect.any(String),
+                workspace: expect.objectContaining({
+                  cwd: config.sessionBaseDir,
+                }),
                 activity: {
                   toolUseCount: 1,
                   toolResultCount: 1,
@@ -3688,6 +3707,9 @@ describe('agent backend integration', () => {
                 sessionId: created.id,
                 sessionKey: 'sdk-task-1',
                 observedAt: expect.any(String),
+                workspace: expect.objectContaining({
+                  cwd: config.sessionBaseDir,
+                }),
                 counts: expect.objectContaining({
                   serviceCount: 1,
                   previewSurfaceCount: 1,
@@ -3928,6 +3950,9 @@ describe('agent backend integration', () => {
                     sessionKey: 'sdk-mcp-provider-config',
                     observedAt: expect.any(String),
                     retainedAt: expect.any(String),
+                    workspace: expect.objectContaining({
+                      cwd: config.sessionBaseDir,
+                    }),
                   }),
                   latestSessionEvidence: expect.objectContaining({
                     source: 'retained_target_evidence',
@@ -3935,6 +3960,9 @@ describe('agent backend integration', () => {
                     sessionKey: 'sdk-mcp-provider-config',
                     observedAt: expect.any(String),
                     retainedAt: expect.any(String),
+                    workspace: expect.objectContaining({
+                      cwd: config.sessionBaseDir,
+                    }),
                     counts: expect.objectContaining({
                       serviceCount: 1,
                       previewSurfaceCount: 1,

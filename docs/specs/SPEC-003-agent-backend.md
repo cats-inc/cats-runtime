@@ -118,7 +118,9 @@ current `api` backend or bury a second orchestration model inside it.
   bounded retained evidence was observed and when it was last retained. The
   same bounded latest-session evidence should remain reusable from broader
   host-facing provider topology reads instead of living only behind
-  diagnostics-only routes.
+  diagnostics-only routes, and those summaries should preserve bounded
+  workspace locator metadata so operators can identify the recent work-product
+  context without reading a full session transcript.
 - **Extensibility**: The adapter contract shall support more than one external
   agent runtime.
 

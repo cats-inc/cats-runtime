@@ -141,6 +141,15 @@ function cloneActivity(
     ...(value.retainedAt
       ? { retainedAt: value.retainedAt }
       : (fallbackRetainedAt ? { retainedAt: fallbackRetainedAt } : {})),
+    ...(value.workspace
+      ? {
+          workspace: {
+            cwd: value.workspace.cwd,
+            ...(value.workspace.outputDir ? { outputDir: value.workspace.outputDir } : {}),
+            ...(value.workspace.workspaceMode ? { workspaceMode: value.workspace.workspaceMode } : {}),
+          },
+        }
+      : {}),
     activity: {
       toolUseCount: value.activity.toolUseCount,
       toolResultCount: value.activity.toolResultCount,
@@ -167,6 +176,15 @@ function cloneEvidence(
     ...(value.retainedAt
       ? { retainedAt: value.retainedAt }
       : (fallbackRetainedAt ? { retainedAt: fallbackRetainedAt } : {})),
+    ...(value.workspace
+      ? {
+          workspace: {
+            cwd: value.workspace.cwd,
+            ...(value.workspace.outputDir ? { outputDir: value.workspace.outputDir } : {}),
+            ...(value.workspace.workspaceMode ? { workspaceMode: value.workspace.workspaceMode } : {}),
+          },
+        }
+      : {}),
     ...(value.latestRun ? { latestRun: { ...value.latestRun } } : {}),
     counts: { ...value.counts },
     artifacts: value.artifacts.map((artifact) => ({ ...artifact })),

@@ -837,6 +837,19 @@ async function diagnoseAgentTarget(
       ...(sessionEvidence.status ? { status: sessionEvidence.status } : {}),
       ...(sessionEvidence.observedAt ? { observedAt: sessionEvidence.observedAt } : {}),
       ...(sessionEvidence.retainedAt ? { retainedAt: sessionEvidence.retainedAt } : {}),
+      ...(sessionEvidence.workspace
+        ? {
+            workspace: {
+              cwd: sessionEvidence.workspace.cwd,
+              ...(sessionEvidence.workspace.outputDir
+                ? { outputDir: sessionEvidence.workspace.outputDir }
+                : {}),
+              ...(sessionEvidence.workspace.workspaceMode
+                ? { workspaceMode: sessionEvidence.workspace.workspaceMode }
+                : {}),
+            },
+          }
+        : {}),
       ...(sessionEvidence.latestRun ? { latestRun: sessionEvidence.latestRun } : {}),
       counts: { ...sessionEvidence.counts },
       artifacts: sessionEvidence.artifacts.map((artifact) => ({ ...artifact })),
@@ -855,6 +868,19 @@ async function diagnoseAgentTarget(
           ...(sessionEvidence.sessionKey ? { sessionKey: sessionEvidence.sessionKey } : {}),
           ...(sessionEvidence.observedAt ? { observedAt: sessionEvidence.observedAt } : {}),
           ...(sessionEvidence.retainedAt ? { retainedAt: sessionEvidence.retainedAt } : {}),
+          ...(sessionEvidence.workspace
+            ? {
+                workspace: {
+                  cwd: sessionEvidence.workspace.cwd,
+                  ...(sessionEvidence.workspace.outputDir
+                    ? { outputDir: sessionEvidence.workspace.outputDir }
+                    : {}),
+                  ...(sessionEvidence.workspace.workspaceMode
+                    ? { workspaceMode: sessionEvidence.workspace.workspaceMode }
+                    : {}),
+                },
+              }
+            : {}),
           artifactCount: sessionEvidence.counts.artifactCount,
           serviceCount: sessionEvidence.counts.serviceCount,
           previewSurfaceCount: sessionEvidence.counts.previewSurfaceCount,
@@ -881,6 +907,19 @@ async function diagnoseAgentTarget(
       ...(fallbackLatestEvidence.status ? { status: fallbackLatestEvidence.status } : {}),
       ...(fallbackLatestEvidence.observedAt ? { observedAt: fallbackLatestEvidence.observedAt } : {}),
       ...(fallbackLatestEvidence.retainedAt ? { retainedAt: fallbackLatestEvidence.retainedAt } : {}),
+      ...(fallbackLatestEvidence.workspace
+        ? {
+            workspace: {
+              cwd: fallbackLatestEvidence.workspace.cwd,
+              ...(fallbackLatestEvidence.workspace.outputDir
+                ? { outputDir: fallbackLatestEvidence.workspace.outputDir }
+                : {}),
+              ...(fallbackLatestEvidence.workspace.workspaceMode
+                ? { workspaceMode: fallbackLatestEvidence.workspace.workspaceMode }
+                : {}),
+            },
+          }
+        : {}),
       ...(fallbackLatestEvidence.latestRun
         ? { latestRun: fallbackLatestEvidence.latestRun }
         : {}),
@@ -904,6 +943,19 @@ async function diagnoseAgentTarget(
             : {}),
           ...(fallbackLatestEvidence.retainedAt
             ? { retainedAt: fallbackLatestEvidence.retainedAt }
+            : {}),
+          ...(fallbackLatestEvidence.workspace
+            ? {
+                workspace: {
+                  cwd: fallbackLatestEvidence.workspace.cwd,
+                  ...(fallbackLatestEvidence.workspace.outputDir
+                    ? { outputDir: fallbackLatestEvidence.workspace.outputDir }
+                    : {}),
+                  ...(fallbackLatestEvidence.workspace.workspaceMode
+                    ? { workspaceMode: fallbackLatestEvidence.workspace.workspaceMode }
+                    : {}),
+                },
+              }
             : {}),
           artifactCount: fallbackLatestEvidence.counts.artifactCount,
           serviceCount: fallbackLatestEvidence.counts.serviceCount,
@@ -930,6 +982,19 @@ async function diagnoseAgentTarget(
       ...(runtimeSessionActivity.status ? { status: runtimeSessionActivity.status } : {}),
       ...(runtimeSessionActivity.observedAt ? { observedAt: runtimeSessionActivity.observedAt } : {}),
       ...(runtimeSessionActivity.retainedAt ? { retainedAt: runtimeSessionActivity.retainedAt } : {}),
+      ...(runtimeSessionActivity.workspace
+        ? {
+            workspace: {
+              cwd: runtimeSessionActivity.workspace.cwd,
+              ...(runtimeSessionActivity.workspace.outputDir
+                ? { outputDir: runtimeSessionActivity.workspace.outputDir }
+                : {}),
+              ...(runtimeSessionActivity.workspace.workspaceMode
+                ? { workspaceMode: runtimeSessionActivity.workspace.workspaceMode }
+                : {}),
+            },
+          }
+        : {}),
       activity: {
         toolUseCount: runtimeSessionActivity.activity.toolUseCount,
         toolResultCount: runtimeSessionActivity.activity.toolResultCount,
@@ -952,6 +1017,19 @@ async function diagnoseAgentTarget(
             : {}),
           ...(runtimeSessionActivity.retainedAt
             ? { retainedAt: runtimeSessionActivity.retainedAt }
+            : {}),
+          ...(runtimeSessionActivity.workspace
+            ? {
+                workspace: {
+                  cwd: runtimeSessionActivity.workspace.cwd,
+                  ...(runtimeSessionActivity.workspace.outputDir
+                    ? { outputDir: runtimeSessionActivity.workspace.outputDir }
+                    : {}),
+                  ...(runtimeSessionActivity.workspace.workspaceMode
+                    ? { workspaceMode: runtimeSessionActivity.workspace.workspaceMode }
+                    : {}),
+                },
+              }
             : {}),
           toolUseCount: runtimeSessionActivity.activity.toolUseCount,
           toolResultCount: runtimeSessionActivity.activity.toolResultCount,
@@ -978,6 +1056,19 @@ async function diagnoseAgentTarget(
       ...(fallbackLatestActivity.retainedAt
         ? { retainedAt: fallbackLatestActivity.retainedAt }
         : {}),
+      ...(fallbackLatestActivity.workspace
+        ? {
+            workspace: {
+              cwd: fallbackLatestActivity.workspace.cwd,
+              ...(fallbackLatestActivity.workspace.outputDir
+                ? { outputDir: fallbackLatestActivity.workspace.outputDir }
+                : {}),
+              ...(fallbackLatestActivity.workspace.workspaceMode
+                ? { workspaceMode: fallbackLatestActivity.workspace.workspaceMode }
+                : {}),
+            },
+          }
+        : {}),
       activity: {
         toolUseCount: fallbackLatestActivity.activity.toolUseCount,
         toolResultCount: fallbackLatestActivity.activity.toolResultCount,
@@ -1000,6 +1091,19 @@ async function diagnoseAgentTarget(
             : {}),
           ...(fallbackLatestActivity.retainedAt
             ? { retainedAt: fallbackLatestActivity.retainedAt }
+            : {}),
+          ...(fallbackLatestActivity.workspace
+            ? {
+                workspace: {
+                  cwd: fallbackLatestActivity.workspace.cwd,
+                  ...(fallbackLatestActivity.workspace.outputDir
+                    ? { outputDir: fallbackLatestActivity.workspace.outputDir }
+                    : {}),
+                  ...(fallbackLatestActivity.workspace.workspaceMode
+                    ? { workspaceMode: fallbackLatestActivity.workspace.workspaceMode }
+                    : {}),
+                },
+              }
             : {}),
           toolUseCount: fallbackLatestActivity.activity.toolUseCount,
           toolResultCount: fallbackLatestActivity.activity.toolResultCount,
