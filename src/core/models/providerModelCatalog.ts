@@ -170,6 +170,10 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
     { id: 'gpt', label: 'gpt', default: true },
     { id: 'gpt-codex', label: 'gpt-codex' },
     { id: 'sonnet', label: 'sonnet' },
+    { id: 'opus', label: 'opus' },
+    { id: 'gemini-pro', label: 'gemini-pro' },
+    { id: 'gemini-flash', label: 'gemini-flash' },
+    { id: 'grok', label: 'grok' },
   ],
   cursor: [
     { id: 'auto', label: 'Auto', default: true },
@@ -399,6 +403,12 @@ function appendKnownStaticCatalogWarnings(
       `Live model discovery is available for ${target.providerName}/${target.backend}/${target.instanceId} `
       + 'via `cursor-agent --list-models`, but this read is serving the curated static fallback '
       + 'until an explicit refresh populates the cache.',
+    );
+  }
+  if (target.backend === 'cli' && target.providerName === 'junie') {
+    warnings.push(
+      'Junie CLI does not expose a live model list; serving a curated alias fallback only. '
+      + "Junie's dynamic Default, BYOK, and custom models are not enumerated here.",
     );
   }
 }

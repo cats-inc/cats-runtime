@@ -446,6 +446,63 @@ describe('ProviderModelCatalogService', () => {
     }
   });
 
+  it('serves an honest curated Junie alias fallback when live discovery is unavailable', () => {
+    const base = createCatalogConfig();
+    const config = {
+      ...base,
+      providerDefaultTargets: {
+        ...base.providerDefaultTargets,
+        junie: { backend: 'cli', instance: 'default' },
+      },
+      providerInstances: {
+        ...base.providerInstances,
+        junie: {
+          default: {
+            id: 'default',
+            providerName: 'junie',
+            commandConfig: {
+              path: 'junie',
+              runner: 'auto',
+              runtime: { mode: 'native' },
+            },
+          },
+        },
+      },
+      providerCommands: {
+        ...base.providerCommands,
+        junie: {
+          path: 'junie',
+          runner: 'auto',
+          runtime: { mode: 'native' },
+        },
+      },
+    } as const;
+
+    const service = new ProviderModelCatalogService(config as never);
+
+    expect(service.getImmediateCatalog('junie')).toEqual({
+      provider: 'junie',
+      backend: 'cli',
+      instance: 'default',
+      defaultModel: 'gpt',
+      source: 'static',
+      cache: null,
+      models: [
+        { id: 'gpt', label: 'gpt', default: true },
+        { id: 'gpt-codex', label: 'gpt-codex', default: false },
+        { id: 'sonnet', label: 'sonnet', default: false },
+        { id: 'opus', label: 'opus', default: false },
+        { id: 'gemini-pro', label: 'gemini-pro', default: false },
+        { id: 'gemini-flash', label: 'gemini-flash', default: false },
+        { id: 'grok', label: 'grok', default: false },
+      ],
+      warnings: [
+        'Junie CLI does not expose a live model list; serving a curated alias fallback only. '
+        + "Junie's dynamic Default, BYOK, and custom models are not enumerated here.",
+      ],
+    });
+  });
+
   it('adds an honest warning when Cursor is still serving the curated static fallback', async () => {
     const config = {
       ...createCatalogConfig(),

@@ -397,6 +397,8 @@ describe('runtime server', () => {
       expect(html).toContain('Runtime Health');
       expect(html).toContain('validateRuntimeApiKey');
       expect(html).toContain('getRuntimeAuthHeaders');
+      expect(html).toContain("junie:[{value:'gpt',label:'gpt'},{value:'gpt-codex',label:'gpt-codex'},{value:'sonnet',label:'sonnet'},{value:'opus',label:'opus'},{value:'gemini-pro',label:'gemini-pro'},{value:'gemini-flash',label:'gemini-flash'},{value:'grok',label:'grok'}],");
+      expect(html).not.toContain("junie:[{value:'gpt-5.4',label:'gpt-5.4 (default)'}],");
       expect(html).toContain('/providers/${name}/models/advanced');
       expect(html).toContain('modelSelection');
       expect(html).toContain('Provider returned no assistant output.');
@@ -3874,6 +3876,34 @@ providers:
           { id: 'gpt-5.2-codex', label: 'gpt-5.2-codex', default: false },
         ],
         warnings: [],
+      });
+    });
+  });
+
+  it('GET /providers/junie/models returns curated aliases with an honesty warning', async () => {
+    await withRuntime({}, {}, async (runtime) => {
+      const response = await runtime.app.request('/providers/junie/models');
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        provider: 'junie',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gpt',
+        source: 'static',
+        cache: null,
+        models: [
+          { id: 'gpt', label: 'gpt', default: true },
+          { id: 'gpt-codex', label: 'gpt-codex', default: false },
+          { id: 'sonnet', label: 'sonnet', default: false },
+          { id: 'opus', label: 'opus', default: false },
+          { id: 'gemini-pro', label: 'gemini-pro', default: false },
+          { id: 'gemini-flash', label: 'gemini-flash', default: false },
+          { id: 'grok', label: 'grok', default: false },
+        ],
+        warnings: [
+          'Junie CLI does not expose a live model list; serving a curated alias fallback only. '
+          + "Junie's dynamic Default, BYOK, and custom models are not enumerated here.",
+        ],
       });
     });
   });
