@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cats Runtime — Playground</title>
+  <title>Cats Runtime Playground</title>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
@@ -590,12 +590,11 @@ class RuntimeClient {
     if (window.CatsUI) return CatsUI.authHeaders();
     return h;
   }
-  async createSession({ provider, model, modelSelection, cwd, workspaceKind, workspaceAccess, workspaceIsolation }) {
+  async createSession({ provider, model, modelSelection, cwd, workspaceKind, workspaceAccess }) {
     const payload = { provider, permissionMode: 'skip' };
     if (cwd) payload.cwd = cwd;
     if (workspaceKind) payload.workspaceKind = workspaceKind;
     if (workspaceAccess) payload.workspaceAccess = workspaceAccess;
-    if (workspaceIsolation) payload.workspaceIsolation = workspaceIsolation;
     if (model) payload.model = model;
     if (modelSelection) payload.modelSelection = modelSelection;
     const r = await fetch(`${this.baseUrl}/sessions`, { method:'POST', headers:this._headers(), body:JSON.stringify(payload) });
@@ -625,6 +624,22 @@ class RuntimeClient {
   async closeSession(sessionId) {
     try { await fetch(`${this.baseUrl}/sessions/${sessionId}/close`, { method:'POST', headers:this._headers() }); } catch {}
   }
+  async createPlaygroundWorkspace() {
+    const r = await fetch(`${this.baseUrl}/playground/workspace`, {
+      method:'POST',
+      headers:this._headers(),
+    });
+    if (!r.ok) throw new RuntimeError(`Failed to create playground workspace: ${await r.text()}`, r.status);
+    return await r.json();
+  }
+  async deletePlaygroundWorkspace(workspaceId) {
+    try {
+      await fetch(`${this.baseUrl}/playground/workspace/${encodeURIComponent(workspaceId)}`, {
+        method:'DELETE',
+        headers:this._headers(),
+      });
+    } catch {}
+  }
 }
 
 // ============================================================
@@ -643,6 +658,7 @@ class ChatRoom {
     this._activeAbort = null;
     this._activeAgent = null;
     this._sharedCwd = workDir;
+    this._sharedWorkspaceId = null;
     const orch = agents.filter(a => a.tags.includes('orchestrator'));
     if (orch.length !== 1) throw new Error(`Exactly one CEO required, found ${orch.length}`);
     this._orchestrator = orch[0];
@@ -654,7 +670,16 @@ class ChatRoom {
   async _emit(e) { try { await this._onEvent(e); } catch {} }
   async start() {
     let sharedCwd = this._sharedCwd;
+    let createdWorkspaceId = null;
     const created = [];
+    if (!sharedCwd) {
+      const workspace = await this.client.createPlaygroundWorkspace();
+      sharedCwd = workspace.cwd;
+      createdWorkspaceId = workspace.id;
+      this._sharedCwd = workspace.cwd;
+      this._sharedWorkspaceId = workspace.id;
+    }
+    if (!sharedCwd) throw new Error('Playground shared workspace cwd is unavailable');
     for (const agent of this.agents) {
       if (agent.sessionId) continue;
       try {
@@ -662,30 +687,22 @@ class ChatRoom {
           provider: agent.provider,
           model: agent.model,
           modelSelection: agent.modelSelection,
+          cwd: sharedCwd,
+          workspaceKind: 'source',
+          workspaceAccess: 'read_write',
         };
-        if (sharedCwd && !this.workDir) {
-          opts.cwd = sharedCwd;
-          opts.workspaceKind = 'source';
-          opts.workspaceAccess = 'read_write';
-          opts.workspaceIsolation = 'shared';
-        } else {
-          opts.cwd = this.workDir || '';
-          if (this.workDir) {
-            opts.workspaceKind = 'source';
-            opts.workspaceAccess = 'read_write';
-            opts.workspaceIsolation = 'shared';
-          } else {
-            delete opts.cwd;
-          }
-        }
         const info = await this.client.createSession(opts);
-        if (!this.workDir && info.cwd && !sharedCwd) { sharedCwd = info.cwd; this._sharedCwd = info.cwd; }
         agent.sessionId = info.id;
         created.push(agent);
         await this._emit({ type:'session_created', agent:agent.name, provider:agent.provider, session_id:info.id });
       } catch (err) {
         for (const a of created.reverse()) {
           if (a.sessionId) { try { await this.client.closeSession(a.sessionId); } catch {} a.sessionId = null; }
+        }
+        if (createdWorkspaceId) {
+          await this.client.deletePlaygroundWorkspace(createdWorkspaceId);
+          this._sharedWorkspaceId = null;
+          this._sharedCwd = this.workDir;
         }
         await this._emit({ type:'error', message:`Failed to create session for ${agent.name}: ${err.message}` });
         throw err;
@@ -697,9 +714,15 @@ class ChatRoom {
       else this._systemPrompts[agent.name] = composeAgentPrompt(agent, this.responseLang);
     }
   }
-  async close() {
+  async close(options = {}) {
+    const releaseWorkspace = options.releaseWorkspace !== false;
     for (const agent of [...this.agents].reverse()) {
       if (agent.sessionId) { try { await this.client.closeSession(agent.sessionId); } catch {} agent.sessionId = null; }
+    }
+    if (releaseWorkspace && this._sharedWorkspaceId) {
+      await this.client.deletePlaygroundWorkspace(this._sharedWorkspaceId);
+      this._sharedWorkspaceId = null;
+      this._sharedCwd = this.workDir;
     }
   }
   async handleMessage(userMessage) {
@@ -793,19 +816,19 @@ class ChatRoom {
     return null;
   }
   async _recoverSessions(agent, err) {
-    if (err.isTransportError()) { await this.close(); await this.start(); }
+    if (err.isTransportError()) { await this.close({ releaseWorkspace:false }); await this.start(); }
     else { await this._restartSingleAgent(agent); }
   }
   async _restartSingleAgent(agent) {
     if (agent.sessionId) { try { await this.client.closeSession(agent.sessionId); } catch {} agent.sessionId = null; }
+    if (!this._sharedCwd) throw new Error('Playground shared workspace cwd is unavailable');
     const info = await this.client.createSession({
       provider:agent.provider,
       model:agent.model,
       modelSelection:agent.modelSelection,
-      cwd:this._sharedCwd||'',
-      workspaceKind:this._sharedCwd?'source':undefined,
-      workspaceAccess:this._sharedCwd?'read_write':undefined,
-      workspaceIsolation:this._sharedCwd?'shared':undefined,
+      cwd:this._sharedCwd,
+      workspaceKind:'source',
+      workspaceAccess:'read_write',
     });
     agent.sessionId = info.id;
     await this._emit({ type:'session_created', agent:agent.name, provider:agent.provider, session_id:info.id });

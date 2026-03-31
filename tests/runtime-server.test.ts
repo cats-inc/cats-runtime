@@ -311,6 +311,7 @@ describe('runtime server', () => {
       const response = await runtime.app.request('/playground');
       expect(response.status).toBe(200);
       const html = await response.text();
+      expect(html).toContain('<title>Cats Runtime Playground</title>');
       expect(html).toContain('Playground');
       expect(html).not.toContain('Playground Shell');
       expect(html).toContain('CATS RUNTIME');
@@ -385,6 +386,9 @@ describe('runtime server', () => {
       expect(html).toContain('window.CatsUI?.getAdvancedCatalogDefaultPresetId');
       expect(html).toContain('window.CatsUI?.listApplicableAdvancedPresets');
       expect(html).toContain('class RuntimeClient');
+      expect(html).toContain('/playground/workspace');
+      expect(html).toContain('createPlaygroundWorkspace()');
+      expect(html).toContain('deletePlaygroundWorkspace(workspaceId)');
       expect(html).toContain('/providers/config');
       expect(html).toContain('data-runtime-surface-switcher');
       expect(html).toContain('data-active-surface="playground"');
@@ -398,7 +402,40 @@ describe('runtime server', () => {
       expect(html).toContain('getAdvancedCatalogChoices');
       expect(html).toContain('workspaceKind');
       expect(html).toContain('workspaceAccess');
+      expect(html).not.toContain('workspaceIsolation = workspaceIsolation');
+      expect(html).not.toContain("opts.workspaceIsolation = 'shared'");
       expect(html).not.toContain('workspaceMode');
+    });
+  });
+
+  it('POST /playground/workspace provisions and cleans up a runtime-owned shared workspace', async () => {
+    await withRuntime({ apiKey: 'runtime-secret' }, {}, async (runtime) => {
+      const createResponse = await runtime.app.request('/playground/workspace', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer runtime-secret',
+        },
+      });
+      expect(createResponse.status).toBe(200);
+      const created = await createResponse.json<{
+        id: string;
+        cwd: string;
+      }>();
+      expect(created.id).toMatch(/^playground-room-/);
+      expect(existsSync(created.cwd)).toBe(true);
+
+      const deleteResponse = await runtime.app.request(`/playground/workspace/${created.id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: 'Bearer runtime-secret',
+        },
+      });
+      expect(deleteResponse.status).toBe(200);
+      expect(await deleteResponse.json()).toEqual({
+        id: created.id,
+        deleted: true,
+      });
+      expect(existsSync(created.cwd)).toBe(false);
     });
   });
 
@@ -410,7 +447,7 @@ describe('runtime server', () => {
         const response = await runtime.app.request('/setup');
         expect(response.status).toBe(200);
         const html = await response.text();
-        expect(html).toContain('Provider Setup');
+        expect(html).toContain('<title>Cats Runtime Setup</title>');
         expect(html).toContain('data-cats-ui');
         expect(html).toContain('data-runtime-surface-switcher');
         expect(html).toContain('data-active-surface="setup"');

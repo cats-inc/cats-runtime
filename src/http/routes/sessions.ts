@@ -121,6 +121,8 @@ interface SessionRouteEnv {
 }
 
 export const sessionRoutes = new Hono<SessionRouteEnv>();
+const PLAYGROUND_WORKSPACE_PREFIX = 'playground-room-';
+const PLAYGROUND_WORKSPACE_ROOT = 'playground-workspaces';
 
 const REUSE_POLICIES = new Set<SessionReusePolicy>([
   'create_new',
@@ -152,6 +154,17 @@ function buildUnavailableBranchCapabilityTruth(
       supported: true,
     },
   };
+}
+
+function resolvePlaygroundWorkspacePath(
+  sessionBaseDir: string,
+  workspaceId: string,
+): string {
+  return join(sessionBaseDir, PLAYGROUND_WORKSPACE_ROOT, workspaceId);
+}
+
+function isValidPlaygroundWorkspaceId(workspaceId: string): boolean {
+  return /^[a-z0-9-]+$/i.test(workspaceId);
 }
 
 function resolveSessionBranching(
@@ -2127,6 +2140,32 @@ async function verifyProviderDiscoveryStateDeleted(
   // pre-finalize filesystem state and incorrectly roll back the delete.
   return true;
 }
+
+/** POST /playground/workspace — create a runtime-owned shared workspace for playground rooms */
+sessionRoutes.post('/playground/workspace', async (c) => {
+  const ctx = c.get('ctx');
+  const workspaceId = `${PLAYGROUND_WORKSPACE_PREFIX}${randomUUID()}`;
+  const workspacePath = resolvePlaygroundWorkspacePath(ctx.config.sessionBaseDir, workspaceId);
+  mkdirSync(workspacePath, { recursive: true });
+  return c.json({
+    id: workspaceId,
+    cwd: workspacePath,
+  });
+});
+
+sessionRoutes.delete('/playground/workspace/:id', async (c) => {
+  const ctx = c.get('ctx');
+  const workspaceId = c.req.param('id');
+  if (!isValidPlaygroundWorkspaceId(workspaceId)) {
+    return c.json({ error: 'Invalid playground workspace id' }, 400);
+  }
+  const workspacePath = resolvePlaygroundWorkspacePath(ctx.config.sessionBaseDir, workspaceId);
+  rmSync(workspacePath, { recursive: true, force: true });
+  return c.json({
+    id: workspaceId,
+    deleted: true,
+  });
+});
 
 /** POST /sessions — create a new runtime-owned session */
 sessionRoutes.post('/sessions', async (c) => {
