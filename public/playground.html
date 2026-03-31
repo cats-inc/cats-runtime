@@ -12,6 +12,13 @@
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: #0f172a; }
     ::-webkit-scrollbar-thumb { background: #334155; border-radius: 999px; }
+    @media (min-width: 1024px) {
+      #left-panel {
+        width: var(--sidebar-width);
+        min-width: var(--sidebar-width);
+        flex: 0 0 var(--sidebar-width);
+      }
+    }
     @keyframes pulse-dot {
       0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
       40% { opacity: 1; transform: scale(1.2); }
@@ -45,53 +52,49 @@
           <!-- CATS_RUNTIME_SURFACE_SWITCHER -->
         </div>
 
-        <div class="runtime-sidebar-section">
-          <p class="runtime-sidebar-title">Playground Shell</p>
-          <p class="runtime-sidebar-copy">
-            Multi-agent runtime demo surface with orchestration, delegation, and
-            same-origin streaming directly against this runtime instance.
-          </p>
-        </div>
-
-        <div id="setup-section" class="runtime-sidebar-section runtime-sidebar-surface space-y-4 overflow-y-auto">
-          <div class="flex items-center justify-between gap-3">
-            <div class="flex items-center gap-2">
-              <h2 class="text-sm font-semibold uppercase tracking-widest text-slate-300">Agents</h2>
-              <button onclick="openPromptsModal()" class="runtime-btn runtime-btn-ghost !h-8 !w-8 !rounded-full !px-0 !py-0" title="View role prompts">
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <div id="setup-section" class="runtime-sidebar-surface flex min-h-0 flex-col overflow-hidden">
+          <div class="runtime-sidebar-section">
+            <div class="flex items-center justify-between gap-3">
+              <div class="flex items-center gap-2">
+                <p class="runtime-sidebar-title">Agents</p>
+                <button onclick="openPromptsModal()" class="runtime-btn runtime-btn-ghost !h-8 !w-8 !rounded-full !px-0 !py-0" title="View role prompts">
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </button>
+              </div>
+              <button onclick="addAgent()" class="runtime-btn runtime-btn-secondary !h-8 !w-8 !rounded-lg !px-0 !py-0" title="Add agent" aria-label="Add agent">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 5v14" />
+                  <path d="M5 12h14" />
+                </svg>
               </button>
             </div>
-            <button onclick="addAgent()" class="runtime-btn runtime-btn-secondary !px-3 !py-1.5 text-xs">+ Add</button>
           </div>
 
-          <div class="runtime-note">
-            One orchestrator is required. The rest of the team can be shaped as
-            PM, architect, coder, tester, reviewer, QA, and marketer roles.
-          </div>
+          <div class="runtime-sidebar-section runtime-sidebar-surface space-y-4 overflow-y-auto">
+            <div id="agents-list" class="space-y-3"></div>
 
-          <div id="agents-list" class="space-y-3"></div>
-
-          <div class="space-y-3 pt-2">
-            <h2 class="text-sm font-semibold uppercase tracking-widest text-slate-300">Session Settings</h2>
-            <div class="runtime-field">
-              <label class="runtime-field-label">Work Directory</label>
-              <div class="flex gap-2">
-                <input id="work-dir" type="text" placeholder="/path/to/repo" class="runtime-input" />
-                <button type="button" onclick="openBrowseModal()" class="runtime-btn runtime-btn-secondary !px-3">Browse</button>
+            <div class="space-y-3 pt-2">
+              <h2 class="text-sm font-semibold uppercase tracking-widest text-slate-300">Session Settings</h2>
+              <div class="runtime-field">
+                <label class="runtime-field-label">Work Directory</label>
+                <div class="flex gap-2">
+                  <input id="work-dir" type="text" placeholder="/path/to/repo" class="runtime-input" />
+                  <button type="button" onclick="openBrowseModal()" class="runtime-btn runtime-btn-secondary !px-3">Browse</button>
+                </div>
+              </div>
+              <div class="runtime-field">
+                <label class="runtime-field-label">Response Language</label>
+                <select id="response-lang" class="runtime-select">
+                  <option value="en">English</option>
+                  <option value="zh-TW">Traditional Chinese</option>
+                </select>
               </div>
             </div>
-            <div class="runtime-field">
-              <label class="runtime-field-label">Response Language</label>
-              <select id="response-lang" class="runtime-select">
-                <option value="en">English</option>
-                <option value="zh-TW">Traditional Chinese</option>
-              </select>
-            </div>
-          </div>
 
-          <button id="btn-start-chat" onclick="startChat()" class="runtime-btn runtime-btn-primary mt-4 w-full justify-center">
-            Start Chat
-          </button>
+            <button id="btn-start-chat" onclick="startChat()" class="runtime-btn runtime-btn-primary mt-4 w-full justify-center">
+              Start Chat
+            </button>
+          </div>
         </div>
 
         <div id="participants-section" class="runtime-sidebar-section runtime-sidebar-surface hidden flex-col">
@@ -138,34 +141,29 @@
 
     <main class="runtime-page">
       <div class="runtime-page-stack">
-        <header class="runtime-page-header">
-          <div class="runtime-page-header-row">
+        <header class="runtime-page-header" style="padding-top:0.75rem;padding-bottom:0.75rem;">
+          <div class="flex flex-wrap items-center gap-6">
             <div>
-              <p class="runtime-page-kicker">Runtime Surface</p>
-              <h1 class="runtime-page-title">Playground</h1>
-              <p class="runtime-page-subtitle">
-                A shared shell for orchestrated agent collaboration, provider
-                comparison, and live runtime streaming behavior.
-              </p>
-          </div>
-
-          <div class="runtime-page-toolbar">
-              <div id="status-bar" class="runtime-page-toolbar-row text-sm">
-                <div class="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1.5">
-                  <span class="text-slate-500">Tokens</span>
-                  <span id="tokens-display" class="font-mono text-white">0</span>
-                </div>
-                <div id="agent-statuses" class="flex flex-wrap gap-2"></div>
+              <p class="runtime-page-kicker" style="font-size:0.58rem;letter-spacing:0.18em;">CATS RUNTIME</p>
+              <h1 class="font-semibold tracking-tight text-white" style="margin-top:0.125rem;font-size:21px;line-height:1.15;">Playground</h1>
+            </div>
+            <div id="status-bar" class="runtime-page-toolbar-row text-sm">
+              <div class="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1.5">
+                <span class="text-slate-500">Tokens</span>
+                <span id="tokens-display" class="font-mono text-white">0</span>
               </div>
+              <div id="agent-statuses" class="flex flex-wrap gap-2"></div>
             </div>
           </div>
         </header>
 
-        <div id="chat-area" class="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
-          <div class="runtime-empty">
-            <div class="runtime-empty-icon">&#x1f4ac;</div>
-            <p class="text-lg font-medium text-slate-300">Set up your agents and start chatting</p>
-            <p class="text-sm text-slate-500">The orchestrator will coordinate the team</p>
+        <div class="runtime-page-content min-h-0 overflow-hidden p-6">
+          <div id="chat-area" class="flex h-full min-h-0 flex-col overflow-y-auto">
+            <div class="runtime-empty flex-1">
+              <div class="runtime-empty-icon">&#x1f4ac;</div>
+              <p class="text-lg font-medium text-slate-300">Set up your agents and start chatting</p>
+              <p class="text-sm text-slate-500">The CEO will coordinate the team</p>
+            </div>
           </div>
         </div>
 
@@ -255,7 +253,7 @@ const PROVIDER_COLORS = {
   ollama:  { bg:'bg-slate-800/70',border:'border-slate-500',text:'text-slate-300',dot:'bg-slate-400' },
 };
 const AVAILABLE_TAGS = ['orchestrator','pm','architect','coder','tester','reviewer','qa','marketer'];
-const ROLE_LABELS = { orchestrator:'ORCHESTRATOR',pm:'PM',architect:'ARCHITECT',coder:'CODER',tester:'TESTER',reviewer:'REVIEWER',qa:'QA',marketer:'MARKETER' };
+const ROLE_LABELS = { orchestrator:'CEO',pm:'PM',architect:'Architect',coder:'Coder',tester:'Tester',reviewer:'Reviewer',qa:'QA',marketer:'Marketer' };
 const PROVIDER_MODELS = {
   claude:[{value:'claude-opus-4-6',label:'claude-opus-4-6 (default)'},{value:'claude-sonnet-4-6',label:'claude-sonnet-4-6'},{value:'claude-haiku-4-5',label:'claude-haiku-4-5'}],
   codex:[{value:'gpt-5.4',label:'gpt-5.4 (default)'},{value:'gpt-5.3-codex',label:'gpt-5.3-codex'},{value:'gpt-5.2-codex',label:'gpt-5.2-codex'}],
@@ -320,7 +318,7 @@ function parseDelegation(content, knownAgents) {
 // ============================================================
 // Prompt templates (ported from prompts.py)
 // ============================================================
-const AGENTS_MD_INSTRUCTION = "IMPORTANT: Your first action MUST be to check if AGENTS.md exists in the working directory root. If it exists, read it first \u2014 it is the source of truth for project context, architecture, tech stack, and conventions. If it does NOT exist, continue with the task using the available context. Only explore additional files when AGENTS.md does not cover what you need. Do NOT create or modify AGENTS.md unless you have the 'architect' or 'orchestrator' role.";
+const AGENTS_MD_INSTRUCTION = "IMPORTANT: Your first action MUST be to check if AGENTS.md exists in the working directory root. If it exists, read it first \u2014 it is the source of truth for project context, architecture, tech stack, and conventions. If it does NOT exist, continue with the task using the available context. Only explore additional files when AGENTS.md does not cover what you need. Do NOT create or modify AGENTS.md unless you have the 'architect' or 'CEO' role.";
 
 const AGENTS_MD_CREATOR_INSTRUCTION = "IMPORTANT: Your first action MUST be to check if AGENTS.md exists in the working directory root.\n- If it exists, read it first \u2014 it is the source of truth for project context, architecture, tech stack, and conventions.\n- If it does NOT exist, do NOT let AGENTS.md setup block the user's task. In an empty scratch workspace or first-turn request, continue with the actual work first.\n- Create AGENTS.md only once the workspace has enough stable project context to document, or when the user explicitly asks for project scaffolding/documentation.\n- When you do create it, include: project purpose, tech stack, directory structure, coding conventions, and any context that helps other agents work efficiently.\n- When the codebase changes significantly (new files, new patterns, architectural decisions), update AGENTS.md to reflect the current state.";
 
@@ -350,9 +348,9 @@ function buildOrchestratorPrompt(agents, responseLang) {
   const hasPM = agents.some(a => !a.tags.includes('orchestrator') && a.tags.includes('pm'));
   const hasMarketer = agents.some(a => !a.tags.includes('orchestrator') && a.tags.includes('marketer'));
   const participants = agents.filter(a => !a.tags.includes('orchestrator'))
-    .map(a => `- **${a.name}** (tags: ${a.tags.length ? a.tags.join(', ') : 'general'})`).join('\n');
+    .map(a => `- **${a.name}** (tags: ${a.tags.length ? a.tags.map(tag => getTagLabel(tag)).join(', ') : 'general'})`).join('\n');
   const parts = [
-    "You are the **Orchestrator** of this group chat room. You are a COORDINATOR, not a worker. Your job is to read the conversation, decide who should act next, and keep the workflow moving.",
+    "You are the **CEO** of this group chat room. You are a COORDINATOR, not a worker. Your job is to read the conversation, decide who should act next, and keep the workflow moving.",
     `## Participants\n\n- **user** (the stakeholder who gives tasks)\n${participants}`,
     "## Delegation Contract\n\nIf any agent work is needed, your final non-empty line MUST be:\n`NEXT: AgentName1, AgentName2`\n\nRules for NEXT:\n- Put `NEXT:` on its own line.\n- Use exact participant names from the list above.\n- List agents in execution order.\n- If no delegation is needed, do NOT output `NEXT:`.\n\nOptional per-agent instructions may appear immediately above the NEXT line:\n@AgentName1 Please implement the login page.\n@AgentName2 Please review after implementation.",
     `## Workflow Principles\n\n**Never send unfinished or rejected work forward.** Read what just happened, understand the current state, then choose the next agent.\n\nQuality gates:\n- If a reviewer rejects code \u2192 route back to the coder with the specific feedback. Do NOT send rejected code to testing.\n- If a reviewer rejects tests \u2192 route back to the tester. Do NOT proceed as if tests are adequate.\n- If QA finds bugs \u2192 route back to the coder. The fix must pass review again before returning to QA.\n\nTypical flows (adapt based on which agents are available):\n- **With tester (writes test code)**:\n  ${hasPM ? 'PM \u2192 ' : ''}Architect \u2192 Coder \u2192 Tester \u2192 Reviewer \u2192 iterate if rejected\n- **With QA (E2E validation)**:\n  ${hasPM ? 'PM \u2192 ' : ''}Architect \u2192 Coder \u2192 Reviewer \u2192 iterate until approved \u2192 QA (deploy + test) \u2192 if bugs, back to Coder\n- **With both tester and QA**:\n  ${hasPM ? 'PM \u2192 ' : ''}Architect \u2192 Coder \u2192 Tester \u2192 Reviewer \u2192 iterate until approved \u2192 QA (deploy + E2E) \u2192 if bugs, back to Coder${hasMarketer ? ' \u2192 Marketer (social post)' : ''}\n\nThese are guidelines, not rigid rules. Use judgment based on the conversation context.`,
@@ -483,7 +481,7 @@ class ChatRoom {
     this._activeAgent = null;
     this._sharedCwd = workDir;
     const orch = agents.filter(a => a.tags.includes('orchestrator'));
-    if (orch.length !== 1) throw new Error(`Exactly one orchestrator required, found ${orch.length}`);
+    if (orch.length !== 1) throw new Error(`Exactly one CEO required, found ${orch.length}`);
     this._orchestrator = orch[0];
     this._workers = agents.filter(a => !a.tags.includes('orchestrator'));
     this._agentMap = Object.fromEntries(agents.map(a => [a.name, a]));
@@ -665,7 +663,7 @@ class ChatRoom {
     }
     const instruction = delegation.instructions[agent.name];
     if (instruction) parts.push(`## Your task\n\n${instruction}`);
-    else parts.push("## Your task\n\nThe orchestrator has delegated this to you. Review the conversation above and contribute based on your role.");
+    else parts.push("## Your task\n\nThe CEO has delegated this to you. Review the conversation above and contribute based on your role.");
     return parts.join('\n\n');
   }
 }
@@ -722,7 +720,8 @@ function authAwareMessage(err, fallback) { return err&&[401,403].includes(err.st
 function setAgentMetadata(agents) { agentMetaByName = {}; for (const a of agents||[]) if (a?.name) agentMetaByName[a.name]=a; }
 function getAgentMeta(n) { return agentMetaByName[n] || {provider:'',tags:[]}; }
 function getPrimaryRoleTag(tags) { return (tags||[])[0]||''; }
-function getRoleLabel(tags) { const t=getPrimaryRoleTag(tags); return t ? (ROLE_LABELS[t]||t.toUpperCase()) : ''; }
+function getTagLabel(tag) { return ROLE_LABELS[tag] || tag; }
+function getRoleLabel(tags) { const t=getPrimaryRoleTag(tags); return t ? getTagLabel(t) : ''; }
 function getProviderBadgeLabel(p) { const n=String(p||'').toUpperCase(); return p==='ollama'?n:`${n}-CLI`; }
 function renderRoleBadge(tags,colorClass='text-slate-300') { const l=getRoleLabel(tags); return l?`<span class="role-badge ${colorClass}" style="border-color:currentColor">${escapeHtml(l)}</span>`:''; }
 function renderProviderBadge(p,extra='') { if(!p)return''; return `<span class="provider-badge ${extra}" data-p="${escapeHtml(p)}">${escapeHtml(getProviderBadgeLabel(p))}</span>`; }
@@ -944,7 +943,7 @@ function syncAgentModelField(div,options={}){
     customInput.value='';
   }
 }
-function buildTagCheckboxes(id,selectedTags=[]){return AVAILABLE_TAGS.map(tag=>{const ch=selectedTags.includes(tag)?'checked':'';return`<label class="flex items-center gap-1 text-xs cursor-pointer"><input type="checkbox" value="${tag}" ${ch} class="agent-tag rounded border-slate-500" /><span>${tag}</span></label>`;}).join('');}
+function buildTagCheckboxes(id,selectedTags=[]){return AVAILABLE_TAGS.map(tag=>{const ch=selectedTags.includes(tag)?'checked':'';return`<label class="flex items-center gap-1 text-xs cursor-pointer"><input type="checkbox" value="${tag}" ${ch} class="agent-tag rounded border-slate-500" /><span>${escapeHtml(getTagLabel(tag))}</span></label>`;}).join('');}
 
 function refreshAllAgentModelFields(){
   document.querySelectorAll('#agents-list > div').forEach(div=>syncAgentModelField(div,{preserve:true}));
@@ -987,7 +986,7 @@ function switchToChatMode(agents) {
   userDiv.innerHTML=`<span class="w-2 h-2 rounded-full bg-blue-400"></span><span class="text-sm font-medium text-blue-300">You</span><span class="tag-pill text-blue-300" style="border-color:currentColor">stakeholder</span>`;
   list.appendChild(userDiv);
   for(const agent of agents){const c=getAgentColor(agent.name);const d=document.createElement('div');d.className='flex items-center gap-2 px-2 py-1.5 rounded bg-slate-700/30';
-    const tagBadges=(agent.tags||[]).map(t=>`<span class="tag-pill ${c.text}" style="border-color:currentColor">${t}</span>`).join(' ');
+    const tagBadges=(agent.tags||[]).map(t=>`<span class="tag-pill ${c.text}" style="border-color:currentColor">${escapeHtml(getTagLabel(t))}</span>`).join(' ');
     d.innerHTML=`<span id="part-status-${safeId(agent.name)}" class="w-2 h-2 rounded-full bg-slate-500"></span><span class="text-sm font-medium ${c.text}">${escapeHtml(agent.name)}</span>${tagBadges}${renderProviderBadge(agent.provider,'ml-auto shrink-0')}`;
     list.appendChild(d);
   }
@@ -1030,7 +1029,7 @@ async function stopChat() {
   document.getElementById('participants-section').classList.add('hidden');
   document.getElementById('input-area').classList.add('hidden');
   document.getElementById('setup-section').classList.remove('hidden');
-  document.getElementById('chat-area').innerHTML=`<div class="text-center text-slate-500 py-12"><div class="text-4xl mb-3">&#x1f4ac;</div><p class="text-lg font-medium">Set up your agents and start chatting</p><p class="text-sm mt-1">The orchestrator will coordinate the team</p></div>`;
+  document.getElementById('chat-area').innerHTML=`<div class="runtime-empty flex-1"><div class="runtime-empty-icon">&#x1f4ac;</div><p class="text-lg font-medium text-slate-300">Set up your agents and start chatting</p><p class="text-sm text-slate-500">The CEO will coordinate the team</p></div>`;
   totalTokens=0;agentColorMap={};agentMetaByName={};pendingAgents=[];clearStreamingState();clearAllThinking();setWorking(false);
   document.getElementById('tokens-display').textContent='0';
   document.getElementById('agent-statuses').innerHTML='';
@@ -1072,7 +1071,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeBrowseModal();
 // Role prompts modal
 // ============================================================
 const ROLE_PROMPTS = {
-  orchestrator:{label:'Orchestrator',prompt:"You are the Orchestrator of this group chat room. You are a coordinator, not a worker.\n\nDelegation Contract:\n- If agent work is needed, the final non-empty line must be NEXT: AgentName1, AgentName2\n- Put NEXT on its own line\n- Use exact participant names\n- Optional per-agent instructions can appear above it as @AgentName ...\n- If no delegation is needed, do not output NEXT:\n\nRules:\n- Simple factual questions: answer directly\n- For non-trivial or multi-step tasks, delegate to PM first when a PM is available\n- Tasks requiring work: delegate to the appropriate agents\n- Briefly explain your reasoning before NEXT:\n- Only delegate to existing participants\n- After agent results: either summarize for the user or delegate again\n- Do NOT delegate to yourself",agentsMd:"First action: check if AGENTS.md exists.\n- If exists: read it as source of truth\n- If NOT: continue the workflow and delegate normally"},
+  orchestrator:{label:'CEO',prompt:"You are the CEO of this group chat room. You are a coordinator, not a worker.\n\nDelegation Contract:\n- If agent work is needed, the final non-empty line must be NEXT: AgentName1, AgentName2\n- Put NEXT on its own line\n- Use exact participant names\n- Optional per-agent instructions can appear above it as @AgentName ...\n- If no delegation is needed, do not output NEXT:\n\nRules:\n- Simple factual questions: answer directly\n- For non-trivial or multi-step tasks, delegate to PM first when a PM is available\n- Tasks requiring work: delegate to the appropriate agents\n- Briefly explain your reasoning before NEXT:\n- Only delegate to existing participants\n- After agent results: either summarize for the user or delegate again\n- Do NOT delegate to yourself",agentsMd:"First action: check if AGENTS.md exists.\n- If exists: read it as source of truth\n- If NOT: continue the workflow and delegate normally"},
   pm:{label:'PM',prompt:"You are a product manager. Your role is product definition and spec writing \u2014 not project tracking and not implementation.\n\nYour job:\n1. Clarify the real objective, target users, constraints, and success criteria\n2. Turn ambiguous requests into a concrete product spec\n3. Define scope, non-goals, user stories, requirements, edge cases, and acceptance criteria\n4. Identify open product decisions, risks, and assumptions\n5. Hand off a clear spec that the architect or coder can execute against\n\nYour primary deliverable is a product requirements/specification document in message form. Do NOT implement code yourself unless no implementation specialist exists.",agentsMd:"First action: check if AGENTS.md exists. If it exists, read it first. Do NOT create or modify AGENTS.md."},
   architect:{label:'Architect',prompt:"You are a software architect. Your role is PLANNING \u2014 do NOT write implementation code unless no coder is available.\n\nYour job:\n1. Analyze the task and existing codebase\n2. Produce a clear, actionable plan (file structure, tech choices, component breakdown, implementation steps)\n3. Create or update AGENTS.md with project context so other agents can work efficiently",agentsMd:"First action: check if AGENTS.md exists.\n- If exists: read it as source of truth\n- If NOT: create AGENTS.md with project purpose, tech stack, directory structure, conventions\n- Update AGENTS.md when codebase changes significantly"},
   coder:{label:'Coder',prompt:"You are an experienced developer. Write clean, well-tested code. Address feedback specifically and implement changes as requested.",agentsMd:"First action: check if AGENTS.md exists. If it exists, read it first. Do NOT create or modify AGENTS.md."},

@@ -313,7 +313,16 @@ describe('runtime server', () => {
       expect(response.status).toBe(200);
       const html = await response.text();
       expect(html).toContain('Playground');
-      expect(html).toContain('Playground Shell');
+      expect(html).not.toContain('Playground Shell');
+      expect(html).toContain('CATS RUNTIME');
+      expect(html).toContain('The CEO will coordinate the team');
+      expect(html).toContain(
+        '<header class="runtime-page-header" style="padding-top:0.75rem;padding-bottom:0.75rem;">',
+      );
+      expect(html).toContain('runtime-page-content min-h-0 overflow-hidden p-6');
+      expect(html).toContain('runtime-empty flex-1');
+      expect(html).toContain('#left-panel {');
+      expect(html).toContain('width: var(--sidebar-width);');
       expect(html).toContain('class RuntimeClient');
       expect(html).toContain('/providers/config');
       expect(html).toContain('data-runtime-surface-switcher');
