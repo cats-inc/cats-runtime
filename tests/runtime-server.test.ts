@@ -402,6 +402,9 @@ describe('runtime server', () => {
       expect(html).toContain('/providers/${name}/models/advanced');
       expect(html).toContain('modelSelection');
       expect(html).toContain('Provider returned no assistant output.');
+      expect(html).toContain('function extractResultEventFallbackText(event) {');
+      expect(html).toContain('event?.raw?.result?.payloads');
+      expect(html).toContain("const fullText = textParts.join('') || resultFallbackText;");
       expect(html).toContain('getAdvancedCatalogChoices');
       expect(html).toContain('workspaceKind');
       expect(html).toContain('workspaceAccess');

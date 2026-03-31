@@ -165,11 +165,20 @@ class FailingOpenClawSocket extends EventTarget {
   }
 }
 
-class RejectNonceOpenClawSocket extends EventTarget {
+type ConnectRetryScenario =
+  | 'legacy-root-nonce'
+  | 'gateway-client-id'
+  | 'device-unsupported'
+  | 'device-identity';
+
+class RetryConnectOpenClawSocket extends EventTarget {
   readyState = WebSocket.CONNECTING;
   readonly connectParams: Array<Record<string, unknown>> = [];
 
-  constructor() {
+  constructor(
+    private readonly scenario: ConnectRetryScenario,
+    private readonly attempt: number,
+  ) {
     super();
     queueMicrotask(() => {
       this.readyState = WebSocket.OPEN;
@@ -189,15 +198,17 @@ class RejectNonceOpenClawSocket extends EventTarget {
     if (method === 'connect') {
       const params = (frame.params ?? {}) as Record<string, unknown>;
       this.connectParams.push(params);
-      if (typeof params.nonce === 'string') {
+      if (this.shouldRejectConnect(params)) {
+        const message = this.buildConnectErrorMessage();
         this.emitFrame({
           type: 'res',
           id: frame.id,
           ok: false,
           error: {
-            message: "invalid connect params: at root: unexpected property 'nonce'",
+            message,
           },
         });
+        this.emitClose(1008, message);
         return;
       }
 
@@ -217,9 +228,15 @@ class RejectNonceOpenClawSocket extends EventTarget {
         ok: true,
         payload: {
           status: 'ok',
-          runId: 'run-fallback',
+          runId: `run-${this.scenario}`,
           sessionKey: 'probe-session',
-          summary: 'gateway done without nonce',
+          summary: this.scenario === 'legacy-root-nonce'
+            ? 'gateway done with legacy nonce'
+            : this.scenario === 'gateway-client-id'
+              ? 'gateway done with gateway client id'
+              : this.scenario === 'device-unsupported'
+                ? 'gateway done without device identity'
+                : 'gateway done with device identity',
         },
       });
     }
@@ -235,6 +252,64 @@ class RejectNonceOpenClawSocket extends EventTarget {
       data: JSON.stringify(frame),
     }));
   }
+
+  private emitClose(code: number, reason: string): void {
+    queueMicrotask(() => {
+      this.readyState = WebSocket.CLOSED;
+      const closeEvent = new Event('close') as Event & { code?: number; reason?: string };
+      closeEvent.code = code;
+      closeEvent.reason = reason;
+      this.dispatchEvent(closeEvent);
+    });
+  }
+
+  private shouldRejectConnect(params: Record<string, unknown>): boolean {
+    if (this.attempt !== 1) {
+      return false;
+    }
+    if (this.scenario === 'legacy-root-nonce') {
+      return typeof params.nonce !== 'string';
+    }
+    if (this.scenario === 'device-unsupported') {
+      return typeof params.device === 'object' && params.device !== null;
+    }
+    if (this.scenario === 'device-identity') {
+      const device = params.device as Record<string, unknown> | undefined;
+      return !device
+        || typeof device.id !== 'string'
+        || typeof device.publicKey !== 'string'
+        || typeof device.signature !== 'string'
+        || typeof device.signedAt !== 'number'
+        || device.nonce !== 'nonce-1';
+    }
+
+    const client = params.client as Record<string, unknown> | undefined;
+    return client?.id !== 'gateway-client';
+  }
+
+  private buildConnectErrorMessage(): string {
+    if (this.scenario === 'legacy-root-nonce') {
+      return "invalid connect params: at root: must have required property 'nonce'";
+    }
+    if (this.scenario === 'device-unsupported') {
+      return "invalid connect params: at root: unexpected property 'device'";
+    }
+    return 'invalid connect params: at /client/id: must be equal to constant; '
+      + 'at /client/id: must match a schema in anyOf';
+  }
+}
+
+function createRetrySocketFactory(scenario: ConnectRetryScenario) {
+  const sockets: RetryConnectOpenClawSocket[] = [];
+  let attempt = 0;
+  return {
+    sockets,
+    factory: () => {
+      const socket = new RetryConnectOpenClawSocket(scenario, ++attempt);
+      sockets.push(socket);
+      return socket as unknown as WebSocket;
+    },
+  };
 }
 
 describe('OpenClawAdapter', () => {
@@ -313,13 +388,10 @@ describe('OpenClawAdapter', () => {
     });
   });
 
-  it('retries connect without nonce when newer gateway schemas reject the nonce field', async () => {
-    let socket: RejectNonceOpenClawSocket | null = null;
+  it('reconnects with the legacy root nonce when older gateways require it', async () => {
+    const { sockets, factory } = createRetrySocketFactory('legacy-root-nonce');
     const adapter = new OpenClawAdapter({
-      webSocketFactory: () => {
-        socket = new RejectNonceOpenClawSocket();
-        return socket as unknown as WebSocket;
-      },
+      webSocketFactory: factory,
     });
 
     const events = [];
@@ -338,11 +410,135 @@ describe('OpenClawAdapter', () => {
 
     expect(events).toEqual([
       expect.objectContaining({ type: 'init', providerSessionId: 'probe-session' }),
-      expect.objectContaining({ type: 'result', summary: 'gateway done without nonce' }),
+      expect.objectContaining({ type: 'result', summary: 'gateway done with legacy nonce' }),
     ]);
-    expect(socket?.connectParams).toEqual([
-      expect.objectContaining({ nonce: 'nonce-1' }),
+    expect(sockets).toHaveLength(2);
+    expect(sockets[0]?.connectParams).toEqual([
       expect.not.objectContaining({ nonce: expect.anything() }),
+    ]);
+    expect(sockets[1]?.connectParams).toEqual([
+      expect.objectContaining({ nonce: 'nonce-1' }),
+    ]);
+  });
+
+  it('reconnects with the supported gateway client id when older runtime configs still use cats-runtime', async () => {
+    const { sockets, factory } = createRetrySocketFactory('gateway-client-id');
+    const adapter = new OpenClawAdapter({
+      webSocketFactory: factory,
+    });
+
+    const events = [];
+    for await (const event of adapter.invoke({
+      sessionId: 'runtime-session',
+      sessionKey: 'probe-session',
+      providerName: 'openclaw',
+      instance: {
+        ...createInstance(),
+        clientId: 'cats-runtime',
+      },
+      turn: {
+        message: 'Probe OpenClaw',
+      },
+      signal: new AbortController().signal,
+    })) {
+      events.push(event);
+    }
+
+    expect(events).toEqual([
+      expect.objectContaining({ type: 'init', providerSessionId: 'probe-session' }),
+      expect.objectContaining({ type: 'result', summary: 'gateway done with gateway client id' }),
+    ]);
+    expect(sockets).toHaveLength(2);
+    expect(sockets[0]?.connectParams).toEqual([
+      expect.objectContaining({
+        client: expect.objectContaining({ id: 'cats-runtime' }),
+      }),
+    ]);
+    expect(sockets[1]?.connectParams).toEqual([
+      expect.objectContaining({
+        client: expect.objectContaining({ id: 'gateway-client' }),
+      }),
+    ]);
+  });
+
+  it('includes a signed device identity in connect payloads for scoped local operator access', async () => {
+    const { sockets, factory } = createRetrySocketFactory('device-identity');
+    const adapter = new OpenClawAdapter({
+      webSocketFactory: factory,
+    });
+
+    const events = [];
+    for await (const event of adapter.invoke({
+      sessionId: 'runtime-session',
+      sessionKey: 'probe-session',
+      providerName: 'openclaw',
+      instance: createInstance(),
+      turn: {
+        message: 'Probe OpenClaw',
+      },
+      signal: new AbortController().signal,
+    })) {
+      events.push(event);
+    }
+
+    expect(events).toEqual([
+      expect.objectContaining({ type: 'init', providerSessionId: 'probe-session' }),
+      expect.objectContaining({ type: 'result', summary: 'gateway done with device identity' }),
+    ]);
+    expect(sockets).toHaveLength(1);
+    expect(sockets[0]?.connectParams).toEqual([
+      expect.objectContaining({
+        device: expect.objectContaining({
+          id: expect.any(String),
+          publicKey: expect.any(String),
+          signature: expect.any(String),
+          signedAt: expect.any(Number),
+          nonce: 'nonce-1',
+        }),
+      }),
+    ]);
+  });
+
+  it('retries without device identity when older gateways reject the device field', async () => {
+    const { sockets, factory } = createRetrySocketFactory('device-unsupported');
+    const adapter = new OpenClawAdapter({
+      webSocketFactory: factory,
+    });
+
+    const events = [];
+    for await (const event of adapter.invoke({
+      sessionId: 'runtime-session',
+      sessionKey: 'probe-session',
+      providerName: 'openclaw',
+      instance: createInstance(),
+      turn: {
+        message: 'Probe OpenClaw',
+      },
+      signal: new AbortController().signal,
+    })) {
+      events.push(event);
+    }
+
+    expect(events).toEqual([
+      expect.objectContaining({ type: 'init', providerSessionId: 'probe-session' }),
+      expect.objectContaining({ type: 'result', summary: 'gateway done without device identity' }),
+    ]);
+    expect(sockets).toHaveLength(2);
+    expect(sockets[0]?.connectParams).toEqual([
+      expect.objectContaining({
+        device: expect.objectContaining({
+          id: expect.any(String),
+          publicKey: expect.any(String),
+          signature: expect.any(String),
+          signedAt: expect.any(Number),
+          nonce: 'nonce-1',
+        }),
+      }),
+    ]);
+    expect(sockets[1]?.connectParams).toEqual([
+      expect.not.objectContaining({
+        device: expect.anything(),
+      }),
     ]);
   });
 });

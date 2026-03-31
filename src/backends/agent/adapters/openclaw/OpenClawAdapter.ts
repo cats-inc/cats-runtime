@@ -1,4 +1,11 @@
-import { randomUUID } from 'node:crypto';
+import {
+  createHash,
+  createPrivateKey,
+  createPublicKey,
+  generateKeyPairSync,
+  randomUUID,
+  sign as signPayload,
+} from 'node:crypto';
 import type {
   ErrorStreamEvent,
   InitStreamEvent,
@@ -32,12 +39,13 @@ import { parseRecord, parseServices, prependInstructions, readString } from '../
 
 const DEFAULT_CONNECT_TIMEOUT_MS = 10_000;
 const DEFAULT_WAIT_TIMEOUT_MS = 30_000;
-const DEFAULT_CLIENT_ID = 'cats-runtime';
+const DEFAULT_CLIENT_ID = 'gateway-client';
 const DEFAULT_CLIENT_MODE = 'backend';
 const DEFAULT_CLIENT_VERSION = '0.1.0';
 const DEFAULT_ROLE = 'operator';
 const DEFAULT_SCOPES = ['operator.admin'];
 const PROTOCOL_VERSION = 3;
+const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
 
 interface GatewayRequestFrame {
   type: 'req';
@@ -71,6 +79,17 @@ interface PendingRequest {
   resolve: (value: any) => void;
   reject: (error: Error) => void;
   timer?: ReturnType<typeof setTimeout>;
+}
+
+interface GatewayDeviceIdentity {
+  deviceId: string;
+  publicKeyRaw: string;
+  privateKeyPem: string;
+}
+
+interface GatewayConnectPlan {
+  connectParams: Record<string, unknown>;
+  deviceIdentity?: GatewayDeviceIdentity;
 }
 
 type GatewayDroppedFrameKind = 'raw_passthrough' | 'schema_failure';
@@ -232,6 +251,101 @@ function buildConnectParams(
     scopes: instance.scopes || DEFAULT_SCOPES,
     auth: resolveAuth(instance, env),
   };
+}
+
+function base64UrlEncode(input: Buffer): string {
+  return input.toString('base64').replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/g, '');
+}
+
+function derivePublicKeyRaw(publicKeyPem: string): Buffer {
+  const key = createPublicKey(publicKeyPem);
+  const spki = key.export({ type: 'spki', format: 'der' }) as Buffer;
+  if (
+    spki.length === ED25519_SPKI_PREFIX.length + 32
+    && spki.subarray(0, ED25519_SPKI_PREFIX.length).equals(ED25519_SPKI_PREFIX)
+  ) {
+    return spki.subarray(ED25519_SPKI_PREFIX.length);
+  }
+  return spki;
+}
+
+function createGatewayDeviceIdentity(): GatewayDeviceIdentity {
+  const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+  const publicKeyPem = publicKey.export({ type: 'spki', format: 'pem' }).toString();
+  const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+  const publicKeyRaw = derivePublicKeyRaw(publicKeyPem);
+  return {
+    deviceId: createHash('sha256').update(publicKeyRaw).digest('hex'),
+    publicKeyRaw: base64UrlEncode(publicKeyRaw),
+    privateKeyPem,
+  };
+}
+
+function resolveSignatureToken(connectParams: Record<string, unknown>): string | null {
+  const auth = parseRecord(connectParams.auth);
+  return readString(auth?.token)
+    || readString(auth?.deviceToken)
+    || readString(auth?.bootstrapToken)
+    || null;
+}
+
+function normalizeDeviceMetadataForAuth(value: unknown): string {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.trim().toLowerCase();
+}
+
+function buildSignedGatewayDevicePayload(
+  connectParams: Record<string, unknown>,
+  nonce: string,
+  deviceIdentity: GatewayDeviceIdentity,
+): Record<string, unknown> {
+  const client = parseRecord(connectParams.client) || {};
+  const role = readString(connectParams.role) || DEFAULT_ROLE;
+  const scopes = Array.isArray(connectParams.scopes)
+    ? connectParams.scopes.filter((scope): scope is string => typeof scope === 'string')
+    : [];
+  const signedAt = Date.now();
+  const signaturePayload = [
+    'v3',
+    deviceIdentity.deviceId,
+    readString(client.id) || DEFAULT_CLIENT_ID,
+    readString(client.mode) || DEFAULT_CLIENT_MODE,
+    role,
+    scopes.join(','),
+    String(signedAt),
+    resolveSignatureToken(connectParams) || '',
+    nonce,
+    normalizeDeviceMetadataForAuth(client.platform),
+    normalizeDeviceMetadataForAuth(client.deviceFamily),
+  ].join('|');
+  const signature = signPayload(
+    null,
+    Buffer.from(signaturePayload, 'utf8'),
+    createPrivateKey(deviceIdentity.privateKeyPem),
+  );
+
+  return {
+    id: deviceIdentity.deviceId,
+    publicKey: deviceIdentity.publicKeyRaw,
+    signature: base64UrlEncode(signature),
+    signedAt,
+    nonce,
+  };
+}
+
+function cloneConnectParams(connectParams: Record<string, unknown>): Record<string, unknown> {
+  const cloned: Record<string, unknown> = {
+    ...connectParams,
+  };
+  const client = parseRecord(connectParams.client);
+  if (client) {
+    cloned.client = {
+      ...client,
+    };
+  }
+  return cloned;
 }
 
 function mergePayloadTemplate(
@@ -533,21 +647,59 @@ function shouldRetryConnectWithoutNonce(error: Error): boolean {
     || message.includes('additional property nonce');
 }
 
+function shouldRetryConnectWithLegacyNonce(error: Error): boolean {
+  const message = error.message.toLowerCase();
+  return message.includes("required property 'nonce'")
+    || message.includes('required property "nonce"');
+}
+
+function shouldRetryConnectWithGatewayClientId(error: Error): boolean {
+  const message = error.message.toLowerCase();
+  return message.includes('/client/id')
+    && message.includes('must be equal to constant');
+}
+
+function shouldRetryConnectWithoutDeviceIdentity(error: Error): boolean {
+  const message = error.message.toLowerCase();
+  return message.includes("unexpected property 'device'")
+    || message.includes('unexpected property "device"')
+    || message.includes('/device')
+    || message.includes('additional property device');
+}
+
+function withGatewayClientId(connectParams: Record<string, unknown>): Record<string, unknown> {
+  const client = parseRecord(connectParams.client);
+  if (!client || readString(client.id) === DEFAULT_CLIENT_ID) {
+    return connectParams;
+  }
+
+  const next = cloneConnectParams(connectParams);
+  next.client = {
+    ...client,
+    id: DEFAULT_CLIENT_ID,
+  };
+  return next;
+}
+
+function formatCloseMessage(prefix: string, code?: number, reason?: unknown): string {
+  const trimmedReason = typeof reason === 'string' ? reason.trim() : '';
+  if (trimmedReason) {
+    return `${prefix} (${code || 1006}): ${trimmedReason}`;
+  }
+  return `${prefix} (${code || 1006})`;
+}
+
+interface ConnectAttempt {
+  connectParams: Record<string, unknown>;
+  includeLegacyRootNonce: boolean;
+  includeDeviceIdentity: boolean;
+  deviceIdentity?: GatewayDeviceIdentity;
+}
+
 class GatewayWsClient {
   private readonly pending = new Map<string, PendingRequest>();
-  private challengeResolve!: (nonce: string) => void;
-  private challengeReject!: (error: Error) => void;
-  private readonly challengePromise = (() => {
-    const promise = new Promise<string>((resolve, reject) => {
-      this.challengeResolve = resolve;
-      this.challengeReject = reject;
-    });
-    // The socket can close before connect() reaches the challenge await path.
-    // Attach a sink so that early rejections do not surface as unhandled
-    // promise rejections and crash the runtime during startup probes.
-    void promise.catch(() => {});
-    return promise;
-  })();
+  private challengeResolve?: (nonce: string) => void;
+  private challengeReject?: (error: Error) => void;
   private socket?: WebSocket;
 
   constructor(
@@ -558,7 +710,33 @@ class GatewayWsClient {
     private readonly onDroppedFrame?: (kind: GatewayDroppedFrameKind, raw: unknown) => void,
   ) {}
 
-  async connect(connectParams: Record<string, unknown>, signal: AbortSignal): Promise<unknown> {
+  async connect(plan: GatewayConnectPlan, signal: AbortSignal): Promise<unknown> {
+    let attempt: ConnectAttempt = {
+      connectParams: cloneConnectParams(plan.connectParams),
+      includeLegacyRootNonce: false,
+      includeDeviceIdentity: Boolean(plan.deviceIdentity),
+      deviceIdentity: plan.deviceIdentity,
+    };
+
+    while (true) {
+      try {
+        return await this.connectOnce(attempt, signal);
+      } catch (error) {
+        const nextAttempt = this.buildRetryAttempt(attempt, error);
+        if (!nextAttempt) {
+          throw error;
+        }
+        this.close(1000, 'retry');
+        attempt = nextAttempt;
+      }
+    }
+  }
+
+  private async connectOnce(
+    attempt: ConnectAttempt,
+    signal: AbortSignal,
+  ): Promise<unknown> {
+    const challengePromise = this.resetChallengePromise();
     this.socket = this.factory(this.url, { headers: this.headers });
     const socket = this.socket;
 
@@ -579,7 +757,11 @@ class GatewayWsClient {
       const handleClose = (event: Event) => {
         const closeEvent = event as Event & { code?: number };
         cleanup();
-        reject(new Error(`OpenClaw websocket closed before open (${closeEvent.code || 1006})`));
+        reject(new Error(formatCloseMessage(
+          'OpenClaw websocket closed before open',
+          closeEvent.code,
+          (closeEvent as Event & { reason?: string }).reason,
+        )));
       };
 
       socket.addEventListener('open', handleOpen, { once: true });
@@ -591,9 +773,13 @@ class GatewayWsClient {
       this.handleMessage(String(event.data));
     });
     socket.addEventListener('close', (event) => {
-      const error = new Error(`OpenClaw websocket closed (${event.code})`);
+      const error = new Error(formatCloseMessage(
+        'OpenClaw websocket closed',
+        event.code,
+        event.reason,
+      ));
       this.failPending(error);
-      this.challengeReject(error);
+      this.challengeReject?.(error);
     });
     socket.addEventListener('error', () => {
       this.failPending(new Error('OpenClaw websocket error'));
@@ -605,23 +791,25 @@ class GatewayWsClient {
 
     await withTimeout(onOpen, DEFAULT_CONNECT_TIMEOUT_MS, 'OpenClaw websocket open timeout');
     const nonce = await withTimeout(
-      this.challengePromise,
+      challengePromise,
       DEFAULT_CONNECT_TIMEOUT_MS,
       'OpenClaw connect challenge timeout',
     );
 
-    try {
-      return await this.request('connect', {
-        ...connectParams,
+    const connectPayload = attempt.includeLegacyRootNonce
+      ? {
+          ...attempt.connectParams,
+          nonce,
+        }
+      : cloneConnectParams(attempt.connectParams);
+    if (attempt.includeDeviceIdentity && attempt.deviceIdentity) {
+      connectPayload.device = buildSignedGatewayDevicePayload(
+        attempt.connectParams,
         nonce,
-      }, DEFAULT_CONNECT_TIMEOUT_MS);
-    } catch (error) {
-      if (!(error instanceof Error) || !shouldRetryConnectWithoutNonce(error)) {
-        throw error;
-      }
-
-      return this.request('connect', connectParams, DEFAULT_CONNECT_TIMEOUT_MS);
+        attempt.deviceIdentity,
+      );
     }
+    return this.request('connect', connectPayload, DEFAULT_CONNECT_TIMEOUT_MS);
   }
 
   async request<T>(
@@ -665,6 +853,70 @@ class GatewayWsClient {
     this.socket = undefined;
   }
 
+  private buildRetryAttempt(
+    attempt: ConnectAttempt,
+    error: unknown,
+  ): ConnectAttempt | null {
+    if (!(error instanceof Error)) {
+      return null;
+    }
+
+    let nextAttempt: ConnectAttempt | null = null;
+
+    if (attempt.includeLegacyRootNonce && shouldRetryConnectWithoutNonce(error)) {
+      nextAttempt = {
+        connectParams: cloneConnectParams(attempt.connectParams),
+        includeLegacyRootNonce: false,
+        includeDeviceIdentity: attempt.includeDeviceIdentity,
+        deviceIdentity: attempt.deviceIdentity,
+      };
+    } else if (!attempt.includeLegacyRootNonce && shouldRetryConnectWithLegacyNonce(error)) {
+      nextAttempt = {
+        connectParams: cloneConnectParams(attempt.connectParams),
+        includeLegacyRootNonce: true,
+        includeDeviceIdentity: attempt.includeDeviceIdentity,
+        deviceIdentity: attempt.deviceIdentity,
+      };
+    }
+
+    if (shouldRetryConnectWithGatewayClientId(error)) {
+      const source = nextAttempt || attempt;
+      const rewritten = withGatewayClientId(source.connectParams);
+      if (rewritten !== source.connectParams) {
+        nextAttempt = {
+          connectParams: rewritten,
+          includeLegacyRootNonce: source.includeLegacyRootNonce,
+          includeDeviceIdentity: source.includeDeviceIdentity,
+          deviceIdentity: source.deviceIdentity,
+        };
+      }
+    }
+
+    if ((nextAttempt || attempt).includeDeviceIdentity && shouldRetryConnectWithoutDeviceIdentity(error)) {
+      const source = nextAttempt || attempt;
+      nextAttempt = {
+        connectParams: cloneConnectParams(source.connectParams),
+        includeLegacyRootNonce: source.includeLegacyRootNonce,
+        includeDeviceIdentity: false,
+        deviceIdentity: source.deviceIdentity,
+      };
+    }
+
+    return nextAttempt;
+  }
+
+  private resetChallengePromise(): Promise<string> {
+    const promise = new Promise<string>((resolve, reject) => {
+      this.challengeResolve = resolve;
+      this.challengeReject = reject;
+    });
+    // The socket can close before connect() reaches the challenge await path.
+    // Attach a sink so that early rejections do not surface as unhandled
+    // promise rejections and crash the runtime during startup probes.
+    void promise.catch(() => {});
+    return promise;
+  }
+
   private failPending(error: Error): void {
     for (const pending of this.pending.values()) {
       if (pending.timer) {
@@ -696,7 +948,7 @@ class GatewayWsClient {
         const payload = parseRecord(frame.payload);
         const nonce = readString(payload?.nonce);
         if (nonce) {
-          this.challengeResolve(nonce);
+          this.challengeResolve?.(nonce);
           return;
         }
       }
@@ -760,8 +1012,19 @@ async function withTimeout<T>(
 
 export class OpenClawAdapter implements AgentAdapter {
   readonly kind = 'openclaw';
+  private deviceIdentity?: GatewayDeviceIdentity;
 
   constructor(private readonly options: AgentBackendOptions = {}) {}
+
+  private buildConnectPlan(
+    instance: RemoteProviderInstanceConfig,
+    env: NodeJS.ProcessEnv,
+  ): GatewayConnectPlan {
+    return {
+      connectParams: buildConnectParams(instance, env),
+      deviceIdentity: this.deviceIdentity || (this.deviceIdentity = createGatewayDeviceIdentity()),
+    };
+  }
 
   async *invoke(input: AgentInvokeInput): AsyncGenerator<StreamEvent> {
     const factory = this.options.webSocketFactory
@@ -876,7 +1139,7 @@ export class OpenClawAdapter implements AgentAdapter {
 
     const run = (async () => {
       try {
-        await client.connect(buildConnectParams(input.instance, env), input.signal);
+        await client.connect(this.buildConnectPlan(input.instance, env), input.signal);
 
         const agentParams = mergePayloadTemplate(input.instance.payloadTemplate, {
           message: prependInstructions(input.turn.message, input.turn.instructions),
@@ -1005,7 +1268,7 @@ export class OpenClawAdapter implements AgentAdapter {
       const client = new GatewayWsClient(factory, url, headers, () => {});
       const controller = new AbortController();
       try {
-        await client.connect(buildConnectParams(instance, env), controller.signal);
+        await client.connect(this.buildConnectPlan(instance, env), controller.signal);
         const health = await client.request('health', { probe: true }, DEFAULT_CONNECT_TIMEOUT_MS);
         const liveProbe = buildGatewayHealthProbeSnapshot(health, url);
         return {
@@ -1061,7 +1324,7 @@ export class OpenClawAdapter implements AgentAdapter {
     const controller = new AbortController();
 
     try {
-      await client.connect(buildConnectParams(instance, env), controller.signal);
+      await client.connect(this.buildConnectPlan(instance, env), controller.signal);
       const payload = await client.request(
         'models.list',
         {},
@@ -1087,7 +1350,7 @@ export class OpenClawAdapter implements AgentAdapter {
     const controller = new AbortController();
 
     try {
-      await client.connect(buildConnectParams(instance, env), controller.signal);
+      await client.connect(this.buildConnectPlan(instance, env), controller.signal);
       if (request.scope === 'effective') {
         if (!request.sessionKey) {
           throw new Error(

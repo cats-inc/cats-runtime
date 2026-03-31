@@ -642,6 +642,29 @@ class RuntimeClient {
   }
 }
 
+function extractResultEventFallbackText(event) {
+  const directText = typeof event?.text === 'string' ? event.text : '';
+  if (directText.trim()) return directText;
+  const sources = [
+    event?.raw?.result?.payloads,
+    event?.raw?.payloads,
+    event?.payloads,
+  ];
+  const parts = [];
+  for (const source of sources) {
+    if (!Array.isArray(source)) continue;
+    for (const item of source) {
+      const text = typeof item?.text === 'string' ? item.text : '';
+      if (text.trim()) parts.push(text);
+    }
+    if (parts.length) break;
+  }
+  if (parts.length) return parts.join('\n\n');
+  const summary = typeof event?.summary === 'string' ? event.summary.trim() : '';
+  if (summary && !['completed', 'success', 'ok'].includes(summary.toLowerCase())) return summary;
+  return '';
+}
+
 // ============================================================
 // ChatRoom (ported from chat.py)
 // ============================================================
@@ -770,7 +793,7 @@ class ChatRoom {
     await this._emit({ type:'agent_thinking', agent:agent.name, provider:agent.provider });
     await this._emit({ type:'agent_streaming_start', agent:agent.name, provider:agent.provider });
     for (let attempt = 0; attempt < 2; attempt++) {
-      const textParts = []; let inputTokens = 0, outputTokens = 0;
+      const textParts = []; let resultFallbackText = ''; let inputTokens = 0, outputTokens = 0;
       this._activeAgent = agent;
       const abort = new AbortController();
       this._activeAbort = abort;
@@ -790,7 +813,12 @@ class ChatRoom {
               if (progress) await this._emit({ type:'agent_progress', agent:agent.name, provider:agent.provider, progress, progress_kind:meta.progressKind });
             }
           } else if (etype === 'error') { throw new RuntimeError(event.text || 'Agent turn failed'); }
-          else if (etype === 'result') { const u = event.usage||{}; inputTokens = u.inputTokens||0; outputTokens = u.outputTokens||0; }
+          else if (etype === 'result') {
+            const u = event.usage||{};
+            inputTokens = u.inputTokens||0;
+            outputTokens = u.outputTokens||0;
+            if (!resultFallbackText.trim()) resultFallbackText = extractResultEventFallbackText(event);
+          }
         }
       } catch (err) {
         if (this._stopRequested) return null;
@@ -805,7 +833,7 @@ class ChatRoom {
         await this._emit({ type:'error', message:`Runtime error for ${agent.name}: ${err.message}` });
         return null;
       } finally { if (this._activeAgent === agent) this._activeAgent = null; this._activeAbort = null; }
-      const fullText = textParts.join('');
+      const fullText = textParts.join('') || resultFallbackText;
       await this._emit({ type:'agent_streaming_end', agent:agent.name, provider:agent.provider, content:fullText, input_tokens:inputTokens, output_tokens:outputTokens });
       if (this._stopRequested) return null;
       if (!fullText.trim()) {

@@ -268,7 +268,7 @@ backends:
         # environment-specific.
         url_env: OPENCLAW_URL
         auth_token_env: OPENCLAW_TOKEN
-        client_id: cats-runtime
+        client_id: gateway-client
         instances:
           gateway:
             model: openai-codex/gpt-5.4
