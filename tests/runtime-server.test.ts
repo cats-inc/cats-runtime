@@ -212,12 +212,11 @@ describe('runtime server', () => {
         .toBeLessThan(html.indexOf('<option value="copilot">copilot</option>'));
       expect(html.indexOf('<option value="copilot">copilot</option>'))
         .toBeLessThan(html.indexOf('<option value="opencode">opencode</option>'));
-      expect(html.indexOf('<option value="opencode">opencode</option>'))
-        .toBeLessThan(html.indexOf('<option value="kilo">kilo</option>'));
-      expect(html.indexOf('<option value="kilo">kilo</option>'))
-        .toBeLessThan(html.indexOf('<option value="auggie">auggie</option>'));
-      expect(html.indexOf('<option value="auggie">auggie</option>'))
-        .toBeLessThan(html.indexOf('<option value="kiro">kiro</option>'));
+      expect(html).toContain(
+        "const PROVIDER_ORDER = ['claude', 'codex', 'gemini', 'cursor', 'copilot', 'opencode', 'kilo', 'goose', 'pi', 'auggie', 'junie', 'kiro', 'ollama', 'openclaw'];",
+      );
+      expect(html).toContain('--openclaw: #f87171;');
+      expect(html).toContain('.provider-badge[data-p="openclaw"]');
 
       const openCreateModalMatch = html.match(
         /async function openCreateModal\(\) \{([\s\S]*?)\n\}/,
@@ -320,13 +319,25 @@ describe('runtime server', () => {
       expect(html).toContain('Designer');
       expect(html).toContain('Security');
       expect(html).toContain('Tech Writer');
+      expect(html).toContain('id="preset-agents-btn"');
+      expect(html).toContain('Use 12-agent preset');
+      expect(html).toContain('id="add-agent-btn"');
       expect(html).toContain(
         '<header class="runtime-page-header" style="padding-top:0.75rem;padding-bottom:0.75rem;">',
       );
       expect(html).toContain('runtime-page-content min-h-0 overflow-hidden p-6');
       expect(html).toContain('runtime-empty flex-1');
+      expect(html).toContain('id="agent-statuses" class="ml-auto flex min-w-0 flex-wrap justify-end gap-2"');
       expect(html).toContain('#left-panel {');
       expect(html).toContain('width: var(--sidebar-width);');
+      expect(html).toContain("const DEFAULT_CHAT_PROMPTS = {\n  en: 'Help me build a calculator website.',");
+      expect(html).toContain("'zh-TW': '\\u5e6b\\u6211\\u5beb\\u500b\\u8a08\\u7b97\\u6a5f\\u7db2\\u7ad9\\u3002',");
+      expect(html).toContain('syncChatInputDefaultPrompt');
+      expect(html).toContain("return document.getElementById('response-lang')?.value || 'en';");
+      expect(html).toContain("responseLangSelect?.addEventListener('change', () => {");
+      expect(html).toContain('openclaw-preview');
+      expect(html).toContain("'openclaw']");
+      expect(html).toContain("return (p==='ollama'||p==='openclaw')?n:`${n}-CLI`;");
       expect(html).toContain('class RuntimeClient');
       expect(html).toContain('/providers/config');
       expect(html).toContain('data-runtime-surface-switcher');

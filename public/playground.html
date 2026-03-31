@@ -61,12 +61,22 @@
                   <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 </button>
               </div>
-              <button onclick="addAgent()" class="runtime-btn runtime-btn-secondary !h-8 !w-8 !rounded-lg !px-0 !py-0" title="Add agent" aria-label="Add agent">
-                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M12 5v14" />
-                  <path d="M5 12h14" />
-                </svg>
-              </button>
+              <div class="flex items-center gap-2">
+                <button id="preset-agents-btn" onclick="applyTwelveAgentPreset()" class="runtime-btn runtime-btn-secondary !h-8 !w-8 !rounded-lg !px-0 !py-0" title="Use 12-agent preset" aria-label="Use 12-agent preset">
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="4" y="4" width="6" height="6" rx="1.5" />
+                    <rect x="14" y="4" width="6" height="6" rx="1.5" />
+                    <rect x="4" y="14" width="6" height="6" rx="1.5" />
+                    <rect x="14" y="14" width="6" height="6" rx="1.5" />
+                  </svg>
+                </button>
+                <button id="add-agent-btn" onclick="addAgent()" class="runtime-btn runtime-btn-secondary !h-8 !w-8 !rounded-lg !px-0 !py-0" title="Add agent" aria-label="Add agent">
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 5v14" />
+                    <path d="M5 12h14" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -147,12 +157,12 @@
               <p class="runtime-page-kicker" style="font-size:0.58rem;letter-spacing:0.18em;">CATS RUNTIME</p>
               <h1 class="font-semibold tracking-tight text-white" style="margin-top:0.125rem;font-size:21px;line-height:1.15;">Playground</h1>
             </div>
-            <div id="status-bar" class="runtime-page-toolbar-row text-sm">
+            <div id="status-bar" class="runtime-page-toolbar-row min-w-0 flex-1 text-sm">
               <div class="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1.5">
                 <span class="text-slate-500">Tokens</span>
                 <span id="tokens-display" class="font-mono text-white">0</span>
               </div>
-              <div id="agent-statuses" class="flex flex-wrap gap-2"></div>
+              <div id="agent-statuses" class="ml-auto flex min-w-0 flex-wrap justify-end gap-2"></div>
             </div>
           </div>
         </header>
@@ -239,17 +249,18 @@ const FALLBACK_AGENT_COLORS = {
 const PROVIDER_COLORS = {
   claude:  { bg:'bg-orange-900/40',border:'border-orange-500',text:'text-orange-400',dot:'bg-orange-400' },
   codex:   { bg:'bg-emerald-900/40',border:'border-emerald-500',text:'text-emerald-400',dot:'bg-emerald-400' },
-  copilot: { bg:'bg-violet-900/40',border:'border-violet-500',text:'text-violet-400',dot:'bg-violet-400' },
-  cursor:  { bg:'bg-orange-900/40',border:'border-orange-500',text:'text-orange-400',dot:'bg-orange-400' },
   gemini:  { bg:'bg-blue-900/40',border:'border-blue-500',text:'text-blue-400',dot:'bg-blue-400' },
-  kiro:    { bg:'bg-teal-900/40',border:'border-teal-500',text:'text-teal-400',dot:'bg-teal-400' },
+  cursor:  { bg:'bg-pink-900/40',border:'border-pink-500',text:'text-pink-400',dot:'bg-pink-400' },
+  copilot: { bg:'bg-indigo-900/40',border:'border-indigo-500',text:'text-indigo-400',dot:'bg-indigo-400' },
+  opencode:{ bg:'bg-purple-900/40',border:'border-purple-500',text:'text-purple-400',dot:'bg-purple-400' },
   kilo:    { bg:'bg-rose-900/40',border:'border-rose-500',text:'text-rose-400',dot:'bg-rose-400' },
+  goose:   { bg:'bg-lime-900/40',border:'border-lime-500',text:'text-lime-400',dot:'bg-lime-400' },
+  pi:      { bg:'bg-stone-900/40',border:'border-stone-500',text:'text-stone-400',dot:'bg-stone-400' },
   auggie:  { bg:'bg-cyan-900/40',border:'border-cyan-500',text:'text-cyan-400',dot:'bg-cyan-400' },
-  opencode:{ bg:'bg-pink-900/40',border:'border-pink-500',text:'text-pink-400',dot:'bg-pink-400' },
-  pi:      { bg:'bg-stone-800/60',border:'border-stone-400',text:'text-stone-300',dot:'bg-stone-300' },
   junie:   { bg:'bg-amber-900/40',border:'border-amber-500',text:'text-amber-400',dot:'bg-amber-400' },
-  goose:   { bg:'bg-violet-900/40',border:'border-violet-500',text:'text-violet-400',dot:'bg-violet-400' },
-  ollama:  { bg:'bg-slate-800/70',border:'border-slate-500',text:'text-slate-300',dot:'bg-slate-400' },
+  kiro:    { bg:'bg-teal-900/40',border:'border-teal-500',text:'text-teal-400',dot:'bg-teal-400' },
+  ollama:  { bg:'bg-slate-900/70',border:'border-slate-500',text:'text-slate-400',dot:'bg-slate-400' },
+  openclaw:{ bg:'bg-red-900/40',border:'border-red-500',text:'text-red-400',dot:'bg-red-400' },
 };
 const AVAILABLE_TAGS = ['orchestrator','pm','researcher','designer','architect','coder','tester','reviewer','security','qa','tech_writer','marketer'];
 const ROLE_LABELS = { orchestrator:'CEO',pm:'PM',researcher:'Researcher',designer:'Designer',architect:'Architect',coder:'Coder',tester:'Tester',reviewer:'Reviewer',security:'Security',qa:'QA',tech_writer:'Tech Writer',marketer:'Marketer' };
@@ -267,9 +278,10 @@ const PROVIDER_MODELS = {
   kiro:[{value:'claude-sonnet-4.5',label:'claude-sonnet-4.5 (default)'},{value:'deepseek-3.2',label:'deepseek-3.2'}],
   goose:[{value:'chatgpt_codex/gpt-5.2-codex',label:'chatgpt_codex/gpt-5.2-codex (default)'}],
   ollama:[{value:'qwen2.5-coder:7b',label:'qwen2.5-coder:7b (default)'}],
+  openclaw:[{value:'openclaw-coder',label:'openclaw-coder (default)'},{value:'openclaw-preview',label:'openclaw-preview'}],
 };
 const PROVIDER_ADVANCED_CATALOGS = {};
-const PROVIDERS = ['claude','codex','gemini','cursor','copilot','opencode','kilo','goose','pi','auggie','junie','kiro','ollama'];
+const PROVIDERS = ['claude','codex','gemini','cursor','copilot','opencode','kilo','goose','pi','auggie','junie','kiro','ollama','openclaw'];
 function getDefaultModel(p) { return (PROVIDER_MODELS[p]||[])[0]?.value || ''; }
 
 // ============================================================
@@ -351,7 +363,9 @@ const JUNIE_TAG_PROMPTS = {
 };
 const LANG_LABELS = { en: 'English', 'zh-TW': 'Traditional Chinese' };
 
-function buildOrchestratorPrompt(agents, responseLang) {
+function buildOrchestratorPrompt(orchestrator, agents, responseLang) {
+  const selfRoles = (orchestrator?.tags||[]).filter(tag=>tag!=='orchestrator');
+  const selfRoleLabels = selfRoles.map(tag=>getTagLabel(tag));
   const hasPM = agents.some(a => !a.tags.includes('orchestrator') && a.tags.includes('pm'));
   const hasResearcher = agents.some(a => !a.tags.includes('orchestrator') && a.tags.includes('researcher'));
   const hasDesigner = agents.some(a => !a.tags.includes('orchestrator') && a.tags.includes('designer'));
@@ -363,8 +377,11 @@ function buildOrchestratorPrompt(agents, responseLang) {
   const discoveryPrefix = `${hasPM ? 'PM \u2192 ' : ''}${hasResearcher ? 'Researcher \u2192 ' : ''}${hasDesigner ? 'Designer \u2192 ' : ''}`;
   const deliverySuffix = `${hasSecurity ? ' \u2192 Security' : ''}${hasTechWriter ? ' \u2192 Tech Writer' : ''}${hasMarketer ? ' \u2192 Marketer (social post)' : ''}`;
   const parts = [
-    "You are the **CEO** of this group chat room. You are a COORDINATOR, not a worker. Your job is to read the conversation, decide who should act next, and keep the workflow moving.",
+    `You are the **CEO** of this group chat room. Your primary responsibility is orchestration: read the conversation, decide who should act next, and keep the workflow moving.${selfRoleLabels.length ? ` You also personally hold these specialist roles: ${selfRoleLabels.join(', ')}.` : ''}`,
     `## Participants\n\n- **user** (the stakeholder who gives tasks)\n${participants}`,
+    selfRoleLabels.length
+      ? `## Your Additional Roles\n\nYou are not only the CEO. You also hold: ${selfRoleLabels.join(', ')}.\n- Stay in CEO/coordinator mode by default.\n- Do NOT delegate to yourself.\n- If one of your additional roles is needed and no better participant should take it, you MAY do that work directly in your own response instead of emitting \`NEXT:\`.\n- If another participant already owns that role, prefer delegating to that participant and remain in coordination mode.`
+      : '',
     "## Delegation Contract\n\nIf any agent work is needed, your final non-empty line MUST be:\n`NEXT: AgentName1, AgentName2`\n\nRules for NEXT:\n- Put `NEXT:` on its own line.\n- Use exact participant names from the list above.\n- List agents in execution order.\n- If no delegation is needed, do NOT output `NEXT:`.\n\nOptional per-agent instructions may appear immediately above the NEXT line:\n@AgentName1 Please implement the login page.\n@AgentName2 Please review after implementation.",
     `## Workflow Principles\n\n**Never send unfinished or rejected work forward.** Read what just happened, understand the current state, then choose the next agent.\n\nQuality gates:\n- If a reviewer rejects code \u2192 route back to the coder with the specific feedback. Do NOT send rejected code to testing.\n- If a reviewer rejects tests \u2192 route back to the tester. Do NOT proceed as if tests are adequate.\n- If QA finds bugs \u2192 route back to the coder. The fix must pass review again before returning to QA.\n\nTypical flows (adapt based on which agents are available):\n- **With tester (writes test code)**:\n  ${discoveryPrefix}Architect \u2192 Coder \u2192 Tester \u2192 Reviewer \u2192 iterate if rejected${deliverySuffix}\n- **With QA (E2E validation)**:\n  ${discoveryPrefix}Architect \u2192 Coder \u2192 Reviewer \u2192 iterate until approved \u2192 QA (deploy + test) \u2192 if bugs, back to Coder${deliverySuffix}\n- **With both tester and QA**:\n  ${discoveryPrefix}Architect \u2192 Coder \u2192 Tester \u2192 Reviewer \u2192 iterate until approved \u2192 QA (deploy + E2E) \u2192 if bugs, back to Coder${deliverySuffix}\n\nThese are guidelines, not rigid rules. Use judgment based on the conversation context.`,
   ];
@@ -374,7 +391,9 @@ function buildOrchestratorPrompt(agents, responseLang) {
   if (hasSecurity) parts.push("## Security Routing\n\n- If a participant with the `security` tag exists, use that agent for auth, permissions, secrets, data exposure, trust boundaries, and abuse-risk review.\n- Security usually happens after implementation details are concrete and before final sign-off.\n- Do NOT treat Security as a replacement for Reviewer or QA.");
   if (hasTechWriter) parts.push("## Documentation Routing\n\n- If a participant with the `tech_writer` tag exists, use that agent for README updates, usage docs, migration notes, release notes, API docs, and operator-facing explanations.\n- Documentation should happen only after the relevant behavior is stable enough to describe accurately.");
   if (hasMarketer) parts.push("## Marketing Routing\n\n- If a participant with the `marketer` tag exists, use that agent for launch messaging, social posts, announcement copy, positioning summaries, and promo-ready writeups.\n- Do NOT expect the coder, reviewer, or QA to produce the final marketing copy unless no marketer exists.\n- **AUTOMATIC**: Once the product work is complete (QA passed, or final reviewer approval if no QA), you MUST automatically delegate to the Marketer as the final step \u2014 do NOT wait for the user to ask for it.\n- If the user explicitly asks for marketing copy at any point, delegate to Marketer once the product facts are sufficiently grounded.");
-  let rules = "## Rules\n\n- You MUST NOT do implementation work yourself. Delegate coding, reviewing, testing, planning, and file/command work to the appropriate agents.\n- When the user asks a brief factual question (not requiring code/file access), you may answer directly WITHOUT delegation.\n- When the task requires ANY work (coding, planning, reviewing, testing, architecture), you MUST delegate \u2014 even if you think you could do it yourself.\n";
+  let rules = "## Rules\n\n- Your default mode is orchestration and delegation.\n- When the user asks a brief factual question (not requiring code/file access), you may answer directly WITHOUT delegation.\n";
+  if (selfRoleLabels.length) rules += "- Because you also hold specialist roles, you MAY do that role's work directly when appropriate instead of delegating to yourself.\n";
+  else rules += "- When the task requires any real work (coding, planning, reviewing, testing, architecture), delegate it to the appropriate participant.\n";
   if (hasPM) rules += "- When a PM is available and the task is not trivial, delegate to the PM first unless there is a strong reason not to.\n";
   if (hasResearcher) rules += "- When a Researcher is available and the task still has missing facts or unresolved options, delegate to the Researcher before locking architecture or implementation.\n";
   if (hasDesigner) rules += "- When a Designer is available and the task affects user-facing behavior, involve the Designer before implementation is locked.\n";
@@ -550,7 +569,7 @@ class ChatRoom {
       }
     }
     for (const agent of this.agents) {
-      if (agent.tags.includes('orchestrator')) this._systemPrompts[agent.name] = buildOrchestratorPrompt(this.agents, this.responseLang);
+      if (agent.tags.includes('orchestrator')) this._systemPrompts[agent.name] = buildOrchestratorPrompt(agent, this.agents, this.responseLang);
       else if (agent.provider === 'junie') this._systemPrompts[agent.name] = composeJunieAgentPrompt(agent, this.responseLang);
       else this._systemPrompts[agent.name] = composeAgentPrompt(agent, this.responseLang);
     }
@@ -692,7 +711,10 @@ class ChatRoom {
 // ============================================================
 // UI State
 // ============================================================
-const DEFAULT_CHAT_PROMPT = '\u5e6b\u6211\u5beb\u500b\u8a08\u7b97\u6a5f\u7db2\u7ad9\u3002';
+const DEFAULT_CHAT_PROMPTS = {
+  en: 'Help me build a calculator website.',
+  'zh-TW': '\u5e6b\u6211\u5beb\u500b\u8a08\u7b97\u6a5f\u7db2\u7ad9\u3002',
+};
 let chatRoom = null;
 let agentColorMap = {};
 let totalTokens = 0;
@@ -717,6 +739,18 @@ marked.setOptions({ breaks:true, gfm:true, highlight:(code,lang)=>{
 // ============================================================
 function escapeHtml(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 function safeId(n) { return n.replace(/[^a-zA-Z0-9_-]/g,'_'); }
+function getSelectedResponseLanguage() {
+  return document.getElementById('response-lang')?.value || 'en';
+}
+function getDefaultChatPrompt(lang = getSelectedResponseLanguage()) {
+  return DEFAULT_CHAT_PROMPTS[lang] || DEFAULT_CHAT_PROMPTS.en;
+}
+function syncChatInputDefaultPrompt(force = false) {
+  const input = document.getElementById('chat-input');
+  if (!input) return;
+  const defaults = Object.values(DEFAULT_CHAT_PROMPTS);
+  if (force || !input.value.trim() || defaults.includes(input.value)) input.value = getDefaultChatPrompt();
+}
 function getRuntimeApiKey() {
   if (window.CatsUI&&typeof CatsUI.getApiKey==='function') return CatsUI.getApiKey();
   const input=document.getElementById('api-key');
@@ -743,7 +777,7 @@ function getAgentMeta(n) { return agentMetaByName[n] || {provider:'',tags:[]}; }
 function getPrimaryRoleTag(tags) { return (tags||[])[0]||''; }
 function getTagLabel(tag) { return ROLE_LABELS[tag] || tag; }
 function getRoleLabel(tags) { const t=getPrimaryRoleTag(tags); return t ? getTagLabel(t) : ''; }
-function getProviderBadgeLabel(p) { const n=String(p||'').toUpperCase(); return p==='ollama'?n:`${n}-CLI`; }
+function getProviderBadgeLabel(p) { const n=String(p||'').toUpperCase(); return (p==='ollama'||p==='openclaw')?n:`${n}-CLI`; }
 function renderRoleBadge(tags,colorClass='text-slate-300') { const l=getRoleLabel(tags); return l?`<span class="role-badge ${colorClass}" style="border-color:currentColor">${escapeHtml(l)}</span>`:''; }
 function renderProviderBadge(p,extra='') { if(!p)return''; return `<span class="provider-badge ${extra}" data-p="${escapeHtml(p)}">${escapeHtml(getProviderBadgeLabel(p))}</span>`; }
 function getAgentColor(n) {
@@ -871,9 +905,34 @@ function updateAgentStatus(agent, status) {
 // ============================================================
 // Agent form (setup)
 // ============================================================
+const MAX_AGENT_COUNT = 12;
+const TWELVE_AGENT_PRESET = [
+  { name:'Agent-1', provider:'auggie', model:getDefaultModel('auggie'), tags:['orchestrator'] },
+  { name:'Agent-2', provider:'claude', model:getDefaultModel('claude'), tags:['pm'] },
+  { name:'Agent-3', provider:'gemini', model:getDefaultModel('gemini'), tags:['researcher'] },
+  { name:'Agent-4', provider:'cursor', model:getDefaultModel('cursor'), tags:['designer'] },
+  { name:'Agent-5', provider:'codex', model:getDefaultModel('codex'), tags:['architect'] },
+  { name:'Agent-6', provider:'copilot', model:getDefaultModel('copilot'), tags:['coder'] },
+  { name:'Agent-7', provider:'opencode', model:getDefaultModel('opencode'), tags:['tester'] },
+  { name:'Agent-8', provider:'goose', model:getDefaultModel('goose'), tags:['reviewer'] },
+  { name:'Agent-9', provider:'pi', model:getDefaultModel('pi'), tags:['security'] },
+  { name:'Agent-10', provider:'junie', model:getDefaultModel('junie'), tags:['qa'] },
+  { name:'Agent-11', provider:'kiro', model:getDefaultModel('kiro'), tags:['tech_writer'] },
+  { name:'Agent-12', provider:'ollama', model:getDefaultModel('ollama'), tags:['marketer'] },
+];
 let agentCounter=0, nextAgentNumber=1;
 function syncNextAgentNumber(name){const m=/^Agent-(\d+)$/i.exec((name||'').trim());if(!m)return;const v=parseInt(m[1],10);if(Number.isFinite(v)&&v>=nextAgentNumber)nextAgentNumber=v+1;}
 function allocateAgentName(){const n=`Agent-${nextAgentNumber}`;nextAgentNumber++;return n;}
+function getAgentCount(){return document.querySelectorAll('#agents-list > div').length;}
+function updateAgentButtons(){
+  const addBtn=document.getElementById('add-agent-btn');
+  if(!addBtn)return;
+  const capped=getAgentCount()>=MAX_AGENT_COUNT;
+  addBtn.disabled=capped;
+  addBtn.setAttribute('aria-disabled',capped?'true':'false');
+  addBtn.classList.toggle('opacity-40',capped);
+  addBtn.classList.toggle('cursor-not-allowed',capped);
+}
 function getProviderAdvancedCatalog(provider){return PROVIDER_ADVANCED_CATALOGS[provider]||null;}
 function getDefaultModelChoice(provider){
   const catalog=getProviderAdvancedCatalog(provider);
@@ -969,27 +1028,59 @@ function buildTagCheckboxes(id,selectedTags=[]){return AVAILABLE_TAGS.map(tag=>{
 function refreshAllAgentModelFields(){
   document.querySelectorAll('#agents-list > div').forEach(div=>syncAgentModelField(div,{preserve:true}));
 }
+function isAgentOrchestratorSelected(div){return Boolean(div?.querySelector('.agent-tag[value="orchestrator"]:checked'));}
+function syncOrchestratorLocks(){
+  document.querySelectorAll('#agents-list > div').forEach(div=>{
+    const removeBtn=div.querySelector('.agent-remove');
+    if(!removeBtn)return;
+    const locked=isAgentOrchestratorSelected(div);
+    removeBtn.disabled=locked;
+    removeBtn.setAttribute('aria-disabled',locked?'true':'false');
+    removeBtn.title=locked?'Move CEO to another agent before removing this one':'Remove agent';
+    removeBtn.classList.toggle('opacity-40',locked);
+    removeBtn.classList.toggle('cursor-not-allowed',locked);
+    removeBtn.classList.toggle('hover:text-red-400',!locked);
+  });
+}
 
-function addAgent(name='',provider='claude',model='',tags=[],modelSelection=null) {
+function addAgent(name='',provider='claude',model='',tags=[],modelSelection=null,options={}) {
+  if(!options.allowOverflow&&getAgentCount()>=MAX_AGENT_COUNT){updateAgentButtons();return null;}
   const list=document.getElementById('agents-list'); const id=agentCounter++;
   if(!name) name=allocateAgentName(); else syncNextAgentNumber(name);
   const div=document.createElement('div'); div.id=`agent-${id}`;
   div.className='bg-slate-700/50 rounded-lg p-3 space-y-2 border border-slate-600';
-  div.innerHTML=`<div class="flex items-center justify-between"><input type="text" value="${escapeHtml(name)}" placeholder="Agent name" class="agent-name bg-transparent font-semibold text-white text-sm focus:outline-none w-2/3" /><button onclick="removeAgent(${id})" class="text-xs text-slate-400 hover:text-red-400">&times; Remove</button></div><div class="grid grid-cols-2 gap-2"><div><label class="block text-xs text-slate-400">Provider</label><select class="agent-provider w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none">${PROVIDERS.map(p=>`<option value="${p}" ${p===provider?'selected':''}>${p}</option>`).join('')}</select></div><div><label class="block text-xs text-slate-400">Model</label><div class="space-y-2"><select class="agent-model-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select><input type="text" placeholder="custom model id" class="agent-model-custom hidden w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none" /></div></div></div><div><label class="block text-xs text-slate-400 mb-1">Tags</label><div class="flex flex-wrap gap-x-3 gap-y-1 agent-tags">${buildTagCheckboxes(id,tags)}</div></div>`;
+  div.innerHTML=`<div class="flex items-center justify-between"><input type="text" value="${escapeHtml(name)}" placeholder="Agent name" class="agent-name bg-transparent font-semibold text-white text-sm focus:outline-none w-2/3" /><button onclick="removeAgent(${id})" class="agent-remove text-xs text-slate-400 hover:text-red-400" title="Remove agent">&times; Remove</button></div><div class="grid grid-cols-2 gap-2"><div><label class="block text-xs text-slate-400">Provider</label><select class="agent-provider w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none">${PROVIDERS.map(p=>`<option value="${p}" ${p===provider?'selected':''}>${p}</option>`).join('')}</select></div><div><label class="block text-xs text-slate-400">Model</label><div class="space-y-2"><select class="agent-model-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select><input type="text" placeholder="custom model id" class="agent-model-custom hidden w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none" /></div></div></div><div><label class="block text-xs text-slate-400 mb-1">Tags</label><div class="flex flex-wrap gap-x-3 gap-y-1 agent-tags">${buildTagCheckboxes(id,tags)}</div></div>`;
   list.appendChild(div);
   syncAgentModelField(div,{preserve:false,model,modelSelection});
   const pSel=div.querySelector('.agent-provider'), mSel=div.querySelector('.agent-model-choice');
   pSel.addEventListener('change',()=>{syncAgentModelField(div,{preserve:false});});
   mSel.addEventListener('change',()=>{syncAgentModelField(div,{preserve:true});});
   div.querySelectorAll('.agent-tag').forEach(cb=>{cb.addEventListener('change',()=>{
-    if(cb.value==='orchestrator'&&cb.checked) document.querySelectorAll('#agents-list .agent-tag').forEach(o=>{if(o!==cb&&o.value==='orchestrator')o.checked=false;});
+    if(cb.value==='orchestrator'&&!cb.checked){cb.checked=true;syncOrchestratorLocks();validateStartChat();return;}
+    if(cb.checked) document.querySelectorAll('#agents-list .agent-tag').forEach(o=>{if(o!==cb&&o.value===cb.value)o.checked=false;});
+    syncOrchestratorLocks();
     validateStartChat();
   });});
   div.querySelector('.agent-name').addEventListener('change',e=>syncNextAgentNumber(e.target.value));
+  syncOrchestratorLocks();
+  updateAgentButtons();
+  validateStartChat();
+  return div;
+}
+function removeAgent(id){const el=document.getElementById(`agent-${id}`);if(!el||isAgentOrchestratorSelected(el)){syncOrchestratorLocks();return;}el.remove();syncOrchestratorLocks();updateAgentButtons();validateStartChat();}
+function applyAgentPreset(preset){
+  const list=document.getElementById('agents-list');
+  list.innerHTML='';
+  agentCounter=0;
+  nextAgentNumber=1;
+  preset.forEach(agent=>addAgent(agent.name,agent.provider,agent.model||'',agent.tags,agent.modelSelection||null));
+  updateAgentButtons();
   validateStartChat();
 }
-function removeAgent(id){const el=document.getElementById(`agent-${id}`);if(el)el.remove();validateStartChat();}
-function validateStartChat(){const a=getAgents();const oc=a.filter(x=>x.tags.includes('orchestrator')).length;const v=a.length>0&&oc===1;const b=document.getElementById('btn-start-chat');b.disabled=!v;b.classList.toggle('opacity-40',!v);b.classList.toggle('cursor-not-allowed',!v);}
+function applyTwelveAgentPreset(){applyAgentPreset(TWELVE_AGENT_PRESET);}
+function hasSupportingRole(agents){return agents.some(agent=>agent.tags.some(tag=>tag!=='orchestrator'));}
+function getSelectedAgents(){return getAgents().filter(agent=>agent.tags.length>0);}
+function validateStartChat(){const a=getSelectedAgents();const oc=a.filter(x=>x.tags.includes('orchestrator')).length;const v=oc===1&&hasSupportingRole(a);const b=document.getElementById('btn-start-chat');b.disabled=!v;b.classList.toggle('opacity-40',!v);b.classList.toggle('cursor-not-allowed',!v);}
 function resetStartButton(){const b=document.getElementById('btn-start-chat');b.textContent='Start Chat';validateStartChat();}
 function getAgents(){return[...document.querySelectorAll('#agents-list > div')].map(div=>{const tags=[...div.querySelectorAll('.agent-tags input:checked')].map(cb=>cb.value);const modelState=readAgentModelState(div);return{name:div.querySelector('.agent-name').value.trim(),provider:div.querySelector('.agent-provider').value,model:modelState.model,modelSelection:modelState.modelSelection,tags};}).filter(a=>a.name);}
 
@@ -1012,22 +1103,23 @@ function switchToChatMode(agents) {
     list.appendChild(d);
   }
   for(const agent of agents){const pill=document.getElementById(`status-${safeId(agent.name)}`);if(pill)updateAgentStatus(agent.name,'idle');}
-  const input=document.getElementById('chat-input'); input.value=DEFAULT_CHAT_PROMPT; input.focus();
+  const input=document.getElementById('chat-input'); input.value=getDefaultChatPrompt(); input.focus();
 }
 
 // ============================================================
 // Actions
 // ============================================================
 async function startChat() {
-  const agentsList=getAgents();
+  const agentsList=getSelectedAgents();
   if(!agentsList.length)return;
-  if(agentsList.filter(a=>a.tags.includes('orchestrator')).length!==1)return;
+  if(agentsList.filter(a=>a.tags.includes('orchestrator')).length!==1||!hasSupportingRole(agentsList))return;
   const btn=document.getElementById('btn-start-chat');
   btn.disabled=true;btn.classList.add('opacity-40','cursor-not-allowed');btn.textContent='Starting...';
   totalTokens=0;agentColorMap={};thinkingAgents.clear();thinkingDetails={};thinkingPriorities={};streamingMessages={};
   document.getElementById('tokens-display').textContent='0';
   document.getElementById('agent-statuses').innerHTML='';
   pendingAgents=agentsList;
+  setAgentMetadata(agentsList);
   const apiKey=getRuntimeApiKey();
   if (!validateRuntimeApiKey(apiKey)) { resetStartButton(); return; }
   const workDir=document.getElementById('work-dir').value.trim();
@@ -1092,7 +1184,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeBrowseModal();
 // Role prompts modal
 // ============================================================
 const ROLE_PROMPTS = {
-  orchestrator:{label:'CEO',prompt:"You are the CEO of this group chat room. You are a coordinator, not a worker.\n\nDelegation Contract:\n- If agent work is needed, the final non-empty line must be NEXT: AgentName1, AgentName2\n- Put NEXT on its own line\n- Use exact participant names\n- Optional per-agent instructions can appear above it as @AgentName ...\n- If no delegation is needed, do not output NEXT:\n\nRules:\n- Simple factual questions: answer directly\n- For non-trivial or multi-step tasks, delegate to PM first when a PM is available\n- Tasks requiring work: delegate to the appropriate agents\n- Briefly explain your reasoning before NEXT:\n- Only delegate to existing participants\n- After agent results: either summarize for the user or delegate again\n- Do NOT delegate to yourself",agentsMd:"First action: check if AGENTS.md exists.\n- If exists: read it as source of truth\n- If NOT: continue the workflow and delegate normally"},
+  orchestrator:{label:'CEO',prompt:"You are the CEO of this group chat room. Your primary role is coordination.\n\nYou may also hold specialist roles such as Coder or PM.\n- Stay in CEO/coordinator mode by default\n- Do NOT delegate to yourself\n- If one of your own additional roles is needed and no better participant should take it, you MAY do that work directly instead of outputting NEXT:\n\nDelegation Contract:\n- If agent work is needed, the final non-empty line must be NEXT: AgentName1, AgentName2\n- Put NEXT on its own line\n- Use exact participant names\n- Optional per-agent instructions can appear above it as @AgentName ...\n- If no delegation is needed, do not output NEXT:\n\nRules:\n- Simple factual questions: answer directly\n- For non-trivial or multi-step tasks, delegate to PM first when a PM is available\n- Tasks requiring work should normally be delegated to the appropriate agents\n- Briefly explain your reasoning before NEXT:\n- Only delegate to existing participants\n- After agent results: either summarize for the user or delegate again\n- Never output NEXT with your own name",agentsMd:"First action: check if AGENTS.md exists.\n- If exists: read it as source of truth\n- If NOT: continue the workflow and delegate normally"},
   pm:{label:'PM',prompt:"You are a product manager. Your role is product definition and spec writing \u2014 not project tracking and not implementation.\n\nYour job:\n1. Clarify the real objective, target users, constraints, and success criteria\n2. Turn ambiguous requests into a concrete product spec\n3. Define scope, non-goals, user stories, requirements, edge cases, and acceptance criteria\n4. Identify open product decisions, risks, and assumptions\n5. Hand off a clear spec that the architect or coder can execute against\n\nYour primary deliverable is a product requirements/specification document in message form. Do NOT implement code yourself unless no implementation specialist exists.",agentsMd:"First action: check if AGENTS.md exists. If it exists, read it first. Do NOT create or modify AGENTS.md."},
   researcher:{label:'Researcher',prompt:"You are a product and technical researcher. Your role is discovery, evidence gathering, and ambiguity reduction before implementation.\n\nYour job:\n1. Identify what is still unknown, ambiguous, or risky\n2. Gather and synthesize relevant context from the codebase, docs, prior conversation, and available references\n3. Compare options, constraints, and tradeoffs when the right path is not yet clear\n4. Turn findings into a concise brief the PM, architect, or coder can act on\n5. Call out assumptions, missing evidence, and open questions\n\nYour deliverable is a grounded research brief in message form. Do NOT implement code yourself unless no implementation specialist exists.",agentsMd:"First action: check if AGENTS.md exists. If it exists, read it first. Do NOT create or modify AGENTS.md."},
   designer:{label:'Designer',prompt:"You are a product designer. Your role is UX, interaction design, information hierarchy, and clarity before or alongside implementation.\n\nYour job:\n1. Translate product goals into clear user flows and interface structure\n2. Identify friction, ambiguity, and unnecessary complexity in the user experience\n3. Recommend layout, hierarchy, interaction, copy, and state design improvements\n4. Highlight edge cases, empty states, and error-state behavior the team should not miss\n5. Hand off concrete UI/UX guidance the architect or coder can implement\n\nYour deliverable is a design brief or UX recommendation in message form. Do NOT implement code yourself unless no implementation specialist exists.",agentsMd:"First action: check if AGENTS.md exists. If it exists, read it first. Do NOT create or modify AGENTS.md."},
@@ -1192,6 +1284,7 @@ async function loadProviderOptions() {
 // ============================================================
 async function initApp() {
   const apiKeyInput = document.getElementById('api-key');
+  const responseLangSelect = document.getElementById('response-lang');
   const authStatus = document.getElementById('runtime-auth-status');
   const authEditor = document.getElementById('runtime-auth-editor');
   const authToggle = document.getElementById('runtime-auth-toggle');
@@ -1219,16 +1312,14 @@ async function initApp() {
   apiKeyInput.addEventListener('keydown', e => {
     if (e.key === 'Enter') refreshAuthBoundState();
   });
+  responseLangSelect?.addEventListener('change', () => {
+    syncChatInputDefaultPrompt();
+  });
   updateRuntimeAuthState();
   await loadProviderOptions();
-  addAgent('Agent-1','auggie','',['orchestrator']);
-  addAgent('Agent-2','kiro','',['pm']);
-  addAgent('Agent-3','codex','',['architect']);
-  addAgent('Agent-4','claude','',['coder']);
-  addAgent('Agent-5','cursor','',['tester']);
-  addAgent('Agent-6','copilot','',['reviewer']);
-  addAgent('Agent-7','gemini','',['qa']);
-  addAgent('Agent-8','opencode','',['marketer']);
+  addAgent('Agent-1','gemini','',['orchestrator']);
+  addAgent('Agent-2','claude','',['coder']);
+  syncChatInputDefaultPrompt(true);
 }
 void initApp();
 </script>

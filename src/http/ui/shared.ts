@@ -30,19 +30,20 @@ export const PROVIDER_BADGE_CSS = `
   letter-spacing: 0.3px;
   display: inline-block;
 }
-.provider-badge[data-p="claude"]   { background: rgba(224,145,69,0.2);  color: var(--claude, #e09145); }
-.provider-badge[data-p="codex"]    { background: rgba(34,197,94,0.2);   color: var(--codex, #22c55e); }
-.provider-badge[data-p="copilot"]  { background: rgba(163,113,247,0.2); color: var(--copilot, #a371f7); }
-.provider-badge[data-p="cursor"]   { background: rgba(249,115,22,0.2);  color: var(--cursorp, #f97316); }
-.provider-badge[data-p="gemini"]   { background: rgba(66,133,244,0.2);  color: var(--gemini, #4285f4); }
-.provider-badge[data-p="kiro"]     { background: rgba(20,184,166,0.2);  color: var(--kiro, #14b8a6); }
-.provider-badge[data-p="kilo"]     { background: rgba(251,113,133,0.2); color: var(--kilo, #fb7185); }
-.provider-badge[data-p="auggie"]   { background: rgba(6,182,212,0.2);   color: var(--auggie, #06b6d4); }
-.provider-badge[data-p="opencode"] { background: rgba(244,114,182,0.2); color: var(--opencode, #f472b6); }
-.provider-badge[data-p="pi"]       { background: rgba(168,162,158,0.2); color: var(--pi, #a8a29e); }
-.provider-badge[data-p="goose"]    { background: rgba(139,92,246,0.2);  color: var(--goose, #8b5cf6); }
-.provider-badge[data-p="junie"]    { background: rgba(252,128,29,0.2);  color: var(--junie, #fc801d); }
-.provider-badge[data-p="ollama"]   { background: rgba(100,116,139,0.2); color: #64748b; }
+.provider-badge[data-p="claude"]   { background: rgba(251,146,60,0.18);  color: var(--claude, #fb923c); }
+.provider-badge[data-p="codex"]    { background: rgba(52,211,153,0.18);  color: var(--codex, #34d399); }
+.provider-badge[data-p="gemini"]   { background: rgba(96,165,250,0.18);  color: var(--gemini, #60a5fa); }
+.provider-badge[data-p="cursor"]   { background: rgba(244,114,182,0.18); color: var(--cursorp, #f472b6); }
+.provider-badge[data-p="copilot"]  { background: rgba(129,140,248,0.18); color: var(--copilot, #818cf8); }
+.provider-badge[data-p="opencode"] { background: rgba(192,132,252,0.18); color: var(--opencode, #c084fc); }
+.provider-badge[data-p="kilo"]     { background: rgba(251,113,133,0.18); color: var(--kilo, #fb7185); }
+.provider-badge[data-p="goose"]    { background: rgba(163,230,53,0.18);  color: var(--goose, #a3e635); }
+.provider-badge[data-p="pi"]       { background: rgba(168,162,158,0.18); color: var(--pi, #a8a29e); }
+.provider-badge[data-p="auggie"]   { background: rgba(34,211,238,0.18);  color: var(--auggie, #22d3ee); }
+.provider-badge[data-p="junie"]    { background: rgba(251,191,36,0.18);  color: var(--junie, #fbbf24); }
+.provider-badge[data-p="kiro"]     { background: rgba(45,212,191,0.18);  color: var(--kiro, #2dd4bf); }
+.provider-badge[data-p="ollama"]   { background: rgba(148,163,184,0.18); color: var(--ollama, #94a3b8); }
+.provider-badge[data-p="openclaw"] { background: rgba(248,113,113,0.18); color: var(--openclaw, #f87171); }
 .status-badge {
   padding: 0.2rem 0.6rem;
   border-radius: 4px;

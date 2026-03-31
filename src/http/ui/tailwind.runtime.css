@@ -18,20 +18,21 @@
     --orange: #fb923c;
     --radius: 1rem;
     --sidebar-width: 20rem;
-    --auggie: #f97316;
-    --claude: #c084fc;
-    --codex: #60a5fa;
-    --copilot: #38bdf8;
+    --auggie: #22d3ee;
+    --claude: #fb923c;
+    --codex: #34d399;
+    --copilot: #818cf8;
     --cursor: #f472b6;
     --cursorp: #f472b6;
-    --gemini: #facc15;
-    --kiro: #4ade80;
+    --gemini: #60a5fa;
+    --kiro: #2dd4bf;
     --kilo: #fb7185;
-    --opencode: #f472b6;
-    --pi: #22d3ee;
+    --opencode: #c084fc;
+    --pi: #a8a29e;
     --goose: #a3e635;
-    --junie: #fb923c;
+    --junie: #fbbf24;
     --ollama: #94a3b8;
+    --openclaw: #f87171;
   }
 
   * {
