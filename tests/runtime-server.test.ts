@@ -363,6 +363,8 @@ describe('runtime server', () => {
       expect(html).toContain('function resolveAgentInitialRouting(provider,model=\'\',modelSelection=null){');
       expect(html).toContain('function syncAgentPresetField(div,catalog,entryId,preferredPresetId=\'\',allowDefaultPreset=true){');
       expect(html).toContain('function renderAgentModelChoice(div){');
+      expect(html).toContain("div.className=`my-1 ${c.bg} border-l-4 ${c.border} rounded-r-lg p-4 max-w-[85%]`;");
+      expect(html).toContain("div.className='my-1 flex justify-end';");
       expect(html).toContain('class="agent-card-toggle" aria-expanded="false" onclick="toggleAgentCard(');
       expect(html).toContain('<div class="agent-summary-meta agent-card-summary-row"></div>');
       expect(html).toContain('<div class="agent-summary-tags agent-card-summary-row"></div>');
@@ -372,6 +374,7 @@ describe('runtime server', () => {
       expect(html).toContain('<div class="agent-mode-group"><label class="block text-xs text-slate-400">Mode</label><select class="agent-preset-choice');
       expect(html).toContain('<div class="agent-model-manual-group hidden"><label class="agent-model-manual-label block text-xs text-slate-400">Legacy Model ID</label>');
       expect(html).toContain('title="Browse directory" aria-label="Browse directory"');
+      expect(html).toContain('>Stakeholder</span>');
       expect(html).toContain('Custom legacy model...');
       expect(html).toContain("manualLabel.textContent='Legacy Model ID';");
       expect(html).toContain("hintEl.textContent='Manual model id passthrough.';");
