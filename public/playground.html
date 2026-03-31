@@ -42,6 +42,48 @@
     .msg-content th { background: #0f172a; }
     .tag-pill { display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 9999px; border: 1px solid; opacity: 0.8; }
     .role-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 9999px; border: 1px solid; letter-spacing: 0.25px; }
+    .agent-tag-toggle { position: relative; display: inline-flex; cursor: pointer; }
+    .agent-tag-toggle input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+    .agent-tag-chip {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 9999px;
+      border: 1px solid #475569;
+      background: rgba(15, 23, 42, 0.45);
+      color: #94a3b8;
+      font-size: 0.68rem;
+      font-weight: 600;
+      line-height: 1;
+      padding: 0.32rem 0.6rem;
+      transition: border-color 140ms ease, background 140ms ease, color 140ms ease, transform 140ms ease;
+      user-select: none;
+    }
+    .agent-tag-toggle:hover .agent-tag-chip {
+      border-color: #64748b;
+      color: #e2e8f0;
+      transform: translateY(-1px);
+    }
+    .agent-tag-toggle input:focus-visible + .agent-tag-chip {
+      outline: 2px solid rgba(96, 165, 250, 0.75);
+      outline-offset: 2px;
+    }
+    .agent-tag-toggle input:checked + .agent-tag-chip {
+      border-color: #38bdf8;
+      background: rgba(14, 116, 144, 0.3);
+      color: #e0f2fe;
+      box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.2);
+    }
+    .agent-tag-toggle input[value="orchestrator"]:checked + .agent-tag-chip {
+      border-color: #f59e0b;
+      background: rgba(146, 64, 14, 0.34);
+      color: #fef3c7;
+      box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.28);
+    }
   </style>
 </head>
 <body class="runtime-shell" data-runtime-surface="__CATS_RUNTIME_SURFACE__" data-bootstrap-required="__CATS_RUNTIME_BOOTSTRAP_REQUIRED__">
@@ -725,6 +767,7 @@ let streamingMessages = {};
 let isWorking = false;
 let pendingAgents = [];
 let agentMetaByName = {};
+let agentDisplayOrder = {};
 
 // ============================================================
 // Markdown setup
@@ -773,11 +816,45 @@ function validateRuntimeApiKey(value) {
 function authSetupMessage() { return 'Enter the runtime API key above and try again.'; }
 function authAwareMessage(err, fallback) { return err&&[401,403].includes(err.statusCode) ? authSetupMessage() : fallback; }
 function setAgentMetadata(agents) { agentMetaByName = {}; for (const a of agents||[]) if (a?.name) agentMetaByName[a.name]=a; }
+function getDisplayOrderedAgents(agents) {
+  const all = [...(agents || [])];
+  return all.filter(agent => agent?.tags?.includes('orchestrator'))
+    .concat(all.filter(agent => !agent?.tags?.includes('orchestrator')));
+}
+function syncAgentDisplayOrder(agents) {
+  agentDisplayOrder = {};
+  getDisplayOrderedAgents(agents).forEach((agent, index) => {
+    if (agent?.name) agentDisplayOrder[agent.name] = index;
+  });
+}
+function reorderAgentStatusPills() {
+  const container = document.getElementById('agent-statuses');
+  if (!container) return;
+  [...container.children]
+    .sort((a, b) => {
+      const aName = a.dataset.agent || '';
+      const bName = b.dataset.agent || '';
+      const aOrder = Object.prototype.hasOwnProperty.call(agentDisplayOrder, aName)
+        ? agentDisplayOrder[aName]
+        : Number.MAX_SAFE_INTEGER;
+      const bOrder = Object.prototype.hasOwnProperty.call(agentDisplayOrder, bName)
+        ? agentDisplayOrder[bName]
+        : Number.MAX_SAFE_INTEGER;
+      return aOrder - bOrder;
+    })
+    .forEach(pill => container.appendChild(pill));
+}
 function getAgentMeta(n) { return agentMetaByName[n] || {provider:'',tags:[]}; }
 function getPrimaryRoleTag(tags) { return (tags||[])[0]||''; }
 function getTagLabel(tag) { return ROLE_LABELS[tag] || tag; }
 function getRoleLabel(tags) { const t=getPrimaryRoleTag(tags); return t ? getTagLabel(t) : ''; }
-function getProviderBadgeLabel(p) { const n=String(p||'').toUpperCase(); return (p==='ollama'||p==='openclaw')?n:`${n}-CLI`; }
+function getProviderBadgeLabel(p) {
+  const provider = String(p || '').toLowerCase();
+  const name = provider.toUpperCase();
+  if (provider === 'ollama') return `${name}-LOCAL`;
+  if (provider === 'openclaw') return `${name}-AGENT`;
+  return `${name}-CLI`;
+}
 function renderRoleBadge(tags,colorClass='text-slate-300') { const l=getRoleLabel(tags); return l?`<span class="role-badge ${colorClass}" style="border-color:currentColor">${escapeHtml(l)}</span>`:''; }
 function renderProviderBadge(p,extra='') { if(!p)return''; return `<span class="provider-badge ${extra}" data-p="${escapeHtml(p)}">${escapeHtml(getProviderBadgeLabel(p))}</span>`; }
 function getAgentColor(n) {
@@ -895,9 +972,10 @@ function renderThinkingBar() {
 function updateAgentStatus(agent, status) {
   const container=document.getElementById('agent-statuses'); const sid=safeId(agent);
   let pill=document.getElementById(`status-${sid}`); const c=getAgentColor(agent);
-  if(!pill){pill=document.createElement('div');pill.id=`status-${sid}`;pill.className='flex items-center gap-1.5 text-xs';container.appendChild(pill);}
+  if(!pill){pill=document.createElement('div');pill.id=`status-${sid}`;pill.dataset.agent=agent;pill.className='flex items-center gap-1.5 text-xs';container.appendChild(pill);}
   const sc={idle:'bg-slate-500',thinking:'bg-amber-400 animate-pulse',done:c.dot};
   pill.innerHTML=`<span class="w-1.5 h-1.5 rounded-full ${sc[status]||'bg-slate-500'}"></span><span class="${c.text}">${escapeHtml(agent)}</span><span class="text-slate-500">${status}</span>`;
+  reorderAgentStatusPills();
   const ps=document.getElementById(`part-status-${sid}`);
   if(ps) ps.className=`w-2 h-2 rounded-full ${sc[status]||'bg-slate-500'}`;
 }
@@ -907,18 +985,18 @@ function updateAgentStatus(agent, status) {
 // ============================================================
 const MAX_AGENT_COUNT = 12;
 const TWELVE_AGENT_PRESET = [
-  { name:'Agent-1', provider:'auggie', model:getDefaultModel('auggie'), tags:['orchestrator'] },
-  { name:'Agent-2', provider:'claude', model:getDefaultModel('claude'), tags:['pm'] },
-  { name:'Agent-3', provider:'gemini', model:getDefaultModel('gemini'), tags:['researcher'] },
-  { name:'Agent-4', provider:'cursor', model:getDefaultModel('cursor'), tags:['designer'] },
-  { name:'Agent-5', provider:'codex', model:getDefaultModel('codex'), tags:['architect'] },
-  { name:'Agent-6', provider:'copilot', model:getDefaultModel('copilot'), tags:['coder'] },
-  { name:'Agent-7', provider:'opencode', model:getDefaultModel('opencode'), tags:['tester'] },
-  { name:'Agent-8', provider:'goose', model:getDefaultModel('goose'), tags:['reviewer'] },
-  { name:'Agent-9', provider:'pi', model:getDefaultModel('pi'), tags:['security'] },
-  { name:'Agent-10', provider:'junie', model:getDefaultModel('junie'), tags:['qa'] },
-  { name:'Agent-11', provider:'kiro', model:getDefaultModel('kiro'), tags:['tech_writer'] },
-  { name:'Agent-12', provider:'ollama', model:getDefaultModel('ollama'), tags:['marketer'] },
+  { name:'Agent-1', provider:'gemini', model:getDefaultModel('gemini'), tags:['orchestrator'] },
+  { name:'Agent-2', provider:'cursor', model:getDefaultModel('cursor'), tags:['pm'] },
+  { name:'Agent-3', provider:'copilot', model:getDefaultModel('copilot'), tags:['researcher'] },
+  { name:'Agent-4', provider:'opencode', model:getDefaultModel('opencode'), tags:['designer'] },
+  { name:'Agent-5', provider:'kilo', model:getDefaultModel('kilo'), tags:['architect'] },
+  { name:'Agent-6', provider:'goose', model:getDefaultModel('goose'), tags:['coder'] },
+  { name:'Agent-7', provider:'pi', model:getDefaultModel('pi'), tags:['tester'] },
+  { name:'Agent-8', provider:'auggie', model:getDefaultModel('auggie'), tags:['reviewer'] },
+  { name:'Agent-9', provider:'junie', model:getDefaultModel('junie'), tags:['security'] },
+  { name:'Agent-10', provider:'kiro', model:getDefaultModel('kiro'), tags:['qa'] },
+  { name:'Agent-11', provider:'ollama', model:getDefaultModel('ollama'), tags:['tech_writer'] },
+  { name:'Agent-12', provider:'openclaw', model:getDefaultModel('openclaw'), tags:['marketer'] },
 ];
 let agentCounter=0, nextAgentNumber=1;
 function syncNextAgentNumber(name){const m=/^Agent-(\d+)$/i.exec((name||'').trim());if(!m)return;const v=parseInt(m[1],10);if(Number.isFinite(v)&&v>=nextAgentNumber)nextAgentNumber=v+1;}
@@ -1023,7 +1101,12 @@ function syncAgentModelField(div,options={}){
     customInput.value='';
   }
 }
-function buildTagCheckboxes(id,selectedTags=[]){return AVAILABLE_TAGS.map(tag=>{const ch=selectedTags.includes(tag)?'checked':'';return`<label class="flex items-center gap-1 text-xs cursor-pointer"><input type="checkbox" value="${tag}" ${ch} class="agent-tag rounded border-slate-500" /><span>${escapeHtml(getTagLabel(tag))}</span></label>`;}).join('');}
+function buildTagCheckboxes(id,selectedTags=[]){
+  return AVAILABLE_TAGS.map(tag=>{
+    const ch=selectedTags.includes(tag)?'checked':'';
+    return `<label class="agent-tag-toggle"><input type="checkbox" value="${tag}" ${ch} class="agent-tag" /><span class="agent-tag-chip">${escapeHtml(getTagLabel(tag))}</span></label>`;
+  }).join('');
+}
 
 function refreshAllAgentModelFields(){
   document.querySelectorAll('#agents-list > div').forEach(div=>syncAgentModelField(div,{preserve:true}));
@@ -1088,7 +1171,9 @@ function getAgents(){return[...document.querySelectorAll('#agents-list > div')].
 // Mode switching
 // ============================================================
 function switchToChatMode(agents) {
+  const orderedAgents = getDisplayOrderedAgents(agents);
   setAgentMetadata(agents);
+  syncAgentDisplayOrder(agents);
   document.getElementById('setup-section').classList.add('hidden');
   document.getElementById('participants-section').classList.remove('hidden');
   document.getElementById('input-area').classList.remove('hidden');
@@ -1097,12 +1182,12 @@ function switchToChatMode(agents) {
   const userDiv=document.createElement('div'); userDiv.className='flex items-center gap-2 px-2 py-1.5 rounded bg-slate-700/30';
   userDiv.innerHTML=`<span class="w-2 h-2 rounded-full bg-blue-400"></span><span class="text-sm font-medium text-blue-300">You</span><span class="tag-pill text-blue-300" style="border-color:currentColor">stakeholder</span>`;
   list.appendChild(userDiv);
-  for(const agent of agents){const c=getAgentColor(agent.name);const d=document.createElement('div');d.className='flex items-center gap-2 px-2 py-1.5 rounded bg-slate-700/30';
+  for(const agent of orderedAgents){const c=getAgentColor(agent.name);const d=document.createElement('div');d.className='flex items-center gap-2 px-2 py-1.5 rounded bg-slate-700/30';
     const tagBadges=(agent.tags||[]).map(t=>`<span class="tag-pill ${c.text}" style="border-color:currentColor">${escapeHtml(getTagLabel(t))}</span>`).join(' ');
     d.innerHTML=`<span id="part-status-${safeId(agent.name)}" class="w-2 h-2 rounded-full bg-slate-500"></span><span class="text-sm font-medium ${c.text}">${escapeHtml(agent.name)}</span>${tagBadges}${renderProviderBadge(agent.provider,'ml-auto shrink-0')}`;
     list.appendChild(d);
   }
-  for(const agent of agents){const pill=document.getElementById(`status-${safeId(agent.name)}`);if(pill)updateAgentStatus(agent.name,'idle');}
+  for(const agent of orderedAgents){const pill=document.getElementById(`status-${safeId(agent.name)}`);if(pill)updateAgentStatus(agent.name,'idle');}
   const input=document.getElementById('chat-input'); input.value=getDefaultChatPrompt(); input.focus();
 }
 
@@ -1120,6 +1205,7 @@ async function startChat() {
   document.getElementById('agent-statuses').innerHTML='';
   pendingAgents=agentsList;
   setAgentMetadata(agentsList);
+  syncAgentDisplayOrder(agentsList);
   const apiKey=getRuntimeApiKey();
   if (!validateRuntimeApiKey(apiKey)) { resetStartButton(); return; }
   const workDir=document.getElementById('work-dir').value.trim();
@@ -1143,7 +1229,7 @@ async function stopChat() {
   document.getElementById('input-area').classList.add('hidden');
   document.getElementById('setup-section').classList.remove('hidden');
   document.getElementById('chat-area').innerHTML=`<div class="runtime-empty flex-1"><div class="runtime-empty-icon">&gt;_</div><div>Set up agents to start</div></div>`;
-  totalTokens=0;agentColorMap={};agentMetaByName={};pendingAgents=[];clearStreamingState();clearAllThinking();setWorking(false);
+  totalTokens=0;agentColorMap={};agentMetaByName={};agentDisplayOrder={};pendingAgents=[];clearStreamingState();clearAllThinking();setWorking(false);
   document.getElementById('tokens-display').textContent='0';
   document.getElementById('agent-statuses').innerHTML='';
   resetStartButton();
@@ -1317,8 +1403,8 @@ async function initApp() {
   });
   updateRuntimeAuthState();
   await loadProviderOptions();
-  addAgent('Agent-1','gemini','',['orchestrator']);
-  addAgent('Agent-2','claude','',['coder']);
+  addAgent('Agent-1','claude','',['orchestrator']);
+  addAgent('Agent-2','codex','',['coder']);
   syncChatInputDefaultPrompt(true);
 }
 void initApp();
