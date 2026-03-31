@@ -1823,8 +1823,7 @@ async function deleteNativeSessionState(
   try {
     if (session.providerName === 'cursor') {
       const cursorNative = getCursorNative(ctx, session.providerInstanceId);
-      const deleted = await cursorNative.deleteSession(session.cwd, session.providerSessionId);
-      if (!deleted) return false;
+      await cursorNative.deleteSession(session.cwd, session.providerSessionId);
       const remaining = await cursorNative.listSessions(
         session.cwd,
         { startIfNeeded: false },
@@ -1834,8 +1833,7 @@ async function deleteNativeSessionState(
 
     if (session.providerName === 'kiro') {
       const kiroNative = getKiroNative(ctx, session.providerInstanceId);
-      const deleted = await kiroNative.deleteSession(session.cwd, session.providerSessionId);
-      if (!deleted) return false;
+      await kiroNative.deleteSession(session.cwd, session.providerSessionId);
       const remaining = await kiroNative.listSessions(
         session.cwd,
         { startIfNeeded: false },
@@ -1850,16 +1848,14 @@ async function deleteNativeSessionState(
 
     if (session.providerName === 'opencode') {
       const opencodeNative = getOpencodeNative(ctx, session.providerInstanceId);
-      const deleted = await opencodeNative.deleteSession(session.cwd, session.providerSessionId);
-      if (!deleted) return false;
+      await opencodeNative.deleteSession(session.cwd, session.providerSessionId);
       const remaining = await opencodeNative.getSession(session.cwd, session.providerSessionId);
       return remaining == null;
     }
 
     if (session.providerName === 'kilo') {
       const kiloNative = getKiloNative(ctx, session.providerInstanceId);
-      const deleted = await kiloNative.deleteSession(session.cwd, session.providerSessionId);
-      if (!deleted) return false;
+      await kiloNative.deleteSession(session.cwd, session.providerSessionId);
       const remaining = await kiloNative.getSession(session.cwd, session.providerSessionId);
       return remaining == null;
     }

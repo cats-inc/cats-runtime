@@ -214,6 +214,27 @@ describe('OpenCode native session management', () => {
     expect(registry.get(session!.id)).toBeUndefined();
   });
 
+  it('deletes OpenCode sessions that are already gone even when native delete returns false', async () => {
+    const session = registry.upsertDiscovered('oc-gone', {
+      providerName: 'opencode',
+      cwd: 'C:/repo',
+      summary: 'Existing OpenCode Session',
+      messageCount: 1,
+    });
+    vi.mocked(opencodeNative.deleteSession).mockResolvedValue(false);
+    vi.mocked(opencodeNative.getSession).mockResolvedValue(null);
+
+    const res = await app.request(`/sessions/${session!.id}`, {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.status).toBe('deleted');
+    expect(body.nativeDeleted).toBe(true);
+    expect(registry.get(session!.id)).toBeUndefined();
+  });
+
   it('deletes stale OpenCode sessions even when their saved instance is no longer configured', async () => {
     const config = makeConfig();
     config.providerDefaultInstances = { opencode: 'docker-dev' };

@@ -238,6 +238,27 @@ describe('Kilo native session management', () => {
     expect(registry.get(session!.id)).toBeUndefined();
   });
 
+  it('deletes Kilo sessions that are already gone even when native delete returns false', async () => {
+    const session = registry.upsertDiscovered('kilo-gone', {
+      providerName: 'kilo',
+      cwd: 'C:/repo',
+      summary: 'Existing Kilo Session',
+      messageCount: 1,
+    });
+    vi.mocked(kiloNative.deleteSession).mockResolvedValue(false);
+    vi.mocked(kiloNative.getSession).mockResolvedValue(null);
+
+    const res = await app.request(`/sessions/${session!.id}`, {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.status).toBe('deleted');
+    expect(body.nativeDeleted).toBe(true);
+    expect(registry.get(session!.id)).toBeUndefined();
+  });
+
   it('deletes stale Kilo sessions even when their saved instance is no longer configured', async () => {
     const config = makeConfig();
     config.providerDefaultInstances = { kilo: 'docker-dev' };

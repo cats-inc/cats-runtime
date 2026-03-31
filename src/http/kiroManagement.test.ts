@@ -205,6 +205,27 @@ describe('Kiro native session management', () => {
     expect(registry.get(session!.id)).toBeUndefined();
   });
 
+  it('deletes Kiro sessions that are already gone even when native delete returns false', async () => {
+    const session = registry.upsertDiscovered('kiro-gone', {
+      providerName: 'kiro',
+      cwd: 'C:/repo',
+      summary: 'Existing Kiro Session',
+      messageCount: 1,
+    });
+    vi.mocked(kiroNative.deleteSession).mockResolvedValue(false);
+    vi.mocked(kiroNative.listSessions).mockResolvedValue([]);
+
+    const res = await app.request(`/sessions/${session!.id}`, {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.status).toBe('deleted');
+    expect(body.nativeDeleted).toBe(true);
+    expect(registry.get(session!.id)).toBeUndefined();
+  });
+
   it('discovers existing Kiro sessions for a workspace', async () => {
     vi.mocked(kiroNative.listSessions).mockResolvedValue([
       {

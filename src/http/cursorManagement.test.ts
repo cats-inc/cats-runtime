@@ -224,6 +224,14 @@ describe('Cursor native session management', () => {
       messageCount: 1,
     });
     vi.mocked(cursorNative.deleteSession).mockResolvedValue(false);
+    vi.mocked(cursorNative.listSessions).mockResolvedValue([
+      {
+        providerSessionId: 'cursor-stuck',
+        cwd: 'C:/repo',
+        summary: 'Still here',
+        messageCount: 1,
+      },
+    ]);
 
     const res = await app.request(`/sessions/${session!.id}`, {
       method: 'DELETE',
@@ -236,6 +244,27 @@ describe('Cursor native session management', () => {
     expect(body.nativeDeleted).toBe(false);
     // Session kept in registry — not removed
     expect(registry.get(session!.id)).toBeDefined();
+  });
+
+  it('deletes Cursor sessions that are already gone even when native delete returns false', async () => {
+    const session = registry.upsertDiscovered('cursor-gone', {
+      providerName: 'cursor',
+      cwd: 'C:/repo',
+      summary: 'Untitled Session',
+      messageCount: 1,
+    });
+    vi.mocked(cursorNative.deleteSession).mockResolvedValue(false);
+    vi.mocked(cursorNative.listSessions).mockResolvedValue([]);
+
+    const res = await app.request(`/sessions/${session!.id}`, {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.status).toBe('deleted');
+    expect(body.nativeDeleted).toBe(true);
+    expect(registry.get(session!.id)).toBeUndefined();
   });
 
   it('retains session when Cursor deletion claims success but the session is still discoverable', async () => {
