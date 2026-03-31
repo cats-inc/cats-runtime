@@ -165,6 +165,78 @@ class FailingOpenClawSocket extends EventTarget {
   }
 }
 
+class RejectNonceOpenClawSocket extends EventTarget {
+  readyState = WebSocket.CONNECTING;
+  readonly connectParams: Array<Record<string, unknown>> = [];
+
+  constructor() {
+    super();
+    queueMicrotask(() => {
+      this.readyState = WebSocket.OPEN;
+      this.dispatchEvent(new Event('open'));
+      this.emitFrame({
+        type: 'event',
+        event: 'connect.challenge',
+        payload: { nonce: 'nonce-1' },
+      });
+    });
+  }
+
+  send(data: string | ArrayBufferLike | Blob | ArrayBufferView): void {
+    const frame = JSON.parse(String(data)) as Record<string, unknown>;
+    const method = typeof frame.method === 'string' ? frame.method : '';
+
+    if (method === 'connect') {
+      const params = (frame.params ?? {}) as Record<string, unknown>;
+      this.connectParams.push(params);
+      if (typeof params.nonce === 'string') {
+        this.emitFrame({
+          type: 'res',
+          id: frame.id,
+          ok: false,
+          error: {
+            message: "invalid connect params: at root: unexpected property 'nonce'",
+          },
+        });
+        return;
+      }
+
+      this.emitFrame({
+        type: 'res',
+        id: frame.id,
+        ok: true,
+        payload: { protocol: 3 },
+      });
+      return;
+    }
+
+    if (method === 'agent') {
+      this.emitFrame({
+        type: 'res',
+        id: frame.id,
+        ok: true,
+        payload: {
+          status: 'ok',
+          runId: 'run-fallback',
+          sessionKey: 'probe-session',
+          summary: 'gateway done without nonce',
+        },
+      });
+    }
+  }
+
+  close(): void {
+    this.readyState = WebSocket.CLOSED;
+    this.dispatchEvent(new Event('close'));
+  }
+
+  private emitFrame(frame: unknown): void {
+    this.dispatchEvent(new MessageEvent('message', {
+      data: JSON.stringify(frame),
+    }));
+  }
+}
+
 describe('OpenClawAdapter', () => {
   it('returns an unavailable probe result when the gateway closes before open without crashing the process', async () => {
     const adapter = new OpenClawAdapter({
@@ -239,5 +311,38 @@ describe('OpenClawAdapter', () => {
     expect(bundle.summary.unknownEventTypes).toEqual({
       mystery: 1,
     });
+  });
+
+  it('retries connect without nonce when newer gateway schemas reject the nonce field', async () => {
+    let socket: RejectNonceOpenClawSocket | null = null;
+    const adapter = new OpenClawAdapter({
+      webSocketFactory: () => {
+        socket = new RejectNonceOpenClawSocket();
+        return socket as unknown as WebSocket;
+      },
+    });
+
+    const events = [];
+    for await (const event of adapter.invoke({
+      sessionId: 'runtime-session',
+      sessionKey: 'probe-session',
+      providerName: 'openclaw',
+      instance: createInstance(),
+      turn: {
+        message: 'Probe OpenClaw',
+      },
+      signal: new AbortController().signal,
+    })) {
+      events.push(event);
+    }
+
+    expect(events).toEqual([
+      expect.objectContaining({ type: 'init', providerSessionId: 'probe-session' }),
+      expect.objectContaining({ type: 'result', summary: 'gateway done without nonce' }),
+    ]);
+    expect(socket?.connectParams).toEqual([
+      expect.objectContaining({ nonce: 'nonce-1' }),
+      expect.not.objectContaining({ nonce: expect.anything() }),
+    ]);
   });
 });

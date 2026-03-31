@@ -526,6 +526,13 @@ function parseGatewayEffectiveToolCatalog(payload: unknown): AgentAdapterToolCat
   };
 }
 
+function shouldRetryConnectWithoutNonce(error: Error): boolean {
+  const message = error.message.toLowerCase();
+  return message.includes("unexpected property 'nonce'")
+    || message.includes('unexpected property "nonce"')
+    || message.includes('additional property nonce');
+}
+
 class GatewayWsClient {
   private readonly pending = new Map<string, PendingRequest>();
   private challengeResolve!: (nonce: string) => void;
@@ -603,10 +610,18 @@ class GatewayWsClient {
       'OpenClaw connect challenge timeout',
     );
 
-    return this.request('connect', {
-      ...connectParams,
-      nonce,
-    }, DEFAULT_CONNECT_TIMEOUT_MS);
+    try {
+      return await this.request('connect', {
+        ...connectParams,
+        nonce,
+      }, DEFAULT_CONNECT_TIMEOUT_MS);
+    } catch (error) {
+      if (!(error instanceof Error) || !shouldRetryConnectWithoutNonce(error)) {
+        throw error;
+      }
+
+      return this.request('connect', connectParams, DEFAULT_CONNECT_TIMEOUT_MS);
+    }
   }
 
   async request<T>(

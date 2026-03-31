@@ -133,7 +133,7 @@ backends:
             command: gemini
             runner: auto
             sessions_dir: ~/.gemini/tmp
-            timeout_ms: 60000
+            timeout_ms: 120000
 
       cursor:
         instances:
@@ -150,6 +150,7 @@ backends:
             command: copilot
             runner: auto
             sessions_dir: ~/.copilot/session-state
+            timeout_ms: 60000
 
       opencode:
         instances:
