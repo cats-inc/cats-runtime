@@ -315,7 +315,11 @@ describe('runtime server', () => {
       expect(html).toContain('Playground');
       expect(html).not.toContain('Playground Shell');
       expect(html).toContain('CATS RUNTIME');
-      expect(html).toContain('The CEO will coordinate the team');
+      expect(html).toContain('Set up agents to start');
+      expect(html).toContain('Researcher');
+      expect(html).toContain('Designer');
+      expect(html).toContain('Security');
+      expect(html).toContain('Tech Writer');
       expect(html).toContain(
         '<header class="runtime-page-header" style="padding-top:0.75rem;padding-bottom:0.75rem;">',
       );
