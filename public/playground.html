@@ -984,6 +984,7 @@ function updateAgentStatus(agent, status) {
 // Agent form (setup)
 // ============================================================
 const MAX_AGENT_COUNT = 12;
+const CUSTOM_AGENT_MODEL_VALUE = '__custom_legacy_model__';
 const TWELVE_AGENT_PRESET = [
   { name:'Agent-1', provider:'gemini', model:getDefaultModel('gemini'), tags:['orchestrator'] },
   { name:'Agent-2', provider:'cursor', model:getDefaultModel('cursor'), tags:['pm'] },
@@ -1012,94 +1013,244 @@ function updateAgentButtons(){
   addBtn.classList.toggle('cursor-not-allowed',capped);
 }
 function getProviderAdvancedCatalog(provider){return PROVIDER_ADVANCED_CATALOGS[provider]||null;}
-function getDefaultModelChoice(provider){
-  const catalog=getProviderAdvancedCatalog(provider);
-  if(catalog&&window.CatsUI?.getAdvancedCatalogDefaultChoice){
-    return window.CatsUI.getAdvancedCatalogDefaultChoice(catalog)||'custom';
-  }
-  const fallback=(PROVIDER_MODELS[provider]||[])[0]?.value||'';
-  return fallback?`legacy:${fallback}`:'custom';
+function listAgentCatalogEntries(catalog){
+  return window.CatsUI?.listAdvancedCatalogEntries
+    ? window.CatsUI.listAdvancedCatalogEntries(catalog)
+    : (Array.isArray(catalog?.entries) ? catalog.entries.filter(entry=>entry&&entry.id) : []);
 }
-function findAdvancedCatalogEntryChoice(catalog,model){
-  const target=String(model||'').trim();
-  if(!target)return null;
-  const entries=Array.isArray(catalog?.entries)?catalog.entries:[];
-  const match=entries.find(entry=>entry?.id===target);
-  return match?.id?`entry:${match.id}`:null;
+function findAgentCatalogEntry(catalog,entryId){
+  return listAgentCatalogEntries(catalog).find(entry=>entry.id===entryId)||null;
 }
-function getInitialAgentModelChoice(provider,model='',modelSelection=null){
-  const catalog=getProviderAdvancedCatalog(provider);
-  if(catalog&&window.CatsUI){
-    if(modelSelection&&typeof modelSelection==='object'){
-      if(modelSelection.entryMode==='explicit'&&modelSelection.entryId){
-        return `entry:${modelSelection.entryId}`;
-      }
-      if(modelSelection.presetId){
-        return `preset:${modelSelection.presetId}`;
-      }
-      return getDefaultModelChoice(provider);
-    }
-    if(model){
-      return findAdvancedCatalogEntryChoice(catalog,model)||'custom';
-    }
-    return getDefaultModelChoice(provider);
-  }
-  if(model){
-    const fallback=(PROVIDER_MODELS[provider]||[]).find(entry=>entry.value===model);
-    return fallback?`legacy:${fallback.value}`:'custom';
-  }
-  return getDefaultModelChoice(provider);
+function listAgentApplicablePresets(catalog,entryId){
+  return window.CatsUI?.listApplicableAdvancedPresets
+    ? window.CatsUI.listApplicableAdvancedPresets(catalog,entryId)
+    : [];
 }
-function buildModelOptions(provider,selected=''){
-  const catalog=getProviderAdvancedCatalog(provider);
-  if(catalog&&window.CatsUI?.getAdvancedCatalogChoices){
-    return window.CatsUI.getAdvancedCatalogChoices(catalog)
-      .map(choice=>`<option value="${choice.id}" ${choice.id===selected?'selected':''}>${escapeHtml(choice.label)}</option>`)
-      .join('');
+function getAgentDefaultEntryId(catalog,entries){
+  if(window.CatsUI?.getAdvancedCatalogDefaultEntryId){
+    return window.CatsUI.getAdvancedCatalogDefaultEntryId(catalog)||'';
   }
-  const legacyOptions=(PROVIDER_MODELS[provider]||[])
-    .map(m=>`<option value="legacy:${m.value}" ${`legacy:${m.value}`===selected?'selected':''}>${escapeHtml(m.label)}</option>`)
+  return entries.find(entry=>entry.default)?.id||entries[0]?.id||'';
+}
+function getAgentDefaultPresetId(catalog,entryId,presets){
+  if(!entryId||!presets.length)return'';
+  if(window.CatsUI?.getAdvancedCatalogDefaultPresetId){
+    return window.CatsUI.getAdvancedCatalogDefaultPresetId(catalog,entryId)||'';
+  }
+  return '';
+}
+function renderAgentRoutingSelectOptions(selectEl,options,selectedValue){
+  if(!selectEl)return'';
+  selectEl.innerHTML=options
+    .map(option=>`<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`)
     .join('');
-  return `${legacyOptions}<option value="custom" ${selected==='custom'?'selected':''}>Custom legacy model</option>`;
+  selectEl.disabled=options.length===0;
+  const nextValue=options.some(option=>option.value===selectedValue)
+    ? selectedValue
+    : (options[0]?.value||'');
+  selectEl.value=nextValue;
+  return nextValue;
 }
 function optionExists(select,value){return[...select.options].some(option=>option.value===value);}
+function resolveAgentInitialRouting(provider,model='',modelSelection=null){
+  const catalog=getProviderAdvancedCatalog(provider);
+  const entries=listAgentCatalogEntries(catalog);
+  if(!catalog||entries.length===0){
+    return { entryId:'', presetId:'', legacyModel:model||'' };
+  }
+  const entryIds=entries.map(entry=>entry.id);
+  let entryId='';
+  let presetId='';
+  if(modelSelection&&typeof modelSelection==='object'){
+    if(modelSelection.entryMode==='explicit'&&modelSelection.entryId&&entryIds.includes(modelSelection.entryId)){
+      entryId=modelSelection.entryId;
+      presetId=modelSelection.presetId||'';
+    } else if(modelSelection.presetId&&window.CatsUI?.resolveAdvancedCatalogChoice){
+      const resolved=window.CatsUI.resolveAdvancedCatalogChoice(catalog,`preset:${modelSelection.presetId}`);
+      if(resolved?.entryId&&entryIds.includes(resolved.entryId)){
+        entryId=resolved.entryId;
+        presetId=modelSelection.presetId||'';
+      }
+    }
+  }
+  if(!entryId&&model&&entryIds.includes(model)){
+    entryId=model;
+  }
+  if(!entryId&&!model&&!modelSelection){
+    entryId=getAgentDefaultEntryId(catalog,entries);
+  }
+  if(!entryId){
+    return { entryId:CUSTOM_AGENT_MODEL_VALUE, presetId:'', legacyModel:model||'' };
+  }
+  const presets=listAgentApplicablePresets(catalog,entryId);
+  if(presetId&&!presets.some(preset=>preset.id===presetId)){
+    presetId='';
+  }
+  if(!presetId&&!model&&!modelSelection){
+    presetId=getAgentDefaultPresetId(catalog,entryId,presets);
+  }
+  return { entryId, presetId, legacyModel:'' };
+}
 function readAgentModelState(div){
   const provider=div.querySelector('.agent-provider')?.value||'';
-  const choiceId=div.querySelector('.agent-model-choice')?.value||'custom';
+  const entryId=div.querySelector('.agent-entry-choice')?.value||'';
+  const presetId=div.querySelector('.agent-preset-choice')?.value||'';
   const customInput=div.querySelector('.agent-model-custom');
   const customModel=customInput?.value.trim()||'';
   const catalog=getProviderAdvancedCatalog(provider);
-  if(catalog&&window.CatsUI?.resolveAdvancedCatalogChoice){
-    const resolved=window.CatsUI.resolveAdvancedCatalogChoice(catalog,choiceId);
-    if(resolved&&resolved.kind==='structured'){
-      return { model:'', modelSelection:JSON.parse(JSON.stringify(resolved.modelSelection||{})) };
+  if(catalog&&entryId&&entryId!==CUSTOM_AGENT_MODEL_VALUE){
+    const modelSelection={ entryMode:'explicit', entryId };
+    if(presetId){
+      modelSelection.presetId=presetId;
     }
-    return { model:customModel, modelSelection:null };
-  }
-  if(choiceId.startsWith('legacy:')){
-    return { model:choiceId.slice('legacy:'.length), modelSelection:null };
+    return { model:'', modelSelection };
   }
   return { model:customModel, modelSelection:null };
 }
+function syncAgentPresetField(div,catalog,entryId,preferredPresetId='',allowDefaultPreset=true){
+  const presetGroup=div.querySelector('.agent-mode-group');
+  const presetEl=div.querySelector('.agent-preset-choice');
+  const staticLabelEl=div.querySelector('.agent-preset-static-label');
+  if(!presetGroup||!presetEl||!staticLabelEl)return'';
+
+  staticLabelEl.classList.add('hidden');
+  staticLabelEl.textContent='';
+  presetEl.classList.remove('hidden');
+
+  if(!catalog||!entryId||entryId===CUSTOM_AGENT_MODEL_VALUE){
+    renderAgentRoutingSelectOptions(presetEl,[], '');
+    presetEl.disabled=true;
+    presetGroup.classList.add('hidden');
+    return '';
+  }
+
+  const presets=listAgentApplicablePresets(catalog,entryId);
+  presetGroup.classList.remove('hidden');
+  if(presets.length===0){
+    renderAgentRoutingSelectOptions(presetEl,[{ value:'', label:'Standard only' }],'');
+    presetEl.disabled=true;
+    return '';
+  }
+
+  const presetOptions=[
+    { value:'', label:'Standard' },
+    ...presets.map(preset=>({ value:preset.id, label:preset.label||preset.id })),
+  ];
+  const nextValue=renderAgentRoutingSelectOptions(
+    presetEl,
+    presetOptions,
+    preferredPresetId&&presetOptions.some(option=>option.value===preferredPresetId)
+      ? preferredPresetId
+      : (allowDefaultPreset ? getAgentDefaultPresetId(catalog,entryId,presets) : ''),
+  );
+  presetEl.disabled=false;
+  return nextValue;
+}
+function renderAgentModelChoice(div){
+  const provider=div.querySelector('.agent-provider')?.value||'';
+  const catalog=getProviderAdvancedCatalog(provider);
+  const entryEl=div.querySelector('.agent-entry-choice');
+  const entryGroup=div.querySelector('.agent-entry-group');
+  const presetEl=div.querySelector('.agent-preset-choice');
+  const manualGroup=div.querySelector('.agent-model-manual-group');
+  const manualLabel=div.querySelector('.agent-model-manual-label');
+  const manualInput=div.querySelector('.agent-model-custom');
+  const hintEl=div.querySelector('.agent-model-hint');
+  if(!entryEl||!entryGroup||!presetEl||!manualGroup||!manualLabel||!manualInput||!hintEl)return;
+
+  const entryId=entryEl.value||'';
+  if(!catalog||entryGroup.classList.contains('hidden')){
+    manualGroup.classList.remove('hidden');
+    manualLabel.textContent='Model ID';
+    hintEl.textContent='Enter a model id manually.';
+    return;
+  }
+
+  if(!entryId||entryId===CUSTOM_AGENT_MODEL_VALUE){
+    manualGroup.classList.remove('hidden');
+    manualLabel.textContent='Legacy Model ID';
+    hintEl.textContent='Manual model id passthrough.';
+    return;
+  }
+
+  manualGroup.classList.add('hidden');
+  const entry=findAgentCatalogEntry(catalog,entryId);
+  const presetId=presetEl.value||'';
+  const preset=presetId
+    ? listAgentApplicablePresets(catalog,entryId).find(item=>item.id===presetId)||null
+    : null;
+  const bits=[];
+  if(entry) bits.push(entry.label||entry.id);
+  bits.push(preset?.label||'Standard');
+  hintEl.textContent=bits.join(' · ')||'Advanced catalog selection';
+}
 function syncAgentModelField(div,options={}){
   const provider=div.querySelector('.agent-provider')?.value||'';
-  const select=div.querySelector('.agent-model-choice');
+  const entryGroup=div.querySelector('.agent-entry-group');
+  const select=div.querySelector('.agent-entry-choice');
+  const presetGroup=div.querySelector('.agent-mode-group');
+  const presetEl=div.querySelector('.agent-preset-choice');
+  const staticLabelEl=div.querySelector('.agent-preset-static-label');
+  const manualGroup=div.querySelector('.agent-model-manual-group');
   const customInput=div.querySelector('.agent-model-custom');
-  if(!select||!customInput)return;
+  const hintEl=div.querySelector('.agent-model-hint');
+  const manualLabel=div.querySelector('.agent-model-manual-label');
+  if(!entryGroup||!select||!presetGroup||!presetEl||!staticLabelEl||!manualGroup||!customInput||!hintEl||!manualLabel)return;
   const preserveCurrent=options.preserve!==false;
   const currentState=preserveCurrent?readAgentModelState(div):{ model:'', modelSelection:null };
   const model=Object.prototype.hasOwnProperty.call(options,'model')?options.model:currentState.model;
   const modelSelection=Object.prototype.hasOwnProperty.call(options,'modelSelection')?options.modelSelection:currentState.modelSelection;
-  const nextChoice=getInitialAgentModelChoice(provider,model,modelSelection);
-  select.innerHTML=buildModelOptions(provider,nextChoice);
-  select.value=optionExists(select,nextChoice)?nextChoice:(select.options[0]?.value||'custom');
-  const shouldShowCustom=select.value==='custom';
-  customInput.classList.toggle('hidden',!shouldShowCustom);
-  if(shouldShowCustom){
+  const catalog=getProviderAdvancedCatalog(provider);
+  const entries=listAgentCatalogEntries(catalog);
+
+  if(!catalog||entries.length===0){
+    entryGroup.classList.add('hidden');
+    presetGroup.classList.add('hidden');
+    renderAgentRoutingSelectOptions(select,[], '');
+    renderAgentRoutingSelectOptions(presetEl,[], '');
+    staticLabelEl.classList.add('hidden');
+    staticLabelEl.textContent='';
+    manualGroup.classList.remove('hidden');
+    manualLabel.textContent='Model ID';
     customInput.value=model||customInput.value||'';
-  } else if(options.preserve===false) {
-    customInput.value='';
+    hintEl.textContent='Enter a model id manually.';
+    return;
   }
+
+  entryGroup.classList.remove('hidden');
+  const initial=resolveAgentInitialRouting(provider,model,modelSelection);
+  const entryOptions=[
+    ...entries.map(entry=>({ value:entry.id, label:entry.label||entry.id })),
+    { value:CUSTOM_AGENT_MODEL_VALUE, label:'Custom legacy model...' },
+  ];
+  const defaultEntryId=getAgentDefaultEntryId(catalog,entries)||CUSTOM_AGENT_MODEL_VALUE;
+  const nextEntryId=renderAgentRoutingSelectOptions(
+    select,
+    entryOptions,
+    initial.entryId&&entryOptions.some(option=>option.value===initial.entryId)
+      ? initial.entryId
+      : defaultEntryId,
+  );
+
+  if(!nextEntryId||nextEntryId===CUSTOM_AGENT_MODEL_VALUE){
+    syncAgentPresetField(div,catalog,'','',false);
+    manualGroup.classList.remove('hidden');
+    manualLabel.textContent='Legacy Model ID';
+    customInput.value=initial.legacyModel||model||customInput.value||'';
+    hintEl.textContent='Manual model id passthrough.';
+    return;
+  }
+
+  customInput.value='';
+  manualGroup.classList.add('hidden');
+  syncAgentPresetField(
+    div,
+    catalog,
+    nextEntryId,
+    initial.presetId||'',
+    options.allowDefaultPreset!==false,
+  );
+  renderAgentModelChoice(div);
 }
 function buildTagCheckboxes(id,selectedTags=[]){
   return AVAILABLE_TAGS.map(tag=>{
@@ -1132,12 +1283,17 @@ function addAgent(name='',provider='claude',model='',tags=[],modelSelection=null
   if(!name) name=allocateAgentName(); else syncNextAgentNumber(name);
   const div=document.createElement('div'); div.id=`agent-${id}`;
   div.className='bg-slate-700/50 rounded-lg p-3 space-y-2 border border-slate-600';
-  div.innerHTML=`<div class="flex items-center justify-between"><input type="text" value="${escapeHtml(name)}" placeholder="Agent name" class="agent-name bg-transparent font-semibold text-white text-sm focus:outline-none w-2/3" /><button onclick="removeAgent(${id})" class="agent-remove text-xs text-slate-400 hover:text-red-400" title="Remove agent">&times; Remove</button></div><div class="grid grid-cols-2 gap-2"><div><label class="block text-xs text-slate-400">Provider</label><select class="agent-provider w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none">${PROVIDERS.map(p=>`<option value="${p}" ${p===provider?'selected':''}>${p}</option>`).join('')}</select></div><div><label class="block text-xs text-slate-400">Model</label><div class="space-y-2"><select class="agent-model-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select><input type="text" placeholder="custom model id" class="agent-model-custom hidden w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none" /></div></div></div><div><label class="block text-xs text-slate-400 mb-1">Tags</label><div class="flex flex-wrap gap-x-3 gap-y-1 agent-tags">${buildTagCheckboxes(id,tags)}</div></div>`;
+  div.innerHTML=`<div class="flex items-center justify-between"><input type="text" value="${escapeHtml(name)}" placeholder="Agent name" class="agent-name bg-transparent font-semibold text-white text-sm focus:outline-none w-2/3" /><button onclick="removeAgent(${id})" class="agent-remove text-xs text-slate-400 hover:text-red-400" title="Remove agent">&times; Remove</button></div><div class="grid grid-cols-2 gap-2"><div><label class="block text-xs text-slate-400">Provider</label><select class="agent-provider w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none">${PROVIDERS.map(p=>`<option value="${p}" ${p===provider?'selected':''}>${p}</option>`).join('')}</select></div><div class="agent-entry-group"><label class="block text-xs text-slate-400">Model</label><select class="agent-entry-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select></div></div><div class="agent-mode-group"><label class="block text-xs text-slate-400">Mode</label><select class="agent-preset-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select><div class="agent-preset-static-label runtime-input hidden !py-2 text-xs text-slate-500"></div></div><div class="agent-model-manual-group hidden"><label class="agent-model-manual-label block text-xs text-slate-400">Legacy Model ID</label><input type="text" placeholder="custom model id" class="agent-model-custom w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none" /></div><p class="agent-model-hint text-[11px] leading-4 text-slate-500"></p><div><label class="block text-xs text-slate-400 mb-1">Tags</label><div class="flex flex-wrap gap-x-3 gap-y-1 agent-tags">${buildTagCheckboxes(id,tags)}</div></div>`;
   list.appendChild(div);
   syncAgentModelField(div,{preserve:false,model,modelSelection});
-  const pSel=div.querySelector('.agent-provider'), mSel=div.querySelector('.agent-model-choice');
+  const pSel=div.querySelector('.agent-provider'), entrySel=div.querySelector('.agent-entry-choice'), presetSel=div.querySelector('.agent-preset-choice');
   pSel.addEventListener('change',()=>{syncAgentModelField(div,{preserve:false});});
-  mSel.addEventListener('change',()=>{syncAgentModelField(div,{preserve:true});});
+  entrySel.addEventListener('change',()=>{
+    const providerName=div.querySelector('.agent-provider')?.value||'';
+    syncAgentPresetField(div,getProviderAdvancedCatalog(providerName),entrySel.value||'','',false);
+    renderAgentModelChoice(div);
+  });
+  presetSel.addEventListener('change',()=>{renderAgentModelChoice(div);});
   div.querySelectorAll('.agent-tag').forEach(cb=>{cb.addEventListener('change',()=>{
     if(cb.value==='orchestrator'&&!cb.checked){cb.checked=true;syncOrchestratorLocks();validateStartChat();return;}
     if(cb.checked) document.querySelectorAll('#agents-list .agent-tag').forEach(o=>{if(o!==cb&&o.value===cb.value)o.checked=false;});

@@ -1355,15 +1355,19 @@ function renderCreateRoutingSelectOptions(selectEl, options, selectedValue) {
 }
 
 function listCreateCatalogEntries(catalog) {
-  return Array.isArray(catalog?.entries)
-    ? catalog.entries.filter((entry) => entry && entry.id)
-    : [];
+  return window.CatsUI?.listAdvancedCatalogEntries
+    ? window.CatsUI.listAdvancedCatalogEntries(catalog)
+    : (Array.isArray(catalog?.entries)
+      ? catalog.entries.filter((entry) => entry && entry.id)
+      : []);
 }
 
 function listCreateCatalogPresets(catalog) {
-  return Array.isArray(catalog?.presets)
-    ? catalog.presets.filter((preset) => preset && preset.id && preset.availability !== 'unavailable')
-    : [];
+  return window.CatsUI?.listAdvancedCatalogPresets
+    ? window.CatsUI.listAdvancedCatalogPresets(catalog)
+    : (Array.isArray(catalog?.presets)
+      ? catalog.presets.filter((preset) => preset && preset.id && preset.availability !== 'unavailable')
+      : []);
 }
 
 function findCreateCatalogEntry(catalog, entryId) {
@@ -1383,22 +1387,29 @@ function createControlAppliesToEntry(control, entryId) {
 }
 
 function listCreateApplicablePresets(catalog, entryId) {
-  return listCreateCatalogPresets(catalog).filter((preset) =>
-    createPresetAppliesToEntry(preset, entryId),
-  );
+  return window.CatsUI?.listApplicableAdvancedPresets
+    ? window.CatsUI.listApplicableAdvancedPresets(catalog, entryId)
+    : listCreateCatalogPresets(catalog).filter((preset) =>
+      createPresetAppliesToEntry(preset, entryId),
+    );
 }
 
 function findCreateCatalogPreset(catalog, entryId, presetId) {
-  return listCreateApplicablePresets(catalog, entryId).find((preset) => preset.id === presetId) || null;
+  return window.CatsUI?.findApplicableAdvancedPreset
+    ? window.CatsUI.findApplicableAdvancedPreset(catalog, entryId, presetId)
+    : (listCreateApplicablePresets(catalog, entryId).find((preset) => preset.id === presetId) || null);
 }
 
 function getCreateDefaultSelection(catalog) {
-  return window.CatsUI?.resolveAdvancedCatalogChoice
-    ? window.CatsUI.resolveAdvancedCatalogChoice(catalog, 'default')
+  return window.CatsUI?.getAdvancedCatalogDefaultSelection
+    ? window.CatsUI.getAdvancedCatalogDefaultSelection(catalog)
     : null;
 }
 
 function getDefaultCreateEntryId(catalog, entries) {
+  if (window.CatsUI?.getAdvancedCatalogDefaultEntryId) {
+    return window.CatsUI.getAdvancedCatalogDefaultEntryId(catalog) || '';
+  }
   const resolved = getCreateDefaultSelection(catalog);
   if (resolved?.entryId && entries.some((entry) => entry.id === resolved.entryId)) {
     return resolved.entryId;
@@ -1410,6 +1421,10 @@ function getDefaultCreateEntryId(catalog, entries) {
 function getDefaultCreatePresetId(catalog, entryId, presets) {
   if (!entryId || !presets.length) {
     return '';
+  }
+
+  if (window.CatsUI?.getAdvancedCatalogDefaultPresetId) {
+    return window.CatsUI.getAdvancedCatalogDefaultPresetId(catalog, entryId) || '';
   }
 
   const entries = listCreateCatalogEntries(catalog);
@@ -1427,6 +1442,9 @@ function getDefaultCreatePresetId(catalog, entryId, presets) {
 }
 
 function buildCreateControlDefaults(catalog, entryId, presetId) {
+  if (window.CatsUI?.getAdvancedEntryControlDefaults) {
+    return window.CatsUI.getAdvancedEntryControlDefaults(catalog, entryId, presetId);
+  }
   const defaults = {};
   const preset = findCreateCatalogPreset(catalog, entryId, presetId);
   if (preset?.controlDefaults && typeof preset.controlDefaults === 'object') {

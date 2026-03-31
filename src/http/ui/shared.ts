@@ -359,6 +359,132 @@ export const SHARED_UI_SCRIPT = `
     return visible;
   }
 
+  function listAdvancedCatalogEntries(catalog) {
+    var normalized = normalizeAdvancedCatalog(catalog);
+    var entries = Array.isArray(normalized && normalized.entries) ? normalized.entries : [];
+    var visible = [];
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i] && entries[i].id) visible.push(entries[i]);
+    }
+    return visible;
+  }
+
+  function listAdvancedCatalogPresets(catalog) {
+    var normalized = normalizeAdvancedCatalog(catalog);
+    var presets = Array.isArray(normalized && normalized.presets) ? normalized.presets : [];
+    var visible = [];
+    for (var i = 0; i < presets.length; i++) {
+      if (presets[i] && presets[i].id && presets[i].availability !== 'unavailable') {
+        visible.push(presets[i]);
+      }
+    }
+    return visible;
+  }
+
+  function advancedPresetAppliesToEntry(preset, entryId) {
+    return !Array.isArray(preset && preset.applicableEntryIds)
+      || preset.applicableEntryIds.length === 0
+      || preset.applicableEntryIds.indexOf(entryId) >= 0;
+  }
+
+  function listApplicableAdvancedPresets(catalog, entryId) {
+    var presets = listAdvancedCatalogPresets(catalog);
+    if (!entryId) return [];
+    var applicable = [];
+    for (var i = 0; i < presets.length; i++) {
+      if (advancedPresetAppliesToEntry(presets[i], entryId)) applicable.push(presets[i]);
+    }
+    return applicable;
+  }
+
+  function findApplicableAdvancedPreset(catalog, entryId, presetId) {
+    var presets = listApplicableAdvancedPresets(catalog, entryId);
+    for (var i = 0; i < presets.length; i++) {
+      if (presets[i] && presets[i].id === presetId) return presets[i];
+    }
+    return null;
+  }
+
+  function advancedControlAppliesToEntry(control, entryId) {
+    return !Array.isArray(control && control.applicableEntryIds)
+      || control.applicableEntryIds.length === 0
+      || control.applicableEntryIds.indexOf(entryId) >= 0;
+  }
+
+  function getAdvancedCatalogDefaultSelection(catalog) {
+    return resolveAdvancedCatalogChoice(catalog, 'default');
+  }
+
+  function getAdvancedCatalogDefaultEntryId(catalog) {
+    var entries = listAdvancedCatalogEntries(catalog);
+    var resolved = getAdvancedCatalogDefaultSelection(catalog);
+    if (resolved && resolved.entryId) {
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i].id === resolved.entryId) return resolved.entryId;
+      }
+    }
+    for (var j = 0; j < entries.length; j++) {
+      if (entries[j] && entries[j]['default'] === true && entries[j].id) return entries[j].id;
+    }
+    return entries[0] && entries[0].id ? entries[0].id : '';
+  }
+
+  function getAdvancedCatalogDefaultPresetId(catalog, entryId) {
+    if (!entryId) return '';
+    var presets = listApplicableAdvancedPresets(catalog, entryId);
+    if (!presets.length) return '';
+    var resolved = getAdvancedCatalogDefaultSelection(catalog);
+    var normalized = normalizeAdvancedCatalog(catalog);
+    var defaultPresetId = resolved && resolved.modelSelection && resolved.modelSelection.presetId
+      ? resolved.modelSelection.presetId
+      : (normalized && normalized.defaultSelection && normalized.defaultSelection.presetId
+        ? normalized.defaultSelection.presetId
+        : '');
+    if (!defaultPresetId) return '';
+    if (entryId !== getAdvancedCatalogDefaultEntryId(catalog)) return '';
+    for (var i = 0; i < presets.length; i++) {
+      if (presets[i] && presets[i].id === defaultPresetId) return defaultPresetId;
+    }
+    return '';
+  }
+
+  function getAdvancedEntryControlDefaults(catalog, entryId, presetId) {
+    var normalized = normalizeAdvancedCatalog(catalog);
+    if (!normalized || !entryId) return {};
+    var defaults = {};
+    var preset = presetId ? findApplicableAdvancedPreset(normalized, entryId, presetId) : null;
+    if (preset && preset.controlDefaults && typeof preset.controlDefaults === 'object') {
+      for (var presetKey in preset.controlDefaults) {
+        defaults[presetKey] = preset.controlDefaults[presetKey];
+      }
+    }
+    var resolved = getAdvancedCatalogDefaultSelection(normalized);
+    if (
+      resolved
+      && resolved.entryId === entryId
+      && ((resolved.modelSelection && resolved.modelSelection.presetId) || '') === (presetId || '')
+      && resolved.modelSelection
+      && resolved.modelSelection.controls
+      && typeof resolved.modelSelection.controls === 'object'
+    ) {
+      for (var controlKey in resolved.modelSelection.controls) {
+        defaults[controlKey] = resolved.modelSelection.controls[controlKey];
+      }
+    }
+    var filtered = {};
+    var controls = Array.isArray(normalized.controls) ? normalized.controls : [];
+    for (var i = 0; i < controls.length; i++) {
+      var control = controls[i];
+      if (!control || !control.key || control.scope === 'request' || !advancedControlAppliesToEntry(control, entryId)) {
+        continue;
+      }
+      if (Object.prototype.hasOwnProperty.call(defaults, control.key)) {
+        filtered[control.key] = defaults[control.key];
+      }
+    }
+    return filtered;
+  }
+
   function closeRuntimeSurfaceMenus() {
     var roots = document.querySelectorAll('[data-runtime-surface-switcher]');
     for (var i = 0; i < roots.length; i++) {
@@ -625,8 +751,16 @@ export const SHARED_UI_SCRIPT = `
     normalizeAdvancedCatalog: normalizeAdvancedCatalog,
     getAdvancedCatalogChoices: getAdvancedCatalogChoices,
     getAdvancedCatalogDefaultChoice: getAdvancedCatalogDefaultChoice,
+    listAdvancedCatalogEntries: listAdvancedCatalogEntries,
+    listAdvancedCatalogPresets: listAdvancedCatalogPresets,
+    listApplicableAdvancedPresets: listApplicableAdvancedPresets,
+    findApplicableAdvancedPreset: findApplicableAdvancedPreset,
+    getAdvancedCatalogDefaultSelection: getAdvancedCatalogDefaultSelection,
+    getAdvancedCatalogDefaultEntryId: getAdvancedCatalogDefaultEntryId,
+    getAdvancedCatalogDefaultPresetId: getAdvancedCatalogDefaultPresetId,
     resolveAdvancedCatalogChoice: resolveAdvancedCatalogChoice,
     getAdvancedChoiceControlDefaults: getAdvancedChoiceControlDefaults,
+    getAdvancedEntryControlDefaults: getAdvancedEntryControlDefaults,
     listStoredAdvancedControls: listStoredAdvancedControls,
     setRuntimeTooltip: setRuntimeTooltip,
     hideRuntimeTooltip: hideRuntimeTooltip,
