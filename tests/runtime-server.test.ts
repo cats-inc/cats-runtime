@@ -321,6 +321,8 @@ describe('runtime server', () => {
       expect(html).toContain('Tech Writer');
       expect(html).toContain('id="preset-agents-btn"');
       expect(html).toContain('Use 12-agent preset');
+      expect(html).toContain('confirmApplyTwelveAgentPreset()');
+      expect(html).toContain("if(!window.confirm('Replace the current agents with the 12-agent preset?')) return;");
       expect(html).toContain('id="add-agent-btn"');
       expect(html).toContain(
         '<header class="runtime-page-header" style="padding-top:0.75rem;padding-bottom:0.75rem;">',
@@ -344,22 +346,37 @@ describe('runtime server', () => {
       expect(html).toContain("{ name:'Agent-1', provider:'gemini', model:getDefaultModel('gemini'), tags:['orchestrator'] },");
       expect(html).toContain("{ name:'Agent-2', provider:'cursor', model:getDefaultModel('cursor'), tags:['pm'] },");
       expect(html).toContain("{ name:'Agent-12', provider:'openclaw', model:getDefaultModel('openclaw'), tags:['marketer'] },");
-      expect(html).toContain("addAgent('Agent-1','claude','',['orchestrator']);");
-      expect(html).toContain("addAgent('Agent-2','codex','',['coder']);");
+      expect(html).toContain("addAgent('Agent-1','claude','',['orchestrator'],null,{expandOnCreate:false});");
+      expect(html).toContain("addAgent('Agent-2','codex','',['coder'],null,{expandOnCreate:false});");
       expect(html).toContain('.agent-tag-chip {');
       expect(html).toContain('.agent-tag-toggle input[value="orchestrator"]:checked + .agent-tag-chip {');
+      expect(html).toContain('.agent-card-toggle {');
+      expect(html).toContain('.agent-card-details {');
+      expect(html).toContain('.agent-remove {');
       expect(html).toContain('function getDisplayOrderedAgents(agents) {');
       expect(html).toContain('reorderAgentStatusPills();');
       expect(html).toContain('const CUSTOM_AGENT_MODEL_VALUE = \'__custom_legacy_model__\';');
+      expect(html).toContain('let expandedAgentId = null;');
+      expect(html).toContain('function refreshAllAgentCardSummaries() {');
+      expect(html).toContain('function setExpandedAgent(id, expand = true) {');
+      expect(html).toContain('function toggleAgentCard(id) {');
       expect(html).toContain('function resolveAgentInitialRouting(provider,model=\'\',modelSelection=null){');
       expect(html).toContain('function syncAgentPresetField(div,catalog,entryId,preferredPresetId=\'\',allowDefaultPreset=true){');
       expect(html).toContain('function renderAgentModelChoice(div){');
+      expect(html).toContain('class="agent-card-toggle" aria-expanded="false" onclick="toggleAgentCard(');
+      expect(html).toContain('<div class="agent-summary-meta agent-card-summary-row"></div>');
+      expect(html).toContain('<div class="agent-summary-tags agent-card-summary-row"></div>');
+      expect(html).toContain('class="agent-remove hover:bg-slate-800/70 hover:text-red-400" title="Remove agent" aria-label="Remove agent"');
+      expect(html).toContain('<div class="agent-card-details hidden space-y-3">');
       expect(html).toContain('<div class="agent-entry-group"><label class="block text-xs text-slate-400">Model</label><select class="agent-entry-choice');
       expect(html).toContain('<div class="agent-mode-group"><label class="block text-xs text-slate-400">Mode</label><select class="agent-preset-choice');
       expect(html).toContain('<div class="agent-model-manual-group hidden"><label class="agent-model-manual-label block text-xs text-slate-400">Legacy Model ID</label>');
+      expect(html).toContain('title="Browse directory" aria-label="Browse directory"');
       expect(html).toContain('Custom legacy model...');
       expect(html).toContain("manualLabel.textContent='Legacy Model ID';");
       expect(html).toContain("hintEl.textContent='Manual model id passthrough.';");
+      expect(html).toContain("if(options.expandOnCreate===false){");
+      expect(html).toContain('setExpandedAgent(id, true);');
       expect(html).toContain('window.CatsUI?.listAdvancedCatalogEntries');
       expect(html).toContain('window.CatsUI?.getAdvancedCatalogDefaultEntryId');
       expect(html).toContain('window.CatsUI?.getAdvancedCatalogDefaultPresetId');

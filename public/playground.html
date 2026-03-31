@@ -84,6 +84,83 @@
       color: #fef3c7;
       box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.28);
     }
+    .agent-card-toggle {
+      display: flex;
+      min-width: 0;
+      flex: 1;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+      border: 0;
+      background: transparent;
+      padding: 0;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    .agent-card-name-row {
+      display: flex;
+      width: 100%;
+      min-width: 0;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .agent-card-name {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #fff;
+    }
+    .agent-card-chevron {
+      flex: none;
+      color: #64748b;
+      transition: transform 140ms ease, color 140ms ease;
+    }
+    .agent-card[data-expanded="true"] .agent-card-chevron {
+      transform: rotate(180deg);
+      color: #cbd5e1;
+    }
+    .agent-card-summary-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      align-items: center;
+    }
+    .agent-summary-chip {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 9999px;
+      border: 1px solid #475569;
+      background: rgba(15, 23, 42, 0.45);
+      color: #cbd5e1;
+      font-size: 0.65rem;
+      font-weight: 600;
+      line-height: 1;
+      padding: 0.22rem 0.5rem;
+    }
+    .agent-card-details {
+      margin-top: 0.75rem;
+      border-top: 1px solid rgba(71, 85, 105, 0.65);
+      padding-top: 0.75rem;
+    }
+    .agent-remove {
+      display: inline-flex;
+      height: 1.75rem;
+      width: 1.75rem;
+      flex: none;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      border-radius: 0.5rem;
+      background: transparent;
+      padding: 0;
+      color: #94a3b8;
+      transition: color 140ms ease, background 140ms ease;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body class="runtime-shell" data-runtime-surface="__CATS_RUNTIME_SURFACE__" data-bootstrap-required="__CATS_RUNTIME_BOOTSTRAP_REQUIRED__">
@@ -104,7 +181,7 @@
                 </button>
               </div>
               <div class="flex items-center gap-2">
-                <button id="preset-agents-btn" onclick="applyTwelveAgentPreset()" class="runtime-btn runtime-btn-secondary !h-8 !w-8 !rounded-lg !px-0 !py-0" title="Use 12-agent preset" aria-label="Use 12-agent preset">
+                <button id="preset-agents-btn" onclick="confirmApplyTwelveAgentPreset()" class="runtime-btn runtime-btn-secondary !h-8 !w-8 !rounded-lg !px-0 !py-0" title="Use 12-agent preset" aria-label="Use 12-agent preset">
                   <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <rect x="4" y="4" width="6" height="6" rx="1.5" />
                     <rect x="14" y="4" width="6" height="6" rx="1.5" />
@@ -131,7 +208,11 @@
                 <label class="runtime-field-label">Work Directory</label>
                 <div class="flex gap-2">
                   <input id="work-dir" type="text" placeholder="/path/to/repo" class="runtime-input" />
-                  <button type="button" onclick="openBrowseModal()" class="runtime-btn runtime-btn-secondary !px-3">Browse</button>
+                  <button type="button" onclick="openBrowseModal()" class="runtime-btn runtime-btn-secondary !h-10 !w-10 !rounded-lg !px-0 !py-0" title="Browse directory" aria-label="Browse directory">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.1a2 2 0 0 1 1.4.57l1.43 1.43H19.5A1.5 1.5 0 0 1 21 9.5v7A1.5 1.5 0 0 1 19.5 18h-15A1.5 1.5 0 0 1 3 16.5v-9Z" />
+                    </svg>
+                  </button>
                 </div>
               </div>
               <div class="runtime-field">
@@ -768,6 +849,7 @@ let isWorking = false;
 let pendingAgents = [];
 let agentMetaByName = {};
 let agentDisplayOrder = {};
+let expandedAgentId = null;
 
 // ============================================================
 // Markdown setup
@@ -862,6 +944,54 @@ function getAgentColor(n) {
   if (p && PROVIDER_COLORS[p]) return PROVIDER_COLORS[p];
   if (!(n in agentColorMap)) { const i=Object.keys(agentColorMap).length%Object.keys(FALLBACK_AGENT_COLORS).length; agentColorMap[n]=FALLBACK_AGENT_COLORS[i]; }
   return agentColorMap[n];
+}
+function renderAgentSummaryChip(label) {
+  return `<span class="agent-summary-chip">${escapeHtml(label)}</span>`;
+}
+function getAgentCardSummaryModelLabel(div) {
+  const provider = div.querySelector('.agent-provider')?.value || '';
+  const catalog = getProviderAdvancedCatalog(provider);
+  const entryId = div.querySelector('.agent-entry-choice')?.value || '';
+  const customValue = div.querySelector('.agent-model-custom')?.value.trim() || '';
+  if (catalog && entryId && entryId !== CUSTOM_AGENT_MODEL_VALUE) {
+    const entry = findAgentCatalogEntry(catalog, entryId);
+    return entry?.label || entry?.id || entryId;
+  }
+  return customValue || 'Legacy model';
+}
+function getAgentCardSelectedTags(div) {
+  return [...div.querySelectorAll('.agent-tags input:checked')].map(cb => cb.value);
+}
+function refreshAgentCardSummary(div) {
+  const summaryName = div.querySelector('.agent-summary-name');
+  const summaryMeta = div.querySelector('.agent-summary-meta');
+  const summaryTags = div.querySelector('.agent-summary-tags');
+  if (!summaryName || !summaryMeta || !summaryTags) return;
+  const name = div.querySelector('.agent-name')?.value.trim() || 'Agent';
+  const provider = div.querySelector('.agent-provider')?.value || '';
+  const tags = getAgentCardSelectedTags(div);
+  summaryName.textContent = name;
+  summaryMeta.innerHTML = `${renderProviderBadge(provider)}${renderAgentSummaryChip(getAgentCardSummaryModelLabel(div))}`;
+  summaryTags.innerHTML = tags.length
+    ? tags.map(tag => `<span class="tag-pill text-slate-300" style="border-color:currentColor">${escapeHtml(getTagLabel(tag))}</span>`).join('')
+    : '<span class="text-xs text-slate-500">No roles selected</span>';
+}
+function refreshAllAgentCardSummaries() {
+  document.querySelectorAll('#agents-list > div').forEach(refreshAgentCardSummary);
+}
+function setExpandedAgent(id, expand = true) {
+  const cards = document.querySelectorAll('#agents-list > div');
+  cards.forEach(card => {
+    const numericId = Number(String(card.id || '').replace('agent-', ''));
+    const isExpanded = expand && numericId === id;
+    card.dataset.expanded = isExpanded ? 'true' : 'false';
+    card.querySelector('.agent-card-details')?.classList.toggle('hidden', !isExpanded);
+    card.querySelector('.agent-card-toggle')?.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+  });
+  expandedAgentId = expand ? id : null;
+}
+function toggleAgentCard(id) {
+  setExpandedAgent(id, expandedAgentId !== id);
 }
 function scrollToBottom() { const c=document.getElementById('chat-area'); requestAnimationFrame(()=>{c.scrollTop=c.scrollHeight;}); }
 function stripNextDirective(t) { return t.replace(/^(?:[-*+]\s*)?(?:[`*_ ]*)NEXT(?:[`*_ ]*)\s*[:：].*$/gmi,'').trim(); }
@@ -1214,6 +1344,7 @@ function syncAgentModelField(div,options={}){
     manualLabel.textContent='Model ID';
     customInput.value=model||customInput.value||'';
     hintEl.textContent='Enter a model id manually.';
+    refreshAgentCardSummary(div);
     return;
   }
 
@@ -1238,6 +1369,7 @@ function syncAgentModelField(div,options={}){
     manualLabel.textContent='Legacy Model ID';
     customInput.value=initial.legacyModel||model||customInput.value||'';
     hintEl.textContent='Manual model id passthrough.';
+    refreshAgentCardSummary(div);
     return;
   }
 
@@ -1251,6 +1383,7 @@ function syncAgentModelField(div,options={}){
     options.allowDefaultPreset!==false,
   );
   renderAgentModelChoice(div);
+  refreshAgentCardSummary(div);
 }
 function buildTagCheckboxes(id,selectedTags=[]){
   return AVAILABLE_TAGS.map(tag=>{
@@ -1274,6 +1407,7 @@ function syncOrchestratorLocks(){
     removeBtn.classList.toggle('opacity-40',locked);
     removeBtn.classList.toggle('cursor-not-allowed',locked);
     removeBtn.classList.toggle('hover:text-red-400',!locked);
+    removeBtn.classList.toggle('hover:bg-slate-800/70',!locked);
   });
 }
 
@@ -1282,39 +1416,67 @@ function addAgent(name='',provider='claude',model='',tags=[],modelSelection=null
   const list=document.getElementById('agents-list'); const id=agentCounter++;
   if(!name) name=allocateAgentName(); else syncNextAgentNumber(name);
   const div=document.createElement('div'); div.id=`agent-${id}`;
-  div.className='bg-slate-700/50 rounded-lg p-3 space-y-2 border border-slate-600';
-  div.innerHTML=`<div class="flex items-center justify-between"><input type="text" value="${escapeHtml(name)}" placeholder="Agent name" class="agent-name bg-transparent font-semibold text-white text-sm focus:outline-none w-2/3" /><button onclick="removeAgent(${id})" class="agent-remove text-xs text-slate-400 hover:text-red-400" title="Remove agent">&times; Remove</button></div><div class="grid grid-cols-2 gap-2"><div><label class="block text-xs text-slate-400">Provider</label><select class="agent-provider w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none">${PROVIDERS.map(p=>`<option value="${p}" ${p===provider?'selected':''}>${p}</option>`).join('')}</select></div><div class="agent-entry-group"><label class="block text-xs text-slate-400">Model</label><select class="agent-entry-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select></div></div><div class="agent-mode-group"><label class="block text-xs text-slate-400">Mode</label><select class="agent-preset-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select><div class="agent-preset-static-label runtime-input hidden !py-2 text-xs text-slate-500"></div></div><div class="agent-model-manual-group hidden"><label class="agent-model-manual-label block text-xs text-slate-400">Legacy Model ID</label><input type="text" placeholder="custom model id" class="agent-model-custom w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none" /></div><p class="agent-model-hint text-[11px] leading-4 text-slate-500"></p><div><label class="block text-xs text-slate-400 mb-1">Tags</label><div class="flex flex-wrap gap-x-3 gap-y-1 agent-tags">${buildTagCheckboxes(id,tags)}</div></div>`;
+  div.className='agent-card bg-slate-700/50 rounded-lg p-3 border border-slate-600';
+  div.dataset.expanded='false';
+  div.innerHTML=`<div class="flex items-start gap-3"><button type="button" class="agent-card-toggle" aria-expanded="false" onclick="toggleAgentCard(${id})"><div class="agent-card-name-row"><span class="agent-summary-name agent-card-name">${escapeHtml(name)}</span><svg class="agent-card-chevron h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></div><div class="agent-summary-meta agent-card-summary-row"></div><div class="agent-summary-tags agent-card-summary-row"></div></button><button onclick="removeAgent(${id})" class="agent-remove hover:bg-slate-800/70 hover:text-red-400" title="Remove agent" aria-label="Remove agent"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /></svg></button></div><div class="agent-card-details hidden space-y-3"><div><label class="block text-xs text-slate-400 mb-1">Name</label><input type="text" value="${escapeHtml(name)}" placeholder="Agent name" class="agent-name w-full bg-transparent border border-slate-600 rounded px-2 py-1 text-sm text-white focus:outline-none" /></div><div class="grid grid-cols-2 gap-2"><div><label class="block text-xs text-slate-400">Provider</label><select class="agent-provider w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none">${PROVIDERS.map(p=>`<option value="${p}" ${p===provider?'selected':''}>${p}</option>`).join('')}</select></div><div class="agent-entry-group"><label class="block text-xs text-slate-400">Model</label><select class="agent-entry-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select></div></div><div class="agent-mode-group"><label class="block text-xs text-slate-400">Mode</label><select class="agent-preset-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select><div class="agent-preset-static-label runtime-input hidden !py-2 text-xs text-slate-500"></div></div><div class="agent-model-manual-group hidden"><label class="agent-model-manual-label block text-xs text-slate-400">Legacy Model ID</label><input type="text" placeholder="custom model id" class="agent-model-custom w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none" /></div><p class="agent-model-hint text-[11px] leading-4 text-slate-500"></p><div><label class="block text-xs text-slate-400 mb-1">Tags</label><div class="flex flex-wrap gap-x-3 gap-y-1 agent-tags">${buildTagCheckboxes(id,tags)}</div></div></div>`;
   list.appendChild(div);
   syncAgentModelField(div,{preserve:false,model,modelSelection});
   const pSel=div.querySelector('.agent-provider'), entrySel=div.querySelector('.agent-entry-choice'), presetSel=div.querySelector('.agent-preset-choice');
+  const nameInput=div.querySelector('.agent-name');
+  const customInput=div.querySelector('.agent-model-custom');
   pSel.addEventListener('change',()=>{syncAgentModelField(div,{preserve:false});});
   entrySel.addEventListener('change',()=>{
     const providerName=div.querySelector('.agent-provider')?.value||'';
     syncAgentPresetField(div,getProviderAdvancedCatalog(providerName),entrySel.value||'','',false);
     renderAgentModelChoice(div);
+    refreshAgentCardSummary(div);
   });
-  presetSel.addEventListener('change',()=>{renderAgentModelChoice(div);});
+  presetSel.addEventListener('change',()=>{renderAgentModelChoice(div); refreshAgentCardSummary(div);});
+  customInput.addEventListener('input',()=>{refreshAgentCardSummary(div);});
   div.querySelectorAll('.agent-tag').forEach(cb=>{cb.addEventListener('change',()=>{
     if(cb.value==='orchestrator'&&!cb.checked){cb.checked=true;syncOrchestratorLocks();validateStartChat();return;}
     if(cb.checked) document.querySelectorAll('#agents-list .agent-tag').forEach(o=>{if(o!==cb&&o.value===cb.value)o.checked=false;});
     syncOrchestratorLocks();
+    refreshAllAgentCardSummaries();
     validateStartChat();
   });});
-  div.querySelector('.agent-name').addEventListener('change',e=>syncNextAgentNumber(e.target.value));
+  nameInput.addEventListener('input',()=>{refreshAgentCardSummary(div);});
+  nameInput.addEventListener('change',e=>{syncNextAgentNumber(e.target.value);refreshAgentCardSummary(div);});
+  refreshAgentCardSummary(div);
+  if(options.expandOnCreate===false){
+    div.dataset.expanded='false';
+    div.querySelector('.agent-card-details')?.classList.add('hidden');
+    div.querySelector('.agent-card-toggle')?.setAttribute('aria-expanded', 'false');
+  } else {
+    setExpandedAgent(id, true);
+  }
   syncOrchestratorLocks();
   updateAgentButtons();
   validateStartChat();
   return div;
 }
-function removeAgent(id){const el=document.getElementById(`agent-${id}`);if(!el||isAgentOrchestratorSelected(el)){syncOrchestratorLocks();return;}el.remove();syncOrchestratorLocks();updateAgentButtons();validateStartChat();}
+function removeAgent(id){
+  const el=document.getElementById(`agent-${id}`);
+  if(!el||isAgentOrchestratorSelected(el)){syncOrchestratorLocks();return;}
+  el.remove();
+  if(expandedAgentId===id) expandedAgentId=null;
+  syncOrchestratorLocks();
+  updateAgentButtons();
+  validateStartChat();
+}
 function applyAgentPreset(preset){
   const list=document.getElementById('agents-list');
   list.innerHTML='';
   agentCounter=0;
   nextAgentNumber=1;
-  preset.forEach(agent=>addAgent(agent.name,agent.provider,agent.model||'',agent.tags,agent.modelSelection||null));
+  expandedAgentId=null;
+  preset.forEach(agent=>addAgent(agent.name,agent.provider,agent.model||'',agent.tags,agent.modelSelection||null,{expandOnCreate:false}));
   updateAgentButtons();
   validateStartChat();
+}
+function confirmApplyTwelveAgentPreset(){
+  if(!window.confirm('Replace the current agents with the 12-agent preset?')) return;
+  applyTwelveAgentPreset();
 }
 function applyTwelveAgentPreset(){applyAgentPreset(TWELVE_AGENT_PRESET);}
 function hasSupportingRole(agents){return agents.some(agent=>agent.tags.some(tag=>tag!=='orchestrator'));}
@@ -1559,8 +1721,8 @@ async function initApp() {
   });
   updateRuntimeAuthState();
   await loadProviderOptions();
-  addAgent('Agent-1','claude','',['orchestrator']);
-  addAgent('Agent-2','codex','',['coder']);
+  addAgent('Agent-1','claude','',['orchestrator'],null,{expandOnCreate:false});
+  addAgent('Agent-2','codex','',['coder'],null,{expandOnCreate:false});
   syncChatInputDefaultPrompt(true);
 }
 void initApp();
