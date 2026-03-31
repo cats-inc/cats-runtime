@@ -13,6 +13,7 @@ export interface CommandResult {
 
 export interface CommandRunnerOptions {
   shell?: boolean;
+  windowsHide?: boolean;
 }
 
 export type CommandRunner = (
@@ -194,17 +195,17 @@ async function resolveWindowsPythonCommand(
     {
       command: 'python3',
       args: ['-c', probe],
-      runnerOptions: {},
+      runnerOptions: { windowsHide: true },
     },
     {
       command: 'python',
       args: ['-c', probe],
-      runnerOptions: {},
+      runnerOptions: { windowsHide: true },
     },
     {
       command: 'py',
       args: ['-3', '-c', probe],
-      runnerOptions: {},
+      runnerOptions: { windowsHide: true },
     },
   ];
 
@@ -220,7 +221,7 @@ async function resolveWindowsPythonCommand(
         return {
           command: executable,
           argsPrefix: [],
-          runnerOptions: {},
+          runnerOptions: { windowsHide: true },
         };
       }
     } catch {
@@ -231,7 +232,7 @@ async function resolveWindowsPythonCommand(
   return {
     command: 'python3',
     argsPrefix: [],
-    runnerOptions: {},
+    runnerOptions: { windowsHide: true },
   };
 }
 
@@ -277,7 +278,7 @@ function resolvePyenvWindowsPythonExecutable(): {
       return {
         command: executablePath,
         argsPrefix: [],
-        runnerOptions: {},
+        runnerOptions: { windowsHide: true },
       };
     }
   }
@@ -302,7 +303,7 @@ function resolveWindowsPythonExecutableFromPath(): {
         return {
           command: executablePath,
           argsPrefix: [],
-          runnerOptions: {},
+          runnerOptions: { windowsHide: true },
         };
       }
     }
@@ -312,7 +313,7 @@ function resolveWindowsPythonExecutableFromPath(): {
       return {
         command: pyLauncher,
         argsPrefix: ['-3'],
-        runnerOptions: {},
+        runnerOptions: { windowsHide: true },
       };
     }
   }

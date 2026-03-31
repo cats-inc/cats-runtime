@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
 import type {
   CliRuntimeConfig,
   DockerDiscoveryPolicy,
@@ -452,6 +453,7 @@ async function defaultCommandRunner(
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
+      ...hiddenWindowsSpawnOptions(),
     });
 
     let stdout = '';

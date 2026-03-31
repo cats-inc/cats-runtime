@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import type { ProviderCommandConfig } from '../config.js';
 import { buildProcessSpawnConfig } from '../runtime/runtime.js';
+import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
 
 export interface OpencodeNativeSessionSummary {
   providerSessionId: string;
@@ -809,6 +810,7 @@ async function defaultOpencodeServerLauncher(input: {
     env,
     shell: spawnConfig.shell,
     stdio: ['ignore', 'pipe', 'pipe'],
+    ...hiddenWindowsSpawnOptions(),
   });
 
   const url = await new Promise<string>((resolve, reject) => {

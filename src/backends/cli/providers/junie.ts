@@ -24,6 +24,7 @@ import type {
   ResultStreamEvent,
 } from '../../../core/types.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
+import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
 
 const DEFAULT_JUNIE_SESSIONS_DIR = join(os.homedir(), '.junie', 'sessions');
 const SESSION_POLL_INTERVAL_MS = 250;
@@ -143,6 +144,7 @@ export class JunieProvider implements Provider {
       stdio: ['pipe', 'pipe', 'pipe'],
       shell: spawnConfig.shell,
       env,
+      ...hiddenWindowsSpawnOptions(),
     });
     child.stdin?.end();
 

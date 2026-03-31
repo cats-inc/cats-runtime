@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import type { ProviderCommandConfig } from '../config.js';
 import { buildProcessSpawnConfig } from '../runtime/runtime.js';
+import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
 
 export interface KiloNativeSessionSummary {
   providerSessionId: string;
@@ -811,6 +812,7 @@ async function defaultKiloServerLauncher(input: {
     env,
     shell: spawnConfig.shell,
     stdio: ['ignore', 'pipe', 'pipe'],
+    ...hiddenWindowsSpawnOptions(),
   });
 
   const url = await new Promise<string>((resolve, reject) => {

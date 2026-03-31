@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
 
 export interface GooseNativeSessionSummary {
   providerSessionId: string;
@@ -467,6 +468,7 @@ async function defaultCommandRunner(command: string, args: string[]): Promise<Co
   return new Promise<CommandResult>((resolve, reject) => {
     const child = spawn(command, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
+      ...hiddenWindowsSpawnOptions(),
     });
 
     let stdout = '';

@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { hiddenWindowsSpawnOptions } from '../process/windowsSpawn.js';
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 const WINDOWS_SHELL_BUILTINS = new Set([
@@ -70,6 +71,7 @@ export async function runCliCommand(
       env: options?.env ? { ...process.env, ...options.env } : undefined,
       stdio: ['ignore', 'pipe', 'pipe'],
       shell: useShell,
+      ...hiddenWindowsSpawnOptions(),
     });
 
     const timer = setTimeout(() => {

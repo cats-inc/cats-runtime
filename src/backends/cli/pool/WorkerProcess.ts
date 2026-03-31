@@ -11,6 +11,7 @@ import type {
 } from '../../../core/types.js';
 import type { Provider, ProviderSpawnOptions } from '../providers/types.js';
 import { buildProcessSpawnConfig } from '../runtime/runtime.js';
+import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
 
 export interface WorkerProcessEvents {
   event: [StreamEvent];
@@ -100,6 +101,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       stdio: ['pipe', 'pipe', 'pipe'],
       shell: spawnConfig.shell,
       env,
+      ...hiddenWindowsSpawnOptions(),
     });
 
     // Read stdout line-by-line (NDJSON)

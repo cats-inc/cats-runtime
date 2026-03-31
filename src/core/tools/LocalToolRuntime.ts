@@ -19,6 +19,7 @@ import { WorkspaceSubstrateService } from '../runtime/WorkspaceSubstrateService.
 import { RuntimeDeliveryService } from '../runtime/RuntimeDeliveryService.js';
 import { RuntimeManagementService } from '../management/RuntimeManagementService.js';
 import type { RuntimeManagementDomain, RuntimeManagementAction } from '../management/types.js';
+import { hiddenWindowsSpawnOptions } from '../process/windowsSpawn.js';
 
 // path.matchesGlob — Node 22+ built-in; @types/node@20 lacks the typedef
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1550,6 +1551,7 @@ async function executeShell(
       cwd,
       env: process.env,
       shell: true,
+      ...hiddenWindowsSpawnOptions(),
     });
 
     let stdout = '';

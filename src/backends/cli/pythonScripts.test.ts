@@ -101,6 +101,7 @@ describe('runPythonJsonScript', () => {
       const probeCalls = runner.mock.calls.filter(([, args]) => args[0] === '-c');
       expect(probeCalls.length).toBeGreaterThan(0);
       expect(probeCalls.every(([, , options]) => options?.shell !== true)).toBe(true);
+      expect(probeCalls.every(([, , options]) => options?.windowsHide === true)).toBe(true);
     } finally {
       if (platformDescriptor) {
         Object.defineProperty(process, 'platform', platformDescriptor);

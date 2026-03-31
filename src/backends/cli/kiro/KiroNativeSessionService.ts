@@ -6,6 +6,7 @@ import type { RuntimeAdapter } from '../runtime/runtime.js';
 import {
   createRuntimeAdapter,
 } from '../runtime/runtime.js';
+import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
 
 export interface KiroNativeSessionSummary {
   providerSessionId: string;
@@ -200,6 +201,7 @@ async function defaultCommandRunner(
     const child = spawn(command, args, {
       shell: options.shell,
       stdio: ['ignore', 'pipe', 'pipe'],
+      ...hiddenWindowsSpawnOptions(),
     });
 
     let stdout = '';

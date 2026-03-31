@@ -7,6 +7,7 @@ import {
   createRuntimeAdapter,
   quoteForBash,
 } from '../runtime/runtime.js';
+import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
 
 export interface CursorNativeSessionSummary {
   providerSessionId: string;
@@ -227,6 +228,7 @@ async function defaultCommandRunner(
     const child = spawn(command, args, {
       shell: options.shell,
       stdio: ['ignore', 'pipe', 'pipe'],
+      ...hiddenWindowsSpawnOptions(),
     });
 
     let stdout = '';
