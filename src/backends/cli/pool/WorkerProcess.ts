@@ -232,6 +232,9 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     let resolve: (() => void) | null = null;
     let error: Error | null = null;
     let sawEvent = false;
+    let sawTerminalEvent = false;
+    let currentAttemptTimeoutMs = 0;
+    let turnInactivityTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
     const push = (item: StreamEvent | null) => {
       queue.push(item);
@@ -241,15 +244,54 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       }
     };
 
+    const clearTurnInactivityTimeout = () => {
+      if (turnInactivityTimeoutId) {
+        clearTimeout(turnInactivityTimeoutId);
+        turnInactivityTimeoutId = undefined;
+      }
+    };
+
+    const armTurnInactivityTimeout = () => {
+      clearTurnInactivityTimeout();
+      if (currentAttemptTimeoutMs <= 0 || sawTerminalEvent) {
+        return;
+      }
+
+      turnInactivityTimeoutId = setTimeout(() => {
+        if (!sawEvent || sawTerminalEvent || !this.process || this.process.exitCode !== null) {
+          return;
+        }
+        error = this.buildProviderRefusalError({
+          category: 'true_timeout',
+          message: `${formatProviderDisplayName(this.provider.name)} stopped responding after the initial response for ${currentAttemptTimeoutMs}ms.`,
+          retryable: true,
+          source: 'timeout',
+          evidenceSummary: this.stderrLines.length > 0
+            ? this.stderrLines.join(' | ')
+            : 'Provider emitted a non-terminal event but never finished the turn.',
+        });
+        this.emit('error', error);
+        this.terminateLaunchProcess();
+      }, currentAttemptTimeoutMs);
+    };
+
     const onEvent = (event: StreamEvent) => {
       sawEvent = true;
+      const terminal = isTerminalStreamEvent(event);
+      if (terminal) {
+        sawTerminalEvent = true;
+        clearTurnInactivityTimeout();
+      } else {
+        armTurnInactivityTimeout();
+      }
       push(event);
-      if (isTerminalStreamEvent(event)) {
+      if (terminal) {
         push(null); // signal done
       }
     };
 
     const onError = (err: Error) => {
+      clearTurnInactivityTimeout();
       error = err;
       push(null);
     };
@@ -259,6 +301,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     };
 
     const handleExit = async (code: number | null) => {
+      clearTurnInactivityTimeout();
       const refusal = this.recordLaunchFailureRefusal({
         source: 'exit',
         exitCode: code,
@@ -306,8 +349,11 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
         for (let attempt = 1; attempt <= retries; attempt++) {
           // Reset per-attempt state
           sawEvent = false;
+          sawTerminalEvent = false;
           error = null;
           queue.length = 0;
+          clearTurnInactivityTimeout();
+          currentAttemptTimeoutMs = timeoutMs;
 
           if (this._providerSessionId) {
             this.spawnOpts = { ...this.spawnOpts, resumeSessionId: this._providerSessionId };
@@ -335,7 +381,8 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
                     `Provider did not respond within ${timeoutMs}ms`
                     + (this.lastLaunchSummary ? `. launch: ${this.lastLaunchSummary}` : ''),
                   );
-                this.process.kill('SIGTERM');
+                this.emit('error', error);
+                this.terminateLaunchProcess();
               }
             }, timeoutMs);
           }
@@ -385,6 +432,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
         yield item;
       }
     } finally {
+      clearTurnInactivityTimeout();
       this.isBusy = false;
       this.removeListener('event', onEvent);
       this.removeListener('error', onError);
@@ -464,7 +512,22 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     }
 
     this.emit('error', this.buildProviderRefusalError(refusal));
-    this.process.kill('SIGTERM');
+    this.terminateLaunchProcess();
+  }
+
+  private terminateLaunchProcess(): void {
+    if (!this.process || this.process.exitCode !== null) {
+      return;
+    }
+
+    const processRef = this.process;
+    processRef.kill('SIGTERM');
+
+    setTimeout(() => {
+      if (processRef.exitCode === null) {
+        processRef.kill('SIGKILL');
+      }
+    }, 5000);
   }
 
   private buildProcessExitError(code: number | null): Error {

@@ -129,6 +129,42 @@ describe('WorkerProcess PowerShell helpers', () => {
       /Process exited with code 1 before responding\..*stderr: daemon listening on port 429/s,
     );
   });
+
+  it('surfaces a timeout promptly even if the provider ignores SIGTERM for a while', async () => {
+    const worker = new WorkerProcess(
+      createSigtermIgnoringSilentProvider(),
+      { cwd: process.cwd() },
+      createNodeCommandConfig(),
+      { retries: 1, timeoutMs: 20 },
+    );
+
+    const startedAt = Date.now();
+    await expect(worker.sendMessage('ignored')).rejects.toThrow(
+      'Provider did not respond within 20ms',
+    );
+    expect(Date.now() - startedAt).toBeLessThan(1000);
+  });
+
+  it('times out a stalled turn after a non-terminal init event', async () => {
+    const worker = new WorkerProcess(
+      createInitThenStallProvider(),
+      { cwd: process.cwd() },
+      createNodeCommandConfig(),
+      { retries: 1, timeoutMs: 1500 },
+    );
+
+    const stream = worker.streamMessage('ignored');
+    await expect(stream.next()).resolves.toMatchObject({
+      done: false,
+      value: { type: 'init', sessionId: 'gemini-session' },
+    });
+
+    const startedAt = Date.now();
+    await expect(stream.next()).rejects.toThrow(
+      'Gemini stopped responding after the initial response for 1500ms.',
+    );
+    expect(Date.now() - startedAt).toBeLessThan(3000);
+  });
 });
 
 function createNodeCommandConfig(): ProviderCommandConfig {
@@ -276,6 +312,60 @@ function createPortNumberOnlyErrorProvider(): Provider {
     },
     parseStreamLine() {
       return null;
+    },
+  };
+}
+
+function createSigtermIgnoringSilentProvider(): Provider {
+  return {
+    name: 'gemini',
+    capabilities: { resume: true, fork: false, permissions: false },
+    ephemeral: true,
+    buildSpawnArgs() {
+      return [
+        '-e',
+        [
+          "process.on('SIGTERM', () => {});",
+          'setTimeout(() => process.exit(0), 2000);',
+        ].join(' '),
+      ];
+    },
+    buildStdinMessage() {
+      return '';
+    },
+    parseStreamLine() {
+      return null;
+    },
+  };
+}
+
+function createInitThenStallProvider(): Provider {
+  return {
+    name: 'gemini',
+    capabilities: { resume: true, fork: false, permissions: false },
+    ephemeral: true,
+    buildSpawnArgs() {
+      return [
+        '-e',
+        [
+          "process.stdout.write(JSON.stringify({ type: 'init', session_id: 'gemini-session' }) + '\\n');",
+          "process.on('SIGTERM', () => {});",
+          'setTimeout(() => process.exit(0), 2000);',
+        ].join(' '),
+      ];
+    },
+    buildStdinMessage() {
+      return '';
+    },
+    parseStreamLine(line: string): StreamEvent | null {
+      const data = JSON.parse(line) as { type?: string; session_id?: string };
+      if (data.type !== 'init') {
+        return null;
+      }
+      return {
+        type: 'init',
+        sessionId: data.session_id,
+      };
     },
   };
 }

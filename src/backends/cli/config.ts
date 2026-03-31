@@ -128,6 +128,7 @@ export interface ProviderInstanceConfig {
   id: string;
   providerName: ProviderName;
   commandConfig: ProviderCommandConfig;
+  timeoutMs?: number;
   auggieSessionsDir?: string;
   claudeProjectsDir?: string;
   codexSessionsDir?: string;
@@ -1043,6 +1044,10 @@ function applyFileBasedProviderConfig(
           id: instanceId,
           providerName: provider,
           commandConfig,
+          timeoutMs: parseOptionalIntValue(
+            instanceDoc.timeout_ms ?? instanceDoc.timeoutMs,
+            `${provider}.instances.${instanceId}.timeout_ms`,
+          ) ?? fallback.timeoutMs,
           auggieSessionsDir: provider === 'auggie'
             ? readString(instanceDoc.sessions_dir)
               || fallback.auggieSessionsDir

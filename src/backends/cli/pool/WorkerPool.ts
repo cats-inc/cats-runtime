@@ -174,21 +174,26 @@ export class WorkerPool {
       throw new Error(`Max sessions (${this.config.maxSessions}) reached`);
     }
 
+    const instance = resolveProviderInstance(
+      this.config,
+      providerName as ProviderName,
+      providerInstanceId,
+    );
     const { provider, commandConfig } = this.resolveProvider(
       providerName as ProviderName,
       providerInstanceId,
       this.compatibility.getCachedAssessment(
         providerName as ProviderName,
-        resolveProviderInstance(
-          this.config,
-          providerName as ProviderName,
-          providerInstanceId,
-        ).id,
+        instance.id,
       )?.profile,
     );
     const resilience: SpawnResilienceConfig = {
       retries: this.config.spawnRetries,
-      timeoutMs: this.config.spawnTimeoutMs,
+      timeoutMs: resolveCliSpawnTimeoutMs(
+        providerName as ProviderName,
+        instance.timeoutMs,
+        this.config.spawnTimeoutMs,
+      ),
     };
     const worker = new WorkerProcess(provider, opts, commandConfig, resilience);
 
@@ -275,4 +280,18 @@ export class WorkerPool {
       providers,
     };
   }
+}
+
+function resolveCliSpawnTimeoutMs(
+  providerName: ProviderName,
+  instanceTimeoutMs: number | undefined,
+  fallbackTimeoutMs: number,
+): number {
+  if (typeof instanceTimeoutMs === 'number') {
+    return instanceTimeoutMs;
+  }
+  if (providerName === 'gemini') {
+    return 60_000;
+  }
+  return fallbackTimeoutMs;
 }

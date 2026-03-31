@@ -41,19 +41,35 @@ describe('GeminiProvider', () => {
       expect(args).toContain('--resume');
       expect(args).toContain('abc-123');
     });
+
+    it('uses --prompt for ephemeral headless turns after prepareEphemeralTurn', () => {
+      provider.prepareEphemeralTurn?.({
+        message: 'hello',
+      });
+
+      const args = provider.buildSpawnArgs({ cwd: '/tmp' });
+      expect(args).toContain('--prompt');
+      expect(args).toContain('hello');
+    });
   });
 
   describe('buildStdinMessage', () => {
-    it('returns raw content', () => {
-      expect(provider.buildStdinMessage('hello')).toBe('hello');
+    it('returns an empty stdin payload because the prompt is passed via args', () => {
+      expect(provider.buildStdinMessage('hello')).toBe('');
     });
 
-    it('prefixes layered instructions when provided', () => {
-      expect(provider.buildStdinMessage('hello', {
+    it('places layered instructions into the pending --prompt argument', () => {
+      provider.prepareEphemeralTurn?.({
         message: 'hello',
         sessionInstructions: 'Session-level instructions.',
         instructions: 'Turn-level instructions.',
-      })).toContain('Turn-level instructions.');
+      });
+
+      const args = provider.buildSpawnArgs({ cwd: '/tmp' });
+      const promptIndex = args.indexOf('--prompt');
+      expect(promptIndex).toBeGreaterThanOrEqual(0);
+      expect(args[promptIndex + 1]).toContain('Turn-level instructions.');
+      expect(args[promptIndex + 1]).toContain('User message:');
     });
   });
 
@@ -240,6 +256,48 @@ describe('GeminiProvider', () => {
       const line = JSON.stringify({ type: 'unknown_event' });
       const event = provider.parseStreamLine(line);
       expect(event?.type).toBe('raw');
+    });
+  });
+
+  describe('classifyLaunchFailure', () => {
+    it('classifies model capacity exhaustion stderr as a structured refusal', () => {
+      expect(provider.classifyLaunchFailure?.({
+        source: 'stderr',
+        line: 'No capacity available for model gemini-3.1-pro-preview on the server',
+        stderrLines: [
+          'Attempt 1 failed with status 429. Retrying with backoff...',
+          'No capacity available for model gemini-3.1-pro-preview on the server',
+          'MODEL_CAPACITY_EXHAUSTED',
+        ],
+      })).toEqual({
+        category: 'capacity_exhausted',
+        message: "Gemini has no capacity available for model 'gemini-3.1-pro-preview'.",
+        statusCode: 429,
+        retryable: true,
+        source: 'stderr',
+        evidenceSummary: [
+          'No capacity available for model gemini-3.1-pro-preview on the server',
+          'Attempt 1 failed with status 429. Retrying with backoff...',
+          'No capacity available for model gemini-3.1-pro-preview on the server',
+          'MODEL_CAPACITY_EXHAUSTED',
+        ].join(' | '),
+      });
+    });
+
+    it('classifies retry-after stderr as rate limited', () => {
+      expect(provider.classifyLaunchFailure?.({
+        source: 'stderr',
+        line: '429 Too Many Requests. Retry after 2s.',
+        stderrLines: ['429 Too Many Requests. Retry after 2s.'],
+      })).toEqual({
+        category: 'rate_limited',
+        message: 'Gemini rate-limited the request.',
+        statusCode: 429,
+        retryAfterMs: 2000,
+        retryable: true,
+        source: 'stderr',
+        evidenceSummary: '429 Too Many Requests. Retry after 2s. | 429 Too Many Requests. Retry after 2s.',
+      });
     });
   });
 });

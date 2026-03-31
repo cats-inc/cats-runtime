@@ -133,6 +133,7 @@ backends:
             command: gemini
             runner: auto
             sessions_dir: ~/.gemini/tmp
+            timeout_ms: 60000
 
       cursor:
         instances:

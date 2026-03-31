@@ -1348,6 +1348,48 @@ backends:
     }
   });
 
+  it('loads CLI provider instance timeout overrides from separated backends config', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const configPath = join(tempDir, 'providers.yaml');
+    writeFileSync(configPath, `
+version: 1
+environments:
+  native:
+    kind: native
+routing:
+  providers:
+    gemini:
+      default_target:
+        backend: cli
+        instance: native
+backends:
+  cli:
+    providers:
+      gemini:
+        instances:
+          native:
+            environment: native
+            command: gemini
+            runner: auto
+            timeout_ms: 60000
+`.trimStart());
+
+    try {
+      const config = loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_CONFIG_PATH: configPath,
+      });
+
+      expect(resolveProviderInstance(config, 'gemini', 'native')).toMatchObject({
+        id: 'native',
+        timeoutMs: 60000,
+      });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it('rejects mixing legacy providers with separated backends blocks', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
     const configPath = join(tempDir, 'providers.yaml');

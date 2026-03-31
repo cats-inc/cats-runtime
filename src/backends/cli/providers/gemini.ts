@@ -1,8 +1,10 @@
 import type {
   CompatibilityProfileSelection,
   Provider,
+  ProviderLaunchFailureInput,
   ProviderCapabilities,
   ProviderSpawnOptions,
+  RuntimeProviderRefusal,
   StreamEvent,
   TurnInput,
 } from './types.js';
@@ -45,11 +47,16 @@ export class GeminiProvider implements Provider {
   name = 'gemini';
   ephemeral = true;
   capabilities: ProviderCapabilities = { resume: true, fork: false, permissions: false };
+  private pendingPrompt: string | null = null;
 
   constructor(
     private readonly compatibilityProfile?: CompatibilityProfileSelection,
     private readonly evolutionObserver?: ProviderEvolutionEvidenceObserver,
   ) {}
+
+  prepareEphemeralTurn(turn: TurnInput): void {
+    this.pendingPrompt = compileRuntimeTurnPrompt(turn.message, turn);
+  }
 
   buildSpawnArgs(opts: ProviderSpawnOptions): string[] {
     const args: string[] = this.compatibilityProfile?.spawnBaseArgs
@@ -64,11 +71,74 @@ export class GeminiProvider implements Provider {
       args.push('--resume', opts.resumeSessionId);
     }
 
+    if (this.pendingPrompt) {
+      args.push('--prompt', this.pendingPrompt);
+      this.pendingPrompt = null;
+    }
+
     return args;
   }
 
-  buildStdinMessage(content: string, turn?: TurnInput): string {
-    return compileRuntimeTurnPrompt(content, turn);
+  buildStdinMessage(_content: string, _turn?: TurnInput): string {
+    return '';
+  }
+
+  classifyLaunchFailure(input: ProviderLaunchFailureInput): RuntimeProviderRefusal | null {
+    const evidenceSummary = [input.line, ...input.stderrLines]
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      .join(' | ');
+    if (!evidenceSummary) {
+      return null;
+    }
+
+    const normalized = evidenceSummary.toLowerCase();
+    if (
+      normalized.includes('model_capacity_exhausted')
+      || normalized.includes('no capacity available for model')
+    ) {
+      return {
+        category: 'capacity_exhausted',
+        message: extractGeminiCapacityMessage(evidenceSummary),
+        statusCode: 429,
+        retryable: true,
+        source: input.source,
+        evidenceSummary,
+      };
+    }
+
+    if (
+      normalized.includes('ratelimitexceeded')
+      || normalized.includes('too many requests')
+      || normalized.includes('retry after')
+    ) {
+      return {
+        category: 'rate_limited',
+        message: 'Gemini rate-limited the request.',
+        statusCode: 429,
+        retryAfterMs: extractRetryAfterMs(evidenceSummary),
+        retryable: true,
+        source: input.source,
+        evidenceSummary,
+      };
+    }
+
+    if (
+      normalized.includes('login required')
+      || normalized.includes('auth required')
+      || normalized.includes('authentication required')
+      || normalized.includes('unauthorized')
+    ) {
+      return {
+        category: 'auth_required',
+        message: 'Gemini requires authentication before it can continue.',
+        statusCode: 401,
+        retryable: false,
+        source: input.source,
+        evidenceSummary,
+      };
+    }
+
+    return null;
   }
 
   parseStreamLine(line: string): StreamEvent | StreamEvent[] | null {
@@ -365,4 +435,27 @@ function readNonEmptyString(value: unknown): string | undefined {
   }
   const trimmed = value.trim();
   return trimmed ? trimmed : undefined;
+}
+
+function extractGeminiCapacityMessage(evidenceSummary: string): string {
+  const modelMatch = evidenceSummary.match(/model\s+([A-Za-z0-9._-]+)/i);
+  if (modelMatch?.[1]) {
+    return `Gemini has no capacity available for model '${modelMatch[1]}'.`;
+  }
+  return 'Gemini has no capacity available for the selected model right now.';
+}
+
+function extractRetryAfterMs(text: string): number | undefined {
+  const normalized = text.toLowerCase();
+  const millisecondMatch = normalized.match(/retry(?:ing)? after\s+(\d+)\s*ms/);
+  if (millisecondMatch) {
+    return Number.parseInt(millisecondMatch[1]!, 10);
+  }
+
+  const secondMatch = normalized.match(/retry(?:ing)? after\s+(\d+(?:\.\d+)?)\s*s/);
+  if (secondMatch) {
+    return Math.round(Number.parseFloat(secondMatch[1]!) * 1000);
+  }
+
+  return undefined;
 }
