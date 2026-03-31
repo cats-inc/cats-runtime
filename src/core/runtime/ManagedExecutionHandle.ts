@@ -1,5 +1,11 @@
 import { EventEmitter } from 'node:events';
-import type { ExecutionHandle, StreamEvent, TurnInput } from '../types.js';
+import type {
+  ExecutionHandle,
+  RuntimeIncidentClassification,
+  RuntimeProviderRefusal,
+  StreamEvent,
+  TurnInput,
+} from '../types.js';
 
 type ExecutionEventName = 'event' | 'exit' | 'error';
 type ExecutionListener = (...args: unknown[]) => void;
@@ -58,12 +64,9 @@ export class ManagedExecutionHandle implements ExecutionHandle {
         yield event;
       }
     } catch (error) {
-      const errorEvent = {
-        type: 'error',
-        text: error instanceof Error ? error.message : String(error),
-      } satisfies StreamEvent;
+      const errorEvent = buildErrorStreamEvent(error);
       this.emitter.emit('event', errorEvent);
-      this.emitter.emit('error', error);
+      this.emitManagedError(error);
       yield errorEvent;
     } finally {
       this.busyState = false;
@@ -105,7 +108,7 @@ export class ManagedExecutionHandle implements ExecutionHandle {
       if (!lifecycleError) {
         lifecycleError = error;
       } else {
-        this.emitter.emit('error', error);
+        this.emitManagedError(error);
       }
     }
 
@@ -117,7 +120,7 @@ export class ManagedExecutionHandle implements ExecutionHandle {
 
   kill(): void {
     void this.close('close').catch((error) => {
-      this.emitter.emit('error', error);
+      this.emitManagedError(error);
     });
   }
 
@@ -152,5 +155,83 @@ export class ManagedExecutionHandle implements ExecutionHandle {
       });
     this.cancelPromise = promise;
     await promise;
+  }
+
+  private emitManagedError(error: unknown): void {
+    if (this.emitter.listenerCount('error') > 0) {
+      this.emitter.emit('error', error);
+    }
+  }
+}
+
+function buildErrorStreamEvent(error: unknown): StreamEvent {
+  const text = error instanceof Error ? error.message : String(error);
+  const refusal = readProviderRefusal(error);
+  if (!refusal) {
+    return {
+      type: 'error',
+      text,
+    } satisfies StreamEvent;
+  }
+
+  return {
+    type: 'error',
+    text,
+    metadata: {
+      providerRefusal: refusal,
+      ...(buildIncidentHint(refusal) ? { incidentHint: buildIncidentHint(refusal) } : {}),
+    },
+  } satisfies StreamEvent;
+}
+
+function readProviderRefusal(error: unknown): RuntimeProviderRefusal | undefined {
+  if (!error || typeof error !== 'object') {
+    return undefined;
+  }
+  const candidate = (error as { refusal?: RuntimeProviderRefusal }).refusal;
+  if (!candidate || typeof candidate !== 'object') {
+    return undefined;
+  }
+  if (typeof candidate.category !== 'string' || typeof candidate.message !== 'string') {
+    return undefined;
+  }
+  return candidate;
+}
+
+function buildIncidentHint(
+  refusal: RuntimeProviderRefusal,
+): {
+  classification: RuntimeIncidentClassification;
+  statusCode?: number;
+  retryAfterMs?: number;
+  evidenceSummary: string;
+  metadata: Record<string, unknown>;
+} | undefined {
+  const classification = mapRefusalToIncidentClassification(refusal);
+  if (!classification) {
+    return undefined;
+  }
+
+  return {
+    classification,
+    ...(typeof refusal.statusCode === 'number' ? { statusCode: refusal.statusCode } : {}),
+    ...(typeof refusal.retryAfterMs === 'number' ? { retryAfterMs: refusal.retryAfterMs } : {}),
+    evidenceSummary: refusal.evidenceSummary ?? refusal.message,
+    metadata: {
+      refusalCategory: refusal.category,
+      ...(refusal.metadata ?? {}),
+    },
+  };
+}
+
+function mapRefusalToIncidentClassification(
+  refusal: RuntimeProviderRefusal,
+): RuntimeIncidentClassification | undefined {
+  switch (refusal.category) {
+    case 'rate_limited':
+    case 'capacity_exhausted':
+      return 'rate_limited';
+    default:
+      return undefined;
   }
 }

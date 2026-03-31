@@ -397,7 +397,7 @@ const PROVIDER_MODELS = {
   auggie:[{value:'gpt-5.4',label:'gpt-5.4 (default)'},{value:'claude opus 4.6',label:'claude opus 4.6'},{value:'sonnet 4.6',label:'sonnet 4.6'}],
   pi:[{value:'openai-codex/gpt-5.4',label:'openai-codex/gpt-5.4 (default)'}],
   junie:[{value:'gpt-5.4',label:'gpt-5.4 (default)'}],
-  cursor:[{value:'gpt-5.4',label:'gpt-5.4 (default)'},{value:'claude-opus-4-6',label:'claude-opus-4-6'},{value:'gemini-3.1-pro',label:'gemini-3.1-pro'}],
+  cursor:[{value:'auto',label:'Auto (default)'},{value:'composer-2-fast',label:'Composer 2 Fast'},{value:'gpt-5.4-medium',label:'GPT-5.4 1M'},{value:'claude-4.6-opus-high-thinking',label:'Opus 4.6 1M Thinking'},{value:'gemini-3-flash',label:'Gemini 3 Flash'}],
   kiro:[{value:'claude-sonnet-4.5',label:'claude-sonnet-4.5 (default)'},{value:'deepseek-3.2',label:'deepseek-3.2'}],
   goose:[{value:'chatgpt_codex/gpt-5.2-codex',label:'chatgpt_codex/gpt-5.2-codex (default)'}],
   ollama:[{value:'qwen2.5-coder:7b',label:'qwen2.5-coder:7b (default)'}],
@@ -808,7 +808,13 @@ class ChatRoom {
       const fullText = textParts.join('');
       await this._emit({ type:'agent_streaming_end', agent:agent.name, provider:agent.provider, content:fullText, input_tokens:inputTokens, output_tokens:outputTokens });
       if (this._stopRequested) return null;
-      if (!fullText.trim()) return null;
+      if (!fullText.trim()) {
+        await this._emit({
+          type:'error',
+          message:`Runtime error for ${agent.name}: Provider returned no assistant output.`,
+        });
+        return null;
+      }
       this.history.push({ sender:agent.name, content:fullText, input_tokens:inputTokens, output_tokens:outputTokens });
       this._lastTurnIndex[agent.name] = this.history.length - 1;
       return fullText;

@@ -399,6 +399,7 @@ describe('runtime server', () => {
       expect(html).toContain('getRuntimeAuthHeaders');
       expect(html).toContain('/providers/${name}/models/advanced');
       expect(html).toContain('modelSelection');
+      expect(html).toContain('Provider returned no assistant output.');
       expect(html).toContain('getAdvancedCatalogChoices');
       expect(html).toContain('workspaceKind');
       expect(html).toContain('workspaceAccess');
@@ -2857,16 +2858,16 @@ backends:
                 metering: expectIdleMeteringSummary(),
                 modelCatalog: expect.objectContaining({
                   source: 'static',
-                  defaultModel: 'gpt-5.4',
-                  modelCount: 3,
+                  defaultModel: 'auto',
+                  modelCount: 5,
                   warnings: [
-                    'Dynamic model discovery is not available for cursor/cli/ubuntu because Cursor does not currently expose a stable model-listing seam to the runtime.',
+                    'Live model discovery is available for cursor/cli/ubuntu via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',
                   ],
                   statusCounts: {
                     configured: 0,
                     available: 0,
                     running: 0,
-                    unknown: 3,
+                    unknown: 5,
                   },
                 }),
                 tooling: {
@@ -2921,16 +2922,16 @@ backends:
                 metering: expectIdleMeteringSummary(),
                 modelCatalog: expect.objectContaining({
                   source: 'static',
-                  defaultModel: 'gpt-5.4',
-                  modelCount: 3,
+                  defaultModel: 'auto',
+                  modelCount: 5,
                   warnings: [
-                    'Dynamic model discovery is not available for cursor/cli/debian because Cursor does not currently expose a stable model-listing seam to the runtime.',
+                    'Live model discovery is available for cursor/cli/debian via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',
                   ],
                   statusCounts: {
                     configured: 0,
                     available: 0,
                     running: 0,
-                    unknown: 3,
+                    unknown: 5,
                   },
                 }),
                 tooling: {

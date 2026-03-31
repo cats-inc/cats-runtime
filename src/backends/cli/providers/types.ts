@@ -2,6 +2,7 @@ import type {
   ProviderCapabilities,
   ProviderSpawnOptions,
   ProviderTurnOptions,
+  RuntimeProviderRefusal,
   StreamEvent,
   TurnInput,
 } from '../../../core/types.js';
@@ -15,6 +16,7 @@ export type {
   ProviderMessage,
   ProviderSpawnOptions,
   ProviderTurnOptions,
+  RuntimeProviderRefusal,
   StreamEvent,
   TurnInput,
 } from '../../../core/types.js';
@@ -91,6 +93,7 @@ export interface Provider {
   buildSpawnArgs(opts: ProviderSpawnOptions): string[];
   buildStdinMessage(content: string, turn?: TurnInput): string;
   parseStreamLine(line: string): StreamEvent | StreamEvent[] | null;
+  classifyLaunchFailure?(input: ProviderLaunchFailureInput): RuntimeProviderRefusal | null;
   buildAutoResponse?(line: string): string | null;
   getPendingTurnStart?(): string | null;
   streamTurn?(turn: TurnInput, opts: ProviderTurnOptions): AsyncGenerator<StreamEvent>;
@@ -100,4 +103,11 @@ export interface Provider {
   resolveFirstEventTimeoutMs?(defaultTimeoutMs: number): number;
   beforeTurn?(opts: ProviderSpawnOptions): Promise<void>;
   afterTurn?(opts: ProviderSpawnOptions): Promise<StreamEvent | StreamEvent[] | null>;
+}
+
+export interface ProviderLaunchFailureInput {
+  source: 'stderr' | 'timeout' | 'exit';
+  line?: string;
+  stderrLines: string[];
+  exitCode?: number | null;
 }

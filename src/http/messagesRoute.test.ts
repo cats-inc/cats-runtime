@@ -828,4 +828,74 @@ describe('message route transcript persistence', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it('preserves provider refusal metadata and incident hints in streamed error output', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-message-route-'));
+    const sessionBaseDir = join(root, 'sessions');
+    mkdirSync(sessionBaseDir, { recursive: true });
+
+    try {
+      const { app, session } = makeApp(sessionBaseDir, async function* () {
+        yield {
+          type: 'error',
+          text: "Gemini has no capacity available for model 'gemini-3.1-pro-preview'.",
+          metadata: {
+            providerRefusal: {
+              category: 'capacity_exhausted',
+              message: "Gemini has no capacity available for model 'gemini-3.1-pro-preview'.",
+              statusCode: 429,
+              retryable: true,
+              source: 'stderr',
+              evidenceSummary: 'MODEL_CAPACITY_EXHAUSTED',
+            },
+            incidentHint: {
+              classification: 'rate_limited',
+              statusCode: 429,
+              evidenceSummary: 'MODEL_CAPACITY_EXHAUSTED',
+              metadata: {
+                refusalCategory: 'capacity_exhausted',
+              },
+            },
+          },
+        };
+      }, {
+        rateLimitCooldownMs: 5000,
+      });
+
+      const response = await app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({ message: 'hello' }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(parseNdjson(await response.text())).toEqual([
+        expect.objectContaining({
+          type: 'error',
+          text: "Gemini has no capacity available for model 'gemini-3.1-pro-preview'.",
+          metadata: expect.objectContaining({
+            providerRefusal: expect.objectContaining({
+              category: 'capacity_exhausted',
+              statusCode: 429,
+            }),
+            incidentHint: expect.objectContaining({
+              classification: 'rate_limited',
+              statusCode: 429,
+            }),
+            incident: expect.objectContaining({
+              classification: 'rate_limited',
+            }),
+            guardrail: expect.objectContaining({
+              outcome: 'cooldown',
+            }),
+          }),
+        }),
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

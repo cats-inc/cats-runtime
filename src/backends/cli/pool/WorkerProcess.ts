@@ -9,7 +9,12 @@ import type {
   StreamEvent,
   TurnInput,
 } from '../../../core/types.js';
-import type { Provider, ProviderSpawnOptions } from '../providers/types.js';
+import type {
+  Provider,
+  ProviderLaunchFailureInput,
+  ProviderSpawnOptions,
+  RuntimeProviderRefusal,
+} from '../providers/types.js';
 import { buildProcessSpawnConfig } from '../runtime/runtime.js';
 import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
 
@@ -47,6 +52,8 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
   private _providerSessionId: string | null = null;
   private activeTurnController: AbortController | null = null;
   private stderrLines: string[] = [];
+  private launchFailureRefusal: RuntimeProviderRefusal | null = null;
+  private launchResponseObserved = false;
   private lastLaunchSummary = '';
   private spawnResilience: SpawnResilienceConfig;
 
@@ -89,6 +96,8 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       Object.assign(env, spawnConfig.env);
     }
     this.stderrLines = [];
+    this.launchFailureRefusal = null;
+    this.launchResponseObserved = false;
     this.lastLaunchSummary = formatLaunchSummary(
       this.commandConfig.runtime.mode,
       this.commandConfig.runner,
@@ -119,6 +128,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       if (parsed) {
         const events = Array.isArray(parsed) ? parsed : [parsed];
         for (const event of events) {
+          this.launchResponseObserved = true;
           if (isSessionIdentityEvent(event) && event.sessionId) {
             this._providerSessionId = event.sessionId;
           }
@@ -139,6 +149,12 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       const text = chunk.toString('utf-8').trim();
       if (text) {
         this.captureStderr(text);
+        const refusal = this.recordLaunchFailureRefusal({
+          source: 'stderr',
+          line: text,
+          stderrLines: [...this.stderrLines],
+        });
+        this.maybeFailFastOnLaunchRefusal(refusal);
         if (shouldLogProviderStderr(this.provider.name)) {
           console.error(`[${this.provider.name}:stderr] ${text}`);
         }
@@ -243,6 +259,17 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     };
 
     const handleExit = async (code: number | null) => {
+      const refusal = this.recordLaunchFailureRefusal({
+        source: 'exit',
+        exitCode: code,
+        stderrLines: [...this.stderrLines],
+      });
+      if (!sawEvent && refusal) {
+        error = this.buildProviderRefusalError(refusal);
+        push(null);
+        return;
+      }
+
       if (!sawEvent && (error || code !== 0)) {
         if (!error) {
           error = this.buildProcessExitError(code);
@@ -298,10 +325,16 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
           if (timeoutMs > 0) {
             timeoutId = setTimeout(() => {
               if (!sawEvent && this.process && this.process.exitCode === null) {
-                error = new Error(
-                  `Provider did not respond within ${timeoutMs}ms`
-                  + (this.lastLaunchSummary ? `. launch: ${this.lastLaunchSummary}` : ''),
-                );
+                const refusal = this.recordLaunchFailureRefusal({
+                  source: 'timeout',
+                  stderrLines: [...this.stderrLines],
+                });
+                error = refusal
+                  ? this.buildProviderRefusalError(refusal)
+                  : new Error(
+                    `Provider did not respond within ${timeoutMs}ms`
+                    + (this.lastLaunchSummary ? `. launch: ${this.lastLaunchSummary}` : ''),
+                  );
                 this.process.kill('SIGTERM');
               }
             }, timeoutMs);
@@ -394,6 +427,46 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     }
   }
 
+  private recordLaunchFailureRefusal(
+    input: ProviderLaunchFailureInput,
+  ): RuntimeProviderRefusal | null {
+    const refusal = this.provider.classifyLaunchFailure?.(input)
+      ?? inferCommonProviderRefusal(this.provider.name, input);
+    if (refusal) {
+      this.launchFailureRefusal = refusal;
+      return refusal;
+    }
+    return this.launchFailureRefusal;
+  }
+
+  private buildProviderRefusalError(refusal: RuntimeProviderRefusal): Error {
+    const error = new Error(refusal.message) as Error & { refusal: RuntimeProviderRefusal };
+    error.name = 'ProviderRefusalError';
+    error.refusal = {
+      ...refusal,
+      metadata: {
+        ...(refusal.metadata ?? {}),
+        ...(this.lastLaunchSummary ? { launch: this.lastLaunchSummary } : {}),
+        ...(this.stderrLines.length > 0 ? { stderrLines: [...this.stderrLines] } : {}),
+      },
+    };
+    return error;
+  }
+
+  private maybeFailFastOnLaunchRefusal(
+    refusal: RuntimeProviderRefusal | null,
+  ): void {
+    if (!refusal || this.launchResponseObserved || !shouldFailFastOnRefusal(refusal)) {
+      return;
+    }
+    if (!this.process || this.process.exitCode !== null) {
+      return;
+    }
+
+    this.emit('error', this.buildProviderRefusalError(refusal));
+    this.process.kill('SIGTERM');
+  }
+
   private buildProcessExitError(code: number | null): Error {
     const details = [`Process exited with code ${code} before responding`];
     if (this.lastLaunchSummary) {
@@ -465,4 +538,150 @@ function formatRetryReason(error: unknown): string {
     return `: ${error}`;
   }
   return '';
+}
+
+function inferCommonProviderRefusal(
+  providerName: string,
+  input: ProviderLaunchFailureInput,
+): RuntimeProviderRefusal | null {
+  const evidenceSummary = [input.line, ...input.stderrLines]
+    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    .join(' | ');
+  if (!evidenceSummary) {
+    return null;
+  }
+
+  const normalized = evidenceSummary.toLowerCase();
+  const statusCode = extractStatusCode(evidenceSummary);
+  const retryAfterMs = extractRetryAfterMs(evidenceSummary);
+  const displayName = formatProviderDisplayName(providerName);
+
+  if (
+    normalized.includes('model_capacity_exhausted')
+    || normalized.includes('no capacity available for model')
+    || normalized.includes('capacity exhausted')
+  ) {
+    return {
+      category: 'capacity_exhausted',
+      message: `${displayName} has no capacity available for the selected model right now.`,
+      statusCode: statusCode ?? 429,
+      retryAfterMs,
+      retryable: true,
+      source: input.source,
+      evidenceSummary,
+    };
+  }
+
+  if (
+    statusCode === 429
+    || normalized.includes('too many requests')
+    || normalized.includes('rate limit')
+    || normalized.includes('ratelimit')
+    || normalized.includes('retry after')
+  ) {
+    return {
+      category: 'rate_limited',
+      message: `${displayName} rate-limited the request.`,
+      statusCode: statusCode ?? 429,
+      retryAfterMs,
+      retryable: true,
+      source: input.source,
+      evidenceSummary,
+    };
+  }
+
+  if (
+    normalized.includes('authentication required')
+    || normalized.includes('auth required')
+    || normalized.includes('login required')
+    || normalized.includes('not authenticated')
+    || normalized.includes('unauthorized')
+  ) {
+    return {
+      category: 'auth_required',
+      message: `${displayName} requires authentication before it can continue.`,
+      statusCode: statusCode ?? 401,
+      retryable: false,
+      source: input.source,
+      evidenceSummary,
+    };
+  }
+
+  if (
+    normalized.includes('connection refused')
+    || normalized.includes('failed to connect')
+    || normalized.includes('server is not running')
+    || normalized.includes('daemon is not running')
+    || normalized.includes('econnrefused')
+  ) {
+    return {
+      category: 'provider_unavailable',
+      message: `${displayName} is unavailable or not reachable right now.`,
+      statusCode,
+      retryable: true,
+      source: input.source,
+      evidenceSummary,
+    };
+  }
+
+  if (
+    normalized.includes('forbidden')
+    || normalized.includes('abuse')
+    || normalized.includes('banned')
+    || normalized.includes('suspended')
+  ) {
+    return {
+      category: 'provider_rejected',
+      message: `${displayName} refused the request.`,
+      statusCode: statusCode ?? 403,
+      retryable: false,
+      source: input.source,
+      evidenceSummary,
+    };
+  }
+
+  return null;
+}
+
+function shouldFailFastOnRefusal(refusal: RuntimeProviderRefusal): boolean {
+  switch (refusal.category) {
+    case 'rate_limited':
+    case 'capacity_exhausted':
+    case 'auth_required':
+    case 'provider_unavailable':
+    case 'provider_rejected':
+      return true;
+    default:
+      return false;
+  }
+}
+
+function extractStatusCode(text: string): number | undefined {
+  const match = text.match(/\b(401|403|408|409|423|429|500|502|503|504)\b/);
+  if (!match) {
+    return undefined;
+  }
+  return Number.parseInt(match[1]!, 10);
+}
+
+function extractRetryAfterMs(text: string): number | undefined {
+  const normalized = text.toLowerCase();
+  const millisecondMatch = normalized.match(/retry(?:ing)? after\s+(\d+)\s*ms/);
+  if (millisecondMatch) {
+    return Number.parseInt(millisecondMatch[1]!, 10);
+  }
+
+  const secondMatch = normalized.match(/retry(?:ing)? after\s+(\d+(?:\.\d+)?)\s*s/);
+  if (secondMatch) {
+    return Math.round(Number.parseFloat(secondMatch[1]!) * 1000);
+  }
+
+  return undefined;
+}
+
+function formatProviderDisplayName(providerName: string): string {
+  if (!providerName) {
+    return 'Provider';
+  }
+  return providerName.charAt(0).toUpperCase() + providerName.slice(1);
 }

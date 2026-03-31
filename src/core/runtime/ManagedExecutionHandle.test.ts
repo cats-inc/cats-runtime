@@ -57,4 +57,54 @@ describe('ManagedExecutionHandle', () => {
     expect(onExit).toHaveBeenCalledTimes(1);
     expect(onError.mock.calls[0]?.[0]).toBeInstanceOf(Error);
   });
+
+  it('preserves provider refusal metadata when streamMessage throws', async () => {
+    const refusalError: Error & {
+      refusal: {
+        category: 'capacity_exhausted';
+        message: string;
+        statusCode: number;
+        retryable: boolean;
+        source: 'stderr';
+        evidenceSummary: string;
+      };
+    } = new Error('Gemini has no capacity available for the selected model right now.');
+    refusalError.refusal = {
+      category: 'capacity_exhausted',
+      message: refusalError.message,
+      statusCode: 429,
+      retryable: true,
+      source: 'stderr',
+      evidenceSummary: 'MODEL_CAPACITY_EXHAUSTED',
+    };
+
+    const handle = new ManagedExecutionHandle({
+      streamMessage: async function* () {
+        throw refusalError;
+      },
+    });
+
+    const events: StreamEvent[] = [];
+    for await (const event of handle.streamMessage({ message: 'hello' })) {
+      events.push(event);
+    }
+
+    expect(events).toEqual([
+      {
+        type: 'error',
+        text: 'Gemini has no capacity available for the selected model right now.',
+        metadata: {
+          providerRefusal: refusalError.refusal,
+          incidentHint: {
+            classification: 'rate_limited',
+            statusCode: 429,
+            evidenceSummary: 'MODEL_CAPACITY_EXHAUSTED',
+            metadata: {
+              refusalCategory: 'capacity_exhausted',
+            },
+          },
+        },
+      },
+    ]);
+  });
 });

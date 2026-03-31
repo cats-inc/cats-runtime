@@ -26,6 +26,10 @@ import {
   type KiloModelDiscoveryRunner,
 } from '../../backends/cli/kilo/models.js';
 import {
+  discoverCursorModels,
+  type CursorModelDiscoveryRunner,
+} from '../../backends/cli/cursor/models.js';
+import {
   buildRemoteModelDiscoveryRequest,
   DEFAULT_REMOTE_MODEL_DISCOVERY_TIMEOUT_MS,
   fetchRemoteModelDiscovery,
@@ -86,6 +90,7 @@ interface ProviderModelCatalogServiceOptions {
   piModelDiscoveryRunner?: PiModelDiscoveryRunner;
   opencodeModelDiscoveryRunner?: OpencodeModelDiscoveryRunner;
   kiloModelDiscoveryRunner?: KiloModelDiscoveryRunner;
+  cursorModelDiscoveryRunner?: CursorModelDiscoveryRunner;
   remoteDiscoveryTimeoutMs?: number;
 }
 
@@ -167,9 +172,11 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
     { id: 'sonnet', label: 'sonnet' },
   ],
   cursor: [
-    { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
-    { id: 'claude-opus-4-6', label: 'claude-opus-4-6' },
-    { id: 'gemini-3.1-pro', label: 'gemini-3.1-pro' },
+    { id: 'auto', label: 'Auto', default: true },
+    { id: 'composer-2-fast', label: 'Composer 2 Fast' },
+    { id: 'gpt-5.4-medium', label: 'GPT-5.4 1M' },
+    { id: 'claude-4.6-opus-high-thinking', label: 'Opus 4.6 1M Thinking' },
+    { id: 'gemini-3-flash', label: 'Gemini 3 Flash' },
   ],
   goose: [
     { id: 'openai/gpt-5-codex', label: 'openai/gpt-5-codex', default: true },
@@ -207,6 +214,10 @@ function resolveDefaultModel(
     : null;
   if (activeModel) {
     return activeModel;
+  }
+
+  if (target.providerName === 'cursor' && target.backend === 'cli') {
+    return null;
   }
 
   const staticModels = getStaticProviderModels(target);
@@ -385,8 +396,9 @@ function appendKnownStaticCatalogWarnings(
 ): void {
   if (target.backend === 'cli' && target.providerName === 'cursor') {
     warnings.push(
-      `Dynamic model discovery is not available for ${target.providerName}/${target.backend}/${target.instanceId} `
-      + 'because Cursor does not currently expose a stable model-listing seam to the runtime.',
+      `Live model discovery is available for ${target.providerName}/${target.backend}/${target.instanceId} `
+      + 'via `cursor-agent --list-models`, but this read is serving the curated static fallback '
+      + 'until an explicit refresh populates the cache.',
     );
   }
 }
@@ -729,6 +741,18 @@ export class ProviderModelCatalogService {
       };
     }
 
+    if (target.backend === 'cli' && target.providerName === 'cursor' && target.cliInstance) {
+      return {
+        models: (await discoverCursorModels(target.cliInstance, {
+          cwd: this.config.sessionBaseDir,
+          runner: this.options.cursorModelDiscoveryRunner,
+        })).map((model) => ({
+          ...model,
+          status: 'available' as const,
+        })),
+      };
+    }
+
     if (target.backend === 'local' && target.remoteInstance?.transport === 'ollama') {
       return this.listOllamaModels(target.remoteInstance);
     }
@@ -1027,11 +1051,14 @@ export class ProviderModelCatalogService {
       warnings: string[];
     },
   ): ProviderModelCatalogResult {
+    const effectiveDefaultModel = input.defaultModel
+      ?? input.models.find((entry) => entry.default)?.id
+      ?? null;
     return {
       provider: target.providerName,
       backend: target.backend,
       instance: target.instanceId,
-      defaultModel: input.defaultModel,
+      defaultModel: effectiveDefaultModel,
       source: input.source,
       cache: input.cache,
       models: input.models,

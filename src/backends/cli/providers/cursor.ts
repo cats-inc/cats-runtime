@@ -1,7 +1,9 @@
 import type {
   Provider,
   ProviderCapabilities,
+  ProviderLaunchFailureInput,
   ProviderSpawnOptions,
+  RuntimeProviderRefusal,
   StreamEvent,
   TurnInput,
 } from './types.js';
@@ -85,6 +87,32 @@ export class CursorProvider implements Provider {
 
   buildStdinMessage(_content: string): string {
     return '';
+  }
+
+  classifyLaunchFailure(input: ProviderLaunchFailureInput): RuntimeProviderRefusal | null {
+    const evidenceSummary = [input.line, ...input.stderrLines]
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      .join(' | ');
+    if (!evidenceSummary) {
+      return null;
+    }
+
+    const unsupportedModel = parseUnsupportedCursorModel(evidenceSummary);
+    if (!unsupportedModel) {
+      return null;
+    }
+
+    return {
+      category: 'provider_rejected',
+      message: unsupportedModel.message,
+      retryable: false,
+      source: input.source,
+      evidenceSummary,
+      metadata: {
+        rejectedModel: unsupportedModel.rejectedModel,
+        availableModels: unsupportedModel.availableModels,
+      },
+    };
   }
 
   parseStreamLine(line: string): StreamEvent | StreamEvent[] | null {
@@ -272,4 +300,33 @@ function stringifyCursorContent(value: unknown): string | undefined {
   } catch {
     return String(value);
   }
+}
+
+function parseUnsupportedCursorModel(
+  evidenceSummary: string,
+): {
+  message: string;
+  rejectedModel: string;
+  availableModels: string[];
+} | null {
+  const match = evidenceSummary.match(
+    /(?:^|\|\s*)Cannot use this model:\s*(.+?)\.\s*Available models:\s*([^|]+)/i,
+  );
+  if (!match?.[1] || !match[2]) {
+    return null;
+  }
+
+  const rejectedModel = match[1].trim();
+  const availableModels = match[2]
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return {
+    message: availableModels.length > 0
+      ? `Cursor cannot use model '${rejectedModel}'. Available models: ${availableModels.join(', ')}`
+      : `Cursor cannot use model '${rejectedModel}'.`,
+    rejectedModel,
+    availableModels,
+  };
 }

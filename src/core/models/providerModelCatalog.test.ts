@@ -446,7 +446,7 @@ describe('ProviderModelCatalogService', () => {
     }
   });
 
-  it('adds an honest warning when Cursor still uses the static catalog fallback', async () => {
+  it('adds an honest warning when Cursor is still serving the curated static fallback', async () => {
     const config = {
       ...createCatalogConfig(),
       providerDefaultTargets: {
@@ -480,18 +480,113 @@ describe('ProviderModelCatalogService', () => {
 
     expect(service.inspectSummary('cursor')).toEqual({
       source: 'static',
-      defaultModel: 'gpt-5.4',
-      modelCount: 3,
+      defaultModel: 'auto',
+      modelCount: 5,
       warnings: [
-        'Dynamic model discovery is not available for cursor/cli/default because Cursor does not currently expose a stable model-listing seam to the runtime.',
+        'Live model discovery is available for cursor/cli/default via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',
       ],
       statusCounts: {
         configured: 0,
         available: 0,
         running: 0,
-        unknown: 3,
+        unknown: 5,
       },
     });
+  });
+
+  it('loads dynamic Cursor model catalogs through cursor-agent --list-models', async () => {
+    const cursorModelDiscoveryRunner = {
+      run: vi.fn(async () => ({
+        exitCode: 0,
+        stdout: [
+          'Loading models…',
+          'Available models',
+          '',
+          'auto - Auto',
+          'gpt-5.4-medium - GPT-5.4 1M',
+          'claude-4.6-opus-high-thinking - Opus 4.6 1M Thinking  (default)',
+          'gpt-5.4-xhigh - GPT-5.4 1M Extra High  (current)',
+          '',
+          'Tip: use --model <id> to switch.',
+        ].join('\n'),
+        stderr: '',
+        timedOut: false,
+        durationMs: 3,
+      })),
+    };
+
+    const config = {
+      ...createCatalogConfig(),
+      providerDefaultTargets: {
+        cursor: { backend: 'cli', instance: 'default' },
+      },
+      providerInstances: {
+        ...createCatalogConfig().providerInstances,
+        cursor: {
+          default: {
+            id: 'default',
+            providerName: 'cursor',
+            commandConfig: {
+              path: 'cursor-agent',
+              runner: 'auto',
+              runtime: { mode: 'native' },
+            },
+          },
+        },
+      },
+      providerCommands: {
+        ...createCatalogConfig().providerCommands,
+        cursor: {
+          path: 'cursor-agent',
+          runner: 'auto',
+          runtime: { mode: 'native' },
+        },
+      },
+    } as const;
+
+    const service = new ProviderModelCatalogService(config as never, {
+      cursorModelDiscoveryRunner,
+      ttlMs: 60_000,
+    });
+
+    const catalog = await service.getCatalog('cursor', undefined, { forceRefresh: true });
+    expect(catalog).toEqual(expect.objectContaining({
+      provider: 'cursor',
+      backend: 'cli',
+      instance: 'default',
+      defaultModel: 'claude-4.6-opus-high-thinking',
+      source: 'dynamic',
+      cache: {
+        servedFromCache: false,
+        cachedAt: expect.any(String),
+        ttlSec: 60,
+      },
+      warnings: [],
+    }));
+    expect(catalog.models).toEqual([
+      {
+        id: 'auto',
+        label: 'Auto',
+        status: 'available',
+      },
+      {
+        id: 'gpt-5.4-medium',
+        label: 'GPT-5.4 1M',
+        status: 'available',
+      },
+      {
+        id: 'claude-4.6-opus-high-thinking',
+        label: 'Opus 4.6 1M Thinking',
+        default: true,
+        status: 'available',
+      },
+      {
+        id: 'gpt-5.4-xhigh',
+        label: 'GPT-5.4 1M Extra High',
+        status: 'available',
+      },
+    ]);
+    expect(vi.mocked(cursorModelDiscoveryRunner.run)).toHaveBeenCalledTimes(1);
   });
 
   it('loads dynamic Pi model catalogs through the shared runtime catalog service', async () => {

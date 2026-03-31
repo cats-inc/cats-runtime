@@ -49,6 +49,34 @@ describe('WorkerProcess PowerShell helpers', () => {
     );
   });
 
+  it('surfaces a classified stderr refusal instead of synthesizing a timeout', async () => {
+    const worker = new WorkerProcess(
+      createRefusalBeforeTimeoutProvider(),
+      { cwd: process.cwd() },
+      createNodeCommandConfig(),
+      { retries: 1, timeoutMs: 10 },
+    );
+
+    await expect(worker.sendMessage('ignored')).rejects.toThrow(
+      'Gemini has no capacity available for the selected model right now.',
+    );
+  });
+
+  it('fails fast on a classified stderr refusal instead of waiting for the timeout window', async () => {
+    const worker = new WorkerProcess(
+      createRefusalBeforeTimeoutProvider(4000),
+      { cwd: process.cwd() },
+      createNodeCommandConfig(),
+      { retries: 1, timeoutMs: 10_000 },
+    );
+
+    const startedAt = Date.now();
+    await expect(worker.sendMessage('ignored')).rejects.toThrow(
+      'Gemini has no capacity available for the selected model right now.',
+    );
+    expect(Date.now() - startedAt).toBeLessThan(2500);
+  });
+
   it('lets completion-only ephemeral providers disable the first-event timeout', async () => {
     const worker = new WorkerProcess(
       createCompletionOnlyProvider(0),
@@ -127,6 +155,39 @@ function createCompletionOnlyProvider(
     },
     resolveFirstEventTimeoutMs(defaultTimeoutMs: number): number {
       return timeoutOverrideMs ?? defaultTimeoutMs;
+    },
+  };
+}
+
+function createRefusalBeforeTimeoutProvider(exitDelayMs = 50): Provider {
+  return {
+    name: 'gemini',
+    capabilities: { resume: true, fork: false, permissions: false },
+    ephemeral: true,
+    buildSpawnArgs() {
+      return [
+        '-e',
+        [
+          "process.stderr.write('429 Too Many Requests. Retry after 2s.\\n');",
+          `setTimeout(() => process.exit(0), ${exitDelayMs});`,
+        ].join(' '),
+      ];
+    },
+    buildStdinMessage() {
+      return '';
+    },
+    parseStreamLine() {
+      return null;
+    },
+    classifyLaunchFailure() {
+      return {
+        category: 'capacity_exhausted',
+        message: 'Gemini has no capacity available for the selected model right now.',
+        statusCode: 429,
+        retryable: true,
+        source: 'stderr',
+        evidenceSummary: '429 Too Many Requests. Retry after 2s.',
+      };
     },
   };
 }

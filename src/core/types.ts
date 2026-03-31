@@ -171,6 +171,14 @@ export type RuntimeIncidentClassification =
   | 'quota_exhausted'
   | 'cooldown_active'
   | 'concurrency_limited';
+export type RuntimeProviderRefusalCategory =
+  | 'rate_limited'
+  | 'capacity_exhausted'
+  | 'auth_required'
+  | 'provider_unavailable'
+  | 'provider_rejected'
+  | 'true_timeout'
+  | 'unknown';
 export type RuntimeIncidentScope =
   | 'session'
   | 'provider_instance'
@@ -221,6 +229,17 @@ export interface WorkspaceSubstrateHints {
   background?: string;
   technologyLabels?: string[];
   documentationStyle?: string;
+}
+
+export interface RuntimeProviderRefusal {
+  category: RuntimeProviderRefusalCategory;
+  message: string;
+  statusCode?: number;
+  retryAfterMs?: number;
+  retryable?: boolean;
+  source?: 'stderr' | 'timeout' | 'exit';
+  evidenceSummary?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface WorkspaceSubstrateAuthorizationInput {

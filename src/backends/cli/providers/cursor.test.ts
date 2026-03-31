@@ -248,4 +248,26 @@ describe('CursorProvider', () => {
       },
     });
   });
+
+  it('classifies unsupported cursor model errors as provider refusals', () => {
+    const provider = new CursorProvider();
+
+    expect(provider.classifyLaunchFailure?.({
+      source: 'stderr',
+      line: 'Cannot use this model: gpt-5.4. Available models: auto, composer-2-fast, gpt-5.4-medium',
+      stderrLines: [
+        'Cannot use this model: gpt-5.4. Available models: auto, composer-2-fast, gpt-5.4-medium',
+      ],
+    })).toEqual({
+      category: 'provider_rejected',
+      message: 'Cursor cannot use model \'gpt-5.4\'. Available models: auto, composer-2-fast, gpt-5.4-medium',
+      retryable: false,
+      source: 'stderr',
+      evidenceSummary: 'Cannot use this model: gpt-5.4. Available models: auto, composer-2-fast, gpt-5.4-medium | Cannot use this model: gpt-5.4. Available models: auto, composer-2-fast, gpt-5.4-medium',
+      metadata: {
+        rejectedModel: 'gpt-5.4',
+        availableModels: ['auto', 'composer-2-fast', 'gpt-5.4-medium'],
+      },
+    });
+  });
 });
