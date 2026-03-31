@@ -544,96 +544,69 @@ function inferCommonProviderRefusal(
   providerName: string,
   input: ProviderLaunchFailureInput,
 ): RuntimeProviderRefusal | null {
-  const evidenceSummary = [input.line, ...input.stderrLines]
-    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
-    .join(' | ');
-  if (!evidenceSummary) {
+  const evidenceLines = collectEvidenceLines(input);
+  if (evidenceLines.length === 0) {
     return null;
   }
 
-  const normalized = evidenceSummary.toLowerCase();
-  const statusCode = extractStatusCode(evidenceSummary);
-  const retryAfterMs = extractRetryAfterMs(evidenceSummary);
+  const evidenceSummary = evidenceLines.join(' | ');
   const displayName = formatProviderDisplayName(providerName);
-
-  if (
-    normalized.includes('model_capacity_exhausted')
-    || normalized.includes('no capacity available for model')
-    || normalized.includes('capacity exhausted')
-  ) {
+  const capacityLine = evidenceLines.find((line) => lineHasCapacitySignal(line));
+  if (capacityLine) {
     return {
       category: 'capacity_exhausted',
       message: `${displayName} has no capacity available for the selected model right now.`,
-      statusCode: statusCode ?? 429,
-      retryAfterMs,
+      statusCode: extractStatusCode(capacityLine) ?? 429,
+      retryAfterMs: extractRetryAfterMs(capacityLine),
       retryable: true,
       source: input.source,
       evidenceSummary,
     };
   }
 
-  if (
-    statusCode === 429
-    || normalized.includes('too many requests')
-    || normalized.includes('rate limit')
-    || normalized.includes('ratelimit')
-    || normalized.includes('retry after')
-  ) {
+  const rateLimitLine = evidenceLines.find((line) => lineHasRateLimitSignal(line));
+  if (rateLimitLine) {
     return {
       category: 'rate_limited',
       message: `${displayName} rate-limited the request.`,
-      statusCode: statusCode ?? 429,
-      retryAfterMs,
+      statusCode: extractStatusCode(rateLimitLine) ?? 429,
+      retryAfterMs: extractRetryAfterMs(rateLimitLine),
       retryable: true,
       source: input.source,
       evidenceSummary,
     };
   }
 
-  if (
-    normalized.includes('authentication required')
-    || normalized.includes('auth required')
-    || normalized.includes('login required')
-    || normalized.includes('not authenticated')
-    || normalized.includes('unauthorized')
-  ) {
+  const authLine = evidenceLines.find((line) => lineHasAuthSignal(line));
+  if (authLine) {
     return {
       category: 'auth_required',
       message: `${displayName} requires authentication before it can continue.`,
-      statusCode: statusCode ?? 401,
+      statusCode: extractStatusCode(authLine) ?? 401,
       retryable: false,
       source: input.source,
       evidenceSummary,
     };
   }
 
-  if (
-    normalized.includes('connection refused')
-    || normalized.includes('failed to connect')
-    || normalized.includes('server is not running')
-    || normalized.includes('daemon is not running')
-    || normalized.includes('econnrefused')
-  ) {
+  const unavailableLine = evidenceLines.find((line) => lineHasUnavailableSignal(line));
+  if (unavailableLine) {
     return {
       category: 'provider_unavailable',
       message: `${displayName} is unavailable or not reachable right now.`,
-      statusCode,
+      statusCode: extractStatusCode(unavailableLine),
       retryable: true,
       source: input.source,
       evidenceSummary,
     };
   }
 
-  if (
-    normalized.includes('forbidden')
-    || normalized.includes('abuse')
-    || normalized.includes('banned')
-    || normalized.includes('suspended')
-  ) {
+  const rejectedLine = evidenceLines.find((line) => lineHasRejectedSignal(line));
+  if (rejectedLine) {
     return {
       category: 'provider_rejected',
       message: `${displayName} refused the request.`,
-      statusCode: statusCode ?? 403,
+      statusCode: extractStatusCode(rejectedLine) ?? 403,
       retryable: false,
       source: input.source,
       evidenceSummary,
@@ -656,12 +629,84 @@ function shouldFailFastOnRefusal(refusal: RuntimeProviderRefusal): boolean {
   }
 }
 
+function collectEvidenceLines(input: ProviderLaunchFailureInput): string[] {
+  const lines = [input.line, ...input.stderrLines]
+    .flatMap((value) => (typeof value === 'string' ? value.split(/\r?\n/) : []))
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  return Array.from(new Set(lines));
+}
+
+function lineHasCapacitySignal(line: string): boolean {
+  const normalized = line.toLowerCase();
+  return (
+    normalized.includes('model_capacity_exhausted')
+    || normalized.includes('no capacity available for model')
+    || normalized.includes('capacity exhausted')
+    || (normalized.includes('resource_exhausted') && extractStatusCode(line) === 429)
+  );
+}
+
+function lineHasRateLimitSignal(line: string): boolean {
+  const normalized = line.toLowerCase();
+  return (
+    normalized.includes('too many requests')
+    || normalized.includes('rate limit')
+    || normalized.includes('ratelimit')
+    || normalized.includes('retry after')
+    || (normalized.includes('resource_exhausted') && extractStatusCode(line) === 429)
+    || (extractStatusCode(line) === 429 && /^429\b/.test(normalized))
+  );
+}
+
+function lineHasAuthSignal(line: string): boolean {
+  const normalized = line.toLowerCase();
+  return (
+    normalized.includes('authentication required')
+    || normalized.includes('auth required')
+    || normalized.includes('login required')
+    || normalized.includes('not authenticated')
+    || normalized.includes('unauthorized')
+  );
+}
+
+function lineHasUnavailableSignal(line: string): boolean {
+  const normalized = line.toLowerCase();
+  return (
+    normalized.includes('connection refused')
+    || normalized.includes('failed to connect')
+    || normalized.includes('server is not running')
+    || normalized.includes('daemon is not running')
+    || normalized.includes('econnrefused')
+  );
+}
+
+function lineHasRejectedSignal(line: string): boolean {
+  const normalized = line.toLowerCase();
+  return (
+    normalized.includes('forbidden')
+    || normalized.includes('abuse')
+    || normalized.includes('banned')
+    || normalized.includes('suspended')
+  );
+}
+
 function extractStatusCode(text: string): number | undefined {
-  const match = text.match(/\b(401|403|408|409|423|429|500|502|503|504)\b/);
-  if (!match) {
-    return undefined;
+  const patterns = [
+    /\bstatus(?:\s*code)?\s*[:=]?\s*(401|403|408|409|423|429|500|502|503|504)\b/i,
+    /\bhttp\s*(401|403|408|409|423|429|500|502|503|504)\b/i,
+    /^\s*(401|403|408|409|423|429|500|502|503|504)\b/,
+    /\b(401|403|408|409|423|429|500|502|503|504)\s+(?:too many requests|unauthorized|forbidden|service unavailable|bad gateway|gateway timeout)\b/i,
+  ] as const;
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      return Number.parseInt(match[1]!, 10);
+    }
   }
-  return Number.parseInt(match[1]!, 10);
+
+  return undefined;
 }
 
 function extractRetryAfterMs(text: string): number | undefined {

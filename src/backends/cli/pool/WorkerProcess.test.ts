@@ -116,6 +116,19 @@ describe('WorkerProcess PowerShell helpers', () => {
       /Process exited with code 127 before responding\..*stderr: sh: 1: auggie: not found/s,
     );
   });
+
+  it('does not misclassify an unrelated port number as a provider refusal status code', async () => {
+    const worker = new WorkerProcess(
+      createPortNumberOnlyErrorProvider(),
+      { cwd: process.cwd() },
+      createNodeCommandConfig(),
+      { retries: 1, timeoutMs: 1000 },
+    );
+
+    await expect(worker.sendMessage('ignored')).rejects.toThrow(
+      /Process exited with code 1 before responding\..*stderr: daemon listening on port 429/s,
+    );
+  });
 });
 
 function createNodeCommandConfig(): ProviderCommandConfig {
@@ -240,6 +253,29 @@ function createMaskingErrorProvider(): Provider {
     },
     async afterTurn() {
       throw new Error('Auggie exited without emitting a usable JSON result.');
+    },
+  };
+}
+
+function createPortNumberOnlyErrorProvider(): Provider {
+  return {
+    name: 'ollama',
+    capabilities: { resume: true, fork: false, permissions: false },
+    ephemeral: true,
+    buildSpawnArgs() {
+      return [
+        '-e',
+        [
+          "process.stderr.write('daemon listening on port 429\\n');",
+          'process.exit(1);',
+        ].join(' '),
+      ];
+    },
+    buildStdinMessage() {
+      return '';
+    },
+    parseStreamLine() {
+      return null;
     },
   };
 }

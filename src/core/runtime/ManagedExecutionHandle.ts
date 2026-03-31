@@ -174,12 +174,14 @@ function buildErrorStreamEvent(error: unknown): StreamEvent {
     } satisfies StreamEvent;
   }
 
+  const incidentHint = buildIncidentHint(refusal);
+
   return {
     type: 'error',
     text,
     metadata: {
       providerRefusal: refusal,
-      ...(buildIncidentHint(refusal) ? { incidentHint: buildIncidentHint(refusal) } : {}),
+      ...(incidentHint ? { incidentHint } : {}),
     },
   } satisfies StreamEvent;
 }
