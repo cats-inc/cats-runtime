@@ -80,11 +80,20 @@ describe('SessionRegistry', () => {
   it('records messages and tokens', () => {
     const s = registry.create({ providerName: 'claude', cwd: '/a' });
     registry.recordMessage(s.id, 100, 50);
-    registry.recordMessage(s.id, 200, 100);
+    registry.recordMessage(s.id, {
+      inputTokens: 200,
+      outputTokens: 100,
+      promptInputTokens: 80,
+      cacheReadInputTokens: 70,
+      cacheCreationInputTokens: 50,
+    });
     const updated = registry.get(s.id)!;
     expect(updated.messageCount).toBe(2);
     expect(updated.totalInputTokens).toBe(300);
     expect(updated.totalOutputTokens).toBe(150);
+    expect(updated.totalPromptInputTokens).toBe(180);
+    expect(updated.totalCacheReadInputTokens).toBe(70);
+    expect(updated.totalCacheCreationInputTokens).toBe(50);
   });
 
   it('sets provider session id', () => {

@@ -399,6 +399,9 @@ describe('ClaudeProvider', () => {
       expect(event?.sessionId).toBe('claude-abc');
       expect(event?.usage?.inputTokens).toBe(115); // 100+10+5
       expect(event?.usage?.outputTokens).toBe(50);
+      expect(event?.usage?.promptInputTokens).toBe(100);
+      expect(event?.usage?.cacheReadInputTokens).toBe(10);
+      expect(event?.usage?.cacheCreationInputTokens).toBe(5);
     });
 
     it('returns raw for non-JSON lines', () => {

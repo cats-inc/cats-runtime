@@ -25,6 +25,7 @@ export type {
   SessionResumeStrategy,
   SessionStatus,
   SessionView,
+  StreamUsage,
   TurnInput,
   WorkspaceAccess,
   WorkspaceKind,

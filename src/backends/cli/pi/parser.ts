@@ -92,6 +92,8 @@ function extractUsage(message: PiStreamEvent['message']): StreamEvent['usage'] |
   return {
     inputTokens: (usage.input ?? 0) + (usage.cacheRead ?? 0),
     outputTokens: usage.output ?? 0,
+    promptInputTokens: usage.input ?? 0,
+    cacheReadInputTokens: usage.cacheRead ?? 0,
   };
 }
 

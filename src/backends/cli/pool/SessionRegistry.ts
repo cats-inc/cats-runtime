@@ -17,6 +17,7 @@ import type {
   SessionReusePolicy,
   SessionSkillState,
   SessionStatus,
+  StreamUsage,
   SessionWorkspaceIsolationState,
   WorkspaceAccess,
   WorkspaceKind,
@@ -184,6 +185,9 @@ export class SessionRegistry {
             legacyWorkspaceIsolation: loaded.workspaceIsolation,
           }),
           strategy: coercePersistedSessionStrategyState(loaded),
+          totalPromptInputTokens: loaded.totalPromptInputTokens ?? 0,
+          totalCacheReadInputTokens: loaded.totalCacheReadInputTokens ?? 0,
+          totalCacheCreationInputTokens: loaded.totalCacheCreationInputTokens ?? 0,
         };
         s.workspaceMode = toLegacyWorkspaceMode(s.workspace.kind, s.workspace.access);
         s.workspaceIsolation = toLegacyWorkspaceIsolationState(s.workspace);
@@ -317,6 +321,9 @@ export class SessionRegistry {
       messageCount: 0,
       totalInputTokens: 0,
       totalOutputTokens: 0,
+      totalPromptInputTokens: 0,
+      totalCacheReadInputTokens: 0,
+      totalCacheCreationInputTokens: 0,
       createdAt: now,
       updatedAt: now,
     };
@@ -522,12 +529,28 @@ export class SessionRegistry {
     return true;
   }
 
-  recordMessage(id: string, inputTokens?: number, outputTokens?: number): boolean {
+  recordMessage(
+    id: string,
+    usageOrInputTokens?: number | StreamUsage,
+    outputTokens?: number,
+  ): boolean {
     const session = this.sessions.get(id);
     if (!session) return false;
+    const usage = normalizeRecordedUsage(usageOrInputTokens, outputTokens);
     session.messageCount++;
-    if (inputTokens) session.totalInputTokens += inputTokens;
-    if (outputTokens) session.totalOutputTokens += outputTokens;
+    if (usage.inputTokens > 0) session.totalInputTokens += usage.inputTokens;
+    if (usage.outputTokens > 0) session.totalOutputTokens += usage.outputTokens;
+    if (usage.promptInputTokens > 0) {
+      session.totalPromptInputTokens = (session.totalPromptInputTokens ?? 0) + usage.promptInputTokens;
+    }
+    if (usage.cacheReadInputTokens > 0) {
+      session.totalCacheReadInputTokens =
+        (session.totalCacheReadInputTokens ?? 0) + usage.cacheReadInputTokens;
+    }
+    if (usage.cacheCreationInputTokens > 0) {
+      session.totalCacheCreationInputTokens =
+        (session.totalCacheCreationInputTokens ?? 0) + usage.cacheCreationInputTokens;
+    }
     session.lastActivity = new Date().toISOString();
     session.updatedAt = new Date().toISOString();
     this.scheduleSave();
@@ -790,6 +813,9 @@ export class SessionRegistry {
       messageCount: mergedData.messageCount ?? 0,
       totalInputTokens: 0,
       totalOutputTokens: 0,
+      totalPromptInputTokens: 0,
+      totalCacheReadInputTokens: 0,
+      totalCacheCreationInputTokens: 0,
       createdAt: now,
       updatedAt: now,
       lastActivity: mergedData.lastActivity,
@@ -1104,10 +1130,58 @@ export class SessionRegistry {
     target.messageCount = Math.max(target.messageCount, incoming.messageCount);
     target.totalInputTokens = Math.max(target.totalInputTokens, incoming.totalInputTokens);
     target.totalOutputTokens = Math.max(target.totalOutputTokens, incoming.totalOutputTokens);
+    target.totalPromptInputTokens = Math.max(
+      target.totalPromptInputTokens ?? 0,
+      incoming.totalPromptInputTokens ?? 0,
+    );
+    target.totalCacheReadInputTokens = Math.max(
+      target.totalCacheReadInputTokens ?? 0,
+      incoming.totalCacheReadInputTokens ?? 0,
+    );
+    target.totalCacheCreationInputTokens = Math.max(
+      target.totalCacheCreationInputTokens ?? 0,
+      incoming.totalCacheCreationInputTokens ?? 0,
+    );
     target.createdAt = earlierTimestamp(target.createdAt, incoming.createdAt);
     target.updatedAt = laterTimestamp(target.updatedAt, incoming.updatedAt);
     target.lastActivity = laterOptionalTimestamp(target.lastActivity, incoming.lastActivity);
   }
+}
+
+function normalizeRecordedUsage(
+  usageOrInputTokens?: number | StreamUsage,
+  outputTokens?: number,
+): Required<Pick<
+  StreamUsage,
+  | 'inputTokens'
+  | 'outputTokens'
+  | 'promptInputTokens'
+  | 'cacheReadInputTokens'
+  | 'cacheCreationInputTokens'
+>> {
+  if (typeof usageOrInputTokens === 'number' || usageOrInputTokens === undefined) {
+    return {
+      inputTokens: usageOrInputTokens ?? 0,
+      outputTokens: outputTokens ?? 0,
+      promptInputTokens: usageOrInputTokens ?? 0,
+      cacheReadInputTokens: 0,
+      cacheCreationInputTokens: 0,
+    };
+  }
+
+  const cacheReadInputTokens = usageOrInputTokens.cacheReadInputTokens ?? 0;
+  const cacheCreationInputTokens = usageOrInputTokens.cacheCreationInputTokens ?? 0;
+  const inputTokens = usageOrInputTokens.inputTokens ?? 0;
+  const promptInputTokens = usageOrInputTokens.promptInputTokens
+    ?? Math.max(inputTokens - cacheReadInputTokens - cacheCreationInputTokens, 0);
+
+  return {
+    inputTokens,
+    outputTokens: usageOrInputTokens.outputTokens ?? 0,
+    promptInputTokens,
+    cacheReadInputTokens,
+    cacheCreationInputTokens,
+  };
 }
 
 function earlierTimestamp(left: string, right: string): string {

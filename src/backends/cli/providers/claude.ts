@@ -168,6 +168,9 @@ export class ClaudeProvider implements Provider {
             + (event.usage.cache_read_input_tokens ?? 0)
             + (event.usage.cache_creation_input_tokens ?? 0),
           outputTokens: event.usage.output_tokens ?? 0,
+          promptInputTokens: event.usage.input_tokens ?? 0,
+          cacheReadInputTokens: event.usage.cache_read_input_tokens ?? 0,
+          cacheCreationInputTokens: event.usage.cache_creation_input_tokens ?? 0,
         } : undefined,
         raw: event,
       } satisfies ResultStreamEvent);

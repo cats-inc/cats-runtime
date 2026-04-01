@@ -33,6 +33,8 @@ describe('parseJunieStreamLine', () => {
         usage: {
           inputTokens: 350,
           outputTokens: 80,
+          promptInputTokens: 300,
+          cacheReadInputTokens: 50,
           estimatedCost: 0.03,
         },
         metadata: {
@@ -133,6 +135,9 @@ describe('parseJunieStreamLine', () => {
       usageDelta: {
         inputTokens: 17,
         outputTokens: 3,
+        promptInputTokens: 10,
+        cacheReadInputTokens: 5,
+        cacheCreationInputTokens: 2,
         estimatedCost: undefined,
       },
     });

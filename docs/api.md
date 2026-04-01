@@ -2369,8 +2369,10 @@ Rules:
 
 For message turns, the runtime now preserves the session's previously persisted
 instructions as a separate base layer for the current execution. The current
-request's `instructions` field stays turn-scoped, and instruction delivery is
-composed in this order:
+request's explicit `instructions` field is delivered as the top execution layer,
+and when provided it also becomes the session's persisted instructions for
+subsequent turns. Instruction delivery for the current execution is composed in
+this order:
 
 1. resolved runtime skill instructions
 2. persisted session-level instructions
@@ -2610,6 +2612,11 @@ Streamed message output may include `tool_use`, `tool_result`, `progress`, and
 additive `content_block` events in addition to `init`, `text`, `result`, and
 `error`.
 
+When providers report usage, `result.usage` may also include additive
+`promptInputTokens`, `cacheReadInputTokens`, and
+`cacheCreationInputTokens` fields in addition to aggregate `inputTokens` and
+`outputTokens`.
+
 `content_block` is a runtime-owned host contract layered over the normalized
 stream. It lets hosts render a stable live transcript without depending on
 provider-native raw block schemas. Each event carries a full block snapshot
@@ -2785,6 +2792,7 @@ such as:
     { "role": "user", "text": "..." },
     { "role": "assistant", "text": "..." }
   ],
+  "instructions": "The following runtime-managed skills are attached to this session.\n\n...",
   "transcript": {
     "ownership": "provider",
     "source": "jsonl",
@@ -2847,6 +2855,17 @@ the last bounded remote tool/service evidence after the live stream is gone.
 `GET /sessions/{id}/history` also reuses the same additive `providerTarget`
 read model returned by `GET /sessions/{id}` so provider continuity/tooling
 semantics stay visible alongside transcript provenance.
+
+When `CATS_RUNTIME_DASHBOARD_SHOW_INSTRUCTIONS=true`, the history payload also
+includes additive `instructions` containing the current effective session
+instruction layers that the runtime would rehydrate for the session:
+
+1. resolved runtime skill instruction overlay
+2. currently persisted session instructions
+
+This field is session-scoped. It reflects the runtime's current persisted
+session state, not the transient per-request layering state from an in-flight
+message turn.
 
 ### Runtime Inspection
 

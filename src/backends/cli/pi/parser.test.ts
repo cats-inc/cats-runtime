@@ -68,6 +68,8 @@ describe('parsePiStreamLine', () => {
     expect(event?.type).toBe('result');
     expect(event?.usage?.inputTokens).toBe(110); // 100 + 10
     expect(event?.usage?.outputTokens).toBe(50);
+    expect(event?.usage?.promptInputTokens).toBe(100);
+    expect(event?.usage?.cacheReadInputTokens).toBe(10);
   });
 
   it('does not end the stream on turn_end for tool-use turns', () => {
@@ -323,6 +325,8 @@ describe('parsePiStreamLine current message schema', () => {
         usage: {
           inputTokens: 1954,
           outputTokens: 255,
+          promptInputTokens: 162,
+          cacheReadInputTokens: 1792,
         },
         metadata: {
           runtimeUsage: {
@@ -436,6 +440,8 @@ describe('parsePiStreamLine current message schema', () => {
         usage: {
           inputTokens: 947,
           outputTokens: 7,
+          promptInputTokens: 947,
+          cacheReadInputTokens: 0,
         },
         metadata: {
           runtimeUsage: {

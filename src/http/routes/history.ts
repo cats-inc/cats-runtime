@@ -10,6 +10,7 @@ import {
 import type { SessionInfo } from '../../backends/cli/pool/types.js';
 import { toSessionView } from '../../backends/cli/pool/sessionView.js';
 import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
+import { mergeRuntimeInstructionLayers } from '../../core/skills/catalog.js';
 import {
   readRuntimeExecutionStrategyEffectiveStrategy,
   readRuntimeExecutionStrategyRequest,
@@ -88,9 +89,13 @@ function buildHistoryMetadata(ctx: AppContext, session: SessionInfo) {
   });
   const strategyRequest = readRuntimeExecutionStrategyRequest(session);
   const strategyState = readRuntimeExecutionStrategyState(session);
+  const dashboardInstructions = mergeRuntimeInstructionLayers(
+    session.skills,
+    session.instructions,
+  );
   return {
-    ...(ctx.config.dashboardShowInstructions && session.instructions
-      ? { instructions: session.instructions }
+    ...(ctx.config.dashboardShowInstructions && dashboardInstructions
+      ? { instructions: dashboardInstructions }
       : {}),
     sessionKey: session.sessionKey,
     providerTarget: buildSessionProviderTargetSummary(ctx, session),

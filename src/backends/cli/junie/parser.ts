@@ -13,6 +13,9 @@ import { createRuntimeProgressEvent } from '../../../core/progress.js';
 export interface JunieUsageTotals {
   inputTokens: number;
   outputTokens: number;
+  promptInputTokens?: number;
+  cacheReadInputTokens?: number;
+  cacheCreationInputTokens?: number;
   estimatedCost?: number;
   currency?: string;
 }
@@ -341,14 +344,21 @@ function aggregateJunieUsage(entries: unknown): JunieUsageTotals | undefined {
 
   let inputTokens = 0;
   let outputTokens = 0;
+  let promptInputTokens = 0;
+  let cacheReadInputTokens = 0;
+  let cacheCreationInputTokens = 0;
   let estimatedCost = 0;
 
   for (const entry of entries) {
     const usage = asRecord(entry);
     if (!usage) continue;
-    inputTokens += readNumber(usage.inputTokens);
-    inputTokens += readNumber(usage.cacheInputTokens);
-    inputTokens += readNumber(usage.cacheCreateTokens);
+    const promptTokens = readNumber(usage.inputTokens);
+    const cacheReadTokens = readNumber(usage.cacheInputTokens);
+    const cacheCreateTokens = readNumber(usage.cacheCreateTokens);
+    promptInputTokens += promptTokens;
+    cacheReadInputTokens += cacheReadTokens;
+    cacheCreationInputTokens += cacheCreateTokens;
+    inputTokens += promptTokens + cacheReadTokens + cacheCreateTokens;
     outputTokens += readNumber(usage.outputTokens);
     estimatedCost += readNumber(usage.cost);
   }
@@ -356,6 +366,9 @@ function aggregateJunieUsage(entries: unknown): JunieUsageTotals | undefined {
   return sanitizeUsage({
     inputTokens,
     outputTokens,
+    ...(promptInputTokens > 0 ? { promptInputTokens } : {}),
+    ...(cacheReadInputTokens > 0 ? { cacheReadInputTokens } : {}),
+    ...(cacheCreationInputTokens > 0 ? { cacheCreationInputTokens } : {}),
     estimatedCost: estimatedCost > 0 ? estimatedCost : undefined,
   });
 }

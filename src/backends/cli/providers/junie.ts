@@ -519,6 +519,10 @@ function mergeUsage(base: JunieUsageTotals, delta: JunieUsageTotals): JunieUsage
   return {
     inputTokens: base.inputTokens + delta.inputTokens,
     outputTokens: base.outputTokens + delta.outputTokens,
+    promptInputTokens: (base.promptInputTokens ?? 0) + (delta.promptInputTokens ?? 0),
+    cacheReadInputTokens: (base.cacheReadInputTokens ?? 0) + (delta.cacheReadInputTokens ?? 0),
+    cacheCreationInputTokens:
+      (base.cacheCreationInputTokens ?? 0) + (delta.cacheCreationInputTokens ?? 0),
     estimatedCost: (base.estimatedCost ?? 0) + (delta.estimatedCost ?? 0),
     currency: base.currency ?? delta.currency,
   };

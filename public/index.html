@@ -2631,7 +2631,7 @@ function connectObserver(id) {
     if (isStreaming) return;
     const event = JSON.parse(e.data);
     if (event.usage) {
-      addSystemMsg(`Tokens: ${event.usage.inputTokens?.toLocaleString()} in / ${event.usage.outputTokens?.toLocaleString()} out`);
+      addSystemMsg(`Tokens: ${formatUsageSummary(event.usage)}`);
     }
     // Reset for next message
     observeFullText = '';
@@ -2689,6 +2689,66 @@ async function loadHistory(id) {
   } catch {}
 }
 
+function readPromptInputTokens(input) {
+  if (!input || typeof input !== 'object') return 0;
+  if (typeof input.promptInputTokens === 'number') {
+    return input.promptInputTokens;
+  }
+  const cacheRead = typeof input.cacheReadInputTokens === 'number'
+    ? input.cacheReadInputTokens
+    : (typeof input.totalCacheReadInputTokens === 'number' ? input.totalCacheReadInputTokens : 0);
+  const cacheCreate = typeof input.cacheCreationInputTokens === 'number'
+    ? input.cacheCreationInputTokens
+    : (typeof input.totalCacheCreationInputTokens === 'number' ? input.totalCacheCreationInputTokens : 0);
+  const totalInput = typeof input.inputTokens === 'number'
+    ? input.inputTokens
+    : (typeof input.totalInputTokens === 'number' ? input.totalInputTokens : 0);
+  return Math.max(totalInput - cacheRead - cacheCreate, 0);
+}
+
+function hasInputBreakdown(input) {
+  if (!input || typeof input !== 'object') return false;
+  return typeof input.promptInputTokens === 'number'
+    || typeof input.cacheReadInputTokens === 'number'
+    || typeof input.cacheCreationInputTokens === 'number'
+    || typeof input.totalPromptInputTokens === 'number'
+    || typeof input.totalCacheReadInputTokens === 'number'
+    || typeof input.totalCacheCreationInputTokens === 'number';
+}
+
+function formatUsageSummary(input) {
+  if (!input || typeof input !== 'object') return '';
+  const outputTokens = typeof input.outputTokens === 'number'
+    ? input.outputTokens
+    : (typeof input.totalOutputTokens === 'number' ? input.totalOutputTokens : 0);
+  if (hasInputBreakdown(input)) {
+    const promptInputTokens = readPromptInputTokens(input);
+    const cacheReadInputTokens = typeof input.cacheReadInputTokens === 'number'
+      ? input.cacheReadInputTokens
+      : (typeof input.totalCacheReadInputTokens === 'number' ? input.totalCacheReadInputTokens : 0);
+    const cacheCreationInputTokens = typeof input.cacheCreationInputTokens === 'number'
+      ? input.cacheCreationInputTokens
+      : (typeof input.totalCacheCreationInputTokens === 'number' ? input.totalCacheCreationInputTokens : 0);
+    const parts = [];
+    if (promptInputTokens > 0 || outputTokens > 0) {
+      parts.push(`${promptInputTokens.toLocaleString()} prompt`);
+    }
+    if (cacheReadInputTokens > 0) {
+      parts.push(`${cacheReadInputTokens.toLocaleString()} cache-read`);
+    }
+    if (cacheCreationInputTokens > 0) {
+      parts.push(`${cacheCreationInputTokens.toLocaleString()} cache-create`);
+    }
+    parts.push(`${outputTokens.toLocaleString()} out`);
+    return parts.join(' / ');
+  }
+
+  const inputTokens = typeof input.inputTokens === 'number'
+    ? input.inputTokens
+    : (typeof input.totalInputTokens === 'number' ? input.totalInputTokens : 0);
+  return `${inputTokens.toLocaleString()} in / ${outputTokens.toLocaleString()} out`;
+}
+
 async function refreshSession() {
   if (!currentSessionId) return;
   try {
@@ -2727,8 +2787,14 @@ async function refreshSession() {
     if (s.cwd) meta.push(s.cwd.replace(/\\/g, '/'));
     if (s.model) meta.push(s.model);
     meta.push(`${s.messageCount || 0} msgs`);
-    if (s.totalInputTokens || s.totalOutputTokens) {
-      meta.push(`${(s.totalInputTokens||0).toLocaleString()} in / ${(s.totalOutputTokens||0).toLocaleString()} out tokens`);
+    if (
+      s.totalInputTokens
+      || s.totalOutputTokens
+      || s.totalPromptInputTokens
+      || s.totalCacheReadInputTokens
+      || s.totalCacheCreationInputTokens
+    ) {
+      meta.push(`${formatUsageSummary(s)} tokens`);
     }
     document.getElementById('chatSessionMeta').textContent = meta.join(' | ');
     renderSessionInsights(s);
@@ -3120,7 +3186,7 @@ function processStreamEvent(event, el, fullText) {
       break;
     case 'result':
       if (event.usage) {
-        addSystemMsg(`Tokens: ${event.usage.inputTokens?.toLocaleString()} in / ${event.usage.outputTokens?.toLocaleString()} out`);
+        addSystemMsg(`Tokens: ${formatUsageSummary(event.usage)}`);
       }
       break;
     case 'error':
@@ -3178,7 +3244,7 @@ function addInstructionsMsg(text) {
   const el = document.createElement('details');
   el.className = 'msg msg-instructions';
   const summary = document.createElement('summary');
-  summary.textContent = 'System Instructions';
+  summary.textContent = 'Effective Session Instructions';
   const pre = document.createElement('pre');
   pre.textContent = text;
   el.appendChild(summary);

@@ -1051,6 +1051,9 @@ export interface SessionControls {
 export interface StreamUsage {
   inputTokens: number;
   outputTokens: number;
+  promptInputTokens?: number;
+  cacheReadInputTokens?: number;
+  cacheCreationInputTokens?: number;
   totalTokens?: number;
   estimatedCost?: number;
   currency?: string;
@@ -1552,6 +1555,9 @@ export interface SessionInfo {
   messageCount: number;
   totalInputTokens: number;
   totalOutputTokens: number;
+  totalPromptInputTokens?: number;
+  totalCacheReadInputTokens?: number;
+  totalCacheCreationInputTokens?: number;
   createdAt: string;
   updatedAt: string;
   lastActivity?: string;

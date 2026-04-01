@@ -761,8 +761,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
               assistantText = flushAssistantText(historyState.sourcePath, assistantText);
               ctx.registry.recordMessage(
                 id,
-                observedEvent.usage?.inputTokens,
-                observedEvent.usage?.outputTokens,
+                observedEvent.usage,
               );
               restoreReadyIfSessionStillInteractive(ctx.registry, id);
             }
@@ -884,8 +883,7 @@ messageRoutes.post('/sessions/:id/messages', async (c) => {
           assistantText = flushAssistantText(sseHistoryState.sourcePath, assistantText);
           ctx.registry.recordMessage(
             id,
-            observedEvent.usage?.inputTokens,
-            observedEvent.usage?.outputTokens,
+            observedEvent.usage,
           );
           restoreReadyIfSessionStillInteractive(ctx.registry, id);
         }

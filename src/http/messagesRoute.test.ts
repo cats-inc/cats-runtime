@@ -19,6 +19,7 @@ import { parseCoreNdjson as parseNdjson } from '../../tests/streamEventTestUtils
 function makeConfig(
   sessionBaseDir: string,
   metering?: CliRuntimeConfig['metering'],
+  dashboardShowInstructions = false,
 ): CliRuntimeConfig {
   return {
     host: '127.0.0.1',
@@ -58,6 +59,7 @@ function makeConfig(
     spawnTimeoutMs: 30000,
     sessionBaseDir,
     metering,
+    dashboardShowInstructions,
     providerCommands: {
       auggie: { path: 'auggie', runner: 'auto', runtime: { mode: 'native' } },
       claude: { path: 'claude', runner: 'auto', runtime: { mode: 'native' } },
@@ -75,6 +77,7 @@ function makeApp(
   sessionBaseDir: string,
   streamMessage: (turnInput: TurnInput) => AsyncGenerator<StreamEvent>,
   metering?: CliRuntimeConfig['metering'],
+  dashboardShowInstructions = false,
 ) {
   const registry = new SessionRegistry();
   const worker = {
@@ -97,7 +100,7 @@ function makeApp(
   } as unknown as WorkerPool;
 
   const app = createApp({
-    config: makeConfig(sessionBaseDir, metering),
+    config: makeConfig(sessionBaseDir, metering, dashboardShowInstructions),
     startup: createRuntimeStartupState(),
     registry,
     pool,
@@ -358,6 +361,63 @@ describe('message route transcript persistence', () => {
           }),
         }),
       }));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('returns composed effective session instructions in history when dashboard display is enabled', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-message-route-'));
+    const sessionBaseDir = join(root, 'sessions');
+    mkdirSync(sessionBaseDir, { recursive: true });
+
+    try {
+      const { app, session } = makeApp(
+        sessionBaseDir,
+        async function* () {
+          yield { type: 'result' };
+        },
+        undefined,
+        true,
+      );
+
+      const response = await app.request(`/sessions/${session.id}/messages`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({
+          message: 'hello',
+          instructions: 'Base room instruction.',
+          skills: {
+            profileId: 'companion',
+            requestedSkills: ['companion'],
+            context: {
+              catId: 'cat-1',
+              roomMode: 'direct_cat_chat',
+              transport: 'web',
+              labels: ['participant:cat'],
+            },
+          },
+        }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(parseNdjson(await response.text())).toEqual([
+        { type: 'result' },
+      ]);
+
+      const historyResponse = await app.request(`/sessions/${session.id}/history`);
+      expect(historyResponse.status).toBe(200);
+      const historyBody = await historyResponse.json();
+      expect(historyBody).toEqual(expect.objectContaining({
+        instructions: expect.stringContaining(
+          'The following runtime-managed skills are attached to this session.',
+        ),
+      }));
+      expect(historyBody.instructions).toContain('Runtime Skill: Companion (companion)');
+      expect(historyBody.instructions).toContain('Base room instruction.');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
