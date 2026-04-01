@@ -452,7 +452,6 @@ function normalizeSelectionAliasesForTarget(
   const normalized = canonicalizeProviderModelSelection(selection);
   const normalizedEntryId = normalizeProviderCatalogModelId(target, normalized.entryId);
   return {
-    ...(normalizedEntryId ? { entryId: normalizedEntryId } : {}),
     ...normalized,
     ...(normalizedEntryId ? { entryId: normalizedEntryId } : {}),
   };

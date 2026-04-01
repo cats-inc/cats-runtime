@@ -228,7 +228,6 @@ function buildCodexCliControls(
     };
   }
 
-  const miniOnlyEntryIds = applicableEntryIds.filter((entryId) => entryId === 'gpt-5.1-codex-mini');
   const nonMiniEntryIds = applicableEntryIds.filter((entryId) => entryId !== 'gpt-5.1-codex-mini');
 
   return {
