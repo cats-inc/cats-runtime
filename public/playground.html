@@ -624,6 +624,9 @@ class RuntimeClient {
   async closeSession(sessionId) {
     try { await fetch(`${this.baseUrl}/sessions/${sessionId}/close`, { method:'POST', headers:this._headers() }); } catch {}
   }
+  async cancelSession(sessionId) {
+    try { await fetch(`${this.baseUrl}/sessions/${sessionId}/cancel`, { method:'POST', headers:this._headers() }); } catch {}
+  }
   async createPlaygroundWorkspace() {
     const r = await fetch(`${this.baseUrl}/playground/workspace`, {
       method:'POST',
@@ -785,7 +788,7 @@ class ChatRoom {
     if (this._activeAbort) { try { this._activeAbort.abort(); } catch {} }
     const active = this._activeAgent;
     if (active && active.sessionId) {
-      try { await this.client.closeSession(active.sessionId); } catch {} active.sessionId = null;
+      try { await this.client.cancelSession(active.sessionId); } catch {}
     }
     await this._emit({type:'interrupted'});
   }

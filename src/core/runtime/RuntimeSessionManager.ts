@@ -341,18 +341,25 @@ export class RuntimeSessionManager {
       };
     }
 
-    switch (session.providerBackend) {
-      case 'agent':
-        await this.agentBackend?.cancel(session.id, 'cancel');
-        break;
-      case 'api':
-      case 'local':
-        await this.apiBackend?.cancel(session.id, 'cancel');
-        break;
-      case 'cli':
-      default:
-        this.pool.cancel(session.id);
-        break;
+    try {
+      switch (session.providerBackend) {
+        case 'agent':
+          await this.agentBackend?.cancel(session.id, 'cancel');
+          break;
+        case 'api':
+        case 'local':
+          await this.apiBackend?.cancel(session.id, 'cancel');
+          break;
+        case 'cli':
+        default:
+          this.pool.cancel(session.id);
+          break;
+      }
+    } catch {
+      await this.close(session, 'close');
+      return {
+        attached: this.isAttached(session.id),
+      };
     }
 
     return {
