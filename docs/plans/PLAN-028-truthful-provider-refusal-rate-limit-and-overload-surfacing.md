@@ -20,7 +20,7 @@
 - Supporting decisions:
   [ADR-017](../decisions/017-own-usage-metering-rate-limit-detection-and-execution-guardrails.md)
 - Related follow-through:
-  [PLAN-008](./PLAN-008-provider-compatibility-and-evidence-engine.md)
+  [PLAN-029](./PLAN-029-provider-compatibility-and-evidence-engine.md)
 
 ## Overview
 

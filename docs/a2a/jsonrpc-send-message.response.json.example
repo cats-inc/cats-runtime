@@ -46,7 +46,7 @@
               "data": {
                 "references": [
                   "docs/specs/SPEC-007-provider-compatibility-and-evidence-engine.md",
-                  "docs/plans/PLAN-008-provider-compatibility-and-evidence-engine.md",
+                  "docs/plans/PLAN-029-provider-compatibility-and-evidence-engine.md",
                   "PROGRESS.md"
                 ]
               },

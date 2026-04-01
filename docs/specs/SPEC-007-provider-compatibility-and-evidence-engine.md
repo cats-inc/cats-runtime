@@ -373,4 +373,4 @@ approval and merge step should remain reviewable by humans.
 *Created: 2026-03-20*
 *Author: Codex*
 *Last updated: 2026-03-23*
-*Related Plan: [PLAN-008-provider-compatibility-and-evidence-engine](../plans/PLAN-008-provider-compatibility-and-evidence-engine.md)*
+*Related Plan: [PLAN-029-provider-compatibility-and-evidence-engine](../plans/PLAN-029-provider-compatibility-and-evidence-engine.md)*

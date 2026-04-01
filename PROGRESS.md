@@ -392,7 +392,7 @@ replay-friendly evidence when probes fail or behavior is unknown.
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Write implementation plan for the first compatibility slice | [x] | `docs/plans/PLAN-008-provider-compatibility-and-evidence-engine.md` records scope, phases, and validation targets |
+| Write implementation plan for the first compatibility slice | [x] | `docs/plans/PLAN-029-provider-compatibility-and-evidence-engine.md` records scope, phases, and validation targets |
 | Add shared compatibility engine under `src/core/compatibility` | [x] | Runtime now caches probe results, classifies compatibility, and exposes cached summaries across routes and execution |
 | Reuse compatibility assessment across setup, diagnostics, and execution | [x] | Session create/resume/fork paths prime CLI targets before spawn; diagnostics and provider config read from the same cache |
 | Add first-wave provider-family knowledge and degraded profile selection | [x] | Claude, Codex, Gemini, and Copilot now have curated probe/profile metadata; other CLI families fall back to runtime-default profiles with explicit degradation |

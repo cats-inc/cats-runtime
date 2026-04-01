@@ -1,4 +1,6 @@
-# PLAN-008: Provider Compatibility and Evidence Engine
+# PLAN-029: Provider Compatibility and Evidence Engine
+
+> Renumbered from PLAN-008 to resolve duplicate numbering with PLAN-008-runtime-managed-skills-v0.
 
 > Implementation plan for the first shipped slice of `SPEC-007`, focused on
 > CLI-backed provider compatibility, replay-friendly evidence capture, and one
