@@ -126,9 +126,9 @@ const KIRO_WSL_MODELS: ProviderModelCatalogEntry[] = [
 
 const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
   claude: [
-    { id: 'default', label: 'Default (recommended)', default: true },
-    { id: 'sonnet', label: 'Sonnet' },
-    { id: 'haiku', label: 'Haiku' },
+    { id: 'default', label: 'Opus 4.6 with 1M context', default: true },
+    { id: 'sonnet', label: 'Sonnet 4.6' },
+    { id: 'haiku', label: 'Haiku 4.5' },
   ],
   codex: [
     { id: 'gpt-5.4', label: 'gpt-5.4', default: true },

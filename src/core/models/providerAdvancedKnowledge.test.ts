@@ -260,9 +260,9 @@ describe('buildProviderAdvancedKnowledge', () => {
       source: 'static',
       cache: null,
       models: [
-        { id: 'default', label: 'Default (recommended)', default: true },
-        { id: 'sonnet', label: 'Sonnet' },
-        { id: 'haiku', label: 'Haiku' },
+        { id: 'default', label: 'Opus 4.6 with 1M context', default: true },
+        { id: 'sonnet', label: 'Sonnet 4.6' },
+        { id: 'haiku', label: 'Haiku 4.5' },
       ],
       warnings: [],
     });
@@ -271,22 +271,22 @@ describe('buildProviderAdvancedKnowledge', () => {
     expect(knowledge.catalog.entries).toEqual([
       {
         id: 'default',
-        label: 'Default (recommended)',
+        label: 'Opus 4.6 with 1M context',
         default: true,
         capabilityTags: ['tool_use'],
-        notes: ['Opus 4.6 with 1M context. Most capable for complex work.'],
+        notes: ['Most capable for complex work.'],
       },
       {
         id: 'sonnet',
-        label: 'Sonnet',
+        label: 'Sonnet 4.6',
         capabilityTags: ['tool_use'],
-        notes: ['Sonnet 4.6. Best for everyday tasks.'],
+        notes: ['Best for everyday tasks.'],
       },
       {
         id: 'haiku',
-        label: 'Haiku',
+        label: 'Haiku 4.5',
         capabilityTags: ['tool_use', 'latency_optimized'],
-        notes: ['Haiku 4.5. Fastest for quick answers.'],
+        notes: ['Fastest for quick answers.'],
       },
     ]);
     expect(knowledge.catalog.controls[0]).toEqual({

@@ -64,11 +64,11 @@ function buildEntryNotes(
   if (target.providerName === 'claude' && target.backend === 'cli') {
     switch (entryId) {
       case 'default':
-        return ['Opus 4.6 with 1M context. Most capable for complex work.'];
+        return ['Most capable for complex work.'];
       case 'sonnet':
-        return ['Sonnet 4.6. Best for everyday tasks.'];
+        return ['Best for everyday tasks.'];
       case 'haiku':
-        return ['Haiku 4.5. Fastest for quick answers.'];
+        return ['Fastest for quick answers.'];
       default:
         return undefined;
     }
