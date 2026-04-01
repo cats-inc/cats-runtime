@@ -393,6 +393,19 @@ interface ResolvedSessionModelState {
   warnings: string[];
 }
 
+function shouldRetrySessionSelectionWithoutPreset(message: string): boolean {
+  return /Unknown preset '/u.test(message)
+    || /Preset '.*' is not applicable to entry '/u.test(message);
+}
+
+function removePresetFromSelection(
+  selection: ProviderModelSelection,
+): ProviderModelSelection {
+  const normalized = canonicalizeProviderModelSelection(selection);
+  const { presetId: _presetId, ...withoutPreset } = normalized;
+  return withoutPreset;
+}
+
 function sessionMatchesTarget(
   session: Pick<SessionInfo, 'providerName' | 'providerBackend' | 'providerInstanceId'>,
   target: ProviderTargetDescriptor,
@@ -438,32 +451,42 @@ async function resolveRequestedSessionModelState(
     warnings: [warning],
   });
   let resolved;
+  let compatibilityWarnings: string[] = [];
   try {
     resolved = resolveProviderSelection(knowledge, effectiveSelection);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (
-      input.legacyModel
-      && (
-        !input.selection
-        || isLegacyCompatibleExplicitSelection(input.selection, input.legacyModel)
-      )
-      && /Unknown catalog entry/.test(message)
-    ) {
-      return buildCompatibilityFallback(
-        input.legacyModel,
-        `Legacy model '${input.legacyModel}' is not present in the advanced catalog; `
-        + 'preserving it as a compatibility passthrough.',
-      );
+    if (input.selection?.presetId && shouldRetrySessionSelectionWithoutPreset(message)) {
+      const sanitizedSelection = removePresetFromSelection(input.selection);
+      resolved = resolveProviderSelection(knowledge, sanitizedSelection);
+      compatibilityWarnings = [
+        `Preset '${input.selection.presetId}' is no longer available for `
+        + `${target.providerName}/${target.backend}/${target.instanceId}; continuing without it.`,
+      ];
+    } else {
+      if (
+        input.legacyModel
+        && (
+          !input.selection
+          || isLegacyCompatibleExplicitSelection(input.selection, input.legacyModel)
+        )
+        && /Unknown catalog entry/.test(message)
+      ) {
+        return buildCompatibilityFallback(
+          input.legacyModel,
+          `Legacy model '${input.legacyModel}' is not present in the advanced catalog; `
+          + 'preserving it as a compatibility passthrough.',
+        );
+      }
+      if (input.legacyModel && input.fallbackToLegacyModelOnResolutionError) {
+        return buildCompatibilityFallback(
+          input.legacyModel,
+          `Structured model selection could not be resolved; preserving legacy model `
+          + `'${input.legacyModel}' as a compatibility fallback (${message}).`,
+        );
+      }
+      throw error;
     }
-    if (input.legacyModel && input.fallbackToLegacyModelOnResolutionError) {
-      return buildCompatibilityFallback(
-        input.legacyModel,
-        `Structured model selection could not be resolved; preserving legacy model `
-        + `'${input.legacyModel}' as a compatibility fallback (${message}).`,
-      );
-    }
-    throw error;
   }
 
   if (
@@ -478,11 +501,16 @@ async function resolveRequestedSessionModelState(
     );
   }
 
+  const warnings = [...compatibilityWarnings, ...resolved.resolution.warnings];
+
   return {
     model: resolved.resolution.model,
     modelSelection: resolved.selection,
-    modelResolution: resolved.resolution,
-    warnings: [...resolved.resolution.warnings],
+    modelResolution: {
+      ...resolved.resolution,
+      warnings,
+    },
+    warnings,
   };
 }
 

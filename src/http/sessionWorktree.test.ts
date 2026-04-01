@@ -278,6 +278,121 @@ describe('session worktree routes', () => {
     );
   });
 
+  it('creates a runtime session by dropping a stale preset from structured model selection', async () => {
+    ctx.providerModelCatalog = {
+      getAdvancedKnowledgeForTarget: vi.fn(async (target) => ({
+        target,
+        catalog: {
+          provider: target.providerName,
+          backend: target.backend,
+          instance: target.instanceId,
+          defaultModel: 'gpt-5.4',
+          source: 'config',
+          cache: null,
+          entries: [
+            { id: 'gpt-5.4', label: 'GPT-5.4', default: true },
+          ],
+          presets: [
+            {
+              id: 'balanced',
+              label: 'Balanced',
+              availability: 'supported',
+              applicableEntryIds: ['gpt-5.4'],
+              preferredEntryId: 'gpt-5.4',
+              controlDefaults: {
+                'openai.reasoning_effort': 'medium',
+              },
+            },
+          ],
+          controls: [{
+            key: 'openai.reasoning_effort',
+            label: 'Reasoning effort',
+            kind: 'enum',
+            scope: 'both',
+            values: ['low', 'medium', 'high'],
+            applicableEntryIds: ['gpt-5.4'],
+          }],
+          defaultSelection: {
+            entryId: 'gpt-5.4',
+            entryMode: 'auto',
+            presetId: 'balanced',
+            controls: {
+              'openai.reasoning_effort': 'medium',
+            },
+          },
+          support: {
+            tier: 'entry_only',
+          },
+          warnings: [],
+        },
+        supportTier: 'entry_only',
+        entryDefaults: {
+          'gpt-5.4': {
+            'openai.reasoning_effort': 'medium',
+          },
+        },
+        controlsByKey: {
+          'openai.reasoning_effort': {
+            key: 'openai.reasoning_effort',
+            label: 'Reasoning effort',
+            kind: 'enum',
+            scope: 'both',
+            values: ['low', 'medium', 'high'],
+            applicableEntryIds: ['gpt-5.4'],
+          },
+        },
+      })),
+    } as never;
+
+    const response = await app.request('/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        provider: 'codex',
+        model: 'gpt-5.4',
+        modelSelection: {
+          entryMode: 'auto',
+          entryId: 'gpt-5.4',
+          presetId: 'deep_reasoning',
+          controls: {
+            'openai.reasoning_effort': 'high',
+          },
+        },
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    const body = await response.json() as {
+      id: string;
+      modelSelection: Record<string, unknown>;
+      modelResolution: {
+        warnings: string[];
+      };
+    };
+    expect(body.modelSelection).toEqual({
+      entryMode: 'auto',
+      entryId: 'gpt-5.4',
+      controls: {
+        'openai.reasoning_effort': 'high',
+      },
+    });
+    expect(body.modelResolution.warnings).toEqual([
+      expect.stringContaining(`Preset 'deep_reasoning'`),
+    ]);
+
+    const stored = registry.get(body.id);
+    expect(stored?.modelSelection).toEqual({
+      entryMode: 'auto',
+      entryId: 'gpt-5.4',
+      controls: {
+        'openai.reasoning_effort': 'high',
+      },
+    });
+    expect(stored?.modelResolution?.warnings).toEqual([
+      expect.stringContaining(`Preset 'deep_reasoning'`),
+    ]);
+  });
+
   it('resets a worktree-backed session and discards the runtime worktree', { timeout: 15_000 }, async () => {
     const repoDir = createGitWorkspace(rootDir, 'repo-reset');
     const prepared = await prepareSessionWorkspace({
