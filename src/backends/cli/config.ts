@@ -201,6 +201,7 @@ export interface CliRuntimeConfig {
   providerInstances?: Partial<Record<ProviderName, Record<string, ProviderInstanceConfig>>>;
   providerDefaultTargets?: Record<string, ProviderDefaultTarget>;
   remoteProviderCatalog?: RemoteProviderCatalog;
+  dashboardShowInstructions: boolean;
 }
 
 interface LegacyRuntimeShape {
@@ -463,6 +464,8 @@ export function loadConfig(
     providerInstances: configured.providerInstances,
     providerDefaultTargets: configured.providerDefaultTargets,
     remoteProviderCatalog: configured.remoteProviderCatalog,
+    dashboardShowInstructions:
+      env.CATS_RUNTIME_DASHBOARD_SHOW_INSTRUCTIONS?.trim().toLowerCase() === 'true',
   };
 }
 

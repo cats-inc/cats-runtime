@@ -89,6 +89,9 @@ function buildHistoryMetadata(ctx: AppContext, session: SessionInfo) {
   const strategyRequest = readRuntimeExecutionStrategyRequest(session);
   const strategyState = readRuntimeExecutionStrategyState(session);
   return {
+    ...(ctx.config.dashboardShowInstructions && session.instructions
+      ? { instructions: session.instructions }
+      : {}),
     sessionKey: session.sessionKey,
     providerTarget: buildSessionProviderTargetSummary(ctx, session),
     requestedStrategy: strategyRequest?.requestedStrategy,
