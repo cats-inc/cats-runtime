@@ -30,6 +30,7 @@ import type {
   SessionBranchCapabilityTruth,
   SessionBranchRequest,
   SessionContextTransplant,
+  ProviderSpawnOptions,
   SessionReusePolicy,
   SessionStatus,
   SessionWorkspaceState,
@@ -90,6 +91,8 @@ import {
   resolveProviderSelection,
   sameProviderModelSelection,
 } from '../../core/models/providerSelectionResolution.js';
+import { normalizeProviderCatalogModelId } from '../../core/models/providerModelCatalog.js';
+import { cloneProviderControls } from '../../core/models/providerControlUtils.js';
 import {
   buildRuntimeExecutionStrategySessionPatch,
   readRuntimeExecutionStrategyEffectiveStrategy,
@@ -393,6 +396,31 @@ interface ResolvedSessionModelState {
   warnings: string[];
 }
 
+function buildSpawnOptions(input: {
+  cwd: string;
+  workspaceMode?: WorkspaceMode;
+  model?: string;
+  modelResolution?: SessionInfo['modelResolution'];
+  resumeSessionId?: string;
+  instructionsFile?: string;
+  permissionMode?: SessionInfo['permissionMode'];
+  allowedTools?: string[];
+  forkSession?: boolean;
+}): ProviderSpawnOptions {
+  const modelControls = cloneProviderControls(input.modelResolution?.controls);
+  return {
+    cwd: input.cwd,
+    ...(input.workspaceMode ? { workspaceMode: input.workspaceMode } : {}),
+    ...(input.model ? { model: input.model } : {}),
+    ...(modelControls ? { modelControls } : {}),
+    ...(input.resumeSessionId ? { resumeSessionId: input.resumeSessionId } : {}),
+    ...(input.instructionsFile ? { instructionsFile: input.instructionsFile } : {}),
+    ...(input.permissionMode ? { permissionMode: input.permissionMode } : {}),
+    ...(input.allowedTools ? { allowedTools: input.allowedTools } : {}),
+    ...(input.forkSession ? { forkSession: input.forkSession } : {}),
+  };
+}
+
 function shouldRetrySessionSelectionWithoutPreset(message: string): boolean {
   return /Unknown preset '/u.test(message)
     || /Preset '.*' is not applicable to entry '/u.test(message);
@@ -404,6 +432,30 @@ function removePresetFromSelection(
   const normalized = canonicalizeProviderModelSelection(selection);
   const { presetId: _presetId, ...withoutPreset } = normalized;
   return withoutPreset;
+}
+
+function normalizeLegacyModelForTarget(
+  target: ProviderTargetDescriptor,
+  legacyModel: string | undefined,
+): string | undefined {
+  return normalizeProviderCatalogModelId(target, legacyModel) ?? undefined;
+}
+
+function normalizeSelectionAliasesForTarget(
+  target: ProviderTargetDescriptor,
+  selection: ProviderModelSelection | undefined,
+): ProviderModelSelection | undefined {
+  if (!selection) {
+    return undefined;
+  }
+
+  const normalized = canonicalizeProviderModelSelection(selection);
+  const normalizedEntryId = normalizeProviderCatalogModelId(target, normalized.entryId);
+  return {
+    ...(normalizedEntryId ? { entryId: normalizedEntryId } : {}),
+    ...normalized,
+    ...(normalizedEntryId ? { entryId: normalizedEntryId } : {}),
+  };
 }
 
 function sessionMatchesTarget(
@@ -426,8 +478,12 @@ async function resolveRequestedSessionModelState(
     preserveSelectionOnFallback?: boolean;
   },
 ): Promise<ResolvedSessionModelState> {
-  const effectiveSelection = input.selection
-    ?? (input.legacyModel ? createLegacyModelSelection(input.legacyModel) : undefined);
+  const normalizedLegacyModel = normalizeLegacyModelForTarget(target, input.legacyModel);
+  const effectiveSelection = normalizeSelectionAliasesForTarget(
+    target,
+    input.selection
+      ?? (normalizedLegacyModel ? createLegacyModelSelection(normalizedLegacyModel) : undefined),
+  );
   if (!effectiveSelection) {
     return { warnings: [] };
   }
@@ -465,24 +521,27 @@ async function resolveRequestedSessionModelState(
       ];
     } else {
       if (
-        input.legacyModel
+        normalizedLegacyModel
         && (
           !input.selection
-          || isLegacyCompatibleExplicitSelection(input.selection, input.legacyModel)
+          || isLegacyCompatibleExplicitSelection(
+            normalizeSelectionAliasesForTarget(target, input.selection),
+            normalizedLegacyModel,
+          )
         )
         && /Unknown catalog entry/.test(message)
       ) {
         return buildCompatibilityFallback(
-          input.legacyModel,
-          `Legacy model '${input.legacyModel}' is not present in the advanced catalog; `
+          normalizedLegacyModel,
+          `Legacy model '${normalizedLegacyModel}' is not present in the advanced catalog; `
           + 'preserving it as a compatibility passthrough.',
         );
       }
-      if (input.legacyModel && input.fallbackToLegacyModelOnResolutionError) {
+      if (normalizedLegacyModel && input.fallbackToLegacyModelOnResolutionError) {
         return buildCompatibilityFallback(
-          input.legacyModel,
+          normalizedLegacyModel,
           `Structured model selection could not be resolved; preserving legacy model `
-          + `'${input.legacyModel}' as a compatibility fallback (${message}).`,
+          + `'${normalizedLegacyModel}' as a compatibility fallback (${message}).`,
         );
       }
       throw error;
@@ -491,12 +550,12 @@ async function resolveRequestedSessionModelState(
 
   if (
     input.enforceLegacyMatch !== false
-    && input.legacyModel
+    && normalizedLegacyModel
     && input.selection
-    && input.legacyModel !== resolved.resolution.model
+    && normalizedLegacyModel !== resolved.resolution.model
   ) {
     throw new Error(
-      `Legacy model '${input.legacyModel}' does not match resolved structured selection `
+      `Legacy model '${normalizedLegacyModel}' does not match resolved structured selection `
       + `'${resolved.resolution.model}'`,
     );
   }
@@ -2391,14 +2450,21 @@ sessionRoutes.post('/sessions', async (c) => {
         }
 
         try {
-          runtime.spawn(updatedExisting.id, updatedExisting.providerName, {
-            cwd: updatedExisting.cwd,
-            workspaceMode: updatedExisting.workspaceMode,
-            model: updatedExisting.model,
-            instructionsFile: updatedExisting.skills?.delivery.instructions?.filePath,
-            permissionMode: updatedExisting.permissionMode,
-            allowedTools: updatedExisting.allowedTools,
-          }, updatedExisting.providerInstanceId, updatedExisting.providerBackend);
+          runtime.spawn(
+            updatedExisting.id,
+            updatedExisting.providerName,
+            buildSpawnOptions({
+              cwd: updatedExisting.cwd,
+              workspaceMode: updatedExisting.workspaceMode,
+              model: updatedExisting.model,
+              modelResolution: updatedExisting.modelResolution,
+              instructionsFile: updatedExisting.skills?.delivery.instructions?.filePath,
+              permissionMode: updatedExisting.permissionMode,
+              allowedTools: updatedExisting.allowedTools,
+            }),
+            updatedExisting.providerInstanceId,
+            updatedExisting.providerBackend,
+          );
           ctx.registry.updateStatus(existing.id, 'ready');
         } catch (err) {
           return c.json({ error: `Failed to reuse session: ${err}` }, 500);
@@ -2516,15 +2582,22 @@ sessionRoutes.post('/sessions', async (c) => {
         ctx,
         resolveCliProviderTarget(ctx, providerName, providerInstance!.id),
       );
-      runtime.spawn(session.id, providerName, {
-        cwd: resolved.cwd,
-        workspaceMode: resolved.workspaceMode,
-        model: cursorModelState.model ?? native.model,
-        resumeSessionId: native.providerSessionId,
-        instructionsFile: skills?.delivery.instructions?.filePath,
-        permissionMode: resolved.permissionMode,
-        allowedTools: body.allowedTools,
-      }, providerInstance!.id, 'cli');
+      runtime.spawn(
+        session.id,
+        providerName,
+        buildSpawnOptions({
+          cwd: resolved.cwd,
+          workspaceMode: resolved.workspaceMode,
+          model: cursorModelState.model ?? native.model,
+          modelResolution: cursorModelState.modelResolution,
+          resumeSessionId: native.providerSessionId,
+          instructionsFile: skills?.delivery.instructions?.filePath,
+          permissionMode: resolved.permissionMode,
+          allowedTools: body.allowedTools,
+        }),
+        providerInstance!.id,
+        'cli',
+      );
       ctx.registry.updateStatus(session.id, 'ready');
 
       return c.json(serializeSession(ctx, session), 201);
@@ -2600,15 +2673,22 @@ sessionRoutes.post('/sessions', async (c) => {
         ctx,
         resolveCliProviderTarget(ctx, providerName, providerInstance!.id),
       );
-      runtime.spawn(session.id, providerName, {
-        cwd: resolved.cwd,
-        workspaceMode: resolved.workspaceMode,
-        model: requestedModelState.model,
-        resumeSessionId: native.providerSessionId,
-        instructionsFile: skills?.delivery.instructions?.filePath,
-        permissionMode: resolved.permissionMode,
-        allowedTools: body.allowedTools,
-      }, providerInstance!.id, 'cli');
+      runtime.spawn(
+        session.id,
+        providerName,
+        buildSpawnOptions({
+          cwd: resolved.cwd,
+          workspaceMode: resolved.workspaceMode,
+          model: requestedModelState.model,
+          modelResolution: requestedModelState.modelResolution,
+          resumeSessionId: native.providerSessionId,
+          instructionsFile: skills?.delivery.instructions?.filePath,
+          permissionMode: resolved.permissionMode,
+          allowedTools: body.allowedTools,
+        }),
+        providerInstance!.id,
+        'cli',
+      );
       ctx.registry.updateStatus(session.id, 'ready');
 
       return c.json(serializeSession(ctx, session), 201);
@@ -2684,15 +2764,22 @@ sessionRoutes.post('/sessions', async (c) => {
         ctx,
         resolveCliProviderTarget(ctx, providerName, providerInstance!.id),
       );
-      runtime.spawn(session.id, providerName, {
-        cwd: resolved.cwd,
-        workspaceMode: resolved.workspaceMode,
-        model: requestedModelState.model,
-        resumeSessionId: native.providerSessionId,
-        instructionsFile: skills?.delivery.instructions?.filePath,
-        permissionMode: resolved.permissionMode,
-        allowedTools: body.allowedTools,
-      }, providerInstance!.id, 'cli');
+      runtime.spawn(
+        session.id,
+        providerName,
+        buildSpawnOptions({
+          cwd: resolved.cwd,
+          workspaceMode: resolved.workspaceMode,
+          model: requestedModelState.model,
+          modelResolution: requestedModelState.modelResolution,
+          resumeSessionId: native.providerSessionId,
+          instructionsFile: skills?.delivery.instructions?.filePath,
+          permissionMode: resolved.permissionMode,
+          allowedTools: body.allowedTools,
+        }),
+        providerInstance!.id,
+        'cli',
+      );
       ctx.registry.updateStatus(session.id, 'ready');
 
       return c.json(serializeSession(ctx, session), 201);
@@ -2771,14 +2858,21 @@ sessionRoutes.post('/sessions', async (c) => {
 
   try {
     await primeCliCompatibility(ctx, providerTarget);
-    runtime.spawn(session.id, providerName, {
-      cwd: resolved.cwd,
-      workspaceMode: resolved.workspaceMode,
-      model: requestedModelState.model,
-      instructionsFile: skills?.delivery.instructions?.filePath,
-      permissionMode: resolved.permissionMode,
-      allowedTools: body.allowedTools,
-    }, providerTarget.instanceId, providerTarget.backend);
+    runtime.spawn(
+      session.id,
+      providerName,
+      buildSpawnOptions({
+        cwd: resolved.cwd,
+        workspaceMode: resolved.workspaceMode,
+        model: requestedModelState.model,
+        modelResolution: requestedModelState.modelResolution,
+        instructionsFile: skills?.delivery.instructions?.filePath,
+        permissionMode: resolved.permissionMode,
+        allowedTools: body.allowedTools,
+      }),
+      providerTarget.instanceId,
+      providerTarget.backend,
+    );
   } catch (err) {
     await discardPreparedWorkspace(ctx, {
       id: sessionId,
@@ -3762,14 +3856,21 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
       });
       hydratedSession = ctx.registry.get(id) ?? preparedSession;
       hydratedSession = await refreshSessionModelStateForTarget(ctx, providerTarget, hydratedSession);
-      runtime.spawn(id, hydratedSession.providerName, {
-        cwd: hydratedSession.cwd,
-        workspaceMode: hydratedSession.workspaceMode,
-        model: hydratedSession.model,
-        instructionsFile: hydratedSession.skills?.delivery.instructions?.filePath,
-        permissionMode: hydratedSession.permissionMode,
-        allowedTools: hydratedSession.allowedTools,
-      }, hydratedSession.providerInstanceId, hydratedSession.providerBackend);
+      runtime.spawn(
+        id,
+        hydratedSession.providerName,
+        buildSpawnOptions({
+          cwd: hydratedSession.cwd,
+          workspaceMode: hydratedSession.workspaceMode,
+          model: hydratedSession.model,
+          modelResolution: hydratedSession.modelResolution,
+          instructionsFile: hydratedSession.skills?.delivery.instructions?.filePath,
+          permissionMode: hydratedSession.permissionMode,
+          allowedTools: hydratedSession.allowedTools,
+        }),
+        hydratedSession.providerInstanceId,
+        hydratedSession.providerBackend,
+      );
       ctx.registry.updateStatus(id, 'ready');
     } catch (err) {
       return c.json({ error: `Failed to resume: ${err}` }, 500);
@@ -3807,15 +3908,22 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         ctx,
         resolveCliProviderTarget(ctx, hydratedSession.providerName, hydratedSession.providerInstanceId),
       );
-      runtime.spawn(id, hydratedSession.providerName, {
-        cwd: hydratedSession.cwd,
-        workspaceMode: hydratedSession.workspaceMode,
-        model: hydratedSession.model,
-        resumeSessionId: hydratedSession.providerSessionId,
-        instructionsFile: hydratedSession.skills?.delivery.instructions?.filePath,
-        permissionMode: hydratedSession.permissionMode,
-        allowedTools: hydratedSession.allowedTools,
-      }, hydratedSession.providerInstanceId, 'cli');
+      runtime.spawn(
+        id,
+        hydratedSession.providerName,
+        buildSpawnOptions({
+          cwd: hydratedSession.cwd,
+          workspaceMode: hydratedSession.workspaceMode,
+          model: hydratedSession.model,
+          modelResolution: hydratedSession.modelResolution,
+          resumeSessionId: hydratedSession.providerSessionId,
+          instructionsFile: hydratedSession.skills?.delivery.instructions?.filePath,
+          permissionMode: hydratedSession.permissionMode,
+          allowedTools: hydratedSession.allowedTools,
+        }),
+        hydratedSession.providerInstanceId,
+        'cli',
+      );
       ctx.registry.updateStatus(id, 'ready');
     } catch (err) {
       return c.json({ error: `Failed to resume: ${err}` }, 500);
@@ -3864,15 +3972,22 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         ctx,
         resolveCliProviderTarget(ctx, hydratedSession.providerName, hydratedSession.providerInstanceId),
       );
-      runtime.spawn(id, hydratedSession.providerName, {
-        cwd: hydratedSession.cwd,
-        workspaceMode: hydratedSession.workspaceMode,
-        model: hydratedSession.model,
-        resumeSessionId: hydratedSession.providerSessionId,
-        instructionsFile: hydratedSession.skills?.delivery.instructions?.filePath,
-        permissionMode: hydratedSession.permissionMode,
-        allowedTools: hydratedSession.allowedTools,
-      }, hydratedSession.providerInstanceId, 'cli');
+      runtime.spawn(
+        id,
+        hydratedSession.providerName,
+        buildSpawnOptions({
+          cwd: hydratedSession.cwd,
+          workspaceMode: hydratedSession.workspaceMode,
+          model: hydratedSession.model,
+          modelResolution: hydratedSession.modelResolution,
+          resumeSessionId: hydratedSession.providerSessionId,
+          instructionsFile: hydratedSession.skills?.delivery.instructions?.filePath,
+          permissionMode: hydratedSession.permissionMode,
+          allowedTools: hydratedSession.allowedTools,
+        }),
+        hydratedSession.providerInstanceId,
+        'cli',
+      );
       ctx.registry.updateStatus(id, 'ready');
     } catch (err) {
       return c.json({ error: `Failed to resume: ${err}` }, 500);
@@ -3926,15 +4041,25 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         ctx,
         resolveCliProviderTarget(ctx, hydratedSession.providerName, hydratedSession.providerInstanceId),
       );
-      runtime.spawn(id, hydratedSession.providerName, {
-        cwd: hydratedSession.cwd,
-        workspaceMode: hydratedSession.workspaceMode,
-        model: hydratedSession.model,
-        resumeSourcePath: resumeTarget.runtimeSourcePath,
-        instructionsFile: hydratedSession.skills?.delivery.instructions?.filePath,
-        permissionMode,
-        allowedTools: (body as { allowedTools?: string[] }).allowedTools ?? hydratedSession.allowedTools,
-      }, hydratedSession.providerInstanceId, 'cli');
+      runtime.spawn(
+        id,
+        hydratedSession.providerName,
+        {
+          ...buildSpawnOptions({
+            cwd: hydratedSession.cwd,
+            workspaceMode: hydratedSession.workspaceMode,
+            model: hydratedSession.model,
+            modelResolution: hydratedSession.modelResolution,
+            instructionsFile: hydratedSession.skills?.delivery.instructions?.filePath,
+            permissionMode,
+            allowedTools: (body as { allowedTools?: string[] }).allowedTools
+              ?? hydratedSession.allowedTools,
+          }),
+          resumeSourcePath: resumeTarget.runtimeSourcePath,
+        },
+        hydratedSession.providerInstanceId,
+        'cli',
+      );
       ctx.registry.updateStatus(id, 'ready');
     } catch (err) {
       return c.json({ error: `Failed to resume: ${err}` }, 500);
@@ -3994,15 +4119,23 @@ sessionRoutes.post('/sessions/:id/resume', async (c) => {
         ? resolveCliProviderTarget(ctx, hydratedSession.providerName, hydratedSession.providerInstanceId)
         : undefined,
     );
-    runtime.spawn(id, hydratedSession.providerName, {
-      cwd: hydratedSession.cwd,
-      workspaceMode: hydratedSession.workspaceMode,
-      model: hydratedSession.model,
-      resumeSessionId: hydratedSession.providerSessionId,
-      instructionsFile: hydratedSession.skills?.delivery.instructions?.filePath,
-      permissionMode,
-      allowedTools: (body as { allowedTools?: string[] }).allowedTools ?? hydratedSession.allowedTools,
-    }, hydratedSession.providerInstanceId, hydratedSession.providerBackend);
+    runtime.spawn(
+      id,
+      hydratedSession.providerName,
+      buildSpawnOptions({
+        cwd: hydratedSession.cwd,
+        workspaceMode: hydratedSession.workspaceMode,
+        model: hydratedSession.model,
+        modelResolution: hydratedSession.modelResolution,
+        resumeSessionId: hydratedSession.providerSessionId,
+        instructionsFile: hydratedSession.skills?.delivery.instructions?.filePath,
+        permissionMode,
+        allowedTools: (body as { allowedTools?: string[] }).allowedTools
+          ?? hydratedSession.allowedTools,
+      }),
+      hydratedSession.providerInstanceId,
+      hydratedSession.providerBackend,
+    );
     ctx.registry.updateStatus(id, hydratedSession.providerBackend === 'cli' ? 'initializing' : 'ready');
   } catch (err) {
     return c.json({ error: `Failed to resume: ${err}` }, 500);
@@ -4318,20 +4451,27 @@ sessionRoutes.post('/sessions/:id/fork', async (c) => {
       ctx,
       childTarget.backend === 'cli' ? childTarget : undefined,
     );
-    runtime.spawn(forked.id, childTarget.providerName, {
-      cwd: forkCwd,
-      workspaceMode: forkWorkspaceMode,
-      model: childModelState.model ?? body.model ?? session.model,
-      instructionsFile: childSkills?.delivery.instructions?.filePath,
-      ...(branchMode === 'native_fork'
-        ? {
-            resumeSessionId: session.providerSessionId,
-            forkSession: true,
-          }
-        : {}),
-      permissionMode: forkPermissionMode,
-      allowedTools: body.allowedTools ?? session.allowedTools,
-    }, childTarget.instanceId, childTarget.backend);
+    runtime.spawn(
+      forked.id,
+      childTarget.providerName,
+      buildSpawnOptions({
+        cwd: forkCwd,
+        workspaceMode: forkWorkspaceMode,
+        model: childModelState.model ?? body.model ?? session.model,
+        modelResolution: childModelState.modelResolution,
+        instructionsFile: childSkills?.delivery.instructions?.filePath,
+        ...(branchMode === 'native_fork'
+          ? {
+              resumeSessionId: session.providerSessionId,
+              forkSession: true,
+            }
+          : {}),
+        permissionMode: forkPermissionMode,
+        allowedTools: body.allowedTools ?? session.allowedTools,
+      }),
+      childTarget.instanceId,
+      childTarget.backend,
+    );
     if (childTarget.backend !== 'cli') {
       ctx.registry.updateStatus(forked.id, 'ready');
     }

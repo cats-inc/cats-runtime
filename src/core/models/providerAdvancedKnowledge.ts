@@ -1,6 +1,7 @@
 import type { ProviderTargetDescriptor } from '../providerCatalog.js';
 import type {
   ProviderAdvancedCatalogControl,
+  ProviderAdvancedCatalogControlOption,
   ProviderAdvancedCatalogEntry,
   ProviderAdvancedCatalogPreset,
   ProviderAdvancedCatalogResult,
@@ -56,6 +57,47 @@ function buildEntryCapabilityTags(
   return tags.size > 0 ? Array.from(tags) : undefined;
 }
 
+function buildEntryNotes(
+  target: ProviderTargetDescriptor,
+  entryId: string,
+): string[] | undefined {
+  if (target.providerName === 'claude' && target.backend === 'cli') {
+    switch (entryId) {
+      case 'default':
+        return ['Opus 4.6 with 1M context. Most capable for complex work.'];
+      case 'sonnet':
+        return ['Sonnet 4.6. Best for everyday tasks.'];
+      case 'haiku':
+        return ['Haiku 4.5. Fastest for quick answers.'];
+      default:
+        return undefined;
+    }
+  }
+
+  if (target.providerName === 'codex' && target.backend === 'cli') {
+    switch (entryId) {
+      case 'gpt-5.4':
+        return ['Latest frontier agentic coding model.'];
+      case 'gpt-5.4-mini':
+        return ['Smaller frontier agentic coding model.'];
+      case 'gpt-5.3-codex':
+        return ['Frontier Codex-optimized agentic coding model.'];
+      case 'gpt-5.2-codex':
+        return ['Frontier agentic coding model.'];
+      case 'gpt-5.2':
+        return ['Optimized for professional work and long-running agents.'];
+      case 'gpt-5.1-codex-max':
+        return ['Codex-optimized model for deep and fast reasoning.'];
+      case 'gpt-5.1-codex-mini':
+        return ['Optimized for codex. Cheaper, faster, but less capable.'];
+      default:
+        return undefined;
+    }
+  }
+
+  return undefined;
+}
+
 function toAdvancedEntries(
   target: ProviderTargetDescriptor,
   catalog: ProviderModelCatalogResult,
@@ -67,6 +109,9 @@ function toAdvancedEntries(
     ...(entry.status ? { status: entry.status } : {}),
     ...(buildEntryCapabilityTags(target, entry.id)
       ? { capabilityTags: buildEntryCapabilityTags(target, entry.id) }
+      : {}),
+    ...(buildEntryNotes(target, entry.id)
+      ? { notes: buildEntryNotes(target, entry.id) }
       : {}),
   }));
 }
@@ -92,6 +137,12 @@ function inferSupportTier(
     return 'full';
   }
   if (target.backend === 'local' && target.remoteInstance?.transport === 'ollama') {
+    return 'full';
+  }
+  if (
+    target.backend === 'cli'
+    && (target.providerName === 'codex' || target.providerName === 'claude')
+  ) {
     return 'full';
   }
 
@@ -128,7 +179,11 @@ function buildOpenAiControls(
       description: 'Controls OpenAI reasoning effort for supported GPT-5 entries.',
       kind: 'enum',
       scope: 'both',
-      values: ['low', 'medium', 'high'],
+      values: [
+        { value: 'low', label: 'Low' },
+        { value: 'medium', label: 'Medium' },
+        { value: 'high', label: 'High' },
+      ],
       applicableEntryIds,
       semanticTags: ['reasoning_intensity'],
     }],
@@ -136,6 +191,147 @@ function buildOpenAiControls(
       applicableEntryIds.map((entryId) => [
         entryId,
         { 'openai.reasoning_effort': 'medium' as ProviderAdvancedControlValue },
+      ]),
+    ),
+  };
+}
+
+function buildControlOptions(
+  values: Array<{
+    value: ProviderAdvancedControlValue;
+    label: string;
+    description?: string;
+    applicableEntryIds?: string[];
+  }>,
+): ProviderAdvancedCatalogControlOption[] {
+  return values.map((value) => ({
+    value: value.value,
+    label: value.label,
+    ...(value.description ? { description: value.description } : {}),
+    ...(value.applicableEntryIds?.length
+      ? { applicableEntryIds: value.applicableEntryIds }
+      : {}),
+  }));
+}
+
+function buildCodexCliControls(
+  entries: ProviderAdvancedCatalogEntry[],
+): {
+  controls: ProviderAdvancedCatalogControl[];
+  entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>>;
+} {
+  const applicableEntryIds = entries.map((entry) => entry.id);
+  if (applicableEntryIds.length === 0) {
+    return {
+      controls: [],
+      entryDefaults: {},
+    };
+  }
+
+  const miniOnlyEntryIds = applicableEntryIds.filter((entryId) => entryId === 'gpt-5.1-codex-mini');
+  const nonMiniEntryIds = applicableEntryIds.filter((entryId) => entryId !== 'gpt-5.1-codex-mini');
+
+  return {
+    controls: [{
+      key: 'codex.reasoning_effort',
+      label: 'Reasoning effort',
+      description: 'Controls Codex CLI reasoning depth for supported models.',
+      kind: 'enum',
+      scope: 'both',
+      values: buildControlOptions([
+        {
+          value: 'low',
+          label: 'Low',
+          description: 'Fast responses with lighter reasoning.',
+          applicableEntryIds: nonMiniEntryIds,
+        },
+        {
+          value: 'medium',
+          label: 'Medium (default)',
+          description: 'Balances speed and reasoning depth for everyday tasks.',
+          applicableEntryIds,
+        },
+        {
+          value: 'high',
+          label: 'High',
+          description: 'Greater reasoning depth for complex problems.',
+          applicableEntryIds,
+        },
+        {
+          value: 'xhigh',
+          label: 'Extra high',
+          description: 'Extra high reasoning depth for complex problems.',
+          applicableEntryIds: nonMiniEntryIds,
+        },
+      ]),
+      applicableEntryIds,
+      semanticTags: ['reasoning_intensity'],
+    }],
+    entryDefaults: Object.fromEntries(
+      applicableEntryIds.map((entryId) => [
+        entryId,
+        { 'codex.reasoning_effort': 'medium' as ProviderAdvancedControlValue },
+      ]),
+    ),
+  };
+}
+
+function buildClaudeCliControls(
+  entries: ProviderAdvancedCatalogEntry[],
+): {
+  controls: ProviderAdvancedCatalogControl[];
+  entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>>;
+} {
+  const effortEntryIds = entries
+    .filter((entry) => entry.id === 'default' || entry.id === 'sonnet')
+    .map((entry) => entry.id);
+  if (effortEntryIds.length === 0) {
+    return {
+      controls: [],
+      entryDefaults: {},
+    };
+  }
+
+  return {
+    controls: [{
+      key: 'claude.reasoning_effort',
+      label: 'Reasoning effort',
+      description: 'Controls Claude Code effort for supported models.',
+      kind: 'enum',
+      scope: 'both',
+      values: buildControlOptions([
+        {
+          value: 'low',
+          label: 'Low',
+          description: 'Lighter reasoning for faster responses.',
+          applicableEntryIds: effortEntryIds,
+        },
+        {
+          value: 'medium',
+          label: 'Medium (default)',
+          description: 'Balanced effort for most work.',
+          applicableEntryIds: effortEntryIds,
+        },
+        {
+          value: 'high',
+          label: 'High',
+          description: 'Greater depth for complex tasks.',
+          applicableEntryIds: effortEntryIds,
+        },
+        {
+          value: 'max',
+          label: 'Max',
+          description: 'Maximum effort for the most complex work.',
+          applicableEntryIds: ['default'],
+        },
+      ]),
+      applicableEntryIds: effortEntryIds,
+      semanticTags: ['reasoning_intensity'],
+    }],
+    entryDefaults: Object.fromEntries(
+      effortEntryIds.map((entryId) => [
+        entryId,
+        { 'claude.reasoning_effort': 'medium' as ProviderAdvancedControlValue },
       ]),
     ),
   };
@@ -190,6 +386,12 @@ function buildControls(
   controls: ProviderAdvancedCatalogControl[];
   entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>>;
 } {
+  if (target.backend === 'cli' && target.providerName === 'codex') {
+    return buildCodexCliControls(entries);
+  }
+  if (target.backend === 'cli' && target.providerName === 'claude') {
+    return buildClaudeCliControls(entries);
+  }
   if (target.backend === 'api' && target.remoteInstance?.transport === 'openai') {
     return buildOpenAiControls(entries);
   }
@@ -208,6 +410,13 @@ function buildPresetCatalog(
   entries: ProviderAdvancedCatalogEntry[],
   controls: ProviderAdvancedCatalogControl[],
 ): ProviderAdvancedCatalogPreset[] {
+  if (
+    target.backend === 'cli'
+    && (target.providerName === 'codex' || target.providerName === 'claude')
+  ) {
+    return [];
+  }
+
   // Preset selection stays runtime-owned. We intentionally infer a small
   // normalized vocabulary from known model naming patterns instead of
   // exposing raw vendor tiers directly.
@@ -287,6 +496,7 @@ function buildPresetCatalog(
 function buildDefaultSelection(
   entries: ProviderAdvancedCatalogEntry[],
   presets: ProviderAdvancedCatalogPreset[],
+  entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>>,
 ): ProviderModelSelection | null {
   const defaultEntry = entries.find((entry) => entry.default) ?? entries[0];
   if (!defaultEntry) {
@@ -296,10 +506,14 @@ function buildDefaultSelection(
   const balancedPreset = presets.find((preset) => preset.id === 'balanced');
   return {
     entryId: defaultEntry.id,
-    entryMode: 'auto',
+    entryMode: balancedPreset ? 'auto' : 'explicit',
     ...(balancedPreset ? { presetId: balancedPreset.id } : {}),
-    ...(balancedPreset?.controlDefaults
-      ? { controls: cloneProviderControls(balancedPreset.controlDefaults) }
+    ...(balancedPreset?.controlDefaults || entryDefaults[defaultEntry.id]
+      ? {
+          controls: cloneProviderControls(
+            balancedPreset?.controlDefaults ?? entryDefaults[defaultEntry.id],
+          ),
+        }
       : {}),
   };
 }
@@ -318,7 +532,7 @@ export function buildProviderAdvancedKnowledge(
     ? buildPresetCatalog(target, entries, controls)
     : [];
   const defaultSelection = verifiedAdvancedMetadata
-    ? buildDefaultSelection(entries, presets)
+    ? buildDefaultSelection(entries, presets, entryDefaults)
     : null;
   const catalog: ProviderAdvancedCatalogResult = {
     provider: modelCatalog.provider,

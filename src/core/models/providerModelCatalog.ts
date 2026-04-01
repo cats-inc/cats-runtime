@@ -126,14 +126,18 @@ const KIRO_WSL_MODELS: ProviderModelCatalogEntry[] = [
 
 const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
   claude: [
-    { id: 'claude-opus-4-6', label: 'opus 4.6', default: true },
-    { id: 'claude-sonnet-4-6', label: 'sonnet 4.6' },
-    { id: 'claude-haiku-4-5', label: 'haiku 4.5' },
+    { id: 'default', label: 'Default (recommended)', default: true },
+    { id: 'sonnet', label: 'Sonnet' },
+    { id: 'haiku', label: 'Haiku' },
   ],
   codex: [
     { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
+    { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini' },
     { id: 'gpt-5.3-codex', label: 'gpt-5.3-codex' },
     { id: 'gpt-5.2-codex', label: 'gpt-5.2-codex' },
+    { id: 'gpt-5.2', label: 'gpt-5.2' },
+    { id: 'gpt-5.1-codex-max', label: 'gpt-5.1-codex-max' },
+    { id: 'gpt-5.1-codex-mini', label: 'gpt-5.1-codex-mini' },
   ],
   gemini: [
     { id: 'gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview', default: true },
@@ -203,13 +207,38 @@ function readNullableString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value : null;
 }
 
+export function normalizeProviderCatalogModelId(
+  target: Pick<ProviderTargetDescriptor, 'providerName' | 'backend'>,
+  modelId: string | null | undefined,
+): string | null {
+  const normalized = modelId?.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  if (target.providerName === 'claude' && target.backend === 'cli') {
+    const lower = normalized.toLowerCase();
+    if (lower === 'claude-opus-4-6' || lower === 'claude-opus-4.6' || lower === 'default') {
+      return 'default';
+    }
+    if (lower === 'claude-sonnet-4-6' || lower === 'claude-sonnet-4.6' || lower === 'sonnet') {
+      return 'sonnet';
+    }
+    if (lower === 'claude-haiku-4-5' || lower === 'claude-haiku-4.5' || lower === 'haiku') {
+      return 'haiku';
+    }
+  }
+
+  return normalized;
+}
+
 function resolveDefaultModel(
   target: ProviderTargetDescriptor,
   env: NodeJS.ProcessEnv,
 ): string | null {
   const configuredModel = target.remoteInstance?.model?.trim();
   if (configuredModel) {
-    return configuredModel;
+    return normalizeProviderCatalogModelId(target, configuredModel);
   }
 
   const activeConfig = inspectProviderActiveConfig(target, { env });
@@ -217,7 +246,7 @@ function resolveDefaultModel(
     ? activeConfig.model?.trim() || null
     : null;
   if (activeModel) {
-    return activeModel;
+    return normalizeProviderCatalogModelId(target, activeModel);
   }
 
   if (target.providerName === 'cursor' && target.backend === 'cli') {
@@ -225,7 +254,10 @@ function resolveDefaultModel(
   }
 
   const staticModels = getStaticProviderModels(target);
-  return staticModels.find((model) => model.default)?.id ?? null;
+  return normalizeProviderCatalogModelId(
+    target,
+    staticModels.find((model) => model.default)?.id ?? null,
+  );
 }
 
 function resolveBaseUrl(

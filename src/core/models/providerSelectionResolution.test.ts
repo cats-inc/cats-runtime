@@ -232,4 +232,85 @@ describe('provider selection resolution', () => {
       },
     });
   });
+
+  it('rejects enum values that are not applicable to the selected entry', () => {
+    const knowledge = createKnowledgeContext({
+      target: {
+        providerName: 'codex',
+        backend: 'cli',
+        instanceId: 'default',
+        defaultTarget: true,
+        cliInstance: {
+          id: 'default',
+          providerName: 'codex',
+          backend: 'cli',
+          command: 'codex',
+        },
+      },
+      catalog: {
+        provider: 'codex',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gpt-5.4',
+        source: 'static',
+        cache: null,
+        entries: [
+          { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
+          { id: 'gpt-5.1-codex-mini', label: 'gpt-5.1-codex-mini' },
+        ],
+        presets: [],
+        controls: [{
+          key: 'codex.reasoning_effort',
+          label: 'Reasoning effort',
+          kind: 'enum',
+          scope: 'both',
+          values: [
+            { value: 'low', label: 'Low', applicableEntryIds: ['gpt-5.4'] },
+            { value: 'medium', label: 'Medium', applicableEntryIds: ['gpt-5.4', 'gpt-5.1-codex-mini'] },
+            { value: 'high', label: 'High', applicableEntryIds: ['gpt-5.4', 'gpt-5.1-codex-mini'] },
+            { value: 'xhigh', label: 'Extra high', applicableEntryIds: ['gpt-5.4'] },
+          ],
+          applicableEntryIds: ['gpt-5.4', 'gpt-5.1-codex-mini'],
+        }],
+        defaultSelection: {
+          entryId: 'gpt-5.4',
+          entryMode: 'explicit',
+          controls: {
+            'codex.reasoning_effort': 'medium',
+          },
+        },
+        support: {
+          tier: 'full',
+        },
+        warnings: [],
+      },
+      entryDefaults: {
+        'gpt-5.4': { 'codex.reasoning_effort': 'medium' },
+        'gpt-5.1-codex-mini': { 'codex.reasoning_effort': 'medium' },
+      },
+      controlsByKey: {
+        'codex.reasoning_effort': {
+          key: 'codex.reasoning_effort',
+          label: 'Reasoning effort',
+          kind: 'enum',
+          scope: 'both',
+          values: [
+            { value: 'low', label: 'Low', applicableEntryIds: ['gpt-5.4'] },
+            { value: 'medium', label: 'Medium', applicableEntryIds: ['gpt-5.4', 'gpt-5.1-codex-mini'] },
+            { value: 'high', label: 'High', applicableEntryIds: ['gpt-5.4', 'gpt-5.1-codex-mini'] },
+            { value: 'xhigh', label: 'Extra high', applicableEntryIds: ['gpt-5.4'] },
+          ],
+          applicableEntryIds: ['gpt-5.4', 'gpt-5.1-codex-mini'],
+        },
+      },
+    });
+
+    expect(() => resolveProviderSelection(knowledge, {
+      entryId: 'gpt-5.1-codex-mini',
+      entryMode: 'explicit',
+      controls: {
+        'codex.reasoning_effort': 'xhigh',
+      },
+    })).toThrow(/must be one of: medium, high/i);
+  });
 });

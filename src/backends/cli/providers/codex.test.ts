@@ -28,6 +28,17 @@ describe('CodexProvider', () => {
       expect(args).toContain('-c');
       expect(args).toContain('model="o3"');
     });
+
+    it('includes reasoning effort config when provided', () => {
+      const args = provider.buildSpawnArgs({
+        cwd: '/tmp',
+        modelControls: {
+          'codex.reasoning_effort': 'xhigh',
+        },
+      });
+      expect(args).toContain('-c');
+      expect(args).toContain('model_reasoning_effort="xhigh"');
+    });
   });
 
   describe('buildStdinMessage', () => {

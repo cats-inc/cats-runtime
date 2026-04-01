@@ -1587,6 +1587,7 @@ export interface ProviderSpawnOptions {
   workspaceAccess?: WorkspaceAccess;
   workspaceMode?: WorkspaceMode;
   model?: string;
+  modelControls?: Record<string, string | number | boolean>;
   resumeSessionId?: string;
   resumeSourcePath?: string;
   forkSession?: boolean;

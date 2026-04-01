@@ -47,6 +47,9 @@ export class ClaudeProvider implements Provider {
     if (opts.model) {
       args.push('--model', opts.model);
     }
+    if (typeof opts.modelControls?.['claude.reasoning_effort'] === 'string') {
+      args.push('--effort', opts.modelControls['claude.reasoning_effort']);
+    }
 
     if (opts.resumeSessionId) {
       args.push('--resume', opts.resumeSessionId);

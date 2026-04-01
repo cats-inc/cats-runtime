@@ -7,6 +7,13 @@ export type ProviderAdvancedControlValue = string | number | boolean;
 export type ProviderAdvancedControlKind = 'enum' | 'boolean' | 'number' | 'string';
 export type ProviderAdvancedControlScope = 'session_default' | 'request' | 'both';
 
+export interface ProviderAdvancedCatalogControlOption {
+  value: ProviderAdvancedControlValue;
+  label: string;
+  description?: string;
+  applicableEntryIds?: string[];
+}
+
 export interface ProviderAdvancedCatalogCacheMetadata {
   servedFromCache: boolean;
   cachedAt: string | null;
@@ -45,7 +52,7 @@ export interface ProviderAdvancedCatalogControl {
   description?: string;
   kind: ProviderAdvancedControlKind;
   scope: ProviderAdvancedControlScope;
-  values?: string[];
+  values?: Array<ProviderAdvancedCatalogControlOption | ProviderAdvancedControlValue>;
   minimum?: number;
   maximum?: number;
   step?: number;

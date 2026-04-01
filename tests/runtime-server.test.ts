@@ -3954,41 +3954,95 @@ providers:
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/providers/codex/models/advanced');
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({
+      const payload = await response.json();
+      expect(payload).toMatchObject({
         provider: 'codex',
         backend: 'cli',
         instance: 'default',
         defaultModel: 'gpt-5.4',
         source: 'static',
         cache: null,
-        entries: [
-          {
-            id: 'gpt-5.4',
-            label: 'gpt-5.4',
-            default: true,
-            capabilityTags: ['tool_use', 'reasoning'],
-          },
-          {
-            id: 'gpt-5.3-codex',
-            label: 'gpt-5.3-codex',
-            default: false,
-            capabilityTags: ['tool_use'],
-          },
-          {
-            id: 'gpt-5.2-codex',
-            label: 'gpt-5.2-codex',
-            default: false,
-            capabilityTags: ['tool_use'],
-          },
-        ],
         presets: [],
-        controls: [],
-        defaultSelection: null,
+        defaultSelection: {
+          entryId: 'gpt-5.4',
+          entryMode: 'explicit',
+          controls: {
+            'codex.reasoning_effort': 'medium',
+          },
+        },
         support: {
-          tier: 'entry_only',
+          tier: 'full',
         },
         warnings: [],
       });
+      expect(payload.entries.map((entry: { id: string }) => entry.id)).toEqual([
+        'gpt-5.4',
+        'gpt-5.4-mini',
+        'gpt-5.3-codex',
+        'gpt-5.2-codex',
+        'gpt-5.2',
+        'gpt-5.1-codex-max',
+        'gpt-5.1-codex-mini',
+      ]);
+      expect(payload.controls).toMatchObject([
+        {
+          key: 'codex.reasoning_effort',
+          applicableEntryIds: [
+            'gpt-5.4',
+            'gpt-5.4-mini',
+            'gpt-5.3-codex',
+            'gpt-5.2-codex',
+            'gpt-5.2',
+            'gpt-5.1-codex-max',
+            'gpt-5.1-codex-mini',
+          ],
+        },
+      ]);
+    });
+  });
+
+  it('GET /providers/:provider/models/advanced publishes Claude native aliases and entry-specific effort options', async () => {
+    await withRuntime({}, {}, async (runtime) => {
+      const response = await runtime.app.request('/providers/claude/models/advanced');
+      expect(response.status).toBe(200);
+      const payload = await response.json();
+      expect(payload).toMatchObject({
+        provider: 'claude',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'default',
+        source: 'static',
+        cache: null,
+        presets: [],
+        defaultSelection: {
+          entryId: 'default',
+          entryMode: 'explicit',
+          controls: {
+            'claude.reasoning_effort': 'medium',
+          },
+        },
+        support: {
+          tier: 'full',
+        },
+        warnings: [],
+      });
+      expect(payload.entries.map((entry: { id: string }) => entry.id)).toEqual([
+        'default',
+        'sonnet',
+        'haiku',
+      ]);
+      expect(payload.controls).toMatchObject([
+        {
+          key: 'claude.reasoning_effort',
+          applicableEntryIds: ['default', 'sonnet'],
+          values: [
+            { value: 'low', applicableEntryIds: ['default', 'sonnet'] },
+            { value: 'medium', applicableEntryIds: ['default', 'sonnet'] },
+            { value: 'high', applicableEntryIds: ['default', 'sonnet'] },
+            { value: 'max', applicableEntryIds: ['default'] },
+          ],
+        },
+      ]);
     });
   });
 
@@ -4034,7 +4088,7 @@ providers:
     }, async (runtime) => {
       const immediate = await runtime.app.request('/providers/codex/models/advanced?instance=api/main');
       expect(immediate.status).toBe(200);
-      expect(await immediate.json()).toEqual({
+      expect(await immediate.json()).toMatchObject({
         provider: 'codex',
         backend: 'api',
         instance: 'main',
@@ -4089,7 +4143,11 @@ providers:
             description: 'Controls OpenAI reasoning effort for supported GPT-5 entries.',
             kind: 'enum',
             scope: 'both',
-            values: ['low', 'medium', 'high'],
+            values: [
+              { value: 'low', label: 'Low' },
+              { value: 'medium', label: 'Medium' },
+              { value: 'high', label: 'High' },
+            ],
             applicableEntryIds: ['gpt-5.4'],
             semanticTags: ['reasoning_intensity'],
           },
@@ -4111,7 +4169,7 @@ providers:
 
       const refreshed = await runtime.app.request('/providers/codex/models/advanced?instance=api/main&refresh=1');
       expect(refreshed.status).toBe(200);
-      expect(await refreshed.json()).toEqual({
+      expect(await refreshed.json()).toMatchObject({
         provider: 'codex',
         backend: 'api',
         instance: 'main',
@@ -4177,7 +4235,11 @@ providers:
             description: 'Controls OpenAI reasoning effort for supported GPT-5 entries.',
             kind: 'enum',
             scope: 'both',
-            values: ['low', 'medium', 'high'],
+            values: [
+              { value: 'low', label: 'Low' },
+              { value: 'medium', label: 'Medium' },
+              { value: 'high', label: 'High' },
+            ],
             applicableEntryIds: ['gpt-5.4', 'gpt-5.4-mini'],
             semanticTags: ['reasoning_intensity'],
           },
@@ -4766,7 +4828,7 @@ providers:
     });
   });
 
-  it('POST /sessions rejects unsupported controls for entry-only targets', async () => {
+  it('POST /sessions rejects controls that do not belong to the selected provider target', async () => {
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/sessions', {
         method: 'POST',
@@ -4789,6 +4851,33 @@ providers:
       expect(response.status).toBe(400);
       expect(await response.json()).toEqual({
         error: "Control 'openai.reasoning_effort' is not supported for codex/cli/default",
+      });
+    });
+  });
+
+  it('POST /sessions rejects Codex effort values that the selected entry does not support', async () => {
+    await withRuntime({}, {}, async (runtime) => {
+      const response = await runtime.app.request('/sessions', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider: 'codex',
+          cwd: '/tmp/cats-runtime-repo',
+          modelSelection: {
+            entryMode: 'explicit',
+            entryId: 'gpt-5.1-codex-mini',
+            controls: {
+              'codex.reasoning_effort': 'xhigh',
+            },
+          },
+        }),
+      });
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: "Control 'codex.reasoning_effort' must be one of: medium, high",
       });
     });
   });

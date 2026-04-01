@@ -1,6 +1,10 @@
 import type { ProviderTargetDescriptor } from '../providerCatalog.js';
 import type { ProviderAdvancedKnowledgeContext } from './providerAdvancedKnowledge.js';
-import type { ProviderAdvancedControlValue } from './providerAdvancedCatalog.js';
+import type {
+  ProviderAdvancedCatalogControl,
+  ProviderAdvancedCatalogControlOption,
+  ProviderAdvancedControlValue,
+} from './providerAdvancedCatalog.js';
 import { cloneProviderControls } from './providerControlUtils.js';
 
 export type ProviderModelSelectionEntryMode = 'auto' | 'explicit';
@@ -120,13 +124,49 @@ function validateControlValue(
       return;
     case 'enum':
       if (typeof value !== 'string') {
-        throw new Error(`Control '${key}' must be one of: ${(control.values || []).join(', ')}`);
+        throw new Error(
+          `Control '${key}' must be one of: ${listEnumControlValues(control).join(', ')}`,
+        );
       }
-      if (control.values && !control.values.includes(value)) {
-        throw new Error(`Control '${key}' must be one of: ${control.values.join(', ')}`);
+      if (control.values && !listEnumControlValues(control).includes(value)) {
+        throw new Error(
+          `Control '${key}' must be one of: ${listEnumControlValues(control).join(', ')}`,
+        );
       }
       return;
   }
+}
+
+function readControlOptionValue(
+  option: ProviderAdvancedCatalogControlOption | ProviderAdvancedControlValue,
+): ProviderAdvancedControlValue {
+  return typeof option === 'object' && option !== null && 'value' in option
+    ? option.value
+    : option;
+}
+
+function controlOptionAppliesToEntry(
+  option: ProviderAdvancedCatalogControlOption | ProviderAdvancedControlValue,
+  entryId: string,
+): boolean {
+  return !(
+    typeof option === 'object'
+    && option !== null
+    && 'applicableEntryIds' in option
+    && Array.isArray(option.applicableEntryIds)
+    && option.applicableEntryIds.length > 0
+    && !option.applicableEntryIds.includes(entryId)
+  );
+}
+
+function listEnumControlValues(
+  control: ProviderAdvancedCatalogControl,
+  entryId?: string,
+): string[] {
+  return (control.values || [])
+    .filter((option) => !entryId || controlOptionAppliesToEntry(option, entryId))
+    .map((option) => readControlOptionValue(option))
+    .filter((value): value is string => typeof value === 'string');
 }
 
 function ensureControlsAreAllowed(
@@ -156,7 +196,7 @@ function ensureControlApplicability(
   entryId: string,
   controls: Record<string, ProviderAdvancedControlValue> | undefined,
 ): void {
-  for (const key of Object.keys(controls || {})) {
+  for (const [key, value] of Object.entries(controls || {})) {
     const control = knowledge.controlsByKey[key];
     if (!control) {
       continue;
@@ -167,6 +207,16 @@ function ensureControlApplicability(
       && !control.applicableEntryIds.includes(entryId)
     ) {
       throw new Error(`Control '${key}' is not applicable to entry '${entryId}'`);
+    }
+    if (
+      control.kind === 'enum'
+      && typeof value === 'string'
+      && control.values
+      && !listEnumControlValues(control, entryId).includes(value)
+    ) {
+      throw new Error(
+        `Control '${key}' must be one of: ${listEnumControlValues(control, entryId).join(', ')}`,
+      );
     }
   }
 }

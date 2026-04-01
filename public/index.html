@@ -1667,7 +1667,33 @@ function setCreateManualModelGroup(visible, label = 'Model ID') {
   customGroup.classList.add('hidden');
 }
 
-function renderCreateModelControlField(control, value) {
+function createControlValueOptionAppliesToEntry(option, entryId) {
+  return !Array.isArray(option?.applicableEntryIds)
+    || option.applicableEntryIds.length === 0
+    || option.applicableEntryIds.includes(entryId);
+}
+
+function listCreateControlValueOptions(control, entryId) {
+  const options = Array.isArray(control?.values) ? control.values : [];
+  return options
+    .map((option) => {
+      if (
+        option
+        && typeof option === 'object'
+        && !Array.isArray(option)
+        && Object.prototype.hasOwnProperty.call(option, 'value')
+      ) {
+        return option;
+      }
+      return {
+        value: option,
+        label: String(option),
+      };
+    })
+    .filter((option) => createControlValueOptionAppliesToEntry(option, entryId));
+}
+
+function renderCreateModelControlField(control, value, entryId) {
   const safeKey = escapeHtml(control.key);
   const label = escapeHtml(control.label || control.key);
   const description = control.description
@@ -1675,8 +1701,8 @@ function renderCreateModelControlField(control, value) {
     : '';
 
   if (control.kind === 'enum') {
-    const options = (control.values || [])
-      .map((option) => `<option value="${escapeHtml(option)}" ${String(value) === String(option) ? 'selected' : ''}>${escapeHtml(option)}</option>`)
+    const options = listCreateControlValueOptions(control, entryId)
+      .map((option) => `<option value="${escapeHtml(option.value)}" ${String(value) === String(option.value) ? 'selected' : ''}>${escapeHtml(option.label || option.value)}</option>`)
       .join('');
     return `
       <label class="runtime-field">
@@ -1777,10 +1803,13 @@ function renderCreateModelChoice() {
   bits.push(preset?.label || 'Standard');
   if (catalog.support?.tier) bits.push(`tier: ${catalog.support.tier}`);
   hintEl.textContent = bits.join(' · ') || 'Advanced catalog selection';
+  if (entry?.notes?.length) {
+    hintEl.textContent += `\n${entry.notes[0]}`;
+  }
 
   if (controls.length > 0) {
     controlsEl.innerHTML = controls
-      .map((control) => renderCreateModelControlField(control, defaultValues[control.key]))
+      .map((control) => renderCreateModelControlField(control, defaultValues[control.key], entryId))
       .join('');
   }
 }
