@@ -423,6 +423,32 @@ describe('message route transcript persistence', () => {
     }
   });
 
+  it('returns explicit null instructions in history when dashboard display is enabled but the session has none', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-message-route-'));
+    const sessionBaseDir = join(root, 'sessions');
+    mkdirSync(sessionBaseDir, { recursive: true });
+
+    try {
+      const { app, session } = makeApp(
+        sessionBaseDir,
+        async function* () {
+          yield { type: 'result' };
+        },
+        undefined,
+        true,
+      );
+
+      const historyResponse = await app.request(`/sessions/${session.id}/history`);
+      expect(historyResponse.status).toBe(200);
+      const historyBody = await historyResponse.json();
+      expect(historyBody).toEqual(expect.objectContaining({
+        instructions: null,
+      }));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('persists additive strategy metadata into turn input, session inspection, and history metadata', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-message-route-'));
     const sessionBaseDir = join(root, 'sessions');

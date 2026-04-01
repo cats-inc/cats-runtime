@@ -2865,7 +2865,9 @@ instruction layers that the runtime would rehydrate for the session:
 
 This field is session-scoped. It reflects the runtime's current persisted
 session state, not the transient per-request layering state from an in-flight
-message turn.
+message turn. When the dashboard flag is enabled but the session currently has
+no effective instructions, `instructions` is returned as `null` so the UI can
+distinguish "feature disabled" from "enabled, but none".
 
 ### Runtime Inspection
 

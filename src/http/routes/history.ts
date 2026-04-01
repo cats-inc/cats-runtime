@@ -94,8 +94,8 @@ function buildHistoryMetadata(ctx: AppContext, session: SessionInfo) {
     session.instructions,
   );
   return {
-    ...(ctx.config.dashboardShowInstructions && dashboardInstructions
-      ? { instructions: dashboardInstructions }
+    ...(ctx.config.dashboardShowInstructions
+      ? { instructions: dashboardInstructions ?? null }
       : {}),
     sessionKey: session.sessionKey,
     providerTarget: buildSessionProviderTargetSummary(ctx, session),
