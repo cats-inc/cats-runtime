@@ -551,6 +551,15 @@
     color: var(--text2);
     font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
   }
+  .session-detail-instructions {
+    margin: 0;
+    padding: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--text2);
+  }
   .insight-card {
     background: rgba(26, 29, 39, 0.88);
     border: 1px solid var(--border);
@@ -1217,8 +1226,10 @@ let currentCreateModelCatalog = null;
 let createModelCatalogRequestId = 0;
 const CUSTOM_CREATE_MODEL_VALUE = '__custom_legacy_model__';
 let sessionScanInFlight = false;
+let currentSessionInstructions = null;
 const sessionDetailUiState = {
   expanded: false,
+  instructionsOpen: false,
   selectionOpen: false,
   resolutionOpen: false,
 };
@@ -2107,12 +2118,23 @@ function formatSessionDetailJson(value) {
   return `<pre class="session-detail-json">${escapeHtml(JSON.stringify(value, null, 2))}</pre>`;
 }
 
+function formatSessionInstructions(value) {
+  if (typeof value !== 'string' || !value.trim()) {
+    return '<div class="session-detail-empty" style="padding:12px;">None</div>';
+  }
+  return `<pre class="session-detail-instructions">${escapeHtml(value)}</pre>`;
+}
+
 function readSessionDetailUiState(container) {
   const shell = container?.querySelector?.('[data-session-detail-shell]');
+  const instructions = container?.querySelector?.('[data-session-detail-block="instructions"]');
   const selection = container?.querySelector?.('[data-session-detail-block="selection"]');
   const resolution = container?.querySelector?.('[data-session-detail-block="resolution"]');
   return {
     expanded: shell instanceof HTMLDetailsElement ? shell.open : sessionDetailUiState.expanded,
+    instructionsOpen: instructions instanceof HTMLDetailsElement
+      ? instructions.open
+      : sessionDetailUiState.instructionsOpen,
     selectionOpen: selection instanceof HTMLDetailsElement ? selection.open : sessionDetailUiState.selectionOpen,
     resolutionOpen: resolution instanceof HTMLDetailsElement ? resolution.open : sessionDetailUiState.resolutionOpen,
   };
@@ -2120,11 +2142,17 @@ function readSessionDetailUiState(container) {
 
 function bindSessionDetailState(container) {
   const shell = container?.querySelector?.('[data-session-detail-shell]');
+  const instructions = container?.querySelector?.('[data-session-detail-block="instructions"]');
   const selection = container?.querySelector?.('[data-session-detail-block="selection"]');
   const resolution = container?.querySelector?.('[data-session-detail-block="resolution"]');
   if (shell instanceof HTMLDetailsElement) {
     shell.addEventListener('toggle', () => {
       sessionDetailUiState.expanded = shell.open;
+    });
+  }
+  if (instructions instanceof HTMLDetailsElement) {
+    instructions.addEventListener('toggle', () => {
+      sessionDetailUiState.instructionsOpen = instructions.open;
     });
   }
   if (selection instanceof HTMLDetailsElement) {
@@ -2226,6 +2254,10 @@ function renderSessionDetails(session) {
             <dd>${formatSessionDetailValue(warningText)}</dd>
           </dl>
         </div>
+        <details class="session-detail-block" data-session-detail-block="instructions" ${uiState.instructionsOpen ? 'open' : ''}>
+          <summary>Effective Session Instructions</summary>
+          ${formatSessionInstructions(currentSessionInstructions)}
+        </details>
         <details class="session-detail-block" data-session-detail-block="selection" ${uiState.selectionOpen ? 'open' : ''}>
           <summary>Requested Model Selection JSON</summary>
           ${formatSessionDetailJson(session.modelSelection)}
@@ -2632,6 +2664,7 @@ function setSessionScanBusy(isBusy) {
 function clearCurrentSessionSelection() {
   disconnectObserver();
   currentSessionId = null;
+  currentSessionInstructions = null;
   document.getElementById('chatContainer').style.display = 'none';
   document.getElementById('chatPlaceholder').style.display = '';
   renderSessionInsights(null);
@@ -3022,13 +3055,12 @@ function disconnectObserver() {
 }
 
 async function loadHistory(id) {
+  currentSessionInstructions = null;
   try {
     const res = await fetch(`${API_BASE}/sessions/${id}/history`, { headers: headers() });
     if (!res.ok) return;
     const data = await res.json();
-    if ('instructions' in data) {
-      addInstructionsMsg(data.instructions);
-    }
+    currentSessionInstructions = 'instructions' in data ? data.instructions : null;
     for (const msg of data.messages || []) {
       if (msg.role === 'user') addUserMsg(msg.text);
       else if (msg.role === 'assistant') addAssistantMsg(msg.text);
@@ -3590,22 +3622,6 @@ function addSystemMsg(text) {
   el.textContent = text;
   document.getElementById('chatMessages').appendChild(el);
   scrollToBottom();
-}
-
-function addInstructionsMsg(text) {
-  if (typeof text !== 'string' || !text.trim()) {
-    addSystemMsg('Effective Session Instructions: none');
-    return;
-  }
-  const el = document.createElement('details');
-  el.className = 'msg msg-instructions';
-  const summary = document.createElement('summary');
-  summary.textContent = 'Effective Session Instructions';
-  const pre = document.createElement('pre');
-  pre.textContent = text;
-  el.appendChild(summary);
-  el.appendChild(pre);
-  document.getElementById('chatMessages').appendChild(el);
 }
 
 function scrollToBottom() {
