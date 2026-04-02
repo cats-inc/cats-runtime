@@ -1558,4 +1558,48 @@ remaining work is follow-through and publication discipline:
 - `docs/plans/PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md`
 
 ---
-*Last updated: 2026-03-29*
+### OPT-16: Runtime Session Delete Durability and Diagnostics
+
+**Priority**: P1
+**Status**: Planned
+
+#### Problem
+
+`cats-runtime` now deletes resurfacing file-backed sessions correctly by
+hydrating missing provider transcript paths before the delete pipeline runs.
+That closes the immediate correctness gap, but two follow-through items still
+remain:
+
+- delete can still fall back to provider-directory scanning when
+  `providerSourcePath` is missing, which is acceptable for now but heavier than
+  a direct lookup
+- when that fallback scan cannot resolve a provider transcript path, the
+  runtime still lacks a first-class warning/diagnostic trail that explains why
+  a registry delete could not fully clear provider-backed session artifacts
+
+#### Follow-through Direction
+
+- surface additive delete diagnostics when provider-discovery hydration is
+  attempted, skipped, or fails to resolve a transcript path
+- preserve those diagnostics in session inspection and delete responses so
+  dashboard/hosts can distinguish full provider cleanup from registry-only
+  cleanup attempts
+- replace the current per-delete full directory scan with a more direct
+  provider-session-id to source-path lookup/cache for file-backed providers
+  once the surrounding discovery data flow is stable
+
+#### Deferred Scope
+
+- do not reopen the current delete correctness fix just to remove the fallback
+  scan immediately
+- do not move product-owned delete policy or confirmation UX into runtime
+
+#### Affected Areas
+
+- `src/http/routes/sessions.ts`
+- `src/backends/cli/discovery/*`
+- `src/backends/cli/pool/SessionRegistry.ts`
+- `public/index.html`
+
+---
+*Last updated: 2026-04-03*
