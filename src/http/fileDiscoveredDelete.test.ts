@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createRuntimeApp as createApp } from './app.js';
+import { CodexSessionScanner } from '../backends/cli/discovery/CodexSessionScanner.js';
 import { SessionScanner } from '../backends/cli/discovery/SessionScanner.js';
 import { JunieSessionScanner } from '../backends/cli/junie/JunieSessionScanner.js';
 import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
@@ -22,10 +23,12 @@ describe('file-discovered session deletion', () => {
   let opencodeNative: OpencodeNativeSessionService;
   let app: ReturnType<typeof createApp>;
   let claudeProjectsDir: string;
+  let codexSessionsDir: string;
   let copilotSessionsDir: string;
   let geminiRootDir: string;
   let geminiSessionsDir: string;
   let junieSessionsDir: string;
+  let sessionBaseDir: string;
 
   const makeConfig = (): CliRuntimeConfig => ({
     host: '127.0.0.1',
@@ -44,8 +47,8 @@ describe('file-discovered session deletion', () => {
     opencodeServerPort: 4097,
     opencodeServerStartupTimeoutMs: 10000,
     auggieSessionsDir: '',
-    claudeProjectsDir: '',
-    codexSessionsDir: '',
+    claudeProjectsDir,
+    codexSessionsDir,
     copilotSessionsDir,
     cursorChatsDir: '~/.cursor/chats',
     cursorRuntime: {
@@ -61,7 +64,7 @@ describe('file-discovered session deletion', () => {
     nativeDiscoveryIntervalMs: 5000,
     externalSessionLiveWindowMs: 15000,
     maxSessions: 10,
-    sessionBaseDir: 'C:/tmp/cats-runtime/sessions',
+    sessionBaseDir,
     providerCommands: {
       auggie: { path: 'auggie', runner: 'auto', runtime: { mode: 'native' } },
       claude: { path: 'claude', runner: 'auto', runtime: { mode: 'native' } },
@@ -76,16 +79,20 @@ describe('file-discovered session deletion', () => {
 
   beforeEach(() => {
     claudeProjectsDir = join(tmpdir(), `claude-delete-test-${Date.now()}`);
+    codexSessionsDir = join(tmpdir(), `codex-delete-test-${Date.now()}`);
     copilotSessionsDir = join(tmpdir(), `copilot-delete-test-${Date.now()}`);
     geminiRootDir = join(tmpdir(), `gemini-delete-test-${Date.now()}`);
     geminiSessionsDir = join(geminiRootDir, 'tmp');
     junieSessionsDir = join(tmpdir(), `junie-delete-test-${Date.now()}`);
+    sessionBaseDir = join(tmpdir(), `cats-runtime-delete-test-${Date.now()}`, 'sessions');
     mkdirSync(claudeProjectsDir, { recursive: true });
+    mkdirSync(codexSessionsDir, { recursive: true });
     mkdirSync(copilotSessionsDir, { recursive: true });
     mkdirSync(geminiSessionsDir, { recursive: true });
     mkdirSync(junieSessionsDir, { recursive: true });
+    mkdirSync(sessionBaseDir, { recursive: true });
 
-    registry = new SessionRegistry();
+    registry = new SessionRegistry(undefined, sessionBaseDir);
     pool = {
       getCapabilities: vi.fn(() => ({ resume: true, fork: true, permissions: true })),
       get: vi.fn(() => undefined),
@@ -145,9 +152,11 @@ describe('file-discovered session deletion', () => {
 
   afterEach(() => {
     rmSync(claudeProjectsDir, { recursive: true, force: true });
+    rmSync(codexSessionsDir, { recursive: true, force: true });
     rmSync(copilotSessionsDir, { recursive: true, force: true });
     rmSync(geminiRootDir, { recursive: true, force: true });
     rmSync(junieSessionsDir, { recursive: true, force: true });
+    rmSync(sessionBaseDir, { recursive: true, force: true });
   });
 
   it('deletes discovered Claude sessions without leaving sessions-index entries behind', async () => {
@@ -204,6 +213,114 @@ describe('file-discovered session deletion', () => {
     const discovered = await new SessionScanner(claudeProjectsDir).scan();
     expect(discovered.some((item) => item.providerSessionId === 'claude-delete')).toBe(false);
     expect(discovered.some((item) => item.providerSessionId === 'claude-keep')).toBe(true);
+  });
+
+  it('deletes runtime-owned Claude sessions before they can be rediscovered from provider files', async () => {
+    const projectDir = join(claudeProjectsDir, '-repo');
+    mkdirSync(projectDir, { recursive: true });
+
+    const providerSourcePath = join(projectDir, 'claude-runtime-delete.jsonl');
+    writeFileSync(
+      providerSourcePath,
+      JSON.stringify({ type: 'user', message: { content: 'Delete me' }, cwd: 'C:/repo' }) + '\n',
+    );
+    writeFileSync(
+      join(projectDir, 'sessions-index.json'),
+      JSON.stringify({
+        'claude-runtime-delete': {
+          cwd: 'C:/repo',
+          summary: 'Delete me',
+          message_count: 1,
+          last_message_at: '2026-03-11T08:05:00Z',
+        },
+      }, null, 2),
+    );
+
+    const session = registry.create({
+      id: 'runtime-claude-delete',
+      providerName: 'claude',
+      cwd: 'C:/repo',
+    });
+    registry.updateStatus(session.id, 'closed');
+    registry.setProviderSessionId(session.id, 'claude-runtime-delete');
+
+    const runtimeSourcePath = join(sessionBaseDir, 'history', `${session.id}.jsonl`);
+    mkdirSync(join(sessionBaseDir, 'history'), { recursive: true });
+    writeFileSync(
+      runtimeSourcePath,
+      JSON.stringify({ type: 'user', message: { content: 'Delete me' }, cwd: 'C:/repo' }) + '\n',
+    );
+    registry.setSourcePath(session.id, runtimeSourcePath);
+
+    const res = await app.request(`/sessions/${session.id}`, {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.status).toBe('deleted');
+    expect(registry.get(session.id)).toBeUndefined();
+    expect(existsSync(runtimeSourcePath)).toBe(false);
+    expect(existsSync(providerSourcePath)).toBe(false);
+
+    const discovered = await new SessionScanner(claudeProjectsDir).scan();
+    expect(discovered.some((item) => item.providerSessionId === 'claude-runtime-delete')).toBe(false);
+  });
+
+  it('deletes runtime-owned Codex sessions before they can be rediscovered from rollout files', async () => {
+    const providerSourcePath = join(
+      codexSessionsDir,
+      '2026',
+      '03',
+      '11',
+      'rollout-thread-runtime-delete.jsonl',
+    );
+    mkdirSync(join(codexSessionsDir, '2026', '03', '11'), { recursive: true });
+    writeFileSync(
+      providerSourcePath,
+      [
+        JSON.stringify({
+          type: 'session_meta',
+          payload: { id: 'thread-runtime-delete', cwd: 'C:/repo' },
+          timestamp: '2026-03-11T08:10:00.000Z',
+        }),
+        JSON.stringify({
+          type: 'event_msg',
+          payload: { type: 'user_message', message: 'Delete me' },
+          timestamp: '2026-03-11T08:10:01.000Z',
+        }),
+      ].join('\n') + '\n',
+    );
+
+    const session = registry.create({
+      id: 'runtime-codex-delete',
+      providerName: 'codex',
+      cwd: 'C:/repo',
+    });
+    registry.updateStatus(session.id, 'closed');
+    registry.setProviderSessionId(session.id, 'thread-runtime-delete');
+
+    const runtimeSourcePath = join(sessionBaseDir, 'history', `${session.id}.jsonl`);
+    mkdirSync(join(sessionBaseDir, 'history'), { recursive: true });
+    writeFileSync(
+      runtimeSourcePath,
+      JSON.stringify({ type: 'user', message: { content: 'Delete me' }, cwd: 'C:/repo' }) + '\n',
+    );
+    registry.setSourcePath(session.id, runtimeSourcePath);
+
+    const res = await app.request(`/sessions/${session.id}`, {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.status).toBe('deleted');
+    expect(registry.get(session.id)).toBeUndefined();
+    expect(existsSync(runtimeSourcePath)).toBe(false);
+    expect(existsSync(providerSourcePath)).toBe(false);
+
+    const discovered = await new CodexSessionScanner(codexSessionsDir).scan();
+    expect(discovered.some((item) => item.providerSessionId === 'thread-runtime-delete')).toBe(false);
   });
 
   it('deletes discovered Copilot directory sessions so they cannot be rediscovered', async () => {

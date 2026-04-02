@@ -46,13 +46,37 @@ import {
 } from '../../backends/cli/pool/sessionView.js';
 import { buildToolPolicyInspection } from '../../core/tools/LocalToolRuntime.js';
 import {
+  SessionScanner,
+} from '../../backends/cli/discovery/SessionScanner.js';
+import {
+  CodexSessionScanner,
+} from '../../backends/cli/discovery/CodexSessionScanner.js';
+import {
+  CopilotSessionScanner,
+} from '../../backends/cli/discovery/CopilotSessionScanner.js';
+import {
+  GeminiSessionScanner,
+} from '../../backends/cli/discovery/GeminiSessionScanner.js';
+import {
+  PiSessionScanner,
+} from '../../backends/cli/discovery/PiSessionScanner.js';
+import {
+  resolveFileBackedProviderPath,
+} from '../../backends/cli/providerPaths.js';
+import {
   getCursorNative,
   getGooseNative,
   getKiloNative,
   getKiroNative,
   getOpencodeNative,
+  getAuggieSessions,
+  getClaudeProjectsDir,
+  getCodexSessionsDir,
+  getCopilotSessionsDir,
+  getGeminiSessionsDir,
 } from '../providerServices.js';
 import { resolvePiResumeTarget } from '../../backends/cli/pi/resume.js';
+import { JunieSessionScanner } from '../../backends/cli/junie/JunieSessionScanner.js';
 import {
   getProviderDefaultTarget,
   listConfiguredProviders,
@@ -1422,6 +1446,10 @@ async function finalizeDeleteAfterWorkspaceCleanup(
   const hasProviderDiscoveryState = tracksProviderDiscoveryState(session);
   const workerDetached = !runtime.isAttached(id);
 
+  if (hasProviderDiscoveryState && !session.providerSourcePath) {
+    await hydrateProviderDiscoverySourcePathForDelete(ctx, session);
+  }
+
   const preparedManagedTranscripts = ctx.registry.prepareManagedTranscriptDeletion(id);
   const preparedProviderDiscovery = prepareProviderDiscoveryDeletion(ctx, session);
   const hadTranscript = preparedManagedTranscripts.hadFiles
@@ -1995,6 +2023,87 @@ function collectProviderDiscoveryArtifactPaths(ctx: AppContext, session: Session
   }
 
   return Array.from(artifactPaths);
+}
+
+type DiscoveredSessionArtifact = {
+  providerSessionId: string;
+  sourcePath?: string;
+  cwd?: string;
+};
+
+function findMatchingProviderDiscoverySourcePath(
+  session: SessionInfo,
+  discovered: DiscoveredSessionArtifact[],
+): string | null {
+  if (!session.providerSessionId) {
+    return null;
+  }
+
+  const exactMatch = discovered.find((item) =>
+    item.providerSessionId === session.providerSessionId
+    && item.sourcePath
+    && (!session.cwd || !item.cwd || item.cwd === session.cwd),
+  );
+  if (exactMatch?.sourcePath) {
+    return exactMatch.sourcePath;
+  }
+
+  const fallbackMatch = discovered.find((item) =>
+    item.providerSessionId === session.providerSessionId
+    && item.sourcePath,
+  );
+  return fallbackMatch?.sourcePath ?? null;
+}
+
+async function hydrateProviderDiscoverySourcePathForDelete(
+  ctx: AppContext,
+  session: SessionInfo,
+): Promise<void> {
+  const discovered = await scanProviderDiscoveryArtifactsForDelete(ctx, session);
+  const sourcePath = findMatchingProviderDiscoverySourcePath(session, discovered);
+  if (!sourcePath) {
+    return;
+  }
+
+  session.providerSourcePath = sourcePath;
+}
+
+async function scanProviderDiscoveryArtifactsForDelete(
+  ctx: AppContext,
+  session: SessionInfo,
+): Promise<DiscoveredSessionArtifact[]> {
+  try {
+    switch (session.providerName) {
+      case 'auggie': {
+        const sessionsService = getAuggieSessions(ctx, session.providerInstanceId);
+        return session.cwd
+          ? await sessionsService.listSessions(session.cwd)
+          : await sessionsService.listAllSessions();
+      }
+      case 'claude':
+        return new SessionScanner(getClaudeProjectsDir(ctx, session.providerInstanceId)).scan();
+      case 'codex':
+        return new CodexSessionScanner(getCodexSessionsDir(ctx, session.providerInstanceId)).scan();
+      case 'copilot':
+        return new CopilotSessionScanner(
+          getCopilotSessionsDir(ctx, session.providerInstanceId),
+        ).scan();
+      case 'gemini':
+        return new GeminiSessionScanner(
+          getGeminiSessionsDir(ctx, session.providerInstanceId),
+        ).scan();
+      case 'pi':
+        return new PiSessionScanner(
+          resolveFileBackedProviderPath(ctx.config, 'pi', session.providerInstanceId),
+        ).scan();
+      case 'junie':
+        return new JunieSessionScanner().scan();
+      default:
+        return [];
+    }
+  } catch {
+    return [];
+  }
 }
 
 function createNoopPreparedDeletion(): PreparedFileDeletion {
