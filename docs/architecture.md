@@ -445,7 +445,7 @@ path is intentionally narrow:
 - Executes file listing, file read/write, grep, and shell commands
 - Exposes policy-neutral workspace substrate operations (`audit-workspace`,
   `init-workspace`, `update-workspace`) as shared headless/local-tool
-  primitives
+  primitives and matching HTTP routes under `/workspace/substrate/*`
 - Returns explicit workspace substrate `contract`, `actions`, `plan`, and
   `approval` payloads so hosts can preview/apply deterministically without
   embedding product policy in the runtime

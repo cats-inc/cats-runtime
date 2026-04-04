@@ -1264,6 +1264,68 @@ session or per-session page capacity, create routes return `400` with a
 machine-readable validation error instead of letting browser state grow
 without limit.
 
+### Workspace Substrate
+
+```text
+POST /workspace/substrate/audit
+POST /workspace/substrate/init
+POST /workspace/substrate/update
+```
+
+These routes expose the runtime-owned workspace substrate service directly over
+HTTP without adding product workflow policy.
+
+Shared request fields:
+
+- `workspacePath` (required)
+- `profile`: `minimal`, `standard`, or `a2a-enabled`
+- `enabledAgents`: bounded subset of `claude`, `gemini`, `codex`
+- `includeA2A`: optional boolean
+- `apply`: optional boolean
+- `hints`: optional structured workspace metadata such as `projectType`,
+  `purpose`, `background`, `technologyLabels`, and `documentationStyle`
+- top-level `actorRole` / `approved` or nested `authorization` for apply-aware
+  host context
+
+Shared response fields:
+
+- `operation`: `audit-workspace`, `init-workspace`, or `update-workspace`
+- `status`: current substrate state such as `missing`, `partial`, `present`,
+  `drifted`, or `conflicting`
+- `contract`: explicit preview/apply mode plus `applyDecision`
+- `authorization` / `approval`: runtime-owned apply gating metadata
+- `findings`: per-file substrate findings
+- `actions`: machine-readable write/update/review-copy plan
+- `plan`: bounded changed/review-copy/pending-approval summary
+- `summary`: compact finding/action counts
+
+Behavioral boundaries:
+
+- `audit-workspace` remains strictly read-only even when `apply: true` is sent.
+- `init-workspace` and `update-workspace` default to preview.
+- Conflicting files still use `write_sidecar` with `*.bootstrap` review copies
+  instead of blind overwrite.
+- These routes expose execution primitives only; approval UX and orchestration
+  remain host-owned.
+
+Init apply example:
+
+```json
+{
+  "workspacePath": "C:/repo",
+  "profile": "standard",
+  "enabledAgents": ["codex"],
+  "includeA2A": true,
+  "apply": true,
+  "actorRole": "boss_cat",
+  "approved": true,
+  "hints": {
+    "projectType": "monorepo",
+    "purpose": "Agent collaboration pilot"
+  }
+}
+```
+
 ### Delivery
 
 ```text

@@ -73,6 +73,7 @@ import { peerExecutionRoutes } from './routes/peerExecutions.js';
 import { skillRoutes } from './routes/skills.js';
 import { wakeupRoutes } from './routes/wakeup.js';
 import { managementRoutes } from './routes/management.js';
+import { workspaceSubstrateRoutes } from './routes/workspaceSubstrate.js';
 import type { RuntimeStartupState } from '../startup.js';
 
 export interface AppContext {
@@ -370,6 +371,7 @@ export function createRuntimeApp(ctx: AppContext) {
   app.route('/', skillRoutes);
   app.route('/', wakeupRoutes);
   app.route('/', managementRoutes);
+  app.route('/', workspaceSubstrateRoutes);
 
   return app;
 }

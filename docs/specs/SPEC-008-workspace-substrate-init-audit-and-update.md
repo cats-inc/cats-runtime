@@ -35,12 +35,15 @@ dependencies on that repo.
 ## Implementation Status
 
 The first slice described here is now landed in `cats-runtime` through the
-runtime-owned workspace substrate service and local tool runtime.
+runtime-owned workspace substrate service, dedicated HTTP routes, the shared
+local tool runtime, MCP tools, and the repo-owned helper entrypoint.
 
 Landed boundaries:
 
 - `init-workspace`, `audit-workspace`, and `update-workspace` are implemented
   as runtime-owned execution primitives
+- those same operations are now reachable through dedicated HTTP routes under
+  `/workspace/substrate/*`
 - results include explicit preview/apply `contract` metadata, machine-readable
   `actions`, a summarized `plan`, and an approval-friendly `approval` payload
 - `audit-workspace` is strictly read-only even when callers send `apply: true`
@@ -48,7 +51,6 @@ Landed boundaries:
 
 Still deferred:
 
-- dedicated HTTP endpoints for workspace substrate operations
 - product-level approval UX, orchestration policy, and delegation behavior
 - full `project-bootstrap` preset/flavor parity beyond collaboration substrate
 
@@ -92,8 +94,8 @@ Still deferred:
    - `audit-workspace`
    - `update-workspace`
 2. These operations shall be available as runtime-owned headless capabilities.
-   They may later be surfaced through APIs, dashboard actions, or runtime-owned
-   local tools.
+   The current baseline now includes direct HTTP routes, MCP tools, runtime-
+   owned local tools, and the repo-owned helper entrypoint.
 3. The first slice shall focus on collaboration substrate files and repo memory
    structure rather than full language/framework project scaffolding.
 4. The substrate model shall be informed by AAIF/A2A layering already accepted
@@ -333,4 +335,3 @@ needs. The first slice should not try to embed:
 *Updated: 2026-03-21*
 *Author: Codex*
 *Related Plan: WP-5 (tracked in PROGRESS.md)*
-
