@@ -19,7 +19,7 @@ import { parseCoreNdjson as parseNdjson } from '../../tests/streamEventTestUtils
 function makeConfig(
   sessionBaseDir: string,
   metering?: CliRuntimeConfig['metering'],
-  dashboardShowInstructions = false,
+  dashboardShowSessionDetails = false,
 ): CliRuntimeConfig {
   return {
     host: '127.0.0.1',
@@ -59,7 +59,7 @@ function makeConfig(
     spawnTimeoutMs: 30000,
     sessionBaseDir,
     metering,
-    dashboardShowInstructions,
+    dashboardShowSessionDetails,
     providerCommands: {
       auggie: { path: 'auggie', runner: 'auto', runtime: { mode: 'native' } },
       claude: { path: 'claude', runner: 'auto', runtime: { mode: 'native' } },
@@ -77,7 +77,7 @@ function makeApp(
   sessionBaseDir: string,
   streamMessage: (turnInput: TurnInput) => AsyncGenerator<StreamEvent>,
   metering?: CliRuntimeConfig['metering'],
-  dashboardShowInstructions = false,
+  dashboardShowSessionDetails = false,
 ) {
   const registry = new SessionRegistry();
   const worker = {
@@ -100,7 +100,7 @@ function makeApp(
   } as unknown as WorkerPool;
 
   const app = createApp({
-    config: makeConfig(sessionBaseDir, metering, dashboardShowInstructions),
+    config: makeConfig(sessionBaseDir, metering, dashboardShowSessionDetails),
     startup: createRuntimeStartupState(),
     registry,
     pool,

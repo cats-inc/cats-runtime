@@ -1227,7 +1227,7 @@ let createModelCatalogRequestId = 0;
 const CUSTOM_CREATE_MODEL_VALUE = '__custom_legacy_model__';
 let sessionScanInFlight = false;
 let currentSessionInstructions = null;
-let currentSessionInstructionsAvailable = false;
+let currentSessionDetailsEnabled = false;
 const sessionDetailUiState = {
   expanded: false,
   instructionsOpen: false,
@@ -2173,7 +2173,7 @@ function renderSessionDetails(session) {
   if (!container) {
     return;
   }
-  if (!session) {
+  if (!session || !currentSessionDetailsEnabled) {
     container.style.display = 'none';
     container.innerHTML = '';
     return;
@@ -2255,10 +2255,10 @@ function renderSessionDetails(session) {
             <dd>${formatSessionDetailValue(warningText)}</dd>
           </dl>
         </div>
-        ${currentSessionInstructionsAvailable ? `<details class="session-detail-block" data-session-detail-block="instructions" ${uiState.instructionsOpen ? 'open' : ''}>
+        <details class="session-detail-block" data-session-detail-block="instructions" ${uiState.instructionsOpen ? 'open' : ''}>
           <summary>Effective Session Instructions</summary>
           ${formatSessionInstructions(currentSessionInstructions)}
-        </details>` : ''}
+        </details>
         <details class="session-detail-block" data-session-detail-block="selection" ${uiState.selectionOpen ? 'open' : ''}>
           <summary>Requested Model Selection JSON</summary>
           ${formatSessionDetailJson(session.modelSelection)}
@@ -2666,7 +2666,7 @@ function clearCurrentSessionSelection() {
   disconnectObserver();
   currentSessionId = null;
   currentSessionInstructions = null;
-  currentSessionInstructionsAvailable = false;
+  currentSessionDetailsEnabled = false;
   document.getElementById('chatContainer').style.display = 'none';
   document.getElementById('chatPlaceholder').style.display = '';
   renderSessionInsights(null);
@@ -3058,13 +3058,13 @@ function disconnectObserver() {
 
 async function loadHistory(id) {
   currentSessionInstructions = null;
-  currentSessionInstructionsAvailable = false;
+  currentSessionDetailsEnabled = false;
   try {
     const res = await fetch(`${API_BASE}/sessions/${id}/history`, { headers: headers() });
     if (!res.ok) return;
     const data = await res.json();
-    currentSessionInstructionsAvailable = 'instructions' in data;
-    currentSessionInstructions = currentSessionInstructionsAvailable ? data.instructions : null;
+    currentSessionDetailsEnabled = data.sessionDetailsEnabled === true;
+    currentSessionInstructions = currentSessionDetailsEnabled && 'instructions' in data ? data.instructions : null;
     for (const msg of data.messages || []) {
       if (msg.role === 'user') addUserMsg(msg.text);
       else if (msg.role === 'assistant') addAssistantMsg(msg.text);

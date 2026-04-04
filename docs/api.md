@@ -2856,17 +2856,23 @@ the last bounded remote tool/service evidence after the live stream is gone.
 read model returned by `GET /sessions/{id}` so provider continuity/tooling
 semantics stay visible alongside transcript provenance.
 
-When `CATS_RUNTIME_DASHBOARD_SHOW_INSTRUCTIONS=true`, the history payload also
-includes additive `instructions` containing the current effective session
-instruction layers that the runtime would rehydrate for the session:
+When `CATS_RUNTIME_DASHBOARD_SHOW_SESSION_DETAILS=true`, the history payload
+includes a `sessionDetailsEnabled: true` flag and additive `instructions`
+containing the current effective session instruction layers that the runtime
+would rehydrate for the session:
 
 1. resolved runtime skill instruction overlay
 2. currently persisted session instructions
 
-This field is session-scoped. It reflects the runtime's current persisted
+The dashboard uses `sessionDetailsEnabled` to decide whether to render the
+full Session Details panel (provider target, model selection/resolution,
+reasoning effort, instructions, and JSON dumps). When the flag is off, the
+panel is hidden entirely and the instruction merge is skipped.
+
+`instructions` is session-scoped. It reflects the runtime's current persisted
 session state, not the transient per-request layering state from an in-flight
-message turn. When the dashboard flag is enabled but the session currently has
-no effective instructions, `instructions` is returned as `null` so the UI can
+message turn. When the flag is enabled but the session currently has no
+effective instructions, `instructions` is returned as `null` so the UI can
 distinguish "feature disabled" from "enabled, but none".
 
 ### Runtime Inspection

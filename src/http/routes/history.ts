@@ -89,12 +89,12 @@ function buildHistoryMetadata(ctx: AppContext, session: SessionInfo) {
   });
   const strategyRequest = readRuntimeExecutionStrategyRequest(session);
   const strategyState = readRuntimeExecutionStrategyState(session);
-  const dashboardInstructions = mergeRuntimeInstructionLayers(
-    session.skills,
-    session.instructions,
-  );
+  const dashboardInstructions = ctx.config.dashboardShowSessionDetails
+    ? mergeRuntimeInstructionLayers(session.skills, session.instructions)
+    : undefined;
   return {
-    ...(ctx.config.dashboardShowInstructions
+    sessionDetailsEnabled: ctx.config.dashboardShowSessionDetails,
+    ...(ctx.config.dashboardShowSessionDetails
       ? { instructions: dashboardInstructions ?? null }
       : {}),
     sessionKey: session.sessionKey,
