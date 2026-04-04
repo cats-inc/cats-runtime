@@ -47,7 +47,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 | Plan | Title | Status | Related Spec |
 |------|-------|--------|--------------|
 | [PLAN-028](./PLAN-028-truthful-provider-refusal-rate-limit-and-overload-surfacing.md) | Truthful Provider Refusal, Rate-Limit, and Overload Surfacing | Draft | [SPEC-010](../specs/SPEC-010-usage-metering-rate-limit-detection-and-execution-guardrails.md), [SPEC-007](../specs/SPEC-007-provider-compatibility-and-evidence-engine.md), [ADR-017](../decisions/017-own-usage-metering-rate-limit-detection-and-execution-guardrails.md) |
-| [PLAN-027](./PLAN-027-kilo-cli-provider-support-and-consumption.md) | Independent Kilo CLI Provider Support and Product Consumption | Draft | [SPEC-017](../specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md), [SPEC-018](../specs/SPEC-018-advanced-provider-model-catalog-and-selection-schema.md), [SPEC-023](../specs/SPEC-023-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md) |
+| [PLAN-027](./PLAN-027-kilo-cli-provider-support-and-consumption.md) | Independent Kilo CLI Provider Support and Product Consumption | Completed | [SPEC-017](../specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md), [SPEC-018](../specs/SPEC-018-advanced-provider-model-catalog-and-selection-schema.md), [SPEC-023](../specs/SPEC-023-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md) |
 | [PLAN-026](./PLAN-026-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md) | Verified Advanced Provider Catalogs and Manual-Refresh Discovery | Draft | [SPEC-023](../specs/SPEC-023-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md), [ADR-029](../decisions/029-keep-advanced-provider-catalogs-verified-and-manual-refresh.md) |
 | [PLAN-025](./PLAN-025-executable-packaging-and-publish-follow-through.md) | Executable Packaging and Publish Follow-Through | In Progress | [ROADMAP OPT-15](../../ROADMAP.md), [SPEC-017](../specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md), [PLAN-019](./PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md) |
 | [PLAN-024](./PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md) | Runtime Skill Library, Setup Diagnostics, and Wakeup Follow-Through | Completed | [SPEC-013](../specs/SPEC-013-internal-skill-library-and-role-taxonomy.md), [SPEC-015](../specs/SPEC-015-runtime-setup-diagnostic-report.md), [SPEC-012](../specs/SPEC-012-scheduled-wakeup-substrate.md) |
@@ -87,6 +87,11 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 - `PLAN-023` is complete for the current `SPEC-006` pilot scope: the repo-owned
   collaboration rewrite and split-safe sibling alignment are landed, while any
   broader production-default adoption remains a separate governance decision.
+- `PLAN-027` is complete: Kilo is already landed as an independent CLI provider
+  across runtime config, compatibility/setup truth, native session routes, and
+  packaged/product consumption. Its only submodule-derived input was
+  `environment-bootstrap` install/check knowledge; `project-bootstrap` had no
+  Kilo-specific extraction scope.
 
 ## For AI Agents
 

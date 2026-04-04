@@ -5,6 +5,11 @@
 > This roadmap treats runtime-managed transcript compaction, recurring wakeup
 > scheduling plus runtime-wide wakeup diagnostics aggregates, and runtime skill
 > execution delivery as shipped baseline slices.
+>
+> `kilo` is also now part of the shipped CLI-provider baseline across runtime
+> config, setup/compatibility truth, native session routing, and packaged
+> `cats-platform` consumption. Future work should treat Kilo under the generic
+> bootstrap/compatibility tracks rather than as a separate launch gap.
 
 ## Optimizations
 

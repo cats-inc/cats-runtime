@@ -24,6 +24,17 @@
 | Docs | In Progress | Core docs now cover startup/diagnostics, provider compatibility/evidence flows, model catalog, session branching, worktree-backed session isolation and cleanup, workspace substrate, runtime hydration/re-entry metadata, delivery primitives, the browser preview substrate including opt-in Playwright driver enablement plus non-persistent restart recovery, single-page close semantics, and explicit idle-ready cleanup support, runtime-managed skills plus the internal skill-library taxonomy/metadata contract, the scheduled wakeup substrate, first-slice metering/progress contracts, additive session inspection/run-state/maintenance payloads including sanitized persisted maintenance requests plus generic maintenance follow-through outcomes, bounded maintenance request/follow-through history, additive `maintenance.flush` read-model state, the runtime MCP facade with authoritative HTTP ownership on `POST /mcp` plus a stdio proxy for `cats-runtime-mcp`, deployment/setup guidance for that proxy boundary, additive `read_only` runtime-tool profile summaries on runtime diagnostics, explicit WSL manual-discovery `startIfNeeded` override truth on provider-native discovery routes, PLAN-017 LAN peer discovery/execution routing v0 including peer network-posture diagnostics, the broader `SPEC-006` pilot including the repo-owned A2A v1 example set, same-environment collaboration skills, repo-owned workspace starter/update helpers, split-safe starter validation, and sibling alignment notes against `cats-platform`, the completed `PLAN-024` follow-through for runtime skills/setup diagnostics/wakeups, and the current `SPEC-017` / `PLAN-019` truth that shared shell/manual-repair/build-baseline slices are landed while deeper page-source convergence remains open; broader browser-driver follow-through and remaining PLAN-003 or PLAN-005 follow-on items still need ongoing updates |
 | Follow-ups | Completed | Accepted post-review findings for provider-instance rollout were implemented and recorded in `docs/plans/PLAN-002-provider-instance-review-followups.md` |
 
+Kilo shipped-baseline note:
+
+- `kilo` is already landed as an independent CLI provider across runtime
+  config, provider ordering, native session routes, install/check metadata,
+  compatibility/setup diagnostics, model catalogs, and `cats-platform`
+  packaged/provider consumption.
+- The Kilo rollout only depended on the `environment-bootstrap` extraction line
+  for install/check/package knowledge such as `@kilocode/cli` and
+  `kilo --version`. `project-bootstrap` had no Kilo-specific source artifacts
+  to port.
+
 **Legend**: Not Started | In Progress | Completed | Blocked
 
 ## Work Packages
