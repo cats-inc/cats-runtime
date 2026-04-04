@@ -1281,6 +1281,20 @@ function resolveAgentInitialRouting(provider,model='',modelSelection=null){
   }
   return { entryId, presetId, legacyModel:'' };
 }
+function readAgentModelControlValues(div){
+  const values={};
+  const els=div.querySelectorAll('.agent-model-controls [data-model-control-key]');
+  for(const el of els){
+    const key=el.getAttribute('data-model-control-key');
+    const kind=el.getAttribute('data-model-control-kind');
+    if(!key||!kind)continue;
+    if(kind==='boolean'){values[key]=Boolean(el.checked);continue;}
+    const raw=typeof el.value==='string'?el.value.trim():'';
+    if(!raw)continue;
+    values[key]=kind==='number'?Number(raw):raw;
+  }
+  return values;
+}
 function readAgentModelState(div){
   const provider=div.querySelector('.agent-provider')?.value||'';
   const entryId=div.querySelector('.agent-entry-choice')?.value||'';
@@ -1292,6 +1306,10 @@ function readAgentModelState(div){
     const modelSelection={ entryMode:'explicit', entryId };
     if(presetId){
       modelSelection.presetId=presetId;
+    }
+    const controls=readAgentModelControlValues(div);
+    if(Object.keys(controls).length>0){
+      modelSelection.controls=controls;
     }
     return { model:'', modelSelection };
   }
@@ -1336,6 +1354,47 @@ function syncAgentPresetField(div,catalog,entryId,preferredPresetId='',allowDefa
   presetEl.disabled=false;
   return nextValue;
 }
+function renderAgentModelControls(div,catalog,entryId,presetId){
+  const controlsEl=div.querySelector('.agent-model-controls');
+  if(!controlsEl)return;
+  if(!catalog||!entryId||entryId===CUSTOM_AGENT_MODEL_VALUE){
+    controlsEl.innerHTML='';
+    return;
+  }
+  const controls=window.CatsUI?.listStoredAdvancedControls
+    ? window.CatsUI.listStoredAdvancedControls(catalog,`entry:${entryId}`)
+    : [];
+  if(controls.length===0){controlsEl.innerHTML='';return;}
+  const defaults=window.CatsUI?.getAdvancedEntryControlDefaults
+    ? window.CatsUI.getAdvancedEntryControlDefaults(catalog,entryId,presetId||'')
+    : {};
+  controlsEl.innerHTML=controls.map(control=>{
+    const safeKey=escapeHtml(control.key);
+    const label=escapeHtml(control.label||control.key);
+    if(control.kind==='enum'){
+      const valueOptions=(Array.isArray(control.values)?control.values:[])
+        .filter(v=>{
+          if(!entryId||!Array.isArray(v.applicableEntryIds)||v.applicableEntryIds.length===0)return true;
+          return v.applicableEntryIds.includes(entryId);
+        });
+      const curVal=defaults[control.key]!==undefined?String(defaults[control.key]):'';
+      const opts=valueOptions.map(v=>`<option value="${escapeHtml(v.value)}" ${String(v.value)===curVal?'selected':''}>${escapeHtml(v.label||v.value)}</option>`).join('');
+      return `<div><label class="block text-xs text-slate-400">${label}</label><select class="agent-model-control w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none" data-model-control-kind="enum" data-model-control-key="${safeKey}">${opts}</select></div>`;
+    }
+    if(control.kind==='boolean'){
+      const checked=defaults[control.key]===true?'checked':'';
+      return `<div><label class="flex items-center gap-2 text-xs text-slate-400"><input type="checkbox" class="agent-model-control h-3.5 w-3.5 rounded border-slate-600 bg-slate-700" data-model-control-kind="boolean" data-model-control-key="${safeKey}" ${checked} />${label}</label></div>`;
+    }
+    const inputType=control.kind==='number'?'number':'text';
+    const curVal=defaults[control.key]!==undefined&&defaults[control.key]!==null?escapeHtml(defaults[control.key]):'';
+    const extraAttrs=[
+      control.minimum!==undefined?`min="${escapeHtml(control.minimum)}"`:'',
+      control.maximum!==undefined?`max="${escapeHtml(control.maximum)}"`:'',
+      control.step!==undefined?`step="${escapeHtml(control.step)}"`:'',
+    ].filter(Boolean).join(' ');
+    return `<div><label class="block text-xs text-slate-400">${label}</label><input type="${inputType}" class="agent-model-control w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none" data-model-control-kind="${escapeHtml(control.kind)}" data-model-control-key="${safeKey}" value="${curVal}" ${extraAttrs} /></div>`;
+  }).join('');
+}
 function renderAgentModelChoice(div){
   const provider=div.querySelector('.agent-provider')?.value||'';
   const catalog=getProviderAdvancedCatalog(provider);
@@ -1353,6 +1412,7 @@ function renderAgentModelChoice(div){
     manualGroup.classList.remove('hidden');
     manualLabel.textContent='Model ID';
     hintEl.textContent='Enter a model id manually.';
+    renderAgentModelControls(div,null,'','');
     return;
   }
 
@@ -1360,6 +1420,7 @@ function renderAgentModelChoice(div){
     manualGroup.classList.remove('hidden');
     manualLabel.textContent='Legacy Model ID';
     hintEl.textContent='Manual model id passthrough.';
+    renderAgentModelControls(div,null,'','');
     return;
   }
 
@@ -1373,6 +1434,7 @@ function renderAgentModelChoice(div){
   if(entry) bits.push(entry.label||entry.id);
   bits.push(preset?.label||'Standard');
   hintEl.textContent=bits.join(' · ')||'Advanced catalog selection';
+  renderAgentModelControls(div,catalog,entryId,presetId);
 }
 function syncAgentModelField(div,options={}){
   const provider=div.querySelector('.agent-provider')?.value||'';
@@ -1478,7 +1540,7 @@ function addAgent(name='',provider='claude',model='',tags=[],modelSelection=null
   const div=document.createElement('div'); div.id=`agent-${id}`;
   div.className='agent-card bg-slate-700/50 rounded-lg p-3 border border-slate-600';
   div.dataset.expanded='false';
-  div.innerHTML=`<div class="flex items-start gap-3"><button type="button" class="agent-card-toggle" aria-expanded="false" onclick="toggleAgentCard(${id})"><div class="agent-card-name-row"><span class="agent-summary-name agent-card-name">${escapeHtml(name)}</span><svg class="agent-card-chevron h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></div><div class="agent-summary-meta agent-card-summary-row"></div><div class="agent-summary-tags agent-card-summary-row"></div></button><button onclick="removeAgent(${id})" class="agent-remove hover:bg-slate-800/70 hover:text-red-400" title="Remove agent" aria-label="Remove agent"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /></svg></button></div><div class="agent-card-details hidden space-y-3"><div><label class="block text-xs text-slate-400 mb-1">Name</label><input type="text" value="${escapeHtml(name)}" placeholder="Agent name" class="agent-name w-full bg-transparent border border-slate-600 rounded px-2 py-1 text-sm text-white focus:outline-none" /></div><div class="grid grid-cols-2 gap-2"><div><label class="block text-xs text-slate-400">Provider</label><select class="agent-provider w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none">${PROVIDERS.map(p=>`<option value="${p}" ${p===provider?'selected':''}>${p}</option>`).join('')}</select></div><div class="agent-entry-group"><label class="block text-xs text-slate-400">Model</label><select class="agent-entry-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select></div></div><div class="agent-mode-group"><label class="block text-xs text-slate-400">Mode</label><select class="agent-preset-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select><div class="agent-preset-static-label runtime-input hidden !py-2 text-xs text-slate-500"></div></div><div class="agent-model-manual-group hidden"><label class="agent-model-manual-label block text-xs text-slate-400">Legacy Model ID</label><input type="text" placeholder="custom model id" class="agent-model-custom w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none" /></div><p class="agent-model-hint text-[11px] leading-4 text-slate-500"></p><div><label class="block text-xs text-slate-400 mb-1">Tags</label><div class="flex flex-wrap gap-x-3 gap-y-1 agent-tags">${buildTagCheckboxes(id,tags)}</div></div></div>`;
+  div.innerHTML=`<div class="flex items-start gap-3"><button type="button" class="agent-card-toggle" aria-expanded="false" onclick="toggleAgentCard(${id})"><div class="agent-card-name-row"><span class="agent-summary-name agent-card-name">${escapeHtml(name)}</span><svg class="agent-card-chevron h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></div><div class="agent-summary-meta agent-card-summary-row"></div><div class="agent-summary-tags agent-card-summary-row"></div></button><button onclick="removeAgent(${id})" class="agent-remove hover:bg-slate-800/70 hover:text-red-400" title="Remove agent" aria-label="Remove agent"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /></svg></button></div><div class="agent-card-details hidden space-y-3"><div><label class="block text-xs text-slate-400 mb-1">Name</label><input type="text" value="${escapeHtml(name)}" placeholder="Agent name" class="agent-name w-full bg-transparent border border-slate-600 rounded px-2 py-1 text-sm text-white focus:outline-none" /></div><div class="grid grid-cols-2 gap-2"><div><label class="block text-xs text-slate-400">Provider</label><select class="agent-provider w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none">${PROVIDERS.map(p=>`<option value="${p}" ${p===provider?'selected':''}>${p}</option>`).join('')}</select></div><div class="agent-entry-group"><label class="block text-xs text-slate-400">Model</label><select class="agent-entry-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select></div></div><div class="agent-mode-group"><label class="block text-xs text-slate-400">Mode</label><select class="agent-preset-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select><div class="agent-preset-static-label runtime-input hidden !py-2 text-xs text-slate-500"></div></div><div class="agent-model-manual-group hidden"><label class="agent-model-manual-label block text-xs text-slate-400">Legacy Model ID</label><input type="text" placeholder="custom model id" class="agent-model-custom w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none" /></div><div class="agent-model-controls space-y-2"></div><p class="agent-model-hint text-[11px] leading-4 text-slate-500"></p><div><label class="block text-xs text-slate-400 mb-1">Tags</label><div class="flex flex-wrap gap-x-3 gap-y-1 agent-tags">${buildTagCheckboxes(id,tags)}</div></div></div>`;
   list.appendChild(div);
   syncAgentModelField(div,{preserve:false,model,modelSelection});
   const pSel=div.querySelector('.agent-provider'), entrySel=div.querySelector('.agent-entry-choice'), presetSel=div.querySelector('.agent-preset-choice');
