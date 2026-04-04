@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -5,26 +6,9 @@ import { describe, expect, it } from 'vitest';
 import {
   buildProcessSpawnConfig,
   buildPowerShellCommandScript,
+  buildWindowsCmdProxyCommandLine,
   createRuntimeAdapter,
 } from './runtime.js';
-
-function decodePowerShellPayload(
-  env: Record<string, string> | undefined,
-): { command: string; args: string[] } | null {
-  if (!env) {
-    return null;
-  }
-
-  const encoded = env.CATS_RUNTIME_PWSH_EXEC_B64;
-  if (!encoded) {
-    return null;
-  }
-
-  return JSON.parse(Buffer.from(encoded, 'base64').toString('utf8')) as {
-    command: string;
-    args: string[];
-  };
-}
 
 describe('runtime adapters', () => {
   it('keeps native POSIX paths unchanged', () => {
@@ -171,21 +155,20 @@ describe('runtime adapters', () => {
     );
 
     if (process.platform === 'win32') {
-      expect(spawnConfig.command.toLowerCase()).toContain('powershell');
+      expect(spawnConfig.command.toLowerCase()).toContain('cmd.exe');
       expect(spawnConfig.args).toEqual([
-        '-NoLogo',
-        '-NoProfile',
-        '-Command',
-        buildPowerShellCommandScript(),
-      ]);
-      expect(decodePowerShellPayload(spawnConfig.env)).toEqual({
-        command: 'kiro-cli',
-        args: [
+        '/d',
+        '/v:off',
+        '/s',
+        '/c',
+        buildWindowsCmdProxyCommandLine('kiro-cli', [
           'chat',
           '--no-interactive',
           'Review ${summary}\n- **user** (stakeholder)',
-        ],
-      });
+        ]),
+      ]);
+      expect(spawnConfig.windowsVerbatimArguments).toBe(true);
+      expect(spawnConfig.env).toBeUndefined();
     } else {
       expect(spawnConfig.command).toBe('kiro-cli');
       expect(spawnConfig.args).toEqual([
@@ -198,7 +181,7 @@ describe('runtime adapters', () => {
     expect(spawnConfig.shell).toBe(false);
   });
 
-  it('wraps the Windows Copilot auto runner in a PowerShell exec payload', () => {
+  it('wraps the Windows Copilot auto runner in a hidden cmd proxy', () => {
     const spawnConfig = buildProcessSpawnConfig(
       {
         path: 'copilot',
@@ -213,17 +196,17 @@ describe('runtime adapters', () => {
     );
 
     if (process.platform === 'win32') {
-      expect(spawnConfig.command.toLowerCase()).toContain('powershell');
-      expect(spawnConfig.args).toEqual([
-        '-NoLogo',
-        '-NoProfile',
-        '-Command',
-        buildPowerShellCommandScript(),
+      expect(spawnConfig.command.toLowerCase()).toContain('cmd.exe');
+      expect(spawnConfig.args.slice(0, 4)).toEqual([
+        '/d',
+        '/v:off',
+        '/s',
+        '/c',
       ]);
-      expect(decodePowerShellPayload(spawnConfig.env)).toEqual({
-        command: expect.stringContaining('copilot'),
-        args: ['--help'],
-      });
+      expect(spawnConfig.args[4]).toContain('copilot');
+      expect(spawnConfig.args[4]).toContain('"--help"');
+      expect(spawnConfig.windowsVerbatimArguments).toBe(true);
+      expect(spawnConfig.env).toBeUndefined();
       expect(spawnConfig.shell).toBe(false);
       return;
     }
@@ -231,6 +214,121 @@ describe('runtime adapters', () => {
     expect(spawnConfig.command.toLowerCase()).toContain('copilot');
     expect(spawnConfig.args).toEqual(['--help']);
     expect(spawnConfig.shell).toBe(false);
+  });
+
+  it('keeps explicit PowerShell runners on the env-based PowerShell proxy', () => {
+    const spawnConfig = buildProcessSpawnConfig(
+      {
+        path: 'kiro-cli',
+        runner: 'pwsh',
+        runnerPath: 'pwsh.exe',
+        runtime: {
+          mode: 'native',
+        },
+      },
+      'kiro',
+      ['chat', '--no-interactive', 'Review ${summary}\n- **user** (stakeholder)'],
+      'C:\\Users\\kenne\\repo',
+    );
+
+    if (process.platform === 'win32') {
+      expect(spawnConfig.command.toLowerCase()).toContain('pwsh');
+      expect(spawnConfig.args).toEqual([
+        '-NoLogo',
+        '-NoProfile',
+        '-Command',
+        buildPowerShellCommandScript(),
+      ]);
+      expect(spawnConfig.env).toEqual({
+        CATS_RUNTIME_PWSH_EXEC_B64: Buffer.from(JSON.stringify({
+          command: 'kiro-cli',
+          args: [
+            'chat',
+            '--no-interactive',
+            'Review ${summary}\n- **user** (stakeholder)',
+          ],
+        }), 'utf8').toString('base64'),
+      });
+      expect(spawnConfig.windowsVerbatimArguments).toBeUndefined();
+      return;
+    }
+
+    expect(spawnConfig.command).toBe('kiro-cli');
+    expect(spawnConfig.args).toEqual([
+      'chat',
+      '--no-interactive',
+      'Review ${summary}\n- **user** (stakeholder)',
+    ]);
+  });
+
+  it('escapes cmd metacharacters in the Windows command proxy payload', () => {
+    const commandLine = buildWindowsCmdProxyCommandLine('C:\\tools\\copilot.cmd', [
+      'scan',
+      '100%',
+      'a^b',
+      'c&d',
+      'group()',
+    ]);
+
+    expect(commandLine).toBe(
+      '"'
+      + '"C:\\tools\\copilot.cmd"'
+      + ' "scan"'
+      + ' "100%"'
+      + ' "a^^b"'
+      + ' "c^&d"'
+      + ' "group^(^)"'
+      + '"',
+    );
+  });
+
+  it('round-trips a hidden cmd proxy invocation for Windows shim commands', () => {
+    if (process.platform !== 'win32') {
+      return;
+    }
+
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-cmd-proxy-'));
+    const shimPath = join(tempDir, 'echo-args.cmd');
+    writeFileSync(shimPath, [
+      '@echo off',
+      'echo argv-start',
+      ':loop',
+      'if "%~1"=="" goto done',
+      'echo [%~1]',
+      'shift',
+      'goto loop',
+      ':done',
+      'echo argv-end',
+    ].join('\r\n'), 'utf8');
+
+    try {
+      const result = spawnSync(
+        process.env.ComSpec || 'cmd.exe',
+        [
+          '/d',
+          '/v:off',
+          '/s',
+          '/c',
+          buildWindowsCmdProxyCommandLine(shimPath, ['100%', 'a^b', 'c&d', 'b c']),
+        ],
+        {
+          encoding: 'utf8',
+          windowsHide: true,
+          windowsVerbatimArguments: true,
+        },
+      );
+
+      expect(result.status).toBe(0);
+      expect(result.stderr).toBe('');
+      expect(result.stdout).toContain('argv-start');
+      expect(result.stdout).toContain('[100%]');
+      expect(result.stdout).toContain('[a^b]');
+      expect(result.stdout).toContain('[c&d]');
+      expect(result.stdout).toContain('[b c]');
+      expect(result.stdout).toContain('argv-end');
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   it('normalizes backslashes in Docker runtime paths', () => {

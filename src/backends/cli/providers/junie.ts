@@ -143,6 +143,7 @@ export class JunieProvider implements Provider {
       cwd: spawnConfig.cwd ?? opts.cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
       shell: spawnConfig.shell,
+      windowsVerbatimArguments: spawnConfig.windowsVerbatimArguments,
       env,
       ...hiddenWindowsSpawnOptions(),
     });

@@ -2045,6 +2045,7 @@ async function runCompatibilityProbe(
     {
       cwd: spawnConfig.cwd ?? cwd,
       shell: spawnConfig.shell,
+      windowsVerbatimArguments: spawnConfig.windowsVerbatimArguments,
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,

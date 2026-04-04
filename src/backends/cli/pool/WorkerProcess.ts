@@ -109,6 +109,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
       cwd: spawnConfig.cwd ?? this.spawnOpts.cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
       shell: spawnConfig.shell,
+      windowsVerbatimArguments: spawnConfig.windowsVerbatimArguments,
       env,
       ...hiddenWindowsSpawnOptions(),
     });
@@ -547,6 +548,7 @@ export class WorkerProcess extends EventEmitter<WorkerProcessEvents> {
     shell: boolean | string;
     cwd?: string;
     env?: Record<string, string>;
+    windowsVerbatimArguments?: boolean;
   } {
     return buildProcessSpawnConfig(
       this.commandConfig,

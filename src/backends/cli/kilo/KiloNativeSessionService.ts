@@ -811,6 +811,7 @@ async function defaultKiloServerLauncher(input: {
     cwd: spawnConfig.cwd,
     env,
     shell: spawnConfig.shell,
+    windowsVerbatimArguments: spawnConfig.windowsVerbatimArguments,
     stdio: ['ignore', 'pipe', 'pipe'],
     ...hiddenWindowsSpawnOptions(),
   });

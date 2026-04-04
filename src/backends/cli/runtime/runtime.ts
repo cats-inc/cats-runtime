@@ -12,6 +12,7 @@ export interface ProcessSpawnConfig extends ShellInvocation {
   shell: boolean | string;
   cwd?: string;
   env?: Record<string, string>;
+  windowsVerbatimArguments?: boolean;
 }
 
 interface RuntimePayloadFile {
@@ -28,6 +29,7 @@ interface RuntimeExecPayload {
 }
 
 const POWERSHELL_EXEC_PAYLOAD_ENV = 'CATS_RUNTIME_PWSH_EXEC_B64';
+const WINDOWS_DIRECT_EXECUTABLE_EXTENSIONS = new Set(['.exe', '.com']);
 
 export interface RuntimeAdapter {
   readonly mode: ProviderRuntimeConfig['mode'];
@@ -181,6 +183,14 @@ export function buildPowerShellExecEnv(
       args,
     }), 'utf8').toString('base64'),
   };
+}
+
+export function buildWindowsCmdProxyCommandLine(
+  commandPath: string,
+  args: string[],
+): string {
+  const quotedParts = [commandPath, ...args].map(quoteWindowsCmdProxyArgument);
+  return `"${quotedParts.join(' ')}"`;
 }
 
 export function quoteForBash(value: string): string {
@@ -460,6 +470,14 @@ function buildNativeSpawnConfig(
           cwd,
         };
       }
+      if (shouldUseDirectWindowsSpawn(commandPath)) {
+        return {
+          command: commandPath,
+          args,
+          shell: false,
+          cwd,
+        };
+      }
       return buildWindowsShellProxySpawnConfig(commandPath, args, cwd);
 
     case 'shell':
@@ -486,7 +504,7 @@ function buildNativeSpawnConfig(
         commandPath,
         args,
         cwd,
-        commandConfig.runnerPath || process.env.PWSH_PATH || 'powershell.exe',
+        commandConfig.runnerPath || process.env.ComSpec || 'cmd.exe',
       );
 
     case 'pwsh':
@@ -511,9 +529,18 @@ function buildWindowsShellProxySpawnConfig(
   commandPath: string,
   args: string[],
   cwd: string,
-  shellPath: string = process.env.PWSH_PATH || 'powershell.exe',
+  shellPath: string = process.env.ComSpec || 'cmd.exe',
 ): ProcessSpawnConfig {
-  return buildPowerShellSpawnConfig(commandPath, args, shellPath, cwd);
+  if (shouldUsePowerShellWindowsProxy(commandPath, args, shellPath)) {
+    return buildPowerShellSpawnConfig(
+      commandPath,
+      args,
+      isPowerShellExecutable(shellPath) ? shellPath : (process.env.PWSH_PATH || 'powershell.exe'),
+      cwd,
+    );
+  }
+
+  return buildWindowsCmdSpawnConfig(commandPath, args, shellPath, cwd);
 }
 
 function buildPowerShellSpawnConfig(
@@ -536,6 +563,27 @@ function buildPowerShellSpawnConfig(
   };
 }
 
+function buildWindowsCmdSpawnConfig(
+  commandPath: string,
+  args: string[],
+  shellPath: string,
+  cwd: string,
+): ProcessSpawnConfig {
+  return {
+    command: shellPath,
+    args: [
+      '/d',
+      '/v:off',
+      '/s',
+      '/c',
+      buildWindowsCmdProxyCommandLine(commandPath, args),
+    ],
+    shell: false,
+    cwd,
+    windowsVerbatimArguments: true,
+  };
+}
+
 function resolveCommandPathForRunner(
   commandPath: string,
   runner: ProviderCommandConfig['runner'],
@@ -547,6 +595,67 @@ function resolveCommandPathForRunner(
     return commandPath;
   }
   return resolveWindowsCommandPath(commandPath);
+}
+
+function shouldUseDirectWindowsSpawn(commandPath: string): boolean {
+  const extension = extname(commandPath).toLowerCase();
+  return WINDOWS_DIRECT_EXECUTABLE_EXTENSIONS.has(extension);
+}
+
+function shouldUsePowerShellWindowsProxy(
+  commandPath: string,
+  args: string[],
+  shellPath: string,
+): boolean {
+  const extension = extname(commandPath).toLowerCase();
+  return isPowerShellExecutable(shellPath)
+    || extension === '.ps1'
+    || commandPath.includes('"')
+    || args.some((arg) => arg.includes('"'));
+}
+
+function isPowerShellExecutable(shellPath: string): boolean {
+  const normalized = shellPath.replace(/\\/g, '/').toLowerCase();
+  return normalized.endsWith('/powershell.exe')
+    || normalized.endsWith('/pwsh.exe')
+    || normalized === 'powershell.exe'
+    || normalized === 'pwsh.exe';
+}
+
+function quoteWindowsCmdProxyArgument(value: string): string {
+  return escapeWindowsCmdMetaChars(quoteWindowsProcessArgument(value));
+}
+
+function quoteWindowsProcessArgument(value: string): string {
+  if (value.length === 0) {
+    return '""';
+  }
+
+  let result = '"';
+  let backslashes = 0;
+  for (const char of value) {
+    if (char === '\\') {
+      backslashes += 1;
+      continue;
+    }
+    if (char === '"') {
+      result += '\\'.repeat(backslashes * 2 + 1);
+      result += '"';
+      backslashes = 0;
+      continue;
+    }
+    result += '\\'.repeat(backslashes);
+    backslashes = 0;
+    result += char;
+  }
+
+  result += '\\'.repeat(backslashes * 2);
+  result += '"';
+  return result;
+}
+
+function escapeWindowsCmdMetaChars(value: string): string {
+  return value.replace(/[\^&|<>()]/g, '^$&');
 }
 
 function resolveWindowsCommandPath(commandPath: string): string {

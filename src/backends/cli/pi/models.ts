@@ -128,6 +128,7 @@ export const defaultPiModelDiscoveryRunner: PiModelDiscoveryRunner = {
       cwd: spawnConfig.cwd,
       env: spawnConfig.env,
       shell: spawnConfig.shell,
+      windowsVerbatimArguments: spawnConfig.windowsVerbatimArguments,
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
       timeoutMs: DEFAULT_PI_MODEL_DISCOVERY_TIMEOUT_MS,

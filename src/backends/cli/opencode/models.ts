@@ -117,6 +117,7 @@ export const defaultOpencodeModelDiscoveryRunner: OpencodeModelDiscoveryRunner =
       cwd: spawnConfig.cwd,
       env: spawnConfig.env,
       shell: spawnConfig.shell,
+      windowsVerbatimArguments: spawnConfig.windowsVerbatimArguments,
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
       timeoutMs: DEFAULT_OPENCODE_MODEL_DISCOVERY_TIMEOUT_MS,

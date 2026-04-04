@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { buildPowerShellCommandScript } from '../runtime/runtime.js';
+import { buildWindowsCmdProxyCommandLine } from '../runtime/runtime.js';
 import {
   buildOpencodeServerSpawnConfig,
   OpencodeNativeSessionService,
@@ -93,25 +93,21 @@ describe('OpencodeNativeSessionService', () => {
       );
 
       expect(spawnConfig).toEqual({
-        command: expect.stringContaining('powershell'),
+        command: expect.stringContaining('cmd.exe'),
         args: [
-          '-NoLogo',
-          '-NoProfile',
-          '-Command',
-          buildPowerShellCommandScript(),
+          '/d',
+          '/v:off',
+          '/s',
+          '/c',
+          buildWindowsCmdProxyCommandLine(shimPath, [
+            'serve',
+            '--hostname=127.0.0.1',
+            '--port=4097',
+          ]),
         ],
         shell: false,
         cwd: 'C:\\Users\\kenne\\repo',
-        env: {
-          CATS_RUNTIME_PWSH_EXEC_B64: Buffer.from(JSON.stringify({
-            command: shimPath,
-            args: [
-              'serve',
-              '--hostname=127.0.0.1',
-              '--port=4097',
-            ],
-          }), 'utf8').toString('base64'),
-        },
+        windowsVerbatimArguments: true,
       });
     } finally {
       if (platformDescriptor) {

@@ -21,6 +21,7 @@ export interface SpawnedCommandOptions {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   shell?: boolean | string;
+  windowsVerbatimArguments?: boolean;
   windowsHide?: boolean;
   stdio?: ['ignore', 'pipe', 'pipe'];
   timeoutMs: number;
