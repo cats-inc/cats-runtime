@@ -412,6 +412,7 @@ describe('message route transcript persistence', () => {
       expect(historyResponse.status).toBe(200);
       const historyBody = await historyResponse.json();
       expect(historyBody).toEqual(expect.objectContaining({
+        sessionDetailsEnabled: true,
         instructions: expect.stringContaining(
           'The following runtime-managed skills are attached to this session.',
         ),
@@ -442,8 +443,34 @@ describe('message route transcript persistence', () => {
       expect(historyResponse.status).toBe(200);
       const historyBody = await historyResponse.json();
       expect(historyBody).toEqual(expect.objectContaining({
+        sessionDetailsEnabled: true,
         instructions: null,
       }));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('omits instructions from history when dashboard session details are disabled', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-message-route-'));
+    const sessionBaseDir = join(root, 'sessions');
+    mkdirSync(sessionBaseDir, { recursive: true });
+
+    try {
+      const { app, session } = makeApp(
+        sessionBaseDir,
+        async function* () {
+          yield { type: 'result' };
+        },
+      );
+
+      const historyResponse = await app.request(`/sessions/${session.id}/history`);
+      expect(historyResponse.status).toBe(200);
+      const historyBody = await historyResponse.json();
+      expect(historyBody).toEqual(expect.objectContaining({
+        sessionDetailsEnabled: false,
+      }));
+      expect('instructions' in historyBody).toBe(false);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

@@ -2792,6 +2792,7 @@ such as:
     { "role": "user", "text": "..." },
     { "role": "assistant", "text": "..." }
   ],
+  "sessionDetailsEnabled": true,
   "instructions": "The following runtime-managed skills are attached to this session.\n\n...",
   "transcript": {
     "ownership": "provider",
@@ -2868,6 +2869,9 @@ The dashboard uses `sessionDetailsEnabled` to decide whether to render the
 full Session Details panel (provider target, model selection/resolution,
 reasoning effort, instructions, and JSON dumps). When the flag is off, the
 panel is hidden entirely and the instruction merge is skipped.
+
+When the flag is off, `sessionDetailsEnabled` is still returned as `false` and
+`instructions` is omitted from the payload entirely.
 
 `instructions` is session-scoped. It reflects the runtime's current persisted
 session state, not the transient per-request layering state from an in-flight

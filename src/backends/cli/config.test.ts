@@ -168,6 +168,13 @@ describe('config platform defaults', () => {
     ).toBe('always');
   });
 
+  it('loads dashboard session details visibility from the environment', () => {
+    expect(loadConfigWithoutProviderFile({}).dashboardShowSessionDetails).toBe(false);
+    expect(loadConfigWithoutProviderFile({
+      CATS_RUNTIME_DASHBOARD_SHOW_SESSION_DETAILS: 'true',
+    }).dashboardShowSessionDetails).toBe(true);
+  });
+
   it('rejects invalid Docker discovery policy values', () => {
     expect(() => loadConfigWithoutProviderFile({
       CATS_RUNTIME_DOCKER_DISCOVERY_POLICY: 'sometimes',
