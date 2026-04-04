@@ -223,7 +223,7 @@ embedding product approval policy into `cats-runtime`.
 | Return approval-friendly payloads without product policy | [x] | Results include `plan.applyPayload` plus `approval` metadata for hosts/skills |
 | Keep `audit-workspace` strictly read-only | [x] | `apply: true` now yields preview with `read_only_operation` and no writes |
 | Use conservative review-copy behavior for conflicts | [x] | Conflicting files produce `write_sidecar` steps targeting `*.bootstrap` paths |
-| Add workspace substrate profile discovery surfaces | [x] | `GET /workspace/substrate/profiles` and MCP `list_workspace_substrate_profiles` now expose the runtime-owned profile catalog so hosts can discover profile ids/defaults without hardcoding them |
+| Add workspace substrate profile discovery surfaces | [x] | `GET /workspace/substrate/profiles`, MCP `list_workspace_substrate_profiles`, and local tool `list-workspace-substrate-profiles` now expose the runtime-owned profile catalog so hosts or sessions can discover profile ids/defaults without hardcoding them |
 | Cover substrate behavior with automated tests | [x] | `tests/workspace-substrate.test.ts` and `src/core/tools/LocalToolRuntime.test.ts` cover the contract |
 
 #### Deferred Boundaries

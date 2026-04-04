@@ -2800,6 +2800,7 @@ operations for API/local sessions:
 - `diff_file`
 - `create_directory`
 
+- `list-workspace-substrate-profiles`
 - `audit-workspace`
 - `init-workspace`
 - `update-workspace`

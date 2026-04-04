@@ -1710,12 +1710,13 @@ describe('LocalToolRuntime', () => {
   });
 
   describe('profiles', () => {
-    it('standard profile lists 29 tools', () => {
+    it('standard profile lists 30 tools', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('standard');
       expect(tools.map((t) => t.name)).toEqual([
         'list_files', 'inspect_path', 'inspect_paths', 'read_file', 'read_files', 'diff_file', 'write_file', 'create_directory', 'edit_file',
         'apply_patch', 'grep', 'glob', 'run_shell',
+        'list-workspace-substrate-profiles',
         'audit-workspace', 'init-workspace', 'update-workspace',
         'audit-delivery-target', 'publish-artifacts', 'inspect-repo-status', 'create-commit', 'push-branch',
         'audit-review-target', 'open-pull-request', 'inspect-pull-request', 'wait-review-checks',
@@ -1723,13 +1724,14 @@ describe('LocalToolRuntime', () => {
       ]);
     });
 
-    it('extended profile lists 32 tools', () => {
+    it('extended profile lists 33 tools', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('extended');
       expect(tools.map((t) => t.name)).toEqual([
         'list_files', 'inspect_path', 'inspect_paths', 'read_file', 'read_files', 'diff_file', 'write_file', 'create_directory', 'edit_file',
         'apply_patch', 'grep', 'glob', 'run_shell',
         'delete_file', 'rename_file', 'copy_file',
+        'list-workspace-substrate-profiles',
         'audit-workspace', 'init-workspace', 'update-workspace',
         'audit-delivery-target', 'publish-artifacts', 'inspect-repo-status', 'create-commit', 'push-branch',
         'audit-review-target', 'open-pull-request', 'inspect-pull-request', 'wait-review-checks',
@@ -1741,56 +1743,56 @@ describe('LocalToolRuntime', () => {
       expect(buildRuntimeToolCatalogSummary()).toEqual({
         profiles: {
           standard: {
-            totalTools: 29,
+            totalTools: 30,
             mutatingTools: 12,
-            readOnlyCompatibleTools: 22,
+            readOnlyCompatibleTools: 23,
             domains: {
               filesystem: 10,
               search: 2,
               shell: 1,
-              workspace: 3,
+              workspace: 4,
               delivery: 5,
               review: 4,
               deployment: 4,
             },
           },
           extended: {
-            totalTools: 32,
+            totalTools: 33,
             mutatingTools: 15,
-            readOnlyCompatibleTools: 22,
+            readOnlyCompatibleTools: 23,
             domains: {
               filesystem: 13,
               search: 2,
               shell: 1,
-              workspace: 3,
+              workspace: 4,
               delivery: 5,
               review: 4,
               deployment: 4,
             },
           },
           readOnly: {
-            totalTools: 17,
+            totalTools: 18,
             mutatingTools: 0,
-            readOnlyCompatibleTools: 17,
+            readOnlyCompatibleTools: 18,
             domains: {
               filesystem: 6,
               search: 2,
               shell: 0,
-              workspace: 1,
+              workspace: 2,
               delivery: 2,
               review: 3,
               deployment: 3,
             },
           },
         },
-        summary: 'Runtime tooling exposes 29 tools in the standard profile, 32 in the extended profile, and 17 in the read_only profile.',
+        summary: 'Runtime tooling exposes 30 tools in the standard profile, 33 in the extended profile, and 18 in the read_only profile.',
       });
     });
 
     it('builds per-tool profile access inspection for runtime-owned tooling', () => {
       expect(buildRuntimeToolCatalogInspection()).toEqual(expect.objectContaining({
-        toolCount: 32,
-        summary: 'Runtime-local tooling exposes 32 unique tools across the standard, extended, and read_only profiles.',
+        toolCount: 33,
+        summary: 'Runtime-local tooling exposes 33 unique tools across the standard, extended, and read_only profiles.',
         tools: expect.arrayContaining([
           {
             name: 'inspect_paths',
@@ -1818,11 +1820,12 @@ describe('LocalToolRuntime', () => {
       }));
     });
 
-    it('read_only profile lists 17 tools', () => {
+    it('read_only profile lists 18 tools', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('read_only');
       expect(tools.map((t) => t.name)).toEqual([
-        'list_files', 'inspect_path', 'inspect_paths', 'read_file', 'read_files', 'diff_file', 'grep', 'glob', 'audit-workspace',
+        'list_files', 'inspect_path', 'inspect_paths', 'read_file', 'read_files', 'diff_file', 'grep', 'glob',
+        'list-workspace-substrate-profiles', 'audit-workspace',
         'audit-delivery-target', 'inspect-repo-status',
         'audit-review-target', 'inspect-pull-request', 'wait-review-checks',
         'audit-deployment-target', 'inspect-deployment', 'read-deployment-logs',
@@ -1838,7 +1841,7 @@ describe('LocalToolRuntime', () => {
     it('unknown profile falls back to standard', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools('unknown_profile');
-      expect(tools.length).toBe(29);
+      expect(tools.length).toBe(30);
       expect(tools.map((t) => t.name)).toContain('apply_patch');
       expect(tools.map((t) => t.name)).toContain('diff_file');
       expect(tools.map((t) => t.name)).toContain('inspect_path');
@@ -1853,7 +1856,7 @@ describe('LocalToolRuntime', () => {
     it('default profile (undefined) is standard', () => {
       const runtime = new LocalToolRuntime();
       const tools = runtime.listTools();
-      expect(tools.length).toBe(29);
+      expect(tools.length).toBe(30);
     });
 
     it('builds read-only compatible tool policy summaries', () => {
@@ -2064,6 +2067,31 @@ describe('LocalToolRuntime', () => {
   });
 
   describe('workspace substrate tools', () => {
+    it('lists workspace substrate profiles without requiring apply context', async () => {
+      const { cwd, cleanup } = createWorkspace();
+      const runtime = new LocalToolRuntime();
+
+      try {
+        const result = await runtime.execute(sharedCtx(cwd), {
+          id: 'substrate-catalog-1',
+          name: 'list-workspace-substrate-profiles',
+          arguments: {},
+        });
+        expect(result.isError).toBeUndefined();
+        expect(JSON.parse(result.output)).toEqual({
+          defaultProfile: 'standard',
+          allowedAgents: ['claude', 'gemini', 'codex'],
+          profiles: [
+            expect.objectContaining({ id: 'minimal' }),
+            expect.objectContaining({ id: 'standard' }),
+            expect.objectContaining({ id: 'a2a-enabled' }),
+          ],
+        });
+      } finally {
+        cleanup();
+      }
+    });
+
     it('audits missing workspace substrate in preview mode', async () => {
       const { cwd, cleanup } = createWorkspace();
       const runtime = new LocalToolRuntime();

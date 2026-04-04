@@ -412,6 +412,14 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
   },
   {
+    name: 'list-workspace-substrate-profiles',
+    description: 'List runtime-owned workspace substrate profiles and their default collaboration posture.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
     name: 'audit-workspace',
     description: 'Audit workspace collaboration substrate and return a read-only JSON report.',
     inputSchema: {
@@ -694,6 +702,7 @@ const READ_ONLY_TOOLS = new Set([
   'diff_file',
   'grep',
   'glob',
+  'list-workspace-substrate-profiles',
   'audit-workspace',
   'audit-delivery-target',
   'inspect-repo-status',
@@ -716,6 +725,7 @@ const TOOL_ORDER = new Map(TOOL_DEFINITIONS.map((tool, index) => [tool.name, ind
 const STANDARD_TOOLS = new Set([
   'list_files', 'inspect_path', 'inspect_paths', 'read_file', 'read_files', 'diff_file', 'write_file', 'create_directory', 'edit_file',
   'apply_patch', 'grep', 'glob', 'run_shell',
+  'list-workspace-substrate-profiles',
   'audit-workspace', 'init-workspace', 'update-workspace',
   'audit-delivery-target', 'publish-artifacts', 'inspect-repo-status', 'create-commit', 'push-branch',
   'audit-review-target', 'open-pull-request', 'inspect-pull-request', 'wait-review-checks',
@@ -748,6 +758,7 @@ const TOOL_CAPABILITY_METADATA: Record<string, ToolCapabilityMetadata> = {
   delete_file: { domain: 'filesystem', mutating: true },
   rename_file: { domain: 'filesystem', mutating: true },
   copy_file: { domain: 'filesystem', mutating: true },
+  'list-workspace-substrate-profiles': { domain: 'workspace', mutating: false },
   'audit-workspace': { domain: 'workspace', mutating: false },
   'init-workspace': { domain: 'workspace', mutating: true },
   'update-workspace': { domain: 'workspace', mutating: true },
@@ -1635,6 +1646,8 @@ export class LocalToolRuntime {
           return await this.renameFile(context, call.id, args);
         case 'copy_file':
           return await this.copyFileTool(context, call.id, args);
+        case 'list-workspace-substrate-profiles':
+          return this.listWorkspaceSubstrateProfiles(call.id);
         case 'audit-workspace':
         case 'init-workspace':
         case 'update-workspace':
@@ -2412,6 +2425,14 @@ export class LocalToolRuntime {
       callId,
       name: operation,
       output: JSON.stringify(result, null, 2),
+    };
+  }
+
+  private listWorkspaceSubstrateProfiles(callId: string): ToolResult {
+    return {
+      callId,
+      name: 'list-workspace-substrate-profiles',
+      output: JSON.stringify(this.substrate.listProfiles(), null, 2),
     };
   }
 
