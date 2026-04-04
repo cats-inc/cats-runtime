@@ -281,7 +281,12 @@ export function defaultAuggieMaxTurns(): number {
 
 export function defaultKiroDbPath(
   platform: NodeJS.Platform = process.platform,
+  runtimeMode: RuntimeMode = defaultKiroRuntimeMode(platform),
 ): string {
+  if (runtimeMode === 'wsl' || runtimeMode === 'docker') {
+    return '~/.local/share/kiro-cli/data.sqlite3';
+  }
+
   if (platform === 'darwin') {
     return '~/Library/Application Support/kiro-cli/data.sqlite3';
   }
@@ -589,6 +594,7 @@ function buildLegacyRuntimeShape(
   home: string,
 ): LegacyRuntimeShape {
   const providerCommands = buildLegacyProviderCommands(env);
+  const kiroRuntime = providerCommands.kiro.runtime;
   const providerDefaultInstances = {
     auggie: 'default',
     claude: 'default',
@@ -612,7 +618,7 @@ function buildLegacyRuntimeShape(
 
   const auggieSessionsDir = env.AUGGIE_SESSIONS_DIR || defaultAuggieSessionsDir();
   const cursorChatsDir = env.CURSOR_CHATS_DIR || defaultCursorChatsDir();
-  const kiroDbPath = env.KIRO_DB_PATH || defaultKiroDbPath();
+  const kiroDbPath = env.KIRO_DB_PATH || defaultKiroDbPath(process.platform, kiroRuntime.mode);
   const kiloServerHost = env.KILO_SERVER_HOST || defaultKiloServerHost();
   const kiloServerPort = parsePositiveInt(
     env.KILO_SERVER_PORT,
@@ -749,7 +755,7 @@ function buildLegacyRuntimeShape(
     cursorRuntime: providerCommands.cursor.runtime,
     geminiSessionsDir: env.GEMINI_SESSIONS_DIR || `${home}/.gemini/tmp`,
     kiroDbPath,
-    kiroRuntime: providerCommands.kiro.runtime,
+    kiroRuntime,
     kiloServerHost,
     kiloServerPort,
     kiloServerStartupTimeoutMs,

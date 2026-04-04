@@ -123,13 +123,21 @@ function buildMinimalProvidersYaml(
     const commandPath = scanned?.commandPath
       || config.providerCommands[provider]?.path
       || provider;
+    const instanceDoc: Record<string, unknown> = {
+      command: commandPath,
+      runner: 'auto',
+    };
+
+    if (provider === 'kiro') {
+      const kiroDbPath = config.providerInstances?.kiro?.default?.kiroDbPath;
+      if (kiroDbPath) {
+        instanceDoc.db_path = kiroDbPath;
+      }
+    }
 
     cliProviders[provider] = {
       instances: {
-        default: {
-          command: commandPath,
-          runner: 'auto',
-        },
+        default: instanceDoc,
       },
     };
   }

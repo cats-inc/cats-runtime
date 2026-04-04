@@ -86,6 +86,12 @@ describe('config platform defaults', () => {
     expect(defaultKiroDbPath('win32')).toBe('~/.local/share/kiro-cli/data.sqlite3');
   });
 
+  it('uses the Linux Kiro database path for WSL and Docker runtimes on every host', () => {
+    expect(defaultKiroDbPath('darwin', 'wsl')).toBe('~/.local/share/kiro-cli/data.sqlite3');
+    expect(defaultKiroDbPath('darwin', 'docker')).toBe('~/.local/share/kiro-cli/data.sqlite3');
+    expect(defaultKiroDbPath('win32', 'docker')).toBe('~/.local/share/kiro-cli/data.sqlite3');
+  });
+
   it('uses the shared Pi sessions path on every platform', () => {
     expect(defaultPiSessionsDir()).toBe('~/.pi/agent/sessions');
   });
@@ -242,6 +248,20 @@ describe('config platform defaults', () => {
       runnerPath: undefined,
       runtime: { mode: 'native', distro: undefined },
     });
+  });
+
+  it('derives the Kiro database path from the configured runtime mode', () => {
+    const nativeConfig = loadConfigWithoutProviderFile({
+      KIRO_RUNTIME: 'native',
+    });
+    const dockerConfig = loadConfigWithoutProviderFile({
+      KIRO_RUNTIME: 'docker',
+    });
+
+    expect(resolveProviderInstance(nativeConfig, 'kiro').kiroDbPath)
+      .toBe(defaultKiroDbPath(process.platform, 'native'));
+    expect(resolveProviderInstance(dockerConfig, 'kiro').kiroDbPath)
+      .toBe(defaultKiroDbPath(process.platform, 'docker'));
   });
 
   it('loads runtime overrides for every CLI provider family', () => {

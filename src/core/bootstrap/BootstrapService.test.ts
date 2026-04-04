@@ -1,9 +1,10 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { ProviderName } from '../../backends/cli/providers/types.js';
 import { KNOWN_PROVIDERS } from '../../backends/cli/providers/types.js';
+import { defaultKiroDbPath } from '../../backends/cli/config.js';
 import { loadConfig } from '../config.js';
 import type { ProviderCompatibilityService } from '../compatibility/ProviderCompatibilityService.js';
 import { BootstrapService } from './BootstrapService.js';
@@ -142,6 +143,36 @@ describe('BootstrapService', () => {
       expect(manualResult.scanType).toBe('manual');
       expect(existsSync(join(env.CATS_RUNTIME_DATA_DIR!, 'setup', 'provider-manual-scan.json'))).toBe(true);
       expect((await bootstrap.getSetupState()).lastManualScanAt).toBeTruthy();
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('writes the runtime-aware Kiro database path into generated providers.yaml', async () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const env = {
+        ...createTestEnv(root),
+        KIRO_RUNTIME: 'docker',
+      };
+      ensureDirs(env);
+      const compatibility = {
+        assessCliTarget: async (target: { providerName: ProviderName; cliInstance?: { commandConfig: { path: string } } }) => (
+          createAssessment(target.providerName, target.cliInstance?.commandConfig.path || target.providerName)
+        ),
+      } as unknown as ProviderCompatibilityService;
+
+      const bootstrap = new BootstrapService({
+        dataDir: env.CATS_RUNTIME_DATA_DIR!,
+        configPath: env.CATS_RUNTIME_CONFIG_PATH!,
+        config: loadConfig(env),
+        compatibility,
+      });
+
+      await bootstrap.applyConfig(['kiro']);
+
+      const yaml = readFileSync(env.CATS_RUNTIME_CONFIG_PATH!, 'utf8');
+      expect(yaml).toContain(`db_path: ${defaultKiroDbPath(process.platform, 'docker')}`);
     } finally {
       cleanup();
     }
