@@ -22,12 +22,11 @@
     flex-direction: column;
     gap: 0.45rem;
     text-align: left;
-    transition: border-color 140ms ease, background 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+    transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
   }
   .setup-workflow-item:hover {
     border-color: rgb(71 85 105 / 0.95);
     background: rgb(15 23 42 / 0.72);
-    transform: translateY(-1px);
   }
   .setup-workflow-item:focus-visible {
     outline: 2px solid rgba(96, 165, 250, 0.78);
@@ -105,6 +104,13 @@
     font-size: 0.875rem;
     line-height: 1.6;
     color: rgb(148 163 184);
+  }
+  .setup-workflow-heading {
+    min-height: 2rem;
+  }
+  .setup-workflow-mode {
+    min-height: 2rem;
+    padding-inline: 0.75rem;
   }
   .setup-workspace[hidden] {
     display: none !important;
@@ -199,52 +205,54 @@
         <!-- CATS_RUNTIME_SURFACE_SWITCHER -->
       </div>
 
-      <div class="runtime-sidebar-section">
-        <div class="flex items-center justify-between gap-3">
-          <p class="runtime-sidebar-title">Setup Workflow</p>
-          <span id="setupWorkflowMode" class="runtime-auth-badge" data-state="idle">Bootstrap</span>
+      <div id="setupWorkflowSection" class="runtime-sidebar-surface flex min-h-0 flex-col overflow-hidden">
+        <div class="runtime-sidebar-section">
+          <div class="setup-workflow-heading flex items-center justify-between gap-3">
+            <p class="runtime-sidebar-title">Setup Workflow</p>
+            <span id="setupWorkflowMode" class="runtime-auth-badge setup-workflow-mode" data-state="idle">Bootstrap</span>
+          </div>
         </div>
-      </div>
 
-      <div class="runtime-sidebar-section runtime-sidebar-surface overflow-y-auto">
-        <div id="setupWorkflowRail" class="setup-workflow-rail">
-          <button
-            type="button"
-            id="setupRailProviders"
-            class="setup-workflow-item"
-            data-workspace="providers"
-            data-active="true"
-            aria-pressed="true"
-            onclick="setActiveSetupWorkspace('providers')"
-          >
-            <span class="setup-workflow-item-title-row">
-              <span class="setup-workflow-item-title">Providers</span>
-              <span id="providersRailBadge" class="setup-workflow-item-pill">Not scanned</span>
-            </span>
-            <span id="providersRailSummary" class="setup-workflow-item-summary">
-              Scan local providers, review readiness, and choose what to apply.
-            </span>
-            <span id="providersRailMeta" class="setup-workflow-item-meta">No providers selected yet.</span>
-          </button>
+        <div class="runtime-sidebar-section runtime-sidebar-surface overflow-y-auto">
+          <div id="setupWorkflowRail" class="setup-workflow-rail">
+            <button
+              type="button"
+              id="setupRailProviders"
+              class="setup-workflow-item"
+              data-workspace="providers"
+              data-active="true"
+              aria-pressed="true"
+              onclick="setActiveSetupWorkspace('providers')"
+            >
+              <span class="setup-workflow-item-title-row">
+                <span class="setup-workflow-item-title">Providers</span>
+                <span id="providersRailBadge" class="setup-workflow-item-pill">Not scanned</span>
+              </span>
+              <span id="providersRailSummary" class="setup-workflow-item-summary">
+                Scan local providers, review readiness, and choose what to apply.
+              </span>
+              <span id="providersRailMeta" class="setup-workflow-item-meta">No providers selected yet.</span>
+            </button>
 
-          <button
-            type="button"
-            id="setupRailConfiguredTargets"
-            class="setup-workflow-item"
-            data-workspace="configured-targets"
-            data-active="false"
-            aria-pressed="false"
-            onclick="setActiveSetupWorkspace('configured-targets')"
-          >
-            <span class="setup-workflow-item-title-row">
-              <span class="setup-workflow-item-title">Configured Targets</span>
-              <span id="configuredTargetsRailBadge" class="setup-workflow-item-pill">Loading</span>
-            </span>
-            <span id="configuredTargetsRailSummary" class="setup-workflow-item-summary">
-              Inspect the runtime-owned behavior of configured provider targets.
-            </span>
-            <span id="configuredTargetsRailMeta" class="setup-workflow-item-meta">Loading configured target catalog.</span>
-          </button>
+            <button
+              type="button"
+              id="setupRailConfiguredTargets"
+              class="setup-workflow-item"
+              data-workspace="configured-targets"
+              data-active="false"
+              aria-pressed="false"
+              onclick="setActiveSetupWorkspace('configured-targets')"
+            >
+              <span class="setup-workflow-item-title-row">
+                <span class="setup-workflow-item-title">Configured Targets</span>
+                <span id="configuredTargetsRailBadge" class="setup-workflow-item-pill">Loading</span>
+              </span>
+              <span id="configuredTargetsRailSummary" class="setup-workflow-item-summary">
+                Inspect the runtime-owned behavior of configured provider targets.
+              </span>
+              <span id="configuredTargetsRailMeta" class="setup-workflow-item-meta">Loading configured target catalog.</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -287,10 +295,10 @@
             <p class="runtime-page-kicker" style="font-size:0.58rem;letter-spacing:0.18em;">CATS RUNTIME</p>
             <h1 class="font-semibold tracking-tight text-white" style="margin-top:0.125rem;font-size:21px;line-height:1.15;">Setup &amp; Repair</h1>
           </div>
-          <div class="runtime-page-toolbar-row min-w-0 flex-1 text-sm">
-            <div class="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3">
-              <span id="statusBadge" class="status-badge status-badge-bootstrap">Bootstrap</span>
+          <div class="runtime-page-toolbar-row min-w-0 flex-1 justify-end text-sm">
+            <div class="flex min-w-0 items-center gap-3 rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1.5">
               <span id="statusText" class="min-w-0 text-sm text-slate-400">Loading runtime setup state...</span>
+              <span id="statusBadge" class="status-badge status-badge-bootstrap">Bootstrap</span>
             </div>
           </div>
         </div>
@@ -308,12 +316,14 @@
                     providers you want to write into this runtime config.
                   </p>
                 </div>
-                <div class="runtime-page-toolbar-row">
-                  <span id="providersWorkspaceSummary" class="text-sm text-slate-400">Loading provider readiness...</span>
-                  <button id="scanBtn" class="runtime-btn runtime-btn-secondary" onclick="runScan()">Scan Providers</button>
-                </div>
               </div>
               <div class="space-y-4 p-4 sm:p-5">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <span id="providersWorkspaceSummary" class="text-sm text-slate-400">Loading provider readiness...</span>
+                  <div class="flex justify-end">
+                    <button id="scanBtn" class="runtime-btn runtime-btn-secondary" onclick="runScan()">Scan Providers</button>
+                  </div>
+                </div>
                 <div class="setup-summary-grid">
                   <div class="setup-summary-panel">
                     <span class="setup-summary-label">Latest Snapshot</span>
