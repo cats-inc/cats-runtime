@@ -173,6 +173,7 @@ Current curated tools:
 - `close_browser_page`
 - `close_browser_session`
 - `cleanup_browser_sessions`
+- `list_workspace_substrate_profiles`
 - `audit_workspace`
 - `init_workspace`
 - `update_workspace`
@@ -1269,6 +1270,7 @@ without limit.
 ### Workspace Substrate
 
 ```text
+GET /workspace/substrate/profiles
 POST /workspace/substrate/audit
 POST /workspace/substrate/init
 POST /workspace/substrate/update
@@ -1276,6 +1278,10 @@ POST /workspace/substrate/update
 
 These routes expose the runtime-owned workspace substrate service directly over
 HTTP without adding product workflow policy.
+
+`GET /workspace/substrate/profiles` returns the runtime-owned substrate profile
+catalog so hosts can discover the supported profile ids and their default
+enabled-agent / A2A posture without hardcoding that matrix.
 
 Shared request fields:
 

@@ -81,6 +81,10 @@ Update indexes when adding or changing tracked artifacts:
 - `POST /delivery/repo/status`
 - `POST /delivery/repo/commit`
 - `POST /delivery/repo/push`
+- `GET /workspace/substrate/profiles`
+- `POST /workspace/substrate/audit`
+- `POST /workspace/substrate/init`
+- `POST /workspace/substrate/update`
 - `GET /skills/catalog`
 - `GET /sessions`
 - `GET /sessions/:id`

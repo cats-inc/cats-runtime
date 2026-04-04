@@ -14,6 +14,7 @@ import type {
   WorkspaceSubstrateApprovalPayload,
   WorkspaceSubstrateAuditStatus,
   WorkspaceSubstrateAuthorization,
+  WorkspaceSubstrateProfileCatalog,
   WorkspaceSubstrateContract,
   WorkspaceSubstrateFinding,
   WorkspaceSubstrateFindingStatus,
@@ -85,6 +86,36 @@ function normalizeIncludeA2A(
   includeA2A?: boolean,
 ): boolean {
   return includeA2A ?? profile === 'a2a-enabled';
+}
+
+function buildWorkspaceSubstrateProfileCatalog(): WorkspaceSubstrateProfileCatalog {
+  return {
+    defaultProfile: 'standard',
+    allowedAgents: [...DEFAULT_STANDARD_AGENTS],
+    profiles: [
+      {
+        id: 'minimal',
+        title: 'Minimal',
+        description: 'Lean collaboration substrate with shared workspace memory entry points but no agent-specific files by default.',
+        defaultEnabledAgents: [],
+        includeA2AByDefault: false,
+      },
+      {
+        id: 'standard',
+        title: 'Standard',
+        description: 'Default collaboration substrate with AGENTS, agent-specific files, and project-memory indexes.',
+        defaultEnabledAgents: [...DEFAULT_STANDARD_AGENTS],
+        includeA2AByDefault: false,
+      },
+      {
+        id: 'a2a-enabled',
+        title: 'A2A Enabled',
+        description: 'Standard substrate plus A2A starter artifacts enabled by default for protocol-facing collaboration pilots.',
+        defaultEnabledAgents: [...DEFAULT_STANDARD_AGENTS],
+        includeA2AByDefault: true,
+      },
+    ],
+  };
 }
 
 function markdownMarker(profile: WorkspaceSubstrateProfileId, filePath: string): string {
@@ -968,6 +999,10 @@ async function collectLegacyA2aActions(input: {
 }
 
 export class WorkspaceSubstrateService {
+  listProfiles(): WorkspaceSubstrateProfileCatalog {
+    return buildWorkspaceSubstrateProfileCatalog();
+  }
+
   async execute(request: WorkspaceSubstrateRequest): Promise<WorkspaceSubstrateResult> {
     const workspacePath = normalizeWorkspacePath(request.workspacePath);
     const profile = normalizeProfile(request.profile);

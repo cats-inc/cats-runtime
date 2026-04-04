@@ -653,6 +653,7 @@ describe('runtime MCP facade', () => {
       'close_browser_page',
       'close_browser_session',
       'cleanup_browser_sessions',
+      'list_workspace_substrate_profiles',
       'audit_workspace',
       'init_workspace',
       'update_workspace',
@@ -3326,6 +3327,35 @@ describe('runtime MCP facade', () => {
     const app = createTestApp();
     const workspacePath = join(rootDir, 'workspace');
     mkdirSync(workspacePath, { recursive: true });
+
+    const profileCatalogResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 80,
+        method: 'tools/call',
+        params: {
+          name: 'list_workspace_substrate_profiles',
+          arguments: {},
+        },
+      }),
+    });
+    expect(profileCatalogResponse.status).toBe(200);
+    const profileCatalog = await profileCatalogResponse.json() as {
+      result: {
+        structuredContent: {
+          defaultProfile: string;
+          profiles: Array<{ id: string }>;
+        };
+      };
+    };
+    expect(profileCatalog.result.structuredContent.defaultProfile).toBe('standard');
+    expect(profileCatalog.result.structuredContent.profiles.map((profile) => profile.id)).toEqual([
+      'minimal',
+      'standard',
+      'a2a-enabled',
+    ]);
 
     const workspaceAuditResponse = await app.request('/mcp', {
       method: 'POST',

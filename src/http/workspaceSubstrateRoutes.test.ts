@@ -28,6 +28,32 @@ function createTestApp() {
 }
 
 describe('workspace substrate routes', () => {
+  it('lists workspace substrate profiles through GET /workspace/substrate/profiles', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/workspace/substrate/profiles');
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      defaultProfile: 'standard',
+      allowedAgents: ['claude', 'gemini', 'codex'],
+      profiles: [
+        expect.objectContaining({
+          id: 'minimal',
+          includeA2AByDefault: false,
+        }),
+        expect.objectContaining({
+          id: 'standard',
+          includeA2AByDefault: false,
+        }),
+        expect.objectContaining({
+          id: 'a2a-enabled',
+          includeA2AByDefault: true,
+        }),
+      ],
+    });
+  });
+
   it('returns read-only audit results through POST /workspace/substrate/audit', async () => {
     const { root, cleanup } = createWorkspace();
     const app = createTestApp();

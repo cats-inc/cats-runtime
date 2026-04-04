@@ -67,6 +67,7 @@ Current tools:
 - `close_browser_page`
 - `close_browser_session`
 - `cleanup_browser_sessions`
+- `list_workspace_substrate_profiles`
 - `audit_workspace`
 - `init_workspace`
 - `update_workspace`
@@ -300,6 +301,7 @@ tool surface here. The first shared tool names are:
 - `close_browser_page`
 - `close_browser_session`
 - `cleanup_browser_sessions`
+- `list_workspace_substrate_profiles`
 - `audit_workspace`
 - `init_workspace`
 - `update_workspace`

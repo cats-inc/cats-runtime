@@ -34,6 +34,11 @@ const ENABLED_AGENTS = ['claude', 'gemini', 'codex'] as const;
 
 export const workspaceSubstrateRoutes = new Hono<RuntimeRouteEnv>();
 
+workspaceSubstrateRoutes.get('/workspace/substrate/profiles', (c) => {
+  const ctx = c.get('ctx');
+  return c.json(getWorkspaceSubstrateService(ctx).listProfiles());
+});
+
 function parseProfile(value: unknown): WorkspaceSubstrateProfileId | undefined {
   return PROFILE_IDS.includes(value as WorkspaceSubstrateProfileId)
     ? value as WorkspaceSubstrateProfileId

@@ -274,6 +274,20 @@ export interface WorkspaceSubstrateRequest {
   authorization?: WorkspaceSubstrateAuthorizationInput;
 }
 
+export interface WorkspaceSubstrateProfileSummary {
+  id: WorkspaceSubstrateProfileId;
+  title: string;
+  description: string;
+  defaultEnabledAgents: Array<'claude' | 'gemini' | 'codex'>;
+  includeA2AByDefault: boolean;
+}
+
+export interface WorkspaceSubstrateProfileCatalog {
+  defaultProfile: WorkspaceSubstrateProfileId;
+  allowedAgents: Array<'claude' | 'gemini' | 'codex'>;
+  profiles: WorkspaceSubstrateProfileSummary[];
+}
+
 export interface WorkspaceSubstrateFinding {
   path: string;
   status: WorkspaceSubstrateFindingStatus;

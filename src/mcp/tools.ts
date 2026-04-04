@@ -1865,6 +1865,17 @@ async function auditWorkspace(
   };
 }
 
+async function listWorkspaceSubstrateProfiles(
+  ctx: AppContext,
+): Promise<McpToolCallResult> {
+  const catalog = getWorkspaceSubstrateService(ctx).listProfiles();
+
+  return {
+    summary: `Returned ${catalog.profiles.length} workspace substrate profile(s).`,
+    structuredContent: catalog,
+  };
+}
+
 async function auditDeliveryTarget(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -4156,6 +4167,19 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: cleanupBrowserSessions,
+  },
+  {
+    definition: {
+      name: 'list_workspace_substrate_profiles',
+      title: 'List Workspace Substrate Profiles',
+      description: 'List runtime-owned workspace substrate profiles and their default collaboration posture.',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        additionalProperties: false,
+      },
+    },
+    execute: listWorkspaceSubstrateProfiles,
   },
   {
     definition: {

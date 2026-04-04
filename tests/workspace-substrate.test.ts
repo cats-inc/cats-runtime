@@ -15,6 +15,32 @@ function createWorkspace() {
 }
 
 describe('WorkspaceSubstrateService', () => {
+  it('lists runtime-owned workspace substrate profiles for hosts', () => {
+    const service = new WorkspaceSubstrateService();
+
+    expect(service.listProfiles()).toEqual({
+      defaultProfile: 'standard',
+      allowedAgents: ['claude', 'gemini', 'codex'],
+      profiles: [
+        expect.objectContaining({
+          id: 'minimal',
+          defaultEnabledAgents: [],
+          includeA2AByDefault: false,
+        }),
+        expect.objectContaining({
+          id: 'standard',
+          defaultEnabledAgents: ['claude', 'gemini', 'codex'],
+          includeA2AByDefault: false,
+        }),
+        expect.objectContaining({
+          id: 'a2a-enabled',
+          defaultEnabledAgents: ['claude', 'gemini', 'codex'],
+          includeA2AByDefault: true,
+        }),
+      ],
+    });
+  });
+
   it('returns machine-readable findings and actions for a missing substrate', async () => {
     const { root, cleanup } = createWorkspace();
     const service = new WorkspaceSubstrateService();
