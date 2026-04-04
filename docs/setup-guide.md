@@ -99,7 +99,7 @@ In bootstrap mode:
 The bootstrap flow:
 
 1. Open `http://127.0.0.1:3110/` (or the configured host/port)
-2. Click "Auto Scan" or "Manual Scan" to detect installed providers
+2. Click "Scan Providers" to detect installed providers
 3. Check the providers you want to enable
 4. Click "Apply" to generate `providers.yaml` and exit bootstrap mode
    If the generated config cannot be reloaded, setup stays in bootstrap mode
@@ -261,10 +261,8 @@ post-bootstrap follow-through:
 
 ### Discovery Posture
 
-WSL discovery defaults to `if_running` — bootstrap auto-scan will not start
-WSL distributions that are not already running. Docker discovery also defaults
-to `if_running`. Use the "Manual Scan" button to trigger a full scan regardless
-of discovery policy.
+WSL discovery defaults to `if_running` — scan will not start WSL distributions
+that are not already running. Docker discovery also defaults to `if_running`.
 
 ### LAN Peer Discovery and Execution Routing
 

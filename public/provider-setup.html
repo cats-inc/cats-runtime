@@ -116,8 +116,8 @@
           <div class="runtime-note">
             <p class="text-sm font-medium text-slate-200">Scan before apply</p>
             <p class="mt-2 text-sm leading-6 text-slate-400">
-              Auto Scan reuses the runtime's conservative discovery posture.
-              Manual Scan is for explicit repair and remediation follow-through.
+              Scan probes each known provider CLI on this machine and reports
+              readiness. Run it whenever providers are installed or updated.
             </p>
           </div>
           <div class="runtime-note">
@@ -176,8 +176,7 @@
 
           <div class="runtime-page-toolbar">
             <div class="runtime-page-toolbar-row">
-              <button id="scanBtn" class="runtime-btn runtime-btn-secondary" onclick="runScan(false)">Auto Scan</button>
-              <button id="manualScanBtn" class="runtime-btn runtime-btn-secondary" onclick="runScan(true)">Manual Scan</button>
+              <button id="scanBtn" class="runtime-btn runtime-btn-secondary" onclick="runScan()">Scan Providers</button>
               <button id="applyBtn" class="runtime-btn runtime-btn-primary" onclick="applyConfig()" disabled>Apply Selected</button>
             </div>
           </div>
@@ -758,12 +757,10 @@ function bindCheckboxes() {
   update();
 }
 
-async function runScan(manual) {
+async function runScan() {
   if (!validateApiKeyInput(document.getElementById('apiKeyInput').value)) return;
   const scanBtn = document.getElementById('scanBtn');
-  const manualScanBtn = document.getElementById('manualScanBtn');
   scanBtn.disabled = true;
-  manualScanBtn.disabled = true;
   document.getElementById('providerList').innerHTML = '<div class="px-6 py-12 text-center text-sm text-slate-500">Scanning providers...</div>';
   hideResult();
 
@@ -772,7 +769,7 @@ async function runScan(manual) {
     const res = await fetchFn('/setup-scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ manual }),
+      body: JSON.stringify({ manual: true }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
@@ -784,7 +781,6 @@ async function runScan(manual) {
       '<div class="px-6 py-12 text-center text-sm text-red-300">Scan failed: ' + escapeHtml(err.message) + '</div>';
   } finally {
     scanBtn.disabled = false;
-    manualScanBtn.disabled = false;
   }
 }
 

@@ -160,8 +160,8 @@ function createNoAction(): SetupReadModelAction {
 function createRunManualScanAction(): SetupReadModelAction {
   return {
     kind: 'run_manual_scan',
-    label: 'Run Manual Scan',
-    summary: 'Trigger a manual provider scan and persist the latest repair snapshot.',
+    label: 'Scan Providers',
+    summary: 'Scan all known provider CLIs and persist the latest readiness snapshot.',
     path: '/setup-scan',
     method: 'POST',
     body: {

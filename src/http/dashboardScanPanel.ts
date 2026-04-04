@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Dashboard Manual Scan & Repair Panel
+// Dashboard Scan & Repair Panel
 //
 // Injects a collapsible provider scan panel into the dashboard that
 // lets operators trigger a manual scan and view repair guidance inline
@@ -148,11 +148,11 @@ const SCAN_PANEL_SCRIPT = `
   drawer.innerHTML = '<div class="scan-panel-header">'
     + '<h3>Provider Scan & Repair</h3>'
     + '<div class="scan-panel-actions">'
-    + '<button class="scan-btn-manual" id="scanPanelManualBtn">\\u21bb Run Manual Scan</button>'
+    + '<button class="scan-btn-manual" id="scanPanelManualBtn">\\u21bb Scan Providers</button>'
     + '<button class="scan-btn-close" id="scanPanelCloseBtn">Close</button>'
     + '</div>'
     + '</div>'
-    + '<div id="scanPanelResults" class="scan-panel-empty">No scan results yet. Click "Run Manual Scan" to check provider availability.</div>'
+    + '<div id="scanPanelResults" class="scan-panel-empty">No scan results yet. Click "Scan Providers" to check provider availability.</div>'
     + '<div id="scanPanelMeta" class="scan-panel-meta"></div>';
   header.parentNode.insertBefore(drawer, header.nextSibling);
 
@@ -213,7 +213,7 @@ const SCAN_PANEL_SCRIPT = `
       resultsEl.innerHTML = '<div class="scan-panel-empty" style="color:var(--red)">Scan failed: ' + escapeHtml(err.message) + '</div>';
     }).finally(function() {
       manualBtn.disabled = false;
-      manualBtn.textContent = '\\u21bb Run Manual Scan';
+      manualBtn.textContent = '\\u21bb Scan Providers';
     });
   });
 

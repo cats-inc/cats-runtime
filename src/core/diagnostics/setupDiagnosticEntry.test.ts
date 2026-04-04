@@ -15,8 +15,8 @@ describe('formatSetupDiagnosticEntrySummary', () => {
             summary: 'Run a manual scan to capture current provider readiness and remediation.',
             nextAction: {
               kind: 'run_manual_scan',
-              label: 'Run Manual Scan',
-              summary: 'Trigger a manual provider scan and persist the latest repair snapshot.',
+              label: 'Scan Providers',
+              summary: 'Scan all known provider CLIs and persist the latest readiness snapshot.',
               method: 'POST',
               path: '/setup-scan',
             },
@@ -33,8 +33,8 @@ describe('formatSetupDiagnosticEntrySummary', () => {
     })).toBe([
       'Setup diagnostic report generated: Setup report found 2 warning(s).',
       'Repair: Run a manual scan to capture current provider readiness and remediation.',
-      'Next action: Run Manual Scan (run_manual_scan)',
-      'Action summary: Trigger a manual provider scan and persist the latest repair snapshot.',
+      'Next action: Scan Providers (run_manual_scan)',
+      'Action summary: Scan all known provider CLIs and persist the latest readiness snapshot.',
       'Action route: POST /setup-scan',
       '- Codex CLI is unavailable.',
       '- ANTHROPIC_API_KEY is missing.',

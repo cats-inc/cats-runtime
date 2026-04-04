@@ -208,15 +208,13 @@ export class BootstrapService {
 
     const result: BootstrapScanResult = {
       scannedAt: new Date().toISOString(),
-      scanType: options.manual ? 'manual' : 'auto',
+      scanType: 'manual',
       providers: entries,
     };
 
     writeJsonAtomic(this.scanPath, result);
-    if (options.manual) {
-      writeJsonAtomic(this.manualScanPath, result);
-      state.lastManualScanAt = result.scannedAt;
-    }
+    writeJsonAtomic(this.manualScanPath, result);
+    state.lastManualScanAt = result.scannedAt;
     state.lastScanAt = result.scannedAt;
     state.status = 'ready';
     state.error = null;
