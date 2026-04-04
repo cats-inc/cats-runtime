@@ -121,6 +121,8 @@ Current curated tools:
 - `discover_cursor_sessions`
 - `list_kiro_sessions`
 - `discover_kiro_sessions`
+- `list_kilo_sessions`
+- `discover_kilo_sessions`
 - `list_auggie_sessions`
 - `discover_auggie_sessions`
 - `list_opencode_sessions`
@@ -264,10 +266,12 @@ same runtime-owned discovery and peer diagnostics surfaces as
 peer list/detail/diagnostics reads, so MCP hosts can inspect LAN discovery
 state, bounded peer registry entries, and peer guardrail/network posture data
 without inventing MCP-only peer contracts.
-`list_codex_sessions`, `discover_codex_sessions`, `list_cursor_sessions`, `discover_cursor_sessions`, `list_kiro_sessions`,
-`discover_kiro_sessions`, `list_auggie_sessions`, `discover_auggie_sessions`,
-`list_opencode_sessions`, and `discover_opencode_sessions` reuse the same
-runtime-owned native-session inspection/import seams as the existing
+`list_codex_sessions`, `discover_codex_sessions`, `list_cursor_sessions`,
+`discover_cursor_sessions`, `list_kiro_sessions`, `discover_kiro_sessions`,
+`list_kilo_sessions`, `discover_kilo_sessions`, `list_auggie_sessions`,
+`discover_auggie_sessions`, `list_opencode_sessions`, and
+`discover_opencode_sessions` reuse the same runtime-owned native-session
+inspection/import seams as the existing
 `GET /{provider}/sessions` and `POST /{provider}/sessions/discover` routes, so
 MCP hosts can inventory or import runtime-local native sessions for supported
 CLI providers without shelling out to a second discovery protocol.
@@ -1961,9 +1965,9 @@ Other `branching` query values are ignored.
 
 `POST /sessions/discover` is the runtime-owned manual session scan entry for
 configured WSL- and Docker-backed CLI targets. It scans the configured
-`cursor`, `goose`, `kiro`, and `opencode` CLI instances whose runtime mode is
-currently `wsl` or `docker`, imports any discovered sessions into the embedded
-registry, and returns a bounded per-target summary:
+`cursor`, `goose`, `kiro`, `kilo`, and `opencode` CLI instances whose runtime
+mode is currently `wsl` or `docker`, imports any discovered sessions into the
+embedded registry, and returns a bounded per-target summary:
 
 - `status`: `idle`, `completed`, `completed_with_errors`, or `failed`
 - `summary.totalTargets`: how many configured WSL/Docker targets were scanned
@@ -3852,6 +3856,8 @@ The first slice supports:
 - dynamic discovery for `ollama`
 - dynamic discovery for `pi` via the runtime-owned `pi --list-models` helper,
   normalized into canonical `provider/model` refs
+- dynamic discovery for `kilo` via the runtime-owned `kilo models` helper,
+  normalized into canonical `provider/model` refs
 - dynamic discovery for `opencode` via the runtime-owned `opencode models`
   helper, normalized into canonical `provider/model` refs and forwarding
   runtime `refresh=1` cache-bypass requests to upstream `--refresh`
@@ -4061,14 +4067,16 @@ GET  /cursor/sessions
 POST /cursor/sessions/discover
 GET  /kiro/sessions
 POST /kiro/sessions/discover
+GET  /kilo/sessions
+POST /kilo/sessions/discover
 GET  /opencode/sessions
 POST /opencode/sessions/discover
 ```
 
-The provider-native endpoints for Auggie, Cursor, Kiro, OpenCode, and Codex accept an
-optional `instance` query/body field so callers can target a specific configured
-provider instance. `"default"` is accepted as an alias for each provider's
-configured default instance. Unknown instance IDs return `400`.
+The provider-native endpoints for Auggie, Cursor, Kilo, Kiro, OpenCode, and
+Codex accept an optional `instance` query/body field so callers can target a
+specific configured provider instance. `"default"` is accepted as an alias for
+each provider's configured default instance. Unknown instance IDs return `400`.
 
 For manual WSL-backed discovery, `POST /cursor/sessions/discover` and
 `POST /kiro/sessions/discover` also accept:

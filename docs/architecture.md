@@ -101,7 +101,7 @@ product shells or ad-hoc prompt helpers. The runtime:
 ┌───────────────────────────────────────────┐
 │ Claude / OpenAI / Gemini / Ollama APIs   │
 │ Claude / Codex / Gemini / Kiro / Cursor  │
-│ Auggie / OpenCode local runtimes         │
+│ Auggie / Kilo / OpenCode local runtimes  │
 │ OpenClaw / Agent SDK bridge runtimes     │
 └───────────────────────────────────────────┘
 ```
@@ -156,6 +156,7 @@ src/
       auggie/
       cursor/
       discovery/
+      kilo/
       kiro/
       opencode/
       pool/

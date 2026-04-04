@@ -6,7 +6,7 @@
 
 - Node.js 22+
 - Installed local CLIs for the providers you want to use (`claude`, `codex`,
-  `gemini`, `cursor-agent`, `kiro-cli`, `opencode`, etc.)
+  `gemini`, `cursor-agent`, `kiro-cli`, `kilo`, `opencode`, etc.)
 
 ## Quick Start (npx)
 
