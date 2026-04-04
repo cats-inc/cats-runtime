@@ -802,9 +802,9 @@ function updateProvidersWorkspaceMetrics() {
     : providerCount > 0
       ? `Review ${pluralize(providerCount, 'provider')} and decide what to apply.`
       : 'Load setup state to inspect local provider candidates.';
-  document.getElementById('providersRailMeta').textContent = selection.selectedCount > 0
-    ? `${selection.selectedCount} selected${hasScan ? ` · ${selection.readySelected} available` : ''}`
-    : 'Scan and selection both stay in the main workspace.';
+  document.getElementById('providersRailMeta').textContent = hasScan
+    ? 'Use the main workspace to choose providers and apply runtime config.'
+    : 'Scan and apply stay in the main workspace.';
 }
 
 function updateSelectAllCheckbox() {
@@ -905,7 +905,20 @@ function updateConfiguredTargetsRail() {
   }
 }
 
-function applySetupStateReadModel(data) {
+function restoreProviderSelection(selectedProviders) {
+  if (!Array.isArray(selectedProviders) || selectedProviders.length === 0) {
+    return;
+  }
+
+  const selected = new Set(selectedProviders);
+  document.querySelectorAll('.provider-check').forEach((checkbox) => {
+    if (!checkbox.disabled && selected.has(checkbox.value)) {
+      checkbox.checked = true;
+    }
+  });
+}
+
+function applySetupStateReadModel(data, selectedProviders = []) {
   latestSetupState = data;
   updateStatusBar(data);
   if (data.scan && data.scan.providers) {
@@ -913,7 +926,13 @@ function applySetupStateReadModel(data) {
   } else {
     renderUniverse(data.universe || []);
   }
+  restoreProviderSelection(selectedProviders);
+  const applyBtn = document.getElementById('applyBtn');
+  if (applyBtn) {
+    applyBtn.disabled = selectableProviderSummary().applyableCount === 0;
+  }
   updateProvidersWorkspaceMetrics();
+  updateSelectAllCheckbox();
 }
 
 async function fetchState() {
@@ -1638,7 +1657,7 @@ async function applyConfig() {
       const stateRes = await fetchFn('/setup-state');
       if (!stateRes.ok) throw new Error(`HTTP ${stateRes.status}`);
       const stateData = await stateRes.json();
-      applySetupStateReadModel(stateData);
+      applySetupStateReadModel(stateData, providers);
       const configuredTargetsLoaded = await loadConfiguredTargetCapabilities();
       setActiveSetupWorkspace(configuredTargetsLoaded ? 'configured-targets' : 'providers');
     } else {
