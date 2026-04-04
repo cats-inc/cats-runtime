@@ -305,9 +305,11 @@ describe('bootstrap mode server', () => {
         const response = await runtime.app.request('/');
         expect(response.status).toBe(200);
         const html = await response.text();
-        expect(html).toContain('Provider Setup');
-        expect(html).toContain('Configured Target Capabilities');
+        expect(html).toContain('Setup &amp; Repair');
+        expect(html).toContain('Providers');
+        expect(html).toContain('Configured Targets');
         expect(html).toContain('setupCapabilityProvider');
+        expect(html).toContain('setupRailProviders');
       } finally {
         await runtime.close();
       }
@@ -1021,7 +1023,7 @@ describe('bootstrap mode server', () => {
         const response = await runtime.app.request('/');
         expect(response.status).toBe(200);
         const html = await response.text();
-        expect(html).toContain('Provider Setup');
+        expect(html).toContain('Setup &amp; Repair');
         expect(html).toContain('data-cats-ui');
         expect(html).toContain('window.CatsUI');
         expect(html).toContain('data-runtime-surface-switcher');

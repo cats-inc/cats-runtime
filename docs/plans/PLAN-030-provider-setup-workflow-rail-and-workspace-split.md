@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | Completed |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User / runtime UI workstream |
@@ -126,11 +126,11 @@
 
 ### Phase 1: Formalize Setup IA Contract
 
-- [ ] Replace page-local prose framing with the workflow-rail vocabulary.
-- [ ] Define the rail entry contract and the active-workspace state model.
-- [ ] Define the empty, loading, ready, and blocked state copy for both
+- [x] Replace page-local prose framing with the workflow-rail vocabulary.
+- [x] Define the rail entry contract and the active-workspace state model.
+- [x] Define the empty, loading, ready, and blocked state copy for both
   workspaces.
-- [ ] Confirm which current actions remain page-header level versus
+- [x] Confirm which current actions remain page-header level versus
   workspace-local actions.
 
 Deliverables:
@@ -141,10 +141,10 @@ Deliverables:
 
 ### Phase 2: Refactor Shell Layout Around the Workflow Rail
 
-- [ ] Remove `Bootstrap Mode` and `Operator Notes` from the setup sidebar.
-- [ ] Add a workflow rail with active-state styling and status summaries.
-- [ ] Keep `Auth` and `Runtime Health` in the persistent footer.
-- [ ] Convert the page body to render one active workspace at a time instead of
+- [x] Remove `Bootstrap Mode` and `Operator Notes` from the setup sidebar.
+- [x] Add a workflow rail with active-state styling and status summaries.
+- [x] Keep `Auth` and `Runtime Health` in the persistent footer.
+- [x] Convert the page body to render one active workspace at a time instead of
   two peer setup cards.
 
 Deliverables:
@@ -155,11 +155,11 @@ Deliverables:
 
 ### Phase 3: Consolidate Providers Workspace
 
-- [ ] Move scan/readiness UI and provider selection into one `Providers`
+- [x] Move scan/readiness UI and provider selection into one `Providers`
   workspace.
-- [ ] Reuse current scan/readiness rendering and selection logic where possible.
-- [ ] Add a sticky or anchored apply summary/action area inside the workspace.
-- [ ] Keep remediation details visible in context with each provider row.
+- [x] Reuse current scan/readiness rendering and selection logic where possible.
+- [x] Add a sticky or anchored apply summary/action area inside the workspace.
+- [x] Keep remediation details visible in context with each provider row.
 
 Deliverables:
 
@@ -169,11 +169,11 @@ Deliverables:
 
 ### Phase 4: Extract Configured Targets as a Distinct Workspace
 
-- [ ] Lift `Configured Target Capabilities` out of the stacked-card model.
-- [ ] Preserve configured provider/instance selectors and capability detail
+- [x] Lift `Configured Target Capabilities` out of the stacked-card model.
+- [x] Preserve configured provider/instance selectors and capability detail
   rendering.
-- [ ] Add a truthful empty state for zero configured targets.
-- [ ] Refresh this workspace after successful apply without coupling it to
+- [x] Add a truthful empty state for zero configured targets.
+- [x] Refresh this workspace after successful apply without coupling it to
   scan-only actions.
 
 Deliverables:
@@ -184,12 +184,12 @@ Deliverables:
 
 ### Phase 5: Regression Coverage and Documentation Follow-Through
 
-- [ ] Update emitted-HTML smoke tests and route tests that assert setup-page
+- [x] Update emitted-HTML smoke tests and route tests that assert setup-page
   copy or structure.
-- [ ] Add focused UI smoke assertions for workflow rail labels and the absence
+- [x] Add focused UI smoke assertions for workflow rail labels and the absence
   of old sidebar prose.
-- [ ] Update runtime docs that describe the setup surface and operator flow.
-- [ ] Record implementation progress back into this plan once work lands.
+- [x] Update runtime docs that describe the setup surface and operator flow.
+- [x] Record implementation progress back into this plan once work lands.
 
 Deliverables:
 
@@ -253,6 +253,7 @@ Deliverables:
 | Date | Update |
 |------|--------|
 | 2026-04-04 | Plan created to formalize the approved setup workflow-rail and workspace split direction. |
+| 2026-04-04 | Workflow rail, Providers / Configured Targets workspaces, setup smoke tests, and setup-flow doc updates landed. |
 
 ---
 

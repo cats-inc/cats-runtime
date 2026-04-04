@@ -99,11 +99,14 @@ In bootstrap mode:
 The bootstrap flow:
 
 1. Open `http://127.0.0.1:3110/` (or the configured host/port)
-2. Click "Scan Providers" to detect installed providers
-3. Check the providers you want to enable
-4. Click "Apply" to generate `providers.yaml` and exit bootstrap mode
+2. Stay on the `Providers` workspace in the setup rail and click `Scan Providers`
+   to detect installed providers
+3. Review readiness in the provider list, then check the providers you want to enable
+4. Click `Apply Selected` to generate `providers.yaml` and exit bootstrap mode
    If the generated config cannot be reloaded, setup stays in bootstrap mode
    and the UI/API reports the reload error instead of partially enabling normal routes
+5. Switch to `Configured Targets` when you want to inspect the runtime-owned
+   behavior of the applied provider targets
 
 Setup artifacts are persisted under `<dataDir>/setup/`:
 

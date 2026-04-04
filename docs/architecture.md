@@ -183,6 +183,10 @@ src/
   design tokens, provider badge styles, and a thin browser-side `CatsUI`
   helper (auth headers, fetch wrapper, badge rendering) so the pages stop
   duplicating theme variables, fetch logic, and provider color definitions.
+- Treats `provider-setup` as a workflow surface rather than a prose-heavy
+  bootstrap form: the sidebar now carries a compact setup rail (`Providers`,
+  `Configured Targets`), while the main workspace owns scan/apply interaction
+  and configured-target inspection as distinct operator tasks.
 - Injects a scan & repair panel (`src/http/dashboardScanPanel.ts`)
   into the dashboard, allowing operators to trigger `POST /setup-scan`
   with `manual: true` and view provider status inline without editing YAML

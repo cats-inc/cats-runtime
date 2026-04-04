@@ -460,7 +460,11 @@ describe('runtime server', () => {
         expect(html).toContain('apiKeyInput');
         expect(html).toContain("window.CatsUI && window.CatsUI.apiFetch");
         expect(html).toContain('validateApiKeyInput');
-        expect(html).toContain('Configured Target Capabilities');
+        expect(html).toContain('Setup Workflow');
+        expect(html).toContain('Configured Targets');
+        expect(html).toContain('Selection Summary');
+        expect(html).toContain('setupRailProviders');
+        expect(html).toContain('setupRailConfiguredTargets');
         expect(html).toContain('setupCapabilityProvider');
         expect(html).toContain('setupCapabilityInstance');
         expect(html).toContain('loadConfiguredTargetCapabilities');
@@ -469,6 +473,8 @@ describe('runtime server', () => {
         expect(html).toContain("document.addEventListener('DOMContentLoaded'");
         expect(html).toContain('escapeHtml(r.summary)');
         expect(html).toContain('escapeHtml(p.commandPath)');
+        expect(html).not.toContain('Bootstrap Mode');
+        expect(html).not.toContain('Operator Notes');
         expect(html).not.toContain('localStorage');
         expect(html).toContain("await fetchFn('/setup-scan'");
         expect(html).toContain("await fetchFn('/setup-apply'");
