@@ -655,6 +655,7 @@ describe('runtime MCP facade', () => {
       'cleanup_browser_sessions',
       'audit_workspace',
       'init_workspace',
+      'update_workspace',
       'audit_delivery_target',
       'commit_changes',
       'publish_artifacts',
@@ -3352,6 +3353,33 @@ describe('runtime MCP facade', () => {
     };
     expect(workspaceAudit.result.structuredContent.operation).toBe('audit-workspace');
     expect(workspaceAudit.result.structuredContent.contract.mode).toBe('preview');
+
+    const workspaceUpdateResponse = await app.request('/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 81,
+        method: 'tools/call',
+        params: {
+          name: 'update_workspace',
+          arguments: {
+            workspacePath,
+          },
+        },
+      }),
+    });
+    expect(workspaceUpdateResponse.status).toBe(200);
+    const workspaceUpdate = await workspaceUpdateResponse.json() as {
+      result: {
+        structuredContent: {
+          operation: string;
+          contract: { mode: string };
+        };
+      };
+    };
+    expect(workspaceUpdate.result.structuredContent.operation).toBe('update-workspace');
+    expect(workspaceUpdate.result.structuredContent.contract.mode).toBe('preview');
 
     const deliveryAuditResponse = await app.request('/mcp', {
       method: 'POST',

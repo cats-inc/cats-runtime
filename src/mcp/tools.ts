@@ -2656,6 +2656,59 @@ async function initWorkspace(
   };
 }
 
+async function updateWorkspace(
+  ctx: AppContext,
+  args: Record<string, unknown>,
+): Promise<McpToolCallResult> {
+  const service = getWorkspaceSubstrateService(ctx);
+  const result = await service.execute({
+    operation: 'update-workspace',
+    workspacePath: readRequiredString(args, 'workspacePath'),
+    profile: readOptionalEnumString(
+      args,
+      'profile',
+      SUBSTRATE_PROFILES,
+      'profile must be a valid workspace substrate profile',
+    ),
+    enabledAgents: readOptionalEnumStringArray(
+      args,
+      'enabledAgents',
+      ENABLED_AGENTS,
+      'enabledAgents must be one of: claude, gemini, codex',
+    ),
+    ...(readOptionalBoolean(args, 'includeA2A') !== undefined
+      ? { includeA2A: readOptionalBoolean(args, 'includeA2A') }
+      : {}),
+    ...(readOptionalBoolean(args, 'apply') !== undefined
+      ? { apply: readOptionalBoolean(args, 'apply') }
+      : {}),
+    ...(readOptionalObject(args, 'hints') ? { hints: readOptionalObject(args, 'hints') } : {}),
+    ...(readOptionalEnumString(
+      args,
+      'actorRole',
+      ACTOR_ROLES,
+      'actorRole must be a valid workspace actor role',
+    ) || readOptionalBoolean(args, 'approved') !== undefined
+      ? {
+          authorization: {
+            actorRole: readOptionalEnumString(
+              args,
+              'actorRole',
+              ACTOR_ROLES,
+              'actorRole must be a valid workspace actor role',
+            ),
+            approved: readOptionalBoolean(args, 'approved'),
+          },
+        }
+      : {}),
+  });
+
+  return {
+    summary: `Workspace update ${result.status} for ${result.workspacePath}.`,
+    structuredContent: result,
+  };
+}
+
 async function commitChanges(
   ctx: AppContext,
   args: Record<string, unknown>,
@@ -4151,6 +4204,32 @@ const TOOL_HANDLERS: McpToolHandler[] = [
       },
     },
     execute: initWorkspace,
+  },
+  {
+    definition: {
+      name: 'update_workspace',
+      title: 'Update Workspace',
+      description: 'Preview or apply runtime-owned workspace substrate convergence for an existing repo.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          workspacePath: { type: 'string' },
+          profile: { type: 'string', enum: SUBSTRATE_PROFILES },
+          enabledAgents: {
+            type: 'array',
+            items: { type: 'string', enum: ENABLED_AGENTS },
+          },
+          includeA2A: { type: 'boolean' },
+          apply: { type: 'boolean' },
+          actorRole: { type: 'string', enum: ACTOR_ROLES },
+          approved: { type: 'boolean' },
+          hints: { type: 'object' },
+        },
+        required: ['workspacePath'],
+        additionalProperties: false,
+      },
+    },
+    execute: updateWorkspace,
   },
   {
     definition: {

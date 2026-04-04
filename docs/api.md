@@ -175,6 +175,7 @@ Current curated tools:
 - `cleanup_browser_sessions`
 - `audit_workspace`
 - `init_workspace`
+- `update_workspace`
 - `audit_delivery_target`
 - `publish_artifacts`
 - `inspect_repo_status`
@@ -343,8 +344,9 @@ Example `tools/call` request:
 
 Successful tool calls return short human `content` plus machine-readable
 `structuredContent`. Session and delivery mutations route into the same runtime
-contracts already exposed over direct HTTP. `init_workspace` remains preview by
-default unless callers explicitly request `apply: true`.
+contracts already exposed over direct HTTP. `init_workspace` and
+`update_workspace` remain preview by default unless callers explicitly request
+`apply: true`.
 
 For repo-local stdio hosts, start:
 

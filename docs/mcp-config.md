@@ -69,6 +69,7 @@ Current tools:
 - `cleanup_browser_sessions`
 - `audit_workspace`
 - `init_workspace`
+- `update_workspace`
 - `audit_delivery_target`
 - `commit_changes`
 
@@ -301,6 +302,7 @@ tool surface here. The first shared tool names are:
 - `cleanup_browser_sessions`
 - `audit_workspace`
 - `init_workspace`
+- `update_workspace`
 - `audit_delivery_target`
 - `commit_changes`
 
