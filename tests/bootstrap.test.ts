@@ -308,6 +308,7 @@ describe('bootstrap mode server', () => {
         expect(html).toContain('Setup &amp; Repair');
         expect(html).toContain('Providers');
         expect(html).toContain('Configured Targets');
+        expect(html).toContain('setupTargetList');
         expect(html).toContain('setupCapabilityProvider');
         expect(html).toContain('setupRailProviders');
       } finally {
