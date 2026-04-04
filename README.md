@@ -5,7 +5,7 @@
 ## Overview
 
 `cats-runtime` is the stable execution boundary for upper-layer products such as
-`cats` and `crew-chat-poc`. It now embeds the CLI runtime directly instead
+`cats-platform` and `crew-chat-poc`. It now embeds the CLI runtime directly instead
 of proxying to a second local sidecar service.
 
 Current capabilities:
@@ -35,7 +35,8 @@ Current capabilities:
 - backend-aware skill delivery modes (`filesystem`, `instructions`, `none`)
 - shared skill re-entry for create/resume/fork so persisted skills are re-derived per target/backend instead of reusing stale delivery artifacts
 - strict `default` instance aliasing and host-path validation for file-backed providers
-- provider-specific helpers such as Kiro model inspection
+- provider-specific helpers such as Kiro model inspection plus Kilo/OpenCode
+  native-session discovery
 - runtime-owned usage metering, incident surfacing, and additive execution guardrails for warn / block / cooldown flows
 - shared CLI compatibility probing with `light` / `live` validation, degraded profile selection, stale-cache-aware summaries, machine-readable reprobe metadata, and replay-friendly evidence capture across first-party CLI provider families
 - runtime-owned provider event capability truth on `/providers/config`, so
@@ -151,7 +152,7 @@ of only existing in the source checkout.
 Supported process startup modes:
 
 - `standalone` for direct local runs
-- `app-managed` for child-process supervision by hosts such as `cats`
+- `app-managed` for child-process supervision by hosts such as `cats-platform`
 
 The executable entry also supports:
 
