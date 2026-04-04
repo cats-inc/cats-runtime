@@ -183,7 +183,7 @@ src/
   design tokens, provider badge styles, and a thin browser-side `CatsUI`
   helper (auth headers, fetch wrapper, badge rendering) so the pages stop
   duplicating theme variables, fetch logic, and provider color definitions.
-- Injects a manual scan & repair panel (`src/http/dashboardScanPanel.ts`)
+- Injects a scan & repair panel (`src/http/dashboardScanPanel.ts`)
   into the dashboard, allowing operators to trigger `POST /setup-scan`
   with `manual: true` and view provider status inline without editing YAML
 - Applies optional bearer auth

@@ -51,7 +51,7 @@ export function buildRepairSummary(input: {
     ];
     return {
       status: 'scan_required',
-      summary: 'No persisted setup scan is available yet. Run a manual scan to capture current provider readiness and remediation.',
+      summary: 'No persisted setup scan is available yet. Run Scan Providers to capture current provider readiness and remediation.',
       preferredScan: {
         source: 'none',
         scannedAt: null,

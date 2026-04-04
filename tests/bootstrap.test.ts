@@ -409,6 +409,38 @@ describe('bootstrap mode server', () => {
     }
   });
 
+  it('POST /setup-scan without manual flag preserves auto scan semantics', { timeout: 60_000 }, async () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const env = createTestEnv(root);
+      ensureDirs(env);
+      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
+      const startup = createRuntimeStartupState({ bootstrapRequired: true });
+      const runtime = createRuntimeServer(config, { startup });
+      try {
+        const response = await runtime.app.request('/setup-scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        expect(response.status).toBe(200);
+        const body = await response.json() as Record<string, unknown>;
+        expect(body.scan).toEqual(expect.objectContaining({
+          scanType: 'auto',
+        }));
+
+        const stateResponse = await runtime.app.request('/setup-state');
+        expect(stateResponse.status).toBe(200);
+        const stateBody = await stateResponse.json() as Record<string, unknown>;
+        expect(stateBody.manualScan).toBeNull();
+      } finally {
+        await runtime.close();
+      }
+    } finally {
+      cleanup();
+    }
+  });
+
   it('setup routes require auth when apiKey is set, even in bootstrap mode', async () => {
     const { root, cleanup } = createTestRoot();
     try {

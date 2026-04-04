@@ -109,7 +109,7 @@ Setup artifacts are persisted under `<dataDir>/setup/`:
 
 - `setup-state.json` — bootstrap workflow state
 - `provider-scan.json` — latest scan results
-- `provider-manual-scan.json` — latest manual scan results
+- `provider-manual-scan.json` — latest explicit operator-triggered scan results
 
 When you need a shareable operator/debug snapshot after startup, the runtime
 now also supports a setup diagnostic report:
@@ -249,7 +249,7 @@ current latest report without digging through the data directory manually.
 post-bootstrap follow-through:
 
 - `repair.status` / `repair.nextAction` tell operators whether the next step is
-  to run a manual scan, apply ready providers, or review remediation
+  to scan providers, apply ready providers, or review remediation
 - `repair.providersReadyToApply` surfaces the ready provider ids/families that
   can be passed directly to `POST /setup-apply`
 - `repair.providersNeedingAttention` now includes bounded remediation previews

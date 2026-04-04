@@ -2,7 +2,7 @@
 // Dashboard Scan & Repair Panel
 //
 // Injects a collapsible provider scan panel into the dashboard that
-// lets operators trigger a manual scan and view repair guidance inline
+// lets operators trigger an explicit provider scan and view repair guidance inline
 // without leaving the dashboard or editing YAML by hand.
 // ---------------------------------------------------------------------------
 
@@ -188,7 +188,7 @@ const SCAN_PANEL_SCRIPT = `
     });
   }
 
-  // --- Manual scan ---
+  // --- Explicit operator scan ---
   var manualBtn = document.getElementById('scanPanelManualBtn');
   manualBtn.addEventListener('click', function() {
     manualBtn.disabled = true;
@@ -260,7 +260,7 @@ const SCAN_PANEL_SCRIPT = `
 </script>`;
 
 /**
- * Inject the manual scan & repair panel into dashboard HTML.
+ * Inject the scan & repair panel into dashboard HTML.
  * Idempotent — returns the input unchanged if already injected.
  */
 export function injectDashboardScanPanel(html: string): string {

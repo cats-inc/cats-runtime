@@ -12,7 +12,7 @@ describe('formatSetupDiagnosticEntrySummary', () => {
       report: {
         setup: {
           repair: {
-            summary: 'Run a manual scan to capture current provider readiness and remediation.',
+            summary: 'Run Scan Providers to capture current provider readiness and remediation.',
             nextAction: {
               kind: 'run_manual_scan',
               label: 'Scan Providers',
@@ -32,7 +32,7 @@ describe('formatSetupDiagnosticEntrySummary', () => {
       } as never,
     })).toBe([
       'Setup diagnostic report generated: Setup report found 2 warning(s).',
-      'Repair: Run a manual scan to capture current provider readiness and remediation.',
+      'Repair: Run Scan Providers to capture current provider readiness and remediation.',
       'Next action: Scan Providers (run_manual_scan)',
       'Action summary: Scan all known provider CLIs and persist the latest readiness snapshot.',
       'Action route: POST /setup-scan',

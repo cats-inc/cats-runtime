@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -110,6 +110,38 @@ describe('BootstrapService', () => {
       const result = await bootstrap.scan();
       expect(result.providers).toHaveLength(KNOWN_PROVIDERS.length);
       expect(maxActive).toBe(2);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('keeps automatic scans separate from explicit manual scan snapshots', async () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const env = createTestEnv(root);
+      ensureDirs(env);
+      const compatibility = {
+        assessCliTarget: async (target: { providerName: ProviderName; cliInstance?: { commandConfig: { path: string } } }) => (
+          createAssessment(target.providerName, target.cliInstance?.commandConfig.path || target.providerName)
+        ),
+      } as unknown as ProviderCompatibilityService;
+
+      const bootstrap = new BootstrapService({
+        dataDir: env.CATS_RUNTIME_DATA_DIR!,
+        configPath: env.CATS_RUNTIME_CONFIG_PATH!,
+        config: loadConfig(env),
+        compatibility,
+      });
+
+      const autoResult = await bootstrap.scan();
+      expect(autoResult.scanType).toBe('auto');
+      expect(existsSync(join(env.CATS_RUNTIME_DATA_DIR!, 'setup', 'provider-manual-scan.json'))).toBe(false);
+      expect((await bootstrap.getSetupState()).lastManualScanAt).toBeNull();
+
+      const manualResult = await bootstrap.scan({ manual: true });
+      expect(manualResult.scanType).toBe('manual');
+      expect(existsSync(join(env.CATS_RUNTIME_DATA_DIR!, 'setup', 'provider-manual-scan.json'))).toBe(true);
+      expect((await bootstrap.getSetupState()).lastManualScanAt).toBeTruthy();
     } finally {
       cleanup();
     }
