@@ -1051,6 +1051,7 @@ describe('bootstrap mode server', () => {
         expect(response.status).toBe(200);
         const html = await response.text();
         expect(html).toContain('Cats Runtime Dashboard');
+        expect(html).toContain('Session Dashboard');
         expect(html).toContain('data-cats-ui');
         expect(html).toContain('data-runtime-surface-switcher');
         expect(html).toContain('data-active-surface="dashboard"');
@@ -1081,7 +1082,7 @@ describe('bootstrap mode server', () => {
         const response = await runtime.app.request('/playground');
         expect(response.status).toBe(200);
         const html = await response.text();
-        expect(html).toContain('Playground');
+        expect(html).toContain('Agent Playground');
         expect(html).toContain('data-cats-ui');
         expect(html).toContain('window.CatsUI');
         expect(html).toContain('data-runtime-surface-switcher');

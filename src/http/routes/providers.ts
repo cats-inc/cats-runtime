@@ -92,55 +92,7 @@ providerRoutes.get('/providers/config', async (c) => {
       }
 
       const instances = await Promise.all(provider.instances.map(async (instance) => {
-        const agentRuntime = instance.backend === 'agent' && instance.remoteInstance
-          ? ctx.agentBackend
-            ? ctx.agentBackend.inspect(instance)
-            : inspectAgentTarget(instance.remoteInstance, { env: process.env })
-          : undefined;
-        const continuity = buildProviderContinuitySummary(instance, {
-          capabilities: instance.backend === 'cli'
-            ? ctx.pool.getCapabilities(instance.providerName, instance.instanceId)
-            : instance.backend === 'agent'
-              ? (ctx.agentBackend?.getCapabilities() || {
-                  resume: true,
-                  fork: true,
-                  permissions: false,
-                })
-              : (ctx.apiBackend?.getCapabilities() || {
-                  resume: true,
-                  fork: true,
-                  permissions: true,
-                }),
-          ...(agentRuntime ? { agentRuntime } : {}),
-        });
-        const latestProbeArtifact = await probeService.readLatestArtifact({
-          provider: instance.providerName,
-          instance: resolveProviderEvolutionArtifactInstance(instance),
-        });
-        const latestProbeArtifactSummary = latestProbeArtifact
-          ? summarizeProviderEvolutionArtifactForReadModel(latestProbeArtifact)
-          : null;
-        const latestCompatibilityEvidence = instance.backend === 'cli'
-          ? await compatibilityEvidence.readLatestArtifact({
-              provider: instance.providerName,
-              instance: instance.instanceId,
-            })
-          : null;
-        const modelCatalog = ctx.providerModelCatalog.inspectSummary(
-          instance.providerName,
-          `${instance.backend}/${instance.instanceId}`,
-        );
-        const metering = getRuntimeMeteringService(ctx).buildProviderTargetSnapshot({
-          provider: instance.providerName,
-          instance: instance.instanceId,
-          backend: instance.backend,
-        });
-        const apiRuntime = inspectApiTarget(instance);
-        const latestAgentTargetEvidence = instance.backend === 'agent'
-          ? readLatestAgentTargetEvidence(ctx, instance)
-          : undefined;
-
-        return {
+        const baseInstance = {
           ...(instance.backend === 'cli' && instance.cliInstance
             ? (() => {
               const activeConfig = inspectProviderActiveConfig(instance);
@@ -155,47 +107,110 @@ providerRoutes.get('/providers/config', async (c) => {
           runtime: instance.cliInstance?.commandConfig.runtime,
           transport: instance.remoteInstance?.transport,
           model: instance.remoteInstance?.model,
-          ...(apiRuntime ? { apiRuntime } : {}),
-          ...(agentRuntime ? { agentRuntime } : {}),
-          ...(latestAgentTargetEvidence?.evidence
-            ? { latestSessionEvidence: latestAgentTargetEvidence.evidence }
+          ...(instance.backend !== 'cli'
+            ? (() => {
+              const apiRuntime = inspectApiTarget(instance);
+              return apiRuntime ? { apiRuntime } : {};
+            })()
             : {}),
-          ...(agentRuntime?.family === 'bridge' && latestAgentTargetEvidence?.activity
-            ? { latestSessionActivity: latestAgentTargetEvidence.activity }
-            : {}),
-          continuity,
-          metering: metering.summary,
-          modelCatalog,
-          tooling: buildProviderToolingSummary(instance, { agentRuntime }),
-          eventCapabilities: buildProviderEventCapabilityTruth(
-            instance,
-            latestProbeArtifactSummary,
-          ),
-          install: instance.backend === 'cli' && instance.cliInstance
-            ? buildProviderInstallCatalogView(
-              instance.providerName as ProviderName,
-              instance.cliInstance.commandConfig.runtime,
-            )
-            : null,
-          compatibility: instance.backend === 'cli'
-            ? compatibility.getCachedSummary(
-              instance.providerName as ProviderName,
-              instance.instanceId,
-            ) || null
-            : null,
-          ...(latestCompatibilityEvidence ? {
-            compatibilityEvidence: {
-              latestArtifact: summarizeCompatibilityEvidenceArtifactForReadModel(
-                latestCompatibilityEvidence,
-              ),
-            },
-          } : {}),
-          ...(latestProbeArtifactSummary ? {
-            providerEvolution: {
-              latestArtifact: latestProbeArtifactSummary,
-            },
-          } : {}),
         };
+
+        try {
+          const agentRuntime = instance.backend === 'agent' && instance.remoteInstance
+            ? ctx.agentBackend
+              ? ctx.agentBackend.inspect(instance)
+              : inspectAgentTarget(instance.remoteInstance, { env: process.env })
+            : undefined;
+          const continuity = buildProviderContinuitySummary(instance, {
+            capabilities: instance.backend === 'cli'
+              ? ctx.pool.getCapabilities(instance.providerName, instance.instanceId)
+              : instance.backend === 'agent'
+                ? (ctx.agentBackend?.getCapabilities() || {
+                    resume: true,
+                    fork: true,
+                    permissions: false,
+                  })
+                : (ctx.apiBackend?.getCapabilities() || {
+                    resume: true,
+                    fork: true,
+                    permissions: true,
+                  }),
+            ...(agentRuntime ? { agentRuntime } : {}),
+          });
+          const latestProbeArtifact = await probeService.readLatestArtifact({
+            provider: instance.providerName,
+            instance: resolveProviderEvolutionArtifactInstance(instance),
+          });
+          const latestProbeArtifactSummary = latestProbeArtifact
+            ? summarizeProviderEvolutionArtifactForReadModel(latestProbeArtifact)
+            : null;
+          const latestCompatibilityEvidence = instance.backend === 'cli'
+            ? await compatibilityEvidence.readLatestArtifact({
+                provider: instance.providerName,
+                instance: instance.instanceId,
+              })
+            : null;
+          const modelCatalog = ctx.providerModelCatalog.inspectSummary(
+            instance.providerName,
+            `${instance.backend}/${instance.instanceId}`,
+          );
+          const metering = getRuntimeMeteringService(ctx).buildProviderTargetSnapshot({
+            provider: instance.providerName,
+            instance: instance.instanceId,
+            backend: instance.backend,
+          });
+          const latestAgentTargetEvidence = instance.backend === 'agent'
+            ? readLatestAgentTargetEvidence(ctx, instance)
+            : undefined;
+
+          return {
+            ...baseInstance,
+            ...(agentRuntime ? { agentRuntime } : {}),
+            ...(latestAgentTargetEvidence?.evidence
+              ? { latestSessionEvidence: latestAgentTargetEvidence.evidence }
+              : {}),
+            ...(agentRuntime?.family === 'bridge' && latestAgentTargetEvidence?.activity
+              ? { latestSessionActivity: latestAgentTargetEvidence.activity }
+              : {}),
+            continuity,
+            metering: metering.summary,
+            modelCatalog,
+            tooling: buildProviderToolingSummary(instance, { agentRuntime }),
+            eventCapabilities: buildProviderEventCapabilityTruth(
+              instance,
+              latestProbeArtifactSummary,
+            ),
+            install: instance.backend === 'cli' && instance.cliInstance
+              ? buildProviderInstallCatalogView(
+                instance.providerName as ProviderName,
+                instance.cliInstance.commandConfig.runtime,
+              )
+              : null,
+            compatibility: instance.backend === 'cli'
+              ? compatibility.getCachedSummary(
+                instance.providerName as ProviderName,
+                instance.instanceId,
+              ) || null
+              : null,
+            ...(latestCompatibilityEvidence ? {
+              compatibilityEvidence: {
+                latestArtifact: summarizeCompatibilityEvidenceArtifactForReadModel(
+                  latestCompatibilityEvidence,
+                ),
+              },
+            } : {}),
+            ...(latestProbeArtifactSummary ? {
+              providerEvolution: {
+                latestArtifact: latestProbeArtifactSummary,
+              },
+            } : {}),
+          };
+        } catch (error) {
+          return {
+            ...baseInstance,
+            inspectionError: error instanceof Error ? error.message : String(error),
+          };
+        }
       }));
 
       if (instances.length === 0) {

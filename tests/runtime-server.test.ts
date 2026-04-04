@@ -201,6 +201,7 @@ describe('runtime server', () => {
       expect(response.status).toBe(200);
       const html = await response.text();
       expect(html).toContain('Cats Runtime Dashboard');
+      expect(html).toContain('Session Dashboard');
       expect(html).toContain('session?.lastInputPreview');
       expect(html.indexOf('<option value="claude">claude</option>'))
         .toBeLessThan(html.indexOf('<option value="codex">codex</option>'));
@@ -312,7 +313,7 @@ describe('runtime server', () => {
       expect(response.status).toBe(200);
       const html = await response.text();
       expect(html).toContain('<title>Cats Runtime Playground</title>');
-      expect(html).toContain('Playground');
+      expect(html).toContain('Agent Playground');
       expect(html).not.toContain('Playground Shell');
       expect(html).toContain('CATS RUNTIME');
       expect(html).toContain('Set up agents to start');
@@ -460,7 +461,7 @@ describe('runtime server', () => {
         expect(html).toContain('apiKeyInput');
         expect(html).toContain("window.CatsUI && window.CatsUI.apiFetch");
         expect(html).toContain('validateApiKeyInput');
-        expect(html).toContain('Setup Workflow');
+        expect(html).toContain('Workflows');
         expect(html).toContain('Configured Targets');
         expect(html).toContain('Selection Summary');
         expect(html).toContain('setupRailProviders');
@@ -2987,6 +2988,29 @@ backends:
             compatibilityDefault: 'simple_tool_call',
           }),
         }),
+      }));
+    });
+  });
+
+  it('GET /providers/config degrades a single target inspection failure instead of returning 500', async () => {
+    await withRuntime({}, {}, async (runtime) => {
+      runtime.context.providerModelCatalog.inspectSummary = (() => {
+        throw new Error('model catalog unavailable');
+      }) as typeof runtime.context.providerModelCatalog.inspectSummary;
+
+      const response = await runtime.app.request('/providers/config');
+      expect(response.status).toBe(200);
+
+      const body = await response.json() as {
+        providers: Record<string, { instances: Array<Record<string, unknown>> }>;
+      };
+      const firstProvider = Object.values(body.providers)[0];
+      expect(firstProvider).toBeDefined();
+      expect(firstProvider.instances[0]).toEqual(expect.objectContaining({
+        id: expect.any(String),
+        target: expect.any(String),
+        backend: expect.any(String),
+        inspectionError: 'model catalog unavailable',
       }));
     });
   });

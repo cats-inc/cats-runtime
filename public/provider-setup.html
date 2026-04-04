@@ -108,10 +108,6 @@
   .setup-workflow-heading {
     min-height: 2rem;
   }
-  .setup-workflow-mode {
-    min-height: 2rem;
-    padding-inline: 0.75rem;
-  }
   .setup-workspace[hidden] {
     display: none !important;
   }
@@ -195,6 +191,9 @@
     font-size: 0.75rem;
     color: rgb(100 116 139);
   }
+  .setup-status-badge {
+    gap: 0.5rem;
+  }
 </style>
 </head>
 <body class="runtime-shell" data-runtime-surface="__CATS_RUNTIME_SURFACE__" data-bootstrap-required="__CATS_RUNTIME_BOOTSTRAP_REQUIRED__">
@@ -208,8 +207,8 @@
       <div id="setupWorkflowSection" class="runtime-sidebar-surface flex min-h-0 flex-col overflow-hidden">
         <div class="runtime-sidebar-section">
           <div class="setup-workflow-heading flex items-center justify-between gap-3">
-            <p class="runtime-sidebar-title">Setup Workflow</p>
-            <span id="setupWorkflowMode" class="runtime-auth-badge setup-workflow-mode" data-state="idle">Bootstrap</span>
+            <p class="runtime-sidebar-title">Workflows</p>
+            <span id="setupWorkflowMode" class="runtime-auth-badge" data-state="idle">Bootstrap</span>
           </div>
         </div>
 
@@ -298,7 +297,10 @@
           <div class="runtime-page-toolbar-row min-w-0 flex-1 justify-end text-sm">
             <div class="flex min-w-0 items-center gap-3 rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1.5">
               <span id="statusText" class="min-w-0 text-sm text-slate-400">Loading runtime setup state...</span>
-              <span id="statusBadge" class="status-badge status-badge-bootstrap">Bootstrap</span>
+              <span id="statusBadge" class="status-badge status-badge-bootstrap setup-status-badge">
+                <span id="statusBadgeLabel">Bootstrap</span>
+                <span id="statusBadgeDot" class="runtime-shell-health-dot !h-2 !w-2" data-state="idle"></span>
+              </span>
             </div>
           </div>
         </div>
@@ -329,11 +331,6 @@
                     <span class="setup-summary-label">Latest Snapshot</span>
                     <span id="providersMetricSnapshotValue" class="setup-summary-value">Not scanned</span>
                     <span id="providersMetricSnapshotDetail" class="setup-summary-secondary">Run Scan Providers to capture current readiness.</span>
-                  </div>
-                  <div class="setup-summary-panel">
-                    <span class="setup-summary-label">Ready</span>
-                    <span id="providersMetricReadyValue" class="setup-summary-value">--</span>
-                    <span id="providersMetricReadyDetail" class="setup-summary-secondary">Scan to measure local provider readiness.</span>
                   </div>
                   <div class="setup-summary-panel">
                     <span class="setup-summary-label">Need Attention</span>
@@ -520,6 +517,14 @@ function providerSelectionSummary() {
   };
 }
 
+function selectableProviderSummary() {
+  const selection = providerSelectionSummary();
+  return {
+    ...selection,
+    applyableCount: Array.isArray(scanData?.providers) ? selection.readySelected : selection.selectedCount,
+  };
+}
+
 function updateProvidersWorkspaceMetrics() {
   const hasScan = Array.isArray(scanData?.providers);
   const providerCount = hasScan
@@ -531,13 +536,13 @@ function updateProvidersWorkspaceMetrics() {
     ? scanData.providers.filter((provider) => provider.available).length
     : 0;
   const attentionCount = hasScan ? providerCount - readyCount : 0;
-  const selection = providerSelectionSummary();
+  const selection = selectableProviderSummary();
 
   const workspaceSummary = hasScan
     ? attentionCount > 0
-      ? `${pluralize(readyCount, 'provider')} ready and ${pluralize(attentionCount, 'provider')} still need attention.`
+      ? `${pluralize(readyCount, 'provider')} available and ${pluralize(attentionCount, 'provider')} still need attention.`
       : providerCount > 0
-        ? `All ${pluralize(providerCount, 'provider')} in the latest snapshot are ready to use.`
+        ? `${providerCount} ${providerCount === 1 ? 'provider is' : 'providers are'} available from the latest snapshot.`
         : 'No provider results were returned by the latest scan.'
     : providerCount > 0
       ? `Scan local providers to inspect ${pluralize(providerCount, 'provider')} before you apply config.`
@@ -553,11 +558,6 @@ function updateProvidersWorkspaceMetrics() {
       ? `${pluralize(providerCount, 'provider')} available to scan from the current universe.`
       : 'Waiting for setup-state data.';
 
-  document.getElementById('providersMetricReadyValue').textContent = hasScan ? String(readyCount) : '--';
-  document.getElementById('providersMetricReadyDetail').textContent = hasScan
-    ? 'Providers that passed the latest readiness probe.'
-    : 'Scan to capture readiness results.';
-
   document.getElementById('providersMetricAttentionValue').textContent = hasScan ? String(attentionCount) : '--';
   document.getElementById('providersMetricAttentionDetail').textContent = hasScan
     ? attentionCount > 0
@@ -568,7 +568,7 @@ function updateProvidersWorkspaceMetrics() {
   document.getElementById('providersMetricSelectedValue').textContent = String(selection.selectedCount);
   document.getElementById('providersMetricSelectedDetail').textContent = selection.selectedCount > 0
     ? hasScan
-      ? `${selection.readySelected} ready${selection.blockedSelected > 0 ? ` · ${selection.blockedSelected} need attention` : ''}`
+      ? `${selection.readySelected} available${selection.blockedSelected > 0 ? ` · ${selection.blockedSelected} need attention` : ''}`
       : 'Apply from the current provider list or scan first for readiness.'
     : 'Selection stays in this workspace.';
 
@@ -580,20 +580,20 @@ function updateProvidersWorkspaceMetrics() {
     ? 'Choose one or more providers from the list above to generate a runtime config.'
     : hasScan
       ? selection.blockedSelected > 0
-        ? `${selection.selectedCount} selected. ${selection.readySelected} ready to apply and ${selection.blockedSelected} still need attention.`
-        : `${selection.selectedCount} selected and ready to write into providers.yaml.`
+        ? `${selection.selectedCount} selected. ${selection.readySelected} available to apply and ${selection.blockedSelected} still need attention.`
+        : `${selection.selectedCount} selected and available to write into providers.yaml.`
       : `${selection.selectedCount} selected from the current provider universe. Scan first if you want readiness evidence before apply.`;
 
-  document.getElementById('providersRailBadge').textContent = hasScan ? `${readyCount} ready` : 'Not scanned';
+  document.getElementById('providersRailBadge').textContent = hasScan ? `${readyCount} available` : 'Not scanned';
   document.getElementById('providersRailSummary').textContent = hasScan
     ? attentionCount > 0
       ? `${attentionCount} provider(s) still need attention in the latest snapshot.`
-      : `Latest snapshot shows ${pluralize(providerCount, 'provider')} ready to use.`
+      : `Latest snapshot shows ${pluralize(providerCount, 'provider')} available to use.`
     : providerCount > 0
       ? `Review ${pluralize(providerCount, 'provider')} and decide what to apply.`
       : 'Load setup state to inspect local provider candidates.';
   document.getElementById('providersRailMeta').textContent = selection.selectedCount > 0
-    ? `${selection.selectedCount} selected${hasScan ? ` · ${selection.readySelected} ready` : ''}`
+    ? `${selection.selectedCount} selected${hasScan ? ` · ${selection.readySelected} available` : ''}`
     : 'Scan and selection both stay in the main workspace.';
 }
 
@@ -658,7 +658,7 @@ function updateConfiguredTargetsRail() {
         ? 'Inspect the active runtime target and its tooling surface.'
         : `Inspect ${providerCount} configured providers and their runtime-owned target behavior.`;
       meta.textContent = providerName && instanceTarget
-        ? `${providerName} · ${instanceTarget}`
+        ? 'Open the workspace to inspect the selected target in detail.'
         : `${instanceCount} configured target(s) available for inspection.`;
   }
 }
@@ -689,20 +689,26 @@ async function fetchState() {
 
 function updateStatusBar(data) {
   const badge = document.getElementById('statusBadge');
-  const text = document.getElementById('statusText');
+  const badgeLabel = document.getElementById('statusBadgeLabel');
+  const badgeDot = document.getElementById('statusBadgeDot');
   const workflowMode = document.getElementById('setupWorkflowMode');
+  const text = document.getElementById('statusText');
   if (data.bootstrapRequired) {
     badge.className = 'status-badge status-badge-bootstrap';
-    badge.textContent = 'Bootstrap';
-    text.textContent = 'Provider setup required before normal operation.';
+    badge.classList.add('setup-status-badge');
+    badgeLabel.textContent = 'Bootstrap';
+    badgeDot.dataset.state = 'idle';
     workflowMode.textContent = 'Bootstrap';
     workflowMode.dataset.state = 'idle';
+    text.textContent = 'Provider setup required before normal operation.';
   } else {
     badge.className = 'status-badge status-badge-ready';
-    badge.textContent = 'Ready';
-    text.textContent = 'Runtime is configured and ready.';
+    badge.classList.add('setup-status-badge');
+    badgeLabel.textContent = 'Ready';
+    badgeDot.dataset.state = 'active';
     workflowMode.textContent = 'Ready';
     workflowMode.dataset.state = 'active';
+    text.textContent = 'Runtime configuration is available for normal operation.';
   }
 }
 
@@ -1045,13 +1051,13 @@ async function refreshSetupCapabilityPreview() {
 }
 
 async function loadConfiguredTargetCapabilities() {
-  if (!validateApiKeyInput(document.getElementById('apiKeyInput').value)) return;
+  if (!validateApiKeyInput(document.getElementById('apiKeyInput').value)) return false;
 
   const providerSelect = document.getElementById('setupCapabilityProvider');
   const instanceSelect = document.getElementById('setupCapabilityInstance');
   const instanceGroup = document.getElementById('setupCapabilityInstanceGroup');
   if (!providerSelect || !instanceSelect || !instanceGroup) {
-    return;
+    return false;
   }
 
   setConfiguredTargetsWorkspaceState('loading', 'Loading configured target catalog.');
@@ -1070,11 +1076,18 @@ async function loadConfiguredTargetCapabilities() {
     const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
     const res = await fetchFn('/providers/config');
     if (!res.ok) {
-      const detail = await res.text().catch(() => '');
+      let detail = '';
+      try {
+        const payload = await res.json();
+        detail = typeof payload?.error === 'string' ? payload.error : JSON.stringify(payload);
+      } catch {
+        detail = await res.text().catch(() => '');
+      }
       throw new Error(detail || `HTTP ${res.status}`);
     }
     configuredTargetCatalog = await res.json();
     syncSetupCapabilitySelectors();
+    return true;
   } catch (error) {
     configuredTargetCatalog = null;
     const message = error instanceof Error ? error.message : String(error);
@@ -1095,6 +1108,7 @@ async function loadConfiguredTargetCapabilities() {
     instanceSelect.innerHTML = '<option value="">Unavailable</option>';
     instanceSelect.disabled = true;
     instanceGroup.style.display = 'none';
+    return false;
   }
 }
 
@@ -1142,8 +1156,8 @@ function renderScanResults(scan) {
       `<div class="mt-2 text-xs text-amber-300">${escapeHtml(r.summary)}${r.command ? ' <code class="rounded bg-slate-950 px-1.5 py-0.5 text-[11px] text-slate-300">' + escapeHtml(r.command) + '</code>' : ''}</div>`
     ).join('');
     return `
-      <label class="flex cursor-pointer items-start gap-4 border-b border-slate-800 px-4 py-4 last:border-b-0 hover:bg-slate-900/40">
-        <input type="checkbox" value="${escapeHtml(p.provider)}" class="provider-check mt-1 h-4 w-4 rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-blue-500" ${p.available ? 'checked' : ''} />
+      <label class="flex items-start gap-4 border-b border-slate-800 px-4 py-4 last:border-b-0 ${p.available ? 'cursor-pointer hover:bg-slate-900/40' : 'cursor-not-allowed opacity-60'}">
+        <input type="checkbox" value="${escapeHtml(p.provider)}" class="provider-check mt-1 h-4 w-4 rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-blue-500" ${p.available ? '' : 'disabled'} />
         <div class="min-w-0 flex-1">
           <div class="text-sm font-semibold text-slate-100">${escapeHtml(p.family)}</div>
           <div class="mt-1 text-xs text-slate-500">
@@ -1164,8 +1178,8 @@ function bindCheckboxes() {
   const checks = document.querySelectorAll('.provider-check');
   const applyBtn = document.getElementById('applyBtn');
   const update = () => {
-    const anyChecked = Array.from(checks).some((checkbox) => checkbox.checked);
-    applyBtn.disabled = !anyChecked;
+    const selection = selectableProviderSummary();
+    applyBtn.disabled = selection.applyableCount === 0;
     updateProvidersWorkspaceMetrics();
   };
   checks.forEach((checkbox) => checkbox.addEventListener('change', update));
@@ -1209,9 +1223,18 @@ async function runScan() {
 
 async function applyConfig() {
   if (!validateApiKeyInput(document.getElementById('apiKeyInput').value)) return;
-  const checks = document.querySelectorAll('.provider-check:checked');
-  const providers = Array.from(checks).map(c => c.value);
-  if (!providers.length) return;
+  const selection = selectableProviderSummary();
+  const providers = Array.isArray(scanData?.providers)
+    ? selection.selectedProviders.filter((provider) =>
+        scanData.providers.some((entry) => entry.provider === provider && entry.available),
+      )
+    : selection.selectedProviders;
+  if (!providers.length) {
+    if (selection.selectedCount > 0) {
+      showResult('Unavailable Selection', 'Only available providers can be applied. Run Scan Providers and select a ready provider.', true);
+    }
+    return;
+  }
 
   const applyBtn = document.getElementById('applyBtn');
   applyBtn.disabled = true;
@@ -1238,9 +1261,9 @@ async function applyConfig() {
       const stateRes = await fetchFn('/setup-state');
       if (!stateRes.ok) throw new Error(`HTTP ${stateRes.status}`);
       const stateData = await stateRes.json();
-      await loadConfiguredTargetCapabilities();
       applySetupStateReadModel(stateData);
-      setActiveSetupWorkspace('configured-targets');
+      const configuredTargetsLoaded = await loadConfiguredTargetCapabilities();
+      setActiveSetupWorkspace(configuredTargetsLoaded ? 'configured-targets' : 'providers');
     } else {
       showResult('Error', data.error || 'Failed to apply configuration.', true);
     }
