@@ -289,6 +289,60 @@ describe('file-discovered session deletion', () => {
     expect(discovered.some((item) => item.providerSessionId === 'claude-runtime-delete')).toBe(false);
   });
 
+  it('uses registry-owned provider discovery locators before falling back to provider scans', async () => {
+    const providerSourcePath = join(
+      tmpdir(),
+      `claude-runtime-delete-cached-${Date.now()}.jsonl`,
+    );
+    writeFileSync(
+      providerSourcePath,
+      JSON.stringify({ type: 'user', message: { content: 'Delete me' }, cwd: 'C:/repo' }) + '\n',
+    );
+
+    const session = registry.create({
+      id: 'runtime-claude-delete-cached',
+      providerName: 'claude',
+      cwd: 'C:/repo',
+    });
+
+    const runtimeSourcePath = join(sessionBaseDir, 'history', `${session.id}.jsonl`);
+    mkdirSync(join(sessionBaseDir, 'history'), { recursive: true });
+    writeFileSync(
+      runtimeSourcePath,
+      JSON.stringify({ type: 'user', message: { content: 'Delete me' }, cwd: 'C:/repo' }) + '\n',
+    );
+    registry.setSourcePath(session.id, runtimeSourcePath);
+
+    const merged = registry.upsertDiscovered('claude-runtime-delete-cached', {
+      providerName: 'claude',
+      cwd: 'C:/repo',
+      sourcePath: providerSourcePath,
+    });
+    expect(merged?.id).toBe(session.id);
+    registry.updateStatus(session.id, 'closed');
+
+    const res = await app.request(`/sessions/${session.id}`, {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.status).toBe('deleted');
+    expect(body.cleanup).toEqual(expect.objectContaining({
+      providerDiscoveryCleared: true,
+      providerDiscoveryDeleteMode: 'full',
+      providerDiscoveryHydration: {
+        status: 'resolved_from_registry_cache',
+        attempted: true,
+        sourcePathPresentBeforeDelete: false,
+        sourcePathPresentAfterHydration: true,
+      },
+    }));
+    expect(registry.get(session.id)).toBeUndefined();
+    expect(existsSync(runtimeSourcePath)).toBe(false);
+    expect(existsSync(providerSourcePath)).toBe(false);
+  });
+
   it('surfaces registry-only delete diagnostics when provider discovery hydration cannot resolve a source path', async () => {
     const session = registry.create({
       id: 'runtime-claude-delete-unresolved',

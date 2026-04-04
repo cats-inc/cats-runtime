@@ -1561,21 +1561,15 @@ remaining work is follow-through and publication discipline:
 ### OPT-16: Runtime Session Delete Durability and Diagnostics
 
 **Priority**: P1
-**Status**: Planned
+**Status**: Completed
 
 #### Problem
 
 `cats-runtime` now deletes resurfacing file-backed sessions correctly by
 hydrating missing provider transcript paths before the delete pipeline runs.
-That closes the immediate correctness gap, but two follow-through items still
-remain:
-
-- delete can still fall back to provider-directory scanning when
-  `providerSourcePath` is missing, which is acceptable for now but heavier than
-  a direct lookup
-- when that fallback scan cannot resolve a provider transcript path, the
-  runtime still lacks a first-class warning/diagnostic trail that explains why
-  a registry delete could not fully clear provider-backed session artifacts
+That closes the immediate correctness gap, but the runtime still needed to stop
+treating per-delete provider scans as the primary hydration path and it needed
+to make partial cleanup outcomes explicit for hosts.
 
 #### Follow-through Direction
 
@@ -1584,9 +1578,8 @@ remain:
 - preserve those diagnostics in session inspection and delete responses so
   dashboard/hosts can distinguish full provider cleanup from registry-only
   cleanup attempts
-- replace the current per-delete full directory scan with a more direct
-  provider-session-id to source-path lookup/cache for file-backed providers
-  once the surrounding discovery data flow is stable
+- keep a runtime-owned provider-session-id to source-path locator cache for
+  file-backed providers, and consult it before falling back to provider scans
 
 #### Current Implementation Status
 
@@ -1597,13 +1590,17 @@ remain:
 - the same cleanup contract now also exposes `providerDiscoveryDeleteMode:
   "full" | "registry_only"` so host/operator flows can distinguish external
   provider-artifact cleanup from registry-only delete attempts
-- the heavier per-delete fallback scan still remains in place for now; only the
-  diagnostics slice is landed so far
+- `SessionRegistry` now persists a runtime-owned provider transcript locator
+  sidecar keyed by provider target + provider session id, so delete can resolve
+  known provider artifacts without paying the full scan path first
+- the heavier provider scan remains only as a conservative fallback when the
+  locator cache is missing or stale, rather than the primary delete hydration
+  path
 
 #### Deferred Scope
 
-- do not reopen the current delete correctness fix just to remove the fallback
-  scan immediately
+- do not reopen the current delete correctness fix just to remove the
+  conservative fallback scan entirely
 - do not move product-owned delete policy or confirmation UX into runtime
 
 #### Affected Areas

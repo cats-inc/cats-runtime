@@ -498,6 +498,47 @@ describe('SessionRegistry', () => {
     );
   });
 
+  it('persists provider discovery source paths for runtime-managed history sessions', () => {
+    const persistDir = mkdtempSync(join(tmpdir(), 'session-registry-provider-discovery-test-'));
+    const runtimeSessionBaseDir = join(persistDir, 'runtime-sessions');
+    mkdirSync(runtimeSessionBaseDir, { recursive: true });
+
+    try {
+      registry = new SessionRegistry(persistDir, runtimeSessionBaseDir);
+
+      const session = registry.create({
+        providerName: 'claude',
+        cwd: '/repo',
+      });
+      registry.setSourcePath(
+        session.id,
+        join(runtimeSessionBaseDir, 'history', 'claude-runtime.jsonl'),
+      );
+
+      const merged = registry.upsertDiscovered('claude-cached', {
+        providerName: 'claude',
+        cwd: '/repo',
+        sourcePath: '/tmp/provider-discovery/claude-cached.jsonl',
+      });
+
+      expect(merged?.id).toBe(session.id);
+      expect(registry.get(session.id)?.providerSourcePath).toBeUndefined();
+      expect(registry.getProviderDiscoverySourcePath('claude', 'claude-cached')).toBe(
+        '/tmp/provider-discovery/claude-cached.jsonl',
+      );
+
+      registry.flush();
+
+      const reloaded = new SessionRegistry(persistDir, runtimeSessionBaseDir);
+      expect(reloaded.get(session.id)?.providerSourcePath).toBeUndefined();
+      expect(reloaded.getProviderDiscoverySourcePath('claude', 'claude-cached')).toBe(
+        '/tmp/provider-discovery/claude-cached.jsonl',
+      );
+    } finally {
+      rmSync(persistDir, { recursive: true, force: true });
+    }
+  });
+
   it('normalizes legacy default instance ids to the configured default instance on load', () => {
     const persistDir = mkdtempSync(join(tmpdir(), 'session-registry-load-test-'));
     const persistPath = join(persistDir, 'sessions.json');

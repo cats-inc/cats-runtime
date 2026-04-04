@@ -717,7 +717,9 @@ path is intentionally narrow:
     rehydrates persisted workspace/skill state and auto-settles retained
     reset/delete follow-through once cleanup succeeds; background worktree
     maintenance reuses the same cleanup path for conservative TTL expiry of
-    preserved retained sessions
+    preserved retained sessions, and file-backed delete hydration now prefers a
+    registry-owned provider transcript locator cache before falling back to a
+    provider scan
 19. `POST /sessions/{id}/compact` reuses the same runtime-owned maintenance
     read model as a public compaction route, returning machine-readable
     readiness plus sanitized hook-payload persistence and compacting managed

@@ -131,7 +131,9 @@ type PersistedSessionRecord = SessionInfo & {
 export class SessionRegistry {
   private sessions = new Map<string, SessionInfo>();
   private pendingDiscovered = new Map<string, DiscoveredSessionData>();
+  private providerDiscoverySourcePaths = new Map<string, string>();
   private persistPath: string | null = null;
+  private providerDiscoveryPersistPath: string | null = null;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
@@ -143,6 +145,7 @@ export class SessionRegistry {
     if (dataDir) {
       mkdirSync(dataDir, { recursive: true });
       this.persistPath = join(dataDir, 'sessions.json');
+      this.providerDiscoveryPersistPath = join(dataDir, 'provider-discovery-source-paths.json');
       this.load();
     }
   }
@@ -234,6 +237,15 @@ export class SessionRegistry {
 
         this.sessions.set(s.id, s);
       }
+      if (this.loadProviderDiscoverySourcePaths()) {
+        migrated = true;
+      }
+      if (this.seedProviderDiscoverySourcePathsFromSessions()) {
+        migrated = true;
+      }
+      if (this.pruneProviderDiscoverySourcePaths()) {
+        migrated = true;
+      }
       if (migrated) {
         this.saveToDisk();
       }
@@ -260,6 +272,14 @@ export class SessionRegistry {
     try {
       const arr = Array.from(this.sessions.values());
       writeFileSync(this.persistPath, JSON.stringify(arr, null, 2));
+      if (this.providerDiscoveryPersistPath) {
+        const entries = Array.from(this.providerDiscoverySourcePaths.entries())
+          .sort(([left], [right]) => left.localeCompare(right));
+        writeFileSync(
+          this.providerDiscoveryPersistPath,
+          JSON.stringify(Object.fromEntries(entries), null, 2),
+        );
+      }
     } catch (err) {
       if (isMissingPersistencePathError(err)) {
         return;
@@ -380,7 +400,16 @@ export class SessionRegistry {
   setProviderSessionId(id: string, providerSessionId: string): boolean {
     const session = this.sessions.get(id);
     if (!session) return false;
+    const previousProviderSessionId = session.providerSessionId;
     session.providerSessionId = providerSessionId;
+    if (previousProviderSessionId && previousProviderSessionId !== providerSessionId) {
+      this.forgetProviderDiscoverySourcePath(
+        session.providerName,
+        previousProviderSessionId,
+        session.providerBackend,
+        session.providerInstanceId,
+      );
+    }
     this.applyPendingDiscovered(session, providerSessionId);
     session.updatedAt = new Date().toISOString();
     this.scheduleSave();
@@ -395,6 +424,7 @@ export class SessionRegistry {
   ): boolean {
     const session = this.sessions.get(id);
     if (!session) return false;
+    this.forgetProviderDiscoverySourcePathForSession(session);
     session.providerSessionId = undefined;
     if (options.clearProviderSourcePath) {
       session.providerSourcePath = undefined;
@@ -663,7 +693,10 @@ export class SessionRegistry {
 
   /** Remove a session from the registry (does not touch files). */
   unregister(id: string): boolean {
-    if (!this.sessions.delete(id)) return false;
+    const session = this.sessions.get(id);
+    if (!session) return false;
+    this.forgetProviderDiscoverySourcePathForSession(session);
+    this.sessions.delete(id);
     this.scheduleSave();
     return true;
   }
@@ -701,6 +734,7 @@ export class SessionRegistry {
         continue;
       }
 
+      this.forgetProviderDiscoverySourcePathForSession(session);
       this.sessions.delete(id);
       removed++;
     }
@@ -718,6 +752,7 @@ export class SessionRegistry {
     if (!session) return { deleted: false, fileDeleted: false };
 
     const { fileDeleted } = this.deleteTranscripts(id);
+    this.forgetProviderDiscoverySourcePathForSession(session);
     this.sessions.delete(id);
     this.scheduleSave();
     return { deleted: true, fileDeleted };
@@ -824,8 +859,30 @@ export class SessionRegistry {
     session.workspaceIsolation = toLegacyWorkspaceIsolationState(session.workspace);
 
     this.sessions.set(id, session);
+    this.rememberProviderDiscoverySourcePath(
+      session.providerName,
+      providerSessionId,
+      mergedData.sourcePath,
+      session.providerBackend,
+      session.providerInstanceId,
+    );
     this.scheduleSave();
     return session;
+  }
+
+  getProviderDiscoverySourcePath(
+    providerName: string,
+    providerSessionId?: string,
+    providerBackend?: string,
+    providerInstanceId?: string,
+  ): string | undefined {
+    const key = this.providerDiscoverySourcePathKey(
+      providerName,
+      providerSessionId,
+      providerBackend,
+      providerInstanceId,
+    );
+    return key ? this.providerDiscoverySourcePaths.get(key) : undefined;
   }
 
   private applyPendingDiscovered(session: SessionInfo, providerSessionId: string): void {
@@ -865,6 +922,7 @@ export class SessionRegistry {
     data: DiscoveredSessionData,
     scheduleSave = true,
   ): SessionInfo {
+    const previousProviderSessionId = session.providerSessionId;
     session.providerSessionId = providerSessionId;
     session.providerBackend = this.normalizeProviderBackend(
       session.providerName,
@@ -874,6 +932,14 @@ export class SessionRegistry {
       session.providerName,
       data.providerInstanceId ?? session.providerInstanceId,
     );
+    if (previousProviderSessionId && previousProviderSessionId !== providerSessionId) {
+      this.forgetProviderDiscoverySourcePath(
+        session.providerName,
+        previousProviderSessionId,
+        session.providerBackend,
+        session.providerInstanceId,
+      );
+    }
 
     // Only update metadata, never overwrite status or runtime-owned cwd
     if (!session.cwd || session.origin !== 'runtime') {
@@ -911,6 +977,13 @@ export class SessionRegistry {
     if (data.sourcePath && (!hasRuntimeHistory || session.providerName === 'pi')) {
       session.providerSourcePath = data.sourcePath;
     }
+    this.rememberProviderDiscoverySourcePath(
+      session.providerName,
+      providerSessionId,
+      data.sourcePath ?? session.providerSourcePath,
+      session.providerBackend,
+      session.providerInstanceId,
+    );
     if (data.sourcePath && !session.sourcePath) session.sourcePath = data.sourcePath;
     if (data.messageCount != null) session.messageCount = data.messageCount;
     if (data.lastActivity) session.lastActivity = data.lastActivity;
@@ -1015,6 +1088,77 @@ export class SessionRegistry {
     }
   }
 
+  private loadProviderDiscoverySourcePaths(): boolean {
+    if (!this.providerDiscoveryPersistPath) {
+      return false;
+    }
+
+    try {
+      const raw = readFileSync(this.providerDiscoveryPersistPath, 'utf-8');
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      let migrated = false;
+      this.providerDiscoverySourcePaths.clear();
+      for (const [key, value] of Object.entries(parsed)) {
+        if (typeof value === 'string' && value.length > 0) {
+          this.providerDiscoverySourcePaths.set(key, value);
+        } else {
+          migrated = true;
+        }
+      }
+      return migrated;
+    } catch {
+      return false;
+    }
+  }
+
+  private seedProviderDiscoverySourcePathsFromSessions(): boolean {
+    let migrated = false;
+    for (const session of this.sessions.values()) {
+      if (!session.providerSessionId) {
+        continue;
+      }
+      const sourcePath = this.selectPersistableProviderDiscoverySourcePath(session);
+      const key = this.providerDiscoverySourcePathKey(
+        session.providerName,
+        session.providerSessionId,
+        session.providerBackend,
+        session.providerInstanceId,
+      );
+      if (!sourcePath || !key || this.providerDiscoverySourcePaths.get(key) === sourcePath) {
+        continue;
+      }
+      this.providerDiscoverySourcePaths.set(key, sourcePath);
+      migrated = true;
+    }
+    return migrated;
+  }
+
+  private pruneProviderDiscoverySourcePaths(): boolean {
+    const validKeys = new Set<string>();
+    for (const session of this.sessions.values()) {
+      const key = this.providerDiscoverySourcePathKey(
+        session.providerName,
+        session.providerSessionId,
+        session.providerBackend,
+        session.providerInstanceId,
+      );
+      if (key) {
+        validKeys.add(key);
+      }
+    }
+
+    let migrated = false;
+    for (const key of Array.from(this.providerDiscoverySourcePaths.keys())) {
+      if (validKeys.has(key)) {
+        continue;
+      }
+      this.providerDiscoverySourcePaths.delete(key);
+      migrated = true;
+    }
+
+    return migrated;
+  }
+
   private normalizeProviderInstanceId(providerName: string, providerInstanceId?: string): string | undefined {
     const defaultInstanceId = this.providerDefaultInstances[providerName];
     if (providerInstanceId === 'default') {
@@ -1072,6 +1216,90 @@ export class SessionRegistry {
     return `${backend}:${instanceId}:${providerSessionId}`;
   }
 
+  private providerDiscoverySourcePathKey(
+    providerName: string,
+    providerSessionId?: string,
+    providerBackend?: string,
+    providerInstanceId?: string,
+  ): string | null {
+    if (!providerSessionId) {
+      return null;
+    }
+
+    return this.discoveredKey(
+      providerName,
+      providerSessionId,
+      providerBackend,
+      providerInstanceId,
+    );
+  }
+
+  private rememberProviderDiscoverySourcePath(
+    providerName: string,
+    providerSessionId: string,
+    sourcePath: string | undefined,
+    providerBackend?: string,
+    providerInstanceId?: string,
+  ): void {
+    const key = this.providerDiscoverySourcePathKey(
+      providerName,
+      providerSessionId,
+      providerBackend,
+      providerInstanceId,
+    );
+    if (!key || !this.isPersistableProviderDiscoverySourcePath(sourcePath)) {
+      return;
+    }
+    this.providerDiscoverySourcePaths.set(key, sourcePath);
+  }
+
+  private forgetProviderDiscoverySourcePath(
+    providerName: string,
+    providerSessionId?: string,
+    providerBackend?: string,
+    providerInstanceId?: string,
+  ): void {
+    const key = this.providerDiscoverySourcePathKey(
+      providerName,
+      providerSessionId,
+      providerBackend,
+      providerInstanceId,
+    );
+    if (!key) {
+      return;
+    }
+    this.providerDiscoverySourcePaths.delete(key);
+  }
+
+  private forgetProviderDiscoverySourcePathForSession(session: SessionInfo): void {
+    this.forgetProviderDiscoverySourcePath(
+      session.providerName,
+      session.providerSessionId,
+      session.providerBackend,
+      session.providerInstanceId,
+    );
+  }
+
+  private selectPersistableProviderDiscoverySourcePath(
+    session: SessionInfo,
+  ): string | undefined {
+    for (const sourcePath of [session.providerSourcePath, session.sourcePath]) {
+      if (this.isPersistableProviderDiscoverySourcePath(sourcePath)) {
+        return sourcePath;
+      }
+    }
+    return undefined;
+  }
+
+  private isPersistableProviderDiscoverySourcePath(
+    sourcePath: string | undefined,
+  ): sourcePath is string {
+    return Boolean(
+      sourcePath
+      && (!this.sessionBaseDir || !sourcePath.startsWith(this.sessionBaseDir))
+    );
+  }
+
   private mergeLoadedDuplicate(target: SessionInfo, incoming: SessionInfo): void {
     target.providerBackend = this.normalizeProviderBackend(
       target.providerName,
@@ -1126,6 +1354,15 @@ export class SessionRegistry {
     }
     if (!target.providerState && incoming.providerState) {
       target.providerState = cloneProviderState(incoming.providerState);
+    }
+    if (target.providerSessionId || incoming.providerSessionId) {
+      this.rememberProviderDiscoverySourcePath(
+        target.providerName,
+        target.providerSessionId ?? incoming.providerSessionId ?? '',
+        target.providerSourcePath ?? incoming.providerSourcePath ?? target.sourcePath ?? incoming.sourcePath,
+        target.providerBackend ?? incoming.providerBackend,
+        target.providerInstanceId ?? incoming.providerInstanceId,
+      );
     }
     target.messageCount = Math.max(target.messageCount, incoming.messageCount);
     target.totalInputTokens = Math.max(target.totalInputTokens, incoming.totalInputTokens);

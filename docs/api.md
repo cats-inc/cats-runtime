@@ -3296,8 +3296,9 @@ surfaces:
   whether provider-side transcript/index artifacts were actually staged for
   cleanup
 - `providerDiscoveryHydration` describing whether delete reused an existing
-  `providerSourcePath`, resolved one from a fallback scan, failed to resolve
-  one, or could not complete the scan at all
+  `providerSourcePath`, resolved one from a registry-owned provider transcript
+  locator, resolved one from a fallback scan, failed to resolve one, or could
+  not complete the scan at all
 
 `GET /providers/config` returns the configured provider topology for dashboards
 or other clients that need to offer provider-instance selection. Each instance

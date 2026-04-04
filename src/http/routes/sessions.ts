@@ -2085,6 +2085,22 @@ async function hydrateProviderDiscoverySourcePathForDelete(
     };
   }
 
+  const cachedSourcePath = ctx.registry.getProviderDiscoverySourcePath(
+    session.providerName,
+    session.providerSessionId,
+    session.providerBackend,
+    session.providerInstanceId,
+  );
+  if (cachedSourcePath && existsSync(cachedSourcePath)) {
+    session.providerSourcePath = cachedSourcePath;
+    return {
+      status: 'resolved_from_registry_cache',
+      attempted: true,
+      sourcePathPresentBeforeDelete,
+      sourcePathPresentAfterHydration: true,
+    };
+  }
+
   const discovered = await scanProviderDiscoveryArtifactsForDelete(ctx, session);
   if (discovered.scanFailed) {
     return {
