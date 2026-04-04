@@ -1227,6 +1227,7 @@ let createModelCatalogRequestId = 0;
 const CUSTOM_CREATE_MODEL_VALUE = '__custom_legacy_model__';
 let sessionScanInFlight = false;
 let currentSessionInstructions = null;
+let currentSessionInstructionsAvailable = false;
 const sessionDetailUiState = {
   expanded: false,
   instructionsOpen: false,
@@ -2254,10 +2255,10 @@ function renderSessionDetails(session) {
             <dd>${formatSessionDetailValue(warningText)}</dd>
           </dl>
         </div>
-        <details class="session-detail-block" data-session-detail-block="instructions" ${uiState.instructionsOpen ? 'open' : ''}>
+        ${currentSessionInstructionsAvailable ? `<details class="session-detail-block" data-session-detail-block="instructions" ${uiState.instructionsOpen ? 'open' : ''}>
           <summary>Effective Session Instructions</summary>
           ${formatSessionInstructions(currentSessionInstructions)}
-        </details>
+        </details>` : ''}
         <details class="session-detail-block" data-session-detail-block="selection" ${uiState.selectionOpen ? 'open' : ''}>
           <summary>Requested Model Selection JSON</summary>
           ${formatSessionDetailJson(session.modelSelection)}
@@ -2665,6 +2666,7 @@ function clearCurrentSessionSelection() {
   disconnectObserver();
   currentSessionId = null;
   currentSessionInstructions = null;
+  currentSessionInstructionsAvailable = false;
   document.getElementById('chatContainer').style.display = 'none';
   document.getElementById('chatPlaceholder').style.display = '';
   renderSessionInsights(null);
@@ -3056,11 +3058,13 @@ function disconnectObserver() {
 
 async function loadHistory(id) {
   currentSessionInstructions = null;
+  currentSessionInstructionsAvailable = false;
   try {
     const res = await fetch(`${API_BASE}/sessions/${id}/history`, { headers: headers() });
     if (!res.ok) return;
     const data = await res.json();
-    currentSessionInstructions = 'instructions' in data ? data.instructions : null;
+    currentSessionInstructionsAvailable = 'instructions' in data;
+    currentSessionInstructions = currentSessionInstructionsAvailable ? data.instructions : null;
     for (const msg of data.messages || []) {
       if (msg.role === 'user') addUserMsg(msg.text);
       else if (msg.role === 'assistant') addAssistantMsg(msg.text);
