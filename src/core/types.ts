@@ -1273,6 +1273,13 @@ export interface RuntimeSessionLifecycleCleanupSummary {
   worktreeMergedPaths?: number;
   managedTranscriptDeleted?: boolean;
   providerDiscoveryCleared?: boolean;
+  providerDiscoveryDeleteMode?: 'full' | 'registry_only';
+  providerDiscoveryHydration?: {
+    status: 'skipped_existing_path' | 'resolved_from_scan' | 'unresolved' | 'scan_failed';
+    attempted: boolean;
+    sourcePathPresentBeforeDelete: boolean;
+    sourcePathPresentAfterHydration: boolean;
+  };
   registryDropped?: boolean;
   runStateCleared?: boolean;
 }

@@ -3268,7 +3268,8 @@ Delete responses also include:
 
 - `cleanup`: machine-readable cleanup results (`workerDetached`,
   `browserSessionsCleared`, `managedTranscriptDeleted`,
-  `providerDiscoveryCleared`, `workspaceCleaned`, `registryDropped`, etc.)
+  `providerDiscoveryCleared`, `providerDiscoveryDeleteMode`,
+  `providerDiscoveryHydration`, `workspaceCleaned`, `registryDropped`, etc.)
 - `maintenance`: the terminal lifecycle marker for the delete attempt, with
   `status: "completed"` or `status: "retained"`
 
@@ -3287,6 +3288,16 @@ For delete responses, top-level `cleanup` is a flat alias of
 `maintenance.cleanup` so transport-facing consumers can read terminal cleanup
 results without having to unwrap the full lifecycle object after the session
 record itself has been removed.
+
+When a file-backed/discovered provider session is deleted, `cleanup` now also
+surfaces:
+
+- `providerDiscoveryDeleteMode: "full" | "registry_only"` so hosts can tell
+  whether provider-side transcript/index artifacts were actually staged for
+  cleanup
+- `providerDiscoveryHydration` describing whether delete reused an existing
+  `providerSourcePath`, resolved one from a fallback scan, failed to resolve
+  one, or could not complete the scan at all
 
 `GET /providers/config` returns the configured provider topology for dashboards
 or other clients that need to offer provider-instance selection. Each instance

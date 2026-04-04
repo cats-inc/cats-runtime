@@ -631,6 +631,8 @@ function buildDeleteCleanupSummary(input: {
   worktreeMergedPaths?: number;
   managedTranscriptDeleted: boolean;
   providerDiscoveryCleared: boolean;
+  providerDiscoveryDeleteMode?: RuntimeSessionLifecycleCleanupSummary['providerDiscoveryDeleteMode'];
+  providerDiscoveryHydration?: RuntimeSessionLifecycleCleanupSummary['providerDiscoveryHydration'];
   registryDropped: boolean;
 }): RuntimeSessionLifecycleCleanupSummary {
   return {
@@ -645,6 +647,12 @@ function buildDeleteCleanupSummary(input: {
     ...(input.worktreeMergedPaths !== undefined ? { worktreeMergedPaths: input.worktreeMergedPaths } : {}),
     managedTranscriptDeleted: input.managedTranscriptDeleted,
     providerDiscoveryCleared: input.providerDiscoveryCleared,
+    ...(input.providerDiscoveryDeleteMode
+      ? { providerDiscoveryDeleteMode: input.providerDiscoveryDeleteMode }
+      : {}),
+    ...(input.providerDiscoveryHydration
+      ? { providerDiscoveryHydration: input.providerDiscoveryHydration }
+      : {}),
     registryDropped: input.registryDropped,
   };
 }
@@ -1445,13 +1453,15 @@ async function finalizeDeleteAfterWorkspaceCleanup(
   const hasNativeSessionState = tracksNativeSessionState(session);
   const hasProviderDiscoveryState = tracksProviderDiscoveryState(session);
   const workerDetached = !runtime.isAttached(id);
-
-  if (hasProviderDiscoveryState && !session.providerSourcePath) {
-    await hydrateProviderDiscoverySourcePathForDelete(ctx, session);
-  }
+  const providerDiscoveryHydration = hasProviderDiscoveryState
+    ? await hydrateProviderDiscoverySourcePathForDelete(ctx, session)
+    : undefined;
 
   const preparedManagedTranscripts = ctx.registry.prepareManagedTranscriptDeletion(id);
   const preparedProviderDiscovery = prepareProviderDiscoveryDeletion(ctx, session);
+  const providerDiscoveryDeleteMode = hasProviderDiscoveryState
+    ? (preparedProviderDiscovery.hadFiles ? 'full' : 'registry_only')
+    : undefined;
   const hadTranscript = preparedManagedTranscripts.hadFiles
     || preparedProviderDiscovery.hadFiles
     || hasNativeSessionState
@@ -1475,6 +1485,8 @@ async function finalizeDeleteAfterWorkspaceCleanup(
         ...(input.worktreeMergedPaths !== undefined
           ? { worktreeMergedPaths: input.worktreeMergedPaths }
           : {}),
+        ...(providerDiscoveryDeleteMode ? { providerDiscoveryDeleteMode } : {}),
+        ...(providerDiscoveryHydration ? { providerDiscoveryHydration } : {}),
       },
     });
     return {
@@ -1532,6 +1544,8 @@ async function finalizeDeleteAfterWorkspaceCleanup(
         ...(input.worktreeMergedPaths !== undefined
           ? { worktreeMergedPaths: input.worktreeMergedPaths }
           : {}),
+        ...(providerDiscoveryDeleteMode ? { providerDiscoveryDeleteMode } : {}),
+        ...(providerDiscoveryHydration ? { providerDiscoveryHydration } : {}),
       },
     });
     return {
@@ -1587,7 +1601,9 @@ async function finalizeDeleteAfterWorkspaceCleanup(
         ? { worktreeMergedPaths: input.worktreeMergedPaths }
         : {}),
       managedTranscriptDeleted: managedDeletion.fileDeleted,
-      providerDiscoveryCleared: providerDeletion.fileDeleted || providerDiscoveryDeleted,
+      providerDiscoveryCleared: providerDeletion.fileDeleted,
+      ...(providerDiscoveryDeleteMode ? { providerDiscoveryDeleteMode } : {}),
+      ...(providerDiscoveryHydration ? { providerDiscoveryHydration } : {}),
       registryDropped: true,
     }),
     clearExecutionState: true,
@@ -2058,51 +2074,108 @@ function findMatchingProviderDiscoverySourcePath(
 async function hydrateProviderDiscoverySourcePathForDelete(
   ctx: AppContext,
   session: SessionInfo,
-): Promise<void> {
+): Promise<NonNullable<RuntimeSessionLifecycleCleanupSummary['providerDiscoveryHydration']>> {
+  const sourcePathPresentBeforeDelete = Boolean(session.providerSourcePath);
+  if (sourcePathPresentBeforeDelete) {
+    return {
+      status: 'skipped_existing_path',
+      attempted: false,
+      sourcePathPresentBeforeDelete,
+      sourcePathPresentAfterHydration: true,
+    };
+  }
+
   const discovered = await scanProviderDiscoveryArtifactsForDelete(ctx, session);
-  const sourcePath = findMatchingProviderDiscoverySourcePath(session, discovered);
+  if (discovered.scanFailed) {
+    return {
+      status: 'scan_failed',
+      attempted: true,
+      sourcePathPresentBeforeDelete,
+      sourcePathPresentAfterHydration: false,
+    };
+  }
+
+  const sourcePath = findMatchingProviderDiscoverySourcePath(session, discovered.items);
   if (!sourcePath) {
-    return;
+    return {
+      status: 'unresolved',
+      attempted: true,
+      sourcePathPresentBeforeDelete,
+      sourcePathPresentAfterHydration: false,
+    };
   }
 
   session.providerSourcePath = sourcePath;
+  return {
+    status: 'resolved_from_scan',
+    attempted: true,
+    sourcePathPresentBeforeDelete,
+    sourcePathPresentAfterHydration: true,
+  };
 }
 
 async function scanProviderDiscoveryArtifactsForDelete(
   ctx: AppContext,
   session: SessionInfo,
-): Promise<DiscoveredSessionArtifact[]> {
+): Promise<{ items: DiscoveredSessionArtifact[]; scanFailed: boolean }> {
   try {
     switch (session.providerName) {
       case 'auggie': {
         const sessionsService = getAuggieSessions(ctx, session.providerInstanceId);
-        return session.cwd
-          ? await sessionsService.listSessions(session.cwd)
-          : await sessionsService.listAllSessions();
+        return {
+          items: session.cwd
+            ? await sessionsService.listSessions(session.cwd)
+            : await sessionsService.listAllSessions(),
+          scanFailed: false,
+        };
       }
       case 'claude':
-        return new SessionScanner(getClaudeProjectsDir(ctx, session.providerInstanceId)).scan();
+        return {
+          items: await new SessionScanner(getClaudeProjectsDir(ctx, session.providerInstanceId)).scan(),
+          scanFailed: false,
+        };
       case 'codex':
-        return new CodexSessionScanner(getCodexSessionsDir(ctx, session.providerInstanceId)).scan();
+        return {
+          items: await new CodexSessionScanner(getCodexSessionsDir(ctx, session.providerInstanceId)).scan(),
+          scanFailed: false,
+        };
       case 'copilot':
-        return new CopilotSessionScanner(
-          getCopilotSessionsDir(ctx, session.providerInstanceId),
-        ).scan();
+        return {
+          items: await new CopilotSessionScanner(
+            getCopilotSessionsDir(ctx, session.providerInstanceId),
+          ).scan(),
+          scanFailed: false,
+        };
       case 'gemini':
-        return new GeminiSessionScanner(
-          getGeminiSessionsDir(ctx, session.providerInstanceId),
-        ).scan();
+        return {
+          items: await new GeminiSessionScanner(
+            getGeminiSessionsDir(ctx, session.providerInstanceId),
+          ).scan(),
+          scanFailed: false,
+        };
       case 'pi':
-        return new PiSessionScanner(
-          resolveFileBackedProviderPath(ctx.config, 'pi', session.providerInstanceId),
-        ).scan();
+        return {
+          items: await new PiSessionScanner(
+            resolveFileBackedProviderPath(ctx.config, 'pi', session.providerInstanceId),
+          ).scan(),
+          scanFailed: false,
+        };
       case 'junie':
-        return new JunieSessionScanner().scan();
+        return {
+          items: await new JunieSessionScanner().scan(),
+          scanFailed: false,
+        };
       default:
-        return [];
+        return {
+          items: [],
+          scanFailed: false,
+        };
     }
   } catch {
-    return [];
+    return {
+      items: [],
+      scanFailed: true,
+    };
   }
 }
 

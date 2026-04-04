@@ -259,12 +259,84 @@ describe('file-discovered session deletion', () => {
     expect(res.status).toBe(200);
     const body = await res.json() as Record<string, unknown>;
     expect(body.status).toBe('deleted');
+    expect(body.cleanup).toEqual(expect.objectContaining({
+      providerDiscoveryCleared: true,
+      providerDiscoveryDeleteMode: 'full',
+      providerDiscoveryHydration: {
+        status: 'resolved_from_scan',
+        attempted: true,
+        sourcePathPresentBeforeDelete: false,
+        sourcePathPresentAfterHydration: true,
+      },
+    }));
+    expect(body.maintenance).toEqual(expect.objectContaining({
+      cleanup: expect.objectContaining({
+        providerDiscoveryCleared: true,
+        providerDiscoveryDeleteMode: 'full',
+        providerDiscoveryHydration: {
+          status: 'resolved_from_scan',
+          attempted: true,
+          sourcePathPresentBeforeDelete: false,
+          sourcePathPresentAfterHydration: true,
+        },
+      }),
+    }));
     expect(registry.get(session.id)).toBeUndefined();
     expect(existsSync(runtimeSourcePath)).toBe(false);
     expect(existsSync(providerSourcePath)).toBe(false);
 
     const discovered = await new SessionScanner(claudeProjectsDir).scan();
     expect(discovered.some((item) => item.providerSessionId === 'claude-runtime-delete')).toBe(false);
+  });
+
+  it('surfaces registry-only delete diagnostics when provider discovery hydration cannot resolve a source path', async () => {
+    const session = registry.create({
+      id: 'runtime-claude-delete-unresolved',
+      providerName: 'claude',
+      cwd: 'C:/repo',
+    });
+    registry.updateStatus(session.id, 'closed');
+    registry.setProviderSessionId(session.id, 'claude-runtime-delete-unresolved');
+
+    const runtimeSourcePath = join(sessionBaseDir, 'history', `${session.id}.jsonl`);
+    mkdirSync(join(sessionBaseDir, 'history'), { recursive: true });
+    writeFileSync(
+      runtimeSourcePath,
+      JSON.stringify({ type: 'user', message: { content: 'Delete me' }, cwd: 'C:/repo' }) + '\n',
+    );
+    registry.setSourcePath(session.id, runtimeSourcePath);
+
+    const res = await app.request(`/sessions/${session.id}`, {
+      method: 'DELETE',
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(body.status).toBe('deleted');
+    expect(body.cleanup).toEqual(expect.objectContaining({
+      providerDiscoveryCleared: false,
+      providerDiscoveryDeleteMode: 'registry_only',
+      providerDiscoveryHydration: {
+        status: 'unresolved',
+        attempted: true,
+        sourcePathPresentBeforeDelete: false,
+        sourcePathPresentAfterHydration: false,
+      },
+    }));
+    expect(body.maintenance).toEqual(expect.objectContaining({
+      cleanup: expect.objectContaining({
+        providerDiscoveryCleared: false,
+        providerDiscoveryDeleteMode: 'registry_only',
+        providerDiscoveryHydration: {
+          status: 'unresolved',
+          attempted: true,
+          sourcePathPresentBeforeDelete: false,
+          sourcePathPresentAfterHydration: false,
+        },
+      }),
+    }));
+    expect(registry.get(session.id)).toBeUndefined();
+    expect(existsSync(runtimeSourcePath)).toBe(false);
   });
 
   it('deletes runtime-owned Codex sessions before they can be rediscovered from rollout files', async () => {

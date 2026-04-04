@@ -645,7 +645,7 @@ composition semantics rather than another round of catalog traversal safety.
 ### OPT-8: Advanced Provider Model Catalog Migration Cleanup
 
 **Priority**: P1
-**Status**: Planned
+**Status**: In Progress
 
 #### Problem
 
@@ -1587,6 +1587,18 @@ remain:
 - replace the current per-delete full directory scan with a more direct
   provider-session-id to source-path lookup/cache for file-backed providers
   once the surrounding discovery data flow is stable
+
+#### Current Implementation Status
+
+- delete responses and retained lifecycle cleanup state now expose bounded
+  `providerDiscoveryHydration` truth so hosts can tell whether delete reused an
+  existing provider transcript path, resolved one from a fallback scan, failed
+  to resolve one, or could not complete the scan
+- the same cleanup contract now also exposes `providerDiscoveryDeleteMode:
+  "full" | "registry_only"` so host/operator flows can distinguish external
+  provider-artifact cleanup from registry-only delete attempts
+- the heavier per-delete fallback scan still remains in place for now; only the
+  diagnostics slice is landed so far
 
 #### Deferred Scope
 
