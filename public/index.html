@@ -1873,7 +1873,7 @@ function renderCreateModelControlField(control, value, entryId) {
     return `
       <label class="runtime-field">
         <span class="runtime-field-label !tracking-[0.16em]">${label}</span>
-        <select class="runtime-select !py-2 text-xs" data-model-control-kind="enum" data-model-control-key="${safeKey}">
+        <select class="runtime-select" data-model-control-kind="enum" data-model-control-key="${safeKey}">
           ${options}
         </select>
         ${description}
@@ -1912,7 +1912,7 @@ function renderCreateModelControlField(control, value, entryId) {
       <span class="runtime-field-label !tracking-[0.16em]">${label}</span>
       <input
         type="${inputType}"
-        class="runtime-input !py-2 text-xs"
+        class="runtime-input"
         data-model-control-kind="${escapeHtml(control.kind)}"
         data-model-control-key="${safeKey}"
         value="${value === undefined || value === null ? '' : escapeHtml(value)}"
