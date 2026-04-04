@@ -182,9 +182,10 @@ creation.
 
 - The delivered wakeup substrate was implemented directly as runtime slices
   before a follow-through plan existed.
-- Ongoing follow-through is now collected under
+- The follow-through work that was later collected under
   [PLAN-024](../plans/PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md),
-  with `PROGRESS.md` / `ROADMAP.md` still carrying the broader runtime status.
+  is now complete, with `PROGRESS.md` / `ROADMAP.md` carrying only broader
+  runtime-status follow-ons outside this spec's shipped slice.
 - The latest follow-through slice adds bounded due/failed request samples on
   runtime-wide wakeup diagnostics so operators can inspect backlog hotspots
   without first listing every retained request.
@@ -208,5 +209,5 @@ creation.
 
 ---
 
-*Last updated: 2026-03-29*
+*Last updated: 2026-04-04*
 *Related Plan: [PLAN-024](../plans/PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md) (follow-through plan; initial substrate slice was implemented directly)*

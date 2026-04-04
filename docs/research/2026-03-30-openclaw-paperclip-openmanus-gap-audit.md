@@ -86,6 +86,22 @@ What the code already proves:
   provider state and browser/session preview surfaces. The open question is no
   longer whether surfacing exists; it is how far to deepen it.
 
+### Follow-through note (2026-04-04)
+
+The doc-truth drift that this audit flagged around collaboration/bootstrap UI
+status has now been corrected in:
+
+- `PLAN-023`
+- `SPEC-006`
+- `PLAN-019`
+- `SPEC-017`
+- `ROADMAP.md`
+- `PROGRESS.md`
+
+That leaves the substantive gap order unchanged: later-target semantic probes
+and broader retained evidence depth still matter more than additional
+architecture reshaping.
+
 ## Largest Gap Groups
 
 ### 1. Agent remote-tool discovery breadth and later-target semantic probes

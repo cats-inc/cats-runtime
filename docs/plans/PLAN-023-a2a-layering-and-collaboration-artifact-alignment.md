@@ -6,7 +6,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Pilot Slice 2: Repo-Owned Bootstrap Extraction) |
+| **Status** | Completed (Pilot Collaboration Baseline and Repo-Owned Rewrite Landed) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User / runtime collaboration workstream |
@@ -35,20 +35,20 @@ submodule history:
 
 But those artifacts have not yet been validated through real repo operation.
 
-This plan therefore treats `SPEC-006` as a pilot run with two slices:
+This plan treated `SPEC-006` as a pilot run with two slices:
 
-- Slice 1 already landed the pilot-owned A2A v1.0 examples, layering docs, and
+- Slice 1 landed the pilot-owned A2A v1.0 examples, layering docs, and
   collaboration skills
-- Slice 2 now expands scope to extract and rewrite the remaining collaboration
-  template/update knowledge that cannot stay as a `project-bootstrap`
-  dependency once `cats-runtime` and `cats` split into separate repos
+- Slice 2 extracted and rewrote the remaining collaboration template/update
+  knowledge that could not stay as a `project-bootstrap` dependency once
+  `cats-runtime` and `cats-platform` split into separate repos
 - `project-bootstrap` stays an input source, not an accepted baseline
 - `cats-runtime` remains the primary implementation repo for the runtime-owned
   collaboration baseline
 - `cats-platform` remains a sibling pilot repo that should consume mirrored outcomes
   where the shared collaboration contract must stay aligned
-- merge-back into `project-bootstrap` and production defaults happen only after
-  several optimization loops
+- merge-back into `project-bootstrap` and production-default adoption remain
+  separate governance decisions after several optimization loops
 
 The key rule is:
 
@@ -353,8 +353,10 @@ collaboration/bootstrap baseline rather than a submodule dependency.
 | 2026-03-30 | Closed the main Phase 5 rewrite gate: the repo-owned workspace substrate helper stack now covers local init/update behavior, preserves `*.bootstrap` review-copy semantics for customized files, and keeps legacy A2A retirement guidance local instead of relying on `project-bootstrap/scripts/*` |
 | 2026-03-30 | Closed the next Phase 6 sibling-alignment gate with `docs/research/2026-03-30-sibling-collaboration-baseline-alignment.md`, recording that `cats-platform` already consumes the mirrored A2A file set plus byte-identical cross-platform skill-sync scripts from repo-owned copies and that the remaining A2A content diffs are intentional repo-identity divergences |
 | 2026-03-30 | Closed the final Phase 6 governance tail: the repo-owned collaboration rewrite has now survived more than one pilot loop across the first-wave repos, generated-repo validation, and sibling alignment checks, but production-default rollout still remains explicitly deferred pending a separate evidence-led adoption decision |
+| 2026-04-04 | Status audit aligned the plan metadata with repo reality: all six phases are complete, and the remaining question is governance adoption rather than unresolved implementation work |
 
 ---
 
 *Created: 2026-03-29*
 *Author: Codex*
+*Last updated: 2026-04-04*

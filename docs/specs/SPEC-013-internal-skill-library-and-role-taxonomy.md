@@ -256,9 +256,10 @@ runtime-managed skill execution flow
 
 - The internal skill-library taxonomy landed directly through the runtime
   skills workstream before a dedicated follow-through plan existed.
-- Current implementation status and remaining follow-through now live under
+- The later hardening/publish-discipline follow-through that lived under
   [PLAN-024](../plans/PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md),
-  with `PROGRESS.md` still carrying the broader runtime truth.
+  is now complete, with `PROGRESS.md` still carrying only the broader runtime
+  truth.
 - Follow-through now also projects catalog fingerprint/cache/guard truth through
   runtime diagnostics so hosts and operators can inspect shipped-library state
   without importing the catalog internals directly.
@@ -292,5 +293,5 @@ runtime-managed skill execution flow
 
 *Created: 2026-03-24*
 *Author: Codex*
-*Last updated: 2026-03-29*
+*Last updated: 2026-04-04*
 *Related Plan: [PLAN-024](../plans/PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md) (follow-through plan; initial slice was implemented directly)*

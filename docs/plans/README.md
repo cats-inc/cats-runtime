@@ -50,12 +50,12 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 | [PLAN-027](./PLAN-027-kilo-cli-provider-support-and-consumption.md) | Independent Kilo CLI Provider Support and Product Consumption | Draft | [SPEC-017](../specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md), [SPEC-018](../specs/SPEC-018-advanced-provider-model-catalog-and-selection-schema.md), [SPEC-023](../specs/SPEC-023-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md) |
 | [PLAN-026](./PLAN-026-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md) | Verified Advanced Provider Catalogs and Manual-Refresh Discovery | Draft | [SPEC-023](../specs/SPEC-023-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md), [ADR-029](../decisions/029-keep-advanced-provider-catalogs-verified-and-manual-refresh.md) |
 | [PLAN-025](./PLAN-025-executable-packaging-and-publish-follow-through.md) | Executable Packaging and Publish Follow-Through | In Progress | [ROADMAP OPT-15](../../ROADMAP.md), [SPEC-017](../specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md), [PLAN-019](./PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md) |
-| [PLAN-024](./PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md) | Runtime Skill Library, Setup Diagnostics, and Wakeup Follow-Through | In Progress | [SPEC-013](../specs/SPEC-013-internal-skill-library-and-role-taxonomy.md), [SPEC-015](../specs/SPEC-015-runtime-setup-diagnostic-report.md), [SPEC-012](../specs/SPEC-012-scheduled-wakeup-substrate.md) |
-| [PLAN-023](./PLAN-023-a2a-layering-and-collaboration-artifact-alignment.md) | A2A Layering and Collaboration Artifact Alignment | In Progress (Pilot Slice 2: Repo-Owned Bootstrap Extraction) | [SPEC-006](../specs/SPEC-006-a2a-protocol-project-memory-and-skill-layering.md), [ADR-010](../decisions/010-separate-a2a-protocol-project-memory-and-skill-packages.md) |
+| [PLAN-024](./PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md) | Runtime Skill Library, Setup Diagnostics, and Wakeup Follow-Through | Completed | [SPEC-013](../specs/SPEC-013-internal-skill-library-and-role-taxonomy.md), [SPEC-015](../specs/SPEC-015-runtime-setup-diagnostic-report.md), [SPEC-012](../specs/SPEC-012-scheduled-wakeup-substrate.md) |
+| [PLAN-023](./PLAN-023-a2a-layering-and-collaboration-artifact-alignment.md) | A2A Layering and Collaboration Artifact Alignment | Completed (Pilot Collaboration Baseline and Repo-Owned Rewrite Landed) | [SPEC-006](../specs/SPEC-006-a2a-protocol-project-memory-and-skill-layering.md), [ADR-010](../decisions/010-separate-a2a-protocol-project-memory-and-skill-packages.md) |
 | [PLAN-022](./PLAN-022-stdio-mcp-proxy-to-primary-runtime.md) | Stdio MCP Proxy to the Primary Runtime | Draft | [SPEC-022](../specs/SPEC-022-stdio-mcp-proxy-to-primary-runtime.md), [ADR-028](../decisions/028-proxy-stdio-mcp-to-the-primary-runtime-http-surface.md) |
 | [PLAN-021](./PLAN-021-provider-evolution-evidence-and-capability-probes.md) | Provider Evolution Evidence and Capability Probes | Completed | [SPEC-021](../specs/SPEC-021-provider-evolution-evidence-and-capability-probes.md), [ADR-025](../decisions/025-keep-provider-evolution-detection-manual-first-and-evidence-driven.md), [ADR-026](../decisions/026-model-a2a-as-an-agent-backend-adapter.md) |
 | [PLAN-020](./PLAN-020-pluggable-execution-strategy-substrate.md) | Pluggable Execution Strategy Substrate | Completed | [SPEC-020](../specs/SPEC-020-pluggable-execution-strategy-substrate.md), [ADR-024](../decisions/024-own-pluggable-execution-strategies-as-runtime-session-local-substrate.md) |
-| [PLAN-019](./PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md) | Shared Runtime UI Foundation for Dashboard, Playground, and Provider Setup | Approved (Direction Locked; Implementation Not Started) | [SPEC-017](../specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md), [ADR-027](../decisions/027-adopt-a-playground-derived-dark-runtime-ui-shell-with-sidebar-surface-switching.md) |
+| [PLAN-019](./PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md) | Shared Runtime UI Foundation for Dashboard, Playground, and Provider Setup | In Progress (Shared Shell, Manual Repair, and Build Baseline Landed) | [SPEC-017](../specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md), [ADR-027](../decisions/027-adopt-a-playground-derived-dark-runtime-ui-shell-with-sidebar-surface-switching.md) |
 | [PLAN-018](./PLAN-018-advanced-provider-model-catalog-and-selection-schema.md) | Advanced Provider Model Catalog and Selection Schema | Completed | [SPEC-018](../specs/SPEC-018-advanced-provider-model-catalog-and-selection-schema.md), [ADR-022](../decisions/022-model-advanced-selection-as-entries-presets-and-provider-specific-controls.md) |
 | [PLAN-017](./PLAN-017-lan-peer-discovery-and-execution-routing-v0.md) | LAN Peer Discovery and Execution Routing v0 | Completed | [SPEC-016](../specs/SPEC-016-lan-peer-discovery-and-execution-routing-v0.md), [ADR-019](../decisions/019-scope-first-lan-peer-sharing-to-execution-only.md) |
 | [PLAN-013](./PLAN-013-browser-preview-substrate-v0.md) | Browser Preview Substrate v0 | Completed | [ADR-011](../decisions/011-runtime-owned-browser-and-preview-subsystem-with-pluggable-drivers.md), [cats SPEC-020](../../../cats-platform/docs/specs/SPEC-020-embedded-preview-surfaces-for-runtime-artifacts-and-services.md) |
@@ -82,12 +82,11 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 
 - `PLAN-003` is broader than `SPEC-002`, but it is the canonical delivery
   track for the shared local tool runtime slice that `SPEC-002` describes.
-- `PLAN-024` now collects the important follow-through for `SPEC-012`,
-  `SPEC-013`, and `SPEC-015`, whose first landed slices were implemented
-  directly before they had a dedicated follow-through plan.
-- `PLAN-023` delivered the first pilot slice of `SPEC-006`, but it is now
-  reopened for the pre-split extraction/rewrite slice that removes remaining
-  dependence on `project-bootstrap` templates and initialize/update tooling.
+- `PLAN-024` collected the important follow-through for `SPEC-012`,
+  `SPEC-013`, and `SPEC-015`; that follow-through is now complete.
+- `PLAN-023` is complete for the current `SPEC-006` pilot scope: the repo-owned
+  collaboration rewrite and split-safe sibling alignment are landed, while any
+  broader production-default adoption remains a separate governance decision.
 
 ## For AI Agents
 
@@ -98,4 +97,4 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 ---
 
 *See also: [specs/](../specs/) for feature specifications*
-*Last updated: 2026-03-31*
+*Last updated: 2026-04-04*

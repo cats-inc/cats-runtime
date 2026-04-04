@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Execution Delivery Slice Landed) |
+| **Status** | Implemented |
 | **Owner** | Codex |
 | **Reviewer** | User review pending |
 
@@ -304,6 +304,5 @@ supports local skill directories.
 
 *Created: 2026-03-19*
 *Author: Codex*
-*Last updated: 2026-03-24*
+*Last updated: 2026-04-04*
 *Related Plan: [PLAN-008-runtime-managed-skills-v0](../plans/PLAN-008-runtime-managed-skills-v0.md)*
-

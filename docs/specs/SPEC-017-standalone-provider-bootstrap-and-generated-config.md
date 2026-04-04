@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Approved (Core Bootstrap Slice Landed; UI Shell Follow-Through Pending) |
+| **Status** | In Progress (Bootstrap Core, Shared Shell Slices, and Package Baseline Landed) |
 | **Owner** | Codex |
 | **Reviewer** | User / runtime setup workstream |
 
@@ -144,8 +144,9 @@ and-egg problem instead of preserving it.
     applicable policy allows it.
 17. The documented and implemented first-run discovery posture for both WSL and
     Docker should be `if_running`.
-18. The current runtime default for WSL discovery shall be treated as a gap
-    until it is aligned with the intended `if_running` posture.
+18. The runtime default for WSL discovery shall preserve the intended
+    `if_running` posture unless a later explicit decision changes that
+    conservative baseline.
 19. `manual_only` must remain usable in bootstrap mode.
 20. When the current discovery policy blocks heavy auto-scan, the setup surface
     shall still expose an explicit manual scan action for the operator.
@@ -153,9 +154,9 @@ and-egg problem instead of preserving it.
     for operators after normal startup. That entry point may trigger manual
     discovery directly or deep-link into the provider setup scan action, but it
     shall not require editing YAML by hand.
-22. The lack of a dashboard manual scan entry point in current repo reality
-    shall be treated as an implementation gap for this setup direction rather
-    than a nice-to-have follow-up.
+22. The dashboard manual scan entry point is part of the required baseline for
+    this setup direction and shall be preserved through later UI follow-through
+    rather than treated as an optional nice-to-have.
 23. The latest bootstrap scan summary and the latest explicit manual scan
     summary shall persist under the runtime data directory so both the setup
     page and the dashboard can surface a shared discovery snapshot.
@@ -370,13 +371,22 @@ Cats SPA.
 
 ## Implementation Tracking
 
-- The core bootstrap/setup slice is landed and the shared runtime UI
-  follow-through remains under
-  [PLAN-019](../plans/PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md).
+- The core bootstrap/setup slice is landed.
+- Shared runtime UI follow-through under
+  [PLAN-019](../plans/PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md)
+  is also partially landed: the runtime now injects a shared sidebar shell,
+  shared CatsUI helpers, shared provider badge/status helpers, a build-time
+  Tailwind CSS payload, provider-setup now reuses persisted `GET /setup-state`
+  truth instead of forcing a scan on load, and the dashboard now exposes a
+  direct manual scan/repair panel.
+- The remaining `PLAN-019` gap is no longer bootstrap correctness. It is the
+  deeper page-source and emitted-HTML convergence track.
 - Executable packaging and npm publish follow-through now also has a separate
   track under
   [PLAN-025](../plans/PLAN-025-executable-packaging-and-publish-follow-through.md)
-  so package/release truth does not stay mixed into the shared UI plan.
+  so package/release truth does not stay mixed into the shared UI plan. The
+  local executable/package baseline is landed; first public publish discipline
+  remains the open follow-through.
 
 ## Dependencies
 
@@ -410,4 +420,5 @@ Cats SPA.
 
 *Created: 2026-03-25*
 *Author: Codex*
+*Last updated: 2026-04-04*
 *Related Plan: [PLAN-019](../plans/PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md), [PLAN-025](../plans/PLAN-025-executable-packaging-and-publish-follow-through.md)*

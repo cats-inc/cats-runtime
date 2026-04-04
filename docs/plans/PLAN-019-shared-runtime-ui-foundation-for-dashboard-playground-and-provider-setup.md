@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Approved (Direction Locked; Implementation Not Started) |
+| **Status** | In Progress (Shared Shell, Manual Repair, and Build Baseline Landed) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User / runtime setup workstream |
@@ -27,7 +27,20 @@
   - `GET /` switches between dashboard and provider setup
   - `GET /dashboard` and `GET /playground` already exist
   - provider setup APIs already exist
-- The remaining gap is that the runtime-owned UI is still three mostly isolated static pages with duplicated CSS/JS, inconsistent visual language, and no shared bootstrap discovery read seam.
+- Since the plan was written, additive runtime-owned UI slices have already
+  landed out of order:
+  - `injectSharedUI()` now injects shared CatsUI helpers, shared provider badge
+    / status helpers, and generated Tailwind-based runtime tokens into all
+    runtime-served pages
+  - `injectRuntimeShellState()` now injects the shared sidebar surface switcher
+    and bootstrap locked-state contract across `Dashboard`, `Playground`, and
+    `Setup`
+  - `GET /setup-state` is now the shared repair/read seam used by
+    `provider-setup` and the dashboard repair panel
+  - the dashboard now has an inline manual scan and repair panel instead of
+    relying on YAML edits or bootstrap-only setup access
+  - `build:ui` now generates the shared runtime Tailwind payload before normal
+    builds and package creation
 - The user-approved direction is now explicit:
   - keep the runtime UI dark
   - treat the current playground surface as the canonical shell/layout baseline
@@ -37,9 +50,9 @@
 - The goal is to converge `dashboard`, `playground`, and `provider-setup` onto
   one lightweight runtime-owned UI foundation while preserving static HTML
   artifacts, existing route behavior, and the current non-SPA runtime model.
-- The plan is still intentionally not started: runtime-owned bootstrap/setup read
-  seams are already in place, so the remaining work here is primarily shared
-  UI/build-layer follow-through rather than missing runtime core substrate.
+- The plan is therefore now in progress: most of the shared shell/manual repair
+  contract is in repo, but the underlying page-source and emitted-HTML
+  convergence work remains unfinished.
 
 ## Scope
 
@@ -68,28 +81,27 @@
 
 ## Current Gaps
 
-- `public/index.html` and `public/provider-setup.html` each define their own theme tokens and component styling inline.
-- `public/playground.html` uses a separate Tailwind CDN-driven styling path and a different visual language from the dashboard and provider-setup page.
-- The three pages do not share one shell model:
-  - dashboard uses a top header + left sidebar session shell
-  - playground uses a different left rail + top status bar structure
-  - provider-setup is a standalone centered single-column page
-- Cross-surface navigation appears in different places:
-  - dashboard uses top-level links
-  - playground uses a back-link
-  - provider-setup uses footer links
-- Provider badge and provider color logic are duplicated between dashboard and playground, while provider-setup uses a third status-badge style with different semantics.
-- Runtime fetch/auth/error handling is duplicated:
-  - dashboard uses `headers()` plus direct `fetch`
-  - playground uses `RuntimeClient` plus separate ad-hoc fetches for provider catalog and models
-  - provider-setup uses raw `fetch` calls with page-local error handling
-- There is no shared lightweight build substrate today; `src/http/app.ts` serves handwritten static HTML files directly from `public/`.
+- Shared shell/navigation, setup-state reuse, and dashboard manual repair now
+  exist, but the three pages still keep substantial page-local markup and
+  scripting instead of a clearer shared source layout.
+- `public/provider-setup.html` still carries significant page-local behavior
+  even though it now sits inside the shared runtime shell and consumes the
+  shared setup read model.
+- `public/index.html` and `public/playground.html` both reuse shared CatsUI
+  helpers, but they still retain duplicated page-local orchestration code that
+  has not yet been pulled into narrower shared modules.
+- `build:ui` now gives the repo one shared Tailwind build path, but it does not
+  yet bundle page-owned entry modules or emit the final HTML artifacts from a
+  runtime-owned source tree.
 - Playground's current visual direction is the strongest baseline, but it is
   implemented as an isolated page rather than the canonical runtime shell.
-- `BootstrapService` already persists both `provider-scan.json` and `provider-manual-scan.json`, but the UI layer does not expose one shared runtime-owned read model over those snapshots.
-- `GET /setup-state` returns only a summary of the latest scan, so `public/provider-setup.html` currently re-triggers `POST /setup-scan` on load to obtain full scan data instead of reusing persisted scan snapshots.
-- Dashboard currently lacks the secondary manual scan and repair entry called out by `SPEC-017`.
-- There is no runtime-owned repair affordance after bootstrap other than editing config or re-entering setup manually.
+- `BootstrapService` already persists both `provider-scan.json` and
+  `provider-manual-scan.json`, and the UI layer now exposes a shared read seam
+  through `GET /setup-state`; the remaining gap is consolidating more of the
+  page-local rendering logic around that seam.
+- The shared read seam still has room to tighten how dashboard and
+  provider-setup reuse the same render helpers instead of maintaining two
+  parallel page-local renderers.
 
 ## Recommended Direction
 
@@ -138,14 +150,14 @@
 
 ### Phase 1: Shared UI Foundation Contract
 
-- [ ] Define the shared shell contract using playground as the canonical layout/visual baseline.
-- [ ] Define the shared Tailwind token/component contract for dashboard, playground, and provider-setup.
-- [ ] Define the shared runtime fetch/error helper contract for same-origin runtime APIs and optional bearer token use.
-- [ ] Define the shared provider badge and provider-status rendering helpers.
-- [ ] Define the shared bootstrap scan snapshot read model, centered on `GET /setup-state`.
+- [x] Define the shared shell contract using playground as the canonical layout/visual baseline.
+- [x] Define the shared Tailwind token/component contract for dashboard, playground, and provider-setup.
+- [x] Define the shared runtime fetch/error helper contract for same-origin runtime APIs and optional bearer token use.
+- [x] Define the shared provider badge and provider-status rendering helpers.
+- [x] Define the shared bootstrap scan snapshot read model, centered on `GET /setup-state`.
 - [ ] Define the runtime-owned UI source layout separately from emitted `public/*.html` artifacts.
-- [ ] Define the sidebar brand-row surface switcher contract, including bootstrap locked-state behavior.
-- [ ] Keep bootstrap logic in runtime-owned services and thin HTTP/UI adapters only.
+- [x] Define the sidebar brand-row surface switcher contract, including bootstrap locked-state behavior.
+- [x] Keep bootstrap logic in runtime-owned services and thin HTTP/UI adapters only.
 
 Deliverables:
 
@@ -158,11 +170,11 @@ Deliverables:
 
 ### Phase 2: Lightweight Static Build Substrate
 
-- [ ] Add a lightweight build pipeline, preferably `esbuild`, for runtime UI sources.
-- [ ] Add build-time Tailwind support for the shared runtime shell and page entries.
+- [x] Add a lightweight build pipeline, preferably `esbuild`, for runtime UI sources.
+- [x] Add build-time Tailwind support for the shared runtime shell and page entries.
 - [ ] Bundle page-specific entry modules against the shared UI foundation without introducing a framework runtime or client router.
 - [ ] Emit static HTML artifacts that remain directly serveable by the runtime and packagable in npm/Electron flows.
-- [ ] Wire the packaging/build lifecycle so runtime UI artifacts are generated before release packaging.
+- [x] Wire the packaging/build lifecycle so runtime UI artifacts are generated before release packaging.
 
 Deliverables:
 
@@ -176,14 +188,14 @@ Deliverables:
 
 ### Phase 3: Migrate Provider Setup onto the Shared Foundation
 
-- [ ] Migrate provider-setup first as the thinnest UI adapter over bootstrap services.
-- [ ] Move provider-setup into the shared sidebar shell instead of a standalone centered page.
-- [ ] Replace page-local fetch logic with shared runtime fetch helpers.
-- [ ] Replace page-local badge/status rendering with shared provider-status helpers.
-- [ ] Stop forcing an auto-scan just to render existing scan results.
-- [ ] Render persisted auto-scan and manual-scan snapshots from the shared setup read model.
-- [ ] Keep bootstrap-mode availability and `POST /setup-apply` behavior unchanged.
-- [ ] Render bootstrap locked-state navigation for dashboard/playground from the shared switcher.
+- [x] Migrate provider-setup first as the thinnest UI adapter over bootstrap services.
+- [x] Move provider-setup into the shared sidebar shell instead of a standalone centered page.
+- [x] Replace page-local fetch logic with shared runtime fetch helpers.
+- [x] Replace page-local badge/status rendering with shared provider-status helpers.
+- [x] Stop forcing an auto-scan just to render existing scan results.
+- [x] Render persisted auto-scan and manual-scan snapshots from the shared setup read model.
+- [x] Keep bootstrap-mode availability and `POST /setup-apply` behavior unchanged.
+- [x] Render bootstrap locked-state navigation for dashboard/playground from the shared switcher.
 
 Deliverables:
 
@@ -195,11 +207,11 @@ Deliverables:
 
 ### Phase 4: Migrate Dashboard and Add Manual Scan / Repair Entry
 
-- [ ] Move dashboard onto the shared shell primitives without rewriting the session UI into components.
-- [ ] Add a secondary manual scan and repair entry in the dashboard.
-- [ ] Use the shared setup read model so the dashboard can show latest scan state, latest manual scan state, and next repair action without owning bootstrap logic.
-- [ ] Implement the first slice as a direct manual scan trigger plus inline result rendering.
-- [ ] Keep `/dashboard` always available in both bootstrap and non-bootstrap modes.
+- [x] Move dashboard onto the shared shell primitives without rewriting the session UI into components.
+- [x] Add a secondary manual scan and repair entry in the dashboard.
+- [x] Use the shared setup read model so the dashboard can show latest scan state, latest manual scan state, and next repair action without owning bootstrap logic.
+- [x] Implement the first slice as a direct manual scan trigger plus inline result rendering.
+- [x] Keep `/dashboard` always available in both bootstrap and non-bootstrap modes.
 
 Deliverables:
 
@@ -211,11 +223,11 @@ Deliverables:
 
 ### Phase 5: Migrate Playground onto the Same Foundation
 
-- [ ] Preserve playground behavior as a same-origin direct runtime API surface.
-- [ ] Keep the existing `RuntimeClient` and orchestration logic mostly intact; extract only the shared pieces that reduce duplication safely.
-- [ ] Replace the current Tailwind CDN dependency with the shared build-time Tailwind path.
-- [ ] Replace duplicated provider badge styling and ad-hoc runtime fetch/auth seams with shared helpers where that does not destabilize streaming behavior.
-- [ ] Preserve playground as the canonical shell reference while moving its implementation onto the shared runtime UI foundation.
+- [x] Preserve playground behavior as a same-origin direct runtime API surface.
+- [x] Keep the existing `RuntimeClient` and orchestration logic mostly intact; extract only the shared pieces that reduce duplication safely.
+- [x] Replace the current Tailwind CDN dependency with the shared build-time Tailwind path.
+- [x] Replace duplicated provider badge styling and ad-hoc runtime fetch/auth seams with shared helpers where that does not destabilize streaming behavior.
+- [x] Preserve playground as the canonical shell reference while moving its implementation onto the shared runtime UI foundation.
 
 Deliverables:
 
@@ -227,9 +239,9 @@ Deliverables:
 
 ### Phase 6: Regression Tests and Docs Follow-Through
 
-- [ ] Add focused regression coverage for route behavior, setup flows, dashboard repair behavior, and shared helpers.
-- [ ] Add emitted HTML smoke checks so the runtime does not accidentally stop shipping static artifacts.
-- [ ] Update runtime docs affected by the implementation once the code change lands.
+- [x] Add focused regression coverage for route behavior, setup flows, dashboard repair behavior, and shared helpers.
+- [x] Add emitted HTML smoke checks so the runtime does not accidentally stop shipping static artifacts.
+- [x] Update runtime docs affected by the implementation once the code change lands.
 
 Deliverables:
 
@@ -352,16 +364,17 @@ Deliverables:
 | Date | Update |
 |------|--------|
 | 2026-03-25 | Plan created for the `SPEC-017` runtime UI foundation follow-through gap. |
+| 2026-04-04 | Status audit aligned the plan with repo reality: the shared shell, shared CatsUI helpers, build-time Tailwind path, provider-setup shared read seam, dashboard repair panel, playground helper adoption, and regression coverage are landed; the remaining open work is the deeper page-source and emitted-HTML convergence track from Phase 2. |
 
 ## Execution Checklist
 
 - [x] Plan created
-- [ ] Phase 1 complete: shared UI foundation contract agreed
+- [x] Phase 1 complete: shared UI foundation contract agreed
 - [ ] Phase 2 complete: lightweight static build substrate in place
-- [ ] Phase 3 complete: provider-setup migrated to shared foundation
-- [ ] Phase 4 complete: dashboard migrated and manual scan/repair entry added
-- [ ] Phase 5 complete: playground migrated onto shared foundation
-- [ ] Phase 6 complete: regression tests and doc follow-through landed
+- [x] Phase 3 complete: provider-setup migrated to shared foundation
+- [x] Phase 4 complete: dashboard migrated and manual scan/repair entry added
+- [x] Phase 5 complete: playground migrated onto shared foundation
+- [x] Phase 6 complete: regression tests and doc follow-through landed
 
 ## Notes for Implementation Team
 
@@ -373,3 +386,4 @@ Deliverables:
 
 - Created: 2026-03-25
 - Author: Codex
+- Last updated: 2026-04-04

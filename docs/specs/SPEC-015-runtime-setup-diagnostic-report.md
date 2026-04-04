@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Implemented (Slice 1) |
+| **Status** | Implemented |
 | **Owner** | Codex |
 | **Reviewer** | User / runtime workstream |
 
@@ -220,10 +220,10 @@ The setup report should not become the new canonical evidence fixture format.
 
 - Slice 1 of this spec landed directly through the bootstrap/setup workstream
   before a dedicated follow-through plan existed.
-- Current follow-through is now collected under
+- The follow-through that was later collected under
   [PLAN-024](../plans/PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md),
-  while `PROGRESS.md` / `ROADMAP.md` still carry the broader bootstrap/setup
-  status.
+  is now complete, while `PROGRESS.md` / `ROADMAP.md` still carry the broader
+  bootstrap/setup status outside this spec's bounded report contract.
 - Setup reports and `GET /setup-state` now reuse the same repair-summary truth,
   and the non-server CLI path now surfaces that same next-action guidance
   without inventing a second setup stack.
@@ -273,5 +273,5 @@ The setup report should not become the new canonical evidence fixture format.
 
 *Created: 2026-03-25*
 *Author: Codex*
-*Last updated: 2026-03-30*
+*Last updated: 2026-04-04*
 *Related Plan: [PLAN-024](../plans/PLAN-024-runtime-skill-library-setup-and-wakeup-follow-through.md) (follow-through plan; slice 1 was implemented directly)*

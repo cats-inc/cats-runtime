@@ -983,6 +983,14 @@ different orchestration subsystem from the shared compatibility surface.
 - bootstrap integration coverage keeps the existing `/setup-state` and
   `/setup-scan` contract intact while avoiding unnecessary slow-path probes in
   the verification suite
+- the shared runtime shell is now injected across dashboard/playground/setup,
+  including the bootstrap locked-state surface switcher
+- `public/provider-setup.html` now reuses persisted `GET /setup-state` truth
+  instead of forcing an auto-scan on load
+- the dashboard now exposes a direct inline manual scan/repair panel backed by
+  the same shared `GET /setup-state` plus `POST /setup-scan` seams
+- `build:ui` now generates the shared runtime Tailwind payload before the main
+  TypeScript build and package flow
 
 #### Follow-through Direction
 
@@ -990,8 +998,9 @@ different orchestration subsystem from the shared compatibility surface.
   read surfaces
 - continue improving setup/operator responsiveness through shared runtime-owned
   bootstrap services rather than page-local logic
-- land the remaining shared UI/manual repair follow-through from `PLAN-019`
-  separately from this scan-orchestration slice
+- keep the remaining `PLAN-019` work focused on deeper page-source / emitted
+  HTML convergence rather than re-solving the already-landed shared shell and
+  manual repair baseline
 
 #### Deferred Scope
 
@@ -1460,7 +1469,7 @@ proxy slice is still intentionally minimal:
 ### OPT-15: Executable Packaging and npm Publish Follow-through
 
 **Priority**: P1
-**Status**: Planned
+**Status**: In Progress
 
 #### Problem
 
@@ -1475,9 +1484,6 @@ proxy slice is still intentionally minimal:
 That means the local packaging baseline is no longer the main gap. The
 remaining work is follow-through and publication discipline:
 
-- some plan/spec tracking around runtime UI packaging still reflects an older
-  "not started" state even though `build:ui` and package-safe static artifact
-  generation already exist
 - deployment docs still describe the npm package path as a planned publish path
   instead of a repo-ready local package plus not-yet-published registry path
 - the package is not yet proven through a first real npm release
@@ -1496,6 +1502,9 @@ remaining work is follow-through and publication discipline:
 - `scripts/linux/pack-install.sh`, `scripts/macos/pack-install.sh`, and
   `scripts/windows/Pack-Install.ps1` now provide aligned local pack/install
   helpers
+- `PLAN-019` / `SPEC-017` now reflect that `build:ui` and the shared runtime
+  shell/manual-repair baseline are already landed, so packaging follow-through
+  is no longer blocked on stale UI-build plan metadata
 - `docs/release-guide.md` documents a manual first-release path plus a future
   trusted-publishing direction
 - `docs/deployment.md` still labels npm package startup as a planned publish
@@ -1504,11 +1513,9 @@ remaining work is follow-through and publication discipline:
 
 #### Follow-through Checklist
 
-- align `PLAN-019` packaging/build notes with current repo reality:
-  - mark the now-landed runtime UI build/package wiring as delivered where
-    appropriate
-  - leave the still-unshipped shared UI foundation migration work clearly
-    deferred instead of mixing it with already-landed package mechanics
+- keep packaging/build docs aligned as further runtime UI source/build
+  convergence lands under `PLAN-019`, without mixing already-landed local
+  package mechanics with still-open HTML/source migration work
 - tighten packaging docs so they distinguish:
   - repo-local package readiness
   - first public npm release

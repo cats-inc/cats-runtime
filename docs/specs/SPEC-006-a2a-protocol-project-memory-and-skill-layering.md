@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Pilot Slice 1 Landed; Bootstrap Extraction Open) |
+| **Status** | Implemented (Pilot Collaboration Baseline Landed; Production-Default Adoption Deferred) |
 | **Owner** | Codex |
 | **Reviewer** | User |
 
@@ -157,8 +157,9 @@ follow-on tasks include:
 
 ## Implementation Tracking
 
-- A dedicated implementation plan now exists in
-  [PLAN-023](../plans/PLAN-023-a2a-layering-and-collaboration-artifact-alignment.md).
+- The dedicated implementation track in
+  [PLAN-023](../plans/PLAN-023-a2a-layering-and-collaboration-artifact-alignment.md)
+  is complete.
 - `cats-runtime` now ships a pilot-owned A2A v1.0 example set under
   `docs/a2a/`, plus runtime-owned collaboration skills for `a2a-handoff` and
   `project-memory-sync`.
@@ -170,23 +171,22 @@ follow-on tasks include:
   `scripts/README.md`, so the split-safe collaboration baseline is no longer
   limited to AGENT/A2A files only.
 - Second-wave validation against `project-bootstrap` tooling has been recorded
-  in a dedicated research note; merge-back remains deferred.
-- A follow-on slice under `PLAN-023` remains open to extract and rewrite the
-  remaining collaboration-template and initialize/update semantics into
-  repo-owned helpers before repo split.
+  in dedicated research notes, and the repo-owned rewrite now covers the
+  remaining collaboration-template plus initialize/update semantics needed for
+  the repo split.
+- Split-safe sibling alignment with `cats-platform` is also recorded, so the
+  remaining open question is no longer extraction work; it is whether and when
+  the pilot baseline should become a broader production-default posture.
 
 ## Open Questions
 
-- [ ] Which exact A2A v1 example set should replace the current generic
-      `task.*.example` files first: message send, task object, task status
-      update, or artifact examples?
 - [ ] Should `cats-runtime` eventually publish a real machine-readable Agent
       Card endpoint, or keep versioned docs/examples first?
 - [ ] Which collaboration skills belong in `cats-runtime` itself versus
-      higher-level products such as `cats`?
-- [ ] Which minimum subset of `project-bootstrap/templates/base` and
-      initialize/update semantics must become runtime-owned or sibling-shared
-      before the repo split?
+      higher-level products such as `cats-platform`?
+- [ ] What evidence threshold should move this pilot collaboration baseline
+      from repo-owned implementation truth to a broader production-default
+      operating posture?
 
 ## References
 
@@ -201,5 +201,5 @@ follow-on tasks include:
 
 *Created: 2026-03-19*
 *Author: Codex*
-*Last updated: 2026-03-29*
+*Last updated: 2026-04-04*
 *Related Plan: [PLAN-023](../plans/PLAN-023-a2a-layering-and-collaboration-artifact-alignment.md)*
