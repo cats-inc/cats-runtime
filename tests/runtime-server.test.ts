@@ -461,12 +461,14 @@ describe('runtime server', () => {
         expect(html).toContain('apiKeyInput');
         expect(html).toContain("window.CatsUI && window.CatsUI.apiFetch");
         expect(html).toContain('validateApiKeyInput');
-        expect(html).toContain('Workflows');
-        expect(html).toContain('Configured Targets');
+        expect(html).toContain('Stages');
+        expect(html).toContain('Runtime Targets');
         expect(html).toContain('setupRailProviders');
         expect(html).toContain('setupRailConfiguredTargets');
+        expect(html).toContain('providersWorkspaceStatus');
         expect(html).toContain('setupTargetList');
         expect(html).toContain('setupTargetListSummary');
+        expect(html).toContain('Target Catalog');
         expect(html).toContain('setupCapabilityProvider');
         expect(html).toContain('setupCapabilityInstance');
         expect(html).toContain('loadConfiguredTargetCapabilities');

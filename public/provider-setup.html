@@ -308,6 +308,11 @@
   .setup-status-badge {
     gap: 0.5rem;
   }
+  .runtime-auth-badge[data-state="warning"] {
+    border-color: rgb(146 64 14 / 0.85);
+    background: rgb(120 53 15 / 0.18);
+    color: rgb(251 191 36);
+  }
 </style>
 </head>
 <body class="runtime-shell" data-runtime-surface="__CATS_RUNTIME_SURFACE__" data-bootstrap-required="__CATS_RUNTIME_BOOTSTRAP_REQUIRED__">
@@ -321,8 +326,8 @@
       <div id="setupWorkflowSection" class="runtime-sidebar-surface flex min-h-0 flex-col overflow-hidden">
         <div class="runtime-sidebar-section">
           <div class="setup-workflow-heading flex items-center justify-between gap-3">
-            <p class="runtime-sidebar-title">Workflows</p>
-            <span id="setupWorkflowMode" class="runtime-auth-badge" data-state="idle">Bootstrap</span>
+            <p class="runtime-sidebar-title">Stages</p>
+            <span id="setupWorkflowMode" class="runtime-auth-badge" data-state="idle">Setup Required</span>
           </div>
         </div>
 
@@ -357,13 +362,13 @@
               onclick="setActiveSetupWorkspace('configured-targets')"
             >
               <span class="setup-workflow-item-title-row">
-                <span class="setup-workflow-item-title">Configured Targets</span>
+                <span class="setup-workflow-item-title">Runtime Targets</span>
                 <span id="configuredTargetsRailBadge" class="setup-workflow-item-pill">Loading</span>
               </span>
               <span id="configuredTargetsRailSummary" class="setup-workflow-item-summary">
-                Inspect the runtime-owned behavior of configured provider targets.
+                Inspect the runtime-owned behavior of applied provider targets.
               </span>
-              <span id="configuredTargetsRailMeta" class="setup-workflow-item-meta">Loading configured target catalog.</span>
+              <span id="configuredTargetsRailMeta" class="setup-workflow-item-meta">Loading runtime target catalog.</span>
             </button>
           </div>
         </div>
@@ -409,13 +414,7 @@
             <h1 class="font-semibold tracking-tight text-white" style="margin-top:0.125rem;font-size:21px;line-height:1.15;">Setup &amp; Repair</h1>
           </div>
           <div class="runtime-page-toolbar-row min-w-0 flex-1 justify-end text-sm">
-            <div class="flex min-w-0 items-center gap-3 rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1.5">
-              <span id="statusText" class="min-w-0 text-sm text-slate-400">Loading runtime setup state...</span>
-              <span id="statusBadge" class="status-badge status-badge-bootstrap setup-status-badge">
-                <span id="statusBadgeLabel">Bootstrap</span>
-                <span id="statusBadgeDot" class="runtime-shell-health-dot !h-2 !w-2" data-state="idle"></span>
-              </span>
-            </div>
+            <span id="statusText" class="hidden" hidden>Loading runtime setup state...</span>
           </div>
         </div>
       </header>
@@ -432,6 +431,7 @@
                     providers you want to write into this runtime config.
                   </p>
                 </div>
+                <span id="providersWorkspaceStatus" class="status-badge status-badge-bootstrap">Bootstrap</span>
               </div>
               <div class="space-y-4 p-4 sm:p-5">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -495,9 +495,9 @@
             <section class="runtime-card">
               <div class="runtime-card-header">
                 <div>
-                  <h2 class="runtime-card-title">Configured Targets</h2>
+                  <h2 class="runtime-card-title">Runtime Targets</h2>
                   <p class="runtime-card-copy">
-                    Inspect the runtime-owned behavior of currently configured
+                    Inspect the runtime-owned behavior of currently applied
                     provider targets, including transport, continuity, and
                     remote tool visibility.
                   </p>
@@ -508,20 +508,20 @@
                 <div class="setup-capability-workspace">
                   <div class="setup-target-list-panel">
                     <div class="setup-target-list-header">
-                      <p class="setup-summary-label">Configured Catalog</p>
+                      <p class="setup-summary-label">Target Catalog</p>
                       <p id="setupTargetListSummary" class="setup-target-list-copy">
-                        Loading configured target catalog...
+                        Loading runtime target catalog...
                       </p>
                     </div>
                     <div id="setupTargetList" class="setup-target-list">
-                      <div class="setup-target-empty">Loading configured target catalog...</div>
+                      <div class="setup-target-empty">Loading runtime target catalog...</div>
                     </div>
                     <div class="setup-capability-hidden-inputs" aria-hidden="true">
                       <div class="setup-capability-toolbar">
                         <div class="runtime-field">
                           <label class="runtime-field-label">Provider</label>
                           <select id="setupCapabilityProvider" class="runtime-select" onchange="onSetupCapabilityProviderChange()">
-                            <option value="">Loading configured targets</option>
+                            <option value="">Loading runtime targets</option>
                           </select>
                         </div>
                         <div class="runtime-field" id="setupCapabilityInstanceGroup">
@@ -535,7 +535,7 @@
                   </div>
                   <div class="setup-capability-panel">
                     <p id="setupCapabilitySummary" class="setup-capability-summary">
-                      Loading configured target capabilities...
+                      Loading runtime target capabilities...
                     </p>
                     <dl id="setupCapabilityGrid" class="setup-capability-grid"></dl>
                     <div id="setupCapabilityTags" class="setup-capability-tags"></div>
@@ -567,7 +567,7 @@ let configuredTargetCatalog = null;
 let activeSetupWorkspace = 'providers';
 let configuredTargetsState = {
   status: 'loading',
-  detail: 'Loading configured target catalog.',
+  detail: 'Loading runtime target catalog.',
 };
 const setupToolingCache = new Map();
 const setupToolingInFlight = new Map();
@@ -608,6 +608,54 @@ function formatTimestamp(value) {
 
 function pluralize(count, noun) {
   return `${count} ${noun}${count === 1 ? '' : 's'}`;
+}
+
+function scanAvailableCount(scan) {
+  if (!scan) {
+    return 0;
+  }
+  if (typeof scan.availableCount === 'number') {
+    return scan.availableCount;
+  }
+  return Array.isArray(scan.providers)
+    ? scan.providers.filter((provider) => provider.available).length
+    : 0;
+}
+
+function deriveSetupLifecycle(data) {
+  if (!data?.bootstrapRequired) {
+    return {
+      label: 'Configured',
+      state: 'active',
+      message: 'Runtime configuration is available for normal operation.',
+    };
+  }
+
+  if (scanAvailableCount(data?.scan) > 0) {
+    return {
+      label: 'Pending Apply',
+      state: 'warning',
+      message: 'Scan complete. Apply at least one available provider to finish setup.',
+    };
+  }
+
+  return {
+    label: 'Setup Required',
+    state: 'idle',
+    message: 'Scan providers to discover what can be configured for this runtime.',
+  };
+}
+
+function currentBootstrapRequired() {
+  if (typeof latestSetupState?.bootstrapRequired === 'boolean') {
+    return latestSetupState.bootstrapRequired;
+  }
+
+  const attr = document.body?.dataset?.bootstrapRequired;
+  if (attr === 'false') {
+    return false;
+  }
+  return true;
 }
 
 function setActiveSetupWorkspace(workspace) {
@@ -672,6 +720,13 @@ function updateProvidersWorkspaceMetrics() {
     : 0;
   const attentionCount = hasScan ? providerCount - readyCount : 0;
   const selection = selectableProviderSummary();
+  const providersWorkspaceStatus = document.getElementById('providersWorkspaceStatus');
+
+  if (providersWorkspaceStatus) {
+    const bootstrapRequired = currentBootstrapRequired();
+    providersWorkspaceStatus.className = `status-badge ${bootstrapRequired ? 'status-badge-bootstrap' : 'status-badge-ready'}`;
+    providersWorkspaceStatus.textContent = bootstrapRequired ? 'Bootstrap' : 'Active';
+  }
 
   const workspaceSummary = hasScan
     ? attentionCount > 0
@@ -793,32 +848,32 @@ function updateConfiguredTargetsRail() {
   switch (configuredTargetsState.status) {
     case 'loading':
       badge.textContent = 'Loading';
-      summary.textContent = 'Loading configured provider targets for runtime inspection.';
+      summary.textContent = 'Loading applied runtime targets for inspection.';
       meta.textContent = configuredTargetsState.detail;
       return;
     case 'locked':
       badge.textContent = 'Locked';
-      summary.textContent = 'Provide the runtime bearer token to inspect configured targets.';
+      summary.textContent = 'Provide the runtime bearer token to inspect runtime targets.';
       meta.textContent = configuredTargetsState.detail;
       return;
     case 'unavailable':
       badge.textContent = 'Unavailable';
-      summary.textContent = 'Configured targets could not be loaded right now.';
+      summary.textContent = 'Runtime targets could not be loaded right now.';
       meta.textContent = configuredTargetsState.detail;
       return;
     case 'empty':
       badge.textContent = 'Empty';
-      summary.textContent = 'No configured provider targets exist yet.';
+      summary.textContent = 'No runtime targets exist yet.';
       meta.textContent = 'Apply selected providers to inspect runtime behavior here.';
       return;
     default:
       badge.textContent = instanceCount === 1 ? '1 target' : `${instanceCount} targets`;
       summary.textContent = providerCount === 1
         ? 'Inspect the active runtime target and its tooling surface.'
-        : `Inspect ${providerCount} configured providers and their runtime-owned target behavior.`;
+        : `Inspect ${providerCount} applied providers and their runtime-owned target behavior.`;
       meta.textContent = providerName && instanceTarget
         ? 'Open the workspace to inspect the selected target in detail.'
-        : `${instanceCount} configured target(s) available for inspection.`;
+        : `${instanceCount} runtime target(s) available for inspection.`;
   }
 }
 
@@ -847,28 +902,12 @@ async function fetchState() {
 }
 
 function updateStatusBar(data) {
-  const badge = document.getElementById('statusBadge');
-  const badgeLabel = document.getElementById('statusBadgeLabel');
-  const badgeDot = document.getElementById('statusBadgeDot');
   const workflowMode = document.getElementById('setupWorkflowMode');
   const text = document.getElementById('statusText');
-  if (data.bootstrapRequired) {
-    badge.className = 'status-badge status-badge-bootstrap';
-    badge.classList.add('setup-status-badge');
-    badgeLabel.textContent = 'Bootstrap';
-    badgeDot.dataset.state = 'idle';
-    workflowMode.textContent = 'Bootstrap';
-    workflowMode.dataset.state = 'idle';
-    text.textContent = 'Provider setup required before normal operation.';
-  } else {
-    badge.className = 'status-badge status-badge-ready';
-    badge.classList.add('setup-status-badge');
-    badgeLabel.textContent = 'Ready';
-    badgeDot.dataset.state = 'active';
-    workflowMode.textContent = 'Ready';
-    workflowMode.dataset.state = 'active';
-    text.textContent = 'Runtime configuration is available for normal operation.';
-  }
+  const lifecycle = deriveSetupLifecycle(data);
+  workflowMode.textContent = lifecycle.label;
+  workflowMode.dataset.state = lifecycle.state;
+  text.textContent = lifecycle.message;
 }
 
 function configuredProviderMeta(providerName) {
@@ -964,7 +1003,7 @@ function configuredTargetListDescription(instance) {
   if (instance?.runtime?.mode) {
     bits.push(`${humanizeToken(instance.runtime.mode)} runtime`);
   }
-  return bits.length > 0 ? bits.join(' · ') : 'Configured runtime target';
+  return bits.length > 0 ? bits.join(' · ') : 'Runtime target';
 }
 
 function renderConfiguredTargetList() {
@@ -975,22 +1014,22 @@ function renderConfiguredTargetList() {
   }
 
   if (!configuredTargetCatalog?.providers) {
-    summary.textContent = 'Loading configured target catalog...';
-    list.innerHTML = '<div class="setup-target-empty">Loading configured target catalog...</div>';
+    summary.textContent = 'Loading runtime target catalog...';
+    list.innerHTML = '<div class="setup-target-empty">Loading runtime target catalog...</div>';
     return;
   }
 
   const entries = configuredTargetEntries();
   if (entries.length === 0) {
-    summary.textContent = 'No configured targets are available yet.';
+    summary.textContent = 'No runtime targets are available yet.';
     list.innerHTML = '<div class="setup-target-empty">Apply a runtime config first, then inspect targets here.</div>';
     return;
   }
 
   const providerCount = new Set(entries.map((entry) => entry.providerName)).size;
   summary.textContent = providerCount === 1
-    ? `${entries.length} target${entries.length === 1 ? '' : 's'} from 1 configured provider.`
-    : `${entries.length} targets across ${providerCount} configured providers.`;
+    ? `${entries.length} target${entries.length === 1 ? '' : 's'} from 1 applied provider.`
+    : `${entries.length} targets across ${providerCount} applied providers.`;
 
   const current = currentSetupCapabilitySelection();
     list.innerHTML = entries.map((entry) => {
@@ -1045,14 +1084,14 @@ function syncConfiguredTargetSelection(providerName, preferredInstanceTarget) {
   }
 
   if (instances.length === 0) {
-    instanceSelect.innerHTML = '<option value="">No configured instances</option>';
+    instanceSelect.innerHTML = '<option value="">No runtime targets</option>';
     instanceSelect.value = '';
     instanceSelect.disabled = true;
     instanceGroup.style.display = 'none';
-    setConfiguredTargetsWorkspaceState('empty', 'This provider has no configured runtime targets yet.');
+    setConfiguredTargetsWorkspaceState('empty', 'This provider has no runtime targets yet.');
     renderConfiguredTargetList();
     renderSetupCapabilityEmpty(
-      'This provider has no configured runtime targets yet.',
+      'This provider has no runtime targets yet.',
       'Empty',
       'status-badge-unknown',
     );
@@ -1160,14 +1199,14 @@ function syncSetupCapabilitySelectors() {
   }
 
   if (!configuredTargetCatalog?.providers) {
-    providerSelect.innerHTML = '<option value="">Loading configured targets</option>';
+    providerSelect.innerHTML = '<option value="">Loading runtime targets</option>';
     providerSelect.disabled = true;
     instanceSelect.innerHTML = '<option value="">Loading instances</option>';
     instanceSelect.disabled = true;
     instanceGroup.style.display = 'none';
-    setConfiguredTargetsWorkspaceState('loading', 'Loading configured target catalog.');
+    setConfiguredTargetsWorkspaceState('loading', 'Loading runtime target catalog.');
     renderConfiguredTargetList();
-    renderSetupCapabilityEmpty('Loading configured target capabilities...', 'Loading', 'status-badge-unknown');
+    renderSetupCapabilityEmpty('Loading runtime target capabilities...', 'Loading', 'status-badge-unknown');
     return;
   }
 
@@ -1176,15 +1215,15 @@ function syncSetupCapabilitySelectors() {
   );
 
   if (providers.length === 0) {
-    providerSelect.innerHTML = '<option value="">No configured targets</option>';
+    providerSelect.innerHTML = '<option value="">No runtime targets</option>';
     providerSelect.disabled = true;
-    instanceSelect.innerHTML = '<option value="">No configured instances</option>';
+    instanceSelect.innerHTML = '<option value="">No runtime targets</option>';
     instanceSelect.disabled = true;
     instanceGroup.style.display = 'none';
-    setConfiguredTargetsWorkspaceState('empty', 'No configured provider targets yet.');
+    setConfiguredTargetsWorkspaceState('empty', 'No runtime targets yet.');
     renderConfiguredTargetList();
     renderSetupCapabilityEmpty(
-      'No configured provider targets yet. Apply a runtime config first, then inspect targets here.',
+      'No runtime targets yet. Apply a runtime config first, then inspect targets here.',
       'Empty',
       'status-badge-unknown',
     );
@@ -1197,7 +1236,7 @@ function syncSetupCapabilitySelectors() {
     .join('');
   providerSelect.disabled = false;
   providerSelect.value = current;
-  setConfiguredTargetsWorkspaceState('ready', `${providers.length} configured provider(s) available.`);
+  setConfiguredTargetsWorkspaceState('ready', `${providers.length} applied provider(s) available.`);
   syncConfiguredTargetSelection(current, instanceSelect.value);
 }
 
@@ -1261,7 +1300,7 @@ async function refreshSetupCapabilityPreview() {
   if (!providerName || !instance) {
     updateConfiguredTargetsRail();
     renderSetupCapabilityEmpty(
-      'Choose a configured target to inspect runtime behavior.',
+      'Choose a runtime target to inspect runtime behavior.',
       'Empty',
       'status-badge-unknown',
     );
@@ -1317,7 +1356,7 @@ async function refreshSetupCapabilityPreview() {
     tags.push('live models');
   }
 
-  setSetupCapabilityStatus('Configured', 'status-badge-ready');
+  setSetupCapabilityStatus('Available', 'status-badge-ready');
   document.getElementById('setupCapabilitySummary').textContent = tooling?.summary
     || 'No additional runtime capability summary is available for this target yet.';
   document.getElementById('setupCapabilityGrid').innerHTML = setupCapabilityGridRows({
@@ -1342,20 +1381,20 @@ async function loadConfiguredTargetCapabilities() {
     return false;
   }
 
-  setConfiguredTargetsWorkspaceState('loading', 'Loading configured target catalog.');
+  setConfiguredTargetsWorkspaceState('loading', 'Loading runtime target catalog.');
   setSetupCapabilityStatus('Loading', 'status-badge-unknown');
-  providerSelect.innerHTML = '<option value="">Loading configured targets</option>';
+  providerSelect.innerHTML = '<option value="">Loading runtime targets</option>';
   providerSelect.disabled = true;
   instanceSelect.innerHTML = '<option value="">Loading instances</option>';
   instanceSelect.disabled = true;
   instanceGroup.style.display = 'none';
   if (targetListSummary) {
-    targetListSummary.textContent = 'Loading configured target catalog...';
+    targetListSummary.textContent = 'Loading runtime target catalog...';
   }
   if (targetList) {
-    targetList.innerHTML = '<div class="setup-target-empty">Loading configured target catalog...</div>';
+    targetList.innerHTML = '<div class="setup-target-empty">Loading runtime target catalog...</div>';
   }
-  document.getElementById('setupCapabilitySummary').textContent = 'Loading configured target capabilities...';
+  document.getElementById('setupCapabilitySummary').textContent = 'Loading runtime target capabilities...';
   document.getElementById('setupCapabilityGrid').innerHTML = '';
   document.getElementById('setupCapabilityTags').innerHTML = '';
   document.getElementById('setupCapabilityCatalog').innerHTML = '';
@@ -1382,12 +1421,12 @@ async function loadConfiguredTargetCapabilities() {
     const authBlocked = message.includes('401') || message.includes('403');
     setConfiguredTargetsWorkspaceState(
       authBlocked ? 'locked' : 'unavailable',
-      authBlocked ? 'Auth required for configured target inspection.' : message,
+      authBlocked ? 'Auth required for runtime target inspection.' : message,
     );
     renderSetupCapabilityEmpty(
       authBlocked
-        ? 'Provide the runtime bearer token to inspect configured targets.'
-        : `Failed to load configured targets: ${message}`,
+        ? 'Provide the runtime bearer token to inspect runtime targets.'
+        : `Failed to load runtime targets: ${message}`,
       authBlocked ? 'Locked' : 'Unavailable',
       authBlocked ? 'status-badge-degraded' : 'status-badge-unavailable',
     );
@@ -1398,14 +1437,14 @@ async function loadConfiguredTargetCapabilities() {
     instanceGroup.style.display = 'none';
     if (targetListSummary) {
       targetListSummary.textContent = authBlocked
-        ? 'Auth is required before the runtime can list configured targets.'
-        : 'Configured target catalog is temporarily unavailable.';
+        ? 'Auth is required before the runtime can list runtime targets.'
+        : 'Runtime target catalog is temporarily unavailable.';
     }
     if (targetList) {
       targetList.innerHTML = `<div class="setup-target-empty">${escapeHtml(
         authBlocked
-          ? 'Provide the runtime bearer token to inspect configured targets.'
-          : `Failed to load configured targets: ${message}`,
+          ? 'Provide the runtime bearer token to inspect runtime targets.'
+          : `Failed to load runtime targets: ${message}`,
       )}</div>`;
     }
     return false;
@@ -1510,6 +1549,12 @@ async function runScan() {
     if (data.scan) {
       if (latestSetupState) {
         latestSetupState.scan = data.scan;
+        updateStatusBar(latestSetupState);
+      } else {
+        updateStatusBar({
+          bootstrapRequired: true,
+          scan: data.scan,
+        });
       }
       renderScanResults(data.scan);
     }

@@ -307,7 +307,7 @@ describe('bootstrap mode server', () => {
         const html = await response.text();
         expect(html).toContain('Setup &amp; Repair');
         expect(html).toContain('Providers');
-        expect(html).toContain('Configured Targets');
+        expect(html).toContain('Runtime Targets');
         expect(html).toContain('setupTargetList');
         expect(html).toContain('setupCapabilityProvider');
         expect(html).toContain('setupRailProviders');
