@@ -106,7 +106,7 @@ To sync skills after changes:
 - Keep it concise and specific to the project (e.g., main service port, core modules, test command).
 - `cats-runtime` default HTTP port is `3110`; restart helper is `scripts/windows/Restart-Server.ps1`.
 - When invoking `scripts/windows/Restart-Server.ps1` from Codex, **MUST** pass `-NoRedirect`.
-- Reason: `Start-Process` with `-RedirectStandardOutput/-RedirectStandardError` keeps `shell_command` attached to the long-lived `node dist/index.js` process, so the command appears hung even after the server is healthy.
+- Reason: `Start-Process` with `-RedirectStandardOutput/-RedirectStandardError` keeps `shell_command` attached to the long-lived `node build/runtime/index.js` process, so the command appears hung even after the server is healthy.
 
 ---
 

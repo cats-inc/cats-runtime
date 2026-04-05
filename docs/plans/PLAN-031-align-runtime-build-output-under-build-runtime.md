@@ -1,6 +1,6 @@
 # PLAN-031: Align Runtime Build Output Under `build/runtime`
 
-Status: In Progress
+Status: Completed
 
 ## Related Decisions
 
@@ -63,27 +63,27 @@ cats-runtime/
 
 ### Phase 1: Freeze the Runtime Output Contract
 
-- [ ] Confirm `build/runtime/` as the only compiled runtime output root.
-- [ ] Audit current references to:
+- [x] Confirm `build/runtime/` as the only compiled runtime output root.
+- [x] Audit current references to:
       - `dist/index.js`
       - `dist/bin/*`
       - `dist/index.d.ts`
       - repo-local docs or scripts that still describe `dist/`
-- [ ] Freeze the no-legacy-shim rule for the runtime output migration.
+- [x] Freeze the no-legacy-shim rule for the runtime output migration.
 
 **Deliverables**: one explicit runtime output contract and an inventory of all
 affected references.
 
 ### Phase 2: Move Package Metadata to `build/runtime`
 
-- [ ] Change `tsconfig.json` `outDir` from `dist` to `build/runtime`.
-- [ ] Update `package.json`:
+- [x] Change `tsconfig.json` `outDir` from `dist` to `build/runtime`.
+- [x] Update `package.json`:
       - `main`
       - `types`
       - `exports`
       - `bin`
       - `files`
-- [ ] Rename cleanup script vocabulary as needed
+- [x] Rename cleanup script vocabulary as needed
       (`clean-dist` -> `clean-build`) so runtime scripts no longer advertise
       the old layout.
 
@@ -92,11 +92,11 @@ affected references.
 
 ### Phase 3: Update Runtime-Owned Scripts and Tooling
 
-- [ ] Update restart/start/pack/install helpers that execute:
+- [x] Update restart/start/pack/install helpers that execute:
       - `dist/index.js`
       - `dist/bin/*`
-- [ ] Update release-check and verification helpers that assume `dist/`.
-- [ ] Update `.gitignore` and cleanup scripts to cover `build/runtime/` and
+- [x] Update release-check and verification helpers that assume `dist/`.
+- [x] Update `.gitignore` and cleanup scripts to cover `build/runtime/` and
       remove stale `dist/` assumptions.
 
 **Deliverables**: runtime-owned operational scripts all execute the new output
@@ -104,10 +104,10 @@ root.
 
 ### Phase 4: Sweep Tests, Docs, and Cross-Package Consumers
 
-- [ ] Update tests and fixtures asserting `dist/`.
-- [ ] Update current docs and release guidance so they no longer describe
+- [x] Update tests and fixtures asserting `dist/`.
+- [x] Update current docs and release guidance so they no longer describe
       `dist/` as the compiled runtime root.
-- [ ] Coordinate with `cats-platform` `PLAN-039` so desktop packaging and
+- [x] Coordinate with `cats-platform` `PLAN-039` so desktop packaging and
       sidecar staging stop assuming the runtime still emits to `dist/`.
 
 **Deliverables**: current runtime docs, tests, and platform consumers all
@@ -151,6 +151,7 @@ Use targeted, package-level validation.
 | 2026-04-06 | Plan created to move `cats-runtime` from `dist/` to `build/runtime/` under runtime package ownership |
 | 2026-04-06 | Phase 2/3 slice 1 landed: moved runtime package metadata and compiler output to `build/runtime`, renamed the cleanup script to `scripts/clean-build.mjs`, updated runtime-owned restart/autostart/workspace-substrate helpers plus package-contract/workspace-substrate/autostart tests to the new compiled entrypoints, and hardened startup version resolution so both `tsx src/*` dev runs and compiled `build/runtime/*` entrypoints resolve the package root correctly; validation included `npm run build`, `node build/runtime/index.js --help`, and `npx vitest run tests/package-contract.test.ts tests/workspace-substrate-bin.test.ts tests/linux-autostart.test.ts tests/macos-autostart.test.ts --pool=threads --poolOptions.threads.singleThread` |
 | 2026-04-06 | Phase 4 slice 2 updated current runtime-facing docs and release/deployment guidance to use `build/runtime/` and `build/runtime/bin/*` instead of `dist/`, keeping the active package contract aligned before the cross-package `cats-platform` consumer migration lands |
+| 2026-04-06 | Final sweep completed: aligned runtime-owned CLI help text, direct-entrypoint tests, package-lock root bin metadata, Codex notes, and roadmap references with `build/runtime`, then closed the paired `cats-platform` consumer migration so no active runtime/platform code, tests, scripts, or current docs still depend on `dist/` as the compiled runtime root |
 
 ---
 

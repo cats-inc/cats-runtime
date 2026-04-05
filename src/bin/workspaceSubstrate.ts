@@ -40,7 +40,7 @@ function printUsage(): void {
   process.stdout.write(`cats-runtime workspace substrate helper
 
 Usage:
-  node dist/bin/workspaceSubstrate.js --operation <audit|init|update> [options]
+  node build/runtime/bin/workspaceSubstrate.js --operation <audit|init|update> [options]
 
 Options:
   --workspace-path <path>         Target workspace path (default: current dir)

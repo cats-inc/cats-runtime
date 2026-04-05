@@ -6,8 +6,8 @@ import { isDirectCliEntrypoint } from './cliEntrypoint.js';
 describe('isDirectCliEntrypoint', () => {
   it('matches when argv path already equals the module path', () => {
     const argvPath = process.platform === 'win32'
-      ? 'C:\\tmp\\cats-runtime\\dist\\index.js'
-      : '/tmp/cats-runtime/dist/index.js';
+      ? 'C:\\tmp\\cats-runtime\\build\\runtime\\index.js'
+      : '/tmp/cats-runtime/build/runtime/index.js';
     expect(isDirectCliEntrypoint(
       pathToFileURL(argvPath).href,
       argvPath,
@@ -16,8 +16,8 @@ describe('isDirectCliEntrypoint', () => {
 
   it('matches when argv path resolves through a symlink', () => {
     const resolvedPath = process.platform === 'win32'
-      ? 'C:\\opt\\cats-runtime\\dist\\index.js'
-      : '/opt/cats-runtime/dist/index.js';
+      ? 'C:\\opt\\cats-runtime\\build\\runtime\\index.js'
+      : '/opt/cats-runtime/build/runtime/index.js';
     expect(isDirectCliEntrypoint(
       pathToFileURL(resolvedPath).href,
       '/usr/local/bin/cats-runtime',
@@ -30,7 +30,7 @@ describe('isDirectCliEntrypoint', () => {
 
   it('returns false when the resolved path points somewhere else', () => {
     expect(isDirectCliEntrypoint(
-      'file:///opt/cats-runtime/dist/index.js',
+      'file:///opt/cats-runtime/build/runtime/index.js',
       '/usr/local/bin/cats-runtime',
       () => '/opt/other/index.js',
     )).toBe(false);
@@ -38,14 +38,14 @@ describe('isDirectCliEntrypoint', () => {
 
   it('returns false when argv path is missing', () => {
     expect(isDirectCliEntrypoint(
-      'file:///opt/cats-runtime/dist/index.js',
+      'file:///opt/cats-runtime/build/runtime/index.js',
       undefined,
     )).toBe(false);
   });
 
   it('returns false when realpath lookup fails', () => {
     expect(isDirectCliEntrypoint(
-      'file:///opt/cats-runtime/dist/index.js',
+      'file:///opt/cats-runtime/build/runtime/index.js',
       '/usr/local/bin/cats-runtime',
       () => {
         throw new Error('boom');
