@@ -307,6 +307,20 @@ describe('runtime server', () => {
     });
   });
 
+  it('redirects surface pages to /setup while bootstrap is incomplete', async () => {
+    await withRuntime(
+      {},
+      { startup: createRuntimeStartupState({ bootstrapRequired: true }) },
+      async (runtime) => {
+        for (const path of ['/', '/dashboard', '/playground']) {
+          const response = await runtime.app.request(path);
+          expect(response.status).toBe(302);
+          expect(response.headers.get('location')).toBe('/setup');
+        }
+      },
+    );
+  });
+
   it('GET /playground serves the embedded playground without auth', async () => {
     await withRuntime({ apiKey: 'runtime-secret' }, {}, async (runtime) => {
       const response = await runtime.app.request('/playground');

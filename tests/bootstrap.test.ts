@@ -293,7 +293,7 @@ describe('WSL default discovery policy', () => {
 // ---------------------------------------------------------------------------
 
 describe('bootstrap mode server', () => {
-  it('GET / serves provider setup page in bootstrap mode', async () => {
+  it('GET / redirects to /setup in bootstrap mode', async () => {
     const { root, cleanup } = createTestRoot();
     try {
       const env = createTestEnv(root);
@@ -303,14 +303,8 @@ describe('bootstrap mode server', () => {
       const runtime = createRuntimeServer(config, { startup });
       try {
         const response = await runtime.app.request('/');
-        expect(response.status).toBe(200);
-        const html = await response.text();
-        expect(html).toContain('Setup &amp; Repair');
-        expect(html).toContain('Providers');
-        expect(html).toContain('Runtime Targets');
-        expect(html).toContain('setupTargetList');
-        expect(html).toContain('setupCapabilityProvider');
-        expect(html).toContain('setupRailProviders');
+        expect(response.status).toBe(302);
+        expect(response.headers.get('location')).toBe('/setup');
       } finally {
         await runtime.close();
       }
@@ -319,7 +313,7 @@ describe('bootstrap mode server', () => {
     }
   });
 
-  it('GET /dashboard always serves the dashboard', async () => {
+  it('GET /dashboard redirects to /setup in bootstrap mode', async () => {
     const { root, cleanup } = createTestRoot();
     try {
       const env = createTestEnv(root);
@@ -329,11 +323,28 @@ describe('bootstrap mode server', () => {
       const runtime = createRuntimeServer(config, { startup });
       try {
         const response = await runtime.app.request('/dashboard');
-        expect(response.status).toBe(200);
-        const html = await response.text();
-        expect(html).toContain('Cats Runtime Dashboard');
-        expect(html).not.toContain('id="providerCapabilityPreview"');
-        expect(html).toContain('id="chatSessionInsights"');
+        expect(response.status).toBe(302);
+        expect(response.headers.get('location')).toBe('/setup');
+      } finally {
+        await runtime.close();
+      }
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('GET /playground redirects to /setup in bootstrap mode', async () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const env = createTestEnv(root);
+      ensureDirs(env);
+      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
+      const startup = createRuntimeStartupState({ bootstrapRequired: true });
+      const runtime = createRuntimeServer(config, { startup });
+      try {
+        const response = await runtime.app.request('/playground');
+        expect(response.status).toBe(302);
+        expect(response.headers.get('location')).toBe('/setup');
       } finally {
         await runtime.close();
       }
@@ -1012,7 +1023,7 @@ describe('bootstrap mode server', () => {
     }
   });
 
-  it('GET / in bootstrap mode includes shared UI foundation', async () => {
+  it('GET /setup in bootstrap mode includes shared UI foundation', async () => {
     const { root, cleanup } = createTestRoot();
     try {
       const env = createTestEnv(root);
@@ -1021,7 +1032,7 @@ describe('bootstrap mode server', () => {
       const startup = createRuntimeStartupState({ bootstrapRequired: true });
       const runtime = createRuntimeServer(config, { startup });
       try {
-        const response = await runtime.app.request('/');
+        const response = await runtime.app.request('/setup');
         expect(response.status).toBe(200);
         const html = await response.text();
         expect(html).toContain('Setup &amp; Repair');

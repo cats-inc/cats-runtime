@@ -266,20 +266,21 @@ export function createRuntimeApp(ctx: AppContext) {
     return html;
   }
 
-  // Serve the root page: setup page in bootstrap mode, dashboard otherwise.
+  // Surface pages redirect into /setup while bootstrap remains incomplete.
   app.get('/', (c) => {
     if (ctx.startup?.bootstrapRequired) {
-      return c.html(renderRuntimePage('../../public/provider-setup.html', 'setup', {
-        includeHealthOverlay: true,
-      }));
+      return c.redirect('/setup', 302);
     }
     return c.html(renderRuntimePage('../../public/index.html', 'dashboard', {
       includeHealthOverlay: true,
     }));
   });
 
-  // Dashboard always accessible regardless of bootstrap mode.
+  // Dashboard is gated behind bootstrap completion.
   app.get('/dashboard', (c) => {
+    if (ctx.startup?.bootstrapRequired) {
+      return c.redirect('/setup', 302);
+    }
     return c.html(renderRuntimePage('../../public/index.html', 'dashboard', {
       includeHealthOverlay: true,
     }));
@@ -292,8 +293,11 @@ export function createRuntimeApp(ctx: AppContext) {
     }));
   });
 
-  // Serve the playground (multi-agent chat) without auth.
+  // Playground is gated behind bootstrap completion.
   app.get('/playground', (c) => {
+    if (ctx.startup?.bootstrapRequired) {
+      return c.redirect('/setup', 302);
+    }
     return c.html(renderRuntimePage('../../public/playground.html', 'playground', {
       includeHealthOverlay: true,
     }));
