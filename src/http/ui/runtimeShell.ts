@@ -1,6 +1,6 @@
 export type RuntimeSurface = 'dashboard' | 'playground' | 'setup';
 
-interface RuntimeSurfaceDescriptor {
+export interface RuntimeSurfaceDescriptor {
   id: RuntimeSurface;
   label: string;
   subtitle: string;
@@ -13,7 +13,7 @@ interface RuntimeShellStateInput {
   bootstrapRequired: boolean;
 }
 
-const SURFACES: readonly RuntimeSurfaceDescriptor[] = [
+export const RUNTIME_SURFACE_DESCRIPTORS: readonly RuntimeSurfaceDescriptor[] = [
   {
     id: 'dashboard',
     label: 'Dashboard',
@@ -48,8 +48,9 @@ export function injectRuntimeShellState(
 }
 
 function renderRuntimeSurfaceSwitcher(input: RuntimeShellStateInput): string {
-  const active = SURFACES.find((surface) => surface.id === input.surface) ?? SURFACES[0];
-  const menuItems = SURFACES.map((surface) => renderSurfaceItem(surface, input)).join('');
+  const active = RUNTIME_SURFACE_DESCRIPTORS.find((surface) => surface.id === input.surface)
+    ?? RUNTIME_SURFACE_DESCRIPTORS[0];
+  const menuItems = RUNTIME_SURFACE_DESCRIPTORS.map((surface) => renderSurfaceItem(surface, input)).join('');
 
   return `
     <div class="runtime-surface-switcher" data-runtime-surface-switcher data-active-surface="${escapeAttr(active.id)}" data-bootstrap-required="${input.bootstrapRequired ? 'true' : 'false'}" data-open="false">

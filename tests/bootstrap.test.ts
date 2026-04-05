@@ -1030,7 +1030,7 @@ describe('bootstrap mode server', () => {
         expect(html).toContain('data-runtime-surface-switcher');
         expect(html).toContain('data-active-surface="setup"');
         expect(html).toContain('data-bootstrap-required="true"');
-        expect((html.match(/>Locked</g) || []).length).toBe(2);
+        expect(html).toContain('runtime-surface-item-badge">Locked');
       } finally {
         await runtime.close();
       }

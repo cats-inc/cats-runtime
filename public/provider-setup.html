@@ -946,6 +946,13 @@ function restoreProviderSelection(selectedProviders) {
 
 function applySetupStateReadModel(data, selectedProviders = []) {
   latestSetupState = data;
+  if (
+    typeof data?.bootstrapRequired === 'boolean'
+    && window.CatsUI
+    && typeof window.CatsUI.syncRuntimeBootstrapState === 'function'
+  ) {
+    window.CatsUI.syncRuntimeBootstrapState(data.bootstrapRequired);
+  }
   updateStatusBar(data);
   if (data.scan && data.scan.providers) {
     renderScanResults(data.scan);

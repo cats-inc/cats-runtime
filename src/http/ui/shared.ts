@@ -9,6 +9,7 @@
 // ---------------------------------------------------------------------------
 
 import { GENERATED_RUNTIME_TAILWIND_CSS } from './generated/runtimeTailwind.js';
+import { RUNTIME_SURFACE_DESCRIPTORS } from './runtimeShell.js';
 
 // ---------------------------------------------------------------------------
 // CSS: Design Tokens
@@ -98,6 +99,101 @@ export const SHARED_UI_SCRIPT = `
 
   function escapeAttr(s) {
     return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  var runtimeSurfaceDescriptors = ${JSON.stringify(RUNTIME_SURFACE_DESCRIPTORS)};
+
+  function findRuntimeSurfaceDescriptor(surfaceId) {
+    for (var i = 0; i < runtimeSurfaceDescriptors.length; i++) {
+      if (runtimeSurfaceDescriptors[i] && runtimeSurfaceDescriptors[i].id === surfaceId) {
+        return runtimeSurfaceDescriptors[i];
+      }
+    }
+    return runtimeSurfaceDescriptors[0] || null;
+  }
+
+  function renderRuntimeSurfaceMenuItem(surface, activeSurface, bootstrapRequired) {
+    if (!surface || !surface.id) {
+      return '';
+    }
+
+    var isCurrent = surface.id === activeSurface;
+    var isLocked = bootstrapRequired && surface.id !== 'setup';
+    var classNames = ['runtime-surface-item'];
+    if (isCurrent) classNames.push('is-current');
+    if (isLocked) classNames.push('is-locked');
+
+    var badge = isLocked
+      ? '<span class="runtime-surface-item-badge">Locked</span>'
+      : isCurrent
+        ? '<span class="runtime-surface-item-badge">Current</span>'
+        : '';
+    var check = isCurrent
+      ? '<span class="runtime-surface-item-check" style="background:rgba(196,101,58,0.12);color:#C4653A;" aria-hidden="true">'
+        + '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+        + '<path d="m2.4 6.3 2.1 2.1 5.1-5.1" />'
+        + '</svg>'
+        + '</span>'
+      : '';
+    var content = ''
+      + '<span class="runtime-surface-swatch" style="' + escapeAttr(surface.swatchStyle || '') + '" aria-hidden="true"></span>'
+      + '<span class="runtime-surface-item-copy">'
+      + '<span class="runtime-surface-item-title-row">'
+      + '<span class="runtime-surface-item-title">' + escapeAttr(surface.label || '') + '</span>'
+      + badge
+      + '</span>'
+      + '<span class="runtime-surface-item-subtitle" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
+      + escapeAttr(surface.subtitle || '')
+      + '</span>'
+      + '</span>'
+      + check;
+
+    if (isLocked || isCurrent) {
+      return '<button type="button" class="' + escapeAttr(classNames.join(' ')) + '" disabled aria-disabled="true" role="menuitemradio" aria-checked="' + (isCurrent ? 'true' : 'false') + '">'
+        + content
+        + '</button>';
+    }
+
+    return '<a href="' + escapeAttr(surface.href || '#') + '" class="' + escapeAttr(classNames.join(' ')) + '" role="menuitemradio" aria-checked="false">'
+      + content
+      + '</a>';
+  }
+
+  function syncRuntimeSurfaceSwitcher(root, options) {
+    if (!(root instanceof Element)) return;
+    var activeSurface = options && options.activeSurface
+      ? options.activeSurface
+      : root.getAttribute('data-active-surface')
+        || document.body.getAttribute('data-runtime-surface')
+        || 'dashboard';
+    var bootstrapRequired = options && typeof options.bootstrapRequired === 'boolean'
+      ? options.bootstrapRequired
+      : root.getAttribute('data-bootstrap-required') === 'true';
+    var activeDescriptor = findRuntimeSurfaceDescriptor(activeSurface);
+    root.setAttribute('data-active-surface', activeSurface);
+    root.setAttribute('data-bootstrap-required', bootstrapRequired ? 'true' : 'false');
+    var triggerLabel = root.querySelector('.runtime-surface-trigger-label');
+    if (triggerLabel && activeDescriptor) {
+      triggerLabel.textContent = activeDescriptor.label || '';
+    }
+    var menuList = root.querySelector('.runtime-surface-menu-list');
+    if (menuList) {
+      menuList.innerHTML = runtimeSurfaceDescriptors.map(function(surface) {
+        return renderRuntimeSurfaceMenuItem(surface, activeSurface, bootstrapRequired);
+      }).join('');
+    }
+  }
+
+  function syncRuntimeBootstrapState(bootstrapRequired) {
+    var nextBootstrapRequired = bootstrapRequired === true;
+    if (document.body) {
+      document.body.setAttribute('data-bootstrap-required', nextBootstrapRequired ? 'true' : 'false');
+    }
+    var roots = document.querySelectorAll('[data-runtime-surface-switcher]');
+    for (var i = 0; i < roots.length; i++) {
+      syncRuntimeSurfaceSwitcher(roots[i], { bootstrapRequired: nextBootstrapRequired });
+    }
+    closeRuntimeSurfaceMenus();
   }
 
   function renderProviderBadge(provider, label) {
@@ -766,6 +862,8 @@ export const SHARED_UI_SCRIPT = `
     hideRuntimeTooltip: hideRuntimeTooltip,
     initRuntimeTooltips: initRuntimeTooltips,
     initRuntimeSurfaceSwitchers: initRuntimeSurfaceSwitchers,
+    syncRuntimeBootstrapState: syncRuntimeBootstrapState,
+    syncRuntimeSurfaceSwitcher: syncRuntimeSurfaceSwitcher,
   };
 
   if (document.readyState === 'loading') {
