@@ -32,7 +32,7 @@ Only Codex should read and maintain this file.
 
 - **MUST** read AGENTS.md at the start of every session
 - **MUST** follow the Development Workflow defined in AGENTS.md
-- **MUST NOT** skip testing when code changes are made
+- **MUST** run validation proportional to the change risk
 - **MUST NOT** modify other agents' files (CLAUDE.md, GEMINI.md)
 - **SHOULD** ask for clarification when requirements are ambiguous
 - **SHOULD** make minimal, focused edits
@@ -47,7 +47,8 @@ If assigned as Conductor in Project Roles table:
 
 ### Code Modification Rules
 
-- **MUST** update tests when modifying code
+- **MUST** prefer targeted tests or focused verification over full-suite runs
+- **MUST** update tests when behavior or contracts change
 - **MUST** update documentation when changing public APIs
 - **MUST** follow coding conventions specified in AGENTS.md
 - **MUST** respect `.editorconfig` settings (LF line endings, final newline, trim rules)
@@ -63,6 +64,19 @@ If assigned as Conductor in Project Roles table:
 - **MUST** prefer checked-in templates such as `*.example` files when configuration examples need to be documented or updated
 - **SHOULD** make minimal, focused changes
 - **SHOULD** commit frequently with clear messages
+
+### Testing Scope
+
+- Default to the smallest validation that can prove the change works.
+- Do **not** default to broad `vitest` or full integration sweeps for small or
+  localized edits.
+- Prefer file-scoped `vitest`, targeted CLI/runtime tests, focused build
+  checks, or a narrow manual verification of the touched flow.
+- Escalate to broader suites only when touching startup/bootstrap, storage
+  layout, provider contracts, shared compatibility layers, or HTTP surfaces
+  used by multiple paths.
+- For docs-only changes, do not run code tests unless the docs depend on a
+  command or behavior you re-verified.
 
 ### Agent Skills
 
@@ -82,7 +96,7 @@ To sync skills after changes:
 ### Preferred Behaviors
 
 - **Precision**: Keep edits minimal and surgical
-- **Testing**: Validate all changes work correctly
+- **Testing**: Use risk-based, targeted validation by default
 - **Configuration compliance**: Always respect `.editorconfig`
 - **Documentation**: Keep docs synchronized with code
 
@@ -100,4 +114,4 @@ To sync skills after changes:
 
 This file is maintained by Codex only. Other agents should not modify this file.
 
-Last updated: 2026-03-23
+Last updated: 2026-04-06
