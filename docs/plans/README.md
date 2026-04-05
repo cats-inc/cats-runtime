@@ -46,6 +46,7 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 
 | Plan | Title | Status | Related Spec |
 |------|-------|--------|--------------|
+| [PLAN-031](./PLAN-031-align-runtime-build-output-under-build-runtime.md) | Align Runtime Build Output Under `build/runtime` | Draft | N/A |
 | [PLAN-030](./PLAN-030-provider-setup-workflow-rail-and-workspace-split.md) | Provider Setup Workflow Rail and Workspace Split | Completed | [SPEC-017](../specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md), [PLAN-019](./PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md), [ADR-027](../decisions/027-adopt-a-playground-derived-dark-runtime-ui-shell-with-sidebar-surface-switching.md) |
 | [PLAN-028](./PLAN-028-truthful-provider-refusal-rate-limit-and-overload-surfacing.md) | Truthful Provider Refusal, Rate-Limit, and Overload Surfacing | Draft | [SPEC-010](../specs/SPEC-010-usage-metering-rate-limit-detection-and-execution-guardrails.md), [SPEC-007](../specs/SPEC-007-provider-compatibility-and-evidence-engine.md), [ADR-017](../decisions/017-own-usage-metering-rate-limit-detection-and-execution-guardrails.md) |
 | [PLAN-027](./PLAN-027-kilo-cli-provider-support-and-consumption.md) | Independent Kilo CLI Provider Support and Product Consumption | Completed | [SPEC-017](../specs/SPEC-017-standalone-provider-bootstrap-and-generated-config.md), [SPEC-018](../specs/SPEC-018-advanced-provider-model-catalog-and-selection-schema.md), [SPEC-023](../specs/SPEC-023-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md) |
@@ -103,4 +104,4 @@ Use [000-template.md](./000-template.md) as the starting point for new plans.
 ---
 
 *See also: [specs/](../specs/) for feature specifications*
-*Last updated: 2026-04-04*
+*Last updated: 2026-04-06*
