@@ -52,8 +52,10 @@ The package is now structured for executable npm distribution:
 Advanced operators can skip bootstrap by providing a valid config upfront:
 
 ```powershell
-copy config\providers.yaml.example config\providers.yaml
-# Edit providers.yaml to enable only the providers you need
+$runtimeHome = Join-Path $HOME '.cats\runtime'
+New-Item -ItemType Directory -Force -Path $runtimeHome | Out-Null
+Copy-Item config\providers.yaml.example (Join-Path $runtimeHome 'providers.yaml')
+# Edit ~/.cats/runtime/providers.yaml to enable only the providers you need
 cats-runtime
 ```
 
@@ -413,7 +415,7 @@ Keep `.env` for runtime-wide values and secrets:
 - `CATS_RUNTIME_API_KEY=`
 - `CATS_RUNTIME_DATA_DIR=...`
 - `CATS_RUNTIME_SESSION_BASE_DIR=...`
-- `CATS_RUNTIME_CONFIG_PATH=config/providers.yaml`
+- `CATS_RUNTIME_CONFIG_PATH=~/.cats/runtime/providers.yaml`
 - `CATS_RUNTIME_MAX_SESSIONS=10`
 - `CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS=5000`
 - `CATS_RUNTIME_WSL_DISCOVERY_POLICY=if_running`
@@ -458,7 +460,7 @@ Keep `.env` for runtime-wide values and secrets:
 - `AGENT_SDK_TOKEN=`
 
 Legacy provider-specific env vars still work, but new installs should prefer
-`config/providers.yaml`.
+the resolved `providers.yaml` config (default `~/.cats/runtime/providers.yaml`).
 
 Peer-specific notes:
 
@@ -475,9 +477,10 @@ Peer-specific notes:
   stronger mutual auth are still later follow-up work
 - advertise values should point at a host/port reachable by other LAN runtimes
 
-## Provider Instances (`config/providers.yaml`)
+## Provider Instances (`providers.yaml`)
 
-`config/providers.yaml` defines provider topology:
+The resolved `providers.yaml` config defaults to `~/.cats/runtime/providers.yaml`
+and defines provider topology:
 
 - `environments`: named execution environments such as `native` or a WSL distro
 - `routing.providers.<name>.default_target`: default backend and instance for that provider family
@@ -603,7 +606,7 @@ actually differs, usually `model`. That avoids copying the same API key across
 `claude.sonnet`, `gemini.flash`, and similar instance variants.
 
 Keep the actual secret values in `.env` or your host environment. The
-`config/providers.yaml` file should only reference env names such as
+`providers.yaml` should only reference env names such as
 `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY`.
 
 Agent backends follow the same pattern. Put shared gateway/auth settings such as
@@ -769,10 +772,11 @@ In that mode:
 - graceful shutdown may be triggered by `SIGINT`, `SIGTERM`, or by closing the
   child stdin stream from the host process
 
-By default, runtime metadata persists under `~/.cats-runtime/data` and runtime
-session workspaces/transcripts persist under `~/.cats-runtime/sessions`. Override
-either path with `CATS_RUNTIME_DATA_DIR` or `CATS_RUNTIME_SESSION_BASE_DIR` if
-you need to relocate local state.
+By default, runtime metadata persists under `~/.cats/runtime/data`, runtime
+session workspaces/transcripts persist under `~/.cats/runtime/sessions`, and
+provider topology persists under `~/.cats/runtime/providers.yaml`. Override
+those with `CATS_RUNTIME_DATA_DIR`, `CATS_RUNTIME_SESSION_BASE_DIR`, or
+`CATS_RUNTIME_CONFIG_PATH` if you need to relocate local state.
 
 ### Restart helper
 

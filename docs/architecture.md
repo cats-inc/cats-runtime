@@ -10,8 +10,9 @@ organized under `src/backends/cli`, while API-key and local-model execution now
 live under `src/backends/api`, and external agent runtimes such as OpenClaw now
 live under `src/backends/agent`.
 
-Provider execution topology now comes from `config/providers.yaml` when present.
-That file maps each provider to one or more named instances, and each instance
+Provider execution topology now comes from the resolved `providers.yaml`
+config (default `~/.cats/runtime/providers.yaml`) when present. That file maps
+each provider to one or more named instances, and each instance
 maps to an execution environment such as `native` or a specific WSL distro.
 File-backed providers still discover sessions from the host process, so their
 discovery paths are resolved as host filesystem paths rather than
@@ -806,8 +807,8 @@ the only durable memory surface for the Cats suite.
 - Delivery policy stays above runtime; hosts should consume runtime-owned
   delivery primitives and machine-readable blocked/degraded states rather than
   reimplementing Git/artifact/preview execution logic above the runtime
-- Keep `.env` focused on runtime-wide values; provider topology belongs in
-  `config/providers.yaml`
+- Keep `.env` focused on runtime-wide values; provider topology belongs in the
+  resolved `providers.yaml` config (default `~/.cats/runtime/providers.yaml`)
 
 ## Key Decisions
 

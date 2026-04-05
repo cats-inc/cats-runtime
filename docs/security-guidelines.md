@@ -45,7 +45,8 @@ Before committing, verify:
 - `CATS_RUNTIME_API_KEY` protects host-facing runtime routes. Keep it distinct
   from any upstream provider secret.
 - Remote API providers such as Anthropic, OpenAI, and Gemini should reference
-  env names in `config/providers.yaml` (`api_key_env`, `organization_env`,
+  env names in the resolved `providers.yaml` config (default
+  `~/.cats/runtime/providers.yaml`) (`api_key_env`, `organization_env`,
   `project_env`) rather than embedding secret values in config files.
 - Peer execution uses a separate shared secret
   (`CATS_RUNTIME_PEER_SHARED_SECRET`), not the host-facing
@@ -64,7 +65,7 @@ Before committing, verify:
   - `OPENAI_ORG_ID`
   - `OPENAI_PROJECT_ID`
   - `GEMINI_API_KEY`
-- Do not copy those values into `config/providers.yaml`, logs, retained probe
+- Do not copy those values into `providers.yaml`, logs, retained probe
   artifacts, or setup reports.
 - When adding diagnostics or evidence capture, prefer env-presence summaries and
   redacted header-name metadata over raw token values.

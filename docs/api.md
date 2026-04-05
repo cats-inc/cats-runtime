@@ -1488,7 +1488,8 @@ The response now also includes:
   `adapter` request context when available
 
 Management adapter configuration lives in `config/management.yaml`, separate
-from `config/providers.yaml`.
+from the resolved `providers.yaml` config (default
+`~/.cats/runtime/providers.yaml`).
 
 ### Skills
 
@@ -1877,7 +1878,7 @@ Example `workspace` shape:
   "workspace": {
     "kind": "worktree",
     "access": "read_write",
-    "runtimeCwd": "C:/Users/example/.cats-runtime/sessions/worktrees/repo-deadbeef/session-123/packages/app",
+    "runtimeCwd": "C:/Users/example/.cats/runtime/sessions/worktrees/repo-deadbeef/session-123/packages/app",
     "sourceCwd": "C:/repo/packages/app",
     "worktree": {
       "id": "repo-session-123",
@@ -1885,7 +1886,7 @@ Example `workspace` shape:
       "sourceHeadOid": "abc123",
       "sourceHeadRef": "main",
       "relativeCwd": "packages/app",
-      "worktreePath": "C:/Users/example/.cats-runtime/sessions/worktrees/repo-deadbeef/session-123",
+      "worktreePath": "C:/Users/example/.cats/runtime/sessions/worktrees/repo-deadbeef/session-123",
       "preparedAt": "2026-03-23T12:00:00.000Z"
     }
   }
@@ -1905,7 +1906,7 @@ Example `workspaceIsolation` shape:
       "sourceHeadOid": "abc123",
       "sourceHeadRef": "main",
       "relativeCwd": "packages/app",
-      "worktreePath": "C:/Users/example/.cats-runtime/sessions/worktrees/repo-deadbeef/session-123",
+      "worktreePath": "C:/Users/example/.cats/runtime/sessions/worktrees/repo-deadbeef/session-123",
       "preparedAt": "2026-03-23T12:00:00.000Z"
     }
   }
@@ -2213,9 +2214,9 @@ intended for host/dashboard run inspectors:
         "requestedAt": "2026-03-24T00:10:00.000Z",
         "workspaceMode": "shared",
         "isolationMode": "worktree",
-        "runtimeCwd": "C:/Users/example/.cats-runtime/sessions/worktrees/repo-deadbeef/session-123",
+        "runtimeCwd": "C:/Users/example/.cats/runtime/sessions/worktrees/repo-deadbeef/session-123",
         "sourceCwd": "C:/Users/example/src/repo",
-        "worktreePath": "C:/Users/example/.cats-runtime/sessions/worktrees/repo-deadbeef/session-123",
+        "worktreePath": "C:/Users/example/.cats/runtime/sessions/worktrees/repo-deadbeef/session-123",
         "reason": "owner_requested_reset",
         "worktreeDisposition": "preserve",
         "hookPayloads": [

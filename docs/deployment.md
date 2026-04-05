@@ -62,7 +62,8 @@ npx cats-runtime
 
 The executable package uses the same runtime entrypoint and supports either
 bootstrap-first startup with no preexisting config, or config supplied through
-`.env`, `config/providers.yaml`, or explicit environment variables.
+`.env`, the default `~/.cats/runtime/providers.yaml`, or explicit environment
+variables.
 
 For production packaging, treat the published binaries plus the HTTP contract
 as the supported host boundary. The package root JavaScript export remains a
@@ -131,7 +132,7 @@ Expected behavior:
 
 - Node.js 22+
 - `.env` or equivalent environment variables
-- either a valid `config/providers.yaml` / `CATS_RUNTIME_CONFIG_PATH`, or
+- either a valid `~/.cats/runtime/providers.yaml` / `CATS_RUNTIME_CONFIG_PATH`, or
   bootstrap mode to generate one on first launch
 - any provider-specific credentials or local CLI installs needed by the chosen
   targets
@@ -151,7 +152,7 @@ Expected behavior:
 
 - Keep `.env` local and uncommitted
 - Keep API keys and auth tokens in environment variables referenced by
-  `config/providers.yaml`
+  `providers.yaml`
 - Do not hardcode credentials into committed config files
 
 ## Operational Notes
@@ -164,8 +165,9 @@ Expected behavior:
 - **Startup metadata**: `GET /health` includes contract version, phase,
   readiness metadata, `managedBy`, `pid`, `startedAt`, and bound address details
 - **State paths**:
-  - metadata defaults to `~/.cats-runtime/data`
-  - session workspaces/transcripts default to `~/.cats-runtime/sessions`
+  - metadata defaults to `~/.cats/runtime/data`
+  - session workspaces/transcripts default to `~/.cats/runtime/sessions`
+  - provider topology config defaults to `~/.cats/runtime/providers.yaml`
 
 ## Verification
 
@@ -195,7 +197,7 @@ process that owns the port.
 
 **Symptoms**: health is up, but provider operations fail  
 **Solution**: verify `GET /diagnostics/providers`, then check `.env`,
-`config/providers.yaml`, and any required local CLI/API credentials for the
+`~/.cats/runtime/providers.yaml`, and any required local CLI/API credentials for the
 configured targets.
 
 ### Issue 3: Dashboard fails in packaged mode
