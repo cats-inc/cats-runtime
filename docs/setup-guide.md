@@ -41,7 +41,7 @@ For a package-style local run:
 
 ```powershell
 npm run build
-node dist/index.js
+node build/runtime/index.js
 ```
 
 The package is now structured for executable npm distribution:
@@ -135,10 +135,10 @@ When the HTTP server itself cannot start, you can generate the same artifact
 from the runtime entrypoint:
 
 ```powershell
-node dist/index.js --diagnose-setup
-node dist/index.js --diagnose-setup --refresh-setup-scan
-node dist/index.js --list-setup-diagnostic-reports --setup-report-limit 5
-node dist/index.js --read-setup-diagnostic-report setup-report-20260327T010203000Z
+node build/runtime/index.js --diagnose-setup
+node build/runtime/index.js --diagnose-setup --refresh-setup-scan
+node build/runtime/index.js --list-setup-diagnostic-reports --setup-report-limit 5
+node build/runtime/index.js --read-setup-diagnostic-report setup-report-20260327T010203000Z
 ```
 
 The CLI path writes the same redacted artifact under `<dataDir>/diagnostics/`
@@ -151,8 +151,8 @@ When you need to clean up stale temp workspaces left by interrupted tests or
 helper processes without starting the HTTP server, use:
 
 ```powershell
-node dist/index.js --cleanup-temp-dirs
-node dist/index.js --cleanup-temp-dirs --cleanup-temp-age-hours 24
+node build/runtime/index.js --cleanup-temp-dirs
+node build/runtime/index.js --cleanup-temp-dirs --cleanup-temp-age-hours 24
 ```
 
 This command scans the system temp root for known transient `cats-runtime-*`
@@ -173,18 +173,18 @@ When you want to inspect provider event drift manually without opening any
 public HTTP surface, use the provider-evolution probe entrypoint:
 
 ```powershell
-node dist/index.js --probe-provider-evolution --probe-provider codex
-node dist/index.js --probe-provider-evolution --probe-provider claude --probe-profile manual_text
-node dist/index.js --probe-provider-evolution --probe-provider claude --probe-instance agent/sdk
-node dist/index.js --probe-provider-evolution --probe-provider goose --probe-model anthropic/claude-sonnet-4
-node dist/index.js --probe-provider-evolution --probe-provider codex --probe-reference release_notes=https://docs.example.com/releases/codex-cli-1-2-3 --probe-reference changelog=https://docs.example.com/changelog/codex-cli
-node dist/index.js --list-provider-evolution-artifacts --probe-provider codex --probe-limit 5
-node dist/index.js --list-provider-evolution-artifacts --probe-provider codex --probe-runtime docker
-node dist/index.js --list-provider-evolution-artifacts --probe-provider claude --probe-instance agent/sdk
-node dist/index.js --list-provider-evolution-artifacts --probe-provider claude --probe-parser agent_sdk_http_v1 --probe-transport agent
-node dist/index.js --list-provider-evolution-artifacts --probe-provider codex --probe-classification regression
-node dist/index.js --read-provider-evolution-artifact artifact-id --probe-provider codex
-node dist/index.js --review-provider-evolution-artifact artifact-id --probe-provider codex --probe-classification regression --probe-review-summary "Manual review flagged a regression." --probe-highlight "Removed event types: tool_result" --probe-reference issue=https://docs.example.com/issues/codex-cli-regression
+node build/runtime/index.js --probe-provider-evolution --probe-provider codex
+node build/runtime/index.js --probe-provider-evolution --probe-provider claude --probe-profile manual_text
+node build/runtime/index.js --probe-provider-evolution --probe-provider claude --probe-instance agent/sdk
+node build/runtime/index.js --probe-provider-evolution --probe-provider goose --probe-model anthropic/claude-sonnet-4
+node build/runtime/index.js --probe-provider-evolution --probe-provider codex --probe-reference release_notes=https://docs.example.com/releases/codex-cli-1-2-3 --probe-reference changelog=https://docs.example.com/changelog/codex-cli
+node build/runtime/index.js --list-provider-evolution-artifacts --probe-provider codex --probe-limit 5
+node build/runtime/index.js --list-provider-evolution-artifacts --probe-provider codex --probe-runtime docker
+node build/runtime/index.js --list-provider-evolution-artifacts --probe-provider claude --probe-instance agent/sdk
+node build/runtime/index.js --list-provider-evolution-artifacts --probe-provider claude --probe-parser agent_sdk_http_v1 --probe-transport agent
+node build/runtime/index.js --list-provider-evolution-artifacts --probe-provider codex --probe-classification regression
+node build/runtime/index.js --read-provider-evolution-artifact artifact-id --probe-provider codex
+node build/runtime/index.js --review-provider-evolution-artifact artifact-id --probe-provider codex --probe-classification regression --probe-review-summary "Manual review flagged a regression." --probe-highlight "Removed event types: tool_result" --probe-reference issue=https://docs.example.com/issues/codex-cli-regression
 ```
 
 The probe path is intentionally manual-first and currently supports the
@@ -683,11 +683,11 @@ evidence under `<dataDir>/compatibility/<provider>/`, the same runtime CLI now
 supports manual-first retained inspection without starting the HTTP server:
 
 ```powershell
-node dist/index.js --list-compatibility-evidence --probe-provider codex --probe-limit 5
-node dist/index.js --list-compatibility-evidence --probe-provider codex --probe-classification probe_failed
-node dist/index.js --list-compatibility-evidence --probe-provider codex --probe-parser codex-json-rpc --probe-profile codex-cli-best-fit
-node dist/index.js --list-compatibility-evidence --probe-provider codex --probe-runtime docker
-node dist/index.js --read-compatibility-evidence artifact-id --probe-provider codex
+node build/runtime/index.js --list-compatibility-evidence --probe-provider codex --probe-limit 5
+node build/runtime/index.js --list-compatibility-evidence --probe-provider codex --probe-classification probe_failed
+node build/runtime/index.js --list-compatibility-evidence --probe-provider codex --probe-parser codex-json-rpc --probe-profile codex-cli-best-fit
+node build/runtime/index.js --list-compatibility-evidence --probe-provider codex --probe-runtime docker
+node build/runtime/index.js --read-compatibility-evidence artifact-id --probe-provider codex
 ```
 
 These commands reuse the runtime-owned retained artifact store and keep stdout
@@ -730,7 +730,7 @@ API directly. For the embedded multi-agent sample, open
 
 ```powershell
 npm run build
-node dist/index.js
+node build/runtime/index.js
 ```
 
 This is the same entrypoint that the npm `bin` command uses for package-style
@@ -745,7 +745,7 @@ tests/dev embedding, not the recommended host integration path for product apps.
 For host-supervised local startup, run the same binary in app-managed mode:
 
 ```powershell
-node dist/index.js --startup-mode app-managed --managed-by cats --ready-output json
+node build/runtime/index.js --startup-mode app-managed --managed-by cats --ready-output json
 ```
 
 In that mode:
@@ -760,9 +760,9 @@ In that mode:
 - the process stays a separate HTTP service rather than being source-imported
   into the host app
 - the published `cats-runtime` binary remains the supported package entrypoint;
-  root-module imports and `dist/bin/*` helpers are still treated as
+  root-module imports and `build/runtime/bin/*` helpers are still treated as
   internal/dev-oriented surfaces
-- `node dist/bin/mcp.js` remains available as a repo-local stdio MCP proxy to
+- `node build/runtime/bin/mcp.js` remains available as a repo-local stdio MCP proxy to
   the primary runtime's `POST /mcp` route; it does not start a second
   independent runtime core
 - stdio-only MCP hosts should either set `CATS_RUNTIME_MCP_PROXY_URL`

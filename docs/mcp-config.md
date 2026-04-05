@@ -8,11 +8,11 @@
 
 ```text
 POST /mcp
-node dist/bin/mcp.js
+node build/runtime/bin/mcp.js
 ```
 
 `POST /mcp` is the authoritative MCP execution surface because it runs inside
-the primary `cats-runtime` process. `node dist/bin/mcp.js` remains as a
+the primary `cats-runtime` process. `node build/runtime/bin/mcp.js` remains as a
 repo-local helper for stdio-only hosts, but it now acts as a thin
 stdio-to-HTTP proxy to that existing `POST /mcp` route instead of creating a
 second runtime core.
@@ -141,7 +141,7 @@ not need to pass `action` and `phase` explicitly.
 
 `POST /mcp` uses the same runtime auth policy as the direct HTTP API. If
 `cats-runtime` is configured with an API key, MCP clients must send the same
-Bearer token. `node dist/bin/mcp.js` forwards that same bearer token to the
+Bearer token. `node build/runtime/bin/mcp.js` forwards that same bearer token to the
 primary runtime when `CATS_RUNTIME_API_KEY` is set.
 
 ## HTTP Usage
@@ -222,12 +222,12 @@ the short human summary.
 Repo-local entrypoint:
 
 ```text
-node dist/bin/mcp.js
+node build/runtime/bin/mcp.js
 ```
 
 Operational notes:
 
-- `node dist/bin/mcp.js` is a repo-local helper, not a published npm `bin`
+- `node build/runtime/bin/mcp.js` is a repo-local helper, not a published npm `bin`
 - start the primary `cats-runtime` first; the stdio MCP helper does not
   auto-start it
 - prefer direct `POST /mcp` when the host supports HTTP MCP
@@ -237,7 +237,7 @@ Operational notes:
 - the proxy now applies a conservative upstream timeout by default and returns
   a dedicated `upstream_timeout` MCP error when the primary runtime does not
   answer in time
-- `node dist/bin/mcp.js --inspect-proxy` is a local utility exit that resolves
+- `node build/runtime/bin/mcp.js --inspect-proxy` is a local utility exit that resolves
   the current proxy target, runs a `ping` preflight against the primary
   runtime, emits JSON to stdout, and exits without starting the stdio MCP
   server
@@ -261,7 +261,7 @@ Example host config:
   "mcpServers": {
     "cats-runtime": {
       "command": "node",
-      "args": ["./dist/bin/mcp.js"],
+      "args": ["./build/runtime/bin/mcp.js"],
       "cwd": "cats-runtime",
       "env": {
         "CATS_RUNTIME_MCP_PROXY_URL": "http://127.0.0.1:3110/mcp"

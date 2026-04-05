@@ -19,9 +19,9 @@ This guide documents the release path that matches that packaging direction.
 The first public npm release has not happened yet. Before publishing,
 `cats-runtime` already has:
 
-- a package entry at `dist/index.js`
+- a package entry at `build/runtime/index.js`
 - an executable `bin` entry for `cats-runtime`
-- bundled repo-local helper scripts under `dist/bin/`
+- bundled repo-local helper scripts under `build/runtime/bin/`
 - curated publish contents via `files`
 - a `prepack` build step
 - a local release gate via `npm run release:check`
@@ -116,8 +116,8 @@ npm run release:check
 Then manually verify:
 
 ```powershell
-node dist/index.js --help
-node dist/index.js --startup-mode app-managed --managed-by release-check --ready-output json
+node build/runtime/index.js --help
+node build/runtime/index.js --startup-mode app-managed --managed-by release-check --ready-output json
 ```
 
 The second command should emit a single-line JSON `runtime.ready` event after

@@ -257,7 +257,7 @@ src/
   aggregate summary plus bounded due/failed request samples on
   `GET /diagnostics/runtime`
 - Exposes the additive MCP facade with authoritative execution on `POST /mcp`
-  plus a repo-local stdio proxy helper at `node dist/bin/mcp.js` for
+  plus a repo-local stdio proxy helper at `node build/runtime/bin/mcp.js` for
   stdio-only hosts
 
 ### `src/mcp`
@@ -272,7 +272,7 @@ src/
 - Keeps `POST /mcp` as the authoritative execution owner inside the primary
   runtime process
 - Supports Content-Length framed stdio transport through a thin proxy path so
-  `node dist/bin/mcp.js` can serve repo-local stdio-only hosts without
+  `node build/runtime/bin/mcp.js` can serve repo-local stdio-only hosts without
   constructing a second runtime core
 - Keeps MCP additive so direct HTTP routes remain the primary product boundary
 
@@ -708,7 +708,7 @@ path is intentionally narrow:
    model-catalog/configured-model readiness checks for
    API/local/agent targets when requested
 14. `POST /mcp` reuses those same runtime-owned services as the authoritative
-    additive orchestrator/tool surface, while `node dist/bin/mcp.js` proxies
+    additive orchestrator/tool surface, while `node build/runtime/bin/mcp.js` proxies
     stdio JSON-RPC to that same route instead of creating a second competing
     runtime execution owner
 15. Optional machine-readable process output emits startup and shutdown

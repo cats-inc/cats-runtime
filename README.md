@@ -27,7 +27,7 @@ Current capabilities:
 - file-based provider topology with separated `routing` / `backends` sections
 - dashboard-side provider instance selection for session creation
 - embedded multi-agent playground sample at `/playground`
-- runtime-owned MCP facade with authoritative execution on `POST /mcp` plus a repo-local stdio proxy helper at `node dist/bin/mcp.js` for stdio-only hosts
+- runtime-owned MCP facade with authoritative execution on `POST /mcp` plus a repo-local stdio proxy helper at `node build/runtime/bin/mcp.js` for stdio-only hosts
 - curated MCP mutation tools for `create_session`, `send_message`, `fork_session`, `init_workspace`, and `commit_changes`
 - runtime-managed skills with session-level requested/resolved/applied metadata plus a family-aware internal skill library
 - additive workspace/skill hydration metadata that distinguishes runtime cwd from the authoritative workspace source
@@ -100,27 +100,27 @@ Embedded UIs:
 MCP usage:
 
 - use `POST /mcp` when the host can speak HTTP JSON-RPC directly
-- use `node dist/bin/mcp.js` only for repo-local stdio-only MCP hosts such as
+- use `node build/runtime/bin/mcp.js` only for repo-local stdio-only MCP hosts such as
   MCP Studio
 - the stdio MCP helper now proxies to an already-running primary
   `cats-runtime` and does not start a second independent runtime core
 - set `CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS` to override the stdio proxy timeout
   when a stdio-only host needs a different upstream request window
-- run `node dist/bin/mcp.js --inspect-proxy` when you want a local JSON
+- run `node build/runtime/bin/mcp.js --inspect-proxy` when you want a local JSON
   preflight of the current proxy target, auth posture, timeout, and `ping`
   reachability
 
 Workspace substrate helper:
 
-- use `node dist/bin/workspaceSubstrate.js` or the wrapper scripts under
+- use `node build/runtime/bin/workspaceSubstrate.js` or the wrapper scripts under
   `scripts/` when you need a repo-owned CLI helper for `audit-workspace`,
   `init-workspace`, or `update-workspace`
 - the helper prints JSON to stdout and uses the same conservative
   create/update/review-copy semantics as the runtime-owned workspace substrate
 - example preview:
-  `node dist/bin/workspaceSubstrate.js --operation audit --workspace-path . --profile standard --agent codex`
+  `node build/runtime/bin/workspaceSubstrate.js --operation audit --workspace-path . --profile standard --agent codex`
 - example apply:
-  `node dist/bin/workspaceSubstrate.js --operation update --workspace-path . --profile a2a-enabled --agent codex --apply --actor-role boss_cat`
+  `node build/runtime/bin/workspaceSubstrate.js --operation update --workspace-path . --profile a2a-enabled --agent codex --apply --actor-role boss_cat`
 
 ## Package-Ready Startup
 
@@ -166,13 +166,13 @@ For direct packaged-style local verification before publish:
 
 ```powershell
 npm run build
-node dist/index.js
+node build/runtime/index.js
 ```
 
 For an app-managed local start, prefer machine-readable readiness output:
 
 ```powershell
-node dist/index.js --startup-mode app-managed --managed-by cats --ready-output json
+node build/runtime/index.js --startup-mode app-managed --managed-by cats --ready-output json
 ```
 
 For graceful local shutdown, a supervising host may either send `SIGINT` /

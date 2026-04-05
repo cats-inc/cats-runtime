@@ -29,7 +29,7 @@ lets the operator generate one from the setup page.
 
 ```powershell
 npm run build
-node dist/index.js
+node build/runtime/index.js
 ```
 
 ### 3. Executable npm package
@@ -78,7 +78,7 @@ Supported startup flags:
 - `--host <bind-host>`
 - `--port <bind-port>`
 
-The companion stdio MCP helper remains `node dist/bin/mcp.js` for repo-local
+The companion stdio MCP helper remains `node build/runtime/bin/mcp.js` for repo-local
 stdio-only hosts. It proxies to the primary runtime rather than starting a
 second runtime core.
 
@@ -91,8 +91,8 @@ an Electron host. In that mode:
 - readiness should be checked over the runtime HTTP boundary
 - the runtime remains a separate process, not an in-process product import
 - `cats-runtime` is the supported package entrypoint; root-module imports and
-  `dist/bin/*` helpers remain internal/dev-oriented surfaces
-- `node dist/bin/mcp.js` is the repo-local stdio MCP proxy helper, not a
+  `build/runtime/bin/*` helpers remain internal/dev-oriented surfaces
+- `node build/runtime/bin/mcp.js` is the repo-local stdio MCP proxy helper, not a
   second standalone runtime server; start the primary `cats-runtime` first
   when using stdio-only MCP hosts
 - stdio proxy target resolution uses `CATS_RUNTIME_MCP_PROXY_URL` first, then
@@ -101,7 +101,7 @@ an Electron host. In that mode:
 Recommended child-process invocation:
 
 ```powershell
-node dist/index.js --startup-mode app-managed --managed-by cats --ready-output json
+node build/runtime/index.js --startup-mode app-managed --managed-by cats --ready-output json
 ```
 
 Expected behavior:
@@ -200,7 +200,7 @@ configured targets.
 ### Issue 3: Dashboard fails in packaged mode
 
 **Symptoms**: `GET /` cannot find the embedded dashboard  
-**Solution**: confirm the packaged artifact includes both `dist/` and `public/`
+**Solution**: confirm the packaged artifact includes both `build/runtime/` and `public/`
 assets. Use `npm pack --dry-run` to inspect the payload.
 
 ---
