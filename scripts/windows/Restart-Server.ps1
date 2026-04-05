@@ -118,9 +118,9 @@ function Stop-ServiceOnPort($port) {
 }
 
 function Invoke-StaleTempCleanup($repoRoot) {
-    $entry = Join-Path $repoRoot "dist\\index.js"
+    $entry = Join-Path $repoRoot "build\\runtime\\index.js"
     if (!(Test-Path $entry)) {
-        Write-Host "  Skipping stale temp cleanup (dist/index.js not built yet)" -ForegroundColor DarkGray
+        Write-Host "  Skipping stale temp cleanup (build/runtime/index.js not built yet)" -ForegroundColor DarkGray
         return
     }
 
@@ -172,7 +172,7 @@ $stderrLog = $null
 
 if ($NoRedirect) {
     Write-Host "  Launching without stdout/stderr redirection" -ForegroundColor DarkGray
-    $process = Start-Process -FilePath "node.exe" -ArgumentList "dist/index.js" `
+    $process = Start-Process -FilePath "node.exe" -ArgumentList "build/runtime/index.js" `
         -WorkingDirectory $repoRoot `
         -WindowStyle Hidden `
         -PassThru
@@ -185,7 +185,7 @@ if ($NoRedirect) {
     $stdoutLog = Join-Path $startupLogDir "cats-runtime-$startupStamp.stdout.log"
     $stderrLog = Join-Path $startupLogDir "cats-runtime-$startupStamp.stderr.log"
 
-    $process = Start-Process -FilePath "node.exe" -ArgumentList "dist/index.js" `
+    $process = Start-Process -FilePath "node.exe" -ArgumentList "build/runtime/index.js" `
         -WorkingDirectory $repoRoot `
         -WindowStyle Hidden `
         -RedirectStandardOutput $stdoutLog `
@@ -301,6 +301,6 @@ try {
         Write-Host "  Logs: $stdoutLog" -ForegroundColor DarkGray
         Write-Host "        $stderrLog" -ForegroundColor DarkGray
     }
-    Write-Host "  Check logs or run: npm run build; node dist/index.js" -ForegroundColor Yellow
+    Write-Host "  Check logs or run: npm run build; node build/runtime/index.js" -ForegroundColor Yellow
     exit 1
 }

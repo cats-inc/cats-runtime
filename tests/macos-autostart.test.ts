@@ -154,7 +154,7 @@ function seedStaleLaunchdInstall(context: MacosScriptTestContext): void {
     `#!/usr/bin/env bash
 set -euo pipefail
 cd ${runtimeRoot}
-exec node dist/index.js
+exec node build/runtime/index.js
 `,
     'utf8',
   );
@@ -202,8 +202,8 @@ describe('macOS autostart scripts', () => {
     expect(runnerScript).toContain(
       `export PATH=${dirname(context.nodeBin)}:"$HOME/.npm-global/bin":"$HOME/.local/bin"`,
     );
-    expect(runnerScript).toContain(`exec ${context.nodeBin} dist/index.js`);
-    expect(runnerScript).not.toContain('exec node dist/index.js');
+    expect(runnerScript).toContain(`exec ${context.nodeBin} build/runtime/index.js`);
+    expect(runnerScript).not.toContain('exec node build/runtime/index.js');
 
     const plist = readText(context.plistFile);
     expect(plist).toContain(context.runnerScript);
@@ -233,8 +233,8 @@ describe('macOS autostart scripts', () => {
     expect(runnerScript).toContain(
       `export PATH=${dirname(context.nodeBin)}:"$HOME/.npm-global/bin":"$HOME/.local/bin"`,
     );
-    expect(runnerScript).toContain(`exec ${context.nodeBin} dist/index.js`);
-    expect(runnerScript).not.toContain('exec node dist/index.js');
+    expect(runnerScript).toContain(`exec ${context.nodeBin} build/runtime/index.js`);
+    expect(runnerScript).not.toContain('exec node build/runtime/index.js');
   });
 
   runIfPosix('refreshes an existing launchd runner before restart bootstraps the agent', () => {
@@ -258,8 +258,8 @@ describe('macOS autostart scripts', () => {
     expect(runnerScript).toContain(
       `export PATH=${dirname(context.nodeBin)}:"$HOME/.npm-global/bin":"$HOME/.local/bin"`,
     );
-    expect(runnerScript).toContain(`exec ${context.nodeBin} dist/index.js`);
-    expect(runnerScript).not.toContain('exec node dist/index.js');
+    expect(runnerScript).toContain(`exec ${context.nodeBin} build/runtime/index.js`);
+    expect(runnerScript).not.toContain('exec node build/runtime/index.js');
 
     const launchctlLog = readText(context.launchctlLog);
     expect(launchctlLog).toContain(`bootstrap gui/${process.getuid?.()} ${context.plistFile}`);
@@ -290,7 +290,7 @@ CATS_RUNTIME_NODE_BIN=${context.managedNodeBin}
     expect(runnerScript).toContain(
       `export PATH=${dirname(context.managedNodeBin)}:"$HOME/.npm-global/bin":"$HOME/.local/bin"`,
     );
-    expect(runnerScript).toContain(`exec ${context.managedNodeBin} dist/index.js`);
+    expect(runnerScript).toContain(`exec ${context.managedNodeBin} build/runtime/index.js`);
     expect(result.stdout).toContain(`Node binary: ${context.managedNodeBin}`);
   });
 });

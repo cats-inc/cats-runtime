@@ -154,7 +154,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=${runtimeRoot}
-ExecStart=/usr/bin/env node dist/index.js
+ExecStart=/usr/bin/env node build/runtime/index.js
 Restart=always
 RestartSec=5
 Environment=NODE_ENV=production
@@ -190,8 +190,8 @@ describe('Linux autostart scripts', () => {
     expect(result.status, result.stderr || result.stdout).toBe(0);
 
     const unitFile = readText(context.unitFile);
-    expect(unitFile).toContain(`ExecStart=${context.nodeBin} dist/index.js`);
-    expect(unitFile).not.toContain('ExecStart=/usr/bin/env node dist/index.js');
+    expect(unitFile).toContain(`ExecStart=${context.nodeBin} build/runtime/index.js`);
+    expect(unitFile).not.toContain('ExecStart=/usr/bin/env node build/runtime/index.js');
 
     const systemctlLog = readText(context.systemctlLog);
     expect(systemctlLog).toContain('--user daemon-reload');
@@ -216,8 +216,8 @@ describe('Linux autostart scripts', () => {
     expect(result.stdout).toContain('Existing systemd unit is stale. Refreshing install.');
 
     const unitFile = readText(context.unitFile);
-    expect(unitFile).toContain(`ExecStart=${context.nodeBin} dist/index.js`);
-    expect(unitFile).not.toContain('ExecStart=/usr/bin/env node dist/index.js');
+    expect(unitFile).toContain(`ExecStart=${context.nodeBin} build/runtime/index.js`);
+    expect(unitFile).not.toContain('ExecStart=/usr/bin/env node build/runtime/index.js');
   });
 
   runIfPosix('refreshes an existing systemd unit before restart restarts the service', () => {
@@ -238,8 +238,8 @@ describe('Linux autostart scripts', () => {
     expect(result.stdout).toContain('Starting cats-runtime via systemd...');
 
     const unitFile = readText(context.unitFile);
-    expect(unitFile).toContain(`ExecStart=${context.nodeBin} dist/index.js`);
-    expect(unitFile).not.toContain('ExecStart=/usr/bin/env node dist/index.js');
+    expect(unitFile).toContain(`ExecStart=${context.nodeBin} build/runtime/index.js`);
+    expect(unitFile).not.toContain('ExecStart=/usr/bin/env node build/runtime/index.js');
 
     const systemctlLog = readText(context.systemctlLog);
     expect(systemctlLog).toContain('--user daemon-reload');
@@ -266,7 +266,7 @@ CATS_RUNTIME_NODE_BIN=${context.managedNodeBin}
     );
 
     expect(result.status, result.stderr || result.stdout).toBe(0);
-    expect(readText(context.unitFile)).toContain(`ExecStart=${context.managedNodeBin} dist/index.js`);
+    expect(readText(context.unitFile)).toContain(`ExecStart=${context.managedNodeBin} build/runtime/index.js`);
     expect(result.stdout).toContain(`Node binary: ${context.managedNodeBin}`);
   });
 });

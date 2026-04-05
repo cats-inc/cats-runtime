@@ -272,7 +272,7 @@ Set-Location `$repoRoot
 Add-Content -Path `$logFile -Value ""
 Add-Content -Path `$logFile -Value "=== [`$timestamp] Starting cats-runtime ==="
 
-Start-Process -FilePath "node.exe" -ArgumentList "dist/index.js" ``
+Start-Process -FilePath "node.exe" -ArgumentList "build/runtime/index.js" ``
     -WorkingDirectory `$repoRoot ``
     -WindowStyle Hidden ``
     -RedirectStandardOutput "`$logFile.out" ``

@@ -1,6 +1,6 @@
 # PLAN-031: Align Runtime Build Output Under `build/runtime`
 
-Status: Draft
+Status: In Progress
 
 ## Related Decisions
 
@@ -149,6 +149,7 @@ Use targeted, package-level validation.
 | Date | Update |
 |------|--------|
 | 2026-04-06 | Plan created to move `cats-runtime` from `dist/` to `build/runtime/` under runtime package ownership |
+| 2026-04-06 | Phase 2/3 slice 1 landed: moved runtime package metadata and compiler output to `build/runtime`, renamed the cleanup script to `scripts/clean-build.mjs`, updated runtime-owned restart/autostart/workspace-substrate helpers plus package-contract/workspace-substrate/autostart tests to the new compiled entrypoints, and hardened startup version resolution so both `tsx src/*` dev runs and compiled `build/runtime/*` entrypoints resolve the package root correctly; validation included `npm run build`, `node build/runtime/index.js --help`, and `npx vitest run tests/package-contract.test.ts tests/workspace-substrate-bin.test.ts tests/linux-autostart.test.ts tests/macos-autostart.test.ts --pool=threads --poolOptions.threads.singleThread` |
 
 ---
 

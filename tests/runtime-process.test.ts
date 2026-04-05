@@ -194,7 +194,7 @@ interface ProviderEvolutionArtifactReviewCliOutput {
 
 const testsDir = dirname(fileURLToPath(import.meta.url));
 const runtimeRoot = resolve(testsDir, '..');
-const runtimeEntry = join(runtimeRoot, 'dist', 'index.js');
+const runtimeEntry = join(runtimeRoot, 'build', 'runtime', 'index.js');
 
 function resolveEnvRuntimePaths(env: NodeJS.ProcessEnv) {
   return createRuntimeTestPaths(env.HOME || env.USERPROFILE || '');

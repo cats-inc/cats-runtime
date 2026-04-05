@@ -51,7 +51,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=$repo_root
-ExecStart=$node_bin dist/index.js
+ExecStart=$node_bin build/runtime/index.js
 Restart=always
 RestartSec=5
 Environment=NODE_ENV=production

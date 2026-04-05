@@ -106,13 +106,13 @@ health_check() {
 }
 
 cleanup_stale_temp_dirs() {
-  if [[ ! -f "$REPO_ROOT/dist/index.js" ]]; then
-    echo "  Skipping stale temp cleanup (dist/index.js not built yet)"
+  if [[ ! -f "$REPO_ROOT/build/runtime/index.js" ]]; then
+    echo "  Skipping stale temp cleanup (build/runtime/index.js not built yet)"
     return 0
   fi
 
   echo "Cleaning stale cats-runtime temp directories..."
-  if (cd "$REPO_ROOT" && node dist/index.js --cleanup-temp-dirs >/dev/null); then
+  if (cd "$REPO_ROOT" && node build/runtime/index.js --cleanup-temp-dirs >/dev/null); then
     echo "  Stale temp cleanup completed"
   else
     echo "  Stale temp cleanup skipped" >&2
@@ -201,7 +201,7 @@ if [[ "$MANAGED_BY_LAUNCHD" == "true" ]]; then
 else
   echo "Starting cats-runtime..."
   pushd "$REPO_ROOT" >/dev/null
-  nohup "$NODE_BIN" dist/index.js >"$STDOUT_LOG" 2>"$STDERR_LOG" < /dev/null &
+  nohup "$NODE_BIN" build/runtime/index.js >"$STDOUT_LOG" 2>"$STDERR_LOG" < /dev/null &
   CATS_RUNTIME_PID=$!
   popd >/dev/null
   disown "$CATS_RUNTIME_PID" 2>/dev/null || true

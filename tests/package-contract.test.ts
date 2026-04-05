@@ -137,14 +137,14 @@ describe('package contract', () => {
     const packedPaths = new Set(packed.files.map((entry) => entry.path));
 
     expect(manifest.bin).toEqual({
-      'cats-runtime': './dist/index.js',
+      'cats-runtime': './build/runtime/index.js',
     });
     expect(manifest.exports?.['.']).toEqual({
-      import: './dist/index.js',
-      types: './dist/index.d.ts',
+      import: './build/runtime/index.js',
+      types: './build/runtime/index.d.ts',
     });
     expect(manifest.files).toEqual([
-      'dist',
+      'build/runtime',
       'public',
       'skills',
       'config/providers.yaml.example',
@@ -160,9 +160,9 @@ describe('package contract', () => {
       'LICENSE',
       'README.md',
       'config/providers.yaml.example',
-      'dist/index.js',
-      'dist/index.d.ts',
-      'dist/bin/verifySkills.js',
+      'build/runtime/index.js',
+      'build/runtime/index.d.ts',
+      'build/runtime/bin/verifySkills.js',
       'public/index.html',
       'public/playground.html',
       'public/provider-setup.html',
@@ -177,8 +177,8 @@ describe('package contract', () => {
     expect(packedPaths.has('vitest.config.ts')).toBe(false);
   }, 20000);
 
-  it('cleans stale dist artifacts before rebuilds and packaging', () => {
-    const stalePath = join(runtimeRoot, 'dist', 'stale', 'old-artifact.txt');
+  it('cleans stale build artifacts before rebuilds and packaging', () => {
+    const stalePath = join(runtimeRoot, 'build', 'runtime', 'stale', 'old-artifact.txt');
     mkdirSync(dirname(stalePath), { recursive: true });
     writeFileSync(stalePath, 'stale\n', 'utf8');
     expect(existsSync(stalePath)).toBe(true);
@@ -189,7 +189,7 @@ describe('package contract', () => {
 
     const packed = runPackDryRun();
     const packedPaths = new Set(packed.files.map((entry) => entry.path));
-    expect(packedPaths.has('dist/stale/old-artifact.txt')).toBe(false);
+    expect(packedPaths.has('build/runtime/stale/old-artifact.txt')).toBe(false);
   }, 90000);
 
   it('smokes the installed runtime entrypoint plus bundled helper scripts from a local tarball', () => {
@@ -215,13 +215,13 @@ describe('package contract', () => {
 
     const installedRoot = join(consumerDir, 'node_modules', 'cats-runtime');
 
-    const runtimeHelp = runNodeCommand([join(installedRoot, 'dist', 'index.js'), '--help'], {
+    const runtimeHelp = runNodeCommand([join(installedRoot, 'build', 'runtime', 'index.js'), '--help'], {
       cwd: consumerDir,
     });
     expect(runtimeHelp.status).toBe(0);
     expect(runtimeHelp.stdout).toContain('Usage: cats-runtime [options]');
 
-    const mcpInspect = runNodeCommand([join(installedRoot, 'dist', 'bin', 'mcp.js'), '--inspect-proxy'], {
+    const mcpInspect = runNodeCommand([join(installedRoot, 'build', 'runtime', 'bin', 'mcp.js'), '--inspect-proxy'], {
       cwd: consumerDir,
       env: {
         CATS_RUNTIME_MCP_PROXY_URL: 'http://127.0.0.1:9/mcp',
@@ -248,7 +248,7 @@ describe('package contract', () => {
     writeFileSync(join(workspaceDir, 'src', 'index.ts'), 'export const value = 1;\n', 'utf8');
 
     const workspaceAudit = runNodeCommand([
-      join(installedRoot, 'dist', 'bin', 'workspaceSubstrate.js'),
+      join(installedRoot, 'build', 'runtime', 'bin', 'workspaceSubstrate.js'),
       '--operation',
       'audit',
       '--workspace-path',

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -7,11 +7,16 @@ interface RuntimePackageJson {
 }
 
 function readRuntimePackageVersion(): string {
-  const packageJsonPath = join(
-    dirname(fileURLToPath(import.meta.url)),
-    '..',
-    'package.json',
-  );
+  const moduleDir = dirname(fileURLToPath(import.meta.url));
+  const packageJsonPath = [
+    join(moduleDir, '..', 'package.json'),
+    join(moduleDir, '..', '..', 'package.json'),
+  ].find((candidate) => existsSync(candidate));
+
+  if (!packageJsonPath) {
+    throw new Error(`Could not resolve package.json from ${moduleDir}`);
+  }
+
   const packageJson = JSON.parse(
     readFileSync(packageJsonPath, 'utf8'),
   ) as RuntimePackageJson;

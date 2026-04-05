@@ -4,7 +4,7 @@
     Invoke the repo-owned cats-runtime workspace substrate helper.
 
 .DESCRIPTION
-    Wraps `dist/bin/workspaceSubstrate.js` so
+    Wraps `build/runtime/bin/workspaceSubstrate.js` so
     Windows users can audit, initialize, or update collaboration substrate
     files without depending on external bootstrap repos.
 
@@ -95,7 +95,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path))
-$binPath = Join-Path $root 'dist\bin\workspaceSubstrate.js'
+$binPath = Join-Path $root 'build\runtime\bin\workspaceSubstrate.js'
 
 if (-not (Test-Path $binPath)) {
     throw "Missing $binPath. Run 'npm run build' in cats-runtime first."

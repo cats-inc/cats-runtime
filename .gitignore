@@ -14,12 +14,10 @@ __pycache__/
 .coverage
 htmlcov/
 *.egg-info/
-dist/
 build/
 
 # === Node.js ===
 node_modules/
-dist/
 .npm/
 *.tgz
 

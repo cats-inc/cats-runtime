@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-const BIN_PATH = fileURLToPath(new URL('../dist/bin/workspaceSubstrate.js', import.meta.url));
+const BIN_PATH = fileURLToPath(new URL('../build/runtime/bin/workspaceSubstrate.js', import.meta.url));
 
 function createWorkspace() {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-substrate-bin-'));

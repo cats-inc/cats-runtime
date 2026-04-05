@@ -8,7 +8,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-BIN_PATH="$ROOT/dist/bin/workspaceSubstrate.js"
+BIN_PATH="$ROOT/build/runtime/bin/workspaceSubstrate.js"
 
 if [ ! -f "$BIN_PATH" ]; then
   echo "Missing $BIN_PATH. Run 'npm run build' in cats-runtime first." >&2

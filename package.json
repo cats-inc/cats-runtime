@@ -12,19 +12,19 @@
     "url": "https://github.com/sammykenny2/one-man-digital-company/issues"
   },
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "build/runtime/index.js",
+  "types": "build/runtime/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./build/runtime/index.d.ts",
+      "import": "./build/runtime/index.js"
     }
   },
   "bin": {
-    "cats-runtime": "./dist/index.js"
+    "cats-runtime": "./build/runtime/index.js"
   },
   "files": [
-    "dist",
+    "build/runtime",
     "public",
     "skills",
     "config/providers.yaml.example",
@@ -33,17 +33,17 @@
     "LICENSE"
   ],
   "scripts": {
-    "clean:dist": "node scripts/clean-dist.mjs",
+    "clean:build": "node scripts/clean-build.mjs",
     "build:ui": "node scripts/build-runtime-ui-css.mjs",
-    "build": "npm run clean:dist && npm run build:ui && tsc -p tsconfig.json",
+    "build": "npm run clean:build && npm run build:ui && tsc -p tsconfig.json",
     "dev": "tsx watch src/index.ts",
-    "start": "node dist/index.js",
+    "start": "node build/runtime/index.js",
     "prepack": "npm run build",
     "release:check": "npm run verify:skills && npm test && npm pack --dry-run",
     "test": "npm run build && vitest run --pool=threads --poolOptions.threads.singleThread",
     "test:watch": "vitest --pool=threads --poolOptions.threads.singleThread",
     "typecheck": "npm run build:ui && tsc --noEmit -p tsconfig.json",
-    "verify:skills": "npm run build && node dist/bin/verifySkills.js"
+    "verify:skills": "npm run build && node build/runtime/bin/verifySkills.js"
   },
   "keywords": [
     "cats",

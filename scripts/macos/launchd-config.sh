@@ -57,7 +57,7 @@ render_runner_script() {
   printf '%s\n' 'set -euo pipefail'
   printf 'export PATH=%q:"$HOME/.npm-global/bin":"$HOME/.local/bin":"$HOME/.pyenv/shims":"$HOME/.pyenv/bin":/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/usr/bin:/bin:/usr/sbin:/sbin${PATH:+:$PATH}\n' "$node_dir"
   printf 'cd %q\n' "$repo_root"
-  printf 'exec %q dist/index.js\n' "$node_bin"
+  printf 'exec %q build/runtime/index.js\n' "$node_bin"
 }
 
 runner_script_matches() {

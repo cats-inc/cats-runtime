@@ -4,9 +4,15 @@ import { fileURLToPath } from 'node:url';
 
 const scriptsDir = dirname(fileURLToPath(import.meta.url));
 const runtimeRoot = join(scriptsDir, '..');
-const distDir = join(runtimeRoot, 'dist');
+const runtimeBuildDir = join(runtimeRoot, 'build', 'runtime');
+const legacyDistDir = join(runtimeRoot, 'dist');
 
-rmSync(distDir, {
+rmSync(runtimeBuildDir, {
+  recursive: true,
+  force: true,
+});
+
+rmSync(legacyDistDir, {
   recursive: true,
   force: true,
 });
