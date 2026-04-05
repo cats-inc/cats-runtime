@@ -2,6 +2,13 @@ import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { parse } from 'yaml';
 import { KNOWN_PROVIDERS, type ProviderName } from './providers/types.js';
+import {
+  resolveRuntimeDataDir,
+  resolveRuntimePathWithinRoot,
+  resolveRuntimeProvidersConfigPath,
+  resolveRuntimeRoot,
+  resolveRuntimeSessionsDir,
+} from '../../shared/runtimePaths.js';
 
 const RUNNER_MODES = [
   'auto',
@@ -353,7 +360,6 @@ export function loadConfig(
   env: NodeJS.ProcessEnv = process.env,
   options: LoadConfigOptions = {},
 ): CliRuntimeConfig {
-  const home = env.HOME || env.USERPROFILE || '';
   const apiKey = env.CATS_RUNTIME_API_KEY || '';
   const host = env.CATS_RUNTIME_HOST || (apiKey ? '' : '127.0.0.1');
   const port = parsePositiveInt(
@@ -361,14 +367,24 @@ export function loadConfig(
     3110,
     'CATS_RUNTIME_PORT',
   );
-  const runtimeRoot = resolveDefaultCatsRuntimeRoot(home);
-  const dataDir = env.CATS_RUNTIME_DATA_DIR
-    || join(runtimeRoot, 'data');
-  const sessionBaseDir = env.CATS_RUNTIME_SESSION_BASE_DIR
-    || join(runtimeRoot, 'sessions');
+  const runtimeRoot = resolveRuntimeRoot(env);
+  const dataDir = resolveRuntimePathWithinRoot(
+    runtimeRoot,
+    env.CATS_RUNTIME_DATA_DIR,
+    resolveRuntimeDataDir(runtimeRoot),
+  );
+  const sessionBaseDir = resolveRuntimePathWithinRoot(
+    runtimeRoot,
+    env.CATS_RUNTIME_SESSION_BASE_DIR,
+    resolveRuntimeSessionsDir(runtimeRoot),
+  );
 
-  const legacy = buildLegacyRuntimeShape(env, home);
-  const configPath = resolveConfigPath(env.CATS_RUNTIME_CONFIG_PATH, home);
+  const legacy = buildLegacyRuntimeShape(env, env.HOME || env.USERPROFILE || '');
+  const configPath = resolveConfigPath(
+    env.CATS_RUNTIME_CONFIG_PATH,
+    env.HOME || env.USERPROFILE || '',
+    env,
+  );
   const hasProviderFile = !options.skipProviderFile && existsSync(configPath);
   const configured = hasProviderFile
     ? applyFileBasedProviderConfig(configPath, legacy)
@@ -579,22 +595,16 @@ export function resolveProviderInstance(
   );
 }
 
-function resolveDefaultCatsRuntimeRoot(home: string): string {
-  if (home) {
-    return join(home, '.cats', 'runtime');
-  }
-
-  return resolve(process.cwd(), '.cats', 'runtime');
-}
-
-export function resolveConfigPath(value: string | undefined, home = ''): string {
-  if (!value) {
-    return join(resolveDefaultCatsRuntimeRoot(home), 'providers.yaml');
-  }
-
-  return isAbsolute(value)
-    ? value
-    : resolve(process.cwd(), value);
+export function resolveConfigPath(
+  value: string | undefined,
+  home = '',
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const runtimeRoot = resolveRuntimeRoot({
+    ...env,
+    ...(home ? { HOME: home } : {}),
+  }, home);
+  return resolveRuntimeProvidersConfigPath(runtimeRoot, value);
 }
 
 function buildLegacyRuntimeShape(

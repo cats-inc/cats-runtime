@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it, afterEach } from 'vitest';
-import { loadManagementConfig } from './config.js';
+import { loadManagementConfig, resolveManagementConfigPath } from './config.js';
 
 describe('loadManagementConfig', () => {
   const dirs: string[] = [];
@@ -77,5 +77,12 @@ adapters:
 `);
     const config = loadManagementConfig(path);
     expect(config!.adapters.review.instances.github.transport).toBe('cli');
+  });
+
+  it('defaults management config under ~/.cats/runtime/config', () => {
+    expect(resolveManagementConfigPath(undefined, undefined, {
+      HOME: '/home/tester',
+      USERPROFILE: '',
+    })).toBe(join('/home/tester', '.cats', 'runtime', 'config', 'management.yaml'));
   });
 });

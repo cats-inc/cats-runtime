@@ -11,7 +11,7 @@ live under `src/backends/api`, and external agent runtimes such as OpenClaw now
 live under `src/backends/agent`.
 
 Provider execution topology now comes from the resolved `providers.yaml`
-config (default `~/.cats/runtime/providers.yaml`) when present. That file maps
+config (default `~/.cats/runtime/config/providers.yaml`) when present. That file maps
 each provider to one or more named instances, and each instance
 maps to an execution environment such as `native` or a specific WSL distro.
 File-backed providers still discover sessions from the host process, so their
@@ -437,8 +437,9 @@ path is intentionally narrow:
   `RuntimePreviewSurface` instances for reuse by existing preview contracts
 - Long-running actions such as `wait_review_checks` use bounded long-poll
   with configurable timeout and a resumable operation ID
-- Management adapter configuration lives in `config/management.yaml`,
-  separate from model-provider routing
+- Management adapter configuration lives in
+  `~/.cats/runtime/config/management.yaml`, separate from model-provider
+  routing
 - Adapter diagnostics are separate from provider-model diagnostics and
   exposed at `GET /management/diagnostics`
 
@@ -808,7 +809,8 @@ the only durable memory surface for the Cats suite.
   delivery primitives and machine-readable blocked/degraded states rather than
   reimplementing Git/artifact/preview execution logic above the runtime
 - Keep `.env` focused on runtime-wide values; provider topology belongs in the
-  resolved `providers.yaml` config (default `~/.cats/runtime/providers.yaml`)
+  resolved `providers.yaml` config (default
+  `~/.cats/runtime/config/providers.yaml`)
 
 ## Key Decisions
 

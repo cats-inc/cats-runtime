@@ -1487,9 +1487,10 @@ The response now also includes:
   `operationId`, `status`, timestamps, and any stored `domain` / `action` /
   `adapter` request context when available
 
-Management adapter configuration lives in `config/management.yaml`, separate
-from the resolved `providers.yaml` config (default
-`~/.cats/runtime/providers.yaml`).
+Management adapter configuration lives in
+`~/.cats/runtime/config/management.yaml`, separate from the resolved
+`providers.yaml` config (default
+`~/.cats/runtime/config/providers.yaml`).
 
 ### Skills
 

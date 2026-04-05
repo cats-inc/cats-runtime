@@ -1,8 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { isAbsolute, resolve } from 'node:path';
 import { parse } from 'yaml';
+import {
+  resolveRuntimeManagementConfigPath,
+  resolveRuntimeRoot,
+} from '../../shared/runtimePaths.js';
 
-const CONFIG_FILE_DEFAULT = 'config/management.yaml';
 const SUPPORTED_VERSION = 1;
 
 // ---------------------------------------------------------------------------
@@ -33,8 +35,9 @@ export interface ManagementConfig {
 export function loadManagementConfig(
   configPathOverride?: string,
   cwd?: string,
+  env: NodeJS.ProcessEnv = process.env,
 ): ManagementConfig | undefined {
-  const configPath = resolveManagementConfigPath(configPathOverride, cwd);
+  const configPath = resolveManagementConfigPath(configPathOverride, cwd, env);
   if (!existsSync(configPath)) {
     return undefined;
   }
@@ -69,12 +72,16 @@ export function loadManagementConfig(
 // Internals
 // ---------------------------------------------------------------------------
 
-function resolveManagementConfigPath(value?: string, cwd?: string): string {
-  const base = cwd || process.cwd();
-  if (!value) {
-    return resolve(base, CONFIG_FILE_DEFAULT);
-  }
-  return isAbsolute(value) ? value : resolve(base, value);
+export function resolveManagementConfigPath(
+  value?: string,
+  cwd?: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const runtimeRoot = resolveRuntimeRoot(
+    env,
+    cwd || env.HOME || env.USERPROFILE || '',
+  );
+  return resolveRuntimeManagementConfigPath(runtimeRoot, value);
 }
 
 function parseDomainConfig(raw: unknown): ManagementDomainConfig | undefined {

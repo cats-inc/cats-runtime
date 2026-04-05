@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { delimiter, extname, isAbsolute, join, posix as pathPosix, win32 as pathWin32 } from 'node:path';
 import type { ProviderCommandConfig, ProviderRuntimeConfig } from '../config.js';
+import { resolveRuntimeRoot, resolveRuntimeSessionsDir } from '../../../shared/runtimePaths.js';
 
 export interface ShellInvocation {
   command: string;
@@ -418,9 +419,8 @@ function mapHostRuntimeSessionPathToDocker(cwd: string): string | null {
 }
 
 function resolveHostRuntimeSessionBaseDir(): string {
-  const home = process.env.HOME || process.env.USERPROFILE || '';
   return process.env.CATS_RUNTIME_SESSION_BASE_DIR
-    || (home ? join(home, '.cats', 'runtime', 'sessions') : '');
+    || resolveRuntimeSessionsDir(resolveRuntimeRoot(process.env));
 }
 
 function selectHostPathApi(left: string, right: string) {

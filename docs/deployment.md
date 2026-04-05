@@ -62,7 +62,7 @@ npx cats-runtime
 
 The executable package uses the same runtime entrypoint and supports either
 bootstrap-first startup with no preexisting config, or config supplied through
-`.env`, the default `~/.cats/runtime/providers.yaml`, or explicit environment
+`.env`, the default `~/.cats/runtime/config/providers.yaml`, or explicit environment
 variables.
 
 For production packaging, treat the published binaries plus the HTTP contract
@@ -132,7 +132,7 @@ Expected behavior:
 
 - Node.js 22+
 - `.env` or equivalent environment variables
-- either a valid `~/.cats/runtime/providers.yaml` / `CATS_RUNTIME_CONFIG_PATH`, or
+- either a valid `~/.cats/runtime/config/providers.yaml` / `CATS_RUNTIME_CONFIG_PATH`, or
   bootstrap mode to generate one on first launch
 - any provider-specific credentials or local CLI installs needed by the chosen
   targets
@@ -144,6 +144,7 @@ Expected behavior:
 | `CATS_RUNTIME_HOST` | No | Bind host, defaults to `127.0.0.1` |
 | `CATS_RUNTIME_PORT` | No | Bind port, defaults to `3110` |
 | `CATS_RUNTIME_API_KEY` | No | Optional bearer token for protected routes |
+| `CATS_RUNTIME_DIR` | No | Primary runtime home override; defaults to `~/.cats/runtime` |
 | `CATS_RUNTIME_CONFIG_PATH` | No | Override provider-topology config path |
 | `CATS_RUNTIME_DATA_DIR` | No | Override runtime metadata directory |
 | `CATS_RUNTIME_SESSION_BASE_DIR` | No | Override session workspace/transcript directory |
@@ -167,7 +168,7 @@ Expected behavior:
 - **State paths**:
   - metadata defaults to `~/.cats/runtime/data`
   - session workspaces/transcripts default to `~/.cats/runtime/sessions`
-  - provider topology config defaults to `~/.cats/runtime/providers.yaml`
+  - provider topology config defaults to `~/.cats/runtime/config/providers.yaml`
 
 ## Verification
 
@@ -197,7 +198,7 @@ process that owns the port.
 
 **Symptoms**: health is up, but provider operations fail  
 **Solution**: verify `GET /diagnostics/providers`, then check `.env`,
-`~/.cats/runtime/providers.yaml`, and any required local CLI/API credentials for the
+`~/.cats/runtime/config/providers.yaml`, and any required local CLI/API credentials for the
 configured targets.
 
 ### Issue 3: Dashboard fails in packaged mode

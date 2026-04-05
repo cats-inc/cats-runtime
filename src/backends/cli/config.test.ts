@@ -197,7 +197,7 @@ describe('config platform defaults', () => {
     expect(config.dataDir).toBe(join('/home/tester', '.cats', 'runtime', 'data'));
     expect(config.sessionBaseDir).toBe(join('/home/tester', '.cats', 'runtime', 'sessions'));
     expect(resolveConfigPath(undefined, '/home/tester')).toBe(
-      join('/home/tester', '.cats', 'runtime', 'providers.yaml'),
+      join('/home/tester', '.cats', 'runtime', 'config', 'providers.yaml'),
     );
     expect(config.configPath).toBeUndefined();
   });

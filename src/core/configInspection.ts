@@ -85,7 +85,11 @@ function countUsableTargets(parsed: unknown): { count: number; usable: boolean }
 export function inspectRuntimeConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): ConfigInspection {
-  const configPath = resolveConfigPath(env.CATS_RUNTIME_CONFIG_PATH);
+  const configPath = resolveConfigPath(
+    env.CATS_RUNTIME_CONFIG_PATH,
+    env.HOME || env.USERPROFILE || '',
+    env,
+  );
   const fileExists = existsSync(configPath);
 
   if (!fileExists) {

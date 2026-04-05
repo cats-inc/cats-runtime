@@ -46,7 +46,7 @@ Before committing, verify:
   from any upstream provider secret.
 - Remote API providers such as Anthropic, OpenAI, and Gemini should reference
   env names in the resolved `providers.yaml` config (default
-  `~/.cats/runtime/providers.yaml`) (`api_key_env`, `organization_env`,
+  `~/.cats/runtime/config/providers.yaml`) (`api_key_env`, `organization_env`,
   `project_env`) rather than embedding secret values in config files.
 - Peer execution uses a separate shared secret
   (`CATS_RUNTIME_PEER_SHARED_SECRET`), not the host-facing

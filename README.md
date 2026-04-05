@@ -187,7 +187,8 @@ Runtime state defaults under the user's home directory:
 
 - registry metadata: `~/.cats/runtime/data`
 - session workspaces and transcripts: `~/.cats/runtime/sessions`
-- provider topology config: `~/.cats/runtime/providers.yaml`
+- provider topology config: `~/.cats/runtime/config/providers.yaml`
+- management adapter config: `~/.cats/runtime/config/management.yaml`
 
 ## Key Files
 
