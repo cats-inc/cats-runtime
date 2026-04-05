@@ -24,6 +24,14 @@ describe('injectRuntimeShellState', () => {
     expect(result).toContain('href="/dashboard"');
     expect(result).toContain('href="/setup"');
     expect(result).toContain('Current');
+    expect(result.indexOf('runtime-surface-item-title">Setup')).toBeLessThan(
+      result.indexOf('runtime-surface-item-title">Dashboard'),
+    );
+    expect(result.indexOf('runtime-surface-item-title">Dashboard')).toBeLessThan(
+      result.indexOf('runtime-surface-item-title">Playground'),
+    );
+    expect(result).toContain('runtime-surface-swatch" style="background:#facc15;box-shadow:0 0 0 4px rgba(250,204,21,0.12);"');
+    expect(result).toContain('runtime-surface-swatch" style="background:#4ade80;box-shadow:0 0 0 4px rgba(74,222,128,0.12);"');
   });
 
   it('locks dashboard and playground in bootstrap mode while keeping setup active', () => {

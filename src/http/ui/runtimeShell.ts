@@ -15,17 +15,17 @@ interface RuntimeShellStateInput {
 
 export const RUNTIME_SURFACE_DESCRIPTORS: readonly RuntimeSurfaceDescriptor[] = [
   {
-    id: 'dashboard',
-    label: 'Dashboard',
-    subtitle: 'Sessions, provider health, and runtime diagnostics',
-    href: '/dashboard',
-    swatchStyle: 'background:#facc15;box-shadow:0 0 0 4px rgba(250,204,21,0.12);',
-  },
-  {
     id: 'setup',
     label: 'Setup',
     subtitle: 'Provider bootstrap, repair, and readiness follow-through',
     href: '/setup',
+    swatchStyle: 'background:#facc15;box-shadow:0 0 0 4px rgba(250,204,21,0.12);',
+  },
+  {
+    id: 'dashboard',
+    label: 'Dashboard',
+    subtitle: 'Sessions, provider health, and runtime diagnostics',
+    href: '/dashboard',
     swatchStyle: 'background:#4ade80;box-shadow:0 0 0 4px rgba(74,222,128,0.12);',
   },
   {
