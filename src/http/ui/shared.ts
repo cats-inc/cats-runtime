@@ -544,6 +544,135 @@ export const SHARED_UI_SCRIPT = `
     return '';
   }
 
+  function listSelectablePlaygroundProviders(selectableProviders, providerOrder) {
+    var available = Array.isArray(selectableProviders) ? selectableProviders : [];
+    var preferredOrder = Array.isArray(providerOrder) ? providerOrder : [];
+    var seen = {};
+    var ordered = [];
+    for (var i = 0; i < preferredOrder.length; i++) {
+      var providerId = preferredOrder[i];
+      if (!providerId || seen[providerId] || available.indexOf(providerId) < 0) continue;
+      seen[providerId] = true;
+      ordered.push(providerId);
+    }
+    for (var j = 0; j < available.length; j++) {
+      var extraProviderId = available[j];
+      if (!extraProviderId || seen[extraProviderId]) continue;
+      seen[extraProviderId] = true;
+      ordered.push(extraProviderId);
+    }
+    return ordered;
+  }
+
+  function normalizePlaygroundAgentSelection(input) {
+    var options = input && typeof input === 'object' ? input : {};
+    var requestedProvider = typeof options.provider === 'string' ? options.provider : '';
+    var selectableProviders = listSelectablePlaygroundProviders(
+      options.selectableProviders,
+      options.providerOrder,
+    );
+    var provider = selectableProviders.indexOf(requestedProvider) >= 0
+      ? requestedProvider
+      : (selectableProviders[0] || requestedProvider || '');
+    var providerChanged = provider !== requestedProvider;
+    var advancedCatalogs = options.advancedCatalogs && typeof options.advancedCatalogs === 'object'
+      ? options.advancedCatalogs
+      : {};
+    var catalog = normalizeAdvancedCatalog(advancedCatalogs[provider]);
+    var model = providerChanged
+      ? ''
+      : (typeof options.model === 'string' ? options.model : '');
+    var incomingSelection = providerChanged
+      ? null
+      : (options.modelSelection && typeof options.modelSelection === 'object'
+        ? cloneJson(options.modelSelection)
+        : null);
+    if (!catalog) {
+      return {
+        provider: provider,
+        model: model,
+        modelSelection: incomingSelection,
+      };
+    }
+
+    var entries = listAdvancedCatalogEntries(catalog);
+    var entryIds = [];
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i] && entries[i].id) entryIds.push(entries[i].id);
+    }
+    var entryId = '';
+    var presetId = '';
+    if (incomingSelection) {
+      if (
+        incomingSelection.entryMode === 'explicit'
+        && typeof incomingSelection.entryId === 'string'
+        && entryIds.indexOf(incomingSelection.entryId) >= 0
+      ) {
+        entryId = incomingSelection.entryId;
+        presetId = typeof incomingSelection.presetId === 'string' ? incomingSelection.presetId : '';
+      } else if (typeof incomingSelection.presetId === 'string' && incomingSelection.presetId) {
+        var resolvedPreset = resolveAdvancedCatalogChoice(catalog, 'preset:' + incomingSelection.presetId);
+        if (resolvedPreset && resolvedPreset.entryId && entryIds.indexOf(resolvedPreset.entryId) >= 0) {
+          entryId = resolvedPreset.entryId;
+          presetId = incomingSelection.presetId;
+        }
+      }
+    }
+    if (!entryId && model && entryIds.indexOf(model) >= 0) {
+      entryId = model;
+    }
+
+    var allowLegacyModel = options.allowLegacyModel === true;
+    if (!entryId) {
+      if (allowLegacyModel && model) {
+        return {
+          provider: provider,
+          model: model,
+          modelSelection: null,
+        };
+      }
+      entryId = getAdvancedCatalogDefaultEntryId(catalog);
+    }
+
+    if (!entryId) {
+      return {
+        provider: provider,
+        model: allowLegacyModel ? model : '',
+        modelSelection: null,
+      };
+    }
+
+    var applicablePreset = presetId
+      ? findApplicableAdvancedPreset(catalog, entryId, presetId)
+      : null;
+    if (!applicablePreset) {
+      presetId = getAdvancedCatalogDefaultPresetId(catalog, entryId) || '';
+    }
+
+    var nextSelection = {
+      entryMode: 'explicit',
+      entryId: entryId,
+    };
+    if (presetId) {
+      nextSelection.presetId = presetId;
+    }
+    if (
+      incomingSelection
+      && incomingSelection.controls
+      && typeof incomingSelection.controls === 'object'
+      && !Array.isArray(incomingSelection.controls)
+      && Object.keys(incomingSelection.controls).length > 0
+    ) {
+      nextSelection.controls = cloneJson(incomingSelection.controls);
+    }
+
+    return {
+      provider: provider,
+      model: '',
+      modelSelection: nextSelection,
+    };
+  }
+
   function getAdvancedEntryControlDefaults(catalog, entryId, presetId) {
     var normalized = normalizeAdvancedCatalog(catalog);
     if (!normalized || !entryId) return {};
@@ -854,6 +983,8 @@ export const SHARED_UI_SCRIPT = `
     getAdvancedCatalogDefaultSelection: getAdvancedCatalogDefaultSelection,
     getAdvancedCatalogDefaultEntryId: getAdvancedCatalogDefaultEntryId,
     getAdvancedCatalogDefaultPresetId: getAdvancedCatalogDefaultPresetId,
+    listSelectablePlaygroundProviders: listSelectablePlaygroundProviders,
+    normalizePlaygroundAgentSelection: normalizePlaygroundAgentSelection,
     resolveAdvancedCatalogChoice: resolveAdvancedCatalogChoice,
     getAdvancedChoiceControlDefaults: getAdvancedChoiceControlDefaults,
     getAdvancedEntryControlDefaults: getAdvancedEntryControlDefaults,

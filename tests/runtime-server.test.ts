@@ -358,11 +358,13 @@ describe('runtime server', () => {
       expect(html).toContain('function getDisplayOrderedAgents(agents) {');
       expect(html).toContain('reorderAgentStatusPills();');
       expect(html).toContain('const CUSTOM_AGENT_MODEL_VALUE = \'__custom_legacy_model__\';');
+      expect(html).toContain('let SELECTABLE_PROVIDERS = [...PROVIDERS];');
       expect(html).toContain('let expandedAgentId = null;');
       expect(html).toContain('function refreshAllAgentCardSummaries() {');
       expect(html).toContain('function setExpandedAgent(id, expand = true) {');
       expect(html).toContain('function toggleAgentCard(id) {');
-      expect(html).toContain('function resolveAgentInitialRouting(provider,model=\'\',modelSelection=null){');
+      expect(html).toContain('function renderAgentProviderSelectOptions(selectEl,selectedProvider=\'\'){');
+      expect(html).toContain('function resolveAgentInitialRouting(provider,model=\'\',modelSelection=null,options={}){');
       expect(html).toContain('function syncAgentPresetField(div,catalog,entryId,preferredPresetId=\'\',allowDefaultPreset=true){');
       expect(html).toContain('function renderAgentModelChoice(div){');
       expect(html).toContain("div.className=`my-1 ${c.bg} border-l-4 ${c.border} rounded-r-lg p-4 max-w-[85%]`;");
@@ -386,6 +388,7 @@ describe('runtime server', () => {
       expect(html).toContain('window.CatsUI?.getAdvancedCatalogDefaultEntryId');
       expect(html).toContain('window.CatsUI?.getAdvancedCatalogDefaultPresetId');
       expect(html).toContain('window.CatsUI?.listApplicableAdvancedPresets');
+      expect(html).toContain('window.CatsUI?.normalizePlaygroundAgentSelection');
       expect(html).toContain('class RuntimeClient');
       expect(html).toContain('/playground/workspace');
       expect(html).toContain('createPlaygroundWorkspace()');
