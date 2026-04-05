@@ -22,6 +22,7 @@ import {
   defaultWslDiscoveryPolicy,
   listProviderInstances,
   loadConfig,
+  resolveConfigPath,
   resolveProviderInstance,
 } from './config.js';
 
@@ -187,14 +188,18 @@ describe('config platform defaults', () => {
     })).toThrow(/Invalid CATS_RUNTIME_DOCKER_DISCOVERY_POLICY/);
   });
 
-  it('defaults runtime data and session directories under ~/.cats', () => {
+  it('defaults runtime config, data, and session directories under ~/.cats/runtime', () => {
     const config = loadConfigWithoutProviderFile({
       HOME: '/home/tester',
       USERPROFILE: '',
     });
 
-    expect(config.dataDir).toBe(join('/home/tester', '.cats', 'data'));
-    expect(config.sessionBaseDir).toBe(join('/home/tester', '.cats', 'sessions'));
+    expect(config.dataDir).toBe(join('/home/tester', '.cats', 'runtime', 'data'));
+    expect(config.sessionBaseDir).toBe(join('/home/tester', '.cats', 'runtime', 'sessions'));
+    expect(resolveConfigPath(undefined, '/home/tester')).toBe(
+      join('/home/tester', '.cats', 'runtime', 'providers.yaml'),
+    );
+    expect(config.configPath).toBeUndefined();
   });
 
   it('loads Auggie and OpenCode command overrides from the environment', () => {

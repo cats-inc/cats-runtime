@@ -413,13 +413,14 @@ function mapHostRuntimeSessionPathToDocker(cwd: string): string | null {
 
   const normalizedRelative = relative.replace(/\\/g, '/');
   return normalizedRelative
-    ? pathPosix.join('/root/.cats/sessions', normalizedRelative)
-    : '/root/.cats/sessions';
+    ? pathPosix.join('/root/.cats/runtime/sessions', normalizedRelative)
+    : '/root/.cats/runtime/sessions';
 }
 
 function resolveHostRuntimeSessionBaseDir(): string {
   const home = process.env.HOME || process.env.USERPROFILE || '';
-  return process.env.CATS_RUNTIME_SESSION_BASE_DIR || (home ? join(home, '.cats', 'sessions') : '');
+  return process.env.CATS_RUNTIME_SESSION_BASE_DIR
+    || (home ? join(home, '.cats', 'runtime', 'sessions') : '');
 }
 
 function selectHostPathApi(left: string, right: string) {

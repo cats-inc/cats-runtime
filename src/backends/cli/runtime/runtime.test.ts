@@ -443,7 +443,7 @@ describe('runtime adapters', () => {
 
   it('maps isolated runtime workspaces into a container-local sessions directory for Docker', () => {
     const previousSessionBaseDir = process.env.CATS_RUNTIME_SESSION_BASE_DIR;
-    process.env.CATS_RUNTIME_SESSION_BASE_DIR = 'C:\\Users\\sammy\\.cats-runtime\\sessions';
+    process.env.CATS_RUNTIME_SESSION_BASE_DIR = 'C:\\Users\\sammy\\.cats\\runtime\\sessions';
 
     try {
       const spawnConfig = buildProcessSpawnConfig(
@@ -456,15 +456,15 @@ describe('runtime adapters', () => {
           },
         },
         'auggie',
-        ['--workspace-root', 'C:\\Users\\sammy\\.cats-runtime\\sessions\\sess-1'],
-        'C:\\Users\\sammy\\.cats-runtime\\sessions\\sess-1',
+        ['--workspace-root', 'C:\\Users\\sammy\\.cats\\runtime\\sessions\\sess-1'],
+        'C:\\Users\\sammy\\.cats\\runtime\\sessions\\sess-1',
       );
 
       expect(spawnConfig.env).toEqual({
         CATS_RUNTIME_DOCKER_EXEC_B64: Buffer.from(JSON.stringify({
-          cwd: '/root/.cats/sessions/sess-1',
+          cwd: '/root/.cats/runtime/sessions/sess-1',
           command: 'auggie',
-          args: ['--workspace-root', '/root/.cats/sessions/sess-1'],
+          args: ['--workspace-root', '/root/.cats/runtime/sessions/sess-1'],
           ensureCwd: true,
         }), 'utf8').toString('base64'),
       });

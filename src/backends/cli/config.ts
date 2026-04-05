@@ -26,7 +26,6 @@ const DOCKER_DISCOVERY_POLICIES = [
   'if_running',
   'manual_only',
 ] as const;
-const CONFIG_FILE_DEFAULT = join('config', 'providers.yaml');
 
 export type RunnerMode = typeof RUNNER_MODES[number];
 export type RuntimeMode = typeof RUNTIME_MODES[number];
@@ -362,13 +361,14 @@ export function loadConfig(
     3110,
     'CATS_RUNTIME_PORT',
   );
+  const runtimeRoot = resolveDefaultCatsRuntimeRoot(home);
   const dataDir = env.CATS_RUNTIME_DATA_DIR
-    || join(home, '.cats', 'data');
+    || join(runtimeRoot, 'data');
   const sessionBaseDir = env.CATS_RUNTIME_SESSION_BASE_DIR
-    || join(home, '.cats', 'sessions');
+    || join(runtimeRoot, 'sessions');
 
   const legacy = buildLegacyRuntimeShape(env, home);
-  const configPath = resolveConfigPath(env.CATS_RUNTIME_CONFIG_PATH);
+  const configPath = resolveConfigPath(env.CATS_RUNTIME_CONFIG_PATH, home);
   const hasProviderFile = !options.skipProviderFile && existsSync(configPath);
   const configured = hasProviderFile
     ? applyFileBasedProviderConfig(configPath, legacy)
@@ -579,9 +579,17 @@ export function resolveProviderInstance(
   );
 }
 
-export function resolveConfigPath(value: string | undefined): string {
+function resolveDefaultCatsRuntimeRoot(home: string): string {
+  if (home) {
+    return join(home, '.cats', 'runtime');
+  }
+
+  return resolve(process.cwd(), '.cats', 'runtime');
+}
+
+export function resolveConfigPath(value: string | undefined, home = ''): string {
   if (!value) {
-    return resolve(process.cwd(), CONFIG_FILE_DEFAULT);
+    return join(resolveDefaultCatsRuntimeRoot(home), 'providers.yaml');
   }
 
   return isAbsolute(value)
