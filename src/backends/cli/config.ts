@@ -363,9 +363,9 @@ export function loadConfig(
     'CATS_RUNTIME_PORT',
   );
   const dataDir = env.CATS_RUNTIME_DATA_DIR
-    || join(home, '.cats-runtime', 'data');
+    || join(home, '.cats', 'data');
   const sessionBaseDir = env.CATS_RUNTIME_SESSION_BASE_DIR
-    || join(home, '.cats-runtime', 'sessions');
+    || join(home, '.cats', 'sessions');
 
   const legacy = buildLegacyRuntimeShape(env, home);
   const configPath = resolveConfigPath(env.CATS_RUNTIME_CONFIG_PATH);

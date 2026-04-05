@@ -187,14 +187,14 @@ describe('config platform defaults', () => {
     })).toThrow(/Invalid CATS_RUNTIME_DOCKER_DISCOVERY_POLICY/);
   });
 
-  it('defaults runtime data and session directories under ~/.cats-runtime', () => {
+  it('defaults runtime data and session directories under ~/.cats', () => {
     const config = loadConfigWithoutProviderFile({
       HOME: '/home/tester',
       USERPROFILE: '',
     });
 
-    expect(config.dataDir).toBe(join('/home/tester', '.cats-runtime', 'data'));
-    expect(config.sessionBaseDir).toBe(join('/home/tester', '.cats-runtime', 'sessions'));
+    expect(config.dataDir).toBe(join('/home/tester', '.cats', 'data'));
+    expect(config.sessionBaseDir).toBe(join('/home/tester', '.cats', 'sessions'));
   });
 
   it('loads Auggie and OpenCode command overrides from the environment', () => {

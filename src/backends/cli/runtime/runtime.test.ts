@@ -462,9 +462,9 @@ describe('runtime adapters', () => {
 
       expect(spawnConfig.env).toEqual({
         CATS_RUNTIME_DOCKER_EXEC_B64: Buffer.from(JSON.stringify({
-          cwd: '/root/.cats-runtime/sessions/sess-1',
+          cwd: '/root/.cats/sessions/sess-1',
           command: 'auggie',
-          args: ['--workspace-root', '/root/.cats-runtime/sessions/sess-1'],
+          args: ['--workspace-root', '/root/.cats/sessions/sess-1'],
           ensureCwd: true,
         }), 'utf8').toString('base64'),
       });
