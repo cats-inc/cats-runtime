@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createRuntimeApp as createApp } from './app.js';
@@ -12,6 +12,10 @@ import type { AuggieSessionService } from '../backends/cli/auggie/AuggieSessionS
 import type { OpencodeNativeSessionService } from '../backends/cli/opencode/OpencodeNativeSessionService.js';
 
 describe('codex management', () => {
+  let runtimeRootDir = '';
+  let dataDir = '';
+  let sessionBaseDir = '';
+
   const makeConfig = (): CliRuntimeConfig => ({
     host: '127.0.0.1',
     port: 3100,
@@ -46,7 +50,8 @@ describe('codex management', () => {
     nativeDiscoveryIntervalMs: 5000,
     externalSessionLiveWindowMs: 15000,
     maxSessions: 10,
-    sessionBaseDir: 'C:/tmp/cats-runtime/sessions',
+    dataDir,
+    sessionBaseDir,
     providerCommands: {
       auggie: { path: 'auggie', runner: 'auto', runtime: { mode: 'native' } },
       claude: { path: 'claude', runner: 'auto', runtime: { mode: 'native' } },
@@ -70,6 +75,9 @@ describe('codex management', () => {
   let codexUbuntuSessionsDir: string;
 
   beforeEach(() => {
+    runtimeRootDir = mkdtempSync(join(tmpdir(), 'codex-management-runtime-'));
+    dataDir = join(runtimeRootDir, 'data');
+    sessionBaseDir = join(runtimeRootDir, 'sessions');
     codexSessionsDir = join(tmpdir(), `codex-management-test-${Date.now()}`);
     codexUbuntuSessionsDir = join(tmpdir(), `codex-management-test-ubuntu-${Date.now()}`);
     mkdirSync(codexSessionsDir, { recursive: true });
@@ -134,6 +142,7 @@ describe('codex management', () => {
   });
 
   afterEach(() => {
+    rmSync(runtimeRootDir, { recursive: true, force: true });
     rmSync(codexSessionsDir, { recursive: true, force: true });
     rmSync(codexUbuntuSessionsDir, { recursive: true, force: true });
   });

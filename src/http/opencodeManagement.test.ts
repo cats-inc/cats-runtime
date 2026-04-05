@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -12,6 +12,10 @@ import type { AuggieSessionService } from '../backends/cli/auggie/AuggieSessionS
 import type { OpencodeNativeSessionService } from '../backends/cli/opencode/OpencodeNativeSessionService.js';
 
 describe('OpenCode native session management', () => {
+  let runtimeRootDir = '';
+  let dataDir = '';
+  let sessionBaseDir = '';
+
   const makeConfig = (): CliRuntimeConfig => ({
     host: '127.0.0.1',
     port: 3100,
@@ -46,7 +50,8 @@ describe('OpenCode native session management', () => {
     nativeDiscoveryIntervalMs: 5000,
     externalSessionLiveWindowMs: 15000,
     maxSessions: 10,
-    sessionBaseDir: 'C:/tmp/cats-runtime/sessions',
+    dataDir,
+    sessionBaseDir,
     providerCommands: {
       auggie: { path: 'auggie', runner: 'auto', runtime: { mode: 'native' } },
       claude: { path: 'claude', runner: 'auto', runtime: { mode: 'native' } },
@@ -69,6 +74,9 @@ describe('OpenCode native session management', () => {
   let attachedWorkers: Map<string, { alive: boolean }>;
 
   beforeEach(() => {
+    runtimeRootDir = mkdtempSync(join(tmpdir(), 'opencode-management-runtime-'));
+    dataDir = join(runtimeRootDir, 'data');
+    sessionBaseDir = join(runtimeRootDir, 'sessions');
     registry = new SessionRegistry();
     attachedWorkers = new Map();
     pool = {
@@ -134,6 +142,10 @@ describe('OpenCode native session management', () => {
       auggieSessions,
       opencodeNative,
     });
+  });
+
+  afterEach(() => {
+    rmSync(runtimeRootDir, { recursive: true, force: true });
   });
 
   it('creates a native OpenCode session through POST /sessions', async () => {

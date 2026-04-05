@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRuntimeApp as createApp } from './app.js';
 import { SessionRegistry } from '../backends/cli/pool/SessionRegistry.js';
 import type { CliRuntimeConfig } from '../backends/cli/config.js';
@@ -12,6 +12,10 @@ import type { AuggieSessionService } from '../backends/cli/auggie/AuggieSessionS
 import type { OpencodeNativeSessionService } from '../backends/cli/opencode/OpencodeNativeSessionService.js';
 
 describe('Auggie native session management', () => {
+  let runtimeRootDir = '';
+  let dataDir = '';
+  let sessionBaseDir = '';
+
   const makeConfig = (): CliRuntimeConfig => ({
     host: '127.0.0.1',
     port: 3100,
@@ -46,7 +50,8 @@ describe('Auggie native session management', () => {
     nativeDiscoveryIntervalMs: 5000,
     externalSessionLiveWindowMs: 15000,
     maxSessions: 10,
-    sessionBaseDir: 'C:/tmp/cats-runtime/sessions',
+    dataDir,
+    sessionBaseDir,
     providerCommands: {
       auggie: { path: 'auggie', runner: 'auto', runtime: { mode: 'native' } },
       claude: { path: 'claude', runner: 'auto', runtime: { mode: 'native' } },
@@ -69,6 +74,9 @@ describe('Auggie native session management', () => {
   let attachedWorkers: Map<string, { alive: boolean }>;
 
   beforeEach(() => {
+    runtimeRootDir = mkdtempSync(join(tmpdir(), 'auggie-management-runtime-'));
+    dataDir = join(runtimeRootDir, 'data');
+    sessionBaseDir = join(runtimeRootDir, 'sessions');
     registry = new SessionRegistry();
     attachedWorkers = new Map();
     pool = {
@@ -134,6 +142,10 @@ describe('Auggie native session management', () => {
       auggieSessions,
       opencodeNative,
     });
+  });
+
+  afterEach(() => {
+    rmSync(runtimeRootDir, { recursive: true, force: true });
   });
 
   it('loads Auggie history through the generic history route', async () => {
