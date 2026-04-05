@@ -6,6 +6,7 @@ import type { ExecutionHandle, StreamEvent } from '../types.js';
 import { loadConfig } from '../config.js';
 import { PeerExecutionService } from './PeerExecutionService.js';
 import type { PeerExecutionRequest } from './types.js';
+import { createRuntimeTestEnv } from '../../../tests/support/runtimeTestPaths.js';
 
 const createdRoots: string[] = [];
 
@@ -13,15 +14,10 @@ function createConfig() {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-peer-exec-service-'));
   createdRoots.push(root);
   return {
-    ...loadConfig({
-      HOME: root,
-      USERPROFILE: root,
-      CATS_RUNTIME_DATA_DIR: join(root, 'data'),
-      CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'sessions'),
-      CATS_RUNTIME_CONFIG_PATH: join(root, 'providers.missing.yaml'),
+    ...loadConfig(createRuntimeTestEnv(root, {
       CATS_RUNTIME_HOST: '127.0.0.1',
       CATS_RUNTIME_PORT: '3110',
-    }),
+    }), { skipProviderFile: true }),
     providerDefaultTargets: {
       codex: { backend: 'api', instance: 'main' },
     },

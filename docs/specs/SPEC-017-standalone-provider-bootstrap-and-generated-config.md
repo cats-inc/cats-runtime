@@ -113,8 +113,7 @@ and-egg problem instead of preserving it.
 6. The runtime shall skip bootstrap mode when a valid config with at least one
    enabled provider target is supplied through:
    - the default config path, or
-   - `--config`, or
-   - `CATS_RUNTIME_CONFIG_PATH`
+   - the `CATS_RUNTIME_DIR` root override
 7. Bootstrap mode shall not require the operator to manually copy
    `providers.yaml.example` before setup can begin.
 8. The standalone bootstrap surface shall be provider-first and separate from

@@ -4,7 +4,6 @@ import { parse } from 'yaml';
 import { KNOWN_PROVIDERS, type ProviderName } from './providers/types.js';
 import {
   resolveRuntimeDataDir,
-  resolveRuntimePathWithinRoot,
   resolveRuntimeProvidersConfigPath,
   resolveRuntimeRoot,
   resolveRuntimeSessionsDir,
@@ -163,7 +162,7 @@ export interface CliRuntimeConfig {
   port: number;
   apiKey: string;
   dataDir?: string;
-  configPath?: string;
+  configPath: string;
   auggieMaxTurns: number;
   auggiePath: string;
   claudePath: string;
@@ -368,23 +367,11 @@ export function loadConfig(
     'CATS_RUNTIME_PORT',
   );
   const runtimeRoot = resolveRuntimeRoot(env);
-  const dataDir = resolveRuntimePathWithinRoot(
-    runtimeRoot,
-    env.CATS_RUNTIME_DATA_DIR,
-    resolveRuntimeDataDir(runtimeRoot),
-  );
-  const sessionBaseDir = resolveRuntimePathWithinRoot(
-    runtimeRoot,
-    env.CATS_RUNTIME_SESSION_BASE_DIR,
-    resolveRuntimeSessionsDir(runtimeRoot),
-  );
+  const dataDir = resolveRuntimeDataDir(runtimeRoot);
+  const sessionBaseDir = resolveRuntimeSessionsDir(runtimeRoot);
 
   const legacy = buildLegacyRuntimeShape(env, env.HOME || env.USERPROFILE || '');
-  const configPath = resolveConfigPath(
-    env.CATS_RUNTIME_CONFIG_PATH,
-    env.HOME || env.USERPROFILE || '',
-    env,
-  );
+  const configPath = resolveConfigPath(env.HOME || env.USERPROFILE || '', env);
   const hasProviderFile = !options.skipProviderFile && existsSync(configPath);
   const configured = hasProviderFile
     ? applyFileBasedProviderConfig(configPath, legacy)
@@ -395,7 +382,7 @@ export function loadConfig(
     port,
     apiKey,
     dataDir,
-    configPath: hasProviderFile ? configPath : undefined,
+    configPath,
     auggieMaxTurns: parsePositiveInt(
       env.AUGGIE_MAX_TURNS,
       defaultAuggieMaxTurns(),
@@ -596,7 +583,6 @@ export function resolveProviderInstance(
 }
 
 export function resolveConfigPath(
-  value: string | undefined,
   home = '',
   env: NodeJS.ProcessEnv = process.env,
 ): string {
@@ -604,7 +590,7 @@ export function resolveConfigPath(
     ...env,
     ...(home ? { HOME: home } : {}),
   }, home);
-  return resolveRuntimeProvidersConfigPath(runtimeRoot, value);
+  return resolveRuntimeProvidersConfigPath(runtimeRoot);
 }
 
 function buildLegacyRuntimeShape(

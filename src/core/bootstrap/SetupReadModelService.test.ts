@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { SetupReadModelService } from './SetupReadModelService.js';
+import { createRuntimeTestEnv } from '../../../tests/support/runtimeTestPaths.js';
 
 function createTestRoot(): { root: string; cleanup: () => void } {
   const root = mkdtempSync(join(tmpdir(), 'cats-setup-read-model-'));
@@ -13,15 +14,10 @@ function createTestRoot(): { root: string; cleanup: () => void } {
 }
 
 function createTestEnv(root: string): NodeJS.ProcessEnv {
-  return {
-    HOME: root,
-    USERPROFILE: root,
-    CATS_RUNTIME_CONFIG_PATH: join(root, 'config', 'providers.yaml'),
-    CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
-    CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
+  return createRuntimeTestEnv(root, {
     CATS_RUNTIME_HOST: '127.0.0.1',
     CATS_RUNTIME_PORT: '3110',
-  };
+  });
 }
 
 describe('SetupReadModelService', () => {

@@ -967,8 +967,7 @@ export function createRuntimeServer(
 
   // Bootstrap service is always created so setup routes can function.
   const paths = getRuntimeResolvedPaths(config);
-  const configPathForBootstrap = config.configPath
-    || resolveConfigPath(process.env.CATS_RUNTIME_CONFIG_PATH);
+  const configPathForBootstrap = config.configPath;
   context.bootstrapService = new BootstrapService({
     dataDir: paths.dataDir,
     configPath: configPathForBootstrap,
@@ -980,8 +979,7 @@ export function createRuntimeServer(
   let activeDiscovery: ReturnType<typeof createDiscoveryController> | null = null;
   context.completeBootstrap = () => {
     // Reload config from the newly written providers.yaml.
-    const reloadEnv = { ...process.env, CATS_RUNTIME_CONFIG_PATH: configPathForBootstrap };
-    const reloaded = loadConfig(reloadEnv);
+    const reloaded = loadConfig(process.env);
     Object.assign(config, reloaded);
     copyRuntimeConfigEnv(config, reloaded);
     context.config = config;

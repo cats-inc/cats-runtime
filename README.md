@@ -161,7 +161,6 @@ The executable entry also supports:
 - `--ready-output <plain|json|silent>`
 - `--host <bind-host>`
 - `--port <bind-port>`
-- `--config <providers-config-path>`
 
 For direct packaged-style local verification before publish:
 
@@ -189,6 +188,8 @@ Runtime state defaults under the user's home directory:
 - session workspaces and transcripts: `~/.cats/runtime/sessions`
 - provider topology config: `~/.cats/runtime/config/providers.yaml`
 - management adapter config: `~/.cats/runtime/config/management.yaml`
+
+Override the runtime storage root with `CATS_RUNTIME_DIR` when needed.
 
 ## Key Files
 

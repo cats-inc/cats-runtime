@@ -80,7 +80,6 @@ Supported startup flags:
 - `--ready-output <plain|json|silent>`
 - `--host <bind-host>`
 - `--port <bind-port>`
-- `--config <providers-config-path>`
 
 ## Bootstrap Mode
 
@@ -413,9 +412,7 @@ Keep `.env` for runtime-wide values and secrets:
 - `CATS_RUNTIME_HOST=127.0.0.1`
 - `CATS_RUNTIME_PORT=3110`
 - `CATS_RUNTIME_API_KEY=`
-- `CATS_RUNTIME_DATA_DIR=...`
-- `CATS_RUNTIME_SESSION_BASE_DIR=...`
-- `CATS_RUNTIME_CONFIG_PATH=~/.cats/runtime/config/providers.yaml`
+- `CATS_RUNTIME_DIR=~/.cats/runtime`
 - `CATS_RUNTIME_MAX_SESSIONS=10`
 - `CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS=5000`
 - `CATS_RUNTIME_WSL_DISCOVERY_POLICY=if_running`
@@ -776,9 +773,9 @@ In that mode:
 
 By default, runtime metadata persists under `~/.cats/runtime/data`, runtime
 session workspaces/transcripts persist under `~/.cats/runtime/sessions`, and
-provider topology persists under `~/.cats/runtime/config/providers.yaml`. Override
-those with `CATS_RUNTIME_DATA_DIR`, `CATS_RUNTIME_SESSION_BASE_DIR`, or
-`CATS_RUNTIME_CONFIG_PATH` if you need to relocate local state.
+provider topology persists under `~/.cats/runtime/config/providers.yaml`.
+Override the runtime root with `CATS_RUNTIME_DIR` if you need to relocate local
+state.
 
 ### Restart helper
 

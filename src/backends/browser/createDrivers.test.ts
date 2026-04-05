@@ -12,7 +12,7 @@ function createEnv(overrides: Record<string, string | undefined> = {}): NodeJS.P
     CATS_RUNTIME_API_KEY: '',
     CATS_RUNTIME_HOST: '127.0.0.1',
     CATS_RUNTIME_PORT: '3110',
-    CATS_RUNTIME_CONFIG_PATH: '__missing__',
+    CATS_RUNTIME_DIR: '/tmp/cats-runtime-browser-drivers/.cats/runtime',
     ...overrides,
   };
 }

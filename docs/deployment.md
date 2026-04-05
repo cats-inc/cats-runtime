@@ -77,7 +77,6 @@ Supported startup flags:
 - `--ready-output <plain|json|silent>`
 - `--host <bind-host>`
 - `--port <bind-port>`
-- `--config <providers-config-path>`
 
 The companion stdio MCP helper remains `node dist/bin/mcp.js` for repo-local
 stdio-only hosts. It proxies to the primary runtime rather than starting a
@@ -132,7 +131,7 @@ Expected behavior:
 
 - Node.js 22+
 - `.env` or equivalent environment variables
-- either a valid `~/.cats/runtime/config/providers.yaml` / `CATS_RUNTIME_CONFIG_PATH`, or
+- either a valid `~/.cats/runtime/config/providers.yaml`, or
   bootstrap mode to generate one on first launch
 - any provider-specific credentials or local CLI installs needed by the chosen
   targets
@@ -145,9 +144,6 @@ Expected behavior:
 | `CATS_RUNTIME_PORT` | No | Bind port, defaults to `3110` |
 | `CATS_RUNTIME_API_KEY` | No | Optional bearer token for protected routes |
 | `CATS_RUNTIME_DIR` | No | Primary runtime home override; defaults to `~/.cats/runtime` |
-| `CATS_RUNTIME_CONFIG_PATH` | No | Override provider-topology config path |
-| `CATS_RUNTIME_DATA_DIR` | No | Override runtime metadata directory |
-| `CATS_RUNTIME_SESSION_BASE_DIR` | No | Override session workspace/transcript directory |
 
 ### Secrets management
 

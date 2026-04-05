@@ -93,7 +93,6 @@ export interface RuntimeCliOptions {
   readyOutput?: RuntimeReadyOutput;
   host?: string;
   port?: string;
-  configPath?: string;
 }
 
 export interface RuntimeListeningAddress {
@@ -507,17 +506,6 @@ export function parseRuntimeCliOptions(argv: string[]): RuntimeCliOptions {
       continue;
     }
 
-    if (arg === '--config') {
-      options.configPath = readOptionValue(argv, index, arg);
-      index += 1;
-      continue;
-    }
-
-    if (arg.startsWith('--config=')) {
-      options.configPath = arg.slice('--config='.length);
-      continue;
-    }
-
     throw new Error(`Unknown argument '${arg}'`);
   }
 
@@ -533,9 +521,6 @@ export function applyRuntimeCliEnvOverrides(
   }
   if (options.port) {
     env.CATS_RUNTIME_PORT = options.port;
-  }
-  if (options.configPath) {
-    env.CATS_RUNTIME_CONFIG_PATH = options.configPath;
   }
 }
 
@@ -863,7 +848,6 @@ export function getRuntimeHelpText(): string {
     '  --ready-output <plain|json|silent>',
     '  --host <host>',
     '  --port <port>',
-    '  --config <path>',
     '  -h, --help',
   ].join('\n');
 }

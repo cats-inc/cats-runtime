@@ -7,19 +7,20 @@ import { createRuntimeApp } from '../src/http/app.js';
 import { SessionRegistry } from '../src/backends/cli/pool/SessionRegistry.js';
 import type { WorkerPool } from '../src/backends/cli/pool/WorkerPool.js';
 import type { ProviderCapabilities } from '../src/core/types.js';
+import {
+  createRuntimeTestEnv,
+  createRuntimeTestPaths,
+  ensureRuntimeTestDirs,
+} from './support/runtimeTestPaths.js';
 
 function createTestConfig() {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-branch-'));
-  const env = {
-    HOME: root,
-    USERPROFILE: root,
-    CATS_RUNTIME_CONFIG_PATH: join(root, 'providers.missing.yaml'),
+  const paths = createRuntimeTestPaths(root);
+  const env = createRuntimeTestEnv(root, {
     CATS_RUNTIME_HOST: '127.0.0.1',
     CATS_RUNTIME_PORT: '3110',
     CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
     CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
-    CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
-    CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
     AUGGIE_SESSIONS_DIR: join(root, '.augment', 'sessions'),
     CLAUDE_PROJECTS_DIR: join(root, '.claude', 'projects'),
     CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
@@ -28,11 +29,10 @@ function createTestConfig() {
     GEMINI_SESSIONS_DIR: join(root, '.gemini', 'tmp'),
     KIRO_DB_PATH: join(root, '.kiro', 'data.sqlite3'),
     PI_SESSIONS_DIR: join(root, '.pi', 'agent', 'sessions'),
-  };
+  });
 
+  ensureRuntimeTestDirs(paths);
   for (const dir of [
-    env.CATS_RUNTIME_SESSION_BASE_DIR,
-    env.CATS_RUNTIME_DATA_DIR,
     env.AUGGIE_SESSIONS_DIR,
     env.CLAUDE_PROJECTS_DIR,
     env.CODEX_SESSIONS_DIR,

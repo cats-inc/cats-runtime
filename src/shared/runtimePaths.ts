@@ -33,39 +33,10 @@ export function resolveRuntimeSessionsDir(runtimeRoot: string): string {
   return join(runtimeRoot, 'sessions');
 }
 
-export function resolveRuntimePathWithinRoot(
-  runtimeRoot: string,
-  overridePath: string | undefined,
-  defaultPath: string,
-): string {
-  const trimmed = overridePath?.trim();
-  if (!trimmed) {
-    return defaultPath;
-  }
-
-  return isAbsolute(trimmed)
-    ? trimmed
-    : join(runtimeRoot, trimmed);
+export function resolveRuntimeProvidersConfigPath(runtimeRoot: string): string {
+  return join(resolveRuntimeConfigDir(runtimeRoot), 'providers.yaml');
 }
 
-export function resolveRuntimeProvidersConfigPath(
-  runtimeRoot: string,
-  overridePath?: string,
-): string {
-  return resolveRuntimePathWithinRoot(
-    runtimeRoot,
-    overridePath,
-    join(resolveRuntimeConfigDir(runtimeRoot), 'providers.yaml'),
-  );
-}
-
-export function resolveRuntimeManagementConfigPath(
-  runtimeRoot: string,
-  overridePath?: string,
-): string {
-  return resolveRuntimePathWithinRoot(
-    runtimeRoot,
-    overridePath,
-    join(resolveRuntimeConfigDir(runtimeRoot), 'management.yaml'),
-  );
+export function resolveRuntimeManagementConfigPath(runtimeRoot: string): string {
+  return join(resolveRuntimeConfigDir(runtimeRoot), 'management.yaml');
 }

@@ -75,8 +75,6 @@ describe('runtime startup helpers', () => {
       '--host',
       '127.0.0.1',
       '--port=3210',
-      '--config',
-      'config/providers.yaml',
     ])).toEqual({
       cleanupTempDirs: true,
       cleanupTempAgeHours: '6',
@@ -116,7 +114,6 @@ describe('runtime startup helpers', () => {
       readyOutput: 'json',
       host: '127.0.0.1',
       port: '3210',
-      configPath: 'config/providers.yaml',
     });
   });
 
@@ -124,18 +121,16 @@ describe('runtime startup helpers', () => {
     expect(() => parseRuntimeCliOptions(['--nope'])).toThrow(/Unknown argument '--nope'/);
   });
 
-  it('applies CLI env overrides for host, port, and config path', () => {
+  it('applies CLI env overrides for host and port', () => {
     const env: NodeJS.ProcessEnv = {};
     applyRuntimeCliEnvOverrides({
       host: '127.0.0.1',
       port: '4010',
-      configPath: 'tmp/providers.yaml',
     }, env);
 
     expect(env).toEqual({
       CATS_RUNTIME_HOST: '127.0.0.1',
       CATS_RUNTIME_PORT: '4010',
-      CATS_RUNTIME_CONFIG_PATH: 'tmp/providers.yaml',
     });
   });
 

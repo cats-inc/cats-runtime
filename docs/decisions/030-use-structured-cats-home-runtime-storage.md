@@ -10,7 +10,7 @@ Accepted
 the runtime still mixes directory-level and file-level defaults:
 
 - `data/` and `sessions/` live under `~/.cats/runtime`
-- `providers.yaml` currently defaults to `~/.cats/runtime/providers.yaml`
+- `providers.yaml` now defaults to `~/.cats/runtime/config/providers.yaml`
 - `management.yaml` still defaults to repo-local `config/management.yaml`
 - path overrides exist, but there is no single directory-first runtime root
   contract exposed to operators
@@ -36,15 +36,13 @@ split its durable files like this:
 The runtime will follow these rules:
 
 1. `CATS_RUNTIME_DIR` becomes the primary directory-level override.
-2. `CATS_RUNTIME_CONFIG_PATH`, `CATS_RUNTIME_DATA_DIR`, and
-   `CATS_RUNTIME_SESSION_BASE_DIR` remain supported as fine-grained overrides.
-3. When those fine-grained overrides are relative, they are resolved under
-   `CATS_RUNTIME_DIR`, not under the current working directory.
-4. `providers.yaml` defaults to `~/.cats/runtime/config/providers.yaml`.
-5. `management.yaml` defaults to `~/.cats/runtime/config/management.yaml`.
-6. Standalone runtime execution and desktop-hosted runtime execution must use
+2. `providers.yaml` defaults to `~/.cats/runtime/config/providers.yaml`.
+3. `management.yaml` defaults to `~/.cats/runtime/config/management.yaml`.
+4. Standalone runtime execution and desktop-hosted runtime execution must use
    the same storage layout.
-7. Repo-local `config/management.yaml` is no longer a runtime default.
+5. Repo-local `config/management.yaml` is no longer a runtime default.
+6. Fine-grained path overrides are removed so incorrect layouts fail
+   immediately during development.
 
 ## Consequences
 
@@ -65,8 +63,8 @@ The runtime will follow these rules:
 
 ### Neutral
 
-- Fine-grained path overrides stay available, but they become secondary to the
-  runtime root directory.
+- `CATS_RUNTIME_DIR` is now the only storage override surface for runtime-owned
+  durable paths.
 
 ## Alternatives Considered
 
@@ -77,12 +75,12 @@ The runtime will follow these rules:
 - **Why rejected**: It preserves the same inconsistency that caused the current
   confusion.
 
-### Alternative 2: Remove all file-level overrides entirely
+### Alternative 2: Keep file-level overrides for tests and edge cases
 
-- **Pros**: Cleaner API surface.
-- **Cons**: Makes tests and special operator setups harder.
-- **Why rejected**: Fine-grained overrides still have value for tests and edge
-  cases; they just should not define the primary contract.
+- **Pros**: Smaller test churn; more escape hatches.
+- **Cons**: Keeps the storage API fragmented and makes bad paths too easy to
+  smuggle back in.
+- **Why rejected**: We want the runtime root to be the single source of truth.
 
 ## References
 

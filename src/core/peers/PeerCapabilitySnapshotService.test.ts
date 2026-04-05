@@ -6,19 +6,16 @@ import { loadConfig } from '../config.js';
 import { createRuntimeStartupState } from '../../startup.js';
 import { PeerCapabilitySnapshotService } from './PeerCapabilitySnapshotService.js';
 import type { PeerRuntimeConfig } from './types.js';
+import { createRuntimeTestEnv } from '../../../tests/support/runtimeTestPaths.js';
 
 const createdRoots: string[] = [];
 
 function createConfigEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-peer-capability-'));
   createdRoots.push(root);
-  return {
-    HOME: root,
-    USERPROFILE: root,
+  return createRuntimeTestEnv(root, {
     CATS_RUNTIME_HOST: '127.0.0.1',
     CATS_RUNTIME_PORT: '3110',
-    CATS_RUNTIME_DATA_DIR: join(root, 'data'),
-    CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'sessions'),
     AUGGIE_SESSIONS_DIR: join(root, '.augment', 'sessions'),
     CLAUDE_PROJECTS_DIR: join(root, '.claude', 'projects'),
     CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
@@ -28,7 +25,7 @@ function createConfigEnv(overrides: Record<string, string> = {}): NodeJS.Process
     KIRO_DB_PATH: join(root, '.kiro', 'data.sqlite3'),
     PI_SESSIONS_DIR: join(root, '.pi', 'agent', 'sessions'),
     ...overrides,
-  };
+  });
 }
 
 function createPeerConfig(overrides: Partial<PeerRuntimeConfig> = {}): PeerRuntimeConfig {

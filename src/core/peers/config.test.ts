@@ -4,19 +4,14 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { loadConfig } from '../config.js';
 import { loadPeerRuntimeConfig } from './config.js';
+import { createRuntimeTestEnv } from '../../../tests/support/runtimeTestPaths.js';
 
 const createdRoots: string[] = [];
 
 function createEnv(overrides: Record<string, string> = {}): NodeJS.ProcessEnv {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-peer-config-'));
   createdRoots.push(root);
-  return {
-    HOME: root,
-    USERPROFILE: root,
-    CATS_RUNTIME_DATA_DIR: join(root, 'data'),
-    CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'sessions'),
-    ...overrides,
-  };
+  return createRuntimeTestEnv(root, overrides);
 }
 
 describe('peer runtime config', () => {

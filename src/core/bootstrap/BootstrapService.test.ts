@@ -8,6 +8,11 @@ import { defaultKiroDbPath } from '../../backends/cli/config.js';
 import { loadConfig } from '../config.js';
 import type { ProviderCompatibilityService } from '../compatibility/ProviderCompatibilityService.js';
 import { BootstrapService } from './BootstrapService.js';
+import {
+  createRuntimeTestEnv,
+  createRuntimeTestPaths,
+  ensureRuntimeTestDirs,
+} from '../../../tests/support/runtimeTestPaths.js';
 
 function createTestRoot(): { root: string; cleanup: () => void } {
   const root = mkdtempSync(join(tmpdir(), 'cats-bootstrap-service-'));
@@ -18,18 +23,12 @@ function createTestRoot(): { root: string; cleanup: () => void } {
 }
 
 function createTestEnv(root: string): NodeJS.ProcessEnv {
-  return {
-    HOME: root,
-    USERPROFILE: root,
-    CATS_RUNTIME_CONFIG_PATH: join(root, 'config', 'providers.yaml'),
-    CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
-    CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
-  };
+  return createRuntimeTestEnv(root);
 }
 
 function ensureDirs(env: NodeJS.ProcessEnv): void {
-  mkdirSync(env.CATS_RUNTIME_DATA_DIR!, { recursive: true });
-  mkdirSync(env.CATS_RUNTIME_SESSION_BASE_DIR!, { recursive: true });
+  const paths = createRuntimeTestPaths(env.HOME || env.USERPROFILE || '');
+  ensureRuntimeTestDirs(paths);
 }
 
 function createAssessment(provider: ProviderName, commandPath: string) {
@@ -68,8 +67,8 @@ describe('BootstrapService', () => {
       } as unknown as ProviderCompatibilityService;
 
       const bootstrap = new BootstrapService({
-        dataDir: env.CATS_RUNTIME_DATA_DIR!,
-        configPath: env.CATS_RUNTIME_CONFIG_PATH!,
+        dataDir: createRuntimeTestPaths(root).dataDir,
+        configPath: createRuntimeTestPaths(root).configPath,
         config: loadConfig(env),
         compatibility,
         scanConcurrency: 4,
@@ -101,8 +100,8 @@ describe('BootstrapService', () => {
       } as unknown as ProviderCompatibilityService;
 
       const bootstrap = new BootstrapService({
-        dataDir: env.CATS_RUNTIME_DATA_DIR!,
-        configPath: env.CATS_RUNTIME_CONFIG_PATH!,
+        dataDir: createRuntimeTestPaths(root).dataDir,
+        configPath: createRuntimeTestPaths(root).configPath,
         config: loadConfig(env),
         compatibility,
         scanConcurrency: 2,
@@ -128,20 +127,20 @@ describe('BootstrapService', () => {
       } as unknown as ProviderCompatibilityService;
 
       const bootstrap = new BootstrapService({
-        dataDir: env.CATS_RUNTIME_DATA_DIR!,
-        configPath: env.CATS_RUNTIME_CONFIG_PATH!,
+        dataDir: createRuntimeTestPaths(root).dataDir,
+        configPath: createRuntimeTestPaths(root).configPath,
         config: loadConfig(env),
         compatibility,
       });
 
       const autoResult = await bootstrap.scan();
       expect(autoResult.scanType).toBe('auto');
-      expect(existsSync(join(env.CATS_RUNTIME_DATA_DIR!, 'setup', 'provider-manual-scan.json'))).toBe(false);
+      expect(existsSync(join(createRuntimeTestPaths(root).dataDir, 'setup', 'provider-manual-scan.json'))).toBe(false);
       expect((await bootstrap.getSetupState()).lastManualScanAt).toBeNull();
 
       const manualResult = await bootstrap.scan({ manual: true });
       expect(manualResult.scanType).toBe('manual');
-      expect(existsSync(join(env.CATS_RUNTIME_DATA_DIR!, 'setup', 'provider-manual-scan.json'))).toBe(true);
+      expect(existsSync(join(createRuntimeTestPaths(root).dataDir, 'setup', 'provider-manual-scan.json'))).toBe(true);
       expect((await bootstrap.getSetupState()).lastManualScanAt).toBeTruthy();
     } finally {
       cleanup();
@@ -163,15 +162,15 @@ describe('BootstrapService', () => {
       } as unknown as ProviderCompatibilityService;
 
       const bootstrap = new BootstrapService({
-        dataDir: env.CATS_RUNTIME_DATA_DIR!,
-        configPath: env.CATS_RUNTIME_CONFIG_PATH!,
+        dataDir: createRuntimeTestPaths(root).dataDir,
+        configPath: createRuntimeTestPaths(root).configPath,
         config: loadConfig(env),
         compatibility,
       });
 
       await bootstrap.applyConfig(['kiro']);
 
-      const yaml = readFileSync(env.CATS_RUNTIME_CONFIG_PATH!, 'utf8');
+      const yaml = readFileSync(createRuntimeTestPaths(root).configPath, 'utf8');
       expect(yaml).toContain(`db_path: ${defaultKiroDbPath(process.platform, 'docker')}`);
     } finally {
       cleanup();

@@ -12,6 +12,11 @@ import {
   formatProviderEvolutionProbeArtifactListSummary,
   formatProviderEvolutionProbeArtifactReadSummary,
 } from './providerEvolutionEntry.js';
+import {
+  createRuntimeTestEnv,
+  createRuntimeTestPaths,
+  ensureRuntimeTestDirs,
+} from '../../../tests/support/runtimeTestPaths.js';
 
 vi.mock('../../backends/agent/adapters/registry.js', () => ({
   buildAgentAdapter: vi.fn(),
@@ -114,8 +119,9 @@ describe('provider evolution entry summaries', () => {
 
   it('generates a provider-evolution artifact for agent-backed targets through the shared probe entrypoint', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-provider-evolution-agent-'));
-    const configPath = join(root, 'providers.yaml');
-    writeFileSync(configPath, `
+    const paths = createRuntimeTestPaths(root);
+    ensureRuntimeTestDirs(paths);
+    writeFileSync(paths.configPath, `
 version: 1
 routing:
   providers:
@@ -134,19 +140,12 @@ backends:
           sdk:
             model: sonnet
 `.trimStart(), 'utf8');
-
     const env: NodeJS.ProcessEnv = {
       ...process.env,
-      HOME: root,
-      USERPROFILE: root,
-      CATS_RUNTIME_CONFIG_PATH: configPath,
-      CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
-      CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
+      ...createRuntimeTestEnv(root),
       CATS_RUNTIME_HOST: '127.0.0.1',
       CATS_RUNTIME_PORT: '3110',
     };
-    mkdirSync(env.CATS_RUNTIME_DATA_DIR, { recursive: true });
-    mkdirSync(env.CATS_RUNTIME_SESSION_BASE_DIR, { recursive: true });
 
     let invokeCount = 0;
     const adapter: AgentAdapter = {

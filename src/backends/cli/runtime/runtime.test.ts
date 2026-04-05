@@ -442,8 +442,8 @@ describe('runtime adapters', () => {
   });
 
   it('maps isolated runtime workspaces into a container-local sessions directory for Docker', () => {
-    const previousSessionBaseDir = process.env.CATS_RUNTIME_SESSION_BASE_DIR;
-    process.env.CATS_RUNTIME_SESSION_BASE_DIR = 'C:\\Users\\sammy\\.cats\\runtime\\sessions';
+    const previousRuntimeDir = process.env.CATS_RUNTIME_DIR;
+    process.env.CATS_RUNTIME_DIR = 'C:\\Users\\sammy\\.cats\\runtime';
 
     try {
       const spawnConfig = buildProcessSpawnConfig(
@@ -469,10 +469,10 @@ describe('runtime adapters', () => {
         }), 'utf8').toString('base64'),
       });
     } finally {
-      if (previousSessionBaseDir === undefined) {
-        delete process.env.CATS_RUNTIME_SESSION_BASE_DIR;
+      if (previousRuntimeDir === undefined) {
+        delete process.env.CATS_RUNTIME_DIR;
       } else {
-        process.env.CATS_RUNTIME_SESSION_BASE_DIR = previousSessionBaseDir;
+        process.env.CATS_RUNTIME_DIR = previousRuntimeDir;
       }
     }
   });

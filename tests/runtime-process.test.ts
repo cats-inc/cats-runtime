@@ -14,6 +14,11 @@ import {
   RUNTIME_STARTUP_CONTRACT_VERSION,
   RUNTIME_VERSION,
 } from '../src/startup.js';
+import {
+  createRuntimeTestEnv,
+  createRuntimeTestPaths,
+  ensureRuntimeTestDirs,
+} from './support/runtimeTestPaths.js';
 
 interface RuntimeLifecycleEvent {
   event: 'runtime.ready' | 'runtime.startup_error' | 'runtime.stopping' | 'runtime.stopped';
@@ -191,10 +196,16 @@ const testsDir = dirname(fileURLToPath(import.meta.url));
 const runtimeRoot = resolve(testsDir, '..');
 const runtimeEntry = join(runtimeRoot, 'dist', 'index.js');
 
+function resolveEnvRuntimePaths(env: NodeJS.ProcessEnv) {
+  return createRuntimeTestPaths(env.HOME || env.USERPROFILE || '');
+}
+
 function createRuntimeProcessEnv(port: number) {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-process-'));
+  const paths = createRuntimeTestPaths(root);
   // Write a minimal valid providers.yaml so the process starts in normal mode.
-  const configPath = join(root, 'providers.yaml');
+  const configPath = paths.configPath;
+  mkdirSync(paths.configDir, { recursive: true });
   writeFileSync(configPath, [
     'version: 1',
     'backends:',
@@ -209,15 +220,11 @@ function createRuntimeProcessEnv(port: number) {
   ].join('\n'), 'utf8');
   const env: NodeJS.ProcessEnv = {
     ...process.env,
-    HOME: root,
-    USERPROFILE: root,
+    ...createRuntimeTestEnv(root),
     CATS_RUNTIME_HOST: '127.0.0.1',
     CATS_RUNTIME_PORT: String(port),
-    CATS_RUNTIME_CONFIG_PATH: configPath,
     CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
     CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
-    CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
-    CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
     AUGGIE_SESSIONS_DIR: join(root, '.augment', 'sessions'),
     CLAUDE_PROJECTS_DIR: join(root, '.claude', 'projects'),
     CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
@@ -228,9 +235,8 @@ function createRuntimeProcessEnv(port: number) {
     PI_SESSIONS_DIR: join(root, '.pi', 'agent', 'sessions'),
   };
 
+  ensureRuntimeTestDirs(paths);
   for (const dir of [
-    env.CATS_RUNTIME_DATA_DIR,
-    env.CATS_RUNTIME_SESSION_BASE_DIR,
     env.AUGGIE_SESSIONS_DIR,
     env.CLAUDE_PROJECTS_DIR,
     env.CODEX_SESSIONS_DIR,
@@ -424,7 +430,7 @@ function writeProviderEvolutionArtifact(
   const transport = overrides.transport || 'cli';
   const runtimeMode = overrides.runtimeMode || 'native';
   const providerDir = join(
-    env.CATS_RUNTIME_DATA_DIR!,
+    resolveEnvRuntimePaths(env).dataDir,
     'compatibility',
     'provider-evolution',
     provider,
@@ -513,7 +519,7 @@ function writeCompatibilityEvidenceArtifact(
     runtimeMode: 'native' | 'wsl' | 'docker';
   }> = {},
 ): string {
-  const providerDir = join(env.CATS_RUNTIME_DATA_DIR!, 'compatibility', provider);
+  const providerDir = join(resolveEnvRuntimePaths(env).dataDir, 'compatibility', provider);
   mkdirSync(providerDir, { recursive: true });
   const artifactPath = join(providerDir, `${artifactId}.json`);
   writeFileSync(artifactPath, `${JSON.stringify({
@@ -569,7 +575,7 @@ function writeSetupDiagnosticArtifact(
     headline: string;
   }> = {},
 ): string {
-  const diagnosticsDir = join(env.CATS_RUNTIME_DATA_DIR!, 'diagnostics');
+  const diagnosticsDir = join(resolveEnvRuntimePaths(env).dataDir, 'diagnostics');
   mkdirSync(diagnosticsDir, { recursive: true });
   const artifactPath = join(diagnosticsDir, `${artifactId}.json`);
   writeFileSync(artifactPath, `${JSON.stringify({
@@ -603,10 +609,10 @@ function writeSetupDiagnosticArtifact(
       },
       paths: {
         configPath: null,
-        dataDir: env.CATS_RUNTIME_DATA_DIR,
-        sessionBaseDir: env.CATS_RUNTIME_SESSION_BASE_DIR,
+        dataDir: resolveEnvRuntimePaths(env).dataDir,
+        sessionBaseDir: resolveEnvRuntimePaths(env).sessionBaseDir,
         diagnosticsDir,
-        compatibilityEvidenceDir: join(env.CATS_RUNTIME_DATA_DIR!, 'compatibility'),
+        compatibilityEvidenceDir: join(resolveEnvRuntimePaths(env).dataDir, 'compatibility'),
       },
       pathChecks: {
         dataDirWritable: true,
@@ -616,7 +622,7 @@ function writeSetupDiagnosticArtifact(
     },
     config: {
       inspection: {
-        configPath: env.CATS_RUNTIME_CONFIG_PATH,
+        configPath: resolveEnvRuntimePaths(env).configPath,
         fileExists: true,
         parseError: null,
         hasUsableTargets: true,
@@ -638,7 +644,7 @@ function writeSetupDiagnosticArtifact(
         available: true,
       },
       compatibilityEvidence: {
-        directory: join(env.CATS_RUNTIME_DATA_DIR!, 'compatibility'),
+        directory: join(resolveEnvRuntimePaths(env).dataDir, 'compatibility'),
         fileCount: 0,
       },
     },
@@ -657,9 +663,9 @@ function writeSetupDiagnosticArtifact(
       },
     },
     references: {
-      latestScanPath: join(env.CATS_RUNTIME_DATA_DIR!, 'setup', 'provider-scan.json'),
-      latestManualScanPath: join(env.CATS_RUNTIME_DATA_DIR!, 'setup', 'provider-manual-scan.json'),
-      compatibilityEvidenceDir: join(env.CATS_RUNTIME_DATA_DIR!, 'compatibility'),
+      latestScanPath: join(resolveEnvRuntimePaths(env).dataDir, 'setup', 'provider-scan.json'),
+      latestManualScanPath: join(resolveEnvRuntimePaths(env).dataDir, 'setup', 'provider-manual-scan.json'),
+      compatibilityEvidenceDir: join(resolveEnvRuntimePaths(env).dataDir, 'compatibility'),
     },
     issues: [],
   }, null, 2)}\n`, 'utf8');
@@ -918,7 +924,7 @@ describe('runtime process startup contract', () => {
   it('enters bootstrap mode instead of crashing on an invalid default providers file', async () => {
     const port = await reservePort();
     const { env, root, cleanup } = createRuntimeProcessEnv(port);
-    const invalidDefaultConfigPath = join(root, 'config', 'providers.yaml');
+    const invalidDefaultConfigPath = resolveEnvRuntimePaths(env).configPath;
     mkdirSync(dirname(invalidDefaultConfigPath), { recursive: true });
     writeFileSync(invalidDefaultConfigPath, [
       'version: 1',
@@ -945,7 +951,6 @@ describe('runtime process startup contract', () => {
       '            model: claude-sonnet-4-6',
       '',
     ].join('\n'), 'utf8');
-    delete env.CATS_RUNTIME_CONFIG_PATH;
     const child = spawnRuntime(port, env, root);
 
     try {

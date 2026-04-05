@@ -19,6 +19,11 @@ import {
   RUNTIME_VERSION,
 } from '../src/startup.js';
 import { defaultWslDiscoveryPolicy } from '../src/backends/cli/config.js';
+import {
+  createRuntimeTestEnv,
+  createRuntimeTestPaths,
+  ensureRuntimeTestDirs,
+} from './support/runtimeTestPaths.js';
 
 function createTestRoot(): { root: string; cleanup: () => void } {
   const root = mkdtempSync(join(tmpdir(), 'cats-bootstrap-test-'));
@@ -29,16 +34,15 @@ function createTestRoot(): { root: string; cleanup: () => void } {
 }
 
 function createTestEnv(root: string, configPath?: string): NodeJS.ProcessEnv {
-  return {
-    HOME: root,
-    USERPROFILE: root,
-    CATS_RUNTIME_CONFIG_PATH: configPath ?? join(root, 'config', 'providers.yaml'),
+  const paths = createRuntimeTestPaths(root);
+  if (configPath) {
+    throw new Error('createTestEnv no longer accepts configPath overrides; use CATS_RUNTIME_DIR');
+  }
+  return createRuntimeTestEnv(root, {
     CATS_RUNTIME_HOST: '127.0.0.1',
     CATS_RUNTIME_PORT: '3110',
     CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
     CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
-    CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
-    CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
     AUGGIE_SESSIONS_DIR: join(root, '.augment', 'sessions'),
     CLAUDE_PROJECTS_DIR: join(root, '.claude', 'projects'),
     CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
@@ -47,13 +51,13 @@ function createTestEnv(root: string, configPath?: string): NodeJS.ProcessEnv {
     GEMINI_SESSIONS_DIR: join(root, '.gemini', 'tmp'),
     KIRO_DB_PATH: join(root, '.kiro', 'data.sqlite3'),
     PI_SESSIONS_DIR: join(root, '.pi', 'agent', 'sessions'),
-  };
+  });
 }
 
 function ensureDirs(env: NodeJS.ProcessEnv): void {
+  const paths = createRuntimeTestPaths(env.HOME || env.USERPROFILE || '');
+  ensureRuntimeTestDirs(paths);
   for (const key of [
-    'CATS_RUNTIME_SESSION_BASE_DIR',
-    'CATS_RUNTIME_DATA_DIR',
     'AUGGIE_SESSIONS_DIR',
     'CLAUDE_PROJECTS_DIR',
     'CODEX_SESSIONS_DIR',
@@ -129,8 +133,8 @@ describe('config inspection', () => {
     const { root, cleanup } = createTestRoot();
     try {
       const env = createTestEnv(root);
-      const configPath = env.CATS_RUNTIME_CONFIG_PATH!;
-      mkdirSync(join(root, 'config'), { recursive: true });
+      const configPath = createRuntimeTestPaths(root).configPath;
+      mkdirSync(createRuntimeTestPaths(root).configDir, { recursive: true });
       writeFileSync(configPath, '{{{{not valid yaml', 'utf8');
       const result = inspectRuntimeConfig(env);
       expect(result.fileExists).toBe(true);
@@ -145,8 +149,8 @@ describe('config inspection', () => {
     const { root, cleanup } = createTestRoot();
     try {
       const env = createTestEnv(root);
-      const configPath = env.CATS_RUNTIME_CONFIG_PATH!;
-      mkdirSync(join(root, 'config'), { recursive: true });
+      const configPath = createRuntimeTestPaths(root).configPath;
+      mkdirSync(createRuntimeTestPaths(root).configDir, { recursive: true });
       writeFileSync(configPath, 'providers: {}\n', 'utf8');
       const result = inspectRuntimeConfig(env);
       expect(result.fileExists).toBe(true);
@@ -162,8 +166,8 @@ describe('config inspection', () => {
     const { root, cleanup } = createTestRoot();
     try {
       const env = createTestEnv(root);
-      const configPath = env.CATS_RUNTIME_CONFIG_PATH!;
-      mkdirSync(join(root, 'config'), { recursive: true });
+      const configPath = createRuntimeTestPaths(root).configPath;
+      mkdirSync(createRuntimeTestPaths(root).configDir, { recursive: true });
       writeFileSync(configPath, 'version: 1\nbackends:\n  cli:\n    providers:\n      claude:\n        instances:\n          default:\n            command: claude\n            runner: auto\n', 'utf8');
       const result = inspectRuntimeConfig(env);
       expect(result.fileExists).toBe(true);
@@ -495,8 +499,8 @@ describe('bootstrap mode server', () => {
     try {
       const env = createTestEnv(root);
       ensureDirs(env);
-      const dataDir = env.CATS_RUNTIME_DATA_DIR!;
-      const configPath = join(root, 'config', 'providers.yaml');
+      const dataDir = createRuntimeTestPaths(root).dataDir;
+      const configPath = createRuntimeTestPaths(root).configPath;
       const config = loadConfig(env);
       // Use a stub compatibility service that returns fast
       const { ProviderCompatibilityService } = await import(
@@ -551,8 +555,8 @@ describe('bootstrap mode server', () => {
     try {
       const env = createTestEnv(root);
       ensureDirs(env);
-      const configPath = env.CATS_RUNTIME_CONFIG_PATH!;
-      mkdirSync(join(root, 'config'), { recursive: true });
+      const configPath = createRuntimeTestPaths(root).configPath;
+      mkdirSync(createRuntimeTestPaths(root).configDir, { recursive: true });
       const config = { ...loadConfig(env), host: '127.0.0.1', port: 0, configPath };
       const startup = createRuntimeStartupState({ bootstrapRequired: true });
       const runtime = createRuntimeServer(config, { startup });
@@ -601,8 +605,8 @@ describe('bootstrap mode server', () => {
     try {
       const env = createTestEnv(root);
       ensureDirs(env);
-      const configPath = env.CATS_RUNTIME_CONFIG_PATH!;
-      mkdirSync(join(root, 'config'), { recursive: true });
+      const configPath = createRuntimeTestPaths(root).configPath;
+      mkdirSync(createRuntimeTestPaths(root).configDir, { recursive: true });
       const config = { ...loadConfig(env), host: '127.0.0.1', port: 0, configPath };
       const startup = createRuntimeStartupState({ bootstrapRequired: true });
       const runtime = createRuntimeServer(config, { startup });
@@ -1119,8 +1123,8 @@ describe('bootstrap mode server', () => {
     try {
       const env = createTestEnv(root);
       ensureDirs(env);
-      const configPath = env.CATS_RUNTIME_CONFIG_PATH!;
-      mkdirSync(join(root, 'config'), { recursive: true });
+      const configPath = createRuntimeTestPaths(root).configPath;
+      mkdirSync(createRuntimeTestPaths(root).configDir, { recursive: true });
       writeFileSync(configPath, 'version: 1\nbackends:\n  cli:\n    providers:\n      claude:\n        instances:\n          default:\n            command: claude\n            runner: auto\n', 'utf8');
       const inspection = inspectRuntimeConfig(env);
       expect(shouldEnterBootstrapMode(inspection, false)).toBe(false);

@@ -17,7 +17,7 @@ Port numbers should be configurable via environment variables so developers can 
 | Variable | Default | Service | Notes |
 |----------|---------|---------|-------|
 | `CATS_RUNTIME_PORT` | `3110` | `cats-runtime` | Main inbound HTTP listener |
-| `CATS_RUNTIME_DATA_DIR` | `~/.cats/runtime/data` | `cats-runtime` | Local registry metadata and persisted session index |
+| `CATS_RUNTIME_DIR` | `~/.cats/runtime` | `cats-runtime` | Runtime root for `config/`, `data/`, and `sessions/` |
 | `OPENCODE_SERVER_PORT` | `4097` | `opencode` embedded server | Only used when the OpenCode backend is active |
 
 ## Cross-Project Port Coordination

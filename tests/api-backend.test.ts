@@ -4,6 +4,11 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../src/core/config.js';
 import { createRuntimeServer } from '../src/server.js';
+import {
+  createRuntimeTestEnv,
+  createRuntimeTestPaths,
+  ensureRuntimeTestDirs,
+} from './support/runtimeTestPaths.js';
 import { parseCoreNdjson as parseNdjson } from './streamEventTestUtils.js';
 
 function jsonResponse(body: Record<string, unknown>): Response {
@@ -50,7 +55,9 @@ function createApiConfigRoot(
   mutateConfig?: (contents: string) => string,
 ) {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-api-test-'));
-  const configPath = join(root, 'providers.yaml');
+  const paths = createRuntimeTestPaths(root);
+  const configPath = paths.configPath;
+  mkdirSync(paths.configDir, { recursive: true });
   const configContents = `
 version: 1
 routing:
@@ -108,21 +115,15 @@ backends:
 `.trimStart();
   writeFileSync(configPath, mutateConfig ? mutateConfig(configContents) : configContents);
 
-  const env = {
-    HOME: root,
-    USERPROFILE: root,
-    CATS_RUNTIME_CONFIG_PATH: configPath,
+  const env = createRuntimeTestEnv(root, {
     CATS_RUNTIME_HOST: '127.0.0.1',
     CATS_RUNTIME_PORT: '3110',
     CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
     CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
-    CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
-    CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
     ...envOverrides,
-  };
+  });
 
-  mkdirSync(env.CATS_RUNTIME_DATA_DIR, { recursive: true });
-  mkdirSync(env.CATS_RUNTIME_SESSION_BASE_DIR, { recursive: true });
+  ensureRuntimeTestDirs(paths);
   mkdirSync(join(root, 'repo', 'src'), { recursive: true });
   writeFileSync(join(root, 'repo', 'src', 'app.ts'), 'export const value = 7;\n');
 

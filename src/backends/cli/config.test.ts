@@ -26,16 +26,28 @@ import {
   resolveProviderInstance,
 } from './config.js';
 
-const MISSING_CONFIG_PATH = join(
+const MISSING_RUNTIME_ROOT = join(
   tmpdir(),
-  `cats-runtime-config-missing-${process.pid}-providers.yaml`,
+  `cats-runtime-config-missing-${process.pid}`,
 );
+const MISSING_CONFIG_PATH = join(MISSING_RUNTIME_ROOT, 'config', 'providers.yaml');
+
+function createRuntimeRootTestPaths(runtimeDir: string) {
+  return {
+    configDir: join(runtimeDir, 'config'),
+    configPath: join(runtimeDir, 'config', 'providers.yaml'),
+  };
+}
 
 function loadConfigWithoutProviderFile(env: NodeJS.ProcessEnv = {}) {
   return loadConfig({
     ...process.env,
     ...env,
-    CATS_RUNTIME_CONFIG_PATH: env.CATS_RUNTIME_CONFIG_PATH || MISSING_CONFIG_PATH,
+    ...(
+      env.CATS_RUNTIME_DIR || env.HOME || env.USERPROFILE
+        ? {}
+        : { CATS_RUNTIME_DIR: MISSING_RUNTIME_ROOT }
+    ),
   }, {
     skipProviderFile: true,
   });
@@ -196,10 +208,10 @@ describe('config platform defaults', () => {
 
     expect(config.dataDir).toBe(join('/home/tester', '.cats', 'runtime', 'data'));
     expect(config.sessionBaseDir).toBe(join('/home/tester', '.cats', 'runtime', 'sessions'));
-    expect(resolveConfigPath(undefined, '/home/tester')).toBe(
+    expect(resolveConfigPath('/home/tester')).toBe(
       join('/home/tester', '.cats', 'runtime', 'config', 'providers.yaml'),
     );
-    expect(config.configPath).toBeUndefined();
+    expect(config.configPath).toBe(join('/home/tester', '.cats', 'runtime', 'config', 'providers.yaml'));
   });
 
   it('loads Auggie and OpenCode command overrides from the environment', () => {
@@ -391,7 +403,9 @@ describe('config platform defaults', () => {
         skipProviderFile: true,
       });
 
-      expect(config.configPath).toBeUndefined();
+      expect(config.configPath).toBe(
+        join(root, '.cats', 'runtime', 'config', 'providers.yaml'),
+      );
       expect(config.providerCommands.claude.path).toBeTruthy();
       expect(config.providerDefaultTargets.claude).toEqual({
         backend: 'cli',
@@ -404,7 +418,9 @@ describe('config platform defaults', () => {
 
   it('loads provider instances from providers.yaml and resolves per-instance runtimes', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
-    const configPath = join(tempDir, 'providers.yaml');
+    const runtimeDir = tempDir;
+    const configPath = join(runtimeDir, 'config', 'providers.yaml');
+    mkdirSync(join(runtimeDir, 'config'), { recursive: true });
     writeFileSync(configPath, `
 version: 1
 environments:
@@ -464,7 +480,7 @@ providers:
       const config = loadConfig({
         HOME: '/home/tester',
         USERPROFILE: '',
-        CATS_RUNTIME_CONFIG_PATH: configPath,
+        CATS_RUNTIME_DIR: runtimeDir,
       });
 
       expect(config.configPath).toBe(configPath);
@@ -559,7 +575,9 @@ providers:
 
   it('parses Pi instructions_file from providers.yaml instances', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
-    const configPath = join(tempDir, 'providers.yaml');
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
     writeFileSync(configPath, `
 version: 1
 environments:
@@ -580,7 +598,7 @@ providers:
       const config = loadConfig({
         HOME: '/home/tester',
         USERPROFILE: '',
-        CATS_RUNTIME_CONFIG_PATH: configPath,
+        CATS_RUNTIME_DIR: runtimeDir,
       });
 
       expect(resolveProviderInstance(config, 'pi', 'default')).toMatchObject({
@@ -594,7 +612,9 @@ providers:
 
   it('rejects WSL environments without a distro in providers.yaml', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
-    const configPath = join(tempDir, 'providers.yaml');
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
     writeFileSync(configPath, `
 version: 1
 environments:
@@ -613,7 +633,7 @@ providers:
       expect(() => loadConfig({
         HOME: '/home/tester',
         USERPROFILE: '',
-        CATS_RUNTIME_CONFIG_PATH: configPath,
+        CATS_RUNTIME_DIR: runtimeDir,
       })).toThrow(/environments\.ubuntu.*distro/);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
@@ -622,7 +642,9 @@ providers:
 
   it('rejects inline WSL instances without a distro in providers.yaml', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
-    const configPath = join(tempDir, 'providers.yaml');
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
     writeFileSync(configPath, `
 version: 1
 providers:
@@ -638,7 +660,7 @@ providers:
       expect(() => loadConfig({
         HOME: '/home/tester',
         USERPROFILE: '',
-        CATS_RUNTIME_CONFIG_PATH: configPath,
+        CATS_RUNTIME_DIR: runtimeDir,
       })).toThrow(/cursor\.instances\.default.*distro/);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
@@ -647,7 +669,9 @@ providers:
 
   it('allows explicit WSL runtime to inherit distro from the referenced environment', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
-    const configPath = join(tempDir, 'providers.yaml');
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
     writeFileSync(configPath, `
 version: 1
 environments:
@@ -668,7 +692,7 @@ providers:
       const config = loadConfig({
         HOME: '/home/tester',
         USERPROFILE: '',
-        CATS_RUNTIME_CONFIG_PATH: configPath,
+        CATS_RUNTIME_DIR: runtimeDir,
       });
 
       expect(resolveProviderInstance(config, 'cursor')).toMatchObject({
@@ -688,7 +712,9 @@ providers:
 
   it('parses Docker environments with container in providers.yaml', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
-    const configPath = join(tempDir, 'providers.yaml');
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
     writeFileSync(configPath, `
 version: 1
 environments:
@@ -709,7 +735,7 @@ providers:
       const config = loadConfig({
         HOME: '/home/tester',
         USERPROFILE: '',
-        CATS_RUNTIME_CONFIG_PATH: configPath,
+        CATS_RUNTIME_DIR: runtimeDir,
       });
 
       expect(resolveProviderInstance(config, 'claude', 'docker')).toMatchObject({
@@ -730,7 +756,9 @@ providers:
 
   it('rejects Docker environments without a container in providers.yaml', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
-    const configPath = join(tempDir, 'providers.yaml');
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
     writeFileSync(configPath, `
 version: 1
 environments:
@@ -749,7 +777,7 @@ providers:
       expect(() => loadConfig({
         HOME: '/home/tester',
         USERPROFILE: '',
-        CATS_RUNTIME_CONFIG_PATH: configPath,
+        CATS_RUNTIME_DIR: runtimeDir,
       })).toThrow(/environments\.docker-dev.*container/);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
@@ -758,7 +786,9 @@ providers:
 
   it('rejects inline Docker instances without a container in providers.yaml', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
-    const configPath = join(tempDir, 'providers.yaml');
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
     writeFileSync(configPath, `
 version: 1
 providers:
@@ -774,7 +804,7 @@ providers:
       expect(() => loadConfig({
         HOME: '/home/tester',
         USERPROFILE: '',
-        CATS_RUNTIME_CONFIG_PATH: configPath,
+        CATS_RUNTIME_DIR: runtimeDir,
       })).toThrow(/claude\.instances\.docker.*container/);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
@@ -783,7 +813,9 @@ providers:
 
   it('only enables providers listed in providers.yaml (positive list)', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
-    const configPath = join(tempDir, 'providers.yaml');
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
     writeFileSync(configPath, `
 version: 1
 environments:
@@ -810,7 +842,7 @@ providers:
       const config = loadConfig({
         HOME: '/home/tester',
         USERPROFILE: '',
-        CATS_RUNTIME_CONFIG_PATH: configPath,
+        CATS_RUNTIME_DIR: runtimeDir,
       });
 
       // Listed providers have instances
@@ -836,7 +868,9 @@ providers:
 
   it('loads separated backend config without mixing CLI and API instances', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
-    const configPath = join(tempDir, 'providers.yaml');
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
     writeFileSync(configPath, `
 version: 1
 environments:
@@ -895,7 +929,7 @@ backends:
       const config = loadConfig({
         HOME: '/home/tester',
         USERPROFILE: '',
-        CATS_RUNTIME_CONFIG_PATH: configPath,
+        CATS_RUNTIME_DIR: runtimeDir,
       });
 
       expect(config.providerDefaultTargets).toEqual({
@@ -974,7 +1008,9 @@ backends:
 
   it('inherits remote provider defaults while allowing per-instance overrides', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
-    const configPath = join(tempDir, 'providers.yaml');
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
     writeFileSync(configPath, `
 version: 1
 routing:
@@ -1014,7 +1050,7 @@ backends:
       const config = loadConfig({
         HOME: '/home/tester',
         USERPROFILE: '',
-        CATS_RUNTIME_CONFIG_PATH: configPath,
+        CATS_RUNTIME_DIR: runtimeDir,
       });
 
       expect(config.providerDefaultTargets?.claude).toEqual({
@@ -1075,7 +1111,9 @@ backends:
 
   it('loads agent-backed provider defaults and per-instance overrides', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
-    const configPath = join(tempDir, 'providers.yaml');
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
     writeFileSync(configPath, `
 version: 1
 routing:
@@ -1116,7 +1154,7 @@ backends:
       const config = loadConfig({
         HOME: '/home/tester',
         USERPROFILE: '',
-        CATS_RUNTIME_CONFIG_PATH: configPath,
+        CATS_RUNTIME_DIR: runtimeDir,
       });
 
       expect(config.providerDefaultTargets?.openclaw).toEqual({
@@ -1196,7 +1234,9 @@ backends:
 
   it('rejects providers that are configured in multiple backends without routing', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
-    const configPath = join(tempDir, 'providers.yaml');
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
     writeFileSync(configPath, `
 version: 1
 environments:
@@ -1226,7 +1266,7 @@ backends:
       expect(() => loadConfig({
         HOME: '/home/tester',
         USERPROFILE: '',
-        CATS_RUNTIME_CONFIG_PATH: configPath,
+        CATS_RUNTIME_DIR: runtimeDir,
       })).toThrow(/configured in multiple backends/);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
@@ -1235,7 +1275,9 @@ backends:
 
   it('accepts API default targets for providers that can now run outside CLI', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
-    const configPath = join(tempDir, 'providers.yaml');
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
     writeFileSync(configPath, `
 version: 1
 routing:
@@ -1259,7 +1301,7 @@ backends:
       const config = loadConfig({
         HOME: '/home/tester',
         USERPROFILE: '',
-        CATS_RUNTIME_CONFIG_PATH: configPath,
+        CATS_RUNTIME_DIR: runtimeDir,
       });
 
       expect(config.providerDefaultTargets?.claude).toEqual({
@@ -1292,7 +1334,9 @@ backends:
 
   it('loads Pi provider instances from providers.yaml with sessions_dir', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
-    const configPath = join(tempDir, 'providers.yaml');
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
     writeFileSync(configPath, `
 version: 1
 environments:
@@ -1312,7 +1356,7 @@ providers:
       const config = loadConfig({
         HOME: '/home/tester',
         USERPROFILE: '',
-        CATS_RUNTIME_CONFIG_PATH: configPath,
+        CATS_RUNTIME_DIR: runtimeDir,
       });
 
       expect(listProviderInstances(config, 'pi')).toHaveLength(1);
@@ -1338,7 +1382,9 @@ providers:
 
   it('loads Pi provider from separated backends config', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
-    const configPath = join(tempDir, 'providers.yaml');
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
     writeFileSync(configPath, `
 version: 1
 environments:
@@ -1366,7 +1412,7 @@ backends:
       const config = loadConfig({
         HOME: '/home/tester',
         USERPROFILE: '',
-        CATS_RUNTIME_CONFIG_PATH: configPath,
+        CATS_RUNTIME_DIR: runtimeDir,
       });
 
       expect(config.providerDefaultTargets?.pi).toEqual({
@@ -1382,7 +1428,9 @@ backends:
 
   it('loads CLI provider instance timeout overrides from separated backends config', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
-    const configPath = join(tempDir, 'providers.yaml');
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
     writeFileSync(configPath, `
 version: 1
 environments:
@@ -1410,7 +1458,7 @@ backends:
       const config = loadConfig({
         HOME: '/home/tester',
         USERPROFILE: '',
-        CATS_RUNTIME_CONFIG_PATH: configPath,
+        CATS_RUNTIME_DIR: runtimeDir,
       });
 
       expect(resolveProviderInstance(config, 'gemini', 'native')).toMatchObject({
@@ -1424,7 +1472,9 @@ backends:
 
   it('loads CLI provider instance timeout overrides for copilot too', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
-    const configPath = join(tempDir, 'providers.yaml');
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
     writeFileSync(configPath, `
 version: 1
 environments:
@@ -1452,7 +1502,7 @@ backends:
       const config = loadConfig({
         HOME: '/home/tester',
         USERPROFILE: '',
-        CATS_RUNTIME_CONFIG_PATH: configPath,
+        CATS_RUNTIME_DIR: runtimeDir,
       });
 
       expect(resolveProviderInstance(config, 'copilot', 'native')).toMatchObject({
@@ -1466,7 +1516,9 @@ backends:
 
   it('rejects mixing legacy providers with separated backends blocks', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
-    const configPath = join(tempDir, 'providers.yaml');
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
     writeFileSync(configPath, `
 version: 1
 providers:
@@ -1490,7 +1542,7 @@ backends:
       expect(() => loadConfig({
         HOME: '/home/tester',
         USERPROFILE: '',
-        CATS_RUNTIME_CONFIG_PATH: configPath,
+        CATS_RUNTIME_DIR: runtimeDir,
       })).toThrow(/Cannot mix top-level providers with backends\.\*/);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });

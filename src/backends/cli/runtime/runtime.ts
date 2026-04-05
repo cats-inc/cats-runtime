@@ -419,8 +419,7 @@ function mapHostRuntimeSessionPathToDocker(cwd: string): string | null {
 }
 
 function resolveHostRuntimeSessionBaseDir(): string {
-  return process.env.CATS_RUNTIME_SESSION_BASE_DIR
-    || resolveRuntimeSessionsDir(resolveRuntimeRoot(process.env));
+  return resolveRuntimeSessionsDir(resolveRuntimeRoot(process.env));
 }
 
 function selectHostPathApi(left: string, right: string) {

@@ -6,6 +6,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { cleanupTempDirWithRetries } from './tempCleanup.js';
+import {
+  createRuntimeTestEnv,
+  createRuntimeTestPaths,
+  ensureRuntimeTestDirs,
+} from './support/runtimeTestPaths.js';
 
 import { loadConfig } from '../src/core/config.js';
 import { getRuntimeManagementService } from '../src/http/app.js';
@@ -97,22 +102,22 @@ function createGitWorkspace(root: string, repoName: string): string {
   return repoDir;
 }
 
+function resolveEnvRuntimePaths(env: NodeJS.ProcessEnv) {
+  return createRuntimeTestPaths(env.HOME || env.USERPROFILE || '');
+}
+
 function createTestConfig(overrides = {}) {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-test-'));
+  const paths = createRuntimeTestPaths(root);
   const {
     env: envOverrides,
     ...configOverrides
   } = overrides as Record<string, unknown>;
-  const env = {
-    HOME: root,
-    USERPROFILE: root,
-    CATS_RUNTIME_CONFIG_PATH: join(root, 'providers.missing.yaml'),
+  const env = createRuntimeTestEnv(root, {
     CATS_RUNTIME_HOST: '127.0.0.1',
     CATS_RUNTIME_PORT: '3110',
     CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
     CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
-    CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
-    CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
     AUGGIE_SESSIONS_DIR: join(root, '.augment', 'sessions'),
     CLAUDE_PROJECTS_DIR: join(root, '.claude', 'projects'),
     CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
@@ -128,11 +133,10 @@ function createTestConfig(overrides = {}) {
         ? envOverrides as Record<string, string>
         : {}
     ),
-  };
+  });
 
+  ensureRuntimeTestDirs(paths);
   for (const dir of [
-    env.CATS_RUNTIME_SESSION_BASE_DIR,
-    env.CATS_RUNTIME_DATA_DIR,
     env.AUGGIE_SESSIONS_DIR,
     env.CLAUDE_PROJECTS_DIR,
     env.CODEX_SESSIONS_DIR,
@@ -1094,19 +1098,16 @@ describe('runtime server', () => {
 
   it('surfaces current browser aggregate state on runtime and health diagnostics', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-browser-diagnostics-test-'));
-    const configPath = join(root, 'providers.yaml');
+    const paths = createRuntimeTestPaths(root);
+    const configPath = paths.configPath;
+    mkdirSync(paths.configDir, { recursive: true });
     writeFileSync(configPath, 'providers: {}\n', 'utf8');
 
-    const env = {
-      HOME: root,
-      USERPROFILE: root,
-      CATS_RUNTIME_CONFIG_PATH: configPath,
+    const env = createRuntimeTestEnv(root, {
       CATS_RUNTIME_HOST: '127.0.0.1',
       CATS_RUNTIME_PORT: '3110',
       CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
       CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
-      CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
-      CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
       AUGGIE_SESSIONS_DIR: join(root, '.augment', 'sessions'),
       CLAUDE_PROJECTS_DIR: join(root, '.claude', 'projects'),
       CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
@@ -1115,11 +1116,13 @@ describe('runtime server', () => {
       GEMINI_SESSIONS_DIR: join(root, '.gemini', 'tmp'),
       KIRO_DB_PATH: join(root, '.kiro', 'data.sqlite3'),
       PI_SESSIONS_DIR: join(root, '.pi', 'agent', 'sessions'),
-    };
+    });
+
+    ensureRuntimeTestDirs(createRuntimeTestPaths(root));
 
     for (const dir of [
-      env.CATS_RUNTIME_SESSION_BASE_DIR,
-      env.CATS_RUNTIME_DATA_DIR,
+      resolveEnvRuntimePaths(env).sessionBaseDir,
+      resolveEnvRuntimePaths(env).dataDir,
       env.AUGGIE_SESSIONS_DIR,
       env.CLAUDE_PROJECTS_DIR,
       env.CODEX_SESSIONS_DIR,
@@ -1226,19 +1229,16 @@ describe('runtime server', () => {
 
   it('surfaces retained worktree backlog on health diagnostics', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-worktree-health-test-'));
-    const configPath = join(root, 'providers.yaml');
+    const paths = createRuntimeTestPaths(root);
+    const configPath = paths.configPath;
+    mkdirSync(paths.configDir, { recursive: true });
     writeFileSync(configPath, 'providers: {}\n', 'utf8');
 
-    const env = {
-      HOME: root,
-      USERPROFILE: root,
-      CATS_RUNTIME_CONFIG_PATH: configPath,
+    const env = createRuntimeTestEnv(root, {
       CATS_RUNTIME_HOST: '127.0.0.1',
       CATS_RUNTIME_PORT: '3110',
       CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
       CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
-      CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
-      CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
       AUGGIE_SESSIONS_DIR: join(root, '.augment', 'sessions'),
       CLAUDE_PROJECTS_DIR: join(root, '.claude', 'projects'),
       CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
@@ -1247,11 +1247,13 @@ describe('runtime server', () => {
       GEMINI_SESSIONS_DIR: join(root, '.gemini', 'tmp'),
       KIRO_DB_PATH: join(root, '.kiro', 'data.sqlite3'),
       PI_SESSIONS_DIR: join(root, '.pi', 'agent', 'sessions'),
-    };
+    });
+
+    ensureRuntimeTestDirs(createRuntimeTestPaths(root));
 
     for (const dir of [
-      env.CATS_RUNTIME_SESSION_BASE_DIR,
-      env.CATS_RUNTIME_DATA_DIR,
+      resolveEnvRuntimePaths(env).sessionBaseDir,
+      resolveEnvRuntimePaths(env).dataDir,
       env.AUGGIE_SESSIONS_DIR,
       env.CLAUDE_PROJECTS_DIR,
       env.CODEX_SESSIONS_DIR,
@@ -1270,7 +1272,7 @@ describe('runtime server', () => {
       const repoDir = createGitWorkspace(root, 'runtime-health-worktree');
       const prepared = await prepareSessionWorkspace({
         sessionId: 'runtime-health-retained-worktree',
-        sessionBaseDir: env.CATS_RUNTIME_SESSION_BASE_DIR,
+        sessionBaseDir: resolveEnvRuntimePaths(env).sessionBaseDir,
         cwd: repoDir,
         workspaceMode: 'shared',
         workspaceIsolationMode: 'worktree',
@@ -1408,7 +1410,9 @@ describe('runtime server', () => {
 
   it('GET /diagnostics/providers reports provider availability for hosts', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-diagnostics-test-'));
-    const configPath = join(root, 'providers.yaml');
+    const paths = createRuntimeTestPaths(root);
+    const configPath = paths.configPath;
+    mkdirSync(paths.configDir, { recursive: true });
     vi.stubEnv('CATS_RUNTIME_TEST_ANTHROPIC_KEY', 'test-secret');
 
     writeFileSync(configPath, `
@@ -1446,23 +1450,20 @@ backends:
             model: claude-sonnet-4-20250514
 `.trimStart());
 
-    const env = {
-      HOME: root,
-      USERPROFILE: root,
-      CATS_RUNTIME_CONFIG_PATH: configPath,
+    const env = createRuntimeTestEnv(root, {
       CATS_RUNTIME_HOST: '127.0.0.1',
       CATS_RUNTIME_PORT: '3110',
       CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
       CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
-      CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
-      CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
       CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
       CLAUDE_PROJECTS_DIR: join(root, '.claude', 'projects'),
-    };
+    });
+
+    ensureRuntimeTestDirs(createRuntimeTestPaths(root));
 
     for (const dir of [
-      env.CATS_RUNTIME_DATA_DIR,
-      env.CATS_RUNTIME_SESSION_BASE_DIR,
+      resolveEnvRuntimePaths(env).dataDir,
+      resolveEnvRuntimePaths(env).sessionBaseDir,
       env.CODEX_SESSIONS_DIR,
       env.CLAUDE_PROJECTS_DIR,
     ]) {
@@ -1581,7 +1582,9 @@ backends:
 
   it('GET /diagnostics/health summarizes runtime and default provider readiness for hosts', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-health-summary-test-'));
-    const configPath = join(root, 'providers.yaml');
+    const paths = createRuntimeTestPaths(root);
+    const configPath = paths.configPath;
+    mkdirSync(paths.configDir, { recursive: true });
     vi.stubEnv('CATS_RUNTIME_TEST_ANTHROPIC_KEY', 'test-secret');
 
     writeFileSync(configPath, `
@@ -1619,23 +1622,20 @@ backends:
             model: claude-sonnet-4-20250514
 `.trimStart());
 
-    const env = {
-      HOME: root,
-      USERPROFILE: root,
-      CATS_RUNTIME_CONFIG_PATH: configPath,
+    const env = createRuntimeTestEnv(root, {
       CATS_RUNTIME_HOST: '127.0.0.1',
       CATS_RUNTIME_PORT: '3110',
       CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
       CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
-      CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
-      CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
       CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
       CLAUDE_PROJECTS_DIR: join(root, '.claude', 'projects'),
-    };
+    });
+
+    ensureRuntimeTestDirs(createRuntimeTestPaths(root));
 
     for (const dir of [
-      env.CATS_RUNTIME_DATA_DIR,
-      env.CATS_RUNTIME_SESSION_BASE_DIR,
+      resolveEnvRuntimePaths(env).dataDir,
+      resolveEnvRuntimePaths(env).sessionBaseDir,
       env.CODEX_SESSIONS_DIR,
       env.CLAUDE_PROJECTS_DIR,
     ]) {
@@ -1891,7 +1891,9 @@ backends:
 
   it('surfaces management operation aggregates on runtime and health diagnostics', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-management-health-test-'));
-    const configPath = join(root, 'providers.yaml');
+    const paths = createRuntimeTestPaths(root);
+    const configPath = paths.configPath;
+    mkdirSync(paths.configDir, { recursive: true });
 
     writeFileSync(configPath, `
 version: 1
@@ -1916,22 +1918,19 @@ backends:
             sessions_dir: ~/.codex/sessions
 `.trimStart());
 
-    const env = {
-      HOME: root,
-      USERPROFILE: root,
-      CATS_RUNTIME_CONFIG_PATH: configPath,
+    const env = createRuntimeTestEnv(root, {
       CATS_RUNTIME_HOST: '127.0.0.1',
       CATS_RUNTIME_PORT: '3110',
       CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
       CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
-      CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
-      CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
       CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
-    };
+    });
+
+    ensureRuntimeTestDirs(createRuntimeTestPaths(root));
 
     for (const dir of [
-      env.CATS_RUNTIME_DATA_DIR,
-      env.CATS_RUNTIME_SESSION_BASE_DIR,
+      resolveEnvRuntimePaths(env).dataDir,
+      resolveEnvRuntimePaths(env).sessionBaseDir,
       env.CODEX_SESSIONS_DIR,
     ]) {
       mkdirSync(dir, { recursive: true });
@@ -2031,7 +2030,9 @@ backends:
 
   it('surfaces latest setup diagnostic report summary on runtime and health diagnostics', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-setup-diagnostics-health-test-'));
-    const configPath = join(root, 'providers.yaml');
+    const paths = createRuntimeTestPaths(root);
+    const configPath = paths.configPath;
+    mkdirSync(paths.configDir, { recursive: true });
 
     writeFileSync(configPath, `
 version: 1
@@ -2056,22 +2057,19 @@ backends:
             sessions_dir: ~/.codex/sessions
 `.trimStart());
 
-    const env = {
-      HOME: root,
-      USERPROFILE: root,
-      CATS_RUNTIME_CONFIG_PATH: configPath,
+    const env = createRuntimeTestEnv(root, {
       CATS_RUNTIME_HOST: '127.0.0.1',
       CATS_RUNTIME_PORT: '3110',
       CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
       CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
-      CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
-      CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
       CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
-    };
+    });
+
+    ensureRuntimeTestDirs(createRuntimeTestPaths(root));
 
     for (const dir of [
-      env.CATS_RUNTIME_DATA_DIR,
-      env.CATS_RUNTIME_SESSION_BASE_DIR,
+      resolveEnvRuntimePaths(env).dataDir,
+      resolveEnvRuntimePaths(env).sessionBaseDir,
       env.CODEX_SESSIONS_DIR,
     ]) {
       mkdirSync(dir, { recursive: true });
@@ -2175,7 +2173,9 @@ backends:
 
   it('GET /diagnostics/health ignores non-default provider targets in the aggregate summary', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-health-defaults-only-test-'));
-    const configPath = join(root, 'providers.yaml');
+    const paths = createRuntimeTestPaths(root);
+    const configPath = paths.configPath;
+    mkdirSync(paths.configDir, { recursive: true });
 
     writeFileSync(configPath, `
 version: 1
@@ -2208,22 +2208,19 @@ backends:
             model: gpt-5.2-codex
 `.trimStart());
 
-    const env = {
-      HOME: root,
-      USERPROFILE: root,
-      CATS_RUNTIME_CONFIG_PATH: configPath,
+    const env = createRuntimeTestEnv(root, {
       CATS_RUNTIME_HOST: '127.0.0.1',
       CATS_RUNTIME_PORT: '3110',
       CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
       CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
-      CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
-      CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
       CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
-    };
+    });
+
+    ensureRuntimeTestDirs(createRuntimeTestPaths(root));
 
     for (const dir of [
-      env.CATS_RUNTIME_DATA_DIR,
-      env.CATS_RUNTIME_SESSION_BASE_DIR,
+      resolveEnvRuntimePaths(env).dataDir,
+      resolveEnvRuntimePaths(env).sessionBaseDir,
       env.CODEX_SESSIONS_DIR,
     ]) {
       mkdirSync(dir, { recursive: true });
@@ -2264,7 +2261,9 @@ backends:
 
   it('GET /diagnostics/health stays degraded when only some provider targets are unavailable', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-health-partial-provider-outage-test-'));
-    const configPath = join(root, 'providers.yaml');
+    const paths = createRuntimeTestPaths(root);
+    const configPath = paths.configPath;
+    mkdirSync(paths.configDir, { recursive: true });
     vi.stubEnv('CATS_RUNTIME_TEST_ANTHROPIC_KEY', 'test-secret');
 
     writeFileSync(configPath, `
@@ -2302,23 +2301,20 @@ backends:
             model: claude-sonnet-4-20250514
 `.trimStart());
 
-    const env = {
-      HOME: root,
-      USERPROFILE: root,
-      CATS_RUNTIME_CONFIG_PATH: configPath,
+    const env = createRuntimeTestEnv(root, {
       CATS_RUNTIME_HOST: '127.0.0.1',
       CATS_RUNTIME_PORT: '3110',
       CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
       CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
-      CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
-      CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
       CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
       CLAUDE_PROJECTS_DIR: join(root, '.claude', 'projects'),
-    };
+    });
+
+    ensureRuntimeTestDirs(createRuntimeTestPaths(root));
 
     for (const dir of [
-      env.CATS_RUNTIME_DATA_DIR,
-      env.CATS_RUNTIME_SESSION_BASE_DIR,
+      resolveEnvRuntimePaths(env).dataDir,
+      resolveEnvRuntimePaths(env).sessionBaseDir,
       env.CODEX_SESSIONS_DIR,
       env.CLAUDE_PROJECTS_DIR,
     ]) {
@@ -3277,7 +3273,9 @@ backends:
 
   it('POST /sessions rejects providers omitted by positive-list YAML config', async () => {
     const root = mkdtempSync(join(tmpdir(), 'cats-runtime-positive-list-test-'));
-    const configPath = join(root, 'providers.yaml');
+    const paths = createRuntimeTestPaths(root);
+    const configPath = paths.configPath;
+    mkdirSync(paths.configDir, { recursive: true });
     writeFileSync(configPath, `
 version: 1
 environments:
@@ -3293,21 +3291,18 @@ providers:
         projects_dir: ~/.claude/projects
 `.trimStart());
 
-    const env = {
-      HOME: root,
-      USERPROFILE: root,
-      CATS_RUNTIME_CONFIG_PATH: configPath,
+    const env = createRuntimeTestEnv(root, {
       CATS_RUNTIME_HOST: '127.0.0.1',
       CATS_RUNTIME_PORT: '3110',
       CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
       CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
-      CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
-      CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
-    };
+    });
+
+    ensureRuntimeTestDirs(createRuntimeTestPaths(root));
 
     for (const dir of [
-      env.CATS_RUNTIME_DATA_DIR,
-      env.CATS_RUNTIME_SESSION_BASE_DIR,
+      resolveEnvRuntimePaths(env).dataDir,
+      resolveEnvRuntimePaths(env).sessionBaseDir,
     ]) {
       mkdirSync(dir, { recursive: true });
     }

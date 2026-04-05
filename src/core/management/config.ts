@@ -33,11 +33,10 @@ export interface ManagementConfig {
 // ---------------------------------------------------------------------------
 
 export function loadManagementConfig(
-  configPathOverride?: string,
   cwd?: string,
   env: NodeJS.ProcessEnv = process.env,
 ): ManagementConfig | undefined {
-  const configPath = resolveManagementConfigPath(configPathOverride, cwd, env);
+  const configPath = resolveManagementConfigPath(cwd, env);
   if (!existsSync(configPath)) {
     return undefined;
   }
@@ -73,7 +72,6 @@ export function loadManagementConfig(
 // ---------------------------------------------------------------------------
 
 export function resolveManagementConfigPath(
-  value?: string,
   cwd?: string,
   env: NodeJS.ProcessEnv = process.env,
 ): string {
@@ -81,7 +79,7 @@ export function resolveManagementConfigPath(
     env,
     cwd || env.HOME || env.USERPROFILE || '',
   );
-  return resolveRuntimeManagementConfigPath(runtimeRoot, value);
+  return resolveRuntimeManagementConfigPath(runtimeRoot);
 }
 
 function parseDomainConfig(raw: unknown): ManagementDomainConfig | undefined {

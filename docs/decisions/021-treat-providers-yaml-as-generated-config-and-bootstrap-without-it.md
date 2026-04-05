@@ -76,8 +76,9 @@ This decision includes:
 6. Setup workflow state must not be stored as `config/providers.yaml.*` sidecar
    files.
 7. Advanced operators may still skip bootstrap by providing a valid config
-   themselves through the default config path, `--config`, or
-   `CATS_RUNTIME_CONFIG_PATH`.
+   themselves through the default config path under
+   `~/.cats/runtime/config/providers.yaml` or the `CATS_RUNTIME_DIR` root
+   override.
 8. Automatic setup-time scanning for WSL and Docker must remain conservative and
    respect runtime discovery policies.
 9. The preferred first-run discovery posture is `if_running` for both WSL and

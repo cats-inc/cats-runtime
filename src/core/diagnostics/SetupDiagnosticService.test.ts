@@ -11,6 +11,11 @@ import {
   SetupDiagnosticService,
   type SetupDiagnosticBootstrapService,
 } from './SetupDiagnosticService.js';
+import {
+  createRuntimeTestEnv,
+  createRuntimeTestPaths,
+  ensureRuntimeTestDirs,
+} from '../../../tests/support/runtimeTestPaths.js';
 
 function createTestRoot(): { root: string; cleanup: () => void } {
   const root = mkdtempSync(join(tmpdir(), 'cats-setup-diagnostic-service-'));
@@ -21,15 +26,10 @@ function createTestRoot(): { root: string; cleanup: () => void } {
 }
 
 function createTestEnv(root: string): NodeJS.ProcessEnv {
-  return {
-    HOME: root,
-    USERPROFILE: root,
-    CATS_RUNTIME_CONFIG_PATH: join(root, 'config', 'providers.yaml'),
-    CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
-    CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
+  return createRuntimeTestEnv(root, {
     CATS_RUNTIME_HOST: '127.0.0.1',
     CATS_RUNTIME_PORT: '3110',
-  };
+  });
 }
 
 function createBootstrapStub(): SetupDiagnosticBootstrapService {
@@ -75,6 +75,7 @@ function createBootstrapStub(): SetupDiagnosticBootstrapService {
 }
 
 async function createProviderEvolutionArtifact(root: string): Promise<void> {
+  ensureRuntimeTestDirs(createRuntimeTestPaths(root));
   const config = loadConfig(createTestEnv(root));
   const service = new ProviderEvolutionProbeService({
     rootDir: join(getRuntimeResolvedPaths(config).compatibilityEvidenceDir, 'provider-evolution'),

@@ -44,7 +44,6 @@ function getHelpText(): string {
     'Options:',
     '  --host <host>          Override the target runtime host when deriving the proxy URL',
     '  --port <port>          Override the target runtime port when deriving the proxy URL',
-    '  --config <path>        Use an explicit providers config file for local diagnostics',
     '  --diagnose-setup       Generate a local setup diagnostic report and exit',
     '  --inspect-proxy        Resolve the MCP proxy target, run a ping preflight, and exit',
     '  --refresh-setup-scan   Refresh the shared setup scan before generating a diagnostic report',

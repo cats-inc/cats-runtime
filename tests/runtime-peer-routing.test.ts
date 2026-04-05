@@ -5,6 +5,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { loadConfig } from '../src/core/config.js';
 import { createRuntimeServer } from '../src/server.js';
 import { parseCoreNdjson as parseNdjson } from './streamEventTestUtils.js';
+import {
+  createRuntimeTestEnv,
+  createRuntimeTestPaths,
+  ensureRuntimeTestDirs,
+} from './support/runtimeTestPaths.js';
 
 function parseSse(text: string): Array<Record<string, unknown>> {
   return text
@@ -23,16 +28,12 @@ function createTestConfig(
   } = {},
 ) {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-peer-routing-'));
-  const env = {
-    HOME: root,
-    USERPROFILE: root,
-    CATS_RUNTIME_CONFIG_PATH: join(root, 'providers.missing.yaml'),
+  const paths = createRuntimeTestPaths(root);
+  const env = createRuntimeTestEnv(root, {
     CATS_RUNTIME_HOST: '127.0.0.1',
     CATS_RUNTIME_PORT: '3110',
     CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS: '0',
     CATS_RUNTIME_EXTERNAL_SESSION_LIVE_WINDOW_MS: '0',
-    CATS_RUNTIME_DATA_DIR: join(root, 'runtime-data'),
-    CATS_RUNTIME_SESSION_BASE_DIR: join(root, 'runtime-sessions'),
     AUGGIE_SESSIONS_DIR: join(root, '.augment', 'sessions'),
     CLAUDE_PROJECTS_DIR: join(root, '.claude', 'projects'),
     CODEX_SESSIONS_DIR: join(root, '.codex', 'sessions'),
@@ -42,11 +43,10 @@ function createTestConfig(
     KIRO_DB_PATH: join(root, '.kiro', 'data.sqlite3'),
     PI_SESSIONS_DIR: join(root, '.pi', 'agent', 'sessions'),
     ...(overrides.env || {}),
-  };
+  });
 
+  ensureRuntimeTestDirs(paths);
   for (const dir of [
-    env.CATS_RUNTIME_DATA_DIR,
-    env.CATS_RUNTIME_SESSION_BASE_DIR,
     env.AUGGIE_SESSIONS_DIR,
     env.CLAUDE_PROJECTS_DIR,
     env.CODEX_SESSIONS_DIR,
