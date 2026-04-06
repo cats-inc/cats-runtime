@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Hono } from 'hono';
@@ -119,6 +119,30 @@ export interface AppContext {
   resolveKiloNative?: (instanceId?: string) => KiloNativeSessionService;
   resolveAuggieSessions?: (instanceId?: string) => AuggieSessionService;
   resolveOpencodeNative?: (instanceId?: string) => OpencodeNativeSessionService;
+}
+
+const RUNTIME_PUBLIC_ROOT_CANDIDATES = [
+  ['..', '..', 'public'],
+  ['..', '..', '..', 'public'],
+] as const;
+
+export function resolveRuntimePublicAssetPath(
+  relativePath: string,
+  moduleUrl: string = import.meta.url,
+): string {
+  const moduleDir = dirname(fileURLToPath(moduleUrl));
+
+  for (const segments of RUNTIME_PUBLIC_ROOT_CANDIDATES) {
+    const candidatePath = resolve(moduleDir, ...segments, relativePath);
+    if (existsSync(candidatePath)) {
+      return candidatePath;
+    }
+  }
+
+  throw new Error(
+    `Could not locate runtime public asset '${relativePath}' from ${moduleDir}. `
+    + `Checked: ${RUNTIME_PUBLIC_ROOT_CANDIDATES.map((segments) => resolve(moduleDir, ...segments, relativePath)).join(', ')}`,
+  );
 }
 
 export function getRuntimeSessionManager(ctx: AppContext): RuntimeSessionManager {
@@ -248,13 +272,13 @@ export function createRuntimeApp(ctx: AppContext) {
   const __dirname = dirname(fileURLToPath(import.meta.url));
 
   function renderRuntimePage(
-    relativePath: string,
+    assetPath: string,
     surface: RuntimeSurface,
     options: {
       includeHealthOverlay?: boolean;
     } = {},
   ): string {
-    let html = readFileSync(resolve(__dirname, relativePath), 'utf-8');
+    let html = readFileSync(resolveRuntimePublicAssetPath(assetPath), 'utf-8');
     html = injectRuntimeShellState(html, {
       surface,
       bootstrapRequired: ctx.startup?.bootstrapRequired === true,
@@ -271,7 +295,7 @@ export function createRuntimeApp(ctx: AppContext) {
     if (ctx.startup?.bootstrapRequired) {
       return c.redirect('/setup', 302);
     }
-    return c.html(renderRuntimePage('../../public/index.html', 'dashboard', {
+    return c.html(renderRuntimePage('index.html', 'dashboard', {
       includeHealthOverlay: true,
     }));
   });
@@ -281,14 +305,14 @@ export function createRuntimeApp(ctx: AppContext) {
     if (ctx.startup?.bootstrapRequired) {
       return c.redirect('/setup', 302);
     }
-    return c.html(renderRuntimePage('../../public/index.html', 'dashboard', {
+    return c.html(renderRuntimePage('index.html', 'dashboard', {
       includeHealthOverlay: true,
     }));
   });
 
   // Provider setup page — always accessible regardless of bootstrap mode.
   app.get('/setup', (c) => {
-    return c.html(renderRuntimePage('../../public/provider-setup.html', 'setup', {
+    return c.html(renderRuntimePage('provider-setup.html', 'setup', {
       includeHealthOverlay: true,
     }));
   });
@@ -298,7 +322,7 @@ export function createRuntimeApp(ctx: AppContext) {
     if (ctx.startup?.bootstrapRequired) {
       return c.redirect('/setup', 302);
     }
-    return c.html(renderRuntimePage('../../public/playground.html', 'playground', {
+    return c.html(renderRuntimePage('playground.html', 'playground', {
       includeHealthOverlay: true,
     }));
   });

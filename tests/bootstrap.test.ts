@@ -1054,6 +1054,30 @@ describe('bootstrap mode server', () => {
     }
   });
 
+  it('GET / serves the dashboard shell when bootstrap is not required', async () => {
+    const { root, cleanup } = createTestRoot();
+    try {
+      const env = createTestEnv(root);
+      ensureDirs(env);
+      const config = { ...loadConfig(env), host: '127.0.0.1', port: 0 };
+      const startup = createRuntimeStartupState({ bootstrapRequired: false });
+      const runtime = createRuntimeServer(config, { startup });
+      try {
+        const response = await runtime.app.request('/');
+        expect(response.status).toBe(200);
+        const html = await response.text();
+        expect(html).toContain('Cats Runtime Dashboard');
+        expect(html).toContain('data-runtime-surface-switcher');
+        expect(html).toContain('data-active-surface="dashboard"');
+        expect(html).toContain('Runtime Health');
+      } finally {
+        await runtime.close();
+      }
+    } finally {
+      cleanup();
+    }
+  });
+
   it('GET /dashboard includes the shared runtime shell', async () => {
     const { root, cleanup } = createTestRoot();
     try {
