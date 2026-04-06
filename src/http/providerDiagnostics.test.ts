@@ -1274,6 +1274,161 @@ describe('provider diagnostics HTTP contract', () => {
     }
   });
 
+  it('uses a bounded light probe for loopback Ollama local targets', async () => {
+    const fetchMock = vi.fn(async (
+      input: string | URL | Request,
+    ) => {
+      const url = typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+      if (url === 'http://127.0.0.1:11434/api/tags') {
+        return new Response(JSON.stringify({ models: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`Unexpected light probe URL: ${url}`);
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const app = createTestApp(makeConfig({
+        providerDefaultTargets: {
+          ollama: { backend: 'local', instance: 'local' },
+        },
+        remoteProviderCatalog: {
+          api: {},
+          local: {
+            ollama: {
+              local: {
+                id: 'local',
+                providerName: 'ollama',
+                backend: 'local',
+                transport: 'ollama',
+                baseUrl: 'http://127.0.0.1:11434',
+                model: 'qwen2.5-coder:7b',
+              },
+            },
+          },
+          agent: {},
+        },
+      }));
+
+      const response = await app.request(
+        '/diagnostics/providers?provider=ollama&backend=local&instance=local',
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual(expect.objectContaining({
+        probe: 'light',
+        summary: expect.objectContaining({
+          status: 'ok',
+          ok: 1,
+          degraded: 0,
+          unavailable: 0,
+        }),
+        providers: [
+          expect.objectContaining({
+            provider: 'ollama',
+            backend: 'local',
+            instance: 'local',
+            availability: expect.objectContaining({
+              status: 'ok',
+              probe: 'light',
+              summary: 'Light probe reached ollama/local endpoint',
+              attentionCodes: [],
+            }),
+            checks: expect.arrayContaining([
+              expect.objectContaining({
+                code: 'endpoint_reachable',
+                status: 'ok',
+                message: 'Light probe reached ollama/local endpoint',
+                details: expect.objectContaining({
+                  url: 'http://127.0.0.1:11434/api/tags',
+                  target: 'model_tags',
+                  authenticated: false,
+                  headerNames: [],
+                  statusCode: 200,
+                }),
+              }),
+            ]),
+          }),
+        ],
+      }));
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('keeps non-loopback Ollama light diagnostics config-only', async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error('non-loopback light diagnostics should not fetch remote endpoints');
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      const app = createTestApp(makeConfig({
+        providerDefaultTargets: {
+          ollama: { backend: 'local', instance: 'remote' },
+        },
+        remoteProviderCatalog: {
+          api: {},
+          local: {
+            ollama: {
+              remote: {
+                id: 'remote',
+                providerName: 'ollama',
+                backend: 'local',
+                transport: 'ollama',
+                baseUrl: 'http://192.168.1.50:11434',
+                model: 'qwen2.5-coder:7b',
+              },
+            },
+          },
+          agent: {},
+        },
+      }));
+
+      const response = await app.request(
+        '/diagnostics/providers?provider=ollama&backend=local&instance=remote',
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual(expect.objectContaining({
+        probe: 'light',
+        summary: expect.objectContaining({
+          status: 'degraded',
+          ok: 0,
+          degraded: 1,
+          unavailable: 0,
+        }),
+        providers: [
+          expect.objectContaining({
+            provider: 'ollama',
+            backend: 'local',
+            instance: 'remote',
+            availability: expect.objectContaining({
+              status: 'degraded',
+              probe: 'light',
+              attentionCodes: ['live_probe_unimplemented'],
+            }),
+            checks: expect.arrayContaining([
+              expect.objectContaining({
+                code: 'live_probe_unimplemented',
+                status: 'degraded',
+                message: "Transport 'ollama' is configured, but this contract only exposes light diagnostics for local targets",
+              }),
+            ]),
+          }),
+        ],
+      }));
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('classifies OpenAI live probes with transport-native auth headers', async () => {
     vi.stubEnv('OPENAI_API_KEY', 'test-openai-secret');
     vi.stubEnv('OPENAI_ORG_ID', 'test-openai-org');

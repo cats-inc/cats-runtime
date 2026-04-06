@@ -216,7 +216,8 @@ src/
   `GET /diagnostics/providers`, including live API/local transport-native
   auth/model probes, additive OpenClaw gateway health-snapshot details, and
   Agent SDK provider-registry/model-visibility checks plus bounded probe-session
-  lifecycle validation when `probe=live`
+  lifecycle validation when `probe=live`, plus a loopback-only bounded Ollama
+  `GET /api/tags` reachability check during the default `probe=light` path
 - Reuses the same agent-backend runtime options for OpenClaw gateway
   `models.list` discovery, so provider model catalogs and diagnostics can
   expose canonical `provider/model` refs instead of config-only fallback data

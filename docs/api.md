@@ -782,6 +782,9 @@ surface for hosts and dashboards. The response includes:
   `~/.config/goose/config.yaml` state (`detected`, `partial`, `missing`,
   `invalid`) plus the inferred provider/model pair
 - lightweight config/command/path checks
+  - loopback-only Ollama local targets also run a bounded `GET /api/tags`
+    reachability probe during `light` mode so localhost health does not stay
+    artificially degraded when the runtime can cheaply verify the daemon
 - sanitized env-variable presence metadata
 - additive `config.tooling` summaries describing whether the target uses
   runtime-managed local tools, provider-native CLI tools, or provider-managed
@@ -856,6 +859,10 @@ discovery.
 OpenAI and Anthropic probes use `GET /v1/models` against the resolved base URL,
 Gemini/Google probes use `GET /v1beta/models`, and Ollama probes use
 `GET /api/tags`.
+When the resolved Ollama target is a loopback/local endpoint, the default
+`probe=light` path also performs that single bounded `GET /api/tags` request so
+host dashboards do not flag localhost Ollama as degraded solely because the
+operator did not ask for a full live probe.
 Successful HTTP reachability yields `endpoint_reachable`; network/timeout
 failures yield `endpoint_probe_failed`, while reachable non-2xx responses add
 semantic checks such as `endpoint_auth_required`, `endpoint_auth_rejected`,

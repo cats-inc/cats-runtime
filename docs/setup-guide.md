@@ -402,6 +402,10 @@ Diagnostics rules:
   validate provider-registry listing, configured-model visibility, and
   registry-declared streaming support before reporting a live bridge target as
   fully ready
+- loopback/local Ollama targets now also get a single bounded `/api/tags`
+  reachability check during the default `probe=light` path, so localhost
+  dashboards do not stay degraded when the runtime can cheaply verify the
+  daemon without a full live fan-out
 - `force=1|true|refresh` refreshes cached CLI compatibility assessments so
   install/upgrade flows can re-probe immediately
 

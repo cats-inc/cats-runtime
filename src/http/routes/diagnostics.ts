@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import { Hono } from 'hono';
 import type { BackendKind, RemoteProviderInstanceConfig } from '../../backends/cli/config.js';
 import { inspectAgentTarget } from '../../backends/agent/inspection.js';
@@ -365,10 +366,16 @@ function classifyRemoteLiveProbe(
     authenticated: boolean;
     headerNames: string[];
   },
+  options: {
+    label: 'Light' | 'Live';
+  } = {
+    label: 'Live',
+  },
 ): {
     classification: string;
     check?: DiagnosticCheck;
   } {
+  const probeLabel = options.label;
   if (!probe.reachable) {
     return {
       classification: probe.timedOut ? 'timeout' : 'network_error',
@@ -398,7 +405,7 @@ function classifyRemoteLiveProbe(
       check: createCheck(
         'endpoint_redirected',
         'degraded',
-        `Live probe for ${targetLabel} was redirected (HTTP ${statusCode})`,
+        `${probeLabel} probe for ${targetLabel} was redirected (HTTP ${statusCode})`,
         details,
       ),
     };
@@ -410,7 +417,7 @@ function classifyRemoteLiveProbe(
       check: createCheck(
         'endpoint_auth_required',
         'unavailable',
-        `Live probe reached ${targetLabel} but the endpoint rejected the request as unauthenticated (HTTP 401)`,
+        `${probeLabel} probe reached ${targetLabel} but the endpoint rejected the request as unauthenticated (HTTP 401)`,
         details,
       ),
     };
@@ -422,7 +429,7 @@ function classifyRemoteLiveProbe(
       check: createCheck(
         'endpoint_auth_rejected',
         'unavailable',
-        `Live probe reached ${targetLabel} but the endpoint rejected the request as unauthorized (HTTP 403)`,
+        `${probeLabel} probe reached ${targetLabel} but the endpoint rejected the request as unauthorized (HTTP 403)`,
         details,
       ),
     };
@@ -434,7 +441,7 @@ function classifyRemoteLiveProbe(
       check: createCheck(
         'endpoint_not_found',
         'unavailable',
-        `Live probe reached ${targetLabel} but the endpoint path returned HTTP 404`,
+        `${probeLabel} probe reached ${targetLabel} but the endpoint path returned HTTP 404`,
         details,
       ),
     };
@@ -446,7 +453,7 @@ function classifyRemoteLiveProbe(
       check: createCheck(
         'endpoint_rate_limited',
         'degraded',
-        `Live probe reached ${targetLabel} but the endpoint is rate limited (HTTP 429)`,
+        `${probeLabel} probe reached ${targetLabel} but the endpoint is rate limited (HTTP 429)`,
         details,
       ),
     };
@@ -458,7 +465,7 @@ function classifyRemoteLiveProbe(
       check: createCheck(
         'endpoint_upstream_error',
         'degraded',
-        `Live probe reached ${targetLabel} but the upstream returned HTTP ${statusCode}`,
+        `${probeLabel} probe reached ${targetLabel} but the upstream returned HTTP ${statusCode}`,
         details,
       ),
     };
@@ -469,10 +476,45 @@ function classifyRemoteLiveProbe(
     check: createCheck(
       'endpoint_http_warning',
       'degraded',
-      `Live probe reached ${targetLabel} with unexpected HTTP ${statusCode}`,
+      `${probeLabel} probe reached ${targetLabel} with unexpected HTTP ${statusCode}`,
       details,
     ),
   };
+}
+
+function isLoopbackEndpoint(endpoint: string): boolean {
+  try {
+    const url = new URL(endpoint);
+    const hostname = url.hostname.trim().toLowerCase();
+    if (!hostname || hostname === '0.0.0.0' || hostname === '::') {
+      return false;
+    }
+    if (hostname === 'localhost' || hostname === '::1') {
+      return true;
+    }
+
+    const ipVersion = isIP(hostname);
+    if (ipVersion === 4) {
+      return hostname.startsWith('127.');
+    }
+    if (ipVersion === 6) {
+      return hostname === '::1';
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function shouldRunImplicitLightProbe(
+  target: ProviderTargetDescriptor,
+  instance: RemoteProviderInstanceConfig,
+  endpoint: string | null,
+): boolean {
+  return target.backend === 'local'
+    && instance.transport === 'ollama'
+    && Boolean(endpoint && isLoopbackEndpoint(endpoint));
 }
 
 async function appendModelCatalogDiagnostics(
@@ -1271,6 +1313,8 @@ async function diagnoseRemoteConfigOnly(
     || instance.transport === 'gemini';
   const apiKey = buildEnvDescriptor(env, instance.apiKeyEnv, requiresApiKey);
   const apiRuntime = inspectApiTarget(target);
+  const implicitLightProbe = probeMode === 'light'
+    && shouldRunImplicitLightProbe(target, instance, endpoint);
   const config: Record<string, unknown> = {
     transport: instance.transport,
     model: instance.model || null,
@@ -1311,9 +1355,10 @@ async function diagnoseRemoteConfigOnly(
     );
   }
 
-  if (probeMode === 'live' && endpoint) {
+  if ((probeMode === 'live' || implicitLightProbe) && endpoint) {
     const probeRequest = buildRemoteModelDiscoveryRequest(instance, env);
-    if (probeRequest) {
+    const probeLabel = probeMode === 'live' ? 'Live' : 'Light';
+    if (probeRequest && probeMode === 'live') {
       checks.push(
         createCheck(
           probeRequest.auth.applied ? 'live_probe_authenticated' : 'live_probe_unauthenticated',
@@ -1343,35 +1388,39 @@ async function diagnoseRemoteConfigOnly(
       headers: {},
       headerNames: [],
       target: 'endpoint',
-      auth: {
-        mode: 'none',
-        required: false,
+        auth: {
+          mode: 'none',
+          required: false,
         applied: false,
-      },
+        },
+      });
+    const classifiedLiveProbe = classifyRemoteLiveProbe(target, liveProbe, {
+      label: probeLabel,
     });
-    const classifiedLiveProbe = classifyRemoteLiveProbe(target, liveProbe);
-    config.liveProbe = {
-      url: liveProbe.url,
-      method: liveProbe.method,
-      target: liveProbe.target,
-      headerNames: liveProbe.headerNames,
-      authentication: {
-        mode: liveProbe.authMode,
-        required: liveProbe.authRequired,
-        applied: liveProbe.authenticated,
-      },
-      reachable: liveProbe.reachable,
-      ...(liveProbe.statusCode !== undefined ? { statusCode: liveProbe.statusCode } : {}),
-      latencyMs: liveProbe.latencyMs,
-      classification: classifiedLiveProbe.classification,
-      ...(liveProbe.timedOut ? { timedOut: true } : {}),
-    };
+    if (probeMode === 'live') {
+      config.liveProbe = {
+        url: liveProbe.url,
+        method: liveProbe.method,
+        target: liveProbe.target,
+        headerNames: liveProbe.headerNames,
+        authentication: {
+          mode: liveProbe.authMode,
+          required: liveProbe.authRequired,
+          applied: liveProbe.authenticated,
+        },
+        reachable: liveProbe.reachable,
+        ...(liveProbe.statusCode !== undefined ? { statusCode: liveProbe.statusCode } : {}),
+        latencyMs: liveProbe.latencyMs,
+        classification: classifiedLiveProbe.classification,
+        ...(liveProbe.timedOut ? { timedOut: true } : {}),
+      };
+    }
     checks.push(
       createCheck(
         liveProbe.reachable ? 'endpoint_reachable' : 'endpoint_probe_failed',
         liveProbe.reachable ? 'ok' : 'unavailable',
         liveProbe.reachable
-          ? `Live probe reached ${target.providerName}/${target.instanceId} endpoint`
+          ? `${probeLabel} probe reached ${target.providerName}/${target.instanceId} endpoint`
           : liveProbe.message,
         {
           url: liveProbe.url,
