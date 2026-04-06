@@ -5,6 +5,7 @@ import type {
   CliRuntimeConfig,
   ProviderCommandConfig,
   ProviderInstanceConfig,
+  RuntimeMode,
 } from '../../backends/cli/config.js';
 import { buildProcessSpawnConfig, quoteForBash } from '../../backends/cli/runtime/runtime.js';
 import type { ProviderName } from '../../backends/cli/providers/types.js';
@@ -96,6 +97,8 @@ export class ProviderCompatibilityService {
   private readonly cache = new Map<string, CacheEntry>();
   private readonly cacheTtlMs: number;
   private readonly probeTimeoutMs: number;
+  private readonly probeTimeoutWslMs: number;
+  private readonly probeTimeoutDockerMs: number;
   private readonly maxConcurrentAssessments: number;
   private readonly maxConcurrentHealthAssessments: number;
   private readonly evidenceDir: string;
@@ -110,11 +113,27 @@ export class ProviderCompatibilityService {
   }> = [];
 
   constructor(
-    private readonly config: Pick<CliRuntimeConfig, 'dataDir' | 'sessionBaseDir'>,
+    private readonly config: Pick<CliRuntimeConfig, 'dataDir' | 'sessionBaseDir'>
+      & Partial<Pick<
+        CliRuntimeConfig,
+        | 'compatibilityProbeTimeoutMs'
+        | 'compatibilityProbeWslTimeoutMs'
+        | 'compatibilityProbeDockerTimeoutMs'
+      >>,
     options: ProviderCompatibilityServiceOptions = {},
   ) {
     this.cacheTtlMs = options.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS;
-    this.probeTimeoutMs = options.probeTimeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS;
+    this.probeTimeoutMs = options.probeTimeoutMs
+      ?? config.compatibilityProbeTimeoutMs
+      ?? DEFAULT_PROBE_TIMEOUT_MS;
+    this.probeTimeoutWslMs = config.compatibilityProbeWslTimeoutMs ?? Math.max(
+      this.probeTimeoutMs,
+      DEFAULT_PROBE_TIMEOUT_MS * 2,
+    );
+    this.probeTimeoutDockerMs = config.compatibilityProbeDockerTimeoutMs ?? Math.max(
+      this.probeTimeoutMs,
+      DEFAULT_PROBE_TIMEOUT_MS * 2,
+    );
     this.maxConcurrentAssessments = normalizeConcurrentAssessmentLimit(
       options.maxConcurrentAssessments,
     );
@@ -133,6 +152,16 @@ export class ProviderCompatibilityService {
     this.runner = options.runner || { run: runCompatibilityProbe };
     this.installCheckRunner = options.installCheckRunner || defaultProviderInstallCheckRunner;
     this.now = options.now || (() => Date.now());
+  }
+
+  private resolveProbeTimeoutMs(runtimeMode: RuntimeMode): number {
+    if (runtimeMode === 'wsl') {
+      return this.probeTimeoutWslMs;
+    }
+    if (runtimeMode === 'docker') {
+      return this.probeTimeoutDockerMs;
+    }
+    return this.probeTimeoutMs;
   }
 
   getEvidenceDir(): string {
@@ -353,13 +382,14 @@ export class ProviderCompatibilityService {
     const checkedAt = new Date(nowMs).toISOString();
     const baseCacheState = this.buildCacheState(nowMs, false);
     const healthOnly = options.purpose === 'health';
+    const probeTimeoutMs = this.resolveProbeTimeoutMs(instance.commandConfig.runtime.mode);
     const versionProbePromise = versionArgs.length
       ? this.runner.run(
         providerName,
         instance.commandConfig,
         versionArgs,
         probeCwd,
-        this.probeTimeoutMs,
+        probeTimeoutMs,
       )
       : Promise.resolve(undefined);
     const helpProbePromise = helpArgs?.length
@@ -368,7 +398,7 @@ export class ProviderCompatibilityService {
         instance.commandConfig,
         helpArgs,
         probeCwd,
-        this.probeTimeoutMs,
+        probeTimeoutMs,
       )
       : Promise.resolve(undefined);
     const [versionProbe, helpProbe] = await Promise.all([
@@ -417,31 +447,31 @@ export class ProviderCompatibilityService {
           this.installCheckRunner.lookupCommand(
             instance.commandConfig.path,
             instance.commandConfig.runtime,
-            this.probeTimeoutMs,
+            probeTimeoutMs,
           ),
           instance.commandConfig.path === installKnowledge.binaryName
             ? this.installCheckRunner.lookupCommand(
               instance.commandConfig.path,
               instance.commandConfig.runtime,
-              this.probeTimeoutMs,
+              probeTimeoutMs,
             )
             : this.installCheckRunner.lookupCommand(
               installKnowledge.binaryName,
               instance.commandConfig.runtime,
-              this.probeTimeoutMs,
+              probeTimeoutMs,
             ),
           installView.path.expectedPath
             ? this.installCheckRunner.checkPath(
               installView.path.expectedPath,
               instance.commandConfig.runtime,
-              this.probeTimeoutMs,
+              probeTimeoutMs,
             )
             : Promise.resolve(undefined),
           installKnowledge.check.npmPackage
             ? this.installCheckRunner.checkNpmPackage(
               installKnowledge.check.npmPackage,
               instance.commandConfig.runtime,
-              this.probeTimeoutMs,
+              probeTimeoutMs,
             )
             : Promise.resolve(undefined),
           Promise.all(
@@ -450,7 +480,7 @@ export class ProviderCompatibilityService {
               lookup: await this.installCheckRunner.lookupCommand(
                 prerequisite.command,
                 instance.commandConfig.runtime,
-                this.probeTimeoutMs,
+                probeTimeoutMs,
               ),
             })),
           ),
@@ -459,13 +489,13 @@ export class ProviderCompatibilityService {
               installView.path.shellRcPath,
               installView.path.persistenceEntry,
               instance.commandConfig.runtime,
-              this.probeTimeoutMs,
+              probeTimeoutMs,
             )
             : Promise.resolve(undefined),
           installView.npm?.expectedPrefix
             ? this.installCheckRunner.getNpmPrefix(
               instance.commandConfig.runtime,
-              this.probeTimeoutMs,
+              probeTimeoutMs,
             )
             : Promise.resolve(undefined),
         ]);
@@ -883,7 +913,7 @@ export class ProviderCompatibilityService {
       input.instance.commandConfig,
       input.profile.liveProbeArgs,
       input.probeCwd,
-      this.probeTimeoutMs,
+      this.resolveProbeTimeoutMs(input.instance.commandConfig.runtime.mode),
     );
     return toProbeRecord('live', input.profile.liveProbeArgs, result);
   }

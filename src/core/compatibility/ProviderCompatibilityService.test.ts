@@ -116,6 +116,75 @@ describe('ProviderCompatibilityService', () => {
     expect(assessment.evidence).toBeUndefined();
   });
 
+  it('uses runtime-specific probe timeouts for compatibility and install checks', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-compat-timeouts-'));
+    tempDirs.push(root);
+    const runner = {
+      run: vi.fn(async (_providerName, _commandConfig, args: string[]) => {
+        if (args[0] === '--version') {
+          return {
+            exitCode: 0,
+            stdout: 'kiro-cli 1.29.3\n',
+            stderr: '',
+            timedOut: false,
+            durationMs: 5,
+          };
+        }
+
+        return {
+          exitCode: 0,
+          stdout: 'Usage: kiro-cli chat --no-interactive --resume --wrap\n',
+          stderr: '',
+          timedOut: false,
+          durationMs: 5,
+        };
+      }),
+    };
+    const installCheckRunner = createInstallCheckRunner();
+    const service = new ProviderCompatibilityService({
+      dataDir: join(root, 'data'),
+      sessionBaseDir: join(root, 'sessions'),
+      compatibilityProbeTimeoutMs: 11000,
+      compatibilityProbeWslTimeoutMs: 17000,
+      compatibilityProbeDockerTimeoutMs: 23000,
+    }, {
+      runner,
+      installCheckRunner,
+      now: () => Date.parse('2026-04-06T00:00:00.000Z'),
+    });
+
+    const assessTimeout = async (
+      instanceId: string,
+      runtimeOverride: Record<string, unknown>,
+      expectedTimeoutMs: number,
+    ) => {
+      runner.run.mockClear();
+      vi.mocked(installCheckRunner.lookupCommand).mockClear();
+      vi.mocked(installCheckRunner.checkPath).mockClear();
+      vi.mocked(installCheckRunner.checkShellRcEntry).mockClear();
+
+      const assessment = await service.assessCliTarget(
+        createCliTarget('kiro', instanceId, runtimeOverride),
+        { force: true },
+      );
+      expect(assessment.classification).toBe('ready');
+      expect(runner.run.mock.calls.every((call) => call[4] === expectedTimeoutMs)).toBe(true);
+      expect(vi.mocked(installCheckRunner.lookupCommand).mock.calls.every(
+        (call) => call[2] === expectedTimeoutMs,
+      )).toBe(true);
+      expect(vi.mocked(installCheckRunner.checkPath).mock.calls.every(
+        (call) => call[2] === expectedTimeoutMs,
+      )).toBe(true);
+      expect(vi.mocked(installCheckRunner.checkShellRcEntry).mock.calls.every(
+        (call) => call[3] === expectedTimeoutMs,
+      )).toBe(true);
+    };
+
+    await assessTimeout('native', { mode: 'native', environmentId: 'native' }, 11000);
+    await assessTimeout('ubuntu', { mode: 'wsl', distro: 'Ubuntu', environmentId: 'ubuntu' }, 17000);
+    await assessTimeout('docker-dev', { mode: 'docker', container: 'cats-cli-dev', environmentId: 'docker-dev' }, 23000);
+  });
+
   const shellFallbackIt = process.platform === 'win32' ? it.skip : it;
 
   shellFallbackIt('retries native compatibility probes through a shell when direct spawn exits without output', async () => {

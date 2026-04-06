@@ -194,6 +194,9 @@ export interface CliRuntimeConfig {
   piSessionsDir: string;
   wslDiscoveryPolicy?: WslDiscoveryPolicy;
   dockerDiscoveryPolicy?: DockerDiscoveryPolicy;
+  compatibilityProbeTimeoutMs: number;
+  compatibilityProbeWslTimeoutMs: number;
+  compatibilityProbeDockerTimeoutMs: number;
   nativeDiscoveryIntervalMs: number;
   externalSessionLiveWindowMs: number;
   maxSessions: number;
@@ -351,6 +354,18 @@ export function defaultSpawnTimeoutMs(): number {
   return 30000;
 }
 
+export function defaultCompatibilityProbeTimeoutMs(): number {
+  return 10000;
+}
+
+export function defaultCompatibilityProbeWslTimeoutMs(): number {
+  return 20000;
+}
+
+export function defaultCompatibilityProbeDockerTimeoutMs(): number {
+  return 20000;
+}
+
 export function defaultRateLimitCooldownMs(): number {
   return 60000;
 }
@@ -369,6 +384,21 @@ export function loadConfig(
   const runtimeRoot = resolveRuntimeRoot(env);
   const dataDir = resolveRuntimeDataDir(runtimeRoot);
   const sessionBaseDir = resolveRuntimeSessionsDir(runtimeRoot);
+  const compatibilityProbeTimeoutMs = parseNonNegativeInt(
+    env.CATS_RUNTIME_COMPATIBILITY_PROBE_TIMEOUT_MS,
+    defaultCompatibilityProbeTimeoutMs(),
+    'CATS_RUNTIME_COMPATIBILITY_PROBE_TIMEOUT_MS',
+  );
+  const compatibilityProbeWslTimeoutMs = parseNonNegativeInt(
+    env.CATS_RUNTIME_COMPATIBILITY_PROBE_WSL_TIMEOUT_MS,
+    defaultCompatibilityProbeWslTimeoutMs(),
+    'CATS_RUNTIME_COMPATIBILITY_PROBE_WSL_TIMEOUT_MS',
+  );
+  const compatibilityProbeDockerTimeoutMs = parseNonNegativeInt(
+    env.CATS_RUNTIME_COMPATIBILITY_PROBE_DOCKER_TIMEOUT_MS,
+    defaultCompatibilityProbeDockerTimeoutMs(),
+    'CATS_RUNTIME_COMPATIBILITY_PROBE_DOCKER_TIMEOUT_MS',
+  );
 
   const legacy = buildLegacyRuntimeShape(env, env.HOME || env.USERPROFILE || '');
   const configPath = resolveConfigPath(env.HOME || env.USERPROFILE || '', env);
@@ -424,6 +454,9 @@ export function loadConfig(
       env.CATS_RUNTIME_DOCKER_DISCOVERY_POLICY,
       defaultDockerDiscoveryPolicy(),
     ),
+    compatibilityProbeTimeoutMs,
+    compatibilityProbeWslTimeoutMs,
+    compatibilityProbeDockerTimeoutMs,
     nativeDiscoveryIntervalMs: parseNonNegativeInt(
       env.CATS_RUNTIME_NATIVE_DISCOVERY_INTERVAL_MS
         || env.NATIVE_DISCOVERY_INTERVAL_MS,

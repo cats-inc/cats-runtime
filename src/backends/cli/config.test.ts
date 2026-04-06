@@ -9,6 +9,9 @@ import {
   defaultCursorRuntimeMode,
   defaultExternalSessionLiveWindowMs,
   defaultNativeDiscoveryIntervalMs,
+  defaultCompatibilityProbeDockerTimeoutMs,
+  defaultCompatibilityProbeTimeoutMs,
+  defaultCompatibilityProbeWslTimeoutMs,
   defaultKiroDbPath,
   defaultKiroRuntimeMode,
   defaultOpencodeServerHost,
@@ -135,6 +138,12 @@ describe('config platform defaults', () => {
     expect(defaultSpawnTimeoutMs()).toBe(30000);
   });
 
+  it('defaults compatibility probe timeouts to 10 seconds for native and 20 seconds for WSL/Docker', () => {
+    expect(defaultCompatibilityProbeTimeoutMs()).toBe(10000);
+    expect(defaultCompatibilityProbeWslTimeoutMs()).toBe(20000);
+    expect(defaultCompatibilityProbeDockerTimeoutMs()).toBe(20000);
+  });
+
   it('loads spawn resilience settings from the environment', () => {
     const config = loadConfigWithoutProviderFile({
       CATS_RUNTIME_SPAWN_RETRIES: '3',
@@ -144,10 +153,27 @@ describe('config platform defaults', () => {
     expect(config.spawnTimeoutMs).toBe(15000);
   });
 
+  it('loads compatibility probe timeouts from the environment', () => {
+    const config = loadConfigWithoutProviderFile({
+      CATS_RUNTIME_COMPATIBILITY_PROBE_TIMEOUT_MS: '12000',
+      CATS_RUNTIME_COMPATIBILITY_PROBE_WSL_TIMEOUT_MS: '18000',
+      CATS_RUNTIME_COMPATIBILITY_PROBE_DOCKER_TIMEOUT_MS: '24000',
+    });
+    expect(config.compatibilityProbeTimeoutMs).toBe(12000);
+    expect(config.compatibilityProbeWslTimeoutMs).toBe(18000);
+    expect(config.compatibilityProbeDockerTimeoutMs).toBe(24000);
+  });
+
   it('rejects non-positive spawn retries', () => {
     expect(() => loadConfigWithoutProviderFile({
       CATS_RUNTIME_SPAWN_RETRIES: '0',
     })).toThrow(/CATS_RUNTIME_SPAWN_RETRIES/);
+  });
+
+  it('rejects invalid compatibility probe timeouts', () => {
+    expect(() => loadConfigWithoutProviderFile({
+      CATS_RUNTIME_COMPATIBILITY_PROBE_WSL_TIMEOUT_MS: '-1',
+    })).toThrow(/CATS_RUNTIME_COMPATIBILITY_PROBE_WSL_TIMEOUT_MS/);
   });
 
   it('allows spawn timeout of zero to disable it', () => {
