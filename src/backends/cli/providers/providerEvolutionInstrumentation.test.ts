@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ProviderEvolutionEvidenceCollector } from '../../../core/compatibility/providerEvolution.js';
+import { AuggieProvider } from './auggie.js';
 import { ClaudeProvider } from './claude.js';
 import { CodexProvider } from './codex.js';
 import { CopilotProvider } from './copilot.js';
@@ -7,6 +8,7 @@ import { GeminiProvider } from './gemini.js';
 import { GooseProvider } from './goose.js';
 import { JunieProvider } from './junie.js';
 import { PiProvider } from './pi.js';
+import type { AuggieSessionService } from '../auggie/AuggieSessionService.js';
 import type { GooseNativeSessionService } from '../goose/GooseNativeSessionService.js';
 
 function createMockGooseNative(): GooseNativeSessionService {
@@ -372,6 +374,60 @@ describe('provider evolution instrumentation', () => {
     const bundle = collector.finalize();
     expect(bundle.summary.ignoredEventTypes.response).toBe(1);
     expect(bundle.summary.unknownEventTypes.some_future_event).toBe(1);
+  });
+
+  it('records normalized and raw passthrough Auggie print-mode paths', async () => {
+    const collector = new ProviderEvolutionEvidenceCollector({
+      provider: 'auggie',
+      instance: 'default',
+      parserId: 'auggie-json',
+      probeProfile: 'manual-smoke',
+      transport: 'cli',
+    });
+    const sessions = {
+      getLatestSession: vi.fn()
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          providerSessionId: 'session-new',
+          cwd: '/tmp/repo',
+          sourcePath: '/tmp/session-new.json',
+          messageCount: 1,
+          exchangeCount: 1,
+          lastActivity: '2026-04-07T00:00:00.000Z',
+          usage: {
+            inputTokens: 11,
+            outputTokens: 7,
+          },
+        }),
+      getSession: vi.fn().mockResolvedValue(null),
+    } as unknown as AuggieSessionService;
+    const provider = new AuggieProvider(sessions, 10, collector);
+
+    await provider.beforeTurn?.({ cwd: '/tmp/repo' });
+    expect(provider.parseStreamLine('Some unexpected Auggie banner')).toBeNull();
+    expect(provider.parseStreamLine(JSON.stringify({
+      type: 'result',
+      session_id: 'remote-session-id',
+      result: 'probe-complete',
+      is_error: false,
+    }))).toEqual({
+      type: 'text',
+      text: 'probe-complete',
+    });
+    await expect(provider.afterTurn?.({ cwd: '/tmp/repo' })).resolves.toEqual({
+      type: 'result',
+      sessionId: 'session-new',
+      usage: {
+        inputTokens: 11,
+        outputTokens: 7,
+      },
+    });
+
+    const bundle = collector.finalize();
+    expect(bundle.summary.rawPassthroughCount).toBe(1);
+    expect(bundle.summary.normalizedCount).toBe(2);
+    expect(bundle.summary.normalizedEventTypes.text).toBe(1);
+    expect(bundle.summary.normalizedEventTypes.result).toBe(1);
   });
 
   it('records normalized and raw passthrough Junie stdout paths', () => {

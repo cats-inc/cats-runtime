@@ -221,6 +221,7 @@ expansion without blocking the first CLI-focused slice.
 | 2026-03-27 | Read-only MCP follow-through landed for retained provider-evolution artifacts: `list_provider_evolution_artifacts` and `read_provider_evolution_artifact` now reuse the same bounded diagnostics list/read surfaces and filters over HTTP JSON-RPC and stdio without introducing an MCP-only evidence path. |
 | 2026-03-27 | MCP write follow-through also landed for retained provider-evolution reviews: `review_provider_evolution_artifact` now reuses the same bounded diagnostics review route over HTTP JSON-RPC and stdio, so orchestrator-style hosts can attach classifications, summaries, highlights, and external references without inventing a second review/update path. |
 | 2026-04-07 | Junie now joins the manual CLI probe entrypoint as the next bounded JSON-output provider-evolution target, so retained artifacts can capture its final text/result seam without waiting for broader later-provider rollout. |
+| 2026-04-07 | Auggie now also joins the manual CLI probe entrypoint with provider-evolution instrumentation over its JSON print/result seam plus retained final-result normalization, so manual probes can compare its bounded text/result output without changing normal runtime execution. |
 
 ---
 

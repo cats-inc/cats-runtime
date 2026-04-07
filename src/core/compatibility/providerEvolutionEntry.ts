@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { AuggieSessionService } from '../../backends/cli/auggie/AuggieSessionService.js';
 import { GooseNativeSessionService } from '../../backends/cli/goose/GooseNativeSessionService.js';
 import {
   getProviderDefaultInstanceId,
@@ -18,6 +19,7 @@ import { resolveProviderTarget, type ProviderTargetDescriptor } from '../provide
 import { ClaudeProvider } from '../../backends/cli/providers/claude.js';
 import { CodexProvider } from '../../backends/cli/providers/codex.js';
 import { CopilotProvider } from '../../backends/cli/providers/copilot.js';
+import { AuggieProvider } from '../../backends/cli/providers/auggie.js';
 import { GeminiProvider } from '../../backends/cli/providers/gemini.js';
 import { GooseProvider } from '../../backends/cli/providers/goose.js';
 import { JunieProvider } from '../../backends/cli/providers/junie.js';
@@ -52,6 +54,7 @@ import {
 } from '../../startup.js';
 
 const SUPPORTED_CLI_PROBE_PROVIDERS = new Set<ProviderName>([
+  'auggie',
   'codex',
   'copilot',
   'pi',
@@ -317,7 +320,13 @@ async function runCliProbeProfile(
   error?: string;
 }> {
   const instance = resolveProviderInstance(options.config, options.providerName, options.instanceId);
-  const provider = createProbeProvider(instance, options.providerName, options.compatibilityProfile, options.observer);
+  const provider = createProbeProvider(
+    options.config,
+    instance,
+    options.providerName,
+    options.compatibilityProfile,
+    options.observer,
+  );
   const workspaceRoot = await mkdtemp(join(tmpdir(), 'cats-runtime-provider-evolution-'));
   const worker = new WorkerProcess(
     provider,
@@ -458,12 +467,19 @@ async function runAgentProbeProfile(
 }
 
 function createProbeProvider(
+  config: CliRuntimeConfig,
   instance: ReturnType<typeof resolveProviderInstance>,
   providerName: ProviderName,
   compatibilityProfile: RunCliProbeProfileOptions['compatibilityProfile'],
   observer: ProviderEvolutionEvidenceObserver,
 ): Provider {
   switch (providerName) {
+    case 'auggie':
+      return new AuggieProvider(
+        new AuggieSessionService(instance.auggieSessionsDir || config.auggieSessionsDir),
+        config.auggieMaxTurns,
+        observer,
+      );
     case 'claude':
       return new ClaudeProvider(compatibilityProfile, observer);
     case 'codex':

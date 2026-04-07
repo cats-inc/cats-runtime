@@ -15,6 +15,13 @@ import type {
   StreamEvent,
   TextStreamEvent,
 } from '../../../core/types.js';
+import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
+import {
+  observeIgnored,
+  observeNormalized,
+  observeRawPassthrough,
+  observeUnknown,
+} from '../../../core/compatibility/providerEvolution.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 
 interface AuggieResultLine {
@@ -63,6 +70,7 @@ export class AuggieProvider implements Provider {
   constructor(
     sessions: AuggieSessionService,
     private readonly maxTurns: number = 10,
+    private readonly evolutionObserver?: ProviderEvolutionEvidenceObserver,
   ) {
     this.sessions = sessions;
   }
@@ -141,18 +149,29 @@ export class AuggieProvider implements Provider {
     const trimmed = line.trim();
     if (!trimmed) return null;
     if (trimmed.startsWith('Applying --max-turns override:')) {
-      return null;
+      return observeIgnored(this.evolutionObserver, {
+        rawEventType: 'max_turns_override',
+        reason: 'cli_banner',
+        rawSample: trimmed,
+      }, null);
     }
 
     let parsed: AuggieResultLine;
     try {
       parsed = JSON.parse(trimmed) as AuggieResultLine;
     } catch {
-      return null;
+      return observeRawPassthrough(this.evolutionObserver, {
+        rawEventType: 'non_json_line',
+        reason: 'stdout_passthrough',
+        rawSample: trimmed,
+      }, null);
     }
 
     if (parsed.type !== 'result') {
-      return null;
+      return observeUnknown(this.evolutionObserver, {
+        rawEventType: typeof parsed.type === 'string' ? parsed.type : 'unknown_json',
+        rawSample: parsed,
+      }, null);
     }
 
     this.sawStructuredResult = true;
@@ -163,18 +182,39 @@ export class AuggieProvider implements Provider {
 
     const text = typeof parsed.result === 'string' ? parsed.result : '';
     if (parsed.is_error) {
-      return {
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: 'result',
+        details: {
+          provider: 'auggie',
+          isError: true,
+        },
+        rawSample: parsed,
+      }, {
         type: 'error',
         text: text.trim() || 'Auggie request failed',
-      } satisfies ErrorStreamEvent;
+      } satisfies ErrorStreamEvent);
     }
 
-    if (!text.trim()) return null;
+    if (!text.trim()) {
+      return observeIgnored(this.evolutionObserver, {
+        rawEventType: 'empty_result',
+        reason: 'empty_result_text',
+        rawSample: parsed,
+      }, null);
+    }
     this.sawText = true;
-    return {
+    return observeNormalized(this.evolutionObserver, {
+      rawEventType: 'result',
+      details: {
+        provider: 'auggie',
+        isError: false,
+        hasSessionId: Boolean(parsed.session_id),
+      },
+      rawSample: parsed,
+    }, {
       type: 'text',
       text,
-    } satisfies TextStreamEvent;
+    } satisfies TextStreamEvent);
   }
 
   private async resolveUpdatedSession(opts: ProviderSpawnOptions): Promise<AuggieSavedSession | null> {
@@ -196,33 +236,57 @@ export class AuggieProvider implements Provider {
     const usage = updatedSession?.usage;
 
     if (opts.resumeSessionId) {
-      return {
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: 'session_result',
+        details: {
+          provider: 'auggie',
+          resumed: true,
+        },
+      }, {
         type: 'result',
         sessionId: opts.resumeSessionId,
         usage,
-      } satisfies ResultStreamEvent;
+      } satisfies ResultStreamEvent);
     }
 
     if (updatedSession) {
-      return {
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: 'session_result',
+        details: {
+          provider: 'auggie',
+          sessionSource: 'local_session_file',
+        },
+      }, {
         type: 'result',
         sessionId: updatedSession.providerSessionId,
         usage,
-      } satisfies ResultStreamEvent;
+      } satisfies ResultStreamEvent);
     }
 
     if (this.lastResult?.remoteSessionId) {
-      return {
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: 'session_result',
+        details: {
+          provider: 'auggie',
+          sessionSource: 'remote_result',
+        },
+      }, {
         type: 'result',
         sessionId: this.lastResult.remoteSessionId,
         usage,
-      } satisfies ResultStreamEvent;
+      } satisfies ResultStreamEvent);
     }
 
-    return {
+    return observeNormalized(this.evolutionObserver, {
+      rawEventType: 'session_result',
+      details: {
+        provider: 'auggie',
+        sessionSource: 'unknown',
+      },
+    }, {
       type: 'result',
       usage,
-    } satisfies ResultStreamEvent;
+    } satisfies ResultStreamEvent);
   }
 
   private buildEmptyResponseError(updatedSession: AuggieSavedSession | null): string {

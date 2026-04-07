@@ -1258,6 +1258,7 @@ always-on self-adapting parser system.
   - `gemini`
   - `claude`
   - `junie`
+  - `auggie`
 - `cats-runtime --probe-provider-evolution --probe-provider <provider>` now
   runs a bounded manual-first probe without starting the HTTP server
 - probe artifacts now include:
