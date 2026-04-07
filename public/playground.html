@@ -181,7 +181,7 @@
                 </button>
               </div>
               <div class="flex items-center gap-2">
-                <button id="preset-agents-btn" onclick="confirmApplyTwelveAgentPreset()" class="runtime-btn runtime-btn-secondary !h-8 !w-8 !rounded-lg !px-0 !py-0" title="Use 12-agent preset" aria-label="Use 12-agent preset">
+                <button id="preset-agents-btn" onclick="confirmApplyTwelveAgentPreset()" class="runtime-btn runtime-btn-secondary !h-8 !w-8 !rounded-lg !px-0 !py-0 opacity-40 cursor-not-allowed" title="Use 12-agent preset" aria-label="Use 12-agent preset" disabled aria-disabled="true">
                   <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <rect x="4" y="4" width="6" height="6" rx="1.5" />
                     <rect x="14" y="4" width="6" height="6" rx="1.5" />
@@ -189,7 +189,7 @@
                     <rect x="14" y="14" width="6" height="6" rx="1.5" />
                   </svg>
                 </button>
-                <button id="add-agent-btn" onclick="addAgent()" class="runtime-btn runtime-btn-secondary !h-8 !w-8 !rounded-lg !px-0 !py-0" title="Add agent" aria-label="Add agent">
+                <button id="add-agent-btn" onclick="addAgent()" class="runtime-btn runtime-btn-secondary !h-8 !w-8 !rounded-lg !px-0 !py-0 opacity-40 cursor-not-allowed" title="Add agent" aria-label="Add agent" disabled aria-disabled="true">
                   <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M12 5v14" />
                     <path d="M5 12h14" />
@@ -200,7 +200,14 @@
           </div>
 
           <div class="runtime-sidebar-section runtime-sidebar-surface space-y-4 overflow-y-auto">
-            <div id="agents-list" class="space-y-3"></div>
+            <div id="agents-loading-state" class="rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-5">
+              <div class="flex items-center justify-center gap-2 text-slate-400">
+                <span class="thinking-dot h-2 w-2 rounded-full bg-slate-500"></span>
+                <span class="thinking-dot h-2 w-2 rounded-full bg-slate-500"></span>
+                <span class="thinking-dot h-2 w-2 rounded-full bg-slate-500"></span>
+              </div>
+            </div>
+            <div id="agents-list" class="hidden space-y-3"></div>
 
             <div class="space-y-3 pt-2">
               <h2 class="text-sm font-semibold uppercase tracking-widest text-slate-300">Session Settings</h2>
@@ -224,7 +231,7 @@
               </div>
             </div>
 
-            <button id="btn-start-chat" onclick="startChat()" class="runtime-btn runtime-btn-primary mt-4 w-full justify-center">
+            <button id="btn-start-chat" onclick="startChat()" class="runtime-btn runtime-btn-primary mt-4 w-full justify-center opacity-40 cursor-not-allowed" disabled>
               Start Chat
             </button>
           </div>
@@ -410,6 +417,7 @@ let SELECTABLE_PROVIDERS = [...PROVIDERS];
 let providerOptionsReady = false;
 let providerOptionsLoading = false;
 let providerOptionsRequestId = 0;
+let starterAgentsInitialized = false;
 function getDefaultModel(p) { return (PROVIDER_MODELS[p]||[])[0]?.value || ''; }
 function getProviderAvailabilityStatus(provider){
   const status=typeof PROVIDER_AVAILABILITY[provider]==='string'?PROVIDER_AVAILABILITY[provider].toLowerCase():'';
@@ -423,7 +431,7 @@ function getProviderAvailabilityLabel(provider){
   return '';
 }
 function listSelectableProviders() {
-  const selectable=SELECTABLE_PROVIDERS.length ? [...SELECTABLE_PROVIDERS] : [...PROVIDERS];
+  const selectable=[...SELECTABLE_PROVIDERS];
   return window.CatsUI?.listSelectablePlaygroundProviders
     ? window.CatsUI.listSelectablePlaygroundProviders(selectable,PROVIDERS,PROVIDER_AVAILABILITY)
     : selectable;
@@ -431,7 +439,7 @@ function listSelectableProviders() {
 function normalizeSelectableProvider(provider) {
   const selectable=listSelectableProviders();
   if(selectable.includes(provider)) return provider;
-  return selectable[0] || provider || PROVIDERS[0] || '';
+  return selectable[0] || provider || '';
 }
 function normalizeAgentSelectionState(provider,model='',modelSelection=null,options={}) {
   const allowLegacyModel=options.allowLegacyModel===true;
@@ -1279,14 +1287,41 @@ let agentCounter=0, nextAgentNumber=1;
 function syncNextAgentNumber(name){const m=/^Agent-(\d+)$/i.exec((name||'').trim());if(!m)return;const v=parseInt(m[1],10);if(Number.isFinite(v)&&v>=nextAgentNumber)nextAgentNumber=v+1;}
 function allocateAgentName(){const n=`Agent-${nextAgentNumber}`;nextAgentNumber++;return n;}
 function getAgentCount(){return document.querySelectorAll('#agents-list > div').length;}
+function setAgentSetupButtonDisabled(button,disabled){
+  if(!button)return;
+  button.disabled=disabled;
+  button.setAttribute('aria-disabled',disabled?'true':'false');
+  button.classList.toggle('opacity-40',disabled);
+  button.classList.toggle('cursor-not-allowed',disabled);
+}
+function renderAgentsLoadingState(mode='loading'){
+  const list=document.getElementById('agents-list');
+  const state=document.getElementById('agents-loading-state');
+  if(!list||!state)return;
+  const ready=mode==='ready';
+  list.classList.toggle('hidden',!ready);
+  state.classList.toggle('hidden',ready);
+  if(ready)return;
+  if(mode==='loading'){
+    state.innerHTML='<div class="flex items-center justify-center gap-2 text-slate-400"><span class="thinking-dot h-2 w-2 rounded-full bg-slate-500"></span><span class="thinking-dot h-2 w-2 rounded-full bg-slate-500"></span><span class="thinking-dot h-2 w-2 rounded-full bg-slate-500"></span></div>';
+    return;
+  }
+  state.innerHTML='<div class="py-3 text-center text-sm text-slate-500">Runtime targets unavailable.</div>';
+}
+function ensureStarterAgents(){
+  if(starterAgentsInitialized||getAgentCount()>0)return;
+  addAgent('Agent-1','claude','',['orchestrator'],null,{expandOnCreate:false,preferAvailableProvider:true});
+  addAgent('Agent-2','codex','',['coder'],null,{expandOnCreate:false,preferAvailableProvider:true});
+  starterAgentsInitialized=true;
+}
 function updateAgentButtons(){
   const addBtn=document.getElementById('add-agent-btn');
-  if(!addBtn)return;
+  const presetBtn=document.getElementById('preset-agents-btn');
+  if(!addBtn||!presetBtn)return;
+  const ready=providerOptionsReady&&!providerOptionsLoading;
   const capped=getAgentCount()>=MAX_AGENT_COUNT;
-  addBtn.disabled=capped;
-  addBtn.setAttribute('aria-disabled',capped?'true':'false');
-  addBtn.classList.toggle('opacity-40',capped);
-  addBtn.classList.toggle('cursor-not-allowed',capped);
+  setAgentSetupButtonDisabled(addBtn,!ready||capped);
+  setAgentSetupButtonDisabled(presetBtn,!ready);
 }
 function getProviderAdvancedCatalog(provider){return PROVIDER_ADVANCED_CATALOGS[provider]||null;}
 function listAgentCatalogEntries(catalog){
@@ -1681,6 +1716,10 @@ function syncOrchestratorLocks(){
 }
 
 function addAgent(name='',provider='claude',model='',tags=[],modelSelection=null,options={}) {
+  if((providerOptionsLoading||!providerOptionsReady)&&!options.allowBeforeProviderReady){
+    updateAgentButtons();
+    return null;
+  }
   if(!options.allowOverflow&&getAgentCount()>=MAX_AGENT_COUNT){updateAgentButtons();return null;}
   const normalizedState=normalizeAgentSelectionState(provider,model,modelSelection,{
     allowLegacyModel:false,
@@ -1753,6 +1792,10 @@ function removeAgent(id){
   validateStartChat();
 }
 function applyAgentPreset(preset){
+  if(providerOptionsLoading||!providerOptionsReady){
+    updateAgentButtons();
+    return;
+  }
   const list=document.getElementById('agents-list');
   list.innerHTML='';
   agentCounter=0;
@@ -1921,6 +1964,8 @@ async function loadProviderOptions() {
   const requestId=++providerOptionsRequestId;
   providerOptionsLoading=true;
   providerOptionsReady=false;
+  renderAgentsLoadingState('loading');
+  updateAgentButtons();
   validateStartChat();
   let loaded=false;
   try {
@@ -1936,9 +1981,7 @@ async function loadProviderOptions() {
         return instances.length>0;
       })
       .map(([name])=>name);
-    SELECTABLE_PROVIDERS=configuredProviders.length
-      ? PROVIDERS.filter(name=>configuredProviders.includes(name))
-      : [...PROVIDERS];
+    SELECTABLE_PROVIDERS=PROVIDERS.filter(name=>configuredProviders.includes(name));
     Object.keys(PROVIDER_ADVANCED_CATALOGS).forEach(name=>{
       if(!configuredProviders.includes(name)) delete PROVIDER_ADVANCED_CATALOGS[name];
     });
@@ -2011,13 +2054,23 @@ async function loadProviderOptions() {
         }
       } catch {}
     }
-    refreshAllAgentModelFields({ allowLegacyModel:false,preserveRequestedProvider:true });
-    loaded=true;
+    loaded=SELECTABLE_PROVIDERS.length>0;
+    if(loaded&&requestId===providerOptionsRequestId){
+      providerOptionsLoading=false;
+      providerOptionsReady=true;
+      ensureStarterAgents();
+      refreshAllAgentModelFields({ allowLegacyModel:false,preserveRequestedProvider:true });
+      renderAgentsLoadingState('ready');
+      updateAgentButtons();
+      validateStartChat();
+    }
   } catch {}
   finally {
     if(requestId===providerOptionsRequestId){
       providerOptionsLoading=false;
       providerOptionsReady=loaded;
+      renderAgentsLoadingState(loaded?'ready':'unavailable');
+      updateAgentButtons();
       validateStartChat();
     }
   }
@@ -2060,8 +2113,8 @@ async function initApp() {
     syncChatInputDefaultPrompt();
   });
   updateRuntimeAuthState();
-  addAgent('Agent-1','claude','',['orchestrator'],null,{expandOnCreate:false,preferAvailableProvider:true});
-  addAgent('Agent-2','codex','',['coder'],null,{expandOnCreate:false,preferAvailableProvider:true});
+  renderAgentsLoadingState('loading');
+  updateAgentButtons();
   void loadProviderOptions();
   syncChatInputDefaultPrompt(true);
 }
