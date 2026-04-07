@@ -366,8 +366,15 @@ describe('runtime server', () => {
       expect(html).toContain("{ name:'Agent-1', provider:'gemini', model:getDefaultModel('gemini'), tags:['orchestrator'] },");
       expect(html).toContain("{ name:'Agent-2', provider:'cursor', model:getDefaultModel('cursor'), tags:['pm'] },");
       expect(html).toContain("{ name:'Agent-12', provider:'openclaw', model:getDefaultModel('openclaw'), tags:['marketer'] },");
-      expect(html).toContain("addAgent('Agent-1','claude','',['orchestrator'],null,{expandOnCreate:false});");
-      expect(html).toContain("addAgent('Agent-2','codex','',['coder'],null,{expandOnCreate:false});");
+      expect(html).toContain('id="agents-loading-state"');
+      expect(html).toContain('function ensureStarterAgents(){');
+      expect(html).toContain(
+        "addAgent('Agent-1','claude','',['orchestrator'],null,{expandOnCreate:false,preferAvailableProvider:true});",
+      );
+      expect(html).toContain(
+        "addAgent('Agent-2','codex','',['coder'],null,{expandOnCreate:false,preferAvailableProvider:true});",
+      );
+      expect(html).toContain('providerOptionsReady&&!providerOptionsLoading');
       expect(html).toContain('.agent-tag-chip {');
       expect(html).toContain('.agent-tag-toggle input[value="orchestrator"]:checked + .agent-tag-chip {');
       expect(html).toContain('.agent-card-toggle {');
