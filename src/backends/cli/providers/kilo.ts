@@ -12,6 +12,8 @@ import type {
   TextStreamEvent,
   ToolUseStreamEvent,
 } from '../../../core/types.js';
+import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
+import { observeNormalized } from '../../../core/compatibility/providerEvolution.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 
 const REQUEST_POLL_INTERVAL_MS = 250;
@@ -21,7 +23,10 @@ export class KiloProvider implements Provider {
   ephemeral = true;
   capabilities: ProviderCapabilities = { resume: true, fork: false, permissions: true };
 
-  constructor(private readonly native: KiloNativeSessionService) {}
+  constructor(
+    private readonly native: KiloNativeSessionService,
+    private readonly evolutionObserver?: ProviderEvolutionEvidenceObserver,
+  ) {}
 
   buildSpawnArgs(_opts: ProviderSpawnOptions): string[] {
     return [];
@@ -67,25 +72,59 @@ export class KiloProvider implements Provider {
       });
 
       for (const toolUse of result.toolUses) {
-        yield {
+        yield observeNormalized(this.evolutionObserver, {
+          rawEventType: 'native_prompt_result',
+          details: {
+            provider: 'kilo',
+            event: 'tool_use',
+          },
+          rawSample: {
+            sessionId: result.sessionId,
+            messageId: result.messageId,
+            toolUse,
+          },
+        }, {
           type: 'tool_use',
           toolId: toolUse.toolId,
           toolName: toolUse.toolName,
-        } satisfies ToolUseStreamEvent;
+        } satisfies ToolUseStreamEvent);
       }
 
       if (result.text) {
-        yield {
+        yield observeNormalized(this.evolutionObserver, {
+          rawEventType: 'native_prompt_result',
+          details: {
+            provider: 'kilo',
+            event: 'text',
+          },
+          rawSample: {
+            sessionId: result.sessionId,
+            messageId: result.messageId,
+            text: result.text,
+          },
+        }, {
           type: 'text',
           text: result.text,
-        } satisfies TextStreamEvent;
+        } satisfies TextStreamEvent);
       }
 
-      yield {
+      yield observeNormalized(this.evolutionObserver, {
+        rawEventType: 'native_prompt_result',
+        details: {
+          provider: 'kilo',
+          event: 'result',
+        },
+        rawSample: {
+          sessionId: result.sessionId,
+          messageId: result.messageId,
+          usage: result.usage,
+          toolUseCount: result.toolUses.length,
+        },
+      }, {
         type: 'result',
         sessionId: result.sessionId,
         usage: result.usage,
-      } satisfies ResultStreamEvent;
+      } satisfies ResultStreamEvent);
     } finally {
       automationRunning = false;
       automationController.abort();

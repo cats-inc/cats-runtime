@@ -1259,6 +1259,8 @@ always-on self-adapting parser system.
   - `claude`
   - `junie`
   - `auggie`
+  - `kilo`
+  - `opencode`
 - `cats-runtime --probe-provider-evolution --probe-provider <provider>` now
   runs a bounded manual-first probe without starting the HTTP server
 - probe artifacts now include:

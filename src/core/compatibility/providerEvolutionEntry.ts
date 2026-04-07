@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AuggieSessionService } from '../../backends/cli/auggie/AuggieSessionService.js';
 import { GooseNativeSessionService } from '../../backends/cli/goose/GooseNativeSessionService.js';
+import { KiloNativeSessionService } from '../../backends/cli/kilo/KiloNativeSessionService.js';
+import { OpencodeNativeSessionService } from '../../backends/cli/opencode/OpencodeNativeSessionService.js';
 import {
   getProviderDefaultInstanceId,
   resolveProviderInstance,
@@ -11,7 +13,11 @@ import {
   type RuntimeMode,
   type RemoteProviderInstanceConfig,
 } from '../../backends/cli/config.js';
-import type { Provider, ProviderName } from '../../backends/cli/providers/types.js';
+import type {
+  Provider,
+  ProviderName,
+  ProviderSpawnOptions,
+} from '../../backends/cli/providers/types.js';
 import { buildAgentAdapter } from '../../backends/agent/adapters/registry.js';
 import type { AgentAdapter } from '../../backends/agent/types.js';
 import { observeNormalized } from './providerEvolution.js';
@@ -23,6 +29,8 @@ import { AuggieProvider } from '../../backends/cli/providers/auggie.js';
 import { GeminiProvider } from '../../backends/cli/providers/gemini.js';
 import { GooseProvider } from '../../backends/cli/providers/goose.js';
 import { JunieProvider } from '../../backends/cli/providers/junie.js';
+import { KiloProvider } from '../../backends/cli/providers/kilo.js';
+import { OpencodeProvider } from '../../backends/cli/providers/opencode.js';
 import { PiProvider } from '../../backends/cli/providers/pi.js';
 import { WorkerProcess } from '../../backends/cli/pool/WorkerProcess.js';
 import {
@@ -62,6 +70,8 @@ const SUPPORTED_CLI_PROBE_PROVIDERS = new Set<ProviderName>([
   'gemini',
   'claude',
   'junie',
+  'kilo',
+  'opencode',
 ]);
 
 export interface ProviderEvolutionEntryContext {
@@ -311,6 +321,12 @@ interface RunCliProbeProfileOptions {
   };
 }
 
+interface CliProbeProviderHandle {
+  provider: Provider;
+  prepareSpawnOptions?: (workspaceRoot: string) => Promise<Partial<ProviderSpawnOptions>>;
+  dispose?: (workspaceRoot: string) => Promise<void>;
+}
+
 async function runCliProbeProfile(
   options: RunCliProbeProfileOptions,
 ): Promise<{
@@ -320,7 +336,7 @@ async function runCliProbeProfile(
   error?: string;
 }> {
   const instance = resolveProviderInstance(options.config, options.providerName, options.instanceId);
-  const provider = createProbeProvider(
+  const providerHandle = createProbeProvider(
     options.config,
     instance,
     options.providerName,
@@ -328,13 +344,17 @@ async function runCliProbeProfile(
     options.observer,
   );
   const workspaceRoot = await mkdtemp(join(tmpdir(), 'cats-runtime-provider-evolution-'));
+  const spawnOverrides = providerHandle.prepareSpawnOptions
+    ? await providerHandle.prepareSpawnOptions(workspaceRoot)
+    : {};
   const worker = new WorkerProcess(
-    provider,
+    providerHandle.provider,
     {
       cwd: workspaceRoot,
       permissionMode: 'skip',
       workspaceMode: 'shared',
       ...(options.model ? { model: options.model } : {}),
+      ...spawnOverrides,
     },
     instance.commandConfig,
     {
@@ -356,7 +376,7 @@ async function runCliProbeProfile(
       'utf8',
     );
 
-    if (!provider.ephemeral) {
+    if (!providerHandle.provider.ephemeral) {
       worker.start();
     }
 
@@ -383,6 +403,7 @@ async function runCliProbeProfile(
     };
   } finally {
     worker.kill();
+    await providerHandle.dispose?.(workspaceRoot);
     await rm(workspaceRoot, { recursive: true, force: true });
   }
 }
@@ -472,38 +493,102 @@ function createProbeProvider(
   providerName: ProviderName,
   compatibilityProfile: RunCliProbeProfileOptions['compatibilityProfile'],
   observer: ProviderEvolutionEvidenceObserver,
-): Provider {
+): CliProbeProviderHandle {
   switch (providerName) {
     case 'auggie':
-      return new AuggieProvider(
-        new AuggieSessionService(instance.auggieSessionsDir || config.auggieSessionsDir),
-        config.auggieMaxTurns,
-        observer,
-      );
+      return {
+        provider: new AuggieProvider(
+          new AuggieSessionService(instance.auggieSessionsDir || config.auggieSessionsDir),
+          config.auggieMaxTurns,
+          observer,
+        ),
+      };
     case 'claude':
-      return new ClaudeProvider(compatibilityProfile, observer);
+      return { provider: new ClaudeProvider(compatibilityProfile, observer) };
     case 'codex':
-      return new CodexProvider(compatibilityProfile, observer);
+      return { provider: new CodexProvider(compatibilityProfile, observer) };
     case 'gemini':
-      return new GeminiProvider(compatibilityProfile, observer);
+      return { provider: new GeminiProvider(compatibilityProfile, observer) };
     case 'copilot':
-      return new CopilotProvider(compatibilityProfile, observer);
+      return { provider: new CopilotProvider(compatibilityProfile, observer) };
     case 'pi':
-      return new PiProvider({
-        instructionsFile: instance.piInstructionsFile,
-        evolutionObserver: observer,
-      });
+      return {
+        provider: new PiProvider({
+          instructionsFile: instance.piInstructionsFile,
+          evolutionObserver: observer,
+        }),
+      };
     case 'goose':
-      return new GooseProvider(
-        new GooseNativeSessionService({ command: instance.commandConfig.path }),
-        observer,
-      );
+      return {
+        provider: new GooseProvider(
+          new GooseNativeSessionService({ command: instance.commandConfig.path }),
+          observer,
+        ),
+      };
     case 'junie':
-      return new JunieProvider(
-        instance.commandConfig,
-        undefined,
-        observer,
-      );
+      return {
+        provider: new JunieProvider(
+          instance.commandConfig,
+          undefined,
+          observer,
+        ),
+      };
+    case 'kilo': {
+      const native = new KiloNativeSessionService({
+        command: instance.commandConfig.path,
+        commandConfig: instance.commandConfig,
+        hostname: instance.kiloServerHost || config.kiloServerHost,
+        port: instance.kiloServerPort || config.kiloServerPort,
+        startupTimeoutMs: instance.kiloServerStartupTimeoutMs || config.kiloServerStartupTimeoutMs,
+      });
+      let probeSessionId: string | undefined;
+      return {
+        provider: new KiloProvider(native, observer),
+        async prepareSpawnOptions(workspaceRoot: string) {
+          const session = await native.createSession(workspaceRoot, {
+            title: 'Provider evolution probe',
+          });
+          probeSessionId = session.providerSessionId;
+          return {
+            resumeSessionId: session.providerSessionId,
+          };
+        },
+        async dispose(workspaceRoot: string) {
+          if (probeSessionId) {
+            await native.deleteSession(workspaceRoot, probeSessionId).catch(() => {});
+          }
+          await native.close().catch(() => {});
+        },
+      };
+    }
+    case 'opencode': {
+      const native = new OpencodeNativeSessionService({
+        command: instance.commandConfig.path,
+        commandConfig: instance.commandConfig,
+        hostname: instance.opencodeServerHost || config.opencodeServerHost,
+        port: instance.opencodeServerPort || config.opencodeServerPort,
+        startupTimeoutMs: instance.opencodeServerStartupTimeoutMs || config.opencodeServerStartupTimeoutMs,
+      });
+      let probeSessionId: string | undefined;
+      return {
+        provider: new OpencodeProvider(native, observer),
+        async prepareSpawnOptions(workspaceRoot: string) {
+          const session = await native.createSession(workspaceRoot, {
+            title: 'Provider evolution probe',
+          });
+          probeSessionId = session.providerSessionId;
+          return {
+            resumeSessionId: session.providerSessionId,
+          };
+        },
+        async dispose(workspaceRoot: string) {
+          if (probeSessionId) {
+            await native.deleteSession(workspaceRoot, probeSessionId).catch(() => {});
+          }
+          await native.close().catch(() => {});
+        },
+      };
+    }
     default:
       throw new Error(`Unsupported provider evolution probe target '${providerName}'`);
   }
