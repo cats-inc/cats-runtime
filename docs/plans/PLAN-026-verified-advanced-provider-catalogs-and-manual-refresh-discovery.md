@@ -8,7 +8,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Safety, Cache-First Reads, Entry-Scoped Controls, and Setup Refresh UX Landed) |
+| **Status** | In Progress (Safety, Cache-First Reads, Verified Baseline, Checklist, and Setup Refresh UX Landed) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User |
@@ -118,7 +118,7 @@ setup becomes the honest inspection/refresh surface.
 
 ### Phase 5: Verified Provider Onboarding
 
-- [ ] Create an evidence-backed onboarding checklist for provider manifests.
+- [x] Create an evidence-backed onboarding checklist for provider manifests.
 - [x] Ship the first verified manifests for the highest-value targets.
 - [x] Keep all remaining providers in conservative entry-only mode until their
       manifests and tests exist.
@@ -189,6 +189,7 @@ audits.
 | 2026-04-07 | Phase 3 setup-surface follow-through landed: `provider-setup` now exposes per-target model-catalog freshness on the runtime-target inspection view, including stale/persisted/backoff hints, metering-derived cooldown warnings, bounded catalog-warning surfacing, and an explicit per-target `refresh=1` button that updates runtime-owned catalog truth without moving that workflow back into the dashboard read path. |
 | 2026-04-07 | Follow-on setup truthfulness slice landed: the same runtime-target inspection view now also reuses `GET /diagnostics/providers` for filtered provider availability truth (`ok` / `degraded` / `unavailable` plus attention codes), so setup/repair surfaces no longer rely on model-catalog metadata alone when deciding how healthy a target currently is. |
 | 2026-04-07 | Follow-on setup operator slice landed: `provider-setup` now also exposes a per-target `POST /diagnostics/providers/reprobe` action through the runtime-target inspection view, so operators can refresh availability truth for one selected target without leaving the setup surface or overloading ordinary dashboard reads. |
+| 2026-04-07 | Phase 5 checklist follow-through landed: `docs/research/2026-04-07-advanced-provider-manifest-onboarding-checklist.md` now defines the explicit target-boundary, evidence, runtime-wiring, regression, and doc-sync gates required before promoting any additional target from conservative entry-only catalogs to `verified_manifest`. |
 
 ---
 
