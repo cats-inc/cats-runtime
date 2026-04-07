@@ -1219,6 +1219,7 @@ let observeSource = null;
 let observeFullText = '';
 let observeAssistantEl = null;
 let providerCatalog = null;
+const PROVIDER_AVAILABILITY = {};
 let discoveryStatusPayload = null;
 const providerAdvancedCatalogCache = new Map();
 const providerAdvancedCatalogInFlight = new Map();
@@ -1345,7 +1346,10 @@ function configuredProviderNames() {
   const extras = Object.keys(providerCatalog.providers)
     .filter((providerName) => !PROVIDER_ORDER.includes(providerName))
     .sort((left, right) => left.localeCompare(right));
-  return [...ordered, ...extras];
+  const configured = [...ordered, ...extras];
+  return window.CatsUI?.listSelectablePlaygroundProviders
+    ? window.CatsUI.listSelectablePlaygroundProviders(configured, PROVIDER_ORDER, PROVIDER_AVAILABILITY)
+    : configured;
 }
 
 function configuredProviderNamesRaw() {
@@ -1354,6 +1358,26 @@ function configuredProviderNamesRaw() {
   return Object.keys(providerCatalog.providers).filter(
     (providerName) => (providerCatalog.providers[providerName]?.instances?.length || 0) > 0,
   );
+}
+
+function getProviderAvailabilityStatus(providerName) {
+  const status = typeof PROVIDER_AVAILABILITY[providerName] === 'string'
+    ? PROVIDER_AVAILABILITY[providerName].toLowerCase()
+    : '';
+  return status || 'unknown';
+}
+
+function formatProviderAvailabilityLabel(providerName) {
+  const status = getProviderAvailabilityStatus(providerName);
+  if (status === 'ok') return 'Available';
+  if (status === 'degraded') return 'Needs attention';
+  if (status === 'unavailable') return 'Unavailable';
+  return '';
+}
+
+function formatProviderSelectLabel(providerName) {
+  const availability = formatProviderAvailabilityLabel(providerName);
+  return availability ? `${providerName} · ${availability}` : providerName;
 }
 
 function rawInstanceTargetValue(instance) {
@@ -2392,7 +2416,7 @@ function syncProviderSelect() {
   }
 
   const current = providerSelect.value || 'claude';
-  const providers = configuredProviderNamesRaw();
+  const providers = configuredProviderNames();
 
   if (providers.length === 0) {
     providerSelect.innerHTML = '<option value="">No configured providers</option>';
@@ -2403,7 +2427,7 @@ function syncProviderSelect() {
   }
 
   providerSelect.innerHTML = providers
-    .map((providerName) => `<option value="${providerName}">${providerName}</option>`)
+    .map((providerName) => `<option value="${providerName}">${escapeHtml(formatProviderSelectLabel(providerName))}</option>`)
     .join('');
   providerSelect.disabled = false;
   providerSelect.value = providers.includes(current)
@@ -2452,13 +2476,36 @@ function onInstanceChange() {
 
 async function refreshProviderCatalog() {
   try {
+    const diagnosticsTask = fetch(
+      `${API_BASE}/diagnostics/providers?defaultOnly=true`,
+      { headers: headers() },
+    )
+      .then(async (response) => {
+        if (!response.ok) {
+          return null;
+        }
+        return response.json();
+      })
+      .catch(() => null);
     const res = await fetch(`${API_BASE}/providers/config`, { headers: headers() });
     if (!res.ok) {
       return false;
     }
 
     const data = await res.json();
+    const diagnostics = await diagnosticsTask;
     providerCatalog = data;
+    Object.keys(PROVIDER_AVAILABILITY).forEach((providerName) => delete PROVIDER_AVAILABILITY[providerName]);
+    const providers = Array.isArray(diagnostics?.providers) ? diagnostics.providers : [];
+    providers.forEach((entry) => {
+      const providerName = typeof entry?.provider === 'string' ? entry.provider : '';
+      const status = typeof entry?.availability?.status === 'string'
+        ? entry.availability.status.toLowerCase()
+        : '';
+      if (providerName && status) {
+        PROVIDER_AVAILABILITY[providerName] = status;
+      }
+    });
     syncProviderSelect();
     onProviderChange();
     renderDiscoveryStatus(discoveryStatusPayload);
