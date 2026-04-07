@@ -28,6 +28,29 @@ describe('runtime execution strategy state helpers', () => {
     expect(normalized?.strategyContext).not.toBe(rawStrategyContext);
   });
 
+  it('canonicalizes common strategy aliases onto shipped runtime ids', () => {
+    expect(normalizeRuntimeExecutionStrategyRequest({
+      requestedStrategy: ' ToT ' as 'tree_of_thoughts',
+    })).toEqual({
+      requestedStrategy: 'tree_of_thoughts',
+    });
+    expect(normalizeRuntimeExecutionStrategyRequest({
+      requestedStrategy: 'plan-execute' as 'plan_execute',
+    })).toEqual({
+      requestedStrategy: 'plan_execute',
+    });
+    expect(normalizeRuntimeExecutionStrategyRequest({
+      requestedStrategy: 'reflection' as 'reflexion',
+    })).toEqual({
+      requestedStrategy: 'reflexion',
+    });
+    expect(normalizeRuntimeExecutionStrategyRequest({
+      requestedStrategy: 'DEPS' as 'deps',
+    })).toEqual({
+      requestedStrategy: 'deps',
+    });
+  });
+
   it('merges persisted request metadata into the session patch and remembers runtime preference', () => {
     const existing: RuntimeExecutionStrategyState = {
       preferredStrategy: 'simple_tool_call',

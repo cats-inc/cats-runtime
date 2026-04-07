@@ -29,6 +29,7 @@ export type RuntimeExecutionStrategyId =
   | 'react'
   | 'plan_execute'
   | 'pdca'
+  | 'deps'
   | 'reflexion'
   | 'tree_of_thoughts'
   | (string & {});

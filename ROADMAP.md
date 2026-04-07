@@ -927,6 +927,9 @@ already exists.
 - explicit `tree_of_thoughts` requests now execute through a bounded
   runtime-owned branch/evaluate/prune/select loop with additive branch events
   and strategy-local branch state
+- common strategy-hint aliases such as `ToT`, `plan-execute`, `reflection`,
+  and uppercase `DEPS` now normalize onto the shipped runtime strategy ids
+  before unsupported-strategy fallback is considered
 - runtime session state owns strategy-local summaries; product task records stay
   outside the runtime boundary
 - `GET /diagnostics/runtime`, `GET /diagnostics/health`, and

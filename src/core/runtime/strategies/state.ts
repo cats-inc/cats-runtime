@@ -6,6 +6,24 @@ import type {
 } from '../../types.js';
 import type { RuntimeExecutionStrategyResolution } from './resolution.js';
 
+const STRATEGY_ID_ALIASES = new Map<string, RuntimeExecutionStrategyId>([
+  ['simple_tool_call', 'simple_tool_call'],
+  ['simpletoolcall', 'simple_tool_call'],
+  ['compatibility', 'simple_tool_call'],
+  ['react', 'react'],
+  ['re_act', 'react'],
+  ['reason_act', 'react'],
+  ['plan_execute', 'plan_execute'],
+  ['planexecute', 'plan_execute'],
+  ['pdca', 'pdca'],
+  ['deps', 'deps'],
+  ['reflexion', 'reflexion'],
+  ['reflection', 'reflexion'],
+  ['tree_of_thoughts', 'tree_of_thoughts'],
+  ['treeofthoughts', 'tree_of_thoughts'],
+  ['tot', 'tree_of_thoughts'],
+]);
+
 export interface RuntimeExecutionStrategySessionStateLike {
   strategy?: RuntimeExecutionStrategyState;
   requestedStrategy?: RuntimeExecutionStrategyId;
@@ -229,7 +247,15 @@ function normalizeNonEmptyString(value: string | undefined): string | undefined 
 function normalizeStrategyId(
   value: RuntimeExecutionStrategyId | undefined,
 ): RuntimeExecutionStrategyId | undefined {
-  return normalizeNonEmptyString(value) as RuntimeExecutionStrategyId | undefined;
+  const normalized = normalizeNonEmptyString(value);
+  if (!normalized) {
+    return undefined;
+  }
+
+  const aliasKey = normalized
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+  return STRATEGY_ID_ALIASES.get(aliasKey) ?? normalized as RuntimeExecutionStrategyId;
 }
 
 function cloneRecord(

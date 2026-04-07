@@ -1170,7 +1170,7 @@ describe('ApiBackendManager', () => {
       const runtime = createRuntimeManager(root, manager);
       const turn = {
         message: 'Inspect answer.txt and return only the verified value.',
-        requestedStrategy: 'tree_of_thoughts' as const,
+        requestedStrategy: 'ToT' as const,
         acceptanceCriteria: 'Return only the verified file value.',
         strategyContext: {
           maxDepth: 3,

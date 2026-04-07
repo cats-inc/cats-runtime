@@ -219,6 +219,7 @@ substrate.
 | 2026-03-26 | The next follow-through slice is landed and verified; `tree_of_thoughts` now runs as a bounded runtime-owned branch/evaluate/prune/select loop with additive branch events and strategy-local state |
 | 2026-03-26 | The next follow-through slice is landed and verified; `plan_execute` now runs as a bounded runtime-owned plan/execute/evaluate loop with additive phase events, stuck detection, and strategy-local plan-progress state |
 | 2026-03-27 | A later-family follow-through slice landed and verified after the core plan completed; `deps` now runs as a bounded runtime-owned describe/explain/plan/select loop with additive phase/replan events, explicit strategy-local state, and the same runtime-hosted strategy catalog/inspection surfaces as the earlier families |
+| 2026-04-07 | Strategy-hint normalization follow-through landed: runtime-owned request parsing now canonicalizes common aliases such as `ToT`, `plan-execute`, `reflection`, and uppercase `DEPS` onto the shipped strategy ids before compatibility fallback, and API manager coverage now locks that normalization through a `tree_of_thoughts` execution path rather than leaving product/task hints sensitive to spelling variants |
 
 ---
 
