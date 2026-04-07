@@ -407,6 +407,9 @@ const PROVIDER_ADVANCED_CATALOGS = {};
 const PROVIDERS = ['claude','codex','gemini','cursor','copilot','opencode','kilo','goose','pi','auggie','junie','kiro','ollama','openclaw'];
 const PROVIDER_AVAILABILITY = {};
 let SELECTABLE_PROVIDERS = [...PROVIDERS];
+let providerOptionsReady = false;
+let providerOptionsLoading = false;
+let providerOptionsRequestId = 0;
 function getDefaultModel(p) { return (PROVIDER_MODELS[p]||[])[0]?.value || ''; }
 function getProviderAvailabilityStatus(provider){
   const status=typeof PROVIDER_AVAILABILITY[provider]==='string'?PROVIDER_AVAILABILITY[provider].toLowerCase():'';
@@ -1773,7 +1776,7 @@ function confirmApplyTwelveAgentPreset(){
 function applyTwelveAgentPreset(){applyAgentPreset(TWELVE_AGENT_PRESET);}
 function hasSupportingRole(agents){return agents.some(agent=>agent.tags.some(tag=>tag!=='orchestrator'));}
 function getSelectedAgents(){return getAgents().filter(agent=>agent.tags.length>0);}
-function validateStartChat(){const a=getSelectedAgents();const oc=a.filter(x=>x.tags.includes('orchestrator')).length;const v=oc===1&&hasSupportingRole(a);const b=document.getElementById('btn-start-chat');b.disabled=!v;b.classList.toggle('opacity-40',!v);b.classList.toggle('cursor-not-allowed',!v);}
+function validateStartChat(){const a=getSelectedAgents();const oc=a.filter(x=>x.tags.includes('orchestrator')).length;const v=providerOptionsReady&&!providerOptionsLoading&&oc===1&&hasSupportingRole(a);const b=document.getElementById('btn-start-chat');b.disabled=!v;b.classList.toggle('opacity-40',!v);b.classList.toggle('cursor-not-allowed',!v);}
 function resetStartButton(){const b=document.getElementById('btn-start-chat');b.textContent='Start Chat';validateStartChat();}
 function getAgents(){return[...document.querySelectorAll('#agents-list > div')].map(div=>{const tags=[...div.querySelectorAll('.agent-tags input:checked')].map(cb=>cb.value);const modelState=readAgentModelState(div);return{name:div.querySelector('.agent-name').value.trim(),provider:div.querySelector('.agent-provider').value,model:modelState.model,modelSelection:modelState.modelSelection,tags};}).filter(a=>a.name);}
 
@@ -1915,6 +1918,11 @@ function closePromptsModal(){document.getElementById('promptsModal').classList.a
 // Provider options (fetch from cats-runtime)
 // ============================================================
 async function loadProviderOptions() {
+  const requestId=++providerOptionsRequestId;
+  providerOptionsLoading=true;
+  providerOptionsReady=false;
+  validateStartChat();
+  let loaded=false;
   try {
     const headers = getRuntimeAuthHeaders();
     const res = await fetch('/providers/config', { headers });
@@ -2004,7 +2012,15 @@ async function loadProviderOptions() {
       } catch {}
     }
     refreshAllAgentModelFields({ allowLegacyModel:false,preserveRequestedProvider:true });
+    loaded=true;
   } catch {}
+  finally {
+    if(requestId===providerOptionsRequestId){
+      providerOptionsLoading=false;
+      providerOptionsReady=loaded;
+      validateStartChat();
+    }
+  }
 }
 
 // ============================================================
