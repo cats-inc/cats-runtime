@@ -1961,40 +1961,29 @@ async function loadProviderOptions() {
   let loaded=false;
   try {
     const headers = getRuntimeAuthHeaders();
-    const res = await fetch('/providers/config', { headers });
-    if (!res.ok) return;
-    const data = await res.json();
-    const providers = data.providers || {};
-    const configuredProviders=Object.entries(providers)
-      .filter(([name, meta])=>{
-        if(!PROVIDERS.includes(name)) return false;
-        const instances=Array.isArray(meta?.instances) ? meta.instances : [];
-        return instances.length>0;
+    const providerState = window.CatsUI?.readRuntimeProviderCatalogState
+      ? await window.CatsUI.readRuntimeProviderCatalogState({
+        headers,
+        allowedProviders: PROVIDERS,
       })
-      .map(([name])=>name);
-    SELECTABLE_PROVIDERS=PROVIDERS.filter(name=>configuredProviders.includes(name));
+      : null;
+    if (!providerState) return;
+    const providers = providerState.providerCatalog?.providers || {};
+    const configuredProviders = Array.isArray(providerState.configuredProviders)
+      ? providerState.configuredProviders
+      : [];
+    SELECTABLE_PROVIDERS = configuredProviders.slice();
     Object.keys(PROVIDER_ADVANCED_CATALOGS).forEach(name=>{
       if(!configuredProviders.includes(name)) delete PROVIDER_ADVANCED_CATALOGS[name];
     });
-    Object.keys(PROVIDER_AVAILABILITY).forEach(name=>{
-      if(!configuredProviders.includes(name)) delete PROVIDER_AVAILABILITY[name];
-    });
-    try {
-      const diagnosticsRes = await fetch('/diagnostics/providers?defaultOnly=true', { headers });
-      if (diagnosticsRes.ok) {
-        const diagnosticsData = await diagnosticsRes.json();
-        Object.keys(PROVIDER_AVAILABILITY).forEach(name=>delete PROVIDER_AVAILABILITY[name]);
-        const providerDiagnostics=Array.isArray(diagnosticsData?.providers)?diagnosticsData.providers:[];
-        providerDiagnostics.forEach(entry=>{
-          const providerName=typeof entry?.provider==='string'?entry.provider:'';
-          const status=typeof entry?.availability?.status==='string'?entry.availability.status.toLowerCase():'';
-          if(providerName&&status){
-            PROVIDER_AVAILABILITY[providerName]=status;
-          }
-        });
+    Object.keys(PROVIDER_AVAILABILITY).forEach(name=>delete PROVIDER_AVAILABILITY[name]);
+    Object.entries(providerState.providerAvailability || {}).forEach(([providerName, status]) => {
+      if (providerName && typeof status === 'string' && status) {
+        PROVIDER_AVAILABILITY[providerName] = status;
       }
-    } catch {}
-    for (const [name] of Object.entries(providers)) {
+    });
+    for (const name of configuredProviders) {
+      if (!providers[name]) continue;
       if (!PROVIDER_MODELS[name]) continue;
       try {
         const advancedRes = await fetch(`/providers/${name}/models/advanced`, { headers });

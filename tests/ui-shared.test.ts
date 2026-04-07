@@ -6,7 +6,7 @@ import {
   SHARED_UI_SCRIPT,
 } from '../src/http/ui/shared.js';
 
-function loadCatsUiHelpers() {
+function loadCatsUiHelpers(fetchImpl = () => Promise.reject(new Error('fetch not available in unit test'))) {
   const document = {
     readyState: 'loading',
     getElementById: () => null,
@@ -35,7 +35,7 @@ function loadCatsUiHelpers() {
       addEventListener: () => {},
     },
     document,
-    fetch: () => Promise.reject(new Error('fetch not available in unit test')),
+    fetch: fetchImpl,
     queueMicrotask: () => {},
     Element: class {},
     Node: class {},
@@ -151,6 +151,7 @@ describe('shared UI script', () => {
     expect(SHARED_UI_SCRIPT).toContain('normalizeAdvancedCatalog');
     expect(SHARED_UI_SCRIPT).toContain('getAdvancedCatalogChoices');
     expect(SHARED_UI_SCRIPT).toContain('resolveAdvancedCatalogChoice');
+    expect(SHARED_UI_SCRIPT).toContain('readRuntimeProviderCatalogState');
     expect(SHARED_UI_SCRIPT).toContain('normalizePlaygroundAgentSelection');
   });
 
@@ -214,7 +215,7 @@ describe('shared UI script', () => {
       model: 'gpt-custom-preview',
       selectableProviders: ['codex'],
       providerOrder: ['codex'],
-      advancedCatalogs: createAdvancedCatalogs(),
+      advancedCatalogs: {},
       allowLegacyModel: true,
     });
 
@@ -222,6 +223,57 @@ describe('shared UI script', () => {
       provider: 'codex',
       model: 'gpt-custom-preview',
       modelSelection: null,
+    });
+  });
+
+  it('loads configured provider topology and availability from the shared runtime read seam', async () => {
+    const catsUi = loadCatsUiHelpers(async (path: string) => {
+      if (path === '/diagnostics/providers?defaultOnly=true') {
+        return {
+          ok: true,
+          json: async () => ({
+            providers: [
+              { provider: 'claude', availability: { status: 'ok' } },
+              { provider: 'codex', availability: { status: 'degraded' } },
+              { provider: 'junie', availability: { status: 'unavailable' } },
+            ],
+          }),
+        };
+      }
+
+      if (path === '/providers/config') {
+        return {
+          ok: true,
+          json: async () => ({
+            providers: {
+              claude: { instances: [{ id: 'default' }] },
+              codex: { instances: [{ id: 'default' }] },
+              junie: { instances: [] },
+            },
+          }),
+        };
+      }
+
+      throw new Error(`unexpected fetch path: ${path}`);
+    });
+
+    const result = await catsUi.readRuntimeProviderCatalogState({
+      allowedProviders: ['claude', 'codex'],
+    });
+
+    expect(result).toEqual({
+      providerCatalog: {
+        providers: {
+          claude: { instances: [{ id: 'default' }] },
+          codex: { instances: [{ id: 'default' }] },
+          junie: { instances: [] },
+        },
+      },
+      configuredProviders: ['claude', 'codex'],
+      providerAvailability: {
+        claude: 'ok',
+        codex: 'degraded',
+      },
     });
   });
 });

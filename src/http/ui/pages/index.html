@@ -2476,33 +2476,20 @@ function onInstanceChange() {
 
 async function refreshProviderCatalog() {
   try {
-    const diagnosticsTask = fetch(
-      `${API_BASE}/diagnostics/providers?defaultOnly=true`,
-      { headers: headers() },
-    )
-      .then(async (response) => {
-        if (!response.ok) {
-          return null;
-        }
-        return response.json();
+    const providerState = window.CatsUI?.readRuntimeProviderCatalogState
+      ? await window.CatsUI.readRuntimeProviderCatalogState({
+        apiBase: API_BASE,
+        headers: headers(),
       })
-      .catch(() => null);
-    const res = await fetch(`${API_BASE}/providers/config`, { headers: headers() });
-    if (!res.ok) {
+      : null;
+    if (!providerState) {
       return false;
     }
 
-    const data = await res.json();
-    const diagnostics = await diagnosticsTask;
-    providerCatalog = data;
+    providerCatalog = providerState.providerCatalog;
     Object.keys(PROVIDER_AVAILABILITY).forEach((providerName) => delete PROVIDER_AVAILABILITY[providerName]);
-    const providers = Array.isArray(diagnostics?.providers) ? diagnostics.providers : [];
-    providers.forEach((entry) => {
-      const providerName = typeof entry?.provider === 'string' ? entry.provider : '';
-      const status = typeof entry?.availability?.status === 'string'
-        ? entry.availability.status.toLowerCase()
-        : '';
-      if (providerName && status) {
+    Object.entries(providerState.providerAvailability || {}).forEach(([providerName, status]) => {
+      if (providerName && typeof status === 'string' && status) {
         PROVIDER_AVAILABILITY[providerName] = status;
       }
     });

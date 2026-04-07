@@ -544,6 +544,88 @@ export const SHARED_UI_SCRIPT = `
     return '';
   }
 
+  function listConfiguredRuntimeProviders(providerCatalog, allowedProviders) {
+    var providers = providerCatalog && providerCatalog.providers && typeof providerCatalog.providers === 'object'
+      ? providerCatalog.providers
+      : null;
+    if (!providers) return [];
+
+    var configured = [];
+    var seen = {};
+    var preferredOrder = Array.isArray(allowedProviders) ? allowedProviders : [];
+    for (var i = 0; i < preferredOrder.length; i++) {
+      var providerId = preferredOrder[i];
+      if (!providerId || seen[providerId]) continue;
+      var providerMeta = providers[providerId];
+      var instances = Array.isArray(providerMeta && providerMeta.instances) ? providerMeta.instances : [];
+      if (!instances.length) continue;
+      seen[providerId] = true;
+      configured.push(providerId);
+    }
+
+    var providerNames = Object.keys(providers);
+    for (var j = 0; j < providerNames.length; j++) {
+      var extraProviderId = providerNames[j];
+      if (!extraProviderId || seen[extraProviderId]) continue;
+      if (preferredOrder.length && preferredOrder.indexOf(extraProviderId) < 0) continue;
+      var extraMeta = providers[extraProviderId];
+      var extraInstances = Array.isArray(extraMeta && extraMeta.instances) ? extraMeta.instances : [];
+      if (!extraInstances.length) continue;
+      seen[extraProviderId] = true;
+      configured.push(extraProviderId);
+    }
+
+    return configured;
+  }
+
+  function normalizeRuntimeProviderAvailability(payload, allowedProviders) {
+    var availability = {};
+    var allowed = Array.isArray(allowedProviders) ? allowedProviders : null;
+    var providers = Array.isArray(payload && payload.providers) ? payload.providers : [];
+    for (var i = 0; i < providers.length; i++) {
+      var entry = providers[i];
+      var providerId = entry && typeof entry.provider === 'string' ? entry.provider : '';
+      if (!providerId) continue;
+      if (allowed && allowed.indexOf(providerId) < 0) continue;
+      var status = entry && entry.availability && typeof entry.availability.status === 'string'
+        ? entry.availability.status.trim().toLowerCase()
+        : '';
+      if (!status) continue;
+      availability[providerId] = status;
+    }
+    return availability;
+  }
+
+  async function readRuntimeProviderCatalogState(options) {
+    options = options && typeof options === 'object' ? options : {};
+    var apiBase = typeof options.apiBase === 'string' ? options.apiBase : '';
+    var allowedProviders = Array.isArray(options.allowedProviders) ? options.allowedProviders : null;
+    var requestHeaders = options.headers && typeof options.headers === 'object' ? options.headers : undefined;
+    var requestInit = requestHeaders ? { headers: requestHeaders } : undefined;
+    var diagnosticsTask = apiFetch(apiBase + '/diagnostics/providers?defaultOnly=true', requestInit)
+      .then(async function(response) {
+        if (!response.ok) {
+          return null;
+        }
+        return response.json();
+      })
+      .catch(function() {
+        return null;
+      });
+    var providerCatalogResponse = await apiFetch(apiBase + '/providers/config', requestInit);
+    if (!providerCatalogResponse.ok) {
+      return null;
+    }
+
+    var providerCatalog = await providerCatalogResponse.json();
+    var diagnostics = await diagnosticsTask;
+    return {
+      providerCatalog: providerCatalog,
+      configuredProviders: listConfiguredRuntimeProviders(providerCatalog, allowedProviders),
+      providerAvailability: normalizeRuntimeProviderAvailability(diagnostics, allowedProviders),
+    };
+  }
+
   function listSelectablePlaygroundProviders(selectableProviders, providerOrder, providerAvailability) {
     var available = Array.isArray(selectableProviders) ? selectableProviders : [];
     var preferredOrder = Array.isArray(providerOrder) ? providerOrder : [];
@@ -1289,6 +1371,8 @@ export const SHARED_UI_SCRIPT = `
     getAdvancedCatalogDefaultSelection: getAdvancedCatalogDefaultSelection,
     getAdvancedCatalogDefaultEntryId: getAdvancedCatalogDefaultEntryId,
     getAdvancedCatalogDefaultPresetId: getAdvancedCatalogDefaultPresetId,
+    listConfiguredRuntimeProviders: listConfiguredRuntimeProviders,
+    readRuntimeProviderCatalogState: readRuntimeProviderCatalogState,
     listSelectablePlaygroundProviders: listSelectablePlaygroundProviders,
     normalizePlaygroundAgentSelection: normalizePlaygroundAgentSelection,
     resolveAdvancedCatalogChoice: resolveAdvancedCatalogChoice,
