@@ -175,6 +175,9 @@ bundle structure.
       `collectProviderDiagnostics(..., { includeArtifacts: false })` and the
       existing shared compatibility engine rather than inventing a second truth
       stack
+- [ ] Preserve cheap top-level `probe` and aggregated `summary` on that scope
+      so selector callers keep zero-cost context while stripping operator-grade
+      per-target decoration
 - [ ] Keep the selector-oriented scope intentionally small:
       - retain target identity (`provider`, `instance`, `backend`,
         `defaultTarget`)

@@ -186,17 +186,20 @@ that depends on runtime setup primitives.
 24. The selector-oriented availability scope shall avoid retained-artifact
     hydration and other operator-grade payload assembly not required to answer
     target selectability.
-25. At minimum, that scope shall be able to return:
+25. That scope may preserve cheap top-level route metadata such as `probe` and
+    aggregated `summary` when those values do not require retained-artifact
+    hydration or other operator-grade payload assembly.
+26. At minimum, that scope shall be able to return:
     - `provider`
     - `instance`
     - `backend`
     - `defaultTarget`
     - `availability`
-26. Operator-grade diagnostics details such as `config`, detailed `checks`,
+27. Operator-grade diagnostics details such as `config`, detailed `checks`,
     `setup`, `compatibility`, `metering`, `compatibilityEvidence`,
     `providerEvolution`, and `reprobe` shall remain outside that selector hot
     path unless the caller explicitly requests the fuller diagnostics surface.
-27. Any additional cache added for selector-oriented diagnostics shall be
+28. Any additional cache added for selector-oriented diagnostics shall be
     bounded and short-lived. The runtime shall not pretend that the current
     full diagnostics pipeline is already broadly cached merely because CLI
     compatibility assessments have their own retained in-memory cache.
