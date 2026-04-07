@@ -1681,7 +1681,7 @@ function addAgent(name='',provider='claude',model='',tags=[],modelSelection=null
   if(!options.allowOverflow&&getAgentCount()>=MAX_AGENT_COUNT){updateAgentButtons();return null;}
   const normalizedState=normalizeAgentSelectionState(provider,model,modelSelection,{
     allowLegacyModel:false,
-    preferAvailableProvider:options.preferAvailableProvider!==false,
+    preferAvailableProvider:options.preferAvailableProvider===true,
   });
   provider=normalizedState.provider;
   model=normalizedState.model;
@@ -1755,7 +1755,14 @@ function applyAgentPreset(preset){
   agentCounter=0;
   nextAgentNumber=1;
   expandedAgentId=null;
-  preset.forEach(agent=>addAgent(agent.name,agent.provider,agent.model||'',agent.tags,agent.modelSelection||null,{expandOnCreate:false}));
+  preset.forEach(agent=>addAgent(
+    agent.name,
+    agent.provider,
+    agent.model||'',
+    agent.tags,
+    agent.modelSelection||null,
+    { expandOnCreate:false, preferAvailableProvider:true },
+  ));
   updateAgentButtons();
   validateStartChat();
 }
@@ -2038,8 +2045,8 @@ async function initApp() {
   });
   updateRuntimeAuthState();
   await loadProviderOptions();
-  addAgent('Agent-1','claude','',['orchestrator'],null,{expandOnCreate:false,preferAvailableProvider:true});
-  addAgent('Agent-2','codex','',['coder'],null,{expandOnCreate:false,preferAvailableProvider:true});
+  addAgent('Agent-1','claude','',['orchestrator'],null,{expandOnCreate:false});
+  addAgent('Agent-2','codex','',['coder'],null,{expandOnCreate:false});
   syncChatInputDefaultPrompt(true);
 }
 void initApp();
