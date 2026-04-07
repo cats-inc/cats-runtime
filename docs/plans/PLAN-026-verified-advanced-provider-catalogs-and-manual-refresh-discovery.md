@@ -8,7 +8,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Safety, Cache-First Reads, Verified Baseline, Checklist, and Setup Refresh UX Landed) |
+| **Status** | Completed |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User |
@@ -50,7 +50,10 @@ Current audit result:
   runtime catalog service
 - a runtime-owned verified-manifest registry plus additive provenance metadata
   are now landed for the first curated targets
-- broader manifest onboarding/checklist work remains open
+- setup/operator refresh ownership is now explicit on both the setup surface and
+  the diagnostics API/MCP seams
+- broader provider-by-provider manifest expansion remains a later breadth task,
+  not an open gap in this follow-through plan
 
 ## Implementation Phases
 
@@ -92,7 +95,7 @@ routine reads.
 
 - [x] Update dashboard `Create New Session` and related session-management flows
       to consume cached/config/static catalogs only.
-- [ ] Move explicit refresh affordances and capability-inspection UX to setup
+- [x] Move explicit refresh affordances and capability-inspection UX to setup
       and diagnostics surfaces.
 - [x] Ensure the dashboard can still create sessions from conservative
       entry-only catalogs without trying to infer missing advanced controls.
@@ -183,13 +186,14 @@ audits.
 | Date | Update |
 |------|--------|
 | 2026-03-30 | Plan created after runtime advanced-catalog truthfulness and discovery-trigger review |
-| 2026-04-07 | Audit update: status corrected to `In Progress`. Landed slices now include conservative advanced catalogs for unverified targets, non-probing ordinary reads plus explicit `refresh=1`, stale in-memory cache reuse with `cache.stale`, and entry-scoped control applicability/default handling on curated verified targets. Persisted snapshots, cooldown/backoff, setup-owned refresh UX, and evidence-backed manifest onboarding remain open. |
+| 2026-04-07 | Audit update: status corrected to `In Progress`. Landed slices now include conservative advanced catalogs for unverified targets, non-probing ordinary reads plus explicit `refresh=1`, stale in-memory cache reuse with `cache.stale`, and entry-scoped control applicability/default handling on curated verified targets. Persisted snapshots, cooldown/backoff, setup-owned refresh UX, and evidence-backed manifest onboarding remained open at that point. |
 | 2026-04-07 | Phase 2 follow-through landed: successful dynamic catalogs now persist restart-stable snapshots under the runtime data dir, ordinary reads can reuse those persisted snapshots before config/static fallback, and repeated refresh failures now activate catalog refresh backoff with additive cache metadata and warnings instead of hammering upstreams on every request. |
 | 2026-04-07 | Phase 1 / 5 follow-through landed: verified advanced targets now resolve through a runtime-owned manifest registry with additive provenance metadata on public advanced catalogs, and the first curated manifests/evidence refs are now recorded in `docs/research/2026-04-07-advanced-provider-manifest-baseline.md`. |
 | 2026-04-07 | Phase 3 setup-surface follow-through landed: `provider-setup` now exposes per-target model-catalog freshness on the runtime-target inspection view, including stale/persisted/backoff hints, metering-derived cooldown warnings, bounded catalog-warning surfacing, and an explicit per-target `refresh=1` button that updates runtime-owned catalog truth without moving that workflow back into the dashboard read path. |
 | 2026-04-07 | Follow-on setup truthfulness slice landed: the same runtime-target inspection view now also reuses `GET /diagnostics/providers` for filtered provider availability truth (`ok` / `degraded` / `unavailable` plus attention codes), so setup/repair surfaces no longer rely on model-catalog metadata alone when deciding how healthy a target currently is. |
 | 2026-04-07 | Follow-on setup operator slice landed: `provider-setup` now also exposes a per-target `POST /diagnostics/providers/reprobe` action through the runtime-target inspection view, so operators can refresh availability truth for one selected target without leaving the setup surface or overloading ordinary dashboard reads. |
 | 2026-04-07 | Phase 5 checklist follow-through landed: `docs/research/2026-04-07-advanced-provider-manifest-onboarding-checklist.md` now defines the explicit target-boundary, evidence, runtime-wiring, regression, and doc-sync gates required before promoting any additional target from conservative entry-only catalogs to `verified_manifest`. |
+| 2026-04-07 | Final status correction: the remaining Phase 3 diagnostics-side ownership is already satisfied by the runtime-owned `GET /diagnostics/providers` inspection seam plus explicit `POST /diagnostics/providers/reprobe` and matching MCP write path, so the plan now closes as completed without inventing a second browser diagnostics page. |
 
 ---
 

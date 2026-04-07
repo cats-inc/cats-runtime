@@ -377,6 +377,10 @@ Diagnostics rules:
   the runtime-wide wakeup snapshot under `runtime.wakeups`
 - `GET /diagnostics/providers` exposes runtime-owned provider availability
   checks plus cached CLI compatibility summaries for host UX and setup flows
+- `POST /diagnostics/providers/reprobe` is the explicit write-like refresh seam
+  for provider availability/compatibility truth; prefer it over `force=1` when
+  the caller is intentionally re-running diagnostics rather than performing a
+  read
 - when a retained manual provider-evolution artifact exists for a target, the
   same diagnostics surface also exposes additive
   `providerEvolution.latestArtifact` summary data so operators can inspect the
@@ -406,8 +410,9 @@ Diagnostics rules:
   reachability check during the default `probe=light` path, so localhost
   dashboards do not stay degraded when the runtime can cheaply verify the
   daemon without a full live fan-out
-- `force=1|true|refresh` refreshes cached CLI compatibility assessments so
-  install/upgrade flows can re-probe immediately
+- `force=1|true|refresh` remains an additive read-path cache bypass for
+  compatibility assessments, but explicit host/operator re-probes should prefer
+  `POST /diagnostics/providers/reprobe`
 
 ## Environment Variables
 
@@ -901,9 +906,11 @@ For host-side setup or Settings surfaces, use:
 - `GET /diagnostics/runtime` to verify runtime contract, port binding, and
   resolved state paths, including where compatibility evidence bundles are
   written, plus the full runtime-owned wakeup snapshot
-- `GET /diagnostics/providers?force=1` to decide whether a provider is
-  immediately usable, needs user action, is running in a degraded profile, or
-  failed to probe after an install/update
+- `GET /diagnostics/providers` to read the latest runtime-owned availability,
+  compatibility, and retained evidence truth for each provider target
+- `POST /diagnostics/providers/reprobe` when the host/operator intentionally
+  wants a fresh compatibility/availability assessment after install, auth, or
+  upgrade work
 - `GET /diagnostics/health` when a lighter host poll also needs aggregate
   wakeup counts/status without fetching `/wakeups`; this path now skips the
   heavier install/path/npm diagnostics and retained-artifact hydration so it

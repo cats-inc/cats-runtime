@@ -724,8 +724,8 @@ tightening and cleanup steps are intentionally deferred.
   `/diagnostics/providers/reprobe` action, so availability truth can be refreshed
   in place without inventing a second product-owned repair screen
 - backend support is staged honestly rather than pretending universal advanced
-  control parity, but broader evidence-backed manifest onboarding/checklist work
-  still remains deferred
+  control parity, and future work is now just broader provider-by-provider
+  manifest expansion rather than missing refresh/checklist hardening
 
 #### Deferred Cleanup Scope
 
