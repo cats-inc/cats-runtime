@@ -1,0 +1,3856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cats Runtime Dashboard</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/github-dark.min.css">
+<script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"></script>
+<style>
+  /* Canonical tokens live in src/http/ui/shared.ts and are injected at
+     serve-time by uiInjector.ts.  This inline copy is the static fallback
+     so the HTML file remains usable when opened outside the runtime. */
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #242836;
+    --border: #2e3345;
+    --text: #e1e4ed;
+    --text2: #8b90a0;
+    --accent: #6c8cff;
+    --accent-dim: #4a62b3;
+    --green: #4ade80;
+    --yellow: #facc15;
+    --red: #f87171;
+    --orange: #fb923c;
+    --auggie: #22d3ee;
+    --claude: #fb923c;
+    --codex: #34d399;
+    --copilot: #818cf8;
+    --cursorp: #f472b6;
+    --gemini: #60a5fa;
+    --kiro: #2dd4bf;
+    --kilo: #fb7185;
+    --opencode: #c084fc;
+    --pi: #a8a29e;
+    --goose: #a3e635;
+    --junie: #fbbf24;
+    --ollama: #94a3b8;
+    --openclaw: #f87171;
+    --radius: 8px;
+  }
+  .runtime-shell {
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  .runtime-status-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+    min-width: 240px;
+  }
+  .runtime-status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--text2);
+  }
+  .runtime-status-dot[data-state="active"] {
+    background: var(--green);
+    box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.12);
+  }
+  .runtime-status-dot[data-state="skipped"] {
+    background: var(--yellow);
+    box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.12);
+  }
+  .runtime-status-dot[data-state="disabled"],
+  .runtime-status-dot[data-state="not_applicable"] {
+    background: var(--text2);
+  }
+  .runtime-status-dot[data-state="failed"] {
+    background: var(--red);
+    box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.12);
+  }
+  .runtime-status-dot[data-state="idle"],
+  .runtime-status-dot[data-state="running"] {
+    background: var(--orange);
+    box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.12);
+  }
+  .runtime-status-copy {
+    min-width: 0;
+  }
+  .runtime-status-title {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+  .runtime-status-meta {
+    font-size: 11px;
+    color: var(--text2);
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .api-key-group {
+    min-width: 18rem;
+  }
+
+  .session-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+  }
+  .session-card {
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    margin-bottom: 4px;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+  }
+  .session-card:hover { background: var(--surface2); }
+  .session-card.active {
+    background: var(--surface2);
+    border-color: var(--accent);
+  }
+  .session-card .sc-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .session-card .sc-id {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12.5px;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    font-weight: 600;
+    font-family: inherit;
+  }
+  .session-card .sc-meta {
+    font-size: 10.5px;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    color: var(--text2);
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .project-group { margin-bottom: 2px; }
+  .project-header {
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 8px;
+    padding: 6px 12px 6px 10px;
+    cursor: pointer;
+    border-radius: var(--radius);
+    font-size: 12.5px;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    font-weight: 600;
+    color: var(--text);
+    user-select: none;
+    transition: background 0.15s;
+    border-left: 3px solid transparent;
+  }
+  .project-header:hover { background: var(--surface2); }
+  .project-header[data-provider="auggie"] { border-left-color: var(--auggie); }
+  .project-header[data-provider="claude"] { border-left-color: var(--claude); }
+  .project-header[data-provider="codex"] { border-left-color: var(--codex); }
+  .project-header[data-provider="copilot"] { border-left-color: var(--copilot); }
+  .project-header[data-provider="cursor"] { border-left-color: var(--cursorp); }
+  .project-header[data-provider="gemini"] { border-left-color: var(--gemini); }
+  .project-header[data-provider="kiro"] { border-left-color: var(--kiro); }
+  .project-header[data-provider="kilo"] { border-left-color: var(--kilo); }
+  .project-header[data-provider="opencode"] { border-left-color: var(--opencode); }
+  .project-header[data-provider="pi"] { border-left-color: var(--pi); }
+  .project-header[data-provider="goose"] { border-left-color: var(--goose); }
+  .project-header[data-provider="junie"] { border-left-color: var(--junie); }
+  .project-header[data-provider="ollama"] { border-left-color: var(--ollama); }
+  .project-header[data-provider="openclaw"] { border-left-color: var(--openclaw); }
+  .project-header[data-provider="mixed"] {
+    border-image: linear-gradient(
+      to bottom,
+      var(--auggie),
+      var(--claude),
+      var(--codex),
+      var(--copilot),
+      var(--cursorp),
+      var(--gemini),
+      var(--kiro),
+      var(--opencode),
+      var(--kilo),
+      var(--pi),
+      var(--goose),
+      var(--junie),
+      var(--ollama),
+      var(--openclaw)
+    ) 1;
+  }
+  /* Canonical badge styles in src/http/ui/shared.ts, injected at serve-time.
+     Static fallback kept here so the file works standalone. */
+  .provider-badge {
+    font-size: 9.5px;
+    line-height: 1.1;
+    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .provider-badge[data-p="claude"] { background: rgba(251,146,60,0.18); color: var(--claude); }
+  .provider-badge[data-p="codex"] { background: rgba(52,211,153,0.18); color: var(--codex); }
+  .provider-badge[data-p="gemini"] { background: rgba(96,165,250,0.18); color: var(--gemini); }
+  .provider-badge[data-p="cursor"] { background: rgba(244,114,182,0.18); color: var(--cursorp); }
+  .provider-badge[data-p="copilot"] { background: rgba(129,140,248,0.18); color: var(--copilot); }
+  .provider-badge[data-p="opencode"] { background: rgba(192,132,252,0.18); color: var(--opencode); }
+  .provider-badge[data-p="kilo"] { background: rgba(251,113,133,0.18); color: var(--kilo); }
+  .provider-badge[data-p="goose"] { background: rgba(163,230,53,0.18); color: var(--goose); }
+  .provider-badge[data-p="pi"] { background: rgba(168,162,158,0.18); color: var(--pi); }
+  .provider-badge[data-p="auggie"] { background: rgba(34,211,238,0.18); color: var(--auggie); }
+  .provider-badge[data-p="junie"] { background: rgba(251,191,36,0.18); color: var(--junie); }
+  .provider-badge[data-p="kiro"] { background: rgba(45,212,191,0.18); color: var(--kiro); }
+  .provider-badge[data-p="ollama"] { background: rgba(148,163,184,0.18); color: var(--ollama); }
+  .provider-badge[data-p="openclaw"] { background: rgba(248,113,113,0.18); color: var(--openclaw); }
+  .instance-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    color: var(--text2);
+    font-size: 9.5px;
+    line-height: 1.1;
+    letter-spacing: 0.02em;
+  }
+  .project-header .chevron {
+    font-size: 10px;
+    color: var(--text2);
+    transition: transform 0.15s;
+    display: inline-block;
+    width: 14px;
+  }
+  .project-group.collapsed .chevron { transform: rotate(-90deg); }
+  .project-group.collapsed .project-sessions { display: none; }
+  .project-header .project-label {
+    min-width: 0;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .project-header .project-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .project-header .project-count {
+    font-size: 10.5px;
+    line-height: 1.2;
+    letter-spacing: 0.01em;
+    color: var(--text2);
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+  .project-header .project-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    justify-self: end;
+  }
+  .project-header .project-dots {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+  }
+  .project-delete {
+    background: none;
+    border: none;
+    color: var(--text2);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border-radius: 6px;
+    opacity: 0;
+    transition: all 0.15s;
+  }
+  .project-header:hover .project-delete { opacity: 1; }
+  .project-delete:hover { color: var(--red); background: rgba(248,113,113,0.15); }
+  .project-delete:disabled { opacity: 1; cursor: not-allowed; }
+  .project-delete .spinner {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--text2);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .project-sessions { padding-left: 22px; }
+  .project-sessions .session-card { margin-bottom: 2px; }
+  .sc-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+  .sc-dot-ready { background: var(--green); }
+  .sc-dot-busy { background: var(--yellow); animation: pulse 1s infinite; }
+
+  .sc-delete {
+    background: none;
+    border: none;
+    color: var(--text2);
+    cursor: pointer;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border-radius: 6px;
+    opacity: 0;
+    transition: all 0.15s;
+  }
+  .session-card:hover .sc-delete { opacity: 1; }
+  .sc-delete:hover { color: var(--red); background: rgba(248,113,113,0.15); }
+  .sc-summary {
+    font-size: 12px;
+    color: var(--text2);
+    margin-bottom: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .session-scan-status-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .session-scan-status-copy {
+    flex: 1;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .session-scan-status-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .session-scan-status-dismiss {
+    background: none;
+    border: none;
+    color: var(--text2);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border-radius: 6px;
+    flex-shrink: 0;
+    transition: all 0.15s;
+  }
+  .session-scan-status-dismiss:hover {
+    color: var(--text);
+    background: rgba(255,255,255,0.08);
+  }
+
+  .chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    min-height: 48px;
+  }
+  .chat-header-info { font-size: 13px; color: var(--text2); }
+  .chat-header-actions { display: flex; gap: 8px; }
+  .chat-session-insights {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(36, 40, 54, 0.55);
+  }
+  .chat-session-details {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(36, 40, 54, 0.55);
+  }
+  .session-detail-shell {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: rgba(15, 17, 23, 0.26);
+    overflow: hidden;
+  }
+  .session-detail-shell-summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    list-style: none;
+    padding: 12px 14px;
+  }
+  .session-detail-shell-summary:hover {
+    background: rgba(255,255,255,0.02);
+  }
+  .session-detail-shell-summary::-webkit-details-marker {
+    display: none;
+  }
+  .session-detail-shell-summary::after {
+    content: '▾';
+    color: var(--text2);
+    font-size: 12px;
+    line-height: 1.2;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+  .session-detail-shell:not([open]) .session-detail-shell-summary::after {
+    content: '▸';
+  }
+  .session-detail-shell-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    flex: 1;
+  }
+  .session-detail-shell-title-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  .session-detail-shell-meta {
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--text2);
+    overflow-wrap: anywhere;
+  }
+  .session-detail-shell-title {
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text2);
+    font-weight: 600;
+  }
+  .session-detail-shell-subtitle {
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--text2);
+  }
+  .session-detail-card {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+  }
+  .session-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px 12px;
+  }
+  .session-detail-kv {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.04);
+    background: rgba(255,255,255,0.025);
+  }
+  .session-detail-kv dt {
+    margin: 0;
+    font-size: 10px;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .session-detail-kv dd {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text);
+    overflow-wrap: anywhere;
+  }
+  .session-detail-empty {
+    color: var(--text2);
+    font-style: italic;
+  }
+  .session-detail-block {
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.02);
+    overflow: hidden;
+  }
+  .session-detail-block summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 10px 12px;
+    font-size: 11px;
+    line-height: 1.3;
+    color: var(--text2);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .session-detail-block summary::-webkit-details-marker {
+    display: none;
+  }
+  .session-detail-block summary::after {
+    content: '▾';
+    float: right;
+    color: var(--text2);
+  }
+  .session-detail-block:not([open]) summary::after {
+    content: '▸';
+  }
+  .session-detail-block[open] summary {
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .session-detail-json {
+    margin: 0;
+    padding: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text2);
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  }
+  .session-detail-instructions {
+    margin: 0;
+    padding: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--text2);
+  }
+  .insight-card {
+    background: rgba(26, 29, 39, 0.88);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+  }
+  .insight-card h4 {
+    margin: 0;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text2);
+  }
+  .insight-summary {
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--text);
+  }
+  .insight-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .insight-tag {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.04);
+    padding: 3px 8px;
+    font-size: 11px;
+    color: var(--text2);
+    gap: 4px;
+  }
+  .insight-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .insight-list li {
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text2);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .insight-list strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .insight-secondary {
+    color: var(--text2);
+    font-size: 11px;
+  }
+  .insight-link {
+    color: var(--accent);
+    text-decoration: none;
+    overflow-wrap: anywhere;
+  }
+  .insight-link:hover {
+    text-decoration: underline;
+  }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .msg {
+    max-width: 85%;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    line-height: 1.5;
+    word-break: break-word;
+  }
+  .msg-user {
+    align-self: flex-end;
+    background: var(--accent);
+    color: #fff;
+    border-bottom-right-radius: 2px;
+    white-space: pre-wrap;
+  }
+  .msg-assistant {
+    align-self: flex-start;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 2px;
+    white-space: normal;
+  }
+  /* Prose styles for markdown inside assistant messages */
+  .msg-assistant p { margin: 0.5em 0; }
+  .msg-assistant p:first-child { margin-top: 0; }
+  .msg-assistant p:last-child { margin-bottom: 0; }
+  .msg-assistant h1, .msg-assistant h2, .msg-assistant h3,
+  .msg-assistant h4, .msg-assistant h5, .msg-assistant h6 {
+    margin: 0.8em 0 0.4em;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .msg-assistant h1 { font-size: 1.4em; }
+  .msg-assistant h2 { font-size: 1.2em; }
+  .msg-assistant h3 { font-size: 1.1em; }
+  .msg-assistant ul, .msg-assistant ol {
+    margin: 0.4em 0;
+    padding-left: 1.5em;
+  }
+  .msg-assistant li { margin: 0.2em 0; }
+  .msg-assistant li > p { margin: 0.2em 0; }
+  .msg-assistant blockquote {
+    border-left: 3px solid var(--accent-dim);
+    padding: 0.2em 0 0.2em 1em;
+    margin: 0.5em 0;
+    color: var(--text2);
+  }
+  .msg-assistant a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .msg-assistant code {
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.9em;
+    background: var(--bg);
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+  }
+  .msg-assistant pre {
+    margin: 0.5em 0;
+    border-radius: 6px;
+    overflow-x: auto;
+  }
+  .msg-assistant pre code {
+    display: block;
+    padding: 0.8em 1em;
+    background: var(--bg);
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre;
+  }
+  .msg-assistant table {
+    border-collapse: collapse;
+    margin: 0.5em 0;
+    font-size: 13px;
+    width: 100%;
+  }
+  .msg-assistant th, .msg-assistant td {
+    border: 1px solid var(--border);
+    padding: 6px 10px;
+    text-align: left;
+  }
+  .msg-assistant th {
+    background: var(--surface2);
+    font-weight: 600;
+  }
+  .msg-assistant hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 0.8em 0;
+  }
+  .msg-assistant strong { font-weight: 600; }
+  .msg-assistant em { font-style: italic; }
+  .msg-assistant img { max-width: 100%; border-radius: 4px; }
+  .msg-tool {
+    align-self: flex-start;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text2);
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+  }
+  .msg-error {
+    align-self: center;
+    background: rgba(248,113,113,0.15);
+    color: var(--red);
+    border: 1px solid rgba(248,113,113,0.3);
+    font-size: 13px;
+  }
+  .msg-system {
+    align-self: center;
+    color: var(--text2);
+    font-size: 12px;
+    font-style: italic;
+  }
+  .msg-instructions {
+    align-self: stretch;
+    background: rgba(99,102,241,0.08);
+    border: 1px solid rgba(99,102,241,0.2);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--text2);
+    margin-bottom: 8px;
+  }
+  .msg-instructions summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text2);
+    padding: 6px 10px;
+  }
+  .msg-instructions pre {
+    margin: 0;
+    padding: 6px 10px 10px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .chat-input-area {
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    gap: 10px;
+  }
+  .chat-input-area textarea {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: none;
+    min-height: 42px;
+    max-height: 120px;
+  }
+  .chat-input-area textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .chat-input-area button {
+    align-self: flex-end;
+    padding: 10px 20px;
+  }
+  .chat-input-area button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+  }
+  .modal-overlay.open { display: flex; }
+  .provider-capability-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: rgba(26, 29, 39, 0.8);
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .provider-capability-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .provider-capability-card-title {
+    margin: 0;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text2);
+  }
+  .provider-capability-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px 12px;
+  }
+  .provider-capability-kv {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .provider-capability-kv dt {
+    margin: 0;
+    font-size: 11px;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .provider-capability-kv dd {
+    margin: 0;
+    font-size: 13px;
+    color: var(--text);
+    overflow-wrap: anywhere;
+  }
+  .provider-capability-summary {
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--text);
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text2); }
+
+  .streaming-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 1s infinite;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .browse-item {
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+  }
+  .browse-item:hover { background: var(--surface2); }
+  .browse-list {
+    max-height: 300px;
+    overflow-y: auto;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin: 8px 0;
+  }
+</style>
+</head>
+<body class="runtime-shell" data-runtime-surface="__CATS_RUNTIME_SURFACE__" data-bootstrap-required="__CATS_RUNTIME_BOOTSTRAP_REQUIRED__">
+
+<div class="runtime-frame">
+  <aside class="runtime-sidebar">
+    <div class="runtime-sidebar-inner">
+      <div class="runtime-brand-row">
+        <!-- CATS_RUNTIME_SURFACE_SWITCHER -->
+      </div>
+
+      <div class="runtime-sidebar-section">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            <p class="runtime-sidebar-title">Sessions</p>
+            <span id="sessionCount" class="runtime-auth-badge" data-state="idle">0</span>
+          </div>
+          <div class="flex gap-2">
+            <button class="runtime-btn runtime-btn-secondary !h-8 !w-8 !rounded-lg !px-0 !py-0" id="scanSessionsBtn" onclick="manualScanSessions()" title="Scan WSL and Docker sessions" aria-label="Scan WSL and Docker sessions">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 12a9 9 0 0 1 15.5-6.36L21 8" />
+                <path d="M21 3v5h-5" />
+                <path d="M21 12a9 9 0 0 1-15.5 6.36L3 16" />
+                <path d="M8 16H3v5" />
+              </svg>
+            </button>
+            <button class="runtime-btn runtime-btn-secondary !h-8 !w-8 !rounded-lg !px-0 !py-0" id="newSessionBtn" onclick="openCreateModal()" title="Create session" aria-label="Create session">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+            </button>
+            <button class="runtime-btn runtime-btn-danger !h-8 !w-8 !rounded-lg !px-0 !py-0" id="deleteAllSessionsBtn" onclick="deleteAllSessions()" title="Delete all sessions &amp; projects" aria-label="Delete all sessions">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 6h18" />
+                <path d="M8 6V4h8v2" />
+                <path d="M19 6l-1 14H6L5 6" />
+                <path d="M10 11v6" />
+                <path d="M14 11v6" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div id="sessionScanStatus" class="mt-3 hidden rounded-2xl border border-slate-800 bg-slate-950/60 px-3 py-3">
+          <div class="session-scan-status-header">
+            <span class="session-scan-status-copy">
+              <span id="sessionScanStatusDot" class="runtime-shell-health-dot !h-2 !w-2" data-state="idle"></span>
+              <span id="sessionScanStatusText" class="session-scan-status-text text-xs font-medium text-slate-300">Scanning sessions...</span>
+            </span>
+            <button class="session-scan-status-dismiss" type="button" onclick="dismissSessionScanStatus()" title="Dismiss" aria-label="Dismiss session scan status">
+              <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
+          </div>
+          <div id="sessionScanProgress" class="mt-3 hidden h-1 overflow-hidden rounded-full bg-slate-800">
+            <div class="h-full w-1/2 animate-pulse rounded-full bg-blue-500/80"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="sessionList" class="session-list runtime-sidebar-surface min-h-0 overflow-y-auto px-3 pb-4">
+        <div class="runtime-empty !rounded-2xl !px-4 !py-10">
+          <div class="runtime-empty-icon">~</div>
+          <div>No sessions yet</div>
+        </div>
+      </div>
+
+      <div class="runtime-sidebar-footer">
+        <div class="runtime-auth-block">
+          <div class="runtime-auth-row">
+            <div class="runtime-auth-copy">
+              <p class="runtime-sidebar-title">Auth</p>
+              <span class="runtime-auth-badge" id="runtimeAuthStatus" data-state="idle">Missing</span>
+            </div>
+            <button class="runtime-btn runtime-btn-ghost !h-8 !w-8 !rounded-lg !px-0 !py-0" type="button" onclick="toggleRuntimeAuthEditor()" aria-controls="runtimeAuthEditor" aria-expanded="false" id="runtimeAuthToggle" title="Edit auth token" aria-label="Edit auth token">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
+              </svg>
+            </button>
+          </div>
+          <div class="runtime-auth-editor hidden" id="runtimeAuthEditor">
+            <label for="apiKeyInput" class="runtime-field-label">Bearer Token</label>
+            <input type="password" id="apiKeyInput" class="runtime-input" placeholder="Bearer token" />
+          </div>
+        </div>
+        <p class="runtime-sidebar-title">Runtime Health</p>
+        <div class="mt-3 runtime-shell-health" data-runtime-shell-health data-runtime-tooltip="Loading runtime diagnostics...">
+          <div class="runtime-shell-health-row">
+            <span class="runtime-shell-health-dot" data-runtime-shell-health-dot data-state="idle"></span>
+            <span class="runtime-shell-health-state" data-runtime-shell-health-state>Loading</span>
+          </div>
+          <p class="runtime-shell-health-summary" data-runtime-shell-health-summary>Waiting for runtime diagnostics.</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="runtime-page">
+    <div class="runtime-page-stack">
+      <header class="runtime-page-header" style="padding-top:0.75rem;padding-bottom:0.75rem;">
+        <div>
+          <p class="runtime-page-kicker" style="font-size:0.58rem;letter-spacing:0.18em;">Cats Runtime</p>
+          <h1 class="font-semibold tracking-tight text-white" style="margin-top:0.125rem;font-size:21px;line-height:1.15;">Session Dashboard</h1>
+        </div>
+      </header>
+
+      <div class="runtime-page-content min-h-0 overflow-hidden p-6">
+        <div class="flex h-full flex-col">
+          <div id="chatPlaceholder" class="runtime-empty flex-1">
+            <div class="runtime-empty-icon">&gt;_</div>
+            <div>Select or create a session to start</div>
+          </div>
+          <div id="chatContainer" class="runtime-card flex-1" style="display:none;flex-direction:column;overflow:hidden;">
+            <div class="chat-header">
+              <div>
+                <span id="chatSessionId" style="font-weight:600;font-size:14px;"></span>
+                <span id="chatSessionStatus" class="badge" style="margin-left:8px;"></span>
+                <div class="chat-header-info" id="chatSessionMeta"></div>
+              </div>
+              <div class="chat-header-actions">
+                <button class="runtime-btn runtime-btn-ghost" id="btnRefresh" onclick="reloadCurrentSession()">Refresh</button>
+                <button class="runtime-btn runtime-btn-primary" id="btnResume" onclick="resumeCurrentSession()" style="display:none;">Resume</button>
+                <button class="runtime-btn runtime-btn-danger" id="btnClose" onclick="closeSession()">Close</button>
+              </div>
+            </div>
+            <div class="chat-session-insights" id="chatSessionInsights" style="display:none;"></div>
+            <div class="chat-session-details" id="chatSessionDetails" style="display:none;"></div>
+            <div class="chat-messages" id="chatMessages"></div>
+            <div class="chat-input-area" id="chatInputArea">
+              <textarea id="msgInput" class="runtime-textarea" placeholder="Send a message..." rows="1"
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
+              <button class="runtime-btn runtime-btn-primary" id="btnSend" onclick="sendMessage()">Send</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Create Session Modal -->
+<div class="modal-overlay fixed inset-0 z-50 items-center justify-center bg-slate-950/80 p-4" id="createModal">
+  <div class="runtime-card w-full max-w-[36rem] overflow-hidden">
+    <div class="runtime-card-header">
+      <div>
+        <h3 class="runtime-card-title">Create New Session</h3>
+        <p class="runtime-card-copy">Choose the provider target, workspace kind/access, and optional model routing for a new runtime session.</p>
+      </div>
+    </div>
+    <div class="space-y-4 p-5">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="runtime-field">
+          <label class="runtime-field-label">Workspace Kind</label>
+          <select id="inputWorkspaceKind" class="runtime-select" onchange="onWorkspaceContractChange()">
+            <option value="sandbox">sandbox (runtime-owned)</option>
+            <option value="source">source (use cwd)</option>
+            <option value="worktree">worktree (git worktree)</option>
+          </select>
+        </div>
+        <div class="runtime-field">
+          <label class="runtime-field-label">Workspace Access</label>
+          <select id="inputWorkspaceAccess" class="runtime-select" onchange="onWorkspaceContractChange()">
+            <option value="read_write">read_write</option>
+            <option value="read_only">read_only</option>
+          </select>
+        </div>
+      </div>
+      <div class="runtime-field" id="cwdGroup" style="display:none;">
+        <label class="runtime-field-label">Working Directory</label>
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="inputCwd" class="runtime-input" placeholder="C:/Users/sammy/Source/my-project" style="flex:1;" />
+          <button type="button" class="runtime-btn runtime-btn-secondary !px-3" onclick="browseDir('inputCwd')" title="Browse">Browse</button>
+        </div>
+      </div>
+      <div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(14rem,1fr));">
+        <div class="runtime-field">
+          <label class="runtime-field-label">Provider</label>
+          <select id="inputProvider" class="runtime-select" onchange="onProviderChange()">
+            <option value="claude">claude</option>
+            <option value="codex">codex</option>
+            <option value="gemini">gemini</option>
+            <option value="cursor">cursor</option>
+            <option value="copilot">copilot</option>
+            <option value="opencode">opencode</option>
+            <option value="kilo">kilo</option>
+            <option value="auggie">auggie</option>
+            <option value="kiro">kiro</option>
+          </select>
+        </div>
+        <div class="runtime-field" id="instanceGroup">
+          <label class="runtime-field-label">Provider Instance</label>
+          <select id="inputInstance" class="runtime-select" onchange="onInstanceChange()"></select>
+        </div>
+      </div>
+      <div class="runtime-field">
+        <div class="flex items-center justify-between gap-2">
+          <label class="runtime-field-label">Model</label>
+          <span id="inputModelSupportBadge" class="runtime-auth-badge" data-state="idle">Loading</span>
+        </div>
+        <div class="runtime-field hidden" id="inputEntryGroup">
+          <select id="inputEntryChoice" class="runtime-select" onchange="onCreateRoutingEntryChange()"></select>
+        </div>
+        <div class="runtime-field hidden" id="inputPresetGroup">
+          <label class="runtime-field-label">Mode</label>
+          <select id="inputPresetChoice" class="runtime-select" onchange="onCreateRoutingPresetChange()"></select>
+          <div
+            id="inputPresetStaticLabel"
+            class="runtime-input hidden flex items-center text-sm text-slate-500"
+            aria-live="polite"
+          ></div>
+        </div>
+        <div class="runtime-field hidden" id="inputModelGroup">
+          <label class="runtime-field-label" id="inputModelLabel">Model ID</label>
+          <input type="text" id="inputModel" class="runtime-input" placeholder="e.g. claude-sonnet-4-6" />
+        </div>
+        <div id="inputModelControls" class="space-y-2"></div>
+        <p id="inputModelHint" class="text-xs text-slate-500"></p>
+      </div>
+      <div class="runtime-field">
+        <label class="runtime-field-label">Group (optional)</label>
+        <input type="text" id="inputGroup" class="runtime-input" placeholder="e.g. backend" />
+      </div>
+      <div class="runtime-field" id="permissionGroup" style="display:none;">
+        <label class="runtime-field-label">Permission Mode</label>
+        <select id="inputPermission" class="runtime-select">
+          <option value="skip">skip (dangerously skip)</option>
+          <option value="default">default (interactive)</option>
+          <option value="whitelist">whitelist</option>
+        </select>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button class="runtime-btn runtime-btn-ghost" onclick="closeCreateModal()">Cancel</button>
+        <button class="runtime-btn runtime-btn-primary" id="createSessionBtn" onclick="createSession()">Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Browse Directory Modal -->
+<div class="modal-overlay fixed inset-0 z-50 items-center justify-center bg-slate-950/80 p-4" id="browseModal">
+  <div class="runtime-card w-full max-w-[32rem] overflow-hidden">
+    <div class="runtime-card-header">
+      <div>
+        <h3 class="runtime-card-title">Select Directory</h3>
+        <p class="runtime-card-copy">Choose the working directory used to create or resume runtime sessions.</p>
+      </div>
+    </div>
+    <div class="space-y-4 p-5">
+      <div class="runtime-field">
+        <label class="runtime-field-label">Path</label>
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="browsePath" class="runtime-input" style="flex:1;" onkeydown="if(event.key==='Enter'){loadBrowse(this.value);}" />
+          <button class="runtime-btn runtime-btn-secondary !px-3" onclick="loadBrowse(document.getElementById('browsePath').value)">Go</button>
+        </div>
+      </div>
+      <div class="browse-list max-h-[320px] overflow-y-auto rounded-2xl border border-slate-800 bg-slate-950 p-2" id="browseList"></div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button class="runtime-btn runtime-btn-ghost" onclick="closeBrowseModal()">Cancel</button>
+        <button class="runtime-btn runtime-btn-primary" onclick="selectBrowsePath()">Select</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Configure marked with highlight.js
+marked.use({
+  breaks: true,
+  gfm: true,
+  renderer: {
+    code({ text, lang }) {
+      const language = lang && hljs.getLanguage(lang) ? lang : null;
+      const highlighted = language
+        ? hljs.highlight(text, { language }).value
+        : hljs.highlightAuto(text).value;
+      const langLabel = language ? `<span style="position:absolute;top:4px;right:8px;font-size:11px;color:var(--text2);opacity:0.6;">${lang}</span>` : '';
+      return `<pre style="position:relative;">${langLabel}<code class="hljs">${highlighted}</code></pre>`;
+    },
+  },
+});
+
+function renderMd(text) {
+  if (!text) return '';
+  const raw = marked.parse(text);
+  return DOMPurify.sanitize(raw, { ADD_ATTR: ['target'] });
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+const API_BASE = window.location.origin;
+const PROVIDER_ORDER = ['claude', 'codex', 'gemini', 'cursor', 'copilot', 'opencode', 'kilo', 'goose', 'pi', 'auggie', 'junie', 'kiro', 'ollama', 'openclaw'];
+const CLI_RUNTIME_ORDER = ['native', 'wsl', 'docker'];
+let currentSessionId = null;
+let isStreaming = false;
+let observeSource = null;
+let observeFullText = '';
+let observeAssistantEl = null;
+let providerCatalog = null;
+let discoveryStatusPayload = null;
+const providerAdvancedCatalogCache = new Map();
+const providerAdvancedCatalogInFlight = new Map();
+let currentCreateModelCatalog = null;
+let createModelCatalogRequestId = 0;
+const CUSTOM_CREATE_MODEL_VALUE = '__custom_legacy_model__';
+let sessionScanInFlight = false;
+let currentSessionInstructions = null;
+let currentSessionDetailsEnabled = false;
+const sessionDetailUiState = {
+  expanded: false,
+  instructionsOpen: false,
+  selectionOpen: false,
+  resolutionOpen: false,
+};
+
+function apiKey() {
+  return document.getElementById('apiKeyInput').value;
+}
+
+  function sessionActivity(session) {
+    if (session.activity) return session.activity;
+    const s = session.status;
+    if (s === 'closing') return 'tearing_down';
+    if (s === 'closed') return 'inactive';
+    return 'interactive';
+  }
+
+  function providerSupportsResume(provider) {
+    const p = (provider || 'claude').toLowerCase();
+    return p === 'auggie' || p === 'claude' || p === 'copilot' || p === 'cursor' || p === 'gemini' || p === 'kiro' || p === 'kilo';
+  }
+
+  function sessionControls(session) {
+    if (session.controls) return session.controls;
+    const activity = sessionActivity(session);
+    const resumeStrategy = session.resumeStrategy
+      || (providerSupportsResume(session.providerName) ? 'provider_session' : 'none');
+    const attached = !!session.attached;
+    return {
+      canSend: attached && activity === 'interactive' && session.status !== 'busy',
+      canResume: !attached && activity === 'inactive' && resumeStrategy !== 'none' && !!session.providerSessionId,
+      canClose: attached && activity === 'interactive',
+      canDelete: activity !== 'tearing_down' && !(activity === 'interactive' && !attached),
+      canRefresh: !attached || activity !== 'interactive',
+    };
+  }
+
+  function isInteractive(session) {
+    return sessionActivity(session) === 'interactive';
+  }
+
+  function humanizeToken(value) {
+    return (value || '').replace(/_/g, ' ');
+  }
+
+function headers(extra = {}) {
+  if (window.CatsUI) return CatsUI.authHeaders(extra);
+  const h = { 'Content-Type': 'application/json', ...extra };
+  const key = apiKey();
+  if (key) h['Authorization'] = `Bearer ${key}`;
+  return h;
+}
+
+function providerMeta(providerName) {
+  return providerCatalog?.providers?.[providerName] || null;
+}
+
+function instanceMeta(providerName, instanceId, backend) {
+  const provider = providerMeta(providerName);
+  if (!provider) return null;
+  const requestedTarget = backend && instanceId ? `${backend}/${instanceId}` : null;
+  return (provider.instances || []).find((instance) => {
+    if (requestedTarget && instance.target === requestedTarget) return true;
+    return instance.id === (instanceId || provider.defaultInstance || 'default');
+  }) || null;
+}
+
+function formatInstanceOptionLabel(providerName, instance) {
+  if (!instance) return 'default';
+  const parts = [instance.id];
+  if (instance.backend && instance.backend !== 'cli') {
+    parts.push(instance.backend);
+  }
+  if (instance.runtime?.mode === 'wsl') {
+    parts.push(instance.runtime.distro ? `wsl:${instance.runtime.distro}` : 'wsl');
+  } else if (instance.runtime?.mode && instance.runtime.mode !== instance.id) {
+    parts.push(instance.runtime.mode);
+  }
+  if (instance.transport) {
+    parts.push(instance.transport);
+  }
+  const provider = providerMeta(providerName);
+  if (provider?.defaultInstance === instance.id && (!provider.defaultBackend || provider.defaultBackend === instance.backend)) {
+    parts.push('default');
+  }
+  return parts.join(' | ');
+}
+
+function shouldShowInstance(session) {
+  const provider = providerMeta(session.providerName);
+  if (!provider || !provider.instances || provider.instances.length <= 1) return false;
+  const instanceId = session.providerInstanceId || 'default';
+  return instanceId !== 'default' && instanceId !== provider.defaultInstance;
+}
+
+function formatSessionInstance(session) {
+  const instanceId = session.providerInstanceId || 'default';
+  const instance = instanceMeta(session.providerName, instanceId, session.providerBackend);
+  if (instance) {
+    return formatInstanceOptionLabel(session.providerName, instance);
+  }
+  return session.providerBackend && session.providerBackend !== 'cli'
+    ? `${session.providerBackend}/${instanceId}`
+    : instanceId;
+}
+
+function configuredProviderNames() {
+  if (!providerCatalog?.providers) return [];
+
+  const ordered = PROVIDER_ORDER.filter(
+    (providerName) => (providerCatalog.providers[providerName]?.instances?.length || 0) > 0,
+  );
+  const extras = Object.keys(providerCatalog.providers)
+    .filter((providerName) => !PROVIDER_ORDER.includes(providerName))
+    .sort((left, right) => left.localeCompare(right));
+  return [...ordered, ...extras];
+}
+
+function configuredProviderNamesRaw() {
+  if (!providerCatalog?.providers) return [];
+
+  return Object.keys(providerCatalog.providers).filter(
+    (providerName) => (providerCatalog.providers[providerName]?.instances?.length || 0) > 0,
+  );
+}
+
+function rawInstanceTargetValue(instance) {
+  if (!instance) return 'default';
+  return instance.target || instance.id || 'default';
+}
+
+function runtimeModeOrder(mode) {
+  const index = CLI_RUNTIME_ORDER.indexOf(mode || 'native');
+  return index >= 0 ? index : CLI_RUNTIME_ORDER.length;
+}
+
+function providerOrderIndex(providerName) {
+  const index = PROVIDER_ORDER.indexOf(providerName);
+  return index >= 0 ? index : PROVIDER_ORDER.length;
+}
+
+function configuredCliRuntimeInstances() {
+  if (!providerCatalog?.providers) return [];
+
+  return configuredProviderNames()
+    .flatMap((providerName) => {
+      const provider = providerMeta(providerName);
+      return (provider?.instances || [])
+        .filter((instance) => instance.backend === 'cli')
+        .map((instance) => ({
+          providerName,
+          provider,
+          instance,
+          runtime: instance.runtime || { mode: 'native' },
+        }));
+    })
+    .sort((left, right) => {
+      const byProvider = providerOrderIndex(left.providerName) - providerOrderIndex(right.providerName);
+      if (byProvider !== 0) return byProvider;
+
+      const byRuntime = runtimeModeOrder(left.runtime.mode) - runtimeModeOrder(right.runtime.mode);
+      if (byRuntime !== 0) return byRuntime;
+
+      return (left.instance.id || '').localeCompare(right.instance.id || '');
+    });
+}
+
+function manualSessionDiscoveryTargets() {
+  return configuredCliRuntimeInstances().filter((entry) => (
+    entry.providerName === 'cursor'
+    || entry.providerName === 'goose'
+    || entry.providerName === 'kiro'
+    || entry.providerName === 'kilo'
+    || entry.providerName === 'opencode'
+  ) && (
+    entry.runtime?.mode === 'wsl' || entry.runtime?.mode === 'docker'
+  ));
+}
+
+function summarizeCliRuntimes(entries) {
+  if (!entries.length) return 'No CLI runtimes configured';
+
+  const counts = {
+    native: 0,
+    wsl: 0,
+    docker: 0,
+  };
+
+  for (const entry of entries) {
+    const mode = entry.runtime?.mode || 'native';
+    if (Object.prototype.hasOwnProperty.call(counts, mode)) {
+      counts[mode] += 1;
+    }
+  }
+
+  return CLI_RUNTIME_ORDER
+    .filter((mode) => counts[mode] > 0)
+    .map((mode) => `${mode} ${counts[mode]}`)
+    .join(' · ');
+}
+
+function formatRuntimeDescriptor(entry) {
+  const provider = entry.provider;
+  const instance = entry.instance;
+  const runtime = entry.runtime || { mode: 'native' };
+  const target = (provider?.instances?.length || 0) > 1
+    ? `${entry.providerName}@${instance.id}`
+    : entry.providerName;
+  const runtimeLabel = runtime.mode === 'wsl'
+    ? `wsl:${runtime.distro || 'Ubuntu'}`
+    : runtime.mode === 'docker'
+      ? `docker:${runtime.container || 'container'}`
+      : 'native';
+
+  const bits = [`${target}`, `[${runtimeLabel}]`];
+  if (provider?.defaultInstance === instance.id && (!provider.defaultBackend || provider.defaultBackend === instance.backend)) {
+    bits.push('default');
+  }
+  if (instance.command) {
+    bits.push(`cmd:${instance.command}`);
+  }
+  return bits.join(' ');
+}
+
+function providerAdvancedCatalogCacheKey(providerName, instanceTarget) {
+  return `${providerName || ''}::${instanceTarget || ''}`;
+}
+
+function renderInsightTags(tags) {
+  return (tags || [])
+    .filter(Boolean)
+    .map((tag) => `<span class="insight-tag">${escapeHtml(tag)}</span>`)
+    .join('');
+}
+
+function currentProviderSelection() {
+  const providerName = document.getElementById('inputProvider').value;
+  const instanceTarget = document.getElementById('inputInstance').value;
+  const provider = providerMeta(providerName);
+  const instance = (provider?.instances || []).find(
+    (entry) => (entry.target || entry.id) === instanceTarget,
+  ) || instanceMeta(providerName, instanceTarget, undefined);
+
+  return { providerName, instanceTarget, provider, instance };
+}
+
+async function fetchProviderAdvancedCatalog(providerName, instanceTarget) {
+  if (!providerName || !instanceTarget) {
+    return null;
+  }
+
+  const key = providerAdvancedCatalogCacheKey(providerName, instanceTarget);
+  if (providerAdvancedCatalogCache.has(key)) {
+    return providerAdvancedCatalogCache.get(key);
+  }
+  if (providerAdvancedCatalogInFlight.has(key)) {
+    return providerAdvancedCatalogInFlight.get(key);
+  }
+
+  const task = fetch(
+    `${API_BASE}/providers/${encodeURIComponent(providerName)}/models/advanced?instance=${encodeURIComponent(instanceTarget)}`,
+    { headers: headers() },
+  )
+    .then(async (response) => {
+      if (!response.ok) {
+        const detail = await response.text().catch(() => '');
+        throw new Error(detail || `HTTP ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((payload) => {
+      const normalized = window.CatsUI?.normalizeAdvancedCatalog
+        ? window.CatsUI.normalizeAdvancedCatalog(payload)
+        : payload;
+      providerAdvancedCatalogCache.set(key, normalized);
+      providerAdvancedCatalogInFlight.delete(key);
+      return normalized;
+    })
+    .catch((error) => {
+      providerAdvancedCatalogInFlight.delete(key);
+      throw error;
+    });
+
+  providerAdvancedCatalogInFlight.set(key, task);
+  return task;
+}
+
+function setCreateModelSupportBadge(text, state) {
+  const badge = document.getElementById('inputModelSupportBadge');
+  if (!badge) return;
+  badge.textContent = text;
+  badge.dataset.state = state || 'idle';
+}
+
+function resetCreateModelControls() {
+  const controlsEl = document.getElementById('inputModelControls');
+  if (controlsEl) {
+    controlsEl.innerHTML = '';
+  }
+}
+
+function renderCreateRoutingSelectOptions(selectEl, options, selectedValue) {
+  if (!selectEl) {
+    return '';
+  }
+
+  selectEl.innerHTML = options
+    .map((option) => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`)
+    .join('');
+  selectEl.disabled = options.length === 0;
+  const nextValue = options.some((option) => option.value === selectedValue)
+    ? selectedValue
+    : (options[0]?.value || '');
+  selectEl.value = nextValue;
+  return nextValue;
+}
+
+function listCreateCatalogEntries(catalog) {
+  return window.CatsUI?.listAdvancedCatalogEntries
+    ? window.CatsUI.listAdvancedCatalogEntries(catalog)
+    : (Array.isArray(catalog?.entries)
+      ? catalog.entries.filter((entry) => entry && entry.id)
+      : []);
+}
+
+function listCreateCatalogPresets(catalog) {
+  return window.CatsUI?.listAdvancedCatalogPresets
+    ? window.CatsUI.listAdvancedCatalogPresets(catalog)
+    : (Array.isArray(catalog?.presets)
+      ? catalog.presets.filter((preset) => preset && preset.id && preset.availability !== 'unavailable')
+      : []);
+}
+
+function findCreateCatalogEntry(catalog, entryId) {
+  return listCreateCatalogEntries(catalog).find((entry) => entry.id === entryId) || null;
+}
+
+function createPresetAppliesToEntry(preset, entryId) {
+  return !Array.isArray(preset?.applicableEntryIds)
+    || preset.applicableEntryIds.length === 0
+    || preset.applicableEntryIds.includes(entryId);
+}
+
+function createControlAppliesToEntry(control, entryId) {
+  return !Array.isArray(control?.applicableEntryIds)
+    || control.applicableEntryIds.length === 0
+    || control.applicableEntryIds.includes(entryId);
+}
+
+function listCreateApplicablePresets(catalog, entryId) {
+  return window.CatsUI?.listApplicableAdvancedPresets
+    ? window.CatsUI.listApplicableAdvancedPresets(catalog, entryId)
+    : listCreateCatalogPresets(catalog).filter((preset) =>
+      createPresetAppliesToEntry(preset, entryId),
+    );
+}
+
+function findCreateCatalogPreset(catalog, entryId, presetId) {
+  return window.CatsUI?.findApplicableAdvancedPreset
+    ? window.CatsUI.findApplicableAdvancedPreset(catalog, entryId, presetId)
+    : (listCreateApplicablePresets(catalog, entryId).find((preset) => preset.id === presetId) || null);
+}
+
+function getCreateDefaultSelection(catalog) {
+  return window.CatsUI?.getAdvancedCatalogDefaultSelection
+    ? window.CatsUI.getAdvancedCatalogDefaultSelection(catalog)
+    : null;
+}
+
+function getDefaultCreateEntryId(catalog, entries) {
+  if (window.CatsUI?.getAdvancedCatalogDefaultEntryId) {
+    return window.CatsUI.getAdvancedCatalogDefaultEntryId(catalog) || '';
+  }
+  const resolved = getCreateDefaultSelection(catalog);
+  if (resolved?.entryId && entries.some((entry) => entry.id === resolved.entryId)) {
+    return resolved.entryId;
+  }
+  const defaultEntry = entries.find((entry) => entry.default);
+  return defaultEntry?.id || entries[0]?.id || '';
+}
+
+function getDefaultCreatePresetId(catalog, entryId, presets) {
+  if (!entryId || !presets.length) {
+    return '';
+  }
+
+  if (window.CatsUI?.getAdvancedCatalogDefaultPresetId) {
+    return window.CatsUI.getAdvancedCatalogDefaultPresetId(catalog, entryId) || '';
+  }
+
+  const entries = listCreateCatalogEntries(catalog);
+  const resolved = getCreateDefaultSelection(catalog);
+  const defaultEntryId = getDefaultCreateEntryId(catalog, entries);
+  const defaultPresetId = resolved?.modelSelection?.presetId || catalog?.defaultSelection?.presetId;
+  if (
+    entryId === defaultEntryId
+    && defaultPresetId
+    && presets.some((preset) => preset.id === defaultPresetId)
+  ) {
+    return defaultPresetId;
+  }
+  return '';
+}
+
+function buildCreateControlDefaults(catalog, entryId, presetId) {
+  if (window.CatsUI?.getAdvancedEntryControlDefaults) {
+    return window.CatsUI.getAdvancedEntryControlDefaults(catalog, entryId, presetId);
+  }
+  const defaults = {};
+  const preset = findCreateCatalogPreset(catalog, entryId, presetId);
+  if (preset?.controlDefaults && typeof preset.controlDefaults === 'object') {
+    Object.assign(defaults, preset.controlDefaults);
+  }
+
+  const resolved = getCreateDefaultSelection(catalog);
+  if (
+    resolved?.entryId === entryId
+    && (resolved.modelSelection?.presetId || '') === (presetId || '')
+    && resolved.modelSelection?.controls
+    && typeof resolved.modelSelection.controls === 'object'
+  ) {
+    Object.assign(defaults, resolved.modelSelection.controls);
+  }
+
+  const filtered = {};
+  const controls = Array.isArray(catalog?.controls) ? catalog.controls : [];
+  for (const control of controls) {
+    if (!control?.key || control.scope === 'request' || !createControlAppliesToEntry(control, entryId)) {
+      continue;
+    }
+    if (Object.prototype.hasOwnProperty.call(defaults, control.key)) {
+      filtered[control.key] = defaults[control.key];
+    }
+  }
+  return filtered;
+}
+
+function setCreatePresetGroupDisplay(mode) {
+  const presetGroup = document.getElementById('inputPresetGroup');
+  if (!presetGroup) {
+    return;
+  }
+
+  presetGroup.classList.remove('hidden');
+  presetGroup.style.visibility = '';
+  presetGroup.style.pointerEvents = '';
+  presetGroup.setAttribute('aria-hidden', 'false');
+
+  if (mode === 'hidden') {
+    presetGroup.classList.add('hidden');
+    presetGroup.setAttribute('aria-hidden', 'true');
+    return;
+  }
+
+  if (mode === 'reserved') {
+    presetGroup.style.visibility = 'hidden';
+    presetGroup.style.pointerEvents = 'none';
+    presetGroup.setAttribute('aria-hidden', 'true');
+  }
+}
+
+function setCreatePresetStaticLabel(label) {
+  const presetEl = document.getElementById('inputPresetChoice');
+  const staticLabelEl = document.getElementById('inputPresetStaticLabel');
+  if (!presetEl || !staticLabelEl) {
+    return '';
+  }
+
+  const optionLabel = label || 'Standard only';
+  renderCreateRoutingSelectOptions(presetEl, [
+    { value: '', label: optionLabel },
+  ], '');
+  presetEl.disabled = true;
+  presetEl.classList.remove('hidden');
+  staticLabelEl.textContent = '';
+  staticLabelEl.classList.add('hidden');
+  setCreatePresetGroupDisplay('visible');
+  return optionLabel;
+}
+
+function syncCreatePresetSelector(catalog, preserveCurrent = false, allowDefaultPreset = true) {
+  const presetEl = document.getElementById('inputPresetChoice');
+  const entryEl = document.getElementById('inputEntryChoice');
+  const staticLabelEl = document.getElementById('inputPresetStaticLabel');
+  if (!presetEl || !entryEl || !staticLabelEl) {
+    return '';
+  }
+
+  presetEl.classList.remove('hidden');
+  staticLabelEl.classList.add('hidden');
+  staticLabelEl.textContent = '';
+
+  const entryId = entryEl.value || '';
+  if (!catalog || !entryId) {
+    renderCreateRoutingSelectOptions(presetEl, [], '');
+    presetEl.disabled = true;
+    setCreatePresetGroupDisplay('hidden');
+    return '';
+  }
+
+  if (entryId === CUSTOM_CREATE_MODEL_VALUE) {
+    renderCreateRoutingSelectOptions(presetEl, [], '');
+    presetEl.disabled = true;
+    setCreatePresetGroupDisplay('hidden');
+    return '';
+  }
+
+  const presets = listCreateApplicablePresets(catalog, entryId);
+  if (presets.length === 0) {
+    return setCreatePresetStaticLabel('Standard only');
+  }
+
+  const presetOptions = [
+    { value: '', label: 'Standard' },
+    ...presets.map((preset) => ({
+      value: preset.id,
+      label: preset.label || preset.id,
+    })),
+  ];
+  const nextValue = renderCreateRoutingSelectOptions(
+    presetEl,
+    presetOptions,
+    preserveCurrent && presetEl.value
+      ? presetEl.value
+      : (allowDefaultPreset ? getDefaultCreatePresetId(catalog, entryId, presets) : ''),
+  );
+  presetEl.disabled = presetOptions.length <= 1;
+  setCreatePresetGroupDisplay('visible');
+  return nextValue;
+}
+
+function syncCreateRoutingSelectors(catalog, preserveCurrent = false) {
+  const presetEl = document.getElementById('inputPresetChoice');
+  const entryEl = document.getElementById('inputEntryChoice');
+  const entryGroup = document.getElementById('inputEntryGroup');
+  if (!presetEl || !entryEl || !entryGroup) {
+    return;
+  }
+
+  const entries = listCreateCatalogEntries(catalog);
+  if (entries.length === 0) {
+    setLegacyCreateModelRouting('Enter a model id manually.');
+    return;
+  }
+
+  const entryOptions = [
+    ...entries.map((entry) => ({
+      value: entry.id,
+      label: entry.label || entry.id,
+    })),
+    { value: CUSTOM_CREATE_MODEL_VALUE, label: 'Custom legacy model...' },
+  ];
+
+  renderCreateRoutingSelectOptions(
+    entryEl,
+    entryOptions,
+    preserveCurrent && entryEl.value
+      ? entryEl.value
+      : getDefaultCreateEntryId(catalog, entries),
+  );
+  entryEl.disabled = false;
+  entryGroup.classList.remove('hidden');
+  syncCreatePresetSelector(catalog, preserveCurrent, true);
+}
+
+function setLegacyCreateModelRouting(message) {
+  const presetEl = document.getElementById('inputPresetChoice');
+  const entryEl = document.getElementById('inputEntryChoice');
+  const entryGroup = document.getElementById('inputEntryGroup');
+  const hintEl = document.getElementById('inputModelHint');
+  const staticLabelEl = document.getElementById('inputPresetStaticLabel');
+
+  currentCreateModelCatalog = null;
+  renderCreateRoutingSelectOptions(presetEl, [], '');
+  renderCreateRoutingSelectOptions(entryEl, [], '');
+  if (presetEl) presetEl.disabled = true;
+  if (presetEl) presetEl.classList.remove('hidden');
+  if (entryEl) entryEl.disabled = true;
+  if (staticLabelEl) staticLabelEl.classList.add('hidden');
+  if (staticLabelEl) staticLabelEl.textContent = '';
+  setCreatePresetGroupDisplay('hidden');
+  if (entryGroup) entryGroup.classList.add('hidden');
+  setCreateManualModelGroup(true, 'Model ID');
+  if (hintEl) hintEl.textContent = message;
+  setCreateModelSupportBadge('Legacy', 'idle');
+  resetCreateModelControls();
+}
+
+function setCreateManualModelGroup(visible, label = 'Model ID') {
+  const customGroup = document.getElementById('inputModelGroup');
+  const customLabel = document.getElementById('inputModelLabel');
+  if (!customGroup || !customLabel) {
+    return;
+  }
+
+  customLabel.textContent = label;
+  if (visible) {
+    customGroup.classList.remove('hidden');
+    return;
+  }
+
+  customGroup.classList.add('hidden');
+}
+
+function createControlValueOptionAppliesToEntry(option, entryId) {
+  return !Array.isArray(option?.applicableEntryIds)
+    || option.applicableEntryIds.length === 0
+    || option.applicableEntryIds.includes(entryId);
+}
+
+function listCreateControlValueOptions(control, entryId) {
+  const options = Array.isArray(control?.values) ? control.values : [];
+  return options
+    .map((option) => {
+      if (
+        option
+        && typeof option === 'object'
+        && !Array.isArray(option)
+        && Object.prototype.hasOwnProperty.call(option, 'value')
+      ) {
+        return option;
+      }
+      return {
+        value: option,
+        label: String(option),
+      };
+    })
+    .filter((option) => createControlValueOptionAppliesToEntry(option, entryId));
+}
+
+function renderCreateModelControlField(control, value, entryId) {
+  const safeKey = escapeHtml(control.key);
+  const label = escapeHtml(control.label || control.key);
+  const description = control.description
+    ? `<p class="text-[11px] leading-4 text-slate-500">${escapeHtml(control.description)}</p>`
+    : '';
+
+  if (control.kind === 'enum') {
+    const options = listCreateControlValueOptions(control, entryId)
+      .map((option) => `<option value="${escapeHtml(option.value)}" ${String(value) === String(option.value) ? 'selected' : ''}>${escapeHtml(option.label || option.value)}</option>`)
+      .join('');
+    return `
+      <label class="runtime-field">
+        <span class="runtime-field-label !tracking-[0.16em]">${label}</span>
+        <select class="runtime-select" data-model-control-kind="enum" data-model-control-key="${safeKey}">
+          ${options}
+        </select>
+        ${description}
+      </label>
+    `;
+  }
+
+  if (control.kind === 'boolean') {
+    return `
+      <label class="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-sm text-slate-200">
+        <div class="min-w-0">
+          <span class="block text-xs font-medium uppercase tracking-[0.16em] text-slate-500">${label}</span>
+          ${description}
+        </div>
+        <input
+          type="checkbox"
+          class="h-4 w-4 rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-blue-500"
+          data-model-control-kind="boolean"
+          data-model-control-key="${safeKey}"
+          ${value === true ? 'checked' : ''}
+        />
+      </label>
+    `;
+  }
+
+  const inputType = control.kind === 'number' ? 'number' : 'text';
+  const extraAttrs = control.kind === 'number'
+    ? [
+      control.minimum !== undefined ? `min="${escapeHtml(control.minimum)}"` : '',
+      control.maximum !== undefined ? `max="${escapeHtml(control.maximum)}"` : '',
+      control.step !== undefined ? `step="${escapeHtml(control.step)}"` : '',
+    ].filter(Boolean).join(' ')
+    : '';
+  return `
+    <label class="runtime-field">
+      <span class="runtime-field-label !tracking-[0.16em]">${label}</span>
+      <input
+        type="${inputType}"
+        class="runtime-input"
+        data-model-control-kind="${escapeHtml(control.kind)}"
+        data-model-control-key="${safeKey}"
+        value="${value === undefined || value === null ? '' : escapeHtml(value)}"
+        ${extraAttrs}
+      />
+      ${description}
+    </label>
+  `;
+}
+
+function renderCreateModelChoice() {
+  const entryEl = document.getElementById('inputEntryChoice');
+  const presetEl = document.getElementById('inputPresetChoice');
+  const entryGroup = document.getElementById('inputEntryGroup');
+  const hintEl = document.getElementById('inputModelHint');
+  const controlsEl = document.getElementById('inputModelControls');
+  if (!entryEl || !presetEl || !entryGroup || !hintEl || !controlsEl) {
+    return;
+  }
+
+  const catalog = currentCreateModelCatalog;
+  const entryId = entryEl.value || '';
+
+  resetCreateModelControls();
+  setCreateManualModelGroup(false);
+
+  if (!catalog) {
+    hintEl.textContent = 'Enter a model id manually.';
+    entryGroup.classList.add('hidden');
+    setCreatePresetGroupDisplay('hidden');
+    setCreateManualModelGroup(true, 'Model ID');
+    return;
+  }
+
+  entryGroup.classList.remove('hidden');
+
+  if (!entryId || entryId === CUSTOM_CREATE_MODEL_VALUE) {
+    hintEl.textContent = 'Manual model id passthrough.';
+    setCreatePresetGroupDisplay('hidden');
+    setCreateManualModelGroup(true, 'Legacy Model ID');
+    return;
+  }
+
+  const entry = findCreateCatalogEntry(catalog, entryId);
+  const presetId = presetEl.value || '';
+  const preset = presetId ? findCreateCatalogPreset(catalog, entryId, presetId) : null;
+  const controls = window.CatsUI?.listStoredAdvancedControls
+    ? window.CatsUI.listStoredAdvancedControls(catalog, `entry:${entryId}`)
+    : [];
+  const defaultValues = buildCreateControlDefaults(catalog, entryId, presetId);
+
+  const bits = [];
+  if (entry) bits.push(entry.label || entry.id);
+  bits.push(preset?.label || 'Standard');
+  if (catalog.support?.tier) bits.push(`tier: ${catalog.support.tier}`);
+  hintEl.textContent = bits.join(' · ') || 'Advanced catalog selection';
+  if (entry?.notes?.length) {
+    hintEl.textContent += `\n${entry.notes[0]}`;
+  }
+
+  if (controls.length > 0) {
+    controlsEl.innerHTML = controls
+      .map((control) => renderCreateModelControlField(control, defaultValues[control.key], entryId))
+      .join('');
+  }
+}
+
+function onCreateRoutingPresetChange() {
+  renderCreateModelChoice();
+}
+
+function onCreateRoutingEntryChange() {
+  syncCreatePresetSelector(currentCreateModelCatalog, false, false);
+  renderCreateModelChoice();
+}
+
+function readCreateModelControlValues() {
+  const values = {};
+  const controls = document.querySelectorAll('#inputModelControls [data-model-control-key]');
+  for (const el of controls) {
+    const key = el.getAttribute('data-model-control-key');
+    const kind = el.getAttribute('data-model-control-kind');
+    if (!key || !kind) continue;
+    if (kind === 'boolean') {
+      values[key] = Boolean(el.checked);
+      continue;
+    }
+    const raw = typeof el.value === 'string' ? el.value.trim() : '';
+    if (!raw) continue;
+    values[key] = kind === 'number' ? Number(raw) : raw;
+  }
+  return values;
+}
+
+function buildCreateModelPayload() {
+  const customInput = document.getElementById('inputModel');
+  const entryEl = document.getElementById('inputEntryChoice');
+  const presetEl = document.getElementById('inputPresetChoice');
+  const catalog = currentCreateModelCatalog;
+  const entryId = entryEl?.value || '';
+
+  if (!catalog || !entryId || entryId === CUSTOM_CREATE_MODEL_VALUE) {
+    const legacyModel = customInput?.value.trim();
+    return legacyModel ? { model: legacyModel } : {};
+  }
+
+  const presetId = presetEl?.value || '';
+  const modelSelection = {
+    entryId,
+    entryMode: 'explicit',
+    ...(presetId ? { presetId } : {}),
+  };
+  const controls = readCreateModelControlValues();
+  if (Object.keys(controls).length > 0) {
+    modelSelection.controls = controls;
+  }
+  return { modelSelection };
+}
+
+async function refreshCreateModelRouting() {
+  const entryEl = document.getElementById('inputEntryChoice');
+  const presetEl = document.getElementById('inputPresetChoice');
+  const entryGroup = document.getElementById('inputEntryGroup');
+  const hintEl = document.getElementById('inputModelHint');
+  if (!entryEl || !presetEl || !entryGroup || !hintEl) {
+    return;
+  }
+
+  const { providerName, instanceTarget } = currentProviderSelection();
+  const requestId = ++createModelCatalogRequestId;
+  currentCreateModelCatalog = null;
+  setCreateModelSupportBadge('Loading', 'idle');
+  renderCreateRoutingSelectOptions(entryEl, [
+    { value: '', label: 'Loading models...' },
+  ], '');
+  renderCreateRoutingSelectOptions(presetEl, [], '');
+  entryEl.disabled = true;
+  presetEl.disabled = true;
+  setCreatePresetGroupDisplay('hidden');
+  entryGroup.classList.remove('hidden');
+  setCreateManualModelGroup(false);
+  hintEl.textContent = 'Loading model catalog...';
+  resetCreateModelControls();
+
+  try {
+    const catalog = await fetchProviderAdvancedCatalog(providerName, instanceTarget);
+    if (requestId !== createModelCatalogRequestId) return;
+
+    currentCreateModelCatalog = catalog;
+    syncCreateRoutingSelectors(catalog, true);
+
+    const tier = catalog?.support?.tier || 'read_only';
+    setCreateModelSupportBadge(
+      tier === 'full' ? 'Advanced' : (tier === 'entry_only' ? 'Catalog' : 'Read-only'),
+      tier === 'read_only' ? 'idle' : 'active',
+    );
+    renderCreateModelChoice();
+  } catch (error) {
+    if (requestId !== createModelCatalogRequestId) return;
+
+    setLegacyCreateModelRouting(
+      error instanceof Error ? error.message : 'Advanced catalog unavailable.',
+    );
+  }
+}
+
+function sessionInsightCard(title, summary, tags, items) {
+  return `
+    <div class="insight-card">
+      <h4>${escapeHtml(title)}</h4>
+      ${summary ? `<div class="insight-summary">${escapeHtml(summary)}</div>` : ''}
+      ${(tags || []).length > 0 ? `<div class="insight-tags">${renderInsightTags(tags)}</div>` : ''}
+      ${(items || []).length > 0 ? `<ul class="insight-list">${items.join('')}</ul>` : ''}
+    </div>
+  `;
+}
+
+function readReasoningControlEntry(controls) {
+  if (!controls || typeof controls !== 'object') {
+    return null;
+  }
+
+  for (const [key, value] of Object.entries(controls)) {
+    if (key.endsWith('.reasoning_effort') && typeof value === 'string') {
+      return { key, value };
+    }
+  }
+
+  return null;
+}
+
+function formatSessionDetailValue(value, fallback = 'Not set') {
+  if (value === null || value === undefined || value === '') {
+    return `<span class="session-detail-empty">${escapeHtml(fallback)}</span>`;
+  }
+  return escapeHtml(String(value));
+}
+
+function formatSessionDetailJson(value) {
+  if (!value || typeof value !== 'object') {
+    return '<div class="session-detail-empty" style="padding:0 12px 12px;">None</div>';
+  }
+  return `<pre class="session-detail-json">${escapeHtml(JSON.stringify(value, null, 2))}</pre>`;
+}
+
+function formatSessionInstructions(value) {
+  if (typeof value !== 'string' || !value.trim()) {
+    return '<div class="session-detail-empty" style="padding:12px;">None</div>';
+  }
+  return `<pre class="session-detail-instructions">${escapeHtml(value)}</pre>`;
+}
+
+function readSessionDetailUiState(container) {
+  const shell = container?.querySelector?.('[data-session-detail-shell]');
+  const instructions = container?.querySelector?.('[data-session-detail-block="instructions"]');
+  const selection = container?.querySelector?.('[data-session-detail-block="selection"]');
+  const resolution = container?.querySelector?.('[data-session-detail-block="resolution"]');
+  return {
+    expanded: shell instanceof HTMLDetailsElement ? shell.open : sessionDetailUiState.expanded,
+    instructionsOpen: instructions instanceof HTMLDetailsElement
+      ? instructions.open
+      : sessionDetailUiState.instructionsOpen,
+    selectionOpen: selection instanceof HTMLDetailsElement ? selection.open : sessionDetailUiState.selectionOpen,
+    resolutionOpen: resolution instanceof HTMLDetailsElement ? resolution.open : sessionDetailUiState.resolutionOpen,
+  };
+}
+
+function bindSessionDetailState(container) {
+  const shell = container?.querySelector?.('[data-session-detail-shell]');
+  const instructions = container?.querySelector?.('[data-session-detail-block="instructions"]');
+  const selection = container?.querySelector?.('[data-session-detail-block="selection"]');
+  const resolution = container?.querySelector?.('[data-session-detail-block="resolution"]');
+  if (shell instanceof HTMLDetailsElement) {
+    shell.addEventListener('toggle', () => {
+      sessionDetailUiState.expanded = shell.open;
+    });
+  }
+  if (instructions instanceof HTMLDetailsElement) {
+    instructions.addEventListener('toggle', () => {
+      sessionDetailUiState.instructionsOpen = instructions.open;
+    });
+  }
+  if (selection instanceof HTMLDetailsElement) {
+    selection.addEventListener('toggle', () => {
+      sessionDetailUiState.selectionOpen = selection.open;
+    });
+  }
+  if (resolution instanceof HTMLDetailsElement) {
+    resolution.addEventListener('toggle', () => {
+      sessionDetailUiState.resolutionOpen = resolution.open;
+    });
+  }
+}
+
+function renderSessionDetails(session) {
+  const container = document.getElementById('chatSessionDetails');
+  if (!container) {
+    return;
+  }
+  if (!session || !currentSessionDetailsEnabled) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+
+  const providerTarget = session.providerTarget || {};
+  const resolutionEffort = readReasoningControlEntry(session.modelResolution?.controls);
+  const selectionEffort = readReasoningControlEntry(session.modelSelection?.controls);
+  const effectiveEffort = resolutionEffort || selectionEffort;
+  const selectionSummary = session.modelSelection
+    ? [
+        session.modelSelection.entryMode || null,
+        session.modelSelection.entryId || null,
+        session.modelSelection.presetId ? `preset:${session.modelSelection.presetId}` : null,
+      ].filter(Boolean).join(' · ')
+    : '';
+  const summaryMeta = [
+    session.providerName || providerTarget.provider || null,
+    session.providerInstanceId || providerTarget.instance || null,
+    session.model || providerTarget.model || null,
+    effectiveEffort?.value ? `reasoning ${effectiveEffort.value}` : null,
+  ].filter(Boolean).join(' · ');
+  const warningText = Array.isArray(session.modelResolution?.warnings) && session.modelResolution.warnings.length > 0
+    ? session.modelResolution.warnings.join(' | ')
+    : '';
+  const uiState = readSessionDetailUiState(container);
+
+  container.innerHTML = `
+    <details class="session-detail-shell" data-session-detail-shell ${uiState.expanded ? 'open' : ''}>
+      <summary class="session-detail-shell-summary">
+        <span class="session-detail-shell-copy">
+          <span class="session-detail-shell-title-row">
+            <span class="session-detail-shell-title">Session Details</span>
+            ${summaryMeta ? `<span class="session-detail-shell-meta">${escapeHtml(summaryMeta)}</span>` : ''}
+          </span>
+          <span class="session-detail-shell-subtitle">Structured target and effective runtime model settings.</span>
+        </span>
+      </summary>
+      <div class="session-detail-card">
+        <div class="session-detail-grid">
+          <dl class="session-detail-kv">
+            <dt>Provider</dt>
+            <dd>${formatSessionDetailValue(session.providerName || providerTarget.provider)}</dd>
+          </dl>
+          <dl class="session-detail-kv">
+            <dt>Backend</dt>
+            <dd>${formatSessionDetailValue(session.providerBackend || providerTarget.backend)}</dd>
+          </dl>
+          <dl class="session-detail-kv">
+            <dt>Instance</dt>
+            <dd>${formatSessionDetailValue(session.providerInstanceId || providerTarget.instance)}</dd>
+          </dl>
+          <dl class="session-detail-kv">
+            <dt>Model</dt>
+            <dd>${formatSessionDetailValue(session.model || providerTarget.model)}</dd>
+          </dl>
+          <dl class="session-detail-kv">
+            <dt>Reasoning Effort</dt>
+            <dd>${formatSessionDetailValue(effectiveEffort?.value)}</dd>
+          </dl>
+          <dl class="session-detail-kv">
+            <dt>Reasoning Source</dt>
+            <dd>${formatSessionDetailValue(
+              resolutionEffort ? `modelResolution (${resolutionEffort.key})` : (
+                selectionEffort ? `modelSelection (${selectionEffort.key})` : null
+              ),
+            )}</dd>
+          </dl>
+          <dl class="session-detail-kv">
+            <dt>Selection</dt>
+            <dd>${formatSessionDetailValue(selectionSummary)}</dd>
+          </dl>
+          <dl class="session-detail-kv">
+            <dt>Target Route</dt>
+            <dd>${formatSessionDetailValue(providerTarget.target)}</dd>
+          </dl>
+          <dl class="session-detail-kv">
+            <dt>Resolution Warnings</dt>
+            <dd>${formatSessionDetailValue(warningText)}</dd>
+          </dl>
+        </div>
+        <details class="session-detail-block" data-session-detail-block="instructions" ${uiState.instructionsOpen ? 'open' : ''}>
+          <summary>Effective Session Instructions</summary>
+          ${formatSessionInstructions(currentSessionInstructions)}
+        </details>
+        <details class="session-detail-block" data-session-detail-block="selection" ${uiState.selectionOpen ? 'open' : ''}>
+          <summary>Requested Model Selection JSON</summary>
+          ${formatSessionDetailJson(session.modelSelection)}
+        </details>
+        <details class="session-detail-block" data-session-detail-block="resolution" ${uiState.resolutionOpen ? 'open' : ''}>
+          <summary>Effective Model Resolution JSON</summary>
+          ${formatSessionDetailJson(session.modelResolution)}
+        </details>
+      </div>
+    </details>
+  `;
+  container.style.display = '';
+  bindSessionDetailState(container);
+}
+
+function renderSessionInsights(session) {
+  const container = document.getElementById('chatSessionInsights');
+  if (!container) {
+    return;
+  }
+
+  const inspection = session?.inspection || {};
+  const strategy = inspection.strategy || {};
+  const cards = [];
+
+  const effectiveStrategy = session?.effectiveStrategy || strategy.effectiveStrategy || strategy.state?.effectiveStrategy;
+  if (effectiveStrategy || strategy.requestedStrategy || strategy.resolutionSource || strategy.acceptanceCriteria) {
+    const items = [];
+    if (strategy.acceptanceCriteria) {
+      items.push(`<li><strong>Acceptance</strong><span class="insight-secondary">${escapeHtml(strategy.acceptanceCriteria)}</span></li>`);
+    }
+    if (strategy.correlation && typeof strategy.correlation === 'object') {
+      const correlation = Object.entries(strategy.correlation)
+        .slice(0, 3)
+        .map(([key, value]) => `${key}:${value}`)
+        .join(' · ');
+      if (correlation) {
+        items.push(`<li><strong>Correlation</strong><span class="insight-secondary">${escapeHtml(correlation)}</span></li>`);
+      }
+    }
+    cards.push(sessionInsightCard(
+      'Execution Strategy',
+      strategy.state?.summary || strategy.summary || 'Runtime-owned execution strategy and plan-state visibility.',
+      [
+        effectiveStrategy ? `effective: ${effectiveStrategy}` : null,
+        strategy.requestedStrategy ? `requested: ${strategy.requestedStrategy}` : null,
+        strategy.resolutionSource ? `resolved via ${humanizeToken(strategy.resolutionSource)}` : null,
+      ],
+      items,
+    ));
+  }
+
+  if ((inspection.services || []).length > 0) {
+    const items = inspection.services.slice(0, 4).map((service) => {
+      const secondary = [service.status, service.url].filter(Boolean).join(' · ');
+      return `<li><strong>${escapeHtml(service.name || service.id)}</strong>${
+        secondary ? `<span class="insight-secondary">${
+          service.url
+            ? `<a class="insight-link" href="${escapeHtml(service.url)}" target="_blank" rel="noreferrer">${escapeHtml(secondary)}</a>`
+            : escapeHtml(secondary)
+        }</span>` : ''
+      }</li>`;
+    });
+    if (inspection.services.length > 4) {
+      items.push(`<li><strong>${escapeHtml(String(inspection.services.length - 4))} more service(s)</strong></li>`);
+    }
+    cards.push(sessionInsightCard(
+      'Runtime Services',
+      'Session-published services and remote runtime endpoints surfaced by the runtime.',
+      [`${inspection.services.length} service(s)`],
+      items,
+    ));
+  }
+
+  if ((inspection.artifacts || []).length > 0) {
+    const items = inspection.artifacts.slice(0, 4).map((artifact) => {
+      const secondary = [artifact.kind, artifact.path || artifact.uri, artifact.mediaType].filter(Boolean).join(' · ');
+      return `<li><strong>${escapeHtml(artifact.label || artifact.id)}</strong>${
+        secondary ? `<span class="insight-secondary">${escapeHtml(secondary)}</span>` : ''
+      }</li>`;
+    });
+    if (inspection.artifacts.length > 4) {
+      items.push(`<li><strong>${escapeHtml(String(inspection.artifacts.length - 4))} more artifact(s)</strong></li>`);
+    }
+    cards.push(sessionInsightCard(
+      'Artifacts',
+      'Runtime-visible artifacts emitted by the session or bound into the current run.',
+      [`${inspection.artifacts.length} artifact(s)`],
+      items,
+    ));
+  }
+
+  if ((inspection.previewSurfaces || []).length > 0) {
+    const items = inspection.previewSurfaces.slice(0, 4).map((surface) => {
+      const secondary = [surface.kind, surface.status, surface.renderHint, surface.url || surface.path].filter(Boolean).join(' · ');
+      return `<li><strong>${escapeHtml(surface.label || surface.id)}</strong>${
+        secondary ? `<span class="insight-secondary">${escapeHtml(secondary)}</span>` : ''
+      }</li>`;
+    });
+    if (inspection.previewSurfaces.length > 4) {
+      items.push(`<li><strong>${escapeHtml(String(inspection.previewSurfaces.length - 4))} more preview surface(s)</strong></li>`);
+    }
+    cards.push(sessionInsightCard(
+      'Preview Surfaces',
+      'Published previews, service surfaces, and browser-backed surfaces attached to this session.',
+      [`${inspection.previewSurfaces.length} surface(s)`],
+      items,
+    ));
+  }
+
+  if (cards.length === 0) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+
+  container.innerHTML = cards.join('');
+  container.style.display = '';
+}
+
+function setCreateModalEnabled(enabled) {
+  document.getElementById('createSessionBtn').disabled = !enabled;
+}
+
+function syncProviderSelect() {
+  const providerSelect = document.getElementById('inputProvider');
+  if (!providerCatalog?.providers) {
+    providerSelect.disabled = true;
+    setCreateModalEnabled(false);
+    return;
+  }
+
+  const current = providerSelect.value || 'claude';
+  const providers = configuredProviderNamesRaw();
+
+  if (providers.length === 0) {
+    providerSelect.innerHTML = '<option value="">No configured providers</option>';
+    providerSelect.value = '';
+    providerSelect.disabled = true;
+    setCreateModalEnabled(false);
+    return;
+  }
+
+  providerSelect.innerHTML = providers
+    .map((providerName) => `<option value="${providerName}">${providerName}</option>`)
+    .join('');
+  providerSelect.disabled = false;
+  providerSelect.value = providers.includes(current)
+    ? current
+    : providers[0];
+  setCreateModalEnabled(true);
+}
+
+function onProviderChange() {
+  const providerName = document.getElementById('inputProvider').value;
+  const provider = providerName ? providerMeta(providerName) : null;
+  const instanceSelect = document.getElementById('inputInstance');
+  const instanceGroup = document.getElementById('instanceGroup');
+  const instances = provider?.instances || [];
+  const selected = instanceSelect.value;
+
+  if (instances.length === 0) {
+    instanceSelect.innerHTML = '';
+    instanceSelect.value = '';
+    instanceSelect.disabled = true;
+    instanceGroup.style.display = 'none';
+    setCreateModalEnabled(false);
+    setLegacyCreateModelRouting('Enter a model id manually.');
+    return;
+  }
+
+  instanceSelect.innerHTML = instances
+    .map((instance) => `<option value="${rawInstanceTargetValue(instance)}">${rawInstanceTargetValue(instance)}</option>`)
+    .join('');
+  const defaultInstance = instances.find((instance) => (
+    instance.id === provider?.defaultInstance
+    && (!provider?.defaultBackend || instance.backend === provider.defaultBackend)
+  ));
+  instanceSelect.value = instances.some((instance) => (instance.target || instance.id) === selected)
+    ? selected
+    : rawInstanceTargetValue(defaultInstance || instances[0]);
+  instanceSelect.disabled = instances.length <= 1;
+  instanceGroup.style.display = '';
+  setCreateModalEnabled(true);
+  void refreshCreateModelRouting();
+}
+
+function onInstanceChange() {
+  void refreshCreateModelRouting();
+}
+
+async function refreshProviderCatalog() {
+  try {
+    const res = await fetch(`${API_BASE}/providers/config`, { headers: headers() });
+    if (!res.ok) {
+      return false;
+    }
+
+    const data = await res.json();
+    providerCatalog = data;
+    syncProviderSelect();
+    onProviderChange();
+    renderDiscoveryStatus(discoveryStatusPayload);
+    refreshSessions();
+    if (currentSessionId) {
+      refreshSession();
+    }
+    return true;
+  } catch {
+    // Leave the dashboard on its static fallback options.
+    return false;
+  }
+}
+
+function formatDiscoveryState(state) {
+  switch (state) {
+    case 'not_applicable':
+      return 'native only';
+    case 'idle':
+      return 'idle';
+    case 'running':
+      return 'scanning';
+    case 'active':
+      return 'active';
+    case 'skipped':
+      return 'skipped';
+    case 'disabled':
+      return 'disabled';
+    case 'failed':
+      return 'error';
+    default:
+      return state || 'unknown';
+  }
+}
+
+function buildDiscoveryTooltip(payload) {
+  const runtimeEntries = configuredCliRuntimeInstances();
+  const runtimeSummary = summarizeCliRuntimes(runtimeEntries);
+  const wsl = payload?.wsl || {};
+  const docker = payload?.docker || {};
+  const summary = wsl.summary || {};
+  const tooltipLines = [];
+
+  if (runtimeEntries.length > 0) {
+    tooltipLines.push(`Configured CLI runtime instances: ${runtimeEntries.length}`);
+    tooltipLines.push(`Summary: ${runtimeSummary}`);
+    for (const entry of runtimeEntries) {
+      tooltipLines.push(`- ${formatRuntimeDescriptor(entry)}`);
+    }
+  } else if (providerCatalog?.providers) {
+    tooltipLines.push('No CLI runtime instances configured');
+  } else {
+    tooltipLines.push('Runtime config is still loading');
+  }
+
+  if (payload?.wsl || payload?.docker) {
+    tooltipLines.push('');
+    tooltipLines.push('Background discovery:');
+  }
+
+  if (payload?.wsl) {
+    tooltipLines.push(
+      `WSL ${wsl.policy || 'always'} - ${summary.message || formatDiscoveryState(summary.state || 'idle')}`,
+    );
+  }
+  if (payload?.docker) {
+    tooltipLines.push(
+      `Docker ${docker.policy || 'if_running'} - ${docker.summary?.message || 'No Docker discovery status'}`,
+    );
+  }
+
+  return tooltipLines.join('\n');
+}
+
+function renderDiscoveryStatus(payload) {
+  discoveryStatusPayload = payload || discoveryStatusPayload;
+
+  const tooltip = buildDiscoveryTooltip(discoveryStatusPayload);
+  window.__runtimeDiscoveryTooltip = tooltip;
+
+  const group = document.getElementById('runtimeStatus');
+  const dot = document.getElementById('runtimeStatusDot');
+  const policyEl = document.getElementById('runtimeStatusTitle');
+  const labelEl = document.getElementById('runtimeStatusLabel');
+  if (!group || !dot || !policyEl || !labelEl) {
+    return;
+  }
+  const runtimeEntries = configuredCliRuntimeInstances();
+  const runtimeSummary = summarizeCliRuntimes(runtimeEntries);
+  const wsl = payload?.wsl || {};
+  const summary = wsl.summary || {};
+  const state = summary.state === 'failed'
+    ? 'failed'
+    : runtimeEntries.length > 0
+      ? 'active'
+      : (providerCatalog?.providers ? 'not_applicable' : 'idle');
+
+  dot.dataset.state = state;
+  policyEl.textContent = 'CLI runtimes';
+  labelEl.textContent = runtimeEntries.length > 0
+    ? runtimeSummary
+      : (providerCatalog?.providers
+      ? 'No CLI runtimes configured'
+      : 'Loading runtime config...');
+  group.title = tooltip;
+}
+
+async function refreshDiscoveryStatus() {
+  try {
+    const res = await fetch(`${API_BASE}/discovery/status`, { headers: headers() });
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        renderDiscoveryStatus({
+          wsl: {
+            policy: 'locked',
+            summary: {
+              state: 'disabled',
+              message: 'API key required for discovery status',
+            },
+            providers: {},
+          },
+        });
+        return;
+      }
+
+      renderDiscoveryStatus({
+        wsl: {
+          policy: 'error',
+          summary: {
+            state: 'failed',
+            message: `Discovery status request failed (${res.status})`,
+          },
+          providers: {},
+        },
+      });
+      return;
+    }
+
+    renderDiscoveryStatus(await res.json());
+  } catch (e) {
+    renderDiscoveryStatus({
+      wsl: {
+        policy: 'error',
+        summary: {
+          state: 'failed',
+          message: `Discovery status unavailable: ${e.message}`,
+        },
+        providers: {},
+      },
+    });
+  }
+}
+
+function renderSessionScanStatus(input) {
+  const root = document.getElementById('sessionScanStatus');
+  const dot = document.getElementById('sessionScanStatusDot');
+  const text = document.getElementById('sessionScanStatusText');
+  const progress = document.getElementById('sessionScanProgress');
+  if (!root || !dot || !text || !progress) return;
+
+  const visible = input?.visible === true;
+  root.classList.toggle('hidden', !visible);
+  const setTooltip = (value) => {
+    if (window.CatsUI && typeof window.CatsUI.setRuntimeTooltip === 'function') {
+      window.CatsUI.setRuntimeTooltip(root, value || '');
+    } else if (value) {
+      root.setAttribute('data-runtime-tooltip', value);
+      root.removeAttribute('title');
+    } else {
+      root.removeAttribute('data-runtime-tooltip');
+      root.removeAttribute('title');
+    }
+  };
+  if (!visible) {
+    setTooltip('');
+    return;
+  }
+
+  text.textContent = input.text || '';
+  dot.dataset.state = input.state || 'idle';
+  progress.classList.toggle('hidden', input.running !== true);
+  setTooltip(input.title || '');
+}
+
+function dismissSessionScanStatus() {
+  renderSessionScanStatus({ visible: false });
+}
+
+function setSessionScanBusy(isBusy) {
+  sessionScanInFlight = isBusy;
+  for (const id of ['scanSessionsBtn', 'deleteAllSessionsBtn', 'newSessionBtn']) {
+    const button = document.getElementById(id);
+    if (button) {
+      button.disabled = isBusy;
+    }
+  }
+  const sessionList = document.getElementById('sessionList');
+  if (sessionList) {
+    sessionList.classList.toggle('pointer-events-none', isBusy);
+    sessionList.classList.toggle('opacity-60', isBusy);
+  }
+}
+
+function clearCurrentSessionSelection() {
+  disconnectObserver();
+  currentSessionId = null;
+  currentSessionInstructions = null;
+  currentSessionDetailsEnabled = false;
+  document.getElementById('chatContainer').style.display = 'none';
+  document.getElementById('chatPlaceholder').style.display = '';
+  renderSessionInsights(null);
+  renderSessionDetails(null);
+}
+
+async function revalidateCurrentSessionSelection() {
+  if (!currentSessionId) return;
+  try {
+    const res = await fetch(`${API_BASE}/sessions/${currentSessionId}`, { headers: headers() });
+    if (res.status === 404) {
+      clearCurrentSessionSelection();
+      return;
+    }
+    if (res.ok && !isStreaming) {
+      await refreshSession();
+    }
+  } catch {}
+}
+
+function summarizeManualSessionDiscovery(result) {
+  const summary = result?.summary || {};
+  const scanned = summary.scannedTargets || 0;
+  const failed = summary.failedTargets || 0;
+  const imported = summary.importedCount || 0;
+  const discovered = summary.discoveredCount || 0;
+  if ((summary.totalTargets || 0) === 0) {
+    return {
+      state: 'idle',
+      text: 'No WSL/Docker targets configured.',
+      title: 'No configured CLI provider instances use WSL or Docker runtime mode.',
+    };
+  }
+
+  const text = failed > 0
+    ? `Scanned ${scanned}/${summary.totalTargets} targets. Imported ${imported} session(s).`
+    : `Scanned ${summary.totalTargets} targets. Imported ${imported} session(s).`;
+  const titleLines = [
+    `Discovered sessions: ${discovered}`,
+    `Imported new sessions: ${imported}`,
+  ];
+  for (const target of result?.targets || []) {
+    const runtimeParts = [target.runtime?.mode];
+    if (target.runtime?.distro) runtimeParts.push(target.runtime.distro);
+    if (target.runtime?.container) runtimeParts.push(target.runtime.container);
+    titleLines.push(
+      `${target.provider}@${target.instanceId} (${runtimeParts.filter(Boolean).join(' / ')}) - ${target.status}: ${target.message}`,
+    );
+  }
+  return {
+    state: failed > 0 ? 'failed' : 'active',
+    text,
+    title: titleLines.join('\n'),
+  };
+}
+
+async function manualScanSessions() {
+  if (sessionScanInFlight) return;
+
+  const targetCount = manualSessionDiscoveryTargets().length;
+  setSessionScanBusy(true);
+  renderSessionScanStatus({
+    visible: true,
+    running: true,
+    state: 'running',
+    text: targetCount > 0
+      ? `Scanning ${targetCount} WSL/Docker target(s)...`
+      : 'Scanning WSL/Docker session targets...',
+    title: '',
+  });
+
+  try {
+    const res = await fetch(`${API_BASE}/sessions/discover`, {
+      method: 'POST',
+      headers: headers(),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(body.error || `HTTP ${res.status}`);
+    }
+
+    const summary = summarizeManualSessionDiscovery(body);
+    renderSessionScanStatus({
+      visible: true,
+      running: false,
+      ...summary,
+    });
+    await refreshSessions();
+    await revalidateCurrentSessionSelection();
+    await refreshDiscoveryStatus();
+  } catch (error) {
+    renderSessionScanStatus({
+      visible: true,
+      running: false,
+      state: 'failed',
+      text: `Session scan failed: ${error.message}`,
+      title: error.message,
+    });
+  } finally {
+    setSessionScanBusy(false);
+  }
+}
+
+// --- Sessions ---
+async function refreshSessions() {
+  try {
+    const res = await fetch(`${API_BASE}/sessions`, { headers: headers() });
+    if (!res.ok) {
+      const el = document.getElementById('sessionList');
+      if (res.status === 401 || res.status === 403) {
+        el.innerHTML = '<div class="runtime-empty !rounded-2xl !px-4 !py-10"><div class="runtime-empty-icon">🔒</div><div>API Key required</div></div>';
+        document.getElementById('sessionCount').textContent = '0';
+      }
+      return;
+    }
+    const data = await res.json();
+    document.getElementById('sessionCount').textContent = String(data.count || 0);
+    renderSessionList(data.sessions);
+  } catch (e) {
+    const el = document.getElementById('sessionList');
+    el.innerHTML = `<div class="runtime-empty !rounded-2xl !px-4 !py-10"><div class="runtime-empty-icon">!</div><div>Connection error: ${e.message}</div></div>`;
+    document.getElementById('sessionCount').textContent = '0';
+  }
+}
+
+function normalizeCwdPath(cwd) {
+  return cwd ? cwd.replace(/\\/g, '/') : 'unknown';
+}
+
+function workspaceKeyFromCwd(cwd) {
+  const normalized = normalizeCwdPath(cwd);
+  if (/^[A-Za-z]:\//.test(normalized) || normalized.startsWith('//')) {
+    return normalized.toLowerCase();
+  }
+  return normalized;
+}
+
+function workspaceKeyForSession(session) {
+  return session.workspaceKey || workspaceKeyFromCwd(session.cwd);
+}
+
+function pickWorkspaceLabel(current, candidate) {
+  if (!current || current === 'unknown') return candidate;
+  if (!candidate || candidate === 'unknown') return current;
+  if (current.toLowerCase() === candidate.toLowerCase()) {
+    if (!/[A-Z]/.test(current) && /[A-Z]/.test(candidate)) {
+      return candidate;
+    }
+  }
+  return current;
+}
+
+function sessionPreviewText(session) {
+  const inspection = session?.inspection;
+  const currentInput = inspection?.currentRun?.inputPreview;
+  if (typeof currentInput === 'string' && currentInput.trim()) {
+    return currentInput.trim();
+  }
+
+  const lastInput = inspection?.lastRun?.inputPreview;
+  if (typeof lastInput === 'string' && lastInput.trim()) {
+    return lastInput.trim();
+  }
+
+  const persistedInput = session?.lastInputPreview;
+  if (typeof persistedInput === 'string' && persistedInput.trim()) {
+    return persistedInput.trim();
+  }
+
+  const summary = session?.summary;
+  if (typeof summary === 'string' && summary.trim()) {
+    return summary.trim();
+  }
+
+  return session?.id ? String(session.id).slice(0, 8) : '';
+}
+
+function renderSessionList(sessions) {
+  const el = document.getElementById('sessionList');
+  if (!sessions || sessions.length === 0) {
+    el.innerHTML = '<div class="runtime-empty !rounded-2xl !px-4 !py-10"><div class="runtime-empty-icon">~</div><div>No sessions yet</div></div>';
+    return;
+  }
+
+  // Sort sessions by last activity (most recent first)
+  const byActivity = (a, b) => {
+    const ta = a.lastActivity || a.updatedAt || a.createdAt || '';
+    const tb = b.lastActivity || b.updatedAt || b.createdAt || '';
+    return tb.localeCompare(ta);
+  };
+  sessions.sort(byActivity);
+
+  // Group by project (cwd)
+  const groups = new Map();
+  for (const s of sessions) {
+    const workspaceKey = workspaceKeyForSession(s);
+    const displayCwd = normalizeCwdPath(s.cwd);
+    if (!groups.has(workspaceKey)) {
+      groups.set(workspaceKey, { cwd: displayCwd, items: [] });
+    }
+    const group = groups.get(workspaceKey);
+    group.cwd = pickWorkspaceLabel(group.cwd, displayCwd);
+    group.items.push(s);
+  }
+
+  el.innerHTML = Array.from(groups.entries()).map(([workspaceKey, group]) => {
+    const { cwd, items } = group;
+    const projectName = cwd.split('/').pop() || cwd;
+    const isCollapsed = collapsedGroups.has(workspaceKey);
+    const dots = items
+      .filter(s => isInteractive(s))
+      .map(s => `<span class="sc-dot ${s.status === 'busy' ? 'sc-dot-busy' : 'sc-dot-ready'}"></span>`)
+      .join('');
+
+    // Determine provider(s) in this group for left border color
+    const providers = [...new Set(items.map(s => s.providerName || 'claude'))];
+    const providerAttr = providers.length === 1 ? providers[0] : 'mixed';
+
+    const groupKey = workspaceKey.replace(/'/g, "\\'");
+    const groupLabel = cwd.replace(/'/g, "\\'");
+    const isDeleting = groupDeleteState.has(workspaceKey);
+
+    const cards = items.map(s => {
+      const summaryText = sessionPreviewText(s);
+      const isActive = s.id === currentSessionId;
+      const activity = sessionActivity(s);
+      const controls = sessionControls(s);
+      const prov = s.providerName || 'claude';
+      const instanceLabel = shouldShowInstance(s)
+        ? `<span class="instance-badge">${formatSessionInstance(s)}</span>`
+        : '';
+      return `
+        <div class="session-card ${isActive ? 'active' : ''}" onclick="selectSession('${s.id}')">
+          <div class="sc-top">
+            <span class="sc-id">
+              ${activity === 'interactive' ? `<span class="sc-dot ${s.status === 'busy' ? 'sc-dot-busy' : 'sc-dot-ready'}"></span>` : ''}
+              ${escapeHtml(summaryText)}
+            </span>
+            ${controls.canDelete ? `<button class="sc-delete" onclick="event.stopPropagation();deleteSession('${s.id}')" title="Delete session" aria-label="Delete session">
+              <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 6h18" />
+                <path d="M8 6V4h8v2" />
+                <path d="M19 6l-1 14H6L5 6" />
+                <path d="M10 11v6" />
+                <path d="M14 11v6" />
+              </svg>
+            </button>` : ''}
+          </div>
+          <div class="sc-meta">
+            <span class="provider-badge" data-p="${prov}">${prov}</span>
+            ${instanceLabel}
+            <span>${s.messageCount || 0} msgs</span>
+            ${s.lastActivity ? `<span>${new Date(s.lastActivity).toLocaleString()}</span>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+
+    const deletableCount = items.filter(s => sessionControls(s).canDelete).length;
+
+    return `
+      <div class="project-group ${isCollapsed ? 'collapsed' : ''}">
+        <div class="project-header" data-provider="${providerAttr}" onclick="toggleGroup('${groupKey}')">
+          <span class="chevron">&#9660;</span>
+          <span class="project-label">
+            <span class="project-name">${escapeHtml(projectName)}</span>
+            <span class="project-count">(${items.length})</span>
+          </span>
+          <span class="project-actions">
+            <span class="project-dots">${dots}</span>
+            <button class="project-delete" ${(isDeleting || deletableCount === 0) ? 'disabled' : ''}
+              onclick="event.stopPropagation();deleteGroup('${groupKey}', '${groupLabel}')"
+              title="${deletableCount === 0 ? 'No deletable sessions in this project right now' : 'Delete all sessions in this project'}"
+              aria-label="Delete project sessions">
+              ${isDeleting ? '<span class="spinner"></span>' : `<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 6h18" />
+                <path d="M8 6V4h8v2" />
+                <path d="M19 6l-1 14H6L5 6" />
+                <path d="M10 11v6" />
+                <path d="M14 11v6" />
+              </svg>`}
+            </button>
+          </span>
+        </div>
+        <div class="project-sessions">${cards}</div>
+      </div>`;
+  }).join('');
+}
+
+const collapsedGroups = new Set();
+function toggleGroup(cwd) {
+  if (collapsedGroups.has(cwd)) collapsedGroups.delete(cwd);
+  else collapsedGroups.add(cwd);
+  refreshSessions();
+}
+
+async function selectSession(id) {
+  disconnectObserver();
+  currentSessionId = id;
+  document.getElementById('chatPlaceholder').style.display = 'none';
+  const container = document.getElementById('chatContainer');
+  container.style.display = 'flex';
+  document.getElementById('chatMessages').innerHTML = '';
+  await loadHistory(id);
+  await refreshSession();
+  refreshSessions();
+  // If the session is live, connect observer for real-time events
+  try {
+    const res = await fetch(`${API_BASE}/sessions/${id}`, { headers: headers() });
+    if (res.ok) {
+      const s = await res.json();
+      if (isInteractive(s) && s.attached) {
+        connectObserver(id);
+      }
+    }
+  } catch {}
+}
+
+function connectObserver(id) {
+  disconnectObserver();
+  const key = apiKey();
+  const tokenParam = key ? `?token=${encodeURIComponent(key)}` : '';
+  observeSource = new EventSource(`${API_BASE}/sessions/${id}/stream${tokenParam}`);
+  observeFullText = '';
+  observeAssistantEl = null;
+
+  observeSource.addEventListener('text', (e) => {
+    if (isStreaming) return; // avoid duplicates when sending from dashboard
+    const event = JSON.parse(e.data);
+    if (!observeAssistantEl) {
+      observeAssistantEl = addAssistantMsg('');
+    }
+    observeFullText += event.text || '';
+    observeAssistantEl.innerHTML = renderMd(observeFullText);
+    scrollToBottom();
+  });
+
+  observeSource.addEventListener('tool_use', (e) => {
+    if (isStreaming) return;
+    const event = JSON.parse(e.data);
+    addToolMsg(`Tool: ${event.toolName || 'unknown'}`);
+  });
+
+  observeSource.addEventListener('result', (e) => {
+    if (isStreaming) return;
+    const event = JSON.parse(e.data);
+    if (event.usage) {
+      addSystemMsg(`Tokens: ${formatUsageSummary(event.usage)}`);
+    }
+    // Reset for next message
+    observeFullText = '';
+    observeAssistantEl = null;
+    refreshSession();
+    refreshSessions();
+  });
+
+  observeSource.addEventListener('session_closed', () => {
+    addSystemMsg('Session closed.');
+    disconnectObserver();
+    refreshSession();
+    refreshSessions();
+  });
+
+  observeSource.addEventListener('error', (e) => {
+    if (isStreaming) return;
+    if (!e.data) return; // transport error — no payload
+    try {
+      const event = JSON.parse(e.data);
+      addErrorMsg(event.text || 'Unknown error');
+    } catch { /* ignore malformed data */ }
+  });
+
+  observeSource.onerror = () => {
+    // Let EventSource auto-reconnect on transient errors (network blip, restart).
+    // HTTP errors (404, 401) set readyState to CLOSED — clean up only then.
+    if (observeSource?.readyState === EventSource.CLOSED) {
+      disconnectObserver();
+    }
+  };
+}
+
+function disconnectObserver() {
+  if (observeSource) {
+    observeSource.close();
+    observeSource = null;
+  }
+  observeFullText = '';
+  observeAssistantEl = null;
+}
+
+async function loadHistory(id) {
+  currentSessionInstructions = null;
+  currentSessionDetailsEnabled = false;
+  try {
+    const res = await fetch(`${API_BASE}/sessions/${id}/history`, { headers: headers() });
+    if (!res.ok) return;
+    const data = await res.json();
+    currentSessionDetailsEnabled = data.sessionDetailsEnabled === true;
+    currentSessionInstructions = currentSessionDetailsEnabled && 'instructions' in data ? data.instructions : null;
+    for (const msg of data.messages || []) {
+      if (msg.role === 'user') addUserMsg(msg.text);
+      else if (msg.role === 'assistant') addAssistantMsg(msg.text);
+    }
+  } catch {}
+}
+
+function readPromptInputTokens(input) {
+  if (!input || typeof input !== 'object') return 0;
+  if (typeof input.promptInputTokens === 'number') {
+    return input.promptInputTokens;
+  }
+  const cacheRead = typeof input.cacheReadInputTokens === 'number'
+    ? input.cacheReadInputTokens
+    : (typeof input.totalCacheReadInputTokens === 'number' ? input.totalCacheReadInputTokens : 0);
+  const cacheCreate = typeof input.cacheCreationInputTokens === 'number'
+    ? input.cacheCreationInputTokens
+    : (typeof input.totalCacheCreationInputTokens === 'number' ? input.totalCacheCreationInputTokens : 0);
+  const totalInput = typeof input.inputTokens === 'number'
+    ? input.inputTokens
+    : (typeof input.totalInputTokens === 'number' ? input.totalInputTokens : 0);
+  return Math.max(totalInput - cacheRead - cacheCreate, 0);
+}
+
+function hasInputBreakdown(input) {
+  if (!input || typeof input !== 'object') return false;
+  return typeof input.promptInputTokens === 'number'
+    || typeof input.cacheReadInputTokens === 'number'
+    || typeof input.cacheCreationInputTokens === 'number'
+    || typeof input.totalPromptInputTokens === 'number'
+    || typeof input.totalCacheReadInputTokens === 'number'
+    || typeof input.totalCacheCreationInputTokens === 'number';
+}
+
+function formatUsageSummary(input) {
+  if (!input || typeof input !== 'object') return '';
+  const outputTokens = typeof input.outputTokens === 'number'
+    ? input.outputTokens
+    : (typeof input.totalOutputTokens === 'number' ? input.totalOutputTokens : 0);
+  if (hasInputBreakdown(input)) {
+    const promptInputTokens = readPromptInputTokens(input);
+    const cacheReadInputTokens = typeof input.cacheReadInputTokens === 'number'
+      ? input.cacheReadInputTokens
+      : (typeof input.totalCacheReadInputTokens === 'number' ? input.totalCacheReadInputTokens : 0);
+    const cacheCreationInputTokens = typeof input.cacheCreationInputTokens === 'number'
+      ? input.cacheCreationInputTokens
+      : (typeof input.totalCacheCreationInputTokens === 'number' ? input.totalCacheCreationInputTokens : 0);
+    const parts = [];
+    if (promptInputTokens > 0 || outputTokens > 0) {
+      parts.push(`${promptInputTokens.toLocaleString()} prompt`);
+    }
+    if (cacheReadInputTokens > 0) {
+      parts.push(`${cacheReadInputTokens.toLocaleString()} cache-read`);
+    }
+    if (cacheCreationInputTokens > 0) {
+      parts.push(`${cacheCreationInputTokens.toLocaleString()} cache-create`);
+    }
+    parts.push(`${outputTokens.toLocaleString()} out`);
+    return parts.join(' / ');
+  }
+
+  const inputTokens = typeof input.inputTokens === 'number'
+    ? input.inputTokens
+    : (typeof input.totalInputTokens === 'number' ? input.totalInputTokens : 0);
+  return `${inputTokens.toLocaleString()} in / ${outputTokens.toLocaleString()} out`;
+}
+
+async function refreshSession() {
+  if (!currentSessionId) return;
+  try {
+    const res = await fetch(`${API_BASE}/sessions/${currentSessionId}`, { headers: headers() });
+    if (!res.ok) return;
+    const s = await res.json();
+    const cwdParts = s.cwd ? s.cwd.replace(/\\/g, '/').split('/') : [];
+    const projectName = cwdParts[cwdParts.length - 1] || s.id.slice(0, 8);
+    document.getElementById('chatSessionId').textContent = projectName;
+    const activity = sessionActivity(s);
+    const controls = sessionControls(s);
+    const badge = document.getElementById('chatSessionStatus');
+    if (activity === 'interactive') {
+      const dotClass = s.status === 'busy' ? 'sc-dot-busy' : 'sc-dot-ready';
+      const label = s.attached
+        ? (s.status === 'busy' ? 'busy' : 'live')
+        : 'observe-only';
+      badge.innerHTML = `<span class="sc-dot ${dotClass}"></span> ${label}`;
+      badge.style.display = '';
+    } else if (activity === 'tearing_down') {
+      badge.textContent = 'closing';
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
+    const meta = [];
+    if (s.origin) meta.push(s.origin);
+    if (s.ownership) meta.push(humanizeToken(s.ownership));
+    if (s.resumeStrategy && s.resumeStrategy !== 'none') meta.push(`resume: ${humanizeToken(s.resumeStrategy)}`);
+    if (!s.attached && activity === 'interactive') meta.push('external active');
+    if (shouldShowInstance(s)) meta.push(`instance: ${formatSessionInstance(s)}`);
+    const workspaceBits = [];
+    if (s.workspaceKind) workspaceBits.push(s.workspaceKind);
+    if (s.workspaceAccess) workspaceBits.push(s.workspaceAccess);
+    if (workspaceBits.length > 0) meta.push(workspaceBits.join(' · '));
+    if (s.cwd) meta.push(s.cwd.replace(/\\/g, '/'));
+    if (s.model) meta.push(s.model);
+    meta.push(`${s.messageCount || 0} msgs`);
+    if (
+      s.totalInputTokens
+      || s.totalOutputTokens
+      || s.totalPromptInputTokens
+      || s.totalCacheReadInputTokens
+      || s.totalCacheCreationInputTokens
+    ) {
+      meta.push(`${formatUsageSummary(s)} tokens`);
+    }
+    document.getElementById('chatSessionMeta').textContent = meta.join(' | ');
+    renderSessionInsights(s);
+    renderSessionDetails(s);
+
+    const canResume = controls.canResume;
+    document.getElementById('btnClose').style.display = controls.canClose ? '' : 'none';
+    document.getElementById('btnResume').style.display = canResume ? '' : 'none';
+    document.getElementById('btnRefresh').style.display = controls.canRefresh ? '' : 'none';
+    document.getElementById('chatInputArea').style.display = '';
+    const msgInput = document.getElementById('msgInput');
+    const btnSend = document.getElementById('btnSend');
+    msgInput.disabled = !controls.canSend;
+    btnSend.disabled = !controls.canSend;
+    if (activity === 'tearing_down') {
+      msgInput.placeholder = 'Session is closing...';
+    } else if (controls.canSend) {
+      msgInput.placeholder = 'Send a message...';
+    } else if (activity === 'interactive') {
+      msgInput.placeholder = 'External session is active — refresh to sync latest history';
+    } else if (!canResume && s.resumeStrategy === 'none') {
+      msgInput.placeholder = 'This provider cannot resume. Create a new session instead.';
+    } else {
+      msgInput.placeholder = 'Resume session to send messages';
+    }
+  } catch {
+    renderSessionInsights(null);
+    renderSessionDetails(null);
+  }
+}
+
+async function reloadCurrentSession() {
+  if (!currentSessionId) return;
+  document.getElementById('chatMessages').innerHTML = '';
+  await loadHistory(currentSessionId);
+  await refreshSession();
+}
+
+async function resumeCurrentSession() {
+  if (!currentSessionId) return;
+  await resumeSession(currentSessionId);
+}
+
+async function closeSession() {
+  if (!currentSessionId) return;
+  if (!confirm('Stop this session?')) return;
+  disconnectObserver();
+  try {
+    await fetch(`${API_BASE}/sessions/${currentSessionId}/close`, {
+      method: 'POST',
+      headers: headers(),
+    });
+    addSystemMsg('Session stopped.');
+    refreshSessions();
+    refreshSession();
+  } catch (e) {
+    addErrorMsg('Failed to close: ' + e.message);
+  }
+}
+
+async function resumeSession(id) {
+  try {
+    const res = await fetch(`${API_BASE}/sessions/${id}/resume`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ permissionMode: 'skip' }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(err.error || 'Failed to resume');
+      return;
+    }
+    refreshSessions();
+    selectSession(id);
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+async function deleteSession(id) {
+  if (id === currentSessionId) disconnectObserver();
+  try {
+    const res = await fetch(`${API_BASE}/sessions/${id}`, {
+      method: 'DELETE',
+      headers: headers(),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const body = await res.json();
+    if (body.status === 'retained') {
+      alert(body.reason || 'Session data could not be removed safely. Session retained.');
+      await refreshSessions();
+      if (id === currentSessionId) {
+        await selectSession(id);
+      }
+      return;
+    }
+    if (id === currentSessionId) {
+      currentSessionId = null;
+      document.getElementById('chatContainer').style.display = 'none';
+      document.getElementById('chatPlaceholder').style.display = '';
+      renderSessionInsights(null);
+      renderSessionDetails(null);
+    }
+    await refreshSessions();
+  } catch (e) {
+    alert('Failed: ' + e.message);
+  }
+}
+
+// --- Batch Group Delete ---
+const groupDeleteState = new Set();
+
+async function deleteGroup(workspaceKey, displayCwd) {
+  // Find all sessions in this group
+  let sessions;
+  try {
+    const res = await fetch(`${API_BASE}/sessions`, { headers: headers() });
+    if (!res.ok) return;
+    const data = await res.json();
+    sessions = (data.sessions || []).filter(s => {
+      return workspaceKeyForSession(s) === workspaceKey;
+    });
+  } catch (e) {
+    alert('Failed to load sessions: ' + e.message);
+    return;
+  }
+
+  if (sessions.length === 0) return;
+
+  const deletableSessions = sessions.filter(s => sessionControls(s).canDelete);
+  if (deletableSessions.length === 0) {
+    alert('No deletable sessions in this project right now.');
+    return;
+  }
+
+  const closableCount = deletableSessions.filter(s => sessionControls(s).canClose).length;
+  const blockedCount = sessions.length - deletableSessions.length;
+  let msg = `Delete all ${sessions.length} session(s) under "${displayCwd.split('/').pop()}"?`;
+  if (closableCount > 0) {
+    msg += `\n\n${closableCount} live runtime-controlled session(s) may be stopped if deletion succeeds.`;
+  }
+  if (blockedCount > 0) {
+    msg += `\n\n${blockedCount} external active/closing session(s) will be skipped.`;
+  }
+  msg += '\n\nThis action is irreversible.';
+  if (!confirm(msg)) return;
+
+  groupDeleteState.add(workspaceKey);
+  refreshSessions(); // show spinner
+
+  let deleted = 0;
+  let retained = 0;
+  let failed = 0;
+  let currentSessionDeleted = false;
+  let currentSessionRetained = false;
+
+  for (const s of deletableSessions) {
+    const controls = sessionControls(s);
+    // Close runtime-controlled live sessions first
+    if (controls.canClose) {
+      try {
+        await fetch(`${API_BASE}/sessions/${s.id}/close`, { method: 'POST', headers: headers() });
+      } catch {}
+    }
+    if (s.id === currentSessionId) disconnectObserver();
+
+    try {
+      const res = await fetch(`${API_BASE}/sessions/${s.id}`, { method: 'DELETE', headers: headers() });
+      if (res.ok) {
+        const body = await res.json();
+        if (body.status === 'retained') {
+          retained++;
+          if (s.id === currentSessionId) currentSessionRetained = true;
+        } else {
+          deleted++;
+          if (s.id === currentSessionId) currentSessionDeleted = true;
+        }
+      } else {
+        failed++;
+      }
+    } catch {
+      failed++;
+    }
+  }
+
+  groupDeleteState.delete(workspaceKey);
+
+  if (currentSessionDeleted) {
+    currentSessionId = null;
+    document.getElementById('chatContainer').style.display = 'none';
+    document.getElementById('chatPlaceholder').style.display = '';
+    renderSessionInsights(null);
+    renderSessionDetails(null);
+  }
+
+  const warnings = [];
+  if (failed > 0) warnings.push(`${failed} failed`);
+  if (retained > 0) warnings.push(`${retained} retained (cleanup incomplete)`);
+  if (warnings.length > 0) {
+    alert(`Deleted ${deleted} session(s). ${warnings.join('; ')}.`);
+  }
+
+  await refreshSessions();
+  if (currentSessionRetained && currentSessionId) {
+    await selectSession(currentSessionId);
+  }
+}
+
+async function deleteAllSessions() {
+  let sessions;
+  try {
+    const res = await fetch(`${API_BASE}/sessions`, { headers: headers() });
+    if (!res.ok) return;
+    const data = await res.json();
+    sessions = data.sessions || [];
+  } catch (e) {
+    alert('Failed to load sessions: ' + e.message);
+    return;
+  }
+
+  if (sessions.length === 0) {
+    alert('No sessions to delete.');
+    return;
+  }
+
+  const deletableSessions = sessions.filter(s => sessionControls(s).canDelete);
+  if (deletableSessions.length === 0) {
+    alert('No deletable sessions right now.');
+    return;
+  }
+
+  const closableCount = deletableSessions.filter(s => sessionControls(s).canClose).length;
+  const blockedCount = sessions.length - deletableSessions.length;
+  let msg = `Delete ALL ${sessions.length} session(s) across all projects?`;
+  if (closableCount > 0) {
+    msg += `\n\n${closableCount} live runtime-controlled session(s) may be stopped if deletion succeeds.`;
+  }
+  if (blockedCount > 0) {
+    msg += `\n\n${blockedCount} external active/closing session(s) will be skipped.`;
+  }
+  msg += '\n\nThis action is irreversible.';
+  if (!confirm(msg)) return;
+
+  let deleted = 0;
+  let retained = 0;
+  let failed = 0;
+  let currentSessionDeleted = false;
+  let currentSessionRetained = false;
+
+  for (const s of deletableSessions) {
+    const controls = sessionControls(s);
+    if (controls.canClose) {
+      try {
+        await fetch(`${API_BASE}/sessions/${s.id}/close`, { method: 'POST', headers: headers() });
+      } catch {}
+    }
+    if (s.id === currentSessionId) disconnectObserver();
+
+    try {
+      const res = await fetch(`${API_BASE}/sessions/${s.id}`, { method: 'DELETE', headers: headers() });
+      if (res.ok) {
+        const body = await res.json();
+        if (body.status === 'retained') {
+          retained++;
+          if (s.id === currentSessionId) currentSessionRetained = true;
+        } else {
+          deleted++;
+          if (s.id === currentSessionId) currentSessionDeleted = true;
+        }
+      } else {
+        failed++;
+      }
+    } catch {
+      failed++;
+    }
+  }
+
+  if (currentSessionDeleted) {
+    currentSessionId = null;
+    document.getElementById('chatContainer').style.display = 'none';
+    document.getElementById('chatPlaceholder').style.display = '';
+    renderSessionInsights(null);
+    renderSessionDetails(null);
+  }
+
+  const warnings = [];
+  if (failed > 0) warnings.push(`${failed} failed`);
+  if (retained > 0) warnings.push(`${retained} retained (cleanup incomplete)`);
+  if (warnings.length > 0) {
+    alert(`Deleted ${deleted} session(s). ${warnings.join('; ')}.`);
+  }
+
+  await refreshSessions();
+  if (currentSessionRetained && currentSessionId) {
+    await selectSession(currentSessionId);
+  }
+}
+
+// --- Messages ---
+async function sendMessage() {
+  if (!currentSessionId || isStreaming) return;
+  const input = document.getElementById('msgInput');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  autoResizeInput();
+
+  addUserMsg(text);
+  isStreaming = true;
+  updateSendButton();
+
+  const assistantEl = addAssistantMsg('');
+
+  try {
+    const res = await fetch(`${API_BASE}/sessions/${currentSessionId}/messages`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ message: text }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      addErrorMsg(err.error || 'Request failed');
+      assistantEl.remove();
+      isStreaming = false;
+      updateSendButton();
+      return;
+    }
+
+    const contentType = res.headers.get('content-type') || '';
+
+    if (contentType.includes('text/event-stream')) {
+      // SSE
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fullText = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const event = JSON.parse(line.slice(6));
+              fullText = processStreamEvent(event, assistantEl, fullText);
+            } catch {}
+          }
+        }
+      }
+    } else {
+      // NDJSON fallback
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fullText = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const event = JSON.parse(line);
+            fullText = processStreamEvent(event, assistantEl, fullText);
+          } catch {}
+        }
+      }
+    }
+  } catch (e) {
+    addErrorMsg('Stream error: ' + e.message);
+  }
+
+  isStreaming = false;
+  updateSendButton();
+  refreshSession();
+  refreshSessions();
+}
+
+function processStreamEvent(event, el, fullText) {
+  switch (event.type) {
+    case 'text':
+      fullText += event.text || '';
+      el.innerHTML = renderMd(fullText);
+      break;
+    case 'tool_use':
+      addToolMsg(`Tool: ${event.toolName || 'unknown'}`);
+      break;
+    case 'result':
+      if (event.usage) {
+        addSystemMsg(`Tokens: ${formatUsageSummary(event.usage)}`);
+      }
+      break;
+    case 'error':
+      addErrorMsg(event.text || 'Unknown error');
+      break;
+  }
+  scrollToBottom();
+  return fullText;
+}
+
+function addUserMsg(text) {
+  const el = document.createElement('div');
+  el.className = 'msg msg-user';
+  el.textContent = text;
+  document.getElementById('chatMessages').appendChild(el);
+  scrollToBottom();
+}
+
+function addAssistantMsg(text) {
+  const el = document.createElement('div');
+  el.className = 'msg msg-assistant';
+  if (text) {
+    el.innerHTML = renderMd(text);
+  }
+  document.getElementById('chatMessages').appendChild(el);
+  scrollToBottom();
+  return el;
+}
+
+function addToolMsg(text) {
+  const el = document.createElement('div');
+  el.className = 'msg msg-tool';
+  el.textContent = text;
+  document.getElementById('chatMessages').appendChild(el);
+  scrollToBottom();
+}
+
+function addErrorMsg(text) {
+  const el = document.createElement('div');
+  el.className = 'msg msg-error';
+  el.textContent = text;
+  document.getElementById('chatMessages').appendChild(el);
+  scrollToBottom();
+}
+
+function addSystemMsg(text) {
+  const el = document.createElement('div');
+  el.className = 'msg msg-system';
+  el.textContent = text;
+  document.getElementById('chatMessages').appendChild(el);
+  scrollToBottom();
+}
+
+function scrollToBottom() {
+  const el = document.getElementById('chatMessages');
+  el.scrollTop = el.scrollHeight;
+}
+
+function updateSendButton() {
+  const btn = document.getElementById('btnSend');
+  btn.disabled = isStreaming;
+  btn.textContent = isStreaming ? 'Streaming...' : 'Send';
+}
+
+// --- Directory Picker ---
+let _browseTarget = null;
+
+async function browseDir(inputId) {
+  _browseTarget = inputId;
+  const current = document.getElementById(inputId).value.trim() || '';
+  await loadBrowse(current || '');
+  document.getElementById('browseModal').classList.add('open');
+}
+
+async function loadBrowse(path) {
+  const el = document.getElementById('browseList');
+  const pathEl = document.getElementById('browsePath');
+  el.innerHTML = '<div style="color:var(--text2);padding:12px;">Loading...</div>';
+  try {
+    const url = path ? `${API_BASE}/browse?path=${encodeURIComponent(path)}` : `${API_BASE}/browse`;
+    const res = await fetch(url, { headers: headers() });
+    if (!res.ok) { el.innerHTML = '<div style="color:var(--red);padding:12px;">Cannot read directory</div>'; return; }
+    const data = await res.json();
+    pathEl.value = data.current;
+    let html = `<div class="browse-item" onclick="loadBrowse('${data.parent.replace(/'/g, "\\'")}')">.. (parent)</div>`;
+    for (const entry of data.entries) {
+      html += `<div class="browse-item" onclick="loadBrowse('${entry.path.replace(/'/g, "\\'")}')">${entry.name}/</div>`;
+    }
+    if (data.entries.length === 0) html += '<div style="color:var(--text2);padding:8px 12px;font-size:13px;">No subdirectories</div>';
+    el.innerHTML = html;
+  } catch {
+    el.innerHTML = '<div style="color:var(--red);padding:12px;">Error loading directories</div>';
+  }
+}
+
+function selectBrowsePath() {
+  const path = document.getElementById('browsePath').value;
+  if (_browseTarget && path) {
+    document.getElementById(_browseTarget).value = path;
+  }
+  document.getElementById('browseModal').classList.remove('open');
+}
+
+function closeBrowseModal() {
+  document.getElementById('browseModal').classList.remove('open');
+}
+
+// --- Create Modal ---
+async function openCreateModal() {
+  syncProviderSelect();
+  onProviderChange();
+  document.getElementById('createModal').classList.add('open');
+  onWorkspaceContractChange();
+  document.getElementById('inputWorkspaceKind').focus();
+  await refreshProviderCatalog();
+  await refreshCreateModelRouting();
+}
+
+function closeCreateModal() {
+  document.getElementById('createModal').classList.remove('open');
+}
+
+function onWorkspaceContractChange() {
+  const kind = document.getElementById('inputWorkspaceKind').value;
+  const accessEl = document.getElementById('inputWorkspaceAccess');
+  accessEl.disabled = false;
+  const access = accessEl.value;
+  const needsCwd = kind === 'source' || kind === 'worktree';
+  document.getElementById('cwdGroup').style.display = needsCwd ? '' : 'none';
+  document.getElementById('permissionGroup').style.display = needsCwd && access === 'read_write' ? '' : 'none';
+}
+
+async function createSession() {
+  const workspaceKind = document.getElementById('inputWorkspaceKind').value;
+  const workspaceAccess = document.getElementById('inputWorkspaceAccess').value;
+  const workspaceIsolation = workspaceKind === 'sandbox'
+    ? 'isolated'
+    : workspaceKind === 'worktree'
+      ? 'worktree'
+      : 'shared';
+  const cwd = document.getElementById('inputCwd').value.trim();
+  const provider = document.getElementById('inputProvider').value;
+
+  if (workspaceKind !== 'sandbox' && !cwd) {
+    alert('Working directory is required for workspaceKind=' + workspaceKind);
+    return;
+  }
+
+  if (!provider) {
+    alert('No providers are configured. Add one to providers.yaml first.');
+    return;
+  }
+
+  const body = {
+    workspaceKind,
+    workspaceAccess,
+    workspaceIsolation,
+    provider,
+  };
+  const instance = document.getElementById('inputInstance').value;
+  if (instance) body.instance = instance;
+  if (cwd) body.cwd = cwd;
+  if (workspaceKind !== 'sandbox' && workspaceAccess === 'read_write') {
+    body.permissionMode = document.getElementById('inputPermission').value;
+  }
+  Object.assign(body, buildCreateModelPayload());
+  const group = document.getElementById('inputGroup').value.trim();
+  if (group) body.group = group;
+
+  try {
+    const res = await fetch(`${API_BASE}/sessions`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(err.error || 'Failed to create session');
+      return;
+    }
+    const session = await res.json();
+    closeCreateModal();
+    refreshSessions();
+    selectSession(session.id);
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+// --- Textarea auto-resize ---
+const msgInput = document.getElementById('msgInput');
+msgInput.addEventListener('input', autoResizeInput);
+function autoResizeInput() {
+  msgInput.style.height = 'auto';
+  msgInput.style.height = Math.min(msgInput.scrollHeight, 120) + 'px';
+}
+
+// --- Init ---
+function validateApiKey(value) {
+  if (/[^\x00-\xff]/.test(value)) {
+    alert('API key contains non-ASCII characters which are not allowed in HTTP headers. Please use only ASCII characters.');
+    return false;
+  }
+  return true;
+}
+
+function updateRuntimeAuthState() {
+  const apiKeyInput = document.getElementById('apiKeyInput');
+  const hasValue = apiKeyInput.value.trim().length > 0;
+  const authStatus = document.getElementById('runtimeAuthStatus');
+  authStatus.textContent = hasValue ? 'Set' : 'Missing';
+  authStatus.dataset.state = hasValue ? 'active' : 'idle';
+}
+
+function toggleRuntimeAuthEditor(forceOpen) {
+  const editor = document.getElementById('runtimeAuthEditor');
+  const toggle = document.getElementById('runtimeAuthToggle');
+  const shouldOpen = typeof forceOpen === 'boolean'
+    ? forceOpen
+    : editor.classList.contains('hidden');
+  editor.classList.toggle('hidden', !shouldOpen);
+  toggle.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+  if (shouldOpen) document.getElementById('apiKeyInput').focus();
+}
+
+document.getElementById('apiKeyInput').addEventListener('input', () => {
+  updateRuntimeAuthState();
+});
+document.getElementById('apiKeyInput').addEventListener('change', (e) => {
+  if (validateApiKey(e.target.value)) {
+    updateRuntimeAuthState();
+    toggleRuntimeAuthEditor(false);
+    refreshProviderCatalog();
+    refreshSessions();
+  }
+});
+// Also refresh on Enter key for immediate feedback
+document.getElementById('apiKeyInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    if (validateApiKey(e.target.value)) {
+      updateRuntimeAuthState();
+      toggleRuntimeAuthEditor(false);
+      refreshProviderCatalog();
+      refreshSessions();
+    }
+  }
+});
+updateRuntimeAuthState();
+
+// Close modal on overlay click
+document.getElementById('createModal').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeCreateModal();
+});
+document.getElementById('browseModal').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeBrowseModal();
+});
+
+// Escape to close modal
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeBrowseModal();
+    closeCreateModal();
+  }
+});
+
+// Initial load
+refreshProviderCatalog();
+refreshDiscoveryStatus();
+refreshSessions();
+
+// Auto-refresh every 5s
+setInterval(() => {
+  refreshDiscoveryStatus();
+  refreshSessions();
+  if (currentSessionId && !isStreaming) refreshSession();
+}, 5000);
+</script>
+</body>
+</html>

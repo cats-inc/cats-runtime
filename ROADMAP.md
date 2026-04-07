@@ -1013,8 +1013,10 @@ different orchestration subsystem from the shared compatibility surface.
   instead of forcing an auto-scan on load
 - the dashboard now exposes a direct inline manual scan/repair panel backed by
   the same shared `GET /setup-state` plus `POST /setup-scan` seams
-- `build:ui` now generates the shared runtime Tailwind payload before the main
-  TypeScript build and package flow
+- `build:ui` now generates the shared runtime Tailwind payload and emits
+  `public/index.html`, `public/playground.html`, and
+  `public/provider-setup.html` from canonical `src/http/ui/pages/*.html`
+  sources before the main TypeScript build and package flow
 
 #### Follow-through Direction
 
@@ -1022,9 +1024,9 @@ different orchestration subsystem from the shared compatibility surface.
   read surfaces
 - continue improving setup/operator responsiveness through shared runtime-owned
   bootstrap services rather than page-local logic
-- keep the remaining `PLAN-019` work focused on deeper page-source / emitted
-  HTML convergence rather than re-solving the already-landed shared shell and
-  manual repair baseline
+- keep the remaining `PLAN-019` work focused on page-entry modularization and
+  narrower shared client helpers rather than re-solving the already-landed
+  shared shell, emitted HTML, and manual repair baseline
 
 #### Deferred Scope
 
@@ -1528,9 +1530,10 @@ remaining work is follow-through and publication discipline:
 - `scripts/linux/pack-install.sh`, `scripts/macos/pack-install.sh`, and
   `scripts/windows/Pack-Install.ps1` now provide aligned local pack/install
   helpers
-- `PLAN-019` / `SPEC-017` now reflect that `build:ui` and the shared runtime
-  shell/manual-repair baseline are already landed, so packaging follow-through
-  is no longer blocked on stale UI-build plan metadata
+- `PLAN-019` / `SPEC-017` now reflect that `build:ui`, the canonical
+  `src/http/ui/pages/*.html` source tree, emitted `public/*.html` artifacts,
+  and the shared runtime shell/manual-repair baseline are already landed, so
+  packaging follow-through is no longer blocked on stale UI-build plan metadata
 - `docs/release-guide.md` documents a manual first-release path plus a future
   trusted-publishing direction
 - `docs/deployment.md` still labels npm package startup as a planned publish

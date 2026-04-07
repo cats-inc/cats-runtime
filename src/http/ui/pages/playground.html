@@ -1,0 +1,1977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cats Runtime Playground</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+  <style>
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 999px; }
+    @media (min-width: 1024px) {
+      #left-panel {
+        width: var(--sidebar-width);
+        min-width: var(--sidebar-width);
+        flex: 0 0 var(--sidebar-width);
+      }
+    }
+    @keyframes pulse-dot {
+      0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+      40% { opacity: 1; transform: scale(1.2); }
+    }
+    .thinking-dot { animation: pulse-dot 1.4s infinite ease-in-out; }
+    .thinking-dot:nth-child(2) { animation-delay: 0.2s; }
+    .thinking-dot:nth-child(3) { animation-delay: 0.4s; }
+    .msg-content h1 { font-size: 1.25rem; font-weight: 700; margin: 0.75rem 0 0.5rem; }
+    .msg-content h2 { font-size: 1.1rem; font-weight: 600; margin: 0.5rem 0 0.25rem; }
+    .msg-content h3 { font-size: 1rem; font-weight: 600; margin: 0.5rem 0 0.25rem; }
+    .msg-content p { margin: 0.25rem 0; }
+    .msg-content ul, .msg-content ol { margin: 0.25rem 0; padding-left: 1.5rem; }
+    .msg-content li { margin: 0.1rem 0; }
+    .msg-content code { background: #0f172a; padding: 0.15rem 0.35rem; border-radius: 0.25rem; font-size: 0.85em; }
+    .msg-content pre { margin: 0.5rem 0; border-radius: 0.5rem; overflow-x: auto; }
+    .msg-content pre code { background: transparent; padding: 0; display: block; }
+    .msg-content blockquote { border-left: 3px solid #475569; padding-left: 0.75rem; margin: 0.5rem 0; opacity: 0.8; }
+    .msg-content a { color: #93c5fd; text-decoration: underline; }
+    .msg-content table { border-collapse: collapse; margin: 0.5rem 0; }
+    .msg-content th, .msg-content td { border: 1px solid #334155; padding: 0.35rem 0.75rem; }
+    .msg-content th { background: #0f172a; }
+    .tag-pill { display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 9999px; border: 1px solid; opacity: 0.8; }
+    .role-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 9999px; border: 1px solid; letter-spacing: 0.25px; }
+    .agent-tag-toggle { position: relative; display: inline-flex; cursor: pointer; }
+    .agent-tag-toggle input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+    .agent-tag-chip {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 9999px;
+      border: 1px solid #475569;
+      background: rgba(15, 23, 42, 0.45);
+      color: #94a3b8;
+      font-size: 0.68rem;
+      font-weight: 600;
+      line-height: 1;
+      padding: 0.32rem 0.6rem;
+      transition: border-color 140ms ease, background 140ms ease, color 140ms ease, transform 140ms ease;
+      user-select: none;
+    }
+    .agent-tag-toggle:hover .agent-tag-chip {
+      border-color: #64748b;
+      color: #e2e8f0;
+      transform: translateY(-1px);
+    }
+    .agent-tag-toggle input:focus-visible + .agent-tag-chip {
+      outline: 2px solid rgba(96, 165, 250, 0.75);
+      outline-offset: 2px;
+    }
+    .agent-tag-toggle input:checked + .agent-tag-chip {
+      border-color: #38bdf8;
+      background: rgba(14, 116, 144, 0.3);
+      color: #e0f2fe;
+      box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.2);
+    }
+    .agent-tag-toggle input[value="orchestrator"]:checked + .agent-tag-chip {
+      border-color: #f59e0b;
+      background: rgba(146, 64, 14, 0.34);
+      color: #fef3c7;
+      box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.28);
+    }
+    .agent-card-toggle {
+      display: flex;
+      min-width: 0;
+      flex: 1;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+      border: 0;
+      background: transparent;
+      padding: 0;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    .agent-card-name-row {
+      display: flex;
+      width: 100%;
+      min-width: 0;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .agent-card-name {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #fff;
+    }
+    .agent-card-chevron {
+      flex: none;
+      color: #64748b;
+      transition: transform 140ms ease, color 140ms ease;
+    }
+    .agent-card[data-expanded="true"] .agent-card-chevron {
+      transform: rotate(180deg);
+      color: #cbd5e1;
+    }
+    .agent-card-summary-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      align-items: center;
+    }
+    .agent-summary-chip {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 9999px;
+      border: 1px solid #475569;
+      background: rgba(15, 23, 42, 0.45);
+      color: #cbd5e1;
+      font-size: 0.65rem;
+      font-weight: 600;
+      line-height: 1;
+      padding: 0.22rem 0.5rem;
+    }
+    .agent-card-details {
+      margin-top: 0.75rem;
+      border-top: 1px solid rgba(71, 85, 105, 0.65);
+      padding-top: 0.75rem;
+    }
+    .agent-remove {
+      display: inline-flex;
+      height: 1.75rem;
+      width: 1.75rem;
+      flex: none;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      border-radius: 0.5rem;
+      background: transparent;
+      padding: 0;
+      color: #94a3b8;
+      transition: color 140ms ease, background 140ms ease;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body class="runtime-shell" data-runtime-surface="__CATS_RUNTIME_SURFACE__" data-bootstrap-required="__CATS_RUNTIME_BOOTSTRAP_REQUIRED__">
+  <div class="runtime-frame">
+    <aside id="left-panel" class="runtime-sidebar">
+      <div class="runtime-sidebar-inner">
+        <div class="runtime-brand-row">
+          <!-- CATS_RUNTIME_SURFACE_SWITCHER -->
+        </div>
+
+        <div id="setup-section" class="runtime-sidebar-surface flex min-h-0 flex-col overflow-hidden">
+          <div class="runtime-sidebar-section">
+            <div class="flex items-center justify-between gap-3">
+              <div class="flex items-center gap-2">
+                <p class="runtime-sidebar-title">Agents</p>
+                <button onclick="openPromptsModal()" class="runtime-btn runtime-btn-ghost !h-8 !w-8 !rounded-full !px-0 !py-0" title="View role prompts">
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </button>
+              </div>
+              <div class="flex items-center gap-2">
+                <button id="preset-agents-btn" onclick="confirmApplyTwelveAgentPreset()" class="runtime-btn runtime-btn-secondary !h-8 !w-8 !rounded-lg !px-0 !py-0" title="Use 12-agent preset" aria-label="Use 12-agent preset">
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="4" y="4" width="6" height="6" rx="1.5" />
+                    <rect x="14" y="4" width="6" height="6" rx="1.5" />
+                    <rect x="4" y="14" width="6" height="6" rx="1.5" />
+                    <rect x="14" y="14" width="6" height="6" rx="1.5" />
+                  </svg>
+                </button>
+                <button id="add-agent-btn" onclick="addAgent()" class="runtime-btn runtime-btn-secondary !h-8 !w-8 !rounded-lg !px-0 !py-0" title="Add agent" aria-label="Add agent">
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 5v14" />
+                    <path d="M5 12h14" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="runtime-sidebar-section runtime-sidebar-surface space-y-4 overflow-y-auto">
+            <div id="agents-list" class="space-y-3"></div>
+
+            <div class="space-y-3 pt-2">
+              <h2 class="text-sm font-semibold uppercase tracking-widest text-slate-300">Session Settings</h2>
+              <div class="runtime-field">
+                <label class="runtime-field-label">Work Directory</label>
+                <div class="flex gap-2">
+                  <input id="work-dir" type="text" placeholder="/path/to/repo" class="runtime-input" />
+                  <button type="button" onclick="openBrowseModal()" class="runtime-btn runtime-btn-secondary !h-10 !w-10 !rounded-lg !px-0 !py-0" title="Browse directory" aria-label="Browse directory">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.1a2 2 0 0 1 1.4.57l1.43 1.43H19.5A1.5 1.5 0 0 1 21 9.5v7A1.5 1.5 0 0 1 19.5 18h-15A1.5 1.5 0 0 1 3 16.5v-9Z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="runtime-field">
+                <label class="runtime-field-label">Response Language</label>
+                <select id="response-lang" class="runtime-select">
+                  <option value="en">English</option>
+                  <option value="zh-TW">Traditional Chinese</option>
+                </select>
+              </div>
+            </div>
+
+            <button id="btn-start-chat" onclick="startChat()" class="runtime-btn runtime-btn-primary mt-4 w-full justify-center">
+              Start Chat
+            </button>
+          </div>
+        </div>
+
+        <div id="participants-section" class="runtime-sidebar-section runtime-sidebar-surface hidden flex-col">
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="text-sm font-semibold uppercase tracking-widest text-slate-300">Participants</h2>
+            <span class="runtime-chip runtime-chip-muted">Live room</span>
+          </div>
+          <div id="participant-list" class="mt-3 flex-1 space-y-2"></div>
+          <button id="btn-stop-chat" onclick="stopChat()" class="runtime-btn runtime-btn-danger mt-4 w-full justify-center">
+            Stop Chat
+          </button>
+        </div>
+
+        <div class="runtime-sidebar-footer">
+          <div class="runtime-auth-block">
+            <div class="runtime-auth-row">
+              <div class="runtime-auth-copy">
+                <p class="runtime-sidebar-title">Auth</p>
+                <span class="runtime-auth-badge" id="runtime-auth-status" data-state="idle">Missing</span>
+              </div>
+              <button class="runtime-btn runtime-btn-ghost !h-8 !w-8 !rounded-lg !px-0 !py-0" type="button" onclick="toggleRuntimeAuthEditor()" aria-controls="runtime-auth-editor" aria-expanded="false" id="runtime-auth-toggle" title="Edit auth token" aria-label="Edit auth token">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
+                </svg>
+              </button>
+            </div>
+            <div class="runtime-auth-editor hidden" id="runtime-auth-editor">
+              <label for="api-key" class="runtime-field-label">Bearer Token</label>
+              <input id="api-key" type="password" placeholder="Bearer token" class="runtime-input" />
+            </div>
+          </div>
+          <p class="runtime-sidebar-title">Runtime Health</p>
+          <div class="mt-3 runtime-shell-health" data-runtime-shell-health data-runtime-tooltip="Loading runtime diagnostics...">
+            <div class="runtime-shell-health-row">
+              <span class="runtime-shell-health-dot" data-runtime-shell-health-dot data-state="idle"></span>
+              <span class="runtime-shell-health-state" data-runtime-shell-health-state>Loading</span>
+            </div>
+            <p class="runtime-shell-health-summary" data-runtime-shell-health-summary>Waiting for runtime diagnostics.</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="runtime-page">
+      <div class="runtime-page-stack">
+        <header class="runtime-page-header" style="padding-top:0.75rem;padding-bottom:0.75rem;">
+          <div class="flex flex-wrap items-center gap-6">
+            <div>
+              <p class="runtime-page-kicker" style="font-size:0.58rem;letter-spacing:0.18em;">CATS RUNTIME</p>
+              <h1 class="font-semibold tracking-tight text-white" style="margin-top:0.125rem;font-size:21px;line-height:1.15;">Agent Playground</h1>
+            </div>
+            <div id="status-bar" class="runtime-page-toolbar-row min-w-0 flex-1 text-sm">
+              <div class="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/70 px-3 py-1.5">
+                <span class="text-slate-500">Tokens</span>
+                <span id="tokens-display" class="font-mono text-white">0in / 0out</span>
+              </div>
+              <div id="agent-statuses" class="ml-auto flex min-w-0 flex-wrap justify-end gap-2"></div>
+            </div>
+          </div>
+        </header>
+
+        <div class="runtime-page-content min-h-0 overflow-hidden p-6">
+          <div id="chat-area" class="flex h-full min-h-0 flex-col overflow-y-auto">
+            <div class="runtime-empty flex-1">
+              <div class="runtime-empty-icon">&gt;_</div>
+              <div>Set up agents to start</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="thinking-bar" class="hidden border-t border-slate-800 bg-slate-950/80 px-6 py-3 backdrop-blur-xl"></div>
+
+        <div id="input-area" class="hidden border-t border-slate-800 bg-slate-950/90 px-6 py-5">
+          <div class="flex gap-3">
+            <textarea id="chat-input" rows="2" placeholder="Type your message..." class="runtime-textarea flex-1" onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
+            <div class="flex flex-col gap-2">
+              <button id="btn-send" onclick="sendMessage()" class="runtime-btn runtime-btn-primary justify-center">Send</button>
+              <button id="btn-stop" onclick="stopAgents()" title="Interrupt the current turn" class="runtime-btn runtime-btn-danger justify-center disabled:opacity-40 disabled:cursor-not-allowed" disabled>Stop</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="browseModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
+    <div class="runtime-card w-full max-w-[560px] overflow-hidden">
+      <div class="runtime-card-header">
+        <div>
+          <h3 class="runtime-card-title">Select Directory</h3>
+          <p class="runtime-card-copy">Browse a working directory to share with the playground team.</p>
+        </div>
+      </div>
+      <div class="space-y-3 p-5">
+        <div class="runtime-field">
+          <label class="runtime-field-label">Path</label>
+          <div class="flex gap-2">
+            <input id="browse-path" type="text" class="runtime-input flex-1" onkeydown="if(event.key==='Enter')loadBrowse(this.value)" />
+            <button onclick="loadBrowse(document.getElementById('browse-path').value)" class="runtime-btn runtime-btn-secondary !px-3">Go</button>
+          </div>
+        </div>
+        <div id="browse-list" class="max-h-[300px] overflow-y-auto rounded-2xl border border-slate-800 bg-slate-950 p-2"></div>
+        <div class="flex justify-end gap-2">
+          <button onclick="closeBrowseModal()" class="runtime-btn runtime-btn-ghost">Cancel</button>
+          <button onclick="selectBrowsePath()" class="runtime-btn runtime-btn-primary">Select</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="promptsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4">
+    <div class="runtime-card flex max-h-[80vh] w-full max-w-[720px] flex-col overflow-hidden">
+      <div class="runtime-card-header">
+        <div>
+          <h3 class="runtime-card-title">Role Prompts</h3>
+          <p class="runtime-card-copy">Inspect the current role prompt scaffolding used for each agent tag.</p>
+        </div>
+        <button onclick="closePromptsModal()" class="runtime-btn runtime-btn-ghost !h-9 !w-9 !rounded-full !px-0 !py-0 text-lg">&times;</button>
+      </div>
+      <div id="prompts-content" class="flex-1 overflow-y-auto space-y-3 p-5"></div>
+      <div class="flex justify-end border-t border-slate-800 px-5 py-4">
+        <button onclick="closePromptsModal()" class="runtime-btn runtime-btn-secondary">Close</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ============================================================
+// Constants
+// ============================================================
+const FALLBACK_AGENT_COLORS = {
+  0: { bg:'bg-cyan-900/40',border:'border-cyan-500',text:'text-cyan-400',dot:'bg-cyan-400' },
+  1: { bg:'bg-emerald-900/40',border:'border-emerald-500',text:'text-emerald-400',dot:'bg-emerald-400' },
+  2: { bg:'bg-amber-900/40',border:'border-amber-500',text:'text-amber-400',dot:'bg-amber-400' },
+  3: { bg:'bg-purple-900/40',border:'border-purple-500',text:'text-purple-400',dot:'bg-purple-400' },
+  4: { bg:'bg-blue-900/40',border:'border-blue-500',text:'text-blue-400',dot:'bg-blue-400' },
+  5: { bg:'bg-rose-900/40',border:'border-rose-500',text:'text-rose-400',dot:'bg-rose-400' },
+  6: { bg:'bg-lime-900/40',border:'border-lime-500',text:'text-lime-400',dot:'bg-lime-400' },
+  7: { bg:'bg-fuchsia-900/40',border:'border-fuchsia-500',text:'text-fuchsia-400',dot:'bg-fuchsia-400' },
+};
+const PROVIDER_COLORS = {
+  claude:  { bg:'bg-orange-900/40',border:'border-orange-500',text:'text-orange-400',dot:'bg-orange-400' },
+  codex:   { bg:'bg-emerald-900/40',border:'border-emerald-500',text:'text-emerald-400',dot:'bg-emerald-400' },
+  gemini:  { bg:'bg-blue-900/40',border:'border-blue-500',text:'text-blue-400',dot:'bg-blue-400' },
+  cursor:  { bg:'bg-pink-900/40',border:'border-pink-500',text:'text-pink-400',dot:'bg-pink-400' },
+  copilot: { bg:'bg-indigo-900/40',border:'border-indigo-500',text:'text-indigo-400',dot:'bg-indigo-400' },
+  opencode:{ bg:'bg-purple-900/40',border:'border-purple-500',text:'text-purple-400',dot:'bg-purple-400' },
+  kilo:    { bg:'bg-rose-900/40',border:'border-rose-500',text:'text-rose-400',dot:'bg-rose-400' },
+  goose:   { bg:'bg-lime-900/40',border:'border-lime-500',text:'text-lime-400',dot:'bg-lime-400' },
+  pi:      { bg:'bg-stone-900/40',border:'border-stone-500',text:'text-stone-400',dot:'bg-stone-400' },
+  auggie:  { bg:'bg-cyan-900/40',border:'border-cyan-500',text:'text-cyan-400',dot:'bg-cyan-400' },
+  junie:   { bg:'bg-amber-900/40',border:'border-amber-500',text:'text-amber-400',dot:'bg-amber-400' },
+  kiro:    { bg:'bg-teal-900/40',border:'border-teal-500',text:'text-teal-400',dot:'bg-teal-400' },
+  ollama:  { bg:'bg-slate-900/70',border:'border-slate-500',text:'text-slate-400',dot:'bg-slate-400' },
+  openclaw:{ bg:'bg-red-900/40',border:'border-red-500',text:'text-red-400',dot:'bg-red-400' },
+};
+const AVAILABLE_TAGS = ['orchestrator','pm','researcher','designer','architect','coder','tester','reviewer','security','qa','tech_writer','marketer'];
+const ROLE_LABELS = { orchestrator:'CEO',pm:'PM',researcher:'Researcher',designer:'Designer',architect:'Architect',coder:'Coder',tester:'Tester',reviewer:'Reviewer',security:'Security',qa:'QA',tech_writer:'Tech Writer',marketer:'Marketer' };
+const PROVIDER_MODELS = {
+  claude:[{value:'claude-opus-4-6',label:'claude-opus-4-6 (default)'},{value:'claude-sonnet-4-6',label:'claude-sonnet-4-6'},{value:'claude-haiku-4-5',label:'claude-haiku-4-5'}],
+  codex:[{value:'gpt-5.4',label:'gpt-5.4 (default)'},{value:'gpt-5.3-codex',label:'gpt-5.3-codex'},{value:'gpt-5.2-codex',label:'gpt-5.2-codex'}],
+  gemini:[{value:'gemini-3.1-pro-preview',label:'gemini-3.1-pro-preview (default)'},{value:'gemini-3-flash-preview',label:'gemini-3-flash-preview'},{value:'gemini-2.5-pro',label:'gemini-2.5-pro'}],
+  copilot:[{value:'gpt-5.4',label:'gpt-5.4 (default)'},{value:'claude-opus-4-6',label:'claude-opus-4-6'},{value:'gemini-3-pro-preview',label:'gemini-3-pro-preview'}],
+  opencode:[{value:'opencode-go/glm-5',label:'opencode-go/glm-5 (default)'},{value:'opencode-go/kimi-k2.5',label:'opencode-go/kimi-k2.5'}],
+  kilo:[{value:'kilo/openai/gpt-5.4',label:'kilo/openai/gpt-5.4 (default)'},{value:'kilo/openai/gpt-5.4-mini',label:'kilo/openai/gpt-5.4-mini'},{value:'kilo/anthropic/claude-sonnet-4.6',label:'kilo/anthropic/claude-sonnet-4.6'}],
+  auggie:[{value:'gpt-5.4',label:'gpt-5.4 (default)'},{value:'claude opus 4.6',label:'claude opus 4.6'},{value:'sonnet 4.6',label:'sonnet 4.6'}],
+  pi:[{value:'openai-codex/gpt-5.4',label:'openai-codex/gpt-5.4 (default)'}],
+  junie:[{value:'gpt',label:'gpt'},{value:'gpt-codex',label:'gpt-codex'},{value:'sonnet',label:'sonnet'},{value:'opus',label:'opus'},{value:'gemini-pro',label:'gemini-pro'},{value:'gemini-flash',label:'gemini-flash'},{value:'grok',label:'grok'}],
+  cursor:[{value:'auto',label:'Auto (default)'},{value:'composer-2-fast',label:'Composer 2 Fast'},{value:'gpt-5.4-medium',label:'GPT-5.4 1M'},{value:'claude-4.6-opus-high-thinking',label:'Opus 4.6 1M Thinking'},{value:'gemini-3-flash',label:'Gemini 3 Flash'}],
+  kiro:[{value:'claude-sonnet-4.5',label:'claude-sonnet-4.5 (default)'},{value:'deepseek-3.2',label:'deepseek-3.2'}],
+  goose:[{value:'chatgpt_codex/gpt-5.2-codex',label:'chatgpt_codex/gpt-5.2-codex (default)'}],
+  ollama:[{value:'qwen2.5-coder:7b',label:'qwen2.5-coder:7b (default)'}],
+  openclaw:[{value:'openclaw-coder',label:'openclaw-coder (default)'},{value:'openclaw-preview',label:'openclaw-preview'}],
+};
+const PROVIDER_ADVANCED_CATALOGS = {};
+const PROVIDERS = ['claude','codex','gemini','cursor','copilot','opencode','kilo','goose','pi','auggie','junie','kiro','ollama','openclaw'];
+let SELECTABLE_PROVIDERS = [...PROVIDERS];
+function getDefaultModel(p) { return (PROVIDER_MODELS[p]||[])[0]?.value || ''; }
+function listSelectableProviders() { return SELECTABLE_PROVIDERS.length ? [...SELECTABLE_PROVIDERS] : [...PROVIDERS]; }
+function normalizeSelectableProvider(provider) {
+  const selectable=listSelectableProviders();
+  if(selectable.includes(provider)) return provider;
+  return selectable[0] || provider || PROVIDERS[0] || '';
+}
+function normalizeAgentSelectionState(provider,model='',modelSelection=null,options={}) {
+  const allowLegacyModel=options.allowLegacyModel===true;
+  const normalized=window.CatsUI?.normalizePlaygroundAgentSelection
+    ? window.CatsUI.normalizePlaygroundAgentSelection({
+      provider,
+      model,
+      modelSelection,
+      selectableProviders:listSelectableProviders(),
+      providerOrder:PROVIDERS,
+      advancedCatalogs:PROVIDER_ADVANCED_CATALOGS,
+      allowLegacyModel,
+    })
+    : null;
+  const next=normalized&&typeof normalized==='object'
+    ? {
+      provider:normalized.provider||normalizeSelectableProvider(provider),
+      model:typeof normalized.model==='string'?normalized.model:'',
+      modelSelection:normalized.modelSelection||null,
+    }
+    : {
+      provider:normalizeSelectableProvider(provider),
+      model:typeof model==='string'?model:'',
+      modelSelection:modelSelection||null,
+    };
+  if(!next.modelSelection){
+    const knownModels=PROVIDER_MODELS[next.provider]||[];
+    const hasKnownModels=knownModels.length>0;
+    const modelIsKnown=!next.model||knownModels.some(entry=>entry?.value===next.model);
+    if(!next.model||(!allowLegacyModel&&hasKnownModels&&!modelIsKnown)){
+      next.model=getDefaultModel(next.provider);
+    }
+  }
+  return next;
+}
+
+// ============================================================
+// Protocol — delegation parsing (ported from protocol.py)
+// ============================================================
+const MAX_DELEGATION_DEPTH = 10;
+const NEXT_LINE_RE = /^(?:[-*+]\s*)?(?:[`*_ ]*)NEXT(?:[`*_ ]*)\s*[:：]\s*(.+?)\s*(?:[`*_ ]*)$/i;
+const AT_INSTRUCTION_RE = /^(?:[-*+]\s*)?@([^\s:：`*_]+)\s*(?:[:：]\s*|\s+)(.+)$/;
+const TRAILING_PUNCT = " \t\r\n`*_.,;:!?";
+function cleanAgentToken(t) {
+  let s = t.trim();
+  while (s.length && TRAILING_PUNCT.includes(s[0])) s = s.slice(1);
+  while (s.length && TRAILING_PUNCT.includes(s[s.length-1])) s = s.slice(0,-1);
+  return s;
+}
+function parseDelegation(content, knownAgents) {
+  const lines = content.split('\n');
+  let nextPayload = null;
+  for (const line of lines) {
+    const m = NEXT_LINE_RE.exec(line.trim());
+    if (m) nextPayload = m[1];
+  }
+  if (nextPayload === null) return null;
+  const knownLower = {};
+  for (const a of knownAgents) knownLower[a.toLowerCase()] = a;
+  const rawNames = nextPayload.replace(/\uff0c/g,',').split(',').map(n => cleanAgentToken(n)).filter(Boolean);
+  const targets = [];
+  for (const name of rawNames) {
+    const matched = knownLower[name.toLowerCase()];
+    if (matched) targets.push(matched);
+  }
+  if (!targets.length) return null;
+  const instructions = {};
+  for (const line of lines) {
+    const m = AT_INSTRUCTION_RE.exec(line.trim());
+    if (!m) continue;
+    const agentName = cleanAgentToken(m[1]);
+    const text = m[2].trim();
+    const matched = knownLower[agentName.toLowerCase()];
+    if (matched && text) instructions[matched] = text;
+  }
+  return { targets, instructions };
+}
+
+// ============================================================
+// Prompt templates (ported from prompts.py)
+// ============================================================
+const AGENTS_MD_INSTRUCTION = "IMPORTANT: Your first action MUST be to check if AGENTS.md exists in the working directory root. If it exists, read it first \u2014 it is the source of truth for project context, architecture, tech stack, and conventions. If it does NOT exist, continue with the task using the available context. Only explore additional files when AGENTS.md does not cover what you need. Do NOT create or modify AGENTS.md unless you have the 'architect' or 'CEO' role.";
+
+const AGENTS_MD_CREATOR_INSTRUCTION = "IMPORTANT: Your first action MUST be to check if AGENTS.md exists in the working directory root.\n- If it exists, read it first \u2014 it is the source of truth for project context, architecture, tech stack, and conventions.\n- If it does NOT exist, do NOT let AGENTS.md setup block the user's task. In an empty scratch workspace or first-turn request, continue with the actual work first.\n- Create AGENTS.md only once the workspace has enough stable project context to document, or when the user explicitly asks for project scaffolding/documentation.\n- When you do create it, include: project purpose, tech stack, directory structure, coding conventions, and any context that helps other agents work efficiently.\n- When the codebase changes significantly (new files, new patterns, architectural decisions), update AGENTS.md to reflect the current state.";
+
+const AGENTS_MD_ORCHESTRATOR_INSTRUCTION = "IMPORTANT: Your first action MUST be to check if AGENTS.md exists in the working directory root.\n- If it exists, read it first for project context.\n- If it does NOT exist, do NOT let AGENTS.md setup block the user's task. Continue the workflow and delegate normally.\n- Only create AGENTS.md when you are clearly working inside a persistent project/codebase and shared team/workflow context will materially help later turns.\n- If you create it, keep it to ONLY the team structure and work distribution plan (who does what, delegation flow). Do NOT add project purpose, tech stack, directory structure, or coding conventions \u2014 that is the architect's responsibility.\n- When delegation patterns change, update the team/workflow section of AGENTS.md. Do NOT modify technical sections written by the architect.";
+
+const TAG_PROMPTS = {
+  pm: "You are a product manager. Focus on product definition and spec writing, not project tracking or implementation.\n\nYour job:\n1. Clarify the user\u2019s real objective, target users, constraints, and success criteria\n2. Turn ambiguous requests into a concrete product spec\n3. Define scope, non-goals, user stories, requirements, edge cases, and acceptance criteria\n4. Identify open product decisions, risks, and assumptions that downstream agents must respect\n5. Hand off a clear spec that the architect/coder can execute against\n\nYour primary deliverable is a product requirements/specification document in message form. Do NOT implement code yourself unless no implementation specialist is available.",
+  researcher: "You are a product and technical researcher. Focus on discovery, evidence gathering, and reducing ambiguity before implementation.\n\nYour job:\n1. Identify what is still unknown, ambiguous, or risky\n2. Gather and synthesize relevant context from the codebase, docs, prior conversation, and available references\n3. Compare options, constraints, and tradeoffs when the right path is not yet clear\n4. Turn raw findings into a concise brief the PM, architect, or coder can act on\n5. Call out assumptions, missing evidence, and questions that still need decisions\n\nYour deliverable is a grounded research brief in message form. Do NOT implement code unless no implementation specialist is available.",
+  designer: "You are a product designer. Focus on UX, interaction design, information hierarchy, and clarity before or alongside implementation.\n\nYour job:\n1. Translate product goals into clear user flows and interface structure\n2. Identify friction, ambiguity, and unnecessary complexity in the user experience\n3. Recommend layout, hierarchy, interaction, copy, and state design improvements\n4. Highlight edge cases, empty states, and error-state behavior that the team should not miss\n5. Hand off concrete UI/UX guidance the architect or coder can implement\n\nYour deliverable is a design brief or UX recommendation in message form. Do NOT implement code unless no implementation specialist is available.",
+  architect: "You are a software architect. Focus on planning and design before any implementation.\n\nYour job:\n1. Analyze the task and existing codebase\n2. Produce a clear, actionable plan (file structure, tech choices, component breakdown, implementation steps)\n3. When there is enough stable project context, create or update AGENTS.md with project context (purpose, tech stack, directory structure, coding conventions) so the team can work efficiently",
+  coder: "You are an experienced developer. Write clean, well-tested code. Address feedback specifically and implement changes as requested.",
+  tester: "You are a test engineer. Write comprehensive **automated** tests (unit tests, integration tests) covering edge cases, error paths, and typical usage. Your deliverable is test CODE, not manual testing.",
+  reviewer: "You are a senior code reviewer. Check for correctness, edge cases, readability, performance, and security issues. Give specific, actionable feedback with line numbers or code references.",
+  security: "You are a security engineer. Focus on auth, permissions, trust boundaries, secrets handling, misuse paths, data exposure, and abuse risk.\n\nYour job:\n1. Review the planned or implemented behavior for security-sensitive edges\n2. Identify trust boundaries, permission gaps, and unsafe assumptions\n3. Flag secret handling, injection, escalation, data leakage, and abuse risks\n4. Recommend concrete mitigations and verification steps\n5. Return findings in message form with severity and rationale\n\nDo NOT implement code unless no implementation specialist is available.",
+  qa: "You are a QA engineer responsible for end-to-end validation.\n\nYour workflow:\n1. Deploy the application natively in the working directory (install dependencies, build, start the dev server, etc.)\n2. Perform E2E testing via browser automation or manual verification against the running application\n3. If feasible, actually open the browser or application and show the website/app instead of relying only on static inspection\n4. Report bugs with clear reproduction steps; confirm fixes when re-tested",
+  tech_writer: "You are a technical writer. Focus on documentation that helps users and developers understand how the product works.\n\nYour job:\n1. Read the conversation and identify the behavior that is now stable enough to document\n2. Write or update clear usage docs, setup steps, API notes, changelog text, migration notes, or operator guidance as appropriate\n3. Prefer concise, task-oriented documentation over marketing language\n4. Call out assumptions, prerequisites, and limitations clearly\n5. Return the documentation content in message form unless asked to edit files directly",
+  marketer: "You are a product marketer and social copywriter.\n\nYour job:\n1. Read the conversation and identify the strongest product outcome, user value, and differentiators\n2. Write a single social-ready post that can be pasted directly to LinkedIn, Facebook, Threads, or similar platforms\n3. Output EXACTLY one fenced markdown block and put the final post inside it\n4. Keep the post roughly 250 to 500 words in the required response language\n5. Use a sharp hook, clear value proposition, concrete capabilities, and a soft CTA\n6. Do NOT invent metrics, customers, traction, or claims that are not supported by the conversation",
+};
+const JUNIE_TAG_PROMPTS = {
+  pm: "You are a product manager. Produce a concrete product specification in message form: objective, users, scope, non-goals, UX rules, edge cases, acceptance criteria, and open decisions.",
+  researcher: "You are a researcher. Produce a concise research brief in message form: what is known, what is unknown, key evidence, options, risks, and the recommended next step.",
+  designer: "You are a designer. Produce clear UX guidance in message form: flows, hierarchy, interaction notes, edge states, and concrete recommendations.",
+  architect: "You are a software architect. Produce a clear technical design and implementation plan in message form: architecture, modules, file structure, tech choices, and implementation steps. Do NOT create project documentation files unless the user explicitly asks for them.",
+  coder: "You are an experienced developer. Implement the requested code changes directly and keep the response focused on what changed and what to do next.",
+  reviewer: "You are a senior code reviewer. Return concrete findings and risks in message form. Do not create files unless explicitly asked.",
+  tester: "You are a test engineer. Produce automated tests or a precise test plan as requested, and return the result in the message response.",
+  security: "You are a security engineer. Return concrete security findings, risks, and mitigations in message form.",
+  qa: "You are a QA engineer. Validate behavior, report bugs precisely, and return results in the message response.",
+  tech_writer: "You are a technical writer. Produce concise documentation or release-note content directly in the message response.",
+  marketer: "You are a marketer. Produce the final marketing copy directly in the message response.",
+};
+const LANG_LABELS = { en: 'English', 'zh-TW': 'Traditional Chinese' };
+
+function buildOrchestratorPrompt(orchestrator, agents, responseLang) {
+  const selfRoles = (orchestrator?.tags||[]).filter(tag=>tag!=='orchestrator');
+  const selfRoleLabels = selfRoles.map(tag=>getTagLabel(tag));
+  const hasPM = agents.some(a => !a.tags.includes('orchestrator') && a.tags.includes('pm'));
+  const hasResearcher = agents.some(a => !a.tags.includes('orchestrator') && a.tags.includes('researcher'));
+  const hasDesigner = agents.some(a => !a.tags.includes('orchestrator') && a.tags.includes('designer'));
+  const hasMarketer = agents.some(a => !a.tags.includes('orchestrator') && a.tags.includes('marketer'));
+  const hasSecurity = agents.some(a => !a.tags.includes('orchestrator') && a.tags.includes('security'));
+  const hasTechWriter = agents.some(a => !a.tags.includes('orchestrator') && a.tags.includes('tech_writer'));
+  const participants = agents.filter(a => !a.tags.includes('orchestrator'))
+    .map(a => `- **${a.name}** (tags: ${a.tags.length ? a.tags.map(tag => getTagLabel(tag)).join(', ') : 'general'})`).join('\n');
+  const discoveryPrefix = `${hasPM ? 'PM \u2192 ' : ''}${hasResearcher ? 'Researcher \u2192 ' : ''}${hasDesigner ? 'Designer \u2192 ' : ''}`;
+  const deliverySuffix = `${hasSecurity ? ' \u2192 Security' : ''}${hasTechWriter ? ' \u2192 Tech Writer' : ''}${hasMarketer ? ' \u2192 Marketer (social post)' : ''}`;
+  const parts = [
+    `You are the **CEO** of this group chat room. Your primary responsibility is orchestration: read the conversation, decide who should act next, and keep the workflow moving.${selfRoleLabels.length ? ` You also personally hold these specialist roles: ${selfRoleLabels.join(', ')}.` : ''}`,
+    `## Participants\n\n- **user** (the stakeholder who gives tasks)\n${participants}`,
+    selfRoleLabels.length
+      ? `## Your Additional Roles\n\nYou are not only the CEO. You also hold: ${selfRoleLabels.join(', ')}.\n- Stay in CEO/coordinator mode by default.\n- Do NOT delegate to yourself.\n- If one of your additional roles is needed and no better participant should take it, you MAY do that work directly in your own response instead of emitting \`NEXT:\`.\n- If another participant already owns that role, prefer delegating to that participant and remain in coordination mode.`
+      : '',
+    "## Delegation Contract\n\nIf any agent work is needed, your final non-empty line MUST be:\n`NEXT: AgentName1, AgentName2`\n\nRules for NEXT:\n- Put `NEXT:` on its own line.\n- Use exact participant names from the list above.\n- List agents in execution order.\n- If no delegation is needed, do NOT output `NEXT:`.\n\nOptional per-agent instructions may appear immediately above the NEXT line:\n@AgentName1 Please implement the login page.\n@AgentName2 Please review after implementation.",
+    `## Workflow Principles\n\n**Never send unfinished or rejected work forward.** Read what just happened, understand the current state, then choose the next agent.\n\nQuality gates:\n- If a reviewer rejects code \u2192 route back to the coder with the specific feedback. Do NOT send rejected code to testing.\n- If a reviewer rejects tests \u2192 route back to the tester. Do NOT proceed as if tests are adequate.\n- If QA finds bugs \u2192 route back to the coder. The fix must pass review again before returning to QA.\n\nTypical flows (adapt based on which agents are available):\n- **With tester (writes test code)**:\n  ${discoveryPrefix}Architect \u2192 Coder \u2192 Tester \u2192 Reviewer \u2192 iterate if rejected${deliverySuffix}\n- **With QA (E2E validation)**:\n  ${discoveryPrefix}Architect \u2192 Coder \u2192 Reviewer \u2192 iterate until approved \u2192 QA (deploy + test) \u2192 if bugs, back to Coder${deliverySuffix}\n- **With both tester and QA**:\n  ${discoveryPrefix}Architect \u2192 Coder \u2192 Tester \u2192 Reviewer \u2192 iterate until approved \u2192 QA (deploy + E2E) \u2192 if bugs, back to Coder${deliverySuffix}\n\nThese are guidelines, not rigid rules. Use judgment based on the conversation context.`,
+  ];
+  if (hasPM) parts.push("## PM Routing\n\n- If a participant with the `pm` tag exists, treat that agent as the default first delegate for any non-trivial, multi-step, or ambiguous request.\n- The PM is a **product manager**, not a project scheduler.\n- The PM should first turn the request into a concrete product spec: scope, requirements, user stories, edge cases, and acceptance criteria.\n- After the PM produces a usable spec, the usual next delegate is the architect or directly the coder if architecture work is unnecessary.\n- Skip the PM only when the user is asking a simple direct question or the next specialist is obvious and no coordination work is needed.");
+  if (hasResearcher) parts.push("## Research Routing\n\n- If a participant with the `researcher` tag exists, use that agent when the task depends on discovery, evidence gathering, competitive comparisons, unresolved domain questions, or missing context.\n- When both PM and Researcher exist, the usual order is PM first, then Researcher, then Architect or Coder.\n- Skip the Researcher when the request is already concrete and implementation-ready.\n- Do NOT use the Researcher as a replacement for coding, reviewing, or QA.");
+  if (hasDesigner) parts.push("## Design Routing\n\n- If a participant with the `designer` tag exists, use that agent for UX structure, interaction clarity, information hierarchy, copy friction, empty states, and end-user flow issues.\n- The usual order is PM and Researcher first, then Designer, then Architect or Coder.\n- Skip the Designer only when the task is entirely backend/infrastructure-facing or the UI direction is already settled.");
+  if (hasSecurity) parts.push("## Security Routing\n\n- If a participant with the `security` tag exists, use that agent for auth, permissions, secrets, data exposure, trust boundaries, and abuse-risk review.\n- Security usually happens after implementation details are concrete and before final sign-off.\n- Do NOT treat Security as a replacement for Reviewer or QA.");
+  if (hasTechWriter) parts.push("## Documentation Routing\n\n- If a participant with the `tech_writer` tag exists, use that agent for README updates, usage docs, migration notes, release notes, API docs, and operator-facing explanations.\n- Documentation should happen only after the relevant behavior is stable enough to describe accurately.");
+  if (hasMarketer) parts.push("## Marketing Routing\n\n- If a participant with the `marketer` tag exists, use that agent for launch messaging, social posts, announcement copy, positioning summaries, and promo-ready writeups.\n- Do NOT expect the coder, reviewer, or QA to produce the final marketing copy unless no marketer exists.\n- **AUTOMATIC**: Once the product work is complete (QA passed, or final reviewer approval if no QA), you MUST automatically delegate to the Marketer as the final step \u2014 do NOT wait for the user to ask for it.\n- If the user explicitly asks for marketing copy at any point, delegate to Marketer once the product facts are sufficiently grounded.");
+  let rules = "## Rules\n\n- Your default mode is orchestration and delegation.\n- When the user asks a brief factual question (not requiring code/file access), you may answer directly WITHOUT delegation.\n";
+  if (selfRoleLabels.length) rules += "- Because you also hold specialist roles, you MAY do that role's work directly when appropriate instead of delegating to yourself.\n";
+  else rules += "- When the task requires any real work (coding, planning, reviewing, testing, architecture), delegate it to the appropriate participant.\n";
+  if (hasPM) rules += "- When a PM is available and the task is not trivial, delegate to the PM first unless there is a strong reason not to.\n";
+  if (hasResearcher) rules += "- When a Researcher is available and the task still has missing facts or unresolved options, delegate to the Researcher before locking architecture or implementation.\n";
+  if (hasDesigner) rules += "- When a Designer is available and the task affects user-facing behavior, involve the Designer before implementation is locked.\n";
+  if (hasSecurity) rules += "- When a Security role is available and the task crosses trust boundaries or permissions, do not skip Security review.\n";
+  if (hasTechWriter) rules += "- When a Tech Writer is available and the change affects user or developer workflows, delegate documentation before ending the workflow.\n";
+  if (hasMarketer) rules += "- When a marketer is available, ALWAYS delegate to the marketer as the final step after product work is complete (QA passed or reviewer approved). Do NOT end the workflow without the marketer producing a social post.\n";
+  rules += "- Before `NEXT:`, briefly explain what you observed and why you chose that agent.\n- Only delegate to agents that exist in the Participants list.\n- After receiving agent results, review them and decide: respond to user, or delegate again. Apply the quality gates above.\n- Do NOT delegate to yourself.";
+  parts.push(rules);
+  parts.push(AGENTS_MD_ORCHESTRATOR_INSTRUCTION);
+  if (responseLang && responseLang !== 'en') {
+    const label = LANG_LABELS[responseLang] || responseLang;
+    parts.push(`## MANDATORY: Response Language\n\nYou MUST respond in **${label}**. All your explanations, analysis, and coordination MUST be written in ${label}. Code, filenames, CLI commands, and technical identifiers stay in English.`);
+  }
+  return parts.filter(Boolean).join('\n\n');
+}
+function composeAgentPrompt(agent, responseLang) {
+  if (agent.systemPrompt) return agent.systemPrompt;
+  const parts = [];
+  for (const tag of agent.tags) {
+    if (JUNIE_TAG_PROMPTS[tag]) parts.push(JUNIE_TAG_PROMPTS[tag]);
+    else if (TAG_PROMPTS[tag]) parts.push(TAG_PROMPTS[tag]);
+  }
+  if (!parts.length) parts.push(`You are ${agent.name}, a helpful team member.`);
+  parts.push(agent.tags.includes('architect') ? AGENTS_MD_CREATOR_INSTRUCTION : AGENTS_MD_INSTRUCTION);
+  if (responseLang && responseLang !== 'en') {
+    const label = LANG_LABELS[responseLang] || responseLang;
+    parts.push(`## MANDATORY: Response Language\n\nYou MUST respond in **${label}**. All your explanations and feedback MUST be written in ${label}. Code, filenames, CLI commands, and technical identifiers stay in English.`);
+  }
+  return parts.join('\n\n');
+}
+function composeJunieAgentPrompt(agent, responseLang) {
+  if (agent.systemPrompt) return agent.systemPrompt;
+  const parts = [];
+  for (const tag of agent.tags) { if (TAG_PROMPTS[tag]) parts.push(TAG_PROMPTS[tag]); }
+  if (!parts.length) parts.push(`You are ${agent.name}, a helpful team member.`);
+  parts.push("Important working rules:\n- If the conversation already established whether AGENTS.md exists, trust that context and do NOT re-check it repeatedly.\n- If the workspace is already known to be empty, stop probing the repo and produce the requested deliverable directly.\n- Do NOT create or update AGENTS.md unless the user explicitly asks for it.\n- Only check AGENTS.md when the conversation has not already resolved that question and the task truly depends on project conventions.\n- For plan/spec/review tasks, return the deliverable directly in the message response instead of creating files.\n- Return one concrete final answer in this turn instead of repeatedly revising the same plan.");
+  if (responseLang && responseLang !== 'en') {
+    const label = LANG_LABELS[responseLang] || responseLang;
+    parts.push(`Respond in **${label}**. Code, filenames, CLI commands, and technical identifiers stay in English.`);
+  }
+  return parts.join('\n\n');
+}
+
+// ============================================================
+// Runtime Client
+// ============================================================
+class RuntimeError extends Error {
+  constructor(message, statusCode) { super(message); this.statusCode = statusCode ?? null; }
+  isSessionRecoverable() {
+    const m = this.message.toLowerCase();
+    const markers = ['session is closed','resume it first','no active worker','worker process has exited','session not found','does not support resume','no longer the latest one for its directory','most recent session in a workspace','auggie completed without streaming assistant text'];
+    if ([400,404,410,501].includes(this.statusCode)) return markers.some(x => m.includes(x));
+    if (this.statusCode === null) {
+      const transport = ['incomplete chunked read','peer closed connection','server disconnected','failed to fetch','networkerror','load failed'];
+      return markers.some(x => m.includes(x)) || transport.some(x => m.includes(x));
+    }
+    return false;
+  }
+  isTransportError() {
+    if (this.statusCode !== null) return false;
+    return ['incomplete chunked read','peer closed connection','server disconnected','failed to fetch','networkerror','load failed'].some(x => this.message.toLowerCase().includes(x));
+  }
+}
+class RuntimeClient {
+  constructor(baseUrl, apiKey) { this.baseUrl = baseUrl.replace(/\/+$/,''); this.apiKey = apiKey || ''; }
+  _headers() {
+    // Honour the captured apiKey so in-flight sessions keep working even
+    // if the DOM input is cleared after chat start.
+    const h = { 'Content-Type': 'application/json' };
+    if (this.apiKey) { h['Authorization'] = `Bearer ${this.apiKey}`; return h; }
+    if (window.CatsUI) return CatsUI.authHeaders();
+    return h;
+  }
+  async createSession({ provider, model, modelSelection, cwd, workspaceKind, workspaceAccess }) {
+    const payload = { provider, permissionMode: 'skip' };
+    if (cwd) payload.cwd = cwd;
+    if (workspaceKind) payload.workspaceKind = workspaceKind;
+    if (workspaceAccess) payload.workspaceAccess = workspaceAccess;
+    if (model) payload.model = model;
+    if (modelSelection) payload.modelSelection = modelSelection;
+    const r = await fetch(`${this.baseUrl}/sessions`, { method:'POST', headers:this._headers(), body:JSON.stringify(payload) });
+    if (!r.ok) throw new RuntimeError(`Failed to create session: ${await r.text()}`, r.status);
+    const d = await r.json();
+    return { id:d.id, provider:d.providerName||provider, model:d.model, status:d.status||'initializing', cwd:d.cwd };
+  }
+  async *streamMessage(sessionId, content, signal) {
+    const r = await fetch(`${this.baseUrl}/sessions/${sessionId}/messages`, {
+      method:'POST', headers:{...this._headers(), Accept:'application/x-ndjson'},
+      body:JSON.stringify({message:content}), signal,
+    });
+    if (!r.ok) throw new RuntimeError(`Failed to send message: ${await r.text()}`, r.status);
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const {done,value} = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, {stream:true});
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) { if (line.trim()) try { yield JSON.parse(line); } catch {} }
+    }
+    if (buf.trim()) try { yield JSON.parse(buf); } catch {}
+  }
+  async closeSession(sessionId) {
+    try { await fetch(`${this.baseUrl}/sessions/${sessionId}/close`, { method:'POST', headers:this._headers() }); } catch {}
+  }
+  async cancelSession(sessionId) {
+    try { await fetch(`${this.baseUrl}/sessions/${sessionId}/cancel`, { method:'POST', headers:this._headers() }); } catch {}
+  }
+  async createPlaygroundWorkspace() {
+    const r = await fetch(`${this.baseUrl}/playground/workspace`, {
+      method:'POST',
+      headers:this._headers(),
+    });
+    if (!r.ok) throw new RuntimeError(`Failed to create playground workspace: ${await r.text()}`, r.status);
+    return await r.json();
+  }
+  async deletePlaygroundWorkspace(workspaceId) {
+    try {
+      await fetch(`${this.baseUrl}/playground/workspace/${encodeURIComponent(workspaceId)}`, {
+        method:'DELETE',
+        headers:this._headers(),
+      });
+    } catch {}
+  }
+}
+
+function extractResultEventFallbackText(event) {
+  const directText = typeof event?.text === 'string' ? event.text : '';
+  if (directText.trim()) return directText;
+  const sources = [
+    event?.raw?.result?.payloads,
+    event?.raw?.payloads,
+    event?.payloads,
+  ];
+  const parts = [];
+  for (const source of sources) {
+    if (!Array.isArray(source)) continue;
+    for (const item of source) {
+      const text = typeof item?.text === 'string' ? item.text : '';
+      if (text.trim()) parts.push(text);
+    }
+    if (parts.length) break;
+  }
+  if (parts.length) return parts.join('\n\n');
+  const summary = typeof event?.summary === 'string' ? event.summary.trim() : '';
+  if (summary && !['completed', 'success', 'ok'].includes(summary.toLowerCase())) return summary;
+  return '';
+}
+
+// ============================================================
+// ChatRoom (ported from chat.py)
+// ============================================================
+class ChatRoom {
+  constructor({ client, agents, onEvent, workDir, responseLang }) {
+    this.client = client;
+    this.agents = agents;
+    this._onEvent = onEvent || (async()=>{});
+    this.workDir = workDir;
+    this.responseLang = responseLang;
+    this.history = [];
+    this._lastTurnIndex = {};
+    this._stopRequested = false;
+    this._activeAbort = null;
+    this._activeAgent = null;
+    this._sharedCwd = workDir;
+    this._sharedWorkspaceId = null;
+    const orch = agents.filter(a => a.tags.includes('orchestrator'));
+    if (orch.length !== 1) throw new Error(`Exactly one CEO required, found ${orch.length}`);
+    this._orchestrator = orch[0];
+    this._workers = agents.filter(a => !a.tags.includes('orchestrator'));
+    this._agentMap = Object.fromEntries(agents.map(a => [a.name, a]));
+    this._knownWorkerNames = this._workers.map(a => a.name);
+    this._systemPrompts = {};
+  }
+  async _emit(e) { try { await this._onEvent(e); } catch {} }
+  async start() {
+    let sharedCwd = this._sharedCwd;
+    let createdWorkspaceId = null;
+    const created = [];
+    if (!sharedCwd) {
+      const workspace = await this.client.createPlaygroundWorkspace();
+      sharedCwd = workspace.cwd;
+      createdWorkspaceId = workspace.id;
+      this._sharedCwd = workspace.cwd;
+      this._sharedWorkspaceId = workspace.id;
+    }
+    if (!sharedCwd) throw new Error('Playground shared workspace cwd is unavailable');
+    for (const agent of this.agents) {
+      if (agent.sessionId) continue;
+      try {
+        const opts = {
+          provider: agent.provider,
+          model: agent.model,
+          modelSelection: agent.modelSelection,
+          cwd: sharedCwd,
+          workspaceKind: 'source',
+          workspaceAccess: 'read_write',
+        };
+        const info = await this.client.createSession(opts);
+        agent.sessionId = info.id;
+        created.push(agent);
+        await this._emit({ type:'session_created', agent:agent.name, provider:agent.provider, session_id:info.id });
+      } catch (err) {
+        for (const a of created.reverse()) {
+          if (a.sessionId) { try { await this.client.closeSession(a.sessionId); } catch {} a.sessionId = null; }
+        }
+        if (createdWorkspaceId) {
+          await this.client.deletePlaygroundWorkspace(createdWorkspaceId);
+          this._sharedWorkspaceId = null;
+          this._sharedCwd = this.workDir;
+        }
+        await this._emit({ type:'error', message:`Failed to create session for ${agent.name}: ${err.message}` });
+        throw err;
+      }
+    }
+    for (const agent of this.agents) {
+      if (agent.tags.includes('orchestrator')) this._systemPrompts[agent.name] = buildOrchestratorPrompt(agent, this.agents, this.responseLang);
+      else if (agent.provider === 'junie') this._systemPrompts[agent.name] = composeJunieAgentPrompt(agent, this.responseLang);
+      else this._systemPrompts[agent.name] = composeAgentPrompt(agent, this.responseLang);
+    }
+  }
+  async close(options = {}) {
+    const releaseWorkspace = options.releaseWorkspace !== false;
+    for (const agent of [...this.agents].reverse()) {
+      if (agent.sessionId) { try { await this.client.closeSession(agent.sessionId); } catch {} agent.sessionId = null; }
+    }
+    if (releaseWorkspace && this._sharedWorkspaceId) {
+      await this.client.deletePlaygroundWorkspace(this._sharedWorkspaceId);
+      this._sharedWorkspaceId = null;
+      this._sharedCwd = this.workDir;
+    }
+  }
+  async handleMessage(userMessage) {
+    this._stopRequested = false;
+    if (this.agents.some(a => !a.sessionId)) await this.start();
+    this.history.push({ sender:'user', content:userMessage });
+    await this._emit({ type:'user_message', content:userMessage });
+    const orchPrompt = this._prependSystemPrompt(this._orchestrator, userMessage);
+    let orchResponse = await this._callAgent(this._orchestrator, orchPrompt);
+    if (orchResponse === null || this._stopRequested) { await this._emit({type:'ready'}); return; }
+    let depth = 0;
+    while (depth < MAX_DELEGATION_DEPTH && !this._stopRequested) {
+      const delegation = parseDelegation(orchResponse, this._knownWorkerNames);
+      if (!delegation) break;
+      await this._emit({ type:'delegation', targets:delegation.targets, instructions:delegation.instructions });
+      const agentResults = [];
+      for (const targetName of delegation.targets) {
+        if (this._stopRequested) break;
+        const agent = this._agentMap[targetName];
+        if (!agent) continue;
+        const context = this._buildAgentContext(agent, delegation);
+        const response = await this._callAgent(agent, context);
+        if (response !== null) agentResults.push(`**${agent.name}**:\n${response}`);
+      }
+      if (this._stopRequested) break;
+      if (agentResults.length) {
+        const followup = `## Agent Results\n\n${agentResults.join('\n\n---\n\n')}\n\nReview the results above. If more work is needed, delegate again with NEXT:. Otherwise, summarize the results for the user.`;
+        orchResponse = await this._callAgent(this._orchestrator, this._prependSystemPrompt(this._orchestrator, followup));
+        if (orchResponse === null || this._stopRequested) break;
+      } else break;
+      depth++;
+    }
+    await this._emit({type:'ready'});
+  }
+  async handleStop() {
+    this._stopRequested = true;
+    if (this._activeAbort) { try { this._activeAbort.abort(); } catch {} }
+    const active = this._activeAgent;
+    if (active && active.sessionId) {
+      try { await this.client.cancelSession(active.sessionId); } catch {}
+    }
+    await this._emit({type:'interrupted'});
+  }
+  async _callAgent(agent, prompt) {
+    await this._emit({ type:'agent_thinking', agent:agent.name, provider:agent.provider });
+    await this._emit({ type:'agent_streaming_start', agent:agent.name, provider:agent.provider });
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const textParts = []; let resultFallbackText = ''; let inputTokens = 0, outputTokens = 0;
+      this._activeAgent = agent;
+      const abort = new AbortController();
+      this._activeAbort = abort;
+      try {
+        for await (const event of this.client.streamMessage(agent.sessionId, prompt, abort.signal)) {
+          if (this._stopRequested) break;
+          const etype = event.type || '';
+          if (etype === 'text') {
+            textParts.push(event.text || '');
+            await this._emit({ type:'agent_streaming_text', agent:agent.name, text:event.text||'' });
+          } else if (etype === 'tool_use') {
+            await this._emit({ type:'agent_tool_use', agent:agent.name, tool_name:event.toolName||'unknown' });
+          } else if (etype === 'raw') {
+            const meta = event.metadata || {};
+            if (meta.source === 'junie-progress') {
+              const progress = String(event.text||'').trim();
+              if (progress) await this._emit({ type:'agent_progress', agent:agent.name, provider:agent.provider, progress, progress_kind:meta.progressKind });
+            }
+          } else if (etype === 'error') { throw new RuntimeError(event.text || 'Agent turn failed'); }
+          else if (etype === 'result') {
+            const u = event.usage||{};
+            inputTokens = u.inputTokens||0;
+            outputTokens = u.outputTokens||0;
+            if (!resultFallbackText.trim()) resultFallbackText = extractResultEventFallbackText(event);
+          }
+        }
+      } catch (err) {
+        if (this._stopRequested) return null;
+        if (err.name === 'AbortError') return null;
+        if (attempt === 0 && !textParts.length && err instanceof RuntimeError && err.isSessionRecoverable()) {
+          try { await this._recoverSessions(agent, err); } catch (re) {
+            await this._emit({ type:'error', message:`Runtime error for ${agent.name}: ${err.message}. Recovery failed: ${re.message}` });
+            return null;
+          }
+          continue;
+        }
+        await this._emit({ type:'error', message:`Runtime error for ${agent.name}: ${err.message}` });
+        return null;
+      } finally { if (this._activeAgent === agent) this._activeAgent = null; this._activeAbort = null; }
+      const fullText = textParts.join('') || resultFallbackText;
+      await this._emit({ type:'agent_streaming_end', agent:agent.name, provider:agent.provider, content:fullText, input_tokens:inputTokens, output_tokens:outputTokens });
+      if (this._stopRequested) return null;
+      if (!fullText.trim()) {
+        await this._emit({
+          type:'error',
+          message:`Runtime error for ${agent.name}: Provider returned no assistant output.`,
+        });
+        return null;
+      }
+      this.history.push({ sender:agent.name, content:fullText, input_tokens:inputTokens, output_tokens:outputTokens });
+      this._lastTurnIndex[agent.name] = this.history.length - 1;
+      return fullText;
+    }
+    return null;
+  }
+  async _recoverSessions(agent, err) {
+    if (err.isTransportError()) { await this.close({ releaseWorkspace:false }); await this.start(); }
+    else { await this._restartSingleAgent(agent); }
+  }
+  async _restartSingleAgent(agent) {
+    if (agent.sessionId) { try { await this.client.closeSession(agent.sessionId); } catch {} agent.sessionId = null; }
+    if (!this._sharedCwd) throw new Error('Playground shared workspace cwd is unavailable');
+    const info = await this.client.createSession({
+      provider:agent.provider,
+      model:agent.model,
+      modelSelection:agent.modelSelection,
+      cwd:this._sharedCwd,
+      workspaceKind:'source',
+      workspaceAccess:'read_write',
+    });
+    agent.sessionId = info.id;
+    await this._emit({ type:'session_created', agent:agent.name, provider:agent.provider, session_id:info.id });
+  }
+  _prependSystemPrompt(agent, message) {
+    const sys = this._systemPrompts[agent.name] || '';
+    return sys ? `${sys}\n\n---\n\n${message}` : message;
+  }
+  _buildAgentContext(agent, delegation) {
+    const parts = [];
+    const sys = this._systemPrompts[agent.name] || '';
+    if (sys) parts.push(sys);
+    const startIdx = (this._lastTurnIndex[agent.name] ?? -1) + 1;
+    const newMsgs = this.history.slice(startIdx);
+    if (newMsgs.length) {
+      parts.push('## Recent conversation');
+      for (const msg of newMsgs) parts.push(`**${msg.sender}**: ${msg.content}`);
+    }
+    const instruction = delegation.instructions[agent.name];
+    if (instruction) parts.push(`## Your task\n\n${instruction}`);
+    else parts.push("## Your task\n\nThe CEO has delegated this to you. Review the conversation above and contribute based on your role.");
+    return parts.join('\n\n');
+  }
+}
+
+// ============================================================
+// UI State
+// ============================================================
+const DEFAULT_CHAT_PROMPTS = {
+  en: 'Help me build a calculator website.',
+  'zh-TW': '\u5e6b\u6211\u5beb\u500b\u8a08\u7b97\u6a5f\u7db2\u7ad9\u3002',
+};
+let chatRoom = null;
+let agentColorMap = {};
+let totalTokens = 0;
+let totalInputTokens = 0;
+let totalOutputTokens = 0;
+let thinkingAgents = new Set();
+let thinkingDetails = {};
+let thinkingPriorities = {};
+let streamingMessages = {};
+let isWorking = false;
+let pendingAgents = [];
+let agentMetaByName = {};
+let agentDisplayOrder = {};
+let expandedAgentId = null;
+
+// ============================================================
+// Markdown setup
+// ============================================================
+marked.setOptions({ breaks:true, gfm:true, highlight:(code,lang)=>{
+  if (lang && hljs.getLanguage(lang)) return hljs.highlight(code,{language:lang}).value;
+  return hljs.highlightAuto(code).value;
+}});
+
+// ============================================================
+// UI helpers
+// ============================================================
+function escapeHtml(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+function safeId(n) { return n.replace(/[^a-zA-Z0-9_-]/g,'_'); }
+function getSelectedResponseLanguage() {
+  return document.getElementById('response-lang')?.value || 'en';
+}
+function getDefaultChatPrompt(lang = getSelectedResponseLanguage()) {
+  return DEFAULT_CHAT_PROMPTS[lang] || DEFAULT_CHAT_PROMPTS.en;
+}
+function syncChatInputDefaultPrompt(force = false) {
+  const input = document.getElementById('chat-input');
+  if (!input) return;
+  const defaults = Object.values(DEFAULT_CHAT_PROMPTS);
+  if (force || !input.value.trim() || defaults.includes(input.value)) input.value = getDefaultChatPrompt();
+}
+function getRuntimeApiKey() {
+  if (window.CatsUI&&typeof CatsUI.getApiKey==='function') return CatsUI.getApiKey();
+  const input=document.getElementById('api-key');
+  return input&&typeof input.value==='string' ? input.value.trim() : '';
+}
+function getRuntimeAuthHeaders(extra) {
+  if (window.CatsUI&&typeof CatsUI.authHeaders==='function') return CatsUI.authHeaders(extra);
+  const headers=Object.assign({}, extra||{});
+  const key=getRuntimeApiKey();
+  if (key) headers.Authorization=`Bearer ${key}`;
+  return headers;
+}
+function validateRuntimeApiKey(value) {
+  if (/[^\x00-\xff]/.test(value)) {
+    alert('API key contains non-ASCII characters which are not allowed in HTTP headers. Please use only ASCII characters.');
+    return false;
+  }
+  return true;
+}
+function authSetupMessage() { return 'Enter the runtime API key above and try again.'; }
+function authAwareMessage(err, fallback) { return err&&[401,403].includes(err.statusCode) ? authSetupMessage() : fallback; }
+function setAgentMetadata(agents) { agentMetaByName = {}; for (const a of agents||[]) if (a?.name) agentMetaByName[a.name]=a; }
+function getDisplayOrderedAgents(agents) {
+  const all = [...(agents || [])];
+  return all.filter(agent => agent?.tags?.includes('orchestrator'))
+    .concat(all.filter(agent => !agent?.tags?.includes('orchestrator')));
+}
+function syncAgentDisplayOrder(agents) {
+  agentDisplayOrder = {};
+  getDisplayOrderedAgents(agents).forEach((agent, index) => {
+    if (agent?.name) agentDisplayOrder[agent.name] = index;
+  });
+}
+function reorderAgentStatusPills() {
+  const container = document.getElementById('agent-statuses');
+  if (!container) return;
+  [...container.children]
+    .sort((a, b) => {
+      const aName = a.dataset.agent || '';
+      const bName = b.dataset.agent || '';
+      const aOrder = Object.prototype.hasOwnProperty.call(agentDisplayOrder, aName)
+        ? agentDisplayOrder[aName]
+        : Number.MAX_SAFE_INTEGER;
+      const bOrder = Object.prototype.hasOwnProperty.call(agentDisplayOrder, bName)
+        ? agentDisplayOrder[bName]
+        : Number.MAX_SAFE_INTEGER;
+      return aOrder - bOrder;
+    })
+    .forEach(pill => container.appendChild(pill));
+}
+function getAgentMeta(n) { return agentMetaByName[n] || {provider:'',tags:[]}; }
+function getPrimaryRoleTag(tags) { return (tags||[])[0]||''; }
+function getTagLabel(tag) { return ROLE_LABELS[tag] || tag; }
+function getRoleLabel(tags) { const t=getPrimaryRoleTag(tags); return t ? getTagLabel(t) : ''; }
+function getProviderBadgeLabel(p) {
+  const provider = String(p || '').toLowerCase();
+  const name = provider.toUpperCase();
+  if (provider === 'ollama') return `${name}-LOCAL`;
+  if (provider === 'openclaw') return `${name}-AGENT`;
+  return `${name}-CLI`;
+}
+function renderRoleBadge(tags,colorClass='text-slate-300') { const l=getRoleLabel(tags); return l?`<span class="role-badge ${colorClass}" style="border-color:currentColor">${escapeHtml(l)}</span>`:''; }
+function renderProviderBadge(p,extra='') { if(!p)return''; return `<span class="provider-badge ${extra}" data-p="${escapeHtml(p)}">${escapeHtml(getProviderBadgeLabel(p))}</span>`; }
+function getAgentColor(n) {
+  const p=getAgentMeta(n).provider;
+  if (p && PROVIDER_COLORS[p]) return PROVIDER_COLORS[p];
+  if (!(n in agentColorMap)) { const i=Object.keys(agentColorMap).length%Object.keys(FALLBACK_AGENT_COLORS).length; agentColorMap[n]=FALLBACK_AGENT_COLORS[i]; }
+  return agentColorMap[n];
+}
+function renderAgentSummaryChip(label) {
+  return `<span class="agent-summary-chip">${escapeHtml(label)}</span>`;
+}
+function getAgentCardSummaryModelLabel(div) {
+  const provider = div.querySelector('.agent-provider')?.value || '';
+  const catalog = getProviderAdvancedCatalog(provider);
+  const entryId = div.querySelector('.agent-entry-choice')?.value || '';
+  const customValue = div.querySelector('.agent-model-custom')?.value.trim() || '';
+  if (catalog && entryId && entryId !== CUSTOM_AGENT_MODEL_VALUE) {
+    const entry = findAgentCatalogEntry(catalog, entryId);
+    return entry?.label || entry?.id || entryId;
+  }
+  return customValue || 'Legacy model';
+}
+function getAgentCardSelectedTags(div) {
+  return [...div.querySelectorAll('.agent-tags input:checked')].map(cb => cb.value);
+}
+function refreshAgentCardSummary(div) {
+  const summaryName = div.querySelector('.agent-summary-name');
+  const summaryMeta = div.querySelector('.agent-summary-meta');
+  const summaryTags = div.querySelector('.agent-summary-tags');
+  if (!summaryName || !summaryMeta || !summaryTags) return;
+  const name = div.querySelector('.agent-name')?.value.trim() || 'Agent';
+  const provider = div.querySelector('.agent-provider')?.value || '';
+  const tags = getAgentCardSelectedTags(div);
+  summaryName.textContent = name;
+  summaryMeta.innerHTML = `${renderProviderBadge(provider)}${renderAgentSummaryChip(getAgentCardSummaryModelLabel(div))}`;
+  summaryTags.innerHTML = tags.length
+    ? tags.map(tag => `<span class="tag-pill text-slate-300" style="border-color:currentColor">${escapeHtml(getTagLabel(tag))}</span>`).join('')
+    : '<span class="text-xs text-slate-500">No roles selected</span>';
+}
+function refreshAllAgentCardSummaries() {
+  document.querySelectorAll('#agents-list > div').forEach(refreshAgentCardSummary);
+}
+function setExpandedAgent(id, expand = true) {
+  const cards = document.querySelectorAll('#agents-list > div');
+  cards.forEach(card => {
+    const numericId = Number(String(card.id || '').replace('agent-', ''));
+    const isExpanded = expand && numericId === id;
+    card.dataset.expanded = isExpanded ? 'true' : 'false';
+    card.querySelector('.agent-card-details')?.classList.toggle('hidden', !isExpanded);
+    card.querySelector('.agent-card-toggle')?.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+  });
+  expandedAgentId = expand ? id : null;
+}
+function toggleAgentCard(id) {
+  setExpandedAgent(id, expandedAgentId !== id);
+}
+function scrollToBottom() { const c=document.getElementById('chat-area'); requestAnimationFrame(()=>{c.scrollTop=c.scrollHeight;}); }
+function stripNextDirective(t) { return t.replace(/^(?:[-*+]\s*)?(?:[`*_ ]*)NEXT(?:[`*_ ]*)\s*[:：].*$/gmi,'').trim(); }
+
+// ============================================================
+// Event handler (replaces WebSocket onmessage)
+// ============================================================
+async function handleEvent(event) {
+  switch(event.type) {
+    case 'session_created': updateAgentStatus(event.agent,'idle'); break;
+    case 'user_message': addUserMessage(event.content); break;
+    case 'agent_thinking': updateAgentStatus(event.agent,'thinking'); showThinking(event.agent,'Thinking',0); break;
+    case 'agent_progress': updateAgentStatus(event.agent,'thinking'); showThinking(event.agent,event.progress||'Working',getProgressPriority(event.progress_kind)); break;
+    case 'agent_streaming_start': streamingMessages[event.agent]={element:null,fullText:''}; break;
+    case 'agent_streaming_text': {
+      let sm=streamingMessages[event.agent];
+      if(sm){ if(!sm.element) sm.element=createAgentBubble(event.agent);
+        sm.fullText += event.text||'';
+        sm.element.querySelector('.msg-content').innerHTML=DOMPurify.sanitize(marked.parse(stripNextDirective(sm.fullText)),{ADD_ATTR:['target']});
+        scrollToBottom();
+      } break;
+    }
+    case 'agent_tool_use': break;
+    case 'agent_streaming_end': {
+      hideThinking(event.agent);
+      const sm=streamingMessages[event.agent];
+      if(sm&&sm.element){
+        const el=sm.element.querySelector('.msg-content');
+        el.innerHTML=DOMPurify.sanitize(marked.parse(stripNextDirective(sm.fullText)),{ADD_ATTR:['target']});
+        el.querySelectorAll('pre code').forEach(e=>hljs.highlightElement(e));
+        sm.element.querySelector('.agent-tokens').textContent=`${(event.input_tokens||0).toLocaleString()}in / ${(event.output_tokens||0).toLocaleString()}out`;
+      }
+      delete streamingMessages[event.agent];
+      updateAgentStatus(event.agent,'idle');
+      totalInputTokens += (event.input_tokens||0);
+      totalOutputTokens += (event.output_tokens||0);
+      totalTokens += (event.input_tokens||0) + (event.output_tokens||0);
+      document.getElementById('tokens-display').textContent=`${totalInputTokens.toLocaleString()}in / ${totalOutputTokens.toLocaleString()}out`;
+      break;
+    }
+    case 'delegation': addDelegationBadge(event.targets,event.instructions||{}); break;
+    case 'interrupted': clearAllThinking(); clearStreamingState(); setWorking(false); addSystemMessage('Interrupted by user'); break;
+    case 'ready': setWorking(false); break;
+    case 'error': clearAllThinking(); clearStreamingState(); addErrorMessage(event.message); setWorking(false); resetStartButton(); break;
+  }
+}
+function clearStreamingState() {
+  Object.keys(streamingMessages).forEach(a=>{hideThinking(a);updateAgentStatus(a,'idle');});
+  streamingMessages = {};
+}
+
+// ============================================================
+// Chat message rendering
+// ============================================================
+function createAgentBubble(agent) {
+  const chat=document.getElementById('chat-area'); const c=getAgentColor(agent); const m=getAgentMeta(agent);
+  const div=document.createElement('div');
+  div.className=`my-1 ${c.bg} border-l-4 ${c.border} rounded-r-lg p-4 max-w-[85%]`;
+  div.innerHTML=`<div class="flex items-start justify-between gap-3 mb-2"><div class="flex flex-wrap items-center gap-2"><span class="w-2 h-2 rounded-full ${c.dot}"></span><span class="font-semibold ${c.text}">${escapeHtml(agent)}</span>${renderRoleBadge(m.tags,c.text)}${renderProviderBadge(m.provider)}</div><span class="agent-tokens text-xs text-slate-500 font-mono"></span></div><div class="msg-content text-sm text-slate-200 leading-relaxed"></div>`;
+  chat.appendChild(div); scrollToBottom(); return div;
+}
+function addUserMessage(content) {
+  const chat=document.getElementById('chat-area'); const div=document.createElement('div');
+  div.className='my-1 flex justify-end';
+  div.innerHTML=`<div class="bg-blue-600/30 border border-blue-500/40 rounded-lg p-3 max-w-[85%]"><div class="text-xs text-blue-300 mb-1 font-semibold">You</div><div class="msg-content text-sm text-slate-200 leading-relaxed">${marked.parse(escapeHtml(content))}</div></div>`;
+  chat.appendChild(div); scrollToBottom();
+}
+function showReadyPlaceholder() {
+  const chat=document.getElementById('chat-area');
+  chat.innerHTML=`<div id="ready-placeholder" class="runtime-empty flex-1"><div class="runtime-empty-icon">&gt;_</div><div>Send a message to begin</div></div>`;
+}
+function clearReadyPlaceholder() {
+  const el=document.getElementById('ready-placeholder');
+  if(el) el.remove();
+}
+function addSystemMessage(text) {
+  clearReadyPlaceholder();
+  const chat=document.getElementById('chat-area'); const div=document.createElement('div');
+  div.className='text-xs text-slate-500 py-1'; div.textContent=text;
+  chat.appendChild(div); scrollToBottom();
+}
+function addErrorMessage(text) {
+  const chat=document.getElementById('chat-area'); const div=document.createElement('div');
+  div.className='bg-red-900/30 border border-red-700 rounded-lg px-4 py-2 text-sm text-red-300';
+  div.textContent=`Error: ${text}`; chat.appendChild(div); scrollToBottom();
+}
+function addDelegationBadge(targets, instructions) {
+  const chat=document.getElementById('chat-area'); const div=document.createElement('div');
+  div.className='flex items-center gap-2 py-1';
+  const arrow='<svg class="w-3 h-3 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>';
+  const badges=targets.map(t=>{const c=getAgentColor(t);return`<span class="tag-pill ${c.text}" style="border-color:currentColor">${escapeHtml(t)}</span>`;}).join(' ');
+  div.innerHTML=`<span class="text-xs text-slate-500">Delegating to</span> ${arrow} ${badges}`;
+  chat.appendChild(div); scrollToBottom();
+}
+
+// ============================================================
+// Thinking indicators
+// ============================================================
+function showThinking(agent,detail='Thinking',priority=0) {
+  const cur=thinkingPriorities[agent]??-1;
+  if(thinkingAgents.has(agent)&&priority<=1&&priority<cur) return;
+  thinkingAgents.add(agent); thinkingDetails[agent]=detail; thinkingPriorities[agent]=priority; renderThinkingBar();
+}
+function hideThinking(agent) { thinkingAgents.delete(agent); delete thinkingDetails[agent]; delete thinkingPriorities[agent]; renderThinkingBar(); }
+function clearAllThinking() { thinkingAgents.clear(); thinkingDetails={}; thinkingPriorities={}; renderThinkingBar(); }
+function getProgressPriority(kind) { switch(kind){case'tool':case'terminal':case'file_changes':case'view_files':return 4;case'plan':return 3;case'thought':return 2;default:return 1;} }
+function renderThinkingBar() {
+  const bar=document.getElementById('thinking-bar');
+  if(!thinkingAgents.size){bar.classList.add('hidden');bar.innerHTML='';return;}
+  bar.classList.remove('hidden');
+  bar.innerHTML=[...thinkingAgents].map(a=>{const c=getAgentColor(a);const d=thinkingDetails[a]||'Thinking';
+    return`<div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full ${c.dot}"></span><span class="text-sm ${c.text}">${escapeHtml(a)}</span><span class="text-xs text-slate-400">${escapeHtml(d)}</span><span class="flex gap-1"><span class="thinking-dot w-1.5 h-1.5 rounded-full bg-slate-400 inline-block"></span><span class="thinking-dot w-1.5 h-1.5 rounded-full bg-slate-400 inline-block"></span><span class="thinking-dot w-1.5 h-1.5 rounded-full bg-slate-400 inline-block"></span></span></div>`;
+  }).join('');
+}
+
+// ============================================================
+// Agent status pills
+// ============================================================
+function updateAgentStatus(agent, status) {
+  const container=document.getElementById('agent-statuses'); const sid=safeId(agent);
+  let pill=document.getElementById(`status-${sid}`); const c=getAgentColor(agent);
+  if(!pill){pill=document.createElement('div');pill.id=`status-${sid}`;pill.dataset.agent=agent;pill.className='flex items-center gap-1.5 text-xs';container.appendChild(pill);}
+  const sc={idle:'bg-slate-500',thinking:'bg-amber-400 animate-pulse',done:c.dot};
+  pill.innerHTML=`<span class="w-1.5 h-1.5 rounded-full ${sc[status]||'bg-slate-500'}"></span><span class="${c.text}">${escapeHtml(agent)}</span><span class="text-slate-500">${status}</span>`;
+  reorderAgentStatusPills();
+  const ps=document.getElementById(`part-status-${sid}`);
+  if(ps) ps.className=`w-2 h-2 rounded-full ${sc[status]||'bg-slate-500'}`;
+}
+
+// ============================================================
+// Agent form (setup)
+// ============================================================
+const MAX_AGENT_COUNT = 12;
+const CUSTOM_AGENT_MODEL_VALUE = '__custom_legacy_model__';
+const TWELVE_AGENT_PRESET = [
+  { name:'Agent-1', provider:'gemini', model:getDefaultModel('gemini'), tags:['orchestrator'] },
+  { name:'Agent-2', provider:'cursor', model:getDefaultModel('cursor'), tags:['pm'] },
+  { name:'Agent-3', provider:'copilot', model:getDefaultModel('copilot'), tags:['researcher'] },
+  { name:'Agent-4', provider:'opencode', model:getDefaultModel('opencode'), tags:['designer'] },
+  { name:'Agent-5', provider:'kilo', model:getDefaultModel('kilo'), tags:['architect'] },
+  { name:'Agent-6', provider:'goose', model:getDefaultModel('goose'), tags:['coder'] },
+  { name:'Agent-7', provider:'pi', model:getDefaultModel('pi'), tags:['tester'] },
+  { name:'Agent-8', provider:'auggie', model:getDefaultModel('auggie'), tags:['reviewer'] },
+  { name:'Agent-9', provider:'junie', model:getDefaultModel('junie'), tags:['security'] },
+  { name:'Agent-10', provider:'kiro', model:getDefaultModel('kiro'), tags:['qa'] },
+  { name:'Agent-11', provider:'ollama', model:getDefaultModel('ollama'), tags:['tech_writer'] },
+  { name:'Agent-12', provider:'openclaw', model:getDefaultModel('openclaw'), tags:['marketer'] },
+];
+let agentCounter=0, nextAgentNumber=1;
+function syncNextAgentNumber(name){const m=/^Agent-(\d+)$/i.exec((name||'').trim());if(!m)return;const v=parseInt(m[1],10);if(Number.isFinite(v)&&v>=nextAgentNumber)nextAgentNumber=v+1;}
+function allocateAgentName(){const n=`Agent-${nextAgentNumber}`;nextAgentNumber++;return n;}
+function getAgentCount(){return document.querySelectorAll('#agents-list > div').length;}
+function updateAgentButtons(){
+  const addBtn=document.getElementById('add-agent-btn');
+  if(!addBtn)return;
+  const capped=getAgentCount()>=MAX_AGENT_COUNT;
+  addBtn.disabled=capped;
+  addBtn.setAttribute('aria-disabled',capped?'true':'false');
+  addBtn.classList.toggle('opacity-40',capped);
+  addBtn.classList.toggle('cursor-not-allowed',capped);
+}
+function getProviderAdvancedCatalog(provider){return PROVIDER_ADVANCED_CATALOGS[provider]||null;}
+function listAgentCatalogEntries(catalog){
+  return window.CatsUI?.listAdvancedCatalogEntries
+    ? window.CatsUI.listAdvancedCatalogEntries(catalog)
+    : (Array.isArray(catalog?.entries) ? catalog.entries.filter(entry=>entry&&entry.id) : []);
+}
+function findAgentCatalogEntry(catalog,entryId){
+  return listAgentCatalogEntries(catalog).find(entry=>entry.id===entryId)||null;
+}
+function listAgentApplicablePresets(catalog,entryId){
+  return window.CatsUI?.listApplicableAdvancedPresets
+    ? window.CatsUI.listApplicableAdvancedPresets(catalog,entryId)
+    : [];
+}
+function getAgentDefaultEntryId(catalog,entries){
+  if(window.CatsUI?.getAdvancedCatalogDefaultEntryId){
+    return window.CatsUI.getAdvancedCatalogDefaultEntryId(catalog)||'';
+  }
+  return entries.find(entry=>entry.default)?.id||entries[0]?.id||'';
+}
+function getAgentDefaultPresetId(catalog,entryId,presets){
+  if(!entryId||!presets.length)return'';
+  if(window.CatsUI?.getAdvancedCatalogDefaultPresetId){
+    return window.CatsUI.getAdvancedCatalogDefaultPresetId(catalog,entryId)||'';
+  }
+  return '';
+}
+function renderAgentRoutingSelectOptions(selectEl,options,selectedValue){
+  if(!selectEl)return'';
+  selectEl.innerHTML=options
+    .map(option=>`<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`)
+    .join('');
+  selectEl.disabled=options.length===0;
+  const nextValue=options.some(option=>option.value===selectedValue)
+    ? selectedValue
+    : (options[0]?.value||'');
+  selectEl.value=nextValue;
+  return nextValue;
+}
+function optionExists(select,value){return[...select.options].some(option=>option.value===value);}
+function renderAgentProviderSelectOptions(selectEl,selectedProvider=''){
+  const providerOptions=listSelectableProviders().map(providerId=>({ value:providerId, label:providerId }));
+  return renderAgentRoutingSelectOptions(
+    selectEl,
+    providerOptions,
+    normalizeSelectableProvider(selectedProvider),
+  );
+}
+function resolveAgentInitialRouting(provider,model='',modelSelection=null,options={}){
+  const catalog=getProviderAdvancedCatalog(provider);
+  const entries=listAgentCatalogEntries(catalog);
+  const allowLegacyModel=options.allowLegacyModel===true;
+  if(!catalog||entries.length===0){
+    return { entryId:'', presetId:'', legacyModel:model||'' };
+  }
+  const entryIds=entries.map(entry=>entry.id);
+  let entryId='';
+  let presetId='';
+  if(modelSelection&&typeof modelSelection==='object'){
+    if(modelSelection.entryMode==='explicit'&&modelSelection.entryId&&entryIds.includes(modelSelection.entryId)){
+      entryId=modelSelection.entryId;
+      presetId=modelSelection.presetId||'';
+    } else if(modelSelection.presetId&&window.CatsUI?.resolveAdvancedCatalogChoice){
+      const resolved=window.CatsUI.resolveAdvancedCatalogChoice(catalog,`preset:${modelSelection.presetId}`);
+      if(resolved?.entryId&&entryIds.includes(resolved.entryId)){
+        entryId=resolved.entryId;
+        presetId=modelSelection.presetId||'';
+      }
+    }
+  }
+  if(!entryId&&model&&entryIds.includes(model)){
+    entryId=model;
+  }
+  if(!entryId&&!model&&!modelSelection){
+    entryId=getAgentDefaultEntryId(catalog,entries);
+  }
+  if(!entryId){
+    if(!allowLegacyModel){
+      const fallbackEntryId=getAgentDefaultEntryId(catalog,entries);
+      if(fallbackEntryId){
+        entryId=fallbackEntryId;
+      }
+    }
+  }
+  if(!entryId){
+    return { entryId:CUSTOM_AGENT_MODEL_VALUE, presetId:'', legacyModel:model||'' };
+  }
+  const presets=listAgentApplicablePresets(catalog,entryId);
+  if(presetId&&!presets.some(preset=>preset.id===presetId)){
+    presetId='';
+  }
+  if(!presetId&&!model&&!modelSelection){
+    presetId=getAgentDefaultPresetId(catalog,entryId,presets);
+  }
+  return { entryId, presetId, legacyModel:'' };
+}
+function readAgentModelControlValues(div){
+  const values={};
+  const els=div.querySelectorAll('.agent-model-controls [data-model-control-key]');
+  for(const el of els){
+    const key=el.getAttribute('data-model-control-key');
+    const kind=el.getAttribute('data-model-control-kind');
+    if(!key||!kind)continue;
+    if(kind==='boolean'){values[key]=Boolean(el.checked);continue;}
+    const raw=typeof el.value==='string'?el.value.trim():'';
+    if(!raw)continue;
+    values[key]=kind==='number'?Number(raw):raw;
+  }
+  return values;
+}
+function readAgentModelState(div){
+  const provider=div.querySelector('.agent-provider')?.value||'';
+  const entryId=div.querySelector('.agent-entry-choice')?.value||'';
+  const presetId=div.querySelector('.agent-preset-choice')?.value||'';
+  const customInput=div.querySelector('.agent-model-custom');
+  const customModel=customInput?.value.trim()||'';
+  const catalog=getProviderAdvancedCatalog(provider);
+  if(catalog&&entryId&&entryId!==CUSTOM_AGENT_MODEL_VALUE){
+    const modelSelection={ entryMode:'explicit', entryId };
+    if(presetId){
+      modelSelection.presetId=presetId;
+    }
+    const controls=readAgentModelControlValues(div);
+    if(Object.keys(controls).length>0){
+      modelSelection.controls=controls;
+    }
+    return { model:'', modelSelection };
+  }
+  return { model:customModel, modelSelection:null };
+}
+function syncAgentPresetField(div,catalog,entryId,preferredPresetId='',allowDefaultPreset=true){
+  const presetGroup=div.querySelector('.agent-mode-group');
+  const presetEl=div.querySelector('.agent-preset-choice');
+  const staticLabelEl=div.querySelector('.agent-preset-static-label');
+  if(!presetGroup||!presetEl||!staticLabelEl)return'';
+
+  staticLabelEl.classList.add('hidden');
+  staticLabelEl.textContent='';
+  presetEl.classList.remove('hidden');
+
+  if(!catalog||!entryId||entryId===CUSTOM_AGENT_MODEL_VALUE){
+    renderAgentRoutingSelectOptions(presetEl,[], '');
+    presetEl.disabled=true;
+    presetGroup.classList.add('hidden');
+    return '';
+  }
+
+  const presets=listAgentApplicablePresets(catalog,entryId);
+  presetGroup.classList.remove('hidden');
+  if(presets.length===0){
+    renderAgentRoutingSelectOptions(presetEl,[{ value:'', label:'Standard only' }],'');
+    presetEl.disabled=true;
+    return '';
+  }
+
+  const presetOptions=[
+    { value:'', label:'Standard' },
+    ...presets.map(preset=>({ value:preset.id, label:preset.label||preset.id })),
+  ];
+  const nextValue=renderAgentRoutingSelectOptions(
+    presetEl,
+    presetOptions,
+    preferredPresetId&&presetOptions.some(option=>option.value===preferredPresetId)
+      ? preferredPresetId
+      : (allowDefaultPreset ? getAgentDefaultPresetId(catalog,entryId,presets) : ''),
+  );
+  presetEl.disabled=false;
+  return nextValue;
+}
+function renderAgentModelControls(div,catalog,entryId,presetId){
+  const controlsEl=div.querySelector('.agent-model-controls');
+  if(!controlsEl)return;
+  if(!catalog||!entryId||entryId===CUSTOM_AGENT_MODEL_VALUE){
+    controlsEl.innerHTML='';
+    return;
+  }
+  const controls=window.CatsUI?.listStoredAdvancedControls
+    ? window.CatsUI.listStoredAdvancedControls(catalog,`entry:${entryId}`)
+    : [];
+  if(controls.length===0){controlsEl.innerHTML='';return;}
+  const defaults=window.CatsUI?.getAdvancedEntryControlDefaults
+    ? window.CatsUI.getAdvancedEntryControlDefaults(catalog,entryId,presetId||'')
+    : {};
+  controlsEl.innerHTML=controls.map(control=>{
+    const safeKey=escapeHtml(control.key);
+    const label=escapeHtml(control.label||control.key);
+    if(control.kind==='enum'){
+      const valueOptions=(Array.isArray(control.values)?control.values:[])
+        .filter(v=>{
+          if(!entryId||!Array.isArray(v.applicableEntryIds)||v.applicableEntryIds.length===0)return true;
+          return v.applicableEntryIds.includes(entryId);
+        });
+      const curVal=defaults[control.key]!==undefined?String(defaults[control.key]):'';
+      const opts=valueOptions.map(v=>`<option value="${escapeHtml(v.value)}" ${String(v.value)===curVal?'selected':''}>${escapeHtml(v.label||v.value)}</option>`).join('');
+      return `<div><label class="block text-xs text-slate-400">${label}</label><select class="agent-model-control w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none" data-model-control-kind="enum" data-model-control-key="${safeKey}">${opts}</select></div>`;
+    }
+    if(control.kind==='boolean'){
+      const checked=defaults[control.key]===true?'checked':'';
+      return `<div><label class="flex items-center gap-2 text-xs text-slate-400"><input type="checkbox" class="agent-model-control h-3.5 w-3.5 rounded border-slate-600 bg-slate-700" data-model-control-kind="boolean" data-model-control-key="${safeKey}" ${checked} />${label}</label></div>`;
+    }
+    const inputType=control.kind==='number'?'number':'text';
+    const curVal=defaults[control.key]!==undefined&&defaults[control.key]!==null?escapeHtml(defaults[control.key]):'';
+    const extraAttrs=[
+      control.minimum!==undefined?`min="${escapeHtml(control.minimum)}"`:'',
+      control.maximum!==undefined?`max="${escapeHtml(control.maximum)}"`:'',
+      control.step!==undefined?`step="${escapeHtml(control.step)}"`:'',
+    ].filter(Boolean).join(' ');
+    return `<div><label class="block text-xs text-slate-400">${label}</label><input type="${inputType}" class="agent-model-control w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none" data-model-control-kind="${escapeHtml(control.kind)}" data-model-control-key="${safeKey}" value="${curVal}" ${extraAttrs} /></div>`;
+  }).join('');
+}
+function renderAgentModelChoice(div){
+  const provider=div.querySelector('.agent-provider')?.value||'';
+  const catalog=getProviderAdvancedCatalog(provider);
+  const entryEl=div.querySelector('.agent-entry-choice');
+  const entryGroup=div.querySelector('.agent-entry-group');
+  const presetEl=div.querySelector('.agent-preset-choice');
+  const manualGroup=div.querySelector('.agent-model-manual-group');
+  const manualLabel=div.querySelector('.agent-model-manual-label');
+  const manualInput=div.querySelector('.agent-model-custom');
+  const hintEl=div.querySelector('.agent-model-hint');
+  if(!entryEl||!entryGroup||!presetEl||!manualGroup||!manualLabel||!manualInput||!hintEl)return;
+
+  const entryId=entryEl.value||'';
+  if(!catalog||entryGroup.classList.contains('hidden')){
+    manualGroup.classList.remove('hidden');
+    manualLabel.textContent='Model ID';
+    hintEl.textContent='Enter a model id manually.';
+    renderAgentModelControls(div,null,'','');
+    return;
+  }
+
+  if(!entryId||entryId===CUSTOM_AGENT_MODEL_VALUE){
+    manualGroup.classList.remove('hidden');
+    manualLabel.textContent='Legacy Model ID';
+    hintEl.textContent='Manual model id passthrough.';
+    renderAgentModelControls(div,null,'','');
+    return;
+  }
+
+  manualGroup.classList.add('hidden');
+  const entry=findAgentCatalogEntry(catalog,entryId);
+  const presetId=presetEl.value||'';
+  const preset=presetId
+    ? listAgentApplicablePresets(catalog,entryId).find(item=>item.id===presetId)||null
+    : null;
+  const bits=[];
+  if(entry) bits.push(entry.label||entry.id);
+  bits.push(preset?.label||'Standard');
+  hintEl.textContent=bits.join(' · ')||'Advanced catalog selection';
+  renderAgentModelControls(div,catalog,entryId,presetId);
+}
+function syncAgentModelField(div,options={}){
+  const providerEl=div.querySelector('.agent-provider');
+  const entryGroup=div.querySelector('.agent-entry-group');
+  const select=div.querySelector('.agent-entry-choice');
+  const presetGroup=div.querySelector('.agent-mode-group');
+  const presetEl=div.querySelector('.agent-preset-choice');
+  const staticLabelEl=div.querySelector('.agent-preset-static-label');
+  const manualGroup=div.querySelector('.agent-model-manual-group');
+  const customInput=div.querySelector('.agent-model-custom');
+  const hintEl=div.querySelector('.agent-model-hint');
+  const manualLabel=div.querySelector('.agent-model-manual-label');
+  if(!providerEl||!entryGroup||!select||!presetGroup||!presetEl||!staticLabelEl||!manualGroup||!customInput||!hintEl||!manualLabel)return;
+  const preserveCurrent=options.preserve!==false;
+  const currentState=preserveCurrent?readAgentModelState(div):{ model:'', modelSelection:null };
+  const requestedProvider=Object.prototype.hasOwnProperty.call(options,'provider')
+    ? options.provider
+    : (providerEl.value||'');
+  const model=Object.prototype.hasOwnProperty.call(options,'model')?options.model:currentState.model;
+  const modelSelection=Object.prototype.hasOwnProperty.call(options,'modelSelection')?options.modelSelection:currentState.modelSelection;
+  const allowLegacyModel=options.allowLegacyModel===true||manualGroup.dataset.legacyOrigin==='explicit';
+  const normalizedState=normalizeAgentSelectionState(
+    requestedProvider,
+    model,
+    modelSelection,
+    { allowLegacyModel },
+  );
+  const provider=renderAgentProviderSelectOptions(providerEl,normalizedState.provider);
+  const catalog=getProviderAdvancedCatalog(provider);
+  const entries=listAgentCatalogEntries(catalog);
+
+  if(!catalog||entries.length===0){
+    entryGroup.classList.add('hidden');
+    presetGroup.classList.add('hidden');
+    renderAgentRoutingSelectOptions(select,[], '');
+    renderAgentRoutingSelectOptions(presetEl,[], '');
+    staticLabelEl.classList.add('hidden');
+    staticLabelEl.textContent='';
+    manualGroup.classList.remove('hidden');
+    manualLabel.textContent='Model ID';
+    customInput.value=normalizedState.model||getDefaultModel(provider)||'';
+    if(!manualGroup.dataset.legacyOrigin){
+      manualGroup.dataset.legacyOrigin=allowLegacyModel?'explicit':'fallback';
+    }
+    hintEl.textContent='Enter a model id manually.';
+    refreshAgentCardSummary(div);
+    return;
+  }
+
+  entryGroup.classList.remove('hidden');
+  const initial=resolveAgentInitialRouting(
+    provider,
+    normalizedState.model,
+    normalizedState.modelSelection,
+    { allowLegacyModel },
+  );
+  const entryOptions=[
+    ...entries.map(entry=>({ value:entry.id, label:entry.label||entry.id })),
+    { value:CUSTOM_AGENT_MODEL_VALUE, label:'Custom legacy model...' },
+  ];
+  const defaultEntryId=getAgentDefaultEntryId(catalog,entries)||CUSTOM_AGENT_MODEL_VALUE;
+  const nextEntryId=renderAgentRoutingSelectOptions(
+    select,
+    entryOptions,
+    initial.entryId&&entryOptions.some(option=>option.value===initial.entryId)
+      ? initial.entryId
+      : defaultEntryId,
+  );
+
+  if(!nextEntryId||nextEntryId===CUSTOM_AGENT_MODEL_VALUE){
+    syncAgentPresetField(div,catalog,'','',false);
+    manualGroup.classList.remove('hidden');
+    manualLabel.textContent='Legacy Model ID';
+    customInput.value=initial.legacyModel||normalizedState.model||customInput.value||'';
+    if(!manualGroup.dataset.legacyOrigin){
+      manualGroup.dataset.legacyOrigin=allowLegacyModel?'explicit':'fallback';
+    }
+    hintEl.textContent='Manual model id passthrough.';
+    refreshAgentCardSummary(div);
+    return;
+  }
+
+  customInput.value='';
+  manualGroup.classList.add('hidden');
+  delete manualGroup.dataset.legacyOrigin;
+  syncAgentPresetField(
+    div,
+    catalog,
+    nextEntryId,
+    initial.presetId||'',
+    options.allowDefaultPreset!==false,
+  );
+  renderAgentModelChoice(div);
+  refreshAgentCardSummary(div);
+}
+function buildTagCheckboxes(id,selectedTags=[]){
+  return AVAILABLE_TAGS.map(tag=>{
+    const ch=selectedTags.includes(tag)?'checked':'';
+    return `<label class="agent-tag-toggle"><input type="checkbox" value="${tag}" ${ch} class="agent-tag" /><span class="agent-tag-chip">${escapeHtml(getTagLabel(tag))}</span></label>`;
+  }).join('');
+}
+
+function refreshAllAgentModelFields(options={}){
+  document.querySelectorAll('#agents-list > div').forEach(div=>syncAgentModelField(div,{preserve:true,...options}));
+}
+function isAgentOrchestratorSelected(div){return Boolean(div?.querySelector('.agent-tag[value="orchestrator"]:checked'));}
+function syncOrchestratorLocks(){
+  document.querySelectorAll('#agents-list > div').forEach(div=>{
+    const removeBtn=div.querySelector('.agent-remove');
+    if(!removeBtn)return;
+    const locked=isAgentOrchestratorSelected(div);
+    removeBtn.disabled=locked;
+    removeBtn.setAttribute('aria-disabled',locked?'true':'false');
+    removeBtn.title=locked?'Move CEO to another agent before removing this one':'Remove agent';
+    removeBtn.classList.toggle('opacity-40',locked);
+    removeBtn.classList.toggle('cursor-not-allowed',locked);
+    removeBtn.classList.toggle('hover:text-red-400',!locked);
+    removeBtn.classList.toggle('hover:bg-slate-800/70',!locked);
+  });
+}
+
+function addAgent(name='',provider='claude',model='',tags=[],modelSelection=null,options={}) {
+  if(!options.allowOverflow&&getAgentCount()>=MAX_AGENT_COUNT){updateAgentButtons();return null;}
+  const normalizedState=normalizeAgentSelectionState(provider,model,modelSelection,{ allowLegacyModel:false });
+  provider=normalizedState.provider;
+  model=normalizedState.model;
+  modelSelection=normalizedState.modelSelection;
+  const list=document.getElementById('agents-list'); const id=agentCounter++;
+  if(!name) name=allocateAgentName(); else syncNextAgentNumber(name);
+  const div=document.createElement('div'); div.id=`agent-${id}`;
+  div.className='agent-card bg-slate-700/50 rounded-lg p-3 border border-slate-600';
+  div.dataset.expanded='false';
+  div.innerHTML=`<div class="flex items-start gap-3"><button type="button" class="agent-card-toggle" aria-expanded="false" onclick="toggleAgentCard(${id})"><div class="agent-card-name-row"><span class="agent-summary-name agent-card-name">${escapeHtml(name)}</span><svg class="agent-card-chevron h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></div><div class="agent-summary-meta agent-card-summary-row"></div><div class="agent-summary-tags agent-card-summary-row"></div></button><button onclick="removeAgent(${id})" class="agent-remove hover:bg-slate-800/70 hover:text-red-400" title="Remove agent" aria-label="Remove agent"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /></svg></button></div><div class="agent-card-details hidden space-y-3"><div><label class="block text-xs text-slate-400 mb-1">Name</label><input type="text" value="${escapeHtml(name)}" placeholder="Agent name" class="agent-name w-full bg-transparent border border-slate-600 rounded px-2 py-1 text-sm text-white focus:outline-none" /></div><div class="grid grid-cols-2 gap-2"><div><label class="block text-xs text-slate-400">Provider</label><select class="agent-provider w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none">${listSelectableProviders().map(p=>`<option value="${p}" ${p===provider?'selected':''}>${p}</option>`).join('')}</select></div><div class="agent-entry-group"><label class="block text-xs text-slate-400">Model</label><select class="agent-entry-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select></div></div><div class="agent-mode-group"><label class="block text-xs text-slate-400">Mode</label><select class="agent-preset-choice w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none"></select><div class="agent-preset-static-label runtime-input hidden !py-2 text-xs text-slate-500"></div></div><div class="agent-model-manual-group hidden"><label class="agent-model-manual-label block text-xs text-slate-400">Legacy Model ID</label><input type="text" placeholder="custom model id" class="agent-model-custom w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none" /></div><div class="agent-model-controls space-y-2"></div><p class="agent-model-hint text-[11px] leading-4 text-slate-500"></p><div><label class="block text-xs text-slate-400 mb-1">Tags</label><div class="flex flex-wrap gap-x-3 gap-y-1 agent-tags">${buildTagCheckboxes(id,tags)}</div></div></div>`;
+  list.appendChild(div);
+  syncAgentModelField(div,{preserve:false,provider,model,modelSelection});
+  const pSel=div.querySelector('.agent-provider'), entrySel=div.querySelector('.agent-entry-choice'), presetSel=div.querySelector('.agent-preset-choice');
+  const manualGroup=div.querySelector('.agent-model-manual-group');
+  const nameInput=div.querySelector('.agent-name');
+  const customInput=div.querySelector('.agent-model-custom');
+  pSel.addEventListener('change',()=>{
+    if(manualGroup) delete manualGroup.dataset.legacyOrigin;
+    syncAgentModelField(div,{preserve:false});
+  });
+  entrySel.addEventListener('change',()=>{
+    const providerName=div.querySelector('.agent-provider')?.value||'';
+    if(entrySel.value===CUSTOM_AGENT_MODEL_VALUE){
+      manualGroup.dataset.legacyOrigin='explicit';
+    } else {
+      delete manualGroup.dataset.legacyOrigin;
+    }
+    syncAgentPresetField(div,getProviderAdvancedCatalog(providerName),entrySel.value||'','',false);
+    renderAgentModelChoice(div);
+    refreshAgentCardSummary(div);
+  });
+  presetSel.addEventListener('change',()=>{renderAgentModelChoice(div); refreshAgentCardSummary(div);});
+  customInput.addEventListener('input',()=>{
+    manualGroup.dataset.legacyOrigin='explicit';
+    refreshAgentCardSummary(div);
+  });
+  div.querySelectorAll('.agent-tag').forEach(cb=>{cb.addEventListener('change',()=>{
+    if(cb.value==='orchestrator'&&!cb.checked){cb.checked=true;syncOrchestratorLocks();validateStartChat();return;}
+    if(cb.checked) document.querySelectorAll('#agents-list .agent-tag').forEach(o=>{if(o!==cb&&o.value===cb.value)o.checked=false;});
+    syncOrchestratorLocks();
+    refreshAllAgentCardSummaries();
+    validateStartChat();
+  });});
+  nameInput.addEventListener('input',()=>{refreshAgentCardSummary(div);});
+  nameInput.addEventListener('change',e=>{syncNextAgentNumber(e.target.value);refreshAgentCardSummary(div);});
+  refreshAgentCardSummary(div);
+  if(options.expandOnCreate===false){
+    div.dataset.expanded='false';
+    div.querySelector('.agent-card-details')?.classList.add('hidden');
+    div.querySelector('.agent-card-toggle')?.setAttribute('aria-expanded', 'false');
+  } else {
+    setExpandedAgent(id, true);
+  }
+  syncOrchestratorLocks();
+  updateAgentButtons();
+  validateStartChat();
+  return div;
+}
+function removeAgent(id){
+  const el=document.getElementById(`agent-${id}`);
+  if(!el||isAgentOrchestratorSelected(el)){syncOrchestratorLocks();return;}
+  el.remove();
+  if(expandedAgentId===id) expandedAgentId=null;
+  syncOrchestratorLocks();
+  updateAgentButtons();
+  validateStartChat();
+}
+function applyAgentPreset(preset){
+  const list=document.getElementById('agents-list');
+  list.innerHTML='';
+  agentCounter=0;
+  nextAgentNumber=1;
+  expandedAgentId=null;
+  preset.forEach(agent=>addAgent(agent.name,agent.provider,agent.model||'',agent.tags,agent.modelSelection||null,{expandOnCreate:false}));
+  updateAgentButtons();
+  validateStartChat();
+}
+function confirmApplyTwelveAgentPreset(){
+  if(!window.confirm('Replace the current agents with the 12-agent preset?')) return;
+  applyTwelveAgentPreset();
+}
+function applyTwelveAgentPreset(){applyAgentPreset(TWELVE_AGENT_PRESET);}
+function hasSupportingRole(agents){return agents.some(agent=>agent.tags.some(tag=>tag!=='orchestrator'));}
+function getSelectedAgents(){return getAgents().filter(agent=>agent.tags.length>0);}
+function validateStartChat(){const a=getSelectedAgents();const oc=a.filter(x=>x.tags.includes('orchestrator')).length;const v=oc===1&&hasSupportingRole(a);const b=document.getElementById('btn-start-chat');b.disabled=!v;b.classList.toggle('opacity-40',!v);b.classList.toggle('cursor-not-allowed',!v);}
+function resetStartButton(){const b=document.getElementById('btn-start-chat');b.textContent='Start Chat';validateStartChat();}
+function getAgents(){return[...document.querySelectorAll('#agents-list > div')].map(div=>{const tags=[...div.querySelectorAll('.agent-tags input:checked')].map(cb=>cb.value);const modelState=readAgentModelState(div);return{name:div.querySelector('.agent-name').value.trim(),provider:div.querySelector('.agent-provider').value,model:modelState.model,modelSelection:modelState.modelSelection,tags};}).filter(a=>a.name);}
+
+// ============================================================
+// Mode switching
+// ============================================================
+function switchToChatMode(agents) {
+  const orderedAgents = getDisplayOrderedAgents(agents);
+  setAgentMetadata(agents);
+  syncAgentDisplayOrder(agents);
+  document.getElementById('setup-section').classList.add('hidden');
+  document.getElementById('participants-section').classList.remove('hidden');
+  document.getElementById('input-area').classList.remove('hidden');
+  document.getElementById('chat-area').innerHTML='';
+  const list=document.getElementById('participant-list'); list.innerHTML='';
+  const userDiv=document.createElement('div'); userDiv.className='flex items-center gap-2 px-2 py-1.5 rounded bg-slate-700/30';
+  userDiv.innerHTML=`<span class="w-2 h-2 rounded-full bg-blue-400"></span><span class="text-sm font-medium text-blue-300">You</span><span class="tag-pill text-blue-300" style="border-color:currentColor">Stakeholder</span>`;
+  list.appendChild(userDiv);
+  for(const agent of orderedAgents){const c=getAgentColor(agent.name);const d=document.createElement('div');d.className='flex items-center gap-2 px-2 py-1.5 rounded bg-slate-700/30';
+    const tagBadges=(agent.tags||[]).map(t=>`<span class="tag-pill ${c.text}" style="border-color:currentColor">${escapeHtml(getTagLabel(t))}</span>`).join(' ');
+    d.innerHTML=`<span id="part-status-${safeId(agent.name)}" class="w-2 h-2 rounded-full bg-slate-500"></span><span class="text-sm font-medium ${c.text}">${escapeHtml(agent.name)}</span>${tagBadges}${renderProviderBadge(agent.provider,'ml-auto shrink-0')}`;
+    list.appendChild(d);
+  }
+  for(const agent of orderedAgents){const pill=document.getElementById(`status-${safeId(agent.name)}`);if(pill)updateAgentStatus(agent.name,'idle');}
+  const input=document.getElementById('chat-input'); input.value=getDefaultChatPrompt(); input.focus();
+}
+
+// ============================================================
+// Actions
+// ============================================================
+async function startChat() {
+  const agentsList=getSelectedAgents();
+  if(!agentsList.length)return;
+  if(agentsList.filter(a=>a.tags.includes('orchestrator')).length!==1||!hasSupportingRole(agentsList))return;
+  const btn=document.getElementById('btn-start-chat');
+  btn.disabled=true;btn.classList.add('opacity-40','cursor-not-allowed');btn.textContent='Starting...';
+  totalTokens=0;totalInputTokens=0;totalOutputTokens=0;agentColorMap={};thinkingAgents.clear();thinkingDetails={};thinkingPriorities={};streamingMessages={};
+  document.getElementById('tokens-display').textContent='0in / 0out';
+  document.getElementById('agent-statuses').innerHTML='';
+  pendingAgents=agentsList;
+  setAgentMetadata(agentsList);
+  syncAgentDisplayOrder(agentsList);
+  const apiKey=getRuntimeApiKey();
+  if (!validateRuntimeApiKey(apiKey)) { resetStartButton(); return; }
+  const workDir=document.getElementById('work-dir').value.trim();
+  const responseLang=document.getElementById('response-lang').value;
+  const client=new RuntimeClient(location.origin,apiKey);
+  const agentDefs=agentsList.map(a=>({name:a.name,provider:a.provider,model:a.model,modelSelection:a.modelSelection,tags:a.tags,systemPrompt:'',sessionId:null}));
+  chatRoom=new ChatRoom({client,agents:agentDefs,onEvent:handleEvent,workDir:workDir||undefined,responseLang});
+  try{await chatRoom.start();switchToChatMode(agentsList);showReadyPlaceholder();}
+  catch(err){addErrorMessage(authAwareMessage(err, err.message));resetStartButton();}
+}
+async function sendMessage() {
+  const input=document.getElementById('chat-input');
+  const msg=input.value.trim(); if(!msg||!chatRoom)return;
+  clearReadyPlaceholder();
+  input.value=''; setWorking(true);
+  try{await chatRoom.handleMessage(msg);}catch(err){addErrorMessage(err.message);setWorking(false);}
+}
+async function stopAgents() { if(chatRoom) await chatRoom.handleStop(); }
+async function stopChat() {
+  if(chatRoom){try{await chatRoom.close();}catch{}chatRoom=null;}
+  document.getElementById('participants-section').classList.add('hidden');
+  document.getElementById('input-area').classList.add('hidden');
+  document.getElementById('setup-section').classList.remove('hidden');
+  document.getElementById('chat-area').innerHTML=`<div class="runtime-empty flex-1"><div class="runtime-empty-icon">&gt;_</div><div>Set up agents to start</div></div>`;
+  totalTokens=0;totalInputTokens=0;totalOutputTokens=0;agentColorMap={};agentMetaByName={};agentDisplayOrder={};pendingAgents=[];clearStreamingState();clearAllThinking();setWorking(false);
+  document.getElementById('tokens-display').textContent='0in / 0out';
+  document.getElementById('agent-statuses').innerHTML='';
+  resetStartButton();
+}
+function setWorking(w) {
+  isWorking=w;
+  document.getElementById('btn-send').disabled=w;
+  document.getElementById('btn-stop').disabled=!w;
+  document.getElementById('btn-send').classList.toggle('opacity-40',w);
+  document.getElementById('btn-send').classList.toggle('cursor-not-allowed',w);
+  if(!w){clearAllThinking();document.getElementById('chat-input').focus();}
+}
+
+// ============================================================
+// Browse modal
+// ============================================================
+function openBrowseModal(){loadBrowse(document.getElementById('work-dir').value.trim()||'');document.getElementById('browseModal').classList.remove('hidden');}
+function closeBrowseModal(){document.getElementById('browseModal').classList.add('hidden');}
+async function loadBrowse(path){
+  const el=document.getElementById('browse-list'),pathEl=document.getElementById('browse-path');
+  el.innerHTML='<div class="text-slate-400 p-3 text-sm">Loading...</div>';
+  try{const url=path?`/browse?path=${encodeURIComponent(path)}`:'/browse';
+    const res=await fetch(url,{headers:getRuntimeAuthHeaders()});
+    if(!res.ok){el.innerHTML=`<div class="text-red-400 p-3 text-sm">${escapeHtml(authAwareMessage({statusCode:res.status},'Cannot read directory'))}</div>`;return;}
+    const d=await res.json();pathEl.value=d.current;
+    let html=`<div class="px-3 py-1.5 text-sm cursor-pointer hover:bg-slate-700 rounded font-mono" onclick="loadBrowse('${d.parent.replace(/'/g,"\\'")}')">..</div>`;
+    for(const e of d.entries) html+=`<div class="px-3 py-1.5 text-sm cursor-pointer hover:bg-slate-700 rounded font-mono" onclick="loadBrowse('${e.path.replace(/'/g,"\\'")}')">${escapeHtml(e.name)}/</div>`;
+    if(!d.entries.length)html+='<div class="text-slate-500 p-3 text-sm">No subdirectories</div>';
+    el.innerHTML=html;
+  }catch{el.innerHTML='<div class="text-red-400 p-3 text-sm">Error loading directories</div>';}
+}
+function selectBrowsePath(){document.getElementById('work-dir').value=document.getElementById('browse-path').value;closeBrowseModal();}
+document.getElementById('browseModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeBrowseModal();});
+document.getElementById('promptsModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closePromptsModal();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeBrowseModal();closePromptsModal();}});
+
+// ============================================================
+// Role prompts modal
+// ============================================================
+const ROLE_PROMPTS = {
+  orchestrator:{label:'CEO',prompt:"You are the CEO of this group chat room. Your primary role is coordination.\n\nYou may also hold specialist roles such as Coder or PM.\n- Stay in CEO/coordinator mode by default\n- Do NOT delegate to yourself\n- If one of your own additional roles is needed and no better participant should take it, you MAY do that work directly instead of outputting NEXT:\n\nDelegation Contract:\n- If agent work is needed, the final non-empty line must be NEXT: AgentName1, AgentName2\n- Put NEXT on its own line\n- Use exact participant names\n- Optional per-agent instructions can appear above it as @AgentName ...\n- If no delegation is needed, do not output NEXT:\n\nRules:\n- Simple factual questions: answer directly\n- For non-trivial or multi-step tasks, delegate to PM first when a PM is available\n- Tasks requiring work should normally be delegated to the appropriate agents\n- Briefly explain your reasoning before NEXT:\n- Only delegate to existing participants\n- After agent results: either summarize for the user or delegate again\n- Never output NEXT with your own name",agentsMd:"First action: check if AGENTS.md exists.\n- If exists: read it as source of truth\n- If NOT: continue the workflow and delegate normally"},
+  pm:{label:'PM',prompt:"You are a product manager. Your role is product definition and spec writing \u2014 not project tracking and not implementation.\n\nYour job:\n1. Clarify the real objective, target users, constraints, and success criteria\n2. Turn ambiguous requests into a concrete product spec\n3. Define scope, non-goals, user stories, requirements, edge cases, and acceptance criteria\n4. Identify open product decisions, risks, and assumptions\n5. Hand off a clear spec that the architect or coder can execute against\n\nYour primary deliverable is a product requirements/specification document in message form. Do NOT implement code yourself unless no implementation specialist exists.",agentsMd:"First action: check if AGENTS.md exists. If it exists, read it first. Do NOT create or modify AGENTS.md."},
+  researcher:{label:'Researcher',prompt:"You are a product and technical researcher. Your role is discovery, evidence gathering, and ambiguity reduction before implementation.\n\nYour job:\n1. Identify what is still unknown, ambiguous, or risky\n2. Gather and synthesize relevant context from the codebase, docs, prior conversation, and available references\n3. Compare options, constraints, and tradeoffs when the right path is not yet clear\n4. Turn findings into a concise brief the PM, architect, or coder can act on\n5. Call out assumptions, missing evidence, and open questions\n\nYour deliverable is a grounded research brief in message form. Do NOT implement code yourself unless no implementation specialist exists.",agentsMd:"First action: check if AGENTS.md exists. If it exists, read it first. Do NOT create or modify AGENTS.md."},
+  designer:{label:'Designer',prompt:"You are a product designer. Your role is UX, interaction design, information hierarchy, and clarity before or alongside implementation.\n\nYour job:\n1. Translate product goals into clear user flows and interface structure\n2. Identify friction, ambiguity, and unnecessary complexity in the user experience\n3. Recommend layout, hierarchy, interaction, copy, and state design improvements\n4. Highlight edge cases, empty states, and error-state behavior the team should not miss\n5. Hand off concrete UI/UX guidance the architect or coder can implement\n\nYour deliverable is a design brief or UX recommendation in message form. Do NOT implement code yourself unless no implementation specialist exists.",agentsMd:"First action: check if AGENTS.md exists. If it exists, read it first. Do NOT create or modify AGENTS.md."},
+  architect:{label:'Architect',prompt:"You are a software architect. Your role is PLANNING \u2014 do NOT write implementation code unless no coder is available.\n\nYour job:\n1. Analyze the task and existing codebase\n2. Produce a clear, actionable plan (file structure, tech choices, component breakdown, implementation steps)\n3. Create or update AGENTS.md with project context so other agents can work efficiently",agentsMd:"First action: check if AGENTS.md exists.\n- If exists: read it as source of truth\n- If NOT: create AGENTS.md with project purpose, tech stack, directory structure, conventions\n- Update AGENTS.md when codebase changes significantly"},
+  coder:{label:'Coder',prompt:"You are an experienced developer. Write clean, well-tested code. Address feedback specifically and implement changes as requested.",agentsMd:"First action: check if AGENTS.md exists. If it exists, read it first. Do NOT create or modify AGENTS.md."},
+  reviewer:{label:'Reviewer',prompt:"You are a senior code reviewer. Check for correctness, edge cases, readability, performance, and security issues. Give specific, actionable feedback.",agentsMd:"First action: check if AGENTS.md exists. If it exists, read it first. Do NOT create or modify AGENTS.md."},
+  tester:{label:'Tester',prompt:"You are a test engineer. Write comprehensive automated tests covering edge cases, error paths, and typical usage. Your deliverable is test code, not manual testing.",agentsMd:"First action: check if AGENTS.md exists. If it exists, read it first. Do NOT create or modify AGENTS.md."},
+  security:{label:'Security',prompt:"You are a security engineer. Focus on auth, permissions, trust boundaries, secrets handling, misuse paths, data exposure, and abuse risk.\n\nYour job:\n1. Review the planned or implemented behavior for security-sensitive edges\n2. Identify trust boundaries, permission gaps, and unsafe assumptions\n3. Flag secret handling, injection, escalation, data leakage, and abuse risks\n4. Recommend concrete mitigations and verification steps\n5. Return findings in message form with severity and rationale\n\nDo NOT implement code yourself unless no implementation specialist exists.",agentsMd:"First action: check if AGENTS.md exists. If it exists, read it first. Do NOT create or modify AGENTS.md."},
+  qa:{label:'QA',prompt:"You are a QA engineer responsible for end-to-end validation.\n\nYour workflow:\n1. Deploy the application natively in the working directory\n2. Perform E2E testing via browser automation or manual verification against the running app\n3. If feasible, actually open the browser or application and show the website/app instead of relying only on static inspection\n4. Report bugs with clear reproduction steps and confirm fixes when re-tested",agentsMd:"First action: check if AGENTS.md exists. If it exists, read it first. Do NOT create or modify AGENTS.md."},
+  tech_writer:{label:'Tech Writer',prompt:"You are a technical writer. Focus on documentation that helps users and developers understand how the product works.\n\nYour job:\n1. Read the conversation and identify the behavior that is now stable enough to document\n2. Write or update clear usage docs, setup steps, API notes, changelog text, migration notes, or operator guidance as appropriate\n3. Prefer concise, task-oriented documentation over marketing language\n4. Call out assumptions, prerequisites, and limitations clearly\n5. Return the documentation content in message form unless asked to edit files directly",agentsMd:"First action: check if AGENTS.md exists. If it exists, read it first. Do NOT create or modify AGENTS.md."},
+  marketer:{label:'Marketer',prompt:"You are a product marketer and social copywriter.\n\nYour job:\n1. Read the conversation and identify the strongest product outcome, user value, and differentiators\n2. Write a single social-ready post that can be pasted directly to LinkedIn, Facebook, Threads, or similar platforms\n3. Output exactly one fenced markdown block and put the final post inside it\n4. Keep the post roughly 250 to 500 words in the requested response language\n5. Use a sharp hook, clear value proposition, concrete capabilities, and a soft CTA\n6. Do not invent metrics, customers, or claims that are not supported by the conversation",agentsMd:"First action: check if AGENTS.md exists. If it exists, read it first. Do NOT create or modify AGENTS.md."},
+};
+function getRolePromptSpec(tag){
+  const configured = ROLE_PROMPTS[tag];
+  if (configured) return configured;
+  return {
+    label: getTagLabel(tag),
+    prompt: 'Prompt not configured yet.',
+    agentsMd: 'AGENTS.md guidance not configured yet.',
+  };
+}
+function openPromptsModal(){
+  document.getElementById('prompts-content').innerHTML=AVAILABLE_TAGS.map(tag=>{const r=getRolePromptSpec(tag);
+    return`<div class="bg-slate-900 border border-slate-700 rounded-lg p-3"><div class="text-sm font-semibold text-slate-200 mb-2">${escapeHtml(r.label)}</div><div class="text-xs text-slate-400 mb-2 whitespace-pre-line">${escapeHtml(r.prompt)}</div><div class="text-xs text-slate-500 border-t border-slate-700 pt-2 mt-2"><span class="font-medium text-slate-400">AGENTS.md:</span> <span class="whitespace-pre-line">${escapeHtml(r.agentsMd)}</span></div></div>`;
+  }).join('');
+  document.getElementById('promptsModal').classList.remove('hidden');
+}
+function closePromptsModal(){document.getElementById('promptsModal').classList.add('hidden');}
+
+// ============================================================
+// Provider options (fetch from cats-runtime)
+// ============================================================
+async function loadProviderOptions() {
+  try {
+    const headers = getRuntimeAuthHeaders();
+    const res = await fetch('/providers/config', { headers });
+    if (!res.ok) return;
+    const data = await res.json();
+    const providers = data.providers || {};
+    const configuredProviders=Object.entries(providers)
+      .filter(([name, meta])=>{
+        if(!PROVIDERS.includes(name)) return false;
+        const instances=Array.isArray(meta?.instances) ? meta.instances : [];
+        return instances.length>0;
+      })
+      .map(([name])=>name);
+    SELECTABLE_PROVIDERS=configuredProviders.length
+      ? PROVIDERS.filter(name=>configuredProviders.includes(name))
+      : [...PROVIDERS];
+    Object.keys(PROVIDER_ADVANCED_CATALOGS).forEach(name=>{
+      if(!configuredProviders.includes(name)) delete PROVIDER_ADVANCED_CATALOGS[name];
+    });
+    for (const [name] of Object.entries(providers)) {
+      if (!PROVIDER_MODELS[name]) continue;
+      try {
+        const advancedRes = await fetch(`/providers/${name}/models/advanced`, { headers });
+        if (advancedRes.ok) {
+          const advancedData = await advancedRes.json();
+          const normalized = window.CatsUI?.normalizeAdvancedCatalog
+            ? window.CatsUI.normalizeAdvancedCatalog(advancedData)
+            : advancedData;
+          if (normalized) {
+            PROVIDER_ADVANCED_CATALOGS[name] = normalized;
+            const entries = Array.isArray(normalized.entries) ? normalized.entries : [];
+            if (entries.length > 0) {
+              PROVIDER_MODELS[name] = entries.map((entry, index) => ({
+                value: entry.id,
+                label: entry.label || (index === 0 ? `${entry.id} (default)` : entry.id),
+              }));
+            }
+            continue;
+          }
+        }
+      } catch {}
+      delete PROVIDER_ADVANCED_CATALOGS[name];
+      try {
+        const mRes = await fetch(`/providers/${name}/models`, { headers });
+        if (mRes.ok) {
+          const mData = await mRes.json();
+          const models = mData.models || mData.catalog || [];
+          if (Array.isArray(models) && models.length) {
+            const mapped = models.map((m, i) => {
+              const value = typeof m === 'string' ? m : (m.id || m.value || m.name);
+              const defaultFlag = typeof m === 'object' && m !== null && (m.default === true || m.isDefault === true);
+              const label = typeof m === 'string'
+                ? (i === 0 ? `${m} (default)` : m)
+                : (m.label || m.id || m.name);
+              return {
+                value,
+                label: defaultFlag && !String(label).includes('(default)') ? `${label} (default)` : label,
+                default: defaultFlag,
+              };
+            });
+            const defaultIndex = mapped.findIndex((entry) => entry.default);
+            if (defaultIndex > 0) {
+              const [defaultEntry] = mapped.splice(defaultIndex, 1);
+              mapped.unshift(defaultEntry);
+            }
+            PROVIDER_MODELS[name] = mapped.map(({ value, label }) => ({ value, label }));
+          }
+        }
+      } catch {}
+    }
+    refreshAllAgentModelFields({ allowLegacyModel:false });
+  } catch {}
+}
+
+// ============================================================
+// Init
+// ============================================================
+async function initApp() {
+  const apiKeyInput = document.getElementById('api-key');
+  const responseLangSelect = document.getElementById('response-lang');
+  const authStatus = document.getElementById('runtime-auth-status');
+  const authEditor = document.getElementById('runtime-auth-editor');
+  const authToggle = document.getElementById('runtime-auth-toggle');
+  const updateRuntimeAuthState = () => {
+    const hasValue = apiKeyInput.value.trim().length > 0;
+    authStatus.textContent = hasValue ? 'Set' : 'Missing';
+    authStatus.dataset.state = hasValue ? 'active' : 'idle';
+  };
+  window.toggleRuntimeAuthEditor = forceOpen => {
+    const shouldOpen = typeof forceOpen === 'boolean'
+      ? forceOpen
+      : authEditor.classList.contains('hidden');
+    authEditor.classList.toggle('hidden', !shouldOpen);
+    authToggle.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+    if (shouldOpen) apiKeyInput.focus();
+  };
+  const refreshAuthBoundState = () => {
+    if (validateRuntimeApiKey(apiKeyInput.value)) {
+      window.toggleRuntimeAuthEditor(false);
+      void loadProviderOptions();
+    }
+  };
+  apiKeyInput.addEventListener('input', updateRuntimeAuthState);
+  apiKeyInput.addEventListener('change', refreshAuthBoundState);
+  apiKeyInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') refreshAuthBoundState();
+  });
+  responseLangSelect?.addEventListener('change', () => {
+    syncChatInputDefaultPrompt();
+  });
+  updateRuntimeAuthState();
+  await loadProviderOptions();
+  addAgent('Agent-1','claude','',['orchestrator'],null,{expandOnCreate:false});
+  addAgent('Agent-2','codex','',['coder'],null,{expandOnCreate:false});
+  syncChatInputDefaultPrompt(true);
+}
+void initApp();
+</script>
+</body>
+</html>

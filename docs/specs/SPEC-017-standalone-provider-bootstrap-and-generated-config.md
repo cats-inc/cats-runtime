@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Bootstrap Core, Shared Shell Slices, and Package Baseline Landed) |
+| **Status** | In Progress (Bootstrap Core, Shared Shell, HTML Emit, and Package Baseline Landed) |
 | **Owner** | Codex |
 | **Reviewer** | User / runtime setup workstream |
 
@@ -375,11 +375,13 @@ Cats SPA.
   [PLAN-019](../plans/PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md)
   is also partially landed: the runtime now injects a shared sidebar shell,
   shared CatsUI helpers, shared provider badge/status helpers, a build-time
-  Tailwind CSS payload, provider-setup now reuses persisted `GET /setup-state`
-  truth instead of forcing a scan on load, and the dashboard now exposes a
-  direct manual scan/repair panel.
+  Tailwind CSS payload, canonical `src/http/ui/pages/*.html` sources that emit
+  the shipped `public/*.html` artifacts, provider-setup now reuses persisted
+  `GET /setup-state` truth instead of forcing a scan on load, and the dashboard
+  now exposes a direct manual scan/repair panel.
 - The remaining `PLAN-019` gap is no longer bootstrap correctness. It is the
-  deeper page-source and emitted-HTML convergence track.
+  remaining page-entry modularization track on top of that emitted static-HTML
+  baseline.
 - Executable packaging and npm publish follow-through now also has a separate
   track under
   [PLAN-025](../plans/PLAN-025-executable-packaging-and-publish-follow-through.md)
@@ -419,5 +421,5 @@ Cats SPA.
 
 *Created: 2026-03-25*
 *Author: Codex*
-*Last updated: 2026-04-04*
+*Last updated: 2026-04-07*
 *Related Plan: [PLAN-019](../plans/PLAN-019-shared-runtime-ui-foundation-for-dashboard-playground-and-provider-setup.md), [PLAN-025](../plans/PLAN-025-executable-packaging-and-publish-follow-through.md)*

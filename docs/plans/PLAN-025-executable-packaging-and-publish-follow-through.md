@@ -126,6 +126,7 @@ without claiming publish infrastructure that is not actually configured yet.
 | 2026-03-29 | Phase 1 slice landed: deployment/release/package docs now distinguish repo-local executable package readiness from not-yet-proven public npm publication, and `SPEC-017` now points shared UI follow-through to `PLAN-019` while keeping packaging follow-through under `PLAN-025` |
 | 2026-03-29 | Phase 2 slice landed: `tests/package-contract.test.ts` now installs the locally packed tarball into a temporary consumer workspace and smokes the packaged runtime and MCP entrypoints, so executable package regressions are no longer limited to static tarball-content checks |
 | 2026-04-06 | Runtime build-output follow-through moved those package-contract smoke checks and published entrypoints under `build/runtime/index.js` and `build/runtime/bin/mcp.js`, keeping packaging validation aligned with the live runtime layout after `PLAN-031` closed |
+| 2026-04-07 | `PLAN-019` landed canonical `src/http/ui/pages/*.html` sources plus emitted `public/*.html` artifacts under `build:ui`, so this packaging workstream is now blocked only on release/publish follow-through rather than stale runtime page-generation ambiguity |
 
 ---
 

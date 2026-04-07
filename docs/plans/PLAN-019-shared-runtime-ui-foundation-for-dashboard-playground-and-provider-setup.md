@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Shared Shell, Manual Repair, and Build Baseline Landed) |
+| **Status** | In Progress (Shared Shell, HTML Emit, and Manual Repair Landed) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User / runtime setup workstream |
@@ -51,8 +51,9 @@
   one lightweight runtime-owned UI foundation while preserving static HTML
   artifacts, existing route behavior, and the current non-SPA runtime model.
 - The plan is therefore now in progress: most of the shared shell/manual repair
-  contract is in repo, but the underlying page-source and emitted-HTML
-  convergence work remains unfinished.
+  contract is in repo, and the runtime-owned page source tree plus emitted
+  `public/*.html` build path are now landed, but the deeper page-entry
+  modularization work remains unfinished.
 
 ## Scope
 
@@ -82,17 +83,21 @@
 ## Current Gaps
 
 - Shared shell/navigation, setup-state reuse, and dashboard manual repair now
-  exist, but the three pages still keep substantial page-local markup and
-  scripting instead of a clearer shared source layout.
-- `public/provider-setup.html` still carries significant page-local behavior
+  exist, and `src/http/ui/pages/*.html` now acts as the canonical source tree
+  for emitted `public/*.html` artifacts, but the three pages still keep
+  substantial page-local markup and scripting instead of narrower shared entry
+  modules.
+- `src/http/ui/pages/provider-setup.html` still carries significant page-local
+  behavior
   even though it now sits inside the shared runtime shell and consumes the
   shared setup read model.
-- `public/index.html` and `public/playground.html` both reuse shared CatsUI
+- `src/http/ui/pages/index.html` and
+  `src/http/ui/pages/playground.html` both reuse shared CatsUI
   helpers, but they still retain duplicated page-local orchestration code that
   has not yet been pulled into narrower shared modules.
-- `build:ui` now gives the repo one shared Tailwind build path, but it does not
-  yet bundle page-owned entry modules or emit the final HTML artifacts from a
-  runtime-owned source tree.
+- `build:ui` now gives the repo one shared Tailwind build path and emits the
+  final `public/*.html` artifacts from a runtime-owned source tree, but it does
+  not yet bundle page-owned entry modules.
 - Playground's current visual direction is the strongest baseline, but it is
   implemented as an isolated page rather than the canonical runtime shell.
 - `BootstrapService` already persists both `provider-scan.json` and
@@ -155,7 +160,7 @@
 - [x] Define the shared runtime fetch/error helper contract for same-origin runtime APIs and optional bearer token use.
 - [x] Define the shared provider badge and provider-status rendering helpers.
 - [x] Define the shared bootstrap scan snapshot read model, centered on `GET /setup-state`.
-- [ ] Define the runtime-owned UI source layout separately from emitted `public/*.html` artifacts.
+- [x] Define the runtime-owned UI source layout separately from emitted `public/*.html` artifacts.
 - [x] Define the sidebar brand-row surface switcher contract, including bootstrap locked-state behavior.
 - [x] Keep bootstrap logic in runtime-owned services and thin HTTP/UI adapters only.
 
@@ -173,7 +178,7 @@ Deliverables:
 - [x] Add a lightweight build pipeline, preferably `esbuild`, for runtime UI sources.
 - [x] Add build-time Tailwind support for the shared runtime shell and page entries.
 - [ ] Bundle page-specific entry modules against the shared UI foundation without introducing a framework runtime or client router.
-- [ ] Emit static HTML artifacts that remain directly serveable by the runtime and packagable in npm/Electron flows.
+- [x] Emit static HTML artifacts that remain directly serveable by the runtime and packagable in npm/Electron flows.
 - [x] Wire the packaging/build lifecycle so runtime UI artifacts are generated before release packaging.
 
 Deliverables:
@@ -256,6 +261,10 @@ Deliverables:
   - `cats-runtime/public/index.html`
   - `cats-runtime/public/playground.html`
   - `cats-runtime/public/provider-setup.html`
+- Canonical runtime UI page sources:
+  - `cats-runtime/src/http/ui/pages/index.html`
+  - `cats-runtime/src/http/ui/pages/playground.html`
+  - `cats-runtime/src/http/ui/pages/provider-setup.html`
 - HTTP serving and route wiring:
   - `cats-runtime/src/http/app.ts`
   - `cats-runtime/src/http/routes/setup.ts`
@@ -365,6 +374,7 @@ Deliverables:
 |------|--------|
 | 2026-03-25 | Plan created for the `SPEC-017` runtime UI foundation follow-through gap. |
 | 2026-04-04 | Status audit aligned the plan with repo reality: the shared shell, shared CatsUI helpers, build-time Tailwind path, provider-setup shared read seam, dashboard repair panel, playground helper adoption, and regression coverage are landed; the remaining open work is the deeper page-source and emitted-HTML convergence track from Phase 2. |
+| 2026-04-07 | `build:ui` now emits `public/index.html`, `public/playground.html`, and `public/provider-setup.html` from canonical `src/http/ui/pages/*.html` sources, and regression coverage now fails if those generated artifacts drift after a build. |
 
 ## Execution Checklist
 
@@ -386,4 +396,4 @@ Deliverables:
 
 - Created: 2026-03-25
 - Author: Codex
-- Last updated: 2026-04-04
+- Last updated: 2026-04-07

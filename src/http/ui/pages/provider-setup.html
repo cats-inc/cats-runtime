@@ -1,0 +1,1777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cats Runtime Setup</title>
+<style>
+  .setup-workflow-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .setup-workflow-item {
+    width: 100%;
+    appearance: none;
+    cursor: pointer;
+    border: 1px solid rgb(30 41 59 / 0.9);
+    border-radius: 1.25rem;
+    background: rgb(2 6 23 / 0.45);
+    padding: 0.95rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    text-align: left;
+    transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+  }
+  .setup-workflow-item:hover {
+    border-color: rgb(71 85 105 / 0.95);
+    background: rgb(15 23 42 / 0.72);
+  }
+  .setup-workflow-item:focus-visible {
+    outline: 2px solid rgba(96, 165, 250, 0.78);
+    outline-offset: 2px;
+  }
+  .setup-workflow-item[data-active="true"] {
+    border-color: rgb(59 130 246 / 0.72);
+    background: rgb(15 23 42 / 0.88);
+    box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.18);
+  }
+  .setup-workflow-item-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .setup-workflow-item-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: rgb(241 245 249);
+  }
+  .setup-workflow-item-pill {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid rgb(51 65 85 / 0.95);
+    border-radius: 999px;
+    background: rgb(15 23 42 / 0.78);
+    padding: 0.12rem 0.5rem;
+    font-size: 0.6875rem;
+    color: rgb(148 163 184);
+    white-space: nowrap;
+  }
+  .setup-workflow-item-summary {
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: rgb(148 163 184);
+  }
+  .setup-workflow-item-meta {
+    font-size: 0.75rem;
+    color: rgb(100 116 139);
+  }
+  .setup-summary-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  }
+  .setup-summary-panel {
+    border: 1px solid rgb(30 41 59 / 0.9);
+    border-radius: 1.25rem;
+    background: rgb(2 6 23 / 0.55);
+    padding: 0.95rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 0;
+  }
+  .setup-summary-label {
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgb(100 116 139);
+  }
+  .setup-summary-value {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: rgb(241 245 249);
+    overflow-wrap: anywhere;
+  }
+  .setup-summary-secondary {
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: rgb(148 163 184);
+  }
+  .setup-selection-copy {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: rgb(148 163 184);
+  }
+  .setup-workflow-heading {
+    min-height: 2rem;
+  }
+  .setup-workspace[hidden] {
+    display: none !important;
+  }
+  .setup-capability-toolbar {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  }
+  .setup-capability-workspace {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .setup-target-list-panel {
+    border: 1px solid rgb(30 41 59 / 0.9);
+    border-radius: 1.5rem;
+    background: rgb(2 6 23 / 0.5);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: 0;
+  }
+  .setup-target-list-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .setup-target-list-copy {
+    font-size: 0.8125rem;
+    line-height: 1.55;
+    color: rgb(148 163 184);
+  }
+  .setup-target-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    min-height: 0;
+    max-height: 24rem;
+    overflow-y: auto;
+    padding-right: 0.15rem;
+  }
+  .setup-target-item {
+    width: 100%;
+    appearance: none;
+    cursor: pointer;
+    border: 1px solid rgb(30 41 59 / 0.9);
+    border-radius: 1.25rem;
+    background: rgb(2 6 23 / 0.4);
+    padding: 0.9rem 0.95rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    text-align: left;
+    transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+  }
+  @media (min-width: 768px) {
+    .setup-target-item {
+      padding: 1rem 1.1rem;
+      gap: 0.55rem;
+    }
+  }
+  .setup-target-item:hover {
+    border-color: rgb(71 85 105 / 0.95);
+    background: rgb(15 23 42 / 0.72);
+  }
+  .setup-target-item:focus-visible {
+    outline: 2px solid rgba(96, 165, 250, 0.78);
+    outline-offset: 2px;
+  }
+  .setup-target-item[data-active="true"] {
+    border-color: rgb(59 130 246 / 0.72);
+    background: rgb(15 23 42 / 0.88);
+    box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.18);
+  }
+  .setup-target-item-main {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+  .setup-target-item-heading {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    align-items: baseline;
+    gap: 0.45rem;
+  }
+  .setup-target-item-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: rgb(241 245 249);
+    min-width: 0;
+  }
+  .setup-target-item-subtitle {
+    font-size: 0.8125rem;
+    color: rgb(148 163 184);
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .setup-target-item-badges {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+    justify-content: flex-end;
+    flex: 0 0 auto;
+  }
+  .setup-target-item-pill {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid rgb(51 65 85 / 0.95);
+    border-radius: 999px;
+    background: rgb(15 23 42 / 0.78);
+    padding: 0.12rem 0.5rem;
+    font-size: 0.6875rem;
+    color: rgb(148 163 184);
+    white-space: nowrap;
+  }
+  .setup-target-item-copy {
+    font-size: 0.75rem;
+    line-height: 1.45;
+    color: rgb(100 116 139);
+  }
+  @media (max-width: 767px) {
+    .setup-target-item-main {
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .setup-target-item-heading {
+      flex-basis: 100%;
+      flex-wrap: wrap;
+    }
+    .setup-target-item-badges {
+      flex-wrap: wrap;
+      justify-content: flex-start;
+    }
+  }
+  .setup-target-empty {
+    border: 1px dashed rgb(51 65 85 / 0.95);
+    border-radius: 1.25rem;
+    padding: 1rem;
+    font-size: 0.8125rem;
+    line-height: 1.55;
+    color: rgb(148 163 184);
+    text-align: center;
+  }
+  .setup-capability-hidden-inputs {
+    display: none !important;
+  }
+  .setup-capability-panel {
+    border: 1px solid rgb(30 41 59 / 0.9);
+    border-radius: 1.5rem;
+    background: rgb(2 6 23 / 0.5);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .setup-capability-summary {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: rgb(203 213 225);
+  }
+  .setup-capability-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 0.75rem;
+  }
+  .setup-capability-kv {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+  .setup-capability-kv dt {
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgb(100 116 139);
+  }
+  .setup-capability-kv dd {
+    margin: 0;
+    font-size: 0.875rem;
+    color: rgb(241 245 249);
+    overflow-wrap: anywhere;
+  }
+  .setup-capability-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .setup-capability-tag {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid rgb(30 41 59 / 0.9);
+    border-radius: 999px;
+    background: rgb(15 23 42 / 0.65);
+    padding: 0.2rem 0.55rem;
+    font-size: 0.75rem;
+    color: rgb(148 163 184);
+  }
+  .setup-capability-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .setup-capability-list li {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    font-size: 0.8125rem;
+    color: rgb(148 163 184);
+  }
+  .setup-capability-list strong {
+    color: rgb(241 245 249);
+    font-weight: 600;
+  }
+  .setup-capability-secondary {
+    font-size: 0.75rem;
+    color: rgb(100 116 139);
+  }
+  .setup-status-badge {
+    gap: 0.5rem;
+  }
+  .runtime-auth-badge[data-state="warning"] {
+    border-color: rgb(146 64 14 / 0.85);
+    background: rgb(120 53 15 / 0.18);
+    color: rgb(251 191 36);
+  }
+  .setup-result-banner {
+    border: 1px solid rgb(30 41 59 / 0.9);
+    border-radius: 1rem;
+    background: rgb(2 6 23 / 0.52);
+    padding: 0.95rem 1rem;
+  }
+  .setup-result-banner[data-variant="success"] {
+    border-color: rgb(21 128 61 / 0.55);
+    background: rgb(20 83 45 / 0.16);
+  }
+  .setup-result-banner[data-variant="error"] {
+    border-color: rgb(185 28 28 / 0.55);
+    background: rgb(127 29 29 / 0.16);
+  }
+  .setup-result-title {
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgb(226 232 240);
+  }
+  .setup-result-copy {
+    margin-top: 0.35rem;
+    font-size: 0.875rem;
+    line-height: 1.55;
+    color: rgb(203 213 225);
+  }
+</style>
+</head>
+<body class="runtime-shell" data-runtime-surface="__CATS_RUNTIME_SURFACE__" data-bootstrap-required="__CATS_RUNTIME_BOOTSTRAP_REQUIRED__">
+<div class="runtime-frame">
+  <aside class="runtime-sidebar">
+    <div class="runtime-sidebar-inner">
+      <div class="runtime-brand-row">
+        <!-- CATS_RUNTIME_SURFACE_SWITCHER -->
+      </div>
+
+      <div id="setupWorkflowSection" class="runtime-sidebar-surface flex min-h-0 flex-col overflow-hidden">
+        <div class="runtime-sidebar-section">
+          <div class="setup-workflow-heading flex items-center justify-between gap-3">
+            <p class="runtime-sidebar-title">Stages</p>
+            <span id="setupWorkflowMode" class="runtime-auth-badge" data-state="idle">Setup Required</span>
+          </div>
+        </div>
+
+        <div class="runtime-sidebar-section runtime-sidebar-surface overflow-y-auto">
+          <div id="setupWorkflowRail" class="setup-workflow-rail">
+            <button
+              type="button"
+              id="setupRailProviders"
+              class="setup-workflow-item"
+              data-workspace="providers"
+              data-active="true"
+              aria-pressed="true"
+              onclick="setActiveSetupWorkspace('providers')"
+            >
+              <span class="setup-workflow-item-title-row">
+                <span class="setup-workflow-item-title">Providers</span>
+                <span id="providersRailBadge" class="setup-workflow-item-pill">Not scanned</span>
+              </span>
+              <span id="providersRailSummary" class="setup-workflow-item-summary">
+                Scan local providers, review readiness, and choose what to apply.
+              </span>
+              <span id="providersRailMeta" class="setup-workflow-item-meta">No providers selected yet.</span>
+            </button>
+
+            <button
+              type="button"
+              id="setupRailConfiguredTargets"
+              class="setup-workflow-item"
+              data-workspace="configured-targets"
+              data-active="false"
+              aria-pressed="false"
+              onclick="setActiveSetupWorkspace('configured-targets')"
+            >
+              <span class="setup-workflow-item-title-row">
+                <span class="setup-workflow-item-title">Runtime Targets</span>
+                <span id="configuredTargetsRailBadge" class="setup-workflow-item-pill">Loading</span>
+              </span>
+              <span id="configuredTargetsRailSummary" class="setup-workflow-item-summary">
+                Inspect the runtime-owned behavior of applied provider targets.
+              </span>
+              <span id="configuredTargetsRailMeta" class="setup-workflow-item-meta">Loading runtime target catalog.</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="runtime-sidebar-footer">
+        <div class="runtime-auth-block">
+          <div class="runtime-auth-row">
+            <div class="runtime-auth-copy">
+              <p class="runtime-sidebar-title">Auth</p>
+              <span class="runtime-auth-badge" id="runtimeAuthStatus" data-state="idle">Missing</span>
+            </div>
+            <button class="runtime-btn runtime-btn-ghost !h-8 !w-8 !rounded-lg !px-0 !py-0" type="button" onclick="toggleRuntimeAuthEditor()" aria-controls="runtimeAuthEditor" aria-expanded="false" id="runtimeAuthToggle" title="Edit auth token" aria-label="Edit auth token">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
+              </svg>
+            </button>
+          </div>
+          <div class="runtime-auth-editor hidden" id="runtimeAuthEditor">
+            <label for="apiKeyInput" class="runtime-field-label">Bearer Token</label>
+            <input type="password" id="apiKeyInput" class="runtime-input" placeholder="Bearer token (if configured)" />
+          </div>
+        </div>
+        <p class="runtime-sidebar-title">Runtime Health</p>
+        <div class="mt-3 runtime-shell-health" data-runtime-shell-health data-runtime-tooltip="Loading runtime diagnostics...">
+          <div class="runtime-shell-health-row">
+            <span class="runtime-shell-health-dot" data-runtime-shell-health-dot data-state="idle"></span>
+            <span class="runtime-shell-health-state" data-runtime-shell-health-state>Loading</span>
+          </div>
+          <p class="runtime-shell-health-summary" data-runtime-shell-health-summary>Waiting for runtime diagnostics.</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="runtime-page">
+    <div class="runtime-page-stack">
+      <header class="runtime-page-header" style="padding-top:0.75rem;padding-bottom:0.75rem;">
+        <div class="flex flex-wrap items-center gap-6">
+          <div>
+            <p class="runtime-page-kicker" style="font-size:0.58rem;letter-spacing:0.18em;">CATS RUNTIME</p>
+            <h1 class="font-semibold tracking-tight text-white" style="margin-top:0.125rem;font-size:21px;line-height:1.15;">Setup &amp; Repair</h1>
+          </div>
+          <div class="runtime-page-toolbar-row min-w-0 flex-1 justify-end text-sm">
+            <span id="statusText" class="hidden" hidden>Loading runtime setup state...</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="runtime-page-content overflow-y-auto p-6">
+        <div class="mx-auto flex max-w-6xl flex-col gap-6">
+          <div id="providersWorkspace" class="setup-workspace space-y-6" data-setup-workspace="providers">
+            <section class="runtime-card">
+              <div class="runtime-card-header">
+                <div>
+                  <h2 class="runtime-card-title">Providers</h2>
+                  <p class="runtime-card-copy">
+                    Scan local provider CLIs, review readiness, and select the
+                    providers you want to write into this runtime config.
+                  </p>
+                </div>
+                <span id="providersWorkspaceStatus" class="status-badge status-badge-bootstrap">Bootstrap</span>
+              </div>
+              <div class="space-y-4 p-4 sm:p-5">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <span id="providersWorkspaceSummary" class="text-sm text-slate-400">Loading provider readiness...</span>
+                  <div class="flex justify-end">
+                    <button id="scanBtn" class="runtime-btn runtime-btn-secondary" onclick="runScan()">Scan Providers</button>
+                  </div>
+                </div>
+                <div class="setup-summary-grid">
+                  <div class="setup-summary-panel">
+                    <span class="setup-summary-label">Latest Snapshot</span>
+                    <span id="providersMetricSnapshotValue" class="setup-summary-value">Not scanned</span>
+                    <span id="providersMetricSnapshotDetail" class="setup-summary-secondary">Run Scan Providers to capture current readiness.</span>
+                  </div>
+                  <div class="setup-summary-panel">
+                    <span class="setup-summary-label">Need Attention</span>
+                    <span id="providersMetricAttentionValue" class="setup-summary-value">--</span>
+                    <span id="providersMetricAttentionDetail" class="setup-summary-secondary">Missing installs or probe failures appear here.</span>
+                  </div>
+                  <div class="setup-summary-panel">
+                    <span class="setup-summary-label">Selected</span>
+                    <span id="providersMetricSelectedValue" class="setup-summary-value">0</span>
+                    <span id="providersMetricSelectedDetail" class="setup-summary-secondary">Selection stays in this workspace.</span>
+                  </div>
+                </div>
+                <div id="providerList" class="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950/50">
+                  <label
+                    id="providerListSelectAllRow"
+                    class="flex items-center justify-between gap-4 border-b border-slate-800 bg-slate-950/80 px-4 py-4 text-sm text-slate-300"
+                  >
+                    <span class="flex items-center gap-3">
+                      <input
+                        id="selectAllCheckbox"
+                        type="checkbox"
+                        class="h-4 w-4 rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-blue-500"
+                        onchange="toggleSelectAllProviders()"
+                        aria-controls="providerListItems"
+                        disabled
+                      />
+                      <span>Select all available providers</span>
+                    </span>
+                    <span id="selectionStatusBadge" class="status-badge status-badge-unknown">0 selected</span>
+                  </label>
+                  <div id="providerListItems">
+                  <div class="px-6 py-12 text-center text-sm text-slate-500">Loading provider catalog...</div>
+                  </div>
+                </div>
+                <div class="flex justify-end pt-1">
+                  <button id="applyBtn" class="runtime-btn runtime-btn-primary" onclick="applyConfig()" disabled>Apply Selected</button>
+                </div>
+                <section id="resultPanel" class="setup-result-banner hidden" hidden aria-live="polite">
+                  <div>
+                    <h3 id="resultTitle" class="setup-result-title">Result</h3>
+                    <p id="resultBody" class="setup-result-copy"></p>
+                  </div>
+                </section>
+              </div>
+            </section>
+          </div>
+
+          <div
+            id="configuredTargetsWorkspace"
+            class="setup-workspace hidden"
+            data-setup-workspace="configured-targets"
+            hidden
+          >
+            <section class="runtime-card">
+              <div class="runtime-card-header">
+                <div>
+                  <h2 class="runtime-card-title">Runtime Targets</h2>
+                  <p class="runtime-card-copy">
+                    Inspect the runtime-owned behavior of currently applied
+                    provider targets, including transport, continuity, and
+                    remote tool visibility.
+                  </p>
+                </div>
+                <span id="setupCapabilityStatus" class="status-badge status-badge-unknown">Loading</span>
+              </div>
+              <div class="space-y-4 p-4 sm:p-5">
+                <div class="setup-capability-workspace">
+                  <div class="setup-capability-panel">
+                    <p id="setupCapabilitySummary" class="setup-capability-summary">
+                      Loading runtime target capabilities...
+                    </p>
+                    <dl id="setupCapabilityGrid" class="setup-capability-grid"></dl>
+                    <div id="setupCapabilityTags" class="setup-capability-tags"></div>
+                    <ul id="setupCapabilityCatalog" class="setup-capability-list"></ul>
+                  </div>
+                  <div class="setup-target-list-panel">
+                    <div class="setup-target-list-header">
+                      <p class="setup-summary-label">Target Catalog</p>
+                      <p id="setupTargetListSummary" class="setup-target-list-copy">
+                        Loading runtime target catalog...
+                      </p>
+                    </div>
+                    <div id="setupTargetList" class="setup-target-list">
+                      <div class="setup-target-empty">Loading runtime target catalog...</div>
+                    </div>
+                    <div class="setup-capability-hidden-inputs" aria-hidden="true">
+                      <div class="setup-capability-toolbar">
+                        <div class="runtime-field">
+                          <label class="runtime-field-label">Provider</label>
+                          <select id="setupCapabilityProvider" class="runtime-select" onchange="onSetupCapabilityProviderChange()">
+                            <option value="">Loading runtime targets</option>
+                          </select>
+                        </div>
+                        <div class="runtime-field" id="setupCapabilityInstanceGroup">
+                          <label class="runtime-field-label">Provider Instance</label>
+                          <select id="setupCapabilityInstance" class="runtime-select" onchange="onSetupCapabilityInstanceChange()">
+                            <option value="">Loading instances</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+let scanData = null;
+let latestSetupState = null;
+let configuredTargetCatalog = null;
+let activeSetupWorkspace = 'providers';
+let configuredTargetsState = {
+  status: 'loading',
+  detail: 'Loading runtime target catalog.',
+};
+const setupToolingCache = new Map();
+const setupToolingInFlight = new Map();
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function validateApiKeyInput(value) {
+  if (/[^\x00-\xff]/.test(value)) {
+    alert('API key contains non-ASCII characters which are not allowed in HTTP headers. Please use only ASCII characters.');
+    return false;
+  }
+  return true;
+}
+
+function humanizeToken(value) {
+  return String(value || '').replace(/_/g, ' ');
+}
+
+function formatTimestamp(value) {
+  if (!value) {
+    return 'Not scanned';
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+  return date.toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+}
+
+function pluralize(count, noun) {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`;
+}
+
+function scanAvailableCount(scan) {
+  if (!scan) {
+    return 0;
+  }
+  if (typeof scan.availableCount === 'number') {
+    return scan.availableCount;
+  }
+  return Array.isArray(scan.providers)
+    ? scan.providers.filter((provider) => provider.available).length
+    : 0;
+}
+
+function deriveSetupLifecycle(data) {
+  if (!data?.bootstrapRequired) {
+    return {
+      label: 'Configured',
+      state: 'active',
+      message: 'Runtime configuration is available for normal operation.',
+    };
+  }
+
+  if (scanAvailableCount(data?.scan) > 0) {
+    return {
+      label: 'Pending Apply',
+      state: 'warning',
+      message: 'Scan complete. Apply at least one available provider to finish setup.',
+    };
+  }
+
+  return {
+    label: 'Setup Required',
+    state: 'idle',
+    message: 'Scan providers to discover what can be configured for this runtime.',
+  };
+}
+
+function currentBootstrapRequired() {
+  if (typeof latestSetupState?.bootstrapRequired === 'boolean') {
+    return latestSetupState.bootstrapRequired;
+  }
+
+  const attr = document.body?.dataset?.bootstrapRequired;
+  if (attr === 'false') {
+    return false;
+  }
+  return true;
+}
+
+function setActiveSetupWorkspace(workspace) {
+  activeSetupWorkspace = workspace === 'configured-targets' ? 'configured-targets' : 'providers';
+
+  document.querySelectorAll('[data-setup-workspace]').forEach((element) => {
+    const isActive = element.getAttribute('data-setup-workspace') === activeSetupWorkspace;
+    element.hidden = !isActive;
+    element.classList.toggle('hidden', !isActive);
+  });
+
+  document.querySelectorAll('.setup-workflow-item[data-workspace]').forEach((button) => {
+    const isActive = button.getAttribute('data-workspace') === activeSetupWorkspace;
+    button.dataset.active = isActive ? 'true' : 'false';
+    button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
+}
+
+function currentSelectedProviders() {
+  return Array.from(document.querySelectorAll('.provider-check:checked')).map((checkbox) => checkbox.value);
+}
+
+function selectableProviderCheckboxes() {
+  return Array.from(document.querySelectorAll('.provider-check')).filter((checkbox) => !checkbox.disabled);
+}
+
+function providerSelectionSummary() {
+  const selectedProviders = currentSelectedProviders();
+  const selectedSet = new Set(selectedProviders);
+  const readySelected = Array.isArray(scanData?.providers)
+    ? scanData.providers.filter((provider) => selectedSet.has(provider.provider) && provider.available).length
+    : 0;
+  const blockedSelected = Array.isArray(scanData?.providers)
+    ? selectedProviders.length - readySelected
+    : 0;
+
+  return {
+    selectedProviders,
+    selectedCount: selectedProviders.length,
+    readySelected,
+    blockedSelected,
+  };
+}
+
+function selectableProviderSummary() {
+  const selection = providerSelectionSummary();
+  return {
+    ...selection,
+    applyableCount: Array.isArray(scanData?.providers) ? selection.readySelected : selection.selectedCount,
+  };
+}
+
+function updateProvidersWorkspaceMetrics() {
+  const hasScan = Array.isArray(scanData?.providers);
+  const providerCount = hasScan
+    ? scanData.providers.length
+    : Array.isArray(latestSetupState?.universe)
+      ? latestSetupState.universe.length
+      : 0;
+  const readyCount = hasScan
+    ? scanData.providers.filter((provider) => provider.available).length
+    : 0;
+  const attentionCount = hasScan ? providerCount - readyCount : 0;
+  const selection = selectableProviderSummary();
+  const providersWorkspaceStatus = document.getElementById('providersWorkspaceStatus');
+
+  if (providersWorkspaceStatus) {
+    const bootstrapRequired = currentBootstrapRequired();
+    providersWorkspaceStatus.className = `status-badge ${bootstrapRequired ? 'status-badge-bootstrap' : 'status-badge-ready'}`;
+    providersWorkspaceStatus.textContent = bootstrapRequired ? 'Bootstrap' : 'Operational';
+  }
+
+  const workspaceSummary = hasScan
+    ? attentionCount > 0
+      ? `${pluralize(readyCount, 'provider')} available and ${pluralize(attentionCount, 'provider')} still need attention.`
+      : providerCount > 0
+        ? `${providerCount} ${providerCount === 1 ? 'provider is' : 'providers are'} available from the latest snapshot.`
+        : 'No provider results were returned by the latest scan.'
+    : providerCount > 0
+      ? `Scan local providers to inspect ${pluralize(providerCount, 'provider')} before you apply config.`
+      : 'No provider catalog entries are available yet.';
+  document.getElementById('providersWorkspaceSummary').textContent = workspaceSummary;
+
+  document.getElementById('providersMetricSnapshotValue').textContent = hasScan
+    ? formatTimestamp(scanData.scannedAt)
+    : 'Not scanned';
+  document.getElementById('providersMetricSnapshotDetail').textContent = hasScan
+    ? `${scanData.scanType === 'manual' ? 'Manual' : 'Auto'} snapshot across ${pluralize(providerCount, 'provider')}.`
+    : providerCount > 0
+      ? `${pluralize(providerCount, 'provider')} available to scan from the current universe.`
+      : 'Waiting for setup-state data.';
+
+  document.getElementById('providersMetricAttentionValue').textContent = hasScan ? String(attentionCount) : '--';
+  document.getElementById('providersMetricAttentionDetail').textContent = hasScan
+    ? attentionCount > 0
+      ? 'Providers still blocked by missing installs or probe failures.'
+      : 'No repair action is required by the latest snapshot.'
+    : 'Missing installs or probe failures appear here after a scan.';
+
+  document.getElementById('providersMetricSelectedValue').textContent = String(selection.selectedCount);
+  document.getElementById('providersMetricSelectedDetail').textContent = selection.selectedCount > 0
+    ? hasScan
+      ? `${selection.readySelected} available${selection.blockedSelected > 0 ? ` · ${selection.blockedSelected} need attention` : ''}`
+      : 'Apply from the current provider list or scan first for readiness.'
+    : 'Selection stays in this workspace.';
+
+  const selectionStatusBadge = document.getElementById('selectionStatusBadge');
+  selectionStatusBadge.className = `status-badge ${selection.selectedCount > 0 ? 'status-badge-ready' : 'status-badge-unknown'}`;
+  selectionStatusBadge.textContent = `${selection.selectedCount} selected`;
+
+  document.getElementById('providersRailBadge').textContent = hasScan ? `${readyCount} available` : 'Not scanned';
+  document.getElementById('providersRailSummary').textContent = hasScan
+    ? attentionCount > 0
+      ? `${attentionCount} provider(s) still need attention in the latest snapshot.`
+      : `Latest snapshot shows ${pluralize(providerCount, 'provider')} available to use.`
+    : providerCount > 0
+      ? `Review ${pluralize(providerCount, 'provider')} and decide what to apply.`
+      : 'Load setup state to inspect local provider candidates.';
+  document.getElementById('providersRailMeta').textContent = hasScan
+    ? 'Use the main workspace to choose providers and apply runtime config.'
+    : 'Scan and apply stay in the main workspace.';
+}
+
+function updateSelectAllCheckbox() {
+  const checkbox = document.getElementById('selectAllCheckbox');
+  if (!checkbox) {
+    return;
+  }
+
+  const selectable = selectableProviderCheckboxes();
+  const checkedCount = selectable.filter((checkbox) => checkbox.checked).length;
+  const hasSelectable = selectable.length > 0;
+
+  checkbox.disabled = !hasSelectable;
+  checkbox.checked = hasSelectable && checkedCount === selectable.length;
+  checkbox.indeterminate = checkedCount > 0 && checkedCount < selectable.length;
+}
+
+function toggleSelectAllProviders() {
+  const masterCheckbox = document.getElementById('selectAllCheckbox');
+  const selectable = selectableProviderCheckboxes();
+  if (!masterCheckbox || selectable.length === 0) {
+    return;
+  }
+
+  const shouldSelectAll = masterCheckbox.checked;
+  selectable.forEach((checkbox) => {
+    checkbox.checked = shouldSelectAll;
+  });
+
+  document.getElementById('applyBtn').disabled = !shouldSelectAll;
+  updateProvidersWorkspaceMetrics();
+  updateSelectAllCheckbox();
+}
+
+function configuredTargetCounts() {
+  const providers = Object.keys(configuredTargetCatalog?.providers || {}).filter(
+    (providerName) => (configuredTargetCatalog.providers[providerName]?.instances?.length || 0) > 0,
+  );
+  const instanceCount = providers.reduce(
+    (count, providerName) => count + (configuredTargetCatalog.providers[providerName]?.instances?.length || 0),
+    0,
+  );
+
+  return {
+    providerCount: providers.length,
+    instanceCount,
+  };
+}
+
+function setConfiguredTargetsWorkspaceState(status, detail) {
+  configuredTargetsState = {
+    status,
+    detail,
+  };
+  updateConfiguredTargetsRail();
+}
+
+function updateConfiguredTargetsRail() {
+  const badge = document.getElementById('configuredTargetsRailBadge');
+  const summary = document.getElementById('configuredTargetsRailSummary');
+  const meta = document.getElementById('configuredTargetsRailMeta');
+  if (!badge || !summary || !meta) {
+    return;
+  }
+
+  const { providerCount, instanceCount } = configuredTargetCounts();
+  const { providerName, instanceTarget } = currentSetupCapabilitySelection();
+
+  switch (configuredTargetsState.status) {
+    case 'loading':
+      badge.textContent = 'Loading';
+      summary.textContent = 'Loading applied runtime targets for inspection.';
+      meta.textContent = configuredTargetsState.detail;
+      return;
+    case 'locked':
+      badge.textContent = 'Locked';
+      summary.textContent = 'Provide the runtime bearer token to inspect runtime targets.';
+      meta.textContent = configuredTargetsState.detail;
+      return;
+    case 'unavailable':
+      badge.textContent = 'Unavailable';
+      summary.textContent = 'Runtime targets could not be loaded right now.';
+      meta.textContent = configuredTargetsState.detail;
+      return;
+    case 'empty':
+      badge.textContent = 'Empty';
+      summary.textContent = 'No runtime targets exist yet.';
+      meta.textContent = 'Apply selected providers to inspect runtime behavior here.';
+      return;
+    default:
+      badge.textContent = instanceCount === 1 ? '1 target' : `${instanceCount} targets`;
+      summary.textContent = providerCount === 1
+        ? 'Inspect the active runtime target and its tooling surface.'
+        : `Inspect ${providerCount} applied providers and their runtime-owned target behavior.`;
+      meta.textContent = providerName && instanceTarget
+        ? 'Open the workspace to inspect the selected target in detail.'
+        : `${instanceCount} runtime target(s) available for inspection.`;
+  }
+}
+
+function restoreProviderSelection(selectedProviders) {
+  if (!Array.isArray(selectedProviders) || selectedProviders.length === 0) {
+    return;
+  }
+
+  const selected = new Set(selectedProviders);
+  document.querySelectorAll('.provider-check').forEach((checkbox) => {
+    if (!checkbox.disabled && selected.has(checkbox.value)) {
+      checkbox.checked = true;
+    }
+  });
+}
+
+function applySetupStateReadModel(data, selectedProviders = []) {
+  latestSetupState = data;
+  if (
+    typeof data?.bootstrapRequired === 'boolean'
+    && window.CatsUI
+    && typeof window.CatsUI.syncRuntimeBootstrapState === 'function'
+  ) {
+    window.CatsUI.syncRuntimeBootstrapState(data.bootstrapRequired);
+  }
+  updateStatusBar(data);
+  if (data.scan && data.scan.providers) {
+    renderScanResults(data.scan);
+  } else {
+    renderUniverse(data.universe || []);
+  }
+  restoreProviderSelection(selectedProviders);
+  const applyBtn = document.getElementById('applyBtn');
+  if (applyBtn) {
+    applyBtn.disabled = selectableProviderSummary().applyableCount === 0;
+  }
+  updateProvidersWorkspaceMetrics();
+  updateSelectAllCheckbox();
+}
+
+async function fetchState() {
+  if (!validateApiKeyInput(document.getElementById('apiKeyInput').value)) return;
+  try {
+    const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
+    const res = await fetchFn('/setup-state');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    applySetupStateReadModel(data);
+  } catch (err) {
+    document.getElementById('statusText').textContent = 'Failed to load state: ' + err.message;
+  }
+}
+
+function updateStatusBar(data) {
+  const workflowMode = document.getElementById('setupWorkflowMode');
+  const text = document.getElementById('statusText');
+  const lifecycle = deriveSetupLifecycle(data);
+  workflowMode.textContent = lifecycle.label;
+  workflowMode.dataset.state = lifecycle.state;
+  text.textContent = lifecycle.message;
+}
+
+function configuredProviderMeta(providerName) {
+  return configuredTargetCatalog?.providers?.[providerName] || null;
+}
+
+function configuredInstanceTargetValue(instance) {
+  if (!instance) {
+    return 'default';
+  }
+  return instance.target || instance.id || 'default';
+}
+
+function setSetupCapabilityStatus(text, className) {
+  const badge = document.getElementById('setupCapabilityStatus');
+  if (!badge) {
+    return;
+  }
+  badge.className = `status-badge ${className || 'status-badge-unknown'}`;
+  badge.textContent = text;
+}
+
+function renderSetupCapabilityTags(tags) {
+  return (tags || [])
+    .filter(Boolean)
+    .map((tag) => `<span class="setup-capability-tag">${escapeHtml(tag)}</span>`)
+    .join('');
+}
+
+function setupToolingCatalogMethodLabel(method) {
+  switch (method) {
+    case 'tools_catalog':
+      return 'remote catalog';
+    case 'tools_effective':
+      return 'effective tools';
+    case 'providers_get':
+      return 'provider config';
+    default:
+      return method || 'unknown';
+  }
+}
+
+function extractConfiguredTooling(payload, fallbackInstance) {
+  if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'summary')) {
+    return payload;
+  }
+  return fallbackInstance?.tooling || null;
+}
+
+function renderSetupCapabilityEmpty(message, badgeText, badgeClass) {
+  setSetupCapabilityStatus(badgeText || 'Unavailable', badgeClass || 'status-badge-unknown');
+  document.getElementById('setupCapabilitySummary').textContent = message;
+  document.getElementById('setupCapabilityGrid').innerHTML = '';
+  document.getElementById('setupCapabilityTags').innerHTML = '';
+  document.getElementById('setupCapabilityCatalog').innerHTML = '';
+}
+
+function currentSetupCapabilitySelection() {
+  const providerName = document.getElementById('setupCapabilityProvider').value;
+  const instanceTarget = document.getElementById('setupCapabilityInstance').value;
+  const provider = configuredProviderMeta(providerName);
+  const instance = (provider?.instances || []).find(
+    (entry) => configuredInstanceTargetValue(entry) === instanceTarget,
+  ) || null;
+
+  return { providerName, instanceTarget, provider, instance };
+}
+
+function configuredTargetEntries() {
+  return Object.entries(configuredTargetCatalog?.providers || {}).flatMap(([providerName, provider]) => (
+    (provider?.instances || []).map((instance) => ({
+      providerName,
+      provider,
+      instance,
+      instanceTarget: configuredInstanceTargetValue(instance),
+      isDefault: instance.id === provider?.defaultInstance
+        && (!provider?.defaultBackend || instance.backend === provider.defaultBackend),
+    }))
+  ));
+}
+
+function configuredTargetListDescription(instance) {
+  const bits = [];
+  if (instance?.command) {
+    bits.push(instance.command);
+  }
+  if (instance?.transport) {
+    bits.push(humanizeToken(instance.transport));
+  }
+  if (instance?.model) {
+    bits.push(instance.model);
+  }
+  if (instance?.runtime?.mode) {
+    bits.push(`${humanizeToken(instance.runtime.mode)} runtime`);
+  }
+  return bits.length > 0 ? bits.join(' · ') : 'Runtime target';
+}
+
+function renderConfiguredTargetList() {
+  const list = document.getElementById('setupTargetList');
+  const summary = document.getElementById('setupTargetListSummary');
+  if (!list || !summary) {
+    return;
+  }
+
+  if (!configuredTargetCatalog?.providers) {
+    summary.textContent = 'Loading runtime target catalog...';
+    list.innerHTML = '<div class="setup-target-empty">Loading runtime target catalog...</div>';
+    return;
+  }
+
+  const entries = configuredTargetEntries();
+  if (entries.length === 0) {
+    summary.textContent = 'No runtime targets are available yet.';
+    list.innerHTML = '<div class="setup-target-empty">Apply a runtime config first, then inspect targets here.</div>';
+    return;
+  }
+
+  const providerCount = new Set(entries.map((entry) => entry.providerName)).size;
+  summary.textContent = providerCount === 1
+    ? `${entries.length} target${entries.length === 1 ? '' : 's'} from 1 applied provider.`
+    : `${entries.length} targets across ${providerCount} applied providers.`;
+
+  const current = currentSetupCapabilitySelection();
+    list.innerHTML = entries.map((entry) => {
+      const active = current.providerName === entry.providerName
+        && current.instanceTarget === entry.instanceTarget;
+      const pills = [
+        ...(entry.isDefault ? ['default'] : []),
+        ...(entry.instance.transport ? [humanizeToken(entry.instance.transport)] : []),
+        ...(!entry.instance.transport && entry.instance.runtime?.mode
+          ? [`${humanizeToken(entry.instance.runtime.mode)} runtime`]
+          : []),
+    ];
+
+    return `
+      <button
+        type="button"
+        class="setup-target-item"
+        data-provider="${escapeHtml(entry.providerName)}"
+        data-instance="${escapeHtml(entry.instanceTarget)}"
+        data-active="${active ? 'true' : 'false'}"
+      >
+        <span class="setup-target-item-main">
+          <span class="setup-target-item-heading">
+            <span class="setup-target-item-title">${escapeHtml(entry.providerName)}</span>
+            <span class="setup-target-item-subtitle">${escapeHtml(entry.instanceTarget)}</span>
+          </span>
+          <span class="setup-target-item-badges">
+            <span class="setup-workflow-item-pill">${escapeHtml(entry.instance.backend || 'unknown')}</span>
+            ${pills.map((pill) => `<span class="setup-target-item-pill">${escapeHtml(pill)}</span>`).join('')}
+          </span>
+        </span>
+        <span class="setup-target-item-copy">${escapeHtml(configuredTargetListDescription(entry.instance))}</span>
+      </button>
+    `;
+  }).join('');
+
+  list.querySelectorAll('.setup-target-item').forEach((button) => {
+    button.addEventListener('click', () => {
+      selectConfiguredTarget(button.dataset.provider || '', button.dataset.instance || '');
+    });
+  });
+}
+
+function syncConfiguredTargetSelection(providerName, preferredInstanceTarget) {
+  const provider = configuredProviderMeta(providerName);
+  const instanceSelect = document.getElementById('setupCapabilityInstance');
+  const instanceGroup = document.getElementById('setupCapabilityInstanceGroup');
+  const instances = provider?.instances || [];
+
+  if (!instanceSelect || !instanceGroup) {
+    return;
+  }
+
+  if (instances.length === 0) {
+    instanceSelect.innerHTML = '<option value="">No runtime targets</option>';
+    instanceSelect.value = '';
+    instanceSelect.disabled = true;
+    instanceGroup.style.display = 'none';
+    setConfiguredTargetsWorkspaceState('empty', 'This provider has no runtime targets yet.');
+    renderConfiguredTargetList();
+    renderSetupCapabilityEmpty(
+      'This provider has no runtime targets yet.',
+      'Empty',
+      'status-badge-unknown',
+    );
+    return;
+  }
+
+  instanceSelect.innerHTML = instances
+    .map((instance) => {
+      const value = configuredInstanceTargetValue(instance);
+      return `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`;
+    })
+    .join('');
+  const defaultInstance = instances.find((instance) => (
+    instance.id === provider?.defaultInstance
+    && (!provider?.defaultBackend || instance.backend === provider.defaultBackend)
+  ));
+  instanceSelect.value = instances.some((instance) => configuredInstanceTargetValue(instance) === preferredInstanceTarget)
+    ? preferredInstanceTarget
+    : configuredInstanceTargetValue(defaultInstance || instances[0]);
+  instanceSelect.disabled = instances.length <= 1;
+  instanceGroup.style.display = '';
+  setConfiguredTargetsWorkspaceState('ready', `${providerName} · ${instanceSelect.value}`);
+  renderConfiguredTargetList();
+  updateConfiguredTargetsRail();
+  void refreshSetupCapabilityPreview();
+}
+
+function selectConfiguredTarget(providerName, instanceTarget) {
+  const providerSelect = document.getElementById('setupCapabilityProvider');
+  if (!providerSelect) {
+    return;
+  }
+
+  providerSelect.value = providerName;
+  syncConfiguredTargetSelection(providerName, instanceTarget);
+}
+
+function setupCapabilityGridRows({ providerName, instance, agentRuntime, tooling }) {
+  const rows = [
+    ['Provider', providerName],
+    ['Target', configuredInstanceTargetValue(instance)],
+    ['Backend', instance?.backend || 'unknown'],
+  ];
+
+  if (instance?.transport) {
+    rows.push(['Transport', instance.transport]);
+  }
+  if (agentRuntime?.transport) {
+    rows.push(['Protocol', `${agentRuntime.transport.kind} · ${humanizeToken(agentRuntime.transport.protocol)}`]);
+    rows.push(['Continuity', agentRuntime.continuity?.providerManagedSessions ? 'provider-managed' : 'runtime-managed']);
+  }
+  if (tooling?.observability?.catalog) {
+    rows.push(['Tooling', humanizeToken(tooling.observability.catalog)]);
+  }
+  if (tooling?.policy?.profile) {
+    rows.push(['Tool Profile', tooling.policy.profile]);
+  }
+
+  return rows.map(([label, value]) => (
+    `<div class="setup-capability-kv"><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`
+  )).join('');
+}
+
+function setupCapabilityCatalogItems(tooling) {
+  const catalog = tooling?.catalog;
+  if (!catalog) {
+    return '';
+  }
+
+  if (catalog.status === 'unavailable') {
+    return `<li><strong>Remote tools unavailable</strong><span class="setup-capability-secondary">${escapeHtml(catalog.error || catalog.summary || 'No tool catalog available.')}</span></li>`;
+  }
+
+  const topTools = (catalog.tools || []).slice(0, 5);
+  const items = topTools.map((tool) => {
+    const detailBits = [];
+    if (tool.title && tool.title !== tool.name) {
+      detailBits.push(tool.title);
+    }
+    if (tool.groupId) {
+      detailBits.push(`group:${tool.groupId}`);
+    }
+    if (tool.pluginId) {
+      detailBits.push(`plugin:${tool.pluginId}`);
+    }
+    detailBits.push(tool.source || 'unknown');
+    return `<li><strong>${escapeHtml(tool.name)}</strong><span class="setup-capability-secondary">${escapeHtml(detailBits.join(' · '))}</span></li>`;
+  });
+
+  if ((catalog.toolCount || 0) > topTools.length) {
+    items.push(
+      `<li><strong>${escapeHtml(String(catalog.toolCount - topTools.length))} more tool(s)</strong><span class="setup-capability-secondary">${escapeHtml(setupToolingCatalogMethodLabel(catalog.method))}</span></li>`,
+    );
+  }
+
+  return items.join('');
+}
+
+function syncSetupCapabilitySelectors() {
+  const providerSelect = document.getElementById('setupCapabilityProvider');
+  const instanceSelect = document.getElementById('setupCapabilityInstance');
+  const instanceGroup = document.getElementById('setupCapabilityInstanceGroup');
+  if (!providerSelect || !instanceSelect || !instanceGroup) {
+    return;
+  }
+
+  if (!configuredTargetCatalog?.providers) {
+    providerSelect.innerHTML = '<option value="">Loading runtime targets</option>';
+    providerSelect.disabled = true;
+    instanceSelect.innerHTML = '<option value="">Loading instances</option>';
+    instanceSelect.disabled = true;
+    instanceGroup.style.display = 'none';
+    setConfiguredTargetsWorkspaceState('loading', 'Loading runtime target catalog.');
+    renderConfiguredTargetList();
+    renderSetupCapabilityEmpty('Loading runtime target capabilities...', 'Loading', 'status-badge-unknown');
+    return;
+  }
+
+  const providers = Object.keys(configuredTargetCatalog.providers).filter(
+    (providerName) => (configuredTargetCatalog.providers[providerName]?.instances?.length || 0) > 0,
+  );
+
+  if (providers.length === 0) {
+    providerSelect.innerHTML = '<option value="">No runtime targets</option>';
+    providerSelect.disabled = true;
+    instanceSelect.innerHTML = '<option value="">No runtime targets</option>';
+    instanceSelect.disabled = true;
+    instanceGroup.style.display = 'none';
+    setConfiguredTargetsWorkspaceState('empty', 'No runtime targets yet.');
+    renderConfiguredTargetList();
+    renderSetupCapabilityEmpty(
+      'No runtime targets yet. Apply a runtime config first, then inspect targets here.',
+      'Empty',
+      'status-badge-unknown',
+    );
+    return;
+  }
+
+  const current = providers.includes(providerSelect.value) ? providerSelect.value : providers[0];
+  providerSelect.innerHTML = providers
+    .map((providerName) => `<option value="${escapeHtml(providerName)}">${escapeHtml(providerName)}</option>`)
+    .join('');
+  providerSelect.disabled = false;
+  providerSelect.value = current;
+  setConfiguredTargetsWorkspaceState('ready', `${providers.length} applied provider(s) available.`);
+  syncConfiguredTargetSelection(current, instanceSelect.value);
+}
+
+function onSetupCapabilityProviderChange() {
+  const providerName = document.getElementById('setupCapabilityProvider').value;
+  const instanceSelect = document.getElementById('setupCapabilityInstance');
+  syncConfiguredTargetSelection(providerName, instanceSelect?.value || '');
+}
+
+function onSetupCapabilityInstanceChange() {
+  const { providerName, instanceTarget } = currentSetupCapabilitySelection();
+  if (providerName && instanceTarget) {
+    setConfiguredTargetsWorkspaceState('ready', `${providerName} · ${instanceTarget}`);
+  }
+  renderConfiguredTargetList();
+  updateConfiguredTargetsRail();
+  void refreshSetupCapabilityPreview();
+}
+
+async function fetchConfiguredProviderTooling(providerName, instanceTarget) {
+  if (!providerName || !instanceTarget) {
+    return null;
+  }
+
+  const key = `${providerName}::${instanceTarget}`;
+  if (setupToolingCache.has(key)) {
+    return setupToolingCache.get(key);
+  }
+  if (setupToolingInFlight.has(key)) {
+    return setupToolingInFlight.get(key);
+  }
+
+  const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
+  const task = fetchFn(
+    `/providers/${encodeURIComponent(providerName)}/tools?instance=${encodeURIComponent(instanceTarget)}`,
+  )
+    .then(async (response) => {
+      if (!response.ok) {
+        const detail = await response.text().catch(() => '');
+        throw new Error(detail || `HTTP ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((payload) => {
+      setupToolingCache.set(key, payload);
+      setupToolingInFlight.delete(key);
+      return payload;
+    })
+    .catch((error) => {
+      setupToolingInFlight.delete(key);
+      throw error;
+    });
+
+  setupToolingInFlight.set(key, task);
+  return task;
+}
+
+async function refreshSetupCapabilityPreview() {
+  const { providerName, instanceTarget, instance } = currentSetupCapabilitySelection();
+
+  if (!providerName || !instance) {
+    updateConfiguredTargetsRail();
+    renderSetupCapabilityEmpty(
+      'Choose a runtime target to inspect runtime behavior.',
+      'Empty',
+      'status-badge-unknown',
+    );
+    return;
+  }
+
+  setSetupCapabilityStatus('Loading', 'status-badge-unknown');
+  document.getElementById('setupCapabilitySummary').textContent = 'Loading capability preview...';
+  document.getElementById('setupCapabilityGrid').innerHTML = '';
+  document.getElementById('setupCapabilityTags').innerHTML = '';
+  document.getElementById('setupCapabilityCatalog').innerHTML = '';
+
+  let toolingPayload = null;
+  try {
+    toolingPayload = await fetchConfiguredProviderTooling(providerName, instanceTarget);
+  } catch (error) {
+    const fallbackTooling = extractConfiguredTooling(null, instance) || {};
+    toolingPayload = {
+      ...fallbackTooling,
+      catalog: {
+        status: 'unavailable',
+        method: 'providers_get',
+        error: error instanceof Error ? error.message : String(error),
+        summary: 'Provider tool summary could not be loaded.',
+      },
+    };
+  }
+
+  const currentSelection = currentSetupCapabilitySelection();
+  if (
+    currentSelection.providerName !== providerName
+    || currentSelection.instanceTarget !== instanceTarget
+  ) {
+    return;
+  }
+
+  const tooling = extractConfiguredTooling(toolingPayload, instance);
+  const agentRuntime = toolingPayload?.agentRuntime || instance?.agentRuntime;
+  const tags = [];
+  if (tooling?.source) {
+    tags.push(`tools: ${humanizeToken(tooling.source)}`);
+  }
+  if (tooling?.observability?.toolCallEvents) {
+    tags.push('tool events');
+  }
+  if (tooling?.observability?.runtimeServices) {
+    tags.push('runtime services');
+  }
+  if (tooling?.catalog?.status === 'ready') {
+    tags.push(`${tooling.catalog.toolCount} remote tools`);
+  }
+  if (agentRuntime?.capabilities?.modelDiscovery) {
+    tags.push('live models');
+  }
+
+  setSetupCapabilityStatus('Available', 'status-badge-ready');
+  document.getElementById('setupCapabilitySummary').textContent = tooling?.summary
+    || 'No additional runtime capability summary is available for this target yet.';
+  document.getElementById('setupCapabilityGrid').innerHTML = setupCapabilityGridRows({
+    providerName,
+    instance,
+    agentRuntime,
+    tooling,
+  });
+  document.getElementById('setupCapabilityTags').innerHTML = renderSetupCapabilityTags(tags);
+  document.getElementById('setupCapabilityCatalog').innerHTML = setupCapabilityCatalogItems(tooling);
+}
+
+async function loadConfiguredTargetCapabilities() {
+  if (!validateApiKeyInput(document.getElementById('apiKeyInput').value)) return false;
+
+  const providerSelect = document.getElementById('setupCapabilityProvider');
+  const instanceSelect = document.getElementById('setupCapabilityInstance');
+  const instanceGroup = document.getElementById('setupCapabilityInstanceGroup');
+  const targetList = document.getElementById('setupTargetList');
+  const targetListSummary = document.getElementById('setupTargetListSummary');
+  if (!providerSelect || !instanceSelect || !instanceGroup) {
+    return false;
+  }
+
+  setConfiguredTargetsWorkspaceState('loading', 'Loading runtime target catalog.');
+  setSetupCapabilityStatus('Loading', 'status-badge-unknown');
+  providerSelect.innerHTML = '<option value="">Loading runtime targets</option>';
+  providerSelect.disabled = true;
+  instanceSelect.innerHTML = '<option value="">Loading instances</option>';
+  instanceSelect.disabled = true;
+  instanceGroup.style.display = 'none';
+  if (targetListSummary) {
+    targetListSummary.textContent = 'Loading runtime target catalog...';
+  }
+  if (targetList) {
+    targetList.innerHTML = '<div class="setup-target-empty">Loading runtime target catalog...</div>';
+  }
+  document.getElementById('setupCapabilitySummary').textContent = 'Loading runtime target capabilities...';
+  document.getElementById('setupCapabilityGrid').innerHTML = '';
+  document.getElementById('setupCapabilityTags').innerHTML = '';
+  document.getElementById('setupCapabilityCatalog').innerHTML = '';
+
+  try {
+    const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
+    const res = await fetchFn('/providers/config');
+    if (!res.ok) {
+      let detail = '';
+      try {
+        const payload = await res.json();
+        detail = typeof payload?.error === 'string' ? payload.error : JSON.stringify(payload);
+      } catch {
+        detail = await res.text().catch(() => '');
+      }
+      throw new Error(detail || `HTTP ${res.status}`);
+    }
+    configuredTargetCatalog = await res.json();
+    syncSetupCapabilitySelectors();
+    return true;
+  } catch (error) {
+    configuredTargetCatalog = null;
+    const message = error instanceof Error ? error.message : String(error);
+    const authBlocked = message.includes('401') || message.includes('403');
+    setConfiguredTargetsWorkspaceState(
+      authBlocked ? 'locked' : 'unavailable',
+      authBlocked ? 'Auth required for runtime target inspection.' : message,
+    );
+    renderSetupCapabilityEmpty(
+      authBlocked
+        ? 'Provide the runtime bearer token to inspect runtime targets.'
+        : `Failed to load runtime targets: ${message}`,
+      authBlocked ? 'Locked' : 'Unavailable',
+      authBlocked ? 'status-badge-degraded' : 'status-badge-unavailable',
+    );
+    providerSelect.innerHTML = `<option value="">${authBlocked ? 'Auth required' : 'Unavailable'}</option>`;
+    providerSelect.disabled = true;
+    instanceSelect.innerHTML = '<option value="">Unavailable</option>';
+    instanceSelect.disabled = true;
+    instanceGroup.style.display = 'none';
+    if (targetListSummary) {
+      targetListSummary.textContent = authBlocked
+        ? 'Auth is required before the runtime can list runtime targets.'
+        : 'Runtime target catalog is temporarily unavailable.';
+    }
+    if (targetList) {
+      targetList.innerHTML = `<div class="setup-target-empty">${escapeHtml(
+        authBlocked
+          ? 'Provide the runtime bearer token to inspect runtime targets.'
+          : `Failed to load runtime targets: ${message}`,
+      )}</div>`;
+    }
+    return false;
+  }
+}
+
+function renderUniverse(universe) {
+  scanData = null;
+  const list = document.getElementById('providerList');
+  if (!universe.length) {
+    document.getElementById('providerListItems').innerHTML = '<div class="px-6 py-12 text-center text-sm text-slate-500">No providers found.</div>';
+    document.getElementById('applyBtn').disabled = true;
+    updateProvidersWorkspaceMetrics();
+    updateSelectAllCheckbox();
+    return;
+  }
+  document.getElementById('providerListItems').innerHTML = universe.map(p => `
+    <label class="flex cursor-pointer items-start gap-4 border-b border-slate-800 px-4 py-4 last:border-b-0 hover:bg-slate-900/40">
+      <input type="checkbox" value="${escapeHtml(p.provider)}" class="provider-check mt-1 h-4 w-4 rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-blue-500" />
+      <div class="min-w-0 flex-1">
+        <div class="text-sm font-semibold text-slate-100">${escapeHtml(p.familyLabel)}</div>
+        <div class="mt-1 text-xs text-slate-500">${escapeHtml(p.provider)} &mdash; ${escapeHtml(p.binaryName)}</div>
+      </div>
+      <div class="shrink-0">
+        <span class="status-badge status-badge-unknown">Not scanned</span>
+      </div>
+    </label>
+  `).join('');
+  bindCheckboxes();
+}
+
+function renderScanResults(scan) {
+  scanData = scan;
+  const list = document.getElementById('providerList');
+  if (!scan.providers.length) {
+    document.getElementById('providerListItems').innerHTML = '<div class="px-6 py-12 text-center text-sm text-slate-500">No providers were returned by the latest scan.</div>';
+    document.getElementById('applyBtn').disabled = true;
+    updateProvidersWorkspaceMetrics();
+    updateSelectAllCheckbox();
+    return;
+  }
+  document.getElementById('providerListItems').innerHTML = scan.providers.map(p => {
+    const statusClass = p.available
+      ? 'status-badge status-badge-ready'
+      : p.commandStatus === 'probe_failed'
+        ? 'status-badge status-badge-unavailable'
+        : 'status-badge status-badge-degraded';
+    const statusText = p.available ? 'Ready' : p.commandStatus === 'missing_install' ? 'Not installed' : p.commandStatus;
+    const remediation = (p.remediation || []).map(r =>
+      `<div class="mt-2 text-xs text-amber-300">${escapeHtml(r.summary)}${r.command ? ' <code class="rounded bg-slate-950 px-1.5 py-0.5 text-[11px] text-slate-300">' + escapeHtml(r.command) + '</code>' : ''}</div>`
+    ).join('');
+    return `
+      <label class="flex items-start gap-4 border-b border-slate-800 px-4 py-4 last:border-b-0 ${p.available ? 'cursor-pointer hover:bg-slate-900/40' : 'cursor-not-allowed opacity-60'}">
+        <input type="checkbox" value="${escapeHtml(p.provider)}" class="provider-check mt-1 h-4 w-4 rounded border-slate-700 bg-slate-950 text-blue-500 focus:ring-blue-500" ${p.available ? '' : 'disabled'} />
+        <div class="min-w-0 flex-1">
+          <div class="text-sm font-semibold text-slate-100">${escapeHtml(p.family)}</div>
+          <div class="mt-1 text-xs text-slate-500">
+            ${escapeHtml(p.provider)}${p.version ? ' v' + escapeHtml(p.version) : ''}${p.commandPath ? ' &mdash; ' + escapeHtml(p.commandPath) : ''}
+          </div>
+          ${remediation}
+        </div>
+        <div class="shrink-0">
+          <span class="${statusClass}">${escapeHtml(statusText)}</span>
+        </div>
+      </label>
+    `;
+  }).join('');
+  bindCheckboxes();
+}
+
+function bindCheckboxes() {
+  const checks = document.querySelectorAll('.provider-check');
+  const applyBtn = document.getElementById('applyBtn');
+  const update = () => {
+    const selection = selectableProviderSummary();
+    applyBtn.disabled = selection.applyableCount === 0;
+    updateProvidersWorkspaceMetrics();
+    updateSelectAllCheckbox();
+  };
+  checks.forEach((checkbox) => checkbox.addEventListener('change', update));
+  update();
+}
+
+async function runScan() {
+  if (!validateApiKeyInput(document.getElementById('apiKeyInput').value)) return;
+  setActiveSetupWorkspace('providers');
+  const scanBtn = document.getElementById('scanBtn');
+  scanBtn.disabled = true;
+  document.getElementById('providerListItems').innerHTML = '<div class="px-6 py-12 text-center text-sm text-slate-500">Scanning providers...</div>';
+  document.getElementById('providersWorkspaceSummary').textContent = 'Scanning local providers...';
+  hideResult();
+
+  try {
+    const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
+    const res = await fetchFn('/setup-scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ manual: true }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.scan) {
+      if (latestSetupState) {
+        latestSetupState.scan = data.scan;
+        updateStatusBar(latestSetupState);
+      } else {
+        updateStatusBar({
+          bootstrapRequired: true,
+          scan: data.scan,
+        });
+      }
+      renderScanResults(data.scan);
+    }
+  } catch (err) {
+    document.getElementById('providerListItems').innerHTML =
+      '<div class="px-6 py-12 text-center text-sm text-red-300">Scan failed: ' + escapeHtml(err.message) + '</div>';
+    document.getElementById('providersWorkspaceSummary').textContent = 'Scan failed. Review the workspace error and retry.';
+    document.getElementById('providersRailBadge').textContent = 'Retry';
+    document.getElementById('providersRailSummary').textContent = 'The latest provider scan failed. Review the error and retry.';
+    updateSelectAllCheckbox();
+  } finally {
+    scanBtn.disabled = false;
+  }
+}
+
+async function applyConfig() {
+  if (!validateApiKeyInput(document.getElementById('apiKeyInput').value)) return;
+  const selection = selectableProviderSummary();
+  const providers = Array.isArray(scanData?.providers)
+    ? selection.selectedProviders.filter((provider) =>
+        scanData.providers.some((entry) => entry.provider === provider && entry.available),
+      )
+    : selection.selectedProviders;
+  if (!providers.length) {
+    if (selection.selectedCount > 0) {
+      showResult('Unavailable Selection', 'Only available providers can be applied. Run Scan Providers and select a ready provider.', true);
+    }
+    return;
+  }
+
+  const applyBtn = document.getElementById('applyBtn');
+  applyBtn.disabled = true;
+  applyBtn.textContent = 'Applying...';
+  hideResult();
+
+  try {
+    const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
+    const res = await fetchFn('/setup-apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ providers }),
+    });
+    const data = await res.json();
+    if (res.ok && data.status === 'applied') {
+      showResult(
+        'Setup Complete',
+        `Configuration written to ${data.configPath}. ` +
+        (data.restart ? 'Please restart the runtime.' : 'Runtime is now active.') +
+        ' <a class="runtime-link" href="/dashboard">Go to Dashboard</a>',
+        false,
+        true
+      );
+      const stateRes = await fetchFn('/setup-state');
+      if (!stateRes.ok) throw new Error(`HTTP ${stateRes.status}`);
+      const stateData = await stateRes.json();
+      applySetupStateReadModel(stateData, providers);
+      await loadConfiguredTargetCapabilities();
+      setActiveSetupWorkspace('providers');
+    } else {
+      showResult('Error', data.error || 'Failed to apply configuration.', true);
+    }
+  } catch (err) {
+    showResult('Error', err.message, true);
+  } finally {
+    applyBtn.disabled = false;
+    applyBtn.textContent = 'Apply Selected';
+  }
+}
+
+function showResult(title, body, isError, allowHtml) {
+  const panel = document.getElementById('resultPanel');
+  const titleEl = document.getElementById('resultTitle');
+  const bodyEl = document.getElementById('resultBody');
+  if (!panel || !titleEl || !bodyEl) {
+    return;
+  }
+  titleEl.textContent = title;
+  if (allowHtml === true) {
+    bodyEl.innerHTML = body;
+  } else {
+    bodyEl.textContent = body;
+  }
+  panel.dataset.variant = isError ? 'error' : 'success';
+  panel.hidden = false;
+  panel.classList.remove('hidden');
+}
+
+function hideResult() {
+  const panel = document.getElementById('resultPanel');
+  if (!panel) {
+    return;
+  }
+  panel.hidden = true;
+  panel.classList.add('hidden');
+  delete panel.dataset.variant;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const apiKeyInput = document.getElementById('apiKeyInput');
+  const authStatus = document.getElementById('runtimeAuthStatus');
+  const authEditor = document.getElementById('runtimeAuthEditor');
+  const authToggle = document.getElementById('runtimeAuthToggle');
+  function updateRuntimeAuthState() {
+    const hasValue = apiKeyInput.value.trim().length > 0;
+    authStatus.textContent = hasValue ? 'Set' : 'Missing';
+    authStatus.dataset.state = hasValue ? 'active' : 'idle';
+  }
+  window.toggleRuntimeAuthEditor = function(forceOpen) {
+    const shouldOpen = typeof forceOpen === 'boolean'
+      ? forceOpen
+      : authEditor.classList.contains('hidden');
+    authEditor.classList.toggle('hidden', !shouldOpen);
+    authToggle.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+    if (shouldOpen) apiKeyInput.focus();
+  };
+  apiKeyInput.addEventListener('input', updateRuntimeAuthState);
+  apiKeyInput.addEventListener('change', function() {
+    updateRuntimeAuthState();
+    window.toggleRuntimeAuthEditor(false);
+    void fetchState();
+    void loadConfiguredTargetCapabilities();
+  });
+  apiKeyInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      updateRuntimeAuthState();
+      window.toggleRuntimeAuthEditor(false);
+      void fetchState();
+      void loadConfiguredTargetCapabilities();
+    }
+  });
+  updateRuntimeAuthState();
+  setActiveSetupWorkspace(activeSetupWorkspace);
+  updateProvidersWorkspaceMetrics();
+  updateConfiguredTargetsRail();
+  void fetchState();
+  void loadConfiguredTargetCapabilities();
+});
+</script>
+</body>
+</html>
