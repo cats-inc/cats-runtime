@@ -1,12 +1,14 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildRuntimeSkillInstructionOverlay,
   inspectRuntimeSkillCatalog,
   listRuntimeSkillCatalog,
   mergeRuntimeSkillInstructions,
+  resolveRuntimeSkillsRoot,
   resolveRuntimeSkillManifest,
   verifyRuntimeSkillCatalog,
 } from './catalog.js';
@@ -105,6 +107,19 @@ describe('runtime skill catalog', () => {
         : {}),
     });
   }
+
+  it('resolves the shipped runtime skills root for both source and built module locations', () => {
+    const expectedSkillsRoot = join(process.cwd(), 'skills');
+    const sourceModuleUrl = pathToFileURL(
+      join(process.cwd(), 'src', 'core', 'skills', 'catalog.ts'),
+    ).href;
+    const builtModuleUrl = pathToFileURL(
+      join(process.cwd(), 'build', 'runtime', 'core', 'skills', 'catalog.js'),
+    ).href;
+
+    expect(resolveRuntimeSkillsRoot(sourceModuleUrl)).toBe(expectedSkillsRoot);
+    expect(resolveRuntimeSkillsRoot(builtModuleUrl)).toBe(expectedSkillsRoot);
+  });
 
   it('materializes filesystem skills for Codex isolated workspaces', () => {
     const sessionBaseDir = mkdtempSync(join(tmpdir(), 'cats-runtime-skill-catalog-'));

@@ -28,7 +28,15 @@ import type {
   WorkspaceMode,
 } from '../types.js';
 
-const SKILLS_ROOT = path.resolve(fileURLToPath(new URL('../../../skills/', import.meta.url)));
+const BUILT_RUNTIME_SEGMENT = `${path.sep}build${path.sep}runtime${path.sep}`;
+const SOURCE_SKILLS_ROOT_CANDIDATES = [
+  ['..', '..', '..', 'skills'],
+  ['..', '..', '..', '..', 'skills'],
+] as const;
+const BUILT_SKILLS_ROOT_CANDIDATES = [
+  ['..', '..', '..', '..', 'skills'],
+  ['..', '..', '..', 'skills'],
+] as const;
 const CODER_SKILLS_ROOT = path.join('.agents', 'skills');
 const RUNTIME_SKILL_STATE_ROOT = '.runtime-skills';
 const MAX_RUNTIME_SKILL_DISCOVERY_DEPTH = 6;
@@ -216,6 +224,24 @@ export interface RuntimeSkillCatalogVerification {
   requiredFields: string[];
   optionalFields: string[];
 }
+
+export function resolveRuntimeSkillsRoot(moduleUrl: string = import.meta.url): string {
+  const moduleDir = path.dirname(fileURLToPath(moduleUrl));
+  const candidates = moduleDir.includes(BUILT_RUNTIME_SEGMENT)
+    ? BUILT_SKILLS_ROOT_CANDIDATES
+    : SOURCE_SKILLS_ROOT_CANDIDATES;
+
+  for (const segments of candidates) {
+    const candidatePath = path.resolve(moduleDir, ...segments);
+    if (existsSync(candidatePath)) {
+      return candidatePath;
+    }
+  }
+
+  return path.resolve(moduleDir, ...candidates[0]);
+}
+
+const SKILLS_ROOT = resolveRuntimeSkillsRoot();
 
 function normalizeOptionalToken(value: string | undefined): string | undefined {
   const normalized = value?.trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');

@@ -1511,10 +1511,10 @@ proxy slice is still intentionally minimal:
 That means the local packaging baseline is no longer the main gap. The
 remaining work is follow-through and publication discipline:
 
-- deployment docs still describe the npm package path as a planned publish path
-  instead of a repo-ready local package plus not-yet-published registry path
 - the package is not yet proven through a first real npm release
-- trusted publishing automation and post-publish validation are still manual
+- repo-owned release preflight now exists, but it intentionally does not
+  publish or claim trusted publishing is configured
+- trusted publishing activation plus post-publish validation are still manual
 
 #### Current Baseline
 
@@ -1534,24 +1534,19 @@ remaining work is follow-through and publication discipline:
   `src/http/ui/pages/*.html` source tree, emitted `public/*.html` artifacts,
   and the shared runtime shell/manual-repair baseline are already landed, so
   packaging follow-through is no longer blocked on stale UI-build plan metadata
-- `docs/release-guide.md` documents a manual first-release path plus a future
-  trusted-publishing direction
-- `docs/deployment.md` still labels npm package startup as a planned publish
-  path, which is now only partially true: local package execution is ready, but
-  public registry publication remains outstanding
+- `docs/release-guide.md`, `docs/deployment.md`, and `README.md` now freeze the
+  first public package posture to unscoped `cats-runtime`, distinguish
+  repo-local package readiness from registry publication, and document `next`
+  as the prerelease validation channel
+- `.github/workflows/cats-runtime-release-preflight.yml` now runs
+  `npm run release:check` in GitHub Actions without `npm publish` or
+  `id-token: write`
 
 #### Follow-through Checklist
 
 - keep packaging/build docs aligned as further runtime UI source/build
   convergence lands under `PLAN-019`, without mixing already-landed local
   package mechanics with still-open HTML/source migration work
-- tighten packaging docs so they distinguish:
-  - repo-local package readiness
-  - first public npm release
-  - later trusted-publishing automation
-- decide and freeze the public package naming posture before first release:
-  - keep `cats-runtime`
-  - or move to a scoped public package
 - execute the first real npm publish trial:
   - run `npm run release:check`
   - publish a prerelease under `next`
@@ -1562,8 +1557,8 @@ remaining work is follow-through and publication discipline:
   - `id-token: write`
   - npm trusted publisher configuration
   - publish trigger discipline from tags or protected manual release workflow
-- update deployment/release docs after the first publish so they stop describing
-  package execution as only a planned path
+- update deployment/release docs after the first publish so they stop
+  describing registry execution as an unproven path
 
 #### Deferred Scope
 

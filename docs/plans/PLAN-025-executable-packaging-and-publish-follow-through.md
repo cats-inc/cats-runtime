@@ -7,7 +7,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress |
+| **Status** | Completed (Repo-Owned Pre-Publish Prep Landed) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User |
@@ -37,7 +37,9 @@ What remains is follow-through:
 - package/readme/operator guidance does not yet fully separate repo-local
   package readiness from not-yet-proven public registry publishing
 - local smoke coverage can still go beyond static tarball contents
-- trusted publishing automation is still only a documented future direction
+- trusted publishing activation is still a later external follow-through, but
+  the repo can now carry a truthful non-publishing preflight workflow and
+  frozen package/release posture
 
 This plan captures the repo-owned work that can be landed before a real npm
 publish is attempted.
@@ -82,9 +84,9 @@ registry publish is attempted.
 
 ### Phase 3: Publish Automation Preparation
 
-- [ ] Decide what trusted-publishing artifacts can be added safely before the
+- [x] Decide what trusted-publishing artifacts can be added safely before the
       first real manual release
-- [ ] Keep pre-publish automation truthful: document what is planned, what is
+- [x] Keep pre-publish automation truthful: document what is planned, what is
       repo-ready, and what still depends on external npm/GitHub configuration
 
 **Deliverables**: the repo is structurally ready for later release automation
@@ -100,11 +102,12 @@ without claiming publish infrastructure that is not actually configured yet.
 | `docs/deployment.md` | Modify | Distinguish repo-local package readiness from public publish |
 | `README.md` | Modify | Keep package/run guidance aligned with current executable posture |
 | `tests/package-contract.test.ts` | Modify | Optional local smoke follow-through beyond static tarball checks |
-| `.github/workflows/*` | Maybe | Only if a truthful pre-publish automation slice is ready |
+| `.github/workflows/cats-runtime-release-preflight.yml` | Create | Run `npm run release:check` in GitHub Actions without publishing or OIDC |
 
 ## Testing Strategy
 
 - `npm run build`
+- `npm run release:check`
 - targeted `vitest` coverage for any packaging smoke additions
 - `npm pack --dry-run`-backed contract checks when modifying tarball contents
 - `git diff --check`
@@ -127,6 +130,7 @@ without claiming publish infrastructure that is not actually configured yet.
 | 2026-03-29 | Phase 2 slice landed: `tests/package-contract.test.ts` now installs the locally packed tarball into a temporary consumer workspace and smokes the packaged runtime and MCP entrypoints, so executable package regressions are no longer limited to static tarball-content checks |
 | 2026-04-06 | Runtime build-output follow-through moved those package-contract smoke checks and published entrypoints under `build/runtime/index.js` and `build/runtime/bin/mcp.js`, keeping packaging validation aligned with the live runtime layout after `PLAN-031` closed |
 | 2026-04-07 | `PLAN-019` landed canonical `src/http/ui/pages/*.html` sources plus emitted `public/*.html` artifacts under `build:ui`, so this packaging workstream is now blocked only on release/publish follow-through rather than stale runtime page-generation ambiguity |
+| 2026-04-07 | Phase 3 landed: the package name posture is now frozen to unscoped `cats-runtime`, docs align `next` vs `latest`, and `.github/workflows/cats-runtime-release-preflight.yml` now runs `npm run release:check` without publishing or claiming trusted publishing is configured |
 
 ---
 

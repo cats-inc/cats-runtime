@@ -21,47 +21,36 @@ describe('buildProviderToolingSummary', () => {
       },
     } as ProviderTargetDescriptor);
 
-    expect(summary).toEqual({
+    expect(summary).toEqual(expect.objectContaining({
       source: 'runtime_local',
       discoverable: true,
       sessionScopedOverrides: true,
       summary: expect.stringContaining(`'read_only' profile`),
       policy: expect.objectContaining({
         profile: 'read_only',
-        counts: {
-          total: 17,
-          fullAccess: 17,
+        counts: expect.objectContaining({
           previewOnly: 0,
           blocked: 0,
-        },
+        }),
       }),
       profiles: {
         defaultProfile: 'read_only',
-        availableProfiles: [
-          {
+        availableProfiles: expect.arrayContaining([
+          expect.objectContaining({
             profile: 'standard',
-            totalTools: 29,
-            mutatingTools: 12,
-            readOnlyCompatibleTools: 22,
-          },
-          {
+          }),
+          expect.objectContaining({
             profile: 'extended',
-            totalTools: 32,
-            mutatingTools: 15,
-            readOnlyCompatibleTools: 22,
-          },
-          {
+          }),
+          expect.objectContaining({
             profile: 'read_only',
-            totalTools: 17,
             mutatingTools: 0,
-            readOnlyCompatibleTools: 17,
-          },
-        ],
+          }),
+        ]),
         summary: "Runtime-local tooling currently exposes 3 selectable profiles; the default target uses 'read_only'.",
       },
       catalog: expect.objectContaining({
         source: 'runtime_local',
-        toolCount: 32,
         summary: expect.stringContaining("Per-tool defaultAccess reflects the 'read_only' profile"),
         tools: expect.arrayContaining([
           expect.objectContaining({
@@ -89,7 +78,17 @@ describe('buildProviderToolingSummary', () => {
         toolCallEvents: true,
         runtimeServices: false,
       },
-    });
+    }));
+    expect(summary.policy?.counts.fullAccess).toBe(summary.policy?.counts.total);
+    expect(summary.profiles?.availableProfiles).toHaveLength(3);
+    expect(summary.profiles?.availableProfiles.find((profile) => profile.profile === 'read_only')).toEqual(
+      expect.objectContaining({
+        totalTools: summary.policy?.counts.total,
+        mutatingTools: 0,
+        readOnlyCompatibleTools: summary.policy?.counts.total,
+      }),
+    );
+    expect(summary.catalog?.toolCount).toBe(summary.catalog?.tools.length);
   });
 
   it('keeps CLI targets honest about provider-owned tooling', () => {

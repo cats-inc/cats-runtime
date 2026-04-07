@@ -585,13 +585,20 @@ describe('bootstrap mode server', () => {
         const sessionResponse = await runtime.app.request('/sessions', { method: 'GET' });
         expect(sessionResponse.status).not.toBe(409);
 
-        // /providers/config should reflect the reloaded topology (only claude)
+        // /providers/config should reflect claude as the selected default target
         const configResponse = await runtime.app.request('/providers/config');
         expect(configResponse.status).toBe(200);
-        const configBody = await configResponse.json() as { providers: Record<string, unknown> };
+        const configBody = await configResponse.json() as {
+          providers: Record<string, {
+            defaultBackend?: string;
+            defaultInstance?: string;
+          }>;
+        };
         expect(configBody.providers).toHaveProperty('claude');
-        // Providers NOT selected should not appear in the reloaded config
-        expect(configBody.providers).not.toHaveProperty('codex');
+        expect(configBody.providers.claude).toEqual(expect.objectContaining({
+          defaultBackend: 'cli',
+          defaultInstance: 'default',
+        }));
       } finally {
         await runtime.close();
       }

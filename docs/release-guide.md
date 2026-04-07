@@ -32,28 +32,36 @@ The first public npm release has not happened yet. Before publishing,
   locally packed artifact
 
 That means repo-local package verification is ready now, while registry
-publication and trusted publishing are still future follow-through.
+publication and trusted publishing activation are still future follow-through.
 
-## Decide the Published Package Name
+## Published Package Name
 
-Choose one of these patterns before the first publish:
+The first public package name is frozen to the unscoped package:
 
-- unscoped: `cats-runtime`
-- scoped public package: `@scope/cats-runtime`
+- `cats-runtime`
 
-If you change to a scoped package later, update:
+If a future migration ever moves to a scoped package, treat that as a separate
+follow-through and update:
 
 - `package.json` `name`
 - README install examples
 - any automation or release docs that mention install commands
 
-Before the first release, verify availability:
+Before the first manual release, verify current registry state and owner access:
 
 ```powershell
 npm view cats-runtime name version
 ```
 
-If npm returns `404 Not Found`, the unscoped name is currently available.
+If npm returns `404 Not Found`, the name is still unpublished.
+
+## Release Channels
+
+- prerelease channel: `next`
+- stable channel: `latest`
+
+That keeps the first external validation off the default install path while the
+registry artifact is still being proven.
 
 ## Release Modes
 
@@ -88,6 +96,26 @@ Consumers can then install or run the beta with:
 npm install cats-runtime@next
 npx cats-runtime@next
 ```
+
+## Repo-Owned Preflight Automation
+
+The repository now includes a non-publishing GitHub Actions preflight at:
+
+- `.github/workflows/cats-runtime-release-preflight.yml`
+
+That workflow currently does only two repo-owned things:
+
+1. `npm ci`
+2. `npm run release:check`
+
+It intentionally does **not**:
+
+- call `npm publish`
+- request `id-token: write`
+- claim npm trusted publishing is already configured
+
+Use it to keep the release gate reproducible in GitHub before the first real
+manual prerelease is attempted.
 
 ### Manual stable release
 
@@ -145,8 +173,12 @@ npm install cats-runtime
 
 ## Future State: Trusted Publishing
 
-After the first manual release is proven, move publish to GitHub Actions trusted
-publishing.
+After the first manual prerelease is proven, add a separate GitHub Actions
+publish workflow and move publish to trusted publishing.
+
+The current preflight workflow is intentionally not that publish workflow. It
+exists to prove the repo-side gate without pretending npm/GitHub external
+configuration is already complete.
 
 Recommended direction:
 
@@ -202,4 +234,4 @@ That keeps the package aligned with the process-boundary ADRs.
 
 ---
 
-*Last updated: 2026-03-30*
+*Last updated: 2026-04-07*

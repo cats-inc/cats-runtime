@@ -1897,8 +1897,8 @@ describe('LocalToolRuntime', () => {
         'copy_file',
       ]));
       expect(policy.counts).toEqual({
-        total: 32,
-        fullAccess: 17,
+        total: 33,
+        fullAccess: 18,
         previewOnly: 5,
         blocked: 10,
       });
@@ -1952,10 +1952,10 @@ describe('LocalToolRuntime', () => {
       expect(policy.blockedTools).toContain('write_file');
       expect(policy.blockedTools).toContain('init-workspace');
       expect(policy.counts).toEqual({
-        total: 32,
+        total: 33,
         fullAccess: 2,
         previewOnly: 0,
-        blocked: 30,
+        blocked: 31,
       });
       expect(policy.capabilities).toEqual(expect.arrayContaining([
         expect.objectContaining({
@@ -1995,8 +1995,8 @@ describe('LocalToolRuntime', () => {
         workspaceOverlayActive: true,
         whitelistActive: false,
         counts: {
-          total: 32,
-          fullAccess: 17,
+          total: 33,
+          fullAccess: 18,
           previewOnly: 5,
           blocked: 10,
         },
@@ -2028,8 +2028,8 @@ describe('LocalToolRuntime', () => {
         workspaceOverlayActive: true,
         whitelistActive: false,
         counts: {
-          total: 32,
-          fullAccess: 22,
+          total: 33,
+          fullAccess: 23,
           previewOnly: 0,
           blocked: 10,
         },

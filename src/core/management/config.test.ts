@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { describe, expect, it, afterEach } from 'vitest';
@@ -7,12 +7,22 @@ import { loadManagementConfig, resolveManagementConfigPath } from './config.js';
 describe('loadManagementConfig', () => {
   const dirs: string[] = [];
 
-  function createTemp(yaml: string): string {
+  function createRuntimeRoot(yaml?: string): string {
     const dir = mkdtempSync(join(tmpdir(), 'cats-mgmt-cfg-'));
+    const configDir = join(dir, 'config');
+    mkdirSync(configDir, { recursive: true });
     dirs.push(dir);
-    const file = join(dir, 'management.yaml');
-    writeFileSync(file, yaml);
-    return file;
+    if (yaml !== undefined) {
+      writeFileSync(join(configDir, 'management.yaml'), yaml);
+    }
+    return dir;
+  }
+
+  function createTestEnv(runtimeRoot?: string): NodeJS.ProcessEnv {
+    return {
+      ...process.env,
+      ...(runtimeRoot ? { CATS_RUNTIME_DIR: runtimeRoot } : { CATS_RUNTIME_DIR: '' }),
+    };
   }
 
   afterEach(() => {
@@ -21,7 +31,7 @@ describe('loadManagementConfig', () => {
   });
 
   it('parses a valid config', () => {
-    const path = createTemp(`
+    const runtimeRoot = createRuntimeRoot(`
 version: 1
 adapters:
   review:
@@ -38,7 +48,7 @@ adapters:
         transport: cli
         command: zeabur
 `);
-    const config = loadManagementConfig(path);
+    const config = loadManagementConfig(undefined, createTestEnv(runtimeRoot));
     expect(config).toBeDefined();
     expect(config!.version).toBe(1);
     expect(config!.adapters.review.default).toBe('github');
@@ -49,24 +59,26 @@ adapters:
   });
 
   it('returns undefined when file does not exist', () => {
-    const config = loadManagementConfig('/tmp/nonexistent-cats-mgmt.yaml');
+    const config = loadManagementConfig(undefined, createTestEnv(createRuntimeRoot()));
     expect(config).toBeUndefined();
   });
 
   it('throws on unsupported version', () => {
-    const path = createTemp('version: 99\nadapters: {}');
-    expect(() => loadManagementConfig(path)).toThrow('Unsupported management config version');
+    const runtimeRoot = createRuntimeRoot('version: 99\nadapters: {}');
+    expect(() => loadManagementConfig(undefined, createTestEnv(runtimeRoot))).toThrow(
+      'Unsupported management config version',
+    );
   });
 
   it('returns empty adapters for missing adapters key', () => {
-    const path = createTemp('version: 1');
-    const config = loadManagementConfig(path);
+    const runtimeRoot = createRuntimeRoot('version: 1');
+    const config = loadManagementConfig(undefined, createTestEnv(runtimeRoot));
     expect(config).toBeDefined();
     expect(Object.keys(config!.adapters)).toHaveLength(0);
   });
 
   it('defaults transport to cli when not specified', () => {
-    const path = createTemp(`
+    const runtimeRoot = createRuntimeRoot(`
 version: 1
 adapters:
   review:
@@ -75,12 +87,12 @@ adapters:
       github:
         command: gh
 `);
-    const config = loadManagementConfig(path);
+    const config = loadManagementConfig(undefined, createTestEnv(runtimeRoot));
     expect(config!.adapters.review.instances.github.transport).toBe('cli');
   });
 
   it('defaults management config under ~/.cats/runtime/config', () => {
-    expect(resolveManagementConfigPath(undefined, undefined, {
+    expect(resolveManagementConfigPath(undefined, {
       HOME: '/home/tester',
       USERPROFILE: '',
     })).toBe(join('/home/tester', '.cats', 'runtime', 'config', 'management.yaml'));

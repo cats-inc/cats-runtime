@@ -33,10 +33,10 @@ export interface ManagementConfig {
 // ---------------------------------------------------------------------------
 
 export function loadManagementConfig(
-  cwd?: string,
+  homeDir?: string,
   env: NodeJS.ProcessEnv = process.env,
 ): ManagementConfig | undefined {
-  const configPath = resolveManagementConfigPath(cwd, env);
+  const configPath = resolveManagementConfigPath(homeDir, env);
   if (!existsSync(configPath)) {
     return undefined;
   }
@@ -72,13 +72,13 @@ export function loadManagementConfig(
 // ---------------------------------------------------------------------------
 
 export function resolveManagementConfigPath(
-  cwd?: string,
+  homeDir: string | undefined = undefined,
   env: NodeJS.ProcessEnv = process.env,
 ): string {
-  const runtimeRoot = resolveRuntimeRoot(
-    env,
-    cwd || env.HOME || env.USERPROFILE || '',
-  );
+  const runtimeRoot = resolveRuntimeRoot({
+    ...env,
+    ...(homeDir ? { HOME: homeDir } : {}),
+  }, homeDir);
   return resolveRuntimeManagementConfigPath(runtimeRoot);
 }
 

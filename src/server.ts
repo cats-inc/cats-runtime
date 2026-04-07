@@ -10,7 +10,12 @@ import {
   resolveProviderInstance,
 } from './backends/cli/config.js';
 import type { CliRuntimeConfig } from './backends/cli/config.js';
-import { loadConfig, getRuntimeResolvedPaths, copyRuntimeConfigEnv } from './core/config.js';
+import {
+  loadConfig,
+  getRuntimeResolvedPaths,
+  copyRuntimeConfigEnv,
+  getRuntimeConfigEnv,
+} from './core/config.js';
 import type { RuntimeConfig } from './core/types.js';
 import { resolveConfigPath } from './backends/cli/config.js';
 import { AuggieSessionScanner } from './backends/cli/discovery/AuggieSessionScanner.js';
@@ -979,7 +984,7 @@ export function createRuntimeServer(
   let activeDiscovery: ReturnType<typeof createDiscoveryController> | null = null;
   context.completeBootstrap = () => {
     // Reload config from the newly written providers.yaml.
-    const reloaded = loadConfig(process.env);
+    const reloaded = loadConfig(getRuntimeConfigEnv(config));
     Object.assign(config, reloaded);
     copyRuntimeConfigEnv(config, reloaded);
     context.config = config;

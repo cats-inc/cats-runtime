@@ -131,6 +131,10 @@ release is ready:
 - `npm install -g cats-runtime` then `cats-runtime`
 - `npx cats-runtime` once the package is published
 
+The first public package name is frozen to the unscoped package
+`cats-runtime`, and prerelease validation should use the `next` dist-tag rather
+than `latest`.
+
 For local packaged-flow verification before publish, use the platform helper
 scripts:
 
@@ -140,6 +144,10 @@ scripts:
 
 Each helper supports interactive install/delete prompts plus explicit
 `--pack-only`, `--install`, `--clean`, and `--skip-build` modes.
+
+The repo also includes a non-publishing GitHub Actions preflight workflow at
+`../.github/workflows/cats-runtime-release-preflight.yml` that runs
+`npm run release:check` without attempting a registry publish.
 
 The executable package starts the same runtime entrypoint as `npm start` and
 supports either bootstrap-first startup with no preexisting `providers.yaml`,

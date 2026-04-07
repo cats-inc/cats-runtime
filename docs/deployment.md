@@ -9,7 +9,7 @@
 |-------------|-----|---------|
 | Development | `http://127.0.0.1:3110` | Local development with source checkout |
 | Built local | `http://127.0.0.1:3110` | Production-style local run from built assets |
-| npm package (repo-ready local path; registry publish pending) | `http://127.0.0.1:3110` by default | Executable package run via `cats-runtime` / `npx cats-runtime` once published |
+| npm package (repo-ready local path; public package name `cats-runtime`; registry publish pending) | `http://127.0.0.1:3110` by default | Executable package run via `cats-runtime` / `npx cats-runtime` once published |
 | App-managed local | Host-assigned | Started and supervised by a local product app such as `cats` |
 
 ## Deployment Modes
@@ -37,6 +37,8 @@ node build/runtime/index.js
 The executable packaging contract is already repo-ready locally, even though
 the first public npm release is still pending.
 
+The planned first public package name is the unscoped package `cats-runtime`.
+
 For local packaged-flow verification before publish, use the platform helper
 scripts:
 
@@ -46,6 +48,10 @@ scripts:
 
 or the equivalent Linux/macOS helpers under `scripts/linux/` and
 `scripts/macos/`.
+
+The repo also now includes a non-publishing GitHub Actions preflight workflow
+at `../../.github/workflows/cats-runtime-release-preflight.yml` that runs
+`npm run release:check` without calling `npm publish`.
 
 Once published, the public package flow is expected to be:
 
@@ -205,4 +211,4 @@ assets. Use `npm pack --dry-run` to inspect the payload.
 
 ---
 
-*Last updated: 2026-03-29*
+*Last updated: 2026-04-07*

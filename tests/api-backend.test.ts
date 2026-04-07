@@ -50,6 +50,65 @@ function expectIdleMeteringSummary() {
   });
 }
 
+const DEFAULT_STANDARD_TOOL_COUNT = 30;
+
+function expectRuntimeContinuity() {
+  return expect.objectContaining({
+    source: 'runtime_stateful',
+    summary: expect.stringContaining('cats-runtime owns the host-visible session lifecycle'),
+    resume: true,
+    fork: true,
+    permissions: true,
+    providerManagedSessions: false,
+    sessionKey: false,
+    providerSessionState: true,
+    remoteCancel: false,
+  });
+}
+
+function expectStandardRuntimeTooling(totalTools = DEFAULT_STANDARD_TOOL_COUNT) {
+  return expect.objectContaining({
+    source: 'runtime_local',
+    discoverable: true,
+    sessionScopedOverrides: true,
+    summary: expect.stringContaining(`'standard' profile`),
+    policy: expect.objectContaining({
+      profile: 'standard',
+      permissionMode: 'skip',
+      whitelistActive: false,
+      counts: expect.objectContaining({
+        total: totalTools,
+        fullAccess: totalTools,
+        previewOnly: 0,
+        blocked: 0,
+      }),
+    }),
+    observability: expect.objectContaining({
+      catalog: 'runtime_enumerated',
+      toolCallEvents: true,
+      runtimeServices: false,
+    }),
+    profiles: expect.objectContaining({
+      defaultProfile: 'standard',
+      availableProfiles: expect.arrayContaining([
+        expect.objectContaining({
+          profile: 'standard',
+          totalTools,
+        }),
+        expect.objectContaining({
+          profile: 'extended',
+          totalTools: 33,
+        }),
+        expect.objectContaining({
+          profile: 'read_only',
+          totalTools: 18,
+          mutatingTools: 0,
+        }),
+      ]),
+    }),
+  });
+}
+
 function createApiConfigRoot(
   envOverrides: Record<string, string> = {},
   mutateConfig?: (contents: string) => string,
@@ -169,17 +228,7 @@ describe('API backend integration', () => {
                     state: 'deferred',
                   }),
                 }),
-                continuity: {
-                  source: 'runtime_stateful',
-                  summary: expect.stringContaining('cats-runtime owns the host-visible session lifecycle'),
-                  resume: true,
-                  fork: true,
-                  permissions: true,
-                  providerManagedSessions: false,
-                  sessionKey: false,
-                  providerSessionState: true,
-                  remoteCancel: false,
-                },
+                continuity: expectRuntimeContinuity(),
                 metering: expectIdleMeteringSummary(),
                 modelCatalog: {
                   source: 'config',
@@ -196,23 +245,7 @@ describe('API backend integration', () => {
                     unknown: 0,
                   },
                 },
-                tooling: expect.objectContaining({
-                  source: 'runtime_local',
-                  discoverable: true,
-                  sessionScopedOverrides: true,
-                  summary: expect.stringContaining(`'standard' profile`),
-                  policy: expect.objectContaining({
-                    profile: 'standard',
-                    counts: expect.objectContaining({
-                      total: 29,
-                    }),
-                  }),
-                  observability: {
-                    catalog: 'runtime_enumerated',
-                    toolCallEvents: true,
-                    runtimeServices: false,
-                  },
-                }),
+                tooling: expectStandardRuntimeTooling(),
                 install: null,
                 compatibility: null,
               }),
@@ -222,17 +255,7 @@ describe('API backend integration', () => {
                 backend: 'api',
                 transport: 'anthropic',
                 model: 'claude-opus-4-6',
-                continuity: {
-                  source: 'runtime_stateful',
-                  summary: expect.stringContaining('cats-runtime owns the host-visible session lifecycle'),
-                  resume: true,
-                  fork: true,
-                  permissions: true,
-                  providerManagedSessions: false,
-                  sessionKey: false,
-                  providerSessionState: true,
-                  remoteCancel: false,
-                },
+                continuity: expectRuntimeContinuity(),
                 metering: expectIdleMeteringSummary(),
                 modelCatalog: {
                   source: 'config',
@@ -249,23 +272,7 @@ describe('API backend integration', () => {
                     unknown: 0,
                   },
                 },
-                tooling: expect.objectContaining({
-                  source: 'runtime_local',
-                  discoverable: true,
-                  sessionScopedOverrides: true,
-                  summary: expect.stringContaining(`'standard' profile`),
-                  policy: expect.objectContaining({
-                    profile: 'standard',
-                    counts: expect.objectContaining({
-                      total: 29,
-                    }),
-                  }),
-                  observability: {
-                    catalog: 'runtime_enumerated',
-                    toolCallEvents: true,
-                    runtimeServices: false,
-                  },
-                }),
+                tooling: expectStandardRuntimeTooling(),
                 install: null,
                 compatibility: null,
               }),
@@ -292,17 +299,7 @@ describe('API backend integration', () => {
                     active: false,
                   }),
                 }),
-                continuity: {
-                  source: 'runtime_stateful',
-                  summary: expect.stringContaining('cats-runtime owns the host-visible session lifecycle'),
-                  resume: true,
-                  fork: true,
-                  permissions: true,
-                  providerManagedSessions: false,
-                  sessionKey: false,
-                  providerSessionState: true,
-                  remoteCancel: false,
-                },
+                continuity: expectRuntimeContinuity(),
                 metering: expectIdleMeteringSummary(),
                 modelCatalog: {
                   source: 'config',
@@ -319,23 +316,7 @@ describe('API backend integration', () => {
                     unknown: 0,
                   },
                 },
-                tooling: expect.objectContaining({
-                  source: 'runtime_local',
-                  discoverable: true,
-                  sessionScopedOverrides: true,
-                  summary: expect.stringContaining(`'standard' profile`),
-                  policy: expect.objectContaining({
-                    profile: 'standard',
-                    counts: expect.objectContaining({
-                      total: 29,
-                    }),
-                  }),
-                  observability: {
-                    catalog: 'runtime_enumerated',
-                    toolCallEvents: true,
-                    runtimeServices: false,
-                  },
-                }),
+                tooling: expectStandardRuntimeTooling(),
                 install: null,
                 compatibility: null,
               }),
@@ -363,17 +344,7 @@ describe('API backend integration', () => {
                     ttl: '3600s',
                   }),
                 }),
-                continuity: {
-                  source: 'runtime_stateful',
-                  summary: expect.stringContaining('cats-runtime owns the host-visible session lifecycle'),
-                  resume: true,
-                  fork: true,
-                  permissions: true,
-                  providerManagedSessions: false,
-                  sessionKey: false,
-                  providerSessionState: true,
-                  remoteCancel: false,
-                },
+                continuity: expectRuntimeContinuity(),
                 metering: expectIdleMeteringSummary(),
                 modelCatalog: {
                   source: 'config',
@@ -390,23 +361,7 @@ describe('API backend integration', () => {
                     unknown: 0,
                   },
                 },
-                tooling: expect.objectContaining({
-                  source: 'runtime_local',
-                  discoverable: true,
-                  sessionScopedOverrides: true,
-                  summary: expect.stringContaining(`'standard' profile`),
-                  policy: expect.objectContaining({
-                    profile: 'standard',
-                    counts: expect.objectContaining({
-                      total: 29,
-                    }),
-                  }),
-                  observability: {
-                    catalog: 'runtime_enumerated',
-                    toolCallEvents: true,
-                    runtimeServices: false,
-                  },
-                }),
+                tooling: expectStandardRuntimeTooling(),
                 install: null,
                 compatibility: null,
               }),
@@ -442,17 +397,7 @@ describe('API backend integration', () => {
                     state: 'runtime_local_only',
                   }),
                 }),
-                continuity: {
-                  source: 'runtime_stateful',
-                  summary: expect.stringContaining('cats-runtime owns the host-visible session lifecycle'),
-                  resume: true,
-                  fork: true,
-                  permissions: true,
-                  providerManagedSessions: false,
-                  sessionKey: false,
-                  providerSessionState: true,
-                  remoteCancel: false,
-                },
+                continuity: expectRuntimeContinuity(),
                 metering: expectIdleMeteringSummary(),
                 modelCatalog: {
                   source: 'config',
@@ -467,23 +412,7 @@ describe('API backend integration', () => {
                     unknown: 0,
                   },
                 },
-                tooling: expect.objectContaining({
-                  source: 'runtime_local',
-                  discoverable: true,
-                  sessionScopedOverrides: true,
-                  summary: expect.stringContaining(`'standard' profile`),
-                  policy: expect.objectContaining({
-                    profile: 'standard',
-                    counts: expect.objectContaining({
-                      total: 29,
-                    }),
-                  }),
-                  observability: {
-                    catalog: 'runtime_enumerated',
-                    toolCallEvents: true,
-                    runtimeServices: false,
-                  },
-                }),
+                tooling: expectStandardRuntimeTooling(),
                 install: null,
                 compatibility: null,
               }),
@@ -528,38 +457,30 @@ describe('API backend integration', () => {
             active: true,
           }),
         }),
-        continuity: {
-          source: 'runtime_stateful',
-          summary: expect.stringContaining('cats-runtime owns the host-visible session lifecycle'),
-          resume: true,
-          fork: true,
-          permissions: true,
-          providerManagedSessions: false,
-          sessionKey: false,
-          providerSessionState: true,
-          remoteCancel: false,
-        },
+        continuity: expectRuntimeContinuity(),
         source: 'runtime_local',
         discoverable: true,
         sessionScopedOverrides: true,
-        catalogContext: {
+        catalogContext: expect.objectContaining({
           scope: 'catalog',
-        },
+        }),
         summary: expect.stringContaining(`'standard' profile`),
         policy: expect.objectContaining({
           profile: 'standard',
-          counts: {
-            total: 29,
-            fullAccess: 29,
+          permissionMode: 'skip',
+          whitelistActive: false,
+          counts: expect.objectContaining({
+            total: DEFAULT_STANDARD_TOOL_COUNT,
+            fullAccess: DEFAULT_STANDARD_TOOL_COUNT,
             previewOnly: 0,
             blocked: 0,
-          },
+          }),
         }),
-        observability: {
+        observability: expect.objectContaining({
           catalog: 'runtime_enumerated',
           toolCallEvents: true,
           runtimeServices: false,
-        },
+        }),
       }));
 
       const localResponse = await runtime.app.request('/providers/ollama/tools?instance=local/local');
@@ -582,25 +503,15 @@ describe('API backend integration', () => {
             management: 'deferred',
           }),
         }),
-        continuity: {
-          source: 'runtime_stateful',
-          summary: expect.stringContaining('cats-runtime owns the host-visible session lifecycle'),
-          resume: true,
-          fork: true,
-          permissions: true,
-          providerManagedSessions: false,
-          sessionKey: false,
-          providerSessionState: true,
-          remoteCancel: false,
-        },
+        continuity: expectRuntimeContinuity(),
         source: 'runtime_local',
         discoverable: true,
         sessionScopedOverrides: true,
-        observability: {
+        observability: expect.objectContaining({
           catalog: 'runtime_enumerated',
           toolCallEvents: true,
           runtimeServices: false,
-        },
+        }),
         policy: expect.objectContaining({
           profile: 'standard',
         }),

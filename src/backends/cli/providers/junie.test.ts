@@ -114,10 +114,11 @@ describe('JunieProvider', () => {
         expect.objectContaining({
           type: 'result',
           sessionId: 'session-1',
-          usage: {
+          usage: expect.objectContaining({
             inputTokens: 100,
             outputTokens: 50,
-          },
+            promptInputTokens: 100,
+          }),
           metadata: {
             runtimeUsage: {
               totalTokens: 150,
