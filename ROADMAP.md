@@ -720,6 +720,9 @@ tightening and cleanup steps are intentionally deferred.
   availability truth for the selected target, so operator repair views can see
   current `ok` / `degraded` / `unavailable` posture plus attention codes
   without inventing product-side selector fallbacks
+- setup-owned operator follow-through now also includes a per-target
+  `/diagnostics/providers/reprobe` action, so availability truth can be refreshed
+  in place without inventing a second product-owned repair screen
 - backend support is staged honestly rather than pretending universal advanced
   control parity, but broader evidence-backed manifest onboarding/checklist work
   still remains deferred

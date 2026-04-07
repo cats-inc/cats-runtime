@@ -572,23 +572,45 @@
                     <p id="setupCapabilitySummary" class="setup-capability-summary">
                       Loading runtime target capabilities...
                     </p>
-                    <div class="setup-summary-panel">
-                      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div class="min-w-0">
-                          <span class="setup-summary-label">Model Catalog Refresh</span>
-                          <p id="setupCatalogStatus" class="setup-summary-secondary">
-                            Loading runtime-owned model metadata...
-                          </p>
+                    <div class="setup-summary-grid">
+                      <div class="setup-summary-panel">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div class="min-w-0">
+                            <span class="setup-summary-label">Model Catalog Refresh</span>
+                            <p id="setupCatalogStatus" class="setup-summary-secondary">
+                              Loading runtime-owned model metadata...
+                            </p>
+                          </div>
+                          <div class="flex justify-end">
+                            <button
+                              id="setupCatalogRefreshBtn"
+                              type="button"
+                              class="runtime-btn runtime-btn-secondary"
+                              onclick="refreshSelectedModelCatalog()"
+                            >
+                              Refresh Model Catalog
+                            </button>
+                          </div>
                         </div>
-                        <div class="flex justify-end">
-                          <button
-                            id="setupCatalogRefreshBtn"
-                            type="button"
-                            class="runtime-btn runtime-btn-secondary"
-                            onclick="refreshSelectedModelCatalog()"
-                          >
-                            Refresh Model Catalog
-                          </button>
+                      </div>
+                      <div class="setup-summary-panel">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div class="min-w-0">
+                            <span class="setup-summary-label">Availability Reprobe</span>
+                            <p id="setupAvailabilityStatus" class="setup-summary-secondary">
+                              Loading provider availability truth...
+                            </p>
+                          </div>
+                          <div class="flex justify-end">
+                            <button
+                              id="setupAvailabilityRefreshBtn"
+                              type="button"
+                              class="runtime-btn runtime-btn-secondary"
+                              onclick="reprobeSelectedProviderDiagnostics()"
+                            >
+                              Reprobe Availability
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -648,6 +670,7 @@ const setupToolingInFlight = new Map();
 const setupDiagnosticsCache = new Map();
 const setupDiagnosticsInFlight = new Map();
 const SETUP_CATALOG_REFRESH_DEFAULT_LABEL = 'Refresh Model Catalog';
+const SETUP_AVAILABILITY_REFRESH_DEFAULT_LABEL = 'Reprobe Availability';
 
 function escapeHtml(s) {
   return String(s == null ? '' : s)
@@ -1067,6 +1090,7 @@ function renderSetupCapabilityEmpty(message, badgeText, badgeClass) {
   document.getElementById('setupCapabilityTags').innerHTML = '';
   document.getElementById('setupCapabilityCatalog').innerHTML = '';
   setSetupCatalogRefreshButtonState(true, SETUP_CATALOG_REFRESH_DEFAULT_LABEL);
+  setSetupAvailabilityRefreshButtonState(true, SETUP_AVAILABILITY_REFRESH_DEFAULT_LABEL);
 }
 
 function currentSetupCapabilitySelection() {
@@ -1266,6 +1290,19 @@ function summarizeProviderAttentionCodes(diagnostics) {
   return availability.attentionCodes.slice(0, 4).map((code) => humanizeToken(code)).join(', ');
 }
 
+function buildProviderAvailabilitySummary(diagnostics, diagnosticsError) {
+  if (diagnosticsError) {
+    return `Provider diagnostics could not be loaded: ${diagnosticsError}`;
+  }
+
+  const availability = currentProviderAvailability(diagnostics);
+  if (!availability) {
+    return 'No cached provider availability truth is available for this target yet.';
+  }
+
+  return availability.summary || buildProviderAvailabilityLabel(diagnostics);
+}
+
 function updateSetupCatalogStatus(text) {
   const node = document.getElementById('setupCatalogStatus');
   if (node) {
@@ -1280,6 +1317,22 @@ function setSetupCatalogRefreshButtonState(disabled, label) {
   }
   button.disabled = !!disabled;
   button.textContent = label || SETUP_CATALOG_REFRESH_DEFAULT_LABEL;
+}
+
+function updateSetupAvailabilityStatus(text) {
+  const node = document.getElementById('setupAvailabilityStatus');
+  if (node) {
+    node.textContent = text;
+  }
+}
+
+function setSetupAvailabilityRefreshButtonState(disabled, label) {
+  const button = document.getElementById('setupAvailabilityRefreshBtn');
+  if (!button) {
+    return;
+  }
+  button.disabled = !!disabled;
+  button.textContent = label || SETUP_AVAILABILITY_REFRESH_DEFAULT_LABEL;
 }
 
 function configuredTargetStatePills(instance) {
@@ -1577,6 +1630,7 @@ function syncSetupCapabilitySelectors() {
     renderConfiguredTargetList();
     renderSetupCapabilityEmpty('Loading runtime target capabilities...', 'Loading', 'status-badge-unknown');
     updateSetupCatalogStatus('Loading runtime-owned model metadata...');
+    updateSetupAvailabilityStatus('Loading provider availability truth...');
     return;
   }
 
@@ -1598,6 +1652,7 @@ function syncSetupCapabilitySelectors() {
       'status-badge-unknown',
     );
     updateSetupCatalogStatus('No runtime-owned model metadata is available until a target exists.');
+    updateSetupAvailabilityStatus('No provider availability truth is available until a target exists.');
     return;
   }
 
@@ -1707,6 +1762,14 @@ async function fetchConfiguredProviderDiagnostics(providerName, instance) {
   return task;
 }
 
+function storeConfiguredProviderDiagnostics(providerName, instance, diagnostics) {
+  if (!providerName || !instance?.backend || !instance?.id) {
+    return;
+  }
+  const key = `${providerName}::${instance.backend}::${instance.id}`;
+  setupDiagnosticsCache.set(key, diagnostics);
+}
+
 async function refreshSetupCapabilityPreview() {
   const { providerName, instanceTarget, instance } = currentSetupCapabilitySelection();
 
@@ -1718,6 +1781,7 @@ async function refreshSetupCapabilityPreview() {
       'status-badge-unknown',
     );
     updateSetupCatalogStatus('Choose a runtime target before refreshing model metadata.');
+    updateSetupAvailabilityStatus('Choose a runtime target before reprobing provider availability.');
     return;
   }
 
@@ -1727,7 +1791,9 @@ async function refreshSetupCapabilityPreview() {
   document.getElementById('setupCapabilityTags').innerHTML = '';
   document.getElementById('setupCapabilityCatalog').innerHTML = '';
   updateSetupCatalogStatus('Loading runtime-owned model metadata...');
+  updateSetupAvailabilityStatus('Loading provider availability truth...');
   setSetupCatalogRefreshButtonState(true, SETUP_CATALOG_REFRESH_DEFAULT_LABEL);
+  setSetupAvailabilityRefreshButtonState(true, SETUP_AVAILABILITY_REFRESH_DEFAULT_LABEL);
 
   let toolingPayload = null;
   let providerDiagnostics = null;
@@ -1845,7 +1911,9 @@ async function refreshSetupCapabilityPreview() {
     diagnosticsError,
   );
   updateSetupCatalogStatus(buildModelCatalogFreshnessSummary(modelCatalog));
+  updateSetupAvailabilityStatus(buildProviderAvailabilitySummary(providerDiagnostics, diagnosticsError));
   setSetupCatalogRefreshButtonState(false, SETUP_CATALOG_REFRESH_DEFAULT_LABEL);
+  setSetupAvailabilityRefreshButtonState(false, SETUP_AVAILABILITY_REFRESH_DEFAULT_LABEL);
 }
 
 async function refreshSelectedModelCatalog() {
@@ -1890,6 +1958,53 @@ async function refreshSelectedModelCatalog() {
   }
 }
 
+async function reprobeSelectedProviderDiagnostics() {
+  if (!validateApiKeyInput(document.getElementById('apiKeyInput').value)) return;
+  const { providerName, instance } = currentSetupCapabilitySelection();
+  if (!providerName || !instance?.backend || !instance?.id) {
+    updateSetupAvailabilityStatus('Choose a runtime target before reprobing provider availability.');
+    setSetupAvailabilityRefreshButtonState(true, SETUP_AVAILABILITY_REFRESH_DEFAULT_LABEL);
+    return;
+  }
+
+  setSetupAvailabilityRefreshButtonState(true, 'Reprobing...');
+  updateSetupAvailabilityStatus(`Reprobing provider availability for ${providerName} · ${instance.id}...`);
+
+  try {
+    const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
+    const response = await fetchFn('/diagnostics/providers/reprobe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        provider: providerName,
+        backend: instance.backend,
+        instance: instance.id,
+      }),
+    });
+    if (!response.ok) {
+      let detail = '';
+      try {
+        const payload = await response.json();
+        detail = typeof payload?.error === 'string' ? payload.error : JSON.stringify(payload);
+      } catch {
+        detail = await response.text().catch(() => '');
+      }
+      throw new Error(detail || `HTTP ${response.status}`);
+    }
+    const payload = await response.json();
+    const diagnostics = Array.isArray(payload?.providers) ? (payload.providers[0] || null) : null;
+    storeConfiguredProviderDiagnostics(providerName, instance, diagnostics);
+    await refreshSetupCapabilityPreview();
+    updateSetupAvailabilityStatus(buildProviderAvailabilitySummary(diagnostics, null));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    updateSetupAvailabilityStatus(`Availability reprobe failed: ${message}`);
+    setSetupCapabilityStatus('Attention', 'status-badge-degraded');
+  } finally {
+    setSetupAvailabilityRefreshButtonState(false, SETUP_AVAILABILITY_REFRESH_DEFAULT_LABEL);
+  }
+}
+
 async function loadConfiguredTargetCapabilities() {
   if (!validateApiKeyInput(document.getElementById('apiKeyInput').value)) return false;
 
@@ -1920,7 +2035,9 @@ async function loadConfiguredTargetCapabilities() {
   document.getElementById('setupCapabilityTags').innerHTML = '';
   document.getElementById('setupCapabilityCatalog').innerHTML = '';
   updateSetupCatalogStatus('Loading runtime-owned model metadata...');
+  updateSetupAvailabilityStatus('Loading provider availability truth...');
   setSetupCatalogRefreshButtonState(true, SETUP_CATALOG_REFRESH_DEFAULT_LABEL);
+  setSetupAvailabilityRefreshButtonState(true, SETUP_AVAILABILITY_REFRESH_DEFAULT_LABEL);
 
   try {
     const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
@@ -1957,6 +2074,11 @@ async function loadConfiguredTargetCapabilities() {
       authBlocked
         ? 'Provide the runtime bearer token to inspect runtime-owned model metadata.'
         : `Failed to load runtime-owned model metadata: ${message}`,
+    );
+    updateSetupAvailabilityStatus(
+      authBlocked
+        ? 'Provide the runtime bearer token to inspect provider availability truth.'
+        : `Failed to load provider availability truth: ${message}`,
     );
     providerSelect.innerHTML = `<option value="">${authBlocked ? 'Auth required' : 'Unavailable'}</option>`;
     providerSelect.disabled = true;

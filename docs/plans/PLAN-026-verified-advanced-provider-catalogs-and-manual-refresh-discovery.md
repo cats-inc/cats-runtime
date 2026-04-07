@@ -188,6 +188,7 @@ audits.
 | 2026-04-07 | Phase 1 / 5 follow-through landed: verified advanced targets now resolve through a runtime-owned manifest registry with additive provenance metadata on public advanced catalogs, and the first curated manifests/evidence refs are now recorded in `docs/research/2026-04-07-advanced-provider-manifest-baseline.md`. |
 | 2026-04-07 | Phase 3 setup-surface follow-through landed: `provider-setup` now exposes per-target model-catalog freshness on the runtime-target inspection view, including stale/persisted/backoff hints, metering-derived cooldown warnings, bounded catalog-warning surfacing, and an explicit per-target `refresh=1` button that updates runtime-owned catalog truth without moving that workflow back into the dashboard read path. |
 | 2026-04-07 | Follow-on setup truthfulness slice landed: the same runtime-target inspection view now also reuses `GET /diagnostics/providers` for filtered provider availability truth (`ok` / `degraded` / `unavailable` plus attention codes), so setup/repair surfaces no longer rely on model-catalog metadata alone when deciding how healthy a target currently is. |
+| 2026-04-07 | Follow-on setup operator slice landed: `provider-setup` now also exposes a per-target `POST /diagnostics/providers/reprobe` action through the runtime-target inspection view, so operators can refresh availability truth for one selected target without leaving the setup surface or overloading ordinary dashboard reads. |
 
 ---
 
