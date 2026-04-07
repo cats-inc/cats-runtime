@@ -3323,9 +3323,16 @@ surfaces:
   not complete the scan at all
 
 `GET /providers/config` returns the configured provider topology for dashboards
-or other clients that need to offer provider-instance selection. Each instance
+or other clients that need to inspect provider-instance shape. Each instance
 entry includes its backend kind (`cli`, `api`, `local`, or `agent`) plus any
 transport or runtime metadata that applies to that backend.
+
+This route is topology truth, not live usability truth. A configured instance
+may still be unavailable because its CLI is missing, auth is broken, the target
+is cooling down, or probe/compatibility checks are degraded. Hosts that need
+"only truly usable choices right now" should treat `/providers/config` as input
+to target resolution and pair it with `GET /diagnostics/providers` availability
+state before rendering execution selectors.
 
 The same response now also includes additive top-level `executionStrategies`
 metadata. This reuses the runtime-owned strategy catalog already exposed by
@@ -3434,10 +3441,13 @@ metadata:
 This `modelCatalog` summary is intentionally bounded and does not force a new
 live discovery round just because a caller asked for `/providers/config`. The
 runtime reuses an already cached dynamic catalog when one exists, otherwise it
-falls back to best-known config/static truth. Use `GET /providers/models`,
-`GET /providers/{provider}/models`, or `GET /providers/{provider}/models/advanced`
-when the caller explicitly wants the full catalog payload and optional refresh
-semantics.
+falls back to best-known config/static truth. That makes it suitable for
+topology inspection, but not as a standalone proof that the target is currently
+healthy. Use `GET /providers/models`, `GET /providers/{provider}/models`, or
+`GET /providers/{provider}/models/advanced` when the caller explicitly wants
+the full catalog payload and optional refresh semantics, and pair those reads
+with provider availability truth when a selector must stay limited to usable
+targets.
 For CLI providers such as Cursor that still do not expose a stable
 runtime-trustworthy model-listing seam, the same `warnings` array now carries a
 bounded additive explanation that the runtime is intentionally staying on the
@@ -3778,10 +3788,10 @@ and intentionally avoids forcing a slow live-discovery fan-out across every
 configured provider. Use `GET /providers/{provider}/models` when you need
 per-provider live discovery or explicit refresh behavior.
 
-`GET /providers/{provider}/models` is the runtime-owned per-provider model
-catalog route. It accepts optional `?instance=<instance-id>` plus additive
-`?refresh=1|true` cache-bypass semantics for manual re-read after model or
-auth changes, and returns a structured catalog:
+`GET /providers/{provider}/models` is the runtime-owned per-provider
+best-known model catalog route. It accepts optional `?instance=<instance-id>`
+plus additive `?refresh=1|true` cache-bypass semantics for manual re-read
+after model or auth changes, and returns a structured catalog:
 
 ```json
 {
@@ -3806,6 +3816,13 @@ auth changes, and returns a structured catalog:
   "warnings": []
 }
 ```
+
+This route answers "what model metadata does the runtime currently know for the
+resolved target?" It does not, by itself, answer "is this target definitely
+usable right now?" A target can return a valid catalog and still be degraded or
+unavailable. Hosts that want truthful execution selectors should first filter
+to usable targets with provider availability truth and only then fetch model
+catalogs for those targets.
 
 Catalog semantics:
 
@@ -3847,10 +3864,21 @@ Catalog semantics:
   `configured` when the runtime injected the configured default into the result
   because discovery did not report it.
 
+Catalog provenance and target usability are intentionally separate. `source`,
+`cache`, and `models[].status` describe what the runtime knows about model
+metadata, not whether the provider target should be shown as selectable on
+their own.
+
 `GET /providers/{provider}/models/advanced` accepts the same additive
 `?instance=<instance-id>&refresh=1` query semantics and reuses the same
 underlying catalog refresh behavior before layering advanced selection/control
 metadata on top.
+
+The same usability warning applies to the advanced route: advanced entries,
+presets, and controls are runtime-owned model metadata, not a guarantee that
+the underlying target is currently healthy. Selector UIs that must only show
+truly usable choices should combine advanced catalog reads with provider
+availability truth instead of treating advanced metadata as a liveness check.
 
 Error semantics:
 

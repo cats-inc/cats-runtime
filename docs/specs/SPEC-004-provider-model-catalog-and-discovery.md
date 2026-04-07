@@ -11,7 +11,7 @@
 ## Summary
 
 `cats-runtime` should expose a runtime-owned provider model catalog so product
-surfaces such as `cats` can render provider/model selection from runtime-fed
+surfaces such as `cats` can render provider/model metadata from runtime-fed
 data instead of renderer-maintained hardcoded lists.
 
 The first slice should introduce a generic, provider-instance-aware model
@@ -19,9 +19,14 @@ catalog endpoint with lazy discovery, TTL caching, and explicit fallback rules.
 It should reuse runtime configuration and backend knowledge instead of creating
 another discovery layer in `cats`.
 
+This catalog is runtime-owned metadata truth. It is not the only truth needed
+for execution selectors that must show only currently usable targets. Those
+selectors still need provider availability truth alongside the catalog.
+
 ## Goals
 
-- Make `cats-runtime` the authoritative owner of provider model availability
+- Make `cats-runtime` the authoritative owner of provider model metadata and
+  provenance
 - Replace renderer-owned hardcoded model catalogs with runtime-fed data
 - Support dynamic discovery where a backend or provider can expose it safely
 - Preserve useful static or config-derived fallback where dynamic discovery is
@@ -49,6 +54,9 @@ another discovery layer in `cats`.
   new provider-specific route every time model discovery is needed.
 - As a UI developer, I want the response to tell me which model is configured by
   default and whether the list came from dynamic discovery or fallback data.
+- As a selector implementer, I want the runtime docs to make it explicit that a
+  model catalog response is not, on its own, proof that the target is currently
+  healthy or usable.
 
 ## Requirements
 
@@ -74,21 +82,28 @@ another discovery layer in `cats`.
 9. When dynamic discovery fails, the runtime shall fall back to config-derived
    or static data when such fallback exists, and may include warnings in the
    response.
-10. Unknown providers or invalid instance ids shall return a client error rather
+10. The route's `source`, `cache`, and `models[].status` fields shall describe
+    model-catalog provenance and runtime-known model state, not standalone
+    target-health truth.
+11. Product consumers that must show only currently usable execution choices
+    shall combine this catalog route with runtime availability read models such
+    as provider diagnostics, rather than treating the catalog alone as
+    sufficient proof of usability.
+12. Unknown providers or invalid instance ids shall return a client error rather
     than an empty success response.
-11. The first implementation slice shall support:
+13. The first implementation slice shall support:
     - dynamic discovery for `ollama`
     - dynamic discovery for `agent_sdk_bridge` targets where the adapter already
       exposes `listModels()`
     - static compatibility for the current `kiro` model table
     - config or static fallback for the remaining configured providers
-12. The runtime may keep provider-specific compatibility routes such as
+14. The runtime may keep provider-specific compatibility routes such as
     `GET /kiro/models`, but new consumers shall target the generic route.
-13. The first slice shall not require an aggregate `GET /providers/models`
+15. The first slice shall not require an aggregate `GET /providers/models`
     endpoint.
-14. The first slice shall not require an explicit refresh route. Manual refresh
+16. The first slice shall not require an explicit refresh route. Manual refresh
     may be added later as an additive endpoint.
-15. `cats` shall be able to consume the catalog through its server-side
+17. `cats` shall be able to consume the catalog through its server-side
     runtime client and expose it to the renderer through product APIs.
 
 ### Non-Functional Requirements
@@ -98,6 +113,8 @@ another discovery layer in `cats`.
   unbounded probe path
 - **Boundary ownership**: backend, auth, transport, and runtime-specific model
   discovery logic shall stay inside `cats-runtime`
+- **Truthful semantics**: catalog provenance and target usability must remain
+  separate concepts in documentation and downstream consumption
 - **Extensibility**: new providers should plug in through discovery strategies
   or fallback sources without changing the public response contract
 - **Compatibility**: the feature shall not break `GET /providers/config` or
@@ -143,6 +160,10 @@ Notes:
   did not explicitly mark it as default.
 - `warnings` is additive and optional, useful when dynamic discovery failed and
   fallback was used.
+- This route intentionally does not claim that the resolved target is healthy.
+  Consumers that need "show only usable choices" must pair it with provider
+  availability truth from runtime diagnostics or an equivalent selector read
+  model.
 
 ### Internal Service Shape
 
@@ -219,6 +240,11 @@ Recommended consumption path:
 1. `cats` server calls `cats-runtime`
 2. `cats` product API returns the resolved model catalog to the renderer
 3. the renderer uses runtime-fed model options for dropdowns
+
+For truthful execution selectors, the product should first determine which
+targets are currently usable and only then fetch model catalogs for those
+targets. Product layers should not compensate for an unavailable target by
+inventing a static fallback dropdown from outside the runtime.
 
 This keeps the direct product API boundary intact and avoids requiring the
 renderer to know runtime auth/base-url details.
