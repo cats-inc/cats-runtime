@@ -3901,6 +3901,34 @@ providers:
     });
   });
 
+  it('GET /providers/gemini/models preserves the curated Gemini CLI order', async () => {
+    await withRuntime({}, {}, async (runtime) => {
+      const response = await runtime.app.request('/providers/gemini/models');
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        provider: 'gemini',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gemini-3.1-pro-preview',
+        source: 'static',
+        cache: null,
+        models: [
+          { id: 'gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview', default: true },
+          { id: 'gemini-3-flash-preview', label: 'gemini-3-flash-preview', default: false },
+          {
+            id: 'gemini-3.1-flash-lite-preview',
+            label: 'gemini-3.1-flash-lite-preview',
+            default: false,
+          },
+          { id: 'gemini-2.5-pro', label: 'gemini-2.5-pro', default: false },
+          { id: 'gemini-2.5-flash', label: 'gemini-2.5-flash', default: false },
+          { id: 'gemini-2.5-flash-lite', label: 'gemini-2.5-flash-lite', default: false },
+        ],
+        warnings: [],
+      });
+    });
+  });
+
   it('GET /providers/junie/models returns curated aliases with an honesty warning', async () => {
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/providers/junie/models');
