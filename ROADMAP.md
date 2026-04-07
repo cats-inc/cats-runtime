@@ -1253,6 +1253,7 @@ always-on self-adapting parser system.
 - the first rollout covers:
   - `codex`
   - `copilot`
+  - `cursor`
   - `pi`
   - `goose`
   - `gemini`

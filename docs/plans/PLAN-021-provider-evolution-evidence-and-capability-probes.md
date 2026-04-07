@@ -223,6 +223,7 @@ expansion without blocking the first CLI-focused slice.
 | 2026-04-07 | Junie now joins the manual CLI probe entrypoint as the next bounded JSON-output provider-evolution target, so retained artifacts can capture its final text/result seam without waiting for broader later-provider rollout. |
 | 2026-04-07 | Auggie now also joins the manual CLI probe entrypoint with provider-evolution instrumentation over its JSON print/result seam plus retained final-result normalization, so manual probes can compare its bounded text/result output without changing normal runtime execution. |
 | 2026-04-07 | Kilo and OpenCode now also join the manual CLI probe entrypoint as native-session-service provider-evolution targets, with runtime-owned probe-session create/delete handling plus normalized tool/text/result evidence capture over their shared prompt response seam. |
+| 2026-04-07 | Cursor now also joins the manual CLI probe entrypoint as the next stream-json provider-evolution target, with parser-level ignored/unknown/raw-passthrough/normalized coverage over its session bootstrap, reasoning, assistant tool, and final-result seams. |
 
 ---
 

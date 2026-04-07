@@ -15,6 +15,13 @@ import type {
   ToolResultStreamEvent,
   ToolUseStreamEvent,
 } from '../../../core/types.js';
+import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
+import {
+  observeIgnored,
+  observeNormalized,
+  observeRawPassthrough,
+  observeUnknown,
+} from '../../../core/compatibility/providerEvolution.js';
 import { createRuntimeProgressEvent } from '../../../core/progress.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 
@@ -55,6 +62,10 @@ export class CursorProvider implements Provider {
 
   private pendingPrompt: string | null = null;
   private sawAssistantChunk = false;
+
+  constructor(
+    private readonly evolutionObserver?: ProviderEvolutionEvidenceObserver,
+  ) {}
 
   prepareEphemeralTurn(turn: TurnInput): void {
     this.pendingPrompt = compileRuntimeTurnPrompt(turn.message, turn);
@@ -123,22 +134,37 @@ export class CursorProvider implements Provider {
     try {
       event = JSON.parse(trimmed) as CursorStreamEvent;
     } catch {
-      return { type: 'raw', text: trimmed } satisfies RawStreamEvent;
+      return observeRawPassthrough(this.evolutionObserver, {
+        rawEventType: 'non_json_line',
+        reason: 'stdout_passthrough',
+        rawSample: trimmed,
+      }, { type: 'raw', text: trimmed } satisfies RawStreamEvent);
     }
 
     if (event.type === 'system' && event.subtype === 'init') {
-      return {
+      return observeIgnored(this.evolutionObserver, {
+        rawEventType: 'system:init',
+        reason: 'session_bootstrap',
+        rawSample: event,
+      }, {
         type: 'init',
         sessionId: event.session_id,
-      } satisfies InitStreamEvent;
+      } satisfies InitStreamEvent);
     }
 
     if (event.type === 'user') {
-      return null;
+      return observeIgnored(this.evolutionObserver, {
+        rawEventType: 'user',
+        reason: 'user_echo',
+        rawSample: event,
+      }, null);
     }
 
     if (event.type === 'thinking') {
-      return createRuntimeProgressEvent({
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: 'thinking',
+        rawSample: event,
+      }, createRuntimeProgressEvent({
         text: event.text?.trim() || 'Cursor updated reasoning.',
         provider: 'cursor',
         backend: 'cli',
@@ -149,41 +175,69 @@ export class CursorProvider implements Provider {
           sourceEvent: 'thinking',
           ...(typeof event.timestamp_ms === 'number' ? { timestampMs: event.timestamp_ms } : {}),
         },
-      });
+      }));
     }
 
     if (event.type === 'assistant') {
       const assistantEvents = extractCursorAssistantEvents(event.message?.content);
-      if (assistantEvents.length === 0) return null;
+      if (assistantEvents.length === 0) {
+        return observeIgnored(this.evolutionObserver, {
+          rawEventType: 'assistant',
+          reason: 'empty_assistant_content',
+          rawSample: event,
+        }, null);
+      }
 
       if (event.timestamp_ms) {
         this.sawAssistantChunk = true;
-        return assistantEvents.length === 1 ? assistantEvents[0]! : assistantEvents;
+        const parsed = assistantEvents.length === 1 ? assistantEvents[0]! : assistantEvents;
+        return observeNormalized(this.evolutionObserver, {
+          rawEventType: 'assistant',
+          rawSample: event,
+        }, parsed);
       }
 
       if (this.sawAssistantChunk) {
         const nonTextEvents = assistantEvents.filter((item) => item.type !== 'text');
         if (nonTextEvents.length === 0) {
-          return null;
+          return observeIgnored(this.evolutionObserver, {
+            rawEventType: 'assistant',
+            reason: 'duplicate_final_text',
+            rawSample: event,
+          }, null);
         }
-        return nonTextEvents.length === 1 ? nonTextEvents[0]! : nonTextEvents;
+        const parsed = nonTextEvents.length === 1 ? nonTextEvents[0]! : nonTextEvents;
+        return observeNormalized(this.evolutionObserver, {
+          rawEventType: 'assistant',
+          rawSample: event,
+        }, parsed);
       }
 
-      return assistantEvents.length === 1 ? assistantEvents[0]! : assistantEvents;
+      const parsed = assistantEvents.length === 1 ? assistantEvents[0]! : assistantEvents;
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: 'assistant',
+        rawSample: event,
+      }, parsed);
     }
 
     if (event.type === 'result') {
-      return {
+      return observeNormalized(this.evolutionObserver, {
+        rawEventType: 'result',
+        rawSample: event,
+      }, {
         type: 'result',
         sessionId: event.session_id,
         usage: event.usage ? {
           inputTokens: event.usage.inputTokens ?? 0,
           outputTokens: event.usage.outputTokens ?? 0,
         } : undefined,
-      } satisfies ResultStreamEvent;
+      } satisfies ResultStreamEvent);
     }
 
-    return null;
+    return observeUnknown(this.evolutionObserver, {
+      rawEventType: event.type || 'unknown_json',
+      rawSample: event,
+    }, null);
   }
 }
 

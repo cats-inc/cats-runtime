@@ -5,6 +5,7 @@ import { AuggieProvider } from './auggie.js';
 import { ClaudeProvider } from './claude.js';
 import { CodexProvider } from './codex.js';
 import { CopilotProvider } from './copilot.js';
+import { CursorProvider } from './cursor.js';
 import { GeminiProvider } from './gemini.js';
 import { GooseProvider } from './goose.js';
 import { JunieProvider } from './junie.js';
@@ -231,6 +232,42 @@ describe('provider evolution instrumentation', () => {
     expect(bundle.summary.normalizedCount).toBe(1);
     expect(bundle.summary.normalizedEventTypes.progress).toBe(1);
     expect(bundle.summary.normalizedEventTypes.tool_result).toBe(1);
+  });
+
+  it('records ignored, normalized, and unknown Cursor event paths', () => {
+    const collector = new ProviderEvolutionEvidenceCollector({
+      provider: 'cursor',
+      instance: 'default',
+      parserId: 'cursor-stream-json',
+      probeProfile: 'manual-smoke',
+      transport: 'cli',
+    });
+    const provider = new CursorProvider(collector);
+
+    expect(provider.parseStreamLine(JSON.stringify({
+      type: 'user',
+      text: 'hello',
+    }))).toBeNull();
+    expect(provider.parseStreamLine(JSON.stringify({
+      type: 'thinking',
+      text: 'Inspecting the repository.',
+    }))).toEqual(expect.objectContaining({
+      type: 'progress',
+    }));
+    expect(provider.parseStreamLine('Cursor banner...')).toEqual({
+      type: 'raw',
+      text: 'Cursor banner...',
+    });
+    expect(provider.parseStreamLine(JSON.stringify({
+      type: 'future.event',
+      payload: { ok: true },
+    }))).toBeNull();
+
+    const bundle = collector.finalize();
+    expect(bundle.summary.ignoredEventTypes.user).toBe(1);
+    expect(bundle.summary.normalizedEventTypes.progress).toBe(1);
+    expect(bundle.summary.rawPassthroughEventTypes.non_json_line).toBe(1);
+    expect(bundle.summary.unknownEventTypes['future.event']).toBe(1);
   });
 
   it('records ignored user echoes and unknown Gemini event types', () => {
