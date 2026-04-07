@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
@@ -60,6 +60,11 @@ runtime, but it will harden the contract with the following rules:
 8. The runtime team owns provider capability verification. Users shall not be
    expected to manually compare every provider and tell the runtime which
    advanced controls are real.
+
+The first hardening slices are now in-repo on the shared provider-model and
+advanced-catalog routes. Remaining manifest/provenance and restart-stable
+snapshot follow-through stays tracked under [SPEC-023](../specs/SPEC-023-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md)
+and [PLAN-026](../plans/PLAN-026-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md).
 
 ## Consequences
 
@@ -125,5 +130,6 @@ runtime, but it will harden the contract with the following rules:
 
 ---
 
-*Decision made: 2026-03-30*
-*Decision makers: Codex + user direction*
+*Proposed: 2026-03-30*
+*Accepted: 2026-04-07*
+*Decision makers: user + Codex*

@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | In Progress (Safety, Cache-First Reads, and Entry-Scoped Controls Landed) |
 | **Owner** | Codex |
 | **Reviewer** | User |
 
@@ -24,6 +24,33 @@ This spec hardens the contract in two directions:
 
 The goal is not to remove runtime ownership. The goal is to keep that ownership
 honest and operationally safe.
+
+## Current Implementation Status
+
+`cats-runtime` already ships the first hardening slices behind the existing
+catalog routes:
+
+- ordinary reads now stay non-probing by using immediate catalog reads, while
+  explicit `refresh=1|true|refresh|force` remains the live-discovery trigger on
+  `GET /providers/{provider}/models` and
+  `GET /providers/{provider}/models/advanced`
+- unverified targets now keep their entry lists while omitting public
+  `presets`, public `controls`, and `defaultSelection`
+- curated verified targets now ship runtime-owned controls/defaults only where
+  the runtime has target-specific knowledge, instead of pretending universal
+  parity across every provider/backend family
+- selection resolution and dashboard helpers now enforce entry-scoped control
+  applicability through `applicableEntryIds` on controls and control options
+- refresh failures can now reuse stale in-memory dynamic catalogs with additive
+  `cache.stale: true` metadata instead of dropping immediately to config/static
+  fallback
+
+The following requirements remain open:
+
+- persisted restart-stable discovery snapshots
+- cooldown/backoff state for repeated refresh failures
+- an evidence-backed manifest/provenance layer for verified advanced metadata
+- fuller setup/diagnostics ownership of refresh UX and warning presentation
 
 ## Goals
 

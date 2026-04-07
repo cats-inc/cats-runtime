@@ -26,7 +26,7 @@ model and need their own architectural home.
 - MCP tools (8 new tools)
 - Local tools (8 new tools)
 - Diagnostics at `GET /management/diagnostics`
-- Config at `config/management.yaml`
+- Config at `~/.cats/runtime/config/management.yaml`
 - Long-running operation model for `wait_review_checks`
 
 ## Implementation Status
@@ -45,13 +45,13 @@ model and need their own architectural home.
 - [x] App wiring
 - [x] MCP tools (8 tools)
 - [x] Local tools (8 tools)
-- [x] Tests: all passing (890 tests, 92 files)
+- [x] Tests: management-adapter unit and route coverage landed in-repo
 - [x] Docs: architecture, api, SPEC-019, ADR-023, terminology
 
 ## Design Decisions Made
 
 - HTTP namespace: `/management/{domain}/{action}` (dedicated, not `/delivery/`)
-- Config: `config/management.yaml` (separate from `providers.yaml`)
+- Config: `~/.cats/runtime/config/management.yaml` (separate from `providers.yaml`)
 - Diagnostics: `GET /management/diagnostics` (separate from provider diagnostics)
 - `wait_review_checks`: bounded long-poll + resumable operation ID
 - Authorization: `actorClass` + `approvalRef` (product-neutral)

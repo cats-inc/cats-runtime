@@ -8,7 +8,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | In Progress (Safety, Cache-First Reads, and Entry-Scoped Controls Landed) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User |
@@ -39,18 +39,28 @@ immediate goal is to stop lying and stop probing too eagerly:
 - live discovery must move behind explicit refresh
 - provider truth must be curated by runtime-owned manifests and tests
 
+Current audit result:
+
+- conservative public advanced catalogs for unverified targets are landed
+- ordinary route reads are non-probing, with explicit refresh reserved for
+  `refresh=1|true|refresh|force`
+- entry-scoped control applicability/default handling is landed on curated
+  verified targets and enforced in resolution/UI helpers
+- restart-stable snapshots, cooldown/backoff, and evidence-backed manifest
+  onboarding remain open
+
 ## Implementation Phases
 
 ### Phase 1: Safety Slice and Contract Tightening
 
 - [ ] Add a runtime-owned advanced metadata registry/manifest seam separate from
       raw entry discovery.
-- [ ] Change advanced-catalog builders so unverified targets emit conservative
+- [x] Change advanced-catalog builders so unverified targets emit conservative
       entry-only catalogs with empty `presets`, empty `controls`, and
       `defaultSelection: null`.
-- [ ] Remove current heuristic-only public presets/controls/support claims from
+- [x] Remove current heuristic-only public presets/controls/support claims from
       unverified providers, especially CLI targets.
-- [ ] Add regression coverage proving unverified providers no longer leak
+- [x] Add regression coverage proving unverified providers no longer leak
       guessed presets or controls.
 
 **Deliverables**: public advanced catalogs become conservative by default even
@@ -58,16 +68,18 @@ before refresh-policy changes land.
 
 ### Phase 2: Discovery Read/Refresh Split
 
-- [ ] Refactor provider catalog service so ordinary route reads are
-      non-probing and use:
-      memory cache -> persisted snapshot -> config -> static fallback.
-- [ ] Preserve explicit live refresh through `refresh=1` or equivalent setup
+- [x] Refactor provider catalog service so ordinary route reads are
+      non-probing and use in-memory cache before falling back to config/static
+      truth.
+- [ ] Extend that fallback ordering with persisted restart-stable snapshots
+      between memory cache and config fallback.
+- [x] Preserve explicit live refresh through `refresh=1` or equivalent setup
       and diagnostics actions.
 - [ ] Persist successful discovery snapshots with timestamps and source
       metadata.
 - [ ] Add cooldown/backoff state for rate limits, auth failures, timeouts, and
       repeated probe failures.
-- [ ] Expose additive freshness/warning metadata so callers know when cached or
+- [x] Expose additive freshness/warning metadata so callers know when cached or
       stale data is being served.
 
 **Deliverables**: live vendor probes only happen on explicit refresh, not on
@@ -75,11 +87,11 @@ routine reads.
 
 ### Phase 3: UI Surface Ownership Cleanup
 
-- [ ] Update dashboard `Create New Session` and related session-management flows
+- [x] Update dashboard `Create New Session` and related session-management flows
       to consume cached/config/static catalogs only.
 - [ ] Move explicit refresh affordances and capability-inspection UX to setup
       and diagnostics surfaces.
-- [ ] Ensure the dashboard can still create sessions from conservative
+- [x] Ensure the dashboard can still create sessions from conservative
       entry-only catalogs without trying to infer missing advanced controls.
 - [ ] Show refresh freshness and stale/cooldown warnings on setup surfaces
       instead of hiding probe state.
@@ -89,13 +101,13 @@ setup becomes the honest inspection/refresh surface.
 
 ### Phase 4: Schema Expressiveness for Verified Providers
 
-- [ ] Extend advanced control schema to support per-entry allowed values and
+- [x] Extend advanced control schema to support per-entry allowed values and
       defaults.
-- [ ] Update selection resolution logic to enforce entry-specific control
+- [x] Update selection resolution logic to enforce entry-specific control
       constraints.
-- [ ] Update UI helpers/renderers to read entry-scoped control constraints
+- [x] Update UI helpers/renderers to read entry-scoped control constraints
       instead of assuming one global `values` list.
-- [ ] Add route and resolver tests for providers whose control values differ by
+- [x] Add route and resolver tests for providers whose control values differ by
       entry.
 
 **Deliverables**: verified providers can express cases like "model A supports
@@ -168,6 +180,7 @@ audits.
 | Date | Update |
 |------|--------|
 | 2026-03-30 | Plan created after runtime advanced-catalog truthfulness and discovery-trigger review |
+| 2026-04-07 | Audit update: status corrected to `In Progress`. Landed slices now include conservative advanced catalogs for unverified targets, non-probing ordinary reads plus explicit `refresh=1`, stale in-memory cache reuse with `cache.stale`, and entry-scoped control applicability/default handling on curated verified targets. Persisted snapshots, cooldown/backoff, setup-owned refresh UX, and evidence-backed manifest onboarding remain open. |
 
 ---
 

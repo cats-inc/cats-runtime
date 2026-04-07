@@ -270,8 +270,9 @@ Exact field names may evolve. The architectural point is:
 - [x] **HTTP namespace**: Dedicated `/management/{domain}/{action}` namespace.
       Rationale: management adapters are architecturally distinct from delivery
       primitives; mixing under `/delivery/` would blur the boundary.
-- [x] **Config**: `config/management.yaml` as a dedicated file, separate from
-      `providers.yaml`.
+- [x] **Config**: `~/.cats/runtime/config/management.yaml` (or
+      `CATS_RUNTIME_DIR/config/management.yaml`) as a dedicated runtime-managed
+      file, separate from `providers.yaml`.
 - [x] **Diagnostics**: Separate `GET /management/diagnostics` endpoint, not
       mixed into `GET /diagnostics/providers`.
 - [x] **`wait_review_checks`**: Both. Bounded long-poll with configurable

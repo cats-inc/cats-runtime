@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
@@ -142,6 +142,6 @@ This decision includes:
 
 ---
 
-*Decision made: 2026-03-19*
-*Decision makers: Proposed by Codex from user direction*
-
+*Proposed: 2026-03-19*
+*Accepted: 2026-04-07*
+*Decision makers: user + Codex*

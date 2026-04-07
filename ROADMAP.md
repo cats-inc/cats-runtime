@@ -6,6 +6,10 @@
 > scheduling plus runtime-wide wakeup diagnostics aggregates, and runtime skill
 > execution delivery as shipped baseline slices.
 >
+> Structured runtime storage under `CATS_RUNTIME_DIR` (`config/`, `data/`, and
+> `sessions/`) plus the compiled `build/runtime` output layout are also now
+> baseline contracts rather than roadmap work.
+>
 > `kilo` is also now part of the shipped CLI-provider baseline across runtime
 > config, setup/compatibility truth, native session routing, and packaged
 > `cats-platform` consumption. Future work should treat Kilo under the generic
@@ -689,13 +693,22 @@ tightening and cleanup steps are intentionally deferred.
   anchored to one provider-native contract instead of separate assumptions
 - `GET /providers/:provider/models/advanced` exists as the additive advanced
   catalog surface
+- ordinary advanced-catalog reads now stay non-probing while explicit
+  `refresh=1|true|refresh|force` remains the live discovery trigger
+- unverified targets now keep their entry lists while omitting public presets,
+  public controls, and `defaultSelection`
+- curated verified targets now expose entry-scoped control applicability/default
+  handling, and the dashboard/create-session helpers enforce those constraints
 - session create/read contracts now support additive `modelSelection` and
   `modelResolution`
 - top-level session `model` remains available as the resolved compatibility
   snapshot
 - legacy session create payloads that only send `model` remain accepted
+- stale in-memory dynamic catalogs can now be reused with additive
+  `cache.stale: true` metadata when a later refresh fails
 - backend support is staged honestly rather than pretending universal advanced
-  control parity
+  control parity, but restart-stable snapshots, cooldown/backoff, and
+  evidence-backed manifest onboarding remain deferred
 
 #### Deferred Cleanup Scope
 
@@ -1481,7 +1494,8 @@ proxy slice is still intentionally minimal:
 `cats-runtime` now has the core executable packaging contract in-repo:
 
 - `cats-runtime` and `cats-runtime-mcp` both ship through npm `bin` entries
-- `npm run build` is now a clean build that clears stale `dist/` artifacts
+- `npm run build` is now a clean build that clears stale `build/runtime`
+  artifacts
 - `prepack`, `release:check`, curated `files`, and package-contract coverage all
   exist
 - Linux/macOS/Windows helper scripts now support local pack/install smoke tests
@@ -1500,7 +1514,7 @@ remaining work is follow-through and publication discipline:
   `cats-runtime-mcp`, curated `files`, `prepack`, `release:check`, `build:ui`,
   and clean-build packaging hooks
 - `tests/package-contract.test.ts` now verifies curated publish contents and
-  protects against stale `dist/` artifacts leaking into the tarball
+  protects against stale `build/runtime` artifacts leaking into the tarball
 - the same package-contract suite now also installs the locally packed tarball
   into a temporary consumer workspace and smokes the packaged
   `build/runtime/index.js --help` plus
@@ -1624,4 +1638,4 @@ to make partial cleanup outcomes explicit for hosts.
 - `public/index.html`
 
 ---
-*Last updated: 2026-04-03*
+*Last updated: 2026-04-07*

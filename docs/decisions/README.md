@@ -39,8 +39,8 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
 | [030-use-structured-cats-home-runtime-storage](./030-use-structured-cats-home-runtime-storage.md) | Use structured `~/.cats` runtime storage with a config subtree | Accepted | 2026-04-05 |
-| [029-keep-advanced-provider-catalogs-verified-and-manual-refresh](./029-keep-advanced-provider-catalogs-verified-and-manual-refresh.md) | Keep advanced provider catalogs verified and manual-refresh | Proposed | 2026-03-30 |
-| [028-proxy-stdio-mcp-to-the-primary-runtime-http-surface](./028-proxy-stdio-mcp-to-the-primary-runtime-http-surface.md) | Proxy stdio MCP to the primary runtime HTTP surface | Proposed | 2026-03-29 |
+| [029-keep-advanced-provider-catalogs-verified-and-manual-refresh](./029-keep-advanced-provider-catalogs-verified-and-manual-refresh.md) | Keep advanced provider catalogs verified and manual-refresh | Accepted | 2026-03-30 |
+| [028-proxy-stdio-mcp-to-the-primary-runtime-http-surface](./028-proxy-stdio-mcp-to-the-primary-runtime-http-surface.md) | Proxy stdio MCP to the primary runtime HTTP surface | Accepted | 2026-03-29 |
 | [027-adopt-a-playground-derived-dark-runtime-ui-shell-with-sidebar-surface-switching](./027-adopt-a-playground-derived-dark-runtime-ui-shell-with-sidebar-surface-switching.md) | Adopt a playground-derived dark runtime UI shell with sidebar surface switching | Accepted | 2026-03-29 |
 | [026-model-a2a-as-an-agent-backend-adapter](./026-model-a2a-as-an-agent-backend-adapter.md) | Model A2A as an agent backend adapter | Proposed | 2026-03-27 |
 | [025-keep-provider-evolution-detection-manual-first-and-evidence-driven](./025-keep-provider-evolution-detection-manual-first-and-evidence-driven.md) | Keep provider evolution detection manual-first and evidence-driven | Accepted | 2026-03-27 |
@@ -60,8 +60,7 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 | [011-runtime-owned-browser-and-preview-subsystem-with-pluggable-drivers](./011-runtime-owned-browser-and-preview-subsystem-with-pluggable-drivers.md) | Add a runtime-owned browser and preview subsystem with pluggable drivers | Accepted | 2026-03-19 |
 | [010-separate-a2a-protocol-project-memory-and-skill-packages](./010-separate-a2a-protocol-project-memory-and-skill-packages.md) | Separate A2A protocol artifacts, project memory, and skill packages | Accepted | 2026-03-19 |
 | [008-runtime-owned-provider-model-catalog](./008-runtime-owned-provider-model-catalog.md) | Keep provider model catalog discovery runtime-owned | Accepted | 2026-03-19 |
-| [007-docker-runtime-adapter](./007-docker-runtime-adapter.md) | Docker runtime adapter | Accepted | 2026-03-17 |
-| [009-keep-cats-runtime-separately-packageable-with-app-managed-local-startup](./009-keep-cats-runtime-separately-packageable-with-app-managed-local-startup.md) | Keep `cats-runtime` separately packageable with app-managed local startup | Proposed | 2026-03-19 |
+| [009-keep-cats-runtime-separately-packageable-with-app-managed-local-startup](./009-keep-cats-runtime-separately-packageable-with-app-managed-local-startup.md) | Keep `cats-runtime` separately packageable with app-managed local startup | Accepted | 2026-03-19 |
 | [007-docker-runtime-adapter](./007-docker-runtime-adapter.md) | Docker runtime adapter | Accepted | 2026-03-17 |
 | [006-agent-backend-and-shared-runtime-contracts](./006-agent-backend-and-shared-runtime-contracts.md) | Introduce an agent backend and shared runtime contracts | Accepted | 2026-03-17 |
 | [005-backend-neutral-runtime-and-api-backend](./005-backend-neutral-runtime-and-api-backend.md) | Introduce a backend-neutral runtime facade for CLI and API backends | Accepted | 2026-03-16 |
@@ -80,6 +79,6 @@ Use [000-template.md](./000-template.md) as the starting point for new ADRs.
 
 ---
 
-*Last updated: 2026-04-05*
+*Last updated: 2026-04-07*
 
 *See also: [AGENTS.md](../../../AGENTS.md) for decision-making protocols*
