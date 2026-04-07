@@ -712,6 +712,10 @@ tightening and cleanup steps are intentionally deferred.
 - successful dynamic discovery snapshots now persist restart-stable catalog
   state under the runtime data dir, and repeated refresh failures now activate
   runtime-owned catalog backoff with additive warning/cache metadata
+- the runtime-owned setup surface now also exposes per-target model-catalog
+  freshness, stale/backoff warnings, metering-derived cooldown hints, and an
+  explicit refresh action so recovery/setup flows do not hide catalog probe
+  state behind the dashboard read path
 - backend support is staged honestly rather than pretending universal advanced
   control parity, but broader evidence-backed manifest onboarding/checklist work
   still remains deferred

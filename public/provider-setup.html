@@ -572,6 +572,26 @@
                     <p id="setupCapabilitySummary" class="setup-capability-summary">
                       Loading runtime target capabilities...
                     </p>
+                    <div class="setup-summary-panel">
+                      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="min-w-0">
+                          <span class="setup-summary-label">Model Catalog Refresh</span>
+                          <p id="setupCatalogStatus" class="setup-summary-secondary">
+                            Loading runtime-owned model metadata...
+                          </p>
+                        </div>
+                        <div class="flex justify-end">
+                          <button
+                            id="setupCatalogRefreshBtn"
+                            type="button"
+                            class="runtime-btn runtime-btn-secondary"
+                            onclick="refreshSelectedModelCatalog()"
+                          >
+                            Refresh Model Catalog
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                     <dl id="setupCapabilityGrid" class="setup-capability-grid"></dl>
                     <div id="setupCapabilityTags" class="setup-capability-tags"></div>
                     <ul id="setupCapabilityCatalog" class="setup-capability-list"></ul>
@@ -625,6 +645,7 @@ let configuredTargetsState = {
 };
 const setupToolingCache = new Map();
 const setupToolingInFlight = new Map();
+const SETUP_CATALOG_REFRESH_DEFAULT_LABEL = 'Refresh Model Catalog';
 
 function escapeHtml(s) {
   return String(s == null ? '' : s)
@@ -1043,6 +1064,7 @@ function renderSetupCapabilityEmpty(message, badgeText, badgeClass) {
   document.getElementById('setupCapabilityGrid').innerHTML = '';
   document.getElementById('setupCapabilityTags').innerHTML = '';
   document.getElementById('setupCapabilityCatalog').innerHTML = '';
+  setSetupCatalogRefreshButtonState(true, SETUP_CATALOG_REFRESH_DEFAULT_LABEL);
 }
 
 function currentSetupCapabilitySelection() {
@@ -1086,6 +1108,169 @@ function configuredTargetListDescription(instance) {
   return bits.length > 0 ? bits.join(' · ') : 'Runtime target';
 }
 
+function summarizeProviderModelCatalogResult(catalog) {
+  if (!catalog || typeof catalog !== 'object') {
+    return null;
+  }
+
+  const models = Array.isArray(catalog.models) ? catalog.models : [];
+  const statusCounts = {
+    configured: 0,
+    available: 0,
+    running: 0,
+    unknown: 0,
+  };
+  let defaultModelStatus;
+
+  models.forEach((model) => {
+    const status = typeof model?.status === 'string' ? model.status : 'unknown';
+    if (status === 'configured' || status === 'available' || status === 'running') {
+      statusCounts[status] += 1;
+    } else {
+      statusCounts.unknown += 1;
+    }
+
+    if (
+      typeof defaultModelStatus !== 'string'
+      && model?.default === true
+      && typeof model?.status === 'string'
+    ) {
+      defaultModelStatus = model.status;
+    }
+  });
+
+  return {
+    source: typeof catalog.source === 'string' ? catalog.source : 'static',
+    defaultModel: typeof catalog.defaultModel === 'string' ? catalog.defaultModel : null,
+    ...(typeof defaultModelStatus === 'string' ? { defaultModelStatus } : {}),
+    modelCount: models.length,
+    warnings: Array.isArray(catalog.warnings) ? catalog.warnings.slice() : [],
+    statusCounts,
+    ...(catalog.cache && typeof catalog.cache === 'object'
+      ? { cache: { ...catalog.cache } }
+      : {}),
+  };
+}
+
+function applyRefreshedModelCatalogSummary(providerName, instanceTarget, catalog) {
+  const provider = configuredTargetCatalog?.providers?.[providerName];
+  if (!provider || !Array.isArray(provider.instances)) {
+    return null;
+  }
+
+  const instance = provider.instances.find(
+    (entry) => configuredInstanceTargetValue(entry) === instanceTarget,
+  );
+  if (!instance) {
+    return null;
+  }
+
+  const summary = summarizeProviderModelCatalogResult(catalog);
+  if (!summary) {
+    return null;
+  }
+
+  instance.modelCatalog = summary;
+  return summary;
+}
+
+function currentModelCatalogSummary(instance) {
+  return instance?.modelCatalog && typeof instance.modelCatalog === 'object'
+    ? instance.modelCatalog
+    : null;
+}
+
+function buildModelCatalogFreshnessSummary(modelCatalog) {
+  if (!modelCatalog) {
+    return 'No runtime-owned model metadata is cached for this target yet.';
+  }
+
+  const sourceLabel = humanizeToken(modelCatalog.source || 'static');
+  const cache = modelCatalog.cache;
+  if (!cache) {
+    return `Using ${sourceLabel} model metadata. Refresh to attempt live discovery.`;
+  }
+
+  const cachedAt = cache.cachedAt ? formatTimestamp(cache.cachedAt) : 'an unknown time';
+  if (cache.stale) {
+    return `Serving stale cached ${sourceLabel} metadata from ${cachedAt}.`;
+  }
+  if (cache.servedFromCache) {
+    return `Using cached ${sourceLabel} metadata from ${cachedAt}.`;
+  }
+  return `Latest ${sourceLabel} metadata captured ${cachedAt}.`;
+}
+
+function buildModelCatalogStateLabel(modelCatalog) {
+  if (!modelCatalog) {
+    return 'Not cached';
+  }
+
+  const state = [];
+  state.push(humanizeToken(modelCatalog.source || 'static'));
+  if (modelCatalog.cache?.persisted) {
+    state.push('persisted');
+  }
+  if (modelCatalog.cache?.stale) {
+    state.push('stale');
+  } else if (modelCatalog.cache?.servedFromCache) {
+    state.push('cached');
+  }
+  if (modelCatalog.cache?.backoff?.active) {
+    state.push('refresh backoff');
+  }
+  return state.join(' · ');
+}
+
+function buildModelCatalogGuardrailSummary(instance) {
+  const metering = instance?.metering;
+  if (!metering || typeof metering !== 'object') {
+    return 'No active runtime guardrails are recorded for this target.';
+  }
+
+  if (metering.summary) {
+    return metering.summary;
+  }
+
+  return metering.status === 'degraded'
+    ? 'Runtime guardrails are currently active for this target.'
+    : 'No active runtime guardrails are recorded for this target.';
+}
+
+function updateSetupCatalogStatus(text) {
+  const node = document.getElementById('setupCatalogStatus');
+  if (node) {
+    node.textContent = text;
+  }
+}
+
+function setSetupCatalogRefreshButtonState(disabled, label) {
+  const button = document.getElementById('setupCatalogRefreshBtn');
+  if (!button) {
+    return;
+  }
+  button.disabled = !!disabled;
+  button.textContent = label || SETUP_CATALOG_REFRESH_DEFAULT_LABEL;
+}
+
+function configuredTargetStatePills(instance) {
+  const pills = [];
+  const modelCatalog = currentModelCatalogSummary(instance);
+  if (modelCatalog?.cache?.stale) {
+    pills.push('stale catalog');
+  }
+  if (modelCatalog?.cache?.backoff?.active) {
+    pills.push('refresh backoff');
+  }
+  if ((instance?.metering?.activeCooldowns || 0) > 0) {
+    pills.push('cooldown active');
+  }
+  if ((instance?.metering?.activeBlocks || 0) > 0) {
+    pills.push('blocked');
+  }
+  return pills;
+}
+
 function renderConfiguredTargetList() {
   const list = document.getElementById('setupTargetList');
   const summary = document.getElementById('setupTargetListSummary');
@@ -1121,6 +1306,7 @@ function renderConfiguredTargetList() {
         ...(!entry.instance.transport && entry.instance.runtime?.mode
           ? [`${humanizeToken(entry.instance.runtime.mode)} runtime`]
           : []),
+        ...configuredTargetStatePills(entry.instance),
     ];
 
     return `
@@ -1210,6 +1396,7 @@ function selectConfiguredTarget(providerName, instanceTarget) {
 }
 
 function setupCapabilityGridRows({ providerName, instance, agentRuntime, tooling }) {
+  const modelCatalog = currentModelCatalogSummary(instance);
   const rows = [
     ['Provider', providerName],
     ['Target', configuredInstanceTargetValue(instance)],
@@ -1229,24 +1416,73 @@ function setupCapabilityGridRows({ providerName, instance, agentRuntime, tooling
   if (tooling?.policy?.profile) {
     rows.push(['Tool Profile', tooling.policy.profile]);
   }
+  if (modelCatalog) {
+    rows.push(['Catalog', `${pluralize(modelCatalog.modelCount || 0, 'model')} · ${buildModelCatalogStateLabel(modelCatalog)}`]);
+    if (modelCatalog.defaultModel) {
+      rows.push([
+        'Default Model',
+        modelCatalog.defaultModelStatus
+          ? `${modelCatalog.defaultModel} · ${humanizeToken(modelCatalog.defaultModelStatus)}`
+          : modelCatalog.defaultModel,
+      ]);
+    }
+    if (modelCatalog.cache?.cachedAt) {
+      rows.push(['Last Refresh', formatTimestamp(modelCatalog.cache.cachedAt)]);
+    }
+  }
+  rows.push(['Guardrails', buildModelCatalogGuardrailSummary(instance)]);
 
   return rows.map(([label, value]) => (
     `<div class="setup-capability-kv"><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`
   )).join('');
 }
 
-function setupCapabilityCatalogItems(tooling) {
+function setupCapabilityCatalogItems(instance, tooling) {
+  const items = [];
+  const modelCatalog = currentModelCatalogSummary(instance);
+  if (Array.isArray(modelCatalog?.warnings)) {
+    modelCatalog.warnings.slice(0, 3).forEach((warning) => {
+      items.push(
+        `<li><strong>Catalog warning</strong><span class="setup-capability-secondary">${escapeHtml(warning)}</span></li>`,
+      );
+    });
+  }
+
+  if (modelCatalog?.cache?.backoff?.active) {
+    const until = modelCatalog.cache.backoff.nextRefreshAllowedAt
+      ? formatTimestamp(modelCatalog.cache.backoff.nextRefreshAllowedAt)
+      : 'a later retry';
+    const failures = modelCatalog.cache.backoff.consecutiveFailures || 0;
+    const reason = modelCatalog.cache.backoff.reason
+      ? ` ${modelCatalog.cache.backoff.reason}`
+      : '';
+    items.push(
+      `<li><strong>Refresh backoff active</strong><span class="setup-capability-secondary">Next refresh allowed at ${escapeHtml(until)} after ${escapeHtml(String(failures))} failure(s).${escapeHtml(reason)}</span></li>`,
+    );
+  }
+
+  if (
+    instance?.metering?.status === 'degraded'
+    || (instance?.metering?.activeCooldowns || 0) > 0
+    || (instance?.metering?.activeBlocks || 0) > 0
+  ) {
+    items.push(
+      `<li><strong>Runtime guardrails</strong><span class="setup-capability-secondary">${escapeHtml(buildModelCatalogGuardrailSummary(instance))}</span></li>`,
+    );
+  }
+
   const catalog = tooling?.catalog;
   if (!catalog) {
-    return '';
+    return items.join('');
   }
 
   if (catalog.status === 'unavailable') {
-    return `<li><strong>Remote tools unavailable</strong><span class="setup-capability-secondary">${escapeHtml(catalog.error || catalog.summary || 'No tool catalog available.')}</span></li>`;
+    items.push(`<li><strong>Remote tools unavailable</strong><span class="setup-capability-secondary">${escapeHtml(catalog.error || catalog.summary || 'No tool catalog available.')}</span></li>`);
+    return items.join('');
   }
 
   const topTools = (catalog.tools || []).slice(0, 5);
-  const items = topTools.map((tool) => {
+  topTools.forEach((tool) => {
     const detailBits = [];
     if (tool.title && tool.title !== tool.name) {
       detailBits.push(tool.title);
@@ -1258,7 +1494,7 @@ function setupCapabilityCatalogItems(tooling) {
       detailBits.push(`plugin:${tool.pluginId}`);
     }
     detailBits.push(tool.source || 'unknown');
-    return `<li><strong>${escapeHtml(tool.name)}</strong><span class="setup-capability-secondary">${escapeHtml(detailBits.join(' · '))}</span></li>`;
+    items.push(`<li><strong>${escapeHtml(tool.name)}</strong><span class="setup-capability-secondary">${escapeHtml(detailBits.join(' · '))}</span></li>`);
   });
 
   if ((catalog.toolCount || 0) > topTools.length) {
@@ -1287,6 +1523,7 @@ function syncSetupCapabilitySelectors() {
     setConfiguredTargetsWorkspaceState('loading', 'Loading runtime target catalog.');
     renderConfiguredTargetList();
     renderSetupCapabilityEmpty('Loading runtime target capabilities...', 'Loading', 'status-badge-unknown');
+    updateSetupCatalogStatus('Loading runtime-owned model metadata...');
     return;
   }
 
@@ -1307,6 +1544,7 @@ function syncSetupCapabilitySelectors() {
       'Empty',
       'status-badge-unknown',
     );
+    updateSetupCatalogStatus('No runtime-owned model metadata is available until a target exists.');
     return;
   }
 
@@ -1384,6 +1622,7 @@ async function refreshSetupCapabilityPreview() {
       'Empty',
       'status-badge-unknown',
     );
+    updateSetupCatalogStatus('Choose a runtime target before refreshing model metadata.');
     return;
   }
 
@@ -1392,6 +1631,8 @@ async function refreshSetupCapabilityPreview() {
   document.getElementById('setupCapabilityGrid').innerHTML = '';
   document.getElementById('setupCapabilityTags').innerHTML = '';
   document.getElementById('setupCapabilityCatalog').innerHTML = '';
+  updateSetupCatalogStatus('Loading runtime-owned model metadata...');
+  setSetupCatalogRefreshButtonState(true, SETUP_CATALOG_REFRESH_DEFAULT_LABEL);
 
   let toolingPayload = null;
   try {
@@ -1419,6 +1660,7 @@ async function refreshSetupCapabilityPreview() {
 
   const tooling = extractConfiguredTooling(toolingPayload, instance);
   const agentRuntime = toolingPayload?.agentRuntime || instance?.agentRuntime;
+  const modelCatalog = currentModelCatalogSummary(instance);
   const tags = [];
   if (tooling?.source) {
     tags.push(`tools: ${humanizeToken(tooling.source)}`);
@@ -1435,9 +1677,33 @@ async function refreshSetupCapabilityPreview() {
   if (agentRuntime?.capabilities?.modelDiscovery) {
     tags.push('live models');
   }
+  if (modelCatalog?.source) {
+    tags.push(`catalog: ${humanizeToken(modelCatalog.source)}`);
+  }
+  if (modelCatalog?.cache?.persisted) {
+    tags.push('persisted snapshot');
+  }
+  if (modelCatalog?.cache?.stale) {
+    tags.push('stale catalog');
+  }
+  if (modelCatalog?.cache?.backoff?.active) {
+    tags.push('refresh backoff');
+  }
+  if ((instance?.metering?.activeCooldowns || 0) > 0) {
+    tags.push('cooldown active');
+  }
 
-  setSetupCapabilityStatus('Available', 'status-badge-ready');
+  const hasAttention = (modelCatalog?.warnings?.length || 0) > 0
+    || modelCatalog?.cache?.stale
+    || modelCatalog?.cache?.backoff?.active
+    || instance?.metering?.status === 'degraded'
+    || tooling?.catalog?.status === 'unavailable';
+  setSetupCapabilityStatus(
+    hasAttention ? 'Attention' : 'Available',
+    hasAttention ? 'status-badge-degraded' : 'status-badge-ready',
+  );
   document.getElementById('setupCapabilitySummary').textContent = tooling?.summary
+    || buildModelCatalogFreshnessSummary(modelCatalog)
     || 'No additional runtime capability summary is available for this target yet.';
   document.getElementById('setupCapabilityGrid').innerHTML = setupCapabilityGridRows({
     providerName,
@@ -1446,7 +1712,51 @@ async function refreshSetupCapabilityPreview() {
     tooling,
   });
   document.getElementById('setupCapabilityTags').innerHTML = renderSetupCapabilityTags(tags);
-  document.getElementById('setupCapabilityCatalog').innerHTML = setupCapabilityCatalogItems(tooling);
+  document.getElementById('setupCapabilityCatalog').innerHTML = setupCapabilityCatalogItems(instance, tooling);
+  updateSetupCatalogStatus(buildModelCatalogFreshnessSummary(modelCatalog));
+  setSetupCatalogRefreshButtonState(false, SETUP_CATALOG_REFRESH_DEFAULT_LABEL);
+}
+
+async function refreshSelectedModelCatalog() {
+  if (!validateApiKeyInput(document.getElementById('apiKeyInput').value)) return;
+  const { providerName, instanceTarget, instance } = currentSetupCapabilitySelection();
+  if (!providerName || !instanceTarget || !instance) {
+    updateSetupCatalogStatus('Choose a runtime target before refreshing model metadata.');
+    setSetupCatalogRefreshButtonState(true, SETUP_CATALOG_REFRESH_DEFAULT_LABEL);
+    return;
+  }
+
+  setSetupCatalogRefreshButtonState(true, 'Refreshing...');
+  updateSetupCatalogStatus(`Refreshing runtime-owned model metadata for ${providerName} · ${instanceTarget}...`);
+
+  try {
+    const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
+    const response = await fetchFn(
+      `/providers/${encodeURIComponent(providerName)}/models?instance=${encodeURIComponent(instanceTarget)}&refresh=1`,
+    );
+    if (!response.ok) {
+      let detail = '';
+      try {
+        const payload = await response.json();
+        detail = typeof payload?.error === 'string' ? payload.error : JSON.stringify(payload);
+      } catch {
+        detail = await response.text().catch(() => '');
+      }
+      throw new Error(detail || `HTTP ${response.status}`);
+    }
+    const payload = await response.json();
+    const summary = applyRefreshedModelCatalogSummary(providerName, instanceTarget, payload);
+    renderConfiguredTargetList();
+    updateConfiguredTargetsRail();
+    await refreshSetupCapabilityPreview();
+    updateSetupCatalogStatus(buildModelCatalogFreshnessSummary(summary));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    updateSetupCatalogStatus(`Refresh failed: ${message}`);
+    setSetupCapabilityStatus('Attention', 'status-badge-degraded');
+  } finally {
+    setSetupCatalogRefreshButtonState(false, SETUP_CATALOG_REFRESH_DEFAULT_LABEL);
+  }
 }
 
 async function loadConfiguredTargetCapabilities() {
@@ -1478,6 +1788,8 @@ async function loadConfiguredTargetCapabilities() {
   document.getElementById('setupCapabilityGrid').innerHTML = '';
   document.getElementById('setupCapabilityTags').innerHTML = '';
   document.getElementById('setupCapabilityCatalog').innerHTML = '';
+  updateSetupCatalogStatus('Loading runtime-owned model metadata...');
+  setSetupCatalogRefreshButtonState(true, SETUP_CATALOG_REFRESH_DEFAULT_LABEL);
 
   try {
     const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
@@ -1509,6 +1821,11 @@ async function loadConfiguredTargetCapabilities() {
         : `Failed to load runtime targets: ${message}`,
       authBlocked ? 'Locked' : 'Unavailable',
       authBlocked ? 'status-badge-degraded' : 'status-badge-unavailable',
+    );
+    updateSetupCatalogStatus(
+      authBlocked
+        ? 'Provide the runtime bearer token to inspect runtime-owned model metadata.'
+        : `Failed to load runtime-owned model metadata: ${message}`,
     );
     providerSelect.innerHTML = `<option value="">${authBlocked ? 'Auth required' : 'Unavailable'}</option>`;
     providerSelect.disabled = true;
