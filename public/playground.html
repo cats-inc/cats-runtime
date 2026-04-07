@@ -408,6 +408,17 @@ const PROVIDERS = ['claude','codex','gemini','cursor','copilot','opencode','kilo
 const PROVIDER_AVAILABILITY = {};
 let SELECTABLE_PROVIDERS = [...PROVIDERS];
 function getDefaultModel(p) { return (PROVIDER_MODELS[p]||[])[0]?.value || ''; }
+function getProviderAvailabilityStatus(provider){
+  const status=typeof PROVIDER_AVAILABILITY[provider]==='string'?PROVIDER_AVAILABILITY[provider].toLowerCase():'';
+  return status||'unknown';
+}
+function getProviderAvailabilityLabel(provider){
+  const status=getProviderAvailabilityStatus(provider);
+  if(status==='ok') return 'Available';
+  if(status==='degraded') return 'Needs attention';
+  if(status==='unavailable') return 'Unavailable';
+  return '';
+}
 function listSelectableProviders() {
   const selectable=SELECTABLE_PROVIDERS.length ? [...SELECTABLE_PROVIDERS] : [...PROVIDERS];
   return window.CatsUI?.listSelectablePlaygroundProviders
@@ -1060,6 +1071,15 @@ function getAgentColor(n) {
 function renderAgentSummaryChip(label) {
   return `<span class="agent-summary-chip">${escapeHtml(label)}</span>`;
 }
+function renderProviderAvailabilityBadge(provider){
+  const status=getProviderAvailabilityStatus(provider);
+  if(status==='unknown') return '';
+  const badgeStatus=status==='ok'?'ready':status;
+  const label=status==='ok'?'Ready':status==='degraded'?'Attention':'Unavailable';
+  return window.CatsUI?.renderStatusBadge
+    ? window.CatsUI.renderStatusBadge(badgeStatus,label)
+    : renderAgentSummaryChip(label);
+}
 function getAgentCardSummaryModelLabel(div) {
   const provider = div.querySelector('.agent-provider')?.value || '';
   const catalog = getProviderAdvancedCatalog(provider);
@@ -1083,7 +1103,7 @@ function refreshAgentCardSummary(div) {
   const provider = div.querySelector('.agent-provider')?.value || '';
   const tags = getAgentCardSelectedTags(div);
   summaryName.textContent = name;
-  summaryMeta.innerHTML = `${renderProviderBadge(provider)}${renderAgentSummaryChip(getAgentCardSummaryModelLabel(div))}`;
+  summaryMeta.innerHTML = `${renderProviderBadge(provider)}${renderProviderAvailabilityBadge(provider)}${renderAgentSummaryChip(getAgentCardSummaryModelLabel(div))}`;
   summaryTags.innerHTML = tags.length
     ? tags.map(tag => `<span class="tag-pill text-slate-300" style="border-color:currentColor">${escapeHtml(getTagLabel(tag))}</span>`).join('')
     : '<span class="text-xs text-slate-500">No roles selected</span>';
@@ -1306,7 +1326,13 @@ function renderAgentRoutingSelectOptions(selectEl,options,selectedValue){
 }
 function optionExists(select,value){return[...select.options].some(option=>option.value===value);}
 function renderAgentProviderSelectOptions(selectEl,selectedProvider=''){
-  const providerOptions=listSelectableProviders().map(providerId=>({ value:providerId, label:providerId }));
+  const providerOptions=listSelectableProviders().map(providerId=>{
+    const availabilityLabel=getProviderAvailabilityLabel(providerId);
+    return {
+      value:providerId,
+      label:availabilityLabel?`${providerId} · ${availabilityLabel}`:providerId,
+    };
+  });
   return renderAgentRoutingSelectOptions(
     selectEl,
     providerOptions,
