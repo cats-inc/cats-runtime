@@ -6,7 +6,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Provider-Specific Optimizations and Verification Follow-Through Remain) |
+| **Status** | In Progress (Provider-Specific Optimizations Remain) |
 | **Owner** | Codex |
 | **Assigned To** | Claude |
 | **Reviewer** | Gemini |
@@ -412,11 +412,11 @@ capable than a pure history-replay MVP.
       `modelCatalog` inspection metadata for API/local targets.
 - [x] Consider an additive `GET /ollama/models` endpoint or fold model listing
       into provider metadata for local-model selection.
-- [ ] Update the remaining security-oriented docs follow-through for API/local
+- [x] Update the remaining security-oriented docs follow-through for API/local
       execution; setup, API, and architecture docs are already in sync.
 - [x] Add `providers.yaml.example` entries for API instances.
-- [ ] Add `.env.example` placeholders for the required API credentials.
-- [ ] Add a regression matrix for stream parsing, tool calls, resume, fork,
+- [x] Add `.env.example` placeholders for the required API credentials.
+- [x] Add a regression matrix for stream parsing, tool calls, resume, fork,
       abort, and rate-limit retries.
 
 **Deliverables**: API instances are understandable, configurable, and covered by
@@ -567,6 +567,7 @@ The phase ordering above is based on the current vendor API surfaces reviewed on
 | 2026-03-28 | Anthropic server-tool inspection follow-through landed: payload-template-configured Anthropic server tools now flow through the same `apiRuntime.providerNativeTools` seam as OpenAI and Gemini, and `tests/api-backend.test.ts` verifies that `/providers/config` reports the configured Anthropic tool ids without changing the host-facing provider topology contract. |
 | 2026-03-28 | Tooling-route inspection coverage follow-through landed: `tests/api-backend.test.ts` now also verifies that `GET /providers/{provider}/tools` preserves `apiRuntime.providerNativeTools` for payload-template-configured Anthropic and OpenAI targets, so the standalone tooling read surface cannot silently drift away from `/providers/config`. |
 | 2026-03-28 | Diagnostics-route inspection coverage follow-through landed: `src/http/providerDiagnostics.test.ts` now verifies that `GET /diagnostics/providers` preserves `apiRuntime.providerNativeTools` for payload-template-configured Anthropic and OpenAI targets, so the operator diagnostics surface stays aligned with the topology and tooling read models. |
+| 2026-04-07 | Status audit reconciled Phase 5 with repo reality: security-doc follow-through, `.env.example` API credential placeholders, and the API/local regression-matrix documentation were already landed on 2026-03-28, so the remaining open work is now only the true provider-specific optimization track from Phase 4. |
 
 ---
 
