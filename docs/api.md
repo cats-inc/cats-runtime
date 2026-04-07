@@ -756,8 +756,11 @@ surface for hosts and dashboards. The response includes:
   yet a general selector-hot-path cache
 - additive target filters such as `provider`, `backend`, `instance`, and
   `defaultOnly=true` are the current way to bound work on this route
-- a narrower additive selector-oriented availability scope is planned, but the
-  current public contract remains the fuller operator diagnostics surface
+- additive `scope=availability` now exposes a narrower selector-oriented read
+  model that preserves cheap top-level `probe` and `summary`, keeps the same
+  query filtering semantics, disables retained-artifact hydration, and strips
+  per-target operator-grade fields down to `provider`, `backend`, `instance`,
+  `defaultTarget`, and `availability`
 - the active probe mode (`light` or `live`)
 - optional forced-refresh semantics for cached CLI compatibility assessments
 - aggregate summary status and counts
@@ -914,6 +917,7 @@ values return `400`.
 - `sessionId`
 - `sessionKey`
 - `defaultOnly=true|false`
+- `scope=full|availability`
 
 These filters narrow the provider catalog before diagnostics run, so host tools
 and orchestrators can inspect one target or one default-only subset without
@@ -921,6 +925,20 @@ re-filtering the full response client-side. The response now also includes:
 
 - `query.hasFilters`
 - `query.filters`
+
+When `scope=availability` is selected, the route keeps the same top-level
+`probe`, `summary`, `query`, and `readiness` metadata, but each provider entry
+is reduced to:
+
+- `provider`
+- `backend`
+- `instance`
+- `defaultTarget`
+- `availability`
+
+That additive scope is intended for truthful selector hot paths. It omits
+per-target `config`, `checks`, `setup`, `compatibility`, `metering`,
+`compatibilityEvidence`, `providerEvolution`, and `reprobe`.
 
 When `sessionId` or `sessionKey` is supplied, the diagnostics route upgrades
 agent inspection from provider-only diagnostics to session-aware diagnostics.

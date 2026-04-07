@@ -103,6 +103,7 @@ import { resolveEffectiveToolCatalogContext } from '../providerToolCatalogContex
 
 type DiagnosticStatus = HealthStatus['status'];
 type DiagnosticsProbeMode = 'light' | 'live';
+type ProviderDiagnosticsScope = 'full' | 'availability';
 const DIAGNOSTIC_BACKENDS: readonly BackendKind[] = ['cli', 'api', 'local', 'agent'];
 const DEFAULT_REMOTE_ENDPOINT_PROBE_TIMEOUT_MS = DEFAULT_REMOTE_MODEL_DISCOVERY_TIMEOUT_MS;
 
@@ -143,6 +144,14 @@ interface ProviderDiagnosticResult {
     forceSupported: boolean;
     liveSupported: boolean;
   };
+}
+
+interface ProviderAvailabilityDiagnosticResult {
+  provider: string;
+  backend: ProviderTargetDescriptor['backend'];
+  instance: string;
+  defaultTarget: boolean;
+  availability: ProviderDiagnosticAvailability;
 }
 
 const diagnosticsRoutes = new Hono<RuntimeRouteEnv>();
@@ -1791,6 +1800,7 @@ diagnosticsRoutes.get('/diagnostics/providers', async (c) => {
   try {
     const ctx = c.get('ctx');
     const probeMode = parseDiagnosticsProbeMode(c.req.query('probe'));
+    const scope = parseProviderDiagnosticsScope(c.req.query('scope'));
     const forceRefresh = parseForceRefreshQuery(c.req.query('force'));
     const filters = normalizeProviderDiagnosticsFilters(
       ctx,
@@ -1802,6 +1812,7 @@ diagnosticsRoutes.get('/diagnostics/providers', async (c) => {
       getRuntimeEnvironment(),
       forceRefresh,
       filters,
+      scope,
     ));
   } catch (error) {
     if (error instanceof DiagnosticsQueryError) {
@@ -2070,6 +2081,7 @@ async function buildProviderDiagnosticsPayload(
   env: NodeJS.ProcessEnv,
   forceRefresh: boolean,
   filters: ProviderDiagnosticsFilters = { defaultOnly: false, toolCatalogScope: 'catalog' },
+  scope: ProviderDiagnosticsScope = 'full',
 ) {
   const { catalog, providers } = await collectProviderDiagnostics(
     ctx,
@@ -2078,7 +2090,7 @@ async function buildProviderDiagnosticsPayload(
     forceRefresh,
     filters,
     {
-      includeArtifacts: true,
+      includeArtifacts: scope !== 'availability',
       compatibilityPurpose: 'diagnostics',
     },
   );
@@ -2094,7 +2106,9 @@ async function buildProviderDiagnosticsPayload(
     query: buildProviderDiagnosticsQuery(filters),
     readiness: getRuntimeReadinessSnapshot(ctx.startup),
     summary,
-    providers,
+    providers: scope === 'availability'
+      ? providers.map(toAvailabilityOnlyProviderDiagnosticResult)
+      : providers,
   };
 }
 
@@ -2102,8 +2116,33 @@ function parseDiagnosticsProbeMode(value: string | undefined): DiagnosticsProbeM
   return value === 'live' ? 'live' : 'light';
 }
 
+function parseProviderDiagnosticsScope(value: string | undefined): ProviderDiagnosticsScope {
+  const normalized = parseOptionalQueryString(value);
+  if (!normalized || normalized === 'full') {
+    return 'full';
+  }
+  if (normalized === 'availability') {
+    return 'availability';
+  }
+  throw new DiagnosticsQueryError(
+    `Unsupported provider diagnostics scope '${normalized}'.`,
+  );
+}
+
 function parseForceRefreshQuery(value: string | undefined): boolean {
   return value === '1' || value === 'true' || value === 'refresh';
+}
+
+function toAvailabilityOnlyProviderDiagnosticResult(
+  provider: ProviderDiagnosticResult,
+): ProviderAvailabilityDiagnosticResult {
+  return {
+    provider: provider.provider,
+    backend: provider.backend,
+    instance: provider.instance,
+    defaultTarget: provider.defaultTarget,
+    availability: provider.availability,
+  };
 }
 
 function buildRuntimeSetupDiagnosticsSummary(ctx: AppContext): RuntimeSetupDiagnosticsSummary {

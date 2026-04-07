@@ -413,6 +413,69 @@ describe('provider diagnostics HTTP contract', () => {
     }
   });
 
+  it('supports availability-only provider diagnostics payloads without retained artifact reads', async () => {
+    const evidenceSpy = vi.spyOn(
+      CompatibilityEvidenceService.prototype,
+      'readLatestArtifact',
+    ).mockImplementation(async () => {
+      throw new Error('availability diagnostics should not read retained compatibility evidence');
+    });
+    const probeSpy = vi.spyOn(
+      ProviderEvolutionProbeService.prototype,
+      'readLatestArtifact',
+    ).mockImplementation(async () => {
+      throw new Error('availability diagnostics should not read retained provider-evolution artifacts');
+    });
+
+    try {
+      const app = createTestApp();
+      const response = await app.request(
+        '/diagnostics/providers?scope=availability&provider=claude&backend=cli&instance=default',
+      );
+      expect(response.status).toBe(200);
+
+      const payload = await response.json() as {
+        probe: string;
+        summary: {
+          configuredProviders: number;
+          targets: number;
+        };
+        providers: Array<Record<string, unknown>>;
+      };
+
+      expect(payload.probe).toBe('light');
+      expect(payload.summary).toEqual(expect.objectContaining({
+        configuredProviders: 1,
+        targets: 1,
+      }));
+      expect(payload.providers).toEqual([
+        {
+          provider: 'claude',
+          backend: 'cli',
+          instance: 'default',
+          defaultTarget: true,
+          availability: expect.objectContaining({
+            status: 'ok',
+            probe: 'light',
+          }),
+        },
+      ]);
+      expect(payload.providers[0]).not.toHaveProperty('config');
+      expect(payload.providers[0]).not.toHaveProperty('checks');
+      expect(payload.providers[0]).not.toHaveProperty('setup');
+      expect(payload.providers[0]).not.toHaveProperty('compatibility');
+      expect(payload.providers[0]).not.toHaveProperty('metering');
+      expect(payload.providers[0]).not.toHaveProperty('compatibilityEvidence');
+      expect(payload.providers[0]).not.toHaveProperty('providerEvolution');
+      expect(payload.providers[0]).not.toHaveProperty('reprobe');
+      expect(evidenceSpy).not.toHaveBeenCalled();
+      expect(probeSpy).not.toHaveBeenCalled();
+    } finally {
+      evidenceSpy.mockRestore();
+      probeSpy.mockRestore();
+    }
+  });
+
   it('uses the lightweight compatibility path on health diagnostics', async () => {
     const installCheckRunner = createInstallCheckRunner();
     const app = createTestApp(makeConfig(), {
@@ -2252,6 +2315,16 @@ describe('provider diagnostics HTTP contract', () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
       error: "Invalid boolean query value 'maybe'.",
+    });
+  });
+
+  it('returns 400 for invalid provider diagnostics scope values', async () => {
+    const app = createTestApp();
+
+    const response = await app.request('/diagnostics/providers?scope=summary');
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Unsupported provider diagnostics scope 'summary'.",
     });
   });
 

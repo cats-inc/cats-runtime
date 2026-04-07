@@ -168,17 +168,17 @@ bundle structure.
 - [x] Add offline evidence triage tooling and review workflow helpers
 - [ ] Layer future rate-limit/metering detection onto the same compatibility
       knowledge base without coupling the initial slice
-- [ ] Add additive `scope=availability` support on `GET /diagnostics/providers`
+- [x] Add additive `scope=availability` support on `GET /diagnostics/providers`
       for selector hot paths instead of forcing them to hydrate the full
       operator diagnostics payload
-- [ ] Implement that selector-oriented scope by reusing
+- [x] Implement that selector-oriented scope by reusing
       `collectProviderDiagnostics(..., { includeArtifacts: false })` and the
       existing shared compatibility engine rather than inventing a second truth
       stack
-- [ ] Preserve cheap top-level `probe` and aggregated `summary` on that scope
+- [x] Preserve cheap top-level `probe` and aggregated `summary` on that scope
       so selector callers keep zero-cost context while stripping operator-grade
       per-target decoration
-- [ ] Keep the selector-oriented scope intentionally small:
+- [x] Keep the selector-oriented scope intentionally small:
       - retain target identity (`provider`, `instance`, `backend`,
         `defaultTarget`)
       - retain `availability`
@@ -288,7 +288,7 @@ bundle structure.
 | 2026-03-27 | MCP read-model follow-through landed for retained compatibility evidence: `list_compatibility_evidence_artifacts` and `read_compatibility_evidence_artifact` now reuse the same bounded diagnostics list/read surfaces and filters over HTTP JSON-RPC and stdio, so orchestrator-style hosts can inspect degraded parser/profile evidence without shelling out to CLI helpers or inventing an MCP-only evidence path |
 | 2026-03-27 | MCP write follow-through also landed for explicit compatibility refresh: `reprobe_provider_diagnostics` now reuses `POST /diagnostics/providers/reprobe` over HTTP JSON-RPC and stdio, so orchestrator-style hosts can request a bounded forced refresh without overloading the read-only diagnostics tool or inventing a second reprobe path |
 | 2026-03-28 | Backlog reality check: phases 1-4 are now effectively complete. The remaining plan work is limited to optional breadth expansion for new provider families, a possible future move from TypeScript-owned manifests into runtime-owned assets, and deeper coupling of rate-limit/metering knowledge back into the compatibility engine itself. |
-| 2026-04-08 | Selector-hot-path follow-through added to the remaining backlog: external truthful selectors now depend on `GET /diagnostics/providers`, and the current default payload still hydrates operator-grade retained-artifact/config/metering detail. The next runtime slice should add an additive `scope=availability` read model that reuses `collectProviderDiagnostics(..., { includeArtifacts: false })`, complements the existing 5-minute compatibility cache, and avoids pretending the full diagnostics pipeline is already cheap. |
+| 2026-04-08 | Selector-hot-path follow-through landed: `GET /diagnostics/providers?scope=availability` now reuses `collectProviderDiagnostics(..., { includeArtifacts: false })`, preserves cheap top-level `probe`/`summary` context, strips per-target operator-grade decoration down to target identity plus `availability`, and gives truthful selector callers a lighter read model without inventing a second truth stack. |
 
 ---
 
