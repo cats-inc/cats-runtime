@@ -2044,9 +2044,9 @@ async function initApp() {
     syncChatInputDefaultPrompt();
   });
   updateRuntimeAuthState();
-  await loadProviderOptions();
-  addAgent('Agent-1','claude','',['orchestrator'],null,{expandOnCreate:false});
-  addAgent('Agent-2','codex','',['coder'],null,{expandOnCreate:false});
+  addAgent('Agent-1','claude','',['orchestrator'],null,{expandOnCreate:false,preferAvailableProvider:true});
+  addAgent('Agent-2','codex','',['coder'],null,{expandOnCreate:false,preferAvailableProvider:true});
+  void loadProviderOptions();
   syncChatInputDefaultPrompt(true);
 }
 void initApp();
