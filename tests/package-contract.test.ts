@@ -220,6 +220,33 @@ describe('package contract', () => {
     });
     expect(runtimeHelp.status).toBe(0);
     expect(runtimeHelp.stdout).toContain('Usage: cats-runtime [options]');
+    expect(runtimeHelp.stdout).toContain('cats-runtime mcp [options]');
+
+    const runtimeMcpInspect = runNodeCommand([
+      join(installedRoot, 'build', 'runtime', 'index.js'),
+      'mcp',
+      '--inspect-proxy',
+    ], {
+      cwd: consumerDir,
+      env: {
+        CATS_RUNTIME_MCP_PROXY_URL: 'http://127.0.0.1:9/mcp',
+        CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS: '25',
+      },
+    });
+    expect(runtimeMcpInspect.status).toBe(1);
+    expect(runtimeMcpInspect.stderr).toContain('cats-runtime MCP proxy preflight failed:');
+    expect(JSON.parse(runtimeMcpInspect.stdout)).toEqual({
+      target: {
+        url: 'http://127.0.0.1:9/mcp',
+        authorizationConfigured: false,
+        timeoutMs: 25,
+      },
+      probe: {
+        status: 'error',
+        reason: 'upstream_unavailable',
+        message: 'Primary cats-runtime MCP endpoint is unavailable at http://127.0.0.1:9/mcp. Start cats-runtime and retry.',
+      },
+    });
 
     const mcpInspect = runNodeCommand([join(installedRoot, 'build', 'runtime', 'bin', 'mcp.js'), '--inspect-proxy'], {
       cwd: consumerDir,

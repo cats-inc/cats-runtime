@@ -820,6 +820,10 @@ export function formatRuntimeStartupError(
 export function getRuntimeHelpText(): string {
   return [
     'Usage: cats-runtime [options]',
+    '       cats-runtime mcp [options]',
+    '',
+    'Subcommands:',
+    '  mcp                                  Start the stdio MCP proxy against the primary runtime',
     '',
     'Options:',
     '  --cleanup-temp-dirs                    Remove stale cats-runtime temp directories and exit',

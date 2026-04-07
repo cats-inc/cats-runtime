@@ -2,6 +2,7 @@
 
 import { isDirectCliEntrypoint } from './core/cliEntrypoint.js';
 import { loadDotEnv } from './core/dotenv.js';
+import { runMcpCli } from './bin/mcp.js';
 import { loadConfig } from './core/config.js';
 import {
   cleanupStaleRuntimeTempDirs,
@@ -69,7 +70,13 @@ function resolveCleanupTempAgeHours(raw: string | undefined): number {
 }
 
 async function main(): Promise<void> {
-  const cliOptions = parseRuntimeCliOptions(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  if (argv[0] === 'mcp') {
+    await runMcpCli(argv.slice(1));
+    return;
+  }
+
+  const cliOptions = parseRuntimeCliOptions(argv);
   if (cliOptions.help) {
     process.stdout.write(`${getRuntimeHelpText()}\n`);
     return;

@@ -8,12 +8,14 @@
 
 ```text
 POST /mcp
+cats-runtime mcp
 node build/runtime/bin/mcp.js
 ```
 
 `POST /mcp` is the authoritative MCP execution surface because it runs inside
-the primary `cats-runtime` process. `node build/runtime/bin/mcp.js` remains as a
-repo-local helper for stdio-only hosts, but it now acts as a thin
+the primary `cats-runtime` process. `cats-runtime mcp` is the published stdio
+entrypoint, and `node build/runtime/bin/mcp.js` remains as a repo-local
+equivalent for stdio-only hosts. Both now act as a thin
 stdio-to-HTTP proxy to that existing `POST /mcp` route instead of creating a
 second runtime core.
 
@@ -219,7 +221,13 @@ the short human summary.
 
 ## Stdio Usage
 
-Repo-local entrypoint:
+Published entrypoint:
+
+```text
+cats-runtime mcp
+```
+
+Repo-local equivalent:
 
 ```text
 node build/runtime/bin/mcp.js
@@ -227,7 +235,9 @@ node build/runtime/bin/mcp.js
 
 Operational notes:
 
-- `node build/runtime/bin/mcp.js` is a repo-local helper, not a published npm `bin`
+- prefer `cats-runtime mcp` for packaged/npm-installed environments
+- `node build/runtime/bin/mcp.js` is the repo-local equivalent, not a separate
+  second runtime surface
 - start the primary `cats-runtime` first; the stdio MCP helper does not
   auto-start it
 - prefer direct `POST /mcp` when the host supports HTTP MCP
@@ -237,7 +247,9 @@ Operational notes:
 - the proxy now applies a conservative upstream timeout by default and returns
   a dedicated `upstream_timeout` MCP error when the primary runtime does not
   answer in time
-- `node build/runtime/bin/mcp.js --inspect-proxy` is a local utility exit that resolves
+- `cats-runtime mcp --inspect-proxy` is the published preflight entrypoint
+- `node build/runtime/bin/mcp.js --inspect-proxy` is the repo-local equivalent
+- either preflight form resolves
   the current proxy target, runs a `ping` preflight against the primary
   runtime, emits JSON to stdout, and exits without starting the stdio MCP
   server
@@ -255,6 +267,22 @@ Notes:
   milliseconds; default is `1800000` (30 minutes)
 
 Example host config:
+
+```json
+{
+  "mcpServers": {
+    "cats-runtime": {
+      "command": "cats-runtime",
+      "args": ["mcp"],
+      "env": {
+        "CATS_RUNTIME_MCP_PROXY_URL": "http://127.0.0.1:3110/mcp"
+      }
+    }
+  }
+}
+```
+
+Repo-local equivalent host config:
 
 ```json
 {

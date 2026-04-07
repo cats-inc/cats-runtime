@@ -399,6 +399,9 @@ describe('runtime startup helpers', () => {
   it('renders help text with supported flags', () => {
     const help = getRuntimeHelpText();
     expect(help).toContain('Usage: cats-runtime [options]');
+    expect(help).toContain('cats-runtime mcp [options]');
+    expect(help).toContain('Subcommands:');
+    expect(help).toContain('mcp                                  Start the stdio MCP proxy');
     expect(help).toContain('--cleanup-temp-dirs');
     expect(help).toContain('--cleanup-temp-age-hours <hours>');
     expect(help).toContain('--diagnose-setup');

@@ -27,7 +27,7 @@ Current capabilities:
 - file-based provider topology with separated `routing` / `backends` sections
 - dashboard-side provider instance selection for session creation
 - embedded multi-agent playground sample at `/playground`
-- runtime-owned MCP facade with authoritative execution on `POST /mcp` plus a repo-local stdio proxy helper at `node build/runtime/bin/mcp.js` for stdio-only hosts
+- runtime-owned MCP facade with authoritative execution on `POST /mcp` plus the published `cats-runtime mcp` stdio proxy entrypoint and a repo-local equivalent at `node build/runtime/bin/mcp.js`
 - curated MCP mutation tools for `create_session`, `send_message`, `fork_session`, `init_workspace`, and `commit_changes`
 - runtime-managed skills with session-level requested/resolved/applied metadata plus a family-aware internal skill library
 - additive workspace/skill hydration metadata that distinguishes runtime cwd from the authoritative workspace source
@@ -100,15 +100,17 @@ Embedded UIs:
 MCP usage:
 
 - use `POST /mcp` when the host can speak HTTP JSON-RPC directly
-- use `node build/runtime/bin/mcp.js` only for repo-local stdio-only MCP hosts such as
-  MCP Studio
+- use `cats-runtime mcp` as the package-facing stdio MCP entrypoint
+- use `node build/runtime/bin/mcp.js` only as the repo-local equivalent for
+  stdio-only MCP hosts such as MCP Studio
 - the stdio MCP helper now proxies to an already-running primary
   `cats-runtime` and does not start a second independent runtime core
 - set `CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS` to override the stdio proxy timeout
   when a stdio-only host needs a different upstream request window
-- run `node build/runtime/bin/mcp.js --inspect-proxy` when you want a local JSON
-  preflight of the current proxy target, auth posture, timeout, and `ping`
-  reachability
+- run `cats-runtime mcp --inspect-proxy` when you want a local JSON preflight
+  of the current proxy target, auth posture, timeout, and `ping` reachability
+- `node build/runtime/bin/mcp.js --inspect-proxy` remains the repo-local
+  equivalent of that same preflight helper
 
 Workspace substrate helper:
 
@@ -129,6 +131,7 @@ is intended to publish as an executable npm package once the first registry
 release is ready:
 
 - `npm install -g cats-runtime` then `cats-runtime`
+- `npm install -g cats-runtime` then `cats-runtime mcp` for stdio MCP hosts
 - `npx cats-runtime` once the package is published
 
 The first public package name is frozen to the unscoped package

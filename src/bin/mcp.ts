@@ -36,10 +36,11 @@ function parseMcpCliOptions(argv: string[]): {
 
 function getHelpText(): string {
   return [
-    'cats-runtime MCP proxy helper',
+    'cats-runtime mcp',
     '',
     'Proxy stdio MCP requests to the primary cats-runtime HTTP /mcp endpoint.',
-    'This helper is repo-local and is not published as a package bin alias.',
+    'Published package usage: cats-runtime mcp',
+    'Repo-local equivalent: node build/runtime/bin/mcp.js',
     '',
     'Options:',
     '  --host <host>          Override the target runtime host when deriving the proxy URL',
@@ -57,8 +58,8 @@ function getHelpText(): string {
   ].join('\n');
 }
 
-async function main(): Promise<void> {
-  const mcpCliOptions = parseMcpCliOptions(process.argv.slice(2));
+export async function runMcpCli(argv: string[] = process.argv.slice(2)): Promise<void> {
+  const mcpCliOptions = parseMcpCliOptions(argv);
   const cliOptions = parseRuntimeCliOptions(mcpCliOptions.passthroughArgv);
   if (cliOptions.help) {
     process.stdout.write(`${getHelpText()}\n`);
@@ -108,7 +109,7 @@ async function main(): Promise<void> {
 }
 
 if (isDirectCliEntrypoint(import.meta.url, process.argv[1])) {
-  main().catch((error) => {
+  runMcpCli().catch((error) => {
     process.stderr.write(`${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
     process.exitCode = 1;
     process.exit(1);

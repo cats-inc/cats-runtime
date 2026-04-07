@@ -1419,7 +1419,7 @@ always-on self-adapting parser system.
 ### OPT-14: MCP Proxy Hardening and CLI Convergence
 
 **Priority**: P2
-**Status**: In Progress
+**Status**: Completed
 
 #### Problem
 
@@ -1427,20 +1427,9 @@ always-on self-adapting parser system.
 
 - `POST /mcp` is the authoritative MCP execution surface inside the primary
   runtime process
-- `cats-runtime-mcp` remains available for stdio-only hosts such as MCP Studio
-  but now proxies to that primary runtime instead of creating a second
-  independent runtime core
-
-That correction removes the state-divergence problem, but the first shipped
-proxy slice is still intentionally minimal:
-
-- no explicit upstream timeout policy yet
-- no dedicated timeout classification separate from general upstream
-  unavailability
-- no CLI convergence yet from `cats-runtime-mcp` to a later
-  `cats-runtime mcp` shape
-- no operator-facing preflight that confirms the primary runtime target before
-  the stdio host starts sending tool traffic
+- the published `cats-runtime mcp` subcommand plus the repo-local
+  `node build/runtime/bin/mcp.js` helper both proxy to that same primary
+  runtime instead of creating a second independent runtime core
 
 #### Current Baseline
 
@@ -1452,22 +1441,25 @@ proxy slice is still intentionally minimal:
 - the proxy now applies a conservative upstream timeout by default, accepts
   `CATS_RUNTIME_MCP_PROXY_TIMEOUT_MS` as an override, and classifies
   proxy-side timeouts separately as `upstream_timeout`
-- `cats-runtime-mcp --inspect-proxy` now provides a local preflight exit that
-  resolves the target, reports auth/timeout posture, and runs a `ping`
-  reachability check without starting stdio serving
+- `cats-runtime mcp --inspect-proxy` now provides the package-facing preflight
+  exit that resolves the target, reports auth/timeout posture, and runs a
+  `ping` reachability check without starting stdio serving
+- `node build/runtime/bin/mcp.js --inspect-proxy` remains the repo-local
+  equivalent of that same preflight helper
 - generic shell `PORT` values are intentionally ignored so hosted shells do
   not accidentally retarget the stdio MCP proxy away from the runtime
-- `cats-runtime-mcp` no longer calls `createRuntimeServer(...)` on the normal
-  MCP-serving path
+- both stdio entrypoints now reuse the same thin proxy handler and neither
+  calls `createRuntimeServer(...)` on the normal MCP-serving path
 - `--diagnose-setup` remains a local utility exit, not a shared-runtime MCP
   serving path
 
 #### Follow-through Direction
 
-- evaluate a later CLI convergence slice that can expose
-  `cats-runtime mcp` while keeping `cats-runtime-mcp` as a compatibility alias
 - keep the proxy transport-thin; do not reintroduce a second independent local
   runtime core or hidden runtime auto-start in the name of convenience
+- if a dedicated alias is ever added later, keep it as a thin compatibility
+  wrapper over the same `cats-runtime mcp` handler rather than a second entry
+  stack
 
 #### Deferred Scope
 
@@ -1502,7 +1494,8 @@ proxy slice is still intentionally minimal:
 
 `cats-runtime` now has the core executable packaging contract in-repo:
 
-- `cats-runtime` and `cats-runtime-mcp` both ship through npm `bin` entries
+- `cats-runtime` ships as the public npm `bin`, and `cats-runtime mcp` now
+  serves as the package-facing stdio MCP entrypoint
 - `npm run build` is now a clean build that clears stale `build/runtime`
   artifacts
 - `prepack`, `release:check`, curated `files`, and package-contract coverage all
@@ -1519,14 +1512,16 @@ remaining work is follow-through and publication discipline:
 
 #### Current Baseline
 
-- `package.json` now includes executable `bin` entries for `cats-runtime` and
-  `cats-runtime-mcp`, curated `files`, `prepack`, `release:check`, `build:ui`,
-  and clean-build packaging hooks
+- `package.json` now includes the executable `cats-runtime` `bin`, while the
+  built package also exposes `cats-runtime mcp` plus the repo-local
+  `build/runtime/bin/mcp.js` helper, alongside curated `files`, `prepack`,
+  `release:check`, `build:ui`, and clean-build packaging hooks
 - `tests/package-contract.test.ts` now verifies curated publish contents and
   protects against stale `build/runtime` artifacts leaking into the tarball
 - the same package-contract suite now also installs the locally packed tarball
   into a temporary consumer workspace and smokes the packaged
-  `build/runtime/index.js --help` plus
+  `build/runtime/index.js --help`, `build/runtime/index.js mcp --inspect-proxy`,
+  plus
   `build/runtime/bin/mcp.js --inspect-proxy` entrypoints
 - `scripts/linux/pack-install.sh`, `scripts/macos/pack-install.sh`, and
   `scripts/windows/Pack-Install.ps1` now provide aligned local pack/install
