@@ -1082,15 +1082,6 @@ function getAgentColor(n) {
 function renderAgentSummaryChip(label) {
   return `<span class="agent-summary-chip">${escapeHtml(label)}</span>`;
 }
-function renderProviderAvailabilityBadge(provider){
-  const status=getProviderAvailabilityStatus(provider);
-  if(status==='unknown') return '';
-  const badgeStatus=status==='ok'?'ready':status;
-  const label=status==='ok'?'Ready':status==='degraded'?'Attention':'Unavailable';
-  return window.CatsUI?.renderStatusBadge
-    ? window.CatsUI.renderStatusBadge(badgeStatus,label)
-    : renderAgentSummaryChip(label);
-}
 function getAgentCardSummaryModelLabel(div) {
   const provider = div.querySelector('.agent-provider')?.value || '';
   const catalog = getProviderAdvancedCatalog(provider);
@@ -1114,7 +1105,7 @@ function refreshAgentCardSummary(div) {
   const provider = div.querySelector('.agent-provider')?.value || '';
   const tags = getAgentCardSelectedTags(div);
   summaryName.textContent = name;
-  summaryMeta.innerHTML = `${renderProviderBadge(provider)}${renderProviderAvailabilityBadge(provider)}${renderAgentSummaryChip(getAgentCardSummaryModelLabel(div))}`;
+  summaryMeta.innerHTML = `${renderProviderBadge(provider)}${renderAgentSummaryChip(getAgentCardSummaryModelLabel(div))}`;
   summaryTags.innerHTML = tags.length
     ? tags.map(tag => `<span class="tag-pill text-slate-300" style="border-color:currentColor">${escapeHtml(getTagLabel(tag))}</span>`).join('')
     : '<span class="text-xs text-slate-500">No roles selected</span>';
