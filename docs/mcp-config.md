@@ -86,7 +86,9 @@ compatibility, setup, and remediation payload, while accepting additive
 `probe: "light" | "live"`, `provider`, `backend`, `instance`, `defaultOnly`,
 and `forceRefresh: true` inputs. This keeps the MCP seam aligned with the
 runtime-owned filtered diagnostics route instead of forcing hosts to fetch the
-full provider catalog and narrow it themselves.
+full provider catalog and narrow it themselves. It mirrors the current
+operator-grade diagnostics payload; it is not a dedicated lightweight
+selector-only availability API.
 
 `list_runtime_skills` is the curated MCP wrapper over the same versioned
 filterable/paged runtime-owned skill catalog exposed by `GET /skills/catalog`,

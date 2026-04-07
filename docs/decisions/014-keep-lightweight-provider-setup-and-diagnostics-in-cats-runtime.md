@@ -118,8 +118,15 @@ host-consumable:
   supervisors can consume directly
 - `GET /diagnostics/runtime` freezes the machine-readable startup, lifecycle,
   and shutdown contract exposed by the runtime process
-- `GET /diagnostics/providers` remains the lightweight provider-readiness and
-  probe surface owned by `cats-runtime`
+- `GET /diagnostics/providers` remains the provider-readiness and probe surface
+  owned by `cats-runtime`
+- "lightweight" in this ADR refers to ownership scope, not to every payload
+  being cheap enough for selector hot paths; the current default
+  `GET /diagnostics/providers` response is still an operator-grade diagnostics
+  read model
+- selector-oriented consumers should get a narrower additive availability scope
+  instead of treating the richer retained-artifact/config/metering payload as a
+  free high-frequency selector contract
 - `GET /diagnostics/health` is the aggregate host-facing summary for runtime +
   provider health, so packaged desktop shells and future product hosts do not
   need to stitch multiple diagnostics routes together
@@ -190,5 +197,5 @@ policy-heavy approval UX into `cats-runtime`.
 ---
 
 *Accepted: 2026-03-20*
-*Last updated: 2026-03-30*
+*Last updated: 2026-04-08*
 *Decision makers: user + Codex*

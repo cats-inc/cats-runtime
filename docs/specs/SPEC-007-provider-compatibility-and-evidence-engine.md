@@ -32,6 +32,11 @@ The current second slice now adds:
 - stale-cache-aware compatibility summaries and machine-readable reprobe hints
   for host-facing diagnostics surfaces
 
+At the same time, the current public diagnostics payload is still
+operator-oriented. `GET /diagnostics/providers` is truthful, but it now bundles
+more setup, metering, retained-artifact, and config-inspection detail than
+high-frequency selector hot paths actually need.
+
 The runtime needs a provider compatibility and evidence engine that can:
 
 - preserve hard-won provider behavior knowledge over time
@@ -74,6 +79,9 @@ that depends on runtime setup primitives.
   instead of from memory and ad hoc terminal transcripts.
 - As a product host, I want runtime setup and diagnostics APIs to use the same
   compatibility logic as real session execution.
+- As a product host, I want a truthful availability-only read model for hot
+  selector paths so I do not have to pay full operator diagnostics cost just to
+  decide which targets are selectable.
 
 ## Requirements
 
@@ -170,6 +178,28 @@ that depends on runtime setup primitives.
     code.
 21. Any future LLM-assisted compatibility analysis shall be optional,
     review-oriented, and outside the hot execution path.
+22. `GET /diagnostics/providers` shall support an additive selector-oriented
+    availability scope for high-frequency truthful selectors.
+23. That availability scope shall reuse the shared compatibility and readiness
+    engine already behind diagnostics instead of inventing a second selector-only
+    truth stack.
+24. The selector-oriented availability scope shall avoid retained-artifact
+    hydration and other operator-grade payload assembly not required to answer
+    target selectability.
+25. At minimum, that scope shall be able to return:
+    - `provider`
+    - `instance`
+    - `backend`
+    - `defaultTarget`
+    - `availability`
+26. Operator-grade diagnostics details such as `config`, detailed `checks`,
+    `setup`, `compatibility`, `metering`, `compatibilityEvidence`,
+    `providerEvolution`, and `reprobe` shall remain outside that selector hot
+    path unless the caller explicitly requests the fuller diagnostics surface.
+27. Any additional cache added for selector-oriented diagnostics shall be
+    bounded and short-lived. The runtime shall not pretend that the current
+    full diagnostics pipeline is already broadly cached merely because CLI
+    compatibility assessments have their own retained in-memory cache.
 
 ### Non-Functional Requirements
 
@@ -177,6 +207,9 @@ that depends on runtime setup primitives.
   silently misparsed
 - **Testability**: evidence bundles should be easy to convert into replay
   fixtures and regression tests
+- **Hot-path latency**: truthful selector reads should avoid operator-grade
+  retained-artifact I/O and full diagnostics assembly when a narrower
+  availability read model would suffice
 - **Portability**: compatibility logic should work across native, WSL, Docker,
   and other runtime modes already supported by `cats-runtime`
 - **Maintainability**: simple behavior changes should be expressible without

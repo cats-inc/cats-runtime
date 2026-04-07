@@ -748,6 +748,16 @@ integrate against:
 `GET /diagnostics/providers` returns the runtime-owned provider availability
 surface for hosts and dashboards. The response includes:
 
+- a truthful but operator-grade diagnostics payload; the current route still
+  hydrates setup, compatibility, metering, config-inspection, and retained
+  latest-artifact detail when present
+- the existing 5-minute in-memory compatibility cache only covers CLI
+  assessment reuse; the full diagnostics payload assembly path itself is not
+  yet a general selector-hot-path cache
+- additive target filters such as `provider`, `backend`, `instance`, and
+  `defaultOnly=true` are the current way to bound work on this route
+- a narrower additive selector-oriented availability scope is planned, but the
+  current public contract remains the fuller operator diagnostics surface
 - the active probe mode (`light` or `live`)
 - optional forced-refresh semantics for cached CLI compatibility assessments
 - aggregate summary status and counts

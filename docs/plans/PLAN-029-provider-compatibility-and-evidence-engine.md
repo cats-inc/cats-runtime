@@ -71,6 +71,9 @@ failure evidence into runtime-owned assets and services.
 - expose machine-readable compatibility status and selected profile metadata
 - add targeted regression tests and fixture-style replay coverage
 - update docs, config example comments, and `PROGRESS.md`
+- add an additive selector-oriented availability scope on
+  `GET /diagnostics/providers` so truthful product selectors do not have to pay
+  full operator diagnostics cost on every hot-path read
 
 ### Out of Scope
 
@@ -165,6 +168,26 @@ bundle structure.
 - [x] Add offline evidence triage tooling and review workflow helpers
 - [ ] Layer future rate-limit/metering detection onto the same compatibility
       knowledge base without coupling the initial slice
+- [ ] Add additive `scope=availability` support on `GET /diagnostics/providers`
+      for selector hot paths instead of forcing them to hydrate the full
+      operator diagnostics payload
+- [ ] Implement that selector-oriented scope by reusing
+      `collectProviderDiagnostics(..., { includeArtifacts: false })` and the
+      existing shared compatibility engine rather than inventing a second truth
+      stack
+- [ ] Keep the selector-oriented scope intentionally small:
+      - retain target identity (`provider`, `instance`, `backend`,
+        `defaultTarget`)
+      - retain `availability`
+      - omit operator-grade `config`, `checks`, `setup`, `compatibility`,
+        `metering`, `compatibilityEvidence`, `providerEvolution`, and
+        `reprobe`
+- [ ] Revisit selector-oriented timeout and any short-lived diagnostics cache
+      alongside that scope so the new hot path complements the existing
+      5-minute compatibility cache instead of pretending the full diagnostics
+      pipeline is already cached
+- [ ] Document the additive selector-oriented scope across `docs/api.md`,
+      `docs/mcp-config.md`, and host-facing integration notes once it lands
 
 ## Files to Create/Modify
 
@@ -179,9 +202,11 @@ bundle structure.
 | `src/backends/cli/pool/WorkerProcess.ts` | Modify | Consume selected compatibility/evidence result before spawn |
 | `src/http/routes/diagnostics.ts` | Modify | Replace route-local CLI checks with compatibility engine output |
 | `src/http/routes/providers.ts` | Modify | Surface compatibility metadata where useful for hosts/dashboard |
+| `src/http/providerDiagnostics.test.ts` | Modify | Cover selector-oriented `scope=availability` semantics once landed |
 | `tests/*` | Modify/Create | Compatibility, evidence, diagnostics, and execution regressions |
 | `config/providers.yaml.example` | Modify | Document compatibility/evidence-related config where relevant |
 | `docs/api.md` | Modify | Document compatibility payloads and re-probe semantics |
+| `docs/mcp-config.md` | Modify | Keep MCP provider diagnostics wording aligned with the full-vs-selector diagnostics split |
 | `docs/architecture.md` | Modify | Document compatibility/evidence service placement |
 | `docs/setup-guide.md` | Modify | Document diagnostics/re-probe/evidence behavior |
 | `PROGRESS.md` | Modify | Track the delivered slice |
@@ -199,6 +224,12 @@ bundle structure.
   successful turn.
 - Keep evidence capture local, redacted, and JSON-based so fixtures can be
   checked into tests without depending on external tooling.
+- Keep the current operator-grade `GET /diagnostics/providers` payload as the
+  default diagnostics surface, but make any selector-oriented availability read
+  model additive rather than replacing the richer operator contract.
+- Be precise about cache boundaries: the shipped runtime already has a bounded
+  compatibility assessment cache, but it does not yet have a broad cache for
+  the full diagnostics payload assembly path.
 
 ## Testing Strategy
 
@@ -210,11 +241,14 @@ bundle structure.
   - replay from captured evidence fixtures
 - **Integration Tests**:
   - diagnostics route compatibility payloads
+  - selector-oriented `scope=availability` payload shape and field omission
   - default-target aggregate health behavior with compatibility states
   - CLI session spawn behavior when compatibility is `ready`, `degraded`, or
     unsupported
 - **Manual Testing**:
   - run `GET /diagnostics/providers` with and without `force=1`
+  - once landed, compare `GET /diagnostics/providers?scope=availability`
+    against the default operator-grade route on a cold start
   - inspect emitted evidence bundles after a forced mismatch/failure
   - verify first-wave providers still spawn normally on known-good configs
 
@@ -224,6 +258,7 @@ bundle structure.
 |------|--------|------------|
 | Compatibility service becomes a second parser stack parallel to adapters | High | Keep adapters authoritative for stream parsing and use profiles to select/parameterize them |
 | Probe latency slows normal runtime paths | Medium | Cache compatibility results and keep probe commands short/timeout-bound |
+| Truthful selector hot paths still time out because they reuse the full diagnostics payload | High | Add a narrower additive `scope=availability`, reuse `includeArtifacts: false`, and keep any selector cache bounded and complementary to the existing compatibility cache |
 | Evidence bundles capture secrets or host-specific noise | High | Redact env-like strings, truncate stdout/stderr samples, and avoid raw prompt capture |
 | First-wave support is too thin for non-major providers | Medium | Return explicit degraded/fallback metadata for generic profiles instead of pretending strong support |
 | Async compatibility checks force broad route churn | Medium | Prefer bounded spawn-time integration and route reuse over whole-runtime API rewrites |
@@ -250,9 +285,10 @@ bundle structure.
 | 2026-03-27 | MCP read-model follow-through landed for retained compatibility evidence: `list_compatibility_evidence_artifacts` and `read_compatibility_evidence_artifact` now reuse the same bounded diagnostics list/read surfaces and filters over HTTP JSON-RPC and stdio, so orchestrator-style hosts can inspect degraded parser/profile evidence without shelling out to CLI helpers or inventing an MCP-only evidence path |
 | 2026-03-27 | MCP write follow-through also landed for explicit compatibility refresh: `reprobe_provider_diagnostics` now reuses `POST /diagnostics/providers/reprobe` over HTTP JSON-RPC and stdio, so orchestrator-style hosts can request a bounded forced refresh without overloading the read-only diagnostics tool or inventing a second reprobe path |
 | 2026-03-28 | Backlog reality check: phases 1-4 are now effectively complete. The remaining plan work is limited to optional breadth expansion for new provider families, a possible future move from TypeScript-owned manifests into runtime-owned assets, and deeper coupling of rate-limit/metering knowledge back into the compatibility engine itself. |
+| 2026-04-08 | Selector-hot-path follow-through added to the remaining backlog: external truthful selectors now depend on `GET /diagnostics/providers`, and the current default payload still hydrates operator-grade retained-artifact/config/metering detail. The next runtime slice should add an additive `scope=availability` read model that reuses `collectProviderDiagnostics(..., { includeArtifacts: false })`, complements the existing 5-minute compatibility cache, and avoids pretending the full diagnostics pipeline is already cheap. |
 
 ---
 
 *Created: 2026-03-23*
 *Author: Codex*
-*Last updated: 2026-03-27*
+*Last updated: 2026-04-08*
