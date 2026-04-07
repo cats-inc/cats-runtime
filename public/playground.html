@@ -405,9 +405,15 @@ const PROVIDER_MODELS = {
 };
 const PROVIDER_ADVANCED_CATALOGS = {};
 const PROVIDERS = ['claude','codex','gemini','cursor','copilot','opencode','kilo','goose','pi','auggie','junie','kiro','ollama','openclaw'];
+const PROVIDER_AVAILABILITY = {};
 let SELECTABLE_PROVIDERS = [...PROVIDERS];
 function getDefaultModel(p) { return (PROVIDER_MODELS[p]||[])[0]?.value || ''; }
-function listSelectableProviders() { return SELECTABLE_PROVIDERS.length ? [...SELECTABLE_PROVIDERS] : [...PROVIDERS]; }
+function listSelectableProviders() {
+  const selectable=SELECTABLE_PROVIDERS.length ? [...SELECTABLE_PROVIDERS] : [...PROVIDERS];
+  return window.CatsUI?.listSelectablePlaygroundProviders
+    ? window.CatsUI.listSelectablePlaygroundProviders(selectable,PROVIDERS,PROVIDER_AVAILABILITY)
+    : selectable;
+}
 function normalizeSelectableProvider(provider) {
   const selectable=listSelectableProviders();
   if(selectable.includes(provider)) return provider;
@@ -422,8 +428,11 @@ function normalizeAgentSelectionState(provider,model='',modelSelection=null,opti
       modelSelection,
       selectableProviders:listSelectableProviders(),
       providerOrder:PROVIDERS,
+      providerAvailability:PROVIDER_AVAILABILITY,
       advancedCatalogs:PROVIDER_ADVANCED_CATALOGS,
       allowLegacyModel,
+      preferAvailableProvider:options.preferAvailableProvider===true,
+      preserveRequestedProvider:options.preserveRequestedProvider===true,
     })
     : null;
   const next=normalized&&typeof normalized==='object'
@@ -1466,6 +1475,20 @@ function renderAgentModelControls(div,catalog,entryId,presetId){
     return `<div><label class="block text-xs text-slate-400">${label}</label><input type="${inputType}" class="agent-model-control w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none" data-model-control-kind="${escapeHtml(control.kind)}" data-model-control-key="${safeKey}" value="${curVal}" ${extraAttrs} /></div>`;
   }).join('');
 }
+function applyAgentModelControlValues(div,controlValues){
+  if(!div||!controlValues||typeof controlValues!=='object'||Array.isArray(controlValues))return;
+  div.querySelectorAll('.agent-model-controls [data-model-control-key]').forEach(el=>{
+    const key=el.getAttribute('data-model-control-key');
+    const kind=el.getAttribute('data-model-control-kind');
+    if(!key||!kind||!Object.prototype.hasOwnProperty.call(controlValues,key))return;
+    const value=controlValues[key];
+    if(kind==='boolean'){
+      el.checked=Boolean(value);
+      return;
+    }
+    el.value=value===undefined||value===null?'':String(value);
+  });
+}
 function renderAgentModelChoice(div){
   const provider=div.querySelector('.agent-provider')?.value||'';
   const catalog=getProviderAdvancedCatalog(provider);
@@ -1599,6 +1622,7 @@ function syncAgentModelField(div,options={}){
     options.allowDefaultPreset!==false,
   );
   renderAgentModelChoice(div);
+  applyAgentModelControlValues(div,normalizedState.modelSelection?.controls);
   refreshAgentCardSummary(div);
 }
 function buildTagCheckboxes(id,selectedTags=[]){
@@ -1629,7 +1653,10 @@ function syncOrchestratorLocks(){
 
 function addAgent(name='',provider='claude',model='',tags=[],modelSelection=null,options={}) {
   if(!options.allowOverflow&&getAgentCount()>=MAX_AGENT_COUNT){updateAgentButtons();return null;}
-  const normalizedState=normalizeAgentSelectionState(provider,model,modelSelection,{ allowLegacyModel:false });
+  const normalizedState=normalizeAgentSelectionState(provider,model,modelSelection,{
+    allowLegacyModel:false,
+    preferAvailableProvider:options.preferAvailableProvider!==false,
+  });
   provider=normalizedState.provider;
   model=normalizedState.model;
   modelSelection=normalizedState.modelSelection;
@@ -1647,7 +1674,7 @@ function addAgent(name='',provider='claude',model='',tags=[],modelSelection=null
   const customInput=div.querySelector('.agent-model-custom');
   pSel.addEventListener('change',()=>{
     if(manualGroup) delete manualGroup.dataset.legacyOrigin;
-    syncAgentModelField(div,{preserve:false});
+    syncAgentModelField(div,{preserve:false,preserveRequestedProvider:true});
   });
   entrySel.addEventListener('change',()=>{
     const providerName=div.querySelector('.agent-provider')?.value||'';
@@ -1874,6 +1901,24 @@ async function loadProviderOptions() {
     Object.keys(PROVIDER_ADVANCED_CATALOGS).forEach(name=>{
       if(!configuredProviders.includes(name)) delete PROVIDER_ADVANCED_CATALOGS[name];
     });
+    Object.keys(PROVIDER_AVAILABILITY).forEach(name=>{
+      if(!configuredProviders.includes(name)) delete PROVIDER_AVAILABILITY[name];
+    });
+    try {
+      const diagnosticsRes = await fetch('/diagnostics/providers?defaultOnly=true', { headers });
+      if (diagnosticsRes.ok) {
+        const diagnosticsData = await diagnosticsRes.json();
+        Object.keys(PROVIDER_AVAILABILITY).forEach(name=>delete PROVIDER_AVAILABILITY[name]);
+        const providerDiagnostics=Array.isArray(diagnosticsData?.providers)?diagnosticsData.providers:[];
+        providerDiagnostics.forEach(entry=>{
+          const providerName=typeof entry?.provider==='string'?entry.provider:'';
+          const status=typeof entry?.availability?.status==='string'?entry.availability.status.toLowerCase():'';
+          if(providerName&&status){
+            PROVIDER_AVAILABILITY[providerName]=status;
+          }
+        });
+      }
+    } catch {}
     for (const [name] of Object.entries(providers)) {
       if (!PROVIDER_MODELS[name]) continue;
       try {
@@ -1925,7 +1970,7 @@ async function loadProviderOptions() {
         }
       } catch {}
     }
-    refreshAllAgentModelFields({ allowLegacyModel:false });
+    refreshAllAgentModelFields({ allowLegacyModel:false,preserveRequestedProvider:true });
   } catch {}
 }
 
@@ -1967,8 +2012,8 @@ async function initApp() {
   });
   updateRuntimeAuthState();
   await loadProviderOptions();
-  addAgent('Agent-1','claude','',['orchestrator'],null,{expandOnCreate:false});
-  addAgent('Agent-2','codex','',['coder'],null,{expandOnCreate:false});
+  addAgent('Agent-1','claude','',['orchestrator'],null,{expandOnCreate:false,preferAvailableProvider:true});
+  addAgent('Agent-2','codex','',['coder'],null,{expandOnCreate:false,preferAvailableProvider:true});
   syncChatInputDefaultPrompt(true);
 }
 void initApp();

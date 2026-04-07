@@ -375,6 +375,7 @@ Deliverables:
 | 2026-03-25 | Plan created for the `SPEC-017` runtime UI foundation follow-through gap. |
 | 2026-04-04 | Status audit aligned the plan with repo reality: the shared shell, shared CatsUI helpers, build-time Tailwind path, provider-setup shared read seam, dashboard repair panel, playground helper adoption, and regression coverage are landed; the remaining open work is the deeper page-source and emitted-HTML convergence track from Phase 2. |
 | 2026-04-07 | `build:ui` now emits `public/index.html`, `public/playground.html`, and `public/provider-setup.html` from canonical `src/http/ui/pages/*.html` sources, and regression coverage now fails if those generated artifacts drift after a build. |
+| 2026-04-07 | Playground agent defaults now reconcile static preset/provider choices against runtime-owned provider availability truth plus advanced-catalog entry/control applicability, so default Agent-1/Agent-2 and the 12-agent preset degrade onto usable providers/models/modes instead of surfacing stale preset-only assumptions. |
 
 ## Execution Checklist
 

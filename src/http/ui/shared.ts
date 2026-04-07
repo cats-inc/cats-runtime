@@ -544,7 +544,7 @@ export const SHARED_UI_SCRIPT = `
     return '';
   }
 
-  function listSelectablePlaygroundProviders(selectableProviders, providerOrder) {
+  function listSelectablePlaygroundProviders(selectableProviders, providerOrder, providerAvailability) {
     var available = Array.isArray(selectableProviders) ? selectableProviders : [];
     var preferredOrder = Array.isArray(providerOrder) ? providerOrder : [];
     var seen = {};
@@ -561,7 +561,294 @@ export const SHARED_UI_SCRIPT = `
       seen[extraProviderId] = true;
       ordered.push(extraProviderId);
     }
+    ordered.sort(function(left, right) {
+      var leftRank = getPlaygroundProviderAvailabilityRank(
+        getPlaygroundProviderAvailabilityStatus(providerAvailability, left),
+      );
+      var rightRank = getPlaygroundProviderAvailabilityRank(
+        getPlaygroundProviderAvailabilityStatus(providerAvailability, right),
+      );
+      return leftRank - rightRank;
+    });
     return ordered;
+  }
+
+  function getPlaygroundProviderAvailabilityStatus(providerAvailability, providerId) {
+    if (
+      !providerId
+      || !providerAvailability
+      || typeof providerAvailability !== 'object'
+      || Array.isArray(providerAvailability)
+    ) {
+      return 'unknown';
+    }
+    var rawStatus = providerAvailability[providerId];
+    return typeof rawStatus === 'string' && rawStatus.trim()
+      ? rawStatus.trim().toLowerCase()
+      : 'unknown';
+  }
+
+  function getPlaygroundProviderAvailabilityRank(status) {
+    switch (status) {
+      case 'ok':
+        return 0;
+      case 'degraded':
+        return 1;
+      case 'unknown':
+        return 2;
+      default:
+        return 3;
+    }
+  }
+
+  function normalizePlaygroundCatalogText(value) {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
+  function tokenizePlaygroundCatalogText(value) {
+    var normalized = normalizePlaygroundCatalogText(value);
+    if (!normalized) return [];
+    var parts = normalized.split(/\s+/);
+    var seen = {};
+    var tokens = [];
+    for (var i = 0; i < parts.length; i++) {
+      var token = parts[i];
+      if (!token || seen[token]) continue;
+      seen[token] = true;
+      tokens.push(token);
+    }
+    return tokens;
+  }
+
+  function getAdvancedEntryAvailabilityRank(entry) {
+    var status = typeof (entry && entry.status) === 'string'
+      ? entry.status.toLowerCase()
+      : 'available';
+    switch (status) {
+      case 'running':
+      case 'available':
+      case 'supported':
+      case 'ready':
+        return 0;
+      case 'unknown':
+        return 1;
+      case 'degraded':
+      case 'limited':
+        return 2;
+      default:
+        return 3;
+    }
+  }
+
+  function collectPlaygroundSelectionReferenceTexts(catalog, model, incomingSelection) {
+    var refs = [];
+    function pushRef(value) {
+      if (typeof value !== 'string' || !value.trim()) return;
+      refs.push(value.trim());
+    }
+    pushRef(model);
+    if (incomingSelection && typeof incomingSelection === 'object') {
+      pushRef(incomingSelection.entryId);
+      if (typeof incomingSelection.presetId === 'string' && incomingSelection.presetId) {
+        pushRef(incomingSelection.presetId);
+        var preset = findAdvancedCatalogPreset(catalog, incomingSelection.presetId);
+        if (preset) {
+          pushRef(preset.label);
+          pushRef(preset.preferredEntryId);
+          var preferredEntry = preset.preferredEntryId
+            ? findAdvancedCatalogEntry(catalog, preset.preferredEntryId)
+            : null;
+          if (preferredEntry) {
+            pushRef(preferredEntry.label);
+          }
+        }
+      }
+    }
+    return refs;
+  }
+
+  function scorePlaygroundAdvancedEntry(entry, referenceTexts) {
+    if (!entry || !entry.id) return Number.NEGATIVE_INFINITY;
+    var candidateTexts = [entry.id, entry.label];
+    if (Array.isArray(entry.notes)) {
+      for (var noteIndex = 0; noteIndex < entry.notes.length; noteIndex++) {
+        candidateTexts.push(entry.notes[noteIndex]);
+      }
+    }
+    var candidateTokens = tokenizePlaygroundCatalogText(candidateTexts.join(' '));
+    var candidateNormalized = candidateTexts
+      .map(normalizePlaygroundCatalogText)
+      .filter(Boolean);
+    var score = entry['default'] === true ? 5 : 0;
+    score += Math.max(0, 3 - getAdvancedEntryAvailabilityRank(entry));
+
+    for (var i = 0; i < referenceTexts.length; i++) {
+      var reference = referenceTexts[i];
+      var normalizedReference = normalizePlaygroundCatalogText(reference);
+      var referenceTokens = tokenizePlaygroundCatalogText(reference);
+      if (!normalizedReference || !referenceTokens.length) continue;
+      if (candidateNormalized.indexOf(normalizedReference) >= 0) {
+        score += 240;
+        continue;
+      }
+      var overlap = 0;
+      for (var tokenIndex = 0; tokenIndex < referenceTokens.length; tokenIndex++) {
+        if (candidateTokens.indexOf(referenceTokens[tokenIndex]) >= 0) {
+          overlap += 1;
+        }
+      }
+      if (overlap === 0) continue;
+      if (overlap === referenceTokens.length) {
+        score += 90;
+      }
+      score += overlap * 18;
+    }
+
+    return score;
+  }
+
+  function findClosestPlaygroundAdvancedEntry(catalog, model, incomingSelection) {
+    var entries = listAdvancedCatalogEntries(catalog);
+    if (!entries.length) return '';
+    var references = collectPlaygroundSelectionReferenceTexts(catalog, model, incomingSelection);
+    if (!references.length) return '';
+    var bestEntryId = '';
+    var bestScore = Number.NEGATIVE_INFINITY;
+    for (var i = 0; i < entries.length; i++) {
+      var entry = entries[i];
+      var score = scorePlaygroundAdvancedEntry(entry, references);
+      if (score > bestScore) {
+        bestScore = score;
+        bestEntryId = entry.id;
+      }
+    }
+    return bestScore > 0 ? bestEntryId : '';
+  }
+
+  function listApplicableEnumControlValues(control, entryId) {
+    if (!control || control.kind !== 'enum') return [];
+    var values = Array.isArray(control.values) ? control.values : [];
+    var allowed = [];
+    for (var i = 0; i < values.length; i++) {
+      var option = values[i];
+      if (
+        typeof option === 'object'
+        && option !== null
+        && Array.isArray(option.applicableEntryIds)
+        && option.applicableEntryIds.length > 0
+        && entryId
+        && option.applicableEntryIds.indexOf(entryId) < 0
+      ) {
+        continue;
+      }
+      var value = typeof option === 'object' && option !== null ? option.value : option;
+      if (typeof value === 'string' && allowed.indexOf(value) < 0) {
+        allowed.push(value);
+      }
+    }
+    return allowed;
+  }
+
+  function normalizePlaygroundNumericControlValue(control, value) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+    var normalized = value;
+    if (control.minimum !== undefined && normalized < control.minimum) {
+      normalized = control.minimum;
+    }
+    if (control.maximum !== undefined && normalized > control.maximum) {
+      normalized = control.maximum;
+    }
+    return normalized;
+  }
+
+  function chooseSemanticEnumFallback(control, allowedValues, requestedValue) {
+    if (
+      !control
+      || !Array.isArray(control.semanticTags)
+      || control.semanticTags.indexOf('reasoning_intensity') < 0
+      || typeof requestedValue !== 'string'
+    ) {
+      return undefined;
+    }
+    var reasoningOrder = ['low', 'medium', 'high', 'max'];
+    var requestedIndex = reasoningOrder.indexOf(requestedValue);
+    if (requestedIndex < 0) return undefined;
+    for (var cursor = requestedIndex - 1; cursor >= 0; cursor--) {
+      if (allowedValues.indexOf(reasoningOrder[cursor]) >= 0) {
+        return reasoningOrder[cursor];
+      }
+    }
+    for (var forward = requestedIndex + 1; forward < reasoningOrder.length; forward++) {
+      if (allowedValues.indexOf(reasoningOrder[forward]) >= 0) {
+        return reasoningOrder[forward];
+      }
+    }
+    return undefined;
+  }
+
+  function normalizePlaygroundControlValue(control, requestedValue, entryId, defaultValue) {
+    if (!control) return undefined;
+    if (!advancedControlAppliesToEntry(control, entryId)) {
+      return undefined;
+    }
+    if (control.kind === 'boolean') {
+      if (typeof requestedValue === 'boolean') return requestedValue;
+      return typeof defaultValue === 'boolean' ? defaultValue : undefined;
+    }
+    if (control.kind === 'string') {
+      if (typeof requestedValue === 'string' && requestedValue.trim()) return requestedValue;
+      return typeof defaultValue === 'string' && defaultValue.trim() ? defaultValue : undefined;
+    }
+    if (control.kind === 'number') {
+      var requestedNumber = normalizePlaygroundNumericControlValue(control, requestedValue);
+      if (requestedNumber !== undefined) return requestedNumber;
+      return normalizePlaygroundNumericControlValue(control, defaultValue);
+    }
+    if (control.kind === 'enum') {
+      var allowedValues = listApplicableEnumControlValues(control, entryId);
+      if (typeof requestedValue === 'string' && allowedValues.indexOf(requestedValue) >= 0) {
+        return requestedValue;
+      }
+      if (typeof defaultValue === 'string' && allowedValues.indexOf(defaultValue) >= 0) {
+        return defaultValue;
+      }
+      var semanticFallback = chooseSemanticEnumFallback(control, allowedValues, requestedValue);
+      if (semanticFallback) {
+        return semanticFallback;
+      }
+      return allowedValues[0];
+    }
+    return undefined;
+  }
+
+  function normalizePlaygroundSelectionControls(catalog, entryId, presetId, controls) {
+    if (!controls || typeof controls !== 'object' || Array.isArray(controls)) {
+      return undefined;
+    }
+    var normalized = normalizeAdvancedCatalog(catalog);
+    if (!normalized || !entryId) return undefined;
+    var defaults = getAdvancedEntryControlDefaults(normalized, entryId, presetId || '');
+    var catalogControls = Array.isArray(normalized.controls) ? normalized.controls : [];
+    var nextControls = {};
+    for (var i = 0; i < catalogControls.length; i++) {
+      var control = catalogControls[i];
+      if (!control || !control.key || !Object.prototype.hasOwnProperty.call(controls, control.key)) {
+        continue;
+      }
+      var nextValue = normalizePlaygroundControlValue(
+        control,
+        controls[control.key],
+        entryId,
+        defaults[control.key],
+      );
+      if (nextValue !== undefined) {
+        nextControls[control.key] = nextValue;
+      }
+    }
+    return Object.keys(nextControls).length > 0 ? nextControls : undefined;
   }
 
   function normalizePlaygroundAgentSelection(input) {
@@ -570,10 +857,26 @@ export const SHARED_UI_SCRIPT = `
     var selectableProviders = listSelectablePlaygroundProviders(
       options.selectableProviders,
       options.providerOrder,
+      options.providerAvailability,
     );
-    var provider = selectableProviders.indexOf(requestedProvider) >= 0
+    var requestedProviderSelectable = selectableProviders.indexOf(requestedProvider) >= 0;
+    var requestedProviderStatus = getPlaygroundProviderAvailabilityStatus(
+      options.providerAvailability,
+      requestedProvider,
+    );
+    var preserveRequestedProvider = options.preserveRequestedProvider === true;
+    var preferAvailableProvider = options.preferAvailableProvider === true;
+    var provider = requestedProviderSelectable
       ? requestedProvider
       : (selectableProviders[0] || requestedProvider || '');
+    if (
+      requestedProviderSelectable
+      && preferAvailableProvider
+      && !preserveRequestedProvider
+      && requestedProviderStatus === 'unavailable'
+    ) {
+      provider = selectableProviders[0] || requestedProvider || '';
+    }
     var providerChanged = provider !== requestedProvider;
     var advancedCatalogs = options.advancedCatalogs && typeof options.advancedCatalogs === 'object'
       ? options.advancedCatalogs
@@ -621,6 +924,9 @@ export const SHARED_UI_SCRIPT = `
     if (!entryId && model && entryIds.indexOf(model) >= 0) {
       entryId = model;
     }
+    if (!entryId) {
+      entryId = findClosestPlaygroundAdvancedEntry(catalog, model, incomingSelection);
+    }
 
     var allowLegacyModel = options.allowLegacyModel === true;
     if (!entryId) {
@@ -656,14 +962,14 @@ export const SHARED_UI_SCRIPT = `
     if (presetId) {
       nextSelection.presetId = presetId;
     }
-    if (
-      incomingSelection
-      && incomingSelection.controls
-      && typeof incomingSelection.controls === 'object'
-      && !Array.isArray(incomingSelection.controls)
-      && Object.keys(incomingSelection.controls).length > 0
-    ) {
-      nextSelection.controls = cloneJson(incomingSelection.controls);
+    var normalizedControls = normalizePlaygroundSelectionControls(
+      catalog,
+      entryId,
+      presetId,
+      incomingSelection && incomingSelection.controls,
+    );
+    if (normalizedControls) {
+      nextSelection.controls = normalizedControls;
     }
 
     return {
