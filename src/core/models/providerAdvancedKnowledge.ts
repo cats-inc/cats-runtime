@@ -3,6 +3,7 @@ import type {
   ProviderAdvancedCatalogControl,
   ProviderAdvancedCatalogControlOption,
   ProviderAdvancedCatalogEntry,
+  ProviderAdvancedMetadataStatus,
   ProviderAdvancedCatalogPreset,
   ProviderAdvancedCatalogResult,
   ProviderAdvancedCatalogSupportTier,
@@ -18,6 +19,25 @@ export interface ProviderAdvancedKnowledgeContext {
   supportTier: ProviderAdvancedCatalogSupportTier;
   entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>>;
   controlsByKey: Record<string, ProviderAdvancedCatalogControl>;
+}
+
+interface VerifiedAdvancedManifestBuildResult {
+  controls: ProviderAdvancedCatalogControl[];
+  entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>>;
+  presets: ProviderAdvancedCatalogPreset[];
+  defaultSelection: ProviderModelSelection | null;
+}
+
+interface VerifiedAdvancedManifest {
+  id: string;
+  version: string;
+  supportTier: ProviderAdvancedCatalogSupportTier;
+  evidenceRefs: string[];
+  matches: (target: ProviderTargetDescriptor) => boolean;
+  build: (
+    target: ProviderTargetDescriptor,
+    entries: ProviderAdvancedCatalogEntry[],
+  ) => VerifiedAdvancedManifestBuildResult;
 }
 
 function buildEntryCapabilityTags(
@@ -130,29 +150,24 @@ function pickEntryByPatterns(
   return undefined;
 }
 
-function inferSupportTier(
-  target: ProviderTargetDescriptor,
-): ProviderAdvancedCatalogSupportTier {
-  if (target.backend === 'api' && target.remoteInstance?.transport === 'openai') {
-    return 'full';
-  }
-  if (target.backend === 'local' && target.remoteInstance?.transport === 'ollama') {
-    return 'full';
-  }
-  if (
-    target.backend === 'cli'
-    && (target.providerName === 'codex' || target.providerName === 'claude')
-  ) {
-    return 'full';
-  }
-
-  return 'entry_only';
-}
-
-function hasVerifiedAdvancedMetadata(
-  target: ProviderTargetDescriptor,
-): boolean {
-  return inferSupportTier(target) === 'full';
+function buildVerifiedSupportMetadata(
+  supportTier: ProviderAdvancedCatalogSupportTier,
+  metadataStatus: ProviderAdvancedMetadataStatus,
+  manifest: VerifiedAdvancedManifest | null,
+) {
+  return {
+    tier: supportTier,
+    advancedMetadataStatus: metadataStatus,
+    discoveryMode: 'manual_refresh' as const,
+    provenance: {
+      status: metadataStatus,
+      ...(manifest ? {
+        manifestId: manifest.id,
+        manifestVersion: manifest.version,
+        evidenceRefs: [...manifest.evidenceRefs],
+      } : {}),
+    },
+  };
 }
 
 function buildOpenAiControls(
@@ -378,32 +393,6 @@ function buildOllamaControls(
   };
 }
 
-function buildControls(
-  target: ProviderTargetDescriptor,
-  entries: ProviderAdvancedCatalogEntry[],
-): {
-  controls: ProviderAdvancedCatalogControl[];
-  entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>>;
-} {
-  if (target.backend === 'cli' && target.providerName === 'codex') {
-    return buildCodexCliControls(entries);
-  }
-  if (target.backend === 'cli' && target.providerName === 'claude') {
-    return buildClaudeCliControls(entries);
-  }
-  if (target.backend === 'api' && target.remoteInstance?.transport === 'openai') {
-    return buildOpenAiControls(entries);
-  }
-  if (target.backend === 'local' && target.remoteInstance?.transport === 'ollama') {
-    return buildOllamaControls(entries);
-  }
-
-  return {
-    controls: [],
-    entryDefaults: {},
-  };
-}
-
 function buildPresetCatalog(
   target: ProviderTargetDescriptor,
   entries: ProviderAdvancedCatalogEntry[],
@@ -517,22 +506,111 @@ function buildDefaultSelection(
   };
 }
 
+function buildGenericManifestResult(
+  target: ProviderTargetDescriptor,
+  entries: ProviderAdvancedCatalogEntry[],
+  controls: ProviderAdvancedCatalogControl[],
+  entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>>,
+): VerifiedAdvancedManifestBuildResult {
+  const presets = buildPresetCatalog(target, entries, controls);
+  return {
+    controls,
+    entryDefaults,
+    presets,
+    defaultSelection: buildDefaultSelection(entries, presets, entryDefaults),
+  };
+}
+
+const VERIFIED_ADVANCED_MANIFESTS: VerifiedAdvancedManifest[] = [
+  {
+    id: 'codex-api-openai-v1',
+    version: '2026-04-07',
+    supportTier: 'full',
+    evidenceRefs: [
+      'docs/research/2026-04-07-advanced-provider-manifest-baseline.md#codex-api-openai-v1',
+    ],
+    matches: (target) => target.providerName === 'codex'
+      && target.backend === 'api'
+      && target.remoteInstance?.transport === 'openai',
+    build: (target, entries) => {
+      const { controls, entryDefaults } = buildOpenAiControls(entries);
+      return buildGenericManifestResult(target, entries, controls, entryDefaults);
+    },
+  },
+  {
+    id: 'codex-cli-v1',
+    version: '2026-04-07',
+    supportTier: 'full',
+    evidenceRefs: [
+      'docs/research/2026-04-07-advanced-provider-manifest-baseline.md#codex-cli-v1',
+    ],
+    matches: (target) => target.providerName === 'codex' && target.backend === 'cli',
+    build: (_target, entries) => {
+      const { controls, entryDefaults } = buildCodexCliControls(entries);
+      return {
+        controls,
+        entryDefaults,
+        presets: [],
+        defaultSelection: buildDefaultSelection(entries, [], entryDefaults),
+      };
+    },
+  },
+  {
+    id: 'claude-cli-v1',
+    version: '2026-04-07',
+    supportTier: 'full',
+    evidenceRefs: [
+      'docs/research/2026-04-07-advanced-provider-manifest-baseline.md#claude-cli-v1',
+    ],
+    matches: (target) => target.providerName === 'claude' && target.backend === 'cli',
+    build: (_target, entries) => {
+      const { controls, entryDefaults } = buildClaudeCliControls(entries);
+      return {
+        controls,
+        entryDefaults,
+        presets: [],
+        defaultSelection: buildDefaultSelection(entries, [], entryDefaults),
+      };
+    },
+  },
+  {
+    id: 'ollama-local-v1',
+    version: '2026-04-07',
+    supportTier: 'full',
+    evidenceRefs: [
+      'docs/research/2026-04-07-advanced-provider-manifest-baseline.md#ollama-local-v1',
+    ],
+    matches: (target) => target.providerName === 'ollama'
+      && target.backend === 'local'
+      && target.remoteInstance?.transport === 'ollama',
+    build: (target, entries) => {
+      const { controls, entryDefaults } = buildOllamaControls(entries);
+      return buildGenericManifestResult(target, entries, controls, entryDefaults);
+    },
+  },
+];
+
+function resolveVerifiedAdvancedManifest(
+  target: ProviderTargetDescriptor,
+): VerifiedAdvancedManifest | null {
+  return VERIFIED_ADVANCED_MANIFESTS.find((manifest) => manifest.matches(target)) || null;
+}
+
 export function buildProviderAdvancedKnowledge(
   target: ProviderTargetDescriptor,
   modelCatalog: ProviderModelCatalogResult,
 ): ProviderAdvancedKnowledgeContext {
   const entries = toAdvancedEntries(target, modelCatalog);
-  const supportTier = inferSupportTier(target);
-  const verifiedAdvancedMetadata = hasVerifiedAdvancedMetadata(target);
-  const { controls, entryDefaults } = verifiedAdvancedMetadata
-    ? buildControls(target, entries)
-    : { controls: [], entryDefaults: {} };
-  const presets = verifiedAdvancedMetadata
-    ? buildPresetCatalog(target, entries, controls)
-    : [];
-  const defaultSelection = verifiedAdvancedMetadata
-    ? buildDefaultSelection(entries, presets, entryDefaults)
-    : null;
+  const manifest = resolveVerifiedAdvancedManifest(target);
+  const supportTier = manifest?.supportTier ?? 'entry_only';
+  const manifestCatalog = manifest
+    ? manifest.build(target, entries)
+    : {
+        controls: [],
+        entryDefaults: {},
+        presets: [],
+        defaultSelection: null,
+      };
   const catalog: ProviderAdvancedCatalogResult = {
     provider: modelCatalog.provider,
     backend: modelCatalog.backend,
@@ -541,12 +619,14 @@ export function buildProviderAdvancedKnowledge(
     source: modelCatalog.source,
     cache: modelCatalog.cache,
     entries,
-    presets,
-    controls,
-    defaultSelection,
-    support: {
-      tier: supportTier,
-    },
+    presets: manifestCatalog.presets,
+    controls: manifestCatalog.controls,
+    defaultSelection: manifestCatalog.defaultSelection,
+    support: buildVerifiedSupportMetadata(
+      supportTier,
+      manifest ? 'verified_manifest' : 'unverified_omitted',
+      manifest,
+    ),
     warnings: [...modelCatalog.warnings],
   };
 
@@ -554,9 +634,9 @@ export function buildProviderAdvancedKnowledge(
     target,
     catalog,
     supportTier,
-    entryDefaults,
+    entryDefaults: manifestCatalog.entryDefaults,
     controlsByKey: Object.fromEntries(
-      controls.map((control) => [control.key, control]),
+      manifestCatalog.controls.map((control) => [control.key, control]),
     ),
   };
 }

@@ -62,8 +62,10 @@ runtime, but it will harden the contract with the following rules:
    advanced controls are real.
 
 The first hardening slices are now in-repo on the shared provider-model and
-advanced-catalog routes. Remaining manifest/provenance and restart-stable
-snapshot follow-through stays tracked under [SPEC-023](../specs/SPEC-023-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md)
+advanced-catalog routes. Restart-stable snapshots, refresh backoff, and the
+first verified-manifest/provenance seam are now landed; broader manifest
+onboarding and setup-owned refresh UX still stay tracked under
+[SPEC-023](../specs/SPEC-023-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md)
 and [PLAN-026](../plans/PLAN-026-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md).
 
 ## Consequences

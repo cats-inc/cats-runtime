@@ -699,6 +699,9 @@ tightening and cleanup steps are intentionally deferred.
   public controls, and `defaultSelection`
 - curated verified targets now expose entry-scoped control applicability/default
   handling, and the dashboard/create-session helpers enforce those constraints
+- curated verified targets now also resolve through a runtime-owned manifest
+  registry, and public advanced catalogs expose additive provenance metadata for
+  those manifests instead of hiding verification context in private code paths
 - session create/read contracts now support additive `modelSelection` and
   `modelResolution`
 - top-level session `model` remains available as the resolved compatibility
@@ -710,8 +713,8 @@ tightening and cleanup steps are intentionally deferred.
   state under the runtime data dir, and repeated refresh failures now activate
   runtime-owned catalog backoff with additive warning/cache metadata
 - backend support is staged honestly rather than pretending universal advanced
-  control parity, but evidence-backed manifest onboarding still remains
-  deferred
+  control parity, but broader evidence-backed manifest onboarding/checklist work
+  still remains deferred
 
 #### Deferred Cleanup Scope
 

@@ -48,13 +48,15 @@ Current audit result:
   verified targets and enforced in resolution/UI helpers
 - restart-stable persisted snapshots and refresh backoff are now landed in the
   runtime catalog service
-- evidence-backed manifest onboarding remains open
+- a runtime-owned verified-manifest registry plus additive provenance metadata
+  are now landed for the first curated targets
+- broader manifest onboarding/checklist work remains open
 
 ## Implementation Phases
 
 ### Phase 1: Safety Slice and Contract Tightening
 
-- [ ] Add a runtime-owned advanced metadata registry/manifest seam separate from
+- [x] Add a runtime-owned advanced metadata registry/manifest seam separate from
       raw entry discovery.
 - [x] Change advanced-catalog builders so unverified targets emit conservative
       entry-only catalogs with empty `presets`, empty `controls`, and
@@ -117,10 +119,10 @@ setup becomes the honest inspection/refresh surface.
 ### Phase 5: Verified Provider Onboarding
 
 - [ ] Create an evidence-backed onboarding checklist for provider manifests.
-- [ ] Ship the first verified manifests for the highest-value targets.
-- [ ] Keep all remaining providers in conservative entry-only mode until their
+- [x] Ship the first verified manifests for the highest-value targets.
+- [x] Keep all remaining providers in conservative entry-only mode until their
       manifests and tests exist.
-- [ ] Link provider-specific verification evidence into repo memory so future
+- [x] Link provider-specific verification evidence into repo memory so future
       updates are auditable.
 
 **Deliverables**: a sustainable rollout model where the runtime team grows
@@ -183,6 +185,7 @@ audits.
 | 2026-03-30 | Plan created after runtime advanced-catalog truthfulness and discovery-trigger review |
 | 2026-04-07 | Audit update: status corrected to `In Progress`. Landed slices now include conservative advanced catalogs for unverified targets, non-probing ordinary reads plus explicit `refresh=1`, stale in-memory cache reuse with `cache.stale`, and entry-scoped control applicability/default handling on curated verified targets. Persisted snapshots, cooldown/backoff, setup-owned refresh UX, and evidence-backed manifest onboarding remain open. |
 | 2026-04-07 | Phase 2 follow-through landed: successful dynamic catalogs now persist restart-stable snapshots under the runtime data dir, ordinary reads can reuse those persisted snapshots before config/static fallback, and repeated refresh failures now activate catalog refresh backoff with additive cache metadata and warnings instead of hammering upstreams on every request. |
+| 2026-04-07 | Phase 1 / 5 follow-through landed: verified advanced targets now resolve through a runtime-owned manifest registry with additive provenance metadata on public advanced catalogs, and the first curated manifests/evidence refs are now recorded in `docs/research/2026-04-07-advanced-provider-manifest-baseline.md`. |
 
 ---
 

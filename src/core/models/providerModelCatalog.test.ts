@@ -1077,6 +1077,16 @@ describe('ProviderModelCatalogService', () => {
       },
       support: {
         tier: 'full',
+        advancedMetadataStatus: 'verified_manifest',
+        discoveryMode: 'manual_refresh',
+        provenance: {
+          status: 'verified_manifest',
+          manifestId: 'codex-api-openai-v1',
+          manifestVersion: '2026-04-07',
+          evidenceRefs: [
+            'docs/research/2026-04-07-advanced-provider-manifest-baseline.md#codex-api-openai-v1',
+          ],
+        },
       },
       warnings: [],
     });
@@ -1570,6 +1580,16 @@ describe('ProviderModelCatalogService', () => {
       },
       support: {
         tier: 'full',
+        advancedMetadataStatus: 'verified_manifest',
+        discoveryMode: 'manual_refresh',
+        provenance: {
+          status: 'verified_manifest',
+          manifestId: 'codex-api-openai-v1',
+          manifestVersion: '2026-04-07',
+          evidenceRefs: [
+            'docs/research/2026-04-07-advanced-provider-manifest-baseline.md#codex-api-openai-v1',
+          ],
+        },
       },
       warnings: [],
     });

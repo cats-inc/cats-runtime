@@ -3,6 +3,7 @@ import type { ProviderModelSelection } from './providerSelectionResolution.js';
 
 export type ProviderAdvancedCatalogSource = 'dynamic' | 'config' | 'static';
 export type ProviderAdvancedCatalogSupportTier = 'full' | 'entry_only' | 'read_only';
+export type ProviderAdvancedMetadataStatus = 'verified_manifest' | 'unverified_omitted';
 export type ProviderAdvancedControlValue = string | number | boolean;
 export type ProviderAdvancedControlKind = 'enum' | 'boolean' | 'number' | 'string';
 export type ProviderAdvancedControlScope = 'session_default' | 'request' | 'both';
@@ -62,6 +63,14 @@ export interface ProviderAdvancedCatalogControl {
 
 export interface ProviderAdvancedCatalogSupport {
   tier: ProviderAdvancedCatalogSupportTier;
+  advancedMetadataStatus?: ProviderAdvancedMetadataStatus;
+  discoveryMode?: 'manual_refresh';
+  provenance?: {
+    status: ProviderAdvancedMetadataStatus;
+    manifestId?: string;
+    manifestVersion?: string;
+    evidenceRefs?: string[];
+  };
 }
 
 export interface ProviderAdvancedCatalogResult {

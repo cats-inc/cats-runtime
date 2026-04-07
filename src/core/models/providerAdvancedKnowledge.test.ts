@@ -42,6 +42,19 @@ describe('buildProviderAdvancedKnowledge', () => {
     const knowledge = buildProviderAdvancedKnowledge(target, createCatalog());
 
     expect(knowledge.supportTier).toBe('full');
+    expect(knowledge.catalog.support).toEqual({
+      tier: 'full',
+      advancedMetadataStatus: 'verified_manifest',
+      discoveryMode: 'manual_refresh',
+      provenance: {
+        status: 'verified_manifest',
+        manifestId: 'codex-api-openai-v1',
+        manifestVersion: '2026-04-07',
+        evidenceRefs: [
+          'docs/research/2026-04-07-advanced-provider-manifest-baseline.md#codex-api-openai-v1',
+        ],
+      },
+    });
     expect(knowledge.catalog.entries).toEqual([
       {
         id: 'gpt-5.4',
@@ -149,6 +162,19 @@ describe('buildProviderAdvancedKnowledge', () => {
     }));
 
     expect(knowledge.supportTier).toBe('full');
+    expect(knowledge.catalog.support).toEqual({
+      tier: 'full',
+      advancedMetadataStatus: 'verified_manifest',
+      discoveryMode: 'manual_refresh',
+      provenance: {
+        status: 'verified_manifest',
+        manifestId: 'codex-cli-v1',
+        manifestVersion: '2026-04-07',
+        evidenceRefs: [
+          'docs/research/2026-04-07-advanced-provider-manifest-baseline.md#codex-cli-v1',
+        ],
+      },
+    });
     expect(knowledge.catalog.controls).toEqual([
       {
         key: 'codex.reasoning_effort',
@@ -268,6 +294,19 @@ describe('buildProviderAdvancedKnowledge', () => {
     });
 
     expect(knowledge.supportTier).toBe('full');
+    expect(knowledge.catalog.support).toEqual({
+      tier: 'full',
+      advancedMetadataStatus: 'verified_manifest',
+      discoveryMode: 'manual_refresh',
+      provenance: {
+        status: 'verified_manifest',
+        manifestId: 'claude-cli-v1',
+        manifestVersion: '2026-04-07',
+        evidenceRefs: [
+          'docs/research/2026-04-07-advanced-provider-manifest-baseline.md#claude-cli-v1',
+        ],
+      },
+    });
     expect(knowledge.catalog.entries).toEqual([
       {
         id: 'default',
@@ -360,6 +399,19 @@ describe('buildProviderAdvancedKnowledge', () => {
     }));
 
     expect(knowledge.supportTier).toBe('full');
+    expect(knowledge.catalog.support).toEqual({
+      tier: 'full',
+      advancedMetadataStatus: 'verified_manifest',
+      discoveryMode: 'manual_refresh',
+      provenance: {
+        status: 'verified_manifest',
+        manifestId: 'ollama-local-v1',
+        manifestVersion: '2026-04-07',
+        evidenceRefs: [
+          'docs/research/2026-04-07-advanced-provider-manifest-baseline.md#ollama-local-v1',
+        ],
+      },
+    });
     expect(knowledge.catalog.controls).toEqual([
       {
         key: 'ollama.temperature',
@@ -388,5 +440,46 @@ describe('buildProviderAdvancedKnowledge', () => {
       entryMode: 'auto',
       presetId: 'balanced',
     });
+  });
+
+  it('keeps unverified targets conservative and marks omitted metadata explicitly', () => {
+    const target: ProviderTargetDescriptor = {
+      providerName: 'pi',
+      backend: 'cli',
+      instanceId: 'default',
+      defaultTarget: true,
+      cliInstance: {
+        id: 'default',
+        providerName: 'pi',
+        backend: 'cli',
+        command: 'pi',
+      },
+    };
+
+    const knowledge = buildProviderAdvancedKnowledge(target, {
+      provider: 'pi',
+      backend: 'cli',
+      instance: 'default',
+      defaultModel: 'openai-codex/gpt-5.4',
+      source: 'static',
+      cache: null,
+      models: [
+        { id: 'openai-codex/gpt-5.4', label: 'openai-codex/gpt-5.4', default: true },
+      ],
+      warnings: [],
+    });
+
+    expect(knowledge.supportTier).toBe('entry_only');
+    expect(knowledge.catalog.support).toEqual({
+      tier: 'entry_only',
+      advancedMetadataStatus: 'unverified_omitted',
+      discoveryMode: 'manual_refresh',
+      provenance: {
+        status: 'unverified_omitted',
+      },
+    });
+    expect(knowledge.catalog.presets).toEqual([]);
+    expect(knowledge.catalog.controls).toEqual([]);
+    expect(knowledge.catalog.defaultSelection).toBeNull();
   });
 });

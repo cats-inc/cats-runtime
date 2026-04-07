@@ -6,6 +6,7 @@
 
 | Entry | Topic | Focus |
 |-------|-------|-------|
+| [2026-04-07-advanced-provider-manifest-baseline](./2026-04-07-advanced-provider-manifest-baseline.md) | Advanced provider manifest baseline | Which provider targets currently count as verified advanced-catalog manifests, what public metadata each one is allowed to expose, and which repo evidence anchors that verification |
 | [2026-03-30-openclaw-paperclip-openmanus-gap-audit](./2026-03-30-openclaw-paperclip-openmanus-gap-audit.md) | OpenClaw / Paperclip / OpenManus gap audit | Which remaining `cats-runtime` gaps are still materially visible when compared against the local submodule reference points, and which one should be cut next |
 | [2026-03-29-project-bootstrap-collaboration-extraction-inventory](./2026-03-29-project-bootstrap-collaboration-extraction-inventory.md) | Project-bootstrap collaboration extraction inventory | Which template families and initialize/update semantics still need a repo-owned rewrite before `cats-runtime` and `cats` split into separate repos |
 | [2026-03-29-a2a-pilot-second-wave-validation](./2026-03-29-a2a-pilot-second-wave-validation.md) | A2A pilot second-wave validation | What `project-bootstrap` actually generated/updated in a throwaway repo, which A2A v1 template behaviors were real, and which collaboration semantics still required pilot-owned adaptation |
@@ -35,4 +36,4 @@ Action Items:
 
 ---
 
-*Last updated: 2026-03-30*
+*Last updated: 2026-04-07*

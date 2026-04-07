@@ -48,13 +48,19 @@ catalog routes:
   additive warning/metadata on served catalogs so callers can see when refresh
   attempts are temporarily suppressed instead of hammering vendors on every
   request
+- verified advanced targets now resolve through a runtime-owned manifest
+  registry, and advanced catalogs surface additive provenance metadata
+  (`advancedMetadataStatus`, `manifestId`, `manifestVersion`, and
+  repo-owned evidence refs) instead of hiding that verification context inside
+  ad hoc builders
 - refresh failures can now reuse stale in-memory dynamic catalogs with additive
   `cache.stale: true` metadata instead of dropping immediately to config/static
   fallback
 
 The following requirements remain open:
 
-- an evidence-backed manifest/provenance layer for verified advanced metadata
+- a broader onboarding checklist and rollout path for adding more verified
+  manifests beyond the current first set
 - fuller setup/diagnostics ownership of refresh UX and warning presentation
 
 ## Goals
