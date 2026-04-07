@@ -41,14 +41,19 @@ catalog routes:
   parity across every provider/backend family
 - selection resolution and dashboard helpers now enforce entry-scoped control
   applicability through `applicableEntryIds` on controls and control options
+- successful dynamic discovery snapshots now persist under the runtime data dir
+  so restart-cold ordinary reads can still reuse the last successful catalog
+  without immediately re-probing upstreams
+- repeated refresh failures now activate runtime-owned refresh backoff, with
+  additive warning/metadata on served catalogs so callers can see when refresh
+  attempts are temporarily suppressed instead of hammering vendors on every
+  request
 - refresh failures can now reuse stale in-memory dynamic catalogs with additive
   `cache.stale: true` metadata instead of dropping immediately to config/static
   fallback
 
 The following requirements remain open:
 
-- persisted restart-stable discovery snapshots
-- cooldown/backoff state for repeated refresh failures
 - an evidence-backed manifest/provenance layer for verified advanced metadata
 - fuller setup/diagnostics ownership of refresh UX and warning presentation
 

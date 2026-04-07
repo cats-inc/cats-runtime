@@ -46,8 +46,9 @@ Current audit result:
   `refresh=1|true|refresh|force`
 - entry-scoped control applicability/default handling is landed on curated
   verified targets and enforced in resolution/UI helpers
-- restart-stable snapshots, cooldown/backoff, and evidence-backed manifest
-  onboarding remain open
+- restart-stable persisted snapshots and refresh backoff are now landed in the
+  runtime catalog service
+- evidence-backed manifest onboarding remains open
 
 ## Implementation Phases
 
@@ -71,13 +72,13 @@ before refresh-policy changes land.
 - [x] Refactor provider catalog service so ordinary route reads are
       non-probing and use in-memory cache before falling back to config/static
       truth.
-- [ ] Extend that fallback ordering with persisted restart-stable snapshots
+- [x] Extend that fallback ordering with persisted restart-stable snapshots
       between memory cache and config fallback.
 - [x] Preserve explicit live refresh through `refresh=1` or equivalent setup
       and diagnostics actions.
-- [ ] Persist successful discovery snapshots with timestamps and source
+- [x] Persist successful discovery snapshots with timestamps and source
       metadata.
-- [ ] Add cooldown/backoff state for rate limits, auth failures, timeouts, and
+- [x] Add cooldown/backoff state for rate limits, auth failures, timeouts, and
       repeated probe failures.
 - [x] Expose additive freshness/warning metadata so callers know when cached or
       stale data is being served.
@@ -181,6 +182,7 @@ audits.
 |------|--------|
 | 2026-03-30 | Plan created after runtime advanced-catalog truthfulness and discovery-trigger review |
 | 2026-04-07 | Audit update: status corrected to `In Progress`. Landed slices now include conservative advanced catalogs for unverified targets, non-probing ordinary reads plus explicit `refresh=1`, stale in-memory cache reuse with `cache.stale`, and entry-scoped control applicability/default handling on curated verified targets. Persisted snapshots, cooldown/backoff, setup-owned refresh UX, and evidence-backed manifest onboarding remain open. |
+| 2026-04-07 | Phase 2 follow-through landed: successful dynamic catalogs now persist restart-stable snapshots under the runtime data dir, ordinary reads can reuse those persisted snapshots before config/static fallback, and repeated refresh failures now activate catalog refresh backoff with additive cache metadata and warnings instead of hammering upstreams on every request. |
 
 ---
 

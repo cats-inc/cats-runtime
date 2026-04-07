@@ -706,9 +706,12 @@ tightening and cleanup steps are intentionally deferred.
 - legacy session create payloads that only send `model` remain accepted
 - stale in-memory dynamic catalogs can now be reused with additive
   `cache.stale: true` metadata when a later refresh fails
+- successful dynamic discovery snapshots now persist restart-stable catalog
+  state under the runtime data dir, and repeated refresh failures now activate
+  runtime-owned catalog backoff with additive warning/cache metadata
 - backend support is staged honestly rather than pretending universal advanced
-  control parity, but restart-stable snapshots, cooldown/backoff, and
-  evidence-backed manifest onboarding remain deferred
+  control parity, but evidence-backed manifest onboarding still remains
+  deferred
 
 #### Deferred Cleanup Scope
 

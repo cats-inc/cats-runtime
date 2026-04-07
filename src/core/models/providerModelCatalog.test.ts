@@ -129,6 +129,14 @@ function createGooseConfigRoot(content: string) {
   };
 }
 
+function createTempDataDir() {
+  const root = mkdtempSync(join(tmpdir(), 'cats-runtime-model-catalog-'));
+  return {
+    root,
+    cleanup: () => rmSync(root, { recursive: true, force: true }),
+  };
+}
+
 describe('ProviderModelCatalogService', () => {
   it('marks running Ollama models, injects missing configured defaults, and caches warnings', async () => {
     const fetchMock = vi.fn<typeof fetch>(async (input) => {
@@ -342,15 +350,112 @@ describe('ProviderModelCatalogService', () => {
         cachedAt: '2026-03-27T00:00:00.000Z',
         ttlSec: 60,
         stale: true,
+        backoff: {
+          active: true,
+          consecutiveFailures: 1,
+          lastFailureAt: '2026-03-27T00:01:01.000Z',
+          nextRefreshAllowedAt: '2026-03-27T00:02:01.000Z',
+          reason: 'Dynamic model discovery failed for ollama/local/local: connection refused',
+        },
       });
       expect(second.models).toEqual(first.models);
       expect(second.warnings).toEqual([
         "Configured default model 'qwen3:latest' was not returned by dynamic discovery; added as configured fallback.",
         "Dynamic model discovery failed for ollama/local/local: connection refused Serving stale cached catalog from 2026-03-27T00:00:00.000Z.",
+        'Dynamic model discovery backoff is active for ollama/local/local until 2026-03-27T00:02:01.000Z after 1 failure(s): Dynamic model discovery failed for ollama/local/local: connection refused',
+      ]);
+
+      const third = await service.getCatalog('ollama');
+      expect(third.cache).toEqual(second.cache);
+      expect(third.warnings).toEqual([
+        'Dynamic model discovery backoff is active for ollama/local/local until 2026-03-27T00:02:01.000Z after 1 failure(s): Dynamic model discovery failed for ollama/local/local: connection refused',
+        "Configured default model 'qwen3:latest' was not returned by dynamic discovery; added as configured fallback.",
       ]);
       expect(fetchMock).toHaveBeenCalledTimes(3);
     } finally {
       vi.useRealTimers();
+    }
+  });
+
+  it('reuses persisted dynamic snapshots after restart without re-probing', async () => {
+    const dataDir = createTempDataDir();
+
+    try {
+      const config = {
+        ...createCatalogConfig(),
+        dataDir: dataDir.root,
+      } as const;
+      const firstFetch = vi.fn<typeof fetch>(async (input) => {
+        const url = typeof input === 'string' ? input : input.url;
+        if (url.endsWith('/api/tags')) {
+          return jsonResponse({
+            models: [
+              { name: 'deepseek-r1:14b' },
+            ],
+          });
+        }
+
+        if (url.endsWith('/api/ps')) {
+          return jsonResponse({
+            models: [
+              { name: 'deepseek-r1:14b' },
+            ],
+          });
+        }
+
+        throw new Error(`Unexpected fetch URL: ${url}`);
+      });
+
+      const firstService = new ProviderModelCatalogService(config as never, {
+        fetch: firstFetch,
+        ttlMs: 60_000,
+      });
+
+      const first = await firstService.getCatalog('ollama');
+      expect(first.source).toBe('dynamic');
+      expect(firstFetch).toHaveBeenCalledTimes(2);
+
+      const secondFetch = vi.fn<typeof fetch>(async () => {
+        throw new Error('restart should use persisted snapshot');
+      });
+      const secondService = new ProviderModelCatalogService(config as never, {
+        fetch: secondFetch,
+        ttlMs: 60_000,
+      });
+
+      const second = await secondService.getCatalog('ollama');
+      expect(second).toEqual({
+        provider: 'ollama',
+        backend: 'local',
+        instance: 'local',
+        defaultModel: 'qwen3:latest',
+        source: 'dynamic',
+        cache: {
+          servedFromCache: true,
+          cachedAt: expect.any(String),
+          ttlSec: 60,
+          persisted: true,
+        },
+        models: [
+          {
+            id: 'qwen3:latest',
+            label: 'qwen3:latest',
+            default: true,
+            status: 'configured',
+          },
+          {
+            id: 'deepseek-r1:14b',
+            label: 'deepseek-r1:14b',
+            status: 'running',
+          },
+        ],
+        warnings: [
+          "Configured default model 'qwen3:latest' was not returned by dynamic discovery; added as configured fallback.",
+        ],
+      });
+      expect(secondFetch).not.toHaveBeenCalled();
+    } finally {
+      dataDir.cleanup();
     }
   });
 
@@ -1131,6 +1236,9 @@ describe('ProviderModelCatalogService', () => {
       ],
       warnings: [
         "Dynamic model discovery failed for codex/api/main: Timed out while listing models from 'https://api.openai.test/v1/models'",
+        expect.stringContaining(
+          'Dynamic model discovery backoff is active for codex/api/main until ',
+        ),
       ],
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);

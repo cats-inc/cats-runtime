@@ -1,3 +1,11 @@
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, join } from 'node:path';
 import type {
   BackendKind,
   CliRuntimeConfig,
@@ -52,6 +60,16 @@ export interface ProviderModelCatalogCacheMetadata {
   cachedAt: string | null;
   ttlSec: number | null;
   stale?: boolean;
+  persisted?: boolean;
+  backoff?: ProviderModelCatalogBackoffMetadata;
+}
+
+export interface ProviderModelCatalogBackoffMetadata {
+  active: boolean;
+  consecutiveFailures: number;
+  lastFailureAt: string | null;
+  nextRefreshAllowedAt: string | null;
+  reason?: string;
 }
 
 export interface ProviderModelCatalogResult {
@@ -104,12 +122,49 @@ interface CachedDynamicModels {
   warnings: string[];
 }
 
+interface RefreshBackoffState {
+  consecutiveFailures: number;
+  lastFailureAt: number;
+  nextRefreshAllowedAt: number;
+  reason: string;
+}
+
+interface PersistedDynamicCatalogSnapshot {
+  key: string;
+  provider: string;
+  backend: BackendKind;
+  instance: string;
+  source: 'dynamic';
+  cachedAt: string;
+  models: ProviderModelCatalogEntry[];
+  warnings: string[];
+}
+
+interface PersistedDynamicCatalogBackoff {
+  key: string;
+  provider: string;
+  backend: BackendKind;
+  instance: string;
+  consecutiveFailures: number;
+  lastFailureAt: string;
+  nextRefreshAllowedAt: string;
+  reason: string;
+}
+
+interface PersistedProviderModelCatalogState {
+  version: 1;
+  snapshots: PersistedDynamicCatalogSnapshot[];
+  backoff: PersistedDynamicCatalogBackoff[];
+}
+
 interface DynamicCatalogLoadResult {
   models: ProviderModelCatalogEntry[];
   warnings?: string[];
 }
 
 const DEFAULT_TTL_MS = 60_000;
+const DEFAULT_DISCOVERY_BACKOFF_MS = 60_000;
+const MAX_DISCOVERY_BACKOFF_MS = 15 * 60_000;
 const MAX_GEMINI_MODEL_LIST_PAGES = 5;
 
 const KIRO_NATIVE_MODELS: ProviderModelCatalogEntry[] = [
@@ -355,13 +410,58 @@ function buildCacheMetadata(
   ttlMs: number,
   cachedAtMs: number,
   servedFromCache: boolean,
-  stale = false,
+  options: {
+    stale?: boolean;
+    persisted?: boolean;
+    backoff?: RefreshBackoffState | null;
+  } = {},
 ): ProviderModelCatalogCacheMetadata {
   return {
     servedFromCache,
     cachedAt: new Date(cachedAtMs).toISOString(),
     ttlSec: Math.floor(ttlMs / 1000),
-    ...(stale ? { stale: true } : {}),
+    ...(options.stale ? { stale: true } : {}),
+    ...(options.persisted ? { persisted: true } : {}),
+    ...(options.backoff ? { backoff: toBackoffMetadata(options.backoff) } : {}),
+  };
+}
+
+function toBackoffMetadata(
+  state: RefreshBackoffState,
+): ProviderModelCatalogBackoffMetadata {
+  return {
+    active: state.nextRefreshAllowedAt > Date.now(),
+    consecutiveFailures: state.consecutiveFailures,
+    lastFailureAt: new Date(state.lastFailureAt).toISOString(),
+    nextRefreshAllowedAt: new Date(state.nextRefreshAllowedAt).toISOString(),
+    ...(state.reason ? { reason: state.reason } : {}),
+  };
+}
+
+function describeBackoffState(
+  target: ProviderTargetDescriptor,
+  state: RefreshBackoffState,
+): string {
+  return `Dynamic model discovery backoff is active for ${target.providerName}/${target.backend}/${target.instanceId} `
+    + `until ${new Date(state.nextRefreshAllowedAt).toISOString()} after ${state.consecutiveFailures} `
+    + `failure(s): ${state.reason}`;
+}
+
+function computeBackoffState(
+  previous: RefreshBackoffState | null,
+  reason: string,
+  now: number,
+): RefreshBackoffState {
+  const consecutiveFailures = Math.max(1, (previous?.consecutiveFailures ?? 0) + 1);
+  const backoffMs = Math.min(
+    DEFAULT_DISCOVERY_BACKOFF_MS * (2 ** Math.max(0, consecutiveFailures - 1)),
+    MAX_DISCOVERY_BACKOFF_MS,
+  );
+  return {
+    consecutiveFailures,
+    lastFailureAt: now,
+    nextRefreshAllowedAt: now + backoffMs,
+    reason,
   };
 }
 
@@ -473,12 +573,40 @@ export function getStaticProviderModels(
   return cloneModels(STATIC_PROVIDER_MODELS[target.providerName] || []);
 }
 
+function resolveProviderModelCatalogStorageFile(
+  config: Pick<CliRuntimeConfig, 'dataDir' | 'sessionBaseDir'>,
+): string | null {
+  return typeof config.dataDir === 'string' && config.dataDir.length > 0
+    ? join(config.dataDir, 'provider-model-catalog', 'snapshots.json')
+    : null;
+}
+
+function isProviderModelCatalogEntry(value: unknown): value is ProviderModelCatalogEntry {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const record = value as Record<string, unknown>;
+  return typeof record.id === 'string'
+    && typeof record.label === 'string'
+    && (record.default === undefined || typeof record.default === 'boolean')
+    && (
+      record.status === undefined
+      || record.status === 'configured'
+      || record.status === 'available'
+      || record.status === 'running'
+    );
+}
+
 export class ProviderModelCatalogService {
   private readonly fetchImpl: typeof fetch;
   private readonly env: NodeJS.ProcessEnv;
   private readonly ttlMs: number;
   private readonly remoteDiscoveryTimeoutMs: number;
+  private readonly storageFile: string | null;
   private readonly dynamicCache = new Map<string, CachedDynamicModels>();
+  private readonly persistedSnapshots = new Map<string, CachedDynamicModels>();
+  private readonly refreshBackoff = new Map<string, RefreshBackoffState>();
 
   constructor(
     private readonly config: CliRuntimeConfig,
@@ -489,6 +617,8 @@ export class ProviderModelCatalogService {
     this.ttlMs = options.ttlMs ?? DEFAULT_TTL_MS;
     this.remoteDiscoveryTimeoutMs = options.remoteDiscoveryTimeoutMs
       ?? DEFAULT_REMOTE_MODEL_DISCOVERY_TIMEOUT_MS;
+    this.storageFile = resolveProviderModelCatalogStorageFile(config);
+    this.loadPersistedState();
   }
 
   async getCatalog(
@@ -581,6 +711,13 @@ export class ProviderModelCatalogService {
       return cachedDynamic;
     }
 
+    const persistedDynamic = this.getPersistedDynamicCatalog(target, defaultModel, warnings);
+    if (persistedDynamic) {
+      return persistedDynamic;
+    }
+
+    this.appendActiveBackoffWarning(target, warnings);
+
     const discoverySkipWarning = this.getDynamicDiscoverySkipWarning(target);
     if (discoverySkipWarning) {
       warnings.push(discoverySkipWarning);
@@ -630,12 +767,47 @@ export class ProviderModelCatalogService {
     }
 
     const stale = Date.now() - cached.cachedAt > this.ttlMs;
+    const backoff = this.getActiveBackoff(target);
+    if (backoff) {
+      warnings.push(describeBackoffState(target, backoff));
+    }
     return this.buildCatalog(target, {
       defaultModel,
       source: 'dynamic',
-      cache: buildCacheMetadata(this.ttlMs, cached.cachedAt, true, stale),
+      cache: buildCacheMetadata(this.ttlMs, cached.cachedAt, true, {
+        stale,
+        backoff,
+      }),
       models: withDefaultModel(cached.models, defaultModel).models,
       warnings: [...warnings, ...cached.warnings],
+    });
+  }
+
+  private getPersistedDynamicCatalog(
+    target: ProviderTargetDescriptor,
+    defaultModel: string | null,
+    warnings: string[],
+  ): ProviderModelCatalogResult | null {
+    const snapshot = this.persistedSnapshots.get(this.cacheKey(target));
+    if (!snapshot) {
+      return null;
+    }
+
+    const stale = Date.now() - snapshot.cachedAt > this.ttlMs;
+    const backoff = this.getActiveBackoff(target);
+    if (backoff) {
+      warnings.push(describeBackoffState(target, backoff));
+    }
+    return this.buildCatalog(target, {
+      defaultModel,
+      source: 'dynamic',
+      cache: buildCacheMetadata(this.ttlMs, snapshot.cachedAt, true, {
+        stale,
+        persisted: true,
+        backoff,
+      }),
+      models: withDefaultModel(snapshot.models, defaultModel).models,
+      warnings: [...warnings, ...snapshot.warnings],
     });
   }
 
@@ -647,15 +819,62 @@ export class ProviderModelCatalogService {
   ): Promise<ProviderModelCatalogResult | null> {
     const key = this.cacheKey(target);
     const cached = this.dynamicCache.get(key);
+    const persistedSnapshot = this.persistedSnapshots.get(key);
     const now = Date.now();
+    const backoff = this.getActiveBackoff(target);
     if (!options.forceRefresh && cached && now - cached.cachedAt < this.ttlMs) {
+      const responseWarnings = backoff
+        ? [...warnings, describeBackoffState(target, backoff), ...cached.warnings]
+        : [...warnings, ...cached.warnings];
       return this.buildCatalog(target, {
         defaultModel,
         source: 'dynamic',
-        cache: buildCacheMetadata(this.ttlMs, cached.cachedAt, true),
+        cache: buildCacheMetadata(this.ttlMs, cached.cachedAt, true, {
+          backoff,
+        }),
         models: withDefaultModel(cached.models, defaultModel).models,
-        warnings: [...warnings, ...cached.warnings],
+        warnings: responseWarnings,
       });
+    }
+
+    if (
+      !options.forceRefresh
+      && !cached
+      && persistedSnapshot
+      && now - persistedSnapshot.cachedAt < this.ttlMs
+    ) {
+      const responseWarnings = backoff
+        ? [...warnings, describeBackoffState(target, backoff), ...persistedSnapshot.warnings]
+        : [...warnings, ...persistedSnapshot.warnings];
+      return this.buildCatalog(target, {
+        defaultModel,
+        source: 'dynamic',
+        cache: buildCacheMetadata(this.ttlMs, persistedSnapshot.cachedAt, true, {
+          persisted: true,
+          backoff,
+        }),
+        models: withDefaultModel(persistedSnapshot.models, defaultModel).models,
+        warnings: responseWarnings,
+      });
+    }
+
+    if (backoff) {
+      warnings.push(describeBackoffState(target, backoff));
+      const snapshotFallback = this.getBestAvailableSnapshot(target);
+      if (snapshotFallback) {
+        return this.buildCatalog(target, {
+          defaultModel,
+          source: 'dynamic',
+          cache: buildCacheMetadata(this.ttlMs, snapshotFallback.snapshot.cachedAt, true, {
+            stale: true,
+            persisted: snapshotFallback.persisted,
+            backoff,
+          }),
+          models: withDefaultModel(snapshotFallback.snapshot.models, defaultModel).models,
+          warnings: [...warnings, ...snapshotFallback.snapshot.warnings],
+        });
+      }
+      return null;
     }
 
     const discoverySkipWarning = this.getDynamicDiscoverySkipWarning(target);
@@ -684,6 +903,13 @@ export class ProviderModelCatalogService {
         models: cloneModels(loaded.models),
         warnings: [...dynamicWarnings],
       });
+      this.persistedSnapshots.set(key, {
+        cachedAt: now,
+        models: cloneModels(loaded.models),
+        warnings: [...dynamicWarnings],
+      });
+      this.refreshBackoff.delete(key);
+      this.persistState();
 
       return this.buildCatalog(target, {
         defaultModel,
@@ -696,23 +922,96 @@ export class ProviderModelCatalogService {
       const errorMessage = `Dynamic model discovery failed for ${target.providerName}/${target.backend}/${target.instanceId}: ${
         error instanceof Error ? error.message : String(error)
       }`;
-      if (cached) {
+      const nextBackoff = computeBackoffState(this.refreshBackoff.get(key) ?? null, errorMessage, now);
+      this.refreshBackoff.set(key, nextBackoff);
+      this.persistState();
+      const snapshotFallback = this.getBestAvailableSnapshot(target);
+      if (snapshotFallback) {
         return this.buildCatalog(target, {
           defaultModel,
           source: 'dynamic',
-          cache: buildCacheMetadata(this.ttlMs, cached.cachedAt, true, true),
-          models: withDefaultModel(cached.models, defaultModel).models,
+          cache: buildCacheMetadata(this.ttlMs, snapshotFallback.snapshot.cachedAt, true, {
+            stale: true,
+            persisted: snapshotFallback.persisted,
+            backoff: nextBackoff,
+          }),
+          models: withDefaultModel(snapshotFallback.snapshot.models, defaultModel).models,
           warnings: [
             ...warnings,
-            ...cached.warnings,
-            `${errorMessage} Serving stale cached catalog from ${new Date(cached.cachedAt).toISOString()}.`,
+            ...snapshotFallback.snapshot.warnings,
+            `${errorMessage} Serving stale cached catalog from ${new Date(snapshotFallback.snapshot.cachedAt).toISOString()}.`,
+            describeBackoffState(target, nextBackoff),
           ],
         });
       }
 
       warnings.push(errorMessage);
+      warnings.push(describeBackoffState(target, nextBackoff));
       return null;
     }
+  }
+
+  private getBestAvailableSnapshot(
+    target: ProviderTargetDescriptor,
+  ): { snapshot: CachedDynamicModels; persisted: boolean } | null {
+    const key = this.cacheKey(target);
+    const cached = this.dynamicCache.get(key);
+    const persisted = this.persistedSnapshots.get(key);
+    if (!cached && !persisted) {
+      return null;
+    }
+    if (!cached && persisted) {
+      return {
+        snapshot: persisted,
+        persisted: true,
+      };
+    }
+    if (cached && !persisted) {
+      return {
+        snapshot: cached,
+        persisted: false,
+      };
+    }
+
+    if ((persisted?.cachedAt ?? 0) > (cached?.cachedAt ?? 0)) {
+      return {
+        snapshot: persisted as CachedDynamicModels,
+        persisted: true,
+      };
+    }
+
+    return {
+      snapshot: cached as CachedDynamicModels,
+      persisted: false,
+    };
+  }
+
+  private appendActiveBackoffWarning(
+    target: ProviderTargetDescriptor,
+    warnings: string[],
+  ): void {
+    const backoff = this.getActiveBackoff(target);
+    if (backoff) {
+      warnings.push(describeBackoffState(target, backoff));
+    }
+  }
+
+  private getActiveBackoff(
+    target: ProviderTargetDescriptor,
+  ): RefreshBackoffState | null {
+    const key = this.cacheKey(target);
+    const state = this.refreshBackoff.get(key);
+    if (!state) {
+      return null;
+    }
+
+    if (state.nextRefreshAllowedAt <= Date.now()) {
+      this.refreshBackoff.delete(key);
+      this.persistState();
+      return null;
+    }
+
+    return state;
   }
 
   private getDynamicDiscoverySkipWarning(
@@ -1081,6 +1380,114 @@ export class ProviderModelCatalogService {
       models: withDefaultModel(getStaticProviderModels(target), defaultModel).models,
       warnings,
     });
+  }
+
+  private loadPersistedState(): void {
+    if (!this.storageFile || !existsSync(this.storageFile)) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(readFileSync(this.storageFile, 'utf8')) as PersistedProviderModelCatalogState;
+      if (!parsed || typeof parsed !== 'object' || parsed.version !== 1) {
+        return;
+      }
+
+      if (Array.isArray(parsed.snapshots)) {
+        for (const snapshot of parsed.snapshots) {
+          if (!snapshot || typeof snapshot !== 'object') {
+            continue;
+          }
+          const cachedAtMs = Date.parse(snapshot.cachedAt);
+          if (
+            typeof snapshot.key !== 'string'
+            || (snapshot.source !== undefined && snapshot.source !== 'dynamic')
+            || Number.isNaN(cachedAtMs)
+            || !Array.isArray(snapshot.models)
+            || snapshot.models.some((entry) => !isProviderModelCatalogEntry(entry))
+          ) {
+            continue;
+          }
+          this.persistedSnapshots.set(snapshot.key, {
+            cachedAt: cachedAtMs,
+            models: cloneModels(snapshot.models),
+            warnings: Array.isArray(snapshot.warnings)
+              ? snapshot.warnings.filter((warning): warning is string => typeof warning === 'string')
+              : [],
+          });
+        }
+      }
+
+      if (Array.isArray(parsed.backoff)) {
+        for (const record of parsed.backoff) {
+          if (!record || typeof record !== 'object') {
+            continue;
+          }
+          const lastFailureAt = Date.parse(record.lastFailureAt);
+          const nextRefreshAllowedAt = Date.parse(record.nextRefreshAllowedAt);
+          if (
+            typeof record.key !== 'string'
+            || typeof record.reason !== 'string'
+            || typeof record.consecutiveFailures !== 'number'
+            || !Number.isFinite(record.consecutiveFailures)
+            || Number.isNaN(lastFailureAt)
+            || Number.isNaN(nextRefreshAllowedAt)
+          ) {
+            continue;
+          }
+          this.refreshBackoff.set(record.key, {
+            consecutiveFailures: Math.max(1, Math.trunc(record.consecutiveFailures)),
+            lastFailureAt,
+            nextRefreshAllowedAt,
+            reason: record.reason,
+          });
+        }
+      }
+    } catch {
+      // Ignore corrupt persisted state; the runtime can rebuild snapshots from live refreshes.
+    }
+  }
+
+  private persistState(): void {
+    if (!this.storageFile) {
+      return;
+    }
+
+    const payload: PersistedProviderModelCatalogState = {
+      version: 1,
+      snapshots: Array.from(this.persistedSnapshots.entries()).map(([key, snapshot]) => {
+        const [provider, backend, instance] = key.split(':');
+        return {
+          key,
+          provider: provider || 'unknown',
+          backend: (backend || 'cli') as BackendKind,
+          instance: instance || 'default',
+          source: 'dynamic',
+          cachedAt: new Date(snapshot.cachedAt).toISOString(),
+          models: cloneModels(snapshot.models),
+          warnings: [...snapshot.warnings],
+        };
+      }),
+      backoff: Array.from(this.refreshBackoff.entries()).map(([key, state]) => {
+        const [provider, backend, instance] = key.split(':');
+        return {
+          key,
+          provider: provider || 'unknown',
+          backend: (backend || 'cli') as BackendKind,
+          instance: instance || 'default',
+          consecutiveFailures: state.consecutiveFailures,
+          lastFailureAt: new Date(state.lastFailureAt).toISOString(),
+          nextRefreshAllowedAt: new Date(state.nextRefreshAllowedAt).toISOString(),
+          reason: state.reason,
+        };
+      }),
+    };
+
+    mkdirSync(dirname(this.storageFile), { recursive: true });
+    const nextContent = `${JSON.stringify(payload, null, 2)}\n`;
+    const tempFile = `${this.storageFile}.tmp`;
+    writeFileSync(tempFile, nextContent, 'utf8');
+    renameSync(tempFile, this.storageFile);
   }
 
   private buildCatalog(

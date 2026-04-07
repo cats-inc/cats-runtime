@@ -5480,6 +5480,9 @@ providers:
           expect.stringContaining(
             'Dynamic model discovery failed for ollama/local/local: connection refused',
           ),
+          expect.stringContaining(
+            'Dynamic model discovery backoff is active for ollama/local/local until ',
+          ),
         ],
       });
     });
@@ -5590,6 +5593,13 @@ providers:
             cachedAt: '2026-03-27T00:00:00.000Z',
             ttlSec: 60,
             stale: true,
+            backoff: {
+              active: true,
+              consecutiveFailures: 1,
+              lastFailureAt: '2026-03-27T00:01:01.000Z',
+              nextRefreshAllowedAt: '2026-03-27T00:02:01.000Z',
+              reason: 'Dynamic model discovery failed for ollama/local/local: connection refused',
+            },
           },
           models: [
             {
@@ -5607,6 +5617,47 @@ providers:
           ],
           warnings: [
             'Dynamic model discovery failed for ollama/local/local: connection refused Serving stale cached catalog from 2026-03-27T00:00:00.000Z.',
+            'Dynamic model discovery backoff is active for ollama/local/local until 2026-03-27T00:02:01.000Z after 1 failure(s): Dynamic model discovery failed for ollama/local/local: connection refused',
+          ],
+        });
+
+        const third = await runtime.app.request('/providers/ollama/models?refresh=1');
+        expect(third.status).toBe(200);
+        expect(await third.json()).toEqual({
+          provider: 'ollama',
+          backend: 'local',
+          instance: 'local',
+          defaultModel: 'qwen2.5-coder:7b',
+          source: 'dynamic',
+          cache: {
+            servedFromCache: true,
+            cachedAt: '2026-03-27T00:00:00.000Z',
+            ttlSec: 60,
+            stale: true,
+            backoff: {
+              active: true,
+              consecutiveFailures: 1,
+              lastFailureAt: '2026-03-27T00:01:01.000Z',
+              nextRefreshAllowedAt: '2026-03-27T00:02:01.000Z',
+              reason: 'Dynamic model discovery failed for ollama/local/local: connection refused',
+            },
+          },
+          models: [
+            {
+              id: 'deepseek-r1:14b',
+              label: 'deepseek-r1:14b',
+              default: false,
+              status: 'available',
+            },
+            {
+              id: 'qwen2.5-coder:7b',
+              label: 'qwen2.5-coder:7b',
+              default: true,
+              status: 'running',
+            },
+          ],
+          warnings: [
+            'Dynamic model discovery backoff is active for ollama/local/local until 2026-03-27T00:02:01.000Z after 1 failure(s): Dynamic model discovery failed for ollama/local/local: connection refused',
           ],
         });
         expect(fetchMock).toHaveBeenCalledTimes(3);
