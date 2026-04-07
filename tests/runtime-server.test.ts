@@ -4027,12 +4027,12 @@ providers:
         provider: 'claude',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'default',
+        defaultModel: 'opus',
         source: 'static',
         cache: null,
         presets: [],
         defaultSelection: {
-          entryId: 'default',
+          entryId: 'opus',
           entryMode: 'explicit',
           controls: {
             'claude.reasoning_effort': 'medium',
@@ -4044,19 +4044,19 @@ providers:
         warnings: [],
       });
       expect(payload.entries.map((entry: { id: string }) => entry.id)).toEqual([
-        'default',
+        'opus',
         'sonnet',
         'haiku',
       ]);
       expect(payload.controls).toMatchObject([
         {
           key: 'claude.reasoning_effort',
-          applicableEntryIds: ['default', 'sonnet'],
+          applicableEntryIds: ['opus', 'sonnet'],
           values: [
-            { value: 'low', applicableEntryIds: ['default', 'sonnet'] },
-            { value: 'medium', applicableEntryIds: ['default', 'sonnet'] },
-            { value: 'high', applicableEntryIds: ['default', 'sonnet'] },
-            { value: 'max', applicableEntryIds: ['default'] },
+            { value: 'low', applicableEntryIds: ['opus', 'sonnet'] },
+            { value: 'medium', applicableEntryIds: ['opus', 'sonnet'] },
+            { value: 'high', applicableEntryIds: ['opus', 'sonnet'] },
+            { value: 'max', applicableEntryIds: ['opus'] },
           ],
         },
       ]);

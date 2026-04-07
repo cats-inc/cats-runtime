@@ -83,7 +83,7 @@ function buildEntryNotes(
 ): string[] | undefined {
   if (target.providerName === 'claude' && target.backend === 'cli') {
     switch (entryId) {
-      case 'default':
+      case 'opus':
         return ['Most capable for complex work.'];
       case 'sonnet':
         return ['Best for everyday tasks.'];
@@ -297,7 +297,7 @@ function buildClaudeCliControls(
   entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>>;
 } {
   const effortEntryIds = entries
-    .filter((entry) => entry.id === 'default' || entry.id === 'sonnet')
+    .filter((entry) => entry.id === 'opus' || entry.id === 'sonnet')
     .map((entry) => entry.id);
   if (effortEntryIds.length === 0) {
     return {
@@ -336,7 +336,7 @@ function buildClaudeCliControls(
           value: 'max',
           label: 'Max',
           description: 'Maximum effort for the most complex work.',
-          applicableEntryIds: ['default'],
+          applicableEntryIds: ['opus'],
         },
       ]),
       applicableEntryIds: effortEntryIds,

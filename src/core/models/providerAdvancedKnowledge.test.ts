@@ -282,11 +282,11 @@ describe('buildProviderAdvancedKnowledge', () => {
       provider: 'claude',
       backend: 'cli',
       instance: 'default',
-      defaultModel: 'default',
+      defaultModel: 'opus',
       source: 'static',
       cache: null,
       models: [
-        { id: 'default', label: 'Opus 4.6 with 1M context', default: true },
+        { id: 'opus', label: 'Opus 4.6 with 1M context', default: true },
         { id: 'sonnet', label: 'Sonnet 4.6' },
         { id: 'haiku', label: 'Haiku 4.5' },
       ],
@@ -309,10 +309,10 @@ describe('buildProviderAdvancedKnowledge', () => {
     });
     expect(knowledge.catalog.entries).toEqual([
       {
-        id: 'default',
+        id: 'opus',
         label: 'Opus 4.6 with 1M context',
         default: true,
-        capabilityTags: ['tool_use'],
+        capabilityTags: ['tool_use', 'reasoning'],
         notes: ['Most capable for complex work.'],
       },
       {
@@ -339,32 +339,32 @@ describe('buildProviderAdvancedKnowledge', () => {
           value: 'low',
           label: 'Low',
           description: 'Lighter reasoning for faster responses.',
-          applicableEntryIds: ['default', 'sonnet'],
+          applicableEntryIds: ['opus', 'sonnet'],
         },
         {
           value: 'medium',
           label: 'Medium (default)',
           description: 'Balanced effort for most work.',
-          applicableEntryIds: ['default', 'sonnet'],
+          applicableEntryIds: ['opus', 'sonnet'],
         },
         {
           value: 'high',
           label: 'High',
           description: 'Greater depth for complex tasks.',
-          applicableEntryIds: ['default', 'sonnet'],
+          applicableEntryIds: ['opus', 'sonnet'],
         },
         {
           value: 'max',
           label: 'Max',
           description: 'Maximum effort for the most complex work.',
-          applicableEntryIds: ['default'],
+          applicableEntryIds: ['opus'],
         },
       ],
-      applicableEntryIds: ['default', 'sonnet'],
+      applicableEntryIds: ['opus', 'sonnet'],
       semanticTags: ['reasoning_intensity'],
     });
     expect(knowledge.catalog.defaultSelection).toEqual({
-      entryId: 'default',
+      entryId: 'opus',
       entryMode: 'explicit',
       controls: {
         'claude.reasoning_effort': 'medium',

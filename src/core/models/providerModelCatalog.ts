@@ -181,7 +181,7 @@ const KIRO_WSL_MODELS: ProviderModelCatalogEntry[] = [
 
 const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
   claude: [
-    { id: 'default', label: 'Opus 4.6 with 1M context', default: true },
+    { id: 'opus', label: 'Opus 4.6 with 1M context', default: true },
     { id: 'sonnet', label: 'Sonnet 4.6' },
     { id: 'haiku', label: 'Haiku 4.5' },
   ],
@@ -273,8 +273,8 @@ export function normalizeProviderCatalogModelId(
 
   if (target.providerName === 'claude' && target.backend === 'cli') {
     const lower = normalized.toLowerCase();
-    if (lower === 'claude-opus-4-6' || lower === 'claude-opus-4.6' || lower === 'default') {
-      return 'default';
+    if (lower === 'claude-opus-4-6' || lower === 'claude-opus-4.6' || lower === 'opus') {
+      return 'opus';
     }
     if (lower === 'claude-sonnet-4-6' || lower === 'claude-sonnet-4.6' || lower === 'sonnet') {
       return 'sonnet';

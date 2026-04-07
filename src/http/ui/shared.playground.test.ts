@@ -62,16 +62,16 @@ describe('shared playground selection helpers', () => {
           provider: 'claude',
           backend: 'cli',
           instance: 'default',
-          defaultModel: 'default',
+          defaultModel: 'opus',
           entries: [
-            { id: 'default', label: 'Opus 4.6 with 1M context', default: true },
+            { id: 'opus', label: 'Opus 4.6 with 1M context', default: true },
             { id: 'sonnet', label: 'Sonnet 4.6' },
           ],
           presets: [],
           controls: [],
           defaultSelection: {
             entryMode: 'explicit',
-            entryId: 'default',
+            entryId: 'opus',
           },
           support: { tier: 'full' },
           warnings: [],
@@ -84,7 +84,7 @@ describe('shared playground selection helpers', () => {
       model: '',
       modelSelection: {
         entryMode: 'explicit',
-        entryId: 'default',
+        entryId: 'opus',
       },
     });
   });
@@ -97,7 +97,7 @@ describe('shared playground selection helpers', () => {
       model: 'claude-opus-4-6',
       modelSelection: {
         entryMode: 'explicit',
-        entryId: 'default',
+        entryId: 'opus',
         controls: {
           'claude.reasoning_effort': 'max',
         },
@@ -129,7 +129,7 @@ describe('shared playground selection helpers', () => {
                 { value: 'low', applicableEntryIds: ['sonnet'] },
                 { value: 'medium', applicableEntryIds: ['sonnet'] },
                 { value: 'high', applicableEntryIds: ['sonnet'] },
-                { value: 'max', applicableEntryIds: ['default'] },
+                { value: 'max', applicableEntryIds: ['opus'] },
               ],
               applicableEntryIds: ['sonnet'],
               semanticTags: ['reasoning_intensity'],

@@ -1697,7 +1697,7 @@ Minimal create example:
   "provider": "claude",
   "instance": "native",
   "cwd": "C:/repo",
-  "model": "claude-opus-4-6",
+  "model": "opus",
   "permissionMode": "skip"
 }
 ```

@@ -2,7 +2,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { ProviderModelCatalogService } from './providerModelCatalog.js';
+import {
+  normalizeProviderCatalogModelId,
+  ProviderModelCatalogService,
+} from './providerModelCatalog.js';
 
 function createCatalogConfig() {
   return {
@@ -96,6 +99,19 @@ function createCatalogConfig() {
     },
   } as const;
 }
+
+describe('normalizeProviderCatalogModelId', () => {
+  it('does not treat default as a Claude opus alias', () => {
+    expect(normalizeProviderCatalogModelId({
+      providerName: 'claude',
+      backend: 'cli',
+    }, 'default')).toBe('default');
+    expect(normalizeProviderCatalogModelId({
+      providerName: 'claude',
+      backend: 'cli',
+    }, 'claude-opus-4-6')).toBe('opus');
+  });
+});
 
 function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), {
