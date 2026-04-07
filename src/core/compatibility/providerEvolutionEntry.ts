@@ -20,6 +20,7 @@ import { CodexProvider } from '../../backends/cli/providers/codex.js';
 import { CopilotProvider } from '../../backends/cli/providers/copilot.js';
 import { GeminiProvider } from '../../backends/cli/providers/gemini.js';
 import { GooseProvider } from '../../backends/cli/providers/goose.js';
+import { JunieProvider } from '../../backends/cli/providers/junie.js';
 import { PiProvider } from '../../backends/cli/providers/pi.js';
 import { WorkerProcess } from '../../backends/cli/pool/WorkerProcess.js';
 import {
@@ -57,6 +58,7 @@ const SUPPORTED_CLI_PROBE_PROVIDERS = new Set<ProviderName>([
   'goose',
   'gemini',
   'claude',
+  'junie',
 ]);
 
 export interface ProviderEvolutionEntryContext {
@@ -478,6 +480,12 @@ function createProbeProvider(
     case 'goose':
       return new GooseProvider(
         new GooseNativeSessionService({ command: instance.commandConfig.path }),
+        observer,
+      );
+    case 'junie':
+      return new JunieProvider(
+        instance.commandConfig,
+        undefined,
         observer,
       );
     default:

@@ -25,6 +25,7 @@ import type {
 } from '../../../core/types.js';
 import { compileRuntimeTurnPrompt } from './prompt.js';
 import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
+import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
 
 const DEFAULT_JUNIE_SESSIONS_DIR = join(os.homedir(), '.junie', 'sessions');
 const SESSION_POLL_INTERVAL_MS = 250;
@@ -49,6 +50,7 @@ export class JunieProvider implements Provider {
   constructor(
     commandConfig?: ProviderCommandConfig,
     sessionsDir: string = DEFAULT_JUNIE_SESSIONS_DIR,
+    private readonly evolutionObserver?: ProviderEvolutionEvidenceObserver,
   ) {
     this.commandConfig = commandConfig;
     this.sessionsDir = sessionsDir;
@@ -112,7 +114,7 @@ export class JunieProvider implements Provider {
   }
 
   parseStreamLine(line: string): StreamEvent | StreamEvent[] | null {
-    return parseJunieStreamLine(line);
+    return parseJunieStreamLine(line, this.evolutionObserver);
   }
 
   async *streamTurn(turn: TurnInput, opts: ProviderTurnOptions): AsyncGenerator<StreamEvent> {
@@ -293,7 +295,7 @@ export class JunieProvider implements Provider {
       const rl = createInterface({ input: stdout });
       rl.on('line', (line) => {
         if (finished) return;
-        applyEvents(parseJunieStreamLine(line));
+        applyEvents(parseJunieStreamLine(line, this.evolutionObserver));
       });
     }
 

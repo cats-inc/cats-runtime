@@ -5,6 +5,7 @@ import { CodexProvider } from './codex.js';
 import { CopilotProvider } from './copilot.js';
 import { GeminiProvider } from './gemini.js';
 import { GooseProvider } from './goose.js';
+import { JunieProvider } from './junie.js';
 import { PiProvider } from './pi.js';
 import type { GooseNativeSessionService } from '../goose/GooseNativeSessionService.js';
 
@@ -371,5 +372,42 @@ describe('provider evolution instrumentation', () => {
     const bundle = collector.finalize();
     expect(bundle.summary.ignoredEventTypes.response).toBe(1);
     expect(bundle.summary.unknownEventTypes.some_future_event).toBe(1);
+  });
+
+  it('records normalized and raw passthrough Junie stdout paths', () => {
+    const collector = new ProviderEvolutionEvidenceCollector({
+      provider: 'junie',
+      instance: 'default',
+      parserId: 'junie-json',
+      probeProfile: 'manual-smoke',
+      transport: 'cli',
+    });
+    const provider = new JunieProvider(undefined, undefined, collector);
+
+    expect(provider.parseStreamLine('Downloading tool metadata...')).toEqual({
+      type: 'raw',
+      text: 'Downloading tool metadata...',
+    });
+    expect(provider.parseStreamLine(JSON.stringify({
+      sessionId: 'junie-session-1',
+      taskName: 'Runtime probe',
+      result: 'probe-complete',
+      llmUsage: [{ inputTokens: 10, outputTokens: 4 }],
+    }))).toEqual([
+      {
+        type: 'text',
+        text: 'probe-complete',
+      },
+      expect.objectContaining({
+        type: 'result',
+        sessionId: 'junie-session-1',
+      }),
+    ]);
+
+    const bundle = collector.finalize();
+    expect(bundle.summary.rawPassthroughCount).toBe(1);
+    expect(bundle.summary.normalizedCount).toBe(1);
+    expect(bundle.summary.normalizedEventTypes.text).toBe(1);
+    expect(bundle.summary.normalizedEventTypes.result).toBe(1);
   });
 });

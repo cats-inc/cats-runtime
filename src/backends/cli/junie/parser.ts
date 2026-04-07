@@ -8,6 +8,12 @@ import type {
   ToolResultStreamEvent,
   ToolUseStreamEvent,
 } from '../../../core/types.js';
+import type { ProviderEvolutionEvidenceObserver } from '../../../core/compatibility/providerEvolution.js';
+import {
+  observeIgnored,
+  observeNormalized,
+  observeRawPassthrough,
+} from '../../../core/compatibility/providerEvolution.js';
 import { createRuntimeProgressEvent } from '../../../core/progress.js';
 
 export interface JunieUsageTotals {
@@ -59,7 +65,10 @@ export interface ParsedJunieSessionEvent {
  * using --output-format json. Non-JSON lines (e.g. progress messages on
  * stderr leak) are passed through as raw.
  */
-export function parseJunieStreamLine(line: string): StreamEvent | StreamEvent[] | null {
+export function parseJunieStreamLine(
+  line: string,
+  observer?: ProviderEvolutionEvidenceObserver,
+): StreamEvent | StreamEvent[] | null {
   const trimmed = line.trim();
   if (!trimmed) return null;
 
@@ -67,12 +76,20 @@ export function parseJunieStreamLine(line: string): StreamEvent | StreamEvent[] 
   try {
     data = JSON.parse(trimmed);
   } catch {
-    return { type: 'raw', text: trimmed } satisfies RawStreamEvent;
+    return observeRawPassthrough(observer, {
+      rawEventType: 'junie.stdout.raw',
+      reason: 'non_json_stdout',
+      rawSample: trimmed,
+    }, { type: 'raw', text: trimmed } satisfies RawStreamEvent);
   }
 
   // Empty object {} means no result (e.g. failed session resume)
   if (!data.sessionId && !data.result && !data.taskName) {
-    return null;
+    return observeIgnored(observer, {
+      rawEventType: 'junie.result.empty',
+      reason: 'empty_result_blob',
+      rawSample: data,
+    }, null);
   }
 
   const usage = aggregateJunieUsage(data.llmUsage);
@@ -88,7 +105,13 @@ export function parseJunieStreamLine(line: string): StreamEvent | StreamEvent[] 
     metadata: usage ? { runtimeUsage: toJunieRuntimeUsage(usage) } : undefined,
   } satisfies ResultStreamEvent);
 
-  return events.length === 1 ? events[0] : events;
+  return observeNormalized(observer, {
+    rawEventType: 'JunieResult',
+    details: {
+      source: 'stdout',
+    },
+    rawSample: data,
+  }, events.length === 1 ? events[0] : events);
 }
 
 export function parseJunieSessionEventLine(
