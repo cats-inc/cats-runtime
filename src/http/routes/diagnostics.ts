@@ -2091,7 +2091,7 @@ async function buildProviderDiagnosticsPayload(
     filters,
     {
       includeArtifacts: scope !== 'availability',
-      compatibilityPurpose: 'diagnostics',
+      compatibilityPurpose: scope === 'availability' ? 'health' : 'diagnostics',
     },
   );
   const summary = summarizeProviderDiagnostics(catalog, providers, {

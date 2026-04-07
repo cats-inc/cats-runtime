@@ -476,6 +476,23 @@ describe('provider diagnostics HTTP contract', () => {
     }
   });
 
+  it('uses the lightweight compatibility path on availability-scoped provider diagnostics', async () => {
+    const installCheckRunner = createInstallCheckRunner();
+    const app = createTestApp(makeConfig(), {
+      installCheckRunner,
+    });
+
+    const response = await app.request(
+      '/diagnostics/providers?scope=availability&provider=claude&backend=cli&instance=default&force=1',
+    );
+    expect(response.status).toBe(200);
+    expect(installCheckRunner.lookupCommand).not.toHaveBeenCalled();
+    expect(installCheckRunner.checkPath).not.toHaveBeenCalled();
+    expect(installCheckRunner.checkNpmPackage).not.toHaveBeenCalled();
+    expect(installCheckRunner.checkShellRcEntry).not.toHaveBeenCalled();
+    expect(installCheckRunner.getNpmPrefix).not.toHaveBeenCalled();
+  });
+
   it('uses the lightweight compatibility path on health diagnostics', async () => {
     const installCheckRunner = createInstallCheckRunner();
     const app = createTestApp(makeConfig(), {
