@@ -152,6 +152,13 @@ The repo also includes a non-publishing GitHub Actions preflight workflow at
 `../.github/workflows/cats-runtime-release-preflight.yml` that runs
 `npm run release:check` without attempting a registry publish.
 
+The repo also now carries a manual publish workflow at
+`../.github/workflows/cats-runtime-npm-publish.yml` with OIDC
+`id-token: write` permission and `next` / `latest` dist-tag selection, but that
+workflow is still only a repo-owned skeleton until the exact npm trusted
+publisher is configured against the matching GitHub repository and workflow
+filename.
+
 The executable package starts the same runtime entrypoint as `npm start` and
 supports either bootstrap-first startup with no preexisting `providers.yaml`,
 or a preseeded valid config / equivalent environment overrides.

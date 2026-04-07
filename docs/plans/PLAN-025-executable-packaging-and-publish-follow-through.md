@@ -7,7 +7,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Completed (Repo-Owned Pre-Publish Prep Landed) |
+| **Status** | Completed (Repo-Owned Pre-Publish Prep and Publish-Workflow Skeleton Landed) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User |
@@ -131,6 +131,7 @@ without claiming publish infrastructure that is not actually configured yet.
 | 2026-04-06 | Runtime build-output follow-through moved those package-contract smoke checks and published entrypoints under `build/runtime/index.js` and `build/runtime/bin/mcp.js`, keeping packaging validation aligned with the live runtime layout after `PLAN-031` closed |
 | 2026-04-07 | `PLAN-019` landed canonical `src/http/ui/pages/*.html` sources plus emitted `public/*.html` artifacts under `build:ui`, so this packaging workstream is now blocked only on release/publish follow-through rather than stale runtime page-generation ambiguity |
 | 2026-04-07 | Phase 3 landed: the package name posture is now frozen to unscoped `cats-runtime`, docs align `next` vs `latest`, and `.github/workflows/cats-runtime-release-preflight.yml` now runs `npm run release:check` without publishing or claiming trusted publishing is configured |
+| 2026-04-07 | Trusted-publishing readiness follow-through landed: `cats-runtime/.nvmrc` now matches the Node 22 runtime baseline, `.github/workflows/cats-runtime-npm-publish.yml` reserves the exact repo-owned publish workflow filename with `id-token: write` and bounded `next` / `latest` dispatch, and release/research docs now pin the exact npm-side org/repo/workflow matching requirements without claiming the npm trusted publisher is already configured |
 
 ---
 

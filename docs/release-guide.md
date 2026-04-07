@@ -117,6 +117,29 @@ It intentionally does **not**:
 Use it to keep the release gate reproducible in GitHub before the first real
 manual prerelease is attempted.
 
+## Repo-Owned Trusted Publishing Skeleton
+
+The repository also now includes a dedicated manual publish workflow at:
+
+- `.github/workflows/cats-runtime-npm-publish.yml`
+
+That workflow exists so npm trusted publishing can later bind to a stable
+GitHub Actions workflow filename without forcing a publish in this repo slice.
+
+Current repo-owned facts:
+
+- it is `workflow_dispatch` only
+- it requests `id-token: write`
+- it uses `cats-runtime/.nvmrc`, which is now aligned to the Node 22 runtime
+  baseline
+- it runs `npm ci`
+- it runs `npm run release:check`
+- it then runs `npm publish --tag <next|latest>`
+
+This still does **not** mean npm trusted publishing is already configured for
+`cats-runtime`. A successful publish depends on external npm-side trusted
+publisher setup matching the same GitHub repository and workflow filename.
+
 ### Manual stable release
 
 After the beta is validated:
@@ -171,32 +194,41 @@ Also validate installation:
 npm install cats-runtime
 ```
 
-## Future State: Trusted Publishing
+## Future State: Trusted Publishing Activation
 
-After the first manual prerelease is proven, add a separate GitHub Actions
-publish workflow and move publish to trusted publishing.
+After the first manual prerelease is proven, keep the dedicated publish
+workflow and finish the external npm trusted-publisher activation around it.
 
-The current preflight workflow is intentionally not that publish workflow. It
-exists to prove the repo-side gate without pretending npm/GitHub external
-configuration is already complete.
+The current preflight workflow is intentionally separate from the publish
+workflow. The publish workflow file now exists, but the npm-side trust
+relationship still has to be configured and proven outside the repo.
 
-Recommended direction:
+Recommended activation checklist:
 
-1. Keep the repository public for public provenance support.
-2. Create a GitHub Actions workflow dedicated to npm publishing.
-3. Configure npm trusted publishing for that exact repository and workflow
-   filename.
-4. Give the workflow `id-token: write` permission.
-5. Publish from Git tags or a protected manual release workflow.
-6. Once trusted publishing works, restrict or remove long-lived publish tokens.
+1. Keep the repository public if public provenance support is desired.
+2. Configure npm trusted publishing for the exact GitHub org/user, repository,
+   and workflow filename `cats-runtime-npm-publish.yml`.
+3. If GitHub environment protection is later added, register the same
+   environment name in npm trusted publisher settings.
+4. Keep the publish workflow on GitHub-hosted runners; npm does not currently
+   support self-hosted runners for trusted publishing.
+5. Keep `package.json` `repository.url` exactly aligned with the GitHub repo.
+6. Use protected manual dispatch first, then decide later whether to move the
+   same workflow to tag- or release-driven publishing.
+7. Once trusted publishing works, restrict or remove long-lived publish tokens.
 
 Important notes from npm's current guidance:
 
 - trusted publishing is preferred over long-lived tokens
+- trusted publishing currently requires npm CLI `11.5.1+` and Node
+  `22.14.0+`
 - GitHub-hosted runners are supported; self-hosted runners are not currently
   supported
+- npm trusted publisher matching is exact for the GitHub repository and
+  workflow filename
 - provenance is generated automatically for public packages published from
-  public repositories through trusted publishing
+  public repositories through trusted publishing, so that path does not need
+  a separate `--provenance` flag
 
 ## Package Metadata Expectations
 
@@ -229,6 +261,7 @@ That keeps the package aligned with the process-boundary ADRs.
 - npm publish: https://docs.npmjs.com/cli/v8/commands/npm-publish
 - Trusted publishing: https://docs.npmjs.com/trusted-publishers/
 - Provenance: https://docs.npmjs.com/generating-provenance-statements
+- GitHub Actions npm publish guide: https://docs.github.com/en/actions/tutorials/publish-packages/publish-nodejs-packages
 - Scoped public packages: https://docs.npmjs.com/creating-and-publishing-scoped-public-packages/
 - Unscoped public packages: https://docs.npmjs.com/creating-and-publishing-unscoped-public-packages
 

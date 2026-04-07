@@ -1541,6 +1541,12 @@ remaining work is follow-through and publication discipline:
 - `.github/workflows/cats-runtime-release-preflight.yml` now runs
   `npm run release:check` in GitHub Actions without `npm publish` or
   `id-token: write`
+- `.github/workflows/cats-runtime-npm-publish.yml` now exists as the dedicated
+  manual npm publish workflow filename with `id-token: write`, while the
+  matching npm trusted-publisher configuration is still an external follow-
+  through rather than a landed repo fact
+- `cats-runtime/.nvmrc` now aligns repo automation with the Node 22 runtime
+  baseline instead of the older Node 20 line
 
 #### Follow-through Checklist
 
@@ -1552,11 +1558,14 @@ remaining work is follow-through and publication discipline:
   - publish a prerelease under `next`
   - validate `npx cats-runtime@next --help` and install flow against the actual
     registry artifact
-- add GitHub Actions trusted publishing once the manual release path is proven:
-  - dedicated publish workflow
-  - `id-token: write`
-  - npm trusted publisher configuration
-  - publish trigger discipline from tags or protected manual release workflow
+- activate npm trusted publishing once the manual release path is proven:
+  - keep `.github/workflows/cats-runtime-npm-publish.yml` as the exact npm
+    trusted-publisher workflow filename
+  - configure npm trusted publisher against the exact GitHub org/user, repo,
+    workflow filename, and optional environment name
+  - keep the workflow on GitHub-hosted runners with `id-token: write`
+  - decide whether the long-term trigger should stay protected manual dispatch
+    or move to tags/releases after the first real publish is proven
 - update deployment/release docs after the first publish so they stop
   describing registry execution as an unproven path
 

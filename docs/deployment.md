@@ -53,6 +53,12 @@ The repo also now includes a non-publishing GitHub Actions preflight workflow
 at `../../.github/workflows/cats-runtime-release-preflight.yml` that runs
 `npm run release:check` without calling `npm publish`.
 
+The repo now also carries a manual publish workflow at
+`../../.github/workflows/cats-runtime-npm-publish.yml` with OIDC
+`id-token: write` permission. That workflow is only the repo-owned skeleton for
+later npm trusted publishing and still depends on exact npm-side trusted
+publisher configuration before any successful registry publish can happen.
+
 Once published, the public package flow is expected to be:
 
 ```powershell

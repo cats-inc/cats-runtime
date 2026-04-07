@@ -26,7 +26,7 @@ These important documents live in the project root:
 | [setup-guide.md](./setup-guide.md) | Complete | Environment setup, startup contract, and diagnostics/compatibility basics |
 | [testing.md](./testing.md) | Complete | Testing strategy |
 | [deployment.md](./deployment.md) | Complete | Standalone and app-managed local deployment guidance |
-| [release-guide.md](./release-guide.md) | Complete | npm packaging, release, and future trusted publishing workflow |
+| [release-guide.md](./release-guide.md) | Complete | npm packaging, release, and repo-owned trusted publishing readiness workflow |
 | [security-guidelines.md](./security-guidelines.md) | Template | Security policies |
 | [mcp-config.md](./mcp-config.md) | Template | MCP server configuration |
 | [services.md](./services.md) | Complete | Service registry and port assignments |
@@ -61,7 +61,7 @@ Add your project-specific automation scripts here.
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| [research/](./research/) | Partial | Research notes and external sources, including Paperclip alignment notes, setup-diagnostic/report research, LAN peer-sharing exploration, workspace contract terminology/semantics, a current maturity-gap assessment, AAIF/A2A layering guidance, a CLI provider event-capability audit, and provider-evolution evidence framing |
+| [research/](./research/) | Partial | Research notes and external sources, including Paperclip alignment notes, setup-diagnostic/report research, LAN peer-sharing exploration, workspace contract terminology/semantics, a current maturity-gap assessment, AAIF/A2A layering guidance, a CLI provider event-capability audit, provider-evolution evidence framing, and trusted-publishing readiness notes |
 
 ## Context-Driven Development
 
@@ -102,4 +102,4 @@ later passes:
 
 ---
 
-*Last updated: 2026-04-04*
+*Last updated: 2026-04-07*
