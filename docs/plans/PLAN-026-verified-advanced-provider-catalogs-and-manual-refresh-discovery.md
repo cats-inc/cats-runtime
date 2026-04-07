@@ -187,6 +187,7 @@ audits.
 | 2026-04-07 | Phase 2 follow-through landed: successful dynamic catalogs now persist restart-stable snapshots under the runtime data dir, ordinary reads can reuse those persisted snapshots before config/static fallback, and repeated refresh failures now activate catalog refresh backoff with additive cache metadata and warnings instead of hammering upstreams on every request. |
 | 2026-04-07 | Phase 1 / 5 follow-through landed: verified advanced targets now resolve through a runtime-owned manifest registry with additive provenance metadata on public advanced catalogs, and the first curated manifests/evidence refs are now recorded in `docs/research/2026-04-07-advanced-provider-manifest-baseline.md`. |
 | 2026-04-07 | Phase 3 setup-surface follow-through landed: `provider-setup` now exposes per-target model-catalog freshness on the runtime-target inspection view, including stale/persisted/backoff hints, metering-derived cooldown warnings, bounded catalog-warning surfacing, and an explicit per-target `refresh=1` button that updates runtime-owned catalog truth without moving that workflow back into the dashboard read path. |
+| 2026-04-07 | Follow-on setup truthfulness slice landed: the same runtime-target inspection view now also reuses `GET /diagnostics/providers` for filtered provider availability truth (`ok` / `degraded` / `unavailable` plus attention codes), so setup/repair surfaces no longer rely on model-catalog metadata alone when deciding how healthy a target currently is. |
 
 ---
 

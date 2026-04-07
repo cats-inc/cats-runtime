@@ -645,6 +645,8 @@ let configuredTargetsState = {
 };
 const setupToolingCache = new Map();
 const setupToolingInFlight = new Map();
+const setupDiagnosticsCache = new Map();
+const setupDiagnosticsInFlight = new Map();
 const SETUP_CATALOG_REFRESH_DEFAULT_LABEL = 'Refresh Model Catalog';
 
 function escapeHtml(s) {
@@ -1237,6 +1239,33 @@ function buildModelCatalogGuardrailSummary(instance) {
     : 'No active runtime guardrails are recorded for this target.';
 }
 
+function currentProviderAvailability(diagnostics) {
+  return diagnostics?.availability && typeof diagnostics.availability === 'object'
+    ? diagnostics.availability
+    : null;
+}
+
+function buildProviderAvailabilityLabel(diagnostics) {
+  const availability = currentProviderAvailability(diagnostics);
+  if (!availability) {
+    return 'Availability unknown';
+  }
+
+  const bits = [humanizeToken(availability.status || 'unknown')];
+  if (availability.probe) {
+    bits.push(`${humanizeToken(availability.probe)} probe`);
+  }
+  return bits.join(' · ');
+}
+
+function summarizeProviderAttentionCodes(diagnostics) {
+  const availability = currentProviderAvailability(diagnostics);
+  if (!Array.isArray(availability?.attentionCodes) || availability.attentionCodes.length === 0) {
+    return '';
+  }
+  return availability.attentionCodes.slice(0, 4).map((code) => humanizeToken(code)).join(', ');
+}
+
 function updateSetupCatalogStatus(text) {
   const node = document.getElementById('setupCatalogStatus');
   if (node) {
@@ -1395,7 +1424,7 @@ function selectConfiguredTarget(providerName, instanceTarget) {
   syncConfiguredTargetSelection(providerName, instanceTarget);
 }
 
-function setupCapabilityGridRows({ providerName, instance, agentRuntime, tooling }) {
+function setupCapabilityGridRows({ providerName, instance, agentRuntime, tooling, diagnostics }) {
   const modelCatalog = currentModelCatalogSummary(instance);
   const rows = [
     ['Provider', providerName],
@@ -1415,6 +1444,13 @@ function setupCapabilityGridRows({ providerName, instance, agentRuntime, tooling
   }
   if (tooling?.policy?.profile) {
     rows.push(['Tool Profile', tooling.policy.profile]);
+  }
+  if (currentProviderAvailability(diagnostics)) {
+    rows.push(['Availability', buildProviderAvailabilityLabel(diagnostics)]);
+    const attentionCodes = summarizeProviderAttentionCodes(diagnostics);
+    if (attentionCodes) {
+      rows.push(['Attention Codes', attentionCodes]);
+    }
   }
   if (modelCatalog) {
     rows.push(['Catalog', `${pluralize(modelCatalog.modelCount || 0, 'model')} · ${buildModelCatalogStateLabel(modelCatalog)}`]);
@@ -1437,8 +1473,25 @@ function setupCapabilityGridRows({ providerName, instance, agentRuntime, tooling
   )).join('');
 }
 
-function setupCapabilityCatalogItems(instance, tooling) {
+function setupCapabilityCatalogItems(instance, tooling, diagnostics, diagnosticsError) {
   const items = [];
+  const availability = currentProviderAvailability(diagnostics);
+  if (diagnosticsError) {
+    items.push(
+      `<li><strong>Diagnostics unavailable</strong><span class="setup-capability-secondary">${escapeHtml(diagnosticsError)}</span></li>`,
+    );
+  } else if (availability && availability.status !== 'ok') {
+    items.push(
+      `<li><strong>Provider availability</strong><span class="setup-capability-secondary">${escapeHtml(availability.summary || buildProviderAvailabilityLabel(diagnostics))}</span></li>`,
+    );
+    const attentionCodes = summarizeProviderAttentionCodes(diagnostics);
+    if (attentionCodes) {
+      items.push(
+        `<li><strong>Attention codes</strong><span class="setup-capability-secondary">${escapeHtml(attentionCodes)}</span></li>`,
+      );
+    }
+  }
+
   const modelCatalog = currentModelCatalogSummary(instance);
   if (Array.isArray(modelCatalog?.warnings)) {
     modelCatalog.warnings.slice(0, 3).forEach((warning) => {
@@ -1612,6 +1665,48 @@ async function fetchConfiguredProviderTooling(providerName, instanceTarget) {
   return task;
 }
 
+async function fetchConfiguredProviderDiagnostics(providerName, instance) {
+  if (!providerName || !instance?.backend || !instance?.id) {
+    return null;
+  }
+
+  const key = `${providerName}::${instance.backend}::${instance.id}`;
+  if (setupDiagnosticsCache.has(key)) {
+    return setupDiagnosticsCache.get(key);
+  }
+  if (setupDiagnosticsInFlight.has(key)) {
+    return setupDiagnosticsInFlight.get(key);
+  }
+
+  const fetchFn = (window.CatsUI && window.CatsUI.apiFetch) || fetch;
+  const searchParams = new URLSearchParams({
+    provider: providerName,
+    backend: instance.backend,
+    instance: instance.id,
+  });
+  const task = fetchFn(`/diagnostics/providers?${searchParams.toString()}`)
+    .then(async (response) => {
+      if (!response.ok) {
+        const detail = await response.text().catch(() => '');
+        throw new Error(detail || `HTTP ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((payload) => {
+      const diagnostics = Array.isArray(payload?.providers) ? (payload.providers[0] || null) : null;
+      setupDiagnosticsCache.set(key, diagnostics);
+      setupDiagnosticsInFlight.delete(key);
+      return diagnostics;
+    })
+    .catch((error) => {
+      setupDiagnosticsInFlight.delete(key);
+      throw error;
+    });
+
+  setupDiagnosticsInFlight.set(key, task);
+  return task;
+}
+
 async function refreshSetupCapabilityPreview() {
   const { providerName, instanceTarget, instance } = currentSetupCapabilitySelection();
 
@@ -1635,19 +1730,32 @@ async function refreshSetupCapabilityPreview() {
   setSetupCatalogRefreshButtonState(true, SETUP_CATALOG_REFRESH_DEFAULT_LABEL);
 
   let toolingPayload = null;
-  try {
-    toolingPayload = await fetchConfiguredProviderTooling(providerName, instanceTarget);
-  } catch (error) {
+  let providerDiagnostics = null;
+  let diagnosticsError = null;
+  const [toolingResult, diagnosticsResult] = await Promise.allSettled([
+    fetchConfiguredProviderTooling(providerName, instanceTarget),
+    fetchConfiguredProviderDiagnostics(providerName, instance),
+  ]);
+  if (toolingResult.status === 'fulfilled') {
+    toolingPayload = toolingResult.value;
+  } else {
     const fallbackTooling = extractConfiguredTooling(null, instance) || {};
     toolingPayload = {
       ...fallbackTooling,
       catalog: {
         status: 'unavailable',
         method: 'providers_get',
-        error: error instanceof Error ? error.message : String(error),
+        error: toolingResult.reason instanceof Error ? toolingResult.reason.message : String(toolingResult.reason),
         summary: 'Provider tool summary could not be loaded.',
       },
     };
+  }
+  if (diagnosticsResult.status === 'fulfilled') {
+    providerDiagnostics = diagnosticsResult.value;
+  } else {
+    diagnosticsError = diagnosticsResult.reason instanceof Error
+      ? diagnosticsResult.reason.message
+      : String(diagnosticsResult.reason);
   }
 
   const currentSelection = currentSetupCapabilitySelection();
@@ -1661,6 +1769,7 @@ async function refreshSetupCapabilityPreview() {
   const tooling = extractConfiguredTooling(toolingPayload, instance);
   const agentRuntime = toolingPayload?.agentRuntime || instance?.agentRuntime;
   const modelCatalog = currentModelCatalogSummary(instance);
+  const availability = currentProviderAvailability(providerDiagnostics);
   const tags = [];
   if (tooling?.source) {
     tags.push(`tools: ${humanizeToken(tooling.source)}`);
@@ -1692,17 +1801,33 @@ async function refreshSetupCapabilityPreview() {
   if ((instance?.metering?.activeCooldowns || 0) > 0) {
     tags.push('cooldown active');
   }
+  if (availability?.status) {
+    tags.push(`availability: ${humanizeToken(availability.status)}`);
+  }
 
-  const hasAttention = (modelCatalog?.warnings?.length || 0) > 0
+  const hasAttention = availability?.status === 'degraded'
+    || availability?.status === 'unavailable'
+    || Boolean(diagnosticsError)
+    || (modelCatalog?.warnings?.length || 0) > 0
     || modelCatalog?.cache?.stale
     || modelCatalog?.cache?.backoff?.active
     || instance?.metering?.status === 'degraded'
     || tooling?.catalog?.status === 'unavailable';
+  const unavailable = availability?.status === 'unavailable';
   setSetupCapabilityStatus(
-    hasAttention ? 'Attention' : 'Available',
-    hasAttention ? 'status-badge-degraded' : 'status-badge-ready',
+    unavailable ? 'Unavailable' : hasAttention ? 'Attention' : 'Available',
+    unavailable ? 'status-badge-unavailable' : hasAttention ? 'status-badge-degraded' : 'status-badge-ready',
   );
-  document.getElementById('setupCapabilitySummary').textContent = tooling?.summary
+  const summaryParts = [];
+  if (diagnosticsError) {
+    summaryParts.push(`Provider diagnostics could not be loaded: ${diagnosticsError}`);
+  } else if (availability?.summary) {
+    summaryParts.push(availability.summary);
+  }
+  if (tooling?.summary && !summaryParts.includes(tooling.summary)) {
+    summaryParts.push(tooling.summary);
+  }
+  document.getElementById('setupCapabilitySummary').textContent = summaryParts[0]
     || buildModelCatalogFreshnessSummary(modelCatalog)
     || 'No additional runtime capability summary is available for this target yet.';
   document.getElementById('setupCapabilityGrid').innerHTML = setupCapabilityGridRows({
@@ -1710,9 +1835,15 @@ async function refreshSetupCapabilityPreview() {
     instance,
     agentRuntime,
     tooling,
+    diagnostics: providerDiagnostics,
   });
   document.getElementById('setupCapabilityTags').innerHTML = renderSetupCapabilityTags(tags);
-  document.getElementById('setupCapabilityCatalog').innerHTML = setupCapabilityCatalogItems(instance, tooling);
+  document.getElementById('setupCapabilityCatalog').innerHTML = setupCapabilityCatalogItems(
+    instance,
+    tooling,
+    providerDiagnostics,
+    diagnosticsError,
+  );
   updateSetupCatalogStatus(buildModelCatalogFreshnessSummary(modelCatalog));
   setSetupCatalogRefreshButtonState(false, SETUP_CATALOG_REFRESH_DEFAULT_LABEL);
 }

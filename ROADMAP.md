@@ -716,6 +716,10 @@ tightening and cleanup steps are intentionally deferred.
   freshness, stale/backoff warnings, metering-derived cooldown hints, and an
   explicit refresh action so recovery/setup flows do not hide catalog probe
   state behind the dashboard read path
+- that same setup surface now also reuses filtered `/diagnostics/providers`
+  availability truth for the selected target, so operator repair views can see
+  current `ok` / `degraded` / `unavailable` posture plus attention codes
+  without inventing product-side selector fallbacks
 - backend support is staged honestly rather than pretending universal advanced
   control parity, but broader evidence-backed manifest onboarding/checklist work
   still remains deferred
