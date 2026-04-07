@@ -154,6 +154,7 @@ describe('buildProviderAdvancedKnowledge', () => {
         { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
         { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini' },
         { id: 'gpt-5.3-codex', label: 'gpt-5.3-codex' },
+        { id: 'gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark' },
         { id: 'gpt-5.2-codex', label: 'gpt-5.2-codex' },
         { id: 'gpt-5.2', label: 'gpt-5.2' },
         { id: 'gpt-5.1-codex-max', label: 'gpt-5.1-codex-max' },
@@ -191,6 +192,7 @@ describe('buildProviderAdvancedKnowledge', () => {
               'gpt-5.4',
               'gpt-5.4-mini',
               'gpt-5.3-codex',
+              'gpt-5.3-codex-spark',
               'gpt-5.2-codex',
               'gpt-5.2',
               'gpt-5.1-codex-max',
@@ -211,6 +213,14 @@ describe('buildProviderAdvancedKnowledge', () => {
             ],
           },
           {
+            value: 'medium',
+            label: 'Medium',
+            description: 'Balances speed and reasoning depth for everyday tasks.',
+            applicableEntryIds: [
+              'gpt-5.3-codex-spark',
+            ],
+          },
+          {
             value: 'high',
             label: 'High',
             description: 'Greater reasoning depth for complex problems.',
@@ -225,6 +235,14 @@ describe('buildProviderAdvancedKnowledge', () => {
             ],
           },
           {
+            value: 'high',
+            label: 'High (default)',
+            description: 'Greater reasoning depth for complex problems.',
+            applicableEntryIds: [
+              'gpt-5.3-codex-spark',
+            ],
+          },
+          {
             value: 'xhigh',
             label: 'Extra high',
             description: 'Extra high reasoning depth for complex problems.',
@@ -232,6 +250,7 @@ describe('buildProviderAdvancedKnowledge', () => {
               'gpt-5.4',
               'gpt-5.4-mini',
               'gpt-5.3-codex',
+              'gpt-5.3-codex-spark',
               'gpt-5.2-codex',
               'gpt-5.2',
               'gpt-5.1-codex-max',
@@ -242,6 +261,7 @@ describe('buildProviderAdvancedKnowledge', () => {
           'gpt-5.4',
           'gpt-5.4-mini',
           'gpt-5.3-codex',
+          'gpt-5.3-codex-spark',
           'gpt-5.2-codex',
           'gpt-5.2',
           'gpt-5.1-codex-max',
@@ -257,6 +277,9 @@ describe('buildProviderAdvancedKnowledge', () => {
       controls: {
         'codex.reasoning_effort': 'medium',
       },
+    });
+    expect(knowledge.entryDefaults['gpt-5.3-codex-spark']).toEqual({
+      'codex.reasoning_effort': 'high',
     });
     expect(knowledge.entryDefaults['gpt-5.1-codex-mini']).toEqual({
       'codex.reasoning_effort': 'medium',

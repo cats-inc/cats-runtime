@@ -313,4 +313,90 @@ describe('provider selection resolution', () => {
       },
     })).toThrow(/must be one of: medium, high/i);
   });
+
+  it('applies Codex Spark default reasoning when callers pin the entry without controls', () => {
+    const knowledge = createKnowledgeContext({
+      target: {
+        providerName: 'codex',
+        backend: 'cli',
+        instanceId: 'default',
+        defaultTarget: true,
+        cliInstance: {
+          id: 'default',
+          providerName: 'codex',
+          backend: 'cli',
+          command: 'codex',
+        },
+      },
+      catalog: {
+        provider: 'codex',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gpt-5.4',
+        source: 'static',
+        cache: null,
+        entries: [
+          { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
+          { id: 'gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark' },
+        ],
+        presets: [],
+        controls: [{
+          key: 'codex.reasoning_effort',
+          label: 'Reasoning effort',
+          kind: 'enum',
+          scope: 'both',
+          values: [
+            { value: 'low', label: 'Low', applicableEntryIds: ['gpt-5.4', 'gpt-5.3-codex-spark'] },
+            { value: 'medium', label: 'Medium (default)', applicableEntryIds: ['gpt-5.4'] },
+            { value: 'medium', label: 'Medium', applicableEntryIds: ['gpt-5.3-codex-spark'] },
+            { value: 'high', label: 'High', applicableEntryIds: ['gpt-5.4'] },
+            { value: 'high', label: 'High (default)', applicableEntryIds: ['gpt-5.3-codex-spark'] },
+            { value: 'xhigh', label: 'Extra high', applicableEntryIds: ['gpt-5.4', 'gpt-5.3-codex-spark'] },
+          ],
+          applicableEntryIds: ['gpt-5.4', 'gpt-5.3-codex-spark'],
+        }],
+        defaultSelection: {
+          entryId: 'gpt-5.4',
+          entryMode: 'explicit',
+          controls: {
+            'codex.reasoning_effort': 'medium',
+          },
+        },
+        support: {
+          tier: 'full',
+        },
+        warnings: [],
+      },
+      entryDefaults: {
+        'gpt-5.4': { 'codex.reasoning_effort': 'medium' },
+        'gpt-5.3-codex-spark': { 'codex.reasoning_effort': 'high' },
+      },
+      controlsByKey: {
+        'codex.reasoning_effort': {
+          key: 'codex.reasoning_effort',
+          label: 'Reasoning effort',
+          kind: 'enum',
+          scope: 'both',
+          values: [
+            { value: 'low', label: 'Low', applicableEntryIds: ['gpt-5.4', 'gpt-5.3-codex-spark'] },
+            { value: 'medium', label: 'Medium (default)', applicableEntryIds: ['gpt-5.4'] },
+            { value: 'medium', label: 'Medium', applicableEntryIds: ['gpt-5.3-codex-spark'] },
+            { value: 'high', label: 'High', applicableEntryIds: ['gpt-5.4'] },
+            { value: 'high', label: 'High (default)', applicableEntryIds: ['gpt-5.3-codex-spark'] },
+            { value: 'xhigh', label: 'Extra high', applicableEntryIds: ['gpt-5.4', 'gpt-5.3-codex-spark'] },
+          ],
+          applicableEntryIds: ['gpt-5.4', 'gpt-5.3-codex-spark'],
+        },
+      },
+    });
+
+    const resolved = resolveProviderSelection(knowledge, {
+      entryId: 'gpt-5.3-codex-spark',
+      entryMode: 'explicit',
+    });
+
+    expect(resolved.resolution.controls).toEqual({
+      'codex.reasoning_effort': 'high',
+    });
+  });
 });

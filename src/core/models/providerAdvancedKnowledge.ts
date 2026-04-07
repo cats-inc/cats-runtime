@@ -102,6 +102,8 @@ function buildEntryNotes(
         return ['Smaller frontier agentic coding model.'];
       case 'gpt-5.3-codex':
         return ['Frontier Codex-optimized agentic coding model.'];
+      case 'gpt-5.3-codex-spark':
+        return ['Ultra-fast coding model.'];
       case 'gpt-5.2-codex':
         return ['Frontier agentic coding model.'];
       case 'gpt-5.2':
@@ -243,6 +245,8 @@ function buildCodexCliControls(
     };
   }
 
+  const sparkEntryIds = applicableEntryIds.filter((entryId) => entryId === 'gpt-5.3-codex-spark');
+  const nonSparkEntryIds = applicableEntryIds.filter((entryId) => entryId !== 'gpt-5.3-codex-spark');
   const nonMiniEntryIds = applicableEntryIds.filter((entryId) => entryId !== 'gpt-5.1-codex-mini');
 
   return {
@@ -263,13 +267,25 @@ function buildCodexCliControls(
           value: 'medium',
           label: 'Medium (default)',
           description: 'Balances speed and reasoning depth for everyday tasks.',
-          applicableEntryIds,
+          applicableEntryIds: nonSparkEntryIds,
+        },
+        {
+          value: 'medium',
+          label: 'Medium',
+          description: 'Balances speed and reasoning depth for everyday tasks.',
+          applicableEntryIds: sparkEntryIds,
         },
         {
           value: 'high',
           label: 'High',
           description: 'Greater reasoning depth for complex problems.',
-          applicableEntryIds,
+          applicableEntryIds: nonSparkEntryIds,
+        },
+        {
+          value: 'high',
+          label: 'High (default)',
+          description: 'Greater reasoning depth for complex problems.',
+          applicableEntryIds: sparkEntryIds,
         },
         {
           value: 'xhigh',
@@ -284,7 +300,11 @@ function buildCodexCliControls(
     entryDefaults: Object.fromEntries(
       applicableEntryIds.map((entryId) => [
         entryId,
-        { 'codex.reasoning_effort': 'medium' as ProviderAdvancedControlValue },
+        {
+          'codex.reasoning_effort': entryId === 'gpt-5.3-codex-spark'
+            ? 'high' as ProviderAdvancedControlValue
+            : 'medium' as ProviderAdvancedControlValue,
+        },
       ]),
     ),
   };
