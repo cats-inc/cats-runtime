@@ -6,6 +6,11 @@ import {
   normalizeProviderCatalogModelId,
   ProviderModelCatalogService,
 } from './providerModelCatalog.js';
+import {
+  createRuntimeTestEnv,
+  createRuntimeTestPaths,
+  ensureRuntimeTestDirs,
+} from '../../../tests/support/runtimeTestPaths.js';
 
 function createCatalogConfig() {
   return {
@@ -149,6 +154,18 @@ function createTempDataDir() {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-model-catalog-'));
   return {
     root,
+    cleanup: () => rmSync(root, { recursive: true, force: true }),
+  };
+}
+
+function createRuntimeRoot() {
+  const root = mkdtempSync(join(tmpdir(), 'cats-runtime-provider-model-catalog-'));
+  const paths = createRuntimeTestPaths(root);
+  ensureRuntimeTestDirs(paths);
+  return {
+    root,
+    paths,
+    env: createRuntimeTestEnv(root),
     cleanup: () => rmSync(root, { recursive: true, force: true }),
   };
 }
@@ -1477,6 +1494,192 @@ describe('ProviderModelCatalogService', () => {
       ],
     });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('applies curated Claude CLI metadata from curated-model-catalogs.yaml', () => {
+    const runtime = createRuntimeRoot();
+
+    try {
+      writeFileSync(runtime.paths.curatedModelCatalogPath, [
+        'schema_version: 1',
+        'catalogs:',
+        '  - cli: Claude',
+        '    version: 2.1.96',
+        '    last_updated: 2026-04-08',
+        '    models:',
+        '      - name: Opus',
+        '        label: Opus 4.6 with 1M context',
+        '        default: true',
+        '        context: 1000000',
+        '        max_output: 32000',
+        '        notes:',
+        '          - Most capable for complex work.',
+        '        options:',
+        '          - name: Effort',
+        '            values:',
+        '              - name: Low',
+        '                notes:',
+        '                  - Lighter reasoning for faster responses.',
+        '              - name: Medium',
+        '                notes:',
+        '                  - Balanced effort for most work.',
+        '              - name: High',
+        '                notes:',
+        '                  - Greater depth for complex tasks.',
+        '              - name: Max',
+        '                notes:',
+        '                  - Maximum effort for the most complex work.',
+        '            default: Medium',
+        '      - name: Sonnet',
+        '        label: Sonnet 4.6',
+        '        notes:',
+        '          - Best for everyday tasks.',
+        '        options:',
+        '          - name: Effort',
+        '            values: [Low, Medium, High]',
+        '            default: Medium',
+        '      - name: Haiku',
+        '        label: Haiku 4.5',
+        '        notes:',
+        '          - Fastest for quick answers.',
+        '        options: []',
+        '',
+      ].join('\n'), 'utf8');
+
+      const base = createCatalogConfig();
+      const config = {
+        ...base,
+        configPath: runtime.paths.configPath,
+        sessionBaseDir: runtime.paths.sessionBaseDir,
+        providerDefaultTargets: {
+          ...base.providerDefaultTargets,
+          claude: { backend: 'cli', instance: 'default' },
+        },
+        providerInstances: {
+          ...base.providerInstances,
+          claude: {
+            default: {
+              id: 'default',
+              providerName: 'claude',
+              commandConfig: {
+                path: 'claude',
+                runner: 'auto',
+                runtime: { mode: 'native' },
+              },
+            },
+          },
+        },
+        providerCommands: {
+          ...base.providerCommands,
+          claude: {
+            path: 'claude',
+            runner: 'auto',
+            runtime: { mode: 'native' },
+          },
+        },
+      } as const;
+
+      const service = new ProviderModelCatalogService(config as never, {
+        env: runtime.env,
+      });
+
+      expect(service.getImmediateAdvancedCatalog('claude')).toEqual({
+        provider: 'claude',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'opus',
+        source: 'static',
+        cache: null,
+        entries: [
+          {
+            id: 'opus',
+            label: 'Opus 4.6 with 1M context',
+            default: true,
+            capabilityTags: ['tool_use', 'reasoning'],
+            limits: {
+              contextWindowTokens: 1000000,
+              maxOutputTokens: 32000,
+            },
+            notes: ['Most capable for complex work.'],
+          },
+          {
+            id: 'sonnet',
+            label: 'Sonnet 4.6',
+            default: false,
+            capabilityTags: ['tool_use'],
+            notes: ['Best for everyday tasks.'],
+          },
+          {
+            id: 'haiku',
+            label: 'Haiku 4.5',
+            default: false,
+            capabilityTags: ['tool_use', 'latency_optimized'],
+            notes: ['Fastest for quick answers.'],
+          },
+        ],
+        presets: [],
+        controls: [
+          {
+            key: 'claude.reasoning_effort',
+            label: 'Reasoning effort',
+            description: 'Controls Claude Code effort for supported models.',
+            kind: 'enum',
+            scope: 'both',
+            values: [
+              {
+                value: 'low',
+                label: 'Low',
+                description: 'Lighter reasoning for faster responses.',
+                applicableEntryIds: ['opus', 'sonnet'],
+              },
+              {
+                value: 'medium',
+                label: 'Medium (default)',
+                description: 'Balanced effort for most work.',
+                applicableEntryIds: ['opus', 'sonnet'],
+              },
+              {
+                value: 'high',
+                label: 'High',
+                description: 'Greater depth for complex tasks.',
+                applicableEntryIds: ['opus', 'sonnet'],
+              },
+              {
+                value: 'max',
+                label: 'Max',
+                description: 'Maximum effort for the most complex work.',
+                applicableEntryIds: ['opus'],
+              },
+            ],
+            applicableEntryIds: ['opus', 'sonnet'],
+            semanticTags: ['reasoning_intensity'],
+          },
+        ],
+        defaultSelection: {
+          entryId: 'opus',
+          entryMode: 'explicit',
+          controls: {
+            'claude.reasoning_effort': 'medium',
+          },
+        },
+        support: {
+          tier: 'full',
+          advancedMetadataStatus: 'verified_manifest',
+          discoveryMode: 'manual_refresh',
+          provenance: {
+            status: 'verified_manifest',
+            manifestId: 'claude-cli-v1',
+            manifestVersion: '2026-04-07',
+            evidenceRefs: [
+              'docs/research/2026-04-07-advanced-provider-manifest-baseline.md#claude-cli-v1',
+            ],
+          },
+        },
+        warnings: [],
+      });
+    } finally {
+      runtime.cleanup();
+    }
   });
 
   it('builds an additive advanced catalog with presets and controls for OpenAI targets', async () => {

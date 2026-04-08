@@ -664,14 +664,20 @@ export class ProviderModelCatalogService {
     options: ProviderModelCatalogRequestOptions = {},
   ): Promise<ProviderAdvancedKnowledgeContext> {
     const catalog = await this.getCatalogForTarget(target, options);
-    return buildProviderAdvancedKnowledge(target, catalog);
+    return buildProviderAdvancedKnowledge(target, catalog, {
+      runtimeConfig: this.config,
+      env: this.env,
+    });
   }
 
   getImmediateAdvancedKnowledgeForTarget(
     target: ProviderTargetDescriptor,
   ): ProviderAdvancedKnowledgeContext {
     const catalog = this.getImmediateCatalogForTarget(target);
-    return buildProviderAdvancedKnowledge(target, catalog);
+    return buildProviderAdvancedKnowledge(target, catalog, {
+      runtimeConfig: this.config,
+      env: this.env,
+    });
   }
 
   async getAdvancedCatalog(

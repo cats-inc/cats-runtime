@@ -381,8 +381,8 @@ The current intended runtime config seam is:
 - repo example:
   `config/curated-model-catalogs.yaml.example`
 
-The importer is not landed yet in this draft spec. This document defines the
-intended human-facing contract and file location first.
+The first importer slice is landed for Claude CLI advanced catalog ingestion.
+Other CLI families are still pending follow-up implementation slices.
 
 ## Example Backfill
 

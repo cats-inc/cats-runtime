@@ -206,7 +206,7 @@ Runtime state defaults under the user's home directory:
 - session workspaces and transcripts: `~/.cats/runtime/sessions`
 - provider topology config: `~/.cats/runtime/config/providers.yaml`
 - management adapter config: `~/.cats/runtime/config/management.yaml`
-- planned curated model catalog input: `~/.cats/runtime/config/curated-model-catalogs.yaml`
+- curated model catalog input: `~/.cats/runtime/config/curated-model-catalogs.yaml`
 
 Override the runtime storage root with `CATS_RUNTIME_DIR` when needed.
 
@@ -221,7 +221,7 @@ Override the runtime storage root with `CATS_RUNTIME_DIR` when needed.
 - `src/backends/cli/` - embedded CLI runtime modules
 - `src/backends/api/` - API-key and local-model runtime modules
 - `config/providers.yaml.example` - reference topology for manual/preseeded config
-- `config/curated-model-catalogs.yaml.example` - draft human-curated CLI model catalog input
+- `config/curated-model-catalogs.yaml.example` - human-curated CLI model catalog input example
 - `docs/api.md` - public HTTP surface
 - `docs/architecture.md` - internal layout and data flow
 

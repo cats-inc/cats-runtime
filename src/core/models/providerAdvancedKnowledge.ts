@@ -3,6 +3,7 @@ import type {
   ProviderAdvancedCatalogControl,
   ProviderAdvancedCatalogControlOption,
   ProviderAdvancedCatalogEntry,
+  ProviderAdvancedCatalogEntryLimits,
   ProviderAdvancedMetadataStatus,
   ProviderAdvancedCatalogPreset,
   ProviderAdvancedCatalogResult,
@@ -12,6 +13,17 @@ import type {
 import type { ProviderModelCatalogResult } from './providerModelCatalog.js';
 import { cloneProviderControls } from './providerControlUtils.js';
 import type { ProviderModelSelection } from './providerSelectionResolution.js';
+import type { CliRuntimeConfig } from '../../backends/cli/config.js';
+import {
+  findCuratedCliCatalog,
+  loadCuratedModelCatalog,
+  resolveCuratedCatalogScope,
+  resolveEffectiveCuratedModelOptions,
+  type CuratedModelCatalogDocument,
+  type CuratedModelCatalogModel,
+  type CuratedModelCatalogOption,
+  type CuratedModelCatalogOptionValue,
+} from './curatedModelCatalog.js';
 
 export interface ProviderAdvancedKnowledgeContext {
   target: ProviderTargetDescriptor;
@@ -19,6 +31,27 @@ export interface ProviderAdvancedKnowledgeContext {
   supportTier: ProviderAdvancedCatalogSupportTier;
   entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>>;
   controlsByKey: Record<string, ProviderAdvancedCatalogControl>;
+}
+
+export interface ProviderAdvancedKnowledgeBuildOptions {
+  runtimeConfig?: Partial<Pick<CliRuntimeConfig, 'configPath'>>;
+  env?: NodeJS.ProcessEnv;
+}
+
+interface CuratedEntryMetadata {
+  label?: string;
+  default?: boolean;
+  limits?: ProviderAdvancedCatalogEntryLimits;
+  capabilityTags?: string[];
+  notes?: string[];
+  deprecated?: boolean;
+}
+
+interface CuratedClaudeCatalogOverlay {
+  entriesById: Record<string, CuratedEntryMetadata>;
+  controls?: ProviderAdvancedCatalogControl[];
+  entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>>;
+  warnings: string[];
 }
 
 interface VerifiedAdvancedManifestBuildResult {
@@ -120,20 +153,267 @@ function buildEntryNotes(
   return undefined;
 }
 
+function mergeCapabilityTags(
+  runtimeTags: string[] | undefined,
+  curatedTags: string[] | undefined,
+): string[] | undefined {
+  const merged = new Set<string>();
+  for (const tag of runtimeTags || []) {
+    merged.add(tag);
+  }
+  for (const tag of curatedTags || []) {
+    merged.add(tag);
+  }
+  return merged.size > 0 ? Array.from(merged) : undefined;
+}
+
+function normalizeClaudeCuratedModelId(model: CuratedModelCatalogModel): string | null {
+  const candidates = [model.name, model.label].filter((value): value is string => Boolean(value));
+  for (const candidate of candidates) {
+    const normalized = candidate.trim().toLowerCase();
+    if (
+      normalized === 'opus'
+      || normalized.includes('claude-opus')
+      || normalized.includes('opus 4.6')
+    ) {
+      return 'opus';
+    }
+    if (
+      normalized === 'sonnet'
+      || normalized.includes('claude-sonnet')
+      || normalized.includes('sonnet 4.6')
+    ) {
+      return 'sonnet';
+    }
+    if (
+      normalized === 'haiku'
+      || normalized.includes('claude-haiku')
+      || normalized.includes('haiku 4.5')
+    ) {
+      return 'haiku';
+    }
+  }
+
+  return null;
+}
+
+function normalizeClaudeEffortValue(
+  value: string | undefined,
+): ProviderAdvancedControlValue | null {
+  const normalized = value?.trim().toLowerCase();
+  switch (normalized) {
+    case 'low':
+      return 'low';
+    case 'medium':
+      return 'medium';
+    case 'high':
+      return 'high';
+    case 'max':
+      return 'max';
+    default:
+      return null;
+  }
+}
+
+function fallbackClaudeEffortDescription(
+  value: ProviderAdvancedControlValue,
+): string | undefined {
+  switch (value) {
+    case 'low':
+      return 'Lighter reasoning for faster responses.';
+    case 'medium':
+      return 'Balanced effort for most work.';
+    case 'high':
+      return 'Greater depth for complex tasks.';
+    case 'max':
+      return 'Maximum effort for the most complex work.';
+    default:
+      return undefined;
+  }
+}
+
+function buildClaudeCuratedEntryMetadata(
+  model: CuratedModelCatalogModel,
+): CuratedEntryMetadata {
+  const limits: ProviderAdvancedCatalogEntryLimits = {};
+  if (model.context) {
+    limits.contextWindowTokens = model.context;
+  }
+  if (model.maxOutput) {
+    limits.maxOutputTokens = model.maxOutput;
+  }
+
+  const notes = model.notes ? [...model.notes] : undefined;
+  if (model.deprecated) {
+    if (!notes) {
+      return {
+        ...(model.label ? { label: model.label } : {}),
+        ...(model.default !== undefined ? { default: model.default } : {}),
+        ...(Object.keys(limits).length > 0 ? { limits } : {}),
+        ...(model.tags ? { capabilityTags: [...model.tags] } : {}),
+        deprecated: true,
+        notes: ['Marked deprecated in curated catalog.'],
+      };
+    }
+    notes.push('Marked deprecated in curated catalog.');
+  }
+
+  return {
+    ...(model.label ? { label: model.label } : {}),
+    ...(model.default !== undefined ? { default: model.default } : {}),
+    ...(Object.keys(limits).length > 0 ? { limits } : {}),
+    ...(model.tags ? { capabilityTags: [...model.tags] } : {}),
+    ...(notes ? { notes } : {}),
+    ...(model.deprecated ? { deprecated: true } : {}),
+  };
+}
+
+function buildCuratedClaudeCliControls(
+  optionsByEntryId: Map<string, CuratedModelCatalogOption>,
+): {
+  controls?: ProviderAdvancedCatalogControl[];
+  entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>>;
+} {
+  if (optionsByEntryId.size === 0) {
+    return {
+      entryDefaults: {},
+    };
+  }
+
+  const controlOptions: ProviderAdvancedCatalogControlOption[] = [];
+  const optionIndex = new Map<string, ProviderAdvancedCatalogControlOption>();
+  const entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>> = {};
+
+  for (const [entryId, option] of optionsByEntryId.entries()) {
+    const defaultValue = normalizeClaudeEffortValue(option.default);
+    if (defaultValue !== null) {
+      entryDefaults[entryId] = {
+        'claude.reasoning_effort': defaultValue,
+      };
+    }
+
+    for (const value of option.values || []) {
+      const normalizedValue = normalizeClaudeEffortValue(value.name);
+      if (normalizedValue === null) {
+        continue;
+      }
+      const description = value.notes?.[0] || fallbackClaudeEffortDescription(normalizedValue);
+      const label = normalizedValue === defaultValue
+        ? `${value.name} (default)`
+        : value.name;
+      const optionKey = [
+        String(normalizedValue),
+        label,
+        description || '',
+      ].join('|');
+      const existing = optionIndex.get(optionKey);
+      if (existing) {
+        const applicableEntryIds = existing.applicableEntryIds || [];
+        if (!applicableEntryIds.includes(entryId)) {
+          applicableEntryIds.push(entryId);
+          existing.applicableEntryIds = applicableEntryIds;
+        }
+        continue;
+      }
+
+      const nextOption: ProviderAdvancedCatalogControlOption = {
+        value: normalizedValue,
+        label,
+        ...(description ? { description } : {}),
+        applicableEntryIds: [entryId],
+      };
+      controlOptions.push(nextOption);
+      optionIndex.set(optionKey, nextOption);
+    }
+  }
+
+  if (controlOptions.length === 0) {
+    return {
+      entryDefaults,
+    };
+  }
+
+  return {
+    controls: [{
+      key: 'claude.reasoning_effort',
+      label: 'Reasoning effort',
+      description: 'Controls Claude Code effort for supported models.',
+      kind: 'enum',
+      scope: 'both',
+      values: controlOptions,
+      applicableEntryIds: Array.from(optionsByEntryId.keys()),
+      semanticTags: ['reasoning_intensity'],
+    }],
+    entryDefaults,
+  };
+}
+
+function buildCuratedClaudeCliOverlay(
+  document: CuratedModelCatalogDocument | undefined,
+): CuratedClaudeCatalogOverlay | null {
+  const catalog = findCuratedCliCatalog(document, 'claude');
+  if (!catalog) {
+    return null;
+  }
+
+  const scope = resolveCuratedCatalogScope(catalog, 'claude');
+  if (!scope) {
+    return null;
+  }
+
+  const entriesById: Record<string, CuratedEntryMetadata> = {};
+  const effortOptions = new Map<string, CuratedModelCatalogOption>();
+  for (const model of scope.models) {
+    const entryId = normalizeClaudeCuratedModelId(model);
+    if (!entryId) {
+      continue;
+    }
+    entriesById[entryId] = buildClaudeCuratedEntryMetadata(model);
+
+    const effectiveOptions = resolveEffectiveCuratedModelOptions(scope.sharedOptions, model);
+    const effortOption = effectiveOptions.find((option) => option.name.trim().toLowerCase() === 'effort');
+    if (effortOption) {
+      effortOptions.set(entryId, effortOption);
+    }
+  }
+
+  const controlResult = buildCuratedClaudeCliControls(effortOptions);
+  return {
+    entriesById,
+    ...(controlResult.controls ? { controls: controlResult.controls } : {}),
+    entryDefaults: controlResult.entryDefaults,
+    warnings: [],
+  };
+}
+
 function toAdvancedEntries(
   target: ProviderTargetDescriptor,
   catalog: ProviderModelCatalogResult,
+  curatedEntriesById: Record<string, CuratedEntryMetadata> = {},
 ): ProviderAdvancedCatalogEntry[] {
   return catalog.models.map((entry) => ({
     id: entry.id,
-    label: entry.label,
-    ...(entry.default !== undefined ? { default: entry.default } : {}),
-    ...(entry.status ? { status: entry.status } : {}),
-    ...(buildEntryCapabilityTags(target, entry.id)
-      ? { capabilityTags: buildEntryCapabilityTags(target, entry.id) }
+    label: curatedEntriesById[entry.id]?.label || entry.label,
+    ...((curatedEntriesById[entry.id]?.default ?? entry.default) !== undefined
+      ? { default: curatedEntriesById[entry.id]?.default ?? entry.default }
       : {}),
-    ...(buildEntryNotes(target, entry.id)
-      ? { notes: buildEntryNotes(target, entry.id) }
+    ...(entry.status ? { status: entry.status } : {}),
+    ...(mergeCapabilityTags(
+      buildEntryCapabilityTags(target, entry.id),
+      curatedEntriesById[entry.id]?.capabilityTags,
+    )
+      ? {
+          capabilityTags: mergeCapabilityTags(
+            buildEntryCapabilityTags(target, entry.id),
+            curatedEntriesById[entry.id]?.capabilityTags,
+          ),
+        }
+      : {}),
+    ...(curatedEntriesById[entry.id]?.limits
+      ? { limits: curatedEntriesById[entry.id]?.limits }
+      : {}),
+    ...((curatedEntriesById[entry.id]?.notes ?? buildEntryNotes(target, entry.id))
+      ? { notes: curatedEntriesById[entry.id]?.notes ?? buildEntryNotes(target, entry.id) }
       : {}),
   }));
 }
@@ -616,14 +896,53 @@ function resolveVerifiedAdvancedManifest(
   return VERIFIED_ADVANCED_MANIFESTS.find((manifest) => manifest.matches(target)) || null;
 }
 
+function loadCuratedClaudeOverlay(
+  target: ProviderTargetDescriptor,
+  options: ProviderAdvancedKnowledgeBuildOptions,
+): CuratedClaudeCatalogOverlay | null {
+  if (
+    target.providerName !== 'claude'
+    || target.backend !== 'cli'
+    || (!options.runtimeConfig && !options.env)
+  ) {
+    return null;
+  }
+
+  const result = loadCuratedModelCatalog({
+    runtimeConfig: options.runtimeConfig,
+    env: options.env,
+  });
+  const overlay = buildCuratedClaudeCliOverlay(result.document);
+  if (!overlay) {
+    return result.warnings.length > 0
+      ? {
+          entriesById: {},
+          entryDefaults: {},
+          warnings: result.warnings,
+        }
+      : null;
+  }
+
+  return {
+    ...overlay,
+    warnings: [...result.warnings, ...overlay.warnings],
+  };
+}
+
 export function buildProviderAdvancedKnowledge(
   target: ProviderTargetDescriptor,
   modelCatalog: ProviderModelCatalogResult,
+  options: ProviderAdvancedKnowledgeBuildOptions = {},
 ): ProviderAdvancedKnowledgeContext {
-  const entries = toAdvancedEntries(target, modelCatalog);
+  const curatedClaudeOverlay = loadCuratedClaudeOverlay(target, options);
+  const entries = toAdvancedEntries(
+    target,
+    modelCatalog,
+    curatedClaudeOverlay?.entriesById,
+  );
   const manifest = resolveVerifiedAdvancedManifest(target);
   const supportTier = manifest?.supportTier ?? 'entry_only';
-  const manifestCatalog = manifest
+  let manifestCatalog = manifest
     ? manifest.build(target, entries)
     : {
         controls: [],
@@ -631,6 +950,17 @@ export function buildProviderAdvancedKnowledge(
         presets: [],
         defaultSelection: null,
       };
+  if (curatedClaudeOverlay) {
+    const entryDefaults = Object.keys(curatedClaudeOverlay.entryDefaults).length > 0
+      ? curatedClaudeOverlay.entryDefaults
+      : manifestCatalog.entryDefaults;
+    manifestCatalog = {
+      ...manifestCatalog,
+      controls: curatedClaudeOverlay.controls || manifestCatalog.controls,
+      entryDefaults,
+      defaultSelection: buildDefaultSelection(entries, manifestCatalog.presets, entryDefaults),
+    };
+  }
   const catalog: ProviderAdvancedCatalogResult = {
     provider: modelCatalog.provider,
     backend: modelCatalog.backend,
@@ -647,7 +977,7 @@ export function buildProviderAdvancedKnowledge(
       manifest ? 'verified_manifest' : 'unverified_omitted',
       manifest,
     ),
-    warnings: [...modelCatalog.warnings],
+    warnings: [...modelCatalog.warnings, ...(curatedClaudeOverlay?.warnings || [])],
   };
 
   return {

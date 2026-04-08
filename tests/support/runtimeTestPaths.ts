@@ -6,6 +6,7 @@ export interface RuntimeTestPaths {
   configDir: string;
   configPath: string;
   managementConfigPath: string;
+  curatedModelCatalogPath: string;
   dataDir: string;
   sessionBaseDir: string;
 }
@@ -17,6 +18,7 @@ export function createRuntimeTestPaths(root: string): RuntimeTestPaths {
     configDir: join(runtimeDir, 'config'),
     configPath: join(runtimeDir, 'config', 'providers.yaml'),
     managementConfigPath: join(runtimeDir, 'config', 'management.yaml'),
+    curatedModelCatalogPath: join(runtimeDir, 'config', 'curated-model-catalogs.yaml'),
     dataDir: join(runtimeDir, 'data'),
     sessionBaseDir: join(runtimeDir, 'sessions'),
   };

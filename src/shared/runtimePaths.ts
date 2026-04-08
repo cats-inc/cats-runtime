@@ -40,3 +40,7 @@ export function resolveRuntimeProvidersConfigPath(runtimeRoot: string): string {
 export function resolveRuntimeManagementConfigPath(runtimeRoot: string): string {
   return join(resolveRuntimeConfigDir(runtimeRoot), 'management.yaml');
 }
+
+export function resolveRuntimeCuratedModelCatalogPath(runtimeRoot: string): string {
+  return join(resolveRuntimeConfigDir(runtimeRoot), 'curated-model-catalogs.yaml');
+}
