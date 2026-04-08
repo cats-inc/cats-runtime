@@ -229,6 +229,14 @@ Current runtime behavior:
   sources are available; the curated file is the runtime-owned static fallback
   seam, not a replacement for verified live discovery
 
+Current stabilization status:
+
+- Claude, Codex, and Gemini curated CLI support now has model-layer and
+  route-layer regression coverage on both `/providers/{provider}/models` and
+  `/providers/{provider}/models/advanced`
+- Cursor curated support remains available, but grouped `providers[]`
+  behavior is still the more likely place for future follow-up changes
+
 ## Key Files
 
 - `src/index.ts` - process entrypoint and shutdown wiring

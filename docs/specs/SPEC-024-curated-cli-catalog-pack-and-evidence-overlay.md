@@ -401,6 +401,16 @@ Current runtime authority rules:
 - dynamic discovery or config-backed catalogs still win when those sources are
   available; the curated file only owns the static-fallback seam
 
+Current closure status:
+
+- Claude, Codex, and Gemini now have route-level runtime regression coverage
+  proving that the same curated YAML affects both `/models` and `/models/advanced`
+- Gemini does not currently require special schema treatment beyond entry
+  metadata on those same static-fallback paths
+- remaining follow-up work is now more likely to concern grouped/router CLIs,
+  version matching, or evidence overlay behavior than these three single-list
+  provider families
+
 Other CLI families are still pending follow-up implementation slices.
 
 ## Example Backfill
