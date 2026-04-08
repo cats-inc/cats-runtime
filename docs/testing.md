@@ -65,7 +65,7 @@ or API/local provider diagnostics/read models, keep this minimum matrix green:
 | Transport parsing and provider-specific request shaping | `npx vitest run src/backends/api/transports/transports.test.ts --pool=threads --poolOptions.threads.singleThread` |
 | Runtime-managed execution, strategy loops, resume/fork continuity | `npx vitest run tests/api-backend.test.ts src/backends/api/runtime/ApiBackendManager.test.ts --pool=threads --poolOptions.threads.singleThread` |
 | Provider diagnostics/config read models, live auth/model probes | `npx vitest run src/http/providerDiagnostics.test.ts tests/runtime-server.test.ts --pool=threads --poolOptions.threads.singleThread` |
-| Model catalog and advanced selection request patches | `npx vitest run src/core/models/providerModelCatalog.test.ts src/core/models/providerSelectionResolution.test.ts src/core/models/providerAdvancedKnowledge.test.ts --pool=threads --poolOptions.threads.singleThread` |
+| Model catalog and advanced selection request patches | `npx vitest run src/core/models/curatedModelCatalog.test.ts src/core/models/providerModelCatalog.test.ts src/core/models/providerSelectionResolution.test.ts src/core/models/providerAdvancedKnowledge.test.ts --pool=threads --poolOptions.threads.singleThread` |
 
 The highest-value behaviors to keep covered are:
 

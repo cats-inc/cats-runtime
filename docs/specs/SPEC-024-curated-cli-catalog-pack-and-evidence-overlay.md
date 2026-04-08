@@ -381,7 +381,13 @@ The current intended runtime config seam is:
 - repo example:
   `config/curated-model-catalogs.yaml.example`
 
-The first importer slice is landed for Claude CLI advanced catalog ingestion.
+Current importer status in runtime:
+
+- Claude CLI: curated entry metadata plus effort control normalization
+- Codex CLI: curated entry metadata plus effort control normalization
+- Gemini CLI: curated entry metadata
+- Cursor CLI: curated entry metadata, including `providers[]` flattening
+
 Other CLI families are still pending follow-up implementation slices.
 
 ## Example Backfill

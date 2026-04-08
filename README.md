@@ -221,7 +221,7 @@ Override the runtime storage root with `CATS_RUNTIME_DIR` when needed.
 - `src/backends/cli/` - embedded CLI runtime modules
 - `src/backends/api/` - API-key and local-model runtime modules
 - `config/providers.yaml.example` - reference topology for manual/preseeded config
-- `config/curated-model-catalogs.yaml.example` - human-curated CLI model catalog input example
+- `config/curated-model-catalogs.yaml.example` - human-curated CLI model catalog input example consumed by the current Claude/Codex/Gemini/Cursor importer slices
 - `docs/api.md` - public HTTP surface
 - `docs/architecture.md` - internal layout and data flow
 
