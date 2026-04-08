@@ -383,10 +383,23 @@ The current intended runtime config seam is:
 
 Current importer status in runtime:
 
-- Claude CLI: curated entry metadata plus effort control normalization
-- Codex CLI: curated entry metadata plus effort control normalization
-- Gemini CLI: curated entry metadata
-- Cursor CLI: curated entry metadata, including `providers[]` flattening
+- Claude CLI: curated entry metadata plus effort control normalization on both
+  the CLI static-fallback catalog and the advanced catalog
+- Codex CLI: curated entry metadata plus effort control normalization on both
+  the CLI static-fallback catalog and the advanced catalog
+- Gemini CLI: curated entry metadata on both the CLI static-fallback catalog
+  and the advanced catalog
+- Cursor CLI: curated entry metadata, including `providers[]` flattening, on
+  both the CLI static-fallback catalog and the advanced catalog
+
+Current runtime authority rules:
+
+- when a supported CLI falls back to the curated static path, the curated file
+  defines the public v1 `/models` entry list and labels
+- for current curated advanced-catalog slices, the curated entry list is also
+  authoritative for entry filtering and ordering
+- dynamic discovery or config-backed catalogs still win when those sources are
+  available; the curated file only owns the static-fallback seam
 
 Other CLI families are still pending follow-up implementation slices.
 

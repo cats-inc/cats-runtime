@@ -210,6 +210,25 @@ Runtime state defaults under the user's home directory:
 
 Override the runtime storage root with `CATS_RUNTIME_DIR` when needed.
 
+## Curated CLI Catalogs
+
+`cats-runtime` now accepts a human-curated CLI model catalog at:
+
+- `~/.cats/runtime/config/curated-model-catalogs.yaml`
+- repo example: `config/curated-model-catalogs.yaml.example`
+
+Current runtime behavior:
+
+- Claude, Codex, Gemini, and Cursor can all consume curated YAML on the CLI
+  static-fallback path
+- Claude, Codex, Gemini, and Cursor advanced catalogs also consume the same
+  curated input
+- for those advanced catalogs, the curated `models[]` or flattened
+  `providers[]` entry list is authoritative for entry filtering and ordering
+- dynamic discovery or config-backed catalogs still take precedence when those
+  sources are available; the curated file is the runtime-owned static fallback
+  seam, not a replacement for verified live discovery
+
 ## Key Files
 
 - `src/index.ts` - process entrypoint and shutdown wiring
