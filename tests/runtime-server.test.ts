@@ -198,6 +198,24 @@ async function withRuntime(
   }
 }
 
+async function withCuratedCatalogRuntime(
+  curatedLines: string[],
+  overrides: Record<string, unknown>,
+  options: Parameters<typeof createRuntimeServer>[1],
+  run: (runtime: ReturnType<typeof createRuntimeServer>) => Promise<void>,
+) {
+  const { root, config, cleanup } = createTestConfig(overrides);
+  const paths = createRuntimeTestPaths(root);
+  writeFileSync(paths.curatedModelCatalogPath, `${curatedLines.join('\n')}\n`, 'utf8');
+  const runtime = createRuntimeServer(config, options);
+  try {
+    await run(runtime);
+  } finally {
+    await runtime.close();
+    cleanup();
+  }
+}
+
 describe('runtime server', () => {
   it('GET / serves the embedded dashboard', async () => {
     await withRuntime({}, {}, async (runtime) => {
@@ -4089,6 +4107,264 @@ providers:
           ],
         },
       ]);
+    });
+  });
+
+  it('GET /providers/claude/models and /advanced honor curated Claude CLI YAML', async () => {
+    await withCuratedCatalogRuntime([
+      'schema_version: 1',
+      'catalogs:',
+      '  - cli: Claude',
+      '    version: 2.1.96',
+      '    last_updated: 2026-04-08',
+      '    models:',
+      '      - name: Opus',
+      '        label: Opus 4.6 with 1M context',
+      '        default: true',
+      '        context: 1000000',
+      '        options:',
+      '          - name: Effort',
+      '            values: [Low, Medium, High, Max]',
+      '            default: Medium',
+      '      - name: Sonnet',
+      '        label: Sonnet 4.6',
+      '        options:',
+      '          - name: Effort',
+      '            values: [Low, Medium, High]',
+      '            default: Medium',
+      '      - name: Haiku',
+      '        label: Haiku 4.5',
+      '        options: []',
+    ], {}, {}, async (runtime) => {
+      const modelsResponse = await runtime.app.request('/providers/claude/models');
+      expect(modelsResponse.status).toBe(200);
+      expect(await modelsResponse.json()).toEqual({
+        provider: 'claude',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'opus',
+        source: 'static',
+        cache: null,
+        models: [
+          { id: 'opus', label: 'Opus 4.6 with 1M context', default: true },
+          { id: 'sonnet', label: 'Sonnet 4.6', default: false },
+          { id: 'haiku', label: 'Haiku 4.5', default: false },
+        ],
+        warnings: [],
+      });
+
+      const advancedResponse = await runtime.app.request('/providers/claude/models/advanced');
+      expect(advancedResponse.status).toBe(200);
+      const advancedPayload = await advancedResponse.json();
+      expect(advancedPayload).toMatchObject({
+        provider: 'claude',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'opus',
+        source: 'static',
+        cache: null,
+        entries: [
+          {
+            id: 'opus',
+            label: 'Opus 4.6 with 1M context',
+            default: true,
+            limits: {
+              contextWindowTokens: 1000000,
+            },
+          },
+          {
+            id: 'sonnet',
+            label: 'Sonnet 4.6',
+            default: false,
+          },
+          {
+            id: 'haiku',
+            label: 'Haiku 4.5',
+            default: false,
+          },
+        ],
+        defaultSelection: {
+          entryId: 'opus',
+          entryMode: 'explicit',
+          controls: {
+            'claude.reasoning_effort': 'medium',
+          },
+        },
+        warnings: [],
+      });
+      expect(advancedPayload.controls).toMatchObject([
+        {
+          key: 'claude.reasoning_effort',
+          applicableEntryIds: ['opus', 'sonnet'],
+        },
+      ]);
+    });
+  });
+
+  it('GET /providers/codex/models and /advanced honor curated Codex CLI YAML', async () => {
+    await withCuratedCatalogRuntime([
+      'schema_version: 1',
+      'catalogs:',
+      '  - cli: Codex',
+      '    version: 0.118.0',
+      '    last_updated: 2026-04-08',
+      '    shared_options:',
+      '      - name: Reasoning Level',
+      '        values: [Low, Medium, High, Extra High]',
+      '        default: Medium',
+      '    models:',
+      '      - name: gpt-5.4',
+      '        default: true',
+      '      - name: gpt-5.4-mini',
+      '      - name: gpt-5.3-codex',
+      '      - name: gpt-5.3-codex-spark',
+      '        options:',
+      '          - name: Reasoning Level',
+      '            default: High',
+      '      - name: gpt-5.2',
+    ], {}, {}, async (runtime) => {
+      const modelsResponse = await runtime.app.request('/providers/codex/models');
+      expect(modelsResponse.status).toBe(200);
+      expect(await modelsResponse.json()).toEqual({
+        provider: 'codex',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gpt-5.4',
+        source: 'static',
+        cache: null,
+        models: [
+          { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
+          { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini', default: false },
+          { id: 'gpt-5.3-codex', label: 'gpt-5.3-codex', default: false },
+          { id: 'gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark', default: false },
+          { id: 'gpt-5.2', label: 'gpt-5.2', default: false },
+        ],
+        warnings: [],
+      });
+
+      const advancedResponse = await runtime.app.request('/providers/codex/models/advanced');
+      expect(advancedResponse.status).toBe(200);
+      const advancedPayload = await advancedResponse.json();
+      expect(advancedPayload.entries.map((entry: { id: string }) => entry.id)).toEqual([
+        'gpt-5.4',
+        'gpt-5.4-mini',
+        'gpt-5.3-codex',
+        'gpt-5.3-codex-spark',
+        'gpt-5.2',
+      ]);
+      expect(advancedPayload.defaultSelection).toEqual({
+        entryId: 'gpt-5.4',
+        entryMode: 'explicit',
+        controls: {
+          'codex.reasoning_effort': 'medium',
+        },
+      });
+      expect(advancedPayload.controls).toMatchObject([
+        {
+          key: 'codex.reasoning_effort',
+          applicableEntryIds: [
+            'gpt-5.4',
+            'gpt-5.4-mini',
+            'gpt-5.3-codex',
+            'gpt-5.3-codex-spark',
+            'gpt-5.2',
+          ],
+        },
+      ]);
+      expect(advancedPayload.warnings).toEqual([]);
+    });
+  });
+
+  it('GET /providers/gemini/models and /advanced honor curated Gemini CLI YAML', async () => {
+    await withCuratedCatalogRuntime([
+      'schema_version: 1',
+      'catalogs:',
+      '  - cli: Gemini',
+      '    version: 0.36.0',
+      '    last_updated: 2026-04-08',
+      '    models:',
+      '      - name: gemini-3.1-pro-preview',
+      '        label: Gemini 3.1 Pro Preview',
+      '        default: true',
+      '        notes:',
+      '          - Primary reasoning model.',
+      '      - name: gemini-3-flash-preview',
+      '        label: Gemini 3 Flash Preview',
+      '      - name: gemini-3.1-flash-lite-preview',
+      '        label: Gemini 3.1 Flash Lite Preview',
+    ], {}, {}, async (runtime) => {
+      const modelsResponse = await runtime.app.request('/providers/gemini/models');
+      expect(modelsResponse.status).toBe(200);
+      expect(await modelsResponse.json()).toEqual({
+        provider: 'gemini',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gemini-3.1-pro-preview',
+        source: 'static',
+        cache: null,
+        models: [
+          {
+            id: 'gemini-3.1-pro-preview',
+            label: 'Gemini 3.1 Pro Preview',
+            default: true,
+          },
+          {
+            id: 'gemini-3-flash-preview',
+            label: 'Gemini 3 Flash Preview',
+            default: false,
+          },
+          {
+            id: 'gemini-3.1-flash-lite-preview',
+            label: 'Gemini 3.1 Flash Lite Preview',
+            default: false,
+          },
+        ],
+        warnings: [],
+      });
+
+      const advancedResponse = await runtime.app.request('/providers/gemini/models/advanced');
+      expect(advancedResponse.status).toBe(200);
+      expect(await advancedResponse.json()).toEqual({
+        provider: 'gemini',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gemini-3.1-pro-preview',
+        source: 'static',
+        cache: null,
+        entries: [
+          {
+            id: 'gemini-3.1-pro-preview',
+            label: 'Gemini 3.1 Pro Preview',
+            default: true,
+            capabilityTags: ['tool_use', 'reasoning'],
+            notes: ['Primary reasoning model.'],
+          },
+          {
+            id: 'gemini-3-flash-preview',
+            label: 'Gemini 3 Flash Preview',
+            default: false,
+            capabilityTags: ['tool_use', 'latency_optimized'],
+          },
+          {
+            id: 'gemini-3.1-flash-lite-preview',
+            label: 'Gemini 3.1 Flash Lite Preview',
+            default: false,
+            capabilityTags: ['tool_use', 'latency_optimized'],
+          },
+        ],
+        presets: [],
+        controls: [],
+        defaultSelection: null,
+        support: {
+          tier: 'entry_only',
+          advancedMetadataStatus: 'unverified_omitted',
+          discoveryMode: 'manual_refresh',
+          provenance: {
+            status: 'unverified_omitted',
+          },
+        },
+        warnings: [],
+      });
     });
   });
 
