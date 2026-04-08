@@ -48,6 +48,7 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 
 | Spec | Title | Status | Related Plan |
 |------|-------|--------|--------------|
+| [SPEC-024](./SPEC-024-curated-cli-catalog-pack-and-evidence-overlay.md) | Curated CLI Catalog Input and Runtime Evidence Overlay | Draft | TBD |
 | [SPEC-023](./SPEC-023-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md) | Verified Advanced Provider Catalogs and Manual-Refresh Discovery | In Progress (Safety, Cache-First Reads, and Entry-Scoped Controls Landed) | [PLAN-026](../plans/PLAN-026-verified-advanced-provider-catalogs-and-manual-refresh-discovery.md) |
 | [SPEC-022](./SPEC-022-stdio-mcp-proxy-to-primary-runtime.md) | Stdio MCP Proxy to the Primary Runtime | Completed | [PLAN-022](../plans/PLAN-022-stdio-mcp-proxy-to-primary-runtime.md) |
 | [SPEC-021](./SPEC-021-provider-evolution-evidence-and-capability-probes.md) | Provider Evolution Evidence and Capability Probes | In Progress (Core Manual-First Slices Landed) | [PLAN-021](../plans/PLAN-021-provider-evolution-evidence-and-capability-probes.md) |
@@ -95,4 +96,4 @@ Use [000-template.md](./000-template.md) as the starting point for new specs.
 ---
 
 *See also: [plans/](../plans/) for implementation plans*
-*Last updated: 2026-04-07*
+*Last updated: 2026-04-08*

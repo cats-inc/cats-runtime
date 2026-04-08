@@ -1,0 +1,210 @@
+schema_version: 1
+
+# Draft curator-facing model catalog input.
+#
+# Purpose:
+# - Keep this file human-writable.
+# - Fill in only the labels you can actually read from the CLI or UI.
+# - Do not translate values into runtime/internal forms.
+#
+# Runtime normalization is intentionally a later cats-runtime responsibility.
+#
+# Seed data below was backfilled from:
+# - local CLI versions observed on 2026-04-08
+# - current cats-runtime static/advanced catalog baselines
+# - current local `cursor-agent --list-models` output
+#
+# Treat this file as a starting point to correct, trim, or expand.
+
+catalogs:
+  - cli: Claude
+    version: 2.1.96
+    models:
+      - name: Opus
+        label: Opus 4.6 with 1M context
+        default: true
+        options:
+          - name: Effort
+            values:
+              - name: Low
+              - name: Medium
+                default: true
+              - name: High
+              - name: Max
+
+      - name: Sonnet
+        label: Sonnet 4.6
+        options:
+          - name: Effort
+            values:
+              - name: Low
+              - name: Medium
+                default: true
+              - name: High
+
+      - name: Haiku
+        label: Haiku 4.5
+
+  - cli: Codex
+    version: 0.118.0
+    models:
+      - name: gpt-5.4
+        label: gpt-5.4
+        default: true
+        options:
+          - name: Effort
+            values:
+              - name: Low
+              - name: Medium
+                default: true
+              - name: High
+              - name: Extra High
+
+      - name: gpt-5.4-mini
+        label: gpt-5.4-mini
+        options:
+          - name: Effort
+            values:
+              - name: Low
+              - name: Medium
+                default: true
+              - name: High
+              - name: Extra High
+
+      - name: gpt-5.3-codex
+        label: gpt-5.3-codex
+        options:
+          - name: Effort
+            values:
+              - name: Low
+              - name: Medium
+                default: true
+              - name: High
+              - name: Extra High
+
+      - name: gpt-5.3-codex-spark
+        label: gpt-5.3-codex-spark
+        options:
+          - name: Effort
+            values:
+              - name: Low
+              - name: Medium
+              - name: High
+                default: true
+              - name: Extra High
+
+      - name: gpt-5.2-codex
+        label: gpt-5.2-codex
+        options:
+          - name: Effort
+            values:
+              - name: Low
+              - name: Medium
+                default: true
+              - name: High
+              - name: Extra High
+
+      - name: gpt-5.2
+        label: gpt-5.2
+        options:
+          - name: Effort
+            values:
+              - name: Low
+              - name: Medium
+                default: true
+              - name: High
+              - name: Extra High
+
+      - name: gpt-5.1-codex-max
+        label: gpt-5.1-codex-max
+        options:
+          - name: Effort
+            values:
+              - name: Low
+              - name: Medium
+                default: true
+              - name: High
+              - name: Extra High
+
+      - name: gpt-5.1-codex-mini
+        label: gpt-5.1-codex-mini
+        options:
+          - name: Effort
+            values:
+              - name: Medium
+                default: true
+              - name: High
+
+  - cli: Gemini
+    version: 0.36.0
+    models:
+      - name: gemini-3.1-pro-preview
+        label: gemini-3.1-pro-preview
+        default: true
+
+      - name: gemini-3-flash-preview
+        label: gemini-3-flash-preview
+
+      - name: gemini-3.1-flash-lite-preview
+        label: gemini-3.1-flash-lite-preview
+
+      - name: gemini-2.5-pro
+        label: gemini-2.5-pro
+
+      - name: gemini-2.5-flash
+        label: gemini-2.5-flash
+
+      - name: gemini-2.5-flash-lite
+        label: gemini-2.5-flash-lite
+
+  - cli: Cursor
+    version: 2026.03.30-a5d3e17
+    notes:
+      - This is a seeded providers[] example only.
+      - The list below is intentionally partial; add/remove models after review.
+    providers:
+      - name: Cursor
+        models:
+          - name: auto
+            label: Auto
+
+          - name: composer-2-fast
+            label: Composer 2 Fast
+            default: true
+
+          - name: composer-2
+            label: Composer 2
+
+      - name: OpenAI
+        models:
+          - name: gpt-5.3-codex
+            label: Codex 5.3
+
+          - name: gpt-5.4-medium
+            label: GPT-5.4 1M
+
+          - name: gpt-5.4-xhigh
+            label: GPT-5.4 1M Extra High
+            current: true
+
+          - name: gpt-5.4-mini-medium
+            label: GPT-5.4 Mini
+
+      - name: Anthropic
+        models:
+          - name: claude-4.6-opus-high-thinking
+            label: Opus 4.6 1M Thinking
+
+          - name: claude-4.6-sonnet-medium
+            label: Sonnet 4.6 1M
+
+          - name: claude-4.5-sonnet
+            label: Sonnet 4.5 1M
+
+      - name: Google
+        models:
+          - name: gemini-3.1-pro
+            label: Gemini 3.1 Pro
+
+          - name: gemini-3-flash
+            label: Gemini 3 Flash
