@@ -70,7 +70,6 @@ catalogs:
     last_updated: 2026-04-08
     notes:
       - "Source: codex model picker and reasoning level selector"
-      - "Account: Plus"
       - "Context window reported ~258K total"
     shared_options:
       - name: Reasoning Level
