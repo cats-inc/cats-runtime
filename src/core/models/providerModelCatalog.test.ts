@@ -1583,6 +1583,20 @@ describe('ProviderModelCatalogService', () => {
         env: runtime.env,
       });
 
+      expect(service.getImmediateCatalog('claude')).toEqual({
+        provider: 'claude',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'opus',
+        source: 'static',
+        cache: null,
+        models: [
+          { id: 'opus', label: 'Opus 4.6 with 1M context', default: true },
+          { id: 'sonnet', label: 'Sonnet 4.6', default: false },
+          { id: 'haiku', label: 'Haiku 4.5', default: false },
+        ],
+        warnings: [],
+      });
       expect(service.getImmediateAdvancedCatalog('claude')).toEqual({
         provider: 'claude',
         backend: 'cli',
@@ -1751,6 +1765,22 @@ describe('ProviderModelCatalogService', () => {
         env: runtime.env,
       });
 
+      expect(service.getImmediateCatalog('codex')).toEqual({
+        provider: 'codex',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gpt-5.4',
+        source: 'static',
+        cache: null,
+        models: [
+          { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
+          { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini', default: false },
+          { id: 'gpt-5.3-codex', label: 'gpt-5.3-codex', default: false },
+          { id: 'gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark', default: false },
+          { id: 'gpt-5.2', label: 'gpt-5.2', default: false },
+        ],
+        warnings: [],
+      });
       const catalog = service.getImmediateAdvancedCatalog('codex');
       expect(catalog.provider).toBe('codex');
       expect(catalog.backend).toBe('cli');
@@ -1934,6 +1964,32 @@ describe('ProviderModelCatalogService', () => {
         env: runtime.env,
       });
 
+      expect(service.getImmediateCatalog('gemini')).toEqual({
+        provider: 'gemini',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gemini-3.1-pro-preview',
+        source: 'static',
+        cache: null,
+        models: [
+          {
+            id: 'gemini-3.1-pro-preview',
+            label: 'Gemini 3.1 Pro Preview',
+            default: true,
+          },
+          {
+            id: 'gemini-3-flash-preview',
+            label: 'Gemini 3 Flash Preview',
+            default: false,
+          },
+          {
+            id: 'gemini-3.1-flash-lite-preview',
+            label: 'Gemini 3.1 Flash Lite Preview',
+            default: false,
+          },
+        ],
+        warnings: [],
+      });
       expect(service.getImmediateAdvancedCatalog('gemini')).toEqual({
         provider: 'gemini',
         backend: 'cli',

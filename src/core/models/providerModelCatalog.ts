@@ -47,6 +47,12 @@ import {
   type RemoteModelDiscoveryHttpRequest,
   RemoteModelDiscoveryTimeoutError,
 } from './remoteModelDiscovery.js';
+import {
+  findCuratedCliCatalog,
+  loadCuratedModelCatalog,
+  resolveCuratedCatalogScope,
+} from './curatedModelCatalog.js';
+import { normalizeCuratedModelId } from './curatedModelCatalogNormalization.js';
 
 export interface ProviderModelCatalogEntry {
   id: string;
@@ -572,6 +578,55 @@ export function getStaticProviderModels(
   }
 
   return cloneModels(STATIC_PROVIDER_MODELS[target.providerName] || []);
+}
+
+function supportsCuratedStaticCliCatalog(providerName: string): boolean {
+  return providerName === 'claude' || providerName === 'codex' || providerName === 'gemini';
+}
+
+function buildCuratedStaticCliModels(
+  target: ProviderTargetDescriptor,
+  config: Pick<CliRuntimeConfig, 'configPath'>,
+  env: NodeJS.ProcessEnv,
+  warnings: string[],
+): ProviderModelCatalogEntry[] | null {
+  if (target.backend !== 'cli' || !supportsCuratedStaticCliCatalog(target.providerName)) {
+    return null;
+  }
+
+  const curatedResult = loadCuratedModelCatalog({
+    runtimeConfig: { configPath: config.configPath },
+    env,
+  });
+  warnings.push(...curatedResult.warnings);
+  if (!curatedResult.document) {
+    return null;
+  }
+
+  const catalog = findCuratedCliCatalog(curatedResult.document, target.providerName);
+  if (!catalog) {
+    return null;
+  }
+
+  const scope = resolveCuratedCatalogScope(catalog, target.providerName);
+  if (!scope) {
+    return null;
+  }
+
+  const models = scope.models.flatMap((model) => {
+    const id = normalizeCuratedModelId(target.providerName, model);
+    if (!id) {
+      return [];
+    }
+
+    return [{
+      id,
+      label: model.label || model.name,
+      ...(model.default !== undefined ? { default: model.default } : {}),
+    }];
+  });
+
+  return models.length > 0 ? models : null;
 }
 
 function resolveProviderModelCatalogStorageFile(
@@ -1380,11 +1435,12 @@ export class ProviderModelCatalogService {
     defaultModel: string | null,
     warnings: string[],
   ): ProviderModelCatalogResult {
+    const curatedModels = buildCuratedStaticCliModels(target, this.config, this.env, warnings);
     return this.buildCatalog(target, {
       defaultModel,
       source: 'static',
       cache: null,
-      models: withDefaultModel(getStaticProviderModels(target), defaultModel).models,
+      models: withDefaultModel(curatedModels || getStaticProviderModels(target), defaultModel).models,
       warnings,
     });
   }
