@@ -68,42 +68,55 @@ catalogs:
   - cli: Codex
     version: 0.118.0
     last_updated: 2026-04-08
+    notes:
+      - "Source: codex model picker and reasoning level selector"
+      - "Account: Plus"
+      - "Context window reported ~258K total"
     shared_options:
-      - name: Effort
-        values: [Low, Medium, High, Extra High]
+      - name: Reasoning Level
+        values:
+          - name: Low
+            notes:
+              - "Fast responses with lighter reasoning"
+          - name: Medium
+            notes:
+              - "Balances speed and reasoning depth for everyday tasks"
+          - name: High
+            notes:
+              - "Greater reasoning depth for complex problems"
+          - name: Extra High
+            notes:
+              - "Extra high reasoning depth for complex problems"
         default: Medium
     models:
       - name: gpt-5.4
         label: gpt-5.4
+        notes:
+          - "Latest frontier agentic coding model."
         default: true
 
       - name: gpt-5.4-mini
         label: gpt-5.4-mini
+        notes:
+          - "Smaller frontier agentic coding model."
 
       - name: gpt-5.3-codex
         label: gpt-5.3-codex
+        notes:
+          - "Frontier Codex-optimized agentic coding model."
 
       - name: gpt-5.3-codex-spark
         label: gpt-5.3-codex-spark
+        notes:
+          - "Ultra-fast coding model."
         options:
-          - name: Effort
+          - name: Reasoning Level
             default: High
-
-      - name: gpt-5.2-codex
-        label: gpt-5.2-codex
 
       - name: gpt-5.2
         label: gpt-5.2
-
-      - name: gpt-5.1-codex-max
-        label: gpt-5.1-codex-max
-
-      - name: gpt-5.1-codex-mini
-        label: gpt-5.1-codex-mini
-        options:
-          - name: Effort
-            values: [Medium, High]
-            default: Medium
+        notes:
+          - "Optimized for professional work and long-running agents."
 
   - cli: Gemini
     version: 0.36.0
