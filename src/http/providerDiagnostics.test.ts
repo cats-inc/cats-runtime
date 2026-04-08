@@ -493,6 +493,92 @@ describe('provider diagnostics HTTP contract', () => {
     expect(installCheckRunner.getNpmPrefix).not.toHaveBeenCalled();
   });
 
+  it('reuses cached availability diagnostics snapshots for repeated non-force reads', async () => {
+    const assessSpy = vi.spyOn(ProviderCompatibilityService.prototype, 'assessCliTarget');
+
+    try {
+      const app = createTestApp();
+
+      const first = await app.request(
+        '/diagnostics/providers?scope=availability&provider=claude&backend=cli&instance=default',
+      );
+      expect(first.status).toBe(200);
+
+      const second = await app.request(
+        '/diagnostics/providers?scope=availability&provider=claude&backend=cli&instance=default',
+      );
+      expect(second.status).toBe(200);
+
+      expect(assessSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      assessSpy.mockRestore();
+    }
+  });
+
+  it('bypasses cached availability diagnostics snapshots when force=1 is requested', async () => {
+    const assessSpy = vi.spyOn(ProviderCompatibilityService.prototype, 'assessCliTarget');
+
+    try {
+      const app = createTestApp();
+
+      const first = await app.request(
+        '/diagnostics/providers?scope=availability&provider=claude&backend=cli&instance=default',
+      );
+      expect(first.status).toBe(200);
+
+      const refreshed = await app.request(
+        '/diagnostics/providers?scope=availability&provider=claude&backend=cli&instance=default&force=1',
+      );
+      expect(refreshed.status).toBe(200);
+
+      expect(assessSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      assessSpy.mockRestore();
+    }
+  });
+
+  it('serves stale availability diagnostics snapshots while refreshing in the background', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-23T00:00:00.000Z'));
+    const assessSpy = vi.spyOn(ProviderCompatibilityService.prototype, 'assessCliTarget');
+
+    try {
+      const app = createTestApp();
+      const path = '/diagnostics/providers?scope=availability&provider=claude&backend=cli&instance=default';
+
+      const first = await app.request(path);
+      expect(first.status).toBe(200);
+      expect(assessSpy).toHaveBeenCalledTimes(1);
+
+      vi.setSystemTime(new Date('2026-03-23T00:00:31.000Z'));
+      assessSpy.mockRejectedValueOnce(new Error('background refresh failed'));
+
+      const second = await app.request(path);
+      expect(second.status).toBe(200);
+      const payload = await second.json() as {
+        providers: Array<{
+          availability: {
+            status: string;
+            probe: string;
+          };
+        }>;
+      };
+
+      expect(payload.providers).toEqual([
+        expect.objectContaining({
+          availability: expect.objectContaining({
+            status: 'ok',
+            probe: 'light',
+          }),
+        }),
+      ]);
+      expect(assessSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      assessSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
   it('uses the lightweight compatibility path on health diagnostics', async () => {
     const installCheckRunner = createInstallCheckRunner();
     const app = createTestApp(makeConfig(), {

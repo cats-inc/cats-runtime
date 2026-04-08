@@ -64,6 +64,7 @@ import { PeerExecutionService } from './core/peers/PeerExecutionService.js';
 import { PeerExecutionAdmissionService } from './core/peers/PeerExecutionAdmissionService.js';
 import { PeerExecutionReplayService } from './core/peers/PeerExecutionReplayService.js';
 import { createRuntimeApp, type AppContext } from './http/app.js';
+import { primeProviderAvailabilityDiagnosticsCache } from './http/routes/diagnostics.js';
 import { executeRetainedWorktreeCleanup } from './http/routes/sessions.js';
 import type { ProviderName } from './backends/cli/providers/types.js';
 import type { ApiBackendOptions } from './backends/api/types.js';
@@ -1057,6 +1058,10 @@ export function createRuntimeServer(
 
           if (!server.listening) {
             await listenServer(server, config.host, config.port);
+          }
+
+          if (!startup.bootstrapRequired) {
+            primeProviderAvailabilityDiagnosticsCache(context);
           }
 
           if (startup.phase !== 'starting') {

@@ -106,6 +106,8 @@ type DiagnosticsProbeMode = 'light' | 'live';
 type ProviderDiagnosticsScope = 'full' | 'availability';
 const DIAGNOSTIC_BACKENDS: readonly BackendKind[] = ['cli', 'api', 'local', 'agent'];
 const DEFAULT_REMOTE_ENDPOINT_PROBE_TIMEOUT_MS = DEFAULT_REMOTE_MODEL_DISCOVERY_TIMEOUT_MS;
+const AVAILABILITY_DIAGNOSTICS_FRESH_TTL_MS = 30_000;
+const AVAILABILITY_DIAGNOSTICS_STALE_TTL_MS = 15 * 60_000;
 
 interface DiagnosticCheck {
   code: string;
@@ -177,6 +179,21 @@ interface ProviderDiagnosticsCollectionOptions {
   compatibilityPurpose?: CompatibilityAssessmentOptions['purpose'];
 }
 
+type ProviderDiagnosticsCatalog = ReturnType<typeof listProviderCatalog>;
+
+interface ProviderDiagnosticsCollectionResult {
+  catalog: ProviderDiagnosticsCatalog;
+  providers: ProviderDiagnosticResult[];
+}
+
+interface AvailabilityDiagnosticsCacheEntry {
+  snapshot: ProviderDiagnosticsCollectionResult | null;
+  cachedAtMs: number;
+  freshUntilMs: number;
+  staleUntilMs: number;
+  inflight: Promise<ProviderDiagnosticsCollectionResult> | null;
+}
+
 interface ProviderDiagnosticToolCatalogContext {
   scope: 'catalog' | 'effective';
   sessionId?: string;
@@ -200,6 +217,8 @@ interface RuntimeSetupDiagnosticsSummary {
 }
 
 class DiagnosticsQueryError extends Error {}
+
+const availabilityDiagnosticsCache = new WeakMap<AppContext, Map<string, AvailabilityDiagnosticsCacheEntry>>();
 
 function combineDiagnosticStatus(checks: DiagnosticCheck[]): DiagnosticStatus {
   if (checks.some((check) => check.status === 'unavailable')) {
@@ -1588,10 +1607,7 @@ async function collectProviderDiagnostics(
   forceRefresh = false,
   filters: ProviderDiagnosticsFilters = { defaultOnly: false, toolCatalogScope: 'catalog' },
   options: ProviderDiagnosticsCollectionOptions = {},
-): Promise<{
-  catalog: ReturnType<typeof listProviderCatalog>;
-  providers: ProviderDiagnosticResult[];
-}> {
+): Promise<ProviderDiagnosticsCollectionResult> {
   const fullCatalog = listProviderCatalog(ctx.config);
   const catalog = filterProviderDiagnosticsCatalog(fullCatalog, filters);
   const toolCatalogContext = buildProviderDiagnosticToolCatalogContext(filters);
@@ -1621,6 +1637,136 @@ async function collectProviderDiagnostics(
     catalog,
     providers,
   };
+}
+
+function getAvailabilityDiagnosticsCacheMap(
+  ctx: AppContext,
+): Map<string, AvailabilityDiagnosticsCacheEntry> {
+  let cache = availabilityDiagnosticsCache.get(ctx);
+  if (!cache) {
+    cache = new Map<string, AvailabilityDiagnosticsCacheEntry>();
+    availabilityDiagnosticsCache.set(ctx, cache);
+  }
+  return cache;
+}
+
+function createAvailabilityDiagnosticsCacheKey(
+  probeMode: DiagnosticsProbeMode,
+  filters: ProviderDiagnosticsFilters,
+): string {
+  return JSON.stringify({
+    probeMode,
+    provider: filters.provider ?? null,
+    backend: filters.backend ?? null,
+    instance: filters.instance ?? null,
+    defaultOnly: filters.defaultOnly,
+    toolCatalogScope: filters.toolCatalogScope,
+    sessionId: filters.sessionId ?? null,
+    sessionKey: filters.sessionKey ?? null,
+  });
+}
+
+function createAvailabilityDiagnosticsCacheEntry(): AvailabilityDiagnosticsCacheEntry {
+  return {
+    snapshot: null,
+    cachedAtMs: 0,
+    freshUntilMs: 0,
+    staleUntilMs: 0,
+    inflight: null,
+  };
+}
+
+function startAvailabilityDiagnosticsRefresh(
+  ctx: AppContext,
+  entry: AvailabilityDiagnosticsCacheEntry,
+  probeMode: DiagnosticsProbeMode,
+  env: Readonly<NodeJS.ProcessEnv>,
+  filters: ProviderDiagnosticsFilters,
+): Promise<ProviderDiagnosticsCollectionResult> {
+  const refresh = collectProviderDiagnostics(
+    ctx,
+    probeMode,
+    env,
+    false,
+    filters,
+    {
+      includeArtifacts: false,
+      compatibilityPurpose: 'health',
+    },
+  ).then((result) => {
+    const now = Date.now();
+    entry.snapshot = result;
+    entry.cachedAtMs = now;
+    entry.freshUntilMs = now + AVAILABILITY_DIAGNOSTICS_FRESH_TTL_MS;
+    entry.staleUntilMs = now + AVAILABILITY_DIAGNOSTICS_STALE_TTL_MS;
+    return result;
+  }).finally(() => {
+    if (entry.inflight === refresh) {
+      entry.inflight = null;
+    }
+  });
+  entry.inflight = refresh;
+  return refresh;
+}
+
+async function collectAvailabilityDiagnostics(
+  ctx: AppContext,
+  probeMode: DiagnosticsProbeMode,
+  env: Readonly<NodeJS.ProcessEnv>,
+  forceRefresh = false,
+  filters: ProviderDiagnosticsFilters = { defaultOnly: false, toolCatalogScope: 'catalog' },
+): Promise<ProviderDiagnosticsCollectionResult> {
+  if (forceRefresh || probeMode !== 'light') {
+    return collectProviderDiagnostics(
+      ctx,
+      probeMode,
+      env,
+      forceRefresh,
+      filters,
+      {
+        includeArtifacts: false,
+        compatibilityPurpose: 'health',
+      },
+    );
+  }
+
+  const cache = getAvailabilityDiagnosticsCacheMap(ctx);
+  const cacheKey = createAvailabilityDiagnosticsCacheKey(probeMode, filters);
+  let entry = cache.get(cacheKey);
+  if (!entry) {
+    entry = createAvailabilityDiagnosticsCacheEntry();
+    cache.set(cacheKey, entry);
+  }
+
+  const now = Date.now();
+  if (entry.snapshot && entry.freshUntilMs > now) {
+    return entry.snapshot;
+  }
+
+  if (entry.snapshot && entry.staleUntilMs > now) {
+    if (!entry.inflight) {
+      void startAvailabilityDiagnosticsRefresh(
+        ctx,
+        entry,
+        probeMode,
+        env,
+        filters,
+      ).catch(() => undefined);
+    }
+    return entry.snapshot;
+  }
+
+  if (entry.inflight) {
+    return entry.inflight;
+  }
+
+  return startAvailabilityDiagnosticsRefresh(
+    ctx,
+    entry,
+    probeMode,
+    env,
+    filters,
+  );
 }
 
 function summarizeProviderDiagnostics(
@@ -1959,16 +2105,12 @@ diagnosticsRoutes.get('/diagnostics/health', async (c) => {
   const readiness = getRuntimeReadinessSnapshot(ctx.startup);
   const runtime = getRuntimeOperationalStatus(ctx.startup);
   const metering = getRuntimeMeteringService(ctx).buildSummary(ctx.registry.list());
-  const { catalog, providers } = await collectProviderDiagnostics(
+  const { catalog, providers } = await collectAvailabilityDiagnostics(
     ctx,
     probeMode,
     env,
     forceRefresh,
     { defaultOnly: true, toolCatalogScope: 'catalog' },
-    {
-      includeArtifacts: false,
-      compatibilityPurpose: 'health',
-    },
   );
   const peers = getPeerDiscoverySnapshot(ctx);
   const wakeups = getRuntimeWakeupSnapshot(ctx);
@@ -2083,17 +2225,25 @@ async function buildProviderDiagnosticsPayload(
   filters: ProviderDiagnosticsFilters = { defaultOnly: false, toolCatalogScope: 'catalog' },
   scope: ProviderDiagnosticsScope = 'full',
 ) {
-  const { catalog, providers } = await collectProviderDiagnostics(
-    ctx,
-    probeMode,
-    env,
-    forceRefresh,
-    filters,
-    {
-      includeArtifacts: scope !== 'availability',
-      compatibilityPurpose: scope === 'availability' ? 'health' : 'diagnostics',
-    },
-  );
+  const { catalog, providers } = scope === 'availability'
+    ? await collectAvailabilityDiagnostics(
+      ctx,
+      probeMode,
+      env,
+      forceRefresh,
+      filters,
+    )
+    : await collectProviderDiagnostics(
+      ctx,
+      probeMode,
+      env,
+      forceRefresh,
+      filters,
+      {
+        includeArtifacts: true,
+        compatibilityPurpose: 'diagnostics',
+      },
+    );
   const summary = summarizeProviderDiagnostics(catalog, providers, {
     queryHasFilters: hasProviderDiagnosticsFilters(filters),
   });
@@ -2110,6 +2260,19 @@ async function buildProviderDiagnosticsPayload(
       ? providers.map(toAvailabilityOnlyProviderDiagnosticResult)
       : providers,
   };
+}
+
+export function primeProviderAvailabilityDiagnosticsCache(
+  ctx: AppContext,
+  env: Readonly<NodeJS.ProcessEnv> = getRuntimeEnvironment(),
+): void {
+  void collectAvailabilityDiagnostics(
+    ctx,
+    'light',
+    env,
+    false,
+    { defaultOnly: false, toolCatalogScope: 'catalog' },
+  ).catch(() => undefined);
 }
 
 function parseDiagnosticsProbeMode(value: string | undefined): DiagnosticsProbeMode {
