@@ -1896,6 +1896,257 @@ describe('ProviderModelCatalogService', () => {
     }
   });
 
+  it('applies curated Gemini CLI entry metadata from curated-model-catalogs.yaml', () => {
+    const runtime = createRuntimeRoot();
+
+    try {
+      writeFileSync(runtime.paths.curatedModelCatalogPath, [
+        'schema_version: 1',
+        'catalogs:',
+        '  - cli: Gemini',
+        '    version: 0.36.0',
+        '    last_updated: 2026-04-08',
+        '    models:',
+        '      - name: gemini-3.1-pro-preview',
+        '        label: Gemini 3.1 Pro Preview',
+        '        default: true',
+        '        notes:',
+        '          - Primary reasoning model.',
+        '      - name: gemini-3-flash-preview',
+        '        label: Gemini 3 Flash Preview',
+        '      - name: gemini-3.1-flash-lite-preview',
+        '        label: Gemini 3.1 Flash Lite Preview',
+        '',
+      ].join('\n'), 'utf8');
+
+      const base = createCatalogConfig();
+      const config = {
+        ...base,
+        configPath: runtime.paths.configPath,
+        sessionBaseDir: runtime.paths.sessionBaseDir,
+        providerDefaultTargets: {
+          ...base.providerDefaultTargets,
+          gemini: { backend: 'cli', instance: 'default' },
+        },
+        providerInstances: {
+          ...base.providerInstances,
+          gemini: {
+            default: {
+              id: 'default',
+              providerName: 'gemini',
+              commandConfig: {
+                path: 'gemini',
+                runner: 'auto',
+                runtime: { mode: 'native' },
+              },
+            },
+          },
+        },
+        providerCommands: {
+          ...base.providerCommands,
+          gemini: {
+            path: 'gemini',
+            runner: 'auto',
+            runtime: { mode: 'native' },
+          },
+        },
+      } as const;
+
+      const service = new ProviderModelCatalogService(config as never, {
+        env: runtime.env,
+      });
+
+      expect(service.getImmediateAdvancedCatalog('gemini')).toEqual({
+        provider: 'gemini',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gemini-3.1-pro-preview',
+        source: 'static',
+        cache: null,
+        entries: [
+          {
+            id: 'gemini-3.1-pro-preview',
+            label: 'Gemini 3.1 Pro Preview',
+            default: true,
+            capabilityTags: ['tool_use', 'reasoning'],
+            notes: ['Primary reasoning model.'],
+          },
+          {
+            id: 'gemini-3-flash-preview',
+            label: 'Gemini 3 Flash Preview',
+            default: false,
+            capabilityTags: ['tool_use', 'latency_optimized'],
+          },
+          {
+            id: 'gemini-3.1-flash-lite-preview',
+            label: 'Gemini 3.1 Flash Lite Preview',
+            default: false,
+            capabilityTags: ['tool_use', 'latency_optimized'],
+          },
+          {
+            id: 'gemini-2.5-pro',
+            label: 'gemini-2.5-pro',
+            default: false,
+            capabilityTags: ['tool_use', 'reasoning'],
+          },
+          {
+            id: 'gemini-2.5-flash',
+            label: 'gemini-2.5-flash',
+            default: false,
+            capabilityTags: ['tool_use', 'latency_optimized'],
+          },
+          {
+            id: 'gemini-2.5-flash-lite',
+            label: 'gemini-2.5-flash-lite',
+            default: false,
+            capabilityTags: ['tool_use', 'latency_optimized'],
+          },
+        ],
+        presets: [],
+        controls: [],
+        defaultSelection: null,
+        support: {
+          tier: 'entry_only',
+          advancedMetadataStatus: 'unverified_omitted',
+          discoveryMode: 'manual_refresh',
+          provenance: {
+            status: 'unverified_omitted',
+          },
+        },
+        warnings: [],
+      });
+    } finally {
+      runtime.cleanup();
+    }
+  });
+
+  it('applies curated Cursor providers[] entry metadata from curated-model-catalogs.yaml', () => {
+    const runtime = createRuntimeRoot();
+
+    try {
+      writeFileSync(runtime.paths.curatedModelCatalogPath, [
+        'schema_version: 1',
+        'catalogs:',
+        '  - cli: Cursor',
+        '    version: 2026.03.30-a5d3e17',
+        '    last_updated: 2026-04-08',
+        '    providers:',
+        '      - name: Cursor',
+        '        models:',
+        '          - name: auto',
+        '            label: Auto',
+        '          - name: composer-2-fast',
+        '            label: Composer 2 Fast',
+        '            default: true',
+        '      - name: OpenAI',
+        '        models:',
+        '          - name: gpt-5.4-medium',
+        '            label: GPT-5.4 1M',
+        '      - name: Anthropic',
+        '        models:',
+        '          - name: claude-4.6-opus-high-thinking',
+        '            label: Opus 4.6 1M Thinking',
+        '      - name: Google',
+        '        models:',
+        '          - name: gemini-3-flash',
+        '            label: Gemini 3 Flash',
+        '',
+      ].join('\n'), 'utf8');
+
+      const base = createCatalogConfig();
+      const config = {
+        ...base,
+        configPath: runtime.paths.configPath,
+        sessionBaseDir: runtime.paths.sessionBaseDir,
+        providerDefaultTargets: {
+          ...base.providerDefaultTargets,
+          cursor: { backend: 'cli', instance: 'default' },
+        },
+        providerInstances: {
+          ...base.providerInstances,
+          cursor: {
+            default: {
+              id: 'default',
+              providerName: 'cursor',
+              commandConfig: {
+                path: 'cursor-agent',
+                runner: 'auto',
+                runtime: { mode: 'native' },
+              },
+            },
+          },
+        },
+        providerCommands: {
+          ...base.providerCommands,
+          cursor: {
+            path: 'cursor-agent',
+            runner: 'auto',
+            runtime: { mode: 'native' },
+          },
+        },
+      } as const;
+
+      const service = new ProviderModelCatalogService(config as never, {
+        env: runtime.env,
+      });
+
+      expect(service.getImmediateAdvancedCatalog('cursor')).toEqual({
+        provider: 'cursor',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'auto',
+        source: 'static',
+        cache: null,
+        entries: [
+          {
+            id: 'auto',
+            label: 'Auto',
+            default: false,
+          },
+          {
+            id: 'composer-2-fast',
+            label: 'Composer 2 Fast',
+            default: true,
+          },
+          {
+            id: 'gpt-5.4-medium',
+            label: 'GPT-5.4 1M',
+            default: false,
+            capabilityTags: ['reasoning'],
+          },
+          {
+            id: 'claude-4.6-opus-high-thinking',
+            label: 'Opus 4.6 1M Thinking',
+            default: false,
+            capabilityTags: ['reasoning'],
+          },
+          {
+            id: 'gemini-3-flash',
+            label: 'Gemini 3 Flash',
+            default: false,
+            capabilityTags: ['latency_optimized'],
+          },
+        ],
+        presets: [],
+        controls: [],
+        defaultSelection: null,
+        support: {
+          tier: 'entry_only',
+          advancedMetadataStatus: 'unverified_omitted',
+          discoveryMode: 'manual_refresh',
+          provenance: {
+            status: 'unverified_omitted',
+          },
+        },
+        warnings: [
+          'Live model discovery is available for cursor/cli/default via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',
+        ],
+      });
+    } finally {
+      runtime.cleanup();
+    }
+  });
+
   it('builds an additive advanced catalog with presets and controls for OpenAI targets', async () => {
     const config = {
       ...createCatalogConfig(),

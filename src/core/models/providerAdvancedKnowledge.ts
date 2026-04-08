@@ -101,7 +101,7 @@ function buildEntryCapabilityTags(
   if (
     normalized.includes('haiku')
     || normalized.includes('flash')
-    || normalized.includes('mini')
+    || (normalized.includes('mini') && !normalized.includes('gemini'))
   ) {
     tags.add('latency_optimized');
   }
@@ -520,15 +520,82 @@ function buildCuratedCodexCliOverlay(
   };
 }
 
+function normalizeLiteralCuratedModelId(
+  model: CuratedModelCatalogModel,
+): string | null {
+  const normalized = model.name.trim().toLowerCase();
+  return normalized || null;
+}
+
+function buildCuratedEntryOnlyOverlay(
+  models: CuratedModelCatalogModel[],
+  normalizeModelId: (model: CuratedModelCatalogModel) => string | null,
+): CuratedCatalogOverlay | null {
+  const entriesById: Record<string, CuratedEntryMetadata> = {};
+  for (const model of models) {
+    const entryId = normalizeModelId(model);
+    if (!entryId) {
+      continue;
+    }
+    entriesById[entryId] = buildCuratedEntryMetadata(model);
+  }
+
+  return Object.keys(entriesById).length > 0
+    ? {
+        entriesById,
+        entryDefaults: {},
+        warnings: [],
+      }
+    : null;
+}
+
+function buildCuratedGeminiCliOverlay(
+  document: CuratedModelCatalogDocument | undefined,
+): CuratedCatalogOverlay | null {
+  const catalog = findCuratedCliCatalog(document, 'gemini');
+  if (!catalog) {
+    return null;
+  }
+
+  const scope = resolveCuratedCatalogScope(catalog, 'gemini');
+  if (!scope) {
+    return null;
+  }
+
+  return buildCuratedEntryOnlyOverlay(scope.models, normalizeLiteralCuratedModelId);
+}
+
+function buildCuratedCursorCliOverlay(
+  document: CuratedModelCatalogDocument | undefined,
+): CuratedCatalogOverlay | null {
+  const catalog = findCuratedCliCatalog(document, 'cursor');
+  if (!catalog) {
+    return null;
+  }
+
+  if (catalog.models) {
+    return buildCuratedEntryOnlyOverlay(catalog.models, normalizeLiteralCuratedModelId);
+  }
+
+  const providerModels = (catalog.providers || []).flatMap((provider) => provider.models);
+  return buildCuratedEntryOnlyOverlay(providerModels, normalizeLiteralCuratedModelId);
+}
+
 function toAdvancedEntries(
   target: ProviderTargetDescriptor,
   catalog: ProviderModelCatalogResult,
   curatedEntriesById: Record<string, CuratedEntryMetadata> = {},
 ): ProviderAdvancedCatalogEntry[] {
+  const curatedHasExplicitDefault = Object.values(curatedEntriesById).some((entry) => entry.default === true);
   return catalog.models.map((entry) => ({
+    ...(curatedHasExplicitDefault
+      ? { default: curatedEntriesById[entry.id]?.default === true }
+      : {}),
     id: entry.id,
     label: curatedEntriesById[entry.id]?.label || entry.label,
-    ...((curatedEntriesById[entry.id]?.default ?? entry.default) !== undefined
+    ...((curatedHasExplicitDefault
+      ? undefined
+      : (curatedEntriesById[entry.id]?.default ?? entry.default)) !== undefined
       ? { default: curatedEntriesById[entry.id]?.default ?? entry.default }
       : {}),
     ...(entry.status ? { status: entry.status } : {}),
@@ -1036,7 +1103,12 @@ function loadCuratedOverlay(
 ): CuratedCatalogOverlay | null {
   if (
     target.backend !== 'cli'
-    || (target.providerName !== 'claude' && target.providerName !== 'codex')
+    || (
+      target.providerName !== 'claude'
+      && target.providerName !== 'codex'
+      && target.providerName !== 'gemini'
+      && target.providerName !== 'cursor'
+    )
     || (!options.runtimeConfig && !options.env)
   ) {
     return null;
@@ -1046,9 +1118,20 @@ function loadCuratedOverlay(
     runtimeConfig: options.runtimeConfig,
     env: options.env,
   });
-  const overlay = target.providerName === 'claude'
-    ? buildCuratedClaudeCliOverlay(result.document)
-    : buildCuratedCodexCliOverlay(result.document);
+  const overlay = (() => {
+    switch (target.providerName) {
+      case 'claude':
+        return buildCuratedClaudeCliOverlay(result.document);
+      case 'codex':
+        return buildCuratedCodexCliOverlay(result.document);
+      case 'gemini':
+        return buildCuratedGeminiCliOverlay(result.document);
+      case 'cursor':
+        return buildCuratedCursorCliOverlay(result.document);
+      default:
+        return null;
+    }
+  })();
   if (!overlay) {
     return result.warnings.length > 0
       ? {
@@ -1090,11 +1173,15 @@ export function buildProviderAdvancedKnowledge(
     const entryDefaults = Object.keys(curatedOverlay.entryDefaults).length > 0
       ? curatedOverlay.entryDefaults
       : manifestCatalog.entryDefaults;
+    const shouldBuildCuratedDefaultSelection = Boolean(curatedOverlay.controls)
+      || Object.keys(entryDefaults).length > 0;
     manifestCatalog = {
       ...manifestCatalog,
       controls: curatedOverlay.controls || manifestCatalog.controls,
       entryDefaults,
-      defaultSelection: buildDefaultSelection(entries, manifestCatalog.presets, entryDefaults),
+      defaultSelection: shouldBuildCuratedDefaultSelection
+        ? buildDefaultSelection(entries, manifestCatalog.presets, entryDefaults)
+        : manifestCatalog.defaultSelection,
     };
   }
   const catalog: ProviderAdvancedCatalogResult = {
