@@ -26,37 +26,43 @@ catalogs:
     last_updated: 2026-04-08
     notes:
       - "Source: claude /model picker and /effort output"
-      - "Login: Claude Max Account"
     models:
       - name: Opus
         label: Opus 4.6 with 1M context
-        notes: Most capable for complex work
+        notes:
+          - Most capable for complex work
         default: true
         context: 1000000
         options:
           - name: Effort
             values:
               - name: Low
-                notes: "Quick, straightforward implementation with minimal overhead"
+                notes:
+                  - "Quick, straightforward implementation with minimal overhead"
               - name: Medium
-                notes: "Balanced approach with standard implementation and testing"
+                notes:
+                  - "Balanced approach with standard implementation and testing"
               - name: High
-                notes: "Comprehensive implementation with extensive testing and documentation"
+                notes:
+                  - "Comprehensive implementation with extensive testing and documentation"
               - name: Max
-                notes: "Maximum capability with deepest reasoning (Opus 4.6 only)"
+                notes:
+                  - "Maximum capability with deepest reasoning (Opus 4.6 only)"
             default: Medium
 
       - name: Sonnet
         label: Sonnet 4.6
-        notes: Best for everyday tasks
+        notes:
+          - Best for everyday tasks
         options:
           - name: Effort
             values: [Low, Medium, High]
-            default: High
+            default: Medium
 
       - name: Haiku
         label: Haiku 4.5
-        notes: Fastest for quick answers
+        notes:
+          - Fastest for quick answers
         options: []
 
   - cli: Codex
