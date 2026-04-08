@@ -294,6 +294,7 @@ describe('buildProviderAdvancedKnowledge', () => {
       '        options:',
       '          - name: Reasoning Level',
       '            default: High',
+      '      - name: gpt-5.0',
       '      - name: gpt-5.4',
       '        label: gpt-5.4',
       '',
@@ -392,6 +393,9 @@ describe('buildProviderAdvancedKnowledge', () => {
           'codex.reasoning_effort': 'high',
         },
       });
+      expect(knowledge.catalog.warnings).toEqual([
+        "Curated model 'gpt-5.0' for Codex could not be normalized and was ignored.",
+      ]);
     } finally {
       rmSync(runtimeRoot, { recursive: true, force: true });
     }

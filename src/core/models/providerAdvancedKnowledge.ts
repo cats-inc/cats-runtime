@@ -24,6 +24,7 @@ import {
   type CuratedModelCatalogOption,
 } from './curatedModelCatalog.js';
 import {
+  describeCuratedModelLabel,
   normalizeClaudeCuratedModelId,
   normalizeCodexCuratedModelId,
   normalizeLiteralCuratedModelId,
@@ -413,9 +414,13 @@ function buildCuratedClaudeCliOverlay(
 
   const entriesById: Record<string, CuratedEntryMetadata> = {};
   const effortOptions = new Map<string, CuratedModelCatalogOption>();
+  const warnings: string[] = [];
   for (const model of scope.models) {
     const entryId = normalizeClaudeCuratedModelId(model);
     if (!entryId) {
+      warnings.push(
+        `Curated model '${describeCuratedModelLabel(model)}' for ${catalog.cli} could not be normalized and was ignored.`,
+      );
       continue;
     }
     entriesById[entryId] = buildCuratedEntryMetadata(model);
@@ -434,7 +439,7 @@ function buildCuratedClaudeCliOverlay(
     entriesById,
     ...(controlResult.controls ? { controls: controlResult.controls } : {}),
     entryDefaults: controlResult.entryDefaults,
-    warnings: [],
+    warnings,
   };
 }
 
@@ -453,9 +458,13 @@ function buildCuratedCodexCliOverlay(
 
   const entriesById: Record<string, CuratedEntryMetadata> = {};
   const effortOptions = new Map<string, CuratedModelCatalogOption>();
+  const warnings: string[] = [];
   for (const model of scope.models) {
     const entryId = normalizeCodexCuratedModelId(model);
     if (!entryId) {
+      warnings.push(
+        `Curated model '${describeCuratedModelLabel(model)}' for ${catalog.cli} could not be normalized and was ignored.`,
+      );
       continue;
     }
     entriesById[entryId] = buildCuratedEntryMetadata(model);
@@ -475,18 +484,23 @@ function buildCuratedCodexCliOverlay(
     entriesById,
     ...(controlResult.controls ? { controls: controlResult.controls } : {}),
     entryDefaults: controlResult.entryDefaults,
-    warnings: [],
+    warnings,
   };
 }
 
 function buildCuratedEntryOnlyOverlay(
+  cliLabel: string,
   models: CuratedModelCatalogModel[],
   normalizeModelId: (model: CuratedModelCatalogModel) => string | null,
 ): CuratedCatalogOverlay | null {
   const entriesById: Record<string, CuratedEntryMetadata> = {};
+  const warnings: string[] = [];
   for (const model of models) {
     const entryId = normalizeModelId(model);
     if (!entryId) {
+      warnings.push(
+        `Curated model '${describeCuratedModelLabel(model)}' for ${cliLabel} could not be normalized and was ignored.`,
+      );
       continue;
     }
     entriesById[entryId] = buildCuratedEntryMetadata(model);
@@ -496,7 +510,7 @@ function buildCuratedEntryOnlyOverlay(
     ? {
         entriesById,
         entryDefaults: {},
-        warnings: [],
+        warnings,
       }
     : null;
 }
@@ -514,7 +528,7 @@ function buildCuratedGeminiCliOverlay(
     return null;
   }
 
-  return buildCuratedEntryOnlyOverlay(scope.models, normalizeLiteralCuratedModelId);
+  return buildCuratedEntryOnlyOverlay(catalog.cli, scope.models, normalizeLiteralCuratedModelId);
 }
 
 function buildCuratedCursorCliOverlay(
@@ -526,11 +540,11 @@ function buildCuratedCursorCliOverlay(
   }
 
   if (catalog.models) {
-    return buildCuratedEntryOnlyOverlay(catalog.models, normalizeLiteralCuratedModelId);
+    return buildCuratedEntryOnlyOverlay(catalog.cli, catalog.models, normalizeLiteralCuratedModelId);
   }
 
   const providerModels = (catalog.providers || []).flatMap((provider) => provider.models);
-  return buildCuratedEntryOnlyOverlay(providerModels, normalizeLiteralCuratedModelId);
+  return buildCuratedEntryOnlyOverlay(catalog.cli, providerModels, normalizeLiteralCuratedModelId);
 }
 
 function toAdvancedEntries(

@@ -52,7 +52,10 @@ import {
   loadCuratedModelCatalog,
   resolveCuratedCatalogScope,
 } from './curatedModelCatalog.js';
-import { normalizeCuratedModelId } from './curatedModelCatalogNormalization.js';
+import {
+  describeCuratedModelLabel,
+  normalizeCuratedModelId,
+} from './curatedModelCatalogNormalization.js';
 
 export interface ProviderModelCatalogEntry {
   id: string;
@@ -618,6 +621,9 @@ function buildCuratedStaticCliModels(
   ).flatMap((model) => {
     const id = normalizeCuratedModelId(target.providerName, model);
     if (!id) {
+      warnings.push(
+        `Curated model '${describeCuratedModelLabel(model)}' for ${catalog.cli} could not be normalized and was ignored.`,
+      );
       return [];
     }
 

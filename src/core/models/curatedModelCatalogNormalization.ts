@@ -73,3 +73,12 @@ export function normalizeCuratedModelId(
       return null;
   }
 }
+
+export function describeCuratedModelLabel(model: CuratedModelCatalogModel): string {
+  const name = model.name.trim();
+  const label = model.label?.trim();
+  if (label && label.length > 0 && label !== name) {
+    return `${name} (${label})`;
+  }
+  return name || label || '<unnamed>';
+}

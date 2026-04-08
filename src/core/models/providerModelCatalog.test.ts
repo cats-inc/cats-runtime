@@ -2036,6 +2036,79 @@ describe('ProviderModelCatalogService', () => {
     }
   });
 
+  it('warns when curated CLI models cannot be normalized', () => {
+    const runtime = createRuntimeRoot();
+
+    try {
+      writeFileSync(runtime.paths.curatedModelCatalogPath, [
+        'schema_version: 1',
+        'catalogs:',
+        '  - cli: Codex',
+        '    version: 0.118.0',
+        '    last_updated: 2026-04-08',
+        '    models:',
+        '      - name: gpt-5.4',
+        '        default: true',
+        '      - name: gpt-5.0',
+        '',
+      ].join('\n'), 'utf8');
+
+      const base = createCatalogConfig();
+      const config = {
+        ...base,
+        configPath: runtime.paths.configPath,
+        sessionBaseDir: runtime.paths.sessionBaseDir,
+        providerDefaultTargets: {
+          ...base.providerDefaultTargets,
+          codex: { backend: 'cli', instance: 'default' },
+        },
+        providerInstances: {
+          ...base.providerInstances,
+          codex: {
+            default: {
+              id: 'default',
+              providerName: 'codex',
+              commandConfig: {
+                path: 'codex',
+                runner: 'auto',
+                runtime: { mode: 'native' },
+              },
+            },
+          },
+        },
+        providerCommands: {
+          ...base.providerCommands,
+          codex: {
+            path: 'codex',
+            runner: 'auto',
+            runtime: { mode: 'native' },
+          },
+        },
+      } as const;
+
+      const service = new ProviderModelCatalogService(config as never, {
+        env: runtime.env,
+      });
+
+      expect(service.getImmediateCatalog('codex')).toEqual({
+        provider: 'codex',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gpt-5.4',
+        source: 'static',
+        cache: null,
+        models: [
+          { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
+        ],
+        warnings: [
+          "Curated model 'gpt-5.0' for Codex could not be normalized and was ignored.",
+        ],
+      });
+    } finally {
+      runtime.cleanup();
+    }
+  });
+
   it('applies curated Cursor providers[] entry metadata from curated-model-catalogs.yaml', () => {
     const runtime = createRuntimeRoot();
 
