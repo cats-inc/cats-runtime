@@ -8,6 +8,10 @@ schema_version: 1
 # - Do not translate values into runtime/internal forms.
 #
 # Runtime normalization is intentionally a later cats-runtime responsibility.
+# Inheritance rules:
+# - model with no `options` key inherits shared_options in scope
+# - use `options: []` to say a model has no options
+# - provider shared_options override same-named catalog shared_options
 #
 # Seed data below was backfilled from:
 # - local CLI versions observed on 2026-04-08

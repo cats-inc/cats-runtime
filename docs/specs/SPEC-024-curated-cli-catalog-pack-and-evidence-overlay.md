@@ -117,29 +117,36 @@ This spec defines that split explicitly:
     - a raw string such as `Low`
     - or an object containing `name`
 13. `shared_options` may appear at the catalog level or provider level.
-14. Model-level `options` shall override same-named shared options by replacing
-    the visible default and/or the visible value list for that model only.
-15. The runtime shall treat all curator-facing `cli`, `provider`, `model`,
+14. When both catalog-level and provider-level `shared_options` exist, models
+    shall inherit the merged set. Catalog-level shared options apply first, and
+    provider-level shared options override same-named catalog-level options.
+15. If a model omits the `options` key entirely, it inherits all merged shared
+    options in scope.
+16. To explicitly indicate that a model has no options, use `options: []`.
+17. Model-level `options` shall override same-named inherited shared options by
+    replacing the visible default and/or the visible value list for that model
+    only.
+18. The runtime shall treat all curator-facing `cli`, `provider`, `model`,
     `option`, and `value` names as raw labels first.
-16. The runtime shall own later normalization from raw labels such as:
+19. The runtime shall own later normalization from raw labels such as:
     - `Claude` -> internal provider family
     - `Effort` -> runtime control key
     - `Extra High` -> internal canonical value such as `xhigh`
-17. The runtime shall maintain runtime-owned normalization and alias rules for
+20. The runtime shall maintain runtime-owned normalization and alias rules for
     known CLI labels, and those rules may evolve over time as CLIs change.
-18. The runtime shall not require the curator to lowercase labels or pre-map
+21. The runtime shall not require the curator to lowercase labels or pre-map
     them into internal wire values.
-19. The runtime may retain only the latest one or two imported revisions later,
+22. The runtime may retain only the latest one or two imported revisions later,
     but the first human-facing file format shall not require explicit revision
     bookkeeping from the curator.
-20. The runtime shall keep evidence and verification outside the curator file.
-21. The runtime evidence overlay shall remain runtime-authored and may record
+23. The runtime shall keep evidence and verification outside the curator file.
+24. The runtime evidence overlay shall remain runtime-authored and may record
     verdicts such as:
     - `confirmed_available`
     - `confirmed_deprecated`
     - `not_observed`
     - `conflicting`
-22. The public advanced catalog may later be derived from:
+25. The public advanced catalog may later be derived from:
     - imported curator input
     - runtime normalization rules
     - runtime evidence overlays
@@ -226,6 +233,34 @@ catalogs:
             default: Medium
 ```
 
+Inheritance rules:
+
+- if both catalog-level and provider-level `shared_options` exist, the model
+  inherits the merged set
+- provider-level shared options override same-named catalog-level shared options
+- if a model omits `options`, it inherits all shared options in scope
+- use `options: []` when you want to say "this model has no options"
+- model-level `options` override only the same-named inherited options
+
+### Option Value Forms
+
+Most curator files can keep values as plain strings:
+
+```yaml
+values: [Low, Medium, High]
+```
+
+When one visible value needs extra notes, the file may expand that value into
+object form:
+
+```yaml
+values:
+  - Low
+  - Medium
+  - name: Max
+    notes: Only shown on Opus
+```
+
 ### Grouped Providers
 
 For CLIs like Cursor, Kilo, Goose, or other router-style tools, the same file
@@ -238,8 +273,16 @@ catalogs:
   - cli: Cursor
     version: 2026.03.30-a5d3e17
     last_updated: 2026-04-08
+    shared_options:
+      - name: Temperature
+        values: [Low, Medium, High]
+        default: Medium
     providers:
       - name: OpenAI
+        shared_options:
+          - name: Effort
+            values: [Low, Medium, High, Extra High]
+            default: Medium
         models:
           - name: gpt-5.4-xhigh
             label: GPT-5.4 1M Extra High
@@ -247,6 +290,9 @@ catalogs:
         models:
           - name: claude-4.6-opus-high-thinking
             label: Opus 4.6 1M Thinking
+          - name: claude-4.5-haiku
+            label: Haiku 4.5
+            options: []
 ```
 
 Again, the curator is only recording visible labels.
