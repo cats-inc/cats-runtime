@@ -3898,10 +3898,7 @@ providers:
           { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini', default: false },
           { id: 'gpt-5.3-codex', label: 'gpt-5.3-codex', default: false },
           { id: 'gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark', default: false },
-          { id: 'gpt-5.2-codex', label: 'gpt-5.2-codex', default: false },
           { id: 'gpt-5.2', label: 'gpt-5.2', default: false },
-          { id: 'gpt-5.1-codex-max', label: 'gpt-5.1-codex-max', default: false },
-          { id: 'gpt-5.1-codex-mini', label: 'gpt-5.1-codex-mini', default: false },
         ]),
         warnings: [],
       });
@@ -4033,10 +4030,7 @@ providers:
         'gpt-5.4-mini',
         'gpt-5.3-codex',
         'gpt-5.3-codex-spark',
-        'gpt-5.2-codex',
         'gpt-5.2',
-        'gpt-5.1-codex-max',
-        'gpt-5.1-codex-mini',
       ]);
       expect(payload.controls).toMatchObject([
         {
@@ -4046,10 +4040,7 @@ providers:
             'gpt-5.4-mini',
             'gpt-5.3-codex',
             'gpt-5.3-codex-spark',
-            'gpt-5.2-codex',
             'gpt-5.2',
-            'gpt-5.1-codex-max',
-            'gpt-5.1-codex-mini',
           ],
         },
       ]);
@@ -4874,7 +4865,7 @@ providers:
     });
   });
 
-  it('POST /sessions rejects Codex effort values that the selected entry does not support', async () => {
+  it('POST /sessions rejects explicit Codex entries that are no longer in the catalog', async () => {
     await withRuntime({}, {}, async (runtime) => {
       const response = await runtime.app.request('/sessions', {
         method: 'POST',
@@ -4896,7 +4887,7 @@ providers:
 
       expect(response.status).toBe(400);
       expect(await response.json()).toEqual({
-        error: "Control 'codex.reasoning_effort' must be one of: medium, high",
+        error: "Unknown catalog entry 'gpt-5.1-codex-mini'",
       });
     });
   });

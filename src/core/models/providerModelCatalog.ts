@@ -190,10 +190,7 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
     { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini' },
     { id: 'gpt-5.3-codex', label: 'gpt-5.3-codex' },
     { id: 'gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark' },
-    { id: 'gpt-5.2-codex', label: 'gpt-5.2-codex' },
     { id: 'gpt-5.2', label: 'gpt-5.2' },
-    { id: 'gpt-5.1-codex-max', label: 'gpt-5.1-codex-max' },
-    { id: 'gpt-5.1-codex-mini', label: 'gpt-5.1-codex-mini' },
   ],
   gemini: [
     { id: 'gemini-3.1-pro-preview', label: 'gemini-3.1-pro-preview', default: true },

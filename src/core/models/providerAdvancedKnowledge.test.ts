@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { ProviderTargetDescriptor } from '../providerCatalog.js';
 import { buildProviderAdvancedKnowledge } from './providerAdvancedKnowledge.js';
@@ -155,10 +158,7 @@ describe('buildProviderAdvancedKnowledge', () => {
         { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini' },
         { id: 'gpt-5.3-codex', label: 'gpt-5.3-codex' },
         { id: 'gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark' },
-        { id: 'gpt-5.2-codex', label: 'gpt-5.2-codex' },
         { id: 'gpt-5.2', label: 'gpt-5.2' },
-        { id: 'gpt-5.1-codex-max', label: 'gpt-5.1-codex-max' },
-        { id: 'gpt-5.1-codex-mini', label: 'gpt-5.1-codex-mini' },
       ],
     }));
 
@@ -193,9 +193,7 @@ describe('buildProviderAdvancedKnowledge', () => {
               'gpt-5.4-mini',
               'gpt-5.3-codex',
               'gpt-5.3-codex-spark',
-              'gpt-5.2-codex',
               'gpt-5.2',
-              'gpt-5.1-codex-max',
             ],
           },
           {
@@ -206,10 +204,7 @@ describe('buildProviderAdvancedKnowledge', () => {
               'gpt-5.4',
               'gpt-5.4-mini',
               'gpt-5.3-codex',
-              'gpt-5.2-codex',
               'gpt-5.2',
-              'gpt-5.1-codex-max',
-              'gpt-5.1-codex-mini',
             ],
           },
           {
@@ -228,10 +223,7 @@ describe('buildProviderAdvancedKnowledge', () => {
               'gpt-5.4',
               'gpt-5.4-mini',
               'gpt-5.3-codex',
-              'gpt-5.2-codex',
               'gpt-5.2',
-              'gpt-5.1-codex-max',
-              'gpt-5.1-codex-mini',
             ],
           },
           {
@@ -251,9 +243,7 @@ describe('buildProviderAdvancedKnowledge', () => {
               'gpt-5.4-mini',
               'gpt-5.3-codex',
               'gpt-5.3-codex-spark',
-              'gpt-5.2-codex',
               'gpt-5.2',
-              'gpt-5.1-codex-max',
             ],
           },
         ],
@@ -262,10 +252,7 @@ describe('buildProviderAdvancedKnowledge', () => {
           'gpt-5.4-mini',
           'gpt-5.3-codex',
           'gpt-5.3-codex-spark',
-          'gpt-5.2-codex',
           'gpt-5.2',
-          'gpt-5.1-codex-max',
-          'gpt-5.1-codex-mini',
         ],
         semanticTags: ['reasoning_intensity'],
       },
@@ -281,10 +268,133 @@ describe('buildProviderAdvancedKnowledge', () => {
     expect(knowledge.entryDefaults['gpt-5.3-codex-spark']).toEqual({
       'codex.reasoning_effort': 'high',
     });
-    expect(knowledge.entryDefaults['gpt-5.1-codex-mini']).toEqual({
+    expect(knowledge.entryDefaults['gpt-5.2']).toEqual({
       'codex.reasoning_effort': 'medium',
     });
     expect(knowledge.controlsByKey['codex.reasoning_effort']).toBeDefined();
+  });
+
+  it('treats curated CLI entries as authoritative for advanced entry filtering and order', () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-curated-knowledge-'));
+    const curatedPath = join(runtimeRoot, 'config', 'curated-model-catalogs.yaml');
+    mkdirSync(join(runtimeRoot, 'config'), { recursive: true });
+    writeFileSync(curatedPath, [
+      'schema_version: 1',
+      'catalogs:',
+      '  - cli: Codex',
+      '    last_updated: 2026-04-08',
+      '    shared_options:',
+      '      - name: Reasoning Level',
+      '        values: [Low, Medium, High, Extra High]',
+      '        default: Medium',
+      '    models:',
+      '      - name: gpt-5.3-codex-spark',
+      '        label: gpt-5.3-codex-spark',
+      '        default: true',
+      '        options:',
+      '          - name: Reasoning Level',
+      '            default: High',
+      '      - name: gpt-5.4',
+      '        label: gpt-5.4',
+      '',
+    ].join('\n'), 'utf8');
+
+    try {
+      const target: ProviderTargetDescriptor = {
+        providerName: 'codex',
+        backend: 'cli',
+        instanceId: 'default',
+        defaultTarget: true,
+        cliInstance: {
+          id: 'default',
+          providerName: 'codex',
+          backend: 'cli',
+          command: 'codex',
+        },
+      };
+
+      const knowledge = buildProviderAdvancedKnowledge(target, createCatalog({
+        provider: 'codex',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gpt-5.4',
+        models: [
+          { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
+          { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini' },
+          { id: 'gpt-5.3-codex', label: 'gpt-5.3-codex' },
+          { id: 'gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark' },
+          { id: 'gpt-5.2', label: 'gpt-5.2' },
+        ],
+      }), {
+        env: {
+          ...process.env,
+          CATS_RUNTIME_DIR: runtimeRoot,
+        },
+      });
+
+      expect(knowledge.catalog.entries.map((entry) => entry.id)).toEqual([
+        'gpt-5.3-codex-spark',
+        'gpt-5.4',
+      ]);
+      expect(knowledge.catalog.controls).toEqual([
+        expect.objectContaining({
+          key: 'codex.reasoning_effort',
+          label: 'Reasoning effort',
+          description: 'Controls Codex CLI reasoning depth for supported models.',
+          kind: 'enum',
+          scope: 'both',
+          values: expect.arrayContaining([
+            {
+              value: 'low',
+              label: 'Low',
+              description: 'Fast responses with lighter reasoning.',
+              applicableEntryIds: ['gpt-5.3-codex-spark', 'gpt-5.4'],
+            },
+            {
+              value: 'medium',
+              label: 'Medium',
+              description: 'Balances speed and reasoning depth for everyday tasks.',
+              applicableEntryIds: ['gpt-5.3-codex-spark'],
+            },
+            {
+              value: 'high',
+              label: 'High (default)',
+              description: 'Greater reasoning depth for complex problems.',
+              applicableEntryIds: ['gpt-5.3-codex-spark'],
+            },
+            {
+              value: 'xhigh',
+              label: 'Extra High',
+              description: 'Extra high reasoning depth for complex problems.',
+              applicableEntryIds: ['gpt-5.3-codex-spark', 'gpt-5.4'],
+            },
+            {
+              value: 'medium',
+              label: 'Medium (default)',
+              description: 'Balances speed and reasoning depth for everyday tasks.',
+              applicableEntryIds: ['gpt-5.4'],
+            },
+            {
+              value: 'high',
+              label: 'High',
+              description: 'Greater reasoning depth for complex problems.',
+              applicableEntryIds: ['gpt-5.4'],
+            },
+          ]),
+          applicableEntryIds: ['gpt-5.3-codex-spark', 'gpt-5.4'],
+          semanticTags: ['reasoning_intensity'],
+        }),
+      ]);
+      expect(knowledge.catalog.defaultSelection).toEqual({
+        entryId: 'gpt-5.3-codex-spark',
+        entryMode: 'explicit',
+        controls: {
+          'codex.reasoning_effort': 'high',
+        },
+      });
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true });
+    }
   });
 
   it('publishes curated native Claude CLI aliases and effort controls', () => {

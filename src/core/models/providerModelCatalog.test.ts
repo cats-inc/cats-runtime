@@ -1693,7 +1693,7 @@ describe('ProviderModelCatalogService', () => {
         '    version: 0.118.0',
         '    last_updated: 2026-04-08',
         '    shared_options:',
-        '      - name: Effort',
+        '      - name: Reasoning Level',
         '        values: [Low, Medium, High, Extra High]',
         '        default: Medium',
         '    models:',
@@ -1707,20 +1707,10 @@ describe('ProviderModelCatalogService', () => {
         '      - name: gpt-5.3-codex-spark',
         '        label: gpt-5.3-codex-spark',
         '        options:',
-        '          - name: Effort',
+        '          - name: Reasoning Level',
         '            default: High',
-        '      - name: gpt-5.2-codex',
-        '        label: gpt-5.2-codex',
         '      - name: gpt-5.2',
         '        label: gpt-5.2',
-        '      - name: gpt-5.1-codex-max',
-        '        label: gpt-5.1-codex-max',
-        '      - name: gpt-5.1-codex-mini',
-        '        label: gpt-5.1-codex-mini',
-        '        options:',
-        '          - name: Effort',
-        '            values: [Medium, High]',
-        '            default: Medium',
         '',
       ].join('\n'), 'utf8');
 
@@ -1765,6 +1755,7 @@ describe('ProviderModelCatalogService', () => {
       expect(catalog.provider).toBe('codex');
       expect(catalog.backend).toBe('cli');
       expect(catalog.defaultModel).toBe('gpt-5.4');
+      expect(catalog.entries).toHaveLength(5);
       expect(catalog.entries).toEqual(expect.arrayContaining([
         expect.objectContaining({
           id: 'gpt-5.4',
@@ -1793,9 +1784,7 @@ describe('ProviderModelCatalogService', () => {
               'gpt-5.4-mini',
               'gpt-5.3-codex',
               'gpt-5.3-codex-spark',
-              'gpt-5.2-codex',
               'gpt-5.2',
-              'gpt-5.1-codex-max',
             ],
           },
           {
@@ -1806,10 +1795,7 @@ describe('ProviderModelCatalogService', () => {
               'gpt-5.4',
               'gpt-5.4-mini',
               'gpt-5.3-codex',
-              'gpt-5.2-codex',
               'gpt-5.2',
-              'gpt-5.1-codex-max',
-              'gpt-5.1-codex-mini',
             ],
           },
           {
@@ -1828,10 +1814,7 @@ describe('ProviderModelCatalogService', () => {
               'gpt-5.4',
               'gpt-5.4-mini',
               'gpt-5.3-codex',
-              'gpt-5.2-codex',
               'gpt-5.2',
-              'gpt-5.1-codex-max',
-              'gpt-5.1-codex-mini',
             ],
           },
           {
@@ -1851,9 +1834,7 @@ describe('ProviderModelCatalogService', () => {
               'gpt-5.4-mini',
               'gpt-5.3-codex',
               'gpt-5.3-codex-spark',
-              'gpt-5.2-codex',
               'gpt-5.2',
-              'gpt-5.1-codex-max',
             ],
           },
         ]),
@@ -1862,10 +1843,7 @@ describe('ProviderModelCatalogService', () => {
           'gpt-5.4-mini',
           'gpt-5.3-codex',
           'gpt-5.3-codex-spark',
-          'gpt-5.2-codex',
           'gpt-5.2',
-          'gpt-5.1-codex-max',
-          'gpt-5.1-codex-mini',
         ],
         semanticTags: ['reasoning_intensity'],
       });
@@ -1980,24 +1958,6 @@ describe('ProviderModelCatalogService', () => {
           {
             id: 'gemini-3.1-flash-lite-preview',
             label: 'Gemini 3.1 Flash Lite Preview',
-            default: false,
-            capabilityTags: ['tool_use', 'latency_optimized'],
-          },
-          {
-            id: 'gemini-2.5-pro',
-            label: 'gemini-2.5-pro',
-            default: false,
-            capabilityTags: ['tool_use', 'reasoning'],
-          },
-          {
-            id: 'gemini-2.5-flash',
-            label: 'gemini-2.5-flash',
-            default: false,
-            capabilityTags: ['tool_use', 'latency_optimized'],
-          },
-          {
-            id: 'gemini-2.5-flash-lite',
-            label: 'gemini-2.5-flash-lite',
             default: false,
             capabilityTags: ['tool_use', 'latency_optimized'],
           },

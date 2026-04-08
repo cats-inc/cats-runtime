@@ -136,14 +136,8 @@ function buildEntryNotes(
         return ['Frontier Codex-optimized agentic coding model.'];
       case 'gpt-5.3-codex-spark':
         return ['Ultra-fast coding model.'];
-      case 'gpt-5.2-codex':
-        return ['Frontier agentic coding model.'];
       case 'gpt-5.2':
         return ['Optimized for professional work and long-running agents.'];
-      case 'gpt-5.1-codex-max':
-        return ['Codex-optimized model for deep and fast reasoning.'];
-      case 'gpt-5.1-codex-mini':
-        return ['Optimized for codex. Cheaper, faster, but less capable.'];
       default:
         return undefined;
     }
@@ -238,10 +232,7 @@ function normalizeCodexCuratedModelId(model: CuratedModelCatalogModel): string |
     'gpt-5.4-mini',
     'gpt-5.3-codex',
     'gpt-5.3-codex-spark',
-    'gpt-5.2-codex',
     'gpt-5.2',
-    'gpt-5.1-codex-max',
-    'gpt-5.1-codex-mini',
   ]);
 
   for (const candidate of candidates) {
@@ -289,6 +280,14 @@ function fallbackCodexEffortDescription(
     default:
       return undefined;
   }
+}
+
+function matchesCuratedOptionName(
+  option: CuratedModelCatalogOption,
+  aliases: string[],
+): boolean {
+  const normalized = option.name.trim().toLowerCase();
+  return aliases.some((alias) => normalized === alias.trim().toLowerCase());
 }
 
 function buildCuratedEntryMetadata(
@@ -467,7 +466,9 @@ function buildCuratedClaudeCliOverlay(
     entriesById[entryId] = buildCuratedEntryMetadata(model);
 
     const effectiveOptions = resolveEffectiveCuratedModelOptions(scope.sharedOptions, model);
-    const effortOption = effectiveOptions.find((option) => option.name.trim().toLowerCase() === 'effort');
+    const effortOption = effectiveOptions.find((option) => matchesCuratedOptionName(option, [
+      'effort',
+    ]));
     if (effortOption) {
       effortOptions.set(entryId, effortOption);
     }
@@ -505,7 +506,10 @@ function buildCuratedCodexCliOverlay(
     entriesById[entryId] = buildCuratedEntryMetadata(model);
 
     const effectiveOptions = resolveEffectiveCuratedModelOptions(scope.sharedOptions, model);
-    const effortOption = effectiveOptions.find((option) => option.name.trim().toLowerCase() === 'effort');
+    const effortOption = effectiveOptions.find((option) => matchesCuratedOptionName(option, [
+      'effort',
+      'reasoning level',
+    ]));
     if (effortOption) {
       effortOptions.set(entryId, effortOption);
     }
@@ -586,8 +590,15 @@ function toAdvancedEntries(
   catalog: ProviderModelCatalogResult,
   curatedEntriesById: Record<string, CuratedEntryMetadata> = {},
 ): ProviderAdvancedCatalogEntry[] {
+  const curatedEntryOrder = Object.keys(curatedEntriesById);
+  const modelById = new Map(catalog.models.map((entry) => [entry.id, entry]));
+  const baseEntries = curatedEntryOrder.length > 0
+    ? curatedEntryOrder
+      .map((entryId) => modelById.get(entryId))
+      .filter((entry): entry is ProviderModelCatalogResult['models'][number] => Boolean(entry))
+    : catalog.models;
   const curatedHasExplicitDefault = Object.values(curatedEntriesById).some((entry) => entry.default === true);
-  return catalog.models.map((entry) => ({
+  return baseEntries.map((entry) => ({
     ...(curatedHasExplicitDefault
       ? { default: curatedEntriesById[entry.id]?.default === true }
       : {}),
@@ -728,8 +739,6 @@ function buildCodexCliControls(
 
   const sparkEntryIds = applicableEntryIds.filter((entryId) => entryId === 'gpt-5.3-codex-spark');
   const nonSparkEntryIds = applicableEntryIds.filter((entryId) => entryId !== 'gpt-5.3-codex-spark');
-  const nonMiniEntryIds = applicableEntryIds.filter((entryId) => entryId !== 'gpt-5.1-codex-mini');
-
   return {
     controls: [{
       key: 'codex.reasoning_effort',
@@ -742,7 +751,7 @@ function buildCodexCliControls(
           value: 'low',
           label: 'Low',
           description: 'Fast responses with lighter reasoning.',
-          applicableEntryIds: nonMiniEntryIds,
+          applicableEntryIds,
         },
         {
           value: 'medium',
@@ -772,7 +781,7 @@ function buildCodexCliControls(
           value: 'xhigh',
           label: 'Extra high',
           description: 'Extra high reasoning depth for complex problems.',
-          applicableEntryIds: nonMiniEntryIds,
+          applicableEntryIds,
         },
       ]),
       applicableEntryIds,
