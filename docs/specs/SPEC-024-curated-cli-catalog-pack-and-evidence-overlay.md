@@ -17,10 +17,12 @@ The curator-facing file should be simple:
 
 - one CLI name
 - one CLI version
+- an optional last-updated date
 - the visible models
 - the visible labels
+- optional visible facts such as context window or output limits
 - the visible option labels and values
-- optional default/current markers
+- optional default or deprecated markers
 
 It should not require the curator to know:
 
@@ -83,43 +85,61 @@ This spec defines that split explicitly:
 6. Each catalog entry shall contain:
    - `cli`
    - `version`
+   - optional `last_updated`
+   - optional `notes`
+   - optional `shared_options`
    - either `models` or `providers`
 7. `models` shall be used for CLIs where the catalog is effectively one model
    list.
 8. `providers` shall be used for CLIs where the user sees multiple provider
    groups or the maintainer wants to organize the file that way.
-9. Each model entry shall support at least:
+9. When `providers` is used, each provider entry may contain:
+   - `name`
+   - optional `last_updated`
+   - optional `notes`
+   - optional `shared_options`
+   - `models`
+10. Each model entry shall support at least:
    - `name`
    - optional `label`
    - optional `default`
-   - optional `current`
+   - optional `deprecated`
+   - optional `context`
+   - optional `max_output`
+   - optional `tags`
    - optional `options`
    - optional `notes`
-10. Each option entry shall support:
-    - `name`
-    - `values`
-11. Each option value entry shall support:
+11. Each option entry shall support:
     - `name`
     - optional `default`
-12. The runtime shall treat all curator-facing `cli`, `provider`, `model`,
+    - `values`
+12. Each option value entry may be either:
+    - a raw string such as `Low`
+    - or an object containing `name`
+13. `shared_options` may appear at the catalog level or provider level.
+14. Model-level `options` shall override same-named shared options by replacing
+    the visible default and/or the visible value list for that model only.
+15. The runtime shall treat all curator-facing `cli`, `provider`, `model`,
     `option`, and `value` names as raw labels first.
-13. The runtime shall own later normalization from raw labels such as:
+16. The runtime shall own later normalization from raw labels such as:
     - `Claude` -> internal provider family
     - `Effort` -> runtime control key
     - `Extra High` -> internal canonical value such as `xhigh`
-14. The runtime shall not require the curator to lowercase labels or pre-map
+17. The runtime shall maintain runtime-owned normalization and alias rules for
+    known CLI labels, and those rules may evolve over time as CLIs change.
+18. The runtime shall not require the curator to lowercase labels or pre-map
     them into internal wire values.
-15. The runtime may retain only the latest one or two imported revisions later,
+19. The runtime may retain only the latest one or two imported revisions later,
     but the first human-facing file format shall not require explicit revision
     bookkeeping from the curator.
-16. The runtime shall keep evidence and verification outside the curator file.
-17. The runtime evidence overlay shall remain runtime-authored and may record
+20. The runtime shall keep evidence and verification outside the curator file.
+21. The runtime evidence overlay shall remain runtime-authored and may record
     verdicts such as:
     - `confirmed_available`
     - `confirmed_deprecated`
     - `not_observed`
     - `conflicting`
-18. The public advanced catalog may later be derived from:
+22. The public advanced catalog may later be derived from:
     - imported curator input
     - runtime normalization rules
     - runtime evidence overlays
@@ -149,18 +169,20 @@ schema_version: 1
 catalogs:
   - cli: Claude
     version: 2.1.96
+    last_updated: 2026-04-08
     models:
       - name: Opus
         label: Opus 4.6 with 1M context
         default: true
+        context: 1000000
         options:
           - name: Effort
             values:
-              - name: Low
-              - name: Medium
-                default: true
-              - name: High
-              - name: Max
+              - Low
+              - Medium
+              - High
+              - Max
+            default: Medium
 ```
 
 This file says only what the curator can read.
@@ -174,6 +196,36 @@ It does **not** say:
 
 Those are internal runtime responsibilities.
 
+### Shared Options
+
+Many CLIs repeat the same visible option on many models. The curator file may
+use `shared_options` to reduce duplication.
+
+```yaml
+schema_version: 1
+
+catalogs:
+  - cli: Codex
+    version: 0.118.0
+    last_updated: 2026-04-08
+    shared_options:
+      - name: Effort
+        values: [Low, Medium, High, Extra High]
+        default: Medium
+    models:
+      - name: gpt-5.3-codex-spark
+        label: gpt-5.3-codex-spark
+        options:
+          - name: Effort
+            default: High
+      - name: gpt-5.1-codex-mini
+        label: gpt-5.1-codex-mini
+        options:
+          - name: Effort
+            values: [Medium, High]
+            default: Medium
+```
+
 ### Grouped Providers
 
 For CLIs like Cursor, Kilo, Goose, or other router-style tools, the same file
@@ -185,12 +237,12 @@ schema_version: 1
 catalogs:
   - cli: Cursor
     version: 2026.03.30-a5d3e17
+    last_updated: 2026-04-08
     providers:
       - name: OpenAI
         models:
           - name: gpt-5.4-xhigh
             label: GPT-5.4 1M Extra High
-            current: true
       - name: Anthropic
         models:
           - name: claude-4.6-opus-high-thinking
@@ -198,6 +250,30 @@ catalogs:
 ```
 
 Again, the curator is only recording visible labels.
+
+### Model Facts
+
+Some facts are human-curated but still useful to the runtime because they are
+often hard to discover safely at runtime.
+
+Examples:
+
+- visible context-window claims such as `1M context`
+- visible output-budget limits
+- optional freeform tags
+- visible deprecation notes
+
+Illustrative shape:
+
+```yaml
+- name: Opus
+  label: Opus 4.6 with 1M context
+  default: true
+  context: 1000000
+  max_output: 32000
+  tags: [reasoning]
+  deprecated: false
+```
 
 ### Runtime Normalization Boundary
 
@@ -209,8 +285,26 @@ runtime-owned concepts such as:
 - normalized enum values
 - entry applicability
 - advanced selection defaults
+- compound model ids that encode more than one internal setting
 
 That normalization is intentionally **not** part of the curator contract.
+
+### Normalization Layer
+
+The simplicity of the curator file pushes complexity into the runtime-owned
+normalization layer. That is intentional and should be stated explicitly.
+
+Examples of runtime-owned normalization work:
+
+- aliasing CLI names such as `Claude`, `Claude Code`, or `claude`
+- mapping visible option labels like `Effort` onto provider-specific internal
+  controls
+- mapping visible values like `Extra High` onto canonical enums such as
+  `xhigh`
+- deciding whether a visible model name such as `gpt-5.4-xhigh` should stay one
+  concrete entry or be decomposed into entry + option state later
+
+Those rules belong to `cats-runtime`, not to the curator file.
 
 ### Evidence Overlay
 

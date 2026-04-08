@@ -19,124 +19,70 @@ schema_version: 1
 catalogs:
   - cli: Claude
     version: 2.1.96
+    last_updated: 2026-04-08
     models:
       - name: Opus
         label: Opus 4.6 with 1M context
         default: true
+        context: 1000000
         options:
           - name: Effort
-            values:
-              - name: Low
-              - name: Medium
-                default: true
-              - name: High
-              - name: Max
+            values: [Low, Medium, High, Max]
+            default: Medium
 
       - name: Sonnet
         label: Sonnet 4.6
         options:
           - name: Effort
-            values:
-              - name: Low
-              - name: Medium
-                default: true
-              - name: High
+            values: [Low, Medium, High]
+            default: Medium
 
       - name: Haiku
         label: Haiku 4.5
 
   - cli: Codex
     version: 0.118.0
+    last_updated: 2026-04-08
+    shared_options:
+      - name: Effort
+        values: [Low, Medium, High, Extra High]
+        default: Medium
     models:
       - name: gpt-5.4
         label: gpt-5.4
         default: true
-        options:
-          - name: Effort
-            values:
-              - name: Low
-              - name: Medium
-                default: true
-              - name: High
-              - name: Extra High
 
       - name: gpt-5.4-mini
         label: gpt-5.4-mini
-        options:
-          - name: Effort
-            values:
-              - name: Low
-              - name: Medium
-                default: true
-              - name: High
-              - name: Extra High
 
       - name: gpt-5.3-codex
         label: gpt-5.3-codex
-        options:
-          - name: Effort
-            values:
-              - name: Low
-              - name: Medium
-                default: true
-              - name: High
-              - name: Extra High
 
       - name: gpt-5.3-codex-spark
         label: gpt-5.3-codex-spark
         options:
           - name: Effort
-            values:
-              - name: Low
-              - name: Medium
-              - name: High
-                default: true
-              - name: Extra High
+            default: High
 
       - name: gpt-5.2-codex
         label: gpt-5.2-codex
-        options:
-          - name: Effort
-            values:
-              - name: Low
-              - name: Medium
-                default: true
-              - name: High
-              - name: Extra High
 
       - name: gpt-5.2
         label: gpt-5.2
-        options:
-          - name: Effort
-            values:
-              - name: Low
-              - name: Medium
-                default: true
-              - name: High
-              - name: Extra High
 
       - name: gpt-5.1-codex-max
         label: gpt-5.1-codex-max
-        options:
-          - name: Effort
-            values:
-              - name: Low
-              - name: Medium
-                default: true
-              - name: High
-              - name: Extra High
 
       - name: gpt-5.1-codex-mini
         label: gpt-5.1-codex-mini
         options:
           - name: Effort
-            values:
-              - name: Medium
-                default: true
-              - name: High
+            values: [Medium, High]
+            default: Medium
 
   - cli: Gemini
     version: 0.36.0
+    last_updated: 2026-04-08
     models:
       - name: gemini-3.1-pro-preview
         label: gemini-3.1-pro-preview
@@ -159,6 +105,7 @@ catalogs:
 
   - cli: Cursor
     version: 2026.03.30-a5d3e17
+    last_updated: 2026-04-08
     notes:
       - This is a seeded providers[] example only.
       - The list below is intentionally partial; add/remove models after review.
@@ -185,7 +132,6 @@ catalogs:
 
           - name: gpt-5.4-xhigh
             label: GPT-5.4 1M Extra High
-            current: true
 
           - name: gpt-5.4-mini-medium
             label: GPT-5.4 Mini
