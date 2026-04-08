@@ -67,6 +67,7 @@ export function normalizeCuratedModelId(
     case 'codex':
       return normalizeCodexCuratedModelId(model);
     case 'gemini':
+    case 'cursor':
       return normalizeLiteralCuratedModelId(model);
     default:
       return null;

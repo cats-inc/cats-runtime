@@ -581,7 +581,10 @@ export function getStaticProviderModels(
 }
 
 function supportsCuratedStaticCliCatalog(providerName: string): boolean {
-  return providerName === 'claude' || providerName === 'codex' || providerName === 'gemini';
+  return providerName === 'claude'
+    || providerName === 'codex'
+    || providerName === 'gemini'
+    || providerName === 'cursor';
 }
 
 function buildCuratedStaticCliModels(
@@ -608,12 +611,11 @@ function buildCuratedStaticCliModels(
     return null;
   }
 
-  const scope = resolveCuratedCatalogScope(catalog, target.providerName);
-  if (!scope) {
-    return null;
-  }
-
-  const models = scope.models.flatMap((model) => {
+  const models = (
+    target.providerName === 'cursor'
+      ? (catalog.models ?? catalog.providers?.flatMap((provider) => provider.models) ?? [])
+      : (resolveCuratedCatalogScope(catalog, target.providerName)?.models ?? [])
+  ).flatMap((model) => {
     const id = normalizeCuratedModelId(target.providerName, model);
     if (!id) {
       return [];
