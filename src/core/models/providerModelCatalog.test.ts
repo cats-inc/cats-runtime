@@ -1682,6 +1682,220 @@ describe('ProviderModelCatalogService', () => {
     }
   });
 
+  it('applies curated Codex CLI effort metadata from curated-model-catalogs.yaml', () => {
+    const runtime = createRuntimeRoot();
+
+    try {
+      writeFileSync(runtime.paths.curatedModelCatalogPath, [
+        'schema_version: 1',
+        'catalogs:',
+        '  - cli: Codex',
+        '    version: 0.118.0',
+        '    last_updated: 2026-04-08',
+        '    shared_options:',
+        '      - name: Effort',
+        '        values: [Low, Medium, High, Extra High]',
+        '        default: Medium',
+        '    models:',
+        '      - name: gpt-5.4',
+        '        label: gpt-5.4',
+        '        default: true',
+        '      - name: gpt-5.4-mini',
+        '        label: gpt-5.4-mini',
+        '      - name: gpt-5.3-codex',
+        '        label: gpt-5.3-codex',
+        '      - name: gpt-5.3-codex-spark',
+        '        label: gpt-5.3-codex-spark',
+        '        options:',
+        '          - name: Effort',
+        '            default: High',
+        '      - name: gpt-5.2-codex',
+        '        label: gpt-5.2-codex',
+        '      - name: gpt-5.2',
+        '        label: gpt-5.2',
+        '      - name: gpt-5.1-codex-max',
+        '        label: gpt-5.1-codex-max',
+        '      - name: gpt-5.1-codex-mini',
+        '        label: gpt-5.1-codex-mini',
+        '        options:',
+        '          - name: Effort',
+        '            values: [Medium, High]',
+        '            default: Medium',
+        '',
+      ].join('\n'), 'utf8');
+
+      const base = createCatalogConfig();
+      const config = {
+        ...base,
+        configPath: runtime.paths.configPath,
+        sessionBaseDir: runtime.paths.sessionBaseDir,
+        providerDefaultTargets: {
+          ...base.providerDefaultTargets,
+          codex: { backend: 'cli', instance: 'default' },
+        },
+        providerInstances: {
+          ...base.providerInstances,
+          codex: {
+            default: {
+              id: 'default',
+              providerName: 'codex',
+              commandConfig: {
+                path: 'codex',
+                runner: 'auto',
+                runtime: { mode: 'native' },
+              },
+            },
+          },
+        },
+        providerCommands: {
+          ...base.providerCommands,
+          codex: {
+            path: 'codex',
+            runner: 'auto',
+            runtime: { mode: 'native' },
+          },
+        },
+      } as const;
+
+      const service = new ProviderModelCatalogService(config as never, {
+        env: runtime.env,
+      });
+
+      const catalog = service.getImmediateAdvancedCatalog('codex');
+      expect(catalog.provider).toBe('codex');
+      expect(catalog.backend).toBe('cli');
+      expect(catalog.defaultModel).toBe('gpt-5.4');
+      expect(catalog.entries).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          id: 'gpt-5.4',
+          label: 'gpt-5.4',
+          default: true,
+        }),
+        expect.objectContaining({
+          id: 'gpt-5.3-codex-spark',
+          label: 'gpt-5.3-codex-spark',
+        }),
+      ]));
+      expect(catalog.controls).toHaveLength(1);
+      expect(catalog.controls[0]).toEqual({
+        key: 'codex.reasoning_effort',
+        label: 'Reasoning effort',
+        description: 'Controls Codex CLI reasoning depth for supported models.',
+        kind: 'enum',
+        scope: 'both',
+        values: expect.arrayContaining([
+          {
+            value: 'low',
+            label: 'Low',
+            description: 'Fast responses with lighter reasoning.',
+            applicableEntryIds: [
+              'gpt-5.4',
+              'gpt-5.4-mini',
+              'gpt-5.3-codex',
+              'gpt-5.3-codex-spark',
+              'gpt-5.2-codex',
+              'gpt-5.2',
+              'gpt-5.1-codex-max',
+            ],
+          },
+          {
+            value: 'medium',
+            label: 'Medium (default)',
+            description: 'Balances speed and reasoning depth for everyday tasks.',
+            applicableEntryIds: [
+              'gpt-5.4',
+              'gpt-5.4-mini',
+              'gpt-5.3-codex',
+              'gpt-5.2-codex',
+              'gpt-5.2',
+              'gpt-5.1-codex-max',
+              'gpt-5.1-codex-mini',
+            ],
+          },
+          {
+            value: 'medium',
+            label: 'Medium',
+            description: 'Balances speed and reasoning depth for everyday tasks.',
+            applicableEntryIds: [
+              'gpt-5.3-codex-spark',
+            ],
+          },
+          {
+            value: 'high',
+            label: 'High',
+            description: 'Greater reasoning depth for complex problems.',
+            applicableEntryIds: [
+              'gpt-5.4',
+              'gpt-5.4-mini',
+              'gpt-5.3-codex',
+              'gpt-5.2-codex',
+              'gpt-5.2',
+              'gpt-5.1-codex-max',
+              'gpt-5.1-codex-mini',
+            ],
+          },
+          {
+            value: 'high',
+            label: 'High (default)',
+            description: 'Greater reasoning depth for complex problems.',
+            applicableEntryIds: [
+              'gpt-5.3-codex-spark',
+            ],
+          },
+          {
+            value: 'xhigh',
+            label: 'Extra High',
+            description: 'Extra high reasoning depth for complex problems.',
+            applicableEntryIds: [
+              'gpt-5.4',
+              'gpt-5.4-mini',
+              'gpt-5.3-codex',
+              'gpt-5.3-codex-spark',
+              'gpt-5.2-codex',
+              'gpt-5.2',
+              'gpt-5.1-codex-max',
+            ],
+          },
+        ]),
+        applicableEntryIds: [
+          'gpt-5.4',
+          'gpt-5.4-mini',
+          'gpt-5.3-codex',
+          'gpt-5.3-codex-spark',
+          'gpt-5.2-codex',
+          'gpt-5.2',
+          'gpt-5.1-codex-max',
+          'gpt-5.1-codex-mini',
+        ],
+        semanticTags: ['reasoning_intensity'],
+      });
+      expect(catalog.controls[0]?.values).toHaveLength(6);
+      expect(catalog.defaultSelection).toEqual({
+        entryId: 'gpt-5.4',
+        entryMode: 'explicit',
+        controls: {
+          'codex.reasoning_effort': 'medium',
+        },
+      });
+      expect(catalog.support).toEqual({
+        tier: 'full',
+        advancedMetadataStatus: 'verified_manifest',
+        discoveryMode: 'manual_refresh',
+        provenance: {
+          status: 'verified_manifest',
+          manifestId: 'codex-cli-v1',
+          manifestVersion: '2026-04-07',
+          evidenceRefs: [
+            'docs/research/2026-04-07-advanced-provider-manifest-baseline.md#codex-cli-v1',
+          ],
+        },
+      });
+      expect(catalog.warnings).toEqual([]);
+    } finally {
+      runtime.cleanup();
+    }
+  });
+
   it('builds an additive advanced catalog with presets and controls for OpenAI targets', async () => {
     const config = {
       ...createCatalogConfig(),

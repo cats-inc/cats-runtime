@@ -22,7 +22,6 @@ import {
   type CuratedModelCatalogDocument,
   type CuratedModelCatalogModel,
   type CuratedModelCatalogOption,
-  type CuratedModelCatalogOptionValue,
 } from './curatedModelCatalog.js';
 
 export interface ProviderAdvancedKnowledgeContext {
@@ -47,7 +46,7 @@ interface CuratedEntryMetadata {
   deprecated?: boolean;
 }
 
-interface CuratedClaudeCatalogOverlay {
+interface CuratedCatalogOverlay {
   entriesById: Record<string, CuratedEntryMetadata>;
   controls?: ProviderAdvancedCatalogControl[];
   entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>>;
@@ -232,7 +231,67 @@ function fallbackClaudeEffortDescription(
   }
 }
 
-function buildClaudeCuratedEntryMetadata(
+function normalizeCodexCuratedModelId(model: CuratedModelCatalogModel): string | null {
+  const candidates = [model.name, model.label].filter((value): value is string => Boolean(value));
+  const knownIds = new Set([
+    'gpt-5.4',
+    'gpt-5.4-mini',
+    'gpt-5.3-codex',
+    'gpt-5.3-codex-spark',
+    'gpt-5.2-codex',
+    'gpt-5.2',
+    'gpt-5.1-codex-max',
+    'gpt-5.1-codex-mini',
+  ]);
+
+  for (const candidate of candidates) {
+    const normalized = candidate.trim().toLowerCase();
+    if (knownIds.has(normalized)) {
+      return normalized;
+    }
+  }
+
+  return null;
+}
+
+function normalizeCodexEffortValue(
+  value: string | undefined,
+): ProviderAdvancedControlValue | null {
+  const normalized = value?.trim().toLowerCase();
+  switch (normalized) {
+    case 'low':
+      return 'low';
+    case 'medium':
+      return 'medium';
+    case 'high':
+      return 'high';
+    case 'extra high':
+    case 'extra-high':
+    case 'xhigh':
+      return 'xhigh';
+    default:
+      return null;
+  }
+}
+
+function fallbackCodexEffortDescription(
+  value: ProviderAdvancedControlValue,
+): string | undefined {
+  switch (value) {
+    case 'low':
+      return 'Fast responses with lighter reasoning.';
+    case 'medium':
+      return 'Balances speed and reasoning depth for everyday tasks.';
+    case 'high':
+      return 'Greater reasoning depth for complex problems.';
+    case 'xhigh':
+      return 'Extra high reasoning depth for complex problems.';
+    default:
+      return undefined;
+  }
+}
+
+function buildCuratedEntryMetadata(
   model: CuratedModelCatalogModel,
 ): CuratedEntryMetadata {
   const limits: ProviderAdvancedCatalogEntryLimits = {};
@@ -268,8 +327,15 @@ function buildClaudeCuratedEntryMetadata(
   };
 }
 
-function buildCuratedClaudeCliControls(
+function buildCuratedEnumControl(
   optionsByEntryId: Map<string, CuratedModelCatalogOption>,
+  control: {
+    key: string;
+    label: string;
+    description: string;
+    normalizeValue: (value: string | undefined) => ProviderAdvancedControlValue | null;
+    fallbackDescription: (value: ProviderAdvancedControlValue) => string | undefined;
+  },
 ): {
   controls?: ProviderAdvancedCatalogControl[];
   entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>>;
@@ -285,19 +351,19 @@ function buildCuratedClaudeCliControls(
   const entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>> = {};
 
   for (const [entryId, option] of optionsByEntryId.entries()) {
-    const defaultValue = normalizeClaudeEffortValue(option.default);
+    const defaultValue = control.normalizeValue(option.default);
     if (defaultValue !== null) {
       entryDefaults[entryId] = {
-        'claude.reasoning_effort': defaultValue,
+        [control.key]: defaultValue,
       };
     }
 
     for (const value of option.values || []) {
-      const normalizedValue = normalizeClaudeEffortValue(value.name);
+      const normalizedValue = control.normalizeValue(value.name);
       if (normalizedValue === null) {
         continue;
       }
-      const description = value.notes?.[0] || fallbackClaudeEffortDescription(normalizedValue);
+      const description = value.notes?.[0] || control.fallbackDescription(normalizedValue);
       const label = normalizedValue === defaultValue
         ? `${value.name} (default)`
         : value.name;
@@ -335,9 +401,9 @@ function buildCuratedClaudeCliControls(
 
   return {
     controls: [{
-      key: 'claude.reasoning_effort',
-      label: 'Reasoning effort',
-      description: 'Controls Claude Code effort for supported models.',
+      key: control.key,
+      label: control.label,
+      description: control.description,
       kind: 'enum',
       scope: 'both',
       values: controlOptions,
@@ -348,9 +414,39 @@ function buildCuratedClaudeCliControls(
   };
 }
 
+function buildCuratedClaudeCliControls(
+  optionsByEntryId: Map<string, CuratedModelCatalogOption>,
+): {
+  controls?: ProviderAdvancedCatalogControl[];
+  entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>>;
+} {
+  return buildCuratedEnumControl(optionsByEntryId, {
+    key: 'claude.reasoning_effort',
+    label: 'Reasoning effort',
+    description: 'Controls Claude Code effort for supported models.',
+    normalizeValue: normalizeClaudeEffortValue,
+    fallbackDescription: fallbackClaudeEffortDescription,
+  });
+}
+
+function buildCuratedCodexCliControls(
+  optionsByEntryId: Map<string, CuratedModelCatalogOption>,
+): {
+  controls?: ProviderAdvancedCatalogControl[];
+  entryDefaults: Record<string, Record<string, ProviderAdvancedControlValue>>;
+} {
+  return buildCuratedEnumControl(optionsByEntryId, {
+    key: 'codex.reasoning_effort',
+    label: 'Reasoning effort',
+    description: 'Controls Codex CLI reasoning depth for supported models.',
+    normalizeValue: normalizeCodexEffortValue,
+    fallbackDescription: fallbackCodexEffortDescription,
+  });
+}
+
 function buildCuratedClaudeCliOverlay(
   document: CuratedModelCatalogDocument | undefined,
-): CuratedClaudeCatalogOverlay | null {
+): CuratedCatalogOverlay | null {
   const catalog = findCuratedCliCatalog(document, 'claude');
   if (!catalog) {
     return null;
@@ -368,7 +464,7 @@ function buildCuratedClaudeCliOverlay(
     if (!entryId) {
       continue;
     }
-    entriesById[entryId] = buildClaudeCuratedEntryMetadata(model);
+    entriesById[entryId] = buildCuratedEntryMetadata(model);
 
     const effectiveOptions = resolveEffectiveCuratedModelOptions(scope.sharedOptions, model);
     const effortOption = effectiveOptions.find((option) => option.name.trim().toLowerCase() === 'effort');
@@ -378,6 +474,44 @@ function buildCuratedClaudeCliOverlay(
   }
 
   const controlResult = buildCuratedClaudeCliControls(effortOptions);
+  return {
+    entriesById,
+    ...(controlResult.controls ? { controls: controlResult.controls } : {}),
+    entryDefaults: controlResult.entryDefaults,
+    warnings: [],
+  };
+}
+
+function buildCuratedCodexCliOverlay(
+  document: CuratedModelCatalogDocument | undefined,
+): CuratedCatalogOverlay | null {
+  const catalog = findCuratedCliCatalog(document, 'codex');
+  if (!catalog) {
+    return null;
+  }
+
+  const scope = resolveCuratedCatalogScope(catalog, 'codex');
+  if (!scope) {
+    return null;
+  }
+
+  const entriesById: Record<string, CuratedEntryMetadata> = {};
+  const effortOptions = new Map<string, CuratedModelCatalogOption>();
+  for (const model of scope.models) {
+    const entryId = normalizeCodexCuratedModelId(model);
+    if (!entryId) {
+      continue;
+    }
+    entriesById[entryId] = buildCuratedEntryMetadata(model);
+
+    const effectiveOptions = resolveEffectiveCuratedModelOptions(scope.sharedOptions, model);
+    const effortOption = effectiveOptions.find((option) => option.name.trim().toLowerCase() === 'effort');
+    if (effortOption) {
+      effortOptions.set(entryId, effortOption);
+    }
+  }
+
+  const controlResult = buildCuratedCodexCliControls(effortOptions);
   return {
     entriesById,
     ...(controlResult.controls ? { controls: controlResult.controls } : {}),
@@ -896,13 +1030,13 @@ function resolveVerifiedAdvancedManifest(
   return VERIFIED_ADVANCED_MANIFESTS.find((manifest) => manifest.matches(target)) || null;
 }
 
-function loadCuratedClaudeOverlay(
+function loadCuratedOverlay(
   target: ProviderTargetDescriptor,
   options: ProviderAdvancedKnowledgeBuildOptions,
-): CuratedClaudeCatalogOverlay | null {
+): CuratedCatalogOverlay | null {
   if (
-    target.providerName !== 'claude'
-    || target.backend !== 'cli'
+    target.backend !== 'cli'
+    || (target.providerName !== 'claude' && target.providerName !== 'codex')
     || (!options.runtimeConfig && !options.env)
   ) {
     return null;
@@ -912,7 +1046,9 @@ function loadCuratedClaudeOverlay(
     runtimeConfig: options.runtimeConfig,
     env: options.env,
   });
-  const overlay = buildCuratedClaudeCliOverlay(result.document);
+  const overlay = target.providerName === 'claude'
+    ? buildCuratedClaudeCliOverlay(result.document)
+    : buildCuratedCodexCliOverlay(result.document);
   if (!overlay) {
     return result.warnings.length > 0
       ? {
@@ -934,11 +1070,11 @@ export function buildProviderAdvancedKnowledge(
   modelCatalog: ProviderModelCatalogResult,
   options: ProviderAdvancedKnowledgeBuildOptions = {},
 ): ProviderAdvancedKnowledgeContext {
-  const curatedClaudeOverlay = loadCuratedClaudeOverlay(target, options);
+  const curatedOverlay = loadCuratedOverlay(target, options);
   const entries = toAdvancedEntries(
     target,
     modelCatalog,
-    curatedClaudeOverlay?.entriesById,
+    curatedOverlay?.entriesById,
   );
   const manifest = resolveVerifiedAdvancedManifest(target);
   const supportTier = manifest?.supportTier ?? 'entry_only';
@@ -950,13 +1086,13 @@ export function buildProviderAdvancedKnowledge(
         presets: [],
         defaultSelection: null,
       };
-  if (curatedClaudeOverlay) {
-    const entryDefaults = Object.keys(curatedClaudeOverlay.entryDefaults).length > 0
-      ? curatedClaudeOverlay.entryDefaults
+  if (curatedOverlay) {
+    const entryDefaults = Object.keys(curatedOverlay.entryDefaults).length > 0
+      ? curatedOverlay.entryDefaults
       : manifestCatalog.entryDefaults;
     manifestCatalog = {
       ...manifestCatalog,
-      controls: curatedClaudeOverlay.controls || manifestCatalog.controls,
+      controls: curatedOverlay.controls || manifestCatalog.controls,
       entryDefaults,
       defaultSelection: buildDefaultSelection(entries, manifestCatalog.presets, entryDefaults),
     };
@@ -977,7 +1113,7 @@ export function buildProviderAdvancedKnowledge(
       manifest ? 'verified_manifest' : 'unverified_omitted',
       manifest,
     ),
-    warnings: [...modelCatalog.warnings, ...(curatedClaudeOverlay?.warnings || [])],
+    warnings: [...modelCatalog.warnings, ...(curatedOverlay?.warnings || [])],
   };
 
   return {
