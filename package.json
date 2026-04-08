@@ -28,6 +28,7 @@
     "public",
     "skills",
     "config/providers.yaml.example",
+    "config/curated-model-catalogs.yaml.example",
     ".env.example",
     "README.md",
     "LICENSE"
