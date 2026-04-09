@@ -386,12 +386,13 @@ describe('runtime server', () => {
       expect(html).toContain("{ name:'Agent-12', provider:'openclaw', model:getDefaultModel('openclaw'), tags:['marketer'] },");
       expect(html).toContain('id="agents-loading-state"');
       expect(html).toContain('function ensureStarterAgents(){');
-      expect(html).toContain(
-        "addAgent('Agent-1','claude','',['orchestrator'],null,{expandOnCreate:false,preferAvailableProvider:true});",
-      );
-      expect(html).toContain(
-        "addAgent('Agent-2','codex','',['coder'],null,{expandOnCreate:false,preferAvailableProvider:true});",
-      );
+      expect(html).toContain('allowBeforeProviderReady:true');
+      expect(html).toContain('const hasAgents=getAgentCount()>0;');
+      expect(html).toContain("const showList=mode==='ready'||hasAgents;");
+      expect(html).toContain("const showState=mode!=='ready'&&!hasAgents;");
+      expect(html).toContain('ensureStarterAgents();');
+      expect(html.indexOf('<script data-cats-ui>')).toBeGreaterThan(-1);
+      expect(html.indexOf('<script data-cats-ui>')).toBeLessThan(html.indexOf('void initApp();'));
       expect(html).toContain('providerOptionsReady&&!providerOptionsLoading');
       expect(html).toContain('.agent-tag-chip {');
       expect(html).toContain('.agent-tag-toggle input[value="orchestrator"]:checked + .agent-tag-chip {');

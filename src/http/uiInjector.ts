@@ -27,8 +27,11 @@ export function injectSharedUI(html: string): string {
   const css = `<style ${MARKER}>\n${SHARED_TOKENS_CSS}\n${PROVIDER_BADGE_CSS}\n</style>`;
   const js = `<script ${MARKER}>\n${SHARED_UI_SCRIPT}\n</script>`;
 
-  html = html.replace('</head>', `${css}\n</head>`);
-  html = html.replace('</body>', `${js}\n</body>`);
+  // Inject CatsUI before page-level scripts execute. Several runtime pages call
+  // window.CatsUI helpers during their first init pass, so appending this at
+  // </body> creates a first-load race that falsely marks runtime targets as
+  // unavailable.
+  html = html.replace('</head>', `${css}\n${js}\n</head>`);
 
   return html;
 }

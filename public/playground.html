@@ -1289,10 +1289,12 @@ function renderAgentsLoadingState(mode='loading'){
   const list=document.getElementById('agents-list');
   const state=document.getElementById('agents-loading-state');
   if(!list||!state)return;
-  const ready=mode==='ready';
-  list.classList.toggle('hidden',!ready);
-  state.classList.toggle('hidden',ready);
-  if(ready)return;
+  const hasAgents=getAgentCount()>0;
+  const showList=mode==='ready'||hasAgents;
+  const showState=mode!=='ready'&&!hasAgents;
+  list.classList.toggle('hidden',!showList);
+  state.classList.toggle('hidden',!showState);
+  if(!showState)return;
   if(mode==='loading'){
     state.innerHTML='<div class="flex items-center justify-center gap-2 text-slate-400"><span class="thinking-dot h-2 w-2 rounded-full bg-slate-500"></span><span class="thinking-dot h-2 w-2 rounded-full bg-slate-500"></span><span class="thinking-dot h-2 w-2 rounded-full bg-slate-500"></span></div>';
     return;
@@ -1301,8 +1303,8 @@ function renderAgentsLoadingState(mode='loading'){
 }
 function ensureStarterAgents(){
   if(starterAgentsInitialized||getAgentCount()>0)return;
-  addAgent('Agent-1','claude','',['orchestrator'],null,{expandOnCreate:false,preferAvailableProvider:true});
-  addAgent('Agent-2','codex','',['coder'],null,{expandOnCreate:false,preferAvailableProvider:true});
+  addAgent('Agent-1','claude','',['orchestrator'],null,{expandOnCreate:false,preferAvailableProvider:true,allowBeforeProviderReady:true});
+  addAgent('Agent-2','codex','',['coder'],null,{expandOnCreate:false,preferAvailableProvider:true,allowBeforeProviderReady:true});
   starterAgentsInitialized=true;
 }
 function updateAgentButtons(){
@@ -2093,6 +2095,7 @@ async function initApp() {
     syncChatInputDefaultPrompt();
   });
   updateRuntimeAuthState();
+  ensureStarterAgents();
   renderAgentsLoadingState('loading');
   updateAgentButtons();
   void loadProviderOptions();
