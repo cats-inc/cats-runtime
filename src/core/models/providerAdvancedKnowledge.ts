@@ -27,6 +27,7 @@ import {
   describeCuratedModelLabel,
   normalizeClaudeCuratedModelId,
   normalizeCodexCuratedModelId,
+  normalizeCursorCuratedModelId,
   normalizeLiteralCuratedModelId,
 } from './curatedModelCatalogNormalization.js';
 
@@ -249,6 +250,7 @@ function matchesCuratedOptionName(
 function buildCuratedEntryMetadata(
   model: CuratedModelCatalogModel,
 ): CuratedEntryMetadata {
+  const visibleLabel = model.label || model.name;
   const limits: ProviderAdvancedCatalogEntryLimits = {};
   if (model.context) {
     limits.contextWindowTokens = model.context;
@@ -261,7 +263,7 @@ function buildCuratedEntryMetadata(
   if (model.deprecated) {
     if (!notes) {
       return {
-        ...(model.label ? { label: model.label } : {}),
+        ...(visibleLabel ? { label: visibleLabel } : {}),
         ...(model.default !== undefined ? { default: model.default } : {}),
         ...(Object.keys(limits).length > 0 ? { limits } : {}),
         ...(model.tags ? { capabilityTags: [...model.tags] } : {}),
@@ -273,7 +275,7 @@ function buildCuratedEntryMetadata(
   }
 
   return {
-    ...(model.label ? { label: model.label } : {}),
+    ...(visibleLabel ? { label: visibleLabel } : {}),
     ...(model.default !== undefined ? { default: model.default } : {}),
     ...(Object.keys(limits).length > 0 ? { limits } : {}),
     ...(model.tags ? { capabilityTags: [...model.tags] } : {}),
@@ -540,11 +542,11 @@ function buildCuratedCursorCliOverlay(
   }
 
   if (catalog.models) {
-    return buildCuratedEntryOnlyOverlay(catalog.cli, catalog.models, normalizeLiteralCuratedModelId);
+    return buildCuratedEntryOnlyOverlay(catalog.cli, catalog.models, normalizeCursorCuratedModelId);
   }
 
   const providerModels = (catalog.providers || []).flatMap((provider) => provider.models);
-  return buildCuratedEntryOnlyOverlay(catalog.cli, providerModels, normalizeLiteralCuratedModelId);
+  return buildCuratedEntryOnlyOverlay(catalog.cli, providerModels, normalizeCursorCuratedModelId);
 }
 
 function toAdvancedEntries(

@@ -4368,6 +4368,90 @@ providers:
     });
   });
 
+  it('GET /providers/cursor/models and /advanced honor curated Cursor raw-label YAML', async () => {
+    await withCuratedCatalogRuntime([
+      'schema_version: 1',
+      'catalogs:',
+      '  - cli: Cursor',
+      '    version: 2026.04.08-a41fba1',
+      '    last_updated: 2026-04-09',
+      '    models:',
+      '      - name: Auto',
+      '      - name: Composer 2 Fast',
+      '      - name: Codex 5.3 Extra High',
+      '      - name: GPT-5.4 1M',
+      '      - name: Opus 4.5 Thinking',
+      '      - name: Gemini 3 Flash',
+    ], {}, {}, async (runtime) => {
+      const modelsResponse = await runtime.app.request('/providers/cursor/models');
+      expect(modelsResponse.status).toBe(200);
+      expect(await modelsResponse.json()).toEqual({
+        provider: 'cursor',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: null,
+        source: 'static',
+        cache: null,
+        models: [
+          { id: 'auto', label: 'Auto' },
+          { id: 'composer-2-fast', label: 'Composer 2 Fast' },
+          { id: 'gpt-5.3-codex-xhigh', label: 'Codex 5.3 Extra High' },
+          { id: 'gpt-5.4-medium', label: 'GPT-5.4 1M' },
+          { id: 'claude-4.5-opus-thinking', label: 'Opus 4.5 Thinking' },
+          { id: 'gemini-3-flash', label: 'Gemini 3 Flash' },
+        ],
+        warnings: [
+          'Live model discovery is available for cursor/cli/default via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',
+        ],
+      });
+
+      const advancedResponse = await runtime.app.request('/providers/cursor/models/advanced');
+      expect(advancedResponse.status).toBe(200);
+      expect(await advancedResponse.json()).toEqual({
+        provider: 'cursor',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: null,
+        source: 'static',
+        cache: null,
+        entries: [
+          { id: 'auto', label: 'Auto' },
+          { id: 'composer-2-fast', label: 'Composer 2 Fast' },
+          { id: 'gpt-5.3-codex-xhigh', label: 'Codex 5.3 Extra High' },
+          {
+            id: 'gpt-5.4-medium',
+            label: 'GPT-5.4 1M',
+            capabilityTags: ['reasoning'],
+          },
+          {
+            id: 'claude-4.5-opus-thinking',
+            label: 'Opus 4.5 Thinking',
+            capabilityTags: ['reasoning'],
+          },
+          {
+            id: 'gemini-3-flash',
+            label: 'Gemini 3 Flash',
+            capabilityTags: ['latency_optimized'],
+          },
+        ],
+        presets: [],
+        controls: [],
+        defaultSelection: null,
+        support: {
+          tier: 'entry_only',
+          advancedMetadataStatus: 'unverified_omitted',
+          discoveryMode: 'manual_refresh',
+          provenance: {
+            status: 'unverified_omitted',
+          },
+        },
+        warnings: [
+          'Live model discovery is available for cursor/cli/default via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',
+        ],
+      });
+    });
+  });
+
   it('GET /providers/:provider/models/advanced only probes verified providers on explicit refresh', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       data: [

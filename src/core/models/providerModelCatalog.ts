@@ -55,6 +55,7 @@ import {
 import {
   describeCuratedModelLabel,
   normalizeCuratedModelId,
+  normalizeCursorModelName,
 } from './curatedModelCatalogNormalization.js';
 
 export interface ProviderModelCatalogEntry {
@@ -292,6 +293,10 @@ export function normalizeProviderCatalogModelId(
     if (lower === 'claude-haiku-4-5' || lower === 'claude-haiku-4.5' || lower === 'haiku') {
       return 'haiku';
     }
+  }
+
+  if (target.providerName === 'cursor' && target.backend === 'cli') {
+    return normalizeCursorModelName(normalized) || normalized;
   }
 
   return normalized;

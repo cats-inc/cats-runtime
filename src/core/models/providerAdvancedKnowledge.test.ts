@@ -401,6 +401,86 @@ describe('buildProviderAdvancedKnowledge', () => {
     }
   });
 
+  it('normalizes curated Cursor raw labels into advanced catalog entries', () => {
+    const runtimeRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-curated-cursor-'));
+    const curatedPath = join(runtimeRoot, 'config', 'curated-model-catalogs.yaml');
+    mkdirSync(join(runtimeRoot, 'config'), { recursive: true });
+    writeFileSync(curatedPath, [
+      'schema_version: 1',
+      'catalogs:',
+      '  - cli: Cursor',
+      '    last_updated: 2026-04-09',
+      '    models:',
+      '      - name: Composer 2 Fast',
+      '      - name: GPT-5.4 1M',
+      '      - name: Opus 4.5 Thinking',
+      '      - name: Gemini 3 Flash',
+      '',
+    ].join('\n'), 'utf8');
+
+    try {
+      const target: ProviderTargetDescriptor = {
+        providerName: 'cursor',
+        backend: 'cli',
+        instanceId: 'default',
+        defaultTarget: true,
+        cliInstance: {
+          id: 'default',
+          providerName: 'cursor',
+          backend: 'cli',
+          command: 'cursor-agent',
+        },
+      };
+
+      const knowledge = buildProviderAdvancedKnowledge(target, createCatalog({
+        provider: 'cursor',
+        backend: 'cli',
+        instance: 'default',
+        defaultModel: 'gpt-5.4-medium',
+        models: [
+          { id: 'composer-2-fast', label: 'composer-2-fast' },
+          { id: 'gpt-5.4-medium', label: 'gpt-5.4-medium', default: true },
+          { id: 'claude-4.5-opus-thinking', label: 'claude-4.5-opus-thinking' },
+          { id: 'gemini-3-flash', label: 'gemini-3-flash' },
+        ],
+      }), {
+        env: {
+          ...process.env,
+          CATS_RUNTIME_DIR: runtimeRoot,
+        },
+      });
+
+      expect(knowledge.supportTier).toBe('entry_only');
+      expect(knowledge.catalog.entries).toEqual([
+        {
+          id: 'composer-2-fast',
+          label: 'Composer 2 Fast',
+        },
+        {
+          id: 'gpt-5.4-medium',
+          label: 'GPT-5.4 1M',
+          default: true,
+          capabilityTags: ['reasoning'],
+        },
+        {
+          id: 'claude-4.5-opus-thinking',
+          label: 'Opus 4.5 Thinking',
+          capabilityTags: ['reasoning'],
+        },
+        {
+          id: 'gemini-3-flash',
+          label: 'Gemini 3 Flash',
+          capabilityTags: ['latency_optimized'],
+        },
+      ]);
+      expect(knowledge.catalog.controls).toEqual([]);
+      expect(knowledge.catalog.defaultSelection).toBeNull();
+      expect(knowledge.catalog.warnings).toEqual([]);
+    } finally {
+      rmSync(runtimeRoot, { recursive: true, force: true });
+    }
+  });
+
   it('publishes curated native Claude CLI aliases and effort controls', () => {
     const target: ProviderTargetDescriptor = {
       providerName: 'claude',

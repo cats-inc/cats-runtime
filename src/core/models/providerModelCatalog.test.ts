@@ -2109,7 +2109,7 @@ describe('ProviderModelCatalogService', () => {
     }
   });
 
-  it('applies curated Cursor providers[] entry metadata from curated-model-catalogs.yaml', () => {
+  it('applies curated Cursor label-only entry metadata from curated-model-catalogs.yaml', () => {
     const runtime = createRuntimeRoot();
 
     try {
@@ -2117,28 +2117,15 @@ describe('ProviderModelCatalogService', () => {
         'schema_version: 1',
         'catalogs:',
         '  - cli: Cursor',
-        '    version: 2026.03.30-a5d3e17',
-        '    last_updated: 2026-04-08',
-        '    providers:',
-        '      - name: Cursor',
-        '        models:',
-        '          - name: auto',
-        '            label: Auto',
-        '          - name: composer-2-fast',
-        '            label: Composer 2 Fast',
-        '            default: true',
-        '      - name: OpenAI',
-        '        models:',
-        '          - name: gpt-5.4-medium',
-        '            label: GPT-5.4 1M',
-        '      - name: Anthropic',
-        '        models:',
-        '          - name: claude-4.6-opus-high-thinking',
-        '            label: Opus 4.6 1M Thinking',
-        '      - name: Google',
-        '        models:',
-        '          - name: gemini-3-flash',
-        '            label: Gemini 3 Flash',
+        '    version: 2026.04.08-a41fba1',
+        '    last_updated: 2026-04-09',
+        '    models:',
+        '      - name: Auto',
+        '      - name: Composer 2 Fast',
+        '      - name: Codex 5.3 Extra High',
+        '      - name: GPT-5.4 1M',
+        '      - name: Opus 4.5 Thinking',
+        '      - name: Gemini 3 Flash',
         '',
       ].join('\n'), 'utf8');
 
@@ -2183,14 +2170,15 @@ describe('ProviderModelCatalogService', () => {
         provider: 'cursor',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'composer-2-fast',
+        defaultModel: null,
         source: 'static',
         cache: null,
         models: [
           { id: 'auto', label: 'Auto' },
-          { id: 'composer-2-fast', label: 'Composer 2 Fast', default: true },
+          { id: 'composer-2-fast', label: 'Composer 2 Fast' },
+          { id: 'gpt-5.3-codex-xhigh', label: 'Codex 5.3 Extra High' },
           { id: 'gpt-5.4-medium', label: 'GPT-5.4 1M' },
-          { id: 'claude-4.6-opus-high-thinking', label: 'Opus 4.6 1M Thinking' },
+          { id: 'claude-4.5-opus-thinking', label: 'Opus 4.5 Thinking' },
           { id: 'gemini-3-flash', label: 'Gemini 3 Flash' },
         ],
         warnings: [
@@ -2201,36 +2189,35 @@ describe('ProviderModelCatalogService', () => {
         provider: 'cursor',
         backend: 'cli',
         instance: 'default',
-        defaultModel: 'composer-2-fast',
+        defaultModel: null,
         source: 'static',
         cache: null,
         entries: [
           {
             id: 'auto',
             label: 'Auto',
-            default: false,
           },
           {
             id: 'composer-2-fast',
             label: 'Composer 2 Fast',
-            default: true,
+          },
+          {
+            id: 'gpt-5.3-codex-xhigh',
+            label: 'Codex 5.3 Extra High',
           },
           {
             id: 'gpt-5.4-medium',
             label: 'GPT-5.4 1M',
-            default: false,
             capabilityTags: ['reasoning'],
           },
           {
-            id: 'claude-4.6-opus-high-thinking',
-            label: 'Opus 4.6 1M Thinking',
-            default: false,
+            id: 'claude-4.5-opus-thinking',
+            label: 'Opus 4.5 Thinking',
             capabilityTags: ['reasoning'],
           },
           {
             id: 'gemini-3-flash',
             label: 'Gemini 3 Flash',
-            default: false,
             capabilityTags: ['latency_optimized'],
           },
         ],
