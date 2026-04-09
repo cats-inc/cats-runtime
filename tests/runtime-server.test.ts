@@ -387,6 +387,7 @@ describe('runtime server', () => {
       expect(html).toContain('id="agents-loading-state"');
       expect(html).toContain('function ensureStarterAgents(){');
       expect(html).toContain('allowBeforeProviderReady:true');
+      expect(html).toContain("if(status==='ok') return '';");
       expect(html).toContain('const hasAgents=getAgentCount()>0;');
       expect(html).toContain("const showList=mode==='ready'||hasAgents;");
       expect(html).toContain("const showState=mode!=='ready'&&!hasAgents;");

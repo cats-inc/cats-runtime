@@ -425,7 +425,7 @@ function getProviderAvailabilityStatus(provider){
 }
 function getProviderAvailabilityLabel(provider){
   const status=getProviderAvailabilityStatus(provider);
-  if(status==='ok') return 'Available';
+  if(status==='ok') return '';
   if(status==='degraded') return 'Needs attention';
   if(status==='unavailable') return 'Unavailable';
   return '';
