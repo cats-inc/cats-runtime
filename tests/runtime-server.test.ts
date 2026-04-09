@@ -389,6 +389,9 @@ describe('runtime server', () => {
       expect(html).toContain('allowBeforeProviderReady:true');
       expect(html).toContain("if(status==='ok') return '';");
       expect(html).toContain('const hasAgents=getAgentCount()>0;');
+      expect(html).toContain('const providerCatalogPending=!providerOptionsReady&&(providerOptionsLoading||providerOptionsRequestId===0);');
+      expect(html).toContain("renderAgentRoutingSelectOptions(select,[{ value:'', label:'Loading models...' }], '');");
+      expect(html).toContain("hintEl.textContent='Loading provider models...';");
       expect(html).toContain("const showList=mode==='ready'||hasAgents;");
       expect(html).toContain("const showState=mode!=='ready'&&!hasAgents;");
       expect(html).toContain('ensureStarterAgents();');

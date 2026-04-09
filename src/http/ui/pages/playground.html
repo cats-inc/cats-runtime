@@ -1616,8 +1616,22 @@ function syncAgentModelField(div,options={}){
   const provider=renderAgentProviderSelectOptions(providerEl,normalizedState.provider);
   const catalog=getProviderAdvancedCatalog(provider);
   const entries=listAgentCatalogEntries(catalog);
+  const providerCatalogPending=!providerOptionsReady&&(providerOptionsLoading||providerOptionsRequestId===0);
 
   if(!catalog||entries.length===0){
+    if(providerCatalogPending){
+      entryGroup.classList.remove('hidden');
+      presetGroup.classList.add('hidden');
+      renderAgentRoutingSelectOptions(select,[{ value:'', label:'Loading models...' }], '');
+      renderAgentRoutingSelectOptions(presetEl,[], '');
+      staticLabelEl.classList.add('hidden');
+      staticLabelEl.textContent='';
+      manualGroup.classList.add('hidden');
+      customInput.value=normalizedState.model||getDefaultModel(provider)||'';
+      hintEl.textContent='Loading provider models...';
+      refreshAgentCardSummary(div);
+      return;
+    }
     entryGroup.classList.add('hidden');
     presetGroup.classList.add('hidden');
     renderAgentRoutingSelectOptions(select,[], '');
