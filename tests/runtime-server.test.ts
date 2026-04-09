@@ -361,6 +361,10 @@ describe('runtime server', () => {
       expect(html).toContain('Use 12-agent preset');
       expect(html).toContain('confirmApplyTwelveAgentPreset()');
       expect(html).toContain("if(!window.confirm('Replace the current agents with the 12-agent preset?')) return;");
+      expect(html).toContain('id="starter-agents-btn"');
+      expect(html).toContain('Restore default 2-agent preset');
+      expect(html).toContain('confirmRestoreStarterAgents()');
+      expect(html).toContain("if(!window.confirm('Replace the current agents with the default 2-agent preset?')) return;");
       expect(html).toContain('id="add-agent-btn"');
       expect(html).toContain(
         '<header class="runtime-page-header" style="padding-top:0.75rem;padding-bottom:0.75rem;">',
@@ -381,12 +385,16 @@ describe('runtime server', () => {
       expect(html).toContain("if (provider === 'openclaw') return `${name}-AGENT`;");
       expect(html).toContain("return `${name}-CLI`;");
       expect(html).toContain('const TWELVE_AGENT_PRESET = [');
+      expect(html).toContain('const STARTER_AGENT_PRESET = [');
+      expect(html).toContain("{ name:'Agent-1', provider:'claude', model:'', tags:['orchestrator'] },");
+      expect(html).toContain("{ name:'Agent-2', provider:'codex', model:'', tags:['coder'] },");
       expect(html).toContain("{ name:'Agent-1', provider:'gemini', model:getDefaultModel('gemini'), tags:['orchestrator'] },");
       expect(html).toContain("{ name:'Agent-2', provider:'cursor', model:getDefaultModel('cursor'), tags:['pm'] },");
       expect(html).toContain("{ name:'Agent-12', provider:'openclaw', model:getDefaultModel('openclaw'), tags:['marketer'] },");
       expect(html).toContain('id="agents-loading-state"');
       expect(html).toContain('function ensureStarterAgents(){');
-      expect(html).toContain('allowBeforeProviderReady:true');
+      expect(html).toContain('applyStarterAgentPreset({ allowBeforeProviderReady:true });');
+      expect(html).toContain('function applyStarterAgentPreset(options={}){');
       expect(html).toContain("if(status==='ok') return '';");
       expect(html).toContain('const hasAgents=getAgentCount()>0;');
       expect(html).toContain('const providerCatalogPending=!providerOptionsReady&&(providerOptionsLoading||providerOptionsRequestId===0);');
@@ -413,6 +421,7 @@ describe('runtime server', () => {
       expect(html).toContain('function setExpandedAgent(id, expand = true) {');
       expect(html).toContain('function toggleAgentCard(id) {');
       expect(html).toContain('function renderAgentProviderSelectOptions(selectEl,selectedProvider=\'\'){');
+      expect(html).toContain('function confirmRestoreStarterAgents(){');
       expect(html).toContain('function resolveAgentInitialRouting(provider,model=\'\',modelSelection=null){');
       expect(html).toContain('function syncAgentPresetField(div,catalog,entryId,preferredPresetId=\'\',allowDefaultPreset=true){');
       expect(html).toContain('function renderAgentModelChoice(div){');

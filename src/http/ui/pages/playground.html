@@ -189,6 +189,12 @@
                     <rect x="14" y="14" width="6" height="6" rx="1.5" />
                   </svg>
                 </button>
+                <button id="starter-agents-btn" onclick="confirmRestoreStarterAgents()" class="runtime-btn runtime-btn-secondary !h-8 !w-8 !rounded-lg !px-0 !py-0 opacity-40 cursor-not-allowed" title="Restore default 2-agent preset" aria-label="Restore default 2-agent preset" disabled aria-disabled="true">
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 12a9 9 0 1 0 3-6.7" />
+                    <path d="M3 4v4h4" />
+                  </svg>
+                </button>
                 <button id="add-agent-btn" onclick="addAgent()" class="runtime-btn runtime-btn-secondary !h-8 !w-8 !rounded-lg !px-0 !py-0 opacity-40 cursor-not-allowed" title="Add agent" aria-label="Add agent" disabled aria-disabled="true">
                   <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M12 5v14" />
@@ -1259,6 +1265,10 @@ function updateAgentStatus(agent, status) {
 // Agent form (setup)
 // ============================================================
 const MAX_AGENT_COUNT = 12;
+const STARTER_AGENT_PRESET = [
+  { name:'Agent-1', provider:'claude', model:'', tags:['orchestrator'] },
+  { name:'Agent-2', provider:'codex', model:'', tags:['coder'] },
+];
 const TWELVE_AGENT_PRESET = [
   { name:'Agent-1', provider:'gemini', model:getDefaultModel('gemini'), tags:['orchestrator'] },
   { name:'Agent-2', provider:'cursor', model:getDefaultModel('cursor'), tags:['pm'] },
@@ -1302,18 +1312,19 @@ function renderAgentsLoadingState(mode='loading'){
 }
 function ensureStarterAgents(){
   if(starterAgentsInitialized||getAgentCount()>0)return;
-  addAgent('Agent-1','claude','',['orchestrator'],null,{expandOnCreate:false,preferAvailableProvider:true,allowBeforeProviderReady:true});
-  addAgent('Agent-2','codex','',['coder'],null,{expandOnCreate:false,preferAvailableProvider:true,allowBeforeProviderReady:true});
+  applyStarterAgentPreset({ allowBeforeProviderReady:true });
   starterAgentsInitialized=true;
 }
 function updateAgentButtons(){
   const addBtn=document.getElementById('add-agent-btn');
   const presetBtn=document.getElementById('preset-agents-btn');
-  if(!addBtn||!presetBtn)return;
+  const starterBtn=document.getElementById('starter-agents-btn');
+  if(!addBtn||!presetBtn||!starterBtn)return;
   const ready=providerOptionsReady&&!providerOptionsLoading;
   const capped=getAgentCount()>=MAX_AGENT_COUNT;
   setAgentSetupButtonDisabled(addBtn,!ready||capped);
   setAgentSetupButtonDisabled(presetBtn,!ready);
+  setAgentSetupButtonDisabled(starterBtn,!ready);
 }
 function getProviderAdvancedCatalog(provider){return PROVIDER_ADVANCED_CATALOGS[provider]||null;}
 function listAgentCatalogEntries(catalog){
@@ -1762,8 +1773,9 @@ function removeAgent(id){
   updateAgentButtons();
   validateStartChat();
 }
-function applyAgentPreset(preset){
-  if(providerOptionsLoading||!providerOptionsReady){
+function applyAgentPreset(preset,options={}){
+  const allowBeforeProviderReady=options.allowBeforeProviderReady===true;
+  if((providerOptionsLoading||!providerOptionsReady)&&!allowBeforeProviderReady){
     updateAgentButtons();
     return;
   }
@@ -1778,10 +1790,22 @@ function applyAgentPreset(preset){
     agent.model||'',
     agent.tags,
     agent.modelSelection||null,
-    { expandOnCreate:false, preferAvailableProvider:true },
+    {
+      expandOnCreate:false,
+      preferAvailableProvider:true,
+      allowBeforeProviderReady,
+    },
   ));
   updateAgentButtons();
   validateStartChat();
+}
+function applyStarterAgentPreset(options={}){
+  applyAgentPreset(STARTER_AGENT_PRESET,options);
+  starterAgentsInitialized=true;
+}
+function confirmRestoreStarterAgents(){
+  if(!window.confirm('Replace the current agents with the default 2-agent preset?')) return;
+  applyStarterAgentPreset();
 }
 function confirmApplyTwelveAgentPreset(){
   if(!window.confirm('Replace the current agents with the 12-agent preset?')) return;
