@@ -76,11 +76,13 @@ observeRoutes.get('/sessions/:id/stream', async (c) => {
   }
 
   return streamSSE(c, async (stream) => {
+    const runtime = getRuntimeSessionManager(ctx);
     let closed = false;
     const contentBlocks = createRuntimeContentBlockProjector();
     let writeQueue = Promise.resolve();
+    let lastObservedSeq = 0;
 
-    const onEvent = (event: StreamEvent) => {
+    const enqueueObservedEvent = (event: StreamEvent): void => {
       if (closed) return;
       const outputEvents = [event, ...contentBlocks.project(event)];
       writeQueue = writeQueue
@@ -97,6 +99,14 @@ observeRoutes.get('/sessions/:id/stream', async (c) => {
         });
     };
 
+    const onObservedEvent = (entry: { seq: number; event: StreamEvent }) => {
+      if (closed || entry.seq <= lastObservedSeq) {
+        return;
+      }
+      lastObservedSeq = entry.seq;
+      enqueueObservedEvent(entry.event);
+    };
+
     const onExit = () => {
       if (closed) return;
       stream.writeSSE({
@@ -106,7 +116,14 @@ observeRoutes.get('/sessions/:id/stream', async (c) => {
       closed = true;
     };
 
-    worker.on('event', onEvent as (...args: unknown[]) => void);
+    const unsubscribeObservedStream = runtime.subscribeObservedStream(id, onObservedEvent);
+    for (const entry of runtime.getObservedStreamReplay(id)) {
+      if (entry.seq <= lastObservedSeq) {
+        continue;
+      }
+      lastObservedSeq = entry.seq;
+      enqueueObservedEvent(entry.event);
+    }
     worker.on('exit', onExit);
 
     // Keepalive every 15s
@@ -128,7 +145,7 @@ observeRoutes.get('/sessions/:id/stream', async (c) => {
       }
     } finally {
       clearInterval(keepalive);
-      worker.off('event', onEvent as (...args: unknown[]) => void);
+      unsubscribeObservedStream();
       worker.off('exit', onExit);
     }
   });

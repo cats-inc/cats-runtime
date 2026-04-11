@@ -3057,6 +3057,14 @@ existing surfaces.
 Agent-backed sessions also reuse the same `session.inspection.agentSession`
 summary across those three read surfaces.
 
+`GET /sessions/{id}/stream` remains the live SSE observation surface, but it
+now replays the bounded recent observed-event buffer for the current or just
+finished turn before continuing with live events. This keeps late subscribers
+from missing early `progress`, `text`, `tool_*`, or `result` frames when the
+execution has already started by the time the observer attaches. The replay
+window is intentionally bounded; it is a stream catch-up seam, not a second
+history API.
+
 `POST /sessions/{id}/cancel` is additive and attempts to stop the current run
 without deleting the logical session. `POST /sessions/{id}/reset` clears
 provider resume/session state so the next `resume` starts from a fresh backend
@@ -4197,4 +4205,4 @@ Errors use this format:
 
 ---
 
-*Last updated: 2026-03-27*
+*Last updated: 2026-04-12*

@@ -44,6 +44,8 @@ type ExecutionListener = (...args: unknown[]) => void;
 const MAX_RECENT_EVENTS = 12;
 const MAX_MAINTENANCE_MARKERS = 12;
 const MAX_MAINTENANCE_HISTORY_ENTRIES = 12;
+const MAX_STREAM_REPLAY_EVENTS = 128;
+const STREAM_REPLAY_WINDOW_MS = 10_000;
 
 interface PoolExecutionLike {
   alive?: boolean;
@@ -51,6 +53,21 @@ interface PoolExecutionLike {
   streamMessage?(message: string | TurnInput): AsyncGenerator<StreamEvent>;
   on?(event: ExecutionEventName, listener: ExecutionListener): unknown;
   off?(event: ExecutionEventName, listener: ExecutionListener): unknown;
+}
+
+export interface RuntimeObservedStreamEventEntry {
+  seq: number;
+  event: StreamEvent;
+}
+
+type RuntimeObservedStreamListener = (entry: RuntimeObservedStreamEventEntry) => void;
+
+interface RuntimeObservedStreamState {
+  nextSeq: number;
+  entries: RuntimeObservedStreamEventEntry[];
+  listeners: Set<RuntimeObservedStreamListener>;
+  updatedAt: string | null;
+  terminal: boolean;
 }
 
 export interface RuntimeTrackedSessionStateSnapshot {
@@ -103,6 +120,8 @@ export class RuntimeSessionManager {
   private readonly sessionStates = new Map<string, RuntimeTrackedSessionStateSnapshot>();
 
   private readonly handleOverrides = new Map<string, ExecutionHandle>();
+
+  private readonly observedStreamStates = new Map<string, RuntimeObservedStreamState>();
 
   constructor(
     private readonly config: RuntimeConfig,
@@ -206,6 +225,7 @@ export class RuntimeSessionManager {
       ...(options.guardrail ? { guardrail: options.guardrail } : {}),
     };
 
+    this.resetObservedStreamState(session.id);
     tracked.state = 'running';
     tracked.wake = wake;
     tracked.currentRun = run;
@@ -234,6 +254,7 @@ export class RuntimeSessionManager {
       ...(progress ? { progress } : {}),
     };
 
+    this.clearObservedStreamState(session.id);
     tracked.state = this.isAttached(session.id) ? 'idle' : 'closed';
     tracked.wake = wake;
     tracked.progress = progress;
@@ -256,6 +277,7 @@ export class RuntimeSessionManager {
   observeEvent(sessionId: string, event: StreamEvent): void {
     const tracked = this.ensureTrackedState(sessionId);
     const observedAt = new Date().toISOString();
+    this.recordObservedStreamEvent(sessionId, event, observedAt);
     const progress = eventToProgressSnapshot(event, observedAt);
     if (progress) {
       tracked.progress = progress;
@@ -325,6 +347,42 @@ export class RuntimeSessionManager {
   getTrackedState(sessionId: string): RuntimeTrackedSessionStateSnapshot | undefined {
     const tracked = this.sessionStates.get(sessionId);
     return tracked ? cloneTrackedState(tracked) : undefined;
+  }
+
+  subscribeObservedStream(
+    sessionId: string,
+    listener: RuntimeObservedStreamListener,
+  ): () => void {
+    const state = this.ensureObservedStreamState(sessionId);
+    state.listeners.add(listener);
+    return () => {
+      state.listeners.delete(listener);
+    };
+  }
+
+  getObservedStreamReplay(
+    sessionId: string,
+  ): RuntimeObservedStreamEventEntry[] {
+    const state = this.observedStreamStates.get(sessionId);
+    if (!state || state.entries.length === 0) {
+      return [];
+    }
+
+    const tracked = this.sessionStates.get(sessionId);
+    if (tracked?.currentRun) {
+      return state.entries.map(cloneObservedStreamEntry);
+    }
+
+    const updatedAt = state.updatedAt ? Date.parse(state.updatedAt) : Number.NaN;
+    if (
+      !state.terminal
+      || Number.isNaN(updatedAt)
+      || Date.now() - updatedAt <= STREAM_REPLAY_WINDOW_MS
+    ) {
+      return state.entries.map(cloneObservedStreamEntry);
+    }
+
+    return [];
   }
 
   async cancel(session: SessionInfo): Promise<{ attached: boolean }> {
@@ -402,6 +460,7 @@ export class RuntimeSessionManager {
   markClosed(sessionId: string): void {
     this.detachExecutionHandle(sessionId);
     const tracked = this.ensureTrackedState(sessionId);
+    this.clearObservedStreamState(sessionId);
     tracked.state = 'closed';
   }
 
@@ -491,6 +550,7 @@ export class RuntimeSessionManager {
       tracked.recentEvents = [];
       tracked.wake = null;
       tracked.state = this.isAttached(sessionId) ? 'idle' : 'closed';
+      this.clearObservedStreamState(sessionId);
     }
 
     const lifecycle: RuntimeSessionLifecycleContract = {
@@ -547,6 +607,7 @@ export class RuntimeSessionManager {
 
   dropSession(sessionId: string): void {
     this.handleOverrides.delete(sessionId);
+    this.observedStreamStates.delete(sessionId);
     this.sessionStates.delete(sessionId);
   }
 
@@ -609,6 +670,7 @@ export class RuntimeSessionManager {
     this.agentBackend?.kill(sessionId);
     this.apiBackend?.kill(sessionId);
     this.pool.kill(sessionId);
+    this.clearObservedStreamState(sessionId);
     this.markClosed(sessionId);
   }
 
@@ -620,6 +682,7 @@ export class RuntimeSessionManager {
     this.agentBackend?.killAll();
     this.apiBackend?.killAll();
     this.pool.killAll();
+    this.observedStreamStates.clear();
     for (const sessionId of this.sessionStates.keys()) {
       this.markClosed(sessionId);
     }
@@ -670,6 +733,61 @@ export class RuntimeSessionManager {
       this.sessionStates.set(sessionId, tracked);
     }
     return tracked;
+  }
+
+  private ensureObservedStreamState(sessionId: string): RuntimeObservedStreamState {
+    let state = this.observedStreamStates.get(sessionId);
+    if (!state) {
+      state = {
+        nextSeq: 1,
+        entries: [],
+        listeners: new Set(),
+        updatedAt: null,
+        terminal: false,
+      };
+      this.observedStreamStates.set(sessionId, state);
+    }
+    return state;
+  }
+
+  private resetObservedStreamState(sessionId: string): void {
+    const state = this.ensureObservedStreamState(sessionId);
+    state.entries = [];
+    state.updatedAt = null;
+    state.terminal = false;
+  }
+
+  private clearObservedStreamState(sessionId: string): void {
+    const state = this.observedStreamStates.get(sessionId);
+    if (!state) {
+      return;
+    }
+    state.entries = [];
+    state.updatedAt = null;
+    state.terminal = false;
+  }
+
+  private recordObservedStreamEvent(
+    sessionId: string,
+    event: StreamEvent,
+    observedAt: string,
+  ): void {
+    const state = this.ensureObservedStreamState(sessionId);
+    const entry = {
+      seq: state.nextSeq,
+      event: cloneStreamEvent(event),
+    } satisfies RuntimeObservedStreamEventEntry;
+    state.nextSeq += 1;
+    state.entries.push(entry);
+    if (state.entries.length > MAX_STREAM_REPLAY_EVENTS) {
+      state.entries.splice(0, state.entries.length - MAX_STREAM_REPLAY_EVENTS);
+    }
+    state.updatedAt = observedAt;
+    state.terminal = event.type === 'result' || event.type === 'error';
+
+    for (const listener of state.listeners) {
+      listener(cloneObservedStreamEntry(entry));
+    }
   }
 
   private finalizeCurrentRun(
@@ -936,6 +1054,21 @@ function cloneLifecycle(
     reasonCodes: [...lifecycle.reasonCodes],
     cleanup: { ...lifecycle.cleanup },
   };
+}
+
+function cloneObservedStreamEntry(
+  entry: RuntimeObservedStreamEventEntry,
+): RuntimeObservedStreamEventEntry {
+  return {
+    seq: entry.seq,
+    event: cloneStreamEvent(entry.event),
+  };
+}
+
+function cloneStreamEvent(
+  event: StreamEvent,
+): StreamEvent {
+  return structuredClone(event);
 }
 
 function buildLifecycleRunSummary(action: RuntimeSessionLifecycleAction): string {

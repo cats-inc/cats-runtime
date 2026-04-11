@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,6 +12,16 @@ import type { KiroNativeSessionService } from '../backends/cli/kiro/KiroNativeSe
 import type { AuggieSessionService } from '../backends/cli/auggie/AuggieSessionService.js';
 import type { OpencodeNativeSessionService } from '../backends/cli/opencode/OpencodeNativeSessionService.js';
 import { RuntimeWakeupService } from '../core/wakeup/RuntimeWakeupService.js';
+
+function parseSse(text: string): Array<Record<string, unknown>> {
+  return text
+    .split('\n\n')
+    .map((frame) => frame
+      .split('\n')
+      .find((line) => line.startsWith('data: ')))
+    .filter((line): line is string => Boolean(line))
+    .map((line) => JSON.parse(line.slice(6)));
+}
 
 describe('session close route', () => {
   const makeConfig = (): CliRuntimeConfig => ({
@@ -1811,5 +1822,66 @@ describe('session close route', () => {
         },
       },
     });
+  });
+
+  it('replays recent observed turn events to late /sessions/:id/stream subscribers', async () => {
+    class MockWorker extends EventEmitter {
+      alive = true;
+      busy = true;
+    }
+
+    const session = registry.create({
+      id: 'session-stream-replay',
+      providerName: 'claude',
+      cwd: 'C:/repo',
+    });
+    registry.updateStatus(session.id, 'busy');
+    const worker = new MockWorker();
+    attachedWorkers.set(session.id, worker as unknown as { alive: boolean; busy?: boolean });
+
+    const runtime = getRuntimeSessionManager(ctx);
+    runtime.beginRun(session, { message: 'Need streamed replay.' });
+    runtime.observeEvent(session.id, {
+      type: 'progress',
+      text: 'Collecting context',
+      metadata: {
+        kind: 'status',
+        status: 'running',
+      },
+    });
+    runtime.observeEvent(session.id, {
+      type: 'text',
+      text: 'Partial streamed output',
+    });
+    runtime.observeEvent(session.id, {
+      type: 'result',
+      text: 'Final output',
+    });
+
+    setTimeout(() => {
+      worker.alive = false;
+      worker.busy = false;
+      worker.emit('exit', 0, null);
+    }, 10);
+
+    const response = await app.request(`/sessions/${session.id}/stream`);
+    expect(response.status).toBe(200);
+    expect(parseSse(await response.text())).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'progress',
+        text: 'Collecting context',
+      }),
+      expect.objectContaining({
+        type: 'text',
+        text: 'Partial streamed output',
+      }),
+      expect.objectContaining({
+        type: 'result',
+        text: 'Final output',
+      }),
+      expect.objectContaining({
+        type: 'session_closed',
+      }),
+    ]));
   });
 });
