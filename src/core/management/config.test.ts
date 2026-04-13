@@ -63,6 +63,30 @@ adapters:
     expect(config).toBeUndefined();
   });
 
+  it('falls back to the bundled management config example when the runtime config file is absent', () => {
+    const runtimeRoot = createRuntimeRoot();
+    const packageRoot = mkdtempSync(join(tmpdir(), 'cats-mgmt-package-'));
+    dirs.push(packageRoot);
+    mkdirSync(join(packageRoot, 'config'), { recursive: true });
+    writeFileSync(join(packageRoot, 'config', 'management.yaml.example'), `
+version: 1
+adapters:
+  review:
+    default: github
+    instances:
+      github:
+        command: gh-enterprise
+`, 'utf8');
+
+    const config = loadManagementConfig(undefined, {
+      ...createTestEnv(runtimeRoot),
+      CATS_RUNTIME_PACKAGE_ROOT: packageRoot,
+    });
+
+    expect(config).toBeDefined();
+    expect(config!.adapters.review.instances.github.command).toBe('gh-enterprise');
+  });
+
   it('throws on unsupported version', () => {
     const runtimeRoot = createRuntimeRoot('version: 99\nadapters: {}');
     expect(() => loadManagementConfig(undefined, createTestEnv(runtimeRoot))).toThrow(

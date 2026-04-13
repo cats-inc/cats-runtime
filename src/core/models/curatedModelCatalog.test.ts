@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -124,6 +124,48 @@ describe('curatedModelCatalog', () => {
       ]);
     } finally {
       runtime.cleanup();
+    }
+  });
+
+  it('falls back to the bundled curated catalog example when the runtime config file is absent', () => {
+    const runtime = createRuntimeRoot();
+    const packageRoot = mkdtempSync(join(tmpdir(), 'cats-runtime-curated-package-'));
+
+    try {
+      mkdirSync(join(packageRoot, 'config'), { recursive: true });
+      writeFileSync(join(packageRoot, 'config', 'curated-model-catalogs.yaml.example'), [
+        'schema_version: 1',
+        'catalogs:',
+        '  - cli: Gemini',
+        '    version: 0.37.1',
+        '    models:',
+        '      - name: gemini-3.1-pro-preview',
+        '        label: Gemini 3.1 Pro Preview',
+        '',
+      ].join('\n'), 'utf8');
+
+      const result = loadCuratedModelCatalog({
+        env: {
+          ...runtime.env,
+          CATS_RUNTIME_PACKAGE_ROOT: packageRoot,
+        },
+      });
+
+      expect(result.path).toBe(join(packageRoot, 'config', 'curated-model-catalogs.yaml.example'));
+      expect(result.warnings).toEqual([]);
+      expect(result.document?.catalogs).toEqual([
+        {
+          cli: 'Gemini',
+          version: '0.37.1',
+          models: [{
+            name: 'gemini-3.1-pro-preview',
+            label: 'Gemini 3.1 Pro Preview',
+          }],
+        },
+      ]);
+    } finally {
+      runtime.cleanup();
+      rmSync(packageRoot, { recursive: true, force: true });
     }
   });
 });

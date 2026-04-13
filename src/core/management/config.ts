@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { parse } from 'yaml';
 import {
+  resolveBundledRuntimeConfigExamplePath,
   resolveRuntimeManagementConfigPath,
   resolveRuntimeRoot,
 } from '../../shared/runtimePaths.js';
@@ -37,11 +38,15 @@ export function loadManagementConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): ManagementConfig | undefined {
   const configPath = resolveManagementConfigPath(homeDir, env);
-  if (!existsSync(configPath)) {
+  const bundledExamplePath = resolveBundledRuntimeConfigExamplePath('management.yaml', env);
+  const loadPath = existsSync(configPath)
+    ? configPath
+    : bundledExamplePath;
+  if (!existsSync(loadPath)) {
     return undefined;
   }
 
-  const raw = parse(readFileSync(configPath, 'utf-8'));
+  const raw = parse(readFileSync(loadPath, 'utf-8'));
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return undefined;
   }

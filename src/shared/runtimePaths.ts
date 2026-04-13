@@ -1,5 +1,6 @@
 import { homedir } from 'node:os';
-import { isAbsolute, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export function resolveDefaultCatsRuntimeRoot(homeDir: string = homedir()): string {
   return join(homeDir || homedir(), '.cats', 'runtime');
@@ -25,6 +26,19 @@ export function resolveRuntimeConfigDir(runtimeRoot: string): string {
   return join(runtimeRoot, 'config');
 }
 
+export function resolveRuntimePackageRoot(
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const trimmedRoot = env.CATS_RUNTIME_PACKAGE_ROOT?.trim();
+  if (trimmedRoot) {
+    return isAbsolute(trimmedRoot)
+      ? trimmedRoot
+      : resolve(process.cwd(), trimmedRoot);
+  }
+
+  return resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+}
+
 export function resolveRuntimeDataDir(runtimeRoot: string): string {
   return join(runtimeRoot, 'data');
 }
@@ -43,4 +57,11 @@ export function resolveRuntimeManagementConfigPath(runtimeRoot: string): string 
 
 export function resolveRuntimeCuratedModelCatalogPath(runtimeRoot: string): string {
   return join(resolveRuntimeConfigDir(runtimeRoot), 'curated-model-catalogs.yaml');
+}
+
+export function resolveBundledRuntimeConfigExamplePath(
+  fileName: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  return join(resolveRuntimePackageRoot(env), 'config', `${fileName}.example`);
 }

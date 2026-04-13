@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { parse } from 'yaml';
 import type { CliRuntimeConfig } from '../../backends/cli/config.js';
 import {
+  resolveBundledRuntimeConfigExamplePath,
   resolveRuntimeCuratedModelCatalogPath,
   resolveRuntimeRoot,
 } from '../../shared/runtimePaths.js';
@@ -101,10 +102,17 @@ export function resolveCuratedModelCatalogPath(
 export function loadCuratedModelCatalog(
   options: LoadCuratedModelCatalogOptions = {},
 ): LoadCuratedModelCatalogResult {
-  const path = resolveCuratedModelCatalogPath(options);
+  const primaryPath = resolveCuratedModelCatalogPath(options);
+  const bundledExamplePath = resolveBundledRuntimeConfigExamplePath(
+    'curated-model-catalogs.yaml',
+    options.env || process.env,
+  );
+  const path = existsSync(primaryPath)
+    ? primaryPath
+    : bundledExamplePath;
   if (!existsSync(path)) {
     return {
-      path,
+      path: primaryPath,
       warnings: [],
     };
   }

@@ -22,8 +22,8 @@ schema_version: 1
 
 catalogs:
   - cli: Claude
-    version: 2.1.96
-    last_updated: 2026-04-08
+    version: 2.1.104
+    last_updated: 2026-04-14
     notes:
       - "Source: claude /model picker and /effort output"
     models:
@@ -47,7 +47,7 @@ catalogs:
                   - "Comprehensive implementation with extensive testing and documentation"
               - name: Max
                 notes:
-                  - "Maximum capability with deepest reasoning (Opus 4.6 only)"
+                  - "Maximum capability with deepest reasoning"
             default: Medium
 
       - name: Sonnet
@@ -56,7 +56,7 @@ catalogs:
           - Best for everyday tasks
         options:
           - name: Effort
-            values: [Low, Medium, High]
+            values: [Low, Medium, High, Max]
             default: Medium
 
       - name: Haiku
@@ -66,8 +66,8 @@ catalogs:
         options: []
 
   - cli: Codex
-    version: 0.118.0
-    last_updated: 2026-04-08
+    version: 0.120.0
+    last_updated: 2026-04-14
     notes:
       - "Source: codex model picker and reasoning level selector"
       - "Context window reported ~258K total"
@@ -118,8 +118,8 @@ catalogs:
           - "Optimized for professional work and long-running agents."
 
   - cli: Gemini
-    version: 0.36.0
-    last_updated: 2026-04-08
+    version: 0.37.1
+    last_updated: 2026-04-14
     models:
       - name: gemini-3.1-pro-preview
         label: gemini-3.1-pro-preview

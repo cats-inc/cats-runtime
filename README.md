@@ -210,12 +210,16 @@ Runtime state defaults under the user's home directory:
 
 Override the runtime storage root with `CATS_RUNTIME_DIR` when needed.
 
+If `management.yaml` or `curated-model-catalogs.yaml` is missing, the runtime
+falls back to the bundled `config/*.yaml.example` templates shipped with the
+installed package.
+
 ## Curated CLI Catalogs
 
 `cats-runtime` now accepts a human-curated CLI model catalog at:
 
 - `~/.cats/runtime/config/curated-model-catalogs.yaml`
-- repo example: `config/curated-model-catalogs.yaml.example`
+- bundled example/fallback: `config/curated-model-catalogs.yaml.example`
 
 Current runtime behavior:
 
@@ -223,6 +227,10 @@ Current runtime behavior:
   static-fallback path
 - Claude, Codex, Gemini, and Cursor advanced catalogs also consume the same
   curated input
+- packaged desktop hosts seed `management.yaml` and
+  `curated-model-catalogs.yaml` into `~/.cats/runtime/config/` on first launch
+  when those files do not already exist, so users get editable runtime-owned
+  copies outside the app bundle
 - for those advanced catalogs, the curated `models[]` or flattened
   `providers[]` entry list is authoritative for entry filtering and ordering
 - dynamic discovery or config-backed catalogs still take precedence when those
@@ -248,6 +256,8 @@ Current stabilization status:
 - `src/backends/cli/` - embedded CLI runtime modules
 - `src/backends/api/` - API-key and local-model runtime modules
 - `config/providers.yaml.example` - reference topology for manual/preseeded config
+- `config/management.yaml.example` - default management adapter template used as
+  the packaged fallback when `~/.cats/runtime/config/management.yaml` is absent
 - `config/curated-model-catalogs.yaml.example` - human-curated CLI model catalog input example consumed by the current Claude/Codex/Gemini/Cursor importer slices
 - `docs/api.md` - public HTTP surface
 - `docs/architecture.md` - internal layout and data flow

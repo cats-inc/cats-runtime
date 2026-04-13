@@ -27,6 +27,7 @@
     "build/runtime",
     "public",
     "skills",
+    "config/management.yaml.example",
     "config/providers.yaml.example",
     "config/curated-model-catalogs.yaml.example",
     ".env.example",
