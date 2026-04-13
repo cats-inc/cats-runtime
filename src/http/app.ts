@@ -290,6 +290,19 @@ export function createRuntimeApp(ctx: AppContext) {
     return html;
   }
 
+  app.get('/favicon.ico', (c) => {
+    try {
+      const iconPath = resolveRuntimePublicAssetPath('favicon.ico');
+      const iconBuffer = readFileSync(iconPath);
+      return c.body(iconBuffer, 200, {
+        'content-type': 'image/x-icon',
+        'cache-control': 'public, max-age=86400',
+      });
+    } catch {
+      return c.notFound();
+    }
+  });
+
   // Surface pages redirect into /setup while bootstrap remains incomplete.
   app.get('/', (c) => {
     if (ctx.startup?.bootstrapRequired) {
