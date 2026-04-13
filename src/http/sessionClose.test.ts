@@ -1824,7 +1824,7 @@ describe('session close route', () => {
     });
   });
 
-  it('replays recent observed turn events to late /sessions/:id/stream subscribers', async () => {
+  it('replays active observed turn events to late /sessions/:id/stream subscribers', async () => {
     class MockWorker extends EventEmitter {
       alive = true;
       busy = true;
@@ -1853,12 +1853,12 @@ describe('session close route', () => {
       type: 'text',
       text: 'Partial streamed output',
     });
-    runtime.observeEvent(session.id, {
-      type: 'result',
-      text: 'Final output',
-    });
 
     setTimeout(() => {
+      runtime.observeEvent(session.id, {
+        type: 'result',
+        text: 'Final output',
+      });
       worker.alive = false;
       worker.busy = false;
       worker.emit('exit', 0, null);
@@ -1893,6 +1893,90 @@ describe('session close route', () => {
         sessionId: session.id,
         streamSeq: 3,
         streamSeqIndex: 0,
+      }),
+      expect.objectContaining({
+        type: 'session_closed',
+      }),
+    ]));
+  });
+
+  it('does not replay terminal observed events from the previous run when a session starts a new turn', async () => {
+    class MockWorker extends EventEmitter {
+      alive = true;
+      busy = true;
+    }
+
+    const session = registry.create({
+      id: 'session-stream-no-terminal-replay',
+      providerName: 'claude',
+      cwd: 'C:/repo',
+    });
+    registry.updateStatus(session.id, 'busy');
+    const worker = new MockWorker();
+    attachedWorkers.set(session.id, worker as unknown as { alive: boolean; busy?: boolean });
+
+    const runtime = getRuntimeSessionManager(ctx);
+    runtime.beginRun(session, { message: 'Old turn.' });
+    runtime.observeEvent(session.id, {
+      type: 'text',
+      text: 'Old turn output',
+    });
+    runtime.observeEvent(session.id, {
+      type: 'result',
+      text: 'Old turn done',
+    });
+
+    setTimeout(() => {
+      runtime.beginRun(session, { message: 'Fresh turn.' });
+      runtime.observeEvent(session.id, {
+        type: 'progress',
+        text: 'Fresh turn starting',
+        metadata: {
+          kind: 'status',
+          status: 'running',
+        },
+      });
+      runtime.observeEvent(session.id, {
+        type: 'text',
+        text: 'Fresh turn output',
+      });
+      runtime.observeEvent(session.id, {
+        type: 'result',
+        text: 'Fresh turn done',
+      });
+      worker.alive = false;
+      worker.busy = false;
+      worker.emit('exit', 0, null);
+    }, 10);
+
+    const response = await app.request(`/sessions/${session.id}/stream`);
+    expect(response.status).toBe(200);
+    const events = parseSse(await response.text());
+    expect(events).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'text',
+        text: 'Old turn output',
+      }),
+      expect.objectContaining({
+        type: 'result',
+        text: 'Old turn done',
+      }),
+    ]));
+    expect(events).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'progress',
+        text: 'Fresh turn starting',
+        sessionId: session.id,
+      }),
+      expect.objectContaining({
+        type: 'text',
+        text: 'Fresh turn output',
+        sessionId: session.id,
+      }),
+      expect.objectContaining({
+        type: 'result',
+        text: 'Fresh turn done',
+        sessionId: session.id,
       }),
       expect.objectContaining({
         type: 'session_closed',

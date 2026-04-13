@@ -45,7 +45,6 @@ const MAX_RECENT_EVENTS = 12;
 const MAX_MAINTENANCE_MARKERS = 12;
 const MAX_MAINTENANCE_HISTORY_ENTRIES = 12;
 const MAX_STREAM_REPLAY_EVENTS = 128;
-const STREAM_REPLAY_WINDOW_MS = 10_000;
 
 interface PoolExecutionLike {
   alive?: boolean;
@@ -369,16 +368,7 @@ export class RuntimeSessionManager {
     }
 
     const tracked = this.sessionStates.get(sessionId);
-    if (tracked?.currentRun) {
-      return state.entries.map(cloneObservedStreamEntry);
-    }
-
-    const updatedAt = state.updatedAt ? Date.parse(state.updatedAt) : Number.NaN;
-    if (
-      !state.terminal
-      || Number.isNaN(updatedAt)
-      || Date.now() - updatedAt <= STREAM_REPLAY_WINDOW_MS
-    ) {
+    if (tracked?.currentRun || !state.terminal) {
       return state.entries.map(cloneObservedStreamEntry);
     }
 
