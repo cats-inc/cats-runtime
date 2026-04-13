@@ -10,9 +10,25 @@ import { buildSessionProviderTargetSummary } from '../sessionProviderTarget.js';
 import { toSessionView } from '../../backends/cli/pool/sessionView.js';
 import { createRuntimeContentBlockProjector } from '../../core/runtime/contentBlocks.js';
 import { buildSessionInspection } from '../../core/runtime/sessionInspection.js';
-import type { StreamEvent } from '../../core/types.js';
+import type { ContentBlockStreamEvent, StreamEvent } from '../../core/types.js';
 
 export const observeRoutes = new Hono();
+
+function buildSequencedObservedEvent(
+  sessionId: string,
+  sourceSeq: number,
+  outputIndex: number,
+  event: StreamEvent | ContentBlockStreamEvent,
+): StreamEvent | ContentBlockStreamEvent | Record<string, unknown> {
+  return {
+    ...event,
+    sessionId: typeof event.sessionId === 'string' && event.sessionId.trim().length > 0
+      ? event.sessionId
+      : sessionId,
+    streamSeq: sourceSeq,
+    streamSeqIndex: outputIndex,
+  };
+}
 
 /** GET /sessions/:id/observe — machine-readable session/run inspection payload */
 observeRoutes.get('/sessions/:id/observe', async (c) => {
@@ -82,14 +98,16 @@ observeRoutes.get('/sessions/:id/stream', async (c) => {
     let writeQueue = Promise.resolve();
     let lastObservedSeq = 0;
 
-    const enqueueObservedEvent = (event: StreamEvent): void => {
+    const enqueueObservedEvent = (sourceSeq: number, event: StreamEvent): void => {
       if (closed) return;
       const outputEvents = [event, ...contentBlocks.project(event)];
       writeQueue = writeQueue
         .then(async () => {
-          for (const outputEvent of outputEvents) {
+          for (const [outputIndex, outputEvent] of outputEvents.entries()) {
             await stream.writeSSE({
-              data: JSON.stringify(outputEvent),
+              data: JSON.stringify(
+                buildSequencedObservedEvent(id, sourceSeq, outputIndex, outputEvent),
+              ),
               event: outputEvent.type,
             });
           }
@@ -104,7 +122,7 @@ observeRoutes.get('/sessions/:id/stream', async (c) => {
         return;
       }
       lastObservedSeq = entry.seq;
-      enqueueObservedEvent(entry.event);
+      enqueueObservedEvent(entry.seq, entry.event);
     };
 
     const onExit = () => {
@@ -122,7 +140,7 @@ observeRoutes.get('/sessions/:id/stream', async (c) => {
         continue;
       }
       lastObservedSeq = entry.seq;
-      enqueueObservedEvent(entry.event);
+      enqueueObservedEvent(entry.seq, entry.event);
     }
     worker.on('exit', onExit);
 

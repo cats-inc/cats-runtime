@@ -1870,14 +1870,29 @@ describe('session close route', () => {
       expect.objectContaining({
         type: 'progress',
         text: 'Collecting context',
+        sessionId: session.id,
+        streamSeq: 1,
+        streamSeqIndex: 0,
       }),
       expect.objectContaining({
         type: 'text',
         text: 'Partial streamed output',
+        sessionId: session.id,
+        streamSeq: 2,
+        streamSeqIndex: 0,
+      }),
+      expect.objectContaining({
+        type: 'content_block',
+        sessionId: session.id,
+        streamSeq: 2,
+        streamSeqIndex: 1,
       }),
       expect.objectContaining({
         type: 'result',
         text: 'Final output',
+        sessionId: session.id,
+        streamSeq: 3,
+        streamSeqIndex: 0,
       }),
       expect.objectContaining({
         type: 'session_closed',
