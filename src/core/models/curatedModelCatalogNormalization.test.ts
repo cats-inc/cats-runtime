@@ -23,7 +23,7 @@ describe('curatedModelCatalogNormalization', () => {
     expect(normalizeCopilotModelName('GPT-5.4')).toBe('gpt-5.4');
     expect(normalizeCopilotModelName('GPT-5.4 mini')).toBe('gpt-5.4-mini');
     expect(normalizeCopilotModelName('GPT-5 mini')).toBe('gpt-5-mini');
-    expect(normalizeCopilotModelName('Claude Opus 4.6')).toBe('claude-opus-4-6');
+    expect(normalizeCopilotModelName('Claude Opus 4.6')).toBe('claude-opus-4.6');
     expect(normalizeCopilotModelName('Claude Sonnet 4')).toBe('claude-sonnet-4');
     expect(normalizeCopilotModelName('Unknown Copilot Model')).toBeNull();
   });

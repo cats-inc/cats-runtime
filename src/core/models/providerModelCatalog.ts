@@ -214,7 +214,7 @@ const STATIC_PROVIDER_MODELS: Record<string, ProviderModelCatalogEntry[]> = {
   ],
   copilot: [
     { id: 'gpt-5.4', label: 'gpt-5.4', default: true },
-    { id: 'claude-opus-4-6', label: 'claude-opus-4-6' },
+    { id: 'claude-opus-4.6', label: 'claude-opus-4.6' },
     { id: 'gemini-3-pro-preview', label: 'gemini-3-pro-preview' },
   ],
   opencode: [

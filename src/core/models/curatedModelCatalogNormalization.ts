@@ -234,11 +234,11 @@ export function normalizeCopilotModelName(
     'gpt-5.4-mini',
     'gpt-5-mini',
     'gpt-4.1',
-    'claude-sonnet-4-6',
-    'claude-sonnet-4-5',
-    'claude-haiku-4-5',
-    'claude-opus-4-6',
-    'claude-opus-4-5',
+    'claude-sonnet-4.6',
+    'claude-sonnet-4.5',
+    'claude-haiku-4.5',
+    'claude-opus-4.6',
+    'claude-opus-4.5',
     'claude-sonnet-4',
   ]);
   if (knownIds.has(normalized)) {
@@ -250,16 +250,21 @@ export function normalizeCopilotModelName(
       return 'gpt-5.4-mini';
     case 'gpt-5 mini':
       return 'gpt-5-mini';
+    case 'claude-sonnet-4-6':
     case 'claude sonnet 4.6':
-      return 'claude-sonnet-4-6';
+      return 'claude-sonnet-4.6';
+    case 'claude-sonnet-4-5':
     case 'claude sonnet 4.5':
-      return 'claude-sonnet-4-5';
+      return 'claude-sonnet-4.5';
+    case 'claude-haiku-4-5':
     case 'claude haiku 4.5':
-      return 'claude-haiku-4-5';
+      return 'claude-haiku-4.5';
+    case 'claude-opus-4-6':
     case 'claude opus 4.6':
-      return 'claude-opus-4-6';
+      return 'claude-opus-4.6';
+    case 'claude-opus-4-5':
     case 'claude opus 4.5':
-      return 'claude-opus-4-5';
+      return 'claude-opus-4.5';
     case 'claude sonnet 4':
       return 'claude-sonnet-4';
     default:

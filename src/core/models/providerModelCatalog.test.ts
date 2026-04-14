@@ -2125,7 +2125,7 @@ describe('ProviderModelCatalogService', () => {
           { id: 'gpt-5.4', label: 'GPT-5.4', default: true },
           { id: 'gpt-5.4-mini', label: 'GPT-5.4 mini', default: false },
           { id: 'gpt-5.2-codex', label: 'GPT-5.2-Codex', default: false },
-          { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', default: false },
+          { id: 'claude-opus-4.6', label: 'Claude Opus 4.6', default: false },
           { id: 'claude-sonnet-4', label: 'Claude Sonnet 4', default: false },
         ],
         warnings: [],
@@ -2156,7 +2156,7 @@ describe('ProviderModelCatalogService', () => {
             default: false,
           },
           {
-            id: 'claude-opus-4-6',
+            id: 'claude-opus-4.6',
             label: 'Claude Opus 4.6',
             default: false,
             capabilityTags: ['reasoning'],
