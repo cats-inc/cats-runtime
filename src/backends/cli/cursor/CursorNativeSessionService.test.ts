@@ -185,6 +185,59 @@ describe('CursorNativeSessionService', () => {
     expect(existsSync(scriptPath)).toBe(false);
   });
 
+  it('creates native Cursor sessions by executing create-chat inside the workspace cwd', async () => {
+    const runner = vi.fn(async (command, args, options) => {
+      if (command === 'cursor-agent.cmd' || command === 'cursor-agent') {
+        return {
+          code: 0,
+          stdout: 'cursor-session-123\n',
+          stderr: '',
+        };
+      }
+
+      return {
+        code: 0,
+        stdout: JSON.stringify([
+          {
+            sessionId: 'cursor-session-123',
+            workspacePath: 'C:/repo',
+            summary: 'Native Cursor Session',
+            messageCount: 0,
+          },
+        ]),
+        stderr: '',
+      };
+    });
+    const service = new CursorNativeSessionService({
+      command: process.platform === 'win32' ? 'cursor-agent.cmd' : 'cursor-agent',
+      chatsDir: '~/.cursor/chats',
+      runtime: createRuntimeAdapter({
+        mode: 'native',
+      }),
+      runner,
+    });
+
+    const session = await service.createSession('C:/repo');
+
+    expect(session).toEqual({
+      providerSessionId: 'cursor-session-123',
+      cwd: 'C:/repo',
+      summary: 'Native Cursor Session',
+      messageCount: 0,
+      lastActivity: undefined,
+      model: undefined,
+    });
+    expect(runner).toHaveBeenNthCalledWith(
+      1,
+      process.platform === 'win32' ? 'cursor-agent.cmd' : 'cursor-agent',
+      ['create-chat'],
+      expect.objectContaining({
+        cwd: 'C:/repo',
+        ...(process.platform === 'win32' ? { shell: true } : {}),
+      }),
+    );
+  });
+
   it('skips WSL discovery when startIfNeeded is false and the distro is stopped', async () => {
     const runner = vi.fn(async () => ({
       code: 0,

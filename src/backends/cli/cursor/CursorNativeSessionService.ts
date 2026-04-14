@@ -5,7 +5,6 @@ import { runPythonJsonScript, type CommandRunner } from '../pythonScripts.js';
 import type { RuntimeAdapter } from '../runtime/runtime.js';
 import {
   createRuntimeAdapter,
-  quoteForBash,
 } from '../runtime/runtime.js';
 import { hiddenWindowsSpawnOptions } from '../../../core/process/windowsSpawn.js';
 
@@ -113,9 +112,9 @@ export class CursorNativeSessionService {
 
   async createSession(cwd: string): Promise<CursorNativeSessionSummary> {
     const workspace = this.normalizeWorkspace(cwd);
-    const stdout = await this.runShell(
-      `cd ${quoteForBash(workspace)} && ${quoteForBash(this.command)} create-chat`,
-    );
+    const stdout = this.runtime.mode === 'native'
+      ? await this.runCommand(['create-chat'], workspace)
+      : await this.runShell(`cd ${shellQuote(workspace)} && ${shellQuote(this.command)} create-chat`);
     const sessionId = stdout
       .trim()
       .split(/\r?\n/)
@@ -191,7 +190,22 @@ export class CursorNativeSessionService {
 
   private async runShell(script: string): Promise<string> {
     const { command, args } = this.runtime.buildShellInvocation(script);
-    const result = await this.runner(command, args);
+    return this.run(command, args);
+  }
+
+  private async runCommand(args: string[], cwd?: string): Promise<string> {
+    return this.run(this.command, args, {
+      ...(shouldUseNativeCommandShell(this.command) ? { shell: true } : {}),
+      ...(cwd ? { cwd } : {}),
+    });
+  }
+
+  private async run(
+    command: string,
+    args: string[],
+    options: CommandRunnerOptions = {},
+  ): Promise<string> {
+    const result = await this.runner(command, args, options);
 
     if (result.code !== 0) {
       const stderr = result.stderr.trim();
@@ -226,6 +240,7 @@ async function defaultCommandRunner(
 }> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
+      cwd: options.cwd,
       shell: options.shell,
       stdio: ['ignore', 'pipe', 'pipe'],
       ...hiddenWindowsSpawnOptions(),
@@ -249,6 +264,18 @@ async function defaultCommandRunner(
       });
     });
   });
+}
+
+function shouldUseNativeCommandShell(command: string): boolean {
+  if (process.platform !== 'win32') {
+    return false;
+  }
+
+  return /\.(cmd|bat)$/i.test(command.trim());
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
 }
 
 const CURSOR_PY_SHARED_A = String.raw`

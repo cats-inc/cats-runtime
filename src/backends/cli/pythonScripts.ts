@@ -12,6 +12,7 @@ export interface CommandResult {
 }
 
 export interface CommandRunnerOptions {
+  cwd?: string;
   shell?: boolean;
   windowsHide?: boolean;
 }
