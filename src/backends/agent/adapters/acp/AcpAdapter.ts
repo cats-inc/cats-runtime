@@ -52,6 +52,7 @@ function buildInspection(
   const command = instance.command?.trim() || undefined;
   const profile = resolveAcpProviderProfile(instance);
   const supportsRemoteCancel = Boolean(command && profile);
+  const supportsModelDiscovery = Boolean(command && profile);
   const transportKind = command ? 'stdio' as const : 'http' as const;
   const launch = command
     ? {
@@ -87,7 +88,7 @@ function buildInspection(
       kind: transportKind,
       protocol: 'acp_v1',
       liveProbe: command ? 'command_help' : 'none',
-      modelDiscovery: 'none',
+      modelDiscovery: supportsModelDiscovery ? 'session_bootstrap' : 'none',
       toolDiscovery: 'none',
       streaming: 'generic',
     },
@@ -121,7 +122,7 @@ function buildInspection(
     },
     capabilities: {
       probe: Boolean(command),
-      modelDiscovery: false,
+      modelDiscovery: supportsModelDiscovery,
       toolCatalog: false,
       effectiveToolCatalog: false,
       cancel: supportsRemoteCancel,
@@ -180,9 +181,7 @@ function buildInitializeParams() {
 }
 
 function buildSessionBootstrapParams(input: AgentInvokeInput) {
-  const cwd = input.turn.context?.workspace?.cwd
-    || input.instance.cwd
-    || input.acpHost?.context.cwd;
+  const cwd = resolveBootstrapCwd(input.instance.cwd, input.turn.context?.workspace?.cwd, input.acpHost?.context.cwd);
   if (!cwd) {
     throw new Error('ACP session bootstrap requires a working directory.');
   }
@@ -191,6 +190,10 @@ function buildSessionBootstrapParams(input: AgentInvokeInput) {
     cwd,
     mcpServers: [],
   };
+}
+
+function resolveBootstrapCwd(...candidates: Array<string | undefined>): string | undefined {
+  return candidates.find((candidate) => typeof candidate === 'string' && candidate.trim().length > 0);
 }
 
 function buildPromptParams(input: AgentInvokeInput, sessionId: string) {
@@ -209,6 +212,31 @@ function extractSessionIdFromBootstrapResult(
 ): string {
   const record = parseRecord(value);
   return readString(record?.sessionId) || fallback || '';
+}
+
+function parseModels(value: unknown): Array<{ id: string; label: string }> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((entry) => {
+    const record = parseRecord(entry);
+    if (!record) {
+      return [];
+    }
+
+    const id = readString(record.modelId)
+      || readString(record.id)
+      || readString(record.name);
+    if (!id) {
+      return [];
+    }
+
+    const label = readString(record.name)
+      || readString(record.title)
+      || id;
+    return [{ id, label }];
+  });
 }
 
 function selectPermissionOption(
@@ -512,6 +540,39 @@ export class AcpAdapter implements AgentAdapter {
         },
       ],
     };
+  }
+
+  async listModels(
+    instance: RemoteProviderInstanceConfig,
+  ): Promise<Array<{ id: string; label: string }>> {
+    const command = instance.command?.trim();
+    if (!command) {
+      throw new Error('ACP model discovery currently supports stdio agent commands only.');
+    }
+
+    const cwd = resolveBootstrapCwd(instance.cwd, process.cwd());
+    if (!cwd) {
+      throw new Error('ACP model discovery requires a working directory.');
+    }
+
+    const env = sanitizeEnv(this.options.env || process.env);
+    const client = new AcpStdioClient({
+      command,
+      args: instance.args,
+      cwd,
+      env,
+      spawnProcess: this.options.acpProcessSpawner,
+    });
+    try {
+      await client.request('initialize', buildInitializeParams());
+      const sessionResult = parseRecord(await client.request('session/new', {
+        cwd,
+        mcpServers: [],
+      }));
+      return parseModels(sessionResult?.models);
+    } finally {
+      await client.close();
+    }
   }
 
   async *invoke(input: AgentInvokeInput): AsyncGenerator<StreamEvent> {

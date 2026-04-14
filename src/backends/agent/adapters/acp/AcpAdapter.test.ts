@@ -260,7 +260,7 @@ describe('AcpAdapter', () => {
         kind: 'stdio',
         protocol: 'acp_v1',
         liveProbe: 'command_help',
-        modelDiscovery: 'none',
+        modelDiscovery: 'session_bootstrap',
         toolDiscovery: 'none',
         streaming: 'generic',
       },
@@ -279,7 +279,7 @@ describe('AcpAdapter', () => {
       },
       capabilities: {
         probe: true,
-        modelDiscovery: false,
+        modelDiscovery: true,
         toolCatalog: false,
         effectiveToolCatalog: false,
         cancel: true,
@@ -287,6 +287,45 @@ describe('AcpAdapter', () => {
         toolCallEvents: true,
       },
     });
+  });
+
+  it('discovers models through transient ACP session bootstrap', async () => {
+    const process = new FakeAcpProcess();
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            sessionId: 'acp-models',
+            models: [
+              { modelId: 'gpt-5.4', name: 'GPT-5.4' },
+              { id: 'gpt-5.4-mini', title: 'GPT-5.4 Mini' },
+            ],
+          },
+        }) + '\n');
+      }
+    });
+
+    const adapter = new AcpAdapter({
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    await expect(adapter.listModels(createStdioInstance())).resolves.toEqual([
+      { id: 'gpt-5.4', label: 'GPT-5.4' },
+      { id: 'gpt-5.4-mini', label: 'GPT-5.4 Mini' },
+    ]);
   });
 
   it('runs a stdio help probe for codex ACP pilot targets', async () => {
