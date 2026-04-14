@@ -27,7 +27,9 @@ interface RuntimeAcpPromptProjectionState {
   lastToolId: string | null;
   toolIdsByName: Map<string, string>;
   publishedToolIds: Set<string>;
+  projectedSessionTitle: string | null;
   projectedCurrentModeId: string | null;
+  projectedCommandSignature: string | null;
   projectedUsageSignature: string | null;
 }
 
@@ -459,7 +461,9 @@ function createPromptProjectionState(): RuntimeAcpPromptProjectionState {
     lastToolId: null,
     toolIdsByName: new Map(),
     publishedToolIds: new Set(),
+    projectedSessionTitle: null,
     projectedCurrentModeId: null,
+    projectedCommandSignature: null,
     projectedUsageSignature: null,
   };
 }
@@ -533,6 +537,60 @@ function buildToolResultContent(text: string): Array<Record<string, unknown>> {
   }];
 }
 
+function readStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.flatMap((entry) => {
+    const resolved = readString(entry);
+    if (resolved) {
+      return [resolved];
+    }
+
+    const record = parseRecord(entry);
+    const named = readString(record?.name) || readString(record?.command);
+    return named ? [named] : [];
+  });
+}
+
+function resolveSessionTitleFromStreamEvent(
+  streamEvent: StreamEvent,
+): string | undefined {
+  const metadata = parseRecord(streamEvent.metadata);
+  const nativeMetadata = parseRecord(metadata?.native);
+  const providerState = parseRecord(streamEvent.providerState);
+  const agentSession = parseRecord(providerState?.agentSession);
+  const adapterState = parseRecord(agentSession?.adapterState);
+
+  return readString(adapterState?.sessionTitle)
+    || readString(agentSession?.summary)
+    || (metadata?.kind === 'session'
+      ? readString(metadata.sessionTitle) || readString(metadata.title)
+      : undefined)
+    || (metadata?.kind === 'session'
+      ? readString(nativeMetadata?.sessionTitle) || readString(nativeMetadata?.title)
+      : undefined);
+}
+
+function resolveAvailableCommandsFromStreamEvent(
+  streamEvent: StreamEvent,
+): string[] {
+  const metadata = parseRecord(streamEvent.metadata);
+  const nativeMetadata = parseRecord(metadata?.native);
+  const providerState = parseRecord(streamEvent.providerState);
+  const agentSession = parseRecord(providerState?.agentSession);
+  const adapterState = parseRecord(agentSession?.adapterState);
+  const candidates = [
+    readStringArray(adapterState?.availableCommands),
+    metadata?.kind === 'command' ? readStringArray(metadata.availableCommands) : [],
+    metadata?.kind === 'command' ? readStringArray(metadata.commandNames) : [],
+    metadata?.kind === 'command' ? readStringArray(nativeMetadata?.availableCommands) : [],
+    metadata?.kind === 'command' ? readStringArray(nativeMetadata?.commandNames) : [],
+  ];
+
+  return candidates.find((entry) => entry.length > 0) ?? [];
+}
+
 function resolveModeIdFromStreamEvent(
   streamEvent: StreamEvent,
 ): string | undefined {
@@ -596,6 +654,20 @@ function buildSessionStateUpdates(
 ): Array<Record<string, unknown>> {
   const updates: Array<Record<string, unknown>> = [];
 
+  const sessionTitle = resolveSessionTitleFromStreamEvent(streamEvent);
+  if (sessionTitle && sessionTitle !== state.projectedSessionTitle) {
+    state.projectedSessionTitle = sessionTitle;
+    updates.push({
+      sessionId: '',
+      update: {
+        sessionUpdate: 'session_info_update',
+        sessionInfoUpdate: {
+          title: sessionTitle,
+        },
+      },
+    });
+  }
+
   const modeId = resolveModeIdFromStreamEvent(streamEvent);
   if (modeId && modeId !== state.projectedCurrentModeId) {
     state.projectedCurrentModeId = modeId;
@@ -608,6 +680,23 @@ function buildSessionStateUpdates(
         },
       },
     });
+  }
+
+  const availableCommands = resolveAvailableCommandsFromStreamEvent(streamEvent);
+  if (availableCommands.length > 0) {
+    const signature = JSON.stringify(availableCommands);
+    if (signature !== state.projectedCommandSignature) {
+      state.projectedCommandSignature = signature;
+      updates.push({
+        sessionId: '',
+        update: {
+          sessionUpdate: 'available_commands_update',
+          availableCommandsUpdate: {
+            availableCommands: availableCommands.map((name) => ({ name })),
+          },
+        },
+      });
+    }
   }
 
   const usage = resolveUsageFromStreamEvent(streamEvent);
