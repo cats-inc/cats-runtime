@@ -116,4 +116,61 @@ describe('inspectAgentTarget', () => {
       },
     });
   });
+
+  it('describes ACP stdio transport semantics', () => {
+    const inspection = inspectAgentTarget({
+      id: 'acp-local',
+      providerName: 'codex',
+      backend: 'agent',
+      transport: 'acp_stdio',
+      command: 'codex-acp',
+      args: ['serve'],
+      cwd: '/tmp/acp',
+      startupTimeoutMs: 15000,
+      model: 'gpt-5.4',
+    });
+
+    expect(inspection).toEqual({
+      adapter: 'acp',
+      family: 'protocol',
+      summary: expect.stringContaining('stdio agent command'),
+      launch: {
+        kind: 'stdio',
+        command: 'codex-acp',
+        args: ['serve'],
+        cwd: '/tmp/acp',
+        startupTimeoutMs: 15000,
+      },
+      transport: {
+        kind: 'stdio',
+        protocol: 'acp_v1',
+        liveProbe: 'none',
+        modelDiscovery: 'none',
+        toolDiscovery: 'none',
+        streaming: 'generic',
+      },
+      request: {
+        headerNames: [],
+      },
+      auth: {
+        mechanisms: [],
+        credentials: [],
+      },
+      continuity: {
+        providerManagedSessions: true,
+        sessionKey: true,
+        providerSessionState: true,
+        cancel: false,
+      },
+      capabilities: {
+        probe: false,
+        modelDiscovery: false,
+        toolCatalog: false,
+        effectiveToolCatalog: false,
+        cancel: false,
+        runtimeServices: false,
+        toolCallEvents: false,
+      },
+    });
+  });
 });

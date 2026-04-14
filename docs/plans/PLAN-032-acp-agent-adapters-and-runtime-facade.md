@@ -8,7 +8,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | In Progress (Phase 1 ACP Transport Slot Skeleton Landed) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User |
@@ -209,3 +209,4 @@ Current rationale for preferring `codex-acp` first:
 | Date | Update |
 |------|--------|
 | 2026-04-15 | Draft plan created to stage ACP under `agent` while reserving a separate runtime-owned ACP facade and documenting ACP + A2A complementarity |
+| 2026-04-15 | Landed the first Phase 1 skeleton: `agent/acp` transport recognition, ACP stdio launch config fields, ACP inspection shape, and focused config/inspection coverage; host-capability bridging and turn execution remain follow-up work |

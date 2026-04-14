@@ -26,6 +26,14 @@ export interface AgentAdapterInspectionCredential {
   configured: boolean;
 }
 
+export interface AgentAdapterInspectionLaunch {
+  kind: 'stdio';
+  command?: string;
+  args?: string[];
+  cwd?: string;
+  startupTimeoutMs?: number;
+}
+
 export interface AgentAdapterProbeCheck {
   code: string;
   status: HealthStatus['status'];
@@ -70,12 +78,13 @@ export interface AgentAdapterToolCatalogRequest {
 
 export interface AgentAdapterInspection {
   adapter: string;
-  family: 'gateway' | 'bridge' | 'generic';
+  family: 'gateway' | 'bridge' | 'protocol' | 'generic';
   summary: string;
   endpoint?: string;
+  launch?: AgentAdapterInspectionLaunch;
   transport: {
-    kind: 'websocket' | 'http';
-    protocol: 'openclaw_gateway_v3' | 'agent_sdk_http_v1' | 'generic';
+    kind: 'websocket' | 'http' | 'stdio';
+    protocol: 'openclaw_gateway_v3' | 'agent_sdk_http_v1' | 'acp_v1' | 'generic';
     liveProbe: 'rpc_health' | 'providers_get' | 'none';
     modelDiscovery: 'models_list' | 'providers_get' | 'none';
     toolDiscovery: 'tools_catalog' | 'tools_effective' | 'providers_get' | 'none';

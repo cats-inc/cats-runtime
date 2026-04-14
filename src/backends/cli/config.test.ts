@@ -1089,6 +1089,9 @@ backends:
         providerName: 'claude',
         backend: 'api',
         transport: 'anthropic',
+        command: undefined,
+        args: undefined,
+        cwd: undefined,
         model: 'claude-sonnet-4-20250514',
         systemPrompt: 'You are the default Claude worker.',
         apiKeyEnv: 'ANTHROPIC_API_KEY',
@@ -1105,6 +1108,7 @@ backends:
         maxRetries: 2,
         maxToolSteps: 24,
         toolProfile: 'standard',
+        startupTimeoutMs: undefined,
       });
 
       expect(config.remoteProviderCatalog?.api.claude.opus).toEqual({
@@ -1112,6 +1116,9 @@ backends:
         providerName: 'claude',
         backend: 'api',
         transport: 'anthropic',
+        command: undefined,
+        args: undefined,
+        cwd: undefined,
         model: 'claude-opus-4-20250514',
         systemPrompt: 'You are the default Claude worker.',
         apiKeyEnv: 'ANTHROPIC_API_KEY',
@@ -1129,6 +1136,7 @@ backends:
         maxRetries: 2,
         maxToolSteps: 24,
         toolProfile: 'standard',
+        startupTimeoutMs: undefined,
       });
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
@@ -1193,6 +1201,9 @@ backends:
         providerName: 'openclaw',
         backend: 'agent',
         transport: 'openclaw_gateway',
+        command: undefined,
+        args: undefined,
+        cwd: undefined,
         url: 'ws://gateway.example/ws',
         urlEnv: undefined,
         model: 'openclaw-coder',
@@ -1219,6 +1230,7 @@ backends:
         maxRetries: 2,
         maxToolSteps: undefined,
         toolProfile: undefined,
+        startupTimeoutMs: undefined,
       });
 
       expect(config.remoteProviderCatalog?.agent.openclaw.preview).toEqual({
@@ -1226,6 +1238,9 @@ backends:
         providerName: 'openclaw',
         backend: 'agent',
         transport: 'openclaw_gateway',
+        command: undefined,
+        args: undefined,
+        cwd: undefined,
         url: 'ws://gateway.example/ws',
         urlEnv: undefined,
         model: 'openclaw-preview',
@@ -1252,6 +1267,87 @@ backends:
         maxRetries: 2,
         maxToolSteps: undefined,
         toolProfile: undefined,
+        startupTimeoutMs: undefined,
+      });
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('loads ACP-backed agent provider launch settings under the existing remote backend shape', () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'cats-runtime-config-test-'));
+    const runtimeDir = tempDir;
+    const configPath = createRuntimeRootTestPaths(runtimeDir).configPath;
+    mkdirSync(createRuntimeRootTestPaths(runtimeDir).configDir, { recursive: true });
+    writeFileSync(configPath, `
+version: 1
+routing:
+  providers:
+    codex:
+      default_target:
+        backend: agent
+        instance: acp-local
+backends:
+  agent:
+    providers:
+      codex:
+        default_instance: acp-local
+        transport: acp_stdio
+        command: codex-acp
+        args:
+          - serve
+        startup_timeout_ms: 15000
+        instances:
+          acp-local:
+            cwd: /tmp/codex-acp
+            model: gpt-5.4
+`.trimStart());
+
+    try {
+      const config = loadConfig({
+        HOME: '/home/tester',
+        USERPROFILE: '',
+        CATS_RUNTIME_DIR: runtimeDir,
+      });
+
+      expect(config.providerDefaultTargets?.codex).toEqual({
+        backend: 'agent',
+        instance: 'acp-local',
+      });
+
+      expect(config.remoteProviderCatalog?.agent.codex['acp-local']).toEqual({
+        id: 'acp-local',
+        providerName: 'codex',
+        backend: 'agent',
+        transport: 'acp_stdio',
+        command: 'codex-acp',
+        args: ['serve'],
+        cwd: '/tmp/codex-acp',
+        url: undefined,
+        urlEnv: undefined,
+        model: 'gpt-5.4',
+        systemPrompt: undefined,
+        apiKeyEnv: undefined,
+        authTokenEnv: undefined,
+        passwordEnv: undefined,
+        baseUrl: undefined,
+        baseUrlEnv: undefined,
+        organizationEnv: undefined,
+        projectEnv: undefined,
+        headers: undefined,
+        clientId: undefined,
+        clientMode: undefined,
+        clientVersion: undefined,
+        role: undefined,
+        scopes: undefined,
+        payloadTemplate: undefined,
+        waitTimeoutMs: undefined,
+        maxOutputTokens: undefined,
+        timeoutMs: undefined,
+        maxRetries: undefined,
+        maxToolSteps: undefined,
+        toolProfile: undefined,
+        startupTimeoutMs: 15000,
       });
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
@@ -1339,6 +1435,9 @@ backends:
         providerName: 'claude',
         backend: 'api',
         transport: 'anthropic',
+        command: undefined,
+        args: undefined,
+        cwd: undefined,
         model: 'claude-sonnet-4-6',
         systemPrompt: undefined,
         apiKeyEnv: 'ANTHROPIC_API_KEY',
@@ -1352,6 +1451,7 @@ backends:
         maxRetries: undefined,
         maxToolSteps: undefined,
         toolProfile: undefined,
+        startupTimeoutMs: undefined,
       });
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
