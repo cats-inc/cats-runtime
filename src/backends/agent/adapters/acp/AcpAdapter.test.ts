@@ -1499,6 +1499,172 @@ describe('AcpAdapter', () => {
     ]);
   });
 
+  it('persists ACP current-mode and usage updates into runtime progress/state', async () => {
+    const process = new FakeAcpProcess();
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: {
+              loadSession: false,
+            },
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            sessionId: 'acp-session-usage',
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/prompt') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: {
+            sessionId: 'acp-session-usage',
+            update: {
+              sessionUpdate: 'current_mode_update',
+              currentModeUpdate: {
+                modeId: 'code',
+              },
+            },
+          },
+        }) + '\n');
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: {
+            sessionId: 'acp-session-usage',
+            update: {
+              sessionUpdate: 'usage_update',
+              usageUpdate: {
+                used: 53000,
+                size: 200000,
+                cost: {
+                  amount: 0.045,
+                  currency: 'USD',
+                },
+              },
+            },
+          },
+        }) + '\n');
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            stopReason: 'end_turn',
+          },
+        }) + '\n');
+      }
+    });
+
+    const hostBridge = createHostBridge();
+    const adapter = new AcpAdapter({
+      acpHostBridge: hostBridge,
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    const events = await collectEvents(adapter.invoke(
+      createInvokeInput(createStdioInstance(), hostBridge),
+    ));
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'init',
+        providerSessionId: 'acp-session-usage',
+      }),
+      {
+        type: 'progress',
+        providerSessionId: 'acp-session-usage',
+        text: 'Codex current mode updated to code.',
+        providerState: expect.objectContaining({
+          agentSession: expect.objectContaining({
+            adapterState: expect.objectContaining({
+              currentModeId: 'code',
+            }),
+          }),
+        }),
+        metadata: {
+          kind: 'session',
+          status: 'updated',
+          source: 'provider',
+          provider: 'codex',
+          backend: 'agent',
+          instance: 'acp-local',
+          native: {
+            sourceEvent: 'session/update:current_mode_update',
+            modeId: 'code',
+          },
+        },
+      },
+      {
+        type: 'progress',
+        providerSessionId: 'acp-session-usage',
+        text: 'Codex context window usage updated to 53000/200000 tokens. Session cost is now 0.045 USD.',
+        providerState: expect.objectContaining({
+          agentSession: expect.objectContaining({
+            adapterState: expect.objectContaining({
+              contextWindowUsage: {
+                used: 53000,
+                size: 200000,
+                costAmount: 0.045,
+                costCurrency: 'USD',
+              },
+            }),
+          }),
+        }),
+        metadata: {
+          kind: 'session',
+          status: 'updated',
+          source: 'provider',
+          provider: 'codex',
+          backend: 'agent',
+          instance: 'acp-local',
+          native: {
+            sourceEvent: 'session/update:usage_update',
+            used: 53000,
+            size: 200000,
+            costAmount: 0.045,
+            costCurrency: 'USD',
+          },
+        },
+      },
+      {
+        type: 'result',
+        providerSessionId: 'acp-session-usage',
+        summary: 'ACP stop reason: end_turn',
+        providerState: expect.objectContaining({
+          agentSession: expect.objectContaining({
+            adapterState: expect.objectContaining({
+              currentModeId: 'code',
+              contextWindowUsage: {
+                used: 53000,
+                size: 200000,
+                costAmount: 0.045,
+                costCurrency: 'USD',
+              },
+              stopReason: 'end_turn',
+            }),
+          }),
+        }),
+        metadata: {
+          stopReason: 'end_turn',
+        },
+      },
+    ]);
+  });
+
   it('uses session/load for continuity and suppresses replay updates during bootstrap', async () => {
     const process = new FakeAcpProcess();
     startFakeServer(process, async (message) => {

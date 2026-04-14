@@ -869,6 +869,30 @@ function summarizeConfigOptionUpdate(
   };
 }
 
+function summarizeCurrentModeUpdate(
+  input: AgentInvokeInput,
+  modeId: string,
+): string {
+  return `${formatProviderLabel(input.providerName)} current mode updated to ${modeId}.`;
+}
+
+function summarizeUsageUpdate(
+  input: AgentInvokeInput,
+  usage: {
+    used: number;
+    size: number;
+    costAmount?: number;
+    costCurrency?: string;
+  },
+): string {
+  const base = `${formatProviderLabel(input.providerName)} context window usage updated to ${usage.used}/${usage.size} tokens.`;
+  if (usage.costAmount === undefined || !usage.costCurrency) {
+    return base;
+  }
+
+  return `${base} Session cost is now ${usage.costAmount} ${usage.costCurrency}.`;
+}
+
 function buildToolMetadata(
   sourceEvent: string,
   toolCall: Record<string, unknown>,
@@ -955,6 +979,68 @@ function parseSessionUpdateEvents(
       {
         sourceEvent: 'session/update:plan',
         ...(summary.stepCount === undefined ? {} : { stepCount: summary.stepCount }),
+      },
+      buildActiveState(),
+    )];
+  }
+
+  if (updateType === 'current_mode_update') {
+    const currentModeUpdate = parseRecord(update.currentModeUpdate) || update;
+    const modeId = readString(currentModeUpdate.modeId) || readString(currentModeUpdate.currentModeId);
+    if (!modeId) {
+      return [];
+    }
+
+    adapterState.currentModeId = modeId;
+    return [buildProgressEvent(
+      input,
+      providerSessionId,
+      summarizeCurrentModeUpdate(input, modeId),
+      'session',
+      'updated',
+      {
+        sourceEvent: 'session/update:current_mode_update',
+        modeId,
+      },
+      buildActiveState(),
+    )];
+  }
+
+  if (updateType === 'usage_update') {
+    const usageUpdate = parseRecord(update.usageUpdate) || update;
+    const used = readNumber(usageUpdate.used);
+    const size = readNumber(usageUpdate.size);
+    if (used === undefined || size === undefined) {
+      return [];
+    }
+
+    const cost = parseRecord(usageUpdate.cost);
+    const costAmount = readNumber(cost?.amount);
+    const costCurrency = readString(cost?.currency);
+    adapterState.contextWindowUsage = {
+      used,
+      size,
+      ...(costAmount === undefined ? {} : { costAmount }),
+      ...(costCurrency ? { costCurrency } : {}),
+    };
+
+    return [buildProgressEvent(
+      input,
+      providerSessionId,
+      summarizeUsageUpdate(input, {
+        used,
+        size,
+        ...(costAmount === undefined ? {} : { costAmount }),
+        ...(costCurrency ? { costCurrency } : {}),
+      }),
+      'session',
+      'updated',
+      {
+        sourceEvent: 'session/update:usage_update',
+        used,
+        size,
+        ...(costAmount === undefined ? {} : { costAmount }),
+        ...(costCurrency ? { costCurrency } : {}),
       },
       buildActiveState(),
     )];
