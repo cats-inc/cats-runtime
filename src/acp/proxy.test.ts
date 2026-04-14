@@ -48,7 +48,16 @@ describe('ACP HTTP proxy', () => {
       return new Response(JSON.stringify({
         jsonrpc: '2.0',
         id: 9,
-        result: { ok: true },
+        result: {
+          ok: true,
+          _meta: {
+            catsRuntime: {
+              transport: 'http',
+              path: '/acp',
+              sessionLifecycle: 'prompt_enabled_over_http_ndjson',
+            },
+          },
+        },
       }), {
         status: 200,
         headers: {
@@ -71,7 +80,21 @@ describe('ACP HTTP proxy', () => {
     })).resolves.toEqual({
       jsonrpc: '2.0',
       id: 9,
-      result: { ok: true },
+      result: {
+        ok: true,
+        _meta: {
+          catsRuntime: {
+            transport: 'stdio',
+            path: '/acp',
+            sessionLifecycle: 'prompt_enabled_over_stdio_proxy',
+            proxy: {
+              mode: 'http_proxy',
+              upstreamTransport: 'http',
+              targetUrl: 'http://127.0.0.1:3110/acp',
+            },
+          },
+        },
+      },
     });
   });
 
@@ -128,6 +151,12 @@ describe('ACP HTTP proxy', () => {
             id: 'prompt-1',
             result: {
               stopReason: 'end_turn',
+              _meta: {
+                catsRuntime: {
+                  transport: 'http',
+                  turnStream: 'application/x-ndjson',
+                },
+              },
             },
           })}\n`));
           controller.close();
@@ -163,6 +192,17 @@ describe('ACP HTTP proxy', () => {
       id: 'prompt-1',
       result: {
         stopReason: 'end_turn',
+        _meta: {
+          catsRuntime: {
+            transport: 'stdio',
+            turnStream: 'application/x-ndjson',
+            proxy: {
+              mode: 'http_proxy',
+              upstreamTransport: 'http',
+              targetUrl: 'http://127.0.0.1:3110/acp',
+            },
+          },
+        },
       },
     });
 

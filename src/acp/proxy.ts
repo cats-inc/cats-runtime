@@ -35,6 +35,13 @@ interface JsonRpcResponseRecord {
   };
 }
 
+function parseRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Record<string, unknown>;
+}
+
 function isPromptRequest(message: unknown): boolean {
   if (!message || typeof message !== 'object' || Array.isArray(message)) {
     return false;
@@ -264,6 +271,50 @@ async function forwardPromptStream(
   );
 }
 
+function projectProxyLifecycleState(value: unknown): unknown {
+  return value === 'prompt_enabled_over_http_ndjson'
+    ? 'prompt_enabled_over_stdio_proxy'
+    : value;
+}
+
+function projectProxyResult(
+  response: AcpJsonRpcSuccess | AcpJsonRpcError,
+  targetUrl: string,
+): AcpJsonRpcSuccess | AcpJsonRpcError {
+  if (!('result' in response)) {
+    return response;
+  }
+
+  const result = parseRecord(response.result);
+  const meta = parseRecord(result?._meta);
+  const catsRuntime = parseRecord(meta?.catsRuntime);
+  if (!result || !meta || !catsRuntime) {
+    return response;
+  }
+
+  return {
+    ...response,
+    result: {
+      ...result,
+      _meta: {
+        ...meta,
+        catsRuntime: {
+          ...catsRuntime,
+          transport: 'stdio',
+          ...(catsRuntime.sessionLifecycle === undefined
+            ? {}
+            : { sessionLifecycle: projectProxyLifecycleState(catsRuntime.sessionLifecycle) }),
+          proxy: {
+            mode: 'http_proxy',
+            upstreamTransport: 'http',
+            targetUrl,
+          },
+        },
+      },
+    },
+  };
+}
+
 export function resolveAcpProxyTarget(
   env: NodeJS.ProcessEnv = process.env,
 ): AcpProxyTarget {
@@ -369,7 +420,13 @@ export function createHttpAcpProxyHandler(
     if (promptProxyRequested && response.ok) {
       const contentType = response.headers.get('content-type') || '';
       if (contentType.includes('application/x-ndjson')) {
-        return forwardPromptStream(response, responder as AcpJsonRpcResponder, requestId, target.url);
+        const streamed = await forwardPromptStream(
+          response,
+          responder as AcpJsonRpcResponder,
+          requestId,
+          target.url,
+        );
+        return projectProxyResult(streamed, target.url);
       }
     }
 
@@ -378,7 +435,7 @@ export function createHttpAcpProxyHandler(
       return null;
     }
     if (isJsonRpcResponse(body)) {
-      return body as AcpJsonRpcSuccess | AcpJsonRpcError;
+      return projectProxyResult(body as AcpJsonRpcSuccess | AcpJsonRpcError, target.url);
     }
     if (response.status === 401 || response.status === 403) {
       return createProxyError(
