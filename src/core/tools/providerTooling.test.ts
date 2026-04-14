@@ -272,6 +272,99 @@ describe('buildProviderToolingSummary', () => {
     });
   });
 
+  it('maps ACP session-bootstrap discovery onto the effective remote tool vocabulary', async () => {
+    const target = {
+      providerName: 'codex',
+      backend: 'agent',
+      instanceId: 'acp-local',
+      defaultTarget: true,
+      remoteInstance: {
+        id: 'acp-local',
+        providerName: 'codex',
+        backend: 'agent',
+        transport: 'acp_stdio',
+      },
+    } as ProviderTargetDescriptor;
+    const listTools = vi.fn(async () => ({
+      method: 'tools_effective' as const,
+      summary: 'ACP bootstrap discovered 2 effective command(s) for codex/acp-local.',
+      toolCount: 2,
+      groupCount: 1,
+      groups: [
+        { id: 'acp_commands', label: 'ACP Commands', toolCount: 2 },
+      ],
+      tools: [
+        { name: '/plan', title: 'Create a plan', source: 'session' as const, groupId: 'acp_commands' },
+        { name: '/review', title: 'Review the patch', source: 'session' as const, groupId: 'acp_commands' },
+      ],
+    }));
+
+    const catalog = await loadProviderRemoteToolCatalog(target, {
+      agentRuntime: {
+        adapter: 'acp',
+        family: 'protocol',
+        summary: 'Codex ACP',
+        transport: {
+          kind: 'stdio',
+          protocol: 'acp_v1',
+          liveProbe: 'command_help',
+          modelDiscovery: 'session_bootstrap',
+          toolDiscovery: 'session_bootstrap',
+          streaming: 'generic',
+        },
+        request: {
+          headerNames: [],
+        },
+        auth: {
+          mechanisms: [],
+          credentials: [],
+        },
+        continuity: {
+          providerManagedSessions: true,
+          sessionKey: true,
+          providerSessionState: true,
+          cancel: true,
+        },
+        capabilities: {
+          probe: true,
+          modelDiscovery: true,
+          toolCatalog: true,
+          effectiveToolCatalog: true,
+          cancel: true,
+          runtimeServices: true,
+          toolCallEvents: true,
+        },
+      },
+      request: {
+        scope: 'effective',
+        sessionKey: 'session-key-1',
+      },
+      agentBackend: {
+        listTools,
+      },
+    });
+
+    expect(listTools).toHaveBeenCalledWith(target, {
+      scope: 'effective',
+      sessionKey: 'session-key-1',
+    });
+    expect(catalog).toEqual({
+      source: 'provider_remote',
+      status: 'ready',
+      method: 'tools_effective',
+      summary: 'ACP bootstrap discovered 2 effective command(s) for codex/acp-local.',
+      toolCount: 2,
+      groupCount: 1,
+      groups: [
+        { id: 'acp_commands', label: 'ACP Commands', toolCount: 2 },
+      ],
+      tools: [
+        { name: '/plan', title: 'Create a plan', source: 'session', groupId: 'acp_commands' },
+        { name: '/review', title: 'Review the patch', source: 'session', groupId: 'acp_commands' },
+      ],
+    });
+  });
+
   it('surfaces an unavailable remote tool catalog when discovery fails', async () => {
     const target = {
       providerName: 'openclaw',
