@@ -11,6 +11,7 @@ import type { GooseNativeSessionService } from '../backends/cli/goose/GooseNativ
 import type { KiroNativeSessionService } from '../backends/cli/kiro/KiroNativeSessionService.js';
 import type { AuggieSessionService } from '../backends/cli/auggie/AuggieSessionService.js';
 import type { OpencodeNativeSessionService } from '../backends/cli/opencode/OpencodeNativeSessionService.js';
+import type { StreamEvent, TurnInput } from '../core/types.js';
 import { createRuntimeStartupState } from '../startup.js';
 
 function makeConfig(sessionBaseDir: string, dataDir: string): CliRuntimeConfig {
@@ -70,7 +71,26 @@ function makeConfig(sessionBaseDir: string, dataDir: string): CliRuntimeConfig {
   } as unknown as CliRuntimeConfig;
 }
 
-function makeApp(options: { bootstrapRequired?: boolean } = {}) {
+function parseNdjsonBody(value: string): unknown[] {
+  return value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as unknown);
+}
+
+function makeApp(
+  options: {
+    bootstrapRequired?: boolean;
+    worker?: {
+      alive?: boolean;
+      busy?: boolean;
+      on?: ReturnType<typeof vi.fn>;
+      off?: ReturnType<typeof vi.fn>;
+      streamMessage(turnInput: string | TurnInput): AsyncGenerator<StreamEvent>;
+    };
+  } = {},
+) {
   const rootDir = mkdtempSync(join(tmpdir(), 'cats-runtime-acp-routes-'));
   const sessionBaseDir = join(rootDir, 'sessions');
   const dataDir = join(rootDir, 'data');
@@ -79,9 +99,10 @@ function makeApp(options: { bootstrapRequired?: boolean } = {}) {
 
   const pool = {
     getCapabilities: vi.fn(() => ({ resume: true, fork: true, permissions: true })),
-    get: vi.fn(() => undefined),
+    get: vi.fn(() => options.worker),
     spawn: vi.fn(),
     kill: vi.fn(),
+    cancel: vi.fn(),
     status: vi.fn(() => ({ active: 0 })),
   } as unknown as WorkerPool;
 
@@ -168,7 +189,11 @@ describe('runtime ACP facade routes', () => {
             path: '/acp',
             bootstrapRequired: false,
             readinessPath: '/health',
-            sessionLifecycle: 'pending',
+            sessionLifecycle: 'prompt_enabled_over_http_ndjson',
+            promptStreaming: {
+              accept: 'application/x-ndjson',
+              notifications: ['session/update'],
+            },
             supportedMethods: [
               'initialize',
               'ping',
@@ -176,6 +201,7 @@ describe('runtime ACP facade routes', () => {
               'session/list',
               'session/load',
               'session/cancel',
+              'session/prompt',
             ],
           },
         },
@@ -421,7 +447,7 @@ describe('runtime ACP facade routes', () => {
     });
   });
 
-  it('returns a truthful not-yet-enabled error for ACP prompt-turn methods', async () => {
+  it('requires NDJSON negotiation for ACP HTTP prompt turns', async () => {
     const { app, rootDir } = makeApp();
     cleanupRoots.push(rootDir);
 
@@ -446,13 +472,14 @@ describe('runtime ACP facade routes', () => {
       jsonrpc: '2.0',
       id: 'session-prompt',
       error: {
-        code: -32601,
-        message: "ACP method 'session/prompt' is not yet enabled by the cats-runtime ACP facade.",
+        code: -32600,
+        message: "ACP HTTP prompt turns require 'Accept: application/x-ndjson'.",
         data: {
           facade: 'runtime_acp_http',
           phase: 'phase_4',
-          reason: 'prompt_turn_requires_bidirectional_transport',
+          reason: 'prompt_turn_requires_ndjson_accept',
           currentTransport: 'http',
+          requiredAccept: 'application/x-ndjson',
           requiredNotifications: ['session/update'],
           supportedMethods: [
             'initialize',
@@ -461,10 +488,153 @@ describe('runtime ACP facade routes', () => {
             'session/list',
             'session/load',
             'session/cancel',
+            'session/prompt',
           ],
         },
       },
     });
+  });
+
+  it('streams prompt-turn updates over ACP HTTP NDJSON carrier', async () => {
+    const worker = {
+      alive: true,
+      busy: false,
+      on: vi.fn(),
+      off: vi.fn(),
+      async *streamMessage(turnInput: string | TurnInput): AsyncGenerator<StreamEvent> {
+        const resolvedInput = typeof turnInput === 'string' ? { message: turnInput } : turnInput;
+        expect(resolvedInput.message).toBe('Summarize the workspace.');
+        yield { type: 'text', text: 'Inspecting workspace. ' };
+        yield {
+          type: 'tool_use',
+          toolId: 'shell-1',
+          toolName: 'run_shell',
+          toolArgs: { command: 'pwd' },
+        };
+        yield {
+          type: 'tool_result',
+          toolId: 'shell-1',
+          toolName: 'run_shell',
+          text: '/tmp/workspace',
+        };
+        yield { type: 'result', text: 'Workspace summarized.' };
+      },
+    };
+    const { app, rootDir, registry } = makeApp({ worker });
+    cleanupRoots.push(rootDir);
+
+    const cwd = join(rootDir, 'workspace-prompt');
+    mkdirSync(cwd, { recursive: true });
+    const session = registry.create({
+      id: 'runtime-session-prompt',
+      providerName: 'claude',
+      cwd,
+    });
+    registry.updateStatus(session.id, 'ready');
+
+    const response = await app.request('/acp', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/x-ndjson',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 'prompt-http',
+        method: 'session/prompt',
+        params: {
+          sessionId: session.id,
+          prompt: [{
+            type: 'text',
+            text: 'Summarize the workspace.',
+          }],
+        },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('application/x-ndjson');
+    const body = await response.text();
+    expect(parseNdjsonBody(body)).toEqual([
+      {
+        jsonrpc: '2.0',
+        method: 'session/update',
+        params: {
+          sessionId: session.id,
+          update: {
+            sessionUpdate: 'agent_message_chunk',
+            content: {
+              type: 'text',
+              text: 'Inspecting workspace. ',
+            },
+          },
+        },
+      },
+      {
+        jsonrpc: '2.0',
+        method: 'session/update',
+        params: {
+          sessionId: session.id,
+          update: {
+            sessionUpdate: 'tool_call',
+            toolCallId: 'shell-1',
+            title: 'run_shell',
+            kind: 'run_shell',
+            status: 'pending',
+            rawInput: {
+              command: 'pwd',
+            },
+          },
+        },
+      },
+      {
+        jsonrpc: '2.0',
+        method: 'session/update',
+        params: {
+          sessionId: session.id,
+          update: {
+            sessionUpdate: 'tool_call_update',
+            toolCallId: 'shell-1',
+            status: 'completed',
+            content: [{
+              type: 'content',
+              content: {
+                type: 'text',
+                text: '/tmp/workspace',
+              },
+            }],
+          },
+        },
+      },
+      {
+        jsonrpc: '2.0',
+        method: 'session/update',
+        params: {
+          sessionId: session.id,
+          update: {
+            sessionUpdate: 'agent_message_chunk',
+            content: {
+              type: 'text',
+              text: 'Workspace summarized.',
+            },
+          },
+        },
+      },
+      {
+        jsonrpc: '2.0',
+        id: 'prompt-http',
+        result: {
+          stopReason: 'end_turn',
+          _meta: {
+            catsRuntime: {
+              source: 'runtime_http_bridge',
+              transport: 'http',
+              turnStream: 'application/x-ndjson',
+            },
+          },
+        },
+      },
+    ]);
   });
 
   it('surfaces bootstrap mode truthfully before ACP session methods are enabled', async () => {

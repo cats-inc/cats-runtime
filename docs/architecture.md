@@ -117,7 +117,8 @@ collapsed into one transport story:
    transports such as the primary HTTP API and the bounded ACP facade under
    `src/acp/` plus `src/http/routes/acp.ts`.
    Today, the ACP facade has two carrier shapes:
-   - HTTP `/acp` for conservative control-plane/session lifecycle methods
+   - HTTP `/acp` for control-plane/session lifecycle methods plus
+     `session/prompt` over `Accept: application/x-ndjson`
    - direct stdio ACP for bidirectional `session/prompt` plus `session/update`
 2. **Runtime-to-provider**
    `cats-runtime` consumes provider runtimes through `backends/cli`,

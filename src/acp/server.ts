@@ -20,6 +20,7 @@ type AcpFacadeTransport = 'http' | 'stdio';
 interface AcpFacadeHandleOptions {
   transport?: AcpFacadeTransport;
   notify?: (message: AcpJsonRpcNotification) => Promise<void> | void;
+  httpPromptCarrier?: 'ndjson';
 }
 
 interface RuntimeAcpPromptProjectionState {
@@ -147,8 +148,20 @@ function resolveTransport(
   return options?.transport ?? 'http';
 }
 
-function canStreamPromptTurns(options: AcpFacadeHandleOptions | undefined): boolean {
-  return resolveTransport(options) === 'stdio' && typeof options?.notify === 'function';
+function supportsHttpPromptCarrier(options: AcpFacadeHandleOptions | undefined): boolean {
+  return resolveTransport(options) === 'http' && options?.httpPromptCarrier === 'ndjson';
+}
+
+function canAdvertisePromptTurns(options: AcpFacadeHandleOptions | undefined): boolean {
+  const transport = resolveTransport(options);
+  if (transport === 'stdio') {
+    return true;
+  }
+  return supportsHttpPromptCarrier(options);
+}
+
+function canExecutePromptTurns(options: AcpFacadeHandleOptions | undefined): boolean {
+  return canAdvertisePromptTurns(options) && typeof options?.notify === 'function';
 }
 
 function buildSupportedMethods(
@@ -162,7 +175,7 @@ function buildSupportedMethods(
     'session/load',
     'session/cancel',
   ];
-  if (canStreamPromptTurns(options)) {
+  if (canAdvertisePromptTurns(options)) {
     methods.push('session/prompt');
   }
   return methods;
@@ -203,9 +216,19 @@ function buildInitializeResult(
         ...(transport === 'http' ? { path: '/acp' } : {}),
         bootstrapRequired,
         readinessPath: RUNTIME_READINESS_PATH,
-        sessionLifecycle: canStreamPromptTurns(options)
+        sessionLifecycle: transport === 'stdio'
           ? 'prompt_enabled_over_stdio'
-          : 'pending',
+          : supportsHttpPromptCarrier(options)
+            ? 'prompt_enabled_over_http_ndjson'
+            : 'pending',
+        ...(transport === 'http' && supportsHttpPromptCarrier(options)
+          ? {
+              promptStreaming: {
+                accept: 'application/x-ndjson',
+                notifications: ['session/update'],
+              },
+            }
+          : {}),
         supportedMethods,
       },
     },
@@ -471,8 +494,24 @@ function createPromptProjectionState(): RuntimeAcpPromptProjectionState {
 function ensurePromptTransport(
   options: AcpFacadeHandleOptions | undefined,
 ): asserts options is Required<Pick<AcpFacadeHandleOptions, 'notify'>> & AcpFacadeHandleOptions {
-  if (canStreamPromptTurns(options)) {
+  if (canExecutePromptTurns(options)) {
     return;
+  }
+
+  if (supportsHttpPromptCarrier(options)) {
+    throw new AcpFacadeError(
+      -32600,
+      "ACP HTTP prompt turns require 'Accept: application/x-ndjson'.",
+      {
+        facade: 'runtime_acp_http',
+        phase: 'phase_4',
+        reason: 'prompt_turn_requires_ndjson_accept',
+        currentTransport: resolveTransport(options),
+        requiredAccept: 'application/x-ndjson',
+        requiredNotifications: ['session/update'],
+        supportedMethods: buildSupportedMethods(options),
+      },
+    );
   }
 
   throw new AcpFacadeError(
@@ -1103,7 +1142,7 @@ async function handlePromptSession(
     _meta: {
       catsRuntime: {
         source: 'runtime_http_bridge',
-        transport: 'stdio',
+        transport: resolveTransport(options),
         turnStream: 'application/x-ndjson',
       },
     },

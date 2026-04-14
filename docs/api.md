@@ -94,12 +94,13 @@ additive: direct runtime APIs remain the primary app boundary, while MCP is
 the curated tool surface for orchestrator-style agents.
 
 `POST /acp` exposes the bounded runtime-owned ACP facade over HTTP JSON-RPC.
-It is intentionally narrower than the primary HTTP session API and currently
-focuses on ACP control-plane/session lifecycle calls. The same repo-local ACP
-entrypoint also has a direct stdio carrier via `node build/runtime/bin/acp.js`.
-By default that helper proxies to the existing HTTP `/acp` surface; when started
-with `--serve-runtime`, it runs an in-process runtime-backed ACP stdio server
-that supports bidirectional prompt turns.
+It is intentionally narrower than the primary HTTP session API, but it now
+supports ACP prompt turns over HTTP when the client negotiates
+`Accept: application/x-ndjson`. The same repo-local ACP entrypoint also has a
+direct stdio carrier via `node build/runtime/bin/acp.js`. By default that helper
+proxies to the existing HTTP `/acp` surface; when started with `--serve-runtime`,
+it runs an in-process runtime-backed ACP stdio server that supports the same
+`session/update` prompt flow over stdio frames.
 
 Supported JSON-RPC methods:
 
@@ -117,13 +118,14 @@ Supported ACP HTTP JSON-RPC methods:
 - `session/list`
 - `session/load`
 - `session/cancel`
+- `session/prompt`
 
 Current ACP HTTP limitations:
 
-- `session/prompt` is still refused on HTTP because the current HTTP carrier
-  does not yet provide ACP's required bidirectional `session/update` path
-- direct ACP prompt turns are currently available only on the direct stdio
-  carrier (`node build/runtime/bin/acp.js --serve-runtime`)
+- `session/prompt` requires `Accept: application/x-ndjson`; a plain JSON HTTP
+  request receives a negotiation error instead of a prompt-turn stream
+- prompt-turn notifications and the final JSON-RPC result are emitted as NDJSON
+  lines on the same HTTP response body
 - the ACP facade is additive and bounded; it does not replace the primary
   runtime HTTP session API
 
