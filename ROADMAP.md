@@ -1672,4 +1672,108 @@ to make partial cleanup outcomes explicit for hosts.
 - `public/index.html`
 
 ---
-*Last updated: 2026-04-14*
+### OPT-17: ACP Provider Integration and Runtime Facade Follow-through
+
+**Priority**: P1
+**Status**: In Progress
+
+#### Problem
+
+`cats-runtime` now has the first ACP scaffolding slice landed:
+
+- ACP is classified under the existing `agent` backend family rather than as a
+  new top-level backend
+- the runtime can parse ACP-oriented remote provider config, including stdio
+  launch metadata
+- `agent/acp` inspection and diagnostics are truthful about current
+  capabilities and explicitly report that execution is not implemented yet
+- the runtime can reserve both provider-side ACP consumption and a future
+  runtime-owned ACP facade without conflating them
+
+That means the taxonomy and Phase 1 slot are no longer the main gap. The
+remaining work is execution and capability follow-through:
+
+- provider-side ACP still cannot execute turns because no runtime-owned host
+  capability bridge exists yet
+- no first ACP provider pilot has been proven through the shared
+  `AgentAdapter` seam
+- `cats-runtime` still cannot be consumed directly by ACP-capable IDE clients
+- A2A and ACP are documented as complementary, but the runtime still needs the
+  corresponding diagnostics and facade boundaries
+- the temporary ACP stdio launch fields currently live on the shared remote
+  provider config shape and should be narrowed before ACP config is treated as a
+  stable multi-provider contract
+
+#### Current Baseline
+
+- `src/backends/agent/adapters/acp/AcpAdapter.ts` exists as a truthful skeleton
+  and currently fails fast from `invoke()` with a Phase 2 follow-up error
+- `buildAgentAdapter(...)` recognizes `acp` and `acp_stdio` under the existing
+  `agent` backend family
+- `AgentAdapterInspection` can now describe ACP transports, including stdio
+  launch metadata and conservative capability truth
+- focused inspection/config coverage now exists for ACP transport recognition
+  and adapter-level inspection branches
+- ADR 031, SPEC 025, and PLAN 032 define the provider-side ACP path, the
+  runtime-owned ACP facade path, and the ACP + A2A layering model
+
+#### Follow-through Checklist
+
+- implement the provider-side ACP host capability bridge so ACP permission,
+  filesystem, terminal, and client-MCP-style requests flow through
+  runtime-owned guardrails instead of bypassing them
+- make `AcpAdapter.invoke()` real by mapping ACP session lifecycle and stream
+  events onto the existing runtime `StreamEvent` contract
+- pilot `codex-acp` first through `agent/acp`, because its protocol semantics
+  overlap most closely with the existing Codex runtime seam; validate a second
+  provider such as `claude-agent-acp` only after the host-capability bridge is
+  proven
+- persist ACP provider-managed continuity in the existing session registry so
+  create/message/cancel/close flows reuse the same runtime session ownership
+  model
+- add truthful diagnostics for whichever ACP targets expose probe, model
+  discovery, tool discovery, or auth/launch capabilities in practice
+- ship a separate runtime-owned ACP facade so ACP-capable IDEs can consume
+  `cats-runtime` directly without modeling that surface inside `providers.yaml`
+- document and enforce the final layered stack explicitly:
+  - IDE/client -> ACP -> `cats-runtime`
+  - `cats-runtime` -> `agent/acp` -> external ACP provider agent
+  - `cats-runtime` -> A2A -> peer runtime or peer agent
+- narrow the ACP launch/connect config shape before declaring ACP provider
+  config stable across multiple targets:
+  - prefer a dedicated launch sub-object or discriminated transport config
+  - avoid leaving ACP-only stdio fields as forever-generic remote provider
+    properties
+- make stdio auth semantics explicit if any future ACP target needs credential
+  propagation through subprocess launch rather than HTTP bearer headers
+
+#### Deferred Scope
+
+- do not replace existing CLI/API seams merely because ACP exists
+- do not model runtime-facing ACP exposure as another provider target
+- do not promise full ACP client parity before the first bounded facade slice is
+  proven
+- do not treat ACP as a replacement for MCP or A2A
+
+#### Affected Areas
+
+- `src/backends/agent/adapters/acp/`
+- `src/backends/agent/types.ts`
+- `src/backends/agent/runtime/`
+- `src/backends/cli/config.ts`
+- `src/core/types.ts`
+- `src/http/routes/`
+- a future `src/acp/` facade surface plus any dedicated stdio entrypoint
+- `docs/architecture.md`
+- `docs/specs/SPEC-025-acp-agent-adapters-and-runtime-facade.md`
+- `docs/plans/PLAN-032-acp-agent-adapters-and-runtime-facade.md`
+
+#### References
+
+- `docs/decisions/031-keep-acp-inside-agent-backend-and-model-runtime-acp-as-a-separate-facade.md`
+- `docs/specs/SPEC-025-acp-agent-adapters-and-runtime-facade.md`
+- `docs/plans/PLAN-032-acp-agent-adapters-and-runtime-facade.md`
+- `docs/decisions/026-model-a2a-as-an-agent-backend-adapter.md`
+
+---
+*Last updated: 2026-04-15*

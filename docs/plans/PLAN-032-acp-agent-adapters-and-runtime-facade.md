@@ -209,4 +209,4 @@ Current rationale for preferring `codex-acp` first:
 | Date | Update |
 |------|--------|
 | 2026-04-15 | Draft plan created to stage ACP under `agent` while reserving a separate runtime-owned ACP facade and documenting ACP + A2A complementarity |
-| 2026-04-15 | Landed the first Phase 1 skeleton: `agent/acp` transport recognition, ACP stdio launch config fields, ACP inspection shape, and focused config/inspection coverage; host-capability bridging and turn execution remain follow-up work |
+| 2026-04-15 | Phase 1 skeleton landed with `agent/acp` transport recognition, ACP launch config fields, truthful inspection, and focused coverage; execution remains a Phase 2 follow-up |
