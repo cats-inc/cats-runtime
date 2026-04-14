@@ -8,7 +8,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Phase 4 ACP Facade HTTP + Stdio Carriers Landed) |
+| **Status** | In Progress (Phase 4 Direct Stdio Prompt Turns Landed) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User |
@@ -255,3 +255,4 @@ Current rationale for preferring `codex-acp` first:
 | 2026-04-15 | Tightened the runtime ACP facade's prompt-turn truthfulness: `session/prompt` refusals now say explicitly that the current HTTP transport still lacks the bidirectional `session/update` path ACP prompt turns require, so operators can distinguish a transport limitation from a generic missing-method stub |
 | 2026-04-15 | Added a runtime ACP stdio transport foundation alongside the HTTP facade: the repo now has a dedicated ACP stdio frame server that can carry `initialize`, `session/new`, `session/list`, `session/load`, and `session/cancel` against the same runtime-owned ACP handler, giving Phase 4 a bidirectional-capable carrier before prompt-turn notifications are wired in |
 | 2026-04-15 | Added a repo-local ACP proxy CLI alongside the new stdio carrier: `cats-runtime acp` now forwards stdio ACP traffic into the runtime's primary HTTP `/acp` endpoint using the same host/port/API-key conventions as the MCP proxy mode, so external ACP clients can target the runtime through either direct HTTP JSON-RPC or a CLI-friendly stdio command without waiting for prompt-turn support to land |
+| 2026-04-15 | Enabled the first real prompt-turn path on the runtime ACP facade, but only on direct stdio transport: the shared ACP handler can now reuse `/sessions/:id/messages` over NDJSON, project runtime text/tool events into outbound `session/update` notifications, and return ACP `stopReason` results, while HTTP `/acp` still truthfully refuses `session/prompt` until it grows a comparable bidirectional carrier |

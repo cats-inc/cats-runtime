@@ -1,12 +1,21 @@
 import type { Writable } from 'node:stream';
 import type { AppContext } from '../http/app.js';
 import { handleAcpJsonRpc } from './server.js';
-import type { AcpJsonRpcError, AcpJsonRpcSuccess } from './types.js';
+import type {
+  AcpJsonRpcError,
+  AcpJsonRpcNotification,
+  AcpJsonRpcSuccess,
+} from './types.js';
 
 const HEADER_DELIMITER = '\r\n\r\n';
 
+export interface AcpJsonRpcResponder {
+  notify(message: AcpJsonRpcNotification): Promise<void>;
+}
+
 export type AcpJsonRpcHandler = (
   message: unknown,
+  responder?: AcpJsonRpcResponder,
 ) => Promise<AcpJsonRpcSuccess | AcpJsonRpcError | null>;
 
 export interface AcpStdioServerOptions {
@@ -102,7 +111,10 @@ function resolveJsonRpcHandler(options: AcpStdioServerOptions): AcpJsonRpcHandle
     return options.handleJsonRpc;
   }
   if (options.ctx) {
-    return (message) => handleAcpJsonRpc(options.ctx as AppContext, message);
+    return (message, responder) => handleAcpJsonRpc(options.ctx as AppContext, message, {
+      transport: 'stdio',
+      notify: responder?.notify,
+    });
   }
 
   throw new Error('ACP stdio server requires either ctx or handleJsonRpc');
@@ -119,6 +131,11 @@ export function startAcpStdioServer(options: AcpStdioServerOptions): AcpStdioSer
 
   const writeResponse = (message: unknown) => {
     output.write(encodeMessage(message));
+  };
+  const responder: AcpJsonRpcResponder = {
+    async notify(message) {
+      writeResponse(message);
+    },
   };
 
   const handleChunk = (chunk: Buffer | string) => {
@@ -144,7 +161,7 @@ export function startAcpStdioServer(options: AcpStdioServerOptions): AcpStdioSer
       buffer = parsed.remainder;
       for (const message of parsed.messages) {
         processing = processing.then(async () => {
-          const response = await handleJsonRpc(message);
+          const response = await handleJsonRpc(message, responder);
           if (response !== null) {
             writeResponse(response);
           }

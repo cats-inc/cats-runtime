@@ -24,7 +24,9 @@ acpRoutes.post('/acp', async (c) => {
     }, 400);
   }
 
-  const response = await handleAcpJsonRpc(ctx, rawBody);
+  const response = await handleAcpJsonRpc(ctx, rawBody, {
+    transport: 'http',
+  });
   if (response === null) {
     return c.body(null, 204);
   }

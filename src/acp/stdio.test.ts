@@ -12,6 +12,7 @@ import type { KiroNativeSessionService } from '../backends/cli/kiro/KiroNativeSe
 import type { AuggieSessionService } from '../backends/cli/auggie/AuggieSessionService.js';
 import type { OpencodeNativeSessionService } from '../backends/cli/opencode/OpencodeNativeSessionService.js';
 import type { AppContext } from '../http/app.js';
+import type { StreamEvent, TurnInput } from '../core/types.js';
 import { createRuntimeStartupState } from '../startup.js';
 import { startAcpStdioServer } from './stdio.js';
 
@@ -286,6 +287,215 @@ describe('ACP stdio transport', () => {
         },
       ]);
     });
+
+    await server.close();
+  });
+
+  it('streams prompt-turn updates over direct ACP stdio transport', async () => {
+    rootDir = mkdtempSync(join(tmpdir(), 'cats-runtime-acp-stdio-'));
+    mkdirSync(join(rootDir, 'sessions'), { recursive: true });
+    mkdirSync(join(rootDir, 'data'), { recursive: true });
+
+    const input = new PassThrough();
+    const output = new PassThrough();
+    const registry = new SessionRegistry();
+    const worker = {
+      alive: true,
+      busy: false,
+      on: vi.fn(),
+      off: vi.fn(),
+      async *streamMessage(turnInput: string | TurnInput): AsyncGenerator<StreamEvent> {
+        const resolvedInput = typeof turnInput === 'string' ? { message: turnInput } : turnInput;
+        expect(resolvedInput.message).toBe('Inspect the workspace and summarize it.');
+        yield { type: 'text', text: 'Starting analysis. ' };
+        yield {
+          type: 'tool_use',
+          toolId: 'shell-1',
+          toolName: 'run_shell',
+          toolArgs: { command: 'pwd' },
+        };
+        yield {
+          type: 'tool_result',
+          toolId: 'shell-1',
+          toolName: 'run_shell',
+          text: rootDir,
+        };
+        yield { type: 'result', text: 'Workspace inspected.' };
+      },
+    };
+    const pool = {
+      getCapabilities: vi.fn(() => ({ resume: true, fork: true, permissions: true })),
+      get: vi.fn(() => worker),
+      spawn: vi.fn(),
+      kill: vi.fn(),
+      cancel: vi.fn(),
+      status: vi.fn(() => ({ active: 1 })),
+    } as unknown as WorkerPool;
+
+    const ctx: AppContext = {
+      config: makeConfig(rootDir),
+      startup: createRuntimeStartupState(),
+      registry,
+      pool,
+      cursorNative: {} as CursorNativeSessionService,
+      gooseNative: {} as GooseNativeSessionService,
+      kiroNative: {} as KiroNativeSessionService,
+      auggieSessions: {} as AuggieSessionService,
+      opencodeNative: {} as OpencodeNativeSessionService,
+      providerModelCatalog: {} as never,
+    };
+
+    const server = startAcpStdioServer({ ctx, input, output });
+    const chunks: Buffer[] = [];
+    output.on('data', (chunk) => {
+      chunks.push(Buffer.from(chunk));
+    });
+
+    const cwd = join(rootDir, 'workspace');
+    mkdirSync(cwd, { recursive: true });
+
+    input.write(Buffer.concat([
+      encodeMessage({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: {
+          protocolVersion: 1,
+        },
+      }),
+      encodeMessage({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'session/new',
+        params: {
+          cwd,
+          mcpServers: [],
+        },
+      }),
+    ]));
+
+    await vi.waitFor(() => {
+      expect(decodeMessages(Buffer.concat(chunks))).toHaveLength(2);
+    });
+
+    const initialMessages = decodeMessages(Buffer.concat(chunks)) as Array<Record<string, unknown>>;
+    expect(initialMessages[0]).toMatchObject({
+      jsonrpc: '2.0',
+      id: 1,
+      result: {
+        _meta: {
+          catsRuntime: {
+            transport: 'stdio',
+            sessionLifecycle: 'prompt_enabled_over_stdio',
+            supportedMethods: expect.arrayContaining(['session/prompt']),
+          },
+        },
+      },
+    });
+
+    const sessionId = (initialMessages[1].result as { sessionId: string }).sessionId;
+    input.write(encodeMessage({
+      jsonrpc: '2.0',
+      id: 3,
+      method: 'session/prompt',
+      params: {
+        sessionId,
+        prompt: [
+          {
+            type: 'text',
+            text: 'Inspect the workspace and summarize it.',
+          },
+        ],
+      },
+    }));
+
+    await vi.waitFor(() => {
+      expect(decodeMessages(Buffer.concat(chunks))).toHaveLength(7);
+    });
+
+    const promptMessages = decodeMessages(Buffer.concat(chunks)).slice(2) as Array<Record<string, unknown>>;
+    expect(promptMessages).toEqual([
+      {
+        jsonrpc: '2.0',
+        method: 'session/update',
+        params: {
+          sessionId,
+          update: {
+            sessionUpdate: 'agent_message_chunk',
+            content: {
+              type: 'text',
+              text: 'Starting analysis. ',
+            },
+          },
+        },
+      },
+      {
+        jsonrpc: '2.0',
+        method: 'session/update',
+        params: {
+          sessionId,
+          update: {
+            sessionUpdate: 'tool_call',
+            toolCallId: 'shell-1',
+            title: 'run_shell',
+            kind: 'run_shell',
+            status: 'pending',
+            rawInput: {
+              command: 'pwd',
+            },
+          },
+        },
+      },
+      {
+        jsonrpc: '2.0',
+        method: 'session/update',
+        params: {
+          sessionId,
+          update: {
+            sessionUpdate: 'tool_call_update',
+            toolCallId: 'shell-1',
+            status: 'completed',
+            content: [
+              {
+                type: 'content',
+                content: {
+                  type: 'text',
+                  text: rootDir,
+                },
+              },
+            ],
+          },
+        },
+      },
+      {
+        jsonrpc: '2.0',
+        method: 'session/update',
+        params: {
+          sessionId,
+          update: {
+            sessionUpdate: 'agent_message_chunk',
+            content: {
+              type: 'text',
+              text: 'Workspace inspected.',
+            },
+          },
+        },
+      },
+      {
+        jsonrpc: '2.0',
+        id: 3,
+        result: {
+          stopReason: 'end_turn',
+          _meta: {
+            catsRuntime: {
+              source: 'runtime_http_bridge',
+              transport: 'stdio',
+              turnStream: 'application/x-ndjson',
+            },
+          },
+        },
+      },
+    ]);
 
     await server.close();
   });

@@ -20,3 +20,9 @@ export interface AcpJsonRpcError {
     data?: unknown;
   };
 }
+
+export interface AcpJsonRpcNotification {
+  jsonrpc: '2.0';
+  method: string;
+  params?: unknown;
+}

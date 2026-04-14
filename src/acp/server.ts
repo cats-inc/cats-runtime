@@ -1,5 +1,5 @@
 import type { AppContext } from '../http/app.js';
-import type { SessionInfo } from '../core/types.js';
+import type { SessionInfo, StreamEvent } from '../core/types.js';
 import {
   RUNTIME_READINESS_PATH,
   RUNTIME_SERVICE_NAME,
@@ -8,11 +8,25 @@ import {
 import { requestRuntimeSessionRoute } from './runtimeHttpBridge.js';
 import type {
   AcpJsonRpcError,
+  AcpJsonRpcNotification,
   AcpJsonRpcRequest,
   AcpJsonRpcSuccess,
 } from './types.js';
 
 export const ACP_PROTOCOL_VERSION = 1;
+
+type AcpFacadeTransport = 'http' | 'stdio';
+
+interface AcpFacadeHandleOptions {
+  transport?: AcpFacadeTransport;
+  notify?: (message: AcpJsonRpcNotification) => Promise<void> | void;
+}
+
+interface RuntimeAcpPromptProjectionState {
+  nextSyntheticToolId: number;
+  lastToolId: string | null;
+  toolIdsByName: Map<string, string>;
+}
 
 class AcpFacadeError extends Error {
   constructor(
@@ -100,8 +114,40 @@ function resolveRequestId(value: unknown): string | number | null {
   return null;
 }
 
-function buildInitializeResult(ctx: AppContext) {
+function resolveTransport(
+  options: AcpFacadeHandleOptions | undefined,
+): AcpFacadeTransport {
+  return options?.transport ?? 'http';
+}
+
+function canStreamPromptTurns(options: AcpFacadeHandleOptions | undefined): boolean {
+  return resolveTransport(options) === 'stdio' && typeof options?.notify === 'function';
+}
+
+function buildSupportedMethods(
+  options: AcpFacadeHandleOptions | undefined,
+): string[] {
+  const methods = [
+    'initialize',
+    'ping',
+    'session/new',
+    'session/list',
+    'session/load',
+    'session/cancel',
+  ];
+  if (canStreamPromptTurns(options)) {
+    methods.push('session/prompt');
+  }
+  return methods;
+}
+
+function buildInitializeResult(
+  ctx: AppContext,
+  options?: AcpFacadeHandleOptions,
+) {
+  const transport = resolveTransport(options);
   const bootstrapRequired = ctx.startup?.bootstrapRequired === true;
+  const supportedMethods = buildSupportedMethods(options);
   return {
     protocolVersion: ACP_PROTOCOL_VERSION,
     agentInfo: {
@@ -126,19 +172,14 @@ function buildInitializeResult(ctx: AppContext) {
     },
     _meta: {
       catsRuntime: {
-        transport: 'http',
-        path: '/acp',
+        transport,
+        ...(transport === 'http' ? { path: '/acp' } : {}),
         bootstrapRequired,
         readinessPath: RUNTIME_READINESS_PATH,
-        sessionLifecycle: 'pending',
-        supportedMethods: [
-          'initialize',
-          'ping',
-          'session/new',
-          'session/list',
-          'session/load',
-          'session/cancel',
-        ],
+        sessionLifecycle: canStreamPromptTurns(options)
+          ? 'prompt_enabled_over_stdio'
+          : 'pending',
+        supportedMethods,
       },
     },
   };
@@ -292,6 +333,363 @@ async function handleNewSession(ctx: AppContext, params: unknown) {
   };
 }
 
+function flattenPromptContent(params: Record<string, unknown>): string {
+  const prompt = params.prompt;
+  if (!Array.isArray(prompt) || prompt.length === 0) {
+    throw new AcpFacadeError(-32602, 'session/prompt requires a non-empty params.prompt array');
+  }
+
+  const parts: string[] = [];
+  for (const block of prompt) {
+    if (!block || typeof block !== 'object' || Array.isArray(block)) {
+      throw new AcpFacadeError(-32602, 'session/prompt prompt blocks must be objects');
+    }
+
+    const record = block as Record<string, unknown>;
+    const type = readOptionalString(record, 'type');
+    if (type === 'text') {
+      const text = readOptionalString(record, 'text');
+      if (!text) {
+        throw new AcpFacadeError(-32602, 'session/prompt text blocks require text content');
+      }
+      parts.push(text);
+      continue;
+    }
+
+    if (type === 'resource') {
+      const resource = ensureRecord(record.resource, 'session/prompt resource block');
+      const resourceText = readOptionalString(resource, 'text');
+      const resourceUri = readOptionalString(resource, 'uri');
+      if (resourceText) {
+        parts.push(resourceText);
+        continue;
+      }
+      if (resourceUri) {
+        parts.push(resourceUri);
+        continue;
+      }
+      throw new AcpFacadeError(-32602, 'session/prompt resource blocks require resource.text or resource.uri');
+    }
+
+    if (type === 'resource_link') {
+      const uri = readOptionalString(record, 'uri');
+      if (!uri) {
+        throw new AcpFacadeError(-32602, 'session/prompt resource_link blocks require uri');
+      }
+      parts.push(uri);
+      continue;
+    }
+
+    throw new AcpFacadeError(
+      -32602,
+      `session/prompt block type '${type ?? 'unknown'}' is not yet supported by the cats-runtime ACP facade.`,
+      {
+        reason: 'unsupported_prompt_content',
+        supportedTypes: ['text', 'resource', 'resource_link'],
+      },
+    );
+  }
+
+  return parts.join('\n\n').trim();
+}
+
+async function* streamNdjsonMessages(
+  body: ReadableStream<Uint8Array>,
+): AsyncGenerator<unknown> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      let newlineIndex = buffer.indexOf('\n');
+      while (newlineIndex >= 0) {
+        const line = buffer.slice(0, newlineIndex).trim();
+        buffer = buffer.slice(newlineIndex + 1);
+        if (line.length > 0) {
+          yield JSON.parse(line) as unknown;
+        }
+        newlineIndex = buffer.indexOf('\n');
+      }
+    }
+
+    const trailing = `${buffer}${decoder.decode()}`.trim();
+    if (trailing.length > 0) {
+      yield JSON.parse(trailing) as unknown;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function createPromptProjectionState(): RuntimeAcpPromptProjectionState {
+  return {
+    nextSyntheticToolId: 1,
+    lastToolId: null,
+    toolIdsByName: new Map(),
+  };
+}
+
+function ensurePromptTransport(
+  options: AcpFacadeHandleOptions | undefined,
+): asserts options is Required<Pick<AcpFacadeHandleOptions, 'notify'>> & AcpFacadeHandleOptions {
+  if (canStreamPromptTurns(options)) {
+    return;
+  }
+
+  throw new AcpFacadeError(
+    -32601,
+    "ACP method 'session/prompt' is not yet enabled by the cats-runtime ACP facade.",
+    {
+      facade: 'runtime_acp_http',
+      phase: 'phase_4',
+      reason: 'prompt_turn_requires_bidirectional_transport',
+      currentTransport: resolveTransport(options),
+      requiredNotifications: ['session/update'],
+      supportedMethods: buildSupportedMethods(options),
+    },
+  );
+}
+
+function buildSessionUpdateNotification(
+  sessionId: string,
+  update: Record<string, unknown>,
+): AcpJsonRpcNotification {
+  return {
+    jsonrpc: '2.0',
+    method: 'session/update',
+    params: {
+      sessionId,
+      update,
+    },
+  };
+}
+
+function buildTextContent(text: string): Record<string, string> {
+  return {
+    type: 'text',
+    text,
+  };
+}
+
+function buildToolResultContent(text: string): Array<Record<string, unknown>> {
+  return [{
+    type: 'content',
+    content: buildTextContent(text),
+  }];
+}
+
+function resolveProjectedToolId(
+  event: StreamEvent,
+  state: RuntimeAcpPromptProjectionState,
+): string | undefined {
+  if (event.toolId?.trim()) {
+    const id = event.toolId.trim();
+    state.lastToolId = id;
+    if (event.toolName?.trim()) {
+      state.toolIdsByName.set(event.toolName.trim(), id);
+    }
+    return id;
+  }
+
+  if (event.toolName?.trim()) {
+    const existing = state.toolIdsByName.get(event.toolName.trim());
+    if (existing) {
+      state.lastToolId = existing;
+      return existing;
+    }
+  }
+
+  if (event.type === 'tool_use') {
+    const syntheticId = `runtime-tool-${state.nextSyntheticToolId}`;
+    state.nextSyntheticToolId += 1;
+    state.lastToolId = syntheticId;
+    if (event.toolName?.trim()) {
+      state.toolIdsByName.set(event.toolName.trim(), syntheticId);
+    }
+    return syntheticId;
+  }
+
+  return state.lastToolId ?? undefined;
+}
+
+function mapRuntimeEventToAcpUpdates(
+  event: unknown,
+  state: RuntimeAcpPromptProjectionState,
+): Array<Record<string, unknown>> {
+  if (!event || typeof event !== 'object' || Array.isArray(event)) {
+    return [];
+  }
+
+  const eventRecord = event as Record<string, unknown>;
+  const eventType = typeof eventRecord.type === 'string' ? eventRecord.type : undefined;
+  if (!eventType || eventType === 'content_block' || eventType === 'init' || eventType === 'raw') {
+    return [];
+  }
+  const streamEvent = eventRecord as unknown as StreamEvent;
+
+  if (eventType === 'text' && typeof streamEvent.text === 'string' && streamEvent.text.length > 0) {
+    return [{
+      sessionId: '',
+      update: {
+        sessionUpdate: 'agent_message_chunk',
+        content: buildTextContent(streamEvent.text),
+      },
+    }];
+  }
+
+  if (eventType === 'result' && typeof streamEvent.text === 'string' && streamEvent.text.length > 0) {
+    return [{
+      sessionId: '',
+      update: {
+        sessionUpdate: 'agent_message_chunk',
+        content: buildTextContent(streamEvent.text),
+      },
+    }];
+  }
+
+  if (eventType === 'progress'
+    && typeof streamEvent.text === 'string'
+    && streamEvent.text.length > 0
+    && streamEvent.metadata
+    && typeof streamEvent.metadata === 'object'
+    && !Array.isArray(streamEvent.metadata)
+    && (streamEvent.metadata as Record<string, unknown>).kind === 'reasoning'
+  ) {
+    return [{
+      sessionId: '',
+      update: {
+        sessionUpdate: 'agent_thought_chunk',
+        content: buildTextContent(streamEvent.text),
+      },
+    }];
+  }
+
+  if (eventType === 'tool_use') {
+    const toolUseEvent = streamEvent as Extract<StreamEvent, { type: 'tool_use' }>;
+    const toolId = resolveProjectedToolId(toolUseEvent, state);
+    return [{
+      sessionId: '',
+      update: {
+        sessionUpdate: 'tool_call',
+        ...(toolId ? { toolCallId: toolId } : {}),
+        title: toolUseEvent.toolName?.trim() || 'Tool',
+        kind: toolUseEvent.toolName?.trim() || 'other',
+        status: 'pending',
+        ...(toolUseEvent.toolArgs ? { rawInput: toolUseEvent.toolArgs } : {}),
+        ...(toolUseEvent.text ? { content: buildToolResultContent(toolUseEvent.text) } : {}),
+      },
+    }];
+  }
+
+  if (eventType === 'tool_result') {
+    const toolResultEvent = streamEvent as Extract<StreamEvent, { type: 'tool_result' }>;
+    const toolId = resolveProjectedToolId(toolResultEvent, state);
+    return [{
+      sessionId: '',
+      update: {
+        sessionUpdate: 'tool_call_update',
+        ...(toolId ? { toolCallId: toolId } : {}),
+        status: toolResultEvent.isError ? 'failed' : 'completed',
+        ...(toolResultEvent.text ? { content: buildToolResultContent(toolResultEvent.text) } : {}),
+      },
+    }];
+  }
+
+  return [];
+}
+
+function looksLikeCancelledStop(text: string): boolean {
+  return /cancelled|canceled|abort|aborted/i.test(text);
+}
+
+async function handlePromptSession(
+  ctx: AppContext,
+  params: unknown,
+  options: AcpFacadeHandleOptions | undefined,
+) {
+  ensureRuntimeReadyForAcp(ctx);
+  ensurePromptTransport(options);
+
+  const request = ensureRecord(params ?? {}, 'session/prompt params');
+  const sessionId = readOptionalString(request, 'sessionId');
+  if (!sessionId) {
+    throw new AcpFacadeError(-32602, 'session/prompt requires params.sessionId');
+  }
+
+  const message = flattenPromptContent(request);
+  if (!message) {
+    throw new AcpFacadeError(-32602, 'session/prompt requires at least one non-empty text-equivalent content block');
+  }
+
+  const response = await requestRuntimeSessionRoute(ctx, `/sessions/${encodeURIComponent(sessionId)}/messages`, {
+    method: 'POST',
+    headers: {
+      accept: 'application/x-ndjson',
+    },
+    body: {
+      message,
+    },
+  });
+
+  if (!response.ok) {
+    const failurePayload = await response.json().catch(() => undefined) as Record<string, unknown> | undefined;
+    throw new AcpFacadeError(
+      -32603,
+      typeof failurePayload?.error === 'string'
+        ? failurePayload.error
+        : `Failed to execute runtime ACP prompt turn for session '${sessionId}'.`,
+      {
+        route: `/sessions/${sessionId}/messages`,
+        httpStatus: response.status,
+      },
+    );
+  }
+
+  if (!response.body) {
+    throw new AcpFacadeError(-32603, 'Runtime ACP prompt turn returned no stream body');
+  }
+
+  const projectionState = createPromptProjectionState();
+  let stopReason: 'end_turn' | 'cancelled' | 'refusal' = 'end_turn';
+
+  for await (const ndjsonEvent of streamNdjsonMessages(response.body)) {
+    const projected = mapRuntimeEventToAcpUpdates(ndjsonEvent, projectionState);
+    for (const notificationParams of projected) {
+      await options.notify(buildSessionUpdateNotification(
+        sessionId,
+        notificationParams.update as Record<string, unknown>,
+      ));
+    }
+
+    if (!ndjsonEvent || typeof ndjsonEvent !== 'object' || Array.isArray(ndjsonEvent)) {
+      continue;
+    }
+
+    const streamEvent = ndjsonEvent as StreamEvent;
+    if (streamEvent.type === 'error') {
+      stopReason = looksLikeCancelledStop(streamEvent.text) ? 'cancelled' : 'refusal';
+    }
+  }
+
+  return {
+    stopReason,
+    _meta: {
+      catsRuntime: {
+        source: 'runtime_http_bridge',
+        transport: 'stdio',
+        turnStream: 'application/x-ndjson',
+      },
+    },
+  };
+}
+
 async function handleCancelSession(ctx: AppContext, params: unknown) {
   const request = ensureRecord(params ?? {}, 'session/cancel params');
   const sessionId = readOptionalString(request, 'sessionId');
@@ -324,6 +722,7 @@ async function handleCancelSession(ctx: AppContext, params: unknown) {
 export async function handleAcpJsonRpc(
   ctx: AppContext,
   rawBody: unknown,
+  options?: AcpFacadeHandleOptions,
 ): Promise<AcpJsonRpcSuccess | AcpJsonRpcError | null> {
   let requestId: string | number | null = null;
 
@@ -337,7 +736,7 @@ export async function handleAcpJsonRpc(
       case 'ping':
         return successResponse(id, {});
       case 'initialize':
-        return successResponse(id, buildInitializeResult(ctx));
+        return successResponse(id, buildInitializeResult(ctx, options));
       case 'session/new':
         return successResponse(id, await handleNewSession(ctx, request.params));
       case 'session/cancel':
@@ -347,6 +746,8 @@ export async function handleAcpJsonRpc(
         return successResponse(id, handleListSessions(ctx, request.params));
       case 'session/load':
         return successResponse(id, handleLoadSession(ctx, request.params));
+      case 'session/prompt':
+        return successResponse(id, await handlePromptSession(ctx, request.params, options));
       case 'authenticate':
       case 'session/set_mode':
       case 'session/set_config_option':
@@ -358,36 +759,7 @@ export async function handleAcpJsonRpc(
           {
             facade: 'runtime_acp_http',
             phase: 'phase_4',
-            supportedMethods: [
-              'initialize',
-              'ping',
-              'session/new',
-              'session/list',
-              'session/load',
-              'session/cancel',
-            ],
-          },
-        );
-      case 'session/prompt':
-        ensureRuntimeReadyForAcp(ctx);
-        return errorResponse(
-          id,
-          -32601,
-          "ACP method 'session/prompt' is not yet enabled by the cats-runtime ACP facade.",
-          {
-            facade: 'runtime_acp_http',
-            phase: 'phase_4',
-            reason: 'prompt_turn_requires_bidirectional_transport',
-            currentTransport: 'http',
-            requiredNotifications: ['session/update'],
-            supportedMethods: [
-              'initialize',
-              'ping',
-              'session/new',
-              'session/list',
-              'session/load',
-              'session/cancel',
-            ],
+            supportedMethods: buildSupportedMethods(options),
           },
         );
       default:
