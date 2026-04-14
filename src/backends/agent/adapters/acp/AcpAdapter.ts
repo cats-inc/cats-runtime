@@ -79,7 +79,7 @@ function buildInspection(
       key.toLowerCase() === 'authorization')),
   );
   const hostBridgeSummary = hostBridgeConfigured
-    ? 'A runtime ACP host-capability bridge is configured; the current execution slice uses runtime permission-policy mediation while fuller filesystem and terminal client capabilities remain follow-up work.'
+    ? 'A runtime ACP host-capability bridge is configured; the current execution slice mediates ACP permission and text-file requests through runtime policy, while fuller terminal client capabilities remain follow-up work.'
     : 'It will require a runtime ACP host-capability bridge before turn execution is enabled.';
   const profileSummary = profile
     ? ` ${profile.label} is the current ACP pilot target because its lifecycle overlaps with an existing runtime seam.`
@@ -172,7 +172,13 @@ function buildProviderState(
   };
 }
 
-function buildInitializeParams(instance?: RemoteProviderInstanceConfig) {
+function buildInitializeParams(
+  instance?: RemoteProviderInstanceConfig,
+  options: {
+    filesystem?: boolean;
+    terminal?: boolean;
+  } = {},
+) {
   const profile = instance ? resolveAcpProviderProfile(instance) : undefined;
   return {
     protocolVersion: DEFAULT_ACP_PROTOCOL_VERSION,
@@ -181,10 +187,10 @@ function buildInitializeParams(instance?: RemoteProviderInstanceConfig) {
         ? { _meta: { ...profile.clientCapabilityMeta } }
         : {}),
       fs: {
-        readTextFile: false,
-        writeTextFile: false,
+        readTextFile: options.filesystem === true,
+        writeTextFile: options.filesystem === true,
       },
-      terminal: false,
+      terminal: options.terminal === true,
     },
     clientInfo: {
       name: 'cats-runtime',
@@ -310,6 +316,72 @@ function buildPermissionResponse(
       outcome: 'cancelled',
     },
   };
+}
+
+async function executeHostTool(
+  binding: NonNullable<AgentInvokeInput['acpHost']>,
+  call: {
+    id: string;
+    name: string;
+    arguments: Record<string, unknown>;
+  },
+): Promise<string> {
+  const result = await binding.bridge.executeTool(binding.context, call);
+  if (result.isError) {
+    throw new AcpJsonRpcClientError(result.output || `ACP host tool '${call.name}' failed.`, -32000);
+  }
+
+  return result.output;
+}
+
+async function handleReadTextFileRequest(
+  binding: NonNullable<AgentInvokeInput['acpHost']>,
+  request: AcpJsonRpcRequest,
+): Promise<Record<string, unknown>> {
+  const params = parseRecord(request.params);
+  const path = readString(params?.path);
+  if (!path) {
+    throw new AcpJsonRpcClientError('ACP fs/read_text_file requires a path.', -32602);
+  }
+
+  const line = readNumber(params?.line);
+  const limit = readNumber(params?.limit);
+  const content = await executeHostTool(binding, {
+    id: `acp-fs-read-${request.id}`,
+    name: 'read_file',
+    arguments: {
+      path,
+      offset_line: line !== undefined && line > 0 ? line - 1 : 0,
+      limit_lines: limit !== undefined ? limit : 2000,
+    },
+  });
+
+  return { content };
+}
+
+async function handleWriteTextFileRequest(
+  binding: NonNullable<AgentInvokeInput['acpHost']>,
+  request: AcpJsonRpcRequest,
+): Promise<Record<string, never>> {
+  const params = parseRecord(request.params);
+  const path = readString(params?.path);
+  if (!path) {
+    throw new AcpJsonRpcClientError('ACP fs/write_text_file requires a path.', -32602);
+  }
+  if (typeof params?.content !== 'string') {
+    throw new AcpJsonRpcClientError('ACP fs/write_text_file requires string content.', -32602);
+  }
+
+  await executeHostTool(binding, {
+    id: `acp-fs-write-${request.id}`,
+    name: 'write_file',
+    arguments: {
+      path,
+      content: params.content,
+    },
+  });
+
+  return {};
 }
 
 function normalizeAllowedToken(value: string | null | undefined): string {
@@ -1041,6 +1113,14 @@ export class AcpAdapter implements AgentAdapter {
         }
       },
       onServerRequest: async (request) => {
+        if (request.method === 'fs/read_text_file' && input.acpHost) {
+          return handleReadTextFileRequest(input.acpHost, request);
+        }
+
+        if (request.method === 'fs/write_text_file' && input.acpHost) {
+          return handleWriteTextFileRequest(input.acpHost, request);
+        }
+
         if (request.method === 'session/request_permission') {
           return buildPermissionResponse(
             request,
@@ -1058,7 +1138,9 @@ export class AcpAdapter implements AgentAdapter {
 
     const run = (async () => {
       const initializeResult = parseRecord(
-        await client.request('initialize', buildInitializeParams(input.instance)),
+        await client.request('initialize', buildInitializeParams(input.instance, {
+          filesystem: true,
+        })),
       );
       const protocolVersion = initializeResult?.protocolVersion;
       const agentCapabilities = parseRecord(initializeResult?.agentCapabilities);

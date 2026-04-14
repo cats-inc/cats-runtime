@@ -1,7 +1,10 @@
 import { EventEmitter } from 'node:events';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { PassThrough } from 'node:stream';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { RemoteProviderInstanceConfig } from '../../../cli/config.js';
 import type {
   AgentAcpHostBridge,
@@ -11,6 +14,7 @@ import type {
   AgentSpawnedProcess,
 } from '../../types.js';
 import type { StreamEvent } from '../../../../core/types.js';
+import { RuntimeAcpHostBridge } from '../../acp/RuntimeAcpHostBridge.js';
 import { AcpAdapter } from './AcpAdapter.js';
 
 class FakeAcpProcess extends EventEmitter implements AgentSpawnedProcess {
@@ -27,6 +31,14 @@ class FakeAcpProcess extends EventEmitter implements AgentSpawnedProcess {
     return true;
   }
 }
+
+const tempRoots: string[] = [];
+
+afterEach(() => {
+  while (tempRoots.length > 0) {
+    rmSync(tempRoots.pop()!, { recursive: true, force: true });
+  }
+});
 
 async function collectEvents(stream: AsyncGenerator<StreamEvent>): Promise<StreamEvent[]> {
   const events: StreamEvent[] = [];
@@ -174,6 +186,7 @@ function createInvokeInput(
   permissionMode: 'skip' | 'default' | 'whitelist' = 'skip',
   allowedTools?: string[],
 ) {
+  const cwd = instance.cwd || '/tmp/acp';
   return {
     sessionId: 'session-1',
     providerName: 'codex',
@@ -189,11 +202,11 @@ function createInvokeInput(
         sessionId: 'session-1',
         providerName: 'codex',
         providerInstanceId: instance.id,
-        cwd: '/tmp/acp',
+        cwd,
         workspace: {
           kind: 'source' as const,
           access: 'read_write' as const,
-          runtimeCwd: '/tmp/acp',
+          runtimeCwd: cwd,
         },
         permissionMode,
         ...(allowedTools ? { allowedTools } : {}),
@@ -683,6 +696,134 @@ describe('AcpAdapter', () => {
 
     const capabilities = initializeParams?.clientCapabilities as Record<string, unknown> | undefined;
     expect(capabilities?._meta).toBeUndefined();
+  });
+
+  it('mediates ACP fs read/write requests through the runtime host bridge and workspace policy', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-acp-fs-'));
+    tempRoots.push(root);
+    writeFileSync(join(root, 'note.txt'), 'line1\nline2\nline3\n', 'utf8');
+
+    const process = new FakeAcpProcess();
+    let initializeParams: Record<string, unknown> | undefined;
+    let promptRequestId = 0;
+    const readReplies: Array<Record<string, unknown>> = [];
+    const writeReplies: Array<Record<string, unknown>> = [];
+
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        initializeParams = message.params as Record<string, unknown>;
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: {
+              loadSession: false,
+            },
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            sessionId: 'acp-session-fs',
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/prompt') {
+        promptRequestId = message.id as number;
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: 77,
+          method: 'fs/read_text_file',
+          params: {
+            sessionId: 'acp-session-fs',
+            path: join(root, 'note.txt'),
+            line: 2,
+            limit: 1,
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.id === 77) {
+        readReplies.push(message);
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: 78,
+          method: 'fs/write_text_file',
+          params: {
+            sessionId: 'acp-session-fs',
+            path: join(root, 'generated.txt'),
+            content: 'written through ACP',
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.id === 78) {
+        writeReplies.push(message);
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: promptRequestId,
+          result: {
+            stopReason: 'end_turn',
+          },
+        }) + '\n');
+      }
+    });
+
+    const hostBridge = new RuntimeAcpHostBridge();
+    const adapter = new AcpAdapter({
+      acpHostBridge: hostBridge,
+      acpProcessSpawner: createSpawner(process),
+    });
+    const instance = {
+      ...createStdioInstance(),
+      cwd: root,
+    };
+
+    const events = await collectEvents(adapter.invoke(
+      createInvokeInput(instance, hostBridge, 'skip'),
+    ));
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'init',
+        providerSessionId: 'acp-session-fs',
+      }),
+      expect.objectContaining({
+        type: 'result',
+        providerSessionId: 'acp-session-fs',
+      }),
+    ]);
+    expect(readReplies).toEqual([{
+      jsonrpc: '2.0',
+      id: 77,
+      result: {
+        content: 'line2',
+      },
+    }]);
+    expect(writeReplies).toEqual([{
+      jsonrpc: '2.0',
+      id: 78,
+      result: {},
+    }]);
+    expect(initializeParams).toEqual(expect.objectContaining({
+      clientCapabilities: expect.objectContaining({
+        fs: {
+          readTextFile: true,
+          writeTextFile: true,
+        },
+      }),
+    }));
+    expect(readFileSync(join(root, 'generated.txt'), 'utf8')).toBe('written through ACP');
   });
 
   it('normalizes ACP reasoning, plan, and terminal-output updates into runtime progress events', async () => {
