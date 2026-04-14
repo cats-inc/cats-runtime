@@ -92,10 +92,14 @@ export function getProviderRemoteToolDiscoveryMethod(
   if (request?.scope === 'effective') {
     return 'tools_effective';
   }
-  return agentRuntime?.transport.toolDiscovery
-    && agentRuntime.transport.toolDiscovery !== 'none'
-    ? agentRuntime.transport.toolDiscovery
-    : 'tools_catalog';
+  const discovery = agentRuntime?.transport.toolDiscovery;
+  if (!discovery || discovery === 'none') {
+    return 'tools_catalog';
+  }
+  if (discovery === 'session_bootstrap') {
+    return 'tools_effective';
+  }
+  return discovery;
 }
 
 export function buildProviderRemoteToolCatalog(

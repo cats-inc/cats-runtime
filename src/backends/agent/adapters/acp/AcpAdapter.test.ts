@@ -291,7 +291,7 @@ describe('AcpAdapter', () => {
         protocol: 'acp_v1',
         liveProbe: 'command_help',
         modelDiscovery: 'session_bootstrap',
-        toolDiscovery: 'none',
+        toolDiscovery: 'session_bootstrap',
         streaming: 'generic',
       },
       request: {
@@ -310,12 +310,84 @@ describe('AcpAdapter', () => {
       capabilities: {
         probe: true,
         modelDiscovery: true,
-        toolCatalog: false,
-        effectiveToolCatalog: false,
+        toolCatalog: true,
+        effectiveToolCatalog: true,
         cancel: true,
         runtimeServices: false,
         toolCallEvents: true,
       },
+    });
+  });
+
+  it('discovers effective ACP command tools through transient session bootstrap', async () => {
+    const process = new FakeAcpProcess();
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: {
+            sessionId: 'acp-tools',
+            update: {
+              sessionUpdate: 'available_commands_update',
+              availableCommandsUpdate: {
+                availableCommands: [
+                  { name: '/plan', description: 'Create a plan' },
+                  { name: '/review', description: 'Review the patch' },
+                ],
+              },
+            },
+          },
+        }) + '\n');
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            sessionId: 'acp-tools',
+          },
+        }) + '\n');
+      }
+    });
+
+    const adapter = new AcpAdapter({
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    await expect(adapter.listTools(createStdioInstance())).resolves.toEqual({
+      method: 'tools_effective',
+      summary: 'ACP bootstrap discovered 2 effective command(s) for codex/acp-local.',
+      toolCount: 2,
+      groupCount: 1,
+      groups: [{
+        id: 'acp_commands',
+        label: 'ACP Commands',
+        toolCount: 2,
+      }],
+      tools: [
+        {
+          name: '/plan',
+          title: 'Create a plan',
+          groupId: 'acp_commands',
+          source: 'session',
+        },
+        {
+          name: '/review',
+          title: 'Review the patch',
+          groupId: 'acp_commands',
+          source: 'session',
+        },
+      ],
     });
   });
 

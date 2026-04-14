@@ -219,7 +219,7 @@ export interface AgentAdapterInspection {
     protocol: 'openclaw_gateway_v3' | 'agent_sdk_http_v1' | 'acp_v1' | 'generic';
     liveProbe: 'rpc_health' | 'providers_get' | 'command_help' | 'none';
     modelDiscovery: 'models_list' | 'providers_get' | 'session_bootstrap' | 'none';
-    toolDiscovery: 'tools_catalog' | 'tools_effective' | 'providers_get' | 'none';
+    toolDiscovery: 'tools_catalog' | 'tools_effective' | 'providers_get' | 'session_bootstrap' | 'none';
     streaming: 'agent_event_frames' | 'sse' | 'generic';
   };
   request: {

@@ -5,6 +5,8 @@ import type {
   AgentAdapterProbeCheck,
   AgentAdapterInspection,
   AgentAdapterProbeResult,
+  AgentAdapterToolCatalog,
+  AgentAdapterToolCatalogRequest,
   AgentBackendOptions,
   AgentInvokeInput,
 } from '../../types.js';
@@ -36,6 +38,11 @@ interface AcpConfigOptionSnapshot {
   id: string;
   label?: string;
   value?: string;
+}
+
+interface AcpAvailableCommand {
+  name: string;
+  description?: string;
 }
 
 interface AcpPermissionDecision {
@@ -93,6 +100,7 @@ function buildInspection(
   const profile = resolveAcpProviderProfile(instance);
   const supportsRemoteCancel = Boolean(command && profile);
   const supportsModelDiscovery = Boolean(command && profile);
+  const supportsToolCatalog = Boolean(command && profile);
   const transportKind = command ? 'stdio' as const : 'http' as const;
   const launch = command
     ? {
@@ -129,7 +137,7 @@ function buildInspection(
       protocol: 'acp_v1',
       liveProbe: command ? 'command_help' : 'none',
       modelDiscovery: supportsModelDiscovery ? 'session_bootstrap' : 'none',
-      toolDiscovery: 'none',
+      toolDiscovery: supportsToolCatalog ? 'session_bootstrap' : 'none',
       streaming: 'generic',
     },
     request: {
@@ -163,8 +171,8 @@ function buildInspection(
     capabilities: {
       probe: Boolean(command),
       modelDiscovery: supportsModelDiscovery,
-      toolCatalog: false,
-      effectiveToolCatalog: false,
+      toolCatalog: supportsToolCatalog,
+      effectiveToolCatalog: supportsToolCatalog,
       cancel: supportsRemoteCancel,
       runtimeServices: hostBridgeConfigured,
       toolCallEvents: Boolean(command),
@@ -397,12 +405,37 @@ function parseModels(value: unknown): Array<{ id: string; label: string }> {
   });
 }
 
+function parseAvailableCommands(value: unknown): AcpAvailableCommand[] {
+  const record = parseRecord(value);
+  const entries = Array.isArray(record?.availableCommands)
+    ? record.availableCommands
+    : Array.isArray(value)
+      ? value
+      : [];
+
+  return entries.flatMap((entry) => {
+    const item = parseRecord(entry);
+    const name = readString(item?.name) || readString(item?.command);
+    if (!name) {
+      return [];
+    }
+
+    return [{
+      name,
+      ...(readString(item?.description) ? { description: readString(item?.description) } : {}),
+    }];
+  });
+}
+
 async function runTransientBootstrap(
   instance: RemoteProviderInstanceConfig,
   env: Record<string, string>,
   options: AgentBackendOptions,
   cwd: string,
   mcpServers: AgentAcpHostMcpServer[] = [],
+  callbacks: {
+    onNotification?: (message: AcpJsonRpcNotification) => void | Promise<void>;
+  } = {},
 ): Promise<{
     initializeResult: Record<string, unknown> | undefined;
     sessionResult: Record<string, unknown> | undefined;
@@ -418,6 +451,7 @@ async function runTransientBootstrap(
     cwd,
     env,
     spawnProcess: options.acpProcessSpawner,
+    ...(callbacks.onNotification ? { onNotification: callbacks.onNotification } : {}),
   });
   const timeoutMs = resolveBootstrapTimeoutMs(instance);
   try {
@@ -1299,13 +1333,7 @@ function parseSessionUpdateEvents(
 
   if (updateType === 'available_commands_update') {
     const availableCommandsUpdate = parseRecord(update.availableCommandsUpdate) || update;
-    const commands = Array.isArray(availableCommandsUpdate.availableCommands)
-      ? availableCommandsUpdate.availableCommands.flatMap((entry) => {
-          const record = parseRecord(entry);
-          const name = readString(record?.name);
-          return name ? [{ name }] : [];
-        })
-      : [];
+    const commands = parseAvailableCommands(availableCommandsUpdate);
     adapterState.availableCommands = commands.map((command) => command.name);
     const summary = summarizeAvailableCommandsUpdate(input, commands);
     return [buildProgressEvent(
@@ -1642,6 +1670,85 @@ export class AcpAdapter implements AgentAdapter {
     const env = sanitizeEnv(this.options.env || process.env);
     const { sessionResult } = await runTransientBootstrap(instance, env, this.options, cwd);
     return parseModels(sessionResult?.models);
+  }
+
+  async listTools(
+    instance: RemoteProviderInstanceConfig,
+    _request: AgentAdapterToolCatalogRequest = {},
+  ): Promise<AgentAdapterToolCatalog> {
+    const command = instance.command?.trim();
+    if (!command) {
+      throw new Error('ACP tool discovery currently supports stdio agent commands only.');
+    }
+
+    const cwd = resolveBootstrapCwd(instance.cwd, process.cwd());
+    if (!cwd) {
+      throw new Error('ACP tool discovery requires a working directory.');
+    }
+
+    const env = sanitizeEnv(this.options.env || process.env);
+    const commands = new Map<string, AcpAvailableCommand>();
+    const rememberCommands = (entries: AcpAvailableCommand[]) => {
+      for (const entry of entries) {
+        if (!commands.has(entry.name)) {
+          commands.set(entry.name, entry);
+        }
+      }
+    };
+
+    const { sessionResult } = await runTransientBootstrap(
+      instance,
+      env,
+      this.options,
+      cwd,
+      [],
+      {
+        onNotification: async (message) => {
+          if (message.method !== 'session/update') {
+            return;
+          }
+          const params = parseRecord(message.params);
+          const update = parseRecord(params?.update);
+          const updateType = readString(update?.sessionUpdate) || readString(update?.type);
+          if (updateType !== 'available_commands_update') {
+            return;
+          }
+          const availableCommandsUpdate = parseRecord(update?.availableCommandsUpdate) || update;
+          rememberCommands(parseAvailableCommands(availableCommandsUpdate));
+        },
+      },
+    );
+    rememberCommands(parseAvailableCommands(sessionResult));
+
+    const tools = Array.from(commands.values())
+      .sort((left, right) => left.name.localeCompare(right.name))
+      .map((entry) => ({
+        name: entry.name,
+        ...(entry.description ? { title: entry.description } : {}),
+        groupId: 'acp_commands',
+        source: 'session' as const,
+      }));
+
+    if (tools.length === 0) {
+      throw new Error(
+        `ACP bootstrap did not expose an effective command catalog for `
+        + `${instance.providerName}/${instance.id}.`,
+      );
+    }
+
+    return {
+      method: 'tools_effective',
+      summary: `ACP bootstrap discovered ${tools.length} effective command(s) for `
+        + `${instance.providerName}/${instance.id}.`,
+      toolCount: tools.length,
+      groupCount: 1,
+      groups: [{
+        id: 'acp_commands',
+        label: 'ACP Commands',
+        toolCount: tools.length,
+      }],
+      tools,
+    };
   }
 
   async *invoke(input: AgentInvokeInput): AsyncGenerator<StreamEvent> {

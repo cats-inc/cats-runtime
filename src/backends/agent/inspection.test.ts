@@ -146,7 +146,7 @@ describe('inspectAgentTarget', () => {
         protocol: 'acp_v1',
         liveProbe: 'command_help',
         modelDiscovery: 'session_bootstrap',
-        toolDiscovery: 'none',
+        toolDiscovery: 'session_bootstrap',
         streaming: 'generic',
       },
       request: {
@@ -165,8 +165,8 @@ describe('inspectAgentTarget', () => {
       capabilities: {
         probe: true,
         modelDiscovery: true,
-        toolCatalog: false,
-        effectiveToolCatalog: false,
+        toolCatalog: true,
+        effectiveToolCatalog: true,
         cancel: true,
         runtimeServices: false,
         toolCallEvents: true,
