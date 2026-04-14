@@ -104,7 +104,7 @@ integration track for only two vendors.
 
 - [x] Define the minimal runtime-owned host capability surface the ACP adapter
       can call into
-- [ ] Map ACP permission requests onto runtime approval/guardrail policy
+- [x] Map ACP permission requests onto runtime approval/guardrail policy
 - [x] Map ACP file access onto runtime workspace/worktree rules
 - [x] Map ACP terminal requests onto runtime execution controls
 - [ ] Decide how ACP-facing client MCP server access should relate to the
@@ -242,3 +242,4 @@ Current rationale for preferring `codex-acp` first:
 | 2026-04-15 | Landed the first official ACP filesystem bridge slice: `agent/acp` now advertises `fs.readTextFile`/`fs.writeTextFile` when a runtime ACP host bridge is attached, and incoming `fs/read_text_file` plus `fs/write_text_file` requests are mediated through the runtime's existing `read_file`/`write_file` guardrails so absolute ACP paths still obey workspace isolation and tool policy |
 | 2026-04-15 | Landed the first official ACP terminal bridge slice: `agent/acp` now advertises `terminal` support when a runtime ACP host bridge is attached, and incoming `terminal/create`, `terminal/output`, `terminal/wait_for_exit`, `terminal/kill`, plus `terminal/release` requests are mediated through runtime-owned shell policy and a bounded terminal registry, so ACP agents can open short-lived execution terminals without bypassing `run_shell`-level workspace and whitelist controls |
 | 2026-04-15 | Extended provider-managed ACP session-state normalization beyond title/commands/config: `current_mode_update` and `usage_update` now become runtime progress events and persist into `providerState.agentSession.adapterState`, so the Codex ACP pilot keeps its current mode and context-window/cost state observable to later inspection, resume, and diagnostics surfaces |
+| 2026-04-15 | Landed a runtime-observable ACP permission-decision slice: `session/request_permission` replies now produce runtime guardrail progress events, rejected decisions carry explicit policy reasons, and already-aborted turns return the ACP-required `cancelled` outcome instead of silently following the normal permission-mode path |

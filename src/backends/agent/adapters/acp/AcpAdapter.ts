@@ -36,6 +36,17 @@ interface AcpConfigOptionSnapshot {
   value?: string;
 }
 
+interface AcpPermissionDecision {
+  response: Record<string, unknown>;
+  progress: {
+    text: string;
+    status: 'updated' | 'blocked';
+    details: Record<string, unknown>;
+    toolId?: string;
+    toolName?: string;
+  };
+}
+
 interface AcpManagedTerminal {
   id: string;
   process: ChildProcess;
@@ -281,7 +292,7 @@ function selectPermissionOption(
   permissionMode: PermissionMode | undefined,
   allowedTools: string[] | undefined,
   request: AcpJsonRpcRequest,
-): string | undefined {
+): Record<string, unknown> | undefined {
   if (!Array.isArray(options)) {
     return undefined;
   }
@@ -294,43 +305,109 @@ function selectPermissionOption(
     ;
 
   if (permissionMode === 'skip') {
-    return readString(findByKind('allow_always', 'allow_once')?.optionId)
-      || readString(records[0]?.optionId);
+    return findByKind('allow_always', 'allow_once') || records[0];
   }
 
   if (permissionMode === 'whitelist' && matchesPermissionRequestToAllowedTools(request, allowedTools)) {
-    return readString(findByKind('allow_always', 'allow_once')?.optionId)
-      || undefined;
+    return findByKind('allow_always', 'allow_once') || undefined;
   }
 
-  return readString(findByKind('reject_once', 'reject_always')?.optionId)
+  return findByKind('reject_once', 'reject_always')
     || undefined;
 }
 
-function buildPermissionResponse(
+function readPermissionToolIdentity(
+  request: AcpJsonRpcRequest,
+): { toolId?: string; toolName?: string } {
+  const params = parseRecord(request.params);
+  const toolCall = parseRecord(params?.toolCall) || parseRecord(params?.tool_call);
+  return {
+    ...(readString(toolCall?.toolCallId) || readString(toolCall?.id)
+      ? { toolId: readString(toolCall?.toolCallId) || readString(toolCall?.id) }
+      : {}),
+    ...(readString(toolCall?.title) || readString(toolCall?.name) || readString(toolCall?.kind)
+      ? { toolName: readString(toolCall?.title) || readString(toolCall?.name) || readString(toolCall?.kind) }
+      : {}),
+  };
+}
+
+function resolvePermissionDecision(
   request: AcpJsonRpcRequest,
   permissionMode: PermissionMode | undefined,
   allowedTools: string[] | undefined,
-): Record<string, unknown> {
+  aborted: boolean,
+): AcpPermissionDecision {
+  const toolIdentity = readPermissionToolIdentity(request);
+  if (aborted) {
+    return {
+      response: {
+        outcome: {
+          outcome: 'cancelled',
+        },
+      },
+      progress: {
+        text: `Runtime cancelled ACP permission request${toolIdentity.toolName ? ` for ${toolIdentity.toolName}` : ''} after the turn was aborted.`,
+        status: 'blocked',
+        details: {
+          outcome: 'cancelled',
+          policyReason: 'turn_aborted',
+          permissionMode: permissionMode || 'skip',
+        },
+        ...toolIdentity,
+      },
+    };
+  }
+
   const params = parseRecord(request.params);
-  const selectedOptionId = selectPermissionOption(
+  const selectedOption = selectPermissionOption(
     params?.options,
     permissionMode,
     allowedTools,
     request,
   );
+  const selectedOptionId = readString(selectedOption?.optionId);
+  const selectedKind = readString(selectedOption?.kind);
   if (selectedOptionId) {
+    const allowed = selectedKind === 'allow_once' || selectedKind === 'allow_always';
     return {
-      outcome: {
-        outcome: 'selected',
-        optionId: selectedOptionId,
+      response: {
+        outcome: {
+          outcome: 'selected',
+          optionId: selectedOptionId,
+        },
+      },
+      progress: {
+        text: allowed
+          ? `Runtime approved ACP permission request${toolIdentity.toolName ? ` for ${toolIdentity.toolName}` : ''}.`
+          : `Runtime rejected ACP permission request${toolIdentity.toolName ? ` for ${toolIdentity.toolName}` : ''}.`,
+        status: allowed ? 'updated' : 'blocked',
+        details: {
+          outcome: 'selected',
+          optionId: selectedOptionId,
+          optionKind: selectedKind,
+          policyReason: allowed ? 'policy_allowed' : 'policy_rejected',
+          permissionMode: permissionMode || 'skip',
+        },
+        ...toolIdentity,
       },
     };
   }
 
   return {
-    outcome: {
-      outcome: 'cancelled',
+    response: {
+      outcome: {
+        outcome: 'cancelled',
+      },
+    },
+    progress: {
+      text: `Runtime cancelled ACP permission request${toolIdentity.toolName ? ` for ${toolIdentity.toolName}` : ''}.`,
+      status: 'blocked',
+      details: {
+        outcome: 'cancelled',
+        policyReason: 'no_supported_option',
+        permissionMode: permissionMode || 'skip',
+      },
+      ...toolIdentity,
     },
   };
 }
@@ -1460,11 +1537,36 @@ export class AcpAdapter implements AgentAdapter {
         }
 
         if (request.method === 'session/request_permission') {
-          return buildPermissionResponse(
+          const decision = resolvePermissionDecision(
             request,
             input.acpHost?.context.permissionMode,
             input.acpHost?.context.allowedTools,
+            input.signal.aborted,
           );
+          if (providerSessionId) {
+            push({
+              ...createRuntimeProgressEvent({
+                text: decision.progress.text,
+                providerSessionId,
+                provider: input.providerName,
+                backend: 'agent',
+                instance: input.instance.id,
+                kind: 'guardrail',
+                status: decision.progress.status,
+                source: 'runtime',
+                details: decision.progress.details,
+              }),
+              ...(decision.progress.toolId ? { toolId: decision.progress.toolId } : {}),
+              ...(decision.progress.toolName ? { toolName: decision.progress.toolName } : {}),
+              providerState: buildProviderState(
+                input,
+                providerSessionId,
+                'active',
+                adapterStateSnapshot,
+              ),
+            });
+          }
+          return decision.response;
         }
 
         throw new AcpJsonRpcClientError(

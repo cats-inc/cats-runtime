@@ -1879,6 +1879,25 @@ describe('AcpAdapter', () => {
         providerSessionId: 'acp-session-2',
       }),
       {
+        type: 'progress',
+        providerSessionId: 'acp-session-2',
+        text: 'Runtime approved ACP permission request.',
+        providerState: expect.any(Object),
+        metadata: {
+          kind: 'guardrail',
+          status: 'updated',
+          source: 'runtime',
+          provider: 'codex',
+          backend: 'agent',
+          instance: 'acp-local',
+          outcome: 'selected',
+          optionId: 'allow-once',
+          optionKind: 'allow_once',
+          policyReason: 'policy_allowed',
+          permissionMode: 'skip',
+        },
+      },
+      {
         type: 'tool_use',
         providerSessionId: 'acp-session-2',
         toolName: 'Run Shell',
@@ -1993,9 +2012,147 @@ describe('AcpAdapter', () => {
         type: 'init',
         providerSessionId: 'acp-session-3',
       }),
+      {
+        type: 'progress',
+        providerSessionId: 'acp-session-3',
+        toolId: 'tool-2',
+        toolName: 'Run Shell',
+        text: 'Runtime rejected ACP permission request for Run Shell.',
+        providerState: expect.any(Object),
+        metadata: {
+          kind: 'guardrail',
+          status: 'blocked',
+          source: 'runtime',
+          provider: 'codex',
+          backend: 'agent',
+          instance: 'acp-local',
+          outcome: 'selected',
+          optionId: 'reject-once',
+          optionKind: 'reject_once',
+          policyReason: 'policy_rejected',
+          permissionMode: 'whitelist',
+        },
+      },
       expect.objectContaining({
         type: 'result',
         providerSessionId: 'acp-session-3',
+      }),
+    ]);
+  });
+
+  it('cancels ACP permission requests when the turn has already been aborted', async () => {
+    const process = new FakeAcpProcess();
+    let permissionReply: Record<string, unknown> | undefined;
+    const controller = new AbortController();
+
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: {
+              loadSession: false,
+            },
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            sessionId: 'acp-session-abort',
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/prompt') {
+        controller.abort();
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: 77,
+          method: 'session/request_permission',
+          params: {
+            sessionId: 'acp-session-abort',
+            toolCall: {
+              toolCallId: 'tool-3',
+              title: 'Run Shell',
+            },
+            options: [
+              { optionId: 'allow-once', kind: 'allow_once' },
+              { optionId: 'reject-once', kind: 'reject_once' },
+            ],
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.id === 77) {
+        permissionReply = message;
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: 2,
+          result: {
+            stopReason: 'cancelled',
+          },
+        }) + '\n');
+      }
+    });
+
+    const hostBridge = createHostBridge('skip');
+    const adapter = new AcpAdapter({
+      acpHostBridge: hostBridge,
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    const input = createInvokeInput(createStdioInstance(), hostBridge, 'skip');
+    const events = await collectEvents(adapter.invoke({
+      ...input,
+      signal: controller.signal,
+    }));
+
+    expect(permissionReply).toEqual({
+      jsonrpc: '2.0',
+      id: 77,
+      result: {
+        outcome: {
+          outcome: 'cancelled',
+        },
+      },
+    });
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'init',
+        providerSessionId: 'acp-session-abort',
+      }),
+      {
+        type: 'progress',
+        providerSessionId: 'acp-session-abort',
+        toolId: 'tool-3',
+        toolName: 'Run Shell',
+        text: 'Runtime cancelled ACP permission request for Run Shell after the turn was aborted.',
+        providerState: expect.any(Object),
+        metadata: {
+          kind: 'guardrail',
+          status: 'blocked',
+          source: 'runtime',
+          provider: 'codex',
+          backend: 'agent',
+          instance: 'acp-local',
+          outcome: 'cancelled',
+          policyReason: 'turn_aborted',
+          permissionMode: 'skip',
+        },
+      },
+      expect.objectContaining({
+        type: 'result',
+        providerSessionId: 'acp-session-abort',
+        summary: 'ACP stop reason: cancelled',
       }),
     ]);
   });
