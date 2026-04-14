@@ -275,14 +275,14 @@ describe('AcpAdapter', () => {
         providerManagedSessions: true,
         sessionKey: true,
         providerSessionState: true,
-        cancel: false,
+        cancel: true,
       },
       capabilities: {
         probe: true,
         modelDiscovery: false,
         toolCatalog: false,
         effectiveToolCatalog: false,
-        cancel: false,
+        cancel: true,
         runtimeServices: false,
         toolCallEvents: true,
       },
@@ -485,6 +485,7 @@ describe('AcpAdapter', () => {
               acpProfile: 'codex-acp',
               loadSessionSupported: true,
               protocolVersion: 1,
+              sessionCwd: '/tmp/acp',
             }),
           }),
         }),
@@ -840,6 +841,77 @@ describe('AcpAdapter', () => {
         type: 'result',
         providerSessionId: 'acp-session-3',
       }),
+    ]);
+  });
+
+  it('loads the provider-managed ACP session and emits a cancel notification for remote abort', async () => {
+    const process = new FakeAcpProcess();
+    const seenMessages: Array<Record<string, unknown>> = [];
+
+    startFakeServer(process, async (message) => {
+      seenMessages.push(message);
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: {
+              loadSession: true,
+            },
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/load') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            restored: true,
+          },
+        }) + '\n');
+      }
+    });
+
+    const adapter = new AcpAdapter({
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    await adapter.cancel('session-1', createStdioInstance(), {
+      agentSession: {
+        providerSessionId: 'acp-session-cancel',
+        adapterState: {
+          sessionCwd: '/tmp/acp',
+        },
+      },
+    });
+
+    expect(seenMessages).toEqual([
+      {
+        jsonrpc: '2.0',
+        id: 0,
+        method: 'initialize',
+        params: expect.any(Object),
+      },
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'session/load',
+        params: {
+          sessionId: 'acp-session-cancel',
+          cwd: '/tmp/acp',
+          mcpServers: [],
+        },
+      },
+      {
+        jsonrpc: '2.0',
+        method: 'session/cancel',
+        params: {
+          sessionId: 'acp-session-cancel',
+        },
+      },
     ]);
   });
 });

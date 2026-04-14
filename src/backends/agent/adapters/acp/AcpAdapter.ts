@@ -51,6 +51,7 @@ function buildInspection(
   const endpoint = resolveEndpoint(instance, env);
   const command = instance.command?.trim() || undefined;
   const profile = resolveAcpProviderProfile(instance);
+  const supportsRemoteCancel = Boolean(command && profile);
   const transportKind = command ? 'stdio' as const : 'http' as const;
   const launch = command
     ? {
@@ -116,14 +117,14 @@ function buildInspection(
       providerManagedSessions: true,
       sessionKey: true,
       providerSessionState: true,
-      cancel: false,
+      cancel: supportsRemoteCancel,
     },
     capabilities: {
       probe: Boolean(command),
       modelDiscovery: false,
       toolCatalog: false,
       effectiveToolCatalog: false,
-      cancel: false,
+      cancel: supportsRemoteCancel,
       runtimeServices: hostBridgeConfigured,
       toolCallEvents: Boolean(command),
     },
@@ -607,6 +608,7 @@ export class AcpAdapter implements AgentAdapter {
         providerState: buildProviderState(input, providerSessionId, 'active', {
           protocolVersion,
           loadSessionSupported,
+          sessionCwd: bootstrapParams.cwd,
         }),
       });
 
@@ -633,6 +635,7 @@ export class AcpAdapter implements AgentAdapter {
           providerState: buildProviderState(input, providerSessionId, 'idle', {
             protocolVersion,
             loadSessionSupported,
+            sessionCwd: bootstrapParams.cwd,
             ...(stopReason ? { stopReason } : {}),
           }),
           metadata: {
@@ -674,6 +677,47 @@ export class AcpAdapter implements AgentAdapter {
         yield item;
       }
       await run;
+    } finally {
+      await client.close();
+    }
+  }
+
+  async cancel(
+    _sessionId: string,
+    instance: RemoteProviderInstanceConfig,
+    state?: SessionProviderState,
+  ): Promise<void> {
+    const command = instance.command?.trim();
+    const providerSessionId = state?.agentSession?.providerSessionId;
+    const adapterState = parseRecord(state?.agentSession?.adapterState);
+    const sessionCwd = readString(adapterState?.sessionCwd) || instance.cwd;
+    if (!command || !providerSessionId || !sessionCwd) {
+      return;
+    }
+
+    const env = sanitizeEnv(this.options.env || process.env);
+    const client = new AcpStdioClient({
+      command,
+      args: instance.args,
+      cwd: instance.cwd || sessionCwd,
+      env,
+      spawnProcess: this.options.acpProcessSpawner,
+    });
+    try {
+      const initializeResult = parseRecord(await client.request('initialize', buildInitializeParams()));
+      const agentCapabilities = parseRecord(initializeResult?.agentCapabilities);
+      if (agentCapabilities?.loadSession !== true) {
+        return;
+      }
+
+      await client.request('session/load', {
+        sessionId: providerSessionId,
+        cwd: sessionCwd,
+        mcpServers: [],
+      });
+      client.notify('session/cancel', {
+        sessionId: providerSessionId,
+      });
     } finally {
       await client.close();
     }
