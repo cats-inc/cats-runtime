@@ -215,4 +215,24 @@ describe('AcpStdioClient', () => {
       },
     });
   });
+
+  it('times out requests that never receive a response', async () => {
+    const process = new FakeAcpProcess();
+    const client = new AcpStdioClient({
+      command: 'codex-acp',
+      spawnProcess: createSpawner(process),
+    });
+    activeClients.push(client);
+
+    const responsePromise = client.request('initialize', {
+      protocolVersion: 1,
+    }, {
+      timeoutMs: 10,
+    });
+    await readNextLine(process.stdin);
+
+    await expect(responsePromise).rejects.toThrow(
+      /ACP stdio request 'initialize' timed out after 10ms/,
+    );
+  });
 });

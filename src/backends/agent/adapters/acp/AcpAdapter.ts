@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import type {
   AgentAdapter,
   AgentAcpHostMcpServer,
+  AgentAdapterProbeCheck,
   AgentAdapterInspection,
   AgentAdapterProbeResult,
   AgentBackendOptions,
@@ -345,6 +346,10 @@ function resolveBootstrapMcpServers(input: AgentInvokeInput): AgentAcpHostMcpSer
   return bridge.listMcpServers(context).map((server) => cloneMcpServer(server));
 }
 
+function resolveBootstrapTimeoutMs(instance: RemoteProviderInstanceConfig): number {
+  return instance.startupTimeoutMs ?? DEFAULT_ACP_STDIN_PROBE_TIMEOUT_MS;
+}
+
 function resolveBootstrapCwd(...candidates: Array<string | undefined>): string | undefined {
   return candidates.find((candidate) => typeof candidate === 'string' && candidate.trim().length > 0);
 }
@@ -390,6 +395,48 @@ function parseModels(value: unknown): Array<{ id: string; label: string }> {
       || id;
     return [{ id, label }];
   });
+}
+
+async function runTransientBootstrap(
+  instance: RemoteProviderInstanceConfig,
+  env: Record<string, string>,
+  options: AgentBackendOptions,
+  cwd: string,
+  mcpServers: AgentAcpHostMcpServer[] = [],
+): Promise<{
+    initializeResult: Record<string, unknown> | undefined;
+    sessionResult: Record<string, unknown> | undefined;
+  }> {
+  const command = instance.command?.trim();
+  if (!command) {
+    throw new Error('ACP transient bootstrap currently supports stdio agent commands only.');
+  }
+
+  const client = new AcpStdioClient({
+    command,
+    args: instance.args,
+    cwd,
+    env,
+    spawnProcess: options.acpProcessSpawner,
+  });
+  const timeoutMs = resolveBootstrapTimeoutMs(instance);
+  try {
+    const initializeResult = parseRecord(
+      await client.request('initialize', buildInitializeParams(instance), { timeoutMs }),
+    ) || undefined;
+    const sessionResult = parseRecord(
+      await client.request('session/new', {
+        cwd,
+        mcpServers,
+      }, { timeoutMs }),
+    ) || undefined;
+    return {
+      initializeResult,
+      sessionResult,
+    };
+  } finally {
+    await client.close();
+  }
 }
 
 function selectPermissionOption(
@@ -1463,57 +1510,119 @@ export class AcpAdapter implements AgentAdapter {
     });
     const commandSummary = [command, ...args].join(' ');
     const combinedOutput = `${result.stdout}\n${result.stderr}`.trim();
-    const status = !result.timedOut && result.code === 0 ? 'ok' : 'unavailable';
+    let status: AgentAdapterProbeCheck['status'] = !result.timedOut && result.code === 0
+      ? 'ok'
+      : 'unavailable';
+    let healthDetails = status === 'ok'
+      ? `ACP stdio help probe succeeded for '${commandSummary}'.`
+      : `ACP stdio help probe failed for '${commandSummary}'.`;
+    const checks: AgentAdapterProbeCheck[] = [
+      {
+        code: 'acp_help_probe_exit',
+        status,
+        message: status === 'ok'
+          ? 'ACP stdio command accepted the help probe.'
+          : 'ACP stdio command did not complete the help probe successfully.',
+        details: {
+          command: commandSummary,
+          exitCode: result.code,
+          timedOut: result.timedOut,
+          durationMs: result.durationMs,
+        },
+      },
+      {
+        code: 'acp_target_profile',
+        status: profile ? 'ok' : 'degraded',
+        message: profile
+          ? `Resolved ACP target profile '${profile.label}'.`
+          : 'ACP target is using the generic stdio profile with no runtime-owned pilot hints.',
+        details: profile
+          ? {
+              profile: profile.id,
+              label: profile.label,
+              family: profile.family,
+            }
+          : {
+              provider: instance.providerName,
+            },
+      },
+    ];
+    const liveProbe: Record<string, unknown> = {
+      transport: 'stdio',
+      command,
+      args,
+      ...(profile ? { profile: profile.id, profileLabel: profile.label } : {}),
+      exitCode: result.code,
+      timedOut: result.timedOut,
+      durationMs: result.durationMs,
+      hasOutput: combinedOutput.length > 0,
+    };
+
+    if (status === 'ok') {
+      const cwd = resolveBootstrapCwd(instance.cwd, process.cwd());
+      if (!cwd) {
+        status = 'unavailable';
+        healthDetails = 'ACP stdio help probe succeeded, but bootstrap diagnostics had no working directory.';
+        checks.push({
+          code: 'acp_session_bootstrap',
+          status,
+          message: 'ACP stdio target did not expose a working directory for bootstrap diagnostics.',
+        });
+      } else {
+        try {
+          const { initializeResult, sessionResult } = await runTransientBootstrap(
+            instance,
+            env,
+            this.options,
+            cwd,
+          );
+          const sessionId = extractSessionIdFromBootstrapResult(sessionResult);
+          const models = parseModels(sessionResult?.models);
+          const agentCapabilities = parseRecord(initializeResult?.agentCapabilities);
+          liveProbe.bootstrapSession = true;
+          liveProbe.bootstrapCwd = cwd;
+          liveProbe.bootstrapSessionIdPresent = sessionId.length > 0;
+          liveProbe.bootstrapModelCount = models.length;
+          if (agentCapabilities?.loadSession === true) {
+            liveProbe.loadSessionSupported = true;
+          }
+          checks.push({
+            code: 'acp_session_bootstrap',
+            status: 'ok',
+            message: 'ACP stdio target completed initialize plus session bootstrap.',
+            details: {
+              cwd,
+              sessionIdPresent: sessionId.length > 0,
+              modelCount: models.length,
+              ...(agentCapabilities?.loadSession === true ? { loadSessionSupported: true } : {}),
+            },
+          });
+        } catch (error) {
+          status = 'unavailable';
+          healthDetails = `ACP stdio help probe succeeded for '${commandSummary}', but bootstrap failed.`;
+          liveProbe.bootstrapSession = false;
+          liveProbe.bootstrapCwd = cwd;
+          checks.push({
+            code: 'acp_session_bootstrap',
+            status,
+            message: 'ACP stdio target did not complete initialize plus session bootstrap.',
+            details: {
+              cwd,
+              error: error instanceof Error ? error.message : String(error),
+            },
+          });
+        }
+      }
+    }
 
     return {
       health: {
         status,
         checkedAt,
-        details: status === 'ok'
-          ? `ACP stdio help probe succeeded for '${commandSummary}'.`
-          : `ACP stdio help probe failed for '${commandSummary}'.`,
+        details: healthDetails,
       },
-      liveProbe: {
-        transport: 'stdio',
-        command,
-        args,
-        ...(profile ? { profile: profile.id, profileLabel: profile.label } : {}),
-        exitCode: result.code,
-        timedOut: result.timedOut,
-        durationMs: result.durationMs,
-        hasOutput: combinedOutput.length > 0,
-      },
-      checks: [
-        {
-          code: 'acp_help_probe_exit',
-          status,
-          message: status === 'ok'
-            ? 'ACP stdio command accepted the help probe.'
-            : 'ACP stdio command did not complete the help probe successfully.',
-          details: {
-            command: commandSummary,
-            exitCode: result.code,
-            timedOut: result.timedOut,
-            durationMs: result.durationMs,
-          },
-        },
-        {
-          code: 'acp_target_profile',
-          status: profile ? 'ok' : 'degraded',
-          message: profile
-            ? `Resolved ACP target profile '${profile.label}'.`
-            : 'ACP target is using the generic stdio profile with no runtime-owned pilot hints.',
-          details: profile
-            ? {
-                profile: profile.id,
-                label: profile.label,
-                family: profile.family,
-              }
-            : {
-                provider: instance.providerName,
-              },
-        },
-      ],
+      liveProbe,
+      checks,
     };
   }
 
@@ -1531,23 +1640,8 @@ export class AcpAdapter implements AgentAdapter {
     }
 
     const env = sanitizeEnv(this.options.env || process.env);
-    const client = new AcpStdioClient({
-      command,
-      args: instance.args,
-      cwd,
-      env,
-      spawnProcess: this.options.acpProcessSpawner,
-    });
-    try {
-      await client.request('initialize', buildInitializeParams(instance));
-      const sessionResult = parseRecord(await client.request('session/new', {
-        cwd,
-        mcpServers: [],
-      }));
-      return parseModels(sessionResult?.models);
-    } finally {
-      await client.close();
-    }
+    const { sessionResult } = await runTransientBootstrap(instance, env, this.options, cwd);
+    return parseModels(sessionResult?.models);
   }
 
   async *invoke(input: AgentInvokeInput): AsyncGenerator<StreamEvent> {
@@ -1567,6 +1661,7 @@ export class AcpAdapter implements AgentAdapter {
     }
 
     const env = sanitizeEnv(this.options.env || process.env);
+    const bootstrapTimeoutMs = resolveBootstrapTimeoutMs(input.instance);
     const queue: Array<StreamEvent | Error | null> = [];
     let resolve: (() => void) | null = null;
     let providerSessionId = input.providerSessionId;
@@ -1686,7 +1781,7 @@ export class AcpAdapter implements AgentAdapter {
         await client.request('initialize', buildInitializeParams(input.instance, {
           filesystem: true,
           terminal: true,
-        })),
+        }), { timeoutMs: bootstrapTimeoutMs }),
       );
       const protocolVersion = initializeResult?.protocolVersion;
       const agentCapabilities = parseRecord(initializeResult?.agentCapabilities);
@@ -1704,9 +1799,11 @@ export class AcpAdapter implements AgentAdapter {
         await client.request('session/load', {
           sessionId: providerSessionId,
           ...bootstrapParams,
-        });
+        }, { timeoutMs: bootstrapTimeoutMs });
       } else {
-        const sessionResult = await client.request('session/new', bootstrapParams);
+        const sessionResult = await client.request('session/new', bootstrapParams, {
+          timeoutMs: bootstrapTimeoutMs,
+        });
         providerSessionId = extractSessionIdFromBootstrapResult(sessionResult);
         if (!providerSessionId) {
           throw new Error('ACP session bootstrap returned no session id.');
@@ -1821,6 +1918,7 @@ export class AcpAdapter implements AgentAdapter {
     }
 
     const env = sanitizeEnv(this.options.env || process.env);
+    const bootstrapTimeoutMs = resolveBootstrapTimeoutMs(instance);
     const client = new AcpStdioClient({
       command,
       args: instance.args,
@@ -1830,7 +1928,9 @@ export class AcpAdapter implements AgentAdapter {
     });
     try {
       const initializeResult = parseRecord(
-        await client.request('initialize', buildInitializeParams(instance)),
+        await client.request('initialize', buildInitializeParams(instance), {
+          timeoutMs: bootstrapTimeoutMs,
+        }),
       );
       const agentCapabilities = parseRecord(initializeResult?.agentCapabilities);
       if (agentCapabilities?.loadSession !== true) {
@@ -1841,7 +1941,7 @@ export class AcpAdapter implements AgentAdapter {
         sessionId: providerSessionId,
         cwd: sessionCwd,
         mcpServers: sessionMcpServers,
-      });
+      }, { timeoutMs: bootstrapTimeoutMs });
       client.notify('session/cancel', {
         sessionId: providerSessionId,
       });

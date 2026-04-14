@@ -56,6 +56,11 @@ interface PendingRequest {
   method: string;
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
+  timeout?: NodeJS.Timeout;
+}
+
+export interface AcpJsonRpcRequestOptions {
+  timeoutMs?: number;
 }
 
 function defaultSpawnProcess(
@@ -172,6 +177,7 @@ export class AcpStdioClient {
   async request<TResponse = unknown, TParams = unknown>(
     method: string,
     params?: TParams,
+    options: AcpJsonRpcRequestOptions = {},
   ): Promise<TResponse> {
     if (this.closed) {
       throw new Error('ACP stdio client is already closed');
@@ -186,11 +192,20 @@ export class AcpStdioClient {
     };
 
     const promise = new Promise<TResponse>((resolve, reject) => {
-      this.pending.set(id, {
+      const pending: PendingRequest = {
         method,
         resolve: resolve as (value: unknown) => void,
         reject,
-      });
+      };
+      if (options.timeoutMs && options.timeoutMs > 0) {
+        pending.timeout = setTimeout(() => {
+          this.pending.delete(id);
+          reject(new Error(
+            `ACP stdio request '${method}' timed out after ${options.timeoutMs}ms.`,
+          ));
+        }, options.timeoutMs);
+      }
+      this.pending.set(id, pending);
     });
     this.writeMessage(request);
     return promise;
@@ -268,6 +283,9 @@ export class AcpStdioClient {
     }
 
     this.pending.delete(message.id);
+    if (pending.timeout) {
+      clearTimeout(pending.timeout);
+    }
     if (message.error) {
       pending.reject(new AcpJsonRpcClientError(
         `${pending.method} failed: ${message.error.message}`,
@@ -320,6 +338,9 @@ export class AcpStdioClient {
     }
 
     for (const pending of this.pending.values()) {
+      if (pending.timeout) {
+        clearTimeout(pending.timeout);
+      }
       pending.reject(error);
     }
     this.pending.clear();

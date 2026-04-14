@@ -359,8 +359,39 @@ describe('AcpAdapter', () => {
   });
 
   it('runs a stdio help probe for codex ACP pilot targets', async () => {
+    const process = new FakeAcpProcess();
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: {
+              loadSession: true,
+            },
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            sessionId: 'probe-session',
+            models: [
+              { modelId: 'gpt-5.4', name: 'GPT-5.4' },
+            ],
+          },
+        }) + '\n');
+      }
+    });
+
     const adapter = new AcpAdapter({
       cliCommandRunner: createSuccessfulProbeRunner(),
+      acpProcessSpawner: createSpawner(process),
     });
 
     await expect(adapter.probe(createStdioInstance())).resolves.toEqual({
@@ -379,6 +410,11 @@ describe('AcpAdapter', () => {
         timedOut: false,
         durationMs: 42,
         hasOutput: true,
+        bootstrapSession: true,
+        bootstrapCwd: '/tmp/acp',
+        bootstrapSessionIdPresent: true,
+        bootstrapModelCount: 1,
+        loadSessionSupported: true,
       },
       checks: [
         {
@@ -400,6 +436,17 @@ describe('AcpAdapter', () => {
             profile: 'codex-acp',
             label: 'Codex ACP',
             family: 'codex',
+          },
+        },
+        {
+          code: 'acp_session_bootstrap',
+          status: 'ok',
+          message: 'ACP stdio target completed initialize plus session bootstrap.',
+          details: {
+            cwd: '/tmp/acp',
+            sessionIdPresent: true,
+            modelCount: 1,
+            loadSessionSupported: true,
           },
         },
       ],
@@ -448,6 +495,83 @@ describe('AcpAdapter', () => {
             profile: 'codex-acp',
             label: 'Codex ACP',
             family: 'codex',
+          },
+        },
+      ],
+    });
+  });
+
+  it('reports bootstrap failures even when the ACP help probe succeeds', async () => {
+    const process = new FakeAcpProcess();
+    startFakeServer(process, async (message) => {
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+          },
+        }) + '\n');
+      }
+    });
+
+    const adapter = new AcpAdapter({
+      cliCommandRunner: createSuccessfulProbeRunner(),
+      acpProcessSpawner: createSpawner(process),
+    });
+    const instance = {
+      ...createStdioInstance(),
+      startupTimeoutMs: 10,
+    };
+
+    await expect(adapter.probe(instance)).resolves.toEqual({
+      health: {
+        status: 'unavailable',
+        checkedAt: expect.any(String),
+        details: "ACP stdio help probe succeeded for 'codex-acp serve --help', but bootstrap failed.",
+      },
+      liveProbe: {
+        transport: 'stdio',
+        command: 'codex-acp',
+        args: ['serve', '--help'],
+        profile: 'codex-acp',
+        profileLabel: 'Codex ACP',
+        exitCode: 0,
+        timedOut: false,
+        durationMs: 42,
+        hasOutput: true,
+        bootstrapSession: false,
+        bootstrapCwd: '/tmp/acp',
+      },
+      checks: [
+        {
+          code: 'acp_help_probe_exit',
+          status: 'ok',
+          message: 'ACP stdio command accepted the help probe.',
+          details: {
+            command: 'codex-acp serve --help',
+            exitCode: 0,
+            timedOut: false,
+            durationMs: 42,
+          },
+        },
+        {
+          code: 'acp_target_profile',
+          status: 'ok',
+          message: "Resolved ACP target profile 'Codex ACP'.",
+          details: {
+            profile: 'codex-acp',
+            label: 'Codex ACP',
+            family: 'codex',
+          },
+        },
+        {
+          code: 'acp_session_bootstrap',
+          status: 'unavailable',
+          message: 'ACP stdio target did not complete initialize plus session bootstrap.',
+          details: {
+            cwd: '/tmp/acp',
+            error: "ACP stdio request 'session/new' timed out after 10ms.",
           },
         },
       ],
