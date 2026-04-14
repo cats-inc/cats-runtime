@@ -315,6 +315,12 @@ existing runtime-owned capability seams wherever possible, for example:
 - runtime-hosted local tool policies
 - MCP visibility policies
 
+In the first provider-side slice, client MCP visibility is an explicit
+host-bridge concern rather than an implicit passthrough. The default runtime
+ACP host bridge exposes no client MCP servers, and ACP session bootstrap should
+pass `mcpServers: []` unless a runtime-owned host bridge implementation
+deliberately supplies MCP server declarations.
+
 ### Runtime-owned ACP Facade
 
 The runtime-facing facade should start with a conservative capability profile.

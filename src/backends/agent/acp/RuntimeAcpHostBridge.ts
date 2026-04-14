@@ -7,6 +7,7 @@ import type {
   AgentAcpHostBridge,
   AgentAcpHostContext,
   AgentAcpHostDescription,
+  AgentAcpHostMcpServer,
   AgentAcpHostToolCall,
   AgentAcpHostToolDefinition,
   AgentAcpHostToolResult,
@@ -74,6 +75,10 @@ export class RuntimeAcpHostBridge implements AgentAcpHostBridge {
       description: tool.description,
       inputSchema: tool.inputSchema,
     }));
+  }
+
+  listMcpServers(_context: AgentAcpHostContext): AgentAcpHostMcpServer[] {
+    return [];
   }
 
   async executeTool(

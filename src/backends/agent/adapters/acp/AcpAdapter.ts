@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import type {
   AgentAdapter,
+  AgentAcpHostMcpServer,
   AgentAdapterInspection,
   AgentAdapterProbeResult,
   AgentBackendOptions,
@@ -107,7 +108,7 @@ function buildInspection(
       key.toLowerCase() === 'authorization')),
   );
   const hostBridgeSummary = hostBridgeConfigured
-    ? 'A runtime ACP host-capability bridge is configured; the current execution slice mediates ACP permission and text-file requests through runtime policy, while fuller terminal client capabilities remain follow-up work.'
+    ? 'A runtime ACP host-capability bridge is configured; the current execution slice mediates ACP permission, filesystem, and terminal requests through runtime policy, while client MCP server exposure remains disabled unless the host bridge explicitly supplies MCP declarations.'
     : 'It will require a runtime ACP host-capability bridge before turn execution is enabled.';
   const profileSummary = profile
     ? ` ${profile.label} is the current ACP pilot target because its lifecycle overlaps with an existing runtime seam.`
@@ -236,8 +237,112 @@ function buildSessionBootstrapParams(input: AgentInvokeInput) {
 
   return {
     cwd,
-    mcpServers: [],
+    mcpServers: resolveBootstrapMcpServers(input),
   };
+}
+
+function cloneMcpServer(server: AgentAcpHostMcpServer): AgentAcpHostMcpServer {
+  if (server.type === 'stdio') {
+    return {
+      type: 'stdio',
+      name: server.name,
+      command: server.command,
+      args: [...server.args],
+      env: server.env.map((entry) => ({
+        name: entry.name,
+        value: entry.value,
+      })),
+    };
+  }
+
+  return {
+    type: server.type,
+    name: server.name,
+    url: server.url,
+    headers: server.headers.map((entry) => ({
+      name: entry.name,
+      value: entry.value,
+    })),
+  };
+}
+
+function readSessionMcpServers(adapterState: Record<string, unknown> | undefined): AgentAcpHostMcpServer[] {
+  if (!Array.isArray(adapterState?.sessionMcpServers)) {
+    return [];
+  }
+
+  const servers: AgentAcpHostMcpServer[] = [];
+  for (const entry of adapterState.sessionMcpServers) {
+    const record = parseRecord(entry);
+    if (!record) {
+      continue;
+    }
+
+    const type = readString(record.type);
+    const name = readString(record.name);
+    if (!type || !name) {
+      continue;
+    }
+
+    if (type === 'stdio') {
+      const command = readString(record.command);
+      const args = Array.isArray(record.args)
+        ? record.args.map((value) => readString(value)).filter((value): value is string => Boolean(value))
+        : [];
+      const env = Array.isArray(record.env)
+        ? record.env.flatMap((item) => {
+          const header = parseRecord(item);
+          const key = readString(header?.name);
+          const value = readString(header?.value);
+          return key && value ? [{ name: key, value }] : [];
+        })
+        : [];
+      if (!command) {
+        continue;
+      }
+      servers.push({
+        type: 'stdio' as const,
+        name,
+        command,
+        args,
+        env,
+      });
+      continue;
+    }
+
+    if (type === 'http' || type === 'sse') {
+      const url = readString(record.url);
+      const headers = Array.isArray(record.headers)
+        ? record.headers.flatMap((item) => {
+          const header = parseRecord(item);
+          const key = readString(header?.name);
+          const value = readString(header?.value);
+          return key && value ? [{ name: key, value }] : [];
+        })
+        : [];
+      if (!url) {
+        continue;
+      }
+      servers.push({
+        type,
+        name,
+        url,
+        headers,
+      });
+    }
+  }
+
+  return servers;
+}
+
+function resolveBootstrapMcpServers(input: AgentInvokeInput): AgentAcpHostMcpServer[] {
+  const bridge = input.acpHost?.bridge;
+  const context = input.acpHost?.context;
+  if (!bridge || !context || !bridge.listMcpServers) {
+    return [];
+  }
+
+  return bridge.listMcpServers(context).map((server) => cloneMcpServer(server));
 }
 
 function resolveBootstrapCwd(...candidates: Array<string | undefined>): string | undefined {
@@ -1616,6 +1721,7 @@ export class AcpAdapter implements AgentAdapter {
           protocolVersion,
           loadSessionSupported,
           sessionCwd: bootstrapParams.cwd,
+          sessionMcpServers: bootstrapParams.mcpServers,
         }),
       });
 
@@ -1644,6 +1750,7 @@ export class AcpAdapter implements AgentAdapter {
             protocolVersion,
             loadSessionSupported,
             sessionCwd: bootstrapParams.cwd,
+            sessionMcpServers: bootstrapParams.mcpServers,
             ...(stopReason ? { stopReason } : {}),
           }),
           metadata: {
@@ -1706,8 +1813,9 @@ export class AcpAdapter implements AgentAdapter {
   ): Promise<void> {
     const command = instance.command?.trim();
     const providerSessionId = state?.agentSession?.providerSessionId;
-    const adapterState = parseRecord(state?.agentSession?.adapterState);
+    const adapterState = parseRecord(state?.agentSession?.adapterState) || undefined;
     const sessionCwd = readString(adapterState?.sessionCwd) || instance.cwd;
+    const sessionMcpServers = readSessionMcpServers(adapterState);
     if (!command || !providerSessionId || !sessionCwd) {
       return;
     }
@@ -1732,7 +1840,7 @@ export class AcpAdapter implements AgentAdapter {
       await client.request('session/load', {
         sessionId: providerSessionId,
         cwd: sessionCwd,
-        mcpServers: [],
+        mcpServers: sessionMcpServers,
       });
       client.notify('session/cancel', {
         sessionId: providerSessionId,

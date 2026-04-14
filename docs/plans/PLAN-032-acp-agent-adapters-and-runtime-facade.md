@@ -8,7 +8,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | In Progress (Phase 2 Host Bridge Contract Landed) |
+| **Status** | In Progress (Phase 2 Capability Bridge Complete; Phase 3 Codex ACP Pilot In Progress) |
 | **Owner** | Codex |
 | **Assigned To** | Codex |
 | **Reviewer** | User |
@@ -107,7 +107,7 @@ integration track for only two vendors.
 - [x] Map ACP permission requests onto runtime approval/guardrail policy
 - [x] Map ACP file access onto runtime workspace/worktree rules
 - [x] Map ACP terminal requests onto runtime execution controls
-- [ ] Decide how ACP-facing client MCP server access should relate to the
+- [x] Decide how ACP-facing client MCP server access should relate to the
       runtime's existing MCP and local-tool policies
 
 **Deliverables**:
@@ -243,3 +243,4 @@ Current rationale for preferring `codex-acp` first:
 | 2026-04-15 | Landed the first official ACP terminal bridge slice: `agent/acp` now advertises `terminal` support when a runtime ACP host bridge is attached, and incoming `terminal/create`, `terminal/output`, `terminal/wait_for_exit`, `terminal/kill`, plus `terminal/release` requests are mediated through runtime-owned shell policy and a bounded terminal registry, so ACP agents can open short-lived execution terminals without bypassing `run_shell`-level workspace and whitelist controls |
 | 2026-04-15 | Extended provider-managed ACP session-state normalization beyond title/commands/config: `current_mode_update` and `usage_update` now become runtime progress events and persist into `providerState.agentSession.adapterState`, so the Codex ACP pilot keeps its current mode and context-window/cost state observable to later inspection, resume, and diagnostics surfaces |
 | 2026-04-15 | Landed a runtime-observable ACP permission-decision slice: `session/request_permission` replies now produce runtime guardrail progress events, rejected decisions carry explicit policy reasons, and already-aborted turns return the ACP-required `cancelled` outcome instead of silently following the normal permission-mode path |
+| 2026-04-15 | Closed the remaining Phase 2 client-MCP policy gap by making ACP `mcpServers` a runtime host-bridge seam: the default runtime bridge still exposes no client MCP servers, but session bootstrap now accepts explicit bridge-owned MCP declarations and persists them for later `session/load` continuity such as remote cancel |

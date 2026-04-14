@@ -61,9 +61,30 @@ export interface AgentAcpHostToolResult {
   isError?: boolean;
 }
 
+export interface AgentAcpHostMcpHeader {
+  name: string;
+  value: string;
+}
+
+export type AgentAcpHostMcpServer =
+  | {
+      type: 'stdio';
+      name: string;
+      command: string;
+      args: string[];
+      env: AgentAcpHostMcpHeader[];
+    }
+  | {
+      type: 'http' | 'sse';
+      name: string;
+      url: string;
+      headers: AgentAcpHostMcpHeader[];
+    };
+
 export interface AgentAcpHostBridge {
   describe(context: AgentAcpHostContext): AgentAcpHostDescription;
   listTools(context: AgentAcpHostContext): AgentAcpHostToolDefinition[];
+  listMcpServers?(context: AgentAcpHostContext): AgentAcpHostMcpServer[];
   executeTool(
     context: AgentAcpHostContext,
     call: AgentAcpHostToolCall,

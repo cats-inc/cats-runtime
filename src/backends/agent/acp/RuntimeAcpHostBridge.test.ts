@@ -93,4 +93,12 @@ describe('RuntimeAcpHostBridge', () => {
       output: expect.stringContaining('allowedTools whitelist'),
     }));
   });
+
+  it('keeps client MCP server exposure disabled in the default runtime bridge', () => {
+    const root = mkdtempSync(join(tmpdir(), 'cats-runtime-acp-host-'));
+    roots.push(root);
+    const bridge = new RuntimeAcpHostBridge();
+
+    expect(bridge.listMcpServers(createContext(root))).toEqual([]);
+  });
 });

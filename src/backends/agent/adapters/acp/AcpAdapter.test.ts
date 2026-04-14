@@ -146,6 +146,9 @@ function createHostBridge(permissionMode: 'skip' | 'default' | 'whitelist' = 'sk
     listTools() {
       return [];
     },
+    listMcpServers() {
+      return [];
+    },
     async executeTool() {
       return {
         callId: 'noop',
@@ -579,6 +582,110 @@ describe('AcpAdapter', () => {
         },
       },
     ]);
+  });
+
+  it('passes host-bridge MCP server declarations through session bootstrap and persists them', async () => {
+    const process = new FakeAcpProcess();
+    const seenMessages: Array<Record<string, unknown>> = [];
+    startFakeServer(process, (message) => {
+      seenMessages.push(message);
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/new') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            sessionId: 'acp-session-mcp',
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/prompt') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            stopReason: 'end_turn',
+          },
+        }) + '\n');
+      }
+    });
+
+    const hostBridge: AgentAcpHostBridge = {
+      ...createHostBridge(),
+      listMcpServers() {
+        return [{
+          type: 'stdio',
+          name: 'cats-runtime',
+          command: 'node',
+          args: ['build/runtime/bin/mcp.js'],
+          env: [{
+            name: 'CATS_RUNTIME_MCP_PROXY_URL',
+            value: 'http://127.0.0.1:3110/mcp',
+          }],
+        }];
+      },
+    };
+
+    const adapter = new AcpAdapter({
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    const events = await collectEvents(adapter.invoke(createInvokeInput(
+      createStdioInstance(),
+      hostBridge,
+    )));
+
+    expect(seenMessages).toContainEqual({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'session/new',
+      params: {
+        cwd: '/tmp/acp',
+        mcpServers: [{
+          type: 'stdio',
+          name: 'cats-runtime',
+          command: 'node',
+          args: ['build/runtime/bin/mcp.js'],
+          env: [{
+            name: 'CATS_RUNTIME_MCP_PROXY_URL',
+            value: 'http://127.0.0.1:3110/mcp',
+          }],
+        }],
+      },
+    });
+
+    expect(events[0]).toEqual(expect.objectContaining({
+      type: 'init',
+      providerSessionId: 'acp-session-mcp',
+      providerState: expect.objectContaining({
+        agentSession: expect.objectContaining({
+          adapterState: expect.objectContaining({
+            sessionMcpServers: [{
+              type: 'stdio',
+              name: 'cats-runtime',
+              command: 'node',
+              args: ['build/runtime/bin/mcp.js'],
+              env: [{
+                name: 'CATS_RUNTIME_MCP_PROXY_URL',
+                value: 'http://127.0.0.1:3110/mcp',
+              }],
+            }],
+          }),
+        }),
+      }),
+    }));
   });
 
   it('advertises the codex terminal-output capability hint during ACP initialize', async () => {
@@ -2216,6 +2323,93 @@ describe('AcpAdapter', () => {
           sessionId: 'acp-session-cancel',
           cwd: '/tmp/acp',
           mcpServers: [],
+        },
+      },
+      {
+        jsonrpc: '2.0',
+        method: 'session/cancel',
+        params: {
+          sessionId: 'acp-session-cancel',
+        },
+      },
+    ]);
+  });
+
+  it('reuses persisted MCP server declarations when reattaching for remote cancel', async () => {
+    const process = new FakeAcpProcess();
+    const seenMessages: Array<Record<string, unknown>> = [];
+    startFakeServer(process, (message) => {
+      seenMessages.push(message);
+      if (message.method === 'initialize') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: 1,
+            agentCapabilities: {
+              loadSession: true,
+            },
+          },
+        }) + '\n');
+        return;
+      }
+
+      if (message.method === 'session/load') {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            restored: true,
+          },
+        }) + '\n');
+      }
+    });
+
+    const adapter = new AcpAdapter({
+      acpProcessSpawner: createSpawner(process),
+    });
+
+    await adapter.cancel('session-1', createStdioInstance(), {
+      agentSession: {
+        providerSessionId: 'acp-session-cancel',
+        adapterState: {
+          sessionCwd: '/tmp/acp',
+          sessionMcpServers: [{
+            type: 'http',
+            name: 'runtime-http',
+            url: 'http://127.0.0.1:3110/mcp',
+            headers: [{
+              name: 'authorization',
+              value: 'Bearer test-token',
+            }],
+          }],
+        },
+      },
+    });
+
+    expect(seenMessages).toEqual([
+      {
+        jsonrpc: '2.0',
+        id: 0,
+        method: 'initialize',
+        params: expect.any(Object),
+      },
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'session/load',
+        params: {
+          sessionId: 'acp-session-cancel',
+          cwd: '/tmp/acp',
+          mcpServers: [{
+            type: 'http',
+            name: 'runtime-http',
+            url: 'http://127.0.0.1:3110/mcp',
+            headers: [{
+              name: 'authorization',
+              value: 'Bearer test-token',
+            }],
+          }],
         },
       },
       {
