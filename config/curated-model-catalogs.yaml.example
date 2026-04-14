@@ -148,6 +148,7 @@ catalogs:
       - "Entries below are raw visible /model names only; provider grouping and canonical ids are intentionally omitted."
     models:
       - name: Auto
+        default: true
       - name: Composer 2 Fast
       - name: Composer 2
       - name: Composer 1.5

@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   findCuratedCliCatalog,
@@ -9,6 +10,8 @@ import {
   resolveEffectiveCuratedModelOptions,
 } from './curatedModelCatalog.js';
 import { createRuntimeTestEnv, createRuntimeTestPaths, ensureRuntimeTestDirs } from '../../../tests/support/runtimeTestPaths.js';
+
+const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 function createRuntimeRoot() {
   const root = mkdtempSync(join(tmpdir(), 'cats-runtime-curated-catalog-'));
@@ -166,6 +169,28 @@ describe('curatedModelCatalog', () => {
     } finally {
       runtime.cleanup();
       rmSync(packageRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('bundled Cursor example marks Auto as the default entry', () => {
+    const runtime = createRuntimeRoot();
+
+    try {
+      const result = loadCuratedModelCatalog({
+        env: {
+          ...runtime.env,
+          CATS_RUNTIME_PACKAGE_ROOT: PACKAGE_ROOT,
+        },
+      });
+
+      expect(result.path).toBe(join(PACKAGE_ROOT, 'config', 'curated-model-catalogs.yaml.example'));
+      expect(result.warnings).toEqual([]);
+      expect(findCuratedCliCatalog(result.document, 'cursor')?.models?.slice(0, 2)).toEqual([
+        { name: 'Auto', default: true },
+        { name: 'Composer 2 Fast' },
+      ]);
+    } finally {
+      runtime.cleanup();
     }
   });
 });

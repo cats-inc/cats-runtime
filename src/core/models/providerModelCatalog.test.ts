@@ -653,51 +653,61 @@ describe('ProviderModelCatalogService', () => {
   });
 
   it('adds an honest warning when Cursor is still serving the curated static fallback', async () => {
-    const config = {
-      ...createCatalogConfig(),
-      providerDefaultTargets: {
-        cursor: { backend: 'cli', instance: 'default' },
-      },
-      providerInstances: {
-        ...createCatalogConfig().providerInstances,
-        cursor: {
-          default: {
-            id: 'default',
-            providerName: 'cursor',
-            commandConfig: {
-              path: 'cursor-agent',
-              runner: 'auto',
-              runtime: { mode: 'native' },
+    const runtime = createRuntimeRoot();
+
+    try {
+      const config = {
+        ...createCatalogConfig(),
+        configPath: runtime.paths.configPath,
+        sessionBaseDir: runtime.paths.sessionBaseDir,
+        providerDefaultTargets: {
+          cursor: { backend: 'cli', instance: 'default' },
+        },
+        providerInstances: {
+          ...createCatalogConfig().providerInstances,
+          cursor: {
+            default: {
+              id: 'default',
+              providerName: 'cursor',
+              commandConfig: {
+                path: 'cursor-agent',
+                runner: 'auto',
+                runtime: { mode: 'native' },
+              },
             },
           },
         },
-      },
-      providerCommands: {
-        ...createCatalogConfig().providerCommands,
-        cursor: {
-          path: 'cursor-agent',
-          runner: 'auto',
-          runtime: { mode: 'native' },
+        providerCommands: {
+          ...createCatalogConfig().providerCommands,
+          cursor: {
+            path: 'cursor-agent',
+            runner: 'auto',
+            runtime: { mode: 'native' },
+          },
         },
-      },
-    } as const;
+      } as const;
 
-    const service = new ProviderModelCatalogService(config as never);
+      const service = new ProviderModelCatalogService(config as never, {
+        env: runtime.env,
+      });
 
-    expect(service.inspectSummary('cursor')).toEqual({
-      source: 'static',
-      defaultModel: 'auto',
-      modelCount: 5,
-      warnings: [
-        'Live model discovery is available for cursor/cli/default via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',
-      ],
-      statusCounts: {
-        configured: 0,
-        available: 0,
-        running: 0,
-        unknown: 5,
-      },
-    });
+      expect(service.inspectSummary('cursor')).toEqual({
+        source: 'static',
+        defaultModel: 'auto',
+        modelCount: 5,
+        warnings: [
+          'Live model discovery is available for cursor/cli/default via `cursor-agent --list-models`, but this read is serving the curated static fallback until an explicit refresh populates the cache.',
+        ],
+        statusCounts: {
+          configured: 0,
+          available: 0,
+          running: 0,
+          unknown: 5,
+        },
+      });
+    } finally {
+      runtime.cleanup();
+    }
   });
 
   it('loads dynamic Cursor model catalogs through cursor-agent --list-models', async () => {
@@ -2398,6 +2408,7 @@ describe('ProviderModelCatalogService', () => {
         '    last_updated: 2026-04-14',
         '    models:',
         '      - name: Auto',
+        '        default: true',
         '      - name: Composer 2 Fast',
         '      - name: Codex 5.3 Extra High',
         '      - name: GPT-5.4 1M',
@@ -2447,11 +2458,11 @@ describe('ProviderModelCatalogService', () => {
         provider: 'cursor',
         backend: 'cli',
         instance: 'default',
-        defaultModel: null,
+        defaultModel: 'auto',
         source: 'static',
         cache: null,
         models: [
-          { id: 'auto', label: 'Auto' },
+          { id: 'auto', label: 'Auto', default: true },
           { id: 'composer-2-fast', label: 'Composer 2 Fast' },
           { id: 'gpt-5.3-codex-xhigh', label: 'Codex 5.3 Extra High' },
           { id: 'gpt-5.4-medium', label: 'GPT-5.4 1M' },
@@ -2466,35 +2477,41 @@ describe('ProviderModelCatalogService', () => {
         provider: 'cursor',
         backend: 'cli',
         instance: 'default',
-        defaultModel: null,
+        defaultModel: 'auto',
         source: 'static',
         cache: null,
         entries: [
           {
             id: 'auto',
             label: 'Auto',
+            default: true,
           },
           {
             id: 'composer-2-fast',
             label: 'Composer 2 Fast',
+            default: false,
           },
           {
             id: 'gpt-5.3-codex-xhigh',
             label: 'Codex 5.3 Extra High',
+            default: false,
           },
           {
             id: 'gpt-5.4-medium',
             label: 'GPT-5.4 1M',
+            default: false,
             capabilityTags: ['reasoning'],
           },
           {
             id: 'claude-4.5-opus-thinking',
             label: 'Opus 4.5 Thinking',
+            default: false,
             capabilityTags: ['reasoning'],
           },
           {
             id: 'gemini-3-flash',
             label: 'Gemini 3 Flash',
+            default: false,
             capabilityTags: ['latency_optimized'],
           },
         ],
