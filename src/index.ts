@@ -2,6 +2,7 @@
 
 import { isDirectCliEntrypoint } from './core/cliEntrypoint.js';
 import { loadDotEnv } from './core/dotenv.js';
+import { runAcpCli } from './bin/acp.js';
 import { runMcpCli } from './bin/mcp.js';
 import { loadConfig } from './core/config.js';
 import {
@@ -71,6 +72,10 @@ function resolveCleanupTempAgeHours(raw: string | undefined): number {
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
+  if (argv[0] === 'acp') {
+    await runAcpCli(argv.slice(1));
+    return;
+  }
   if (argv[0] === 'mcp') {
     await runMcpCli(argv.slice(1));
     return;
