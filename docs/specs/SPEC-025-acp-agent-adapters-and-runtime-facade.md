@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Draft |
+| **Status** | In Progress |
 | **Owner** | Codex |
 | **Reviewer** | User |
 
@@ -360,18 +360,18 @@ architectural separation.
 
 ## Acceptance Criteria
 
-- [ ] ACP-backed provider targets are documented as `agent` transports rather
+- [x] ACP-backed provider targets are documented as `agent` transports rather
       than a new top-level backend family
-- [ ] The docs show that one provider family may expose CLI/API/agent ACP
+- [x] The docs show that one provider family may expose CLI/API/agent ACP
       targets side by side
-- [ ] A provider-side ACP adapter contract is defined against the shared
+- [x] A provider-side ACP adapter contract is defined against the shared
       `AgentAdapter` seam
-- [ ] A runtime-owned ACP facade is documented as a separate runtime transport
+- [x] A runtime-owned ACP facade is documented as a separate runtime transport
       boundary, not a provider target
-- [ ] The first ACP capability profile is explicitly bounded and truthful
-- [ ] The architecture documentation states that ACP and A2A are complementary
+- [x] The first ACP capability profile is explicitly bounded and truthful
+- [x] The architecture documentation states that ACP and A2A are complementary
       layers rather than substitutes
-- [ ] An implementation plan exists for the staged delivery sequence
+- [x] An implementation plan exists for the staged delivery sequence
 
 ## Related
 
