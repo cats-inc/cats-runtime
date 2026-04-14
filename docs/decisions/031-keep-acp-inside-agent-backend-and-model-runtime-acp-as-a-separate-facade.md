@@ -154,6 +154,18 @@ Keeping them separate preserves a clean stack:
   agent-to-agent/runtime-to-runtime contracts
 - **Why rejected**: the layers are complementary, not interchangeable
 
+### 5. Gradually migrate existing CLI targets to `agent/acp`
+
+- **Pros**: could eventually reduce provider-specific subprocess parsing and
+  consolidate more behavior under one agent-style transport
+- **Cons**: assumes ACP targets will reach sufficient capability parity,
+  stability, and governance fit for each provider family; also risks removing a
+  simpler and already-proven CLI fallback too early
+- **Why not chosen as the default direction now**: the runtime should treat
+  CLI and `agent/acp` as coexistence paths first. Migration, if it happens at
+  all, should be a later provider-by-provider decision made only after the ACP
+  path proves operationally superior for that family
+
 ## Notes for Future Work
 
 Future ACP work should preserve three explicit distinctions:
@@ -165,6 +177,13 @@ Future ACP work should preserve three explicit distinctions:
 The first ACP slice should be free to start conservatively with a bounded
 capability profile rather than promising parity with every ACP-capable IDE on
 day one.
+
+The runtime should also keep the relationship between existing CLI targets and
+future `agent/acp` targets explicit:
+
+- coexistence comes first
+- migration is optional and provider-specific
+- CLI remains a valid long-term fallback unless a later decision retires it
 
 ## Related
 

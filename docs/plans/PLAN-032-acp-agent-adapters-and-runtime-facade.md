@@ -121,6 +121,8 @@ This plan stages both directions deliberately so the runtime can:
 - [ ] Add targeted diagnostics, probe behavior, and model/tool discovery where
       the ACP target makes them available
 
+The default recommendation for the first pilot is `codex-acp`.
+
 **Candidate first targets**:
 
 - `codex-acp`
@@ -128,10 +130,24 @@ This plan stages both directions deliberately so the runtime can:
 
 Selection should be based on:
 
-- runtime fit
+- protocol overlap with an existing runtime seam
 - capability truthfulness
 - auth and launch stability
 - testability in local repo workflows
+
+Current rationale for preferring `codex-acp` first:
+
+- the existing `codex` CLI provider already models Codex-specific JSON-RPC
+  bootstrap, thread lifecycle, turn start, and approval/event handling, so the
+  runtime already understands a meaningful slice of Codex-native semantics
+- that makes `codex-acp` a narrower delta than starting from a provider family
+  whose current runtime seam is less protocol-shaped
+- the first ACP-specific work can therefore focus more on ACP client capability
+  bridging and less on relearning provider-native turn semantics at the same
+  time
+- `claude-agent-acp` remains a strong second target once the ACP host
+  capability bridge and diagnostics shape have been proven on one concrete
+  target first
 
 **Deliverables**:
 

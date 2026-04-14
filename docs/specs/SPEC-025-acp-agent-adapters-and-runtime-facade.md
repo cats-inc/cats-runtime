@@ -147,6 +147,12 @@ This direction treats ACP as another `agent` transport:
 
 Conceptual config shape:
 
+The example below intentionally follows the current `providers.yaml` family /
+`default_instance` / `instances` layout that existing remote backends already
+use today. It is conceptual only in the ACP-specific transport fields; it does
+not propose a second config hierarchy for ACP, and it does not freeze the exact
+ACP launch/connect keys for the first executable slice.
+
 ```yaml
 routing:
   providers:
@@ -173,6 +179,12 @@ This preserves side-by-side targets such as:
 - `cli/native`
 - `api/main`
 - `agent/acp-local`
+
+That means the current config mental model stays intact:
+
+- `routing.providers.<family>.default_target` still chooses the active target
+- `backends.agent.providers.<family>` still owns remote agent transports
+- ACP only adds another transport family under that existing shape
 
 ### 2. Runtime-owned ACP Facade
 
